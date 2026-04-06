@@ -20,6 +20,19 @@ def get_backend_root() -> Path:
     return _backend_root
 
 
+def get_data_dir() -> Path:
+    """
+    Persistent data directory for `bot_servers.json` and other runtime files.
+
+    Docker Compose maps `./data:/app/data` so this resolves to `/app/data` in the container.
+    Override with `DATA_DIR` if needed (absolute path recommended).
+    """
+    override = (os.getenv("DATA_DIR") or "").strip()
+    if override:
+        return Path(override).resolve()
+    return get_backend_root() / "data"
+
+
 def _dashboard_fetch_url() -> str:
     """Legacy global dashboard URL (used when bot_servers.json has no instances)."""
     base = os.getenv("DASHBOARD_JSON_URL", "").strip()
@@ -86,4 +99,6 @@ def get_settings() -> dict:
         "cors_origins": os.getenv("CORS_ORIGINS", "*"),
         # Used in generated mod config XML (backendUrl). Set on VPS to https://your-domain (no path).
         "public_base_url": os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/"),
+        # Fernet key for encrypting ftp_pass / llm_api_key in bot_servers.json (never store the raw key in git).
+        "encryption_key_configured": bool(os.getenv("ENCRYPTION_KEY", "").strip()),
     }

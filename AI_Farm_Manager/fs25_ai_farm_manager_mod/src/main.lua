@@ -131,7 +131,7 @@ function AIFarmBridge.onPlayerChat(playerName, message)
             if not AIFarmBridge._httpWarned then
                 AIFarmBridge._httpWarned = true
                 Logging.warning(
-                    "[AIFarmManager] HTTP POST failed (status=%s err=%s) url=%s — set backendUrl to your public API (e.g. Koyeb HTTPS).",
+                    "[AIFarmManager] HTTP POST failed (status=%s err=%s) url=%s — set backendUrl to your public API (HTTPS URL of your VPS or reverse proxy, no trailing slash).",
                     tostring(status),
                     tostring(err),
                     tostring(url)

@@ -1,6 +1,11 @@
-"""Multi-server bot instances: each game server (token) maps to Farm Dashboard serverId + isolated queue."""
+"""Multi-server bot instances: each game server (token) maps to Farm Dashboard serverId + isolated queue.
+
+Optional per-instance secrets `ftp_pass` and `llm_api_key` are encrypted at rest in bot_servers.json
+(see app.services.encryption). In-memory copies after load_registry() are plaintext for app use.
+"""
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import logging
@@ -9,18 +14,52 @@ import secrets
 import uuid
 from typing import Any
 
-from app.config import get_backend_root, get_settings
+from app.config import get_data_dir, get_settings
+from app.services.encryption import decrypt_value, encrypt_value
 from app.services.log_buffer import log_event
 
 logger = logging.getLogger(__name__)
 
-# Same folder as `.env`: backend/data/bot_servers.json (not relative to CWD).
-_DATA_PATH = str(get_backend_root() / "data" / "bot_servers.json")
+def _bot_servers_json_path() -> str:
+    """Persistent JSON path; in Docker Compose this is /app/data/bot_servers.json (volume-mounted)."""
+    return str(get_data_dir() / "bot_servers.json")
+
+# Persisted encrypted at rest; plaintext only in memory after load_registry().
+_SECRET_INSTANCE_FIELDS = ("ftp_pass", "llm_api_key")
+
+
+def _decrypt_instance_secrets_inplace(instances: list[Any]) -> None:
+    for inst in instances:
+        if not isinstance(inst, dict):
+            continue
+        for field in _SECRET_INSTANCE_FIELDS:
+            raw = inst.get(field)
+            if raw is None or raw == "":
+                continue
+            inst[field] = decrypt_value(str(raw))
+
+
+def _encrypt_instance_secrets_for_disk(data: dict[str, Any]) -> dict[str, Any]:
+    """Deep copy; encrypt secret fields for JSON serialization only."""
+    payload = copy.deepcopy(data)
+    for inst in payload.get("instances") or []:
+        if not isinstance(inst, dict):
+            continue
+        for field in _SECRET_INSTANCE_FIELDS:
+            raw = inst.get(field)
+            if raw is None:
+                continue
+            s = str(raw).strip()
+            if not s:
+                inst.pop(field, None)
+                continue
+            inst[field] = encrypt_value(s)
+    return payload
 
 
 def get_registry_path() -> str:
     """Absolute path to bot_servers.json (for diagnostics)."""
-    return os.path.abspath(_DATA_PATH)
+    return os.path.abspath(_bot_servers_json_path())
 
 
 def normalize_server_token(t: str) -> str:
@@ -47,8 +86,7 @@ def _normalize_server_token(t: str) -> str:
 
 
 def _ensure_dir() -> None:
-    d = os.path.dirname(_DATA_PATH)
-    os.makedirs(d, exist_ok=True)
+    get_data_dir().mkdir(parents=True, exist_ok=True)
 
 
 def _default_file() -> dict[str, Any]:
@@ -57,34 +95,38 @@ def _default_file() -> dict[str, Any]:
 
 def load_registry() -> dict[str, Any]:
     _ensure_dir()
-    if not os.path.isfile(_DATA_PATH):
+    path = _bot_servers_json_path()
+    if not os.path.isfile(path):
         return _default_file()
     try:
-        with open(_DATA_PATH, encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         if not isinstance(data, dict):
-            logger.warning("bot_servers.json root is not an object: %s", _DATA_PATH)
+            logger.warning("bot_servers.json root is not an object: %s", path)
             return _default_file()
         data.setdefault("version", 1)
         data.setdefault("instances", [])
         if not isinstance(data["instances"], list):
             data["instances"] = []
+        _decrypt_instance_secrets_inplace(data["instances"])
         return data
     except json.JSONDecodeError as e:
-        logger.warning("bot_servers.json invalid JSON (%s): %s", _DATA_PATH, e)
+        logger.warning("bot_servers.json invalid JSON (%s): %s", path, e)
         return _default_file()
     except OSError as e:
-        logger.warning("bot_servers.json unreadable (%s): %s", _DATA_PATH, e)
+        logger.warning("bot_servers.json unreadable (%s): %s", path, e)
         return _default_file()
 
 
 def save_registry(data: dict[str, Any]) -> None:
     _ensure_dir()
-    tmp = _DATA_PATH + ".tmp"
+    to_write = _encrypt_instance_secrets_for_disk(data)
+    path = _bot_servers_json_path()
+    tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2)
+        json.dump(to_write, f, indent=2)
         f.write("\n")
-    os.replace(tmp, _DATA_PATH)
+    os.replace(tmp, path)
 
 
 def mask_token(t: str) -> str:

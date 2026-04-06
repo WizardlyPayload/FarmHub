@@ -1,15 +1,14 @@
 --[[
-  HttpClient.lua — HTTP helpers for bridge + relay client.
+  HttpClient.lua — HTTP helpers for the dedicated-server bridge (direct HTTPS to the SaaS API).
 
   FS25 notes (from sdk/debugger/gameSource.zip):
   - Shipped Lua under dataS/scripts/ does not define Internet.lua / createHTTPRequest in text form;
     HTTP is provided by the engine on some builds (often dedicated server), not always on the game client.
-  - The relay path uses POST (postJson): engine HTTP if present, else Windows curl to localhost.
-  - GET (poll) uses the same order; if both fail, err is `no_http_implementation`.
+  - POST (postJson) / GET (poll) use engine HTTP if present, else Windows curl; if both fail, err is `no_http_implementation`.
 
   Curl output uses -w "\\n%{http_code}"; we parse the last line as status (handles CRLF from Windows curl).
 
-  Prefer engine createHTTPRequest when present; curl runs synchronously (short localhost calls only).
+  Prefer engine createHTTPRequest when present; curl runs synchronously (short calls only).
   If io.popen is unavailable (FS25 client), we fall back to cmd.exe + .bat + os.execute.
 --]]
 
@@ -174,7 +173,7 @@ local function runCurlReadAny(cmd)
     return runCurlReadViaBatch(cmd)
 end
 
---- Last-resort POST for relay client: Windows curl (ships with Win10+), body via temp file.
+--- Last-resort POST via Windows curl (ships with Win10+), body via temp file.
 local function postJsonViaCurl(url, jsonBody, callback)
     local tmpWin = (getenvSafe("TEMP") or getenvSafe("TMP") or ".")
         .. "\\aifarm_mgr_"

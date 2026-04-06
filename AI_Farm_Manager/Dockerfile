@@ -1,4 +1,4 @@
-# AI Farm Manager — FastAPI (Koyeb, Fly.io, Railway, or any Docker host)
+# AI Farm Manager — FastAPI (Docker / Coolify / Hetzner VPS, port 8000)
 FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -8,12 +8,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Layer cache: deps change less often than app code
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Application (Python package `app` lives under backend/)
 COPY backend/ .
+
+# Runtime state: bot_servers.json, logs; compose mounts ./data:/app/data
+RUN mkdir -p /app/data && chmod 775 /app/data
 
 EXPOSE 8000
 

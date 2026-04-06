@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>AI Farm Manager — Admin</title>
+  <link rel="stylesheet" href="/static/admin.css"/>
+</head>
+<body>
+  <header class="top">
+    <h1>AI Farm Manager</h1>
+    <p class="muted">Settings and live logs (HTTP Basic auth)</p>
+  </header>
+
+  <main class="grid">
+    <section class="card">
+      <h2>Bot &amp; integrations</h2>
+      <p class="muted small" style="margin: -0.25rem 0 0.75rem 0;">
+        <strong>Farm Dashboard link key</strong> — set in <code>backend/.env</code> only as <code>FARMDASH_INTEGRATION_KEY=…</code>, and paste the same value into the Farm Dashboard app (robot button → <strong>Farm Dashboard link key</strong>). Not your LLM API keys below. Not on this form.
+      </p>
+      <form method="post" action="/admin/api/settings" class="form">
+        <label class="row">
+          <span>Bot enabled</span>
+          <span class="inline">
+            <label><input type="radio" name="bot_enabled" value="true" {% if bot_enabled %}checked{% endif %}/> On</label>
+            <label><input type="radio" name="bot_enabled" value="false" {% if not bot_enabled %}checked{% endif %}/> Off</label>
+          </span>
+        </label>
+        <label class="row">
+          <span>Trigger prefix</span>
+          <input type="text" name="trigger_prefix" value="{{ trigger_prefix }}" maxlength="32" required/>
+        </label>
+        <label class="row">
+          <span>Farm Dashboard JSON URL</span>
+          <input type="url" name="dashboard_json_url" value="{{ dashboard_url }}" placeholder="http://127.0.0.1:8766/api/data"/>
+        </label>
+        <label class="row">
+          <span>Farm Dashboard server ID (optional)</span>
+          <input type="text" name="dashboard_server_id" value="{{ dashboard_server_id }}" placeholder="Only if you use multiple servers in Farm Dashboard — same as ?serverId="/>
+        </label>
+        <label class="row">
+          <span>LLM provider</span>
+          <select name="llm_provider">
+            <option value="openai" {% if llm_provider == 'openai' %}selected{% endif %}>OpenAI</option>
+            <option value="gemini" {% if llm_provider == 'gemini' %}selected{% endif %}>Google Gemini</option>
+          </select>
+        </label>
+        <label class="row">
+          <span>OpenAI API key</span>
+          <input type="password" name="llm_api_key" placeholder="{% if has_llm_key %}•••• (unchanged if empty){% else %}sk-…{% endif %}"/>
+        </label>
+        <label class="row">
+          <span>OpenAI model</span>
+          <input type="text" name="llm_model" value="{{ llm_model }}"/>
+        </label>
+        <label class="row">
+          <span>Gemini API key</span>
+          <input type="password" name="gemini_api_key" placeholder="{% if has_gemini_key %}•••• (unchanged if empty){% else %}optional{% endif %}"/>
+        </label>
+        <label class="row">
+          <span>Gemini endpoint</span>
+          <select name="gemini_api_endpoint">
+            <option value="generativelanguage" {% if gemini_api_endpoint == 'generativelanguage' %}selected{% endif %}>AI Studio (generativelanguage.googleapis.com)</option>
+            <option value="aiplatform" {% if gemini_api_endpoint == 'aiplatform' %}selected{% endif %}>AI Platform / Vertex publisher (aiplatform.googleapis.com)</option>
+          </select>
+        </label>
+        <label class="row">
+          <span>Gemini model</span>
+          <input type="text" name="gemini_model" value="{{ gemini_model }}"/>
+        </label>
+        <button type="submit" class="btn primary">Save settings</button>
+      </form>
+    </section>
+
+    <section class="card full" id="bots">
+      <h2>Multi-server bot (Farm Dashboard)</h2>
+      <p class="muted small">
+        Add one profile per dedicated game server. Each profile gets its own <code>server_token</code> and message queue.
+        Map the <strong>Farm Dashboard server id</strong> so the LLM pulls <code>/api/data?serverId=…</code> for the correct save.
+        <strong>Do not edit XML by hand:</strong> use <strong>Download XML</strong> per profile, or Farm Dashboard’s <strong>Install config</strong> (writes <code>modsSettings/ai_farm_manager_config.xml</code> for you).
+        Set <code>PUBLIC_BASE_URL</code> in <code>.env</code> so generated files point at your real API (HTTPS) hostname.
+      </p>
+      {% if overview.farmDashboardError %}
+      <p class="warn">Farm Dashboard unreachable at {{ overview.farmDashboardOrigin }} — {{ overview.farmDashboardError }}</p>
+      {% endif %}
+      <p><strong>Farm Dashboard servers:</strong> {{ overview.farmDashboardServerCount }} · <strong>Bot profiles:</strong> {{ overview.botInstanceCount }}
+        {% if overview.legacySingleTokenMode %}<span class="muted small">(legacy single <code>SERVER_TOKEN</code> in .env still works until you add profiles)</span>{% endif %}
+      </p>
+
+      <h3 class="subh">Existing profiles</h3>
+      {% if overview.botInstances and overview.botInstances|length > 0 %}
+      <div class="table-scroll">
+      <table class="data-table">
+        <thead><tr><th>Label / edit</th><th>Token</th><th>Download XML</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for inst in overview.botInstances %}
+          <tr>
+            <td class="nested">
+              <form method="post" action="/admin/api/bot/save" class="inline-form">
+                <input type="hidden" name="instance_id" value="{{ inst.id }}"/>
+                <input type="text" name="label" value="{{ inst.label }}" placeholder="Label"/>
+                <input type="text" name="dashboard_server_id" value="{{ inst.dashboard_server_id }}" placeholder="Farm Dash server id"/>
+                <input type="text" name="server_token" placeholder="Rotate token (optional)"/>
+                <label class="inline"><input type="radio" name="enabled" value="true" {% if inst.enabled %}checked{% endif %}/> on</label>
+                <label class="inline"><input type="radio" name="enabled" value="false" {% if not inst.enabled %}checked{% endif %}/> off</label>
+                <button type="submit" class="btn">Save</button>
+              </form>
+            </td>
+            <td class="mono">{{ inst.server_token_masked }}</td>
+            <td>
+              <a class="btn" href="/admin/api/bot-config.xml?instance_id={{ inst.id }}">Download <code>ai_farm_manager_config.xml</code></a>
+            </td>
+            <td>
+              <form method="post" action="/admin/api/bot/delete" class="inline-form" onsubmit="return confirm('Delete this bot profile?');">
+                <input type="hidden" name="instance_id" value="{{ inst.id }}"/>
+                <button type="submit" class="btn danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      {% else %}
+      <p class="muted small">No profiles yet — use the form below (or keep using legacy <code>SERVER_TOKEN</code> only).</p>
+      {% endif %}
+
+      <h3 class="subh">Add profile</h3>
+      <form method="post" action="/admin/api/bot/save" class="form">
+        <input type="hidden" name="instance_id" value=""/>
+        <label class="row"><span>Label</span><input type="text" name="label" placeholder="e.g. G-Portal EU #1" required/></label>
+        <label class="row"><span>Farm Dashboard server</span>
+          <select name="dashboard_server_id">
+            <option value="">(first server / leave empty)</option>
+            {% for s in overview.farmDashboardServers %}
+            <option value="{{ s.id }}">{{ s.name }} ({{ s.id }})</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="row"><span>Enabled</span>
+          <span class="inline">
+            <label><input type="radio" name="enabled" value="true" checked/> On</label>
+            <label><input type="radio" name="enabled" value="false"/> Off</label>
+          </span>
+        </label>
+        <button type="submit" class="btn primary">Create profile &amp; token</button>
+      </form>
+    </section>
+
+    <section class="card full">
+      <h2>System prompt</h2>
+      <form method="post" action="/admin/api/settings" class="form">
+        <textarea name="system_prompt" rows="14" spellcheck="false">{{ system_prompt }}</textarea>
+        <p class="muted small">Stored in <code>prompts/system_prompt.txt</code> when you save (multiline safe).</p>
+        <button type="submit" class="btn primary">Save prompt</button>
+      </form>
+    </section>
+
+    <section class="card full">
+      <h2>Live logs</h2>
+      <p class="muted small">Recent backend events (chat triggers, LLM latency, errors). Polls every 2s.</p>
+      <pre id="logBox" class="logbox" aria-live="polite"></pre>
+    </section>
+  </main>
+
+  <script src="/static/admin.js" defer></script>
+</body>
+</html>

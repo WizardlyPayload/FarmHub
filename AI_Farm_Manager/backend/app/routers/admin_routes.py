@@ -1,0 +1,223 @@
+"""Admin UI + settings API (HTTP Basic)."""
+from __future__ import annotations
+
+import os
+from typing import Any
+
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
+
+from app.config import get_settings
+from app.prompt_loader import write_system_prompt
+from app.routers.integration import get_overview_payload
+from app.services.bot_registry import delete_instance, find_instance_by_id, upsert_instance
+from app.services.mod_config_xml import build_mod_config_xml, resolve_backend_url_for_xml
+from app.services.log_buffer import get_recent_logs
+from app.services.log_buffer import log_event as push_log
+
+router = APIRouter(tags=["admin"])
+security = HTTPBasic(auto_error=False)
+
+_templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "..", "templates"))
+
+
+def require_admin(credentials: HTTPBasicCredentials | None = Depends(security)) -> str:
+    s = get_settings()
+    user = s["admin_username"]
+    pw = s["admin_password"]
+    if not pw:
+        raise HTTPException(503, "Admin password not configured (set ADMIN_PASSWORD in .env)")
+    if credentials is None or credentials.username != user or credentials.password != pw:
+        raise HTTPException(
+            status_code=401,
+            detail="Unauthorized",
+            headers={"WWW-Authenticate": "Basic realm=admin"},
+        )
+    return credentials.username
+
+
+@router.get("/admin", response_class=HTMLResponse)
+async def admin_page(request: Request, _: str = Depends(require_admin)) -> HTMLResponse:
+    s = get_settings()
+    overview = await get_overview_payload()
+    # Explicit render avoids rare Jinja2 cache / TemplateResponse arg issues on some Starlette+Jinja builds.
+    ctx: dict[str, Any] = {
+        "request": request,
+        "bot_enabled": s["bot_enabled"],
+        "trigger_prefix": s["trigger_prefix"],
+        "dashboard_url": s["dashboard_json_url"],
+        "dashboard_server_id": s.get("dashboard_server_id", ""),
+        "llm_model": s["llm_model"],
+        "llm_provider": s["llm_provider"],
+        "gemini_model": s.get("gemini_model", "gemini-1.5-flash"),
+        "gemini_api_endpoint": s.get("gemini_api_endpoint", "generativelanguage"),
+        "system_prompt": s["system_prompt"],
+        "has_llm_key": bool(s["llm_api_key"]),
+        "has_gemini_key": bool(s.get("gemini_api_key")),
+        "overview": overview,
+    }
+    for cp in _templates.context_processors:
+        ctx.update(cp(request))
+    html = _templates.env.get_template("admin.html").render(ctx)
+    return HTMLResponse(html)
+
+
+class SettingsUpdate(BaseModel):
+    bot_enabled: bool | None = None
+    trigger_prefix: str | None = None
+    dashboard_json_url: str | None = None
+    llm_api_key: str | None = None
+    llm_model: str | None = None
+    llm_provider: str | None = None
+    system_prompt: str | None = None
+
+
+def _write_env_updates(updates: dict[str, str]) -> None:
+    """Append updates to .env file (simple key=value lines)."""
+    env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
+    if not os.path.isfile(env_path):
+        raise HTTPException(500, ".env not found — copy .env.example to .env on the server")
+
+    with open(env_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    keys = set(updates.keys())
+    out: list[str] = []
+    seen = set()
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            out.append(line)
+            continue
+        k = stripped.split("=", 1)[0].strip()
+        if k in keys:
+            seen.add(k)
+            out.append(f"{k}={updates[k]}\n")
+        else:
+            out.append(line)
+    for k, v in updates.items():
+        if k not in seen:
+            out.append(f"{k}={v}\n")
+
+    with open(env_path, "w", encoding="utf-8") as f:
+        f.writelines(out)
+
+    get_settings.cache_clear()
+
+
+@router.post("/admin/api/settings")
+async def admin_save_settings(
+    request: Request,
+    _: str = Depends(require_admin),
+    bot_enabled: str | None = Form(None),
+    trigger_prefix: str | None = Form(None),
+    dashboard_json_url: str | None = Form(None),
+    dashboard_server_id: str | None = Form(None),
+    llm_api_key: str | None = Form(None),
+    llm_model: str | None = Form(None),
+    llm_provider: str | None = Form(None),
+    gemini_api_key: str | None = Form(None),
+    gemini_model: str | None = Form(None),
+    gemini_api_endpoint: str | None = Form(None),
+    system_prompt: str | None = Form(None),
+) -> RedirectResponse:
+    updates: dict[str, str] = {}
+    if bot_enabled is not None:
+        updates["ENABLE_AI_BOT"] = "true" if bot_enabled in ("on", "true", "1") else "false"
+    if trigger_prefix is not None and trigger_prefix.strip():
+        updates["TRIGGER_PREFIX"] = trigger_prefix.strip()
+    if dashboard_json_url is not None:
+        updates["DASHBOARD_JSON_URL"] = dashboard_json_url.strip()
+    if dashboard_server_id is not None:
+        updates["DASHBOARD_SERVER_ID"] = dashboard_server_id.strip()
+    if llm_api_key is not None and llm_api_key.strip():
+        updates["LLM_API_KEY"] = llm_api_key.strip()
+    if llm_model is not None and llm_model.strip():
+        updates["LLM_MODEL"] = llm_model.strip()
+    if llm_provider is not None and llm_provider.strip():
+        updates["LLM_PROVIDER"] = llm_provider.strip().lower()
+    if gemini_api_key is not None and gemini_api_key.strip():
+        updates["GEMINI_API_KEY"] = gemini_api_key.strip()
+    if gemini_model is not None and gemini_model.strip():
+        updates["GEMINI_MODEL"] = gemini_model.strip()
+    if gemini_api_endpoint is not None and gemini_api_endpoint.strip():
+        updates["GEMINI_API_ENDPOINT"] = gemini_api_endpoint.strip().lower()
+    if system_prompt is not None:
+        write_system_prompt(system_prompt)
+        get_settings.cache_clear()
+
+    if updates:
+        _write_env_updates(updates)
+        push_log("INFO", "Admin updated settings", keys=list(updates.keys()))
+
+    return RedirectResponse(url="/admin", status_code=303)
+
+
+@router.get("/admin/api/logs")
+async def admin_logs(tail: int = 200, _: str = Depends(require_admin)) -> dict[str, Any]:
+    items, total = get_recent_logs(tail)
+    return {"logs": items, "total": total}
+
+
+@router.get("/admin/api/bot-config.xml")
+async def admin_download_bot_config_xml(
+    request: Request,
+    _: str = Depends(require_admin),
+    instance_id: str = Query(..., min_length=1),
+) -> Response:
+    """Download generated mod config XML (no hand-editing) for a bot profile."""
+    inst = find_instance_by_id(instance_id.strip())
+    if not inst:
+        raise HTTPException(404, "Instance not found")
+    s = get_settings()
+    xml = build_mod_config_xml(
+        resolve_backend_url_for_xml(s, str(request.base_url)),
+        str(inst.get("server_token") or ""),
+        s["trigger_prefix"],
+    )
+    return Response(
+        content=xml,
+        media_type="application/xml; charset=utf-8",
+        headers={
+            "Content-Disposition": 'attachment; filename="ai_farm_manager_config.xml"',
+        },
+    )
+
+
+@router.post("/admin/api/bot/save")
+async def admin_bot_save(
+    _: str = Depends(require_admin),
+    label: str = Form(""),
+    dashboard_server_id: str = Form(""),
+    enabled: str = Form("true"),
+    server_token: str = Form(""),
+    instance_id: str = Form(""),
+) -> RedirectResponse:
+    """Create or update a bot instance (multi-server)."""
+    try:
+        enabled_bool = enabled not in ("false", "0", "off", "")
+        upsert_instance(
+            instance_id.strip() or None,
+            label,
+            dashboard_server_id,
+            enabled_bool,
+            server_token.strip() or None,
+        )
+        push_log("INFO", "Admin saved bot instance", label=label)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return RedirectResponse(url="/admin#bots", status_code=303)
+
+
+@router.post("/admin/api/bot/delete")
+async def admin_bot_delete(
+    _: str = Depends(require_admin),
+    instance_id: str = Form(...),
+) -> RedirectResponse:
+    if not delete_instance(instance_id.strip()):
+        raise HTTPException(404, "Instance not found")
+    push_log("INFO", "Admin deleted bot instance", instance_id=instance_id)
+    return RedirectResponse(url="/admin#bots", status_code=303)

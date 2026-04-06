@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<!-- FS25 FarmDashboard | setup.html | v2.0.0 | Authors: JoshWalki, WizardlyPayload -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="author" content="JoshWalki, WizardlyPayload"/>
+  <title data-setup-i18n="setup.pageTitle">Server Manager - FS25 Farm Dashboard</title>
+  <style>
+    /* Reset & base */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      min-height: 100vh;
+      margin: 0;
+      padding: clamp(12px, 2.5vw, 30px) clamp(10px, 2vw, 24px);
+      overflow-x: hidden;
+      /* Fix: allow pointer events everywhere */
+      pointer-events: auto;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+
+    .container {
+      background: #313244;
+      padding: clamp(18px, 3vw, 30px);
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+      width: 100%;
+      max-width: min(920px, 100%);
+      display: flex;
+      gap: clamp(18px, 3vw, 30px);
+      align-items: stretch;
+    }
+
+    .left-panel  { flex: 1; border-right: 2px solid #45475a; padding-right: 24px; min-width: 0; }
+    .right-panel { flex: 1.6; min-width: 0; overflow-y: auto; max-height: min(85vh, calc(100vh - 8rem)); padding-right: 6px; }
+
+    @media (max-width: 900px) {
+      .container {
+        flex-direction: column;
+      }
+      .left-panel {
+        flex: 1 1 auto;
+        border-right: none;
+        border-bottom: 2px solid #45475a;
+        padding-right: 0;
+        padding-bottom: clamp(16px, 3vw, 24px);
+      }
+      .right-panel {
+        flex: 1 1 auto;
+        max-height: none;
+        overflow-y: visible;
+        padding-right: 0;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .row-flex {
+        flex-direction: column;
+      }
+      .radio-group {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+    }
+
+    h2, h3, h4 { margin-top: 0; color: #89b4fa; }
+    h4 { margin: 0 0 10px; }
+
+    .form-group { margin-bottom: 14px; }
+
+    label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 600;
+      font-size: 13px;
+      color: #a6adc8;
+      /* Fix: labels must not swallow pointer events from inputs below */
+      pointer-events: none;
+    }
+
+    /* THE INPUT FIX — explicit cursor, pointer-events, user-select */
+    input[type="text"],
+    input[type="password"],
+    input[type="number"] {
+      display: block;
+      width: 100%;
+      padding: 9px 11px;
+      border: 1px solid #45475a;
+      border-radius: 6px;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      cursor: text;
+      pointer-events: auto;
+      -webkit-user-select: text;
+      user-select: text;
+      /* Electron sometimes needs this to re-enable the caret */
+      -webkit-app-region: no-drag;
+    }
+
+    input[type="text"]:focus,
+    input[type="password"]:focus,
+    input[type="number"]:focus {
+      border-color: #89b4fa;
+      box-shadow: 0 0 0 2px rgba(137,180,250,.25);
+    }
+
+    input::placeholder { color: #585b70; }
+
+    .row-flex { display: flex; gap: 10px; }
+    .row-flex .form-group { flex: 1; min-width: 0; }
+    .row-flex .form-group.wide { flex: 3; }
+    .row-flex .form-group.narrow { flex: 1; }
+
+    .radio-group {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #45475a;
+    }
+    .radio-group label {
+      font-weight: normal;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      color: #cdd6f4;
+      pointer-events: auto;
+    }
+    .radio-group input[type="radio"] {
+      width: auto;
+      cursor: pointer;
+      accent-color: #89b4fa;
+      pointer-events: auto;
+    }
+
+    button {
+      padding: 9px 14px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all .2s;
+      -webkit-app-region: no-drag;
+      pointer-events: auto;
+    }
+
+    .btn-add    { background: #89b4fa; color: #11111b; width: 100%; margin-top: 12px; }
+    .btn-add:hover { background: #b4befe; }
+
+    .btn-launch { background: #a6e3a1; color: #11111b; width: 100%; font-size: 16px; padding: 14px; margin-top: 20px; }
+    .btn-launch:hover { background: #94e289; transform: translateY(-1px); }
+
+    .btn-delete {
+      background: #f38ba8; color: #11111b;
+      padding: 5px 11px; font-size: 12px; border-radius: 5px;
+      flex-shrink: 0;
+    }
+    .btn-delete:hover { background: #ff9eb5; }
+
+    .btn-magic {
+      background: linear-gradient(135deg, #a6e3a1 0%, #89b4fa 100%);
+      color: #11111b; width: 100%; margin-bottom: 22px; font-size: 15px;
+      box-shadow: 0 4px 15px rgba(137,180,250,.3);
+    }
+    .btn-magic:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(137,180,250,.5); }
+    .btn-magic:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+
+    .hint { font-size: 11px; color: #7f849c; margin-top: 4px; line-height: 1.4; }
+
+    .server-item {
+      background: #1e1e2e;
+      padding: 13px 14px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid #45475a;
+    }
+    .server-item .info { min-width: 0; }
+    .server-item .info strong { display: block; color: #a6e3a1; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .server-item .info span   { font-size: 12px; color: #a6adc8; }
+
+    #empty-servers { text-align: center; color: #7f849c; font-size: 13px; font-style: italic; margin-top: 20px; white-space: pre-line; }
+
+    /* Compact language control — top-right (first-run setup) */
+    .setup-lang-corner {
+      position: fixed;
+      top: 12px;
+      right: 14px;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 8px 5px 10px;
+      background: rgba(49, 50, 68, 0.96);
+      border: 1px solid #45475a;
+      border-radius: 8px;
+      box-shadow: 0 2px 14px rgba(0, 0, 0, 0.4);
+      -webkit-app-region: no-drag;
+      pointer-events: auto;
+    }
+    .setup-lang-corner-label {
+      margin: 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: #7f849c;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .setup-lang-select-corner {
+      max-width: 168px;
+      min-width: 120px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      border: 1px solid #45475a;
+      background: #1e1e2e;
+      color: #cdd6f4;
+      font-size: 12px;
+      cursor: pointer;
+      outline: none;
+    }
+    .setup-lang-select-corner:focus {
+      border-color: #89b4fa;
+      box-shadow: 0 0 0 2px rgba(137, 180, 250, 0.2);
+    }
+
+    .section-divider { border: none; border-top: 1px solid #45475a; margin: 18px 0; }
+
+    #ftp-fields { display: none; }
+
+    .optional-badge {
+      display: inline-block;
+      background: #45475a;
+      color: #a6adc8;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+      vertical-align: middle;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+
+    .section-heading {
+      border-top: 1px solid #45475a;
+      padding-top: 18px;
+      margin-bottom: 14px;
+    }
+
+    /* Scrollbar for right panel */
+    .right-panel::-webkit-scrollbar { width: 6px; }
+    .right-panel::-webkit-scrollbar-track { background: transparent; }
+    .right-panel::-webkit-scrollbar-thumb { background: #45475a; border-radius: 3px; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(-6px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    /* Mod shop image export progress (Electron IPC; no Bootstrap on setup) */
+    .fd-modexp-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      background: rgba(0, 0, 0, 0.72);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .fd-modexp-panel {
+      background: #313244;
+      border-radius: 12px;
+      padding: 22px 24px;
+      max-width: 720px;
+      width: 100%;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    }
+    .fd-modexp-title { margin: 0 0 12px; color: #89b4fa; font-size: 1.15rem; }
+    .fd-modexp-status { margin: 0 0 10px; color: #a6adc8; font-size: 13px; min-height: 1.6em; }
+    .fd-modexp-bar-wrap {
+      height: 22px;
+      background: #45475a;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+    .fd-modexp-bar-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 6px;
+      background: linear-gradient(90deg, #89b4fa, #b4befe);
+      transition: width 0.2s ease;
+    }
+    .fd-modexp-bar-fill.fd-indeterminate {
+      width: 100% !important;
+      animation: fd-modexp-pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes fd-modexp-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.55; }
+    }
+    .fd-modexp-log-label { font-size: 12px; color: #a6adc8; margin-bottom: 4px; }
+    .fd-modexp-log {
+      margin: 0;
+      max-height: 240px;
+      overflow: auto;
+      font-size: 11px;
+      line-height: 1.35;
+      color: #bac2de;
+      background: #181825;
+      border: 1px solid #45475a;
+      border-radius: 6px;
+      padding: 10px;
+      white-space: pre-wrap;
+      font-family: ui-monospace, Consolas, monospace;
+    }
+  </style>
+</head>
+<body>
+
+<div class="setup-lang-corner">
+  <label for="setup-lang-select" class="setup-lang-corner-label" data-setup-i18n="setup.langHeading">Language</label>
+  <select id="setup-lang-select" class="setup-lang-select-corner" data-setup-i18n-title="setup.langHint" aria-label="Language"></select>
+</div>
+
+<div class="container">
+
+  <!-- LEFT: server list -->
+  <div class="left-panel">
+    <h2 data-setup-i18n="setup.serverManager">⚙️ Server Manager</h2>
+
+    <div id="server-list"></div>
+    <div id="empty-servers" data-setup-i18n="setup.emptyServers">No servers added yet.
+
+Use Auto-Detect or add one manually →</div>
+
+    <hr class="section-divider"/>
+
+    <h3 style="margin:0 0 8px;color:#89b4fa;font-size:16px;" data-setup-i18n="setup.ftpHeading">FTP polling</h3>
+    <p class="hint" style="margin-bottom:12px;" data-setup-i18n="setup.ftpPollHint">
+      Applies to dedicated (FTP) servers. Local saves use file watching, not this schedule.
+    </p>
+    <div class="form-group">
+      <label for="ftpInitialDelay" data-setup-i18n="setup.delayLabel">Delay before first poll (seconds)</label>
+      <input type="number" id="ftpInitialDelay" min="0" max="600" value="0"/>
+    </div>
+    <div class="form-group">
+      <label for="ftpIntervalMinutes" data-setup-i18n="setup.pollLabel">Poll every (minutes)</label>
+      <input type="number" id="ftpIntervalMinutes" min="1" max="25" value="5"/>
+      <div class="hint" data-setup-i18n="setup.pollCycleHint">Full cycle length: 1–25 min.</div>
+    </div>
+    <div class="radio-group" style="flex-direction:column;align-items:flex-start;gap:10px;padding-bottom:8px;">
+      <label><input type="radio" name="ftpSchedule" value="sync" checked/> <span data-setup-i18n="setup.scheduleSync">Each cycle: poll all FTP servers at once</span></label>
+      <label><input type="radio" name="ftpSchedule" value="staggered"/> <span data-setup-i18n="setup.scheduleStaggered">Staggered: one FTP server per equal slice across the interval</span></label>
+    </div>
+
+    <button class="btn-launch" id="launchBtn" onclick="saveAndLaunch()">
+      🚀 <span data-setup-i18n="setup.launch">Launch Dashboard</span>
+    </button>
+  </div>
+
+  <!-- RIGHT: add server form -->
+  <div class="right-panel">
+
+    <button class="btn-magic" id="detectBtn" onclick="autoDetectSaves()">
+      ✨ <span data-setup-i18n="setup.autoDetect">Auto-Detect Local Saves</span>
+    </button>
+
+    <button type="button" class="btn-magic" id="modImagesBtn" onclick="scanModImagesForDashboard()"
+            style="background: linear-gradient(135deg, #cba6f7 0%, #89b4fa 100%); margin-bottom: 22px;">
+      📷 <span data-setup-i18n="setup.modImages">Scan FS25 mods for dashboard images</span>
+    </button>
+    <p class="hint" style="margin-top: -14px; margin-bottom: 18px;" data-setup-i18n="setup.modImagesHint">
+      Copies shop-style PNGs and converts icon_*.dds from your FS25 mods folder into the dashboard (items_mod_extract). DDS conversion uses ImageMagick if installed, or texconv.exe placed in the app resources/texconv folder.
+    </p>
+
+    <h3 class="section-heading" data-setup-i18n="setup.addManual">Add Server Manually</h3>
+
+    <div class="form-group">
+      <label for="serverName" data-setup-i18n="setup.displayName">Display Name</label>
+      <input type="text" id="serverName" placeholder="e.g., My Elmcreek Save" autocomplete="off"/>
+    </div>
+
+    <div class="radio-group">
+      <label><input type="radio" name="mode" value="local" checked onchange="toggleMode()"> <span data-setup-i18n="setup.modeLocal">Local PC</span></label>
+      <label><input type="radio" name="mode" value="ftp"   onchange="toggleMode()"> <span data-setup-i18n="setup.modeFtp">Dedicated Server (FTP)</span></label>
+    </div>
+
+    <!-- LOCAL -->
+    <div id="local-fields">
+      <div class="form-group">
+        <label for="localPath"><span data-setup-i18n="setup.localPath">modSettings Base Path</span> <span class="optional-badge">optional</span></label>
+        <input type="text" id="localPath"
+               placeholder="C:\Users\...\FarmingSimulator2025\modSettings\FS25_FarmDashboard"
+               autocomplete="off"/>
+        <div class="hint" data-setup-i18n="setup.localHint">Leave blank to use the default Documents path.</div>
+      </div>
+      <div class="form-group">
+        <label for="localSubFolder"><span data-setup-i18n="setup.saveFolder">Savegame Folder</span> <span class="optional-badge">optional</span></label>
+        <input type="text" id="localSubFolder" placeholder="e.g., savegame1" autocomplete="off"/>
+        <div class="hint" data-setup-i18n="setup.saveHint">Leave blank to use the Display Name as the folder name.</div>
+      </div>
+    </div>
+
+    <!-- FTP / Dedicated -->
+    <div id="ftp-fields">
+      <div class="row-flex">
+        <div class="form-group wide">
+          <label for="ftpHost" data-setup-i18n="setup.ftpHost">FTP Host / IP</label>
+          <input type="text" id="ftpHost" placeholder="e.g., ftp.gportal.com" autocomplete="off"/>
+        </div>
+        <div class="form-group narrow">
+          <label for="ftpPort" data-setup-i18n="setup.ftpPort">Port</label>
+          <input type="number" id="ftpPort" value="21"/>
+        </div>
+      </div>
+      <div class="row-flex">
+        <div class="form-group">
+          <label for="ftpUser" data-setup-i18n="setup.ftpUser">Username</label>
+          <input type="text" id="ftpUser" autocomplete="off"/>
+        </div>
+        <div class="form-group">
+          <label for="ftpPass" data-setup-i18n="setup.ftpPass">Password</label>
+          <input type="password" id="ftpPass" autocomplete="new-password"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="ftpBasePath" data-setup-i18n="setup.basePath">Base Profile Path</label>
+        <input type="text" id="ftpBasePath" value="profile" autocomplete="off"/>
+      </div>
+      <div class="form-group">
+        <label for="ftpSubFolder" data-setup-i18n="setup.slotFolder">Savegame Slot Folder</label>
+        <input type="text" id="ftpSubFolder" placeholder="e.g., savegame1" autocomplete="off"/>
+        <div class="hint" data-setup-i18n="setup.slotHint">Which slot the mod writes data.json into.</div>
+      </div>
+
+      <hr class="section-divider"/>
+
+      <h4><span data-setup-i18n="setup.httpHeading">HTTP Feed</span> <span class="optional-badge">optional — for richer XML data</span></h4>
+      <p class="hint" style="margin-bottom:12px;" data-setup-i18n="setup.httpHint">
+        If your dedicated server exposes the Giants HTTP feed, enter the details below.
+        Provides vehicle age, prices and crop price history. Leave blank to use Lua-only mode.
+      </p>
+
+      <div class="row-flex">
+        <div class="form-group wide">
+          <label for="httpFeedHost" data-setup-i18n="setup.httpHost">Server IP / Host</label>
+          <input type="text" id="httpFeedHost" placeholder="e.g., 149.102.148.127" autocomplete="off"/>
+        </div>
+        <div class="form-group narrow">
+          <label for="httpFeedPort" data-setup-i18n="setup.httpPort">HTTP Port</label>
+          <input type="number" id="httpFeedPort" value="8080"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="httpFeedCode" data-setup-i18n="setup.feedCode">Feed Access Code</label>
+        <input type="text" id="httpFeedCode" placeholder="e.g., EyT1GC4XDQNi5Cm5" autocomplete="off"/>
+      </div>
+    </div>
+
+    <button class="btn-add" onclick="addServer()">+ <span data-setup-i18n="setup.addServer">Add Server</span></button>
+
+  </div><!-- /right-panel -->
+</div><!-- /container -->
+
+<div id="modExportProgressModal" class="fd-modexp-overlay" style="display: none" aria-hidden="true">
+  <div class="fd-modexp-panel">
+    <h3 class="fd-modexp-title" data-setup-i18n="setup.modexpTitle">Import mod shop images</h3>
+    <p id="modExportProgressLabel" class="fd-modexp-status">Starting…</p>
+    <div class="fd-modexp-bar-wrap"><div id="modExportProgressBar" class="fd-modexp-bar-fill" style="width: 0%"></div></div>
+    <div class="fd-modexp-log-label" data-setup-i18n="setup.modexpLog">Conversion log</div>
+    <pre id="modExportLog" class="fd-modexp-log"></pre>
+  </div>
+</div>
+
+<script src="web/assests/js/setup-i18n.js"></script>
+<script src="web/assests/js/modExportProgress.js"></script>
+<script>
+// nodeIntegration is true so require('electron') works here.
+// We only removed alert() — that was the sole cause of the input-lock bug.
+// alert() in Electron opens a native OS dialog which permanently loses
+// renderer focus. Replaced with an in-page toast that never steals focus.
+
+const { ipcRenderer } = require('electron');
+let servers = [];
+
+// ── toast (never steals focus unlike alert) ──────────────────────────────
+function toast(msg, type) {
+  const prev = document.getElementById('_toast');
+  if (prev) prev.remove();
+
+  const colors = {
+    success: ['#a6e3a1', '#11111b'],
+    error:   ['#f38ba8', '#11111b'],
+    info:    ['#89b4fa', '#11111b'],
+  };
+  const [bg, fg] = colors[type] || colors.info;
+
+  const el = document.createElement('div');
+  el.id = '_toast';
+  el.style.cssText = [
+    'position:fixed', 'top:16px', 'left:50%', 'transform:translateX(-50%)',
+    `background:${bg}`, `color:${fg}`,
+    'padding:10px 22px', 'border-radius:8px',
+    'font-weight:700', 'font-size:14px',
+    'box-shadow:0 4px 18px rgba(0,0,0,.45)',
+    'z-index:9999', 'pointer-events:none',
+    'white-space:nowrap',
+  ].join(';');
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.remove(); }, 3200);
+}
+
+// ── mode toggle ──────────────────────────────────────────────────────────
+function toggleMode() {
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  document.getElementById('local-fields').style.display = mode === 'local' ? 'block' : 'none';
+  document.getElementById('ftp-fields').style.display   = mode === 'ftp'   ? 'block' : 'none';
+}
+window.toggleMode = toggleMode;
+
+// ── render server list ───────────────────────────────────────────────────
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderServers() {
+  const list  = document.getElementById('server-list');
+  const empty = document.getElementById('empty-servers');
+  list.innerHTML = '';
+  empty.style.display = servers.length === 0 ? 'block' : 'none';
+
+  servers.forEach((srv, i) => {
+    const info = srv.mode === 'local'
+      ? '📁 Local: ' + (srv.localSubFolder || srv.name)
+      : '🌐 FTP: ' + srv.ftpHost + (srv.httpFeedHost ? ' + HTTP Feed' : '');
+    var removeLabel = (typeof window.setupT === 'function') ? window.setupT('setup.remove') : 'Remove';
+
+    const item = document.createElement('div');
+    item.className = 'server-item';
+    item.innerHTML =
+      '<div class="info">' +
+        '<strong>' + escHtml(srv.name) + '</strong>' +
+        '<span>' + escHtml(info) + '</span>' +
+      '</div>' +
+      '<button class="btn-delete" data-idx="' + i + '">' + escHtml(removeLabel) + '</button>';
+    list.appendChild(item);
+  });
+
+  list.querySelectorAll('.btn-delete').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      servers.splice(parseInt(btn.dataset.idx), 1);
+      renderServers();
+    });
+  });
+}
+
+// ── auto-detect ──────────────────────────────────────────────────────────
+function autoDetectSaves() {
+  const btn = document.getElementById('detectBtn');
+  btn.textContent = '🔍 Scanning...';
+  // no btn.disabled — can cause focus loss in Electron
+
+  ipcRenderer.invoke('scan-local-saves').then(function(found) {
+    if (!found || found.length === 0) {
+      toast('No saves found. Make sure the mod has run at least once.', 'info');
+    } else {
+      var fresh = found.filter(function(f) {
+        return !servers.some(function(s) { return s.localSubFolder === f.localSubFolder; });
+      });
+      if (fresh.length > 0) {
+        servers = servers.concat(fresh);
+        renderServers();
+        toast('✅ Imported ' + fresh.length + ' save' + (fresh.length > 1 ? 's' : '') + '!', 'success');
+      } else {
+        toast('All detected saves are already in your list.', 'info');
+      }
+    }
+    btn.textContent = '✨ Auto-Detect Local Saves';
+  }).catch(function(e) {
+    toast('Scan error: ' + e.message, 'error');
+    btn.textContent = '✨ Auto-Detect Local Saves';
+  });
+}
+window.autoDetectSaves = autoDetectSaves;
+
+// ── mod shop images (PowerShell export; progress modal + native summary dialog) ─────
+function scanModImagesForDashboard() {
+  const btn = document.getElementById('modImagesBtn');
+  const prev = btn ? btn.textContent : '';
+  if (btn) btn.textContent = '⏳ Scanning mods...';
+  var cleanupProgress = null;
+  if (typeof window.attachModExportProgress === 'function') {
+    cleanupProgress = window.attachModExportProgress(ipcRenderer);
+  }
+  ipcRenderer.invoke('export-mod-store-images').then(function() {
+    /* success: native dialog already shown in main process */
+  }).catch(function(e) {
+    toast('Mod images: ' + (e.message || e), 'error');
+  }).finally(function() {
+    if (typeof cleanupProgress === 'function') cleanupProgress();
+    if (btn) btn.textContent = prev;
+  });
+}
+window.scanModImagesForDashboard = scanModImagesForDashboard;
+
+// ── add server ───────────────────────────────────────────────────────────
+function addServer() {
+  var name = document.getElementById('serverName').value.trim();
+  var mode = document.querySelector('input[name="mode"]:checked').value;
+  if (!name) { toast('Please enter a display name.', 'error'); return; }
+
+  var srv = { id: 'srv_' + Date.now(), name: name, mode: mode };
+
+  if (mode === 'local') {
+    srv.localPath      = document.getElementById('localPath').value.trim();
+    srv.localSubFolder = document.getElementById('localSubFolder').value.trim();
+  } else {
+    srv.ftpHost        = document.getElementById('ftpHost').value.trim();
+    srv.ftpPort        = document.getElementById('ftpPort').value;
+    srv.ftpUser        = document.getElementById('ftpUser').value.trim();
+    srv.ftpPass        = document.getElementById('ftpPass').value;
+    srv.ftpBasePath    = document.getElementById('ftpBasePath').value.trim() || 'profile';
+    srv.localSubFolder = document.getElementById('ftpSubFolder').value.trim() || 'savegame1';
+
+    if (!srv.ftpHost || !srv.ftpUser || !srv.ftpPass) {
+      toast('FTP Host, Username and Password are all required.', 'error');
+      return;
+    }
+
+    var feedHost = document.getElementById('httpFeedHost').value.trim();
+    var feedCode = document.getElementById('httpFeedCode').value.trim();
+    if (feedHost && feedCode) {
+      srv.httpFeedHost = feedHost;
+      srv.httpFeedPort = parseInt(document.getElementById('httpFeedPort').value) || 8080;
+      srv.httpFeedCode = feedCode;
+    }
+  }
+
+  servers.push(srv);
+  renderServers();
+  toast('✅ "' + name + '" added!', 'success');
+
+  ['serverName','localPath','localSubFolder','ftpHost','ftpUser',
+   'ftpPass','ftpSubFolder','httpFeedHost','httpFeedCode'].forEach(function(id) {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('ftpPort').value      = '21';
+  document.getElementById('httpFeedPort').value = '8080';
+  document.getElementById('ftpBasePath').value  = 'profile';
+}
+window.addServer = addServer;
+
+// ── launch ───────────────────────────────────────────────────────────────
+function saveAndLaunch() {
+  if (servers.length === 0) { toast('Add at least one server first.', 'error'); return; }
+  document.getElementById('launchBtn').textContent = '⏳ Starting...';
+  var delaySec = parseInt(document.getElementById('ftpInitialDelay').value, 10);
+  if (isNaN(delaySec)) delaySec = 0;
+  delaySec = Math.min(600, Math.max(0, delaySec));
+  var intervalMin = parseInt(document.getElementById('ftpIntervalMinutes').value, 10);
+  if (isNaN(intervalMin)) intervalMin = 5;
+  intervalMin = Math.min(25, Math.max(1, intervalMin));
+  var scheduleEl = document.querySelector('input[name="ftpSchedule"]:checked');
+  var ftpPolling = {
+    initialDelaySeconds: delaySec,
+    intervalMinutes: intervalMin,
+    scheduleMode: scheduleEl && scheduleEl.value === 'staggered' ? 'staggered' : 'sync'
+  };
+  ipcRenderer.send('save-settings', { isConfigured: true, servers: servers, ftpPolling: ftpPolling });
+}
+window.saveAndLaunch = saveAndLaunch;
+
+// ── load existing config on page ready ───────────────────────────────────
+function loadFtpPollingFromConfig(cfg) {
+  var fp = (cfg && cfg.ftpPolling) || {};
+  var d = document.getElementById('ftpInitialDelay');
+  var m = document.getElementById('ftpIntervalMinutes');
+  if (d) d.value = fp.initialDelaySeconds != null ? fp.initialDelaySeconds : 0;
+  if (m) m.value = fp.intervalMinutes != null ? fp.intervalMinutes : 5;
+  var mode = fp.scheduleMode === 'staggered' ? 'staggered' : 'sync';
+  document.querySelectorAll('input[name="ftpSchedule"]').forEach(function(r) {
+    r.checked = (r.value === mode);
+  });
+}
+
+ipcRenderer.invoke('get-current-config').then(function(cfg) {
+  if (cfg && cfg.servers) {
+    servers = cfg.servers;
+    renderServers();
+  }
+  loadFtpPollingFromConfig(cfg || {});
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "instances": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "label": "Example dedicated server",
+      "dashboard_server_id": "paste-farm-dashboard-server-id-here",
+      "enabled": true,
+      "server_token": "paste-or-generate-long-random-token"
+    }
+  ]
+}

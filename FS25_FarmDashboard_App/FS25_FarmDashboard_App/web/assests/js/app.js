@@ -1,0 +1,78 @@
+// FS25 FarmDashboard | app.js | v2.0.0
+
+import * as apiStorage    from './modules/apiStorage.js';
+import * as parsers       from './modules/parsers.js';
+import * as navigation    from './modules/navigation.js';
+import * as notifications from './modules/notifications.js';
+import * as changes       from './modules/changes.js';
+import * as livestock     from './modules/livestock.js';
+import * as pastures      from './modules/pastures.js';
+import * as vehicles      from './modules/vehicles.js';
+import * as economy       from './modules/economy.js';
+import * as fields        from './modules/fields.js';
+import * as environment   from './modules/environment.js';
+import * as theming       from './modules/theming.js';
+import * as productions   from './modules/productions.js';
+import * as dashboardSettings from './modules/dashboard-settings.js';
+import { initI18n, t }    from './i18n/i18n.js';
+
+class LivestockDashboard {
+  constructor() {
+    this.animals            = [];
+    this.allFields          = [];
+    this.fields             = [];
+    this.placeables         = [];
+    this.pastures           = [];
+    this.playerFarms        = [];
+    this.notificationHistory = [];
+    this.maxNotifications   = 10;
+    this.selectedFarmId     = 1;
+    this.activeFarmId       = 1;
+    // Merged data fields
+    this.mapTitle           = null;
+    this.savegameName       = null;
+    this.dataSource         = 'unknown';
+    this.xmlAvailable       = false;
+    this.luaAvailable       = false;
+    this.money              = 0;
+    this.gameSettings       = {};
+
+    this.init();
+  }
+
+  init() {
+    this.setupEventListeners();
+    this.setupDashboardSettingsModal();
+    this.setupTabs();
+    this.setupURLRouting();
+    this.loadNotificationHistory();
+    this.checkAPIAvailability();
+    this.initTheming();
+  }
+}
+
+Object.assign(
+  LivestockDashboard.prototype,
+  apiStorage, parsers, navigation, notifications,
+  changes, livestock, pastures, vehicles, economy,
+  fields, environment, theming, productions, dashboardSettings
+);
+
+let dashboard;
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    await initI18n();
+    window.t = t;
+  } catch (e) {
+    console.warn('[i18n]', e);
+  }
+  try {
+    const r = await fetch('/api/item-image-filenames');
+    const data = await r.json();
+    vehicles.primeModExtractImageFilenames(data.modExtract || []);
+  } catch (e) {
+    console.warn('[item-image-filenames]', e);
+  }
+  dashboard = new LivestockDashboard();
+  window.dashboard = dashboard;
+});

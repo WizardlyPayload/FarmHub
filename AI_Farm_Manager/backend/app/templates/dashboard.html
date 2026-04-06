@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>AI Farm Manager — Farm snapshot</title>
+  <style>
+    body { font-family: system-ui, Segoe UI, sans-serif; background: #0d1117; color: #e6edf3; margin: 0; padding: 1.5rem; line-height: 1.5; }
+    a { color: #58a6ff; }
+    code { background: #21262d; padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.9em; }
+    h1 { font-size: 1.35rem; margin-top: 0; }
+    .muted { color: #8b949e; font-size: 0.95rem; }
+    .panel { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 1rem 1.25rem; margin-top: 1rem; }
+    pre { overflow: auto; max-height: 70vh; font-size: 0.8rem; line-height: 1.4; }
+    nav { margin-bottom: 1rem; }
+    nav a { margin-right: 1rem; }
+    .warn { color: #d29922; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/admin"><strong>Admin</strong></a>
+    <a href="/health">Health</a>
+    <a href="/docs">API docs</a>
+  </nav>
+  <h1>Farm snapshot</h1>
+  <p class="muted">
+    Data comes from the latest <code>data.json</code> pulled over FTP from your G-Portal host (when <code>GPORTAL_FTP_*</code> is set).
+    For local development without FTP, configure <code>DASHBOARD_JSON_URL</code> and use the AI bot only — this page may stay empty.
+  </p>
+  {% if not ftp_mode %}
+  <p class="warn">FTP is not configured — snapshot panel is informational only. Use <code>DASHBOARD_JSON_URL</code> for the LLM or set G-Portal FTP env vars.</p>
+  {% endif %}
+  <div class="panel">
+    {% if snapshot %}
+    <pre>{{ snapshot | tojson(indent=2) }}</pre>
+    {% else %}
+    <p class="warn">No snapshot loaded yet.{% if snapshot_error %} {{ snapshot_error }}{% endif %}</p>
+    {% endif %}
+  </div>
+</body>
+</html>

@@ -11,7 +11,7 @@ from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from app.config import get_settings
-from app.routers import admin_routes, chat, integration, mod_config_download
+from app.routers import admin_routes, chat, consultant, integration, mod_config_download
 from app.services import ftp_service
 
 
@@ -60,6 +60,7 @@ else:
 app.include_router(chat.router)
 app.include_router(admin_routes.router)
 app.include_router(integration.router)
+app.include_router(consultant.router)
 app.include_router(mod_config_download.router)
 
 _templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "templates"))

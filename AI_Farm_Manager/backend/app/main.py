@@ -17,6 +17,10 @@ from app.services import ftp_service
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.services.encryption import ensure_encryption_configured
+
+    ensure_encryption_configured()
+
     stop = asyncio.Event()
     poll_task: asyncio.Task | None = None
     if ftp_service.is_ftp_mode_enabled():
@@ -93,7 +97,7 @@ async def health() -> dict:
     """Liveness + how many bot profiles the running process loaded (0 = wrong/missing data/bot_servers.json)."""
     import os
 
-    from app.config import get_backend_root
+    from app.config import get_backend_root, get_data_dir, get_settings
     from app.services.bot_registry import get_registry_path, load_registry
 
     reg = load_registry()
@@ -103,9 +107,11 @@ async def health() -> dict:
     return {
         "status": "ok",
         "backend_root": str(get_backend_root()),
+        "data_dir": str(get_data_dir()),
         "bot_profiles_loaded": n,
         "registry_file": path,
         "registry_file_exists": os.path.isfile(path),
         "legacy_server_token_set": len(st) > 0,
         "ftp_dashboard": ftp_service.is_ftp_mode_enabled(),
+        "encryption_at_rest": get_settings().get("encryption_key_configured", False),
     }

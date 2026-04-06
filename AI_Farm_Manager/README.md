@@ -1,191 +1,109 @@
 # AI Farm Manager (FS25)
 
-Unified **FastAPI** backend for **Farming Simulator 25** dedicated servers (e.g. **G-Portal**): chat API, optional LLM, farm snapshot (FTP or local HTTP), admin UI, and a simple **web dashboard** at `GET /`.
+Centralized **FastAPI** SaaS for **Farming Simulator 25** dedicated servers (e.g. **G-Portal**): chat API, optional LLM, farm snapshot over FTP, admin UI, and a **Jinja2** dashboard at `GET /`.
 
-**Cloud-first:** deploy with **Docker** on [Koyeb](https://www.koyeb.com) (free tier, no credit card required for signup). The in-game Lua mod uses **direct HTTPS** to your API (`POST /api/chat/receive`, `GET /api/chat/poll`). Relay mode has been removed.
+**Production target:** **Docker** on a **Hetzner VPS** (or any Linux host) with **[Coolify](https://coolify.io)** or plain **Docker Compose**. The in-game Lua mod uses **direct HTTPS** (`POST /api/chat/receive`, `GET /api/chat/poll`). Relay mode is not used.
 
 ```
 AI_Farm_Manager/
-├── README.md                          ← this file
-├── Dockerfile                         ← container image (Koyeb, etc.)
+├── README.md
+├── Dockerfile                 ← production image (port 8000)
+├── docker-compose.yml         ← persistent ./data → /app/data
+├── data/                      ← host volume (bot_servers.json); gitignored
 ├── backend/
 │   ├── .env.example
 │   ├── requirements.txt
 │   ├── prompts/
-│   │   └── system_prompt.txt
 │   └── app/
-│       ├── main.py
-│       ├── config.py
-│       ├── prompt_loader.py
-│       ├── templates/
-│       │   ├── admin.html
-│       │   └── dashboard.html         ← GET / farm snapshot
-│       ├── static/
-│       ├── routers/
-│       │   ├── chat.py                ← POST /api/chat/receive, GET /api/chat/poll
-│       │   └── admin_routes.py
-│       └── services/
-│           ├── dashboard_service.py
-│           ├── ftp_service.py         ← G-Portal FTP → in-memory data.json
-│           ├── llm_service.py
-│           └── ...
+│       ├── main.py            ← lifespan: FTP poller + encryption init
+│       ├── services/
+│       │   ├── encryption.py
+│       │   ├── bot_registry.py   → /app/data/bot_servers.json (encrypted secrets)
+│       │   ├── ftp_service.py
+│       │   └── dashboard_service.py
+│       └── templates/
+│           └── dashboard.html
 └── fs25_ai_farm_manager_mod/
-    ├── modDesc.xml
-    ├── icon.png
-    ├── config/
-    │   └── ai_farm_manager_config.xml
-    └── src/
-        ├── Config.lua
-        ├── HttpClient.lua
-        ├── ChatHooks.lua
-        └── main.lua
+    └── src/                   ← Lua bridge for G-Portal
 ```
 
-## Deploy to Koyeb (recommended — free tier, no card for signup)
+## Deploy with Docker Compose (VPS)
 
-[![Deploy to Koyeb](https://www.koyeb.com/static/images/deploy/button.svg)](https://app.koyeb.com/deploy?type=git)
+1. **Server:** Ubuntu 22.04+ (e.g. Hetzner Cloud). Open **port 8000** (or put **Caddy/Traefik** in front on **443**).
 
-Follow these steps **in order**. You need a **GitHub** account (Koyeb can connect to your repository without you typing server code by hand).
+2. **Copy environment:** From `backend/.env.example`, create a **`.env` file in the same directory as `docker-compose.yml`** (the `AI_Farm_Manager` folder). Set at minimum:
+   - **`ENCRYPTION_KEY`** — Fernet key (see `.env.example`); required so tenant secrets are never stored plaintext.
+   - **`ADMIN_PASSWORD`** — `/admin` login.
+   - **`SERVER_TOKEN`** — must match `<serverToken>` in the Lua mod XML.
+   - **`PUBLIC_BASE_URL`** — `https://your-domain-or-ip` **without trailing slash** — this becomes **`backendUrl`** in generated `ai_farm_manager_config.xml` so the mod points at your VPS or reverse proxy.
+   - LLM / FTP variables as needed.
 
-### A) Start from GitHub
+3. **Data volume:** The compose file mounts **`./data:/app/data`**. All customer registry data (`bot_servers.json` with encrypted `ftp_pass` / `llm_api_key` per tenant) lives under **`./data` on the host**. **Back up this directory.**
 
-1. Push this project to a **GitHub** repository (the folder that contains `AI_Farm_Manager`, or only `AI_Farm_Manager` if that is the repo root).
-2. Click the **Deploy to Koyeb** button above (or open [Koyeb deploy](https://app.koyeb.com/deploy?type=git) and choose **GitHub**).
+4. **Run:**
 
-### B) Sign up (no credit card)
+   ```bash
+   cd AI_Farm_Manager
+   docker compose up -d --build
+   ```
 
-1. Create a Koyeb account. Choosing **Sign in with GitHub** is the simplest option.
-2. You can use the **free** tier — you should **not** need to add a credit card just to sign up and deploy a small app (always confirm on Koyeb’s current pricing page).
+5. **Verify:** `curl -s https://YOUR_HOST/health` (or `http://SERVER_IP:8000/health` if no TLS yet) — expect `"status":"ok"` and `"data_dir":".../app/data"`.
 
-### C) Configure environment variables
+6. **Lua mod:** Set **`backendUrl`** in `ai_farm_manager_config.xml` to your public API base URL (same idea as **`PUBLIC_BASE_URL`**). Use HTTPS once a certificate is in front of the app.
 
-In the deployment screen, open **Environment variables** and add at least the following. Use **Generate** or a password manager for secrets; **copy and save** `SERVER_TOKEN` and `ADMIN_PASSWORD` somewhere safe — you will need them for the game and the web UI.
+## Deploy with Coolify (Hetzner)
 
-| Variable | What to put |
-|----------|-------------|
-| `ADMIN_PASSWORD` | Password for the **Admin** web panel (`/admin`). |
-| `SERVER_TOKEN` | Long random secret — must match the value you put in the FS25 **`ai_farm_manager_config.xml`** on the game server (`<serverToken>`). |
-| `ENABLE_AI_BOT` | `true` to enable `!bot` AI replies, or `false` to turn the LLM off. |
-| `LLM_API_KEY` | Your **OpenAI** API key (only if `ENABLE_AI_BOT` is `true` and you use the default OpenAI provider). Leave empty if the bot is off. |
-| `GPORTAL_FTP_HOST` | FTP hostname from your G-Portal (or host) file manager. |
-| `GPORTAL_FTP_USER` | FTP username. |
-| `GPORTAL_FTP_PASS` | FTP password. |
-| `GPORTAL_FTP_PATH` | Full path to **`data.json`** on the FTP server (as shown in the host’s file browser). |
+1. Install **Coolify** on the VPS (see [Coolify docs](https://coolify.io/docs)).
 
-**Strongly recommended** after you know your public URL (step E):
+2. **New resource → Docker Compose** (or **Dockerfile** build from Git).
 
-| Variable | What to put |
-|----------|-------------|
-| `PUBLIC_BASE_URL` | Your live app URL, e.g. `https://your-app-name.koyeb.app` — **no trailing slash**. This makes **Download config** / generated XML use the correct `backendUrl` for the Lua mod. |
+3. Point the repository / build context to the **`AI_Farm_Manager`** folder (where **`Dockerfile`** lives).
 
-Optional: `ADMIN_USERNAME` (defaults to `admin`), `TRIGGER_PREFIX` (default `!bot`), and other keys from `backend/.env.example`.
+4. **Persistent storage:** In Coolify, add a volume mapping **`/app/data`** to a host path (e.g. `/var/lib/coolify/.../data`) — equivalent to `./data:/app/data` in the sample compose file.
 
-### D) Instance size
+5. **Environment variables:** Add the same variables as in **`backend/.env.example`**, especially **`ENCRYPTION_KEY`**, **`ADMIN_PASSWORD`**, **`SERVER_TOKEN`**, **`PUBLIC_BASE_URL`**, **`ENABLE_AI_BOT`**, **`LLM_API_KEY`**, and **`GPORTAL_FTP_*`** as needed.
 
-Under **Instance** or **Resources**, choose the **Free** tier (**Eco** / **Micro** or the smallest free option Koyeb shows). That is enough for light API traffic and polling.
+6. **Domain / SSL:** Assign your domain in Coolify and enable HTTPS. Set **`PUBLIC_BASE_URL`** to that **`https://` URL** so downloaded mod XML is correct.
 
-### E) Deploy and connect the game
+7. **Port:** The container listens on **8000**; Coolify’s reverse proxy should forward HTTPS → container **8000**.
 
-1. Click **Deploy** and wait until the service is **running** and shows a public URL (ends with **`.koyeb.app`** unless you added a custom domain).
-2. Open `https://YOUR-APP.koyeb.app/health` in a browser — you should see JSON with `"status":"ok"`.
-3. Set **`PUBLIC_BASE_URL`** to exactly that base URL (if you did not already), redeploy if required, then download or generate **`ai_farm_manager_config.xml`** from `/admin` so **`backendUrl`** matches your Koyeb HTTPS URL.
-4. Put the XML on the dedicated server’s **modsSettings** folder (see below). **`serverToken`** in XML must equal **`SERVER_TOKEN`** in Koyeb.
+## Security (encryption & registry)
 
-**Repository layout tip:** If your GitHub repo root is a **parent** folder (e.g. it contains `FarmHub/` and other projects), set Koyeb’s **Root directory** / **Docker context** to the folder that contains this **`Dockerfile`** — usually **`AI_Farm_Manager`**. Koyeb should detect the `Dockerfile` at that level.
+- **`app/services/encryption.py`** uses **`cryptography.fernet.Fernet`**. If **`ENCRYPTION_KEY`** is missing, the app **fails at startup** (lifespan).
 
----
+- **`app/services/bot_registry.py`** reads/writes **`bot_servers.json`** under **`get_data_dir()`** (default **`/app/data`** in Docker). Fields **`ftp_pass`** and **`llm_api_key`** are **encrypted on disk** and **decrypted in memory** only.
 
-## Farm snapshot: FTP (cloud) vs HTTP (local)
+- Optional **`DATA_DIR`** env forces the data directory (e.g. **`/app/data`**).
 
-**G-Portal / cloud:** Configure `GPORTAL_FTP_*` in the environment. A background task downloads `data.json` (exported by the Farm Dashboard FS25 mod) over FTP into process memory. The LLM and the `GET /` page read that snapshot — no local Electron app required on the server.
+## Farm snapshot & dashboard
 
-**Local development:** Leave `GPORTAL_FTP_HOST` empty and set `DASHBOARD_JSON_URL` (e.g. `http://127.0.0.1:8766/api/data`) if you still run the Farm Dashboard desktop app.
+- With **`GPORTAL_FTP_*`** set, **`ftp_service`** polls FTP into memory; **`GET /`** (Jinja **`dashboard.html`**) reads **`ftp_service.get_dashboard_dict()`**.
 
-If the game is not connected yet, JSON may contain `"error": "Waiting for data..."` — the bot is instructed not to invent numbers until live data exists.
+- **`lifespan`** in **`app/main.py`** starts the FTP background loop when FTP is configured.
 
-### Multi-server (many dedis at once)
-
-1. Set **`PUBLIC_BASE_URL`** to your public API URL so generated config files use the correct host.
-2. In **`/admin` → Multi-server bot**, add one profile per dedicated server (label, Farm Dashboard server id, token).
-3. Download **`ai_farm_manager_config.xml`** per profile (`/admin` or `GET /api/mod/config.xml?server_token=…`) and place it in the host **modsSettings** folder.
-4. Chat + poll + LLM context are routed **per token**, with separate outgoing queues.
-
-**Farm Dashboard ↔ integration:** `FARMDASH_INTEGRATION_KEY` matches the Electron app’s “Farm Dashboard link key” when you use that integration — not your OpenAI key and not `SERVER_TOKEN`.
-
-## Module 1 — Run the Python backend locally
+## Local development (without Docker)
 
 ```bash
 cd backend
 python -m venv .venv
-.venv\Scripts\activate          # Windows
-# source .venv/bin/activate     # Linux
+.venv\Scripts\activate   # Windows
 pip install -r requirements.txt
-copy .env.example .env          # Windows
-```
-
-Edit `.env`:
-
-- `SERVER_TOKEN` — must match the Lua mod XML.
-- `ENABLE_AI_BOT` — `true` to enable `!bot` LLM replies (requires `LLM_API_KEY` or `GEMINI_API_KEY` depending on `LLM_PROVIDER`).
-- `GPORTAL_FTP_*` — for cloud snapshot; optional locally.
-- `DASHBOARD_JSON_URL` — optional local Farm Dashboard URL when FTP is not used.
-- `ADMIN_USERNAME` / `ADMIN_PASSWORD` — required for `/admin`.
-
-### Uvicorn (development)
-
-From the `backend` folder:
-
-```bash
+copy .env.example .env
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
-
-Health: `GET http://127.0.0.1:8080/health`
-
-### Docker (local smoke test)
-
-From the `AI_Farm_Manager` folder (where the `Dockerfile` lives):
-
-```bash
-docker build -t ai-farm-manager .
-docker run --rm -p 8000:8000 -e ADMIN_PASSWORD=test -e SERVER_TOKEN=test ai-farm-manager
-```
-
-Then open `http://127.0.0.1:8000/health`.
-
-## Module 2 — Admin panel
-
-1. Open `https://YOUR_HOST/admin` (HTTP Basic: `ADMIN_USERNAME` / `ADMIN_PASSWORD`).
-2. Toggle the bot, set dashboard URL (local), API keys, models, and the system prompt.
-
-## Module 3 — FS25 Lua mod (G-Portal)
-
-1. Add **256×256** `icon.png` next to `modDesc.xml`.
-2. Zip the **contents** of `fs25_ai_farm_manager_mod` (so `modDesc.xml` is at the zip root).
-3. Upload and activate on the host.
-4. Copy **`ai_farm_manager_config.xml`** into **modsSettings**. Set:
-   - **`backendUrl`** — your public FastAPI base URL (HTTPS on Koyeb), no trailing slash.
-   - **`serverToken`** — same as the bot profile / `SERVER_TOKEN`.
-   - **`triggerPrefix`** — e.g. `!bot`.
-
-The dedicated server sends chat triggers **directly** to your API; poll returns bot lines for in-game broadcast.
-
-### HTTP notes (Giants may change APIs)
-
-The bridge uses async HTTP (`HttpClient.lua`). If requests fail, verify `createHTTPRequest` / `Internet` signatures in your game build and adjust `HttpClient.lua`.
 
 ## API summary
 
 | Method | Path | Notes |
 |--------|------|-------|
-| GET | `/` | HTML farm snapshot (FTP or empty) |
-| POST | `/api/chat/receive` | JSON `player`, `message`, `server_token` — async; use poll |
-| GET | `/api/chat/poll?server_token=…` | `{ "messages": [ { "sender", "text" } ] }` |
-| GET | `/admin` | Basic-auth settings UI |
-| GET | `/health` | Liveness |
+| GET | `/` | Farm snapshot (FTP) |
+| POST | `/api/chat/receive` | Lua bridge |
+| GET | `/api/chat/poll` | Lua bridge |
+| GET | `/admin` | Basic auth |
+| GET | `/health` | Liveness + `data_dir` path |
 
 ## Behaviour summary
 
-- **Rate limit**: max **5** LLM-bound trigger messages per **minute** per **player** name (in-memory).
-- **LLM failure / timeout**: queued fallback reply (see `llm_service.py`).
-- **Dashboard unavailable**: model is told data is offline (`dashboard_service.py`).
-- **ENABLE_AI_BOT without API keys**: queued message explains that the bot is not configured.
+- **Rate limit:** 5 LLM-bound triggers per minute per player name.
+- **LLM / FTP failures:** See `llm_service.py` / `dashboard_service.py`.
+- **`PUBLIC_BASE_URL`:** Keep aligned with the URL players and the Lua mod use for HTTPS.

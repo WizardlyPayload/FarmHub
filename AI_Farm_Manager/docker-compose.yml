@@ -1,0 +1,18 @@
+# AI Farm Manager — production stack (Coolify, Hetzner VPS, or plain Docker Compose)
+# Copy .env from backend/.env.example, set secrets, then: docker compose up -d --build
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      # Customer configs + encrypted bot_servers.json — backup this directory
+      - ./data:/app/data
+    # Place a `.env` next to this file (copy from `backend/.env.example`). Must include at least
+    # ENCRYPTION_KEY, ADMIN_PASSWORD, SERVER_TOKEN, and your LLM / FTP settings.
+    env_file:
+      - .env
+    restart: unless-stopped

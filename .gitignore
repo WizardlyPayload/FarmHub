@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+
+# Electron / electron-builder output
+release/
+dist/
+out/
+
+# Logs and local env
+*.log
+.env
+.env.*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Giants FS game data extract (huge; keep local only — do not sync to GitHub)
+dataS_py_extracted/
+dataS_py_extract/
+
+# Mod shop images exported from FS25 mods folder (local only; not for git)
+FS25_FarmDashboard_App/FS25_FarmDashboard_App/web/assests/img/items_mod_extract/*
+!FS25_FarmDashboard_App/FS25_FarmDashboard_App/web/assests/img/items_mod_extract/.gitkeep
+
+# Optional: keep built installers only in GitHub Releases, not in git
+# (uncomment if you prefer never to commit installers)
+# *.exe

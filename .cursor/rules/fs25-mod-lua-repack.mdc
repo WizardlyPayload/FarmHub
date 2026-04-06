@@ -1,0 +1,28 @@
+---
+description: After editing FS25 Farm Dashboard mod Lua, rebuild the mod zip (no moving files in repo)
+globs: FS25_FarmDashboard_Mod/**/*.lua
+alwaysApply: false
+---
+
+# FS25 mod Lua — zip only (no relocations)
+
+After editing any **`.lua`** under `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/src/`, **rebuild the install zip**. Do **not** copy or move icons or other assets from elsewhere in the project—only package what is **already** in the mod folder:
+
+- `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml`
+- `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/icon.png`
+- `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/src/` (entire tree)
+
+## Command
+
+From repo root (`MAIN CODEBASE`):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\Zip-FarmDashboardMod.ps1
+```
+
+This **replaces** `FS25_FarmDashboard_Mod/FS25_FarmDashboard.zip`. It reads the three paths above and writes the zip; it does not modify your source tree except creating/overwriting that zip.
+
+## Agent behaviour
+
+- After Lua changes in this mod, **run** that script from the project root (unless the user asks for source-only edits).
+- **Do not** move or duplicate `icon.png` / `modDesc.xml` / `src` from other folders—only zip the existing mod directory contents.

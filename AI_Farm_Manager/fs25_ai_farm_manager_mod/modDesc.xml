@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AI Farm Manager bridge mod — FS25. Match descVersion to your game if Giants updates it. -->
+<modDesc descVersion="99">
+    <author>AI Farm Manager</author>
+    <version>2.0.0.0</version>
+    <title>
+        <en>AI Farm Manager (Chat Bridge)</en>
+    </title>
+    <description>
+        <en><![CDATA[Server-side bridge: !bot chat via HTTP to your AI Farm Manager API (direct mode). Configure backendUrl + serverToken in modsSettings XML (see README).]]></en>
+    </description>
+    <iconFilename>icon.png</iconFilename>
+    <multiplayer supported="true"/>
+    <extraSourceFiles>
+        <sourceFile filename="src/Config.lua"/>
+        <sourceFile filename="src/HttpClient.lua"/>
+        <sourceFile filename="src/ChatHooks.lua"/>
+        <sourceFile filename="src/main.lua"/>
+    </extraSourceFiles>
+</modDesc>

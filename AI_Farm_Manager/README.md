@@ -99,8 +99,24 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
 | GET | `/` | Farm snapshot (FTP) |
 | POST | `/api/chat/receive` | Lua bridge |
 | GET | `/api/chat/poll` | Lua bridge |
+| GET | `/api/v1/consultant/insights` | Proactive “Smart Suggestions” (Farm Dashboard) |
 | GET | `/admin` | Basic auth |
 | GET | `/health` | Liveness + `data_dir` path |
+
+## Proactive Consultant API
+
+The AI Farm Manager exposes a **Smart Suggestions** layer for the **Farm Dashboard (Electron)**: the dashboard calls the backend with the same integration key you use for other Farm Dashboard features.
+
+### Endpoint: `GET /api/v1/consultant/insights`
+
+- **Authentication:** Header **`X-FarmDash-Key`** — must match **`FARMDASH_INTEGRATION_KEY`** in `backend/.env` (same value as “Farm Dashboard link key” in the Electron app’s AI Farm Manager panel).
+- **Behaviour:**
+  - **Heuristics:** Flags production outputs or storage levels at or above ~**90%** capacity (high-priority alerts even when the LLM is slow, rate-limited, or disabled).
+  - **LLM analysis:** When a Gemini/OpenAI key is available, adds strategic reasoning (e.g. market prices, fields, animals, finance).
+- **Response:** JSON with **`insights`** (category, priority, message, reasoning) and **`llm_used`** so the client can show whether items are heuristic-only or LLM-augmented.
+- **Client:** The Electron app loads **`web/assests/js/ai-farm-consultant-insights.js`** — priority-based cards, periodic refresh, and debounced reload when the livestock dashboard becomes visible.
+
+OpenAPI: this route lives under the **consultant** tag in **`/docs`**.
 
 ## Behaviour summary
 

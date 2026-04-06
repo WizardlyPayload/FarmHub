@@ -1086,6 +1086,28 @@ th {
   word-break: break-all;
 }
 
+/* AI Farm Manager — proactive consultant insights */
+#ai-insights-panel .insight-card {
+  border-left: 4px solid var(--bs-secondary);
+  padding: 0.65rem 0.75rem;
+  margin-bottom: 0.5rem;
+  border-radius: 0.25rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+#ai-insights-panel .insight-card.priority-high {
+  border-left-color: var(--bs-danger);
+}
+#ai-insights-panel .insight-card.priority-medium {
+  border-left-color: var(--bs-warning);
+}
+#ai-insights-panel .insight-card.priority-low {
+  border-left-color: var(--bs-info);
+}
+#ai-insights-panel .insight-meta {
+  font-size: 0.75rem;
+  opacity: 0.85;
+}
+
 /* Navbar Enhancement */
 .navbar-custom {
   background: rgba(26, 26, 26, 0.95) !important;

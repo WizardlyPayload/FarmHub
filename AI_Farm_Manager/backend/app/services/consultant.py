@@ -381,7 +381,9 @@ async def generate_farm_insights(
             key = normalize_incoming_api_key(base.get("llm_api_key"))
         if not key:
             return heuristics, False
-        prov = prov or (prov_base if prov_base in ("openai", "gemini") else None)
+        # Use server LLM_PROVIDER only — ignore X-AI-Provider when not using BYOK (clients may
+        # default to openai while the VPS uses gemini, which would mis-route the server key).
+        prov = prov_base if prov_base in ("openai", "gemini") else None
 
     settings = _consultant_llm_settings_for_byok(key, prov)
 

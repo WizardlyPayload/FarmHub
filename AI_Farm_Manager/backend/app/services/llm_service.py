@@ -5,8 +5,8 @@ import time
 from typing import Any
 
 import httpx
-
 from pathlib import Path
+from urllib.parse import quote
 
 from app.config import get_settings
 from app.services.game_reference import build_game_reference_block
@@ -90,17 +90,20 @@ async def _openai(settings: dict[str, Any], user_message: str, dashboard_context
 
 def _gemini_generate_url(settings: dict[str, Any]) -> str:
     """REST URL for non-streaming generateContent (same body as streamGenerateContent minus SSE)."""
-    key = settings["gemini_api_key"]
-    model = settings["gemini_model"]
+    key = (settings.get("gemini_api_key") or "").strip().replace("\ufeff", "").replace("\u200b", "")
+    model = (settings.get("gemini_model") or "gemini-1.5-flash").strip()
     endpoint = settings.get("gemini_api_endpoint", "generativelanguage")
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY is empty")
+    qkey = quote(key, safe="")
     if endpoint == "aiplatform":
         return (
             "https://aiplatform.googleapis.com/v1/publishers/google/models/"
-            f"{model}:generateContent?key={key}"
+            f"{model}:generateContent?key={qkey}"
         )
     return (
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        f"?key={key}"
+        f"?key={qkey}"
     )
 
 

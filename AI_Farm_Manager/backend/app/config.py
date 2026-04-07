@@ -75,6 +75,11 @@ def get_settings() -> dict:
     llm_provider = os.getenv("LLM_PROVIDER", "openai").lower().strip()
     llm_api_key = os.getenv("LLM_API_KEY", "")
     gemini_api_key = os.getenv("GEMINI_API_KEY", "")
+    # Common deploy mistake: Gemini (AIza…) only in LLM_API_KEY while provider is gemini.
+    if llm_provider == "gemini" and not (gemini_api_key or "").strip():
+        lk = (llm_api_key or "").strip()
+        if lk.startswith("AIza"):
+            gemini_api_key = lk
     be = _bot_enabled()
     if llm_provider == "gemini":
         llm_configured = be and bool(gemini_api_key)

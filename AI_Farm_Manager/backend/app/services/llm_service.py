@@ -93,6 +93,9 @@ def _gemini_generate_url(settings: dict[str, Any]) -> str:
     key = (settings.get("gemini_api_key") or "").strip().replace("\ufeff", "").replace("\u200b", "")
     model = (settings.get("gemini_model") or "gemini-1.5-flash").strip()
     endpoint = settings.get("gemini_api_endpoint", "generativelanguage")
+    api_ver = (settings.get("gemini_rest_api_version") or "v1").strip().lower()
+    if api_ver not in ("v1", "v1beta"):
+        api_ver = "v1"
     if not key:
         raise RuntimeError("GEMINI_API_KEY is empty")
     qkey = quote(key, safe="")
@@ -102,7 +105,7 @@ def _gemini_generate_url(settings: dict[str, Any]) -> str:
             f"{model}:generateContent?key={qkey}"
         )
     return (
-        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        f"https://generativelanguage.googleapis.com/{api_ver}/models/{model}:generateContent"
         f"?key={qkey}"
     )
 

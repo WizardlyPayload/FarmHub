@@ -308,7 +308,7 @@ async def _gemini_consultant(settings: dict, user_message: str) -> str:
         raise RuntimeError("GEMINI_API_KEY not set")
     url = _gemini_generate_url(settings)
     prompt = f"{CONSULTANT_SYSTEM}\n\n{user_message}"
-    # Single-turn text; omit "role" for widest compatibility with generativelanguage v1beta.
+    # Single-turn text; omit "role" for widest compatibility with generativelanguage v1 / v1beta.
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.3, "maxOutputTokens": 4096},

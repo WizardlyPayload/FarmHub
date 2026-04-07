@@ -64,6 +64,12 @@ def _gemini_api_endpoint() -> str:
     return "generativelanguage"
 
 
+def _gemini_rest_api_version() -> str:
+    """Path segment for AI Studio REST: v1 (current docs / gemini-2.5+) or v1beta."""
+    v = (os.getenv("GEMINI_REST_API_VERSION") or "v1").strip().lower()
+    return v if v in ("v1", "v1beta") else "v1"
+
+
 @lru_cache
 def get_settings() -> dict:
     llm_provider = os.getenv("LLM_PROVIDER", "openai").lower().strip()
@@ -84,6 +90,7 @@ def get_settings() -> dict:
         "gemini_model": os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
         # generativelanguage = AI Studio (AIza…); aiplatform = Vertex publisher API (Cloud API key)
         "gemini_api_endpoint": _gemini_api_endpoint(),
+        "gemini_rest_api_version": _gemini_rest_api_version(),
         "dashboard_json_url": os.getenv("DASHBOARD_JSON_URL", "").strip(),
         "dashboard_server_id": os.getenv("DASHBOARD_SERVER_ID", "").strip(),
         "dashboard_fetch_url": _dashboard_fetch_url(),

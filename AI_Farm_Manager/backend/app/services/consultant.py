@@ -8,6 +8,11 @@ from typing import Any
 from app.config import get_settings
 from app.schemas.insights import FarmInsight, InsightCategory, InsightPriority
 from app.services.log_buffer import log_event
+from app.services.llm_service import format_gemini_http_error
+
+# Oversized dashboard JSON often yields Gemini 400 (INVALID_ARGUMENT / token limits).
+_CONSULTANT_SNAPSHOT_CHARS_GEMINI = 65000
+_CONSULTANT_SNAPSHOT_CHARS_OPENAI = 118000
 
 CONSULTANT_SYSTEM = """You are an expert Farming Simulator 25 field and logistics consultant. Analyze the provided game state JSON.
 
@@ -164,9 +169,20 @@ async def _llm_insights_from_snapshot(
     """Call OpenAI or Gemini with consultant system prompt; parse JSON insights."""
     provider = (settings.get("llm_provider") or "openai").strip().lower()
 
+    max_chars = (
+        _CONSULTANT_SNAPSHOT_CHARS_GEMINI
+        if provider == "gemini"
+        else _CONSULTANT_SNAPSHOT_CHARS_OPENAI
+    )
+    snap = snapshot_json if len(snapshot_json) <= max_chars else snapshot_json[:max_chars]
+    trunc_note = (
+        "\n\n(JSON above was truncated for API input limits — infer from visible data.)\n"
+        if len(snapshot_json) > max_chars
+        else ""
+    )
     user_payload = (
         "Analyze this game state JSON and return ONLY the JSON object as specified.\n\n"
-        f"```json\n{snapshot_json[:118000]}\n```"
+        f"```json\n{snap}\n```{trunc_note}"
     )
 
     try:
@@ -225,22 +241,42 @@ async def _llm_insights_from_snapshot(
 
 async def _openai_consultant(settings: dict, user_message: str) -> str:
     from openai import AsyncOpenAI
+    from openai import BadRequestError
 
     key = settings.get("llm_api_key") or ""
     if not key:
         raise RuntimeError("LLM_API_KEY not set")
     client = AsyncOpenAI(api_key=key)
     model = settings["llm_model"]
-    resp = await client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": CONSULTANT_SYSTEM},
-            {"role": "user", "content": user_message},
-        ],
-        temperature=0.3,
-        max_tokens=4096,
-        response_format={"type": "json_object"},
-    )
+    messages = [
+        {"role": "system", "content": CONSULTANT_SYSTEM},
+        {"role": "user", "content": user_message},
+    ]
+    kwargs = {
+        "model": model,
+        "messages": messages,
+        "temperature": 0.3,
+        "max_tokens": 4096,
+    }
+    try:
+        resp = await client.chat.completions.create(
+            **kwargs,
+            response_format={"type": "json_object"},
+        )
+    except BadRequestError as e:
+        # Many models return 400 if json_object / response_format is not supported.
+        detail = str(getattr(e, "message", None) or getattr(e, "body", None) or e)
+        if "json" in detail.lower() or "response_format" in detail.lower():
+            log_event(
+                "WARN",
+                "OpenAI rejected json_object for this model; retrying without response_format",
+                model=model,
+                detail=detail[:500],
+            )
+            resp = await client.chat.completions.create(**kwargs)
+        else:
+            log_event("WARN", f"OpenAI BadRequest (consultant): {detail[:800]}")
+            raise
     return (resp.choices[0].message.content or "").strip()
 
 
@@ -254,12 +290,15 @@ async def _gemini_consultant(settings: dict, user_message: str) -> str:
         raise RuntimeError("GEMINI_API_KEY not set")
     url = _gemini_generate_url(settings)
     prompt = f"{CONSULTANT_SYSTEM}\n\n{user_message}"
+    # Single-turn text; omit "role" for widest compatibility with generativelanguage v1beta.
     payload = {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.3, "maxOutputTokens": 4096},
     }
     async with httpx.AsyncClient(timeout=90.0) as client:
         r = await client.post(url, json=payload)
+        if r.status_code >= 400:
+            log_event("WARN", format_gemini_http_error(r))
         try:
             r.raise_for_status()
         except httpx.HTTPStatusError as e:

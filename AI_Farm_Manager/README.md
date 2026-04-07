@@ -77,7 +77,7 @@ AI_Farm_Manager/
 
 ## Farm snapshot & dashboard
 
-- With **`GPORTAL_FTP_*`** set, **`ftp_service`** polls FTP into memory; **`GET /`** (Jinja **`dashboard.html`**) reads **`ftp_service.get_dashboard_dict()`**.
+- With **`GPORTAL_FTP_*`** set, **`ftp_service`** polls FTP into memory; **`GET /`** (Jinja **`dashboard.html`**) reads **`ftp_service.get_dashboard_dict()`**. Set **`GPORTAL_FTP_PORT`** when the host does not use port **21** (many G-Portal FTP endpoints use a custom port).
 
 - **`lifespan`** in **`app/main.py`** starts the FTP background loop when FTP is configured.
 

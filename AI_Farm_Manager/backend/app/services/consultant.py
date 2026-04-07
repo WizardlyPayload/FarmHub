@@ -4,11 +4,29 @@ from __future__ import annotations
 import json
 import re
 from typing import Any
+from urllib.parse import unquote
 
 from app.config import get_settings
 from app.schemas.insights import FarmInsight, InsightCategory, InsightPriority
 from app.services.log_buffer import log_event
 from app.services.llm_service import format_gemini_http_error
+
+
+def normalize_incoming_api_key(header_val: str | None) -> str:
+    """
+    Strip BOM / ZWSP; optional URI-decode (matches X-FarmDash-Key handling for Unicode-safe clients).
+    """
+    if header_val is None:
+        return ""
+    s = str(header_val).strip().replace("\ufeff", "").replace("\u200b", "")
+    if not s:
+        return ""
+    try:
+        dec = unquote(s).strip()
+        return dec if dec else s
+    except Exception:
+        return s
+
 
 # Oversized dashboard JSON often yields Gemini 400 (INVALID_ARGUMENT / token limits).
 _CONSULTANT_SNAPSHOT_CHARS_GEMINI = 65000
@@ -320,10 +338,10 @@ def _consultant_llm_settings_for_byok(
     user_api_key: str,
     user_provider: str | None,
 ) -> dict[str, Any]:
-    """Ephemeral settings for consultant LLM using the client's key (BYOK). Server .env LLM keys are not used."""
+    """Build settings dict for one consultant LLM call (BYOK key or server env key)."""
     base = get_settings()
     merged: dict[str, Any] = dict(base)
-    key = user_api_key.strip()
+    key = normalize_incoming_api_key(user_api_key)
     prov = (user_provider or "").strip().lower()
     if prov not in ("openai", "gemini"):
         prov = "gemini" if key.startswith("AIza") else "openai"
@@ -343,15 +361,29 @@ async def generate_farm_insights(
 ) -> tuple[list[FarmInsight], bool]:
     """
     Combine heuristic rules (e.g. output fill >= 90%) with LLM analysis.
-    LLM runs only when the client sends X-AI-API-Key (BYOK); server .env keys are not used for this path.
-    Returns (insights, llm_used).
+
+    API key resolution:
+    1. Non-empty ``X-AI-API-Key`` (BYOK) after normalize/decode.
+    2. Else server ``GEMINI_API_KEY`` or ``LLM_API_KEY`` per ``LLM_PROVIDER`` (same as admin / ``!bot``).
     """
     heuristics = _heuristic_production_output_space(snapshot_data)
-    key = (user_api_key or "").strip()
-    if not key:
-        return heuristics, False
+    key = normalize_incoming_api_key(user_api_key)
+    prov = (user_provider or "").strip().lower() or None
+    if prov not in ("openai", "gemini", "", None):
+        prov = None
 
-    settings = _consultant_llm_settings_for_byok(key, user_provider)
+    if not key:
+        base = get_settings()
+        prov_base = (base.get("llm_provider") or "openai").strip().lower()
+        if prov_base == "gemini":
+            key = normalize_incoming_api_key(base.get("gemini_api_key"))
+        else:
+            key = normalize_incoming_api_key(base.get("llm_api_key"))
+        if not key:
+            return heuristics, False
+        prov = prov or (prov_base if prov_base in ("openai", "gemini") else None)
+
+    settings = _consultant_llm_settings_for_byok(key, prov)
 
     try:
         snap_str = json.dumps(snapshot_data, ensure_ascii=False, default=str)

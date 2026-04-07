@@ -9,21 +9,25 @@ from app.config import get_settings
 from app.schemas.insights import FarmInsight, InsightCategory, InsightPriority
 from app.services.log_buffer import log_event
 
-CONSULTANT_SYSTEM = """You are an expert Farming Simulator logistics consultant. Analyze the provided game state JSON. Identify:
+CONSULTANT_SYSTEM = """You are an expert Farming Simulator 25 field and logistics consultant. Analyze the provided game state JSON.
 
-Immediate production bottlenecks (inputs low/outputs full).
+Focus especially on **fields** (arable parcels):
+- Current crop, growth stage, harvest readiness, withered state, soil work (plow/cultivate), lime/pH, nitrogen/Precision Farming.
+- Suggest a **smart next crop or rotation** where relevant (e.g. after harvest or for empty fields), using the current and previous crop context in the JSON.
 
-Critical field tasks (harvesting/planting/withering).
-
-Animal welfare (low food/water or space for new purchases).
-
-Market opportunities (best prices for stored crops).
-
-Provide your reasoning as a series of brief, actionable bullet points.
+Also mention when relevant: production bottlenecks, animals, and market/stored crop opportunities — but **prioritize actionable field advice**.
 
 You MUST respond with ONLY valid JSON (no markdown, no prose before or after) in this exact shape:
-{"insights":[{"category":"Field|Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"..."},...]}
-Use at least one insight per relevant area; use an empty array if the snapshot has no usable data."""
+{"insights":[{"category":"Field|Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":"..."},...]}
+
+CRITICAL — field-specific insights:
+- When an insight applies to **one** parcel, **category MUST be exactly** `Field` (capital F, rest lowercase).
+- **field_ref MUST be the exact numeric identifier** copied from the source JSON for that parcel: use the value of **farmlandId** if present, otherwise **id**. Use the raw number or its string form only (e.g. `42` or `"42"` in JSON).
+- Do **NOT** prefix with the word "Field", "Parcel", or "#". Do **NOT** use the field display name. Do **NOT** add units or extra text. **Only** the id so clients can match rows.
+
+For farm-wide or non-parcel field advice, omit **field_ref** or set it to null.
+
+Use at least one Field insight when the snapshot lists fields; use an empty array only if there is no usable data."""
 
 
 def _coerce_pct(value: Any) -> float | None:
@@ -133,10 +137,32 @@ def _parse_priority(raw: Any) -> InsightPriority:
     return InsightPriority.MEDIUM
 
 
-async def _llm_insights_from_snapshot(snapshot_json: str) -> tuple[list[FarmInsight], bool]:
+def _normalize_field_ref(raw: Any) -> str | None:
+    """Strip LLM fluff; return a short id string for matching farmlandId/id, or None."""
+    if raw is None:
+        return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    s = re.sub(r"^field\s*#?\s*", "", s, flags=re.I)
+    s = re.sub(r"^parcel\s*#?\s*", "", s, flags=re.I)
+    s = re.sub(r"^farmland\s*#?\s*", "", s, flags=re.I)
+    s = s.lstrip("#").strip()
+    if not s:
+        return None
+    # First token only if model appended noise (e.g. "42 note")
+    part = s.split()[0] if s.split() else s
+    if len(part) > 64:
+        part = part[:64]
+    return part or None
+
+
+async def _llm_insights_from_snapshot(
+    snapshot_json: str,
+    settings: dict[str, Any],
+) -> tuple[list[FarmInsight], bool]:
     """Call OpenAI or Gemini with consultant system prompt; parse JSON insights."""
-    settings = get_settings()
-    provider = settings["llm_provider"]
+    provider = (settings.get("llm_provider") or "openai").strip().lower()
 
     user_payload = (
         "Analyze this game state JSON and return ONLY the JSON object as specified.\n\n"
@@ -144,26 +170,32 @@ async def _llm_insights_from_snapshot(snapshot_json: str) -> tuple[list[FarmInsi
     )
 
     try:
-        if provider == "gemini" and settings.get("gemini_api_key"):
+        if provider == "gemini" and (settings.get("gemini_api_key") or "").strip():
             text = await _gemini_consultant(settings, user_payload)
         else:
             text = await _openai_consultant(settings, user_payload)
     except Exception as e:
-        log_event("WARN", f"Consultant LLM failed: {e}")
+        # Invalid API key, quota, network, or provider HTTP errors — fall back to heuristics only.
+        log_event("WARN", f"Consultant LLM request failed (auth/network/provider): {e}")
         return [], False
 
-    text = text.strip()
+    text = (text or "").strip()
     text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
     text = re.sub(r"\s*```\s*$", "", text)
 
     try:
         data = json.loads(text)
-    except json.JSONDecodeError:
-        log_event("WARN", "Consultant LLM returned non-JSON")
+    except (json.JSONDecodeError, TypeError, ValueError, RecursionError) as e:
+        log_event("WARN", f"Consultant LLM returned unparsable JSON: {e}")
         return [], False
 
-    raw_list = data.get("insights") if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        log_event("WARN", "Consultant LLM JSON root is not an object")
+        return [], False
+
+    raw_list = data.get("insights")
     if not isinstance(raw_list, list):
+        log_event("WARN", "Consultant LLM JSON missing insights array")
         return [], False
 
     out: list[FarmInsight] = []
@@ -171,12 +203,19 @@ async def _llm_insights_from_snapshot(snapshot_json: str) -> tuple[list[FarmInsi
         if not isinstance(item, dict):
             continue
         try:
+            cat = _parse_category(item.get("category"))
+            field_ref = (
+                _normalize_field_ref(item.get("field_ref"))
+                if cat == InsightCategory.FIELD
+                else None
+            )
             out.append(
                 FarmInsight(
-                    category=_parse_category(item.get("category")),
+                    category=cat,
                     priority=_parse_priority(item.get("priority")),
                     message=str(item.get("message", ""))[:2000],
                     reasoning=str(item.get("reasoning", ""))[:4000],
+                    field_ref=field_ref,
                 )
             )
         except Exception:
@@ -221,8 +260,15 @@ async def _gemini_consultant(settings: dict, user_message: str) -> str:
     }
     async with httpx.AsyncClient(timeout=90.0) as client:
         r = await client.post(url, json=payload)
-        r.raise_for_status()
-        data = r.json()
+        try:
+            r.raise_for_status()
+        except httpx.HTTPStatusError as e:
+            code = e.response.status_code if e.response is not None else r.status_code
+            raise RuntimeError(f"Gemini HTTP {code}") from e
+        try:
+            data = r.json()
+        except json.JSONDecodeError as e:
+            raise RuntimeError("Gemini response body is not JSON") from e
     parts = (
         data.get("candidates", [{}])[0]
         .get("content", {})
@@ -231,38 +277,61 @@ async def _gemini_consultant(settings: dict, user_message: str) -> str:
     return "".join(p.get("text", "") for p in parts).strip()
 
 
-def _llm_api_available(settings: dict[str, Any]) -> bool:
-    """Consultant may use LLM whenever provider keys are set (independent of ENABLE_AI_BOT)."""
-    if settings.get("llm_provider") == "gemini":
-        return bool((settings.get("gemini_api_key") or "").strip())
-    return bool((settings.get("llm_api_key") or "").strip())
+def _consultant_llm_settings_for_byok(
+    user_api_key: str,
+    user_provider: str | None,
+) -> dict[str, Any]:
+    """Ephemeral settings for consultant LLM using the client's key (BYOK). Server .env LLM keys are not used."""
+    base = get_settings()
+    merged: dict[str, Any] = dict(base)
+    key = user_api_key.strip()
+    prov = (user_provider or "").strip().lower()
+    if prov not in ("openai", "gemini"):
+        prov = "gemini" if key.startswith("AIza") else "openai"
+    merged["llm_provider"] = prov
+    if prov == "gemini":
+        merged["gemini_api_key"] = key
+    else:
+        merged["llm_api_key"] = key
+    return merged
 
 
-async def generate_farm_insights(snapshot_data: dict[str, Any]) -> tuple[list[FarmInsight], bool]:
+async def generate_farm_insights(
+    snapshot_data: dict[str, Any],
+    *,
+    user_api_key: str | None = None,
+    user_provider: str | None = None,
+) -> tuple[list[FarmInsight], bool]:
     """
     Combine heuristic rules (e.g. output fill >= 90%) with LLM analysis.
+    LLM runs only when the client sends X-AI-API-Key (BYOK); server .env keys are not used for this path.
     Returns (insights, llm_used).
     """
     heuristics = _heuristic_production_output_space(snapshot_data)
-    settings = get_settings()
-
-    if not _llm_api_available(settings):
+    key = (user_api_key or "").strip()
+    if not key:
         return heuristics, False
+
+    settings = _consultant_llm_settings_for_byok(key, user_provider)
 
     try:
         snap_str = json.dumps(snapshot_data, ensure_ascii=False, default=str)
     except Exception:
         snap_str = "{}"
 
-    llm_list, llm_ok = await _llm_insights_from_snapshot(snap_str)
+    try:
+        llm_list, llm_ok = await _llm_insights_from_snapshot(snap_str, settings)
+    except Exception as e:
+        log_event("WARN", f"Consultant pipeline unexpected error: {e}")
+        return heuristics, False
 
     # Merge: heuristics first (deterministic), then LLM; dedupe similar messages
     seen_msg: set[str] = {h.message[:80] for h in heuristics}
     merged = list(heuristics)
     for ins in llm_list:
-        key = ins.message[:80]
-        if key not in seen_msg:
-            seen_msg.add(key)
+        msg_key = ins.message[:80]
+        if msg_key not in seen_msg:
+            seen_msg.add(msg_key)
             merged.append(ins)
 
     return merged, llm_ok

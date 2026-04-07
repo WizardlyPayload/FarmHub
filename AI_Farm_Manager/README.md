@@ -49,6 +49,8 @@ AI_Farm_Manager/
 
 5. **Verify:** `curl -s https://YOUR_HOST/health` (or `http://SERVER_IP:8000/health` if no TLS yet) — expect `"status":"ok"` and `"data_dir":".../app/data"`.
 
+6. **Admin “Save” and `.env`:** Compose’s `env_file` injects variables but does not always create a file **inside** the container. Saving settings from **`/admin`** will **create `/app/.env`** if needed. To persist those edits across image rebuilds, optionally mount a host file, e.g. **`- ./backend/.env:/app/.env`** (adjust paths to match your host layout).
+
 6. **Lua mod:** Set **`backendUrl`** in `ai_farm_manager_config.xml` to your public API base URL (same idea as **`PUBLIC_BASE_URL`**). Use HTTPS once a certificate is in front of the app.
 
 ## Deploy with Coolify (Hetzner)
@@ -110,10 +112,11 @@ The AI Farm Manager exposes a **Smart Suggestions** layer for the **Farm Dashboa
 ### Endpoint: `GET /api/v1/consultant/insights`
 
 - **Authentication:** Header **`X-FarmDash-Key`** — must match **`FARMDASH_INTEGRATION_KEY`** in `backend/.env` (same value as “Farm Dashboard link key” in the Electron app’s AI Farm Manager panel).
+- **LLM (Bring Your Own Key):** Send **`X-AI-API-Key`** with the user’s OpenAI or Gemini key, and optional **`X-AI-Provider`** (`openai` or `gemini`). The server **does not** use **`LLM_API_KEY` / `GEMINI_API_KEY`** from `.env` for this endpoint; if the header is omitted, the response is **heuristics only** (`llm_used=false`). Keys are forwarded to the provider and are not stored.
 - **Behaviour:**
   - **Heuristics:** Flags production outputs or storage levels at or above ~**90%** capacity (high-priority alerts even when the LLM is slow, rate-limited, or disabled).
-  - **LLM analysis:** When a Gemini/OpenAI key is available, adds strategic reasoning (e.g. market prices, fields, animals, finance).
-- **Response:** JSON with **`insights`** (category, priority, message, reasoning) and **`llm_used`** so the client can show whether items are heuristic-only or LLM-augmented.
+  - **LLM analysis:** Field-focused rotation and next-step advice; other areas when relevant. Field-specific rows may include **`field_ref`** (farmland id string) for per-parcel UI in the Electron app.
+- **Response:** JSON with **`insights`** (category, priority, message, reasoning, optional **`field_ref`**) and **`llm_used`** so the client can show whether items are heuristic-only or LLM-augmented.
 - **Client:** The Electron app loads **`web/assests/js/ai-farm-consultant-insights.js`** — priority-based cards, periodic refresh, and debounced reload when the livestock dashboard becomes visible.
 
 OpenAPI: this route lives under the **consultant** tag in **`/docs`**.

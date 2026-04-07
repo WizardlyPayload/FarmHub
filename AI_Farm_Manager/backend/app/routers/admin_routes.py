@@ -10,7 +10,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from app.config import get_settings
+from app.config import get_backend_root, get_settings, reload_backend_dotenv
 from app.prompt_loader import write_system_prompt
 from app.routers.integration import get_overview_payload
 from app.services.bot_registry import delete_instance, find_instance_by_id, upsert_instance
@@ -76,17 +76,23 @@ class SettingsUpdate(BaseModel):
 
 
 def _write_env_updates(updates: dict[str, str]) -> None:
-    """Append updates to .env file (simple key=value lines)."""
-    env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
-    if not os.path.isfile(env_path):
-        raise HTTPException(500, ".env not found — copy .env.example to .env on the server")
+    """Merge updates into backend `.env` (simple key=value lines).
 
-    with open(env_path, "r", encoding="utf-8") as f:
-        lines = f.readlines()
+    Creates the file if missing (Docker/Coolify often inject env via `env_file` without a real `/app/.env`).
+    """
+    env_path = get_backend_root() / ".env"
+    if env_path.is_file():
+        lines = env_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    else:
+        env_path.parent.mkdir(parents=True, exist_ok=True)
+        lines = [
+            "# Auto-created — settings from /admin were saved here.\n"
+            "# For a full template, copy backend/.env.example locally and merge as needed.\n"
+        ]
 
     keys = set(updates.keys())
     out: list[str] = []
-    seen = set()
+    seen: set[str] = set()
     for line in lines:
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
@@ -102,9 +108,8 @@ def _write_env_updates(updates: dict[str, str]) -> None:
         if k not in seen:
             out.append(f"{k}={v}\n")
 
-    with open(env_path, "w", encoding="utf-8") as f:
-        f.writelines(out)
-
+    env_path.write_text("".join(out), encoding="utf-8")
+    reload_backend_dotenv(override=True)
     get_settings.cache_clear()
 
 

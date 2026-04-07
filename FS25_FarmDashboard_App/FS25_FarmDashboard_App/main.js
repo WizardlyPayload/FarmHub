@@ -904,6 +904,44 @@ ipcMain.handle('get-ui-preferences', () => {
     };
 });
 
+// ── AI Consultant BYOK (stored in electron-store; never committed) ─────────────
+ipcMain.handle('get-consultant-byok-credentials', () => {
+    const raw = store.get('consultantByok');
+    const r = raw && typeof raw === 'object' ? raw : {};
+    const apiKey = r.apiKey && String(r.apiKey).trim() ? String(r.apiKey).trim() : '';
+    const provider = r.provider === 'gemini' ? 'gemini' : 'openai';
+    return { apiKey: apiKey || null, provider };
+});
+
+ipcMain.handle('get-consultant-byok-meta', () => {
+    const raw = store.get('consultantByok');
+    const r = raw && typeof raw === 'object' ? raw : {};
+    const apiKey = r.apiKey && String(r.apiKey).trim() ? String(r.apiKey).trim() : '';
+    return {
+        hasKey: apiKey.length > 0,
+        provider: r.provider === 'gemini' ? 'gemini' : 'openai',
+    };
+});
+
+ipcMain.handle('save-consultant-byok-credentials', (_e, payload) => {
+    const clear = payload && payload.clear === true;
+    if (clear) {
+        store.delete('consultantByok');
+        return { ok: true, cleared: true };
+    }
+    const rawPrev = store.get('consultantByok');
+    const prev = rawPrev && typeof rawPrev === 'object' ? rawPrev : {};
+    const prevKey = prev.apiKey && String(prev.apiKey).trim() ? String(prev.apiKey).trim() : '';
+    const incoming = payload && payload.apiKey != null ? String(payload.apiKey).trim() : '';
+    const apiKey = incoming || prevKey;
+    const provider = payload && payload.provider === 'gemini' ? 'gemini' : 'openai';
+    if (!apiKey) {
+        return { ok: false, error: 'empty_key' };
+    }
+    store.set('consultantByok', { apiKey, provider });
+    return { ok: true };
+});
+
 ipcMain.handle('save-ui-preferences', (_e, prefs) => {
     const prev = store.get('uiPreferences') || {};
     const prevEx = normalizeExcludedFarmlandIdsMap(prev.excludedFarmlandIdsByServer);

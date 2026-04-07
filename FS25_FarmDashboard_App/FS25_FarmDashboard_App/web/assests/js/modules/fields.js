@@ -1,5 +1,12 @@
 // FS25 FarmDashboard | fields.js | v2.0.0
 
+import { getLocalFieldSuggestion } from "../rules-engine.js";
+import {
+  refreshFieldConsultantCache,
+  scheduleFieldConsultantFetch,
+  lookupFieldConsultantInsight,
+} from "../field-consultant-bridge.js";
+
 /**
  * fields.js  —  FarmDashboard FS25
  * Live field data from the API, auto-refreshes every 5 seconds.
@@ -16,6 +23,17 @@ let fieldsIsLoading      = false;
 /** Persists across API refreshes until user leaves the fields section (then reset to all). */
 let fieldsFilterType     = "all";
 let fieldsSearchTerm     = "";
+let fieldConsultantListenerRegistered = false;
+
+function ensureFieldConsultantListener() {
+  if (fieldConsultantListenerRegistered || typeof window === "undefined") return;
+  fieldConsultantListenerRegistered = true;
+  window.addEventListener("field-consultant-updated", () => {
+    if (document.getElementById("fields-list")) {
+      renderFields(fieldsFilterType, fieldsSearchTerm);
+    }
+  });
+}
 
 /** Single field bar: purple when mulched (map-style), matches progress bar */
 const MULCH_PURPLE = "#7b1fa2";
@@ -61,6 +79,7 @@ if (typeof window !== 'undefined') {
 export function showFieldsSection() {
     fieldsFilterType = "all";
     fieldsSearchTerm = "";
+    ensureFieldConsultantListener();
 
     document.getElementById("section-content").innerHTML = buildFieldsHTML();
     document.getElementById("section-content").classList.remove("d-none");
@@ -120,6 +139,7 @@ async function loadFieldsData() {
         renderFields(fieldsFilterType, fieldsSearchTerm);
         updateFieldStats();
         updateLandingCount();
+        scheduleFieldConsultantFetch();
 
     } catch (err) {
         console.error("[Fields] Load error:", err);
@@ -593,17 +613,9 @@ function getWinterFieldSeasonalNote(field) {
     return "Winter: arable growth is minimal — field readings may look unchanged until spring. Suggestions still reflect soil prep and planning.";
 }
 
-// ── Suggested Next Step: single action (lowest priority number = best action from here) ──
-function buildSuggestion(field) {
-    const seasonalNote = getWinterFieldSeasonalNote(field);
-    if (!field.suggestions || field.suggestions.length === 0) {
-        if (!seasonalNote) return "";
-        return `
-        <div class="mt-3 p-2 bg-dark rounded border-start border-info border-3">
-            <small class="text-muted d-block">Season</small>
-            <span class="text-info small"><i class="bi bi-snow me-1"></i>${escapeFieldHtml(seasonalNote)}</span>
-        </div>`;
-    }
+// ── Suggested Next Step: Layer 1 rules (local) + optional Layer 2 AI (VPS, field_ref) ──
+function pickApiFallbackSuggestion(field) {
+    if (!field.suggestions || field.suggestions.length === 0) return null;
     let sorted = [...field.suggestions].sort((a, b) => (a.priority || 9) - (b.priority || 9));
     if (shouldSuppressHarvestSuggestions(field)) {
         sorted = sorted.filter(s => {
@@ -615,8 +627,45 @@ function buildSuggestion(field) {
         });
     }
     const top = sorted.find(s => s && s.action);
-    if (!top) {
-        if (!seasonalNote) return "";
+    if (!top) return null;
+    return {
+        action: top.action,
+        reason: top.reason || "",
+        source: "rules",
+    };
+}
+
+function buildSuggestion(field) {
+    const seasonalNote = getWinterFieldSeasonalNote(field);
+    let rulesLocal = getLocalFieldSuggestion(field);
+    const rulesApi = pickApiFallbackSuggestion(field);
+    if (
+        rulesLocal &&
+        rulesLocal.action === "Review field status in game" &&
+        rulesApi
+    ) {
+        rulesLocal = rulesApi;
+    }
+    const rules = rulesLocal || rulesApi;
+
+    const aiMap = typeof window !== "undefined" && window.__fieldConsultantByRef ? window.__fieldConsultantByRef : null;
+    const ai = lookupFieldConsultantInsight(aiMap, field);
+    const useAi = !!(ai && (ai.message || "").trim());
+
+    const action = useAi ? String(ai.message).trim() : (rules ? rules.action : "");
+    const detail = useAi ? String(ai.reasoning || "").trim() : (rules ? rules.reason : "");
+    const layer = useAi ? "ai" : "rules";
+
+    const layerBadge =
+        layer === "ai"
+            ? `<span class="badge bg-info text-dark ms-1 field-suggestion-layer-ai" title="AI Consultant (VPS + your API key)"><i class="bi bi-stars me-1"></i>AI</span>`
+            : `<span class="badge bg-secondary ms-1 field-suggestion-layer-rules" title="Local rules / game data"><i class="bi bi-diagram-3 me-1"></i>Rules</span>`;
+
+    const borderClass = layer === "ai" ? "border-info" : "border-warning";
+
+    if (!action && !seasonalNote) return "";
+
+    if (!action && seasonalNote) {
         return `
         <div class="mt-3 p-2 bg-dark rounded border-start border-info border-3">
             <small class="text-muted d-block">Season</small>
@@ -625,16 +674,19 @@ function buildSuggestion(field) {
     }
 
     return `
-        <div class="mt-3 p-2 bg-dark rounded border-start border-warning border-3">
+        <div class="mt-3 p-2 bg-dark rounded border-start ${borderClass} border-3 field-suggestion-card field-suggestion-layer-${layer}">
             ${seasonalNote ? `<div class="text-info small mb-2 border-bottom border-secondary pb-2">
                 <i class="bi bi-snow me-1"></i>${escapeFieldHtml(seasonalNote)}
             </div>` : ""}
-            <small class="text-muted d-block">Suggested Next Step</small>
-            <span class="text-warning fw-bold" style="font-size:0.85rem;">
-                <i class="bi bi-tools me-1"></i>${escapeFieldHtml(top.action)}
+            <div class="d-flex align-items-center flex-wrap gap-1 mb-1">
+                <small class="text-muted d-block mb-0">Suggested next step</small>
+                ${layerBadge}
+            </div>
+            <span class="${layer === "ai" ? "text-info" : "text-warning"} fw-bold d-block" style="font-size:0.85rem;">
+                <i class="bi ${layer === "ai" ? "bi-stars" : "bi-tools"} me-1"></i>${escapeFieldHtml(action)}
             </span>
-            ${top.reason ? `<span class="d-block text-light small mt-1 opacity-75">
-                <i class="bi bi-info-circle me-1"></i>${escapeFieldHtml(top.reason)}
+            ${detail ? `<span class="d-block text-light small mt-1 opacity-75">
+                <i class="bi bi-info-circle me-1"></i>${escapeFieldHtml(detail)}
             </span>` : ""}
         </div>`;
 }
@@ -655,6 +707,13 @@ export function filterFields(type) {
 export function searchFields(term) {
     fieldsSearchTerm = term;
     renderFields(fieldsFilterType, fieldsSearchTerm);
+}
+
+/** Manual refresh of VPS field consultant map (respects 8 min throttle unless user waits). */
+export function refreshFieldConsultantAI() {
+    return refreshFieldConsultantCache({ force: true }).catch((e) => {
+        console.warn("[fields] AI consultant refresh", e);
+    });
 }
 
 // ── Error state ───────────────────────────────────────────────────────────────
@@ -721,7 +780,10 @@ function buildFieldsHTML() {
         </div>
 
         <div class="row mb-3">
-            <div class="col-md-6 d-flex gap-2 flex-wrap">
+            <div class="col-md-6 d-flex gap-2 flex-wrap align-items-center">
+                <button type="button" class="btn btn-outline-success btn-sm" onclick="dashboard.refreshFieldConsultantAI()" title="Refresh AI field tips (max once per 8 minutes unless forced)">
+                    <i class="bi bi-stars me-1"></i>AI field tips
+                </button>
                 <button class="btn btn-outline-primary active"
                         onclick="dashboard.filterFields('all')">All</button>
                 <button class="btn btn-outline-warning"

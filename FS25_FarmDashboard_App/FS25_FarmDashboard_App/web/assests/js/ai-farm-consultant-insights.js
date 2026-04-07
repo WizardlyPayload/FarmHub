@@ -6,6 +6,8 @@
   var LS_URL = 'farmdash_ai_manager_base_url';
   var LS_KEY = 'farmdash_ai_integration_key';
   var REFRESH_MS = 300000; // 5 minutes
+  var insightsIntervalId = null;
+  var insightsObserver = null;
 
   function getBase() {
     return (localStorage.getItem(LS_URL) || 'http://127.0.0.1:8080').replace(/\/$/, '');
@@ -13,6 +15,22 @@
 
   function getKey() {
     return localStorage.getItem(LS_KEY) || '';
+  }
+
+  function getByokHeadersSync() {
+    try {
+      var ipc = require('electron').ipcRenderer;
+      return ipc.invoke('get-consultant-byok-credentials').then(function (c) {
+        if (!c || !c.apiKey) return {};
+        var h = { 'X-AI-API-Key': c.apiKey };
+        if (c.provider === 'gemini' || c.provider === 'openai') {
+          h['X-AI-Provider'] = c.provider;
+        }
+        return h;
+      });
+    } catch (e) {
+      return Promise.resolve({});
+    }
   }
 
   function renderInsights(insights, llmUsed) {
@@ -23,7 +41,9 @@
     if (badge) {
       badge.textContent = llmUsed ? 'AI' : 'Rules';
       badge.className = 'badge ms-1 ' + (llmUsed ? 'bg-success' : 'bg-secondary');
-      badge.title = llmUsed ? 'LLM analysis included' : 'Heuristics only (no LLM or LLM unavailable)';
+      badge.title = llmUsed
+        ? 'LLM via your API key (BYOK)'
+        : 'Heuristics only — add key in Dashboard Settings → AI Consultant (BYOK) to enable LLM';
     }
 
     container.innerHTML = '';
@@ -77,12 +97,17 @@
 
     var apiURL = base + '/api/v1/consultant/insights';
 
-    fetch(apiURL, {
-      method: 'GET',
-      headers: {
-        'X-FarmDash-Key': encodeURIComponent(key),
-        Accept: 'application/json',
-      },
+    getByokHeadersSync().then(function (extra) {
+      return fetch(apiURL, {
+        method: 'GET',
+        headers: Object.assign(
+          {
+            'X-FarmDash-Key': encodeURIComponent(key),
+            Accept: 'application/json',
+          },
+          extra
+        ),
+      });
     })
       .then(function (r) {
         if (r.status === 401) throw new Error('401 — wrong key or FARMDASH_INTEGRATION_KEY not set on AI server');
@@ -110,19 +135,29 @@
   }
 
   document.addEventListener('DOMContentLoaded', function () {
+    if (window.__farmdashConsultantInsightsInit) {
+      return;
+    }
+    window.__farmdashConsultantInsightsInit = true;
+
     var btn = document.getElementById('ai-insights-refresh-btn');
     if (btn) btn.addEventListener('click', refreshFarmInsights);
 
-    setInterval(refreshFarmInsights, REFRESH_MS);
+    if (insightsIntervalId != null) {
+      clearInterval(insightsIntervalId);
+    }
+    insightsIntervalId = setInterval(refreshFarmInsights, REFRESH_MS);
 
     var dashEl = document.getElementById('dashboard-content');
-    var visDebounce;
-    if (dashEl) {
-      new MutationObserver(function () {
+    if (dashEl && !window.__farmdashConsultantDashObserverDone) {
+      window.__farmdashConsultantDashObserverDone = true;
+      var visDebounce;
+      insightsObserver = new MutationObserver(function () {
         if (dashEl.classList.contains('d-none')) return;
         clearTimeout(visDebounce);
         visDebounce = setTimeout(refreshFarmInsights, 400);
-      }).observe(dashEl, { attributes: true, attributeFilter: ['class'] });
+      });
+      insightsObserver.observe(dashEl, { attributes: true, attributeFilter: ['class'] });
     }
   });
 })();

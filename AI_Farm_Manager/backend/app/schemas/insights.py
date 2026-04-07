@@ -28,6 +28,11 @@ class FarmInsight(BaseModel):
         max_length=4000,
         description="Brief explanation for the dashboard.",
     )
+    field_ref: str | None = Field(
+        default=None,
+        max_length=64,
+        description="For Field insights: farmlandId from the snapshot so clients can override per-field UI.",
+    )
 
 
 class FarmInsightsResponse(BaseModel):

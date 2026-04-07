@@ -17,6 +17,23 @@ FALLBACK_REPLY = (
 )
 
 
+def format_gemini_http_error(response: httpx.Response) -> str:
+    """Human-readable line for admin logs (Google returns JSON with error.message)."""
+    code = response.status_code
+    raw = (response.text or "")[:2500]
+    try:
+        data = response.json()
+        err = data.get("error") if isinstance(data, dict) else None
+        if isinstance(err, dict):
+            msg = (err.get("message") or err.get("status") or "").strip()
+            status = (err.get("status") or "").strip()
+            if msg:
+                return f"Gemini HTTP {code} ({status}): {msg}"
+    except Exception:
+        pass
+    return f"Gemini HTTP {code}: {raw}"
+
+
 async def run_llm(
     user_message: str,
     dashboard_context: str,
@@ -93,19 +110,13 @@ async def _gemini(settings: dict[str, Any], user_message: str, dashboard_context
     url = _gemini_generate_url(settings)
     prompt = f"{system}\n\n{dashboard_context}\n\nUser: {user_message}"
     payload = {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.4, "maxOutputTokens": 1024},
     }
     async with httpx.AsyncClient(timeout=60.0) as client:
         r = await client.post(url, json=payload)
         if r.status_code >= 400:
-            # Surface API message (invalid key, model id, region, malformed JSON, etc.)
-            log_event(
-                "ERROR",
-                "Gemini HTTP error",
-                status=r.status_code,
-                detail=(r.text or "")[:2500],
-            )
+            log_event("ERROR", format_gemini_http_error(r))
         r.raise_for_status()
         data = r.json()
     parts = (

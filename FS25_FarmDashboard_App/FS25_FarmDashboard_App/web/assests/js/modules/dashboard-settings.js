@@ -178,6 +178,25 @@ export async function populateDashboardSettingsForm() {
   } catch (e) {
     console.warn("[dashboard-settings] mod config", e);
   }
+
+  const byokClear = document.getElementById("settings-consultant-byok-clear");
+  const byokKey = document.getElementById("settings-consultant-byok-key");
+  const byokProv = document.getElementById("settings-consultant-byok-provider");
+  if (byokClear) byokClear.checked = false;
+  if (byokKey) byokKey.value = "";
+  try {
+    const meta = await ipcRenderer.invoke("get-consultant-byok-meta");
+    if (byokProv) {
+      byokProv.value = meta?.provider === "gemini" ? "gemini" : "openai";
+    }
+    if (byokKey && meta?.hasKey) {
+      byokKey.placeholder = "Leave blank to keep saved key (••••••••)";
+    } else if (byokKey) {
+      byokKey.placeholder = "Paste API key to enable VPS consultant LLM";
+    }
+  } catch (e) {
+    console.warn("[dashboard-settings] consultant BYOK", e);
+  }
 }
 
 export async function saveDashboardSettingsFromModal() {
@@ -198,6 +217,29 @@ export async function saveDashboardSettingsFromModal() {
   } catch (e) {
     this.showAlert?.(t("settings.saveFailed") + " (UI)", "error");
     return;
+  }
+
+  const byokClear = document.getElementById("settings-consultant-byok-clear")?.checked;
+  const byokKeyRaw = document.getElementById("settings-consultant-byok-key")?.value || "";
+  const byokKey = byokKeyRaw.trim();
+  const byokProv =
+    document.getElementById("settings-consultant-byok-provider")?.value === "gemini"
+      ? "gemini"
+      : "openai";
+  try {
+    if (byokClear) {
+      await ipcRenderer.invoke("save-consultant-byok-credentials", { clear: true });
+    } else {
+      const meta = await ipcRenderer.invoke("get-consultant-byok-meta");
+      if (byokKey || meta?.hasKey) {
+        await ipcRenderer.invoke("save-consultant-byok-credentials", {
+          apiKey: byokKey,
+          provider: byokProv,
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("[dashboard-settings] save BYOK", e);
   }
 
   const ui = parseInt(

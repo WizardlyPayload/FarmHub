@@ -20,6 +20,11 @@ def get_backend_root() -> Path:
     return _backend_root
 
 
+def reload_backend_dotenv(*, override: bool = True) -> None:
+    """Re-read `backend/.env` into `os.environ` (e.g. after admin UI writes the file)."""
+    load_dotenv(_backend_root / ".env", override=override)
+
+
 def get_data_dir() -> Path:
     """
     Persistent data directory for `bot_servers.json` and other runtime files.

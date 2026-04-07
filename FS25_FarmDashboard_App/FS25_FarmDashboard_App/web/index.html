@@ -596,6 +596,28 @@
             <p class="small text-muted" data-i18n="settings.fieldExclusionHint">Only parcels your selected farm owns are listed. Hide any that still appear as fields after a pasture or farmyard. Switch farm in the header and reopen Settings for another farm.</p>
             <div id="settings-field-exclusions" class="mb-3 small text-break">—</div>
 
+            <hr class="border-secondary my-3"/>
+
+            <h6 class="text-farm-accent"><i class="bi bi-stars me-2"></i>AI Consultant (optional, BYOK)</h6>
+            <p class="small text-muted">Store your OpenAI or Gemini key on this PC only (Electron user data). It is sent as <code class="text-break">X-AI-API-Key</code> to your AI Farm Manager VPS for consultant insights — the server does not persist it. Fields use it for per-parcel AI tips when a matching <code>field_ref</code> is returned.</p>
+            <div class="row g-3 mb-2">
+              <div class="col-md-4">
+                <label class="form-label small" for="settings-consultant-byok-provider">Provider</label>
+                <select id="settings-consultant-byok-provider" class="form-select form-select-sm bg-secondary text-light border-secondary">
+                  <option value="openai">OpenAI</option>
+                  <option value="gemini">Google Gemini</option>
+                </select>
+              </div>
+              <div class="col-md-8">
+                <label class="form-label small" for="settings-consultant-byok-key">API key</label>
+                <input type="password" class="form-control form-control-sm font-monospace bg-secondary text-light border-secondary" id="settings-consultant-byok-key" placeholder="Leave blank to keep saved key" autocomplete="off" spellcheck="false"/>
+              </div>
+            </div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" id="settings-consultant-byok-clear"/>
+              <label class="form-check-label small" for="settings-consultant-byok-clear">Remove saved AI key from this computer</label>
+            </div>
+
             <hr class="border-secondary"/>
 
             <h6 class="text-farm-accent" data-i18n="settings.modTitle">FS25 mod — config.xml (this PC)</h6>

@@ -1108,6 +1108,14 @@ th {
   opacity: 0.85;
 }
 
+/* Fields: Layer 1 rules vs Layer 2 AI consultant */
+.field-suggestion-card.field-suggestion-layer-ai {
+  box-shadow: 0 0 0 1px rgba(13, 202, 240, 0.25);
+}
+.field-suggestion-layer-rules .field-suggestion-layer-rules {
+  opacity: 0.95;
+}
+
 /* Navbar Enhancement */
 .navbar-custom {
   background: rgba(26, 26, 26, 0.95) !important;

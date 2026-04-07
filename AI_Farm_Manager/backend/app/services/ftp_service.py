@@ -21,6 +21,22 @@ def is_ftp_mode_enabled() -> bool:
     return bool(os.getenv("GPORTAL_FTP_HOST", "").strip())
 
 
+def _resolve_ftp_port(default: int = 21) -> int:
+    """Port from GPORTAL_FTP_PORT; default 21. Empty or invalid values fall back with a warning."""
+    raw = (os.getenv("GPORTAL_FTP_PORT") or "").strip()
+    if not raw:
+        return default
+    try:
+        port = int(raw)
+    except ValueError:
+        logger.warning("GPORTAL_FTP_PORT=%r is not an integer; using %s", raw, default)
+        return default
+    if not (1 <= port <= 65535):
+        logger.warning("GPORTAL_FTP_PORT=%s out of range; using %s", port, default)
+        return default
+    return port
+
+
 def get_dashboard_json_from_memory() -> tuple[str | None, str | None]:
     """
     Returns (json_string, error_message).
@@ -59,6 +75,7 @@ def _ftp_download_sync() -> tuple[str | None, str | None]:
     if not remote_path:
         remote_path = "/data.json"
     use_tls = os.getenv("GPORTAL_FTP_TLS", "").lower() in ("1", "true", "yes", "on")
+    port = _resolve_ftp_port(21)
 
     import ftplib
 
@@ -70,7 +87,8 @@ def _ftp_download_sync() -> tuple[str | None, str | None]:
         ftp = ftplib.FTP()
 
     try:
-        ftp.connect(host, int(os.getenv("GPORTAL_FTP_PORT", "21")), timeout=45)
+        # Explicit host + port (G-Portal and similar often use a non-21 port; defaulting to 21 causes wrong service / 530).
+        ftp.connect(host, port, timeout=45)
         ftp.login(user, password)
         if use_tls and hasattr(ftp, "prot_p"):
             ftp.prot_p()

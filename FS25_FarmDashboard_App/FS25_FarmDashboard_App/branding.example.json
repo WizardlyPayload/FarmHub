@@ -1,0 +1,6 @@
+{
+  "serviceName": "Your farm AI (hosted)",
+  "defaultAiBackendUrl": "https://your-vps.example.com",
+  "embeddedFarmdashIntegrationKey": "PASTE_SAME_VALUE_AS_VPS_FARMDASH_INTEGRATION_KEY",
+  "pushSnapshotsDefault": true
+}

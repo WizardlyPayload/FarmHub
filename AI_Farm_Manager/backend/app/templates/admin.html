@@ -13,6 +13,20 @@
   </header>
 
   <main class="grid">
+    <section class="card full" style="border-left: 4px solid #6ea8fe;">
+      <h2 class="subh" style="margin-top:0;">Where things run</h2>
+      <p class="muted small" style="margin-bottom:0;">
+        <strong>Farm Dashboard</strong> (Electron, usually port <code>8766</code>) often runs on <strong>your PC</strong> next to the game.
+        <strong>AI Farm Manager</strong> (this page) may run on a <strong>cloud VPS</strong>.
+        Your PC calls the VPS (robot panel → <strong>AI backend URL</strong>) — <strong>no inbound ports required on your PC</strong> if you use
+        <strong>PC push mode</strong>: set <code>DASHBOARD_PUSH_MODE=1</code> in this server’s environment, leave <strong>Farm Dashboard JSON URL</strong> empty,
+        and in Farm Dashboard enable <strong>Push snapshots to AI server</strong> (same panel). Snapshots are POSTed outbound from your PC.
+        Alternatively the VPS can use <strong>G-Portal FTP</strong> or (if you accept it) an HTTP URL/tunnel to your PC.
+      </p>
+      {% if dashboard_push_mode %}
+      <p class="muted small" style="margin: 0.75rem 0 0 0;"><strong>Push mode is on</strong> — snapshots are expected from the desktop app, not from <code>DASHBOARD_JSON_URL</code>.</p>
+      {% endif %}
+    </section>
     <section class="card">
       <h2>Bot &amp; integrations</h2>
       <p class="muted small" style="margin: -0.25rem 0 0.75rem 0;">
@@ -34,6 +48,10 @@
           <span>Farm Dashboard JSON URL</span>
           <input type="url" name="dashboard_json_url" value="{{ dashboard_url }}" placeholder="http://127.0.0.1:8766/api/data"/>
         </label>
+        <p class="muted small" style="margin: -0.35rem 0 0.5rem 0;">
+          Used to pull <code>/api/data</code> for the bot and to list servers from the same host’s <code>/api/servers</code>.
+          Must be reachable <strong>from this backend</strong>: plain <code>127.0.0.1</code> only works when AI Farm Manager runs on the same OS as Farm Dashboard (not inside a remote VPS or container — use <code>host.docker.internal</code>, your LAN IP, FTP mode, or a tunnel).
+        </p>
         <label class="row">
           <span>Farm Dashboard server ID (optional)</span>
           <input type="text" name="dashboard_server_id" value="{{ dashboard_server_id }}" placeholder="Only if you use multiple servers in Farm Dashboard — same as ?serverId="/>
@@ -82,6 +100,9 @@
       </p>
       {% if overview.farmDashboardError %}
       <p class="warn">Farm Dashboard unreachable at {{ overview.farmDashboardOrigin }} — {{ overview.farmDashboardError }}</p>
+      {% if overview.farmDashboardConnectHint %}
+      <p class="muted small" style="margin-top: -0.5rem;">{{ overview.farmDashboardConnectHint }}</p>
+      {% endif %}
       {% endif %}
       <p><strong>Farm Dashboard servers:</strong> {{ overview.farmDashboardServerCount }} · <strong>Bot profiles:</strong> {{ overview.botInstanceCount }}
         {% if overview.legacySingleTokenMode %}<span class="muted small">(legacy single <code>SERVER_TOKEN</code> in .env still works until you add profiles)</span>{% endif %}

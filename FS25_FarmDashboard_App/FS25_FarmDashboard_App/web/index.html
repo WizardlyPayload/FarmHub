@@ -598,25 +598,9 @@
 
             <hr class="border-secondary my-3"/>
 
-            <h6 class="text-farm-accent"><i class="bi bi-stars me-2"></i>AI Consultant (optional, BYOK)</h6>
-            <p class="small text-muted">Store your OpenAI or Gemini key on this PC only (Electron user data). It is sent as <code class="text-break">X-AI-API-Key</code> to your AI Farm Manager VPS for consultant insights — the server does not persist it. Fields use it for per-parcel AI tips when a matching <code>field_ref</code> is returned.</p>
-            <div class="row g-3 mb-2">
-              <div class="col-md-4">
-                <label class="form-label small" for="settings-consultant-byok-provider">Provider</label>
-                <select id="settings-consultant-byok-provider" class="form-select form-select-sm bg-secondary text-light border-secondary">
-                  <option value="openai">OpenAI</option>
-                  <option value="gemini">Google Gemini</option>
-                </select>
-              </div>
-              <div class="col-md-8">
-                <label class="form-label small" for="settings-consultant-byok-key">API key</label>
-                <input type="password" class="form-control form-control-sm font-monospace bg-secondary text-light border-secondary" id="settings-consultant-byok-key" placeholder="Leave blank to keep saved key" autocomplete="off" spellcheck="false"/>
-              </div>
-            </div>
-            <div class="form-check mb-2">
-              <input class="form-check-input" type="checkbox" id="settings-consultant-byok-clear"/>
-              <label class="form-check-label small" for="settings-consultant-byok-clear">Remove saved AI key from this computer</label>
-            </div>
+            <h6 class="text-farm-accent"><i class="bi bi-robot me-2"></i>AI farm assistant</h6>
+            <p class="small text-muted mb-2">Your OpenAI or Gemini key and server link are set in the <strong>AI Farm Manager</strong> panel (robot button in the top bar).</p>
+            <button type="button" class="btn btn-sm btn-outline-success mb-3" data-bs-toggle="modal" data-bs-target="#aiFarmBotModal" data-bs-dismiss="modal">Open AI Farm Manager…</button>
 
             <hr class="border-secondary"/>
 
@@ -811,23 +795,52 @@
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <p class="small text-muted">Link each dedicated server to a bot profile in the AI backend so <code>!bot</code> uses the correct Farm Dashboard snapshot (<code>/api/data?serverId=</code>).</p>
-            <div class="row g-2 mb-3">
-              <div class="col-12">
-                <label class="form-label small" for="aiFarmBotBaseUrl">AI backend URL <span class="text-muted fw-normal">(your FastAPI address, e.g. port 8080)</span></label>
-                <input type="text" class="form-control form-control-sm w-100" id="aiFarmBotBaseUrl" placeholder="http://127.0.0.1:8080" autocomplete="off"/>
+            <p class="small mb-2" id="aiFarmBotIntro">Connect to your hosted AI farm assistant. Your <strong>LLM API key</strong> stays on this PC; the game mod token is created on the server when you install config below.</p>
+            <div class="card bg-secondary bg-opacity-25 border border-success border-opacity-50 mb-3">
+              <div class="card-body py-3">
+                <h6 class="text-success mb-2"><i class="bi bi-key-fill me-1"></i> Your AI provider key (you only paste this)</h6>
+                <p class="small text-muted mb-2">OpenAI or Google Gemini — used for in-dashboard tips and field consultant. Not stored on the server.</p>
+                <div class="row g-2">
+                  <div class="col-md-4">
+                    <label class="form-label small mb-0" for="aiFarmBotByokProvider">Provider</label>
+                    <select id="aiFarmBotByokProvider" class="form-select form-select-sm">
+                      <option value="openai">OpenAI</option>
+                      <option value="gemini">Google Gemini</option>
+                    </select>
+                  </div>
+                  <div class="col-md-8">
+                    <label class="form-label small mb-0" for="aiFarmBotByokKey">API key</label>
+                    <input type="password" class="form-control form-control-sm font-monospace" id="aiFarmBotByokKey" placeholder="sk-… or AIza…" autocomplete="off" spellcheck="false"/>
+                  </div>
+                </div>
+                <div class="form-check mt-2 mb-0">
+                  <input class="form-check-input" type="checkbox" id="aiFarmBotClearByok"/>
+                  <label class="form-check-label small" for="aiFarmBotClearByok">Remove saved AI key from this computer</label>
+                </div>
               </div>
-              <div class="col-12">
-                <label class="form-label small" for="aiFarmBotIntegrationKey">Farm Dashboard link key</label>
-                <p class="small text-muted mb-1">Same value as <code class="text-info">FARMDASH_INTEGRATION_KEY=</code> in <code class="text-secondary">AI_Farm_Manager/backend/.env</code> — not your OpenAI key, not the game <code>SERVER_TOKEN</code>.</p>
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-12" id="aiFarmBotRowBackendUrl">
+                <label class="form-label small" for="aiFarmBotBaseUrl">AI server URL <span class="text-muted fw-normal">(only if your build did not set one)</span></label>
+                <input type="text" class="form-control form-control-sm w-100" id="aiFarmBotBaseUrl" placeholder="https://your-hosted-ai.example.com" autocomplete="off"/>
+              </div>
+              <div class="col-12 d-none" id="aiFarmBotRowIntegrationKey">
+                <label class="form-label small" for="aiFarmBotIntegrationKey">Connection key <span class="text-muted fw-normal">(power users / dev only)</span></label>
                 <div class="input-group input-group-sm">
-                  <input type="password" class="form-control font-monospace" id="aiFarmBotIntegrationKey" placeholder="paste the exact characters after FARMDASH_INTEGRATION_KEY=" autocomplete="off" spellcheck="false"/>
+                  <input type="password" class="form-control font-monospace" id="aiFarmBotIntegrationKey" placeholder="only if not embedded in your installer" autocomplete="off" spellcheck="false"/>
                   <button type="button" class="btn btn-outline-secondary" id="aiFarmBotToggleKey" title="Show or hide key" aria-pressed="false">
                     <i class="bi bi-eye" id="aiFarmBotToggleKeyIcon" aria-hidden="true"></i>
                   </button>
                 </div>
               </div>
+              <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="aiFarmBotPushSnapshots" checked/>
+                  <label class="form-check-label small" for="aiFarmBotPushSnapshots"><strong>Send farm data to the AI server</strong> (outbound only — no open ports on this PC). Your host enables this on the server.</label>
+                </div>
+              </div>
             </div>
+            <p class="small text-muted mb-2 d-none" id="aiFarmBotBrandedNote">This installer is already linked to your host — you do not need a separate connection key.</p>
             <div class="d-flex gap-2 mb-3">
               <button type="button" class="btn btn-sm btn-success" id="aiFarmBotSaveSettings">Save &amp; load</button>
               <button type="button" class="btn btn-sm btn-outline-light" id="aiFarmBotRefresh">Refresh</button>

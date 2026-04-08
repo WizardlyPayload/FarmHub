@@ -17,9 +17,11 @@ from app.services import ftp_service
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.services.bootstrap_env import ensure_farmdash_integration_key_if_missing
     from app.services.encryption import ensure_encryption_configured
 
     ensure_encryption_configured()
+    ensure_farmdash_integration_key_if_missing()
 
     stop = asyncio.Event()
     poll_task: asyncio.Task | None = None
@@ -114,5 +116,6 @@ async def health() -> dict:
         "registry_file_exists": os.path.isfile(path),
         "legacy_server_token_set": len(st) > 0,
         "ftp_dashboard": ftp_service.is_ftp_mode_enabled(),
+        "dashboard_push_mode": get_settings().get("dashboard_push_mode", False),
         "encryption_at_rest": get_settings().get("encryption_key_configured", False),
     }

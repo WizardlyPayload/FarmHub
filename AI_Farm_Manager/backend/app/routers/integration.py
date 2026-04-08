@@ -6,7 +6,7 @@ from typing import Any
 from urllib.parse import unquote
 
 import httpx
-from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field
@@ -20,6 +20,7 @@ from app.services.bot_registry import (
     upsert_instance,
 )
 from app.services.mod_config_xml import build_mod_config_xml, resolve_backend_url_for_xml
+from app.services import snapshot_push_service
 
 router = APIRouter(prefix="/api/integration", tags=["integration"])
 _security = HTTPBasic(auto_error=False)
@@ -46,6 +47,27 @@ def _farm_dashboard_origin() -> str:
     return parts[0] if len(parts) == 2 and parts[1] == "api" else u.rstrip("/")
 
 
+def _farm_dashboard_connect_hint(origin: str, error: str | None) -> str | None:
+    """Short troubleshooting when /api/servers fails (no secrets)."""
+    if not error:
+        return None
+    o = origin.lower()
+    if "127.0.0.1" not in o and "localhost" not in o:
+        return (
+            "If Farm Dashboard runs on your PC, this URL must be reachable from wherever AI Farm Manager runs "
+            "(firewall, VPN, or wrong host). For a cloud VPS, use FTP snapshot mode or a tunnel to your PC."
+        )
+    return (
+        "127.0.0.1 / localhost here means this server (e.g. your VPS), not your gaming PC. "
+        "If Farm Dashboard runs on your PC and AI Farm Manager runs in the cloud, the VPS cannot reach your PC at 127.0.0.1. "
+        "Use one of: (1) G-Portal FTP snapshot env vars on the VPS so it pulls data.json from your hoster; "
+        "(2) a secure tunnel or VPN exposing your PC’s port 8766, then set Farm Dashboard JSON URL on the VPS to that HTTPS URL with path /api/data; "
+        "(3) run AI Farm Manager on the same machine as Farm Dashboard. "
+        "Same PC but AI in Docker only: http://host.docker.internal:8766/api/data . "
+        "Keep Farm Dashboard running on the PC with the game save."
+    )
+
+
 async def require_integration_or_admin(
     x_farmdash_key: str | None = Header(default=None, alias="X-FarmDash-Key"),
     credentials: HTTPBasicCredentials | None = Depends(_security),
@@ -70,6 +92,33 @@ async def require_integration_or_admin(
 
 async def get_overview_payload() -> dict[str, Any]:
     """Shared by /api/integration/overview and Admin bot panel."""
+    reg = load_registry()
+    base_out: dict[str, Any] = {
+        "botInstances": list_instances_masked(),
+        "botInstanceCount": len(reg.get("instances") or []),
+        "legacySingleTokenMode": len(reg.get("instances") or []) == 0,
+    }
+
+    if snapshot_push_service.is_push_mode_enabled():
+        meta = snapshot_push_service.get_servers_meta() or []
+        hint = None
+        if not meta:
+            hint = (
+                "Push mode: the server list arrives with the next snapshot from Farm Dashboard "
+                '(desktop app → enable "Push snapshots to AI server"). You can still type a Farm Dashboard server id manually in /admin.'
+            )
+        base_out.update(
+            {
+                "farmDashboardOrigin": "(snapshots pushed from your PC — no inbound ports)",
+                "farmDashboardServers": meta,
+                "farmDashboardError": None,
+                "farmDashboardConnectHint": hint,
+                "farmDashboardServerCount": len(meta),
+                "farmDashboardPushMode": True,
+            }
+        )
+        return base_out
+
     origin = _farm_dashboard_origin()
     farm_servers: list[dict[str, Any]] = []
     farm_error: str | None = None
@@ -83,22 +132,67 @@ async def get_overview_payload() -> dict[str, Any]:
     except Exception as e:
         farm_error = str(e)
 
-    reg = load_registry()
-    return {
-        "farmDashboardOrigin": origin,
-        "farmDashboardServers": farm_servers,
-        "farmDashboardError": farm_error,
-        "farmDashboardServerCount": len(farm_servers),
-        "botInstances": list_instances_masked(),
-        "botInstanceCount": len(reg.get("instances") or []),
-        "legacySingleTokenMode": len(reg.get("instances") or []) == 0,
-    }
+    base_out.update(
+        {
+            "farmDashboardOrigin": origin,
+            "farmDashboardServers": farm_servers,
+            "farmDashboardError": farm_error,
+            "farmDashboardConnectHint": _farm_dashboard_connect_hint(origin, farm_error),
+            "farmDashboardServerCount": len(farm_servers),
+            "farmDashboardPushMode": False,
+        }
+    )
+    return base_out
 
 
 @router.get("/overview")
 async def integration_overview(_: str = Depends(require_integration_or_admin)) -> dict[str, Any]:
     """Farm Dashboard server list (proxied) + bot instances (masked tokens)."""
     return await get_overview_payload()
+
+
+@router.post("/push-snapshot")
+async def integration_push_snapshot(
+    request: Request,
+    server_id: str | None = Query(None, alias="serverId"),
+    _: str = Depends(require_integration_or_admin),
+) -> dict[str, Any]:
+    """
+    Farm Dashboard (desktop) POSTs JSON here on an outbound connection — no open ports on the gaming PC.
+    Requires DASHBOARD_PUSH_MODE=1 on this server. Same auth as /overview (X-FarmDash-Key or admin Basic).
+
+    Body: ``{"snapshot": { ... same shape as GET /api/data ... }, "servers": [ optional /api/servers shape ]}``
+    If ``snapshot`` is omitted, the root object is treated as the snapshot (for simple clients).
+    """
+    if not snapshot_push_service.is_push_mode_enabled():
+        raise HTTPException(
+            status_code=503,
+            detail="Set DASHBOARD_PUSH_MODE=1 in AI Farm Manager environment to accept pushed snapshots.",
+        )
+    try:
+        body: Any = await request.json()
+    except Exception:
+        raise HTTPException(400, "Request body must be JSON") from None
+    if not isinstance(body, dict):
+        raise HTTPException(400, "JSON object expected")
+
+    servers_raw = body.get("servers")
+    servers: list[dict[str, Any]] | None = None
+    if isinstance(servers_raw, list):
+        servers = [x for x in servers_raw if isinstance(x, dict)]
+
+    if "snapshot" in body and isinstance(body["snapshot"], dict):
+        snap = body["snapshot"]
+    else:
+        snap = {k: v for k, v in body.items() if k != "servers"}
+
+    if not snap:
+        raise HTTPException(400, "Missing snapshot object")
+
+    ok, err = snapshot_push_service.store_push(server_id, snap, servers)
+    if not ok:
+        raise HTTPException(400, err or "Invalid snapshot")
+    return {"ok": True, "serverId": (server_id or "").strip() or None}
 
 
 class InstancePayload(BaseModel):

@@ -137,13 +137,14 @@ async def get_overview_payload() -> dict[str, Any]:
 
     if origin is None:
         farm_error = (
-            "Farm Dashboard JSON URL is not configured on this server. "
-            "If Farm Dashboard runs on a PC and AI Farm Manager on a VPS: set DASHBOARD_PUSH_MODE=1 and enable push in the desktop app "
-            "(do not use 127.0.0.1 here — that is the VPS itself). "
-            "For local dev on the same machine, set DASHBOARD_JSON_URL=http://127.0.0.1:8766/api/data explicitly."
+            "Snapshot source not configured on the AI server — add DASHBOARD_PUSH_MODE=1 (recommended for VPS) "
+            "or DASHBOARD_JSON_URL in /admin."
         )
         connect_hint = (
-            "Empty URL is correct only with push mode. Otherwise set Farm Dashboard JSON URL in /admin to a URL this server can reach."
+            "VPS + Farm Dashboard on your PC: set DASHBOARD_PUSH_MODE=1 in AI Farm Manager, restart the container, "
+            'then in this app enable “Send farm data to the AI server” and Save (outbound only). '
+            "Do not use 127.0.0.1 on the VPS for a remote PC’s dashboard. "
+            "Local dev with app + AI on one machine: DASHBOARD_JSON_URL=http://127.0.0.1:8766/api/data in /admin."
         )
     else:
         try:
@@ -159,7 +160,8 @@ async def get_overview_payload() -> dict[str, Any]:
 
     base_out.update(
         {
-            "farmDashboardOrigin": origin or "(not set — use push mode or configure URL)",
+            "farmDashboardOrigin": origin
+            or "(not configured — enable push mode on the server or set DASHBOARD_JSON_URL in /admin)",
             "farmDashboardServers": farm_servers,
             "farmDashboardError": farm_error,
             "farmDashboardConnectHint": connect_hint,

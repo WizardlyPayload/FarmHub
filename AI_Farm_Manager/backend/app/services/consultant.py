@@ -43,6 +43,8 @@ Also mention when relevant: production bottlenecks, animals, and market/stored c
 You MUST respond with ONLY valid JSON (no markdown, no prose before or after) in this exact shape:
 {"insights":[{"category":"Field|Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":"..."},...]}
 
+JSON rules: escape double quotes inside **message** and **reasoning** as \\" — do not break the JSON with raw " characters inside strings.
+
 CRITICAL — field-specific insights:
 - When an insight applies to **one** parcel, **category MUST be exactly** `Field` (capital F, rest lowercase).
 - **field_ref MUST be the exact numeric identifier** copied from the source JSON for that parcel: use the value of **farmlandId** if present, otherwise **id**. Use the raw number or its string form only (e.g. `42` or `"42"` in JSON).
@@ -217,10 +219,13 @@ async def _llm_insights_from_snapshot(
     text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
     text = re.sub(r"\s*```\s*$", "", text)
 
-    try:
-        data = json.loads(text)
-    except (json.JSONDecodeError, TypeError, ValueError, RecursionError) as e:
-        log_event("WARN", f"Consultant LLM returned unparsable JSON: {e}")
+    data = _parse_consultant_llm_json_text(text)
+    if data is None:
+        log_event(
+            "WARN",
+            "Consultant LLM returned unparsable JSON (try shorter snapshot or different model)",
+            preview=(text[:400] + "…") if len(text) > 400 else text,
+        )
         return [], False
 
     if not isinstance(data, dict):
@@ -353,6 +358,53 @@ def _consultant_llm_settings_for_byok(
     return merged
 
 
+def resolve_consultant_llm_settings(
+    user_api_key: str | None,
+    user_provider: str | None,
+) -> dict[str, Any] | None:
+    """
+    Same API key routing as :func:`generate_farm_insights` (BYOK or server env).
+    Returns ``None`` if no LLM key is available.
+    """
+    key = normalize_incoming_api_key(user_api_key)
+    prov = (user_provider or "").strip().lower() or None
+    if prov not in ("openai", "gemini", "", None):
+        prov = None
+
+    if not key:
+        base = get_settings()
+        prov_base = (base.get("llm_provider") or "openai").strip().lower()
+        if prov_base == "gemini":
+            key = normalize_incoming_api_key(base.get("gemini_api_key"))
+        else:
+            key = normalize_incoming_api_key(base.get("llm_api_key"))
+        if not key:
+            return None
+        prov = prov_base if prov_base in ("openai", "gemini") else None
+
+    return _consultant_llm_settings_for_byok(key, prov)
+
+
+def _parse_consultant_llm_json_text(text: str) -> dict[str, Any] | None:
+    """
+    Parse consultant JSON; tolerate trailing prose after the first JSON object (``raw_decode``).
+    """
+    t = (text or "").strip()
+    t = re.sub(r"^```(?:json)?\s*", "", t, flags=re.I)
+    t = re.sub(r"\s*```\s*$", "", t)
+    decoder = json.JSONDecoder()
+    try:
+        obj, _end = decoder.raw_decode(t)
+        return obj if isinstance(obj, dict) else None
+    except json.JSONDecodeError:
+        pass
+    try:
+        obj = json.loads(t)
+        return obj if isinstance(obj, dict) else None
+    except (json.JSONDecodeError, TypeError, ValueError, RecursionError):
+        return None
+
+
 async def generate_farm_insights(
     snapshot_data: dict[str, Any],
     *,
@@ -367,25 +419,9 @@ async def generate_farm_insights(
     2. Else server ``GEMINI_API_KEY`` or ``LLM_API_KEY`` per ``LLM_PROVIDER`` (same as admin / ``!bot``).
     """
     heuristics = _heuristic_production_output_space(snapshot_data)
-    key = normalize_incoming_api_key(user_api_key)
-    prov = (user_provider or "").strip().lower() or None
-    if prov not in ("openai", "gemini", "", None):
-        prov = None
-
-    if not key:
-        base = get_settings()
-        prov_base = (base.get("llm_provider") or "openai").strip().lower()
-        if prov_base == "gemini":
-            key = normalize_incoming_api_key(base.get("gemini_api_key"))
-        else:
-            key = normalize_incoming_api_key(base.get("llm_api_key"))
-        if not key:
-            return heuristics, False
-        # Use server LLM_PROVIDER only — ignore X-AI-Provider when not using BYOK (clients may
-        # default to openai while the VPS uses gemini, which would mis-route the server key).
-        prov = prov_base if prov_base in ("openai", "gemini") else None
-
-    settings = _consultant_llm_settings_for_byok(key, prov)
+    settings = resolve_consultant_llm_settings(user_api_key, user_provider)
+    if settings is None:
+        return heuristics, False
 
     try:
         snap_str = json.dumps(snapshot_data, ensure_ascii=False, default=str)

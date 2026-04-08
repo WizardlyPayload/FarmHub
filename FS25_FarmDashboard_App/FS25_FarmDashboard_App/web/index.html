@@ -841,10 +841,12 @@
               </div>
             </div>
             <p class="small text-muted mb-2 d-none" id="aiFarmBotBrandedNote">This installer is already linked to your host — you do not need a separate connection key.</p>
-            <div class="d-flex gap-2 mb-3">
+            <div class="d-flex flex-wrap gap-2 mb-2">
               <button type="button" class="btn btn-sm btn-success" id="aiFarmBotSaveSettings">Save &amp; load</button>
               <button type="button" class="btn btn-sm btn-outline-light" id="aiFarmBotRefresh">Refresh</button>
+              <button type="button" class="btn btn-sm btn-outline-info" id="aiFarmBotLlmPing" title="Verifies Farm Dashboard → AI server → LLM (same path as consultant; optional BYOK below)">Test dashboard → LLM</button>
             </div>
+            <p id="aiFarmBotLlmPingResult" class="small text-muted mb-3 mb-md-2" aria-live="polite"></p>
             <div id="aiFarmBotPanelBody" class="border border-secondary rounded p-2 small" style="min-height: 120px;">Open this panel to load status…</div>
             <div class="mt-3 border-top border-secondary pt-3">
               <label class="form-label small mb-1">Install config automatically (this PC)</label>

@@ -21,6 +21,8 @@ from app.services.bot_registry import (
 )
 from app.services.mod_config_xml import build_mod_config_xml, resolve_backend_url_for_xml
 from app.services import snapshot_push_service
+from app.services.consultant import normalize_incoming_api_key, resolve_consultant_llm_settings
+from app.services.llm_service import test_llm_connectivity
 
 router = APIRouter(prefix="/api/integration", tags=["integration"])
 _security = HTTPBasic(auto_error=False)
@@ -171,6 +173,31 @@ async def get_overview_payload() -> dict[str, Any]:
 async def integration_overview(_: str = Depends(require_integration_or_admin)) -> dict[str, Any]:
     """Farm Dashboard server list (proxied) + bot instances (masked tokens)."""
     return await get_overview_payload()
+
+
+@router.get("/llm-ping")
+async def integration_llm_ping(
+    request: Request,
+    _: str = Depends(require_integration_or_admin),
+) -> dict[str, Any]:
+    """
+    Same auth as ``/overview`` (``X-FarmDash-Key``). Optional ``X-AI-API-Key`` / ``X-AI-Provider`` (BYOK)
+    like ``/consultant/insights``. Verifies the path **Farm Dashboard → this API → LLM** with a short ping.
+    """
+    user_key = normalize_incoming_api_key(request.headers.get("X-AI-API-Key"))
+    user_prov = (request.headers.get("X-AI-Provider") or "").strip().lower() or None
+    if user_prov and user_prov not in ("openai", "gemini"):
+        user_prov = None
+    merged = resolve_consultant_llm_settings(user_key or None, user_prov)
+    if merged is None:
+        return {
+            "ok": False,
+            "detail": "No LLM API key — set keys on the server or BYOK in Farm Dashboard (robot panel).",
+        }
+    return await test_llm_connectivity(
+        probe_message='Hi — are you there? Reply in one short sentence (max 20 words).',
+        settings=merged,
+    )
 
 
 @router.post("/push-snapshot")

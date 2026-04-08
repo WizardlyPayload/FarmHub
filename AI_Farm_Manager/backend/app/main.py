@@ -23,6 +23,48 @@ async def lifespan(app: FastAPI):
     ensure_encryption_configured()
     ensure_farmdash_integration_key_if_missing()
 
+    async def _startup_llm_probe() -> None:
+        """Background: ping configured LLM so logs show whether keys/model work (does not block bind)."""
+        await asyncio.sleep(1.5)
+        raw = (os.getenv("STARTUP_LLM_PROBE") or "1").strip().lower()
+        if raw in ("0", "false", "no", "off"):
+            return
+        try:
+            from app.services.log_buffer import log_event
+            from app.services.llm_service import test_llm_connectivity
+
+            out = await test_llm_connectivity(
+                probe_message='Hi — are you there? Reply in one short sentence (max 20 words).',
+            )
+            detail = (out.get("detail") or "").strip()
+            if not out.get("ok") and "not set" in detail.lower():
+                log_event("INFO", "Startup LLM check skipped — no API key for selected provider")
+                return
+            if out.get("ok"):
+                log_event(
+                    "INFO",
+                    "Startup LLM check OK",
+                    provider=out.get("provider"),
+                    latency_ms=out.get("latency_ms"),
+                    model=out.get("model"),
+                    reply_preview=detail[:240] if detail else None,
+                )
+            else:
+                log_event(
+                    "WARN",
+                    "Startup LLM check failed",
+                    provider=out.get("provider"),
+                    latency_ms=out.get("latency_ms"),
+                    model=out.get("model"),
+                    detail=detail[:500] if detail else None,
+                )
+        except Exception as e:
+            from app.services.log_buffer import log_event
+
+            log_event("ERROR", f"Startup LLM check error: {e}")
+
+    asyncio.create_task(_startup_llm_probe())
+
     stop = asyncio.Event()
     poll_task: asyncio.Task | None = None
     if ftp_service.is_ftp_mode_enabled():

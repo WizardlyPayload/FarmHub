@@ -39,8 +39,16 @@ def _parse_integration_key(header_val: str | None) -> str:
         return header_val
 
 
-def _farm_dashboard_origin() -> str:
-    u = get_settings().get("dashboard_json_url") or "http://127.0.0.1:8766/api/data"
+def _farm_dashboard_origin() -> str | None:
+    """
+    Base URL for Farm Dashboard HTTP API (e.g. http://host:8766).
+
+    Returns None when DASHBOARD_JSON_URL is unset — do not default to 127.0.0.1 on a VPS
+    (that points at the VPS itself, not the player's PC). Use DASHBOARD_PUSH_MODE=1 instead.
+    """
+    u = (get_settings().get("dashboard_json_url") or "").strip()
+    if not u:
+        return None
     if "/api/data" in u:
         return u.split("/api/data")[0].rstrip("/")
     parts = u.rstrip("/").rsplit("/", 1)
@@ -122,22 +130,36 @@ async def get_overview_payload() -> dict[str, Any]:
     origin = _farm_dashboard_origin()
     farm_servers: list[dict[str, Any]] = []
     farm_error: str | None = None
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            r = await client.get(f"{origin}/api/servers")
-            r.raise_for_status()
-            data = r.json()
-            if isinstance(data, list):
-                farm_servers = data
-    except Exception as e:
-        farm_error = str(e)
+    connect_hint: str | None = None
+
+    if origin is None:
+        farm_error = (
+            "Farm Dashboard JSON URL is not configured on this server. "
+            "If Farm Dashboard runs on a PC and AI Farm Manager on a VPS: set DASHBOARD_PUSH_MODE=1 and enable push in the desktop app "
+            "(do not use 127.0.0.1 here — that is the VPS itself). "
+            "For local dev on the same machine, set DASHBOARD_JSON_URL=http://127.0.0.1:8766/api/data explicitly."
+        )
+        connect_hint = (
+            "Empty URL is correct only with push mode. Otherwise set Farm Dashboard JSON URL in /admin to a URL this server can reach."
+        )
+    else:
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                r = await client.get(f"{origin}/api/servers")
+                r.raise_for_status()
+                data = r.json()
+                if isinstance(data, list):
+                    farm_servers = data
+        except Exception as e:
+            farm_error = str(e)
+        connect_hint = _farm_dashboard_connect_hint(origin, farm_error)
 
     base_out.update(
         {
-            "farmDashboardOrigin": origin,
+            "farmDashboardOrigin": origin or "(not set — use push mode or configure URL)",
             "farmDashboardServers": farm_servers,
             "farmDashboardError": farm_error,
-            "farmDashboardConnectHint": _farm_dashboard_connect_hint(origin, farm_error),
+            "farmDashboardConnectHint": connect_hint,
             "farmDashboardServerCount": len(farm_servers),
             "farmDashboardPushMode": False,
         }

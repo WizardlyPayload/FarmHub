@@ -28,7 +28,17 @@ def format_gemini_http_error(response: httpx.Response) -> str:
             msg = (err.get("message") or err.get("status") or "").strip()
             status = (err.get("status") or "").strip()
             if msg:
-                return f"Gemini HTTP {code} ({status}): {msg}"
+                line = f"Gemini HTTP {code} ({status}): {msg}"
+                if code == 404:
+                    line += (
+                        " — Set GEMINI_MODEL to a model your API version supports (e.g. gemini-2.5-flash or "
+                        "gemini-2.0-flash); or try GEMINI_REST_API_VERSION=v1beta."
+                    )
+                elif code == 403:
+                    line += (
+                        " — Check Google AI Studio / Cloud: API enabled, billing, and project not restricted."
+                    )
+                return line
     except Exception:
         pass
     return f"Gemini HTTP {code}: {raw}"
@@ -91,7 +101,7 @@ async def _openai(settings: dict[str, Any], user_message: str, dashboard_context
 def _gemini_generate_url(settings: dict[str, Any]) -> str:
     """REST URL for non-streaming generateContent (same body as streamGenerateContent minus SSE)."""
     key = (settings.get("gemini_api_key") or "").strip().replace("\ufeff", "").replace("\u200b", "")
-    model = (settings.get("gemini_model") or "gemini-1.5-flash").strip()
+    model = (settings.get("gemini_model") or "gemini-2.5-flash").strip()
     endpoint = settings.get("gemini_api_endpoint", "generativelanguage")
     api_ver = (settings.get("gemini_rest_api_version") or "v1").strip().lower()
     if api_ver not in ("v1", "v1beta"):
@@ -132,3 +142,100 @@ async def _gemini(settings: dict[str, Any], user_message: str, dashboard_context
     )
     text = "".join(p.get("text", "") for p in parts).strip()
     return text or FALLBACK_REPLY
+
+
+async def test_llm_connectivity(
+    *,
+    probe_message: str | None = None,
+) -> dict[str, Any]:
+    """
+    One request to OpenAI or Gemini to verify keys and model (admin diagnostics or startup probe).
+
+    ``probe_message`` — user text; default is a tiny ping suitable for the admin "Test LLM" button.
+    Never returns API keys; detail is a short reply snippet or error message.
+    """
+    settings = get_settings()
+    provider = (settings.get("llm_provider") or "openai").strip().lower()
+    t0 = time.perf_counter()
+    user_msg = (
+        probe_message
+        if probe_message is not None
+        else "Reply with exactly the word OK."
+    )
+    gemini_max_out = 128 if len(user_msg) > 32 else 24
+    openai_max_tokens = 120 if len(user_msg) > 32 else 12
+
+    try:
+        if provider == "gemini":
+            if not (settings.get("gemini_api_key") or "").strip():
+                return {
+                    "ok": False,
+                    "provider": "gemini",
+                    "latency_ms": None,
+                    "detail": "GEMINI_API_KEY not set",
+                }
+            url = _gemini_generate_url(settings)
+            payload = {
+                "contents": [{"parts": [{"text": user_msg}]}],
+                "generationConfig": {"temperature": 0.2, "maxOutputTokens": gemini_max_out},
+            }
+            async with httpx.AsyncClient(timeout=45.0) as client:
+                r = await client.post(url, json=payload)
+            ms = round((time.perf_counter() - t0) * 1000, 1)
+            if r.status_code >= 400:
+                return {
+                    "ok": False,
+                    "provider": "gemini",
+                    "latency_ms": ms,
+                    "detail": format_gemini_http_error(r),
+                    "model": settings.get("gemini_model"),
+                }
+            data = r.json()
+            parts = (
+                data.get("candidates", [{}])[0]
+                .get("content", {})
+                .get("parts", [])
+            )
+            snippet = ("".join(p.get("text", "") for p in parts) or "").strip()[:120]
+            return {
+                "ok": True,
+                "provider": "gemini",
+                "latency_ms": ms,
+                "detail": snippet or "(empty reply)",
+                "model": settings.get("gemini_model"),
+            }
+
+        if not (settings.get("llm_api_key") or "").strip():
+            return {
+                "ok": False,
+                "provider": "openai",
+                "latency_ms": None,
+                "detail": "LLM_API_KEY not set",
+            }
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=settings["llm_api_key"])
+        model = settings["llm_model"]
+        resp = await client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": user_msg}],
+            temperature=0.2,
+            max_tokens=openai_max_tokens,
+        )
+        text = (resp.choices[0].message.content or "").strip()[:120]
+        ms = round((time.perf_counter() - t0) * 1000, 1)
+        return {
+            "ok": True,
+            "provider": "openai",
+            "latency_ms": ms,
+            "detail": text or "(empty reply)",
+            "model": model,
+        }
+    except Exception as e:
+        ms = round((time.perf_counter() - t0) * 1000, 1)
+        return {
+            "ok": False,
+            "provider": provider,
+            "latency_ms": ms,
+            "detail": str(e)[:500],
+        }

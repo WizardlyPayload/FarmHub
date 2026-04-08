@@ -99,6 +99,8 @@ def get_settings() -> dict:
         "dashboard_json_url": os.getenv("DASHBOARD_JSON_URL", "").strip(),
         "dashboard_server_id": os.getenv("DASHBOARD_SERVER_ID", "").strip(),
         "dashboard_fetch_url": _dashboard_fetch_url(),
+        # PC → VPS snapshot POST (/api/integration/push-snapshot); no inbound ports on the gaming PC
+        "dashboard_push_mode": _b("DASHBOARD_PUSH_MODE", False),
         "bot_enabled": be,
         "llm_configured": llm_configured,
         "trigger_prefix": os.getenv("TRIGGER_PREFIX", "!bot").strip(),

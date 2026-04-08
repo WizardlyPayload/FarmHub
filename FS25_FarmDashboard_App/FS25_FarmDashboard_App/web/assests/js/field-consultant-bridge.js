@@ -14,12 +14,29 @@ let lastFetchAt = 0;
 let inFlight = false;
 let debounceId = null;
 
-function getBase() {
-  return (localStorage.getItem(LS_URL) || "http://127.0.0.1:8080").replace(/\/$/, "");
+async function getBase() {
+  const ls = (localStorage.getItem(LS_URL) || "").replace(/\/$/, "");
+  if (ls) return ls;
+  try {
+    const { ipcRenderer } = require("electron");
+    const c = await ipcRenderer.invoke("get-ai-manager-connection");
+    if (c?.baseUrl) return String(c.baseUrl).replace(/\/$/, "");
+  } catch {
+    /* ignore */
+  }
+  return "http://127.0.0.1:8080";
 }
 
-function getIntegrationKey() {
-  return localStorage.getItem(LS_KEY) || "";
+async function getIntegrationKey() {
+  const ls = localStorage.getItem(LS_KEY) || "";
+  if (ls) return ls;
+  try {
+    const { ipcRenderer } = require("electron");
+    const c = await ipcRenderer.invoke("get-ai-manager-connection");
+    return (c?.integrationKey || "").trim();
+  } catch {
+    return "";
+  }
 }
 
 async function getByokHeaders() {
@@ -118,7 +135,7 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
     return { skipped: true };
   }
 
-  const intKey = getIntegrationKey();
+  const intKey = await getIntegrationKey();
   if (!intKey) {
     if (typeof window !== "undefined") {
       window.__fieldConsultantByRef = {};
@@ -130,7 +147,8 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
   inFlight = true;
   try {
     const extra = await getByokHeaders();
-    const r = await fetch(`${getBase()}/api/v1/consultant/insights`, {
+    const base = await getBase();
+    const r = await fetch(`${base}/api/v1/consultant/insights`, {
       method: "GET",
       headers: {
         "X-FarmDash-Key": encodeURIComponent(intKey),

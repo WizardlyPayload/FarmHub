@@ -21,6 +21,63 @@ const { mergeData }      = require('./dataMerger');
 
 const store = new Store();
 
+/** Optional release branding — copy branding.example.json → branding.json (do not commit secrets). */
+let _brandingLoaded = false;
+let _brandingCache = {};
+
+function loadBrandingFromDisk() {
+    if (_brandingLoaded) return _brandingCache;
+    _brandingLoaded = true;
+    const candidates = [];
+    if (process.resourcesPath) {
+        candidates.push(path.join(process.resourcesPath, 'branding.json'));
+    }
+    candidates.push(path.join(__dirname, 'branding.json'));
+    for (const p of candidates) {
+        try {
+            if (fs.existsSync(p)) {
+                const raw = JSON.parse(stripUtf8Bom(fs.readFileSync(p, 'utf8')));
+                if (raw && typeof raw === 'object') {
+                    _brandingCache = raw;
+                    console.log('[branding] loaded', p);
+                    return _brandingCache;
+                }
+            }
+        } catch (e) {
+            console.warn('[branding]', p, e.message);
+        }
+    }
+    return _brandingCache;
+}
+
+function mergeBrandingIntoAiManagerConnection() {
+    const b = loadBrandingFromDisk();
+    const cur = store.get('aiManagerConnection') || {};
+    const next = { ...cur };
+    let changed = false;
+    const defUrl = String(b.defaultAiBackendUrl || '').trim().replace(/\/$/, '');
+    const embKey = String(b.embeddedFarmdashIntegrationKey || '').trim();
+    if (defUrl && !next.baseUrl) {
+        next.baseUrl = defUrl;
+        changed = true;
+    }
+    if (embKey && !next.integrationKey) {
+        next.integrationKey = embKey;
+        changed = true;
+    }
+    if (b.pushSnapshotsDefault === true && next.pushSnapshots === undefined) {
+        next.pushSnapshots = true;
+        changed = true;
+    }
+    if (changed) {
+        store.set('aiManagerConnection', {
+            baseUrl: next.baseUrl || '',
+            integrationKey: next.integrationKey || '',
+            pushSnapshots: !!next.pushSnapshots,
+        });
+    }
+}
+
 const VALID_LOCALE_RE = /^[a-z]{2}$/;
 
 /** Written by the NSIS installer (first page); consumed on first app launch. */
@@ -57,6 +114,10 @@ let mainWindow;
 let serverStates = {};   // id → { luaData, xmlData, mergedData, watcher, intervals[] }
 /** Timeouts/intervals for coordinated multi-FTP polling (cleared in stopAllWatchers). */
 let ftpPollingTimers = [];
+/** Throttle AI snapshot push per server (outbound POST to VPS — no open ports on this PC). */
+const AI_SNAPSHOT_PUSH_MIN_MS = 30000;
+let lastAiSnapshotPushAt = {};
+let aiSnapshotPushInterval = null;
 
 /** PowerShell script: repo tools/ or packaged resources/tools/ */
 function getModExportScriptPath() {
@@ -473,11 +534,81 @@ function broadcast(serverId, data) {
 
 // ── Data processing ───────────────────────────────────────────────────────────
 
+function buildServersPayloadForAiPush() {
+    const config = store.get('config');
+    if (!config?.servers) return [];
+    return config.servers.map(s => ({
+        id: s.id,
+        name: s.name,
+        mode: s.mode || 'local',
+        localSubFolder: s.localSubFolder || null,
+    }));
+}
+
+function buildDataPayloadForAiPush(serverId) {
+    const state = serverStates[serverId];
+    const d = state?.mergedData;
+    const sid = serverId || Object.keys(serverStates)[0];
+    const clone = d ? cloneMergedDataWithFieldExclusions(d, sid) : null;
+    const ts = new Date().toISOString();
+    return clone ? { ...clone, timestamp: ts } : { error: 'Waiting for data...', timestamp: ts };
+}
+
+async function maybePushSnapshotToAiManager(serverId) {
+    const conn = store.get('aiManagerConnection') || {};
+    if (!conn.pushSnapshots) return;
+    const base = String(conn.baseUrl || '').trim().replace(/\/$/, '');
+    const key = String(conn.integrationKey || '').trim();
+    if (!base || !key) return;
+    const now = Date.now();
+    if ((lastAiSnapshotPushAt[serverId] || 0) + AI_SNAPSHOT_PUSH_MIN_MS > now) return;
+    lastAiSnapshotPushAt[serverId] = now;
+    const snapshot = buildDataPayloadForAiPush(serverId);
+    const servers = buildServersPayloadForAiPush();
+    const url = `${base}/api/integration/push-snapshot?serverId=${encodeURIComponent(serverId)}`;
+    const body = JSON.stringify({ snapshot, servers });
+    try {
+        const r = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-FarmDash-Key': encodeURIComponent(key),
+            },
+            body,
+        });
+        if (!r.ok) {
+            const t = await r.text();
+            console.warn('[ai-snapshot-push]', r.status, t.slice(0, 300));
+        }
+    } catch (e) {
+        console.warn('[ai-snapshot-push]', e && e.message ? e.message : e);
+    }
+}
+
+function pushAllSnapshotsToAiManager() {
+    const conn = store.get('aiManagerConnection') || {};
+    if (!conn.pushSnapshots) return;
+    Object.keys(serverStates).forEach(sid => { maybePushSnapshotToAiManager(sid); });
+}
+
+function ensureAiSnapshotPushInterval() {
+    if (aiSnapshotPushInterval) return;
+    aiSnapshotPushInterval = setInterval(() => pushAllSnapshotsToAiManager(), 60000);
+}
+
+function stopAiSnapshotPushInterval() {
+    if (aiSnapshotPushInterval) {
+        clearInterval(aiSnapshotPushInterval);
+        aiSnapshotPushInterval = null;
+    }
+}
+
 function rebuildMerged(serverId) {
     const state = serverStates[serverId];
     if (!state) return;
     state.mergedData = mergeData(state.luaData, state.xmlData);
     broadcast(serverId, state.mergedData);
+    maybePushSnapshotToAiManager(serverId);
 }
 
 function processLuaData(serverId, raw) {
@@ -801,7 +932,10 @@ process.on('unhandledRejection', (reason) => {
 
 app.whenReady().then(() => {
     consumeInstallLocaleFile();
+    mergeBrandingIntoAiManagerConnection();
     createWindow();
+    const amc = store.get('aiManagerConnection');
+    if (amc && amc.pushSnapshots) ensureAiSnapshotPushInterval();
 });
 app.on('window-all-closed', () => { stopAllWatchers(); if (process.platform !== 'darwin') app.quit(); });
 
@@ -824,6 +958,53 @@ ipcMain.on('save-settings', (event, newConfig) => {
 ipcMain.handle('get-current-config', () => store.get('config'));
 
 /** Write AI Farm Manager mod config XML to local FS25 modsSettings (Windows; same PC as game). */
+ipcMain.handle('get-ai-client-branding', () => {
+    const b = loadBrandingFromDisk();
+    const emb = String(b.embeddedFarmdashIntegrationKey || '').trim();
+    const defUrl = String(b.defaultAiBackendUrl || '').trim();
+    return {
+        serviceName: String(b.serviceName || 'AI Farm Manager').trim() || 'AI Farm Manager',
+        hasEmbeddedIntegrationKey: emb.length > 0,
+        hasDefaultBackendUrl: defUrl.length > 0,
+        defaultAiBackendUrl: defUrl.replace(/\/$/, ''),
+    };
+});
+
+ipcMain.handle('get-ai-manager-connection', () => {
+    const b = loadBrandingFromDisk();
+    const c = store.get('aiManagerConnection') || {};
+    const embKey = String(b.embeddedFarmdashIntegrationKey || '').trim();
+    const defUrl = String(b.defaultAiBackendUrl || '').trim().replace(/\/$/, '');
+    let push = c.pushSnapshots;
+    if (push === undefined && b.pushSnapshotsDefault === true) {
+        push = true;
+    }
+    return {
+        baseUrl: (c.baseUrl || defUrl || '').replace(/\/$/, ''),
+        integrationKey: (c.integrationKey || embKey || '').trim(),
+        pushSnapshots: !!push,
+    };
+});
+
+ipcMain.handle('save-ai-manager-connection', (_e, payload) => {
+    const b = loadBrandingFromDisk();
+    const embKey = String(b.embeddedFarmdashIntegrationKey || '').trim();
+    let baseUrl = String(payload?.baseUrl || '').trim().replace(/\/$/, '');
+    let integrationKey = String(payload?.integrationKey || '').trim();
+    if (!integrationKey && embKey) {
+        integrationKey = embKey;
+    }
+    const pushSnapshots = !!payload?.pushSnapshots;
+    store.set('aiManagerConnection', { baseUrl, integrationKey, pushSnapshots });
+    if (pushSnapshots && baseUrl && integrationKey) {
+        ensureAiSnapshotPushInterval();
+        pushAllSnapshotsToAiManager();
+    } else {
+        stopAiSnapshotPushInterval();
+    }
+    return { ok: true };
+});
+
 ipcMain.handle('ai-farm-install-config-xml', async (_e, { baseUrl, integrationKey, instanceId }) => {
     const base = String(baseUrl || '').replace(/\/$/, '');
     const url = `${base}/api/integration/config-xml`;

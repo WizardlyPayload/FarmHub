@@ -9,12 +9,29 @@
   var insightsIntervalId = null;
   var insightsObserver = null;
 
-  function getBase() {
-    return (localStorage.getItem(LS_URL) || 'http://127.0.0.1:8080').replace(/\/$/, '');
+  function getBaseAsync() {
+    var ls = (localStorage.getItem(LS_URL) || '').replace(/\/$/, '');
+    if (ls) return Promise.resolve(ls);
+    try {
+      return require('electron').ipcRenderer.invoke('get-ai-manager-connection').then(function (c) {
+        if (c && c.baseUrl) return String(c.baseUrl).replace(/\/$/, '');
+        return 'http://127.0.0.1:8080';
+      });
+    } catch (e) {
+      return Promise.resolve('http://127.0.0.1:8080');
+    }
   }
 
-  function getKey() {
-    return localStorage.getItem(LS_KEY) || '';
+  function getKeyAsync() {
+    var ls = localStorage.getItem(LS_KEY) || '';
+    if (ls) return Promise.resolve(ls);
+    try {
+      return require('electron').ipcRenderer.invoke('get-ai-manager-connection').then(function (c) {
+        return (c && c.integrationKey) || '';
+      });
+    } catch (e2) {
+      return Promise.resolve('');
+    }
   }
 
   function getByokHeadersSync() {
@@ -42,8 +59,8 @@
       badge.textContent = llmUsed ? 'AI' : 'Rules';
       badge.className = 'badge ms-1 ' + (llmUsed ? 'bg-success' : 'bg-secondary');
       badge.title = llmUsed
-        ? 'LLM via your API key (BYOK)'
-        : 'Heuristics only — add key in Dashboard Settings → AI Consultant (BYOK) to enable LLM';
+        ? 'LLM via your API key'
+        : 'Heuristics only — add your OpenAI/Gemini key in the robot panel (AI Farm Manager)';
     }
 
     container.innerHTML = '';
@@ -80,35 +97,36 @@
     var container = document.getElementById('ai-insights-panel');
     if (!container) return;
 
-    var base = getBase();
-    var key = getKey();
-    if (!key) {
-      var badge = document.getElementById('ai-insights-llm-badge');
-      if (badge) {
-        badge.textContent = '—';
-        badge.className = 'badge ms-1 bg-secondary';
-      }
-      container.innerHTML =
-        '<p class="text-warning small mb-0">Set the Farm Dashboard link key in the <i class="bi bi-robot"></i> AI Farm Manager panel, then Save.</p>';
-      return;
-    }
-
     container.innerHTML = '<p class="text-muted small mb-0"><i class="bi bi-hourglass-split me-1"></i> Loading insights…</p>';
 
-    var apiURL = base + '/api/v1/consultant/insights';
-
-    getByokHeadersSync().then(function (extra) {
-      return fetch(apiURL, {
-        method: 'GET',
-        headers: Object.assign(
-          {
-            'X-FarmDash-Key': encodeURIComponent(key),
-            Accept: 'application/json',
-          },
-          extra
-        ),
-      });
-    })
+    Promise.all([getBaseAsync(), getKeyAsync()])
+      .then(function (pair) {
+        var base = pair[0] || 'http://127.0.0.1:8080';
+        var key = pair[1] || '';
+        if (!key) {
+          var badge = document.getElementById('ai-insights-llm-badge');
+          if (badge) {
+            badge.textContent = '—';
+            badge.className = 'badge ms-1 bg-secondary';
+          }
+          container.innerHTML =
+            '<p class="text-warning small mb-0">Open <i class="bi bi-robot"></i> <strong>AI Farm Manager</strong> and click <strong>Save &amp; load</strong>.</p>';
+          return Promise.reject(new Error('__no_key__'));
+        }
+        var apiURL = base + '/api/v1/consultant/insights';
+        return getByokHeadersSync().then(function (extra) {
+          return fetch(apiURL, {
+            method: 'GET',
+            headers: Object.assign(
+              {
+                'X-FarmDash-Key': encodeURIComponent(key),
+                Accept: 'application/json',
+              },
+              extra
+            ),
+          });
+        });
+      })
       .then(function (r) {
         if (r.status === 401) throw new Error('401 — wrong key or FARMDASH_INTEGRATION_KEY not set on AI server');
         if (r.status === 503) return r.json().then(function (j) { throw new Error(j.detail || 'Snapshot unavailable (FTP / DASHBOARD_JSON_URL)'); });
@@ -124,6 +142,7 @@
         } catch (e1) {}
       })
       .catch(function (err) {
+        if (err && err.message === '__no_key__') return;
         container.innerHTML =
           '<p class="text-danger small mb-0"><i class="bi bi-exclamation-triangle me-1"></i> ' +
           String(err.message || err) +

@@ -57,6 +57,7 @@ async def admin_page(request: Request, _: str = Depends(require_admin)) -> HTMLR
         "system_prompt": s["system_prompt"],
         "has_llm_key": bool(s["llm_api_key"]),
         "has_gemini_key": bool(s.get("gemini_api_key")),
+        "dashboard_push_mode": bool(s.get("dashboard_push_mode")),
         "overview": overview,
     }
     for cp in _templates.context_processors:

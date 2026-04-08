@@ -157,6 +157,13 @@
         })
         .then(function (data) {
           render(container, data, null);
+          // When the API returns a subscription tier / plan name, show #aiFarmBotSubscriptionTierRow and set text, e.g.:
+          // var tr = document.getElementById('aiFarmBotCurrentTierText');
+          // var row = document.getElementById('aiFarmBotSubscriptionTierRow');
+          // if (data && data.subscriptionPlan != null && tr && row) {
+          //   tr.textContent = String(data.subscriptionPlan);
+          //   row.classList.remove('d-none');
+          // }
         })
         .catch(function (e) {
           render(container, null, String(e.message || e));

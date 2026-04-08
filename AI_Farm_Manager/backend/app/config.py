@@ -70,6 +70,14 @@ def _gemini_rest_api_version() -> str:
     return v if v in ("v1", "v1beta") else "v1"
 
 
+def _clamp_int(raw: str, lo: int, hi: int, default: int) -> int:
+    try:
+        v = int((raw or "").strip())
+    except (TypeError, ValueError):
+        return default
+    return max(lo, min(hi, v))
+
+
 @lru_cache
 def get_settings() -> dict:
     llm_provider = os.getenv("LLM_PROVIDER", "openai").lower().strip()
@@ -121,4 +129,8 @@ def get_settings() -> dict:
         "public_base_url": os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/"),
         # Fernet key for encrypting ftp_pass / llm_api_key in bot_servers.json (never store the raw key in git).
         "encryption_key_configured": bool(os.getenv("ENCRYPTION_KEY", "").strip()),
+        # Subscription tiers (0=free local, 1=consultant, 2=+chat). When false, all routes behave as tier 2.
+        "enable_subscription_tiers": _b("ENABLE_SUBSCRIPTION_TIERS", False),
+        # When X-Bot-Instance-Id is omitted, tier checks use this (0–2). Default 2 preserves today’s behaviour.
+        "default_subscription_tier": _clamp_int(os.getenv("DEFAULT_SUBSCRIPTION_TIER", "2"), 0, 2, 2),
     }

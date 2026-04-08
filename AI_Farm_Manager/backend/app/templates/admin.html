@@ -84,9 +84,14 @@
         </label>
         <label class="row">
           <span>Gemini model</span>
-          <input type="text" name="gemini_model" value="{{ gemini_model }}"/>
+          <input type="text" name="gemini_model" value="{{ gemini_model }}" placeholder="gemini-2.5-flash"/>
         </label>
+        <p class="muted small" style="margin: -0.35rem 0 0.5rem 0;">Use an id from Google’s API for your key (e.g. <code>gemini-2.5-flash</code>, <code>gemini-2.0-flash</code>). If you see HTTP 404, try <code>GEMINI_REST_API_VERSION=v1beta</code> or another model name.</p>
         <button type="submit" class="btn primary">Save settings</button>
+        <p class="muted small" style="margin-top: 0.75rem;">
+          <button type="button" class="btn" id="adminTestLlmBtn">Test LLM connection</button>
+          <span id="adminTestLlmResult" class="muted small" style="margin-left: 0.5rem;"></span>
+        </p>
       </form>
     </section>
 

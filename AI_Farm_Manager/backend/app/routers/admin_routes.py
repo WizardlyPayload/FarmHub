@@ -15,6 +15,7 @@ from app.prompt_loader import write_system_prompt
 from app.routers.integration import get_overview_payload
 from app.services.bot_registry import delete_instance, find_instance_by_id, upsert_instance
 from app.services.mod_config_xml import build_mod_config_xml, resolve_backend_url_for_xml
+from app.services.llm_service import test_llm_connectivity
 from app.services.log_buffer import get_recent_logs
 from app.services.log_buffer import log_event as push_log
 
@@ -52,7 +53,7 @@ async def admin_page(request: Request, _: str = Depends(require_admin)) -> HTMLR
         "dashboard_server_id": s.get("dashboard_server_id", ""),
         "llm_model": s["llm_model"],
         "llm_provider": s["llm_provider"],
-        "gemini_model": s.get("gemini_model", "gemini-1.5-flash"),
+        "gemini_model": s.get("gemini_model", "gemini-2.5-flash"),
         "gemini_api_endpoint": s.get("gemini_api_endpoint", "generativelanguage"),
         "system_prompt": s["system_prompt"],
         "has_llm_key": bool(s["llm_api_key"]),
@@ -160,6 +161,23 @@ async def admin_save_settings(
         push_log("INFO", "Admin updated settings", keys=list(updates.keys()))
 
     return RedirectResponse(url="/admin", status_code=303)
+
+
+@router.get("/admin/api/test-llm")
+async def admin_test_llm(_: str = Depends(require_admin)) -> dict[str, Any]:
+    """
+    Run a tiny request to the configured provider (OpenAI or Gemini) to verify keys and model.
+    Requires the same HTTP Basic auth as /admin. Response never includes secrets.
+    """
+    out = await test_llm_connectivity()
+    push_log(
+        "INFO" if out.get("ok") else "WARN",
+        "Admin LLM connectivity test",
+        provider=out.get("provider"),
+        ok=out.get("ok"),
+        latency_ms=out.get("latency_ms"),
+    )
+    return out
 
 
 @router.get("/admin/api/logs")

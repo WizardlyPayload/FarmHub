@@ -92,7 +92,8 @@ def get_settings() -> dict:
         "llm_model": os.getenv("LLM_MODEL", "gpt-4o-mini"),
         "llm_provider": llm_provider,
         "gemini_api_key": gemini_api_key,
-        "gemini_model": os.getenv("GEMINI_MODEL", "gemini-1.5-flash"),
+        # generativelanguage v1: use a current model id (1.5 short names often 404 on v1 — see Google ListModels).
+        "gemini_model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
         # generativelanguage = AI Studio (AIza…); aiplatform = Vertex publisher API (Cloud API key)
         "gemini_api_endpoint": _gemini_api_endpoint(),
         "gemini_rest_api_version": _gemini_rest_api_version(),

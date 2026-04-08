@@ -59,8 +59,8 @@
       badge.textContent = llmUsed ? 'AI' : 'Rules';
       badge.className = 'badge ms-1 ' + (llmUsed ? 'bg-success' : 'bg-secondary');
       badge.title = llmUsed
-        ? 'LLM via your API key'
-        : 'Heuristics only — add your OpenAI/Gemini key in the robot panel (AI Farm Manager)';
+        ? 'LLM suggestions (server API key and/or BYOK in AI Farm Manager)'
+        : 'Heuristics only — configure LLM on the AI server or add BYOK in the robot panel';
     }
 
     container.innerHTML = '';
@@ -158,6 +158,9 @@
       return;
     }
     window.__farmdashConsultantInsightsInit = true;
+
+    /** Called after AI Farm Manager “Test dashboard → LLM” succeeds — insights otherwise refresh every 5 min only. */
+    window.refreshFarmDashConsultantInsights = refreshFarmInsights;
 
     var btn = document.getElementById('ai-insights-refresh-btn');
     if (btn) btn.addEventListener('click', refreshFarmInsights);

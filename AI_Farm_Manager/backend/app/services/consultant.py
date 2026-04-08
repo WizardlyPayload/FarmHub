@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from typing import Any
 from urllib.parse import unquote
@@ -313,7 +314,14 @@ async def _openai_consultant(settings: dict, user_message: str) -> str:
 
 
 async def _gemini_consultant(settings: dict, user_message: str) -> str:
-    """Gemini: prefer JSON MIME type when the API accepts it; parse in caller."""
+    """
+    Gemini REST generateContent for consultant JSON.
+
+    ``responseMimeType: application/json`` is **not** sent by default: many
+    ``generativelanguage.googleapis.com`` v1 + model combinations return 400.
+    Set ``GEMINI_CONSULTANT_RESPONSE_JSON=1`` to opt in (e.g. v1beta); if the API
+    still returns 400, we retry once without JSON MIME and log a single warning.
+    """
     import httpx
 
     from app.services.llm_service import _gemini_generate_url
@@ -324,24 +332,29 @@ async def _gemini_consultant(settings: dict, user_message: str) -> str:
     prompt = f"{CONSULTANT_SYSTEM}\n\n{user_message}"
     # Single-turn text; omit "role" for widest compatibility with generativelanguage v1 / v1beta.
     base_cfg: dict[str, Any] = {"temperature": 0.3, "maxOutputTokens": 8192}
-    json_cfg = {**base_cfg, "responseMimeType": "application/json"}
-    payload_json = {
+    want_json_mime = (os.getenv("GEMINI_CONSULTANT_RESPONSE_JSON") or "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    gen_cfg: dict[str, Any] = (
+        {**base_cfg, "responseMimeType": "application/json"} if want_json_mime else base_cfg
+    )
+    payload: dict[str, Any] = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": json_cfg,
-    }
-    payload_plain = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": base_cfg,
+        "generationConfig": gen_cfg,
     }
     async with httpx.AsyncClient(timeout=90.0) as client:
-        r = await client.post(url, json=payload_json)
-        if r.status_code == 400:
-            # Some model/API combos reject responseMimeType — retry without JSON mode.
+        r = await client.post(url, json=payload)
+        if r.status_code == 400 and want_json_mime:
             log_event(
-                "INFO",
-                "Gemini consultant: retrying without responseMimeType (API returned 400)",
+                "WARN",
+                "Gemini consultant: responseMimeType rejected (400); retrying without JSON MIME. "
+                "Unset GEMINI_CONSULTANT_RESPONSE_JSON or use GEMINI_REST_API_VERSION=v1beta if supported.",
             )
-            r = await client.post(url, json=payload_plain)
+            payload["generationConfig"] = base_cfg
+            r = await client.post(url, json=payload)
         if r.status_code >= 400:
             log_event("WARN", format_gemini_http_error(r))
         try:

@@ -245,6 +245,86 @@
       });
     }
     if (refreshBtn) refreshBtn.addEventListener('click', loadPanel);
+
+    var llmPingBtn = document.getElementById('aiFarmBotLlmPing');
+    var llmPingOut = document.getElementById('aiFarmBotLlmPingResult');
+    function runDashboardLlmPing() {
+      if (!llmPingOut) return;
+      llmPingOut.textContent = 'Checking…';
+      llmPingOut.className = 'small text-info mb-3 mb-md-2';
+
+      function mergeHeaders(byok) {
+        var h = { 'X-FarmDash-Key': '' };
+        if (byok && byok.apiKey) {
+          h['X-AI-API-Key'] = byok.apiKey;
+          if (byok.provider === 'gemini' || byok.provider === 'openai') {
+            h['X-AI-Provider'] = byok.provider;
+          }
+        }
+        return h;
+      }
+
+      function doPing(base, key, headers) {
+        var b = (base || '').replace(/\/$/, '') || 'http://127.0.0.1:8080';
+        if (!key) {
+          llmPingOut.textContent = 'Save connection settings first (Farm Dashboard link key).';
+          llmPingOut.className = 'small text-warning mb-3 mb-md-2';
+          return;
+        }
+        headers['X-FarmDash-Key'] = encodeURIComponent(key);
+        fetch(b + '/api/integration/llm-ping', { headers: headers })
+          .then(function (r) {
+            if (r.status === 401) throw new Error('401 — link key mismatch.');
+            return r.text().then(function (txt) {
+              try {
+                return { status: r.status, body: JSON.parse(txt) };
+              } catch (eJ) {
+                throw new Error('HTTP ' + r.status + (txt ? ': ' + txt.slice(0, 120) : ''));
+              }
+            });
+          })
+          .then(function (x) {
+            var j = x.body || {};
+            if (j.ok) {
+              var ms = j.latency_ms != null ? String(j.latency_ms) : '—';
+              var prov = j.provider || '—';
+              var model = j.model ? ' · ' + j.model : '';
+              var det = (j.detail || '').replace(/</g, '');
+              llmPingOut.textContent =
+                'OK — ' + prov + model + ' · ' + ms + ' ms · ' + det;
+              llmPingOut.className = 'small text-success mb-3 mb-md-2';
+            } else {
+              llmPingOut.textContent = (j.detail || j.message || 'LLM check failed') + '';
+              llmPingOut.className = 'small text-warning mb-3 mb-md-2';
+            }
+          })
+          .catch(function (e) {
+            llmPingOut.textContent = String(e.message || e);
+            llmPingOut.className = 'small text-danger mb-3 mb-md-2';
+          });
+      }
+
+      try {
+        var ipc = require('electron').ipcRenderer;
+        Promise.all([
+          ipc.invoke('get-ai-manager-connection'),
+          ipc.invoke('get-consultant-byok-credentials'),
+        ])
+          .then(function (arr) {
+            var c = arr[0];
+            var byok = arr[1];
+            var base = (c && c.baseUrl) || getBase() || '';
+            var key = (c && c.integrationKey) || getKey() || '';
+            doPing(base, key, mergeHeaders(byok || {}));
+          })
+          .catch(function () {
+            doPing(getBase(), getKey(), {});
+          });
+      } catch (ePing) {
+        doPing(getBase(), getKey(), {});
+      }
+    }
+    if (llmPingBtn) llmPingBtn.addEventListener('click', runDashboardLlmPing);
     var toggleKeyBtn = document.getElementById('aiFarmBotToggleKey');
     var toggleKeyIcon = document.getElementById('aiFarmBotToggleKeyIcon');
     if (toggleKeyBtn && keyIn) {

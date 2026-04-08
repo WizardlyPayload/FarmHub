@@ -147,14 +147,16 @@ async def _gemini(settings: dict[str, Any], user_message: str, dashboard_context
 async def test_llm_connectivity(
     *,
     probe_message: str | None = None,
+    settings: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """
     One request to OpenAI or Gemini to verify keys and model (admin diagnostics or startup probe).
 
     ``probe_message`` — user text; default is a tiny ping suitable for the admin "Test LLM" button.
+    ``settings`` — optional merged settings (e.g. Farm Dashboard BYOK); defaults to ``get_settings()``.
     Never returns API keys; detail is a short reply snippet or error message.
     """
-    settings = get_settings()
+    settings = settings if settings is not None else get_settings()
     provider = (settings.get("llm_provider") or "openai").strip().lower()
     t0 = time.perf_counter()
     user_msg = (

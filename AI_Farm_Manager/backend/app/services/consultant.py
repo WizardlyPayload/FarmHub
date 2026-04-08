@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.schemas.insights import FarmInsight, InsightCategory, InsightPriority
 from app.services.log_buffer import log_event
 from app.services.llm_service import format_gemini_http_error
+from app.services.snapshot_pruner import prune_dashboard_snapshot_for_llm
 
 
 def normalize_incoming_api_key(header_val: str | None) -> str:
@@ -52,7 +53,12 @@ CRITICAL — field-specific insights:
 
 For farm-wide or non-parcel field advice, omit **field_ref** or set it to null.
 
-Use at least one Field insight when the snapshot lists fields; use an empty array only if there is no usable data."""
+Use at least one Field insight when the snapshot lists fields; use an empty array only if there is no usable data.
+
+Output limits (so the JSON always completes):
+- Return **at most 4** insights.
+- **priority** must be exactly **Low**, **Medium**, or **High** (spell **Medium** in full — not Med).
+- Keep **message** and **reasoning** **brief** (aim under 180 characters each). Do not write long paragraphs."""
 
 
 def _coerce_pct(value: Any) -> float | None:
@@ -156,6 +162,8 @@ def _parse_category(raw: Any) -> InsightCategory:
 
 def _parse_priority(raw: Any) -> InsightPriority:
     s = str(raw or "").strip().title()
+    if s in ("Med", "Mid"):
+        s = "Medium"
     for p in InsightPriority:
         if p.value == s:
             return p
@@ -219,12 +227,13 @@ async def _llm_insights_from_snapshot(
     text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.I)
     text = re.sub(r"\s*```\s*$", "", text)
 
-    data = _parse_consultant_llm_json_text(text)
+    data, parse_err = _parse_consultant_llm_json_text(text)
     if data is None:
         log_event(
             "WARN",
             "Consultant LLM returned unparsable JSON (try shorter snapshot or different model)",
-            preview=(text[:400] + "…") if len(text) > 400 else text,
+            parse_detail=parse_err,
+            preview=(text[:500] + "…") if len(text) > 500 else text,
         )
         return [], False
 
@@ -304,7 +313,7 @@ async def _openai_consultant(settings: dict, user_message: str) -> str:
 
 
 async def _gemini_consultant(settings: dict, user_message: str) -> str:
-    """Gemini: JSON reply when supported; parse in caller."""
+    """Gemini: prefer JSON MIME type when the API accepts it; parse in caller."""
     import httpx
 
     from app.services.llm_service import _gemini_generate_url
@@ -314,12 +323,25 @@ async def _gemini_consultant(settings: dict, user_message: str) -> str:
     url = _gemini_generate_url(settings)
     prompt = f"{CONSULTANT_SYSTEM}\n\n{user_message}"
     # Single-turn text; omit "role" for widest compatibility with generativelanguage v1 / v1beta.
-    payload = {
+    base_cfg: dict[str, Any] = {"temperature": 0.3, "maxOutputTokens": 8192}
+    json_cfg = {**base_cfg, "responseMimeType": "application/json"}
+    payload_json = {
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.3, "maxOutputTokens": 4096},
+        "generationConfig": json_cfg,
+    }
+    payload_plain = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": base_cfg,
     }
     async with httpx.AsyncClient(timeout=90.0) as client:
-        r = await client.post(url, json=payload)
+        r = await client.post(url, json=payload_json)
+        if r.status_code == 400:
+            # Some model/API combos reject responseMimeType — retry without JSON mode.
+            log_event(
+                "INFO",
+                "Gemini consultant: retrying without responseMimeType (API returned 400)",
+            )
+            r = await client.post(url, json=payload_plain)
         if r.status_code >= 400:
             log_event("WARN", format_gemini_http_error(r))
         try:
@@ -331,11 +353,24 @@ async def _gemini_consultant(settings: dict, user_message: str) -> str:
             data = r.json()
         except json.JSONDecodeError as e:
             raise RuntimeError("Gemini response body is not JSON") from e
-    parts = (
-        data.get("candidates", [{}])[0]
-        .get("content", {})
-        .get("parts", [])
-    )
+
+    cands = data.get("candidates") or []
+    cand0 = cands[0] if cands else {}
+    finish = (cand0.get("finishReason") or "").strip().upper()
+    um = data.get("usageMetadata") if isinstance(data.get("usageMetadata"), dict) else {}
+    if finish == "MAX_TOKENS":
+        log_event(
+            "WARN",
+            "Gemini consultant hit MAX_TOKENS — output JSON may be cut mid-string; "
+            "prompt asks for ≤4 brief insights; check snapshot size",
+            finishReason=finish,
+            candidates_tokens=um.get("candidatesTokenCount"),
+            prompt_tokens=um.get("promptTokenCount"),
+        )
+    elif finish in ("SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII"):
+        log_event("WARN", "Gemini consultant stopped early", finishReason=finish)
+
+    parts = cand0.get("content", {}).get("parts", [])
     return "".join(p.get("text", "") for p in parts).strip()
 
 
@@ -385,24 +420,35 @@ def resolve_consultant_llm_settings(
     return _consultant_llm_settings_for_byok(key, prov)
 
 
-def _parse_consultant_llm_json_text(text: str) -> dict[str, Any] | None:
+def _parse_consultant_llm_json_text(text: str) -> tuple[dict[str, Any] | None, str | None]:
     """
     Parse consultant JSON; tolerate trailing prose after the first JSON object (``raw_decode``).
+    Returns (dict, None) on success, or (None, short error detail) on failure.
     """
     t = (text or "").strip()
     t = re.sub(r"^```(?:json)?\s*", "", t, flags=re.I)
     t = re.sub(r"\s*```\s*$", "", t)
     decoder = json.JSONDecoder()
+    errs: list[str] = []
     try:
         obj, _end = decoder.raw_decode(t)
-        return obj if isinstance(obj, dict) else None
-    except json.JSONDecodeError:
-        pass
+        if isinstance(obj, dict):
+            return obj, None
+        errs.append("raw_decode: root JSON value is not an object")
+    except json.JSONDecodeError as e:
+        errs.append(f"raw_decode: {e.msg} at col {e.colno} (char {e.pos})")
+
     try:
         obj = json.loads(t)
-        return obj if isinstance(obj, dict) else None
-    except (json.JSONDecodeError, TypeError, ValueError, RecursionError):
-        return None
+        if isinstance(obj, dict):
+            return obj, None
+        errs.append("loads: root JSON value is not an object")
+    except json.JSONDecodeError as e:
+        errs.append(f"loads: {e.msg} at col {e.colno} (char {e.pos})")
+    except (TypeError, ValueError, RecursionError) as e:
+        errs.append(str(e)[:200])
+
+    return None, errs[-1] if errs else "empty or non-JSON text"
 
 
 async def generate_farm_insights(
@@ -424,7 +470,11 @@ async def generate_farm_insights(
         return heuristics, False
 
     try:
-        snap_str = json.dumps(snapshot_data, ensure_ascii=False, default=str)
+        if isinstance(snapshot_data, dict):
+            pruned = prune_dashboard_snapshot_for_llm(snapshot_data)
+        else:
+            pruned = snapshot_data
+        snap_str = json.dumps(pruned, ensure_ascii=False, default=str)
     except Exception:
         snap_str = "{}"
 

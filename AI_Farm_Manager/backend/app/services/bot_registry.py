@@ -109,6 +109,9 @@ def load_registry() -> dict[str, Any]:
         if not isinstance(data["instances"], list):
             data["instances"] = []
         _decrypt_instance_secrets_inplace(data["instances"])
+        for inst in data["instances"]:
+            if isinstance(inst, dict):
+                inst.setdefault("subscription_tier", 2)
         return data
     except json.JSONDecodeError as e:
         logger.warning("bot_servers.json invalid JSON (%s): %s", path, e)
@@ -240,10 +243,19 @@ def list_instances_masked() -> list[dict[str, Any]]:
                 "label": inst.get("label", ""),
                 "dashboard_server_id": inst.get("dashboard_server_id") or "",
                 "enabled": bool(inst.get("enabled", True)),
+                "subscription_tier": _clamp_subscription_tier(inst.get("subscription_tier", 2)),
                 "server_token_masked": mask_token(str(inst.get("server_token", ""))),
             }
         )
     return out
+
+
+def _clamp_subscription_tier(raw: Any) -> int:
+    try:
+        t = int(raw)
+    except (TypeError, ValueError):
+        return 2
+    return max(0, min(2, t))
 
 
 def upsert_instance(
@@ -252,6 +264,7 @@ def upsert_instance(
     dashboard_server_id: str,
     enabled: bool,
     server_token: str | None = None,
+    subscription_tier: int | None = None,
 ) -> dict[str, Any]:
     """Create or update. If server_token is None on create, generates one."""
     reg = load_registry()
@@ -266,6 +279,8 @@ def upsert_instance(
                 inst["enabled"] = enabled
                 if server_token and server_token.strip():
                     inst["server_token"] = server_token.strip()
+                if subscription_tier is not None:
+                    inst["subscription_tier"] = _clamp_subscription_tier(subscription_tier)
                 save_registry(reg)
                 return inst
         raise ValueError("instance id not found")
@@ -277,6 +292,7 @@ def upsert_instance(
         "dashboard_server_id": did,
         "enabled": enabled,
         "server_token": tok,
+        "subscription_tier": _clamp_subscription_tier(subscription_tier if subscription_tier is not None else 2),
     }
     reg["instances"].append(new_inst)
     save_registry(reg)

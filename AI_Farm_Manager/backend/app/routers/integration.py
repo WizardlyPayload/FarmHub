@@ -250,6 +250,8 @@ class InstancePayload(BaseModel):
     dashboard_server_id: str = Field("", max_length=200)
     enabled: bool = True
     server_token: str | None = Field(None, max_length=512)
+    # 0=free (local), 1=consultant, 2=consultant+chat — used when ENABLE_SUBSCRIPTION_TIERS=true
+    subscription_tier: int | None = Field(None, ge=0, le=2)
 
 
 @router.post("/instances")
@@ -264,6 +266,7 @@ async def create_or_update_instance(
             body.dashboard_server_id,
             body.enabled,
             body.server_token,
+            subscription_tier=body.subscription_tier,
         )
         return {"ok": True, "instance": inst}
     except ValueError as e:

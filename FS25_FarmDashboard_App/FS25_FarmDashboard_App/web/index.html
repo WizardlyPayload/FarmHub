@@ -819,6 +819,15 @@
                 </div>
               </div>
             </div>
+            <!-- Subscription tier: remove d-none on #aiFarmBotSubscriptionTierRow when billing exposes tier on /api/integration/overview -->
+            <div class="d-none mb-2" id="aiFarmBotSubscriptionTierRow" aria-hidden="true">
+              <label class="form-label small mb-0" for="aiFarmBotCurrentTierText">Current plan</label>
+              <p class="small mb-0 text-muted font-monospace" id="aiFarmBotCurrentTierText">—</p>
+              <p class="small text-muted mb-0">0 = Free (BYOK) · 1 = Web Consultant · 2 = Full (consultant + in-game bot)</p>
+            </div>
+            <!--
+            <p class="small text-warning">Comment block kept for designers: duplicate tier row with badge styling when un-hiding.</p>
+            -->
             <div class="row g-2 mb-2">
               <div class="col-12" id="aiFarmBotRowBackendUrl">
                 <label class="form-label small" for="aiFarmBotBaseUrl">AI server URL <span class="text-muted fw-normal">(only if your build did not set one)</span></label>

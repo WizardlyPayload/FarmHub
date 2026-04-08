@@ -4,7 +4,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
@@ -14,6 +14,7 @@ from app.services.llm_service import FALLBACK_REPLY, run_llm
 from app.services.log_buffer import log_event
 from app.services.outgoing_queue import push_message
 from app.services.rate_limit import allow
+from app.services.subscription import assert_chat_allowed
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -58,7 +59,11 @@ async def _process_llm_job(player: str, text: str, fetch_url: str | None, server
 
 
 @router.post("/receive")
-async def receive_chat(body: ReceiveBody, background_tasks: BackgroundTasks) -> dict[str, Any]:
+async def receive_chat(
+    request: Request,
+    body: ReceiveBody,
+    background_tasks: BackgroundTasks,
+) -> dict[str, Any]:
     ok, err, fetch_url, instance_on = resolve_auth(body.server_token)
     if not ok:
         log_event(
@@ -68,6 +73,8 @@ async def receive_chat(body: ReceiveBody, background_tasks: BackgroundTasks) -> 
             token_len=len((body.server_token or "").strip()),
         )
         raise HTTPException(status_code=401, detail=err or "Invalid server_token")
+
+    assert_chat_allowed(request, body.server_token)
 
     tok = normalize_server_token(body.server_token)
     settings = get_settings()

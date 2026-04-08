@@ -10,6 +10,7 @@ import httpx
 from app.services import ftp_service
 from app.services import snapshot_push_service
 from app.services.log_buffer import log_event
+from app.services.snapshot_pruner import prune_dashboard_snapshot_for_llm
 
 
 def build_dashboard_fetch_url(base_url: str, server_id: str | None) -> str:
@@ -80,6 +81,7 @@ async def fetch_dashboard_json(url: str | None, timeout: float = 8.0) -> tuple[s
 def build_dashboard_context_block(raw_json: str | None, err: str | None) -> str:
     if raw_json:
         waiting_note = ""
+        payload = raw_json
         try:
             data = json.loads(raw_json)
             if isinstance(data, dict) and data.get("error"):
@@ -90,13 +92,22 @@ def build_dashboard_context_block(raw_json: str | None, err: str | None) -> str:
                         "(e.g. game not running, mod not exporting, or wrong server). "
                         "Do not invent numbers; say data is not available yet.\n\n"
                     )
+            if isinstance(data, dict):
+                pruned = prune_dashboard_snapshot_for_llm(data)
+                payload = json.dumps(pruned, ensure_ascii=False, default=str)
+            elif isinstance(data, list):
+                pruned = prune_dashboard_snapshot_for_llm(data)
+                payload = json.dumps(pruned, ensure_ascii=False, default=str)
         except Exception:
-            pass
+            payload = raw_json
+        cap = 120000
+        if len(payload) > cap:
+            payload = payload[:cap] + "\n…(truncated)"
         return (
             waiting_note
-            + "Current farm dashboard snapshot (JSON). Use it for factual answers; "
+            + "Current farm dashboard snapshot (JSON; pruned for token efficiency). Use it for factual answers; "
             "if a field is missing, say you do not see it.\n```json\n"
-            + raw_json[:120000]
+            + payload
             + "\n```"
         )
     return (

@@ -300,6 +300,9 @@
               llmPingOut.textContent =
                 'OK — ' + prov + model + ' · ' + ms + ' ms · ' + det;
               llmPingOut.className = 'small text-success mb-3 mb-md-2';
+              if (typeof window.refreshFarmDashConsultantInsights === 'function') {
+                window.refreshFarmDashConsultantInsights();
+              }
             } else {
               llmPingOut.textContent = (j.detail || j.message || 'LLM check failed') + '';
               llmPingOut.className = 'small text-warning mb-3 mb-md-2';

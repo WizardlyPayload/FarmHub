@@ -23,6 +23,7 @@ from app.services.mod_config_xml import build_mod_config_xml, resolve_backend_ur
 from app.services import snapshot_push_service
 from app.services.consultant import normalize_incoming_api_key, resolve_consultant_llm_settings
 from app.services.llm_service import test_llm_connectivity
+from app.services.log_buffer import log_event
 
 router = APIRouter(prefix="/api/integration", tags=["integration"])
 _security = HTTPBasic(auto_error=False)
@@ -190,14 +191,39 @@ async def integration_llm_ping(
         user_prov = None
     merged = resolve_consultant_llm_settings(user_key or None, user_prov)
     if merged is None:
+        log_event(
+            "WARN",
+            "Farm Dashboard LLM ping — no API key (server or BYOK)",
+        )
         return {
             "ok": False,
             "detail": "No LLM API key — set keys on the server or BYOK in Farm Dashboard (robot panel).",
         }
-    return await test_llm_connectivity(
+    out = await test_llm_connectivity(
         probe_message='Hi — are you there? Reply in one short sentence (max 20 words).',
         settings=merged,
     )
+    detail = (out.get("detail") or "").strip()
+    if out.get("ok"):
+        log_event(
+            "INFO",
+            "Farm Dashboard LLM ping OK",
+            provider=out.get("provider"),
+            latency_ms=out.get("latency_ms"),
+            model=out.get("model"),
+            reply_preview=detail[:240] if detail else None,
+            byok=bool(user_key),
+        )
+    else:
+        log_event(
+            "WARN",
+            "Farm Dashboard LLM ping failed",
+            provider=out.get("provider"),
+            latency_ms=out.get("latency_ms"),
+            model=out.get("model"),
+            detail=detail[:500] if detail else None,
+        )
+    return out
 
 
 @router.post("/push-snapshot")

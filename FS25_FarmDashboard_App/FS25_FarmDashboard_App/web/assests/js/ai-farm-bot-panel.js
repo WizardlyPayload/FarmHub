@@ -57,10 +57,12 @@
     html += '<p><strong>Farm saves in this app:</strong> ' + (data.farmDashboardServerCount || 0) +
       ' · <strong>AI bot profiles:</strong> ' + (data.botInstanceCount || 0) + '</p>';
     if (fdErr) {
-      html += '<p class="text-warning small">Note: ' + String(fdErr) + '</p>';
-      if (fdHint) {
-        html += '<p class="text-info small">' + String(fdHint) + '</p>';
-      }
+      html +=
+        '<div class="alert alert-warning small py-2 px-3 mb-2" role="alert">' +
+        '<strong>Snapshot / server list:</strong> ' +
+        String(fdErr) +
+        (fdHint ? '<div class="small mt-2 mb-0 text-body">' + String(fdHint) + '</div>' : '') +
+        '</div>';
     }
     html += '<h6 class="text-farm-accent mt-3">Your servers (from this app)</h6><ul class="small">';
     for (var i = 0; i < fd.length; i++) {

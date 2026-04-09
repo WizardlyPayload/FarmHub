@@ -118,6 +118,18 @@
           return Promise.reject(new Error('__no_key__'));
         }
         var apiURL = base + '/api/v1/consultant/insights';
+        var sid = '';
+        try {
+          sid =
+            (window.dashboard && window.dashboard.activeServerId) ||
+            localStorage.getItem('dashboard_active_server') ||
+            '';
+        } catch (e0) {
+          sid = '';
+        }
+        if (sid) {
+          apiURL += (apiURL.indexOf('?') >= 0 ? '&' : '?') + 'serverId=' + encodeURIComponent(sid);
+        }
         return getByokHeadersSync().then(function (extra) {
           return fetch(apiURL, {
             method: 'GET',

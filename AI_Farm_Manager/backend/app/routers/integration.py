@@ -306,6 +306,37 @@ async def create_or_update_instance(
         raise HTTPException(400, str(e)) from e
 
 
+class InstanceEnabledPayload(BaseModel):
+    enabled: bool = True
+
+
+@router.patch("/instances/{inst_id}/enabled")
+async def patch_bot_instance_enabled(
+    inst_id: str,
+    body: InstanceEnabledPayload,
+    _: str = Depends(require_integration_or_admin),
+) -> dict[str, Any]:
+    """
+    Toggle in-game ``!bot`` for one bot profile (same as /admin) using Farm Dashboard link key.
+    Disabled instances still receive HTTP 200 on chat but responses are not queued (see chat router).
+    """
+    inst = find_instance_by_id(inst_id.strip())
+    if not inst:
+        raise HTTPException(404, "Instance not found")
+    try:
+        upsert_instance(
+            inst_id,
+            str(inst.get("label") or ""),
+            str(inst.get("dashboard_server_id") or ""),
+            body.enabled,
+            None,
+            subscription_tier=inst.get("subscription_tier"),
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"ok": True, "enabled": body.enabled}
+
+
 @router.delete("/instances/{inst_id}")
 async def remove_instance(
     inst_id: str,

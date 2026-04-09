@@ -91,7 +91,42 @@
     }
   }
 
-  function render(container, data, err) {
+  function wireBotEnableToggles(container, base, key) {
+    var b = (base || '').replace(/\/$/, '') || 'http://127.0.0.1:8080';
+    var list = container.querySelector('#aiFarmBotProfileToggles');
+    if (!list || list._aiFarmBotWired) return;
+    list._aiFarmBotWired = true;
+    list.addEventListener('change', function (ev) {
+      var t = ev.target;
+      if (!t || !t.classList || !t.classList.contains('ai-farm-bot-enable-cb')) return;
+      var id = t.getAttribute('data-inst-id');
+      if (!id || !key) return;
+      var want = !!t.checked;
+      fetch(b + '/api/integration/instances/' + encodeURIComponent(id) + '/enabled', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-FarmDash-Key': encodeURIComponent(key),
+        },
+        body: JSON.stringify({ enabled: want }),
+      })
+        .then(function (r) {
+          if (!r.ok) return r.text().then(function (tx) { throw new Error(tx || 'HTTP ' + r.status); });
+          return r.json();
+        })
+        .then(function () {
+          pl('renderer_ok', want ? 'In-game chat enabled for profile' : 'In-game chat disabled for profile', {
+            instId: id,
+          });
+        })
+        .catch(function (e) {
+          t.checked = !want;
+          alert('Could not update: ' + (e.message || e));
+        });
+    });
+  }
+
+  function render(container, data, err, base, key) {
     if (err) {
       container.innerHTML = '<p class="text-warning">' + esc(err) + '</p>';
       populateInstanceSelect(null);
@@ -126,16 +161,38 @@
         (s.localSubFolder ? ' · save <code>' + s.localSubFolder + '</code>' : '') + '</li>';
     }
     html += '</ul>';
-    html += '<h6 class="text-farm-accent mt-3">Bot profiles (game <code>!bot</code>)</h6><ul class="small">';
+    html += '<h6 class="text-farm-accent mt-3">In-game chat (<code>!bot</code>) per profile</h6>';
+    html +=
+      '<p class="small text-muted mb-2">Each profile matches one Farm Dashboard save (set by your host in <code>/admin</code>). Uncheck saves you are not using with the mod so <code>!bot</code> only runs where you want.</p>';
+    html += '<ul class="small list-unstyled mb-2" id="aiFarmBotProfileToggles">';
+    if (bi.length === 0) {
+      html += '<li class="text-muted">No bot profiles yet — your host creates them in /admin.</li>';
+    }
     for (var j = 0; j < bi.length; j++) {
-      var b = bi[j];
-      html += '<li>' + (b.label || '—') + ' → save id <code>' + (b.dashboard_server_id || '(default)') + '</code> · ' +
-        (b.enabled ? 'on' : 'off') + ' · token <code>' + (b.server_token_masked || '—') + '</code></li>';
+      var bp = bi[j];
+      var bid = bp.id || '';
+      var chk = bp.enabled !== false ? ' checked' : '';
+      html +=
+        '<li class="mb-2"><label class="d-flex align-items-start gap-2 mb-0">' +
+        '<input type="checkbox" class="form-check-input ai-farm-bot-enable-cb mt-1" data-inst-id="' +
+        esc(bid) +
+        '"' +
+        chk +
+        ' />' +
+        '<span><strong>' +
+        esc(bp.label || '—') +
+        '</strong> — save <code>' +
+        esc(bp.dashboard_server_id || '(match in /admin)') +
+        '</code> · token <code>' +
+        esc(bp.server_token_masked || '—') +
+        '</code></span></label></li>';
     }
     html += '</ul>';
-    html += '<p class="small text-muted mb-0">Your host manages profiles. Use <strong>Write to FS25 modsSettings</strong> to install the token for <code>!bot</code>.</p>';
+    html +=
+      '<p class="small text-muted mb-0">Use <strong>Write to FS25 modsSettings</strong> to install the mod token for each save you play.</p>';
     container.innerHTML = html;
     populateInstanceSelect(data);
+    wireBotEnableToggles(container, base, key);
   }
 
   function applyBrandingUi() {
@@ -217,7 +274,7 @@
           return r.json();
         })
         .then(function (data) {
-          render(container, data, null);
+          render(container, data, null, b, key);
           // When the API returns a subscription tier / plan name, show #aiFarmBotSubscriptionTierRow and set text, e.g.:
           // var tr = document.getElementById('aiFarmBotCurrentTierText');
           // var row = document.getElementById('aiFarmBotSubscriptionTierRow');

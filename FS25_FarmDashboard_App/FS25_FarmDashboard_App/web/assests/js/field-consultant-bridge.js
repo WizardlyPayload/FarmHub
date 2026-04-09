@@ -151,7 +151,16 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
     if (typeof globalThis.pipelineLog === "function") {
       globalThis.pipelineLog("renderer_out", "GET /api/v1/consultant/insights (field map)", { base });
     }
-    const r = await fetch(`${base}/api/v1/consultant/insights`, {
+    const qs = new URLSearchParams();
+    const sid =
+      (typeof window !== "undefined" &&
+        window.dashboard &&
+        window.dashboard.activeServerId) ||
+      (typeof localStorage !== "undefined" ? localStorage.getItem("dashboard_active_server") : "") ||
+      "";
+    if (sid) qs.set("serverId", sid);
+    qs.set("context", "fields");
+    const r = await fetch(`${base}/api/v1/consultant/insights?${qs.toString()}`, {
       method: "GET",
       headers: {
         "X-FarmDash-Key": encodeURIComponent(intKey),
@@ -212,4 +221,38 @@ export function scheduleFieldConsultantFetch() {
     debounceId = null;
     refreshFieldConsultantCache({ force: false }).catch(() => {});
   }, 800);
+}
+
+/**
+ * Strict per-field LLM (server sends only one parcel JSON). Prefer throttling if calling many times.
+ */
+export async function fetchConsultantInsightSingleField(fieldRef) {
+  const ref = fieldRef != null ? String(fieldRef).trim() : "";
+  if (!ref) return { ok: false, error: "missing_field_ref" };
+  const intKey = await getIntegrationKey();
+  if (!intKey) return { ok: false, reason: "no_integration_key" };
+  const base = await getBase();
+  const extra = await getByokHeaders();
+  const qs = new URLSearchParams();
+  const sid =
+    (typeof window !== "undefined" &&
+      window.dashboard &&
+      window.dashboard.activeServerId) ||
+    (typeof localStorage !== "undefined" ? localStorage.getItem("dashboard_active_server") : "") ||
+    "";
+  if (sid) qs.set("serverId", sid);
+  qs.set("fieldRef", ref);
+  const r = await fetch(`${base}/api/v1/consultant/insights?${qs.toString()}`, {
+    method: "GET",
+    headers: {
+      "X-FarmDash-Key": encodeURIComponent(intKey),
+      Accept: "application/json",
+      ...extra,
+    },
+    cache: "no-store",
+  });
+  if (!r.ok) return { ok: false, status: r.status };
+  const data = await r.json();
+  const list = (data && data.insights) || [];
+  return { ok: true, insights: list, llm_used: !!data.llm_used };
 }

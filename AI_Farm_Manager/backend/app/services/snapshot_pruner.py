@@ -245,3 +245,64 @@ def pruned_json_bytes_estimate(data: Any) -> int:
         return len(json.dumps(data, ensure_ascii=False, default=str))
     except Exception:
         return 0
+
+
+def _field_row_matches_ref(row: dict[str, Any], target: str) -> bool:
+    t = (target or "").strip()
+    if not t or not isinstance(row, dict):
+        return False
+    for key in ("farmlandId", "id"):
+        if key not in row:
+            continue
+        v = row.get(key)
+        if v is None:
+            continue
+        if str(v).strip() == t:
+            return True
+        try:
+            if int(float(v)) == int(float(t)):
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
+
+
+def slice_snapshot_for_single_field(snapshot: dict[str, Any], field_ref: str) -> dict[str, Any] | None:
+    """
+    Minimal snapshot: one field row + light farm context so the LLM cannot see other parcels' data.
+    """
+    ref = (field_ref or "").strip()
+    if not ref or not isinstance(snapshot, dict):
+        return None
+    out: dict[str, Any] = {}
+    for key in ("timestamp", "serverInfo", "activeFarm", "farmId", "gameTime", "error"):
+        if key in snapshot:
+            out[key] = copy.deepcopy(snapshot[key])
+    for arr_key in ("fields", "allFields"):
+        arr = snapshot.get(arr_key)
+        if not isinstance(arr, list):
+            continue
+        for row in arr:
+            if isinstance(row, dict) and _field_row_matches_ref(row, ref):
+                pf = prune_field_entry(row)
+                out["fields"] = [pf if pf is not None else copy.deepcopy(row)]
+                out["_consultant_field_scope"] = ref
+                return out
+    return None
+
+
+def prune_snapshot_fields_context_only(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """
+    Server-wide consultant call focused on crops/soil: drop heavy non-field sections from LLM input.
+    """
+    if not isinstance(snapshot, dict):
+        return snapshot
+    root = copy.deepcopy(snapshot)
+    for drop in ("vehicles", "animals", "missions", "productionPoints"):
+        root.pop(drop, None)
+    if "production" in root:
+        root["production"] = _prune_value(root["production"], 0)
+    for light in ("weather", "economy", "farms", "statistics"):
+        if light in root:
+            root[light] = _prune_value(root[light], 0)
+    return root

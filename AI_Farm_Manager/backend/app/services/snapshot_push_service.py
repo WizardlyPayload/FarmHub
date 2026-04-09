@@ -68,9 +68,25 @@ def get_snapshot_json(server_id: str | None) -> tuple[str | None, str | None, st
         "No snapshot received yet from Farm Dashboard. On the PC: open AI Farm Manager panel → enable "
         '"Push snapshots to AI server" → Save. On the VPS: set DASHBOARD_PUSH_MODE=1.'
     )
+    def _newest_push() -> tuple[str, str]:
+        best_sid, (raw, _ts) = max(_snapshots.items(), key=lambda kv: kv[1][1])
+        return best_sid, raw
+
     with _lock:
         if sid in _snapshots:
             return _snapshots[sid][0], None, sid
+        # Requested id from DASHBOARD_SERVER_ID / URL does not match any RAM key (stale env or another farm).
+        # Still prefer real PC pushes over FTP whenever we have any snapshot.
+        if sid != "" and len(_snapshots) > 0:
+            best_sid, raw = _newest_push()
+            log_pipeline(
+                "push_resolve",
+                "serverId from env/URL not in push RAM; using newest PC push (fix DASHBOARD_SERVER_ID to match this farm)",
+                requested_server_id=sid,
+                chosen_server_id=best_sid,
+                candidates=len(_snapshots),
+            )
+            return raw, None, best_sid
         if sid != "":
             return None, err, ""
         if len(_snapshots) == 0:
@@ -79,7 +95,7 @@ def get_snapshot_json(server_id: str | None) -> tuple[str | None, str | None, st
             only_sid, (raw, _) = next(iter(_snapshots.items()))
             return raw, None, only_sid
         # Ambiguous: several PCs/saves pushing; URL did not specify serverId — pick freshest push.
-        best_sid, (raw, _ts) = max(_snapshots.items(), key=lambda kv: kv[1][1])
+        best_sid, raw = _newest_push()
         log_pipeline(
             "push_resolve",
             "Multiple PC snapshots in RAM; using newest push (add ?serverId= to DASHBOARD_JSON_URL to pin one save)",

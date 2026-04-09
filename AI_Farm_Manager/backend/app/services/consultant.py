@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from typing import Any
 from urllib.parse import unquote
+
+logger = logging.getLogger(__name__)
 
 from app.config import get_settings
 from app.schemas.insights import FarmInsight, InsightCategory, InsightPriority
@@ -237,6 +240,7 @@ async def _llm_insights_from_snapshot(
     except Exception as e:
         # Invalid API key, quota, network, or provider HTTP errors — fall back to heuristics only.
         log_event("WARN", f"Consultant LLM request failed (auth/network/provider): {e}")
+        logger.warning("Consultant fallback: LLM request failed — %s", e)
         return [], False
 
     text = (text or "").strip()
@@ -251,15 +255,22 @@ async def _llm_insights_from_snapshot(
             parse_detail=parse_err,
             preview=(text[:500] + "…") if len(text) > 500 else text,
         )
+        logger.warning(
+            "Consultant fallback: unparsable LLM JSON (%s) — preview_chars=%s",
+            parse_err or "unknown",
+            len(text or ""),
+        )
         return [], False
 
     if not isinstance(data, dict):
         log_event("WARN", "Consultant LLM JSON root is not an object")
+        logger.warning("Consultant fallback: LLM JSON root is not an object")
         return [], False
 
     raw_list = data.get("insights")
     if not isinstance(raw_list, list):
         log_event("WARN", "Consultant LLM JSON missing insights array")
+        logger.warning("Consultant fallback: LLM JSON missing 'insights' array")
         return [], False
 
     out: list[FarmInsight] = []
@@ -506,6 +517,10 @@ async def generate_farm_insights(
     heuristics = _heuristic_production_output_space(snapshot_data)
     settings = resolve_consultant_llm_settings(user_api_key, user_provider)
     if settings is None:
+        logger.warning(
+            "Consultant fallback: llm_used=false — no LLM API key (empty BYOK and server env missing "
+            "GEMINI_API_KEY / LLM_API_KEY for configured LLM_PROVIDER)"
+        )
         return heuristics, False
 
     try:
@@ -526,7 +541,13 @@ async def generate_farm_insights(
         )
     except Exception as e:
         log_event("WARN", f"Consultant pipeline unexpected error: {e}")
+        logger.warning("Consultant fallback: pipeline error before/around LLM merge — %s", e)
         return heuristics, False
+
+    if not llm_ok:
+        logger.warning(
+            "Consultant: llm_used=false after LLM path — using heuristics only (see prior WARNING lines for parse/auth errors)"
+        )
 
     # Merge: heuristics first (deterministic), then LLM; dedupe similar messages
     seen_msg: set[str] = {h.message[:80] for h in heuristics}

@@ -178,18 +178,60 @@
             });
           });
         })
-        .then(function (r) {
+        .then(async function (r) {
           pl('renderer_out', 'GET /api/v1/consultant/insights (Smart suggestions)', { httpStatus: r.status });
-          if (r.status === 401) throw new Error('401 — wrong key or FARMDASH_INTEGRATION_KEY not set on AI server');
-          if (r.status === 503) return r.json().then(function (j) { throw new Error(j.detail || 'Snapshot unavailable (FTP / DASHBOARD_JSON_URL)'); });
-          if (!r.ok) throw new Error('HTTP ' + r.status);
+          var errText = '';
+          if (!r.ok) {
+            try {
+              errText = await r.text();
+            } catch (eTxt) {
+              errText = String(eTxt);
+            }
+            try {
+              if (typeof dashReportConsultantProblem === 'function') {
+                var detErr = errText.slice(0, 500);
+                try {
+                  var jErr = JSON.parse(errText);
+                  if (jErr && jErr.detail) detErr = String(jErr.detail);
+                } catch (eJ) {}
+                dashReportConsultantProblem('smart-suggestions', {
+                  status: r.status,
+                  detail: detErr,
+                  bodySnippet: errText.slice(0, 800),
+                });
+              }
+            } catch (eRep) {}
+            dbg('error', { httpStatus: r.status, body: errText.slice(0, 4000) });
+            if (r.status === 401) throw new Error('401 — wrong key or FARMDASH_INTEGRATION_KEY not set on AI server');
+            if (r.status === 503) {
+              var msg503 = 'Snapshot unavailable (FTP / DASHBOARD_JSON_URL)';
+              try {
+                var j503 = JSON.parse(errText);
+                if (j503 && j503.detail) msg503 = String(j503.detail);
+              } catch (eParse503) {}
+              throw new Error(msg503);
+            }
+            throw new Error('HTTP ' + r.status + (errText ? ': ' + errText.slice(0, 200) : ''));
+          }
           return r.json();
         })
         .then(function (data) {
-          dbg('response', { body: data });
+          dbg('response', { httpStatus: 200, body: data });
           var list = (data && data.insights) || [];
           var llm = !!(data && data.llm_used);
-          renderInsights(list, llm);
+          try {
+            if (typeof dashReportConsultantProblem === 'function') {
+              dashReportConsultantProblem('smart-suggestions', { status: 200, llm_used: llm, detail: '' });
+            }
+          } catch (eLlm) {}
+          var doRender = function () {
+            renderInsights(list, llm);
+          };
+          if (typeof dashFlushDomWork === 'function') {
+            dashFlushDomWork(doRender);
+          } else {
+            doRender();
+          }
           pl('renderer_ok', 'consultant/insights parsed', { count: list.length, llm_used: llm });
           try {
             console.log('[AI Farm] Insights loaded. llm_used=' + llm + ', count=' + list.length);

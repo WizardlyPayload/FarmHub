@@ -66,6 +66,11 @@ CRITICAL — field-specific insights:
 - **field_ref MUST be the exact numeric identifier** copied from the source JSON for that parcel: use the value of **farmlandId** if present, otherwise **id**. Use the raw number or its string form only (e.g. `42` or `"42"` in JSON).
 - Do **NOT** prefix with the word "Field", "Parcel", or "#". Do **NOT** use the field display name. Do **NOT** add units or extra text. **Only** the id so clients can match rows.
 
+Equipment and natural language (message + reasoning):
+- If the JSON includes **vehicles** (player-owned machines), use it: when a suitable machine type for the task exists (harvester, cultivator, sprayer, spreader, etc.), say **use your** / **run** / **operate** that equipment — do **not** tell the player to buy that class of machine.
+- If vehicles are absent or none match the task, describe the farm job plainly (**Harvest when ready**, **Weed soon**, **Lime if needed**) without assuming they must purchase equipment.
+- **Never** write broken phrases like "Consider purchasing to harvest" or "Consider purchasing to plan" — they are ungrammatical. Use full sentences: e.g. "Harvest when ready, then plow before the next crop." Only mention buying/leasing if a tool is clearly missing from **vehicles** and phrase it as a normal conditional sentence.
+
 For farm-wide or non-parcel field advice, omit **field_ref** or set it to null.
 
 Use at least one Field insight when the snapshot lists fields; use an empty array only if there is no usable data.
@@ -85,6 +90,7 @@ Respond with ONLY valid JSON (no markdown) in this exact shape:
 Rules:
 - Return **at most 2** insights; **category** must always be **Field**.
 - **field_ref** must be the parcel's **farmlandId** or **id** from the JSON (numeric string or number), matching CONSULTANT_SYSTEM rules for field_ref.
+- If **vehicles** appears in the JSON, match tasks to owned machines; otherwise plain task language — never "Consider purchasing to …".
 - Keep **message** and **reasoning** brief (under 180 characters each).
 - If the JSON has no usable field data, return {"insights":[]}."""
 
@@ -102,14 +108,20 @@ CRITICAL — COVERAGE (overrides any earlier "at most 4" / summary instructions 
 - Count those field objects; ensure your `insights` array length matches that count exactly. Do not summarize, merge, or skip fields.
 - **Every** insight MUST use "category":"Field" and a non-null **field_ref** copied from that parcel's **farmlandId** or **id** in the JSON (number or string, no name, no # prefix).
 - Do **not** return Animal, Production, or Finance categories here — the UI ignores them for per-field lines.
-- Keep **message** and **reasoning** brief (aim under 180 characters each) so the full JSON still completes."""
+- Keep **message** and **reasoning** brief (aim under 180 characters each) so the full JSON still completes.
+
+FIELD MAP — equipment + wording (each per-field **message**):
+- The JSON includes a slim **vehicles** list (player-owned equipment). Match tasks to it: if a combine/harvester, cultivator, sprayer, weeder, lime spreader, or plow appears relevant, instruct **use your** / **run** / **send** that equipment — **not** "buy" or "purchase" for that same job.
+- If no suitable vehicle appears in **vehicles**, state the task in plain FS25 language (**Harvest sorghum when ready**; **Weed this field**; **Lime if pH is low**) with **no** default purchase advice.
+- **Banned:** "Consider purchasing to [verb]", "Consider purchasing to plan", or any "purchasing to …" — rewrite as clear imperatives or conditionals, e.g. "Harvest when ready, then plow for the next crop." Mention acquiring equipment only if nothing in **vehicles** fits and phrase as a full sentence (e.g. "If you lack a weeder, consider renting or buying one")."""
 )
 
 # Smart suggestions panel on Fields tab (?view=fields, context=full) — not the field-map row API (context=fields).
 CONSULTANT_SYSTEM_VIEW_FIELDS_SMART = """VIEW MODE — fields:
-You are an expert Farming Simulator 25 **field** consultant. The JSON is **cropland only** for the active farm (no vehicles/animals).
+You are an expert Farming Simulator 25 **field** consultant. The JSON is **cropland** for the active farm; a slim **vehicles** list may be present for equipment-aware wording.
 
 Focus: crops, growth, harvest readiness, withered, soil (plow/cultivate/lime/PF nitrogen), rotation hints.
+Use **vehicles** when present: prefer "use your …" over purchase hints; never "Consider purchasing to [verb]".
 
 Respond with ONLY valid JSON (no markdown):
 {"insights":[{"category":"Field|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":"..." or null},...]}

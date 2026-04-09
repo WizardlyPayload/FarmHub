@@ -290,6 +290,9 @@ def slice_snapshot_for_single_field(snapshot: dict[str, Any], field_ref: str) ->
                 pf = prune_field_entry(row)
                 out["fields"] = [pf if pf is not None else copy.deepcopy(row)]
                 out["_consultant_field_scope"] = ref
+                slim_v = _slim_vehicles_for_equipment_hints(snapshot.get("vehicles"))
+                if slim_v:
+                    out["vehicles"] = slim_v
                 return out
     return None
 
@@ -488,13 +491,44 @@ def prune_snapshot_for_dashboard_view(snapshot: dict[str, Any], view: str) -> di
     return root
 
 
+def _slim_vehicles_for_equipment_hints(vehicles: Any, limit: int = 100) -> list[dict[str, Any]]:
+    """
+    Minimal vehicle rows so the LLM can match tasks to owned equipment (harvest, plow, weed, lime)
+    without sending full physics/poses. Empty list if none.
+    """
+    if not isinstance(vehicles, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for v in vehicles[:limit]:
+        if not isinstance(v, dict):
+            continue
+        row: dict[str, Any] = {}
+        for k in (
+            "name",
+            "vehicleName",
+            "displayName",
+            "type",
+            "category",
+            "brand",
+            "fillType",
+            "fillTypeName",
+        ):
+            if k in v and v[k] is not None:
+                row[k] = v[k]
+        if row:
+            out.append(row)
+    return out
+
+
 def prune_snapshot_fields_context_only(snapshot: dict[str, Any]) -> dict[str, Any]:
     """
     Server-wide consultant call focused on crops/soil: drop heavy non-field sections from LLM input.
+    Re-injects a **slim** ``vehicles`` list so the model can tell "use your combine" vs "consider acquiring".
     """
     if not isinstance(snapshot, dict):
         return snapshot
     root = copy.deepcopy(snapshot)
+    raw_vehicles = root.get("vehicles")
     for drop in ("vehicles", "animals", "missions", "productionPoints"):
         root.pop(drop, None)
     if "production" in root:
@@ -505,6 +539,9 @@ def prune_snapshot_fields_context_only(snapshot: dict[str, Any]) -> dict[str, An
     # Field-map requests do not need global stats — saves prompt tokens.
     for drop_extra in ("statistics", "economy", "missions"):
         root.pop(drop_extra, None)
+    slim_v = _slim_vehicles_for_equipment_hints(raw_vehicles)
+    if slim_v:
+        root["vehicles"] = slim_v
     return root
 
 

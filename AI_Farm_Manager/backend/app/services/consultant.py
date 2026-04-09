@@ -458,9 +458,12 @@ def resolve_consultant_llm_settings(
         base = get_settings()
         prov_base = (base.get("llm_provider") or "openai").strip().lower()
         if prov_base == "gemini":
-            key = normalize_incoming_api_key(base.get("gemini_api_key"))
-        else:
-            key = normalize_incoming_api_key(base.get("llm_api_key"))
+            if not has_gemini_credentials(base):
+                return None
+            # Do not route through _consultant_llm_settings_for_byok — that would replace
+            # gemini_api_keys with a one-element list and drop GEMINI_API_KEYS rotation / quota pool.
+            return dict(base)
+        key = normalize_incoming_api_key(base.get("llm_api_key"))
         if not key:
             return None
         prov = prov_base if prov_base in ("openai", "gemini") else None

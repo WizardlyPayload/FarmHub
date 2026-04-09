@@ -240,6 +240,12 @@ async def admin_test_llm(
         "detail": (
             "Same as GET /api/v1/consultant/insights "
             f"(context={ctx!r}, server API keys). llm_used={resp.llm_used}."
+            + (
+                " Insights may be rule-based only (e.g. storage/production fill) — the Gemini call did not "
+                "return usable JSON; check Admin → API logs for WARNING lines (HTTP errors, parse failures)."
+                if not resp.llm_used
+                else ""
+            )
         ),
         "provider": prov,
         "model": model_out,

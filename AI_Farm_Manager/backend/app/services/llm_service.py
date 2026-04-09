@@ -1,19 +1,22 @@
 """LLM calls (OpenAI or Gemini)."""
 from __future__ import annotations
 
+import asyncio
+import os
+import re
 import time
-from typing import Any
-
-import httpx
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
+import httpx
+
 from app.config import active_gemini_api_key, get_settings, has_gemini_credentials
+from app.services.game_reference import build_game_reference_block
+from app.services.log_buffer import log_event
 
 # Retry with next API key (time-ordered pool) on Google overload / rate limits.
 _GEMINI_QUOTA_RETRY_STATUS: frozenset[int] = frozenset({429, 503})
-from app.services.game_reference import build_game_reference_block
-from app.services.log_buffer import log_event
 
 FALLBACK_REPLY = (
     "Sorry, I'm checking my notes right now, ask again in a minute!"
@@ -136,6 +139,64 @@ def _gemini_generate_url_for_key(settings: dict[str, Any], api_key: str) -> str:
     )
 
 
+def _gemini_429_sleep_retry_enabled() -> bool:
+    v = (os.getenv("GEMINI_429_SLEEP_RETRY") or "1").strip().lower()
+    return v not in ("0", "false", "no", "off")
+
+
+def _gemini_429_max_sleep_sec() -> float:
+    try:
+        return min(120.0, max(1.0, float((os.getenv("GEMINI_429_MAX_SLEEP_SEC") or "45").strip())))
+    except (TypeError, ValueError):
+        return 45.0
+
+
+def _gemini_retry_after_seconds(response: httpx.Response) -> float | None:
+    h = response.headers.get("Retry-After")
+    if h:
+        try:
+            return float(h.strip())
+        except ValueError:
+            pass
+    raw = (response.text or "")[:8000]
+    m = re.search(r"retry in\s+([0-9]+(?:\.[0-9]+)?)\s*s", raw, re.I)
+    if m:
+        try:
+            return float(m.group(1))
+        except ValueError:
+            pass
+    return None
+
+
+async def _gemini_post_same_key_429_wait_retry(
+    client: httpx.AsyncClient,
+    url: str,
+    payload: dict[str, Any],
+) -> httpx.Response:
+    """
+    One generateContent POST; on HTTP 429 optionally sleep for Google's suggested window
+    (body text ``Please retry in Xs`` or ``Retry-After`` header) capped by GEMINI_429_MAX_SLEEP_SEC,
+    then retry **once** on the same URL/key.
+    """
+    r = await client.post(url, json=payload)
+    if r.status_code != 429:
+        return r
+    if not _gemini_429_sleep_retry_enabled():
+        return r
+    delay = _gemini_retry_after_seconds(r)
+    if delay is None or delay <= 0:
+        return r
+    cap = _gemini_429_max_sleep_sec()
+    wait = min(delay, cap)
+    log_event(
+        "INFO",
+        f"Gemini 429 rate limit — waiting {wait:.1f}s then one retry (same key). "
+        "Free tier limits: https://ai.google.dev/gemini-api/docs/rate-limits",
+    )
+    await asyncio.sleep(wait)
+    return await client.post(url, json=payload)
+
+
 async def _gemini_post_with_quota_fallback(
     settings: dict[str, Any],
     payload: dict[str, Any],
@@ -152,7 +213,7 @@ async def _gemini_post_with_quota_fallback(
     async with httpx.AsyncClient(timeout=timeout) as client:
         for i, key in enumerate(keys):
             url = _gemini_generate_url_for_key(settings, key)
-            r = await client.post(url, json=payload)
+            r = await _gemini_post_same_key_429_wait_retry(client, url, payload)
             if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
                 if i < len(keys) - 1:
                     log_event(
@@ -186,16 +247,17 @@ async def gemini_consultant_post_with_quota_fallback(
     async with httpx.AsyncClient(timeout=timeout) as client:
         for i, key in enumerate(keys):
             url = _gemini_generate_url_for_key(settings, key)
-            r = await client.post(url, json=payload)
+            r = await _gemini_post_same_key_429_wait_retry(client, url, payload)
             if r.status_code == 400 and want_json_mime:
                 log_event(
                     "WARN",
                     "Gemini consultant: responseMimeType rejected (400); retrying without JSON MIME. "
                     "Unset GEMINI_CONSULTANT_RESPONSE_JSON or use GEMINI_REST_API_VERSION=v1beta if supported.",
                 )
-                r = await client.post(
+                r = await _gemini_post_same_key_429_wait_retry(
+                    client,
                     url,
-                    json={**payload, "generationConfig": dict(base_generation_config)},
+                    {**payload, "generationConfig": dict(base_generation_config)},
                 )
             if r.status_code in _GEMINI_QUOTA_RETRY_STATUS and i < len(keys) - 1:
                 log_event(
@@ -375,9 +437,9 @@ async def test_llm_connectivity(
             async with httpx.AsyncClient(timeout=45.0) as client:
                 for i, key in enumerate(keys):
                     url = _gemini_generate_url_for_key(settings, key)
-                    r = await client.post(url, json=payload_with_safety)
+                    r = await _gemini_post_same_key_429_wait_retry(client, url, payload_with_safety)
                     if r.status_code in (400, 403):
-                        r = await client.post(url, json=payload_no_safety)
+                        r = await _gemini_post_same_key_429_wait_retry(client, url, payload_no_safety)
                     if r.status_code in _GEMINI_QUOTA_RETRY_STATUS and i < len(keys) - 1:
                         log_event(
                             "WARN",

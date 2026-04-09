@@ -59,10 +59,6 @@ For farm-wide or non-parcel field advice, omit **field_ref** or set it to null.
 
 Use at least one Field insight when the snapshot lists fields; use an empty array only if there is no usable data.
 
-CRITICAL — how you write for players (not developers):
-- CRITICAL: Field insights must be short and punchy (1 to 2 sentences maximum).
-- CRITICAL: Speak naturally like a human farm manager or agronomist. DO NOT reference raw data variables, code, or state names (e.g., never say "needsPlow is true", "farmlandId", or "sprayLevel"). Instead, translate that into natural advice (e.g., "This field needs plowing before your next planting").
-
 Output limits (so the JSON always completes):
 - Return **at most 4** insights.
 - **priority** must be exactly **Low**, **Medium**, or **High** (spell **Medium** in full — not Med).
@@ -78,8 +74,6 @@ Respond with ONLY valid JSON (no markdown) in this exact shape:
 Rules:
 - Return **at most 2** insights; **category** must always be **Field**.
 - **field_ref** must be the parcel's **farmlandId** or **id** from the JSON (numeric string or number), matching CONSULTANT_SYSTEM rules for field_ref.
-- CRITICAL: Field insights must be short and punchy (1 to 2 sentences maximum).
-- CRITICAL: Speak naturally like a human farm manager or agronomist. DO NOT reference raw data variables, code, or state names (e.g., never say "needsPlow is true", "farmlandId", or "sprayLevel"). Instead, translate that into natural advice (e.g., "This field needs plowing before your next planting").
 - Keep **message** and **reasoning** brief (under 180 characters each).
 - If the JSON has no usable field data, return {"insights":[]}."""
 
@@ -93,8 +87,6 @@ CONSULTANT_SYSTEM_FIELDS_FOCUS = (
 FIELD MAP MODE (this HTTP request only — clients match rows by field_ref):
 - **Every** insight MUST use "category":"Field" and a non-null **field_ref** copied from that parcel's **farmlandId** or **id** in the JSON (number or string, no name, no # prefix).
 - Do **not** return Animal, Production, or Finance categories here — the UI ignores them for per-field lines.
-- CRITICAL: Field insights must be short and punchy (1 to 2 sentences maximum).
-- CRITICAL: Speak naturally like a human farm manager or agronomist. DO NOT reference raw data variables, code, or state names (e.g., never say "needsPlow is true", "farmlandId", or "sprayLevel"). Instead, translate that into natural advice (e.g., "This field needs plowing before your next planting").
 - Up to 4 insights; prefer **distinct** parcels when multiple need attention."""
 )
 

@@ -3,17 +3,15 @@
   const testOut = document.getElementById("adminTestLlmResult");
   if (testBtn && testOut) {
     testBtn.addEventListener("click", async function () {
-      testOut.textContent = "Loading snapshot, picking first owned field, running single-field consultant (next job)…";
+      testOut.textContent = "Running consultant pipeline (Smart suggestions)…";
       testOut.className = "muted small";
       testOut.style.color = "";
       try {
         var sidEl = document.getElementById("adminTestLlmServerId");
-        var farmEl = document.getElementById("adminTestLlmActiveFarm");
         var sid = sidEl && sidEl.value ? String(sidEl.value).trim() : "";
-        var af = farmEl && farmEl.value !== "" ? String(farmEl.value).trim() : "";
         var qs = new URLSearchParams();
         if (sid) qs.set("serverId", sid);
-        if (af) qs.set("activeFarmId", af);
+        qs.set("context", "full");
         var url = "/admin/api/test-llm?" + qs.toString();
         const r = await fetch(url, { credentials: "same-origin" });
         const j = await r.json().catch(function () {
@@ -25,25 +23,16 @@
           return;
         }
         if (j.ok) {
-          var fld = j.field || {};
           var prev = (j.insights_preview || [])[0];
-          var firstMsg = prev && prev.message ? String(prev.message) : "";
-          var firstWhy = prev && prev.reasoning ? String(prev.reasoning) : "";
-          var parcel =
-            "Field #" +
-            (fld.chosen_field_ref || "?") +
-            (fld.fruit_type ? " (" + fld.fruit_type + ")" : "") +
-            (fld.field_name ? " — " + fld.field_name : "");
+          var firstMsg = prev && prev.message ? String(prev.message).slice(0, 120) : "";
           testOut.textContent =
-            "OK — " +
-            parcel +
-            " — llm_used=" +
+            "OK — llm_used=" +
             j.llm_used +
-            (j.insight_count != null ? " — " + j.insight_count + " insight(s)" : "") +
+            " — " +
+            (j.insight_count != null ? j.insight_count + " insights" : "") +
             (j.provider ? " — " + j.provider : "") +
             (j.model ? " / " + j.model : "") +
-            (firstMsg ? " — Next: " + firstMsg : "") +
-            (firstWhy ? " — " + firstWhy.slice(0, 160) + (firstWhy.length > 160 ? "…" : "") : "");
+            (firstMsg ? " — e.g. " + firstMsg + (firstMsg.length >= 120 ? "…" : "") : "");
           testOut.className = "small";
           testOut.style.color = "#6ee7b7";
         } else {
@@ -67,8 +56,12 @@
       const data = await r.json();
       const lines = (data.logs || []).map(function (row) {
         const extra = Object.keys(row)
-          .filter(function (k) { return k !== "ts" && k !== "level" && k !== "message"; })
-          .map(function (k) { return k + "=" + JSON.stringify(row[k]); })
+          .filter(function (k) {
+            return k !== "ts" && k !== "level" && k !== "message";
+          })
+          .map(function (k) {
+            return k + "=" + JSON.stringify(row[k]);
+          })
           .join(" ");
         return row.ts + " [" + row.level + "] " + row.message + (extra ? " " + extra : "");
       });

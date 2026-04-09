@@ -10,10 +10,10 @@ from urllib.parse import unquote
 
 logger = logging.getLogger(__name__)
 
-from app.config import get_settings
+from app.config import get_settings, has_gemini_credentials
 from app.schemas.insights import FarmInsight, InsightCategory, InsightPriority
 from app.services.log_buffer import log_event
-from app.services.llm_service import format_gemini_http_error
+from app.services.llm_service import gemini_consultant_post_with_quota_fallback
 from app.services.snapshot_pruner import prune_dashboard_snapshot_for_llm
 
 
@@ -246,7 +246,7 @@ async def _llm_insights_from_snapshot(
     )
 
     try:
-        if provider == "gemini" and (settings.get("gemini_api_key") or "").strip():
+        if provider == "gemini" and has_gemini_credentials(settings):
             text = await _gemini_consultant(settings, user_payload, system_instruction=system_instruction)
         else:
             text = await _openai_consultant(settings, user_payload, system_instruction=system_instruction)
@@ -371,13 +371,8 @@ async def _gemini_consultant(
     Set ``GEMINI_CONSULTANT_RESPONSE_JSON=1`` to opt in (e.g. v1beta); if the API
     still returns 400, we retry once without JSON MIME and log a single warning.
     """
-    import httpx
-
-    from app.services.llm_service import _gemini_generate_url
-
-    if not settings.get("gemini_api_key"):
+    if not has_gemini_credentials(settings):
         raise RuntimeError("GEMINI_API_KEY not set")
-    url = _gemini_generate_url(settings)
     prompt = f"{system_instruction}\n\n{user_message}"
     # Single-turn text; omit "role" for widest compatibility with generativelanguage v1 / v1beta.
     base_cfg: dict[str, Any] = {"temperature": 0.3, "maxOutputTokens": 8192}
@@ -394,27 +389,17 @@ async def _gemini_consultant(
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": gen_cfg,
     }
-    async with httpx.AsyncClient(timeout=90.0) as client:
-        r = await client.post(url, json=payload)
-        if r.status_code == 400 and want_json_mime:
-            log_event(
-                "WARN",
-                "Gemini consultant: responseMimeType rejected (400); retrying without JSON MIME. "
-                "Unset GEMINI_CONSULTANT_RESPONSE_JSON or use GEMINI_REST_API_VERSION=v1beta if supported.",
-            )
-            payload["generationConfig"] = base_cfg
-            r = await client.post(url, json=payload)
-        if r.status_code >= 400:
-            log_event("WARN", format_gemini_http_error(r))
-        try:
-            r.raise_for_status()
-        except httpx.HTTPStatusError as e:
-            code = e.response.status_code if e.response is not None else r.status_code
-            raise RuntimeError(f"Gemini HTTP {code}") from e
-        try:
-            data = r.json()
-        except json.JSONDecodeError as e:
-            raise RuntimeError("Gemini response body is not JSON") from e
+    r = await gemini_consultant_post_with_quota_fallback(
+        settings,
+        payload=payload,
+        want_json_mime=want_json_mime,
+        base_generation_config=base_cfg,
+        timeout=90.0,
+    )
+    try:
+        data = r.json()
+    except json.JSONDecodeError as e:
+        raise RuntimeError("Gemini response body is not JSON") from e
 
     cands = data.get("candidates") or []
     cand0 = cands[0] if cands else {}
@@ -450,6 +435,7 @@ def _consultant_llm_settings_for_byok(
     merged["llm_provider"] = prov
     if prov == "gemini":
         merged["gemini_api_key"] = key
+        merged["gemini_api_keys"] = [key]
     else:
         merged["llm_api_key"] = key
     return merged

@@ -50,24 +50,43 @@ def store_push(
     return True, None
 
 
-def get_snapshot_json(server_id: str | None) -> tuple[str | None, str | None]:
+def get_snapshot_json(server_id: str | None) -> tuple[str | None, str | None, str]:
     """
-    When push mode is on: return stored JSON for server_id, or single stored server if id empty.
-    Returns (None, error_hint) if nothing stored yet.
+    When push mode is on: return stored JSON for server_id, or resolve an ambiguous id.
+
+    Resolution when ``server_id`` is empty (e.g. ``DASHBOARD_JSON_URL`` has no ``?serverId=``):
+
+    - Exactly one pushed server → use it.
+    - Multiple pushed servers → use the **newest** by push time (monotonic), so PC merges still beat FTP.
+
+    Returns ``(json, error_hint, chosen_server_id)``. ``chosen_server_id`` is which RAM key was used, or "".
     """
     if not is_push_mode_enabled():
-        return None, None
+        return None, None, ""
     sid = _norm_sid(server_id)
-    with _lock:
-        if sid in _snapshots:
-            return _snapshots[sid][0], None
-        if sid == "" and len(_snapshots) == 1:
-            _, (raw, _) = next(iter(_snapshots.items()))
-            return raw, None
-    return None, (
+    err = (
         "No snapshot received yet from Farm Dashboard. On the PC: open AI Farm Manager panel → enable "
         '"Push snapshots to AI server" → Save. On the VPS: set DASHBOARD_PUSH_MODE=1.'
     )
+    with _lock:
+        if sid in _snapshots:
+            return _snapshots[sid][0], None, sid
+        if sid != "":
+            return None, err, ""
+        if len(_snapshots) == 0:
+            return None, err, ""
+        if len(_snapshots) == 1:
+            only_sid, (raw, _) = next(iter(_snapshots.items()))
+            return raw, None, only_sid
+        # Ambiguous: several PCs/saves pushing; URL did not specify serverId — pick freshest push.
+        best_sid, (raw, _ts) = max(_snapshots.items(), key=lambda kv: kv[1][1])
+        log_pipeline(
+            "push_resolve",
+            "Multiple PC snapshots in RAM; using newest push (add ?serverId= to DASHBOARD_JSON_URL to pin one save)",
+            chosen_server_id=best_sid,
+            candidates=len(_snapshots),
+        )
+        return raw, None, best_sid
 
 
 def get_servers_meta() -> list[dict[str, Any]] | None:

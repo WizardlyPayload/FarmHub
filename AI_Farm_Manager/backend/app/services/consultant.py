@@ -77,6 +77,19 @@ Rules:
 - Keep **message** and **reasoning** brief (under 180 characters each).
 - If the JSON has no usable field data, return {"insights":[]}."""
 
+# Appended when Farm Dashboard calls GET …/insights?context=fields (per-parcel field map).
+# The default CONSULTANT_SYSTEM allows mixed categories; models often fill all slots with
+# Production/Finance — those never map to field rows in the dashboard UI.
+CONSULTANT_SYSTEM_FIELDS_FOCUS = (
+    CONSULTANT_SYSTEM
+    + """
+
+FIELD MAP MODE (this HTTP request only — clients match rows by field_ref):
+- **Every** insight MUST use "category":"Field" and a non-null **field_ref** copied from that parcel's **farmlandId** or **id** in the JSON (number or string, no name, no # prefix).
+- Do **not** return Animal, Production, or Finance categories here — the UI ignores them for per-field lines.
+- Up to 4 insights; prefer **distinct** parcels when multiple need attention."""
+)
+
 
 def _coerce_pct(value: Any) -> float | None:
     if value is None:

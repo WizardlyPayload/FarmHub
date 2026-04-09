@@ -101,11 +101,20 @@ function addInsightKeys(map, rawKey, ins) {
   }
 }
 
+/** Pydantic/JSON may send category as "Field" or edge-case variants; field map only accepts Field. */
+function insightCategoryIsField(cat) {
+  if (cat == null) return false;
+  const raw =
+    typeof cat === "object" && cat !== null && "value" in cat ? (cat).value : cat;
+  const s = String(raw).trim().replace(/^["']|["']$/g, "");
+  return s.toLowerCase() === "field";
+}
+
 export function indexFieldConsultantInsights(insights) {
   const map = {};
   if (!Array.isArray(insights)) return map;
   for (const ins of insights) {
-    if (!ins || String(ins.category) !== "Field") continue;
+    if (!ins || !insightCategoryIsField(ins.category)) continue;
     if (normalizeFieldRefKey(ins.field_ref) === "") continue;
     addInsightKeys(map, ins.field_ref, ins);
   }
@@ -248,6 +257,19 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
 
     const list = (data && data.insights) || [];
     const byRef = indexFieldConsultantInsights(list);
+    const indexedKeys = Object.keys(byRef);
+    if (list.length > 0 && indexedKeys.length === 0 && data.llm_used) {
+      const sample = list.slice(0, 3).map((x) => ({
+        category: x && x.category,
+        field_ref: x && x.field_ref,
+        messageLen: x && x.message ? String(x.message).length : 0,
+      }));
+      console.error(
+        "[field-consultant-bridge] LLM returned insights but none are usable for the field map. " +
+          "Need category Field + numeric field_ref (farmlandId/id). Sample:",
+        sample
+      );
+    }
 
     try {
       if (typeof globalThis.dashReportConsultantProblem === "function") {

@@ -11,11 +11,12 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from app.config import get_backend_root, get_settings, reload_backend_dotenv
+from app.schemas.insights import InsightCategory
 from app.prompt_loader import write_system_prompt
+from app.routers.consultant import compute_consultant_insights_first_owned_field
 from app.routers.integration import get_overview_payload
 from app.services.bot_registry import delete_instance, find_instance_by_id, upsert_instance
 from app.services.mod_config_xml import build_mod_config_xml, resolve_backend_url_for_xml
-from app.services.llm_service import test_llm_connectivity
 from app.services.log_buffer import get_recent_logs
 from app.services.log_buffer import log_event as push_log
 
@@ -164,20 +165,91 @@ async def admin_save_settings(
 
 
 @router.get("/admin/api/test-llm")
-async def admin_test_llm(_: str = Depends(require_admin)) -> dict[str, Any]:
+async def admin_test_llm(
+    _: str = Depends(require_admin),
+    serverId: str | None = Query(
+        None,
+        description="Same as Farm Dashboard consultant ?serverId= (else DASHBOARD_SERVER_ID / push buffer).",
+    ),
+    activeFarmId: int | None = Query(
+        None,
+        ge=1,
+        description="Active farm id (same as dashboard farm dropdown). Omit to use snapshot activeFarmId or 1.",
+    ),
+) -> dict[str, Any]:
     """
-    Run a tiny request to the configured provider (OpenAI or Gemini) to verify keys and model.
-    Requires the same HTTP Basic auth as /admin. Response never includes secrets.
+    Full diagnostic: load the dashboard snapshot, pick the **first owned field** for that farm, then run the
+    **single-field** consultant — same as ``GET /api/v1/consultant/insights?fieldRef=<farmlandId>`` (next job
+    for that parcel). Uses **server** API keys only (no BYOK). Expect **10–60s**.
     """
-    out = await test_llm_connectivity()
-    push_log(
-        "INFO" if out.get("ok") else "WARN",
-        "Admin LLM connectivity test",
-        provider=out.get("provider"),
-        ok=out.get("ok"),
-        latency_ms=out.get("latency_ms"),
+    try:
+        resp, meta = await compute_consultant_insights_first_owned_field(
+            server_id=serverId,
+            active_farm_id=activeFarmId,
+            user_api_key=None,
+            user_provider=None,
+        )
+    except HTTPException as e:
+        det = e.detail
+        if not isinstance(det, str):
+            det = str(det)
+        push_log(
+            "WARN",
+            "Admin first-field consultant test failed",
+            status_code=e.status_code,
+            detail=det[:400],
+        )
+        return {
+            "ok": False,
+            "mode": "first_owned_field_next_job",
+            "detail": det,
+            "status_code": e.status_code,
+        }
+
+    preview: list[dict[str, Any]] = []
+    ordered = sorted(
+        resp.insights,
+        key=lambda i: (0 if i.category == InsightCategory.FIELD else 1, 0),
     )
-    return out
+    for ins in ordered[:8]:
+        preview.append(
+            {
+                "category": ins.category.value,
+                "priority": ins.priority.value,
+                "message": (ins.message or "")[:280],
+                "reasoning": (ins.reasoning or "")[:280],
+                "field_ref": ins.field_ref,
+            }
+        )
+    s2 = get_settings()
+    prov = (s2.get("llm_provider") or "").strip().lower()
+    model_out = (
+        (s2.get("gemini_model") or "")
+        if prov == "gemini"
+        else (s2.get("llm_model") or "")
+    )
+    push_log(
+        "INFO",
+        "Admin first-field consultant test OK",
+        llm_used=resp.llm_used,
+        insight_count=len(resp.insights),
+        field_ref=meta.get("chosen_field_ref"),
+        provider=prov,
+    )
+    return {
+        "ok": True,
+        "mode": "first_owned_field_next_job",
+        "llm_used": resp.llm_used,
+        "insight_count": len(resp.insights),
+        "insights_preview": preview,
+        "field": meta,
+        "detail": (
+            "Loaded snapshot → first owned parcel → same path as consultant?fieldRef=… single-field prompt "
+            f"(next job). Parcel farmlandId/id={meta.get('chosen_field_ref')!r}. llm_used={resp.llm_used}."
+        ),
+        "provider": prov,
+        "model": model_out,
+    }
 
 
 @router.get("/admin/api/logs")

@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 import time
 from typing import Any
 
 from app.services.pipeline_log import log_pipeline
+
+logger = logging.getLogger(__name__)
 
 
 _lock = threading.Lock()
@@ -46,6 +49,12 @@ def store_push(
         bytes_utf8=len(raw.encode("utf-8")),
         server_id=sid or "(default)",
         servers_listed=n_srv,
+    )
+    logger.info(
+        "snapshot_push: RAM key=%r bytes_utf8=%s servers_listed=%s (must match GET consultant ?serverId=)",
+        sid or "(default)",
+        len(raw.encode("utf-8")),
+        n_srv,
     )
     return True, None
 

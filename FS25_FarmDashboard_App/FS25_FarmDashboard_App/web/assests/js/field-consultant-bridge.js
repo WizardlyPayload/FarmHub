@@ -216,6 +216,20 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
         errText = String(e);
       }
       dashDebug("field-consultant-bridge", "error", { status: r.status, body: errText.slice(0, 4000) });
+      try {
+        let detErr = errText.slice(0, 500);
+        try {
+          const jErr = JSON.parse(errText);
+          if (jErr && jErr.detail) detErr = String(jErr.detail);
+        } catch (eJ) {}
+        if (typeof globalThis.dashReportConsultantProblem === "function") {
+          globalThis.dashReportConsultantProblem("field-map-insights", {
+            status: r.status,
+            detail: detErr,
+            bodySnippet: errText.slice(0, 800),
+          });
+        }
+      } catch (eRep) {}
       if (typeof globalThis.pipelineLog === "function") {
         globalThis.pipelineLog("renderer_err", "consultant/insights HTTP error (field map)", { status: r.status });
       }
@@ -235,10 +249,27 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
     const list = (data && data.insights) || [];
     const byRef = indexFieldConsultantInsights(list);
 
-    if (typeof window !== "undefined") {
-      window.__fieldConsultantByRef = byRef;
-      window.__fieldConsultantLlmUsed = !!data.llm_used;
-      window.dispatchEvent(new CustomEvent("field-consultant-updated"));
+    try {
+      if (typeof globalThis.dashReportConsultantProblem === "function") {
+        globalThis.dashReportConsultantProblem("field-map-insights", {
+          status: r.status,
+          llm_used: !!data.llm_used,
+          detail: "activeServerId=" + (sid || "(none)"),
+        });
+      }
+    } catch (eWarn) {}
+
+    function applyFieldConsultantDom() {
+      if (typeof window !== "undefined") {
+        window.__fieldConsultantByRef = byRef;
+        window.__fieldConsultantLlmUsed = !!data.llm_used;
+        window.dispatchEvent(new CustomEvent("field-consultant-updated"));
+      }
+    }
+    if (typeof globalThis.dashFlushDomWork === "function") {
+      globalThis.dashFlushDomWork(applyFieldConsultantDom);
+    } else {
+      applyFieldConsultantDom();
     }
     lastFetchAt = Date.now();
     if (typeof globalThis.pipelineLog === "function") {

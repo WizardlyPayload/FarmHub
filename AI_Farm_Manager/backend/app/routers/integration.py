@@ -1,6 +1,7 @@
 """Farm Dashboard ↔ AI Farm Manager: overview + bot instance CRUD (key or admin Basic)."""
 from __future__ import annotations
 
+import logging
 import os
 from typing import Any
 from urllib.parse import unquote
@@ -25,6 +26,8 @@ from app.services.consultant import normalize_incoming_api_key, resolve_consulta
 from app.services.llm_service import test_llm_connectivity
 from app.services.log_buffer import log_event
 from app.services.pipeline_log import log_pipeline
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/integration", tags=["integration"])
 _security = HTTPBasic(auto_error=False)
@@ -274,7 +277,12 @@ async def integration_push_snapshot(
     ok, err = snapshot_push_service.store_push(server_id, snap, servers)
     if not ok:
         raise HTTPException(400, err or "Invalid snapshot")
-    return {"ok": True, "serverId": (server_id or "").strip() or None}
+    sid_out = (server_id or "").strip() or None
+    logger.info(
+        "push-snapshot: stored under serverId=%r — use the same id in GET /api/v1/consultant/insights?serverId=",
+        sid_out,
+    )
+    return {"ok": True, "serverId": sid_out}
 
 
 class InstancePayload(BaseModel):

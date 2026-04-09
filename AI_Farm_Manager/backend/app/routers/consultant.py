@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -17,6 +18,8 @@ from app.services.dashboard_service import build_dashboard_fetch_url, fetch_dash
 from app.services.pipeline_log import approx_json_bytes, log_pipeline
 from app.services.snapshot_pruner import prune_snapshot_fields_context_only, slice_snapshot_for_single_field
 from app.services.subscription import assert_consultant_allowed
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/consultant", tags=["consultant"])
 
@@ -67,10 +70,24 @@ async def get_consultant_insights(
 
     raw, err = await fetch_dashboard_json(fetch_url or None)
     if raw is None:
+        logger.warning(
+            "consultant: no snapshot (serverId query=%r fetch_url=%r err=%s)",
+            (serverId or "").strip() or None,
+            (fetch_url or "")[:160],
+            err,
+        )
         raise HTTPException(
             status_code=503,
             detail=err or "Dashboard snapshot unavailable — configure FTP or DASHBOARD_JSON_URL",
         )
+
+    logger.info(
+        "consultant: snapshot bytes_utf8=%s server_id_query=%r context=%s fieldRef=%s",
+        len(raw.encode("utf-8")),
+        sid,
+        (context or "full").strip().lower(),
+        (fieldRef or "").strip() or None,
+    )
 
     try:
         snapshot = json.loads(raw)

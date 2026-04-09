@@ -96,7 +96,7 @@
           <button type="button" class="btn" id="adminTestLlmBtn">Test Smart suggestions (consultant pipeline)</button>
           <span id="adminTestLlmResult" class="muted small" style="margin-left: 0.5rem; display: inline-block; max-width: 42rem; vertical-align: top;"></span>
         </p>
-        <p class="muted small" style="margin-top: 0.25rem;">Runs the same request as Farm Dashboard <strong>Smart suggestions</strong> (<code>GET /api/v1/consultant/insights?context=full</code>). May take 10–60s. Server API keys only (not BYOK).</p>
+        <p class="muted small" style="margin-top: 0.25rem;">Runs the same request as Farm Dashboard <strong>Smart suggestions</strong> (<code>GET /api/v1/consultant/insights?context=full</code>). Usually 10–90s depending on snapshot size; this admin endpoint skips Gemini “wait on 429” delays so the page doesn’t hit proxy timeouts. Server API keys only (not BYOK).</p>
       </form>
     </section>
 

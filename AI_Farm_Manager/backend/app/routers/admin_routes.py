@@ -11,9 +11,8 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
 from app.config import get_backend_root, get_settings, reload_backend_dotenv
-from app.schemas.insights import InsightCategory
 from app.prompt_loader import write_system_prompt
-from app.routers.consultant import compute_consultant_insights_first_owned_field
+from app.routers.consultant import compute_consultant_insights
 from app.routers.integration import get_overview_payload
 from app.services.bot_registry import delete_instance, find_instance_by_id, upsert_instance
 from app.services.mod_config_xml import build_mod_config_xml, resolve_backend_url_for_xml
@@ -171,21 +170,22 @@ async def admin_test_llm(
         None,
         description="Same as Farm Dashboard consultant ?serverId= (else DASHBOARD_SERVER_ID / push buffer).",
     ),
-    activeFarmId: int | None = Query(
-        None,
-        ge=1,
-        description="Active farm id (same as dashboard farm dropdown). Omit to use snapshot activeFarmId or 1.",
+    context: str = Query(
+        "full",
+        description="Same as GET /api/v1/consultant/insights (full = Smart suggestions).",
     ),
 ) -> dict[str, Any]:
     """
-    Full diagnostic: load the dashboard snapshot, pick the **first owned field** for that farm, then run the
-    **single-field** consultant — same as ``GET /api/v1/consultant/insights?fieldRef=<farmlandId>`` (next job
-    for that parcel). Uses **server** API keys only (no BYOK). Expect **10–60s**.
+    Same pipeline as Farm Dashboard Smart suggestions: ``GET /api/v1/consultant/insights`` with server API keys.
     """
+    ctx = (context or "full").strip().lower()
+    if ctx not in ("full", "fields"):
+        ctx = "full"
     try:
-        resp, meta = await compute_consultant_insights_first_owned_field(
+        resp = await compute_consultant_insights(
             server_id=serverId,
-            active_farm_id=activeFarmId,
+            field_ref=None,
+            context=ctx,
             user_api_key=None,
             user_provider=None,
         )
@@ -195,23 +195,19 @@ async def admin_test_llm(
             det = str(det)
         push_log(
             "WARN",
-            "Admin first-field consultant test failed",
+            "Admin consultant test failed",
             status_code=e.status_code,
             detail=det[:400],
         )
         return {
             "ok": False,
-            "mode": "first_owned_field_next_job",
+            "mode": "consultant_insights",
             "detail": det,
             "status_code": e.status_code,
         }
 
     preview: list[dict[str, Any]] = []
-    ordered = sorted(
-        resp.insights,
-        key=lambda i: (0 if i.category == InsightCategory.FIELD else 1, 0),
-    )
-    for ins in ordered[:8]:
+    for ins in resp.insights[:8]:
         preview.append(
             {
                 "category": ins.category.value,
@@ -230,22 +226,20 @@ async def admin_test_llm(
     )
     push_log(
         "INFO",
-        "Admin first-field consultant test OK",
+        "Admin consultant test OK",
         llm_used=resp.llm_used,
         insight_count=len(resp.insights),
-        field_ref=meta.get("chosen_field_ref"),
         provider=prov,
     )
     return {
         "ok": True,
-        "mode": "first_owned_field_next_job",
+        "mode": "consultant_insights",
         "llm_used": resp.llm_used,
         "insight_count": len(resp.insights),
         "insights_preview": preview,
-        "field": meta,
         "detail": (
-            "Loaded snapshot → first owned parcel → same path as consultant?fieldRef=… single-field prompt "
-            f"(next job). Parcel farmlandId/id={meta.get('chosen_field_ref')!r}. llm_used={resp.llm_used}."
+            "Same as GET /api/v1/consultant/insights "
+            f"(context={ctx!r}, server API keys). llm_used={resp.llm_used}."
         ),
         "provider": prov,
         "model": model_out,

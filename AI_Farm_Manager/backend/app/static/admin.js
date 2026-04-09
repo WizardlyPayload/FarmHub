@@ -6,6 +6,10 @@
       testOut.textContent = "Running consultant pipeline (Smart suggestions)…";
       testOut.className = "muted small";
       testOut.style.color = "";
+      var ac = new AbortController();
+      var tid = setTimeout(function () {
+        ac.abort();
+      }, 180000);
       try {
         var sidEl = document.getElementById("adminTestLlmServerId");
         var sid = sidEl && sidEl.value ? String(sidEl.value).trim() : "";
@@ -13,12 +17,23 @@
         if (sid) qs.set("serverId", sid);
         qs.set("context", "full");
         var url = "/admin/api/test-llm?" + qs.toString();
-        const r = await fetch(url, { credentials: "same-origin" });
-        const j = await r.json().catch(function () {
-          return {};
-        });
+        const r = await fetch(url, { credentials: "same-origin", signal: ac.signal });
+        const raw = await r.text();
+        var j = {};
+        try {
+          j = raw ? JSON.parse(raw) : {};
+        } catch (_) {
+          j = {};
+        }
         if (!r.ok) {
-          testOut.textContent = "HTTP " + r.status + (j.detail ? " — " + JSON.stringify(j.detail) : "");
+          var errLine =
+            "HTTP " +
+            r.status +
+            (j.detail != null ? " — " + (typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail)) : "");
+          if (!j.detail && raw) {
+            errLine += " — " + raw.slice(0, 200).replace(/\s+/g, " ");
+          }
+          testOut.textContent = errLine;
           testOut.style.color = "#fbbf24";
           return;
         }
@@ -41,7 +56,15 @@
           testOut.style.color = "#fbbf24";
         }
       } catch (e) {
-        testOut.textContent = String(e.message || e);
+        if (e && e.name === "AbortError") {
+          testOut.textContent =
+            "Timed out after 3 min — proxy or Gemini still too slow; check server logs. (Admin test skips 429 sleep; try again.)";
+        } else {
+          testOut.textContent = String((e && e.message) || e);
+        }
+        testOut.style.color = "#fbbf24";
+      } finally {
+        clearTimeout(tid);
       }
     });
   }

@@ -5,6 +5,7 @@ import asyncio
 import os
 import re
 import time
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -17,6 +18,21 @@ from app.services.log_buffer import log_event
 
 # Retry with next API key (time-ordered pool) on Google overload / rate limits.
 _GEMINI_QUOTA_RETRY_STATUS: frozenset[int] = frozenset({429, 503})
+
+# When True (admin /admin/api/test-llm only): skip asyncio.sleep on 429 so the request finishes
+# before reverse-proxy/browser timeouts; multi-key rotation still applies.
+_GEMINI_ADMIN_TEST_NO_429_WAIT: ContextVar[bool] = ContextVar(
+    "_GEMINI_ADMIN_TEST_NO_429_WAIT", default=False
+)
+
+
+def gemini_admin_test_no_429_wait_begin() -> Any:
+    """Call before consultant LLM for admin test; pair with :func:`gemini_admin_test_no_429_wait_end`."""
+    return _GEMINI_ADMIN_TEST_NO_429_WAIT.set(True)
+
+
+def gemini_admin_test_no_429_wait_end(token: Any) -> None:
+    _GEMINI_ADMIN_TEST_NO_429_WAIT.reset(token)
 
 FALLBACK_REPLY = (
     "Sorry, I'm checking my notes right now, ask again in a minute!"
@@ -178,6 +194,8 @@ async def _gemini_post_same_key_429_wait_retry(
     (body text ``Please retry in Xs`` or ``Retry-After`` header) capped by GEMINI_429_MAX_SLEEP_SEC,
     then retry **once** on the same URL/key.
     """
+    if _GEMINI_ADMIN_TEST_NO_429_WAIT.get():
+        return await client.post(url, json=payload)
     r = await client.post(url, json=payload)
     if r.status_code != 429:
         return r

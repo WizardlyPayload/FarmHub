@@ -18,6 +18,10 @@ from app.services.bot_registry import delete_instance, find_instance_by_id, upse
 from app.services.mod_config_xml import build_mod_config_xml, resolve_backend_url_for_xml
 from app.services.log_buffer import get_recent_logs
 from app.services.log_buffer import log_event as push_log
+from app.services.llm_service import (
+    gemini_admin_test_no_429_wait_begin,
+    gemini_admin_test_no_429_wait_end,
+)
 
 router = APIRouter(tags=["admin"])
 security = HTTPBasic(auto_error=False)
@@ -181,6 +185,8 @@ async def admin_test_llm(
     ctx = (context or "full").strip().lower()
     if ctx not in ("full", "fields"):
         ctx = "full"
+    # Avoid multi-minute stalls from GEMINI 429 sleep × keys (proxies often timeout & the button looks "broken").
+    _tok = gemini_admin_test_no_429_wait_begin()
     try:
         resp = await compute_consultant_insights(
             server_id=serverId,
@@ -205,6 +211,8 @@ async def admin_test_llm(
             "detail": det,
             "status_code": e.status_code,
         }
+    finally:
+        gemini_admin_test_no_429_wait_end(_tok)
 
     preview: list[dict[str, Any]] = []
     for ins in resp.insights[:8]:

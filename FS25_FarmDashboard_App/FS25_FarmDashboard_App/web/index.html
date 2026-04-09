@@ -226,7 +226,7 @@
                   </button>
                 </div>
                 <div class="card-body py-3" id="ai-insights-panel">
-                  <p class="text-muted small mb-0">Set <strong>AI backend URL</strong> and <strong>Farm Dashboard link key</strong> in the robot panel, then click Refresh.</p>
+                  <p class="text-muted small mb-0">Open the <strong>robot</strong> button → enter your <strong>AI server URL</strong> + <strong>link key</strong> → turn on <strong>Send farm data</strong> → <strong>Save &amp; load</strong>. Then <strong>Refresh</strong> here. (Your host must enable data sync on the server.)</p>
                 </div>
               </div>
             </div>
@@ -599,7 +599,10 @@
             <hr class="border-secondary my-3"/>
 
             <h6 class="text-farm-accent"><i class="bi bi-robot me-2"></i>AI farm assistant</h6>
-            <p class="small text-muted mb-2">Your OpenAI or Gemini key and server link are set in the <strong>AI Farm Manager</strong> panel (robot button in the top bar).</p>
+            <p class="small text-muted mb-2">Smart suggestions need your <strong>AI server</strong> plus <strong>farm data</strong> reaching that server (outbound from this app — still secure).</p>
+            <div id="settings-ai-connection-status" class="alert alert-secondary small py-2 mb-3" role="status">
+              <span class="text-muted">Open this dialog again to check connection status.</span>
+            </div>
             <button type="button" class="btn btn-sm btn-outline-success mb-3" data-bs-toggle="modal" data-bs-target="#aiFarmBotModal" data-bs-dismiss="modal">Open AI Farm Manager…</button>
 
             <hr class="border-secondary"/>
@@ -723,6 +726,7 @@
         }
       </script>
 
+      <script src="assests/js/pipeline-log.js"></script>
       <script src="assests/js/realtime-connector.js"></script>
       <script src="assests/js/modExportProgress.js"></script>
       <script src="assests/js/ai-farm-consultant-insights.js"></script>
@@ -795,11 +799,17 @@
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <p class="small mb-2" id="aiFarmBotIntro">Connect to your hosted AI farm assistant. Your <strong>LLM API key</strong> stays on this PC; the game mod token is created on the server when you install config below.</p>
+            <p class="small mb-1 text-light" id="aiFarmBotIntroLead">Three things — only the <strong>outbound farm snapshot</strong> leaves this PC (encrypted HTTPS). Your <strong>link key</strong> proves this app is allowed; it is not your mod token.</p>
+            <ol class="small text-muted ps-3 mb-3" id="aiFarmBotSteps">
+              <li><strong class="text-light">AI server URL</strong> — <code class="text-muted">https://…</code> from your host</li>
+              <li><strong class="text-light">Link key</strong> — secret string from your host (like a password for this integration)</li>
+              <li><strong class="text-light">Send farm data</strong> — must be <strong>on</strong> for Smart suggestions; your host enables matching mode on the server</li>
+            </ol>
+            <div id="aiFarmBotConnectionBanner" class="alert small py-2 px-3 mb-3 d-none" role="status"></div>
             <div class="card bg-secondary bg-opacity-25 border border-success border-opacity-50 mb-3">
               <div class="card-body py-3">
-                <h6 class="text-success mb-2"><i class="bi bi-key-fill me-1"></i> Your AI provider key (you only paste this)</h6>
-                <p class="small text-muted mb-2">OpenAI or Google Gemini — used for in-dashboard tips and field consultant. Not stored on the server.</p>
+                <h6 class="text-success mb-2"><i class="bi bi-key-fill me-1"></i> Optional: your OpenAI / Gemini key (BYOK)</h6>
+                <p class="small text-muted mb-2">For tips when the host does not pay for LLM, or to use your own quota. Stays on this PC only.</p>
                 <div class="row g-2">
                   <div class="col-md-4">
                     <label class="form-label small mb-0" for="aiFarmBotByokProvider">Provider</label>
@@ -830,11 +840,12 @@
             -->
             <div class="row g-2 mb-2">
               <div class="col-12" id="aiFarmBotRowBackendUrl">
-                <label class="form-label small" for="aiFarmBotBaseUrl">AI server URL <span class="text-muted fw-normal">(only if your build did not set one)</span></label>
-                <input type="text" class="form-control form-control-sm w-100" id="aiFarmBotBaseUrl" placeholder="https://your-hosted-ai.example.com" autocomplete="off"/>
+                <label class="form-label small" for="aiFarmBotBaseUrl">AI server URL</label>
+                <input type="text" class="form-control form-control-sm w-100" id="aiFarmBotBaseUrl" placeholder="https://your-ai-server.example.com (no path)" autocomplete="off"/>
+                <span class="form-text text-muted">Only if your installer did not embed a default.</span>
               </div>
               <div class="col-12 d-none" id="aiFarmBotRowIntegrationKey">
-                <label class="form-label small" for="aiFarmBotIntegrationKey">Connection key <span class="text-muted fw-normal">(power users / dev only)</span></label>
+                <label class="form-label small" for="aiFarmBotIntegrationKey">Link key (from your host)</label>
                 <div class="input-group input-group-sm">
                   <input type="password" class="form-control font-monospace" id="aiFarmBotIntegrationKey" placeholder="only if not embedded in your installer" autocomplete="off" spellcheck="false"/>
                   <button type="button" class="btn btn-outline-secondary" id="aiFarmBotToggleKey" title="Show or hide key" aria-pressed="false">
@@ -845,7 +856,7 @@
               <div class="col-12">
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" id="aiFarmBotPushSnapshots" checked/>
-                  <label class="form-check-label small" for="aiFarmBotPushSnapshots"><strong>Send farm data to the AI server</strong> (outbound only — no open ports on this PC). Your host enables this on the server.</label>
+                  <label class="form-check-label small" for="aiFarmBotPushSnapshots"><strong>Send farm data to the AI server</strong> — <em>required for Smart suggestions.</em> Outbound HTTPS only; no open ports on this PC. Your host sets push mode on the server.</label>
                 </div>
               </div>
             </div>

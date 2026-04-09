@@ -9,6 +9,8 @@ import threading
 from io import BytesIO
 from typing import Any
 
+from app.services.pipeline_log import log_pipeline
+
 logger = logging.getLogger(__name__)
 
 _lock = threading.Lock()
@@ -128,6 +130,15 @@ async def ftp_poll_loop(stop: asyncio.Event) -> None:
                 _raw_json = raw
                 _last_error = None
                 _last_ok_at = now
+                try:
+                    bu = len(raw.encode("utf-8"))
+                except Exception:
+                    bu = len(raw)
+                log_pipeline(
+                    "ftp_in",
+                    "FTP poll stored data.json in RAM (G-Portal / cloud path)",
+                    bytes_utf8=bu,
+                )
             else:
                 _last_error = err
                 logger.warning("FTP dashboard fetch failed: %s", err)
@@ -151,6 +162,15 @@ async def run_initial_ftp_fetch() -> None:
             _raw_json = raw
             _last_error = None
             _last_ok_at = time.time()
+            try:
+                bu = len(raw.encode("utf-8"))
+            except Exception:
+                bu = len(raw)
+            log_pipeline(
+                "ftp_in",
+                "Initial FTP download stored data.json in RAM",
+                bytes_utf8=bu,
+            )
         else:
             _last_error = err
             logger.warning("Initial FTP fetch failed: %s", err)

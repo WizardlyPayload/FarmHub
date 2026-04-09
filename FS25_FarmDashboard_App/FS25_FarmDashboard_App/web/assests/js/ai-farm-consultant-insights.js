@@ -5,6 +5,10 @@
 (function () {
   var LS_URL = 'farmdash_ai_manager_base_url';
   var LS_KEY = 'farmdash_ai_integration_key';
+
+  function pl(stage, message, meta) {
+    if (typeof pipelineLog === 'function') pipelineLog(stage, message, meta);
+  }
   var REFRESH_MS = 300000; // 5 minutes
   var insightsIntervalId = null;
   var insightsObserver = null;
@@ -128,6 +132,7 @@
         });
       })
       .then(function (r) {
+        pl('renderer_out', 'GET /api/v1/consultant/insights (Smart suggestions)', { httpStatus: r.status });
         if (r.status === 401) throw new Error('401 — wrong key or FARMDASH_INTEGRATION_KEY not set on AI server');
         if (r.status === 503) return r.json().then(function (j) { throw new Error(j.detail || 'Snapshot unavailable (FTP / DASHBOARD_JSON_URL)'); });
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -137,12 +142,14 @@
         var list = (data && data.insights) || [];
         var llm = !!(data && data.llm_used);
         renderInsights(list, llm);
+        pl('renderer_ok', 'consultant/insights parsed', { count: list.length, llm_used: llm });
         try {
           console.log('[AI Farm] Insights loaded. llm_used=' + llm + ', count=' + list.length);
         } catch (e1) {}
       })
       .catch(function (err) {
         if (err && err.message === '__no_key__') return;
+        pl('renderer_err', 'GET /api/v1/consultant/insights failed', { error: String(err.message || err) });
         container.innerHTML =
           '<p class="text-danger small mb-0"><i class="bi bi-exclamation-triangle me-1"></i> ' +
           String(err.message || err) +

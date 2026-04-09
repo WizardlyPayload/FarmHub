@@ -10,7 +10,22 @@ import httpx
 from app.services import ftp_service
 from app.services import snapshot_push_service
 from app.services.log_buffer import log_event
+from app.services.pipeline_log import log_pipeline
 from app.services.snapshot_pruner import prune_dashboard_snapshot_for_llm
+
+
+def _log_snapshot_selected(source: str, raw: str, **extra: Any) -> None:
+    try:
+        n = len(raw.encode("utf-8"))
+    except Exception:
+        n = len(raw)
+    log_pipeline(
+        "snapshot_out",
+        f"Dashboard snapshot will be used next (source={source})",
+        source=source,
+        bytes_utf8=n,
+        **extra,
+    )
 
 
 def build_dashboard_fetch_url(base_url: str, server_id: str | None) -> str:
@@ -47,24 +62,36 @@ def server_id_from_dashboard_url(url: str | None) -> str:
 async def fetch_dashboard_json(url: str | None, timeout: float = 8.0) -> tuple[str | None, str | None]:
     """
     Returns (json_string, error_message).
-    Cloud: reads JSON loaded by ftp_service from G-Portal FTP `data.json`.
-    PC push: when DASHBOARD_PUSH_MODE=1, reads last POST from Farm Dashboard (outbound from PC; no open ports).
-    Local: if FTP is not configured and push mode off, falls back to HTTP GET `url` (legacy co-hosted dev).
-    """
-    mem, mem_err = ftp_service.get_dashboard_json_from_memory()
-    if mem is not None:
-        return mem, None
-    if ftp_service.is_ftp_mode_enabled():
-        return None, mem_err or "Dashboard snapshot not available"
 
+    Precedence when multiple sources exist:
+
+    1. **PC push** (``DASHBOARD_PUSH_MODE=1``) — last POST from Farm Dashboard; preferred when set so
+       merged API-shaped JSON from the desktop app is not masked by an older FTP ``data.json``.
+    2. **FTP** — G-Portal / cloud ``data.json`` in memory.
+    3. **HTTP GET** to ``url`` (``DASHBOARD_JSON_URL`` / local dev).
+
+    If push mode is on but no snapshot has arrived yet, we **fall through** to FTP/HTTP so mixed setups
+    still work; once a push exists, it wins on future requests.
+    """
+    push_wait_detail: str | None = None
     if snapshot_push_service.is_push_mode_enabled():
         sid = server_id_from_dashboard_url(url)
         pushed, perr = snapshot_push_service.get_snapshot_json(sid)
         if pushed is not None:
+            _log_snapshot_selected("push", pushed, server_id_query=(sid or ""))
             return pushed, None
-        return None, perr or "Push mode: no dashboard snapshot in memory yet."
+        push_wait_detail = perr
+
+    mem, mem_err = ftp_service.get_dashboard_json_from_memory()
+    if mem is not None:
+        _log_snapshot_selected("ftp", mem)
+        return mem, None
+    if ftp_service.is_ftp_mode_enabled():
+        return None, mem_err or "Dashboard snapshot not available"
 
     if not url:
+        if push_wait_detail:
+            return None, push_wait_detail
         return None, "DASHBOARD_JSON_URL is not configured"
     try:
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
@@ -72,6 +99,7 @@ async def fetch_dashboard_json(url: str | None, timeout: float = 8.0) -> tuple[s
             r.raise_for_status()
             text = r.text
             json.loads(text)
+            _log_snapshot_selected("http_get", text, url=(url or "")[:200])
             return text, None
     except Exception as e:
         log_event("WARN", f"Dashboard fetch failed: {e}")

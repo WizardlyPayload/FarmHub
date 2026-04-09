@@ -12,6 +12,22 @@ logger = logging.getLogger(__name__)
 
 from pydantic import ValidationError
 
+
+def _sanitize_consultant_user_copy(text: str) -> str:
+    """
+    Strip internal game counters the UI should not echo (e.g. weed level digits).
+    Keeps meaning where possible.
+    """
+    if not text:
+        return text
+    s = str(text)
+    # "Weeds (level 6)" / "weeds (level 6)" → plain wording
+    s = re.sub(r"(?i)\bweeds?\s*\(\s*level\s*\d+\s*\)", "weeds", s)
+    s = re.sub(r"(?i)\bweed\s*level\s*[:]?\s*\d+", "weeds", s)
+    s = re.sub(r"(?i)\bweeds?\s+at\s+level\s+\d+", "weeds", s)
+    s = re.sub(r"\s{2,}", " ", s).strip()
+    return s
+
 from app.config import get_settings, has_gemini_credentials
 from app.schemas.insights import FarmInsight, InsightCategory, InsightPriority
 from app.services.log_buffer import log_event
@@ -67,8 +83,11 @@ CRITICAL — field-specific insights:
 - Do **NOT** prefix with the word "Field", "Parcel", or "#". Do **NOT** use the field display name. Do **NOT** add units or extra text. **Only** the id so clients can match rows.
 
 Equipment and natural language (message + reasoning):
-- If the JSON includes **vehicles** (player-owned machines), use it: when a suitable machine type for the task exists (harvester, cultivator, sprayer, spreader, etc.), say **use your** / **run** / **operate** that equipment — do **not** tell the player to buy that class of machine.
-- If vehicles are absent or none match the task, describe the farm job plainly (**Harvest when ready**, **Weed soon**, **Lime if needed**) without assuming they must purchase equipment.
+- If the JSON includes **vehicles** (player-owned machines), use it: when a suitable machine type for the task exists, say **use your** / **run** / **operate** that equipment — do **not** tell the player to buy that class of machine.
+- **Grass / meadow / forage (fruitType GRASS or similar):** never recommend a **grain combine** (cereal harvester) for these crops. In FS25, grass is mowed, tedded, baled, or picked up with a **forage harvester** / **loading wagon** — only name an owned vehicle if it clearly matches (mower, baler, forage, wagon); otherwise say **mow/bale or use forage gear** without naming a combine.
+- **Weeds — mechanical vs chemical:** If **growthLabel** / growth stage shows **late** growth (about the **last 1–2 stages** before harvest, or roughly the **final ~30%** of the growth bar, e.g. 8/9, 9/9, 7/8 near ripe): **do not** recommend **rotary hoe / mechanical weeder** work — it is inappropriate and can damage the crop; recommend **herbicide spraying** and match a **sprayer** from **vehicles** if present. For **early/mid** growth, mechanical weeding is OK if a weeder fits.
+- **Never** repeat internal counters in user text: do **not** write "weed level", "weeds (level N)", or any numeric weed severity — say **weeds** / **heavy weeds** / **needs spraying** only.
+- If vehicles are absent or none match the task, describe the farm job plainly (**Harvest when ready**, **Spray weeds**, **Lime if needed**) without assuming they must purchase equipment.
 - **Never** write broken phrases like "Consider purchasing to harvest" or "Consider purchasing to plan" — they are ungrammatical. Use full sentences: e.g. "Harvest when ready, then plow before the next crop." Only mention buying/leasing if a tool is clearly missing from **vehicles** and phrase it as a normal conditional sentence.
 
 For farm-wide or non-parcel field advice, omit **field_ref** or set it to null.
@@ -91,6 +110,7 @@ Rules:
 - Return **at most 2** insights; **category** must always be **Field**.
 - **field_ref** must be the parcel's **farmlandId** or **id** from the JSON (numeric string or number), matching CONSULTANT_SYSTEM rules for field_ref.
 - If **vehicles** appears in the JSON, match tasks to owned machines; otherwise plain task language — never "Consider purchasing to …".
+- Grass/forage: no grain combines; late growth + weeds: sprayer not mechanical weeder; never echo "weed level" or "(level N)" for weeds.
 - Keep **message** and **reasoning** brief (under 180 characters each).
 - If the JSON has no usable field data, return {"insights":[]}."""
 
@@ -111,9 +131,12 @@ CRITICAL — COVERAGE (overrides any earlier "at most 4" / summary instructions 
 - Keep **message** and **reasoning** brief (aim under 180 characters each) so the full JSON still completes.
 
 FIELD MAP — equipment + wording (each per-field **message**):
-- The JSON includes a slim **vehicles** list (player-owned equipment). Match tasks to it: if a combine/harvester, cultivator, sprayer, weeder, lime spreader, or plow appears relevant, instruct **use your** / **run** / **send** that equipment — **not** "buy" or "purchase" for that same job.
-- If no suitable vehicle appears in **vehicles**, state the task in plain FS25 language (**Harvest sorghum when ready**; **Weed this field**; **Lime if pH is low**) with **no** default purchase advice.
-- **Banned:** "Consider purchasing to [verb]", "Consider purchasing to plan", or any "purchasing to …" — rewrite as clear imperatives or conditionals, e.g. "Harvest when ready, then plow for the next crop." Mention acquiring equipment only if nothing in **vehicles** fits and phrase as a full sentence (e.g. "If you lack a weeder, consider renting or buying one")."""
+- The JSON includes a slim **vehicles** list (player-owned equipment). Match **task + crop type** to the right machine class — **not** "buy" or "purchase" for that same job.
+- **Grain harvest (wheat, barley, canola, maize grain, sorghum grain, etc.):** a **grain combine** is appropriate when named from **vehicles** if it matches cereals.
+- **Grass / meadow:** never assign a **grain combine** — use **mower, baler, tedder, forage harvester, loading wagon** from **vehicles** only when names/types fit; otherwise **mow or bale the grass** / **use forage equipment** with no combine.
+- **Weeds:** Do **not** output "weed level", "weeds (level N)", or numeric weed counts — say **weeds** / **needs a spray** only. Use **growthLabel** / stage (e.g. `x/y`): if **late** (last 1–2 stages or ~last third of growth), **do not** recommend **mechanical weeders** (rotary hoe, etc.); recommend **herbicide** and a **sprayer** from **vehicles**. Early/mid growth: mechanical weeder OK if listed and appropriate.
+- If no suitable vehicle appears in **vehicles**, state the task in plain FS25 language with **no** default purchase advice.
+- **Banned:** "Consider purchasing to [verb]", "Consider purchasing to plan", or any "purchasing to …" — rewrite as clear imperatives or conditionals. Mention acquiring equipment only if nothing in **vehicles** fits and phrase as a full sentence."""
 )
 
 # Smart suggestions panel on Fields tab (?view=fields, context=full) — not the field-map row API (context=fields).
@@ -122,6 +145,7 @@ You are an expert Farming Simulator 25 **field** consultant. The JSON is **cropl
 
 Focus: crops, growth, harvest readiness, withered, soil (plow/cultivate/lime/PF nitrogen), rotation hints.
 Use **vehicles** when present: prefer "use your …" over purchase hints; never "Consider purchasing to [verb]".
+Grass/forage: not grain combines; late growth + weeds: sprayer not hoe; never echo weed level numbers in text.
 
 Respond with ONLY valid JSON (no markdown):
 {"insights":[{"category":"Field|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":"..." or null},...]}
@@ -444,12 +468,14 @@ async def _llm_insights_from_snapshot(
                 if cat == InsightCategory.FIELD
                 else None
             )
+            msg = _sanitize_consultant_user_copy(str(item.get("message", ""))[:2000])
+            reas = _sanitize_consultant_user_copy(str(item.get("reasoning", ""))[:4000])
             out.append(
                 FarmInsight(
                     category=cat,
                     priority=_parse_priority(item.get("priority")),
-                    message=str(item.get("message", ""))[:2000],
-                    reasoning=str(item.get("reasoning", ""))[:4000],
+                    message=msg,
+                    reasoning=reas,
                     field_ref=field_ref,
                 )
             )

@@ -72,12 +72,17 @@ async function getByokHeaders() {
 }
 
 /**
- * Normalize LLM field_ref for map keys (must match backend _normalize_field_ref where possible).
+ * Normalize LLM field_ref for map keys (aligns with backend _normalize_field_ref; extra digit-only pass).
+ * Strips ALL non-digits so "Field 4", "#4", "farmland_4" → "4" for reliable matching.
  */
 export function normalizeFieldRefKey(ref) {
   if (ref == null || ref === "") return "";
   let s = String(ref).trim();
   if (!s) return "";
+  const digitsOnly = s.replace(/\D/g, "");
+  if (digitsOnly.length > 0) {
+    return digitsOnly.length > 64 ? digitsOnly.slice(0, 64) : digitsOnly;
+  }
   s = s.replace(/^field\s*#?\s*/i, "");
   s = s.replace(/^parcel\s*#?\s*/i, "");
   s = s.replace(/^farmland\s*#?\s*/i, "");
@@ -87,11 +92,13 @@ export function normalizeFieldRefKey(ref) {
   return first.length > 64 ? first.slice(0, 64) : first;
 }
 
-/** Register insight under all plausible string keys for numeric ids. */
+/** Register insight under normalized key + digit-only alias + numeric string variants. */
 function addInsightKeys(map, rawKey, ins) {
   const k = normalizeFieldRefKey(rawKey);
   if (!k) return;
   if (!map[k]) map[k] = ins;
+  const digits = String(rawKey != null ? rawKey : "").replace(/\D/g, "");
+  if (digits && !map[digits]) map[digits] = ins;
   const n = Number(k);
   if (Number.isFinite(n)) {
     const a = String(n);
@@ -141,6 +148,8 @@ export function lookupFieldConsultantInsight(map, field) {
     if (!k || tried.has(k)) continue;
     tried.add(k);
     if (map[k]) return map[k];
+    const digitKey = String(v).replace(/\D/g, "");
+    if (digitKey && digitKey !== k && map[digitKey]) return map[digitKey];
     const n = Number(v);
     if (Number.isFinite(n)) {
       const a = String(n);
@@ -258,6 +267,37 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
     const list = (data && data.insights) || [];
     const byRef = indexFieldConsultantInsights(list);
     const indexedKeys = Object.keys(byRef);
+    if (list.length > 0) {
+      try {
+        const rows =
+          (typeof window !== "undefined" &&
+            window.dashboard &&
+            (window.dashboard.fields || window.dashboard.allFields)) ||
+          [];
+        const fieldRows = Array.isArray(rows) ? rows : [];
+        const aiFieldLines = list.filter((ins) => ins && insightCategoryIsField(ins.category));
+        const stableIds = fieldRows.map((f) => ({
+          farmlandId: f && f.farmlandId,
+          id: f && f.id,
+          stableId: f ? getFieldStableId(f) : "",
+          normFarmland: f ? normalizeFieldRefKey(f.farmlandId) : "",
+          normId: f ? normalizeFieldRefKey(f.id) : "",
+        }));
+        console.warn(
+          "[field-consultant-bridge] Field ref matcher — AI vs dashboard IDs (check mismatch if UI shows Rules)",
+          {
+            aiFieldRefs: aiFieldLines.map((ins) => ({
+              raw: ins.field_ref,
+              normalized: normalizeFieldRefKey(ins.field_ref),
+            })),
+            stableIds,
+            indexedMapKeys: indexedKeys,
+          }
+        );
+      } catch (eDbg) {
+        console.warn("[field-consultant-bridge] matcher debug failed", eDbg);
+      }
+    }
     if (list.length > 0 && indexedKeys.length === 0 && data.llm_used) {
       const sample = list.slice(0, 3).map((x) => ({
         category: x && x.category,

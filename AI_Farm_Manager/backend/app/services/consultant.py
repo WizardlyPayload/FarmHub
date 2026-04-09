@@ -61,6 +61,19 @@ Output limits (so the JSON always completes):
 - **priority** must be exactly **Low**, **Medium**, or **High** (spell **Medium** in full — not Med).
 - Keep **message** and **reasoning** **brief** (aim under 180 characters each). Do not write long paragraphs."""
 
+CONSULTANT_SYSTEM_SINGLE_FIELD = """You are an expert Farming Simulator 25 **single-field** consultant.
+
+You receive JSON for **one field parcel only** (plus minimal farm context). You MUST NOT invent or assume data for other fields.
+
+Respond with ONLY valid JSON (no markdown) in this exact shape:
+{"insights":[{"category":"Field","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":"..."}]}
+
+Rules:
+- Return **at most 2** insights; **category** must always be **Field**.
+- **field_ref** must be the parcel's **farmlandId** or **id** from the JSON (numeric string or number), matching CONSULTANT_SYSTEM rules for field_ref.
+- Keep **message** and **reasoning** brief (under 180 characters each).
+- If the JSON has no usable field data, return {"insights":[]}."""
+
 
 def _coerce_pct(value: Any) -> float | None:
     if value is None:
@@ -194,6 +207,8 @@ def _normalize_field_ref(raw: Any) -> str | None:
 async def _llm_insights_from_snapshot(
     snapshot_json: str,
     settings: dict[str, Any],
+    *,
+    system_instruction: str = CONSULTANT_SYSTEM,
 ) -> tuple[list[FarmInsight], bool]:
     """Call OpenAI or Gemini with consultant system prompt; parse JSON insights."""
     provider = (settings.get("llm_provider") or "openai").strip().lower()
@@ -216,9 +231,9 @@ async def _llm_insights_from_snapshot(
 
     try:
         if provider == "gemini" and (settings.get("gemini_api_key") or "").strip():
-            text = await _gemini_consultant(settings, user_payload)
+            text = await _gemini_consultant(settings, user_payload, system_instruction=system_instruction)
         else:
-            text = await _openai_consultant(settings, user_payload)
+            text = await _openai_consultant(settings, user_payload, system_instruction=system_instruction)
     except Exception as e:
         # Invalid API key, quota, network, or provider HTTP errors — fall back to heuristics only.
         log_event("WARN", f"Consultant LLM request failed (auth/network/provider): {e}")
@@ -272,7 +287,12 @@ async def _llm_insights_from_snapshot(
     return out, True
 
 
-async def _openai_consultant(settings: dict, user_message: str) -> str:
+async def _openai_consultant(
+    settings: dict,
+    user_message: str,
+    *,
+    system_instruction: str = CONSULTANT_SYSTEM,
+) -> str:
     from openai import AsyncOpenAI
     from openai import BadRequestError
 
@@ -282,7 +302,7 @@ async def _openai_consultant(settings: dict, user_message: str) -> str:
     client = AsyncOpenAI(api_key=key)
     model = settings["llm_model"]
     messages = [
-        {"role": "system", "content": CONSULTANT_SYSTEM},
+        {"role": "system", "content": system_instruction},
         {"role": "user", "content": user_message},
     ]
     kwargs = {
@@ -313,7 +333,12 @@ async def _openai_consultant(settings: dict, user_message: str) -> str:
     return (resp.choices[0].message.content or "").strip()
 
 
-async def _gemini_consultant(settings: dict, user_message: str) -> str:
+async def _gemini_consultant(
+    settings: dict,
+    user_message: str,
+    *,
+    system_instruction: str = CONSULTANT_SYSTEM,
+) -> str:
     """
     Gemini REST generateContent for consultant JSON.
 
@@ -329,7 +354,7 @@ async def _gemini_consultant(settings: dict, user_message: str) -> str:
     if not settings.get("gemini_api_key"):
         raise RuntimeError("GEMINI_API_KEY not set")
     url = _gemini_generate_url(settings)
-    prompt = f"{CONSULTANT_SYSTEM}\n\n{user_message}"
+    prompt = f"{system_instruction}\n\n{user_message}"
     # Single-turn text; omit "role" for widest compatibility with generativelanguage v1 / v1beta.
     base_cfg: dict[str, Any] = {"temperature": 0.3, "maxOutputTokens": 8192}
     want_json_mime = (os.getenv("GEMINI_CONSULTANT_RESPONSE_JSON") or "").strip().lower() in (
@@ -469,6 +494,7 @@ async def generate_farm_insights(
     *,
     user_api_key: str | None = None,
     user_provider: str | None = None,
+    system_instruction: str | None = None,
 ) -> tuple[list[FarmInsight], bool]:
     """
     Combine heuristic rules (e.g. output fill >= 90%) with LLM analysis.
@@ -491,8 +517,13 @@ async def generate_farm_insights(
     except Exception:
         snap_str = "{}"
 
+    sys_inst = system_instruction or CONSULTANT_SYSTEM
     try:
-        llm_list, llm_ok = await _llm_insights_from_snapshot(snap_str, settings)
+        llm_list, llm_ok = await _llm_insights_from_snapshot(
+            snap_str,
+            settings,
+            system_instruction=sys_inst,
+        )
     except Exception as e:
         log_event("WARN", f"Consultant pipeline unexpected error: {e}")
         return heuristics, False

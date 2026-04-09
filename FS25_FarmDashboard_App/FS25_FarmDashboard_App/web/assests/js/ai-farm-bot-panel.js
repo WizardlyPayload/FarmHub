@@ -261,6 +261,15 @@
         );
         return;
       }
+      try {
+        if (typeof dashAiDebug === 'function') {
+          dashAiDebug('ai-farm-bot-panel', 'request', {
+            url: b + '/api/integration/overview',
+            method: 'GET',
+            headers: { 'X-FarmDash-Key': '(redacted)' },
+          });
+        }
+      } catch (eDbg0) {}
       fetch(b + '/api/integration/overview', {
         headers: { 'X-FarmDash-Key': encodeURIComponent(key) },
       })
@@ -274,6 +283,14 @@
           return r.json();
         })
         .then(function (data) {
+          try {
+            if (typeof dashAiDebug === 'function') {
+              dashAiDebug('ai-farm-bot-panel', 'response', { body: data });
+            }
+          } catch (eDbg2) {}
+          return data;
+        })
+        .then(function (data) {
           render(container, data, null, b, key);
           // When the API returns a subscription tier / plan name, show #aiFarmBotSubscriptionTierRow and set text, e.g.:
           // var tr = document.getElementById('aiFarmBotCurrentTierText');
@@ -284,6 +301,11 @@
           // }
         })
         .catch(function (e) {
+          try {
+            if (typeof dashAiDebug === 'function') {
+              dashAiDebug('ai-farm-bot-panel', 'error', { message: String(e && e.message ? e.message : e) });
+            }
+          } catch (eDbg3) {}
           pl('renderer_err', 'GET /api/integration/overview failed', { error: String(e.message || e) });
           render(container, null, String(e.message || e));
         });
@@ -398,6 +420,18 @@
           return;
         }
         headers['X-FarmDash-Key'] = encodeURIComponent(key);
+        try {
+          if (typeof dashAiDebug === 'function') {
+            var hdrCopy = {};
+            for (var hk in headers) {
+              if (Object.prototype.hasOwnProperty.call(headers, hk)) {
+                hdrCopy[hk] =
+                  String(hk).toLowerCase().indexOf('key') >= 0 ? '(redacted)' : headers[hk];
+              }
+            }
+            dashAiDebug('llm-ping', 'request', { url: b + '/api/integration/llm-ping', headers: hdrCopy });
+          }
+        } catch (ePingDbg) {}
         fetch(b + '/api/integration/llm-ping', { headers: headers })
           .then(function (r) {
             pl('renderer_out', 'GET /api/integration/llm-ping', { httpStatus: r.status });
@@ -411,6 +445,11 @@
             });
           })
           .then(function (x) {
+            try {
+              if (typeof dashAiDebug === 'function') {
+                dashAiDebug('llm-ping', 'response', { status: x.status, body: x.body });
+              }
+            } catch (ePingRes) {}
             var j = x.body || {};
             if (j.ok) {
               var ms = j.latency_ms != null ? String(j.latency_ms) : '—';
@@ -430,6 +469,11 @@
             }
           })
           .catch(function (e) {
+            try {
+              if (typeof dashAiDebug === 'function') {
+                dashAiDebug('llm-ping', 'error', { message: String(e && e.message ? e.message : e) });
+              }
+            } catch (ePingErr) {}
             llmPingOut.textContent = String(e.message || e);
             llmPingOut.className = 'small text-danger mb-3 mb-md-2';
           });

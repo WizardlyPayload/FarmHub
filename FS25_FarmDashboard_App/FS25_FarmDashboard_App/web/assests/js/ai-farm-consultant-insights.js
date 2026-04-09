@@ -54,10 +54,28 @@
     }
   }
 
+  function showInsightsSkeleton() {
+    var container = document.getElementById('ai-insights-panel');
+    if (!container) return;
+    container.setAttribute('aria-busy', 'true');
+    container.innerHTML =
+      '<div class="ai-insights-thinking-placeholder">' +
+      '<p class="small text-info mb-3">' +
+      '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' +
+      'AI thinking… fetching suggestions from your host.' +
+      '</p>' +
+      '<div class="placeholder-glow">' +
+      '<span class="placeholder col-12 bg-secondary mb-2 rounded d-block" style="height: 3rem;"></span>' +
+      '<span class="placeholder col-10 bg-secondary mb-2 rounded d-block" style="height: 0.9rem;"></span>' +
+      '<span class="placeholder col-11 bg-secondary rounded d-block" style="height: 0.9rem;"></span>' +
+      '</div></div>';
+  }
+
   function renderInsights(insights, llmUsed) {
     var container = document.getElementById('ai-insights-panel');
     var badge = document.getElementById('ai-insights-llm-badge');
     if (!container) return;
+    container.removeAttribute('aria-busy');
 
     if (badge) {
       badge.textContent = llmUsed ? 'AI' : 'Rules';
@@ -101,75 +119,102 @@
     var container = document.getElementById('ai-insights-panel');
     if (!container) return;
 
-    container.innerHTML = '<p class="text-muted small mb-0"><i class="bi bi-hourglass-split me-1"></i> Loading insights…</p>';
+    showInsightsSkeleton();
 
-    Promise.all([getBaseAsync(), getKeyAsync()])
-      .then(function (pair) {
-        var base = pair[0] || 'http://127.0.0.1:8080';
-        var key = pair[1] || '';
-        if (!key) {
-          var badge = document.getElementById('ai-insights-llm-badge');
-          if (badge) {
-            badge.textContent = '—';
-            badge.className = 'badge ms-1 bg-secondary';
+    function dbg(phase, payload) {
+      try {
+        if (typeof dashAiDebug === 'function') dashAiDebug('smart-suggestions', phase, payload);
+      } catch (e0) {}
+    }
+
+    function runFetch() {
+      Promise.all([getBaseAsync(), getKeyAsync()])
+        .then(function (pair) {
+          var base = pair[0] || 'http://127.0.0.1:8080';
+          var key = pair[1] || '';
+          if (!key) {
+            var badge = document.getElementById('ai-insights-llm-badge');
+            if (badge) {
+              badge.textContent = '—';
+              badge.className = 'badge ms-1 bg-secondary';
+            }
+            container.removeAttribute('aria-busy');
+            container.innerHTML =
+              '<p class="text-warning small mb-0">Open <i class="bi bi-robot"></i> <strong>AI Farm Manager</strong> and click <strong>Save &amp; load</strong>.</p>';
+            return Promise.reject(new Error('__no_key__'));
           }
-          container.innerHTML =
-            '<p class="text-warning small mb-0">Open <i class="bi bi-robot"></i> <strong>AI Farm Manager</strong> and click <strong>Save &amp; load</strong>.</p>';
-          return Promise.reject(new Error('__no_key__'));
-        }
-        var apiURL = base + '/api/v1/consultant/insights';
-        var sid = '';
-        try {
-          sid =
-            (window.dashboard && window.dashboard.activeServerId) ||
-            localStorage.getItem('dashboard_active_server') ||
-            '';
-        } catch (e0) {
-          sid = '';
-        }
-        if (sid) {
-          apiURL += (apiURL.indexOf('?') >= 0 ? '&' : '?') + 'serverId=' + encodeURIComponent(sid);
-        }
-        return getByokHeadersSync().then(function (extra) {
-          return fetch(apiURL, {
-            method: 'GET',
-            headers: Object.assign(
+          var apiURL = base + '/api/v1/consultant/insights';
+          var sid = '';
+          try {
+            sid =
+              (window.dashboard && window.dashboard.activeServerId) ||
+              localStorage.getItem('dashboard_active_server') ||
+              '';
+          } catch (e0) {
+            sid = '';
+          }
+          if (sid) {
+            apiURL += (apiURL.indexOf('?') >= 0 ? '&' : '?') + 'serverId=' + encodeURIComponent(sid);
+          }
+          return getByokHeadersSync().then(function (extra) {
+            var hdrs = Object.assign(
               {
                 'X-FarmDash-Key': encodeURIComponent(key),
                 Accept: 'application/json',
               },
               extra
-            ),
+            );
+            dbg('request', {
+              url: apiURL,
+              method: 'GET',
+              headers:
+                typeof window !== 'undefined' && typeof window.dashRedactHeaders === 'function'
+                  ? window.dashRedactHeaders(hdrs)
+                  : hdrs,
+            });
+            return fetch(apiURL, {
+              method: 'GET',
+              headers: hdrs,
+            });
           });
+        })
+        .then(function (r) {
+          pl('renderer_out', 'GET /api/v1/consultant/insights (Smart suggestions)', { httpStatus: r.status });
+          if (r.status === 401) throw new Error('401 — wrong key or FARMDASH_INTEGRATION_KEY not set on AI server');
+          if (r.status === 503) return r.json().then(function (j) { throw new Error(j.detail || 'Snapshot unavailable (FTP / DASHBOARD_JSON_URL)'); });
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function (data) {
+          dbg('response', { body: data });
+          var list = (data && data.insights) || [];
+          var llm = !!(data && data.llm_used);
+          renderInsights(list, llm);
+          pl('renderer_ok', 'consultant/insights parsed', { count: list.length, llm_used: llm });
+          try {
+            console.log('[AI Farm] Insights loaded. llm_used=' + llm + ', count=' + list.length);
+          } catch (e1) {}
+        })
+        .catch(function (err) {
+          if (err && err.message === '__no_key__') return;
+          dbg('error', { message: String(err && err.message ? err.message : err) });
+          pl('renderer_err', 'GET /api/v1/consultant/insights failed', { error: String(err.message || err) });
+          container.removeAttribute('aria-busy');
+          container.innerHTML =
+            '<p class="text-danger small mb-0"><i class="bi bi-exclamation-triangle me-1"></i> ' +
+            String(err.message || err) +
+            '</p>';
+          try {
+            console.error('[AI Farm] Consultant insights failed:', err);
+          } catch (e2) {}
         });
-      })
-      .then(function (r) {
-        pl('renderer_out', 'GET /api/v1/consultant/insights (Smart suggestions)', { httpStatus: r.status });
-        if (r.status === 401) throw new Error('401 — wrong key or FARMDASH_INTEGRATION_KEY not set on AI server');
-        if (r.status === 503) return r.json().then(function (j) { throw new Error(j.detail || 'Snapshot unavailable (FTP / DASHBOARD_JSON_URL)'); });
-        if (!r.ok) throw new Error('HTTP ' + r.status);
-        return r.json();
-      })
-      .then(function (data) {
-        var list = (data && data.insights) || [];
-        var llm = !!(data && data.llm_used);
-        renderInsights(list, llm);
-        pl('renderer_ok', 'consultant/insights parsed', { count: list.length, llm_used: llm });
-        try {
-          console.log('[AI Farm] Insights loaded. llm_used=' + llm + ', count=' + list.length);
-        } catch (e1) {}
-      })
-      .catch(function (err) {
-        if (err && err.message === '__no_key__') return;
-        pl('renderer_err', 'GET /api/v1/consultant/insights failed', { error: String(err.message || err) });
-        container.innerHTML =
-          '<p class="text-danger small mb-0"><i class="bi bi-exclamation-triangle me-1"></i> ' +
-          String(err.message || err) +
-          '</p>';
-        try {
-          console.error('[AI Farm] Consultant insights failed:', err);
-        } catch (e2) {}
-      });
+    }
+
+    if (typeof dashScheduleIdle === 'function') {
+      dashScheduleIdle(runFetch, 900);
+    } else {
+      setTimeout(runFetch, 0);
+    }
   }
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -188,6 +233,14 @@
       clearInterval(insightsIntervalId);
     }
     insightsIntervalId = setInterval(refreshFarmInsights, REFRESH_MS);
+
+    if (typeof dashScheduleIdle === 'function') {
+      dashScheduleIdle(function () {
+        refreshFarmInsights();
+      }, 1500);
+    } else {
+      setTimeout(refreshFarmInsights, 600);
+    }
 
     var dashEl = document.getElementById('dashboard-content');
     if (dashEl && !window.__farmdashConsultantDashObserverDone) {

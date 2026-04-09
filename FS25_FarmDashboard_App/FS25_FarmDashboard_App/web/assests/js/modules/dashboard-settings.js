@@ -126,6 +126,13 @@ async function refreshSettingsAiConnectionStatus() {
     if (typeof globalThis.pipelineLog === "function") {
       globalThis.pipelineLog("renderer_out", "GET /api/integration/overview (Dashboard Settings)", { base });
     }
+    if (typeof globalThis.dashAiDebug === "function") {
+      globalThis.dashAiDebug("dashboard-settings", "request", {
+        url: `${base}/api/integration/overview`,
+        method: "GET",
+        headers: { "X-FarmDash-Key": "(redacted)" },
+      });
+    }
     const r = await fetch(base + "/api/integration/overview", {
       headers: { "X-FarmDash-Key": encodeURIComponent(key) },
     });
@@ -133,6 +140,9 @@ async function refreshSettingsAiConnectionStatus() {
       globalThis.pipelineLog("renderer_out", "integration/overview response (settings)", { httpStatus: r.status });
     }
     if (!r.ok) {
+      if (typeof globalThis.dashAiDebug === "function") {
+        globalThis.dashAiDebug("dashboard-settings", "error", { status: r.status });
+      }
       el.classList.add("alert-warning");
       el.innerHTML =
         "<strong>Cannot reach AI server</strong> (HTTP " +
@@ -141,6 +151,9 @@ async function refreshSettingsAiConnectionStatus() {
       return;
     }
     const data = await r.json();
+    if (typeof globalThis.dashAiDebug === "function") {
+      globalThis.dashAiDebug("dashboard-settings", "response", { body: data });
+    }
     const push = data.farmDashboardPushMode;
     const fd = data.farmDashboardServers || [];
     const fdErr = data.farmDashboardError;

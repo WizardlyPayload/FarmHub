@@ -33,6 +33,11 @@ function ensureFieldConsultantListener() {
       renderFields(fieldsFilterType, fieldsSearchTerm);
     }
   });
+  window.addEventListener("field-consultant-loading", (ev) => {
+    const on = ev.detail && ev.detail.loading;
+    const row = document.getElementById("field-ai-thinking-row");
+    if (row) row.classList.toggle("d-none", !on);
+  });
 }
 
 /** Single field bar: purple when mulched (map-style), matches progress bar */
@@ -810,6 +815,15 @@ function buildFieldsHTML() {
                            class="form-control bg-secondary border-secondary text-white"
                            placeholder="Search fields or crops…"
                            oninput="dashboard.searchFields(this.value)">
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-2 d-none" id="field-ai-thinking-row" aria-live="polite">
+            <div class="col-12">
+                <div class="alert alert-dark border-secondary py-2 px-3 mb-0 d-flex align-items-center gap-2">
+                    <div class="spinner-grow spinner-grow-sm text-info" role="status"></div>
+                    <span class="small text-muted mb-0">AI thinking… loading field suggestions from your host.</span>
                 </div>
             </div>
         </div>

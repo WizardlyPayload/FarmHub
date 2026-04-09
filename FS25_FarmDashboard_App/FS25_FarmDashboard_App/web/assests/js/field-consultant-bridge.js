@@ -14,6 +14,23 @@ let lastFetchAt = 0;
 let inFlight = false;
 let debounceId = null;
 
+function emitFieldConsultantLoading(loading) {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(
+      new CustomEvent("field-consultant-loading", { detail: { loading: !!loading } })
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+function dashDebug(label, phase, payload) {
+  if (typeof globalThis.dashAiDebug === "function") {
+    globalThis.dashAiDebug(label, phase, payload);
+  }
+}
+
 async function getBase() {
   const ls = (localStorage.getItem(LS_URL) || "").replace(/\/$/, "");
   if (ls) return ls;
@@ -128,11 +145,17 @@ export function lookupFieldConsultantInsight(map, field) {
 
 export async function refreshFieldConsultantCache({ force = false } = {}) {
   const now = Date.now();
-  if (!force && now - lastFetchAt < MIN_INTERVAL_MS) {
-    return { skipped: true };
+  if (!force && lastFetchAt > 0 && now - lastFetchAt < MIN_INTERVAL_MS) {
+    dashDebug("field-consultant-bridge", "skip", {
+      reason: "throttle",
+      msSinceLastOk: now - lastFetchAt,
+      minIntervalMs: MIN_INTERVAL_MS,
+    });
+    return { skipped: true, reason: "throttle" };
   }
   if (inFlight) {
-    return { skipped: true };
+    dashDebug("field-consultant-bridge", "skip", { reason: "in_flight" });
+    return { skipped: true, reason: "in_flight" };
   }
 
   const intKey = await getIntegrationKey();
@@ -141,10 +164,12 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
       window.__fieldConsultantByRef = {};
       window.dispatchEvent(new CustomEvent("field-consultant-updated"));
     }
+    dashDebug("field-consultant-bridge", "skip", { reason: "no_integration_key" });
     return { skipped: true, reason: "no_integration_key" };
   }
 
   inFlight = true;
+  emitFieldConsultantLoading(true);
   try {
     const extra = await getByokHeaders();
     const base = await getBase();
@@ -160,13 +185,23 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
       "";
     if (sid) qs.set("serverId", sid);
     qs.set("context", "fields");
-    const r = await fetch(`${base}/api/v1/consultant/insights?${qs.toString()}`, {
+    const url = `${base}/api/v1/consultant/insights?${qs.toString()}`;
+    const reqHeaders = {
+      "X-FarmDash-Key": encodeURIComponent(intKey),
+      Accept: "application/json",
+      ...extra,
+    };
+    dashDebug("field-consultant-bridge", "request", {
+      url,
       method: "GET",
-      headers: {
-        "X-FarmDash-Key": encodeURIComponent(intKey),
-        Accept: "application/json",
-        ...extra,
-      },
+      headers:
+        typeof globalThis.dashRedactHeaders === "function"
+          ? globalThis.dashRedactHeaders(reqHeaders)
+          : reqHeaders,
+    });
+    const r = await fetch(url, {
+      method: "GET",
+      headers: reqHeaders,
       cache: "no-store",
     });
     if (typeof globalThis.pipelineLog === "function") {
@@ -174,6 +209,13 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
     }
 
     if (!r.ok) {
+      let errText = "";
+      try {
+        errText = await r.text();
+      } catch (e) {
+        errText = String(e);
+      }
+      dashDebug("field-consultant-bridge", "error", { status: r.status, body: errText.slice(0, 4000) });
       if (typeof globalThis.pipelineLog === "function") {
         globalThis.pipelineLog("renderer_err", "consultant/insights HTTP error (field map)", { status: r.status });
       }
@@ -184,9 +226,11 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
     try {
       data = await r.json();
     } catch (parseErr) {
+      dashDebug("field-consultant-bridge", "error", { parse: String(parseErr) });
       console.warn("[field-consultant-bridge] Invalid JSON body", parseErr);
       return { ok: false, error: "invalid_json" };
     }
+    dashDebug("field-consultant-bridge", "response", { httpStatus: r.status, body: data });
 
     const list = (data && data.insights) || [];
     const byRef = indexFieldConsultantInsights(list);
@@ -205,6 +249,7 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
     }
     return { ok: true, llm_used: !!data.llm_used };
   } catch (e) {
+    dashDebug("field-consultant-bridge", "error", { exception: String(e?.message || e), stack: e?.stack });
     if (typeof globalThis.pipelineLog === "function") {
       globalThis.pipelineLog("renderer_err", "field consultant fetch failed", { error: String(e?.message || e) });
     }
@@ -212,6 +257,7 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
     return { ok: false, error: String(e.message || e) };
   } finally {
     inFlight = false;
+    emitFieldConsultantLoading(false);
   }
 }
 
@@ -219,7 +265,12 @@ export function scheduleFieldConsultantFetch() {
   if (debounceId) clearTimeout(debounceId);
   debounceId = setTimeout(() => {
     debounceId = null;
-    refreshFieldConsultantCache({ force: false }).catch(() => {});
+    var idle = typeof globalThis.dashScheduleIdle === "function" ? globalThis.dashScheduleIdle : function (fn, t) {
+      setTimeout(fn, 0);
+    };
+    idle(function () {
+      refreshFieldConsultantCache({ force: false }).catch(() => {});
+    }, 1500);
   }, 800);
 }
 
@@ -242,17 +293,46 @@ export async function fetchConsultantInsightSingleField(fieldRef) {
     "";
   if (sid) qs.set("serverId", sid);
   qs.set("fieldRef", ref);
-  const r = await fetch(`${base}/api/v1/consultant/insights?${qs.toString()}`, {
-    method: "GET",
-    headers: {
-      "X-FarmDash-Key": encodeURIComponent(intKey),
-      Accept: "application/json",
-      ...extra,
-    },
-    cache: "no-store",
-  });
-  if (!r.ok) return { ok: false, status: r.status };
+  const url = `${base}/api/v1/consultant/insights?${qs.toString()}`;
+  const h = {
+    "X-FarmDash-Key": encodeURIComponent(intKey),
+    Accept: "application/json",
+    ...extra,
+  };
+  if (typeof globalThis.dashAiDebug === "function") {
+    globalThis.dashAiDebug("field-consultant-single-field", "request", {
+      url,
+      headers: typeof globalThis.dashRedactHeaders === "function" ? globalThis.dashRedactHeaders(h) : h,
+    });
+  }
+  const r = await fetch(url, { method: "GET", headers: h, cache: "no-store" });
+  if (!r.ok) {
+    if (typeof globalThis.dashAiDebug === "function") {
+      globalThis.dashAiDebug("field-consultant-single-field", "error", { status: r.status });
+    }
+    return { ok: false, status: r.status };
+  }
   const data = await r.json();
+  if (typeof globalThis.dashAiDebug === "function") {
+    globalThis.dashAiDebug("field-consultant-single-field", "response", { body: data });
+  }
   const list = (data && data.insights) || [];
   return { ok: true, insights: list, llm_used: !!data.llm_used };
+}
+
+/* Prefetch field AI map after load (does not wait for Fields tab). Throttle still applies after first success. */
+if (typeof window !== "undefined") {
+  window.addEventListener("load", function () {
+    var idle = typeof globalThis.dashScheduleIdle === "function" ? globalThis.dashScheduleIdle : function (fn, t) {
+      setTimeout(fn, t || 0);
+    };
+    idle(function () {
+      try {
+        if (!localStorage.getItem(LS_KEY)) return;
+        scheduleFieldConsultantFetch();
+      } catch (e) {
+        /* ignore */
+      }
+    }, 2000);
+  });
 }

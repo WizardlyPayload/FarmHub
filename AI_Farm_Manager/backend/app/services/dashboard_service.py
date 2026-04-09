@@ -76,9 +76,12 @@ async def fetch_dashboard_json(url: str | None, timeout: float = 8.0) -> tuple[s
     push_wait_detail: str | None = None
     if snapshot_push_service.is_push_mode_enabled():
         sid = server_id_from_dashboard_url(url)
-        pushed, perr = snapshot_push_service.get_snapshot_json(sid)
+        pushed, perr, chosen_push_sid = snapshot_push_service.get_snapshot_json(sid)
         if pushed is not None:
-            _log_snapshot_selected("push", pushed, server_id_query=(sid or ""))
+            extra: dict[str, Any] = {"server_id_query": sid or ""}
+            if chosen_push_sid:
+                extra["chosen_push_server_id"] = chosen_push_sid
+            _log_snapshot_selected("push", pushed, **extra)
             return pushed, None
         push_wait_detail = perr
 

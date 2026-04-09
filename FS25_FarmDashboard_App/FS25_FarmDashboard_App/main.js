@@ -577,7 +577,7 @@ async function maybePushSnapshotToAiManager(serverId) {
             body,
         });
         if (r.ok) {
-            console.info('[Pipeline] push_out: POST /api/integration/push-snapshot OK → AI server', {
+            console.info('[Pipeline] push_out: POST /api/integration/push-snapshot OK -> AI server', {
                 serverId,
                 bytesUtf8: Buffer.byteLength(body, 'utf8'),
                 url: url.split('?')[0],
@@ -1014,7 +1014,7 @@ ipcMain.handle('save-ai-manager-connection', (_e, payload) => {
 ipcMain.handle('ai-farm-install-config-xml', async (_e, { baseUrl, integrationKey, instanceId }) => {
     const base = String(baseUrl || '').replace(/\/$/, '');
     const url = `${base}/api/integration/config-xml`;
-    console.info('[Pipeline] main_out: POST /api/integration/config-xml → AI server', {
+    console.info('[Pipeline] main_out: POST /api/integration/config-xml -> AI server', {
         base,
         instanceId: String(instanceId || ''),
     });

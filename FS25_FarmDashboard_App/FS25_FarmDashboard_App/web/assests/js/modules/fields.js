@@ -640,8 +640,8 @@ function pickApiFallbackSuggestion(field) {
     };
 }
 
-function buildSuggestion(field) {
-    const seasonalNote = getWinterFieldSeasonalNote(field);
+/** Guaranteed non-empty rules object for display when no AI line applies. */
+function getRulesSuggestionForField(field) {
     let rulesLocal = getLocalFieldSuggestion(field);
     const rulesApi = pickApiFallbackSuggestion(field);
     if (
@@ -651,15 +651,44 @@ function buildSuggestion(field) {
     ) {
         rulesLocal = rulesApi;
     }
-    const rules = rulesLocal || rulesApi;
+    let rules = rulesLocal || rulesApi;
+    if (!rules || !(String(rules.action || "").trim())) {
+        rules = {
+            action: "Review field status in game",
+            reason: "No sharper local rule matched — check crop and soil in game.",
+            source: "rules",
+        };
+    }
+    return rules;
+}
+
+function buildSuggestion(field) {
+    const seasonalNote = getWinterFieldSeasonalNote(field);
 
     const aiMap = typeof window !== "undefined" && window.__fieldConsultantByRef ? window.__fieldConsultantByRef : null;
     const ai = lookupFieldConsultantInsight(aiMap, field);
-    const useAi = !!(ai && (ai.message || "").trim());
+    const aiMsgRaw = ai && String(ai.message || "").trim();
+    const useAi = !!aiMsgRaw;
 
-    const action = useAi ? String(ai.message).trim() : (rules ? rules.action : "");
-    const detail = useAi ? String(ai.reasoning || "").trim() : (rules ? rules.reason : "");
-    const layer = useAi ? "ai" : "rules";
+    const rules = getRulesSuggestionForField(field);
+
+    let action;
+    let detail;
+    let layer;
+
+    if (useAi) {
+        action = aiMsgRaw;
+        detail = String(ai.reasoning || "").trim();
+        layer = "ai";
+    } else {
+        action = String(rules.action || "").trim();
+        detail = String(rules.reason || "").trim();
+        layer = "rules";
+        if (!action) {
+            action = "Review field status in game";
+            detail = detail || "Local heuristics — verify in game.";
+        }
+    }
 
     const layerBadge =
         layer === "ai"
@@ -669,14 +698,6 @@ function buildSuggestion(field) {
     const borderClass = layer === "ai" ? "border-info" : "border-warning";
 
     if (!action && !seasonalNote) return "";
-
-    if (!action && seasonalNote) {
-        return `
-        <div class="mt-3 p-2 bg-dark rounded border-start border-info border-3">
-            <small class="text-muted d-block">Season</small>
-            <span class="text-info small"><i class="bi bi-snow me-1"></i>${escapeFieldHtml(seasonalNote)}</span>
-        </div>`;
-    }
 
     return `
         <div class="mt-3 p-2 bg-dark rounded border-start ${borderClass} border-3 field-suggestion-card field-suggestion-layer-${layer}">
@@ -845,4 +866,9 @@ function formatCropName(name) {
     if (n === "beetroot") return "Sugar beet";
     return String(name).replace(/_/g, " ")
                .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+/** Register early so field-consultant-updated is not missed if AI returns before opening Field Management. */
+if (typeof window !== "undefined") {
+    ensureFieldConsultantListener();
 }

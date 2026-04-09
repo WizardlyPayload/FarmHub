@@ -17,6 +17,69 @@ FALLBACK_REPLY = (
 )
 
 
+# Connectivity / probe only — reduces false "empty reply" when Google flags harmless pings.
+_GEMINI_PROBE_SAFETY_SETTINGS: list[dict[str, str]] = [
+    {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+    {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+]
+
+
+def _gemini_extract_text_and_diagnostics(data: dict[str, Any]) -> tuple[str, str]:
+    """
+    Extract model text from generateContent JSON. Some models use ``thought`` parts or omit ``text``;
+    empty body often comes with ``finishReason`` / ``promptFeedback.blockReason``.
+    Returns (snippet, human_note_if_empty).
+    """
+    if not isinstance(data, dict):
+        return "", "response JSON is not an object"
+
+    pf = data.get("promptFeedback")
+    if isinstance(pf, dict):
+        br = pf.get("blockReason")
+        if br:
+            return "", f"prompt blocked: {br}"
+
+    cands = data.get("candidates")
+    if not isinstance(cands, list) or len(cands) == 0:
+        return "", "no candidates[] (blocked or API mismatch — try GEMINI_REST_API_VERSION=v1beta)"
+
+    first: dict[str, Any] = cands[0] if isinstance(cands[0], dict) else {}
+    finish = first.get("finishReason") or ""
+    content = first.get("content")
+    if not isinstance(content, dict):
+        content = {}
+    parts = content.get("parts")
+    if not isinstance(parts, list):
+        parts = []
+
+    texts: list[str] = []
+    for p in parts:
+        if not isinstance(p, dict):
+            continue
+        for key in ("text", "thought"):
+            chunk = p.get(key)
+            if isinstance(chunk, str) and chunk.strip():
+                texts.append(chunk)
+                break
+
+    snippet = "".join(texts).strip()
+    if snippet:
+        return snippet, ""
+
+    bits: list[str] = []
+    if finish:
+        bits.append(f"finishReason={finish}")
+    if not parts:
+        bits.append("content.parts missing or empty")
+    elif not texts:
+        bits.append("parts exist but no text/thought strings (new API part shape?)")
+    if finish in ("SAFETY", "RECITATION", "OTHER") and not snippet:
+        bits.append("model produced no text (often safety/recitation)")
+    return "", "; ".join(bits) if bits else "empty candidates[0] content"
+
+
 def format_gemini_http_error(response: httpx.Response) -> str:
     """Human-readable line for admin logs (Google returns JSON with error.message)."""
     code = response.status_code
@@ -135,13 +198,10 @@ async def _gemini(settings: dict[str, Any], user_message: str, dashboard_context
             log_event("ERROR", format_gemini_http_error(r))
         r.raise_for_status()
         data = r.json()
-    parts = (
-        data.get("candidates", [{}])[0]
-        .get("content", {})
-        .get("parts", [])
-    )
-    text = "".join(p.get("text", "") for p in parts).strip()
-    return text or FALLBACK_REPLY
+    text, empty_note = _gemini_extract_text_and_diagnostics(data)
+    if not (text or "").strip() and empty_note:
+        log_event("WARN", f"Gemini generateContent returned no text ({empty_note})")
+    return (text or "").strip() or FALLBACK_REPLY
 
 
 async def test_llm_connectivity(
@@ -177,33 +237,62 @@ async def test_llm_connectivity(
                     "detail": "GEMINI_API_KEY not set",
                 }
             url = _gemini_generate_url(settings)
-            payload = {
+            # Same single-turn shape as _gemini(); role is optional and can confuse some v1 builds.
+            payload: dict[str, Any] = {
                 "contents": [{"parts": [{"text": user_msg}]}],
-                "generationConfig": {"temperature": 0.2, "maxOutputTokens": gemini_max_out},
+                "generationConfig": {
+                    "temperature": 0.2,
+                    "maxOutputTokens": max(gemini_max_out, 256),
+                },
+                "safetySettings": _GEMINI_PROBE_SAFETY_SETTINGS,
             }
             async with httpx.AsyncClient(timeout=45.0) as client:
                 r = await client.post(url, json=payload)
             ms = round((time.perf_counter() - t0) * 1000, 1)
             if r.status_code >= 400:
+                # Retry without safetySettings — some keys/regions reject BLOCK_NONE on thresholds.
+                if r.status_code in (400, 403):
+                    payload = {
+                        "contents": [{"parts": [{"text": user_msg}]}],
+                        "generationConfig": {
+                            "temperature": 0.2,
+                            "maxOutputTokens": max(gemini_max_out, 256),
+                        },
+                    }
+                    async with httpx.AsyncClient(timeout=45.0) as client2:
+                        r = await client2.post(url, json=payload)
+                    ms = round((time.perf_counter() - t0) * 1000, 1)
+                if r.status_code >= 400:
+                    return {
+                        "ok": False,
+                        "provider": "gemini",
+                        "latency_ms": ms,
+                        "detail": format_gemini_http_error(r),
+                        "model": settings.get("gemini_model"),
+                    }
+            try:
+                data = r.json()
+            except Exception:
                 return {
                     "ok": False,
                     "provider": "gemini",
                     "latency_ms": ms,
-                    "detail": format_gemini_http_error(r),
+                    "detail": "Gemini returned non-JSON body",
                     "model": settings.get("gemini_model"),
                 }
-            data = r.json()
-            parts = (
-                data.get("candidates", [{}])[0]
-                .get("content", {})
-                .get("parts", [])
-            )
-            snippet = ("".join(p.get("text", "") for p in parts) or "").strip()[:120]
+            raw_snippet, empty_note = _gemini_extract_text_and_diagnostics(data)
+            snippet = raw_snippet[:120]
+            if not snippet and empty_note:
+                detail = f"(empty reply) — {empty_note}"
+            elif not snippet:
+                detail = "(empty reply) — unknown cause (check model id and GEMINI_REST_API_VERSION)"
+            else:
+                detail = snippet
             return {
                 "ok": True,
                 "provider": "gemini",
                 "latency_ms": ms,
-                "detail": snippet or "(empty reply)",
+                "detail": detail,
                 "model": settings.get("gemini_model"),
             }
 

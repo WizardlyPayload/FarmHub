@@ -24,6 +24,7 @@ from app.services import snapshot_push_service
 from app.services.consultant import normalize_incoming_api_key, resolve_consultant_llm_settings
 from app.services.llm_service import test_llm_connectivity
 from app.services.log_buffer import log_event
+from app.services.pipeline_log import log_pipeline
 
 router = APIRouter(prefix="/api/integration", tags=["integration"])
 _security = HTTPBasic(auto_error=False)
@@ -175,6 +176,10 @@ async def get_overview_payload() -> dict[str, Any]:
 @router.get("/overview")
 async def integration_overview(_: str = Depends(require_integration_or_admin)) -> dict[str, Any]:
     """Farm Dashboard server list (proxied) + bot instances (masked tokens)."""
+    log_pipeline(
+        "integration_poll",
+        "GET /api/integration/overview — Farm Dashboard connection status",
+    )
     return await get_overview_payload()
 
 

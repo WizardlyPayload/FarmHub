@@ -148,6 +148,9 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
   try {
     const extra = await getByokHeaders();
     const base = await getBase();
+    if (typeof globalThis.pipelineLog === "function") {
+      globalThis.pipelineLog("renderer_out", "GET /api/v1/consultant/insights (field map)", { base });
+    }
     const r = await fetch(`${base}/api/v1/consultant/insights`, {
       method: "GET",
       headers: {
@@ -157,8 +160,14 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
       },
       cache: "no-store",
     });
+    if (typeof globalThis.pipelineLog === "function") {
+      globalThis.pipelineLog("renderer_out", "consultant/insights response (field map)", { httpStatus: r.status });
+    }
 
     if (!r.ok) {
+      if (typeof globalThis.pipelineLog === "function") {
+        globalThis.pipelineLog("renderer_err", "consultant/insights HTTP error (field map)", { status: r.status });
+      }
       return { ok: false, status: r.status };
     }
 
@@ -179,8 +188,17 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
       window.dispatchEvent(new CustomEvent("field-consultant-updated"));
     }
     lastFetchAt = Date.now();
+    if (typeof globalThis.pipelineLog === "function") {
+      globalThis.pipelineLog("renderer_ok", "field consultant cache updated", {
+        insightCount: list.length,
+        llm_used: !!data.llm_used,
+      });
+    }
     return { ok: true, llm_used: !!data.llm_used };
   } catch (e) {
+    if (typeof globalThis.pipelineLog === "function") {
+      globalThis.pipelineLog("renderer_err", "field consultant fetch failed", { error: String(e?.message || e) });
+    }
     console.warn("[field-consultant-bridge]", e);
     return { ok: false, error: String(e.message || e) };
   } finally {

@@ -10,6 +10,7 @@ from app.routers.integration import require_integration_or_admin
 from app.schemas.insights import FarmInsightsResponse
 from app.services.consultant import generate_farm_insights, normalize_incoming_api_key
 from app.services.dashboard_service import fetch_dashboard_json
+from app.services.pipeline_log import approx_json_bytes, log_pipeline
 from app.services.subscription import assert_consultant_allowed
 
 router = APIRouter(prefix="/api/v1/consultant", tags=["consultant"])
@@ -22,7 +23,7 @@ async def get_consultant_insights(
     _subscription: None = Depends(assert_consultant_allowed),
 ) -> FarmInsightsResponse:
     """
-    Fetch current dashboard snapshot (FTP in-memory or DASHBOARD_JSON_URL), run heuristics + optional LLM.
+    Fetch current dashboard snapshot (PC push preferred if ``DASHBOARD_PUSH_MODE``, else FTP, else HTTP URL), then run heuristics + optional LLM.
     Requires `X-FarmDash-Key` matching `FARMDASH_INTEGRATION_KEY`, or Admin HTTP Basic auth.
 
     LLM: optional **`X-AI-API-Key`** (BYOK) + **`X-AI-Provider`** (`openai` or `gemini`). If the header is
@@ -33,6 +34,11 @@ async def get_consultant_insights(
     set. Optional **`X-Bot-Instance-Id`** selects a bot profile for tier; otherwise **`DEFAULT_SUBSCRIPTION_TIER`**
     applies (default 2).
     """
+    log_pipeline(
+        "consultant_in",
+        "GET /api/v1/consultant/insights — Farm Dashboard requested Smart suggestions",
+        byok=bool(normalize_incoming_api_key(request.headers.get("X-AI-API-Key"))),
+    )
     settings = get_settings()
     fetch_url = settings.get("dashboard_fetch_url") or settings.get("dashboard_json_url") or ""
 
@@ -60,5 +66,12 @@ async def get_consultant_insights(
         snapshot,
         user_api_key=user_key or None,
         user_provider=user_prov,
+    )
+    log_pipeline(
+        "consultant_out",
+        "Responded with Smart suggestions",
+        insight_count=len(insights),
+        llm_used=llm_used,
+        snapshot_bytes=approx_json_bytes(snapshot),
     )
     return FarmInsightsResponse(insights=insights, llm_used=llm_used)

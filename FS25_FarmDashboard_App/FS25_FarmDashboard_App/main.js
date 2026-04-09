@@ -576,12 +576,18 @@ async function maybePushSnapshotToAiManager(serverId) {
             },
             body,
         });
-        if (!r.ok) {
+        if (r.ok) {
+            console.info('[Pipeline] push_out: POST /api/integration/push-snapshot OK → AI server', {
+                serverId,
+                bytesUtf8: Buffer.byteLength(body, 'utf8'),
+                url: url.split('?')[0],
+            });
+        } else {
             const t = await r.text();
-            console.warn('[ai-snapshot-push]', r.status, t.slice(0, 300));
+            console.warn('[Pipeline] push_out: POST push-snapshot failed', r.status, t.slice(0, 300));
         }
     } catch (e) {
-        console.warn('[ai-snapshot-push]', e && e.message ? e.message : e);
+        console.warn('[Pipeline] push_out: POST push-snapshot error', e && e.message ? e.message : e);
     }
 }
 
@@ -1008,6 +1014,10 @@ ipcMain.handle('save-ai-manager-connection', (_e, payload) => {
 ipcMain.handle('ai-farm-install-config-xml', async (_e, { baseUrl, integrationKey, instanceId }) => {
     const base = String(baseUrl || '').replace(/\/$/, '');
     const url = `${base}/api/integration/config-xml`;
+    console.info('[Pipeline] main_out: POST /api/integration/config-xml → AI server', {
+        base,
+        instanceId: String(instanceId || ''),
+    });
     const res = await fetch(url, {
         method: 'POST',
         headers: {
@@ -1019,8 +1029,10 @@ ipcMain.handle('ai-farm-install-config-xml', async (_e, { baseUrl, integrationKe
     });
     const text = await res.text();
     if (!res.ok) {
+        console.warn('[Pipeline] main_err: config-xml HTTP', res.status, String(text || '').slice(0, 400));
         throw new Error(text || `HTTP ${res.status}`);
     }
+    console.info('[Pipeline] main_ok: config-xml received', { bytesUtf8: Buffer.byteLength(text, 'utf8') });
     const docs = app.getPath('documents');
     const target = path.join(docs, 'My Games', 'FarmingSimulator2025', 'modsSettings', 'ai_farm_manager_config.xml');
     fs.mkdirSync(path.dirname(target), { recursive: true });

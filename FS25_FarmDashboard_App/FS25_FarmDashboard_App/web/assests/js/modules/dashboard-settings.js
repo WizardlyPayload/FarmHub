@@ -100,6 +100,82 @@ function escHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
+/** Live check for Dashboard Settings → AI section (same logic as AI Farm Manager status). */
+async function refreshSettingsAiConnectionStatus() {
+  const el = document.getElementById("settings-ai-connection-status");
+  if (!el) return;
+  el.className = "alert small py-2 mb-3";
+  el.innerHTML = '<span class="text-muted">Checking connection to AI server…</span>';
+  try {
+    const { ipcRenderer } = require("electron");
+    const c = await ipcRenderer.invoke("get-ai-manager-connection");
+    const base = (c?.baseUrl || "").replace(/\/$/, "");
+    const key = (c?.integrationKey || "").trim();
+    if (!base) {
+      el.classList.add("alert-secondary");
+      el.innerHTML =
+        "<strong>AI server URL missing.</strong> Open <strong>AI Farm Manager</strong> (robot icon) and paste the <code>https://…</code> address from your host.";
+      return;
+    }
+    if (!key) {
+      el.classList.add("alert-secondary");
+      el.innerHTML =
+        "<strong>Link key missing.</strong> Paste the secret <strong>link key</strong> from your host in AI Farm Manager, then <strong>Save &amp; load</strong>.";
+      return;
+    }
+    if (typeof globalThis.pipelineLog === "function") {
+      globalThis.pipelineLog("renderer_out", "GET /api/integration/overview (Dashboard Settings)", { base });
+    }
+    const r = await fetch(base + "/api/integration/overview", {
+      headers: { "X-FarmDash-Key": encodeURIComponent(key) },
+    });
+    if (typeof globalThis.pipelineLog === "function") {
+      globalThis.pipelineLog("renderer_out", "integration/overview response (settings)", { httpStatus: r.status });
+    }
+    if (!r.ok) {
+      el.classList.add("alert-warning");
+      el.innerHTML =
+        "<strong>Cannot reach AI server</strong> (HTTP " +
+        r.status +
+        "). Check URL, link key, and that the server is online.";
+      return;
+    }
+    const data = await r.json();
+    const push = data.farmDashboardPushMode;
+    const fd = data.farmDashboardServers || [];
+    const fdErr = data.farmDashboardError;
+    const n = fd.length;
+    if (push) {
+      if (n > 0) {
+        el.classList.add("alert-success");
+        el.innerHTML =
+          "<strong>Farm data:</strong> syncing — Smart suggestions should work. Use <strong>Refresh</strong> on the suggestions card if needed.";
+      } else {
+        el.classList.add("alert-warning");
+        el.innerHTML =
+          "<strong>Farm data:</strong> not received yet. In AI Farm Manager keep <strong>Send farm data</strong> on, click <strong>Save &amp; load</strong>. Your host must set <code>DASHBOARD_PUSH_MODE=1</code> on the AI server.";
+      }
+    } else if (fdErr) {
+      el.classList.add("alert-warning");
+      el.innerHTML =
+        "<strong>Farm data:</strong> the AI server is not set up to read your dashboard. Your host must enable push mode or configure a dashboard URL — see the yellow banner in AI Farm Manager.";
+    } else {
+      el.classList.add("alert-success");
+      el.innerHTML =
+        "<strong>Farm data:</strong> linked (" + n + " save(s) visible to the server).";
+    }
+  } catch (e) {
+    if (typeof globalThis.pipelineLog === "function") {
+      globalThis.pipelineLog("renderer_err", "integration/overview (settings) failed", {
+        error: String(e?.message || e),
+      });
+    }
+    el.classList.add("alert-secondary");
+    el.innerHTML =
+      "Could not check (offline?). Open <strong>AI Farm Manager</strong> → <strong>Test dashboard → LLM</strong> to verify the link.";
+  }
+}
+
 export async function populateDashboardSettingsForm() {
   const { ipcRenderer } = require("electron");
 
@@ -199,6 +275,8 @@ export async function populateDashboardSettingsForm() {
       console.warn("[dashboard-settings] consultant BYOK", e);
     }
   }
+
+  await refreshSettingsAiConnectionStatus();
 }
 
 export async function saveDashboardSettingsFromModal() {

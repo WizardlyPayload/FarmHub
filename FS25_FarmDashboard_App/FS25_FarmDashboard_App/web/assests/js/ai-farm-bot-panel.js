@@ -6,6 +6,10 @@
   const LS_URL = 'farmdash_ai_manager_base_url';
   const LS_KEY = 'farmdash_ai_integration_key';
 
+  function pl(stage, message, meta) {
+    if (typeof pipelineLog === 'function') pipelineLog(stage, message, meta);
+  }
+
   function getBase() {
     return (localStorage.getItem(LS_URL) || '').replace(/\/$/, '');
   }
@@ -34,37 +38,88 @@
     }
   }
 
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function setConnectionBanner(data, fd, fdErr, _fdHint, loadError) {
+    var el = document.getElementById('aiFarmBotConnectionBanner');
+    if (!el) return;
+    el.classList.remove('d-none', 'alert-success', 'alert-warning', 'alert-danger', 'alert-info', 'alert-secondary');
+    if (loadError) {
+      el.classList.add('alert-danger');
+      el.innerHTML =
+        '<strong>Could not reach AI server.</strong> ' + esc(loadError) + ' Check URL, link key, and network.';
+      return;
+    }
+    if (!data) {
+      el.classList.add('alert-secondary');
+      el.innerHTML = '<strong>Status unknown.</strong> Click <strong>Refresh</strong> after <strong>Save &amp; load</strong>.';
+      return;
+    }
+    var push = data.farmDashboardPushMode;
+    var n = fd && fd.length ? fd.length : 0;
+    if (push) {
+      if (n > 0) {
+        el.classList.add('alert-success');
+        el.innerHTML =
+          '<i class="bi bi-check-circle me-1"></i><strong>Farm data OK.</strong> This app is sending your save list &amp; snapshot — Smart suggestions can load.';
+      } else if (data.farmDashboardConnectHint) {
+        el.classList.add('alert-warning');
+        el.innerHTML =
+          '<i class="bi bi-exclamation-triangle me-1"></i><strong>Not sending yet.</strong> Keep <strong>Send farm data</strong> on, click <strong>Save &amp; load</strong>. Your host must set <code>DASHBOARD_PUSH_MODE=1</code> on the AI server.';
+      } else {
+        el.classList.add('alert-warning');
+        el.innerHTML =
+          '<i class="bi bi-hourglass-split me-1"></i><strong>Waiting</strong> for the first snapshot from this app.';
+      }
+    } else if (fdErr) {
+      el.classList.add('alert-warning');
+      el.innerHTML =
+        '<i class="bi bi-link-45deg me-1"></i><strong>Farm data not configured on the AI server.</strong> Ask your host to enable <strong>push mode</strong> (recommended) or set a dashboard URL in AI admin. <span class="d-block small mt-1">' +
+        esc(fdErr) +
+        '</span>';
+    } else {
+      el.classList.add('alert-success');
+      el.innerHTML =
+        '<i class="bi bi-check-circle me-1"></i><strong>Linked.</strong> AI server sees your dashboard (' +
+        n +
+        ' save(s)).';
+    }
+  }
+
   function render(container, data, err) {
     if (err) {
-      container.innerHTML = '<p class="text-warning">' + err + '</p>';
+      container.innerHTML = '<p class="text-warning">' + esc(err) + '</p>';
       populateInstanceSelect(null);
+      setConnectionBanner(null, [], null, null, err);
       return;
     }
     if (!data) {
       container.innerHTML = '<p class="text-muted">No data.</p>';
       populateInstanceSelect(null);
+      setConnectionBanner(null, [], null, null, null);
       return;
     }
     var fd = data.farmDashboardServers || [];
     var bi = data.botInstances || [];
     var fdErr = data.farmDashboardError;
     var fdHint = data.farmDashboardConnectHint;
+    setConnectionBanner(data, fd, fdErr, null, null);
     var html = '';
     if (data.farmDashboardPushMode) {
-      html += '<p class="small text-success mb-2"><strong>Data sync</strong> — this app sends farm snapshots to the AI server (outbound only).</p>';
+      html += '<p class="small text-success mb-2"><strong>Data sync mode</strong> — snapshots go out to your host’s AI server only.</p>';
     }
-    html += '<p class="small text-muted mb-2">Server link: <code>' + (data.farmDashboardOrigin || '—') + '</code></p>';
-    html += '<p><strong>Farm saves in this app:</strong> ' + (data.farmDashboardServerCount || 0) +
-      ' · <strong>AI bot profiles:</strong> ' + (data.botInstanceCount || 0) + '</p>';
-    if (fdErr) {
-      html +=
-        '<div class="alert alert-warning small py-2 px-3 mb-2" role="alert">' +
-        '<strong>Snapshot / server list:</strong> ' +
-        String(fdErr) +
-        (fdHint ? '<div class="small mt-2 mb-0 text-body">' + String(fdHint) + '</div>' : '') +
-        '</div>';
+    html += '<p class="small text-muted mb-2">Technical: server link <code>' + esc(data.farmDashboardOrigin || '—') + '</code></p>';
+    html += '<p><strong>Farm saves listed:</strong> ' + (data.farmDashboardServerCount || 0) +
+      ' · <strong>Bot profiles on server:</strong> ' + (data.botInstanceCount || 0) + '</p>';
+    if (fdHint && data.farmDashboardPushMode && fd.length === 0) {
+      html += '<p class="small text-info mb-2">' + esc(fdHint) + '</p>';
     }
-    html += '<h6 class="text-farm-accent mt-3">Your servers (from this app)</h6><ul class="small">';
+    html += '<h6 class="text-farm-accent mt-3">Your servers (this app)</h6><ul class="small">';
     for (var i = 0; i < fd.length; i++) {
       var s = fd[i];
       html += '<li><strong>' + (s.name || s.id) + '</strong> — id <code>' + (s.id || '') + '</code>' +
@@ -87,16 +142,16 @@
     var rowUrl = document.getElementById('aiFarmBotRowBackendUrl');
     var rowKey = document.getElementById('aiFarmBotRowIntegrationKey');
     var note = document.getElementById('aiFarmBotBrandedNote');
-    var intro = document.getElementById('aiFarmBotIntro');
+    var introLead = document.getElementById('aiFarmBotIntroLead');
     try {
       var ipc = require('electron').ipcRenderer;
       ipc.invoke('get-ai-client-branding').then(function (b) {
         if (!b) return;
-        if (intro && b.serviceName) {
-          intro.innerHTML =
-            'Connect to <strong>' +
+        if (introLead && b.serviceName) {
+          introLead.innerHTML =
+            '<strong>' +
             String(b.serviceName).replace(/</g, '') +
-            '</strong>. Your <strong>LLM API key</strong> stays on this PC; use <strong>Write to FS25 modsSettings</strong> below to install the in-game token for <code>!bot</code>.';
+            '</strong> — same three steps below. Optional BYOK key stays on this PC; use <strong>Write to FS25 modsSettings</strong> for the in-game <code>!bot</code> token.';
         }
         if (b.hasEmbeddedIntegrationKey) {
           if (rowKey) rowKey.classList.add('d-none');
@@ -153,6 +208,10 @@
         headers: { 'X-FarmDash-Key': encodeURIComponent(key) },
       })
         .then(function (r) {
+          pl('renderer_out', 'GET /api/integration/overview (AI Farm Manager status)', {
+            httpStatus: r.status,
+            base: b,
+          });
           if (r.status === 401) throw new Error('401 — contact your host (link key mismatch).');
           if (!r.ok) throw new Error('HTTP ' + r.status);
           return r.json();
@@ -168,6 +227,7 @@
           // }
         })
         .catch(function (e) {
+          pl('renderer_err', 'GET /api/integration/overview failed', { error: String(e.message || e) });
           render(container, null, String(e.message || e));
         });
     }
@@ -283,6 +343,7 @@
         headers['X-FarmDash-Key'] = encodeURIComponent(key);
         fetch(b + '/api/integration/llm-ping', { headers: headers })
           .then(function (r) {
+            pl('renderer_out', 'GET /api/integration/llm-ping', { httpStatus: r.status });
             if (r.status === 401) throw new Error('401 — link key mismatch.');
             return r.text().then(function (txt) {
               try {
@@ -302,6 +363,7 @@
               llmPingOut.textContent =
                 'OK — ' + prov + model + ' · ' + ms + ' ms · ' + det;
               llmPingOut.className = 'small text-success mb-3 mb-md-2';
+              pl('renderer_ok', 'LLM ping OK — refreshing Smart suggestions', { provider: prov, ms: ms });
               if (typeof window.refreshFarmDashConsultantInsights === 'function') {
                 window.refreshFarmDashConsultantInsights();
               }

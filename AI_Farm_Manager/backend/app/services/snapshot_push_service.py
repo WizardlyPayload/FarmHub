@@ -7,6 +7,8 @@ import threading
 import time
 from typing import Any
 
+from app.services.pipeline_log import log_pipeline
+
 
 _lock = threading.Lock()
 _snapshots: dict[str, tuple[str, float]] = {}
@@ -37,6 +39,14 @@ def store_push(
         _snapshots[sid] = (raw, time.monotonic())
         if servers is not None:
             _servers_meta = servers
+    n_srv = len(servers) if servers else 0
+    log_pipeline(
+        "push_in",
+        "Received Farm Dashboard snapshot POST (stored in RAM for consultant / !bot)",
+        bytes_utf8=len(raw.encode("utf-8")),
+        server_id=sid or "(default)",
+        servers_listed=n_srv,
+    )
     return True, None
 
 

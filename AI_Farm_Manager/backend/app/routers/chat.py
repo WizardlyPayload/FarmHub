@@ -14,6 +14,7 @@ from app.services.llm_service import FALLBACK_REPLY, run_llm
 from app.services.log_buffer import log_event
 from app.services.outgoing_queue import push_message
 from app.services.rate_limit import allow
+from app.services.pipeline_log import log_pipeline
 from app.services.subscription import assert_chat_allowed
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -38,6 +39,13 @@ async def _process_llm_job(player: str, text: str, fetch_url: str | None, server
 
     raw, err = await fetch_dashboard_json(fetch_url or "")
     ctx = build_dashboard_context_block(raw, err)
+    if raw is None:
+        log_pipeline(
+            "chat_snapshot",
+            "!bot LLM job: no dashboard snapshot available",
+            "WARN",
+            detail=(err or "")[:300],
+        )
     try:
         reply, latency = await asyncio.wait_for(
             run_llm(text, ctx),
@@ -49,6 +57,14 @@ async def _process_llm_job(player: str, text: str, fetch_url: str | None, server
             "LLM reply queued",
             player=player,
             latency_s=round(latency, 3) if latency else None,
+        )
+        log_pipeline(
+            "chat_out",
+            "!bot reply ready for GET /api/chat/poll (game mod)",
+            player=player,
+            reply_chars=len(reply or ""),
+            latency_s=round(latency, 3) if latency else None,
+            snapshot_ok=raw is not None,
         )
     except asyncio.TimeoutError:
         log_event("WARN", "LLM timeout", player=player)
@@ -108,6 +124,12 @@ async def receive_chat(
         return {"ok": True, "queued": True}
 
     log_event("INFO", "Chat trigger", player=body.player, preview=user_text[:200])
+    log_pipeline(
+        "chat_in",
+        "POST /api/chat/receive — in-game !bot message accepted; will fetch snapshot + LLM",
+        player=body.player,
+        preview_chars=len(user_text),
+    )
     background_tasks.add_task(_process_llm_job, body.player, user_text, fetch_url, tok)
     return {"ok": True, "queued": True}
 

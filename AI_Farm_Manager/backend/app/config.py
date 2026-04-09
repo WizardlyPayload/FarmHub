@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import os
+import time
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -78,21 +80,87 @@ def _clamp_int(raw: str, lo: int, hi: int, default: int) -> int:
     return max(lo, min(hi, v))
 
 
+def _strip_key(s: str) -> str:
+    return (s or "").strip().replace("\ufeff", "").replace("\u200b", "")
+
+
+def _parse_gemini_key_list(llm_provider: str, llm_api_key: str) -> list[str]:
+    """
+    Ordered Gemini keys for optional time-based rotation.
+
+    - If ``GEMINI_API_KEYS`` is set (comma- or newline-separated), that list wins.
+    - Else: ``GEMINI_API_KEY`` plus optional ``GEMINI_API_KEY_2`` … ``GEMINI_API_KEY_16``.
+    """
+    raw_multi = (os.getenv("GEMINI_API_KEYS") or "").strip()
+    keys: list[str] = []
+    if raw_multi:
+        for part in raw_multi.replace("\n", ",").split(","):
+            k = _strip_key(part)
+            if k:
+                keys.append(k)
+        return keys
+
+    primary = _strip_key(os.getenv("GEMINI_API_KEY", ""))
+    if llm_provider == "gemini" and not primary:
+        lk = _strip_key(llm_api_key)
+        if lk.startswith("AIza"):
+            primary = lk
+    if primary:
+        keys.append(primary)
+    for i in range(2, 17):
+        ek = _strip_key(os.getenv(f"GEMINI_API_KEY_{i}", ""))
+        if ek:
+            keys.append(ek)
+    return keys
+
+
+def active_gemini_api_key(settings: dict[str, Any]) -> str:
+    """
+    Pick the Gemini key for this request.
+
+    If ``gemini_api_keys`` has more than one entry, rotate by wall-clock time: the
+    window ``gemini_rotation_window_sec`` (default 900) is split into equal slots
+    so each key is active for ``window / N`` seconds before the next key.
+    BYOK / single-key dicts use the sole ``gemini_api_key`` string.
+    """
+    lst = settings.get("gemini_api_keys")
+    if isinstance(lst, list) and len(lst) > 1:
+        window = int(settings.get("gemini_rotation_window_sec") or 900)
+        window = max(60, min(window, 86400))
+        n = len(lst)
+        tmod = time.time() % float(window)
+        idx = int(tmod * n // window)
+        if idx >= n:
+            idx = n - 1
+        return _strip_key(lst[idx])
+    single = _strip_key(settings.get("gemini_api_key") or "")
+    if single:
+        return single
+    if isinstance(lst, list) and len(lst) == 1:
+        return _strip_key(lst[0])
+    return ""
+
+
+def has_gemini_credentials(settings: dict[str, Any]) -> bool:
+    """True if server-side Gemini calls can run (single key, multi-key pool, or BYOK merge)."""
+    return bool(active_gemini_api_key(settings))
+
+
 @lru_cache
 def get_settings() -> dict:
     llm_provider = os.getenv("LLM_PROVIDER", "openai").lower().strip()
     llm_api_key = os.getenv("LLM_API_KEY", "")
-    gemini_api_key = os.getenv("GEMINI_API_KEY", "")
-    # Common deploy mistake: Gemini (AIza…) only in LLM_API_KEY while provider is gemini.
-    if llm_provider == "gemini" and not (gemini_api_key or "").strip():
-        lk = (llm_api_key or "").strip()
-        if lk.startswith("AIza"):
-            gemini_api_key = lk
+    gemini_api_key = _strip_key(os.getenv("GEMINI_API_KEY", ""))
+    gemini_api_keys = _parse_gemini_key_list(llm_provider, llm_api_key)
+    if gemini_api_keys:
+        gemini_api_key = gemini_api_keys[0]
     be = _bot_enabled()
     if llm_provider == "gemini":
-        llm_configured = be and bool(gemini_api_key)
+        llm_configured = be and bool(gemini_api_keys or gemini_api_key)
     else:
         llm_configured = be and bool(llm_api_key)
+
+    rotation_window = _clamp_int(os.getenv("GEMINI_ROTATION_WINDOW_SEC", "900"), 60, 86400, 900)
 
     return {
         "server_token": os.getenv("SERVER_TOKEN", ""),
@@ -100,6 +168,8 @@ def get_settings() -> dict:
         "llm_model": os.getenv("LLM_MODEL", "gpt-4o-mini"),
         "llm_provider": llm_provider,
         "gemini_api_key": gemini_api_key,
+        "gemini_api_keys": gemini_api_keys,
+        "gemini_rotation_window_sec": rotation_window,
         # generativelanguage v1: use a current model id (1.5 short names often 404 on v1 — see Google ListModels).
         "gemini_model": os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
         # generativelanguage = AI Studio (AIza…); aiplatform = Vertex publisher API (Cloud API key)

@@ -8,7 +8,10 @@ import httpx
 from pathlib import Path
 from urllib.parse import quote
 
-from app.config import get_settings
+from app.config import active_gemini_api_key, get_settings, has_gemini_credentials
+
+# Retry with next API key (time-ordered pool) on Google overload / rate limits.
+_GEMINI_QUOTA_RETRY_STATUS: frozenset[int] = frozenset({429, 503})
 from app.services.game_reference import build_game_reference_block
 from app.services.log_buffer import log_event
 
@@ -80,6 +83,136 @@ def _gemini_extract_text_and_diagnostics(data: dict[str, Any]) -> tuple[str, str
     return "", "; ".join(bits) if bits else "empty candidates[0] content"
 
 
+def _strip_gemini_key(s: str) -> str:
+    return (s or "").strip().replace("\ufeff", "").replace("\u200b", "")
+
+
+def _gemini_ordered_keys(settings: dict[str, Any]) -> list[str]:
+    """
+    Deduplicated pool order for fallback: time-active key first, then the rest of the pool (wrap).
+    BYOK / single-key yields a one-element list.
+    """
+    lst = settings.get("gemini_api_keys")
+    raw: list[str] = []
+    if isinstance(lst, list) and lst:
+        seen: set[str] = set()
+        for k in lst:
+            sk = _strip_gemini_key(str(k))
+            if sk and sk not in seen:
+                seen.add(sk)
+                raw.append(sk)
+    if not raw:
+        one = active_gemini_api_key(settings)
+        return [one] if one else []
+    if len(raw) == 1:
+        return raw
+    active = active_gemini_api_key(settings)
+    try:
+        start = next(i for i, x in enumerate(raw) if x == active)
+    except StopIteration:
+        start = 0
+    return raw[start:] + raw[:start]
+
+
+def _gemini_generate_url_for_key(settings: dict[str, Any], api_key: str) -> str:
+    """REST URL for generateContent with an explicit API key (used for multi-key fallback)."""
+    key = _strip_gemini_key(api_key)
+    model = (settings.get("gemini_model") or "gemini-2.5-flash").strip()
+    endpoint = settings.get("gemini_api_endpoint", "generativelanguage")
+    api_ver = (settings.get("gemini_rest_api_version") or "v1").strip().lower()
+    if api_ver not in ("v1", "v1beta"):
+        api_ver = "v1"
+    if not key:
+        raise RuntimeError("GEMINI_API_KEY is empty")
+    qkey = quote(key, safe="")
+    if endpoint == "aiplatform":
+        return (
+            "https://aiplatform.googleapis.com/v1/publishers/google/models/"
+            f"{model}:generateContent?key={qkey}"
+        )
+    return (
+        f"https://generativelanguage.googleapis.com/{api_ver}/models/{model}:generateContent"
+        f"?key={qkey}"
+    )
+
+
+async def _gemini_post_with_quota_fallback(
+    settings: dict[str, Any],
+    payload: dict[str, Any],
+    *,
+    timeout: float,
+) -> httpx.Response:
+    """
+    POST generateContent; on HTTP 429 / 503 try the next key in the pool (starting from time-active key).
+    Other 4xx/5xx: no key rotation (likely same failure for every key).
+    """
+    keys = _gemini_ordered_keys(settings)
+    if not keys:
+        raise RuntimeError("GEMINI_API_KEY is empty")
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for i, key in enumerate(keys):
+            url = _gemini_generate_url_for_key(settings, key)
+            r = await client.post(url, json=payload)
+            if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
+                if i < len(keys) - 1:
+                    log_event(
+                        "WARN",
+                        f"Gemini key overloaded (HTTP {r.status_code}), rotating to next key…",
+                    )
+                    continue
+                log_event("ERROR", format_gemini_http_error(r))
+                r.raise_for_status()
+            if r.status_code >= 400:
+                log_event("ERROR", format_gemini_http_error(r))
+            r.raise_for_status()
+            return r
+
+
+async def gemini_consultant_post_with_quota_fallback(
+    settings: dict[str, Any],
+    *,
+    payload: dict[str, Any],
+    want_json_mime: bool,
+    base_generation_config: dict[str, Any],
+    timeout: float = 90.0,
+) -> httpx.Response:
+    """
+    Consultant generateContent: same key fallback on 429/503; on 400 with JSON MIME, retry once
+    without JSON MIME on the **same** key (existing behaviour), then move to next key only for quota.
+    """
+    keys = _gemini_ordered_keys(settings)
+    if not keys:
+        raise RuntimeError("GEMINI_API_KEY is empty")
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        for i, key in enumerate(keys):
+            url = _gemini_generate_url_for_key(settings, key)
+            r = await client.post(url, json=payload)
+            if r.status_code == 400 and want_json_mime:
+                log_event(
+                    "WARN",
+                    "Gemini consultant: responseMimeType rejected (400); retrying without JSON MIME. "
+                    "Unset GEMINI_CONSULTANT_RESPONSE_JSON or use GEMINI_REST_API_VERSION=v1beta if supported.",
+                )
+                r = await client.post(
+                    url,
+                    json={**payload, "generationConfig": dict(base_generation_config)},
+                )
+            if r.status_code in _GEMINI_QUOTA_RETRY_STATUS and i < len(keys) - 1:
+                log_event(
+                    "WARN",
+                    f"Gemini key overloaded (HTTP {r.status_code}), rotating to next key…",
+                )
+                continue
+            if r.status_code >= 400:
+                log_event("WARN", format_gemini_http_error(r))
+            try:
+                r.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                code = e.response.status_code if e.response is not None else r.status_code
+                raise RuntimeError(f"Gemini HTTP {code}") from e
+            return r
+
+
 def format_gemini_http_error(response: httpx.Response) -> str:
     """Human-readable line for admin logs (Google returns JSON with error.message)."""
     code = response.status_code
@@ -127,7 +260,7 @@ async def run_llm(
         merged_ctx = dashboard_context + "\n\n" + extra
 
     try:
-        if provider == "gemini" and settings["gemini_api_key"]:
+        if provider == "gemini" and has_gemini_credentials(settings):
             text = await _gemini(settings, user_message, merged_ctx)
         else:
             text = await _openai(settings, user_message, merged_ctx)
@@ -162,42 +295,20 @@ async def _openai(settings: dict[str, Any], user_message: str, dashboard_context
 
 
 def _gemini_generate_url(settings: dict[str, Any]) -> str:
-    """REST URL for non-streaming generateContent (same body as streamGenerateContent minus SSE)."""
-    key = (settings.get("gemini_api_key") or "").strip().replace("\ufeff", "").replace("\u200b", "")
-    model = (settings.get("gemini_model") or "gemini-2.5-flash").strip()
-    endpoint = settings.get("gemini_api_endpoint", "generativelanguage")
-    api_ver = (settings.get("gemini_rest_api_version") or "v1").strip().lower()
-    if api_ver not in ("v1", "v1beta"):
-        api_ver = "v1"
-    if not key:
-        raise RuntimeError("GEMINI_API_KEY is empty")
-    qkey = quote(key, safe="")
-    if endpoint == "aiplatform":
-        return (
-            "https://aiplatform.googleapis.com/v1/publishers/google/models/"
-            f"{model}:generateContent?key={qkey}"
-        )
-    return (
-        f"https://generativelanguage.googleapis.com/{api_ver}/models/{model}:generateContent"
-        f"?key={qkey}"
-    )
+    """REST URL using the time-active key (diagnostics / single-key callers)."""
+    return _gemini_generate_url_for_key(settings, active_gemini_api_key(settings))
 
 
 async def _gemini(settings: dict[str, Any], user_message: str, dashboard_context: str) -> str:
     """Google Gemini via Generative Language API or Vertex AI Platform publisher REST."""
     system = settings["system_prompt"]
-    url = _gemini_generate_url(settings)
     prompt = f"{system}\n\n{dashboard_context}\n\nUser: {user_message}"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"temperature": 0.4, "maxOutputTokens": 1024},
     }
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        r = await client.post(url, json=payload)
-        if r.status_code >= 400:
-            log_event("ERROR", format_gemini_http_error(r))
-        r.raise_for_status()
-        data = r.json()
+    r = await _gemini_post_with_quota_fallback(settings, payload, timeout=60.0)
+    data = r.json()
     text, empty_note = _gemini_extract_text_and_diagnostics(data)
     if not (text or "").strip() and empty_note:
         log_event("WARN", f"Gemini generateContent returned no text ({empty_note})")
@@ -229,16 +340,23 @@ async def test_llm_connectivity(
 
     try:
         if provider == "gemini":
-            if not (settings.get("gemini_api_key") or "").strip():
+            if not has_gemini_credentials(settings):
                 return {
                     "ok": False,
                     "provider": "gemini",
                     "latency_ms": None,
                     "detail": "GEMINI_API_KEY not set",
                 }
-            url = _gemini_generate_url(settings)
+            keys = _gemini_ordered_keys(settings)
+            if not keys:
+                return {
+                    "ok": False,
+                    "provider": "gemini",
+                    "latency_ms": None,
+                    "detail": "GEMINI_API_KEY not set",
+                }
             # Same single-turn shape as _gemini(); role is optional and can confuse some v1 builds.
-            payload: dict[str, Any] = {
+            payload_with_safety: dict[str, Any] = {
                 "contents": [{"parts": [{"text": user_msg}]}],
                 "generationConfig": {
                     "temperature": 0.2,
@@ -246,30 +364,44 @@ async def test_llm_connectivity(
                 },
                 "safetySettings": _GEMINI_PROBE_SAFETY_SETTINGS,
             }
+            payload_no_safety: dict[str, Any] = {
+                "contents": [{"parts": [{"text": user_msg}]}],
+                "generationConfig": {
+                    "temperature": 0.2,
+                    "maxOutputTokens": max(gemini_max_out, 256),
+                },
+            }
+            r: httpx.Response | None = None
             async with httpx.AsyncClient(timeout=45.0) as client:
-                r = await client.post(url, json=payload)
-            ms = round((time.perf_counter() - t0) * 1000, 1)
-            if r.status_code >= 400:
-                # Retry without safetySettings — some keys/regions reject BLOCK_NONE on thresholds.
-                if r.status_code in (400, 403):
-                    payload = {
-                        "contents": [{"parts": [{"text": user_msg}]}],
-                        "generationConfig": {
-                            "temperature": 0.2,
-                            "maxOutputTokens": max(gemini_max_out, 256),
-                        },
-                    }
-                    async with httpx.AsyncClient(timeout=45.0) as client2:
-                        r = await client2.post(url, json=payload)
-                    ms = round((time.perf_counter() - t0) * 1000, 1)
-                if r.status_code >= 400:
+                for i, key in enumerate(keys):
+                    url = _gemini_generate_url_for_key(settings, key)
+                    r = await client.post(url, json=payload_with_safety)
+                    if r.status_code in (400, 403):
+                        r = await client.post(url, json=payload_no_safety)
+                    if r.status_code in _GEMINI_QUOTA_RETRY_STATUS and i < len(keys) - 1:
+                        log_event(
+                            "WARN",
+                            f"Gemini key overloaded (HTTP {r.status_code}), rotating to next key…",
+                        )
+                        continue
+                    if r.status_code < 400:
+                        break
                     return {
                         "ok": False,
                         "provider": "gemini",
-                        "latency_ms": ms,
+                        "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
                         "detail": format_gemini_http_error(r),
                         "model": settings.get("gemini_model"),
                     }
+            ms = round((time.perf_counter() - t0) * 1000, 1)
+            if r is None or r.status_code >= 400:
+                return {
+                    "ok": False,
+                    "provider": "gemini",
+                    "latency_ms": ms,
+                    "detail": format_gemini_http_error(r) if r is not None else "Gemini probe failed",
+                    "model": settings.get("gemini_model"),
+                }
             try:
                 data = r.json()
             except Exception:

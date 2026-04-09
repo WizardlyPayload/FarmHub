@@ -10,11 +10,16 @@ from urllib.parse import unquote
 
 logger = logging.getLogger(__name__)
 
+from pydantic import ValidationError
+
 from app.config import get_settings, has_gemini_credentials
 from app.schemas.insights import FarmInsight, InsightCategory, InsightPriority
 from app.services.log_buffer import log_event
 from app.services.llm_service import gemini_consultant_post_with_quota_fallback
-from app.services.snapshot_pruner import prune_dashboard_snapshot_for_llm
+from app.services.snapshot_pruner import (
+    cap_field_rows_in_snapshot,
+    prune_dashboard_snapshot_for_llm,
+)
 
 
 def normalize_incoming_api_key(header_val: str | None) -> str:
@@ -35,7 +40,13 @@ def normalize_incoming_api_key(header_val: str | None) -> str:
 
 # Oversized dashboard JSON often yields Gemini 400 (INVALID_ARGUMENT / token limits).
 _CONSULTANT_SNAPSHOT_CHARS_GEMINI = 65000
+# FIELD MAP (?context=fields): smaller prompt so Gemini 2.5 has room for JSON output (thinking + text).
+_CONSULTANT_SNAPSHOT_CHARS_GEMINI_FIELD_MAP = 42000
+# Section views (?view=vehicles|…): payload already slimmed.
+_CONSULTANT_SNAPSHOT_CHARS_GEMINI_VIEW = 48000
 _CONSULTANT_SNAPSHOT_CHARS_OPENAI = 118000
+# After prune_dashboard_snapshot_for_llm, cap rows so huge farms do not blow prompt size (field-map mode).
+_FIELD_MAP_MAX_FIELD_ROWS = 100
 
 CONSULTANT_SYSTEM = """You are an expert Farming Simulator 25 field and logistics consultant. Analyze the provided game state JSON.
 
@@ -85,10 +96,123 @@ CONSULTANT_SYSTEM_FIELDS_FOCUS = (
     + """
 
 FIELD MAP MODE (this HTTP request only — clients match rows by field_ref):
+
+CRITICAL — COVERAGE (overrides any earlier "at most 4" / summary instructions in this prompt):
+- You MUST generate exactly ONE insight for EVERY SINGLE field row provided in the JSON (under `fields` and/or `allFields` as present for this request).
+- Count those field objects; ensure your `insights` array length matches that count exactly. Do not summarize, merge, or skip fields.
 - **Every** insight MUST use "category":"Field" and a non-null **field_ref** copied from that parcel's **farmlandId** or **id** in the JSON (number or string, no name, no # prefix).
 - Do **not** return Animal, Production, or Finance categories here — the UI ignores them for per-field lines.
-- Up to 4 insights; prefer **distinct** parcels when multiple need attention."""
+- Keep **message** and **reasoning** brief (aim under 180 characters each) so the full JSON still completes."""
 )
+
+# Smart suggestions panel on Fields tab (?view=fields, context=full) — not the field-map row API (context=fields).
+CONSULTANT_SYSTEM_VIEW_FIELDS_SMART = """VIEW MODE — fields:
+You are an expert Farming Simulator 25 **field** consultant. The JSON is **cropland only** for the active farm (no vehicles/animals).
+
+Focus: crops, growth, harvest readiness, withered, soil (plow/cultivate/lime/PF nitrogen), rotation hints.
+
+Respond with ONLY valid JSON (no markdown):
+{"insights":[{"category":"Field|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":"..." or null},...]}
+
+- Prefer **Field** category with **field_ref** = that parcel's **farmlandId** or **id** when the tip targets one parcel.
+- At most **4** insights; keep **message** and **reasoning** brief (under 180 characters each)."""
+
+CONSULTANT_SYSTEM_VIEW_VEHICLES = """VIEW MODE — vehicles:
+You are an FS25 **fleet / vehicle** consultant. The JSON is **vehicles only** for the active farm.
+
+Focus: low fuel, damage / repair need, maintenance, attachments, operating hours, machines that should be refuelled or repaired soon.
+
+Respond with ONLY valid JSON:
+{"insights":[{"category":"Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null},...]}
+
+- Use **Production** for operational equipment advice (fuel, repair, use). Use **Finance** only for buy/sell/cost tips.
+- **field_ref** must be **null** (not applicable to vehicles).
+- At most **4** insights; brief **message** and **reasoning** (under 180 characters each)."""
+
+CONSULTANT_SYSTEM_VIEW_PASTURES = """VIEW MODE — pastures:
+You are an FS25 **pasture / grazing** consultant. Data includes **pastures** and may include **animals** for context.
+
+Focus: pasture food levels, grass / grazing quality, manure or slurry storage needing emptying, herd health on pasture, overcrowding.
+
+Respond with ONLY valid JSON:
+{"insights":[{"category":"Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null},...]}
+
+- **Animal** for herd / grazing tips; **Production** for storage / manure / outputs; **Finance** if about selling.
+- **field_ref** usually null unless a specific **farmland** is clearly implicated.
+- At most **4** insights; brief lines."""
+
+CONSULTANT_SYSTEM_VIEW_LIVESTOCK = """VIEW MODE — livestock:
+You are an FS25 **barn / husbandry** consultant. The JSON is **animals / buildings** for the active farm.
+
+Focus: animals needing food or water, low health, reproduction, production outputs (milk, wool), overcrowding, animals worth selling.
+
+Respond with ONLY valid JSON:
+{"insights":[{"category":"Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null},...]}
+
+- Prefer **Animal** for herd tips; **Production** for facility throughput; **Finance** for cull/sell/value.
+- **field_ref** null unless a **field/parcel** is clearly relevant.
+- At most **4** insights; brief lines."""
+
+CONSULTANT_SYSTEM_VIEW_PRODUCTIONS = """VIEW MODE — productions:
+You are an FS25 **production chain** consultant. The JSON emphasizes **production** and **productionPoints**.
+
+Focus: bottlenecks, missing inputs, full outputs, stalled chains, which plant to clear or feed next.
+
+Respond with ONLY valid JSON:
+{"insights":[{"category":"Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null},...]}
+
+- **Production** for operational tips; **Finance** for selling/stored value.
+- At most **4** insights; brief lines."""
+
+CONSULTANT_SYSTEM_VIEW_ECONOMY = """VIEW MODE — economy:
+You are an FS25 **finance and market** consultant. The JSON emphasizes **economy**, **farms** / **farmInfo**, and related stats.
+
+Focus: loan pressure, cash flow, crop/stock prices, best times to sell, storage vs market opportunity.
+
+Respond with ONLY valid JSON:
+{"insights":[{"category":"Finance|Production","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null},...]}
+
+- **Finance** for money/market tips; **Production** only if tied to selling processed goods.
+- At most **4** insights; brief lines."""
+
+
+def consultant_system_instruction_for_view(view: str | None) -> str | None:
+    """System prompt for ``?view=`` (Smart suggestions panel). Returns None to use default CONSULTANT_SYSTEM."""
+    v = (view or "").strip().lower()
+    m = {
+        "fields": CONSULTANT_SYSTEM_VIEW_FIELDS_SMART,
+        "vehicles": CONSULTANT_SYSTEM_VIEW_VEHICLES,
+        "pastures": CONSULTANT_SYSTEM_VIEW_PASTURES,
+        "livestock": CONSULTANT_SYSTEM_VIEW_LIVESTOCK,
+        "productions": CONSULTANT_SYSTEM_VIEW_PRODUCTIONS,
+        "economy": CONSULTANT_SYSTEM_VIEW_ECONOMY,
+    }
+    return m.get(v)
+
+
+def _consultant_view_scope_mode(system_instruction: str | None) -> bool:
+    """Section-scoped dashboard view (smaller prompts than full farm JSON)."""
+    s = system_instruction or ""
+    return "VIEW MODE —" in s
+
+
+def _consultant_skip_production_heuristics(system_instruction: str | None) -> bool:
+    """Skip generic production-fill heuristics when the LLM snapshot is intentionally not production-focused."""
+    s = system_instruction or ""
+    return any(
+        tag in s
+        for tag in (
+            "VIEW MODE — fields",
+            "VIEW MODE — vehicles",
+            "VIEW MODE — pastures",
+            "VIEW MODE — livestock",
+        )
+    )
+
+
+def _consultant_field_map_mode(system_instruction: str | None) -> bool:
+    s = system_instruction or ""
+    return "FIELD MAP MODE" in s
 
 
 def _coerce_pct(value: Any) -> float | None:
@@ -187,6 +311,11 @@ def _parse_category(raw: Any) -> InsightCategory:
     for c in InsightCategory:
         if c.value == s:
             return c
+    original = str(raw).strip() if raw is not None else ""
+    logger.warning(
+        "Consultant: unknown LLM category %r — defaulting to Production",
+        (original[:200] + "…") if len(original) > 200 else original,
+    )
     return InsightCategory.PRODUCTION
 
 
@@ -229,11 +358,15 @@ async def _llm_insights_from_snapshot(
     """Call OpenAI or Gemini with consultant system prompt; parse JSON insights."""
     provider = (settings.get("llm_provider") or "openai").strip().lower()
 
-    max_chars = (
-        _CONSULTANT_SNAPSHOT_CHARS_GEMINI
-        if provider == "gemini"
-        else _CONSULTANT_SNAPSHOT_CHARS_OPENAI
-    )
+    if provider == "gemini":
+        if _consultant_field_map_mode(system_instruction):
+            max_chars = _CONSULTANT_SNAPSHOT_CHARS_GEMINI_FIELD_MAP
+        elif _consultant_view_scope_mode(system_instruction):
+            max_chars = _CONSULTANT_SNAPSHOT_CHARS_GEMINI_VIEW
+        else:
+            max_chars = _CONSULTANT_SNAPSHOT_CHARS_GEMINI
+    else:
+        max_chars = _CONSULTANT_SNAPSHOT_CHARS_OPENAI
     snap = snapshot_json if len(snapshot_json) <= max_chars else snapshot_json[:max_chars]
     trunc_note = (
         "\n\n(JSON above was truncated for API input limits — infer from visible data.)\n"
@@ -287,8 +420,10 @@ async def _llm_insights_from_snapshot(
         return [], False
 
     out: list[FarmInsight] = []
+    dropped_validation = 0
     for item in raw_list:
         if not isinstance(item, dict):
+            dropped_validation += 1
             continue
         try:
             cat = _parse_category(item.get("category"))
@@ -306,8 +441,17 @@ async def _llm_insights_from_snapshot(
                     field_ref=field_ref,
                 )
             )
-        except Exception:
-            continue
+        except ValidationError as e:
+            dropped_validation += 1
+            logger.warning("Consultant: dropped insight row (Pydantic validation): %s", e)
+        except Exception as e:
+            dropped_validation += 1
+            logger.warning("Consultant: dropped insight row: %s", e)
+    if dropped_validation:
+        logger.warning(
+            "Consultant: dropped %s insight(s) due to validation or parse errors",
+            dropped_validation,
+        )
     return out, True
 
 
@@ -374,8 +518,20 @@ async def _gemini_consultant(
     if not has_gemini_credentials(settings):
         raise RuntimeError("GEMINI_API_KEY not set")
     prompt = f"{system_instruction}\n\n{user_message}"
+    # Gemini 2.5 may allocate internal tokens toward maxOutputTokens; 8k can truncate JSON.
+    _default_out = 16384
+    _raw_out = (os.getenv("GEMINI_CONSULTANT_MAX_OUTPUT_TOKENS") or "").strip()
+    if _raw_out:
+        try:
+            max_out = max(1024, min(65536, int(_raw_out)))
+        except ValueError:
+            max_out = _default_out
+    else:
+        max_out = _default_out
+    if _consultant_field_map_mode(system_instruction):
+        max_out = min(65536, max(max_out * 2, _default_out))
     # Single-turn text; omit "role" for widest compatibility with generativelanguage v1 / v1beta.
-    base_cfg: dict[str, Any] = {"temperature": 0.3, "maxOutputTokens": 8192}
+    base_cfg: dict[str, Any] = {"temperature": 0.3, "maxOutputTokens": max_out}
     want_json_mime = (os.getenv("GEMINI_CONSULTANT_RESPONSE_JSON") or "").strip().lower() in (
         "1",
         "true",
@@ -516,7 +672,10 @@ async def generate_farm_insights(
     1. Non-empty ``X-AI-API-Key`` (BYOK) after normalize/decode.
     2. Else server ``GEMINI_API_KEY`` or ``LLM_API_KEY`` per ``LLM_PROVIDER`` (same as admin / ``!bot``).
     """
-    heuristics = _heuristic_production_output_space(snapshot_data)
+    if _consultant_skip_production_heuristics(system_instruction):
+        heuristics = []
+    else:
+        heuristics = _heuristic_production_output_space(snapshot_data)
     settings = resolve_consultant_llm_settings(user_api_key, user_provider)
     if settings is None:
         logger.warning(
@@ -528,11 +687,14 @@ async def generate_farm_insights(
     try:
         if isinstance(snapshot_data, dict):
             pruned = prune_dashboard_snapshot_for_llm(snapshot_data)
+            if _consultant_field_map_mode(system_instruction):
+                pruned = cap_field_rows_in_snapshot(pruned, _FIELD_MAP_MAX_FIELD_ROWS)
         else:
             pruned = snapshot_data
         snap_str = json.dumps(pruned, ensure_ascii=False, default=str)
-    except Exception:
-        snap_str = "{}"
+    except Exception as e:
+        logger.error("Failed to serialize snapshot: %s", e)
+        return heuristics, False
 
     sys_inst = system_instruction or CONSULTANT_SYSTEM
     try:

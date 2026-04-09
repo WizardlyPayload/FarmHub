@@ -13,6 +13,7 @@ from app.schemas.insights import FarmInsightsResponse, InsightCategory
 from app.services.consultant import (
     CONSULTANT_SYSTEM_FIELDS_FOCUS,
     CONSULTANT_SYSTEM_SINGLE_FIELD,
+    consultant_system_instruction_for_view,
     generate_farm_insights,
     normalize_incoming_api_key,
 )
@@ -21,6 +22,9 @@ from app.services.pipeline_log import approx_json_bytes, log_pipeline
 from app.services.snapshot_pruner import (
     pick_first_owned_field_row,
     prune_snapshot_fields_context_only,
+    prune_snapshot_for_dashboard_view,
+    prune_snapshot_to_active_farm,
+    resolve_consultant_farm_id,
     slice_snapshot_for_single_field,
 )
 from app.services.subscription import assert_consultant_allowed
@@ -28,6 +32,20 @@ from app.services.subscription import assert_consultant_allowed
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/consultant", tags=["consultant"])
+
+_ALLOWED_CONSULTANT_VIEWS = frozenset(
+    {"fields", "vehicles", "pastures", "livestock", "productions", "economy"}
+)
+
+
+def _raise_if_invalid_view(view: str | None) -> None:
+    if view is None:
+        return
+    v = str(view).strip().lower()
+    if not v:
+        return
+    if v not in _ALLOWED_CONSULTANT_VIEWS:
+        raise HTTPException(status_code=400, detail="Invalid view parameter")
 
 
 async def _load_snapshot_for_consultant(server_id: str | None) -> tuple[dict[str, Any], str]:
@@ -66,15 +84,21 @@ async def _run_consultant_core(
     snapshot: dict[str, Any],
     *,
     server_id: str | None,
-    field_ref: str | None,
-    context: str,
-    user_api_key: str | None,
-    user_provider: str | None,
+    farm_id_resolved: int | None = None,
+    field_ref: str | None = None,
+    context: str = "full",
+    view: str | None = None,
+    user_api_key: str | None = None,
+    user_provider: str | None = None,
     consultant_out_message: str = "Responded with Smart suggestions",
 ) -> FarmInsightsResponse:
     ctx = (context or "full").strip().lower()
     if ctx not in ("full", "fields"):
         ctx = "full"
+
+    vw = (view or "").strip().lower() or None
+    if vw in ("full", "dashboard", "landing", "general", ""):
+        vw = None
 
     field_ref_q = (field_ref or "").strip()
     sys_inst: str | None = None
@@ -90,8 +114,13 @@ async def _run_consultant_core(
         work = sliced
         sys_inst = CONSULTANT_SYSTEM_SINGLE_FIELD
     elif ctx == "fields":
+        # Per-row field map (GET … context=fields) — not the same as ?view=fields Smart panel.
         work = prune_snapshot_fields_context_only(work)
         sys_inst = CONSULTANT_SYSTEM_FIELDS_FOCUS
+    elif vw:
+        sys_inst = consultant_system_instruction_for_view(vw)
+        if sys_inst is not None:
+            work = prune_snapshot_for_dashboard_view(work, vw)
 
     up = (user_provider or "").strip().lower() or None
     if up and up not in ("openai", "gemini"):
@@ -128,8 +157,10 @@ async def _run_consultant_core(
         llm_used=llm_used,
         snapshot_bytes=approx_json_bytes(work),
         server_id_query=(server_id or "").strip() or None,
+        farm_id_resolved=farm_id_resolved,
         field_ref=field_ref_q or None,
         context=ctx,
+        view=vw,
     )
     return FarmInsightsResponse(insights=insights, llm_used=llm_used)
 
@@ -137,8 +168,10 @@ async def _run_consultant_core(
 async def compute_consultant_insights(
     *,
     server_id: str | None = None,
+    farm_id: int | None = None,
     field_ref: str | None = None,
     context: str = "full",
+    view: str | None = None,
     user_api_key: str | None = None,
     user_provider: str | None = None,
 ) -> FarmInsightsResponse:
@@ -147,19 +180,25 @@ async def compute_consultant_insights(
 
     Uses server env LLM keys when ``user_api_key`` is empty (same as Farm Dashboard without BYOK).
     """
+    _raise_if_invalid_view(view)
     snapshot, sid = await _load_snapshot_for_consultant(server_id)
+    farm_resolved = resolve_consultant_farm_id(snapshot, farm_id)
+    snapshot = prune_snapshot_to_active_farm(snapshot, farm_resolved)
     logger.info(
-        "consultant: snapshot bytes_utf8≈%s server_id_query=%r context=%s fieldRef=%s",
+        "consultant: snapshot bytes_utf8≈%s server_id_query=%r farm_id_resolved=%s context=%s fieldRef=%s",
         approx_json_bytes(snapshot),
         sid,
+        farm_resolved,
         (context or "full").strip().lower(),
         (field_ref or "").strip() or None,
     )
     return await _run_consultant_core(
         snapshot,
         server_id=server_id,
+        farm_id_resolved=farm_resolved,
         field_ref=field_ref,
         context=context,
+        view=view,
         user_api_key=user_api_key,
         user_provider=user_provider,
     )
@@ -177,7 +216,9 @@ async def compute_consultant_insights_first_owned_field(
     **single-field** consultant (``CONSULTANT_SYSTEM_SINGLE_FIELD``) — “next job” for that field.
     """
     snapshot, sid = await _load_snapshot_for_consultant(server_id)
-    ref, row = pick_first_owned_field_row(snapshot, active_farm_id)
+    af = resolve_consultant_farm_id(snapshot, active_farm_id)
+    snapshot = prune_snapshot_to_active_farm(snapshot, af)
+    ref, row = pick_first_owned_field_row(snapshot, af)
     if not ref or row is None:
         raise HTTPException(
             status_code=503,
@@ -201,8 +242,10 @@ async def compute_consultant_insights_first_owned_field(
     resp = await _run_consultant_core(
         snapshot,
         server_id=server_id,
+        farm_id_resolved=af,
         field_ref=ref,
         context="full",
+        view=None,
         user_api_key=user_api_key,
         user_provider=user_provider,
         consultant_out_message="Responded — first owned field (next job)",
@@ -226,6 +269,11 @@ async def get_consultant_insights(
         None,
         description="Farm Dashboard save id (srv_…). Required for correct snapshot when multiple saves push.",
     ),
+    farmId: int | None = Query(
+        None,
+        ge=1,
+        description="Active farm id (Farm Dashboard farm selector). Narrows JSON to that farm only.",
+    ),
     fieldRef: str | None = Query(
         None,
         description="Optional: only this parcel (farmlandId) is sent to the LLM — strict per-field suggestions.",
@@ -233,6 +281,14 @@ async def get_consultant_insights(
     context: str = Query(
         "full",
         description="full = whole snapshot; fields = drop vehicles/animals etc. for server-wide field focus.",
+    ),
+    view: str | None = Query(
+        None,
+        description=(
+            "Farm Dashboard section: fields, vehicles, pastures, livestock, productions, economy — "
+            "narrows JSON + prompt to what the user is viewing (Smart suggestions). "
+            "Use with context=full. Field map uses context=fields instead."
+        ),
     ),
     _: str = Depends(require_integration_or_admin),
     _subscription: None = Depends(assert_consultant_allowed),
@@ -243,17 +299,25 @@ async def get_consultant_insights(
     **Multi-save:** pass ``serverId`` matching the navbar / active Farm Dashboard server so the AI uses that
     push buffer, not another save.
 
+    **Active farm:** pass ``farmId`` matching the farm dropdown so the LLM only sees that farm's fields
+    and assets (same as on-screen). If omitted, the snapshot's ``activeFarmId`` is used.
+
     **Per-field LLM:** pass ``fieldRef`` (farmlandId) to send only that field row to the model.
 
     **Context:** ``context=fields`` narrows JSON to agronomic sections (still one LLM call per request).
+
+    **View:** ``view=vehicles|pastures|…`` (with ``context=full``) sends only that section's data and a matching prompt
+    (Smart suggestions panel — reduces tokens vs whole-farm JSON).
     """
     log_pipeline(
         "consultant_in",
         "GET /api/v1/consultant/insights — Farm Dashboard requested Smart suggestions",
         byok=bool(normalize_incoming_api_key(request.headers.get("X-AI-API-Key"))),
         server_id_query=(serverId or "").strip() or None,
+        farm_id_query=farmId,
         field_ref=(fieldRef or "").strip() or None,
         context=(context or "full").strip().lower(),
+        view_query=(view or "").strip() or None,
     )
     user_key = normalize_incoming_api_key(request.headers.get("X-AI-API-Key"))
     user_prov = (request.headers.get("X-AI-Provider") or "").strip().lower() or None
@@ -262,8 +326,10 @@ async def get_consultant_insights(
 
     return await compute_consultant_insights(
         server_id=serverId,
+        farm_id=farmId,
         field_ref=fieldRef,
         context=context,
+        view=view,
         user_api_key=user_key or None,
         user_provider=user_prov,
     )

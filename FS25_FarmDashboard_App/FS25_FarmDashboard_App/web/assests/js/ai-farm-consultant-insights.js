@@ -156,6 +156,37 @@
           if (sid) {
             apiURL += (apiURL.indexOf('?') >= 0 ? '&' : '?') + 'serverId=' + encodeURIComponent(sid);
           }
+          var farmId = '';
+          try {
+            if (window.dashboard && window.dashboard.activeFarmId != null) {
+              farmId = String(window.dashboard.activeFarmId);
+            }
+          } catch (eFarm) {
+            farmId = '';
+          }
+          if (farmId) {
+            apiURL += (apiURL.indexOf('?') >= 0 ? '&' : '?') + 'farmId=' + encodeURIComponent(farmId);
+          }
+          function sectionToViewParam(section) {
+            var s = String(section || 'landing').toLowerCase();
+            if (s === 'landing' || s === 'dashboard') return '';
+            var allowed = ['fields', 'vehicles', 'pastures', 'livestock', 'productions', 'economy'];
+            for (var i = 0; i < allowed.length; i++) {
+              if (allowed[i] === s) return s;
+            }
+            return '';
+          }
+          var viewParam = '';
+          try {
+            if (window.dashboard && typeof window.dashboard.getCurrentSection === 'function') {
+              viewParam = sectionToViewParam(window.dashboard.getCurrentSection());
+            }
+          } catch (eView) {
+            viewParam = '';
+          }
+          if (viewParam) {
+            apiURL += (apiURL.indexOf('?') >= 0 ? '&' : '?') + 'view=' + encodeURIComponent(viewParam);
+          }
           return getByokHeadersSync().then(function (extra) {
             var hdrs = Object.assign(
               {

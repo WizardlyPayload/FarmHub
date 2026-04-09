@@ -174,6 +174,15 @@ async def admin_test_llm(
         None,
         description="Same as Farm Dashboard consultant ?serverId= (else DASHBOARD_SERVER_ID / push buffer).",
     ),
+    farmId: int | None = Query(
+        None,
+        ge=1,
+        description="Same as Farm Dashboard ?farmId= (active farm); omit to use snapshot activeFarmId.",
+    ),
+    view: str | None = Query(
+        None,
+        description="Same as Farm Dashboard ?view= (section-scoped consultant).",
+    ),
     context: str = Query(
         "full",
         description="Same as GET /api/v1/consultant/insights (full = Smart suggestions).",
@@ -190,8 +199,10 @@ async def admin_test_llm(
     try:
         resp = await compute_consultant_insights(
             server_id=serverId,
+            farm_id=farmId,
             field_ref=None,
             context=ctx,
+            view=view,
             user_api_key=None,
             user_provider=None,
         )

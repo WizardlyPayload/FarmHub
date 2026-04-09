@@ -14,6 +14,7 @@ import httpx
 
 from app.config import active_gemini_api_key, get_settings, has_gemini_credentials
 from app.services.game_reference import build_game_reference_block
+from app.services.gemini_budget import wait_gemini_budget_or_skip
 from app.services.log_buffer import log_event
 
 # Retry with next API key (time-ordered pool) on Google overload / rate limits.
@@ -230,6 +231,13 @@ async def _gemini_post_with_quota_fallback(
         raise RuntimeError("GEMINI_API_KEY is empty")
     async with httpx.AsyncClient(timeout=timeout) as client:
         for i, key in enumerate(keys):
+            ok = await wait_gemini_budget_or_skip(key)
+            if not ok:
+                log_event(
+                    "INFO",
+                    "Gemini budget: daily request cap for this key — trying next key in pool",
+                )
+                continue
             url = _gemini_generate_url_for_key(settings, key)
             r = await _gemini_post_same_key_429_wait_retry(client, url, payload)
             if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
@@ -245,6 +253,9 @@ async def _gemini_post_with_quota_fallback(
                 log_event("ERROR", format_gemini_http_error(r))
             r.raise_for_status()
             return r
+    raise RuntimeError(
+        "Gemini: no successful request — all keys skipped (daily budget per GEMINI_BUDGET_RPD) or exhausted"
+    )
 
 
 async def gemini_consultant_post_with_quota_fallback(
@@ -264,6 +275,13 @@ async def gemini_consultant_post_with_quota_fallback(
         raise RuntimeError("GEMINI_API_KEY is empty")
     async with httpx.AsyncClient(timeout=timeout) as client:
         for i, key in enumerate(keys):
+            ok = await wait_gemini_budget_or_skip(key)
+            if not ok:
+                log_event(
+                    "INFO",
+                    "Gemini budget: daily request cap for this key — trying next key in pool",
+                )
+                continue
             url = _gemini_generate_url_for_key(settings, key)
             r = await _gemini_post_same_key_429_wait_retry(client, url, payload)
             if r.status_code == 400 and want_json_mime:
@@ -272,6 +290,14 @@ async def gemini_consultant_post_with_quota_fallback(
                     "Gemini consultant: responseMimeType rejected (400); retrying without JSON MIME. "
                     "Unset GEMINI_CONSULTANT_RESPONSE_JSON or use GEMINI_REST_API_VERSION=v1beta if supported.",
                 )
+                ok2 = await wait_gemini_budget_or_skip(key)
+                if not ok2:
+                    log_event("WARN", "Gemini budget: no slot for JSON-MIME retry — rotating key")
+                    if i < len(keys) - 1:
+                        continue
+                    raise RuntimeError(
+                        "Gemini consultant: daily budget exhausted for all keys before MIME retry"
+                    )
                 r = await _gemini_post_same_key_429_wait_retry(
                     client,
                     url,
@@ -291,6 +317,9 @@ async def gemini_consultant_post_with_quota_fallback(
                 code = e.response.status_code if e.response is not None else r.status_code
                 raise RuntimeError(f"Gemini HTTP {code}") from e
             return r
+    raise RuntimeError(
+        "Gemini consultant: no successful request — all keys skipped (daily budget per GEMINI_BUDGET_RPD) or exhausted"
+    )
 
 
 def format_gemini_http_error(response: httpx.Response) -> str:

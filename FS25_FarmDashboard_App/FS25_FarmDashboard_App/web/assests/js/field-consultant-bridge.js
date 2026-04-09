@@ -124,6 +124,41 @@ export function indexFieldConsultantInsights(insights) {
 /**
  * Match AI insight to a field using string-safe keys (farmlandId, id, stable id).
  */
+/**
+ * Stable fingerprint of active-farm field agronomic state for client-side deduplication (saves LLM tokens).
+ */
+function computeActiveFarmFieldsStateHash() {
+  try {
+    const d = typeof window !== "undefined" ? window.dashboard : null;
+    if (!d) return "";
+    let rows = d.fields;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      rows = Array.isArray(d.allFields) ? d.allFields : [];
+    }
+    const farmId = Number(d.activeFarmId ?? 1);
+    const filtered = rows.filter((f) => {
+      if (!f || typeof f !== "object") return false;
+      const oid = Number(f.ownerFarmId ?? f.farmId ?? 0);
+      return oid === farmId;
+    });
+    const sig = filtered
+      .map((f) => ({
+        id: f.farmlandId ?? f.id,
+        fruitType: f.fruitType,
+        growthState: f.growthState,
+        growthLabel: f.growthLabel,
+        needsPlowing: f.needsPlowing,
+        needsLime: f.needsLime,
+        harvestReady: f.harvestReady,
+        isWithered: f.isWithered,
+      }))
+      .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+    return JSON.stringify(sig);
+  } catch (e) {
+    return "";
+  }
+}
+
 export function lookupFieldConsultantInsight(map, field) {
   if (!map || !field) return null;
   const candidates = [];
@@ -177,6 +212,15 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
     return { skipped: true, reason: "no_integration_key" };
   }
 
+  if (!force) {
+    const stateHash = computeActiveFarmFieldsStateHash();
+    if (stateHash && typeof window !== "undefined" && window.__lastFieldStateHash === stateHash) {
+      console.log("[AI Farm] Field state unchanged, skipping LLM request to save tokens.");
+      dashDebug("field-consultant-bridge", "skip", { reason: "state_unchanged" });
+      return { skipped: true, reason: "state_unchanged" };
+    }
+  }
+
   inFlight = true;
   emitFieldConsultantLoading(true);
   try {
@@ -193,6 +237,14 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
       (typeof localStorage !== "undefined" ? localStorage.getItem("dashboard_active_server") : "") ||
       "";
     if (sid) qs.set("serverId", sid);
+    const farmId =
+      (typeof window !== "undefined" &&
+        window.dashboard &&
+        window.dashboard.activeFarmId != null &&
+        String(window.dashboard.activeFarmId)) ||
+      "";
+    if (farmId) qs.set("farmId", farmId);
+    qs.set("view", "fields");
     qs.set("context", "fields");
     const url = `${base}/api/v1/consultant/insights?${qs.toString()}`;
     const reqHeaders = {
@@ -294,6 +346,9 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
       applyFieldConsultantDom();
     }
     lastFetchAt = Date.now();
+    if (typeof window !== "undefined" && !force) {
+      window.__lastFieldStateHash = computeActiveFarmFieldsStateHash();
+    }
     if (typeof globalThis.pipelineLog === "function") {
       globalThis.pipelineLog("renderer_ok", "field consultant cache updated", {
         insightCount: list.length,
@@ -314,7 +369,11 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
   }
 }
 
-export function scheduleFieldConsultantFetch() {
+/**
+ * Debounced field-map consultant fetch. Pass `{ force: true }` to bypass throttle and state-hash dedupe (via refresh).
+ */
+export function scheduleFieldConsultantFetch(options) {
+  const force = options && options.force;
   if (debounceId) clearTimeout(debounceId);
   debounceId = setTimeout(() => {
     debounceId = null;
@@ -322,7 +381,7 @@ export function scheduleFieldConsultantFetch() {
       setTimeout(fn, 0);
     };
     idle(function () {
-      refreshFieldConsultantCache({ force: false }).catch(() => {});
+      refreshFieldConsultantCache({ force: !!force }).catch(() => {});
     }, 1500);
   }, 800);
 }
@@ -345,6 +404,13 @@ export async function fetchConsultantInsightSingleField(fieldRef) {
     (typeof localStorage !== "undefined" ? localStorage.getItem("dashboard_active_server") : "") ||
     "";
   if (sid) qs.set("serverId", sid);
+  const farmId =
+    (typeof window !== "undefined" &&
+      window.dashboard &&
+      window.dashboard.activeFarmId != null &&
+      String(window.dashboard.activeFarmId)) ||
+    "";
+  if (farmId) qs.set("farmId", farmId);
   qs.set("fieldRef", ref);
   const url = `${base}/api/v1/consultant/insights?${qs.toString()}`;
   const h = {

@@ -180,7 +180,10 @@ def prune_dashboard_snapshot_for_llm(data: Any) -> Any:
                     nv = _prune_value(f, 0)
                     if nv is not None:
                         new_list.append(nv)
-            root[key] = new_list[:300]
+            # Cap for token control: keep at least 50 field rows when the farm has that many (never below [:50] intent when len>=50).
+            n = len(new_list)
+            max_fields = max(50, min(300, n))
+            root[key] = new_list[:max_fields]
 
     if isinstance(root.get("vehicles"), list):
         slim: list[Any] = []
@@ -291,6 +294,200 @@ def slice_snapshot_for_single_field(snapshot: dict[str, Any], field_ref: str) ->
     return None
 
 
+def _owner_farm_id(row: dict[str, Any]) -> int:
+    try:
+        return int(row.get("ownerFarmId", row.get("farmId")) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def resolve_consultant_farm_id(snapshot: dict[str, Any], farm_id_query: int | None) -> int:
+    """
+    Farm Dashboard farm selector (or ``?farmId=``). Falls back to snapshot ``activeFarmId`` / ``activeFarm.id`` / 1.
+    """
+    if farm_id_query is not None:
+        try:
+            q = int(farm_id_query)
+            if q > 0:
+                return q
+        except (TypeError, ValueError):
+            pass
+    raw_af = snapshot.get("activeFarmId") if isinstance(snapshot, dict) else None
+    if raw_af is None and isinstance(snapshot, dict) and isinstance(snapshot.get("activeFarm"), dict):
+        raw_af = snapshot["activeFarm"].get("id")
+    try:
+        af = int(raw_af) if raw_af is not None else 1
+        return af if af > 0 else 1
+    except (TypeError, ValueError):
+        return 1
+
+
+def prune_snapshot_to_active_farm(snapshot: dict[str, Any], farm_id: int) -> dict[str, Any]:
+    """
+    Keep only rows for the farm the player is viewing (same rule as ``filterFieldsForFarmView``:
+    ``ownerFarmId`` / ``farmId`` must match). Drops other farms' fields, vehicles, animals, production chains.
+
+    Call for consultant paths so the LLM is not given the whole map / other saves' data is already split by server.
+    """
+    if not isinstance(snapshot, dict) or farm_id <= 0:
+        return snapshot
+    root = copy.deepcopy(snapshot)
+    root["activeFarmId"] = farm_id
+    root["_consultant_farm_scope"] = farm_id
+    if isinstance(root.get("activeFarm"), dict):
+        afm = copy.deepcopy(root["activeFarm"])
+        try:
+            cur = int(afm.get("id", farm_id))
+        except (TypeError, ValueError):
+            cur = farm_id
+        if cur != farm_id:
+            afm["id"] = farm_id
+        root["activeFarm"] = afm
+
+    def keep_owned_field(f: dict[str, Any]) -> bool:
+        return _owner_farm_id(f) == farm_id
+
+    for key in ("fields", "allFields"):
+        arr = root.get(key)
+        if not isinstance(arr, list):
+            continue
+        root[key] = [copy.deepcopy(f) for f in arr if isinstance(f, dict) and keep_owned_field(f)]
+
+    if isinstance(root.get("vehicles"), list):
+        root["vehicles"] = [
+            copy.deepcopy(v)
+            for v in root["vehicles"]
+            if isinstance(v, dict) and _owner_farm_id(v) == farm_id
+        ]
+
+    an = root.get("animals")
+    if isinstance(an, list):
+        root["animals"] = [
+            copy.deepcopy(b)
+            for b in an
+            if isinstance(b, dict) and _owner_farm_id(b) == farm_id
+        ]
+
+    prod = root.get("production")
+    if isinstance(prod, dict) and isinstance(prod.get("chains"), list):
+        prod = copy.deepcopy(prod)
+        prod["chains"] = [
+            copy.deepcopy(c)
+            for c in prod["chains"]
+            if isinstance(c, dict) and _owner_farm_id(c) == farm_id
+        ]
+        root["production"] = prod
+    elif isinstance(prod, list):
+        root["production"] = [
+            copy.deepcopy(p)
+            for p in prod
+            if isinstance(p, dict) and _owner_farm_id(p) == farm_id
+        ]
+
+    if isinstance(root.get("productionPoints"), list):
+        root["productionPoints"] = [
+            copy.deepcopy(p)
+            for p in root["productionPoints"]
+            if isinstance(p, dict) and _owner_farm_id(p) == farm_id
+        ]
+
+    for fk in ("farms", "farmInfo"):
+        fa = root.get(fk)
+        if not isinstance(fa, list):
+            continue
+        slim: list[Any] = []
+        for x in fa:
+            if not isinstance(x, dict):
+                continue
+            try:
+                xid = int(x.get("id", x.get("farmId")) or 0)
+            except (TypeError, ValueError):
+                xid = 0
+            if xid == farm_id:
+                slim.append(copy.deepcopy(x))
+        root[fk] = slim
+
+    return root
+
+
+def cap_field_rows_in_snapshot(snapshot: dict[str, Any], max_rows: int) -> dict[str, Any]:
+    """
+    Limit ``fields`` / ``allFields`` length after pruning so FIELD MAP mode stays small enough
+    for Gemini output (2.5 models may use internal tokens toward maxOutputTokens).
+    """
+    if not isinstance(snapshot, dict) or max_rows < 1:
+        return snapshot
+    out = copy.deepcopy(snapshot)
+    for key in ("fields", "allFields"):
+        arr = out.get(key)
+        if isinstance(arr, list) and len(arr) > max_rows:
+            out[key] = arr[:max_rows]
+    return out
+
+
+def _consultant_minimal_headers(root: dict[str, Any]) -> dict[str, Any]:
+    """Tiny farm/save context for section-scoped consultant calls (after active-farm prune)."""
+    out: dict[str, Any] = {}
+    for k in (
+        "timestamp",
+        "serverInfo",
+        "activeFarmId",
+        "activeFarm",
+        "farmId",
+        "gameTime",
+        "error",
+        "_consultant_farm_scope",
+    ):
+        if k in root:
+            out[k] = copy.deepcopy(root[k])
+    return out
+
+
+def prune_snapshot_for_dashboard_view(snapshot: dict[str, Any], view: str) -> dict[str, Any]:
+    """
+    Reduce consultant JSON to what the Farm Dashboard user is looking at (navbar section).
+
+    Call **after** ``prune_snapshot_to_active_farm``. ``view`` matches hash sections:
+    fields, vehicles, pastures, livestock, productions, economy. ``full`` / ``dashboard`` / ``landing`` = no op.
+    """
+    v = (view or "full").strip().lower()
+    if v in ("full", "dashboard", "landing", "general", ""):
+        return copy.deepcopy(snapshot)
+    if not isinstance(snapshot, dict):
+        return snapshot
+
+    root = copy.deepcopy(snapshot)
+    if v == "fields":
+        return prune_snapshot_fields_context_only(root)
+
+    h = _consultant_minimal_headers(root)
+
+    if v == "vehicles":
+        h["vehicles"] = copy.deepcopy(root.get("vehicles") or [])
+        return h
+    if v == "pastures":
+        h["pastures"] = copy.deepcopy(root.get("pastures") or [])
+        if root.get("animals"):
+            h["animals"] = copy.deepcopy(root["animals"])
+        return h
+    if v == "livestock":
+        h["animals"] = copy.deepcopy(root.get("animals") or [])
+        return h
+    if v == "productions":
+        if "production" in root:
+            h["production"] = copy.deepcopy(root["production"])
+        if "productionPoints" in root:
+            h["productionPoints"] = copy.deepcopy(root["productionPoints"])
+        return h
+    if v == "economy":
+        for k in ("economy", "farmInfo", "farms", "statistics", "weather"):
+            if k in root:
+                h[k] = copy.deepcopy(root[k])
+        return h
+
+    return root
+
+
 def prune_snapshot_fields_context_only(snapshot: dict[str, Any]) -> dict[str, Any]:
     """
     Server-wide consultant call focused on crops/soil: drop heavy non-field sections from LLM input.
@@ -305,6 +502,9 @@ def prune_snapshot_fields_context_only(snapshot: dict[str, Any]) -> dict[str, An
     for light in ("weather", "economy", "farms", "statistics"):
         if light in root:
             root[light] = _prune_value(root[light], 0)
+    # Field-map requests do not need global stats — saves prompt tokens.
+    for drop_extra in ("statistics", "economy", "missions"):
+        root.pop(drop_extra, None)
     return root
 
 

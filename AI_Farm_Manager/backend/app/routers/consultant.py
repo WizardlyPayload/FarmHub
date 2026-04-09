@@ -3,25 +3,220 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.config import get_settings
 from app.routers.integration import require_integration_or_admin
-from app.schemas.insights import FarmInsightsResponse
+from app.schemas.insights import FarmInsightsResponse, InsightCategory
 from app.services.consultant import (
+    CONSULTANT_SYSTEM_FIELDS_FOCUS,
     CONSULTANT_SYSTEM_SINGLE_FIELD,
     generate_farm_insights,
     normalize_incoming_api_key,
 )
 from app.services.dashboard_service import build_dashboard_fetch_url, fetch_dashboard_json
 from app.services.pipeline_log import approx_json_bytes, log_pipeline
-from app.services.snapshot_pruner import prune_snapshot_fields_context_only, slice_snapshot_for_single_field
+from app.services.snapshot_pruner import (
+    pick_first_owned_field_row,
+    prune_snapshot_fields_context_only,
+    slice_snapshot_for_single_field,
+)
 from app.services.subscription import assert_consultant_allowed
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/consultant", tags=["consultant"])
+
+
+async def _load_snapshot_for_consultant(server_id: str | None) -> tuple[dict[str, Any], str]:
+    settings = get_settings()
+    base = (settings.get("dashboard_json_url") or "").strip()
+    env_sid = (settings.get("dashboard_server_id") or "").strip()
+    sid = (server_id or "").strip() or env_sid
+    fetch_url = build_dashboard_fetch_url(base, sid if sid else None)
+    if not fetch_url:
+        fetch_url = settings.get("dashboard_fetch_url") or settings.get("dashboard_json_url") or ""
+
+    raw, err = await fetch_dashboard_json(fetch_url or None)
+    if raw is None:
+        logger.warning(
+            "consultant: no snapshot (serverId query=%r fetch_url=%r err=%s)",
+            (server_id or "").strip() or None,
+            (fetch_url or "")[:160],
+            err,
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=err or "Dashboard snapshot unavailable — configure FTP or DASHBOARD_JSON_URL",
+        )
+
+    try:
+        snapshot = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=503, detail=f"Invalid dashboard JSON: {e}") from e
+
+    if not isinstance(snapshot, dict):
+        snapshot = {"_raw": snapshot}
+    return snapshot, sid
+
+
+async def _run_consultant_core(
+    snapshot: dict[str, Any],
+    *,
+    server_id: str | None,
+    field_ref: str | None,
+    context: str,
+    user_api_key: str | None,
+    user_provider: str | None,
+    consultant_out_message: str = "Responded with Smart suggestions",
+) -> FarmInsightsResponse:
+    ctx = (context or "full").strip().lower()
+    if ctx not in ("full", "fields"):
+        ctx = "full"
+
+    field_ref_q = (field_ref or "").strip()
+    sys_inst: str | None = None
+    work = snapshot
+
+    if field_ref_q:
+        sliced = slice_snapshot_for_single_field(work, field_ref_q)
+        if sliced is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No field matches fieldRef={field_ref_q!r} in this save's snapshot.",
+            )
+        work = sliced
+        sys_inst = CONSULTANT_SYSTEM_SINGLE_FIELD
+    elif ctx == "fields":
+        work = prune_snapshot_fields_context_only(work)
+        sys_inst = CONSULTANT_SYSTEM_FIELDS_FOCUS
+
+    up = (user_provider or "").strip().lower() or None
+    if up and up not in ("openai", "gemini"):
+        up = None
+
+    nkey = normalize_incoming_api_key(user_api_key)
+    insights, llm_used = await generate_farm_insights(
+        work,
+        user_api_key=nkey or None,
+        user_provider=up,
+        system_instruction=sys_inst,
+    )
+
+    if ctx == "fields" and not field_ref_q:
+        field_only = [i for i in insights if i.category == InsightCategory.FIELD]
+        dropped = len(insights) - len(field_only)
+        if dropped > 0:
+            logger.warning(
+                "consultant context=fields: dropped %s non-Field insight(s) (Animal/Production/Finance) — "
+                "field map UI only uses category=Field with field_ref",
+                dropped,
+            )
+        insights = field_only
+        if llm_used and not insights:
+            logger.warning(
+                "consultant context=fields: LLM ran but no Field-tagged insights with field_ref — "
+                "Farm Dashboard field rows will show local rules only",
+            )
+
+    log_pipeline(
+        "consultant_out",
+        consultant_out_message,
+        insight_count=len(insights),
+        llm_used=llm_used,
+        snapshot_bytes=approx_json_bytes(work),
+        server_id_query=(server_id or "").strip() or None,
+        field_ref=field_ref_q or None,
+        context=ctx,
+    )
+    return FarmInsightsResponse(insights=insights, llm_used=llm_used)
+
+
+async def compute_consultant_insights(
+    *,
+    server_id: str | None = None,
+    field_ref: str | None = None,
+    context: str = "full",
+    user_api_key: str | None = None,
+    user_provider: str | None = None,
+) -> FarmInsightsResponse:
+    """
+    Shared implementation for ``GET /api/v1/consultant/insights`` and admin “test” (same snapshot + LLM path).
+
+    Uses server env LLM keys when ``user_api_key`` is empty (same as Farm Dashboard without BYOK).
+    """
+    snapshot, sid = await _load_snapshot_for_consultant(server_id)
+    logger.info(
+        "consultant: snapshot bytes_utf8≈%s server_id_query=%r context=%s fieldRef=%s",
+        approx_json_bytes(snapshot),
+        sid,
+        (context or "full").strip().lower(),
+        (field_ref or "").strip() or None,
+    )
+    return await _run_consultant_core(
+        snapshot,
+        server_id=server_id,
+        field_ref=field_ref,
+        context=context,
+        user_api_key=user_api_key,
+        user_provider=user_provider,
+    )
+
+
+async def compute_consultant_insights_first_owned_field(
+    *,
+    server_id: str | None = None,
+    active_farm_id: int | None = None,
+    user_api_key: str | None = None,
+    user_provider: str | None = None,
+) -> tuple[FarmInsightsResponse, dict[str, Any]]:
+    """
+    Load snapshot, pick the first owned parcel (same rules as Farm Dashboard field list), then run the
+    **single-field** consultant (``CONSULTANT_SYSTEM_SINGLE_FIELD``) — “next job” for that field.
+    """
+    snapshot, sid = await _load_snapshot_for_consultant(server_id)
+    ref, row = pick_first_owned_field_row(snapshot, active_farm_id)
+    if not ref or row is None:
+        raise HTTPException(
+            status_code=503,
+            detail="No field rows in dashboard snapshot — push a snapshot or configure FTP / DASHBOARD_JSON_URL.",
+        )
+
+    log_pipeline(
+        "consultant_in",
+        "First owned parcel — single-field consultant (next job on field)",
+        server_id_query=(server_id or "").strip() or None,
+        field_ref=ref,
+        fruit_type=row.get("fruitType"),
+    )
+    logger.info(
+        "consultant: first-owned test field_ref=%r name=%r fruit=%r",
+        ref,
+        row.get("name"),
+        row.get("fruitType"),
+    )
+
+    resp = await _run_consultant_core(
+        snapshot,
+        server_id=server_id,
+        field_ref=ref,
+        context="full",
+        user_api_key=user_api_key,
+        user_provider=user_provider,
+        consultant_out_message="Responded — first owned field (next job)",
+    )
+    meta = {
+        "chosen_field_ref": ref,
+        "field_name": row.get("name"),
+        "fruit_type": row.get("fruitType"),
+        "growth_label": row.get("growthLabel"),
+        "harvest_ready": row.get("harvestReady"),
+        "owner_farm_id": row.get("ownerFarmId", row.get("farmId")),
+        "server_id_query": (server_id or "").strip() or None,
+    }
+    return resp, meta
 
 
 @router.get("/insights", response_model=FarmInsightsResponse)
@@ -60,81 +255,15 @@ async def get_consultant_insights(
         field_ref=(fieldRef or "").strip() or None,
         context=(context or "full").strip().lower(),
     )
-    settings = get_settings()
-    base = (settings.get("dashboard_json_url") or "").strip()
-    env_sid = (settings.get("dashboard_server_id") or "").strip()
-    sid = (serverId or "").strip() or env_sid
-    fetch_url = build_dashboard_fetch_url(base, sid if sid else None)
-    if not fetch_url:
-        fetch_url = settings.get("dashboard_fetch_url") or settings.get("dashboard_json_url") or ""
-
-    raw, err = await fetch_dashboard_json(fetch_url or None)
-    if raw is None:
-        logger.warning(
-            "consultant: no snapshot (serverId query=%r fetch_url=%r err=%s)",
-            (serverId or "").strip() or None,
-            (fetch_url or "")[:160],
-            err,
-        )
-        raise HTTPException(
-            status_code=503,
-            detail=err or "Dashboard snapshot unavailable — configure FTP or DASHBOARD_JSON_URL",
-        )
-
-    logger.info(
-        "consultant: snapshot bytes_utf8=%s server_id_query=%r context=%s fieldRef=%s",
-        len(raw.encode("utf-8")),
-        sid,
-        (context or "full").strip().lower(),
-        (fieldRef or "").strip() or None,
-    )
-
-    try:
-        snapshot = json.loads(raw)
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=503, detail=f"Invalid dashboard JSON: {e}") from e
-
-    if not isinstance(snapshot, dict):
-        snapshot = {"_raw": snapshot}
-
-    ctx = (context or "full").strip().lower()
-    if ctx not in ("full", "fields"):
-        ctx = "full"
-
-    field_ref_q = (fieldRef or "").strip()
-    sys_inst: str | None = None
-
-    if field_ref_q:
-        sliced = slice_snapshot_for_single_field(snapshot, field_ref_q)
-        if sliced is None:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No field matches fieldRef={field_ref_q!r} in this save's snapshot.",
-            )
-        snapshot = sliced
-        sys_inst = CONSULTANT_SYSTEM_SINGLE_FIELD
-    elif ctx == "fields":
-        snapshot = prune_snapshot_fields_context_only(snapshot)
-
     user_key = normalize_incoming_api_key(request.headers.get("X-AI-API-Key"))
     user_prov = (request.headers.get("X-AI-Provider") or "").strip().lower() or None
     if user_prov and user_prov not in ("openai", "gemini"):
         user_prov = None
 
-    insights, llm_used = await generate_farm_insights(
-        snapshot,
+    return await compute_consultant_insights(
+        server_id=serverId,
+        field_ref=fieldRef,
+        context=context,
         user_api_key=user_key or None,
         user_provider=user_prov,
-        system_instruction=sys_inst,
     )
-    log_pipeline(
-        "consultant_out",
-        "Responded with Smart suggestions",
-        insight_count=len(insights),
-        llm_used=llm_used,
-        snapshot_bytes=approx_json_bytes(snapshot),
-        server_id_query=(serverId or "").strip() or None,
-        field_ref=field_ref_q or None,
-        context=ctx,
-    )
-    return FarmInsightsResponse(insights=insights, llm_used=llm_used)

@@ -89,9 +89,18 @@
         <p class="muted small" style="margin: -0.35rem 0 0.5rem 0;">Use an id from Google’s API for your key (e.g. <code>gemini-2.5-flash</code>, <code>gemini-2.0-flash</code>). If you see HTTP 404, try <code>GEMINI_REST_API_VERSION=v1beta</code> or another model name.</p>
         <button type="submit" class="btn primary">Save settings</button>
         <p class="muted small" style="margin-top: 0.75rem;">
-          <button type="button" class="btn" id="adminTestLlmBtn">Test LLM connection</button>
-          <span id="adminTestLlmResult" class="muted small" style="margin-left: 0.5rem;"></span>
+          <label class="row" style="margin-bottom: 0.5rem; max-width: 28rem;">
+            <span><code>serverId</code> (Farm Dashboard save / push buffer)</span>
+            <input type="text" name="admin_test_llm_server_id" id="adminTestLlmServerId" value="{{ dashboard_server_id|e }}" placeholder="srv_…" autocomplete="off"/>
+          </label>
+          <label class="row" style="margin-bottom: 0.5rem; max-width: 14rem;">
+            <span><code>activeFarmId</code> (optional, same as farm dropdown — default 1 / snapshot)</span>
+            <input type="number" name="admin_test_llm_active_farm" id="adminTestLlmActiveFarm" min="1" step="1" placeholder="1" autocomplete="off"/>
+          </label>
+          <button type="button" class="btn" id="adminTestLlmBtn">Test next job on first owned field</button>
+          <span id="adminTestLlmResult" class="muted small" style="margin-left: 0.5rem; display: inline-block; max-width: 46rem; vertical-align: top;"></span>
         </p>
+        <p class="muted small" style="margin-top: 0.25rem;">Loads the latest snapshot, picks the <strong>first owned field</strong> for that farm, then runs the <strong>single-field</strong> consultant (same as <code>?fieldRef=&lt;farmlandId&gt;</code>) so the reply is the suggested <strong>next job</strong> on that parcel. May take 10–60s. Server API keys only (not BYOK).</p>
       </form>
     </section>
 

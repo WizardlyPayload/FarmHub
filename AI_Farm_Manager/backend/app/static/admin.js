@@ -3,24 +3,47 @@
   const testOut = document.getElementById("adminTestLlmResult");
   if (testBtn && testOut) {
     testBtn.addEventListener("click", async function () {
-      testOut.textContent = "Running…";
+      testOut.textContent = "Loading snapshot, picking first owned field, running single-field consultant (next job)…";
       testOut.className = "muted small";
+      testOut.style.color = "";
       try {
-        const r = await fetch("/admin/api/test-llm", { credentials: "same-origin" });
+        var sidEl = document.getElementById("adminTestLlmServerId");
+        var farmEl = document.getElementById("adminTestLlmActiveFarm");
+        var sid = sidEl && sidEl.value ? String(sidEl.value).trim() : "";
+        var af = farmEl && farmEl.value !== "" ? String(farmEl.value).trim() : "";
+        var qs = new URLSearchParams();
+        if (sid) qs.set("serverId", sid);
+        if (af) qs.set("activeFarmId", af);
+        var url = "/admin/api/test-llm?" + qs.toString();
+        const r = await fetch(url, { credentials: "same-origin" });
         const j = await r.json().catch(function () {
           return {};
         });
         if (!r.ok) {
           testOut.textContent = "HTTP " + r.status + (j.detail ? " — " + JSON.stringify(j.detail) : "");
+          testOut.style.color = "#fbbf24";
           return;
         }
         if (j.ok) {
+          var fld = j.field || {};
+          var prev = (j.insights_preview || [])[0];
+          var firstMsg = prev && prev.message ? String(prev.message) : "";
+          var firstWhy = prev && prev.reasoning ? String(prev.reasoning) : "";
+          var parcel =
+            "Field #" +
+            (fld.chosen_field_ref || "?") +
+            (fld.fruit_type ? " (" + fld.fruit_type + ")" : "") +
+            (fld.field_name ? " — " + fld.field_name : "");
           testOut.textContent =
             "OK — " +
-            (j.provider || "") +
-            (j.latency_ms != null ? " — " + j.latency_ms + " ms" : "") +
-            (j.model ? " — model " + j.model : "") +
-            (j.detail ? " — reply: " + j.detail : "");
+            parcel +
+            " — llm_used=" +
+            j.llm_used +
+            (j.insight_count != null ? " — " + j.insight_count + " insight(s)" : "") +
+            (j.provider ? " — " + j.provider : "") +
+            (j.model ? " / " + j.model : "") +
+            (firstMsg ? " — Next: " + firstMsg : "") +
+            (firstWhy ? " — " + firstWhy.slice(0, 160) + (firstWhy.length > 160 ? "…" : "") : "");
           testOut.className = "small";
           testOut.style.color = "#6ee7b7";
         } else {

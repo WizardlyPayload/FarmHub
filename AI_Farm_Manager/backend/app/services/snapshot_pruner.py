@@ -306,3 +306,82 @@ def prune_snapshot_fields_context_only(snapshot: dict[str, Any]) -> dict[str, An
         if light in root:
             root[light] = _prune_value(root[light], 0)
     return root
+
+
+def pick_first_owned_field_row(
+    snapshot: dict[str, Any],
+    active_farm_id: int | None = None,
+) -> tuple[str | None, dict[str, Any] | None]:
+    """
+    Choose one parcel for single-field consultant tests: first owned field for the active farm.
+
+    Matches Farm Dashboard behaviour: filter by ``ownerFarmId`` / ``farmId`` vs ``activeFarmId``
+    (from JSON or default 1). Falls back to any player-owned field, then any field with an id.
+    """
+    af = active_farm_id
+    if af is None:
+        raw_af = snapshot.get("activeFarmId")
+        if raw_af is None and isinstance(snapshot.get("activeFarm"), dict):
+            raw_af = snapshot["activeFarm"].get("id")
+        try:
+            af = int(raw_af) if raw_af is not None else 1
+        except (TypeError, ValueError):
+            af = 1
+
+    rows: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for key in ("fields", "allFields"):
+        arr = snapshot.get(key)
+        if not isinstance(arr, list):
+            continue
+        for f in arr:
+            if not isinstance(f, dict):
+                continue
+            rid = f.get("farmlandId", f.get("id"))
+            sk = str(rid).strip() if rid is not None else ""
+            if sk and sk in seen:
+                continue
+            if sk:
+                seen.add(sk)
+            rows.append(f)
+
+    def sort_key(f: dict[str, Any]) -> tuple[int, int]:
+        v = f.get("farmlandId", f.get("id"))
+        try:
+            return (0, int(v))
+        except (TypeError, ValueError):
+            return (1, 0)
+
+    rows.sort(key=sort_key)
+
+    def owner_id(f: dict[str, Any]) -> int:
+        try:
+            return int(f.get("ownerFarmId", f.get("farmId")) or 0)
+        except (TypeError, ValueError):
+            return 0
+
+    def field_ref_of(f: dict[str, Any]) -> str | None:
+        v = f.get("farmlandId", f.get("id"))
+        if v is None:
+            return None
+        s = str(v).strip()
+        return s if s else None
+
+    for f in rows:
+        if owner_id(f) > 0 and owner_id(f) == af:
+            ref = field_ref_of(f)
+            if ref:
+                return ref, f
+
+    for f in rows:
+        if owner_id(f) > 0:
+            ref = field_ref_of(f)
+            if ref:
+                return ref, f
+
+    for f in rows:
+        ref = field_ref_of(f)
+        if ref:
+            return ref, f
+
+    return None, None

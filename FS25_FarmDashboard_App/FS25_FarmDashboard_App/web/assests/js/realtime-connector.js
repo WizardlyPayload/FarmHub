@@ -3,6 +3,43 @@
 /** Set true only when diagnosing livestock change notifications */
 const VERBOSE_CHANGE_LOG = false;
 
+/**
+ * Animal lists are filtered by selected farm. Switching farm/server/save replaces the list — not the same as animals leaving the map.
+ * Skip add/remove toasts when the dashboard view context changed since the last payload.
+ */
+function shouldSkipLivestockChangeToasts(oldState, dashboard) {
+  if (!oldState || !dashboard) return false;
+  const hadCtx =
+    oldState.contextFarmId !== undefined ||
+    oldState.contextServerId !== undefined ||
+    oldState.contextSaveKey !== undefined;
+  if (!hadCtx) return false;
+
+  const farm = Number(dashboard.activeFarmId ?? 1);
+  const srv = String(
+    dashboard.activeServerId ??
+      (typeof localStorage !== "undefined"
+        ? localStorage.getItem("dashboard_active_server") || ""
+        : "")
+  );
+  const save = String(dashboard.savegameName ?? "");
+
+  if (oldState.contextFarmId !== undefined && oldState.contextFarmId !== farm) {
+    return true;
+  }
+  if (
+    oldState.contextServerId !== undefined &&
+    String(oldState.contextServerId) !== srv
+  ) {
+    return true;
+  }
+  const oldSk = oldState.contextSaveKey;
+  if (oldSk !== undefined && oldSk !== "" && save !== oldSk) {
+    return true;
+  }
+  return false;
+}
+
 class RealtimeConnector {
   constructor(dashboard) {
     this.dashboard = dashboard;
@@ -291,11 +328,19 @@ class RealtimeConnector {
     this.dashboard.lastUpdate = new Date();
     this.updateLastUpdateTime();
 
-    // Store current state for next comparison
+    // Store current state for next comparison (include view context so we don't toast "removed" on farm/save switches)
     const newState = {
       animals: this.dashboard.animals ? [...this.dashboard.animals] : [],
       pastures: this.dashboard.pastures ? [...this.dashboard.pastures] : [],
       gameTime: this.dashboard.gameTime,
+      contextFarmId: Number(this.dashboard.activeFarmId ?? 1),
+      contextServerId: String(
+        this.dashboard.activeServerId ??
+          (typeof localStorage !== "undefined"
+            ? localStorage.getItem("dashboard_active_server") || ""
+            : "")
+      ),
+      contextSaveKey: String(this.dashboard.savegameName ?? ""),
     };
 
     // Check for changes and show toast notifications
@@ -318,7 +363,15 @@ class RealtimeConnector {
             })`
           );
         }
-        this.detectAndShowChanges(oldState);
+        if (shouldSkipLivestockChangeToasts(oldState, this.dashboard)) {
+          if (VERBOSE_CHANGE_LOG) {
+            console.log(
+              "[ChangeDetection] Skipping livestock toasts — farm/server/save context changed (not real removals)"
+            );
+          }
+        } else {
+          this.detectAndShowChanges(oldState);
+        }
         this.lastChangeCheck = now;
       }
     }

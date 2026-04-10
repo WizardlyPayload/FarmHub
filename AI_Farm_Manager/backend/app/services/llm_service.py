@@ -104,7 +104,7 @@ def _gemini_extract_text_and_diagnostics(data: dict[str, Any]) -> tuple[str, str
 
 
 def _strip_gemini_key(s: str) -> str:
-    return (s or "").strip().replace("\ufeff", "").replace("\u200b", "")
+    return (s or "").strip().replace("\ufeff", "").replace("\u200b", "").replace("\r", "")
 
 
 def _gemini_ordered_keys(settings: dict[str, Any]) -> list[str]:
@@ -190,6 +190,8 @@ async def _gemini_retry_same_key_once_after_429(
     url: str,
     payload: dict[str, Any],
     r: httpx.Response,
+    *,
+    pool_size: int = 1,
 ) -> httpx.Response:
     """
     First POST already returned HTTP 429 for this URL/key and there are **no** other keys left to try.
@@ -209,10 +211,17 @@ async def _gemini_retry_same_key_once_after_429(
         return r
     cap = _gemini_429_max_sleep_sec()
     wait = min(delay, cap)
+    pool_note = (
+        f"After HTTP 429 on all {pool_size} distinct key(s) in the pool — "
+        if pool_size > 1
+        else "Only one key in the pool — "
+    )
     log_event(
         "INFO",
-        f"Gemini 429 on last available key — waiting {wait:.1f}s then one retry (same key). "
-        "Add GEMINI_API_KEY_2… to rotate without waiting. "
+        f"Gemini 429: {pool_note}waiting {wait:.1f}s then one retry (same key). "
+        "If you expected more keys, check startup log "
+        "\"Gemini API key pool\" for unique vs duplicate env slots. "
+        "Free-tier quota is per Google Cloud project; billing or separate projects may be required. "
         "https://ai.google.dev/gemini-api/docs/rate-limits",
     )
     await asyncio.sleep(wait)
@@ -247,11 +256,14 @@ async def _gemini_post_with_quota_fallback(
                 if i < len(keys) - 1:
                     log_event(
                         "WARN",
-                        f"Gemini HTTP {r.status_code} — trying next API key immediately (no wait)",
+                        f"Gemini HTTP {r.status_code} — trying next API key immediately "
+                        f"(no wait) [{i + 1}/{len(keys)}]",
                     )
                     continue
                 if r.status_code == 429:
-                    r = await _gemini_retry_same_key_once_after_429(client, url, payload, r)
+                    r = await _gemini_retry_same_key_once_after_429(
+                        client, url, payload, r, pool_size=len(keys)
+                    )
                 if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
                     log_event("ERROR", format_gemini_http_error(r))
                     r.raise_for_status()
@@ -311,12 +323,13 @@ async def gemini_consultant_post_with_quota_fallback(
                 if i < len(keys) - 1:
                     log_event(
                         "WARN",
-                        f"Gemini HTTP {r.status_code} — trying next API key immediately (no wait)",
+                        f"Gemini HTTP {r.status_code} — trying next API key immediately "
+                        f"(no wait) [{i + 1}/{len(keys)}]",
                     )
                     continue
                 if r.status_code == 429:
                     r = await _gemini_retry_same_key_once_after_429(
-                        client, url, effective_payload, r
+                        client, url, effective_payload, r, pool_size=len(keys)
                     )
             if r.status_code >= 400:
                 log_event("WARN", format_gemini_http_error(r))
@@ -498,17 +511,18 @@ async def test_llm_connectivity(
                     if r.status_code in (400, 403):
                         post_payload = payload_no_safety
                         r = await client.post(url, json=post_payload)
-                    if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
-                        if i < len(keys) - 1:
-                            log_event(
-                                "WARN",
-                                f"Gemini HTTP {r.status_code} — trying next API key immediately (no wait)",
-                            )
-                            continue
-                        if r.status_code == 429:
-                            r = await _gemini_retry_same_key_once_after_429(
-                                client, url, post_payload, r
-                            )
+            if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
+                if i < len(keys) - 1:
+                    log_event(
+                        "WARN",
+                        f"Gemini HTTP {r.status_code} — trying next API key immediately "
+                        f"(no wait) [{i + 1}/{len(keys)}]",
+                    )
+                    continue
+                if r.status_code == 429:
+                    r = await _gemini_retry_same_key_once_after_429(
+                        client, url, post_payload, r, pool_size=len(keys)
+                    )
                     if r.status_code < 400:
                         break
                     return {

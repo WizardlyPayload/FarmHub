@@ -84,12 +84,12 @@ def _clamp_int(raw: str, lo: int, hi: int, default: int) -> int:
 
 
 def _strip_key(s: str) -> str:
-    return (s or "").strip().replace("\ufeff", "").replace("\u200b", "")
+    return (s or "").strip().replace("\ufeff", "").replace("\u200b", "").replace("\r", "")
 
 
-def _parse_gemini_key_list(llm_provider: str, llm_api_key: str) -> list[str]:
+def _parse_gemini_key_list(llm_provider: str, llm_api_key: str) -> tuple[list[str], int]:
     """
-    Ordered unique Gemini keys for rotation and 429 fallback.
+    Ordered unique Gemini keys for rotation and 429 fallback, plus a raw slot count.
 
     All of the following are merged (first occurrence sets order; duplicates are skipped):
 
@@ -97,35 +97,39 @@ def _parse_gemini_key_list(llm_provider: str, llm_api_key: str) -> list[str]:
     - ``GEMINI_API_KEY`` (and ``LLM_API_KEY`` when provider is gemini and it looks like ``AIza…``)
     - ``GEMINI_API_KEY_2`` … ``GEMINI_API_KEY_16``
 
-    Previously, a non-empty ``GEMINI_API_KEYS`` replaced the numbered vars entirely, which
-    caused hosts that set both (e.g. one key in ``GEMINI_API_KEYS`` plus ``GEMINI_API_KEY_2``…)
-    to only see a single key.
+    The second return value counts **non-empty env slots** (before dedupe). If it is greater than
+    ``len(keys)``, the same key string was repeated in multiple variables.
     """
     keys: list[str] = []
     seen: set[str] = set()
+    raw_slots = 0
 
-    def add(raw: str) -> None:
+    def consider(raw: str) -> None:
+        nonlocal raw_slots
         k = _strip_key(raw)
-        if k and k not in seen:
+        if not k:
+            return
+        raw_slots += 1
+        if k not in seen:
             seen.add(k)
             keys.append(k)
 
     raw_multi = (os.getenv("GEMINI_API_KEYS") or "").strip()
     if raw_multi:
         for part in raw_multi.replace("\n", ",").split(","):
-            add(part)
+            consider(part)
 
     primary = _strip_key(os.getenv("GEMINI_API_KEY", ""))
     if llm_provider == "gemini" and not primary:
         lk = _strip_key(llm_api_key)
         if lk.startswith("AIza"):
             primary = lk
-    add(primary)
+    consider(primary)
 
     for i in range(2, 17):
-        add(os.getenv(f"GEMINI_API_KEY_{i}", ""))
+        consider(os.getenv(f"GEMINI_API_KEY_{i}", ""))
 
-    return keys
+    return keys, raw_slots
 
 
 def active_gemini_api_key(settings: dict[str, Any]) -> str:
@@ -165,15 +169,26 @@ def get_settings() -> dict:
     llm_provider = os.getenv("LLM_PROVIDER", "openai").lower().strip()
     llm_api_key = os.getenv("LLM_API_KEY", "")
     gemini_api_key = _strip_key(os.getenv("GEMINI_API_KEY", ""))
-    gemini_api_keys = _parse_gemini_key_list(llm_provider, llm_api_key)
+    gemini_api_keys, gemini_key_raw_slots = _parse_gemini_key_list(llm_provider, llm_api_key)
     if gemini_api_keys:
         gemini_api_key = gemini_api_keys[0]
     if llm_provider == "gemini" and gemini_api_keys:
-        logger.info(
-            "Gemini API key pool: %s unique key(s) loaded (GEMINI_API_KEYS + GEMINI_API_KEY + "
-            "GEMINI_API_KEY_2…, deduped; values not logged)",
-            len(gemini_api_keys),
-        )
+        n_u, n_r = len(gemini_api_keys), gemini_key_raw_slots
+        if n_r > n_u:
+            logger.info(
+                "Gemini API key pool: %s unique key(s), %s non-empty env slot(s) — %s duplicate slot(s) "
+                "(same AIza… string repeated; only unique strings rotate). Key values are not logged.",
+                n_u,
+                n_r,
+                n_r - n_u,
+            )
+        else:
+            logger.info(
+                "Gemini API key pool: %s unique key(s), %s env slot(s) (no duplicate strings among slots). "
+                "Key values are not logged.",
+                n_u,
+                n_r,
+            )
     be = _bot_enabled()
     if llm_provider == "gemini":
         llm_configured = be and bool(gemini_api_keys or gemini_api_key)

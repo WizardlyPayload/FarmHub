@@ -185,20 +185,22 @@ def _gemini_retry_after_seconds(response: httpx.Response) -> float | None:
     return None
 
 
-async def _gemini_post_same_key_429_wait_retry(
+async def _gemini_retry_same_key_once_after_429(
     client: httpx.AsyncClient,
     url: str,
     payload: dict[str, Any],
+    r: httpx.Response,
 ) -> httpx.Response:
     """
-    One generateContent POST; on HTTP 429 optionally sleep for Google's suggested window
-    (body text ``Please retry in Xs`` or ``Retry-After`` header) capped by GEMINI_429_MAX_SLEEP_SEC,
-    then retry **once** on the same URL/key.
+    First POST already returned HTTP 429 for this URL/key and there are **no** other keys left to try.
+    Optionally sleep for Google's suggested window, then POST **once** more on the same key.
+
+    When ``GEMINI_API_KEY_2``… (or a multi-key pool) is configured, callers should rotate to the next
+    key **before** calling this — no sleep, so the user does not wait while another key is available.
     """
-    if _GEMINI_ADMIN_TEST_NO_429_WAIT.get():
-        return await client.post(url, json=payload)
-    r = await client.post(url, json=payload)
     if r.status_code != 429:
+        return r
+    if _GEMINI_ADMIN_TEST_NO_429_WAIT.get():
         return r
     if not _gemini_429_sleep_retry_enabled():
         return r
@@ -209,8 +211,9 @@ async def _gemini_post_same_key_429_wait_retry(
     wait = min(delay, cap)
     log_event(
         "INFO",
-        f"Gemini 429 rate limit — waiting {wait:.1f}s then one retry (same key). "
-        "Free tier limits: https://ai.google.dev/gemini-api/docs/rate-limits",
+        f"Gemini 429 on last available key — waiting {wait:.1f}s then one retry (same key). "
+        "Add GEMINI_API_KEY_2… to rotate without waiting. "
+        "https://ai.google.dev/gemini-api/docs/rate-limits",
     )
     await asyncio.sleep(wait)
     return await client.post(url, json=payload)
@@ -239,16 +242,19 @@ async def _gemini_post_with_quota_fallback(
                 )
                 continue
             url = _gemini_generate_url_for_key(settings, key)
-            r = await _gemini_post_same_key_429_wait_retry(client, url, payload)
+            r = await client.post(url, json=payload)
             if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
                 if i < len(keys) - 1:
                     log_event(
                         "WARN",
-                        f"Gemini key overloaded (HTTP {r.status_code}), rotating to next key…",
+                        f"Gemini HTTP {r.status_code} — trying next API key immediately (no wait)",
                     )
                     continue
-                log_event("ERROR", format_gemini_http_error(r))
-                r.raise_for_status()
+                if r.status_code == 429:
+                    r = await _gemini_retry_same_key_once_after_429(client, url, payload, r)
+                if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
+                    log_event("ERROR", format_gemini_http_error(r))
+                    r.raise_for_status()
             if r.status_code >= 400:
                 log_event("ERROR", format_gemini_http_error(r))
             r.raise_for_status()
@@ -283,7 +289,8 @@ async def gemini_consultant_post_with_quota_fallback(
                 )
                 continue
             url = _gemini_generate_url_for_key(settings, key)
-            r = await _gemini_post_same_key_429_wait_retry(client, url, payload)
+            effective_payload: dict[str, Any] = dict(payload)
+            r = await client.post(url, json=effective_payload)
             if r.status_code == 400 and want_json_mime:
                 log_event(
                     "WARN",
@@ -298,17 +305,19 @@ async def gemini_consultant_post_with_quota_fallback(
                     raise RuntimeError(
                         "Gemini consultant: daily budget exhausted for all keys before MIME retry"
                     )
-                r = await _gemini_post_same_key_429_wait_retry(
-                    client,
-                    url,
-                    {**payload, "generationConfig": dict(base_generation_config)},
-                )
-            if r.status_code in _GEMINI_QUOTA_RETRY_STATUS and i < len(keys) - 1:
-                log_event(
-                    "WARN",
-                    f"Gemini key overloaded (HTTP {r.status_code}), rotating to next key…",
-                )
-                continue
+                effective_payload = {**payload, "generationConfig": dict(base_generation_config)}
+                r = await client.post(url, json=effective_payload)
+            if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
+                if i < len(keys) - 1:
+                    log_event(
+                        "WARN",
+                        f"Gemini HTTP {r.status_code} — trying next API key immediately (no wait)",
+                    )
+                    continue
+                if r.status_code == 429:
+                    r = await _gemini_retry_same_key_once_after_429(
+                        client, url, effective_payload, r
+                    )
             if r.status_code >= 400:
                 log_event("WARN", format_gemini_http_error(r))
             try:
@@ -484,15 +493,22 @@ async def test_llm_connectivity(
             async with httpx.AsyncClient(timeout=45.0) as client:
                 for i, key in enumerate(keys):
                     url = _gemini_generate_url_for_key(settings, key)
-                    r = await _gemini_post_same_key_429_wait_retry(client, url, payload_with_safety)
+                    post_payload: dict[str, Any] = payload_with_safety
+                    r = await client.post(url, json=post_payload)
                     if r.status_code in (400, 403):
-                        r = await _gemini_post_same_key_429_wait_retry(client, url, payload_no_safety)
-                    if r.status_code in _GEMINI_QUOTA_RETRY_STATUS and i < len(keys) - 1:
-                        log_event(
-                            "WARN",
-                            f"Gemini key overloaded (HTTP {r.status_code}), rotating to next key…",
-                        )
-                        continue
+                        post_payload = payload_no_safety
+                        r = await client.post(url, json=post_payload)
+                    if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
+                        if i < len(keys) - 1:
+                            log_event(
+                                "WARN",
+                                f"Gemini HTTP {r.status_code} — trying next API key immediately (no wait)",
+                            )
+                            continue
+                        if r.status_code == 429:
+                            r = await _gemini_retry_same_key_once_after_429(
+                                client, url, post_payload, r
+                            )
                     if r.status_code < 400:
                         break
                     return {

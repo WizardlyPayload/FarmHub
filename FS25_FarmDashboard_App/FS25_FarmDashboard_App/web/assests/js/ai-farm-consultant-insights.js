@@ -54,6 +54,25 @@
     }
   }
 
+  /** Current navbar section → consultant ``view=`` param (must match sectionToViewParam inside refreshFarmInsights). */
+  function getSmartPanelViewParam() {
+    function sectionToViewParam(section) {
+      var s = String(section || 'landing').toLowerCase();
+      if (s === 'landing' || s === 'dashboard') return '';
+      var allowed = ['fields', 'vehicles', 'pastures', 'livestock', 'productions', 'economy'];
+      for (var i = 0; i < allowed.length; i++) {
+        if (allowed[i] === s) return s;
+      }
+      return '';
+    }
+    try {
+      if (window.dashboard && typeof window.dashboard.getCurrentSection === 'function') {
+        return sectionToViewParam(window.dashboard.getCurrentSection());
+      }
+    } catch (e) {}
+    return '';
+  }
+
   function showInsightsSkeleton() {
     var container = document.getElementById('ai-insights-panel');
     if (!container) return;
@@ -119,6 +138,25 @@
     var container = document.getElementById('ai-insights-panel');
     if (!container) return;
 
+    /**
+     * On the Fields tab we already run ``context=fields`` for each field card (field-consultant-bridge).
+     * A second parallel ``GET …/insights`` for the Smart panel doubles Gemini calls and burns free-tier quota (HTTP 429).
+     */
+    if (getSmartPanelViewParam() === 'fields') {
+      container.removeAttribute('aria-busy');
+      var badgeSkip = document.getElementById('ai-insights-llm-badge');
+      if (badgeSkip) {
+        badgeSkip.textContent = 'Per-field';
+        badgeSkip.className = 'badge ms-1 bg-info text-dark';
+        badgeSkip.title =
+          'Farm-wide LLM is not requested on the Fields tab. Each field card loads AI below. Open Home or another tab for summaries here.';
+      }
+      container.innerHTML =
+        '<p class="small text-muted mb-0">Farm-wide Smart suggestions are not fetched on the <strong>Fields</strong> tab (avoids duplicate Gemini calls). Use the AI lines on each field card below. Switch to <strong>Home</strong> or another section for summaries in this panel.</p>';
+      pl('renderer_ok', 'smart suggestions panel skipped on Fields tab (per-field consultant only)', {});
+      return;
+    }
+
     showInsightsSkeleton();
 
     function dbg(phase, payload) {
@@ -167,23 +205,7 @@
           if (farmId) {
             apiURL += (apiURL.indexOf('?') >= 0 ? '&' : '?') + 'farmId=' + encodeURIComponent(farmId);
           }
-          function sectionToViewParam(section) {
-            var s = String(section || 'landing').toLowerCase();
-            if (s === 'landing' || s === 'dashboard') return '';
-            var allowed = ['fields', 'vehicles', 'pastures', 'livestock', 'productions', 'economy'];
-            for (var i = 0; i < allowed.length; i++) {
-              if (allowed[i] === s) return s;
-            }
-            return '';
-          }
-          var viewParam = '';
-          try {
-            if (window.dashboard && typeof window.dashboard.getCurrentSection === 'function') {
-              viewParam = sectionToViewParam(window.dashboard.getCurrentSection());
-            }
-          } catch (eView) {
-            viewParam = '';
-          }
+          var viewParam = getSmartPanelViewParam();
           if (viewParam) {
             apiURL += (apiURL.indexOf('?') >= 0 ? '&' : '?') + 'view=' + encodeURIComponent(viewParam);
           }

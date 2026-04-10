@@ -64,7 +64,8 @@ _CONSULTANT_SNAPSHOT_CHARS_OPENAI = 118000
 # After prune_dashboard_snapshot_for_llm, cap rows so huge farms do not blow prompt size (field-map mode).
 _FIELD_MAP_MAX_FIELD_ROWS = 100
 
-CONSULTANT_SYSTEM = """You are an expert Farming Simulator 25 field and logistics consultant. Analyze the provided game state JSON.
+# Shared body: no global "max 4" here — field map appends its own output limits (one insight per row).
+CONSULTANT_SYSTEM_BASE = """You are an expert Farming Simulator 25 field and logistics consultant. Analyze the provided game state JSON.
 
 Focus especially on **fields** (arable parcels):
 - Current crop, growth stage, harvest readiness, withered state, soil work (plow/cultivate), lime/pH, nitrogen/Precision Farming.
@@ -92,12 +93,21 @@ Equipment and natural language (message + reasoning):
 
 For farm-wide or non-parcel field advice, omit **field_ref** or set it to null.
 
-Use at least one Field insight when the snapshot lists fields; use an empty array only if there is no usable data.
+Use at least one Field insight when the snapshot lists fields; use an empty array only if there is no usable data."""
 
-Output limits (so the JSON always completes):
+_CONSULTANT_OUTPUT_TAIL_SUMMARY = """
+Output limits (farm-wide / default consultant — so the JSON always completes):
 - Return **at most 4** insights.
 - **priority** must be exactly **Low**, **Medium**, or **High** (spell **Medium** in full — not Med).
 - Keep **message** and **reasoning** **brief** (aim under 180 characters each). Do not write long paragraphs."""
+
+CONSULTANT_SYSTEM = CONSULTANT_SYSTEM_BASE + _CONSULTANT_OUTPUT_TAIL_SUMMARY
+
+_CONSULTANT_OUTPUT_TAIL_FIELD_MAP = """
+Output limits (field map only — applies after FIELD MAP MODE rules above):
+- **priority** must be exactly **Low**, **Medium**, or **High** (spell **Medium** in full — not Med).
+- Keep **message** and **reasoning** brief (aim under 180 characters each).
+- The **`insights` array length MUST equal the number of field objects in this request** — never stop at 4, 6, or any smaller number than the field row count."""
 
 CONSULTANT_SYSTEM_SINGLE_FIELD = """You are an expert Farming Simulator 25 **single-field** consultant.
 
@@ -115,15 +125,14 @@ Rules:
 - If the JSON has no usable field data, return {"insights":[]}."""
 
 # Appended when Farm Dashboard calls GET …/insights?context=fields (per-parcel field map).
-# The default CONSULTANT_SYSTEM allows mixed categories; models often fill all slots with
-# Production/Finance — those never map to field rows in the dashboard UI.
+# Uses CONSULTANT_SYSTEM_BASE (no "at most 4") + field-map tail — otherwise models stop at 4 insights.
 CONSULTANT_SYSTEM_FIELDS_FOCUS = (
-    CONSULTANT_SYSTEM
+    CONSULTANT_SYSTEM_BASE
     + """
 
 FIELD MAP MODE (this HTTP request only — clients match rows by field_ref):
 
-CRITICAL — COVERAGE (overrides any earlier "at most 4" / summary instructions in this prompt):
+CRITICAL — COVERAGE:
 - You MUST generate exactly ONE insight for EVERY SINGLE field row provided in the JSON (under `fields` and/or `allFields` as present for this request).
 - Count those field objects; ensure your `insights` array length matches that count exactly. Do not summarize, merge, or skip fields.
 - **Every** insight MUST use "category":"Field" and a non-null **field_ref** copied from that parcel's **farmlandId** or **id** in the JSON (number or string, no name, no # prefix).
@@ -137,6 +146,7 @@ FIELD MAP — equipment + wording (each per-field **message**):
 - **Weeds:** Do **not** output "weed level", "weeds (level N)", or numeric weed counts — say **weeds** / **needs a spray** only. Use **growthLabel** / stage (e.g. `x/y`): if **late** (last 1–2 stages or ~last third of growth), **do not** recommend **mechanical weeders** (rotary hoe, etc.); recommend **herbicide** and a **sprayer** from **vehicles**. Early/mid growth: mechanical weeder OK if listed and appropriate.
 - If no suitable vehicle appears in **vehicles**, state the task in plain FS25 language with **no** default purchase advice.
 - **Banned:** "Consider purchasing to [verb]", "Consider purchasing to plan", or any "purchasing to …" — rewrite as clear imperatives or conditionals. Mention acquiring equipment only if nothing in **vehicles** fits and phrase as a full sentence."""
+    + _CONSULTANT_OUTPUT_TAIL_FIELD_MAP
 )
 
 # Smart suggestions panel on Fields tab (?view=fields, context=full) — not the field-map row API (context=fields).
@@ -603,7 +613,7 @@ async def _gemini_consultant(
         log_event(
             "WARN",
             "Gemini consultant hit MAX_TOKENS — output JSON may be cut mid-string; "
-            "prompt asks for ≤4 brief insights; check snapshot size",
+            "prompt output may be truncated; field map needs one insight per field — check snapshot size / maxOutputTokens",
             finishReason=finish,
             candidates_tokens=um.get("candidatesTokenCount"),
             prompt_tokens=um.get("promptTokenCount"),

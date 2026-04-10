@@ -330,6 +330,12 @@ def prune_snapshot_to_active_farm(snapshot: dict[str, Any], farm_id: int) -> dic
     Keep only rows for the farm the player is viewing (same rule as ``filterFieldsForFarmView``:
     ``ownerFarmId`` / ``farmId`` must match). Drops other farms' fields, vehicles, animals, production chains.
 
+    **Field ``isOwned``:** In Lua this flag is ``ownerFarmId == currentFarmId`` (the farm **active in the game
+    session**). Farm Dashboard can switch ``activeFarmId`` to preview another farm without changing the
+    save's current farm, so raw JSON may show ``isOwned: false`` on parcels that still belong to the
+    selected farm. After filtering by ``ownerFarmId``, we set ``isOwned`` to **True** on each kept field
+    row so the consultant does not suggest buying land the player already owns for that farm view.
+
     Call for consultant paths so the LLM is not given the whole map / other saves' data is already split by server.
     """
     if not isinstance(snapshot, dict) or farm_id <= 0:
@@ -354,7 +360,14 @@ def prune_snapshot_to_active_farm(snapshot: dict[str, Any], farm_id: int) -> dic
         arr = root.get(key)
         if not isinstance(arr, list):
             continue
-        root[key] = [copy.deepcopy(f) for f in arr if isinstance(f, dict) and keep_owned_field(f)]
+        kept: list[dict[str, Any]] = []
+        for f in arr:
+            if not isinstance(f, dict) or not keep_owned_field(f):
+                continue
+            fc = copy.deepcopy(f)
+            fc["isOwned"] = True
+            kept.append(fc)
+        root[key] = kept
 
     if isinstance(root.get("vehicles"), list):
         root["vehicles"] = [

@@ -6,13 +6,19 @@
 
 import { getFieldStableId } from "./rules-engine.js";
 
-const MIN_INTERVAL_MS = 8 * 60 * 1000; // 8 minutes — avoid hammering VPS
+const MIN_INTERVAL_MS = 8 * 60 * 1000; // 8 minutes — avoid hammering VPS (same farm + same state only)
 const LS_URL = "farmdash_ai_manager_base_url";
 const LS_KEY = "farmdash_ai_integration_key";
 
-let lastFetchAt = 0;
+/** In-memory consultant map per server+farm — instant restore when switching farms if field state unchanged */
+const fieldConsultantFarmCache = new Map();
+
 let inFlight = false;
 let debounceId = null;
+/** Last successful *network* fetch for throttle (same cache key + same state hash) */
+let lastNetworkFetchAt = 0;
+let lastNetworkKey = "";
+let lastNetworkStateHash = "";
 
 function emitFieldConsultantLoading(loading) {
   if (typeof window === "undefined") return;
@@ -125,7 +131,25 @@ export function indexFieldConsultantInsights(insights) {
  * Match AI insight to a field using string-safe keys (farmlandId, id, stable id).
  */
 /**
+ * serverId + farmId — cache key for per-farm AI insight maps.
+ */
+function getConsultantFarmCacheKey() {
+  const sid =
+    (typeof window !== "undefined" &&
+      window.dashboard &&
+      window.dashboard.activeServerId) ||
+    (typeof localStorage !== "undefined" ? localStorage.getItem("dashboard_active_server") : "") ||
+    "";
+  const farmId =
+    typeof window !== "undefined" && window.dashboard && window.dashboard.activeFarmId != null
+      ? String(window.dashboard.activeFarmId)
+      : "1";
+  return `${sid || ""}::${farmId}`;
+}
+
+/**
  * Stable fingerprint of active-farm field agronomic state for client-side deduplication (saves LLM tokens).
+ * Include anything that should invalidate cached AI lines when it changes.
  */
 function computeActiveFarmFieldsStateHash() {
   try {
@@ -149,14 +173,57 @@ function computeActiveFarmFieldsStateHash() {
         growthLabel: f.growthLabel,
         needsPlowing: f.needsPlowing,
         needsLime: f.needsLime,
+        needsCultivation: f.needsCultivation,
+        needsWork: f.needsWork,
         harvestReady: f.harvestReady,
         isWithered: f.isWithered,
+        nitrogenLevel: f.nitrogenLevel,
+        phValue: f.phValue,
+        weedLevel: f.weedLevel,
       }))
       .sort((a, b) => String(a.id).localeCompare(String(b.id)));
     return JSON.stringify(sig);
   } catch (e) {
     return "";
   }
+}
+
+/**
+ * Restore consultant map from per-farm memory if state matches. Updates DOM only when key/hash differs from last apply.
+ * @returns {boolean} true if no network call is needed (cache served or already up to date)
+ */
+function tryApplyFieldConsultantFarmCache(cacheKey, stateHash, force) {
+  if (force || !stateHash) return false;
+  const entry = fieldConsultantFarmCache.get(cacheKey);
+  if (!entry || entry.stateHash !== stateHash) return false;
+
+  const prevK = typeof window !== "undefined" ? window.__fieldConsultantAppliedKey : null;
+  const prevH = typeof window !== "undefined" ? window.__fieldConsultantAppliedHash : null;
+  if (prevK === cacheKey && prevH === stateHash) {
+    return true;
+  }
+
+  function apply() {
+    if (typeof window === "undefined") return;
+    window.__fieldConsultantByRef = { ...entry.byRef };
+    window.__fieldConsultantLlmUsed = !!entry.llmUsed;
+    window.__lastFieldStateHash = stateHash;
+    window.__fieldConsultantAppliedKey = cacheKey;
+    window.__fieldConsultantAppliedHash = stateHash;
+    window.dispatchEvent(new CustomEvent("field-consultant-updated"));
+  }
+  if (typeof globalThis.dashFlushDomWork === "function") {
+    globalThis.dashFlushDomWork(apply);
+  } else {
+    apply();
+  }
+  if (typeof globalThis.pipelineLog === "function") {
+    globalThis.pipelineLog("renderer_ok", "field consultant restored from memory (farm cache)", {
+      cacheKey,
+      insightKeys: Object.keys(entry.byRef || {}).length,
+    });
+  }
+  return true;
 }
 
 export function lookupFieldConsultantInsight(map, field) {
@@ -189,18 +256,6 @@ export function lookupFieldConsultantInsight(map, field) {
 
 export async function refreshFieldConsultantCache({ force = false } = {}) {
   const now = Date.now();
-  if (!force && lastFetchAt > 0 && now - lastFetchAt < MIN_INTERVAL_MS) {
-    dashDebug("field-consultant-bridge", "skip", {
-      reason: "throttle",
-      msSinceLastOk: now - lastFetchAt,
-      minIntervalMs: MIN_INTERVAL_MS,
-    });
-    return { skipped: true, reason: "throttle" };
-  }
-  if (inFlight) {
-    dashDebug("field-consultant-bridge", "skip", { reason: "in_flight" });
-    return { skipped: true, reason: "in_flight" };
-  }
 
   const intKey = await getIntegrationKey();
   if (!intKey) {
@@ -212,9 +267,43 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
     return { skipped: true, reason: "no_integration_key" };
   }
 
+  const cacheKey = getConsultantFarmCacheKey();
+  const stateHash = computeActiveFarmFieldsStateHash();
+
+  if (force) {
+    fieldConsultantFarmCache.delete(cacheKey);
+  }
+
+  if (!force && stateHash && tryApplyFieldConsultantFarmCache(cacheKey, stateHash, false)) {
+    dashDebug("field-consultant-bridge", "skip", { reason: "farm_cache_hit" });
+    return { skipped: true, reason: "farm_cache_hit" };
+  }
+
+  if (inFlight) {
+    dashDebug("field-consultant-bridge", "skip", { reason: "in_flight" });
+    return { skipped: true, reason: "in_flight" };
+  }
+
   if (!force) {
-    const stateHash = computeActiveFarmFieldsStateHash();
-    if (stateHash && typeof window !== "undefined" && window.__lastFieldStateHash === stateHash) {
+    if (
+      lastNetworkKey === cacheKey &&
+      lastNetworkStateHash === stateHash &&
+      lastNetworkFetchAt > 0 &&
+      now - lastNetworkFetchAt < MIN_INTERVAL_MS
+    ) {
+      dashDebug("field-consultant-bridge", "skip", {
+        reason: "throttle",
+        msSinceLastOk: now - lastNetworkFetchAt,
+        minIntervalMs: MIN_INTERVAL_MS,
+      });
+      return { skipped: true, reason: "throttle" };
+    }
+    if (
+      stateHash &&
+      typeof window !== "undefined" &&
+      window.__fieldConsultantAppliedKey === cacheKey &&
+      window.__lastFieldStateHash === stateHash
+    ) {
       console.log("[AI Farm] Field state unchanged, skipping LLM request to save tokens.");
       dashDebug("field-consultant-bridge", "skip", { reason: "state_unchanged" });
       return { skipped: true, reason: "state_unchanged" };
@@ -223,6 +312,8 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
 
   inFlight = true;
   emitFieldConsultantLoading(true);
+  const hashWhenQueued = stateHash;
+  const requestCacheKey = cacheKey;
   try {
     const extra = await getByokHeaders();
     const base = await getBase();
@@ -333,22 +424,38 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
       }
     } catch (eWarn) {}
 
+    const stillOnRequestedFarm = getConsultantFarmCacheKey() === requestCacheKey;
+    const cacheStateHash = stillOnRequestedFarm
+      ? computeActiveFarmFieldsStateHash()
+      : hashWhenQueued;
+
     function applyFieldConsultantDom() {
-      if (typeof window !== "undefined") {
-        window.__fieldConsultantByRef = byRef;
-        window.__fieldConsultantLlmUsed = !!data.llm_used;
-        window.dispatchEvent(new CustomEvent("field-consultant-updated"));
+      if (typeof window === "undefined") return;
+      if (getConsultantFarmCacheKey() !== requestCacheKey) {
+        dashDebug("field-consultant-bridge", "skip", { reason: "response_stale_farm_switch" });
+        return;
       }
+      window.__fieldConsultantByRef = byRef;
+      window.__fieldConsultantLlmUsed = !!data.llm_used;
+      window.__lastFieldStateHash = cacheStateHash;
+      window.__fieldConsultantAppliedKey = requestCacheKey;
+      window.__fieldConsultantAppliedHash = cacheStateHash;
+      window.dispatchEvent(new CustomEvent("field-consultant-updated"));
     }
     if (typeof globalThis.dashFlushDomWork === "function") {
       globalThis.dashFlushDomWork(applyFieldConsultantDom);
     } else {
       applyFieldConsultantDom();
     }
-    lastFetchAt = Date.now();
-    if (typeof window !== "undefined" && !force) {
-      window.__lastFieldStateHash = computeActiveFarmFieldsStateHash();
-    }
+
+    fieldConsultantFarmCache.set(requestCacheKey, {
+      byRef: { ...byRef },
+      llmUsed: !!data.llm_used,
+      stateHash: cacheStateHash,
+    });
+    lastNetworkFetchAt = Date.now();
+    lastNetworkKey = requestCacheKey;
+    lastNetworkStateHash = cacheStateHash;
     if (typeof globalThis.pipelineLog === "function") {
       globalThis.pipelineLog("renderer_ok", "field consultant cache updated", {
         insightCount: list.length,
@@ -370,7 +477,7 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
 }
 
 /**
- * Debounced field-map consultant fetch. Pass `{ force: true }` to bypass throttle and state-hash dedupe (via refresh).
+ * Debounced field-map consultant fetch. `{ force: true }` clears this farm’s memory entry and bypasses throttle.
  */
 export function scheduleFieldConsultantFetch(options) {
   const force = options && options.force;

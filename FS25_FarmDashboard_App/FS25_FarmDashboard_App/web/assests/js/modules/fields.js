@@ -714,7 +714,7 @@ export function searchFields(term) {
     renderFields(fieldsFilterType, fieldsSearchTerm);
 }
 
-/** Manual refresh of VPS field consultant map (respects 8 min throttle unless user waits). */
+/** Manual refresh of VPS field consultant map (force=true clears farm memory cache; else rate-limit per farm when state unchanged). */
 export function refreshFieldConsultantAI() {
     return refreshFieldConsultantCache({ force: true }).catch((e) => {
         console.warn("[fields] AI consultant refresh", e);
@@ -786,7 +786,7 @@ function buildFieldsHTML() {
 
         <div class="row mb-3">
             <div class="col-md-6 d-flex gap-2 flex-wrap align-items-center">
-                <button type="button" class="btn btn-outline-success btn-sm" onclick="dashboard.refreshFieldConsultantAI()" title="Refresh AI field tips (max once per 8 minutes unless forced)">
+                <button type="button" class="btn btn-outline-success btn-sm" onclick="dashboard.refreshFieldConsultantAI()" title="Refresh AI field tips (per-farm memory when unchanged; max once per 8 min per farm+state unless forced)">
                     <i class="bi bi-stars me-1"></i>AI field tips
                 </button>
                 <button class="btn btn-outline-primary active"

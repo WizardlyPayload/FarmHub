@@ -107,6 +107,21 @@ def _strip_gemini_key(s: str) -> str:
     return (s or "").strip().replace("\ufeff", "").replace("\u200b", "").replace("\r", "")
 
 
+def _gemini_quota_rotate_warn(http_status: int, failed_key_index0: int, pool_len: int) -> str:
+    """
+    Human-readable line when rotating after 429/503.
+
+    ``failed_key_index0`` is 0-based (first key tried in *this* request is 0). The try order restarts
+    from the time-rotated active key on every new HTTP call, so ``1/pool_len`` here does **not**
+    mean "first unit of quota ever" — only "first key in this call's sequence failed."
+    """
+    return (
+        f"Gemini HTTP {http_status} — try-sequence {failed_key_index0 + 1}/{pool_len}: this key slot "
+        f"failed; next key immediately (no wait). "
+        f"(Each new request starts from the time-rotated active key, not a global step counter.)"
+    )
+
+
 def _gemini_ordered_keys(settings: dict[str, Any]) -> list[str]:
     """
     Deduplicated pool order for fallback: time-active key first, then the rest of the pool (wrap).
@@ -254,11 +269,7 @@ async def _gemini_post_with_quota_fallback(
             r = await client.post(url, json=payload)
             if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
                 if i < len(keys) - 1:
-                    log_event(
-                        "WARN",
-                        f"Gemini HTTP {r.status_code} — trying next API key immediately "
-                        f"(no wait) [{i + 1}/{len(keys)}]",
-                    )
+                    log_event("WARN", _gemini_quota_rotate_warn(r.status_code, i, len(keys)))
                     continue
                 if r.status_code == 429:
                     r = await _gemini_retry_same_key_once_after_429(
@@ -321,11 +332,7 @@ async def gemini_consultant_post_with_quota_fallback(
                 r = await client.post(url, json=effective_payload)
             if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
                 if i < len(keys) - 1:
-                    log_event(
-                        "WARN",
-                        f"Gemini HTTP {r.status_code} — trying next API key immediately "
-                        f"(no wait) [{i + 1}/{len(keys)}]",
-                    )
+                    log_event("WARN", _gemini_quota_rotate_warn(r.status_code, i, len(keys)))
                     continue
                 if r.status_code == 429:
                     r = await _gemini_retry_same_key_once_after_429(
@@ -513,11 +520,7 @@ async def test_llm_connectivity(
                         r = await client.post(url, json=post_payload)
                     if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
                         if i < len(keys) - 1:
-                            log_event(
-                                "WARN",
-                                f"Gemini HTTP {r.status_code} — trying next API key immediately "
-                                f"(no wait) [{i + 1}/{len(keys)}]",
-                            )
+                            log_event("WARN", _gemini_quota_rotate_warn(r.status_code, i, len(keys)))
                             continue
                         if r.status_code == 429:
                             r = await _gemini_retry_same_key_once_after_429(

@@ -511,18 +511,18 @@ async def test_llm_connectivity(
                     if r.status_code in (400, 403):
                         post_payload = payload_no_safety
                         r = await client.post(url, json=post_payload)
-            if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
-                if i < len(keys) - 1:
-                    log_event(
-                        "WARN",
-                        f"Gemini HTTP {r.status_code} — trying next API key immediately "
-                        f"(no wait) [{i + 1}/{len(keys)}]",
-                    )
-                    continue
-                if r.status_code == 429:
-                    r = await _gemini_retry_same_key_once_after_429(
-                        client, url, post_payload, r, pool_size=len(keys)
-                    )
+                    if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
+                        if i < len(keys) - 1:
+                            log_event(
+                                "WARN",
+                                f"Gemini HTTP {r.status_code} — trying next API key immediately "
+                                f"(no wait) [{i + 1}/{len(keys)}]",
+                            )
+                            continue
+                        if r.status_code == 429:
+                            r = await _gemini_retry_same_key_once_after_429(
+                                client, url, post_payload, r, pool_size=len(keys)
+                            )
                     if r.status_code < 400:
                         break
                     return {

@@ -1,6 +1,7 @@
 """Load settings from environment (.env supported via python-dotenv)."""
 from __future__ import annotations
 
+import logging
 import os
 import time
 from functools import lru_cache
@@ -11,6 +12,8 @@ from dotenv import load_dotenv
 
 from app.prompt_loader import read_system_prompt
 from app.services.dashboard_service import build_dashboard_fetch_url
+
+logger = logging.getLogger(__name__)
 
 # Always load backend/.env (not only when CWD happens to be the backend folder).
 _backend_root = Path(__file__).resolve().parent.parent
@@ -86,31 +89,42 @@ def _strip_key(s: str) -> str:
 
 def _parse_gemini_key_list(llm_provider: str, llm_api_key: str) -> list[str]:
     """
-    Ordered Gemini keys for optional time-based rotation.
+    Ordered unique Gemini keys for rotation and 429 fallback.
 
-    - If ``GEMINI_API_KEYS`` is set (comma- or newline-separated), that list wins.
-    - Else: ``GEMINI_API_KEY`` plus optional ``GEMINI_API_KEY_2`` … ``GEMINI_API_KEY_16``.
+    All of the following are merged (first occurrence sets order; duplicates are skipped):
+
+    - ``GEMINI_API_KEYS`` (comma- or newline-separated), if set
+    - ``GEMINI_API_KEY`` (and ``LLM_API_KEY`` when provider is gemini and it looks like ``AIza…``)
+    - ``GEMINI_API_KEY_2`` … ``GEMINI_API_KEY_16``
+
+    Previously, a non-empty ``GEMINI_API_KEYS`` replaced the numbered vars entirely, which
+    caused hosts that set both (e.g. one key in ``GEMINI_API_KEYS`` plus ``GEMINI_API_KEY_2``…)
+    to only see a single key.
     """
-    raw_multi = (os.getenv("GEMINI_API_KEYS") or "").strip()
     keys: list[str] = []
+    seen: set[str] = set()
+
+    def add(raw: str) -> None:
+        k = _strip_key(raw)
+        if k and k not in seen:
+            seen.add(k)
+            keys.append(k)
+
+    raw_multi = (os.getenv("GEMINI_API_KEYS") or "").strip()
     if raw_multi:
         for part in raw_multi.replace("\n", ",").split(","):
-            k = _strip_key(part)
-            if k:
-                keys.append(k)
-        return keys
+            add(part)
 
     primary = _strip_key(os.getenv("GEMINI_API_KEY", ""))
     if llm_provider == "gemini" and not primary:
         lk = _strip_key(llm_api_key)
         if lk.startswith("AIza"):
             primary = lk
-    if primary:
-        keys.append(primary)
+    add(primary)
+
     for i in range(2, 17):
-        ek = _strip_key(os.getenv(f"GEMINI_API_KEY_{i}", ""))
-        if ek:
-            keys.append(ek)
+        add(os.getenv(f"GEMINI_API_KEY_{i}", ""))
+
     return keys
 
 
@@ -154,6 +168,12 @@ def get_settings() -> dict:
     gemini_api_keys = _parse_gemini_key_list(llm_provider, llm_api_key)
     if gemini_api_keys:
         gemini_api_key = gemini_api_keys[0]
+    if llm_provider == "gemini" and gemini_api_keys:
+        logger.info(
+            "Gemini API key pool: %s unique key(s) loaded (GEMINI_API_KEYS + GEMINI_API_KEY + "
+            "GEMINI_API_KEY_2…, deduped; values not logged)",
+            len(gemini_api_keys),
+        )
     be = _bot_enabled()
     if llm_provider == "gemini":
         llm_configured = be and bool(gemini_api_keys or gemini_api_key)

@@ -74,7 +74,7 @@ def assert_chat_allowed(request: Request, server_token: str) -> None:
         raise HTTPException(
             status_code=403,
             detail=(
-                "This subscription tier does not include in-game AI chat (Scout Riley / !riley trigger). "
+                "This subscription tier does not include in-game AI chat (Hank / !hank trigger). "
                 "Upgrade to Full Auto-Farm (tier 2) or use BYOK where supported."
             ),
         )

@@ -2,6 +2,21 @@
 
 This document describes the **FarmHub** workspace: the **FS25 Farm Dashboard** (Electron/desktop + embedded web UI) and the **AI Farm Manager** backend (FastAPI on a VPS or local machine). It is intended for onboarding, audits, and maintenance.
 
+**Deep dive (Gemini):** [docs/LLM_GEMINI_ROUTING.md](docs/LLM_GEMINI_ROUTING.md)
+
+| § | Topic |
+|---|--------|
+| [1](#1-high-level-architecture) | Architecture diagram |
+| [2](#2-repository-layout-farmhub) | Repository layout |
+| [3](#3-fs25-farm-dashboard-frontend) | Farm Dashboard (Electron + web) |
+| [4](#4-ai-farm-manager-backend) | AI Farm Manager backend, routers, consultant, **LLM** |
+| [5](#5-cross-system-data-flow-consultant) | Consultant data flow |
+| [6](#6-deployment-notes) | Deployment |
+| [7](#7-performance-changes-audit) | Performance audit table |
+| [8](#8-debugging-checklist) | Debugging |
+| [9](#9-key-files-quick-reference) | Key files |
+| [10](#10-ownership--conventions) | Conventions |
+
 ---
 
 ## 1. High-level architecture
@@ -16,7 +31,7 @@ flowchart LR
     Electron[Electron App]
   end
   subgraph vps [VPS / Coolify]
-    AI[AI Farm Manager FastAPI :8080]
+    AI[AI Farm Manager FastAPI :8000]
     FTP[FTP / JSON ingest optional]
   end
   Mod --> DashHTTP
@@ -28,7 +43,7 @@ flowchart LR
 
 - **Game → mod** exposes farm state over HTTP (fields, vehicles, animals, economy, etc.).
 - **Electron** loads the web UI (`web/index.html`), talks to the **local** dashboard API, and optionally **POSTs** merged snapshots to **AI Farm Manager** (`/api/integration/push-snapshot` or similar) so the AI server does not need inbound access to the gaming PC.
-- **AI Farm Manager** stores the latest JSON in RAM (per `serverId`), runs **consultant insights**, **chat** (**Scout Riley** — trigger `!riley`, configurable via `TRIGGER_PREFIX` / mod XML), and admin tools.
+- **AI Farm Manager** stores the latest JSON in RAM (per `serverId`), runs **consultant insights**, **in-game chat** (**Hank** — default trigger `!hank` via `TRIGGER_PREFIX` / mod XML), and admin tools.
 
 ---
 
@@ -114,11 +129,11 @@ Supporting / integration:
 
 | Router | Prefix | Notes |
 |--------|--------|------|
-| `chat` | `/api/...` | Game / bot chat — **Scout Riley**, default trigger `!riley` (`TRIGGER_PREFIX`) |
+| `chat` | `/api/chat/...` | In-game bot chat — **Hank**; trigger from `TRIGGER_PREFIX` (default `!hank`) |
 | `admin_routes` | `/admin` | HTML admin, env, LLM test |
-| `integration` | `/api/integration` | Push snapshot, instances, keys, **`GET /gemini-models`** (Google ListModels, `generateContent` ids) |
-| `consultant` | `/api/v1/consultant` | **GET /insights** — farm insights |
-| `mod_config_download` | — | Mod XML delivery if configured |
+| `integration` | `/api/integration` | Push snapshot, instances, keys, **`GET /gemini-models`** (Google ListModels) |
+| `consultant` | `/api/v1/consultant` | **GET /insights** — Smart suggestions / farm insights |
+| `mod_config_download` | `/api/mod/...` | Mod XML download when configured |
 
 ### 4.3 Consultant pipeline
 
@@ -128,27 +143,35 @@ Supporting / integration:
    - `home` → `prune_snapshot_home_overview` (multi-domain compact JSON for “top 3”).
    - `fields`, `vehicles`, etc. → section-specific slices.
 4. **`generate_farm_insights`** (`consultant.py`) — optional **production-fill heuristics** (scoped/skipped per view), then **Gemini** JSON response, merge/dedupe, cap **3** for `VIEW MODE — home`. **LLM result cache:** `cachetools.TTLCache` (~10 min, bounded size) keys on SHA-256 of pruned snapshot + `serverId` / `farmId` / `view` / `context` / `fieldRef` + system-prompt hash — avoids repeat Gemini calls when the farm JSON is unchanged (see `_consultant_llm_cache_key`).
-5. **LLM** — `llm_service.gemini_consultant_post_with_quota_fallback` (and similar for generic chat).
+5. **LLM** — `llm_service.gemini_consultant_post_with_quota_fallback` (Gemini) or OpenAI path when `LLM_PROVIDER=openai`.
 
 ### 4.4 LLM / Gemini (`app/services/llm_service.py`)
 
-- **Multi-key pool** — `GEMINI_API_KEY`, `GEMINI_API_KEY_2`, … merged in `config.py`; deduped order.
-- **Sticky last-success key** — `GEMINI_STICKY_LAST_SUCCESS` (default on): next request tries last working key first (`_gemini_last_success_key`).
-- **Model rollover** — `GEMINI_MODEL_ROLLOVER`: comma-separated model IDs. Set to `0`/`off` to use **only** `GEMINI_MODEL` (**no** model cycling — fixed model for BYOK users who pin one id). If unset, a **default multi-model chain** (3.x previews + 2.5 stable) is used — override if your API version/region does not support previews.
-- **BYOK / single-key:** When only **one** API key is in use (typical Farm Dashboard BYOK), the service tries the **full** rollover list on **429/503** before giving up on that key — so free-tier rate limits can fall through to the next model on the same key. Multi-key server pools still use **one** model slot per key index (avoids multiplying calls).
-- **HTTP** — **Single shared `httpx.AsyncClient`** (`gemini_http_client.py`) for **connection reuse** to `generativelanguage.googleapis.com` (reduces TLS/handshake overhead vs creating a new client per request).
-- **429/503** — rotate to next key; optional sleep retry on last key for 429 (`_gemini_retry_same_key_once_after_429`).
-- **Budget** — `gemini_budget.py` enforces per-key RPM/RPD-style caps (env-driven).
+**Authoritative detail:** [docs/LLM_GEMINI_ROUTING.md](docs/LLM_GEMINI_ROUTING.md) — key order, model stack, 429/503, BYOK, and how this differs from `active_gemini_api_key()` in `config.py`.
+
+Summary:
+
+| Topic | Behaviour |
+|--------|-----------|
+| **Key pool** | `GEMINI_API_KEY`, `GEMINI_API_KEYS`, `GEMINI_API_KEY_2`… merged and **deduplicated** in `config.py`. |
+| **Per-request key order (multi-key)** | **Strict round-robin:** a thread-safe counter rotates which key is tried **first** on each new `generateContent` request so concurrent bursts spread load. |
+| **BYOK / single key** | Only one key in settings → no key rotation; that key still uses the **full model stack** on 429/503. |
+| **Models** | **`GEMINI_MODEL_ROLLOVER`:** comma list, **first = best**. Unset → built-in default chain in code. **`0` / `off` →** only **`GEMINI_MODEL`**, no stepping down. **Each new request** starts from the best model again (no cross-request “sticky” downgrade). |
+| **429 / 503** | Same key → next model in the rollover list; if exhausted → **next key** (wrapped order) and **restart models from best**. Last key, still 429 → optional `Retry-After` sleep + one retry. |
+| **HTTP client** | Single shared **`httpx.AsyncClient`** (`gemini_http_client.py`) for keep-alive to Google. |
+| **Budget** | Optional per-key caps via `gemini_budget.py` (`GEMINI_BUDGET_*`). |
+
+**Separate mechanism:** `active_gemini_api_key(settings)` in `config.py` uses **wall-clock time** and **`GEMINI_ROTATION_WINDOW_SEC`** to pick one “active” key for **ListModels** (`GET /api/integration/gemini-models`) and helpers — it does **not** replace round-robin for chat/consultant `generateContent` calls.
 
 ### 4.5 Important environment variables (AI server)
 
 | Variable | Purpose |
 |----------|---------|
 | `LLM_PROVIDER` | `gemini` or `openai` |
-| `GEMINI_API_KEY`, `GEMINI_API_KEY_2`, … | Key pool |
-| `GEMINI_MODEL` | Default model when rollover **disabled** |
-| `GEMINI_MODEL_ROLLOVER` | `0` = off; unset = default list; or comma IDs |
-| `GEMINI_STICKY_LAST_SUCCESS` | `0` restores time-slot key rotation only |
+| `GEMINI_API_KEY`, `GEMINI_API_KEY_2`, … | Gemini key pool |
+| `GEMINI_MODEL` | Single model when **`GEMINI_MODEL_ROLLOVER`** is off |
+| `GEMINI_MODEL_ROLLOVER` | Comma-separated IDs (best first), or `0`/`off` for `GEMINI_MODEL` only |
+| `GEMINI_ROTATION_WINDOW_SEC` | Time window for **`active_gemini_api_key`** (ListModels / diagnostics), not for per-request RR |
 | `GEMINI_REST_API_VERSION` | `v1` / `v1beta` |
 | `DASHBOARD_JSON_URL` / FTP | Ingest dashboard JSON if not using push |
 | `FARMDASH_INTEGRATION_KEY` / `X-FarmDash-Key` | Farm Dashboard → AI auth |
@@ -188,7 +211,7 @@ The **Smart suggestions** and field-map consultant behaviour come from **`app/se
 | **Backend** | **GZip** middleware for compressible responses. |
 | **Backend** | **Pre-create** HTTP client at startup (`get_gemini_async_client()` in lifespan). |
 | **Backend** | **Consultant LLM cache** — `cachetools.TTLCache` (~10 min, max ~512 entries); keys hash pruned snapshot + scope; evicts by TTL and cap (**no** unbounded growth). |
-| **Backend** | **BYOK model cycling** — on **429/503**, single-key requests iterate **`GEMINI_MODEL_ROLLOVER`** before the next API key or 429 sleep (disabled when `GEMINI_MODEL_ROLLOVER=off`). |
+| **Backend** | **Gemini routing** — multi-key: **round-robin** start index per request; **429/503:** step through **`GEMINI_MODEL_ROLLOVER`** (best→fallback) on each key before rotating keys; BYOK uses one key + same model stack ([docs/LLM_GEMINI_ROUTING.md](docs/LLM_GEMINI_ROUTING.md)). |
 | **Frontend** | **`/api/data` dedupe** — skip `handleRealtimeData` when merged JSON (no `timestamp`) + farm/server unchanged; **`refreshHttpDataNow()`** bypasses dedupe for a forced refresh. |
 | **Frontend** | **In-flight guard** + **`.then(done, done)`** cleanup for consultant GET. |
 | **Frontend** | **Refresh** / **navigation** use **`forceRefresh`** on insights so loading state shows; background 5 min poll does not flash skeleton. |
@@ -208,7 +231,7 @@ End-user BYOK setup: **`AI_Farm_Manager/docs/BYOK_GUIDE.md`**.
 
 | Symptom | Where to look |
 |---------|----------------|
-| 429 / rate limits | Server logs (`Gemini HTTP 429`), `gemini_budget.py`, key pool size, `GEMINI_MODEL_ROLLOVER` (fewer preview models). |
+| 429 / rate limits | Server logs (`Gemini HTTP 429`), `gemini_budget.py`, add keys or shorten **`GEMINI_MODEL_ROLLOVER`** (drop heavy preview models). See [docs/LLM_GEMINI_ROUTING.md](docs/LLM_GEMINI_ROUTING.md). |
 | Wrong farm data | `serverId` / `farmId` query mismatch vs push buffer (`push_resolve` logs). |
 | Fields AI empty | `field-consultant-bridge` — `category` must be Field + `field_ref`; consultant `context=fields` filter. |
 | Smart panel stale | `ai-farm-consultant-insights.js` stale-check vs `getCurrentDashboardSection()`. |
@@ -242,4 +265,4 @@ End-user BYOK setup: **`AI_Farm_Manager/docs/BYOK_GUIDE.md`**.
 
 ---
 
-*Generated for FarmHub maintenance. Update this file when you add major routes, env vars, or deployment steps.*
+*Maintenance: update when you add routes, env vars, deployment steps, or change LLM routing (see [docs/LLM_GEMINI_ROUTING.md](docs/LLM_GEMINI_ROUTING.md)).*

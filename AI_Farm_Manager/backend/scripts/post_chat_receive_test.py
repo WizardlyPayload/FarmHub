@@ -34,7 +34,7 @@ def main() -> None:
 
     payload = {
         "player": "Test",
-        "message": "!riley hello",
+        "message": "!hank hello",
         "server_token": token,
     }
     url = f"{base}/api/chat/receive"

@@ -164,6 +164,9 @@ After pulling, run **`npm install`** under `FS25_FarmDashboard_App/FS25_FarmDash
 | [RELEASE_NOTES.md](../RELEASE_NOTES.md) | Short copy-paste text for GitHub Releases |
 | [docs/DESCRIPTION_AND_SCREENSHOTS.md](./DESCRIPTION_AND_SCREENSHOTS.md) | Long-form product description + screenshot checklist |
 | [docs/SECURITY.md](./SECURITY.md) | Network exposure, LAN browser use, trust model |
+| [docs/LLM_GEMINI_ROUTING.md](./LLM_GEMINI_ROUTING.md) | AI Farm Manager: Gemini key round-robin, model rollover, 429/503, BYOK |
+| [DEVELOPER_HANDOVER.md](../DEVELOPER_HANDOVER.md) | FarmHub stack: dashboard + backend architecture and file map |
+| [../AI_Farm_Manager/README.md](../AI_Farm_Manager/README.md) | Deploy AI Farm Manager (Docker/Coolify), API summary, BYOK |
 | [../AUTHORS.md](../AUTHORS.md) | JoshWalki & WizardlyPayload |
 | This file | Full version history |
 

@@ -95,6 +95,12 @@ See **`docs/RELEASE_v2.0.0.md`** for the full changelog. Summary:
 
 ---
 
+## FarmHub repo documentation
+
+This app lives under the **FarmHub** workspace. For **AI Farm Manager** (Smart suggestions backend), **security / LAN**, and the **full developer handover**, see the parent tree: [../../README.md](../../README.md), [../../docs/SECURITY.md](../../docs/SECURITY.md), [../../docs/LLM_GEMINI_ROUTING.md](../../docs/LLM_GEMINI_ROUTING.md), [../../DEVELOPER_HANDOVER.md](../../DEVELOPER_HANDOVER.md).
+
+---
+
 ## Licence / credits
 
 Bundled third-party components (Electron, Chromium, ImageMagick when installed, etc.) are subject to their respective licences. Game content and mod data remain property of Giants Software and respective mod authors.

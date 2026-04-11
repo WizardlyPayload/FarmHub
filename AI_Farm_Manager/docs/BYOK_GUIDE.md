@@ -1,28 +1,71 @@
-# How to Use the AI Farm Manager for FREE (BYOK Guide)
+# Bring your own API key (BYOK) — Farm Dashboard + AI Farm Manager
 
-Farm Dashboard includes an incredibly powerful AI Farm Manager that acts as your personal Agronomist. To keep the base software free, we use a "Bring Your Own Key" (BYOK) system.
+Farm Dashboard can call **AI Farm Manager** with **your** Google or OpenAI credentials so you are not limited to the server host’s API quota. This guide focuses on **Google Gemini** (recommended; tested against this stack).
 
-We highly recommend using **Google Gemini**, as it is the model this software was rigorously tested on, and Google provides a generous **Free Tier** for developers.
+**Related:** Full routing rules (keys, models, 429/503) — [LLM_GEMINI_ROUTING.md](../../docs/LLM_GEMINI_ROUTING.md).
 
-📹 **Need visual help?** [Watch this quick video tutorial on how to get a Gemini API Key](https://www.youtube.com/watch?v=BYBeQm_AsCI).
+---
 
-### Step 1: Get Your Free Gemini API Key
-1. Go to **[Google AI Studio](https://aistudio.google.com/)**.
-2. Sign in with your standard Google/Gmail account.
-3. Click the **"Get API key"** button on the left-hand menu (or go to `https://aistudio.google.com/app/apikey`).
-4. Click **"Create API key"**. If it asks you to select a project, just click "Create a project" and let it use the default Gemini project.
-5. Click **"Create key"** and copy the long string of text it generates. Treat this like a password—do not share it with anyone!
+## 1. Get a Gemini API key (free tier)
 
-### Step 2: Add it to Farm Dashboard
-1. Open your Farm Dashboard Desktop App.
-2. Navigate to the **Robot/AI Settings Panel**.
-3. Under the "AI Provider" dropdown, select **Gemini**.
-4. Paste your API key into the "API Key" input field.
-5. Hit **Save**.
+1. Open **[Google AI Studio](https://aistudio.google.com/)** and sign in.
+2. Use **Get API key** → create a key for a project.
+3. Copy the key and store it like a password (do not commit it to git or share it publicly).
 
-### How it Works Behind the Scenes
-Google's Free Tier has rate limits (Requests Per Minute). If you hit this limit, the Farm Dashboard is smart enough to handle it:
-1. **Model Cycling:** If the main model (`gemini-2.5-flash`) is overloaded, the app will automatically try to use an alternative model (like `gemini-1.5-flash`) so your dashboard doesn't break.
-2. **Local Fallback:** If you completely exhaust your free quota for the minute, the app will gracefully fall back to our local "Rules Engine" and provide basic agronomic advice until your API key cools down.
+**Video walkthrough:** [YouTube — getting a Gemini API key](https://www.youtube.com/watch?v=BYBeQm_AsCI).
 
-*Note: OpenAI (ChatGPT) keys also work in the dashboard, but you must have a funded/paid developer account for them to function, as OpenAI does not offer a perpetual free tier for API access.*
+---
+
+## 2. Enter the key in Farm Dashboard
+
+1. Open the **Farm Dashboard** desktop app.
+2. Open the **Robot / AI** settings panel (wording may vary slightly by locale).
+3. Set **AI provider** to **Gemini**.
+4. Paste the key into the API key field and **Save**.
+
+The app sends the key to AI Farm Manager on consultant / smart-suggestion requests using the headers documented in **`AI_Farm_Manager/README.md`** (`X-AI-API-Key`, optional `X-AI-Provider`).
+
+---
+
+## 3. What happens when Google rate-limits you (429 / 503)?
+
+The **AI Farm Manager** backend (not the Electron app alone) implements:
+
+1. **Model stack (`GEMINI_MODEL_ROLLOVER` on the server)**  
+   Requests try models in **order** (best first). If the preferred model returns **429** or **503**, the server tries the **next** model in the list **on the same API key** before giving up on that key.
+
+2. **No “stuck on a slow model” across sessions**  
+   Each **new** request starts again from the **best** model in the list — earlier fallbacks are not remembered.
+
+3. **BYOK = one key**  
+   Your dashboard sends **one** key. The server does **not** round-robin multiple keys for BYOK (there is only one). **Multi-key round-robin** applies when the **server** has several `GEMINI_API_KEY_*` entries in its environment.
+
+4. **Optional server-side budget**  
+   Admins can enable **`GEMINI_BUDGET_*`** caps; see `gemini_budget.py` and `.env.example`.
+
+5. **Local rules on the dashboard**  
+   If the AI is unavailable, the **rules engine** (`rules-engine.js`) can still show **local** field suggestions — that is separate from Gemini routing.
+
+**Pin a single model:** On the server, set **`GEMINI_MODEL_ROLLOVER=0`** (or `off`) and set **`GEMINI_MODEL`** to the model id you want — no automatic stepping to fallback models.
+
+---
+
+## 4. OpenAI BYOK
+
+OpenAI keys work if your OpenAI project has **billing** enabled (no perpetual free API tier comparable to Gemini’s). Configure the same panel for provider **OpenAI** and paste your key.
+
+---
+
+## 5. Troubleshooting
+
+| Symptom | What to check |
+|--------|----------------|
+| 429 / “quota” in logs | Shorter rollover list, fewer concurrent dashboard tabs, more server keys (hosting admin), or wait for Google’s reset window. |
+| Wrong model errors (404) | **`GEMINI_REST_API_VERSION`** (`v1` vs `v1beta`) and model id — use **`GET /api/integration/gemini-models`** on your server with a valid key. |
+| BYOK ignored | Integration auth: **`X-FarmDash-Key`** must match **`FARMDASH_INTEGRATION_KEY`**; consultant requires valid snapshot / push. |
+
+---
+
+## 6. Authors
+
+See **[AUTHORS.md](../../AUTHORS.md)** (JoshWalki, WizardlyPayload).

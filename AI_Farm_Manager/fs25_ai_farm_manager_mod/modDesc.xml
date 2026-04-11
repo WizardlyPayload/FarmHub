@@ -7,7 +7,7 @@
         <en>AI Farm Manager (Chat Bridge)</en>
     </title>
     <description>
-        <en><![CDATA[Server-side bridge: chat to Scout Riley with !riley via HTTP to your AI Farm Manager API (direct mode). Configure backendUrl + serverToken + triggerPrefix in modsSettings XML (see README).]]></en>
+        <en><![CDATA[Server-side bridge: chat to Hank with !hank via HTTP to your AI Farm Manager API (direct mode). Configure backendUrl + serverToken + triggerPrefix in modsSettings XML (see README).]]></en>
     </description>
     <iconFilename>icon.png</iconFilename>
     <multiplayer supported="true"/>

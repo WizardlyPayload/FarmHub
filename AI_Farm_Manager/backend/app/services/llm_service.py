@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import os
 import re
+import threading
 import time
 from contextvars import ContextVar
 from pathlib import Path
@@ -18,12 +19,12 @@ from app.services.game_reference import build_game_reference_block
 from app.services.gemini_budget import wait_gemini_budget_or_skip
 from app.services.log_buffer import log_event
 
-# Retry with next API key (sticky last-success first, then pool order; optional legacy time-rotation)
-# on Google overload / rate limits.
+# Retry: model degradation on same key (429/503), then next API key in round-robin order.
 _GEMINI_QUOTA_RETRY_STATUS: frozenset[int] = frozenset({429, 503})
 
-# Stripped key string of the last Gemini key that completed generateContent successfully (process-wide).
-_gemini_last_success_key: str | None = None
+# Strict round-robin: each new request advances this counter to pick the first key in the rotated pool.
+_gemini_rr_lock = threading.Lock()
+_gemini_rr_counter: int = 0
 
 # Default multi-model chain — stable 2.5 first (avoids 404 on v1 for unreleased preview ids). Previews last.
 # Use GET /api/integration/gemini-models in Farm Dashboard to see IDs your key supports.
@@ -39,11 +40,11 @@ _DEFAULT_GEMINI_MODEL_ROLLOVER: tuple[str, ...] = (
 
 def _gemini_model_pool(settings: dict[str, Any]) -> list[str] | None:
     """
-    Models to cycle alongside key fallback: attempt ``i`` uses ``pool[i % len(pool)]``.
+    Ordered model stack (best first) for 429/503 degradation on a fixed API key.
 
     - ``GEMINI_MODEL_ROLLOVER=0`` / ``false`` / ``off`` → single model only: ``GEMINI_MODEL`` (legacy).
     - Unset → default 6-model chain above.
-    - Non-empty comma list → custom order (e.g. ``gemini-2.5-flash,gemini-2.5-pro``).
+    - Non-empty comma list → custom order (comma-separated, first = preferred).
     """
     raw = (os.getenv("GEMINI_MODEL_ROLLOVER") or "").strip()
     if raw.lower() in ("0", "false", "no", "off"):
@@ -54,39 +55,23 @@ def _gemini_model_pool(settings: dict[str, Any]) -> list[str] | None:
     return parts if parts else list(_DEFAULT_GEMINI_MODEL_ROLLOVER)
 
 
-def _gemini_model_for_attempt(settings: dict[str, Any], attempt_index0: int) -> str:
-    pool = _gemini_model_pool(settings)
-    if pool:
-        return pool[attempt_index0 % len(pool)]
-    return (settings.get("gemini_model") or "gemini-2.5-flash").strip()
-
-
 def _gemini_single_config_model(settings: dict[str, Any]) -> str:
     """When ``GEMINI_MODEL_ROLLOVER`` is off — single explicit ``GEMINI_MODEL`` only (no cycling)."""
     return (settings.get("gemini_model") or "gemini-2.5-flash").strip()
 
 
-def _gemini_models_to_try_for_key(
-    settings: dict[str, Any],
-    *,
-    key_index0: int,
-    total_keys: int,
-) -> list[str]:
+def _gemini_models_to_try_for_key(settings: dict[str, Any]) -> list[str]:
     """
-    Models to attempt for one API key before rotating to the next key (or giving up).
+    Top-down model stack for **every** request and **every** API key: index 0 is best (``GEMINI_MODEL``
+    when rollover is off, else first entry in ``GEMINI_MODEL_ROLLOVER`` / default chain).
 
-    - **Rollover disabled** (``GEMINI_MODEL_ROLLOVER=0`` / ``off``): only ``GEMINI_MODEL`` — never cycle.
-    - **Single key** (typical **BYOK**): full ``GEMINI_MODEL_ROLLOVER`` list so HTTP **429/503** can advance
-      to the next model on the **same** key (free-tier rate limits).
-    - **Multi-key server pool**: preserve legacy behaviour — one model index per key slot
-      (``pool[key_index % len(pool)]``), not the full list per key (avoids N_keys × N_models calls).
+    On 429/503, step down within this list on the **same** key before rotating to the next key.
+    No cross-request “sticky” downgrade — each new request starts again from the best model.
     """
     pool = _gemini_model_pool(settings)
     if pool is None:
         return [_gemini_single_config_model(settings)]
-    if total_keys <= 1:
-        return list(pool)
-    return [_gemini_model_for_attempt(settings, key_index0)]
+    return list(pool)
 
 # When True (admin /admin/api/test-llm only): skip asyncio.sleep on 429 so the request finishes
 # before reverse-proxy/browser timeouts; multi-key rotation still applies.
@@ -183,23 +168,17 @@ def _gemini_quota_rotate_warn(
     model_id: str | None = None,
 ) -> str:
     """
-    Human-readable line when rotating after 429/503.
+    Human-readable line when rotating to the next API key after 429/503 on all models for the
+    current key.
 
-    ``failed_key_index0`` is 0-based (first key tried in *this* request is 0). The try order for
-    each new HTTP call starts from the sticky preferred key (last success) when enabled, so
-    ``1/pool_len`` here means "first key in this call's sequence failed," not a global quota step.
+    ``failed_key_index0`` is 0-based within this request’s **round-robin rotated** key order.
     """
     m = f" model={model_id!r}" if model_id else ""
     return (
-        f"Gemini HTTP {http_status} — try-sequence {failed_key_index0 + 1}/{pool_len}: this key slot "
-        f"failed; next key + model immediately (no wait).{m} "
-        f"(Sticky key order when GEMINI_STICKY_LAST_SUCCESS=1; models from GEMINI_MODEL_ROLLOVER.)"
+        f"Gemini HTTP {http_status} — key attempt {failed_key_index0 + 1}/{pool_len}: "
+        f"all models exhausted on this key; rotating to next key (best model first).{m} "
+        f"(Round-robin key order; model stack from GEMINI_MODEL_ROLLOVER / GEMINI_MODEL.)"
     )
-
-
-def _gemini_sticky_enabled() -> bool:
-    v = (os.getenv("GEMINI_STICKY_LAST_SUCCESS") or "1").strip().lower()
-    return v not in ("0", "false", "no", "off")
 
 
 def _gemini_deduped_pool(settings: dict[str, Any]) -> list[str]:
@@ -219,45 +198,29 @@ def _gemini_deduped_pool(settings: dict[str, Any]) -> list[str]:
     return raw
 
 
-def _gemini_record_success_for_key(key: str) -> None:
-    """Remember which key worked so the next request tries it first (when sticky mode is on)."""
-    global _gemini_last_success_key
-    if not _gemini_sticky_enabled():
-        return
-    sk = _strip_gemini_key(key)
-    if sk:
-        _gemini_last_success_key = sk
+def _gemini_rr_next_start(pool_len: int) -> int:
+    """Next round-robin offset into the deduped key pool (BYOK / single-key → always 0)."""
+    global _gemini_rr_counter
+    if pool_len <= 1:
+        return 0
+    with _gemini_rr_lock:
+        start = _gemini_rr_counter % pool_len
+        _gemini_rr_counter += 1
+        return start
 
 
-def _gemini_ordered_keys(settings: dict[str, Any]) -> list[str]:
+def _gemini_round_robin_key_order(settings: dict[str, Any]) -> list[str]:
     """
-    Deduplicated pool order for fallback.
+    Deduplicated keys rotated so each **incoming** request starts at the next key (strict RR).
 
-    Default (GEMINI_STICKY_LAST_SUCCESS=1): last successful key first, then remaining keys in pool
-    order (wrap to the start after the last key).
-
-    Legacy (GEMINI_STICKY_LAST_SUCCESS=0): time-active key first (same as pre-sticky behaviour).
-
-    BYOK / single-key yields a one-element list.
+    **BYOK** (exactly one key): returns that single key — no pool rotation; model degradation still
+    uses the full ``GEMINI_MODEL_ROLLOVER`` stack on 429/503.
     """
     raw = _gemini_deduped_pool(settings)
     if len(raw) <= 1:
         return raw
-    if not _gemini_sticky_enabled():
-        active = active_gemini_api_key(settings)
-        try:
-            start = next(i for i, x in enumerate(raw) if x == active)
-        except StopIteration:
-            start = 0
-        return raw[start:] + raw[:start]
-    lk = _gemini_last_success_key
-    if lk:
-        try:
-            idx = next(i for i, x in enumerate(raw) if x == lk)
-            return raw[idx:] + raw[:idx]
-        except StopIteration:
-            pass
-    return raw
+    start = _gemini_rr_next_start(len(raw))
+    return raw[start:] + raw[:start]
 
 
 def _gemini_generate_url_for_key(
@@ -366,15 +329,17 @@ async def _gemini_post_with_quota_fallback(
     timeout: float,
 ) -> httpx.Response:
     """
-    POST generateContent; on HTTP 429 / 503 try the next model (BYOK / single-key rollover) or next API key.
+    POST generateContent; on HTTP 429 / 503 step down the model stack on the same key, then the next
+    key (round-robin start order for multi-key). Each request begins with the best model again.
 
     Other 4xx/5xx: no model cycling (same failure is raised immediately).
     """
-    keys = _gemini_ordered_keys(settings)
+    keys = _gemini_round_robin_key_order(settings)
     if not keys:
         raise RuntimeError("GEMINI_API_KEY is empty")
     client = get_gemini_async_client()
     n_keys = len(keys)
+    models = _gemini_models_to_try_for_key(settings)
     for i, key in enumerate(keys):
         ok = await wait_gemini_budget_or_skip(key)
         if not ok:
@@ -383,7 +348,6 @@ async def _gemini_post_with_quota_fallback(
                 "Gemini budget: daily request cap for this key — trying next key in pool",
             )
             continue
-        models = _gemini_models_to_try_for_key(settings, key_index0=i, total_keys=n_keys)
         for mi, model_try in enumerate(models):
             url = _gemini_generate_url_for_key(settings, key, model_override=model_try)
             r = await client.post(url, json=payload, timeout=timeout)
@@ -392,7 +356,7 @@ async def _gemini_post_with_quota_fallback(
                     log_event(
                         "WARN",
                         f"Gemini HTTP {r.status_code} — same key, next model in rollover "
-                        f"({mi + 2}/{len(models)}), was {model_try!r} (BYOK uses full rollover list).",
+                        f"({mi + 2}/{len(models)}), was {model_try!r}.",
                     )
                     continue
                 if i < n_keys - 1:
@@ -411,12 +375,10 @@ async def _gemini_post_with_quota_fallback(
                 if r.status_code >= 400:
                     log_event("ERROR", format_gemini_http_error(r))
                 r.raise_for_status()
-                _gemini_record_success_for_key(key)
                 return r
             if r.status_code >= 400:
                 log_event("ERROR", format_gemini_http_error(r))
             r.raise_for_status()
-            _gemini_record_success_for_key(key)
             return r
     raise RuntimeError(
         "Gemini: no successful request — all keys skipped (daily budget per GEMINI_BUDGET_RPD) or exhausted"
@@ -433,13 +395,14 @@ async def gemini_consultant_post_with_quota_fallback(
 ) -> httpx.Response:
     """
     Consultant generateContent: on 400 with JSON MIME, retry once without JSON MIME on the **same**
-    model URL; on 429/503 cycle **models** for single-key/BYOK (``GEMINI_MODEL_ROLLOVER``), then keys.
+    model URL; on 429/503 use the top-down ``GEMINI_MODEL_ROLLOVER`` stack per key, then round-robin keys.
     """
-    keys = _gemini_ordered_keys(settings)
+    keys = _gemini_round_robin_key_order(settings)
     if not keys:
         raise RuntimeError("GEMINI_API_KEY is empty")
     client = get_gemini_async_client()
     n_keys = len(keys)
+    models = _gemini_models_to_try_for_key(settings)
 
     for i, key in enumerate(keys):
         ok = await wait_gemini_budget_or_skip(key)
@@ -449,7 +412,6 @@ async def gemini_consultant_post_with_quota_fallback(
                 "Gemini budget: daily request cap for this key — trying next key in pool",
             )
             continue
-        models = _gemini_models_to_try_for_key(settings, key_index0=i, total_keys=n_keys)
         for mi, model_try in enumerate(models):
             url = _gemini_generate_url_for_key(settings, key, model_override=model_try)
             effective_payload: dict[str, Any] = dict(payload)
@@ -495,7 +457,6 @@ async def gemini_consultant_post_with_quota_fallback(
             except httpx.HTTPStatusError as e:
                 code = e.response.status_code if e.response is not None else r.status_code
                 raise RuntimeError(f"Gemini HTTP {code}") from e
-            _gemini_record_success_for_key(key)
             return r
     raise RuntimeError(
         "Gemini consultant: no successful request — all keys skipped (daily budget per GEMINI_BUDGET_RPD) or exhausted"
@@ -636,7 +597,7 @@ async def test_llm_connectivity(
                     "latency_ms": None,
                     "detail": "GEMINI_API_KEY not set",
                 }
-            keys = _gemini_ordered_keys(settings)
+            keys = _gemini_round_robin_key_order(settings)
             if not keys:
                 return {
                     "ok": False,
@@ -660,39 +621,54 @@ async def test_llm_connectivity(
                     "maxOutputTokens": max(gemini_max_out, 256),
                 },
             }
+            models_try = _gemini_models_to_try_for_key(settings)
             r: httpx.Response | None = None
             last_model_try: str | None = None
             client = get_gemini_async_client()
-            for i, key in enumerate(keys):
-                model_try = _gemini_model_for_attempt(settings, i)
-                last_model_try = model_try
-                url = _gemini_generate_url_for_key(settings, key, model_override=model_try)
-                post_payload: dict[str, Any] = payload_with_safety
-                r = await client.post(url, json=post_payload, timeout=45.0)
-                if r.status_code in (400, 403):
-                    post_payload = payload_no_safety
+            n_keys = len(keys)
+            probe_ok = False
+            for ki, key in enumerate(keys):
+                for mi, model_try in enumerate(models_try):
+                    last_model_try = model_try
+                    url = _gemini_generate_url_for_key(settings, key, model_override=model_try)
+                    post_payload: dict[str, Any] = payload_with_safety
                     r = await client.post(url, json=post_payload, timeout=45.0)
-                if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
-                    if i < len(keys) - 1:
-                        log_event(
-                            "WARN",
-                            _gemini_quota_rotate_warn(r.status_code, i, len(keys), model_id=model_try),
-                        )
-                        continue
-                    if r.status_code == 429:
-                        r = await _gemini_retry_same_key_once_after_429(
-                            client, url, post_payload, r, pool_size=len(keys)
-                        )
-                if r.status_code < 400:
-                    _gemini_record_success_for_key(key)
+                    if r.status_code in (400, 403):
+                        post_payload = payload_no_safety
+                        r = await client.post(url, json=post_payload, timeout=45.0)
+                    if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
+                        if mi < len(models_try) - 1:
+                            log_event(
+                                "WARN",
+                                f"Gemini probe HTTP {r.status_code} — same key, next model "
+                                f"({mi + 2}/{len(models_try)}), was {model_try!r}.",
+                            )
+                            continue
+                        if ki < n_keys - 1:
+                            log_event(
+                                "WARN",
+                                _gemini_quota_rotate_warn(r.status_code, ki, n_keys, model_id=model_try),
+                            )
+                            break
+                        if r.status_code == 429:
+                            r = await _gemini_retry_same_key_once_after_429(
+                                client, url, post_payload, r, pool_size=n_keys
+                            )
+                        if r is not None and r.status_code < 400:
+                            probe_ok = True
+                        break
+                    if r.status_code < 400:
+                        probe_ok = True
+                        break
+                    return {
+                        "ok": False,
+                        "provider": "gemini",
+                        "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+                        "detail": format_gemini_http_error(r),
+                        "model": last_model_try or settings.get("gemini_model"),
+                    }
+                if probe_ok:
                     break
-                return {
-                    "ok": False,
-                    "provider": "gemini",
-                    "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
-                    "detail": format_gemini_http_error(r),
-                    "model": last_model_try or settings.get("gemini_model"),
-                }
             ms = round((time.perf_counter() - t0) * 1000, 1)
             if r is None or r.status_code >= 400:
                 return {

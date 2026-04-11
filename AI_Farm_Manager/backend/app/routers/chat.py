@@ -19,6 +19,9 @@ from app.services.subscription import assert_chat_allowed
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
+# Display name in poll queue + in-game chat (matches consultant “Scout Riley” mentor voice).
+CHAT_BOT_DISPLAY_NAME = "Scout Riley"
+
 
 class ReceiveBody(BaseModel):
     player: str = Field(..., min_length=1, max_length=128)
@@ -30,7 +33,7 @@ async def _process_llm_job(player: str, text: str, fetch_url: str | None, server
     settings = get_settings()
     if not settings.get("llm_configured"):
         push_message(
-            "Bot",
+            CHAT_BOT_DISPLAY_NAME,
             "AI replies are off or no LLM API key is set — add LLM_API_KEY in the host environment or enable the bot in admin.",
             server_token,
         )
@@ -42,7 +45,7 @@ async def _process_llm_job(player: str, text: str, fetch_url: str | None, server
     if raw is None:
         log_pipeline(
             "chat_snapshot",
-            "!bot LLM job: no dashboard snapshot available",
+            "chat LLM job: no dashboard snapshot available",
             "WARN",
             detail=(err or "")[:300],
         )
@@ -51,7 +54,7 @@ async def _process_llm_job(player: str, text: str, fetch_url: str | None, server
             run_llm(text, ctx),
             timeout=90.0,
         )
-        push_message("Bot", reply, server_token)
+        push_message(CHAT_BOT_DISPLAY_NAME, reply, server_token)
         log_event(
             "INFO",
             "LLM reply queued",
@@ -60,7 +63,7 @@ async def _process_llm_job(player: str, text: str, fetch_url: str | None, server
         )
         log_pipeline(
             "chat_out",
-            "!bot reply ready for GET /api/chat/poll (game mod)",
+            "Scout Riley reply ready for GET /api/chat/poll (game mod)",
             player=player,
             reply_chars=len(reply or ""),
             latency_s=round(latency, 3) if latency else None,
@@ -68,10 +71,10 @@ async def _process_llm_job(player: str, text: str, fetch_url: str | None, server
         )
     except asyncio.TimeoutError:
         log_event("WARN", "LLM timeout", player=player)
-        push_message("Bot", FALLBACK_REPLY, server_token)
+        push_message(CHAT_BOT_DISPLAY_NAME, FALLBACK_REPLY, server_token)
     except Exception as e:
         log_event("ERROR", f"LLM job failed: {e}", player=player)
-        push_message("Bot", FALLBACK_REPLY, server_token)
+        push_message(CHAT_BOT_DISPLAY_NAME, FALLBACK_REPLY, server_token)
 
 
 @router.post("/receive")
@@ -90,24 +93,62 @@ async def receive_chat(
         )
         raise HTTPException(status_code=401, detail=err or "Invalid server_token")
 
-    assert_chat_allowed(request, body.server_token)
+    try:
+        assert_chat_allowed(request, body.server_token)
+    except HTTPException as exc:
+        log_pipeline(
+            "chat_blocked",
+            f"POST /api/chat/receive rejected ({exc.status_code}): {exc.detail}",
+            "WARN",
+            player=body.player,
+        )
+        raise
 
     tok = normalize_server_token(body.server_token)
     settings = get_settings()
+    prefix = settings["trigger_prefix"]
+    msg = body.message.strip()
+
+    log_pipeline(
+        "chat_receive",
+        "POST /api/chat/receive — authenticated; evaluating trigger and bot flags",
+        player=body.player,
+        trigger_prefix=prefix,
+        trigger_matched=msg.lower().startswith(prefix.lower()),
+    )
+
     if not settings["bot_enabled"]:
+        log_pipeline(
+            "chat_ignored",
+            "bot disabled globally (ENABLE_AI_BOT / LLM keys)",
+            "WARN",
+            player=body.player,
+        )
         return {"ok": True, "ignored": True, "reason": "bot_disabled"}
     if not instance_on:
+        log_pipeline(
+            "chat_ignored",
+            "bot disabled for this server_token instance (admin / integration toggle)",
+            "WARN",
+            player=body.player,
+        )
         return {"ok": True, "ignored": True, "reason": "bot_disabled_instance"}
 
-    msg = body.message.strip()
-    prefix = settings["trigger_prefix"]
     if not msg.lower().startswith(prefix.lower()):
+        log_pipeline(
+            "chat_ignored",
+            "message does not match TRIGGER_PREFIX — sync server .env with modsSettings triggerPrefix",
+            "WARN",
+            player=body.player,
+            trigger_prefix=prefix,
+            preview=msg[:160],
+        )
         return {"ok": True, "ignored": True, "reason": "no_trigger"}
 
     rate_key = f"{tok}:{body.player}"
     if not allow(rate_key, max_per_minute=5):
         push_message(
-            "Bot",
+            CHAT_BOT_DISPLAY_NAME,
             "You're sending messages a bit fast — wait a moment and try again.",
             tok,
         )
@@ -117,7 +158,7 @@ async def receive_chat(
     user_text = msg[len(prefix) :].strip()
     if not user_text:
         push_message(
-            "Bot",
+            CHAT_BOT_DISPLAY_NAME,
             f'Say something after "{prefix}", e.g. {prefix} what is growing?',
             tok,
         )
@@ -126,9 +167,10 @@ async def receive_chat(
     log_event("INFO", "Chat trigger", player=body.player, preview=user_text[:200])
     log_pipeline(
         "chat_in",
-        "POST /api/chat/receive — in-game !bot message accepted; will fetch snapshot + LLM",
+        "POST /api/chat/receive — in-game trigger accepted; will fetch snapshot + LLM",
         player=body.player,
         preview_chars=len(user_text),
+        trigger_prefix=prefix,
     )
     background_tasks.add_task(_process_llm_job, body.player, user_text, fetch_url, tok)
     return {"ok": True, "queued": True}

@@ -1102,7 +1102,11 @@ ipcMain.handle('get-consultant-byok-credentials', () => {
     const raw = store.get('consultantByok');
     const r = raw && typeof raw === 'object' ? raw : {};
     const apiKey = r.apiKey && String(r.apiKey).trim() ? String(r.apiKey).trim() : '';
-    const provider = r.provider === 'gemini' ? 'gemini' : 'openai';
+    let provider = r.provider === 'gemini' ? 'gemini' : 'openai';
+    if (apiKey) {
+        if (apiKey.startsWith('AIza')) provider = 'gemini';
+        else if (apiKey.startsWith('sk-')) provider = 'openai';
+    }
     return { apiKey: apiKey || null, provider };
 });
 
@@ -1110,9 +1114,14 @@ ipcMain.handle('get-consultant-byok-meta', () => {
     const raw = store.get('consultantByok');
     const r = raw && typeof raw === 'object' ? raw : {};
     const apiKey = r.apiKey && String(r.apiKey).trim() ? String(r.apiKey).trim() : '';
+    let provider = r.provider === 'gemini' ? 'gemini' : 'openai';
+    if (apiKey) {
+        if (apiKey.startsWith('AIza')) provider = 'gemini';
+        else if (apiKey.startsWith('sk-')) provider = 'openai';
+    }
     return {
         hasKey: apiKey.length > 0,
-        provider: r.provider === 'gemini' ? 'gemini' : 'openai',
+        provider,
     };
 });
 
@@ -1127,7 +1136,11 @@ ipcMain.handle('save-consultant-byok-credentials', (_e, payload) => {
     const prevKey = prev.apiKey && String(prev.apiKey).trim() ? String(prev.apiKey).trim() : '';
     const incoming = payload && payload.apiKey != null ? String(payload.apiKey).trim() : '';
     const apiKey = incoming || prevKey;
-    const provider = payload && payload.provider === 'gemini' ? 'gemini' : 'openai';
+    let provider = payload && payload.provider === 'gemini' ? 'gemini' : 'openai';
+    if (apiKey) {
+        if (apiKey.startsWith('AIza')) provider = 'gemini';
+        else if (apiKey.startsWith('sk-')) provider = 'openai';
+    }
     if (!apiKey) {
         return { ok: false, error: 'empty_key' };
     }

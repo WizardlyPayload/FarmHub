@@ -45,7 +45,7 @@ def store_push(
     n_srv = len(servers) if servers else 0
     log_pipeline(
         "push_in",
-        "Received Farm Dashboard snapshot POST (stored in RAM for consultant / !bot)",
+        "Received Farm Dashboard snapshot POST (stored in RAM for consultant / in-game Scout Riley)",
         bytes_utf8=len(raw.encode("utf-8")),
         server_id=sid or "(default)",
         servers_listed=n_srv,

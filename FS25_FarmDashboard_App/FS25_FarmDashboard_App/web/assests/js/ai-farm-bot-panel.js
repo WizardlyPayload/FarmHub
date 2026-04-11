@@ -161,9 +161,9 @@
         (s.localSubFolder ? ' · save <code>' + s.localSubFolder + '</code>' : '') + '</li>';
     }
     html += '</ul>';
-    html += '<h6 class="text-farm-accent mt-3">In-game chat (<code>!bot</code>) per profile</h6>';
+    html += '<h6 class="text-farm-accent mt-3">In-game chat — <strong>Scout Riley</strong> (<code>!riley</code>) per profile</h6>';
     html +=
-      '<p class="small text-muted mb-2">Each profile matches one Farm Dashboard save (set by your host in <code>/admin</code>). Uncheck saves you are not using with the mod so <code>!bot</code> only runs where you want.</p>';
+      '<p class="small text-muted mb-2">Each profile matches one Farm Dashboard save (set by your host in <code>/admin</code>). Uncheck saves you are not using with the mod so <code>!riley</code> only runs where you want.</p>';
     html += '<ul class="small list-unstyled mb-2" id="aiFarmBotProfileToggles">';
     if (bi.length === 0) {
       html += '<li class="text-muted">No bot profiles yet — your host creates them in /admin.</li>';
@@ -208,7 +208,7 @@
           introLead.innerHTML =
             '<strong>' +
             String(b.serviceName).replace(/</g, '') +
-            '</strong> — same three steps below. Optional BYOK key stays on this PC; use <strong>Write to FS25 modsSettings</strong> for the in-game <code>!bot</code> token.';
+            '</strong> — same three steps below. Optional BYOK key stays on this PC; use <strong>Write to FS25 modsSettings</strong> for the in-game <code>!riley</code> token.';
         }
         if (b.hasEmbeddedIntegrationKey) {
           if (rowKey) rowKey.classList.add('d-none');
@@ -500,6 +500,140 @@
       }
     }
     if (llmPingBtn) llmPingBtn.addEventListener('click', runDashboardLlmPing);
+
+    var LS_GEMINI_MODELS = 'farmdash_gemini_models_cache_v2';
+    function geminiModelsMergeHeaders(byok) {
+      var h = {};
+      if (byok && byok.apiKey) {
+        h['X-AI-API-Key'] = byok.apiKey;
+        if (byok.provider === 'gemini' || byok.provider === 'openai') {
+          h['X-AI-Provider'] = byok.provider;
+        }
+      }
+      return h;
+    }
+    function fillGeminiModelSelect(models) {
+      var sel = document.getElementById('aiFarmBotGeminiModelSelect');
+      if (!sel) return;
+      sel.innerHTML = '';
+      var placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent =
+        models && models.length ? '— select a model id to copy —' : '— no models —';
+      sel.appendChild(placeholder);
+      if (!models || !models.length) return;
+      for (var i = 0; i < models.length; i++) {
+        var m = models[i];
+        var id = (m && m.id) || '';
+        if (!id) continue;
+        var o = document.createElement('option');
+        o.value = id;
+        var dn = (m && m.displayName) || '';
+        o.textContent = dn && dn !== id ? id + ' — ' + dn : id;
+        sel.appendChild(o);
+      }
+    }
+    function tryHydrateGeminiModelsFromLs() {
+      var meta = document.getElementById('aiFarmBotGeminiModelsMeta');
+      try {
+        var raw = localStorage.getItem(LS_GEMINI_MODELS);
+        if (!raw) return;
+        var o = JSON.parse(raw);
+        var base = (getBase() || '').replace(/\/$/, '');
+        if (!o.base || String(o.base).replace(/\/$/, '') !== base) return;
+        fillGeminiModelSelect(o.models || []);
+        if (meta && o.fetchedAt) {
+          meta.textContent =
+            String((o.models && o.models.length) || 0) +
+            ' models · ' +
+            o.fetchedAt +
+            (o.fromCache ? ' (last fetch)' : '');
+        }
+      } catch (eH) {}
+    }
+    function runGeminiModelsFetch(force) {
+      var meta = document.getElementById('aiFarmBotGeminiModelsMeta');
+      if (meta) meta.textContent = 'Loading…';
+      function doFetch(base, key, headers) {
+        var b = (base || '').replace(/\/$/, '') || 'http://127.0.0.1:8080';
+        if (!key) {
+          if (meta) meta.textContent = 'Save link key first.';
+          fillGeminiModelSelect([]);
+          return;
+        }
+        headers['X-FarmDash-Key'] = encodeURIComponent(key);
+        var url = b + '/api/integration/gemini-models' + (force ? '?refresh=1' : '');
+        fetch(url, { headers: headers })
+          .then(function (r) {
+            pl('renderer_out', 'GET /api/integration/gemini-models', {
+              httpStatus: r.status,
+              force: !!force,
+            });
+            return r.text().then(function (txt) {
+              try {
+                return { status: r.status, body: JSON.parse(txt) };
+              } catch (eJ) {
+                throw new Error('HTTP ' + r.status + (txt ? ': ' + txt.slice(0, 160) : ''));
+              }
+            });
+          })
+          .then(function (x) {
+            var j = x.body || {};
+            if (!j.ok) {
+              if (meta) meta.textContent = (j.detail || 'Request failed') + '';
+              fillGeminiModelSelect([]);
+              return;
+            }
+            var models = j.models || [];
+            fillGeminiModelSelect(models);
+            var parts = [];
+            parts.push(String(models.length) + ' models');
+            if (j.fetchedAt) parts.push(j.fetchedAt);
+            if (j.fromCache) parts.push('server cache');
+            if (j.apiVersion) parts.push(j.apiVersion);
+            if (meta) meta.textContent = parts.join(' · ');
+            try {
+              localStorage.setItem(
+                LS_GEMINI_MODELS,
+                JSON.stringify({
+                  base: b,
+                  fetchedAt: j.fetchedAt,
+                  models: models,
+                  fromCache: j.fromCache,
+                }),
+              );
+            } catch (eLs) {}
+          })
+          .catch(function (e) {
+            if (meta) meta.textContent = String(e.message || e);
+            fillGeminiModelSelect([]);
+          });
+      }
+      try {
+        var ipc = require('electron').ipcRenderer;
+        Promise.all([
+          ipc.invoke('get-ai-manager-connection'),
+          ipc.invoke('get-consultant-byok-credentials'),
+        ])
+          .then(function (arr) {
+            var c = arr[0];
+            var byok = arr[1];
+            var base = (c && c.baseUrl) || getBase() || '';
+            var key = (c && c.integrationKey) || getKey() || '';
+            doFetch(base, key, geminiModelsMergeHeaders(byok || {}));
+          })
+          .catch(function () {
+            doFetch(getBase(), getKey(), geminiModelsMergeHeaders({}));
+          });
+      } catch (eG) {
+        doFetch(getBase(), getKey(), geminiModelsMergeHeaders({}));
+      }
+    }
+    var gemRefresh = document.getElementById('aiFarmBotGeminiModelsRefresh');
+    var gemForce = document.getElementById('aiFarmBotGeminiModelsForce');
+    if (gemRefresh) gemRefresh.addEventListener('click', function () { runGeminiModelsFetch(false); });
+    if (gemForce) gemForce.addEventListener('click', function () { runGeminiModelsFetch(true); });
+
     var toggleKeyBtn = document.getElementById('aiFarmBotToggleKey');
     var toggleKeyIcon = document.getElementById('aiFarmBotToggleKeyIcon');
     if (toggleKeyBtn && keyIn) {
@@ -519,6 +653,7 @@
         applyBrandingUi();
         populateByokFromStore();
         loadPanel();
+        tryHydrateGeminiModelsFromLs();
       });
     }
     if (installBtn && installOut) {

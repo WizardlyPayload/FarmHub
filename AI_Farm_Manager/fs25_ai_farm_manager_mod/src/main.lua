@@ -11,7 +11,7 @@
 
 AIFarmBridge = {}
 AIFarmBridge.MOD_NAME = "fs25_ai_farm_manager_mod"
-AIFarmBridge.BOT_SENDER = "AI Farm Manager"
+AIFarmBridge.BOT_SENDER = "Scout Riley"
 AIFarmBridge.POLL_MS = 3000
 AIFarmBridge.BACKOFF_MS = 10000
 AIFarmBridge.config = nil

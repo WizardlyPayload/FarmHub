@@ -12,7 +12,7 @@ from fastapi.responses import Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field
 
-from app.config import get_settings
+from app.config import active_gemini_api_key, get_settings, has_gemini_credentials
 from app.services.bot_registry import (
     delete_instance,
     find_instance_by_id,
@@ -23,6 +23,7 @@ from app.services.bot_registry import (
 from app.services.mod_config_xml import build_mod_config_xml, resolve_backend_url_for_xml
 from app.services import snapshot_push_service
 from app.services.consultant import normalize_incoming_api_key, resolve_consultant_llm_settings
+from app.services.gemini_models_catalog import fetch_gemini_models_catalog
 from app.services.llm_service import test_llm_connectivity
 from app.services.log_buffer import log_event
 from app.services.pipeline_log import log_pipeline
@@ -233,6 +234,60 @@ async def integration_llm_ping(
             model=out.get("model"),
             detail=detail[:500] if detail else None,
         )
+    return out
+
+
+@router.get("/gemini-models")
+async def integration_gemini_models(
+    request: Request,
+    refresh: bool = Query(False, description="Bypass server cache and call Google ListModels again"),
+    _: str = Depends(require_integration_or_admin),
+) -> dict[str, Any]:
+    """
+    Lists Gemini model IDs that support ``generateContent`` for the active API key (server env or BYOK).
+
+    Cached server-side (default 1h, ``GEMINI_LISTMODELS_CACHE_SEC``). Use ``refresh=true`` to force a new fetch.
+    Matches ``GEMINI_REST_API_VERSION`` (``v1`` / ``v1beta``) for both ListModels and generateContent.
+    """
+    user_key = normalize_incoming_api_key(request.headers.get("X-AI-API-Key"))
+    user_prov = (request.headers.get("X-AI-Provider") or "").strip().lower() or None
+    if user_prov and user_prov not in ("openai", "gemini"):
+        user_prov = None
+    merged = resolve_consultant_llm_settings(user_key or None, user_prov)
+    base = get_settings()
+    byok = bool(user_key)
+    cand: dict[str, Any] = merged if merged is not None else base
+    if not has_gemini_credentials(cand):
+        if byok:
+            return {
+                "ok": False,
+                "detail": (
+                    "BYOK must be a Google (Gemini / AIza…) key for this list, or remove BYOK in the robot panel "
+                    "to use the AI server’s GEMINI_API_KEY — same rule as Smart suggestions when you choose OpenAI BYOK."
+                ),
+                "models": [],
+            }
+        if not has_gemini_credentials(base):
+            return {
+                "ok": False,
+                "detail": "No Gemini API key — set GEMINI_API_KEY on the AI server or BYOK (Google) in the robot panel.",
+                "models": [],
+            }
+        cand = base
+    key = active_gemini_api_key(cand)
+    api_ver = (cand.get("gemini_rest_api_version") or "v1").strip().lower()
+    if api_ver not in ("v1", "v1beta"):
+        api_ver = "v1"
+    out = await fetch_gemini_models_catalog(key, api_version=api_ver, force_refresh=refresh)
+    n = len(out.get("models") or [])
+    log_pipeline(
+        "gemini_models",
+        "GET /api/integration/gemini-models — Google ListModels (generateContent)",
+        ok=bool(out.get("ok")),
+        count=n,
+        refresh=refresh,
+        api_version=api_ver,
+    )
     return out
 
 

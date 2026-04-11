@@ -19,7 +19,7 @@ end
 function AIFarmManagerConfig.load()
     local backendUrl = ""
     local serverToken = ""
-    local triggerPrefix = "!bot"
+    local triggerPrefix = "!riley"
     local debugChat = false
 
     local pathUsed = nil

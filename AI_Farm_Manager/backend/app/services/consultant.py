@@ -106,8 +106,9 @@ CONSULTANT_NPC_VOICE_INTRO = """**Voice — FS25 locals (every insight):** Write
 - **Neighbor David** — Ex–city neighbor learning beside you. Owns his blunders; warns you with “I once…” so you don’t repeat his mistakes—light, cautionary.
 - **Animal Farmer Katie** — World traveler back home on livestock. Animals, barns, pasture, feed, health—kind expert tone; a tiny travel-flavored aside only if it still fits the character cap.
 - **Lumberjack Noah** — Local forester and lumberjack. Trees, logging, selling wood, protecting the forest; gruff if someone’s careless; woodcraft or a quick detective-story nod only if space allows.
+- **Scout Riley** — The **in-game AI line** (dashboard / dedicated bridge): quick field checks, “what’s growing?”, next job nudges—friendly, plain, like radioing the yard from the cab. Same tone as Ben on kit, Walter on soil when the player asks **after** the `!riley` trigger.
 
-**Topic → voice:** crops/soil/rotation/history → Walter (or Ben for machine-heavy jobs). Equipment/how-to run machines → Ben. Risky or dumb mistakes to avoid → David. Herds, barns, pasture → Katie. Forestry, trees, wood, stumps → Noah.
+**Topic → voice:** crops/soil/rotation/history → Walter (or Ben for machine-heavy jobs). Equipment/how-to run machines → Ben. Risky or dumb mistakes to avoid → David. Herds, barns, pasture → Katie. Forestry, trees, wood, stumps → Noah. Short in-game chat Q&A after **!riley** → Riley.
 
 You may prefix **message** with the speaker once (e.g. `Walter:`) **or** write pure first-person with no label—whichever reads best under the length limit. Stay inside JSON string rules (escape `"` as `\\"`).
 
@@ -765,9 +766,18 @@ def _consultant_llm_settings_for_byok(
     base = get_settings()
     merged: dict[str, Any] = dict(base)
     key = normalize_incoming_api_key(user_api_key)
-    prov = (user_provider or "").strip().lower()
-    if prov not in ("openai", "gemini"):
-        prov = "gemini" if key.startswith("AIza") else "openai"
+    p = (user_provider or "").strip().lower()
+    if p not in ("openai", "gemini", "", None):
+        p = None
+    # Same rules as a correctly configured server: Google AI Studio keys (AIza…) always use Gemini.
+    if key.startswith("AIza"):
+        prov = "gemini"
+    elif key.startswith("sk-"):
+        prov = "openai"
+    elif p in ("openai", "gemini"):
+        prov = p
+    else:
+        prov = "openai"
     merged["llm_provider"] = prov
     if prov == "gemini":
         merged["gemini_api_key"] = key
@@ -855,7 +865,7 @@ async def generate_farm_insights(
 
     API key resolution:
     1. Non-empty ``X-AI-API-Key`` (BYOK) after normalize/decode.
-    2. Else server ``GEMINI_API_KEY`` or ``LLM_API_KEY`` per ``LLM_PROVIDER`` (same as admin / ``!bot``).
+    2. Else server ``GEMINI_API_KEY`` or ``LLM_API_KEY`` per ``LLM_PROVIDER`` (same as admin / in-game ``!riley``).
     """
     if _consultant_skip_production_heuristics(system_instruction):
         heuristics = []

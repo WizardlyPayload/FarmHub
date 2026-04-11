@@ -25,14 +25,15 @@ _GEMINI_QUOTA_RETRY_STATUS: frozenset[int] = frozenset({429, 503})
 # Stripped key string of the last Gemini key that completed generateContent successfully (process-wide).
 _gemini_last_success_key: str | None = None
 
-# Default multi-model chain (3.x previews + 2.5 stable) — used when GEMINI_MODEL_ROLLOVER is unset.
+# Default multi-model chain — stable 2.5 first (avoids 404 on v1 for unreleased preview ids). Previews last.
+# Use GET /api/integration/gemini-models in Farm Dashboard to see IDs your key supports.
 _DEFAULT_GEMINI_MODEL_ROLLOVER: tuple[str, ...] = (
-    "gemini-3.1-pro-preview",
-    "gemini-3-flash-preview",
-    "gemini-3.1-flash-lite-preview",
-    "gemini-2.5-pro",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
+    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-3.1-pro-preview",
 )
 
 

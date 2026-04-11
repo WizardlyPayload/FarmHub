@@ -28,7 +28,7 @@ flowchart LR
 
 - **Game → mod** exposes farm state over HTTP (fields, vehicles, animals, economy, etc.).
 - **Electron** loads the web UI (`web/index.html`), talks to the **local** dashboard API, and optionally **POSTs** merged snapshots to **AI Farm Manager** (`/api/integration/push-snapshot` or similar) so the AI server does not need inbound access to the gaming PC.
-- **AI Farm Manager** stores the latest JSON in RAM (per `serverId`), runs **consultant insights**, **chat** (`!bot`), and admin tools.
+- **AI Farm Manager** stores the latest JSON in RAM (per `serverId`), runs **consultant insights**, **chat** (**Scout Riley** — trigger `!riley`, configurable via `TRIGGER_PREFIX` / mod XML), and admin tools.
 
 ---
 
@@ -114,9 +114,9 @@ Supporting / integration:
 
 | Router | Prefix | Notes |
 |--------|--------|------|
-| `chat` | `/api/...` | Game / bot chat, `!bot` trigger |
+| `chat` | `/api/...` | Game / bot chat — **Scout Riley**, default trigger `!riley` (`TRIGGER_PREFIX`) |
 | `admin_routes` | `/admin` | HTML admin, env, LLM test |
-| `integration` | `/api/integration` | Push snapshot, instances, keys |
+| `integration` | `/api/integration` | Push snapshot, instances, keys, **`GET /gemini-models`** (Google ListModels, `generateContent` ids) |
 | `consultant` | `/api/v1/consultant` | **GET /insights** — farm insights |
 | `mod_config_download` | — | Mod XML delivery if configured |
 

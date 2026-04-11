@@ -833,6 +833,20 @@
                 </div>
               </div>
             </div>
+            <div class="card bg-secondary bg-opacity-25 border border-secondary mb-3" id="aiFarmBotGeminiModelsCard">
+              <div class="card-body py-2">
+                <h6 class="text-light mb-2 small"><i class="bi bi-list-ul me-1"></i> Gemini models (live list)</h6>
+                <p class="small text-muted mb-2">Calls Google <strong>ListModels</strong> for IDs that support <code>generateContent</code>. Use the same id in your host <code>GEMINI_MODEL</code> / <code>GEMINI_MODEL_ROLLOVER</code>. Cached on the AI server ~1h — use <strong>Force refresh</strong> to pull an updated list.</p>
+                <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                  <button type="button" class="btn btn-sm btn-outline-secondary" id="aiFarmBotGeminiModelsRefresh">Fetch list</button>
+                  <button type="button" class="btn btn-sm btn-outline-warning" id="aiFarmBotGeminiModelsForce" title="Bypass server cache and query Google again">Force refresh</button>
+                  <span class="small text-muted" id="aiFarmBotGeminiModelsMeta">—</span>
+                </div>
+                <select id="aiFarmBotGeminiModelSelect" class="form-select form-select-sm font-monospace" aria-label="Gemini model ids from Google">
+                  <option value="">— click Fetch list —</option>
+                </select>
+              </div>
+            </div>
             <!-- Subscription tier: remove d-none on #aiFarmBotSubscriptionTierRow when billing exposes tier on /api/integration/overview -->
             <div class="d-none mb-2" id="aiFarmBotSubscriptionTierRow" aria-hidden="true">
               <label class="form-label small mb-0" for="aiFarmBotCurrentTierText">Current plan</label>

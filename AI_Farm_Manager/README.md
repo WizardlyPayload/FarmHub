@@ -127,7 +127,7 @@ Smart suggestions and field-map modes use the **FS25 mentor / agronomy** prompt 
 ### Endpoint: `GET /api/v1/consultant/insights`
 
 - **Authentication:** Header **`X-FarmDash-Key`** — must match **`FARMDASH_INTEGRATION_KEY`** in `backend/.env` (same value as “Farm Dashboard link key” in the Electron app’s AI Farm Manager panel).
-- **LLM keys:** Optional header **`X-AI-API-Key`** (and **`X-AI-Provider`**: `openai` or `gemini`) for BYOK from the Farm Dashboard app. If the header is missing or empty, the server uses **`LLM_API_KEY` / `GEMINI_API_KEY`** from the environment (**`LLM_PROVIDER`**) — the same keys as **`!bot`** and **`/admin`**. Keys are forwarded to the provider and are not stored by the app beyond `.env` / your host env.
+- **LLM keys:** Optional header **`X-AI-API-Key`** (and **`X-AI-Provider`**: `openai` or `gemini`) for BYOK from the Farm Dashboard app. If the header is missing or empty, the server uses **`LLM_API_KEY` / `GEMINI_API_KEY`** from the environment (**`LLM_PROVIDER`**) — the same keys as in-game **`!riley`** (Scout Riley) and **`/admin`**. Keys are forwarded to the provider and are not stored by the app beyond `.env` / your host env.
 - **Behaviour:**
   - **Heuristics:** Flags production outputs or storage levels at or above ~**90%** capacity (high-priority alerts even when the LLM is slow, rate-limited, or disabled).
   - **LLM analysis:** Field-focused rotation and next-step advice; other areas when relevant. Field-specific rows may include **`field_ref`** (farmland id string) for per-parcel UI in the Electron app.

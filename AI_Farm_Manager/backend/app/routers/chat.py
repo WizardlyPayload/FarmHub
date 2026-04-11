@@ -137,7 +137,7 @@ async def receive_chat(
     if not msg.lower().startswith(prefix.lower()):
         log_pipeline(
             "chat_ignored",
-            "message does not match TRIGGER_PREFIX — sync server .env with modsSettings triggerPrefix",
+            "message does not match TRIGGER_PREFIX — sync server .env with modSettings triggerPrefix",
             "WARN",
             player=body.player,
             trigger_prefix=prefix,

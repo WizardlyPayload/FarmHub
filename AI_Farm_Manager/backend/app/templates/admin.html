@@ -105,7 +105,7 @@
       <p class="muted small">
         Add one profile per dedicated game server. Each profile gets its own <code>server_token</code> and message queue.
         Map the <strong>Farm Dashboard server id</strong> so the LLM pulls <code>/api/data?serverId=…</code> for the correct save.
-        <strong>Do not edit XML by hand:</strong> use <strong>Download XML</strong> per profile, or Farm Dashboard’s <strong>Install config</strong> (writes <code>modsSettings/ai_farm_manager_config.xml</code> for you).
+        <strong>Do not edit XML by hand:</strong> use <strong>Download XML</strong> per profile, or Farm Dashboard’s <strong>Install config</strong> (writes <code>modSettings/ai_farm_manager_config.xml</code> for you).
         Set <code>PUBLIC_BASE_URL</code> in <code>.env</code> so generated files point at your real API (HTTPS) hostname.
       </p>
       {% if overview.farmDashboardError %}

@@ -1,5 +1,7 @@
 --[[
-  Config.lua — load backend URL + token from modsSettings XML (no hardcoded VPS IP in Lua).
+  Config.lua — load backend URL + token from modSettings XML (no hardcoded VPS IP in Lua).
+
+  Profile path: getUserProfileAppPath() … FarmingSimulator2025/modSettings/ai_farm_manager_config.xml
 
   If Giants changes profile paths, search for getUserProfileAppPath in GDN / base scripts.
 --]]
@@ -9,9 +11,7 @@ AIFarmManagerConfig.FILE_NAME = "ai_farm_manager_config.xml"
 
 function AIFarmManagerConfig.tryPaths()
     local base = getUserProfileAppPath()
-    -- FS often uses "modsSettings" (with an "s"); some docs say "modSettings" — try both.
     return {
-        base .. "modsSettings/" .. AIFarmManagerConfig.FILE_NAME,
         base .. "modSettings/" .. AIFarmManagerConfig.FILE_NAME,
     }
 end

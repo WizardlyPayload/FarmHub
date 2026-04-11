@@ -189,7 +189,7 @@
     }
     html += '</ul>';
     html +=
-      '<p class="small text-muted mb-0">Use <strong>Write to FS25 modsSettings</strong> to install the mod token for each save you play.</p>';
+      '<p class="small text-muted mb-0">Use <strong>Write to FS25 modSettings</strong> to install the mod token for each save you play.</p>';
     container.innerHTML = html;
     populateInstanceSelect(data);
     wireBotEnableToggles(container, base, key);
@@ -208,7 +208,7 @@
           introLead.innerHTML =
             '<strong>' +
             String(b.serviceName).replace(/</g, '') +
-            '</strong> — same three steps below. Optional BYOK key stays on this PC; use <strong>Write to FS25 modsSettings</strong> for the in-game <code>!hank</code> token.';
+            '</strong> — same three steps below. Optional BYOK key stays on this PC; use <strong>Write to FS25 modSettings</strong> for the in-game <code>!hank</code> token.';
         }
         if (b.hasEmbeddedIntegrationKey) {
           if (rowKey) rowKey.classList.add('d-none');

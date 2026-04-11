@@ -13,10 +13,9 @@ AIFarmChatHooks._installed = false
 AIFarmChatHooks._installMissingLogged = false
 AIFarmChatHooks._prefixHintShown = false
 
---- Must match AIFarmBridge:isAuthority() — single-player host is not always `getIsServer()`,
---- but we still need to forward chat; the old `mission:getIsServer()` gate blocked SP.
+--- In-game chat bot is multiplayer-only — same gate as AIFarmBridge:isChatBridgeActive().
 function AIFarmChatHooks.shouldHandleChat()
-    return AIFarmBridge:isAuthority()
+    return AIFarmBridge:isChatBridgeActive()
 end
 
 --- Broadcast a bot line to all players (server only).

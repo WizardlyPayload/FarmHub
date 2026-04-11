@@ -1,5 +1,8 @@
 --[[
-  main.lua — AI Farm Manager bridge (dedicated server / MP host authority only).
+  main.lua — In-game Hank chat bridge (multiplayer only).
+
+  Supported: multiplayer where this process has authority — MP host, dedicated server, G-Portal / rented host, etc.
+  Not supported: single-player career (use Farm Dashboard + consultant for AI on your own PC).
 
   Flow:
   1) Load XML config (backend URL + token).
@@ -25,6 +28,7 @@ AIFarmBridge._hookGiveUpLogged = false
 AIFarmBridge._configWarned = false
 AIFarmBridge._httpWarned = false
 AIFarmBridge._postOkLogged = false
+AIFarmBridge._spChatInfoLogged = false
 
 --- Match FarmDashboard / dedicated: SP + host + dedicated; not MP clients.
 function AIFarmBridge:isAuthority()
@@ -49,12 +53,24 @@ function AIFarmBridge:isAuthority()
     return true
 end
 
+--- In-game !hank / Hank chat bot: multiplayer sessions only (host, dedicated, G-Portal, …). Not single-player career.
+function AIFarmBridge:isChatBridgeActive()
+    if not self:isAuthority() then
+        return false
+    end
+    local md = g_currentMission and g_currentMission.missionDynamicInfo
+    if md == nil then
+        return false
+    end
+    return md.isMultiplayer == true
+end
+
 --- Register chat hook + poll loop once mission exists (loadMap often runs before g_currentMission).
 function AIFarmBridge:registerWhenReady()
     if g_currentMission == nil then
         return
     end
-    if not self:isAuthority() then
+    if not self:isChatBridgeActive() then
         return
     end
     if not self._updateableRegistered then
@@ -72,10 +88,21 @@ function AIFarmBridge:loadMap()
     if self.config.pathUsed == nil and not self._configWarned then
         self._configWarned = true
         Logging.warning(
-            "[AIFarmManager] No config XML found. Place ai_farm_manager_config.xml in modsSettings (see mod /config folder)."
+            "[AIFarmManager] No config XML found. Place ai_farm_manager_config.xml in modSettings (see mod /config folder)."
         )
     elseif self.config.pathUsed ~= nil then
         Logging.info("[AIFarmManager] Loaded config: %s", self.config.pathUsed)
+    end
+
+    if self:isAuthority() and g_currentMission and g_currentMission.missionDynamicInfo
+        and g_currentMission.missionDynamicInfo.isMultiplayer ~= true then
+        if not self._spChatInfoLogged then
+            self._spChatInfoLogged = true
+            Logging.info(
+                "[AIFarmManager] In-game Hank chat (!hank) runs in multiplayer only (host / dedicated / rented server). "
+                    .. "Single-player: use Farm Dashboard for Smart suggestions — not this chat bridge."
+            )
+        end
     end
 
     self:registerWhenReady()
@@ -193,7 +220,7 @@ end
 function AIFarmBridge:update(dt)
     AIFarmHttp.update(dt)
 
-    if not self:isAuthority() then
+    if not self:isChatBridgeActive() then
         return
     end
 

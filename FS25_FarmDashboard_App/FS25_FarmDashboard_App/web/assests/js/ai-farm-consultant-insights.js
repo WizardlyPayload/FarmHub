@@ -90,6 +90,100 @@
       '</div></div>';
   }
 
+  function escapeInsightHtml(s) {
+    return String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function priorityLabelFromInsight(ins) {
+    if (!ins || ins.priority == null) return 'Medium';
+    var p = ins.priority;
+    if (typeof p === 'object' && p !== null && 'value' in p) return String(p.value);
+    return String(ins.priority);
+  }
+
+  /** Fields tab only: one card — which existing per-field AI tip to do first (no extra GET /insights). */
+  function renderFieldsSmartPanelForFieldsTab() {
+    var container = document.getElementById('ai-insights-panel');
+    var badge = document.getElementById('ai-insights-llm-badge');
+    if (!container) return;
+    container.removeAttribute('aria-busy');
+
+    var fields =
+      window.dashboard && Array.isArray(window.dashboard.fields) ? window.dashboard.fields : [];
+    var picked =
+      typeof window.pickDoThisFirstFromFieldInsights === 'function'
+        ? window.pickDoThisFirstFromFieldInsights(fields)
+        : null;
+    var llmUsed = !!window.__fieldConsultantLlmUsed;
+
+    if (badge) {
+      if (picked) {
+        badge.textContent = llmUsed ? 'AI' : 'Rules';
+        badge.className = 'badge ms-1 ' + (llmUsed ? 'bg-success' : 'bg-secondary');
+        badge.title = llmUsed
+          ? 'Do-this-first is picked from your per-field AI tips (same response as the field cards).'
+          : 'Do-this-first is ranked from per-field tips (heuristics).';
+      } else {
+        badge.textContent = 'Fields';
+        badge.className = 'badge ms-1 bg-info text-dark';
+        badge.title =
+          'Waiting for per-field AI tips. Open the Fields section or tap AI field tips on that page.';
+      }
+    }
+
+    if (!picked) {
+      var noFields = fields.length === 0;
+      container.innerHTML = noFields
+        ? '<p class="small text-muted mb-0"><i class="bi bi-hourglass-split me-1"></i> ' +
+          'Waiting for field data… then tap <strong>AI field tips</strong> on the Fields page. ' +
+          'This panel will show which task to do first (from the same tips as each field card).</p>'
+        : '<p class="small text-muted mb-0"><i class="bi bi-info-circle me-1"></i> ' +
+          'No per-field AI tips yet. On <strong>Fields</strong>, tap <strong>AI field tips</strong> — ' +
+          'we&rsquo;ll rank them here as <strong>do this first</strong> (no extra server call).</p>';
+      return;
+    }
+
+    var field = picked.field;
+    var ins = picked.ins;
+    var fname = field.name || 'Field ' + (field.farmlandId != null ? field.farmlandId : field.id);
+    var priStr = priorityLabelFromInsight(ins);
+    var priClass = String(priStr).toLowerCase();
+    var msg = String(ins.message || '').trim();
+    var excerpt = msg.length > 220 ? msg.slice(0, 217) + '…' : msg;
+    var reason = String(ins.reasoning || '').trim();
+
+    var div = document.createElement('div');
+    div.className = 'insight-card priority-' + (priClass || 'medium');
+    div.innerHTML =
+      '<div class="insight-meta text-farm-accent">[Field] · ' +
+      escapeInsightHtml(priStr) +
+      ' — do this first</div>' +
+      '<strong class="d-block mt-1"><i class="bi bi-flag-fill text-warning me-1"></i>' +
+      escapeInsightHtml(fname) +
+      ' — ' +
+      escapeInsightHtml(excerpt) +
+      '</strong>' +
+      (reason
+        ? '<p class="small text-muted mb-0 mt-1">' + escapeInsightHtml(reason) + '</p>'
+        : '<p class="small text-muted mb-0 mt-1">Highest priority among the AI tips already shown on your field cards.</p>');
+    container.innerHTML = '';
+    container.appendChild(div);
+  }
+
+  function showFieldsSmartLoadingPlaceholder() {
+    var container = document.getElementById('ai-insights-panel');
+    if (!container) return;
+    container.setAttribute('aria-busy', 'true');
+    container.innerHTML =
+      '<p class="small text-info mb-0">' +
+      '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' +
+      'Loading per-field AI tips… then we&rsquo;ll show what to do first.</p>';
+  }
+
   function renderInsights(insights, llmUsed) {
     var container = document.getElementById('ai-insights-panel');
     var badge = document.getElementById('ai-insights-llm-badge');
@@ -153,21 +247,18 @@
     if (!container) return;
 
     /**
-     * On the Fields tab we already run ``context=fields`` for each field card (field-consultant-bridge).
-     * A second parallel ``GET …/insights`` for the Smart panel doubles Gemini calls and burns free-tier quota (HTTP 429).
+     * Fields tab: no second GET /insights — show one “do this first” card from per-field map (__fieldConsultantByRef).
      */
     if (getSmartPanelViewParam() === 'fields') {
-      container.removeAttribute('aria-busy');
-      var badgeSkip = document.getElementById('ai-insights-llm-badge');
-      if (badgeSkip) {
-        badgeSkip.textContent = 'Per-field';
-        badgeSkip.className = 'badge ms-1 bg-info text-dark';
-        badgeSkip.title =
-          'Farm-wide LLM is not requested on the Fields tab. Each field card loads AI below. Open Home or another tab for summaries here.';
+      var doRenderFields = function () {
+        renderFieldsSmartPanelForFieldsTab();
+      };
+      if (typeof dashFlushDomWork === 'function') {
+        dashFlushDomWork(doRenderFields);
+      } else {
+        doRenderFields();
       }
-      container.innerHTML =
-        '<p class="small text-muted mb-0">Farm-wide Smart suggestions are not fetched on the <strong>Fields</strong> tab (avoids duplicate Gemini calls). Use the AI lines on each field card below. Switch to <strong>Home</strong> or another section for summaries in this panel.</p>';
-      pl('renderer_ok', 'smart suggestions panel skipped on Fields tab (per-field consultant only)', {});
+      pl('renderer_ok', 'smart suggestions Fields tab: do-this-first from per-field map', {});
       return;
     }
 
@@ -362,5 +453,35 @@
       });
       insightsObserver.observe(insightRowEl, { attributes: true, attributeFilter: ['class'] });
     }
+
+    window.addEventListener(
+      'field-consultant-updated',
+      function () {
+        try {
+          if (getSmartPanelViewParam() !== 'fields') return;
+          var fn = function () {
+            renderFieldsSmartPanelForFieldsTab();
+          };
+          if (typeof dashFlushDomWork === 'function') {
+            dashFlushDomWork(fn);
+          } else {
+            fn();
+          }
+        } catch (eFC) {}
+      },
+      false
+    );
+    window.addEventListener(
+      'field-consultant-loading',
+      function (ev) {
+        try {
+          if (getSmartPanelViewParam() !== 'fields') return;
+          var on = ev.detail && ev.detail.loading;
+          if (on) showFieldsSmartLoadingPlaceholder();
+          else renderFieldsSmartPanelForFieldsTab();
+        } catch (eL) {}
+      },
+      false
+    );
   });
 })();

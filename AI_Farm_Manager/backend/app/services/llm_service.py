@@ -17,8 +17,12 @@ from app.services.game_reference import build_game_reference_block
 from app.services.gemini_budget import wait_gemini_budget_or_skip
 from app.services.log_buffer import log_event
 
-# Retry with next API key (time-ordered pool) on Google overload / rate limits.
+# Retry with next API key (sticky last-success first, then pool order; optional legacy time-rotation)
+# on Google overload / rate limits.
 _GEMINI_QUOTA_RETRY_STATUS: frozenset[int] = frozenset({429, 503})
+
+# Stripped key string of the last Gemini key that completed generateContent successfully (process-wide).
+_gemini_last_success_key: str | None = None
 
 # When True (admin /admin/api/test-llm only): skip asyncio.sleep on 429 so the request finishes
 # before reverse-proxy/browser timeouts; multi-key rotation still applies.
@@ -111,22 +115,24 @@ def _gemini_quota_rotate_warn(http_status: int, failed_key_index0: int, pool_len
     """
     Human-readable line when rotating after 429/503.
 
-    ``failed_key_index0`` is 0-based (first key tried in *this* request is 0). The try order restarts
-    from the time-rotated active key on every new HTTP call, so ``1/pool_len`` here does **not**
-    mean "first unit of quota ever" — only "first key in this call's sequence failed."
+    ``failed_key_index0`` is 0-based (first key tried in *this* request is 0). The try order for
+    each new HTTP call starts from the sticky preferred key (last success) when enabled, so
+    ``1/pool_len`` here means "first key in this call's sequence failed," not a global quota step.
     """
     return (
         f"Gemini HTTP {http_status} — try-sequence {failed_key_index0 + 1}/{pool_len}: this key slot "
         f"failed; next key immediately (no wait). "
-        f"(Each new request starts from the time-rotated active key, not a global step counter.)"
+        f"(Each new request starts from the sticky preferred key when GEMINI_STICKY_LAST_SUCCESS=1.)"
     )
 
 
-def _gemini_ordered_keys(settings: dict[str, Any]) -> list[str]:
-    """
-    Deduplicated pool order for fallback: time-active key first, then the rest of the pool (wrap).
-    BYOK / single-key yields a one-element list.
-    """
+def _gemini_sticky_enabled() -> bool:
+    v = (os.getenv("GEMINI_STICKY_LAST_SUCCESS") or "1").strip().lower()
+    return v not in ("0", "false", "no", "off")
+
+
+def _gemini_deduped_pool(settings: dict[str, Any]) -> list[str]:
+    """Unique keys in config order (merged GEMINI_API_KEY + GEMINI_API_KEY_2…)."""
     lst = settings.get("gemini_api_keys")
     raw: list[str] = []
     if isinstance(lst, list) and lst:
@@ -139,14 +145,48 @@ def _gemini_ordered_keys(settings: dict[str, Any]) -> list[str]:
     if not raw:
         one = active_gemini_api_key(settings)
         return [one] if one else []
-    if len(raw) == 1:
+    return raw
+
+
+def _gemini_record_success_for_key(key: str) -> None:
+    """Remember which key worked so the next request tries it first (when sticky mode is on)."""
+    global _gemini_last_success_key
+    if not _gemini_sticky_enabled():
+        return
+    sk = _strip_gemini_key(key)
+    if sk:
+        _gemini_last_success_key = sk
+
+
+def _gemini_ordered_keys(settings: dict[str, Any]) -> list[str]:
+    """
+    Deduplicated pool order for fallback.
+
+    Default (GEMINI_STICKY_LAST_SUCCESS=1): last successful key first, then remaining keys in pool
+    order (wrap to the start after the last key).
+
+    Legacy (GEMINI_STICKY_LAST_SUCCESS=0): time-active key first (same as pre-sticky behaviour).
+
+    BYOK / single-key yields a one-element list.
+    """
+    raw = _gemini_deduped_pool(settings)
+    if len(raw) <= 1:
         return raw
-    active = active_gemini_api_key(settings)
-    try:
-        start = next(i for i, x in enumerate(raw) if x == active)
-    except StopIteration:
-        start = 0
-    return raw[start:] + raw[:start]
+    if not _gemini_sticky_enabled():
+        active = active_gemini_api_key(settings)
+        try:
+            start = next(i for i, x in enumerate(raw) if x == active)
+        except StopIteration:
+            start = 0
+        return raw[start:] + raw[:start]
+    lk = _gemini_last_success_key
+    if lk:
+        try:
+            idx = next(i for i, x in enumerate(raw) if x == lk)
+            return raw[idx:] + raw[:idx]
+        except StopIteration:
+            pass
+    return raw
 
 
 def _gemini_generate_url_for_key(settings: dict[str, Any], api_key: str) -> str:
@@ -250,7 +290,7 @@ async def _gemini_post_with_quota_fallback(
     timeout: float,
 ) -> httpx.Response:
     """
-    POST generateContent; on HTTP 429 / 503 try the next key in the pool (starting from time-active key).
+    POST generateContent; on HTTP 429 / 503 try the next key in the pool (sticky preferred key first).
     Other 4xx/5xx: no key rotation (likely same failure for every key).
     """
     keys = _gemini_ordered_keys(settings)
@@ -281,6 +321,7 @@ async def _gemini_post_with_quota_fallback(
             if r.status_code >= 400:
                 log_event("ERROR", format_gemini_http_error(r))
             r.raise_for_status()
+            _gemini_record_success_for_key(key)
             return r
     raise RuntimeError(
         "Gemini: no successful request — all keys skipped (daily budget per GEMINI_BUDGET_RPD) or exhausted"
@@ -345,6 +386,7 @@ async def gemini_consultant_post_with_quota_fallback(
             except httpx.HTTPStatusError as e:
                 code = e.response.status_code if e.response is not None else r.status_code
                 raise RuntimeError(f"Gemini HTTP {code}") from e
+            _gemini_record_success_for_key(key)
             return r
     raise RuntimeError(
         "Gemini consultant: no successful request — all keys skipped (daily budget per GEMINI_BUDGET_RPD) or exhausted"
@@ -527,6 +569,7 @@ async def test_llm_connectivity(
                                 client, url, post_payload, r, pool_size=len(keys)
                             )
                     if r.status_code < 400:
+                        _gemini_record_success_for_key(key)
                         break
                     return {
                         "ok": False,

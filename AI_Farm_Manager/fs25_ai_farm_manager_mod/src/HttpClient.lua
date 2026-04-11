@@ -4,12 +4,12 @@
   FS25 notes (from sdk/debugger/gameSource.zip):
   - Shipped Lua under dataS/scripts/ does not define Internet.lua / createHTTPRequest in text form;
     HTTP is provided by the engine on some builds (often dedicated server), not always on the game client.
-  - POST (postJson) / GET (poll) use engine HTTP if present, else Windows curl; if both fail, err is `no_http_implementation`.
+  - POST (postJson) / GET (poll) use engine HTTP if present, else curl. Linux DS: JSON body under $TMPDIR or /tmp (never .\\ under game/), and no cmd/.bat read path (io.open often write-only).
 
   Curl output uses -w "\\n%{http_code}"; we parse the last line as status (handles CRLF from Windows curl).
 
   Prefer engine createHTTPRequest when present; curl runs synchronously (short calls only).
-  If io.popen is unavailable (FS25 client), we fall back to cmd.exe + .bat + os.execute.
+  If io.popen is unavailable (FS25 client), on Windows we fall back to cmd.exe + .bat + os.execute (reads curl .out).
 --]]
 
 AIFarmHttp = {}
@@ -47,6 +47,33 @@ local function removeFileSafe(path)
             os.remove(path)
         end)
     end
+end
+
+--- True on typical Windows (batch + cmd fallback); false on Linux DS / G-Portal.
+local function isWindowsHost()
+    local w = getenvSafe("WINDIR")
+    local o = getenvSafe("OS")
+    return (w ~= nil and w ~= "") or o == "Windows_NT"
+end
+
+--- Temp directory: avoid "." + ".\\" on Linux (invalid-case / mixed-separator loads in game dir).
+local function getTempDirNormalized()
+    local t = getenvSafe("TEMP") or getenvSafe("TMP") or getenvSafe("TMPDIR")
+    if t ~= nil and t ~= "" then
+        return (string.gsub(t, "\\", "/"))
+    end
+    if isWindowsHost() then
+        return "."
+    end
+    return "/tmp"
+end
+
+local function joinPath(dir, name)
+    dir = string.gsub(dir or "", "[/\\]+$", "")
+    if dir == "" then
+        dir = "."
+    end
+    return dir .. "/" .. name
 end
 
 --- Resolve engine createHTTPRequest if exposed as a method on Internet (some builds).
@@ -130,20 +157,24 @@ local function escapePercentForBatch(s)
 end
 
 local function runCurlReadViaBatch(cmd)
+    -- Linux DS: io.open often allows only "w"; reading .out after cmd breaks. Skip batch path.
+    if not isWindowsHost() then
+        return false, nil
+    end
     if os == nil or type(os.execute) ~= "function" then
         return false, nil
     end
-    local dir = getenvSafe("TEMP") or "."
+    local dir = getenvSafe("TEMP") or getenvSafe("TMP") or "."
     local id = tostring(math.random(100000, 999999))
-    local outpath = dir .. "\\aifarm_http_" .. id .. ".out"
-    local batpath = dir .. "\\aifarm_http_" .. id .. ".bat"
+    local outpath = joinPath(dir, "aifarm_http_" .. id .. ".out")
+    local batpath = joinPath(dir, "aifarm_http_" .. id .. ".bat")
     local batCmd = escapePercentForBatch(cmd)
     local fh = io.open(batpath, "wb")
     if fh == nil then
         return false, nil
     end
     fh:write("@echo off\r\n")
-    fh:write(batCmd .. ' > "' .. outpath .. '" 2>&1\r\n')
+    fh:write(batCmd .. " > \"" .. string.gsub(outpath, "/", "\\") .. "\" 2>&1\r\n")
     fh:close()
     local exe = 'cmd /c "' .. batpath .. '"'
     pcall(function()
@@ -173,12 +204,27 @@ local function runCurlReadAny(cmd)
     return runCurlReadViaBatch(cmd)
 end
 
---- Last-resort POST via Windows curl (ships with Win10+), body via temp file.
+--- Temp file for curl --data-binary @path (must not live under game/ — Linux DS loads paths there as assets).
+local function makeTempJsonPathForCurl()
+    if not isWindowsHost() then
+        local td = getenvSafe("TMPDIR") or "/tmp"
+        return joinPath(string.gsub(td, "\\", "/"), "aifarm_mgr_" .. tostring(math.random(100000, 999999)) .. ".json")
+    end
+    if os ~= nil and type(os.tmpname) == "function" then
+        local base = os.tmpname()
+        if base ~= nil and base ~= "" then
+            return (base .. ".json")
+        end
+    end
+    return joinPath(
+        getTempDirNormalized(),
+        "aifarm_mgr_" .. tostring(math.random(100000, 999999)) .. ".json"
+    )
+end
+
+--- Last-resort POST via curl (body via temp file outside game folder when possible).
 local function postJsonViaCurl(url, jsonBody, callback)
-    local tmpWin = (getenvSafe("TEMP") or getenvSafe("TMP") or ".")
-        .. "\\aifarm_mgr_"
-        .. tostring(math.random(100000, 999999))
-        .. ".json"
+    local tmpWin = makeTempJsonPathForCurl()
     local tmpCurl = string.gsub(tmpWin, "\\", "/")
     local f = io.open(tmpWin, "wb")
     if f == nil then

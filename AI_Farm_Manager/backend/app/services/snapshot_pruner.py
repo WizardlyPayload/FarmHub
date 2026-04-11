@@ -200,6 +200,7 @@ def prune_dashboard_snapshot_for_llm(data: Any) -> Any:
                 "type",
                 "category",
                 "brand",
+                "ownerFarmId",
                 "farmId",
                 "isRunning",
                 "motorIsStarted",
@@ -226,6 +227,18 @@ def prune_dashboard_snapshot_for_llm(data: Any) -> Any:
                 if "fill" in kl or "level" in kl or "capacity" in kl:
                     sv[k2] = _prune_value(v2, 0)
             slim.append(sv)
+        scope = root.get("_consultant_farm_scope")
+        if scope is not None and slim:
+            try:
+                fid = int(scope)
+            except (TypeError, ValueError):
+                fid = 0
+            if fid > 0:
+                slim = [
+                    x
+                    for x in slim
+                    if isinstance(x, dict) and _owner_farm_id(x) == fid
+                ]
         root["vehicles"] = slim
 
     for section in ("economy", "farms", "production", "productionPoints", "animals", "weather", "missions", "statistics"):
@@ -278,7 +291,7 @@ def slice_snapshot_for_single_field(snapshot: dict[str, Any], field_ref: str) ->
     if not ref or not isinstance(snapshot, dict):
         return None
     out: dict[str, Any] = {}
-    for key in ("timestamp", "serverInfo", "activeFarm", "farmId", "gameTime", "error"):
+    for key in ("timestamp", "serverInfo", "activeFarm", "activeFarmId", "farmId", "gameTime", "error", "_consultant_farm_scope"):
         if key in snapshot:
             out[key] = copy.deepcopy(snapshot[key])
     for arr_key in ("fields", "allFields"):
@@ -290,7 +303,16 @@ def slice_snapshot_for_single_field(snapshot: dict[str, Any], field_ref: str) ->
                 pf = prune_field_entry(row)
                 out["fields"] = [pf if pf is not None else copy.deepcopy(row)]
                 out["_consultant_field_scope"] = ref
-                slim_v = _slim_vehicles_for_equipment_hints(snapshot.get("vehicles"))
+                scope = snapshot.get("_consultant_farm_scope")
+                if scope is None:
+                    scope = snapshot.get("activeFarmId")
+                try:
+                    af = int(scope) if scope is not None else 0
+                except (TypeError, ValueError):
+                    af = 0
+                slim_v = _slim_vehicles_for_equipment_hints(
+                    snapshot.get("vehicles"), farm_id=af if af > 0 else None
+                )
                 if slim_v:
                     out["vehicles"] = slim_v
                 return out
@@ -504,16 +526,32 @@ def prune_snapshot_for_dashboard_view(snapshot: dict[str, Any], view: str) -> di
     return root
 
 
-def _slim_vehicles_for_equipment_hints(vehicles: Any, limit: int = 100) -> list[dict[str, Any]]:
+def _slim_vehicles_for_equipment_hints(
+    vehicles: Any,
+    limit: int = 100,
+    *,
+    farm_id: int | None = None,
+) -> list[dict[str, Any]]:
     """
     Minimal vehicle rows so the LLM can match tasks to owned equipment (harvest, plow, weed, lime)
     without sending full physics/poses. Empty list if none.
+
+    When ``farm_id`` is set (>0), only includes vehicles whose ``ownerFarmId`` / ``farmId`` matches
+    (defensive filter for field-map / section-scoped snapshots).
     """
     if not isinstance(vehicles, list):
         return []
     out: list[dict[str, Any]] = []
+    fid = 0
+    if farm_id is not None:
+        try:
+            fid = int(farm_id)
+        except (TypeError, ValueError):
+            fid = 0
     for v in vehicles[:limit]:
         if not isinstance(v, dict):
+            continue
+        if fid > 0 and _owner_farm_id(v) != fid:
             continue
         row: dict[str, Any] = {}
         for k in (
@@ -523,6 +561,8 @@ def _slim_vehicles_for_equipment_hints(vehicles: Any, limit: int = 100) -> list[
             "type",
             "category",
             "brand",
+            "ownerFarmId",
+            "farmId",
             "fillType",
             "fillTypeName",
         ):
@@ -552,7 +592,12 @@ def prune_snapshot_fields_context_only(snapshot: dict[str, Any]) -> dict[str, An
     # Field-map requests do not need global stats — saves prompt tokens.
     for drop_extra in ("statistics", "economy", "missions"):
         root.pop(drop_extra, None)
-    slim_v = _slim_vehicles_for_equipment_hints(raw_vehicles)
+    scope = root.get("_consultant_farm_scope")
+    try:
+        af = int(scope) if scope is not None else 0
+    except (TypeError, ValueError):
+        af = 0
+    slim_v = _slim_vehicles_for_equipment_hints(raw_vehicles, farm_id=af if af > 0 else None)
     if slim_v:
         root["vehicles"] = slim_v
     return root

@@ -9,6 +9,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
+from starlette.middleware.gzip import GZipMiddleware
 
 from app.config import get_settings
 from app.routers import admin_routes, chat, consultant, integration, mod_config_download
@@ -65,6 +66,10 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(_startup_llm_probe())
 
+    from app.services.gemini_http_client import get_gemini_async_client
+
+    get_gemini_async_client()
+
     stop = asyncio.Event()
     poll_task: asyncio.Task | None = None
     if ftp_service.is_ftp_mode_enabled():
@@ -78,9 +83,13 @@ async def lifespan(app: FastAPI):
             await poll_task
         except asyncio.CancelledError:
             pass
+    from app.services.gemini_http_client import close_gemini_async_client
+
+    await close_gemini_async_client()
 
 
 app = FastAPI(title="AI Farm Manager", version="1.0.0", lifespan=lifespan)
+app.add_middleware(GZipMiddleware, minimum_size=800)
 
 _s = get_settings()
 _origins = [o.strip() for o in _s["cors_origins"].split(",") if o.strip()]

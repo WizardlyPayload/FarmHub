@@ -62,6 +62,8 @@ class RealtimeConnector {
     // Store previous data for change comparison
     this.previousData = null;
     this.lastChangeCheck = 0;
+    /** Skip handleRealtimeData when merged JSON unchanged (ignores volatile `timestamp`). */
+    this.lastRealtimePayloadKey = null;
   }
 
   // Helper function to generate consistent hash from string
@@ -163,8 +165,9 @@ class RealtimeConnector {
       clearInterval(this.updateTimer);
     }
 
-    const poll = () => {
-      fetch(`${this.httpEndpoint}/api/data`)
+    const self = this;
+    this._httpPollData = function (bypassPayloadDedupe) {
+      fetch(`${self.httpEndpoint}/api/data`)
         .then((response) => {
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -172,20 +175,68 @@ class RealtimeConnector {
           return response.json();
         })
         .then((data) => {
-          this.handleRealtimeData(data);
-          this.isConnected = true;
-          this.updateConnectionStatus(true);
+          if (!data || typeof data !== "object") {
+            self.handleRealtimeData(data);
+            self.isConnected = true;
+            self.updateConnectionStatus(true);
+            return;
+          }
+          if (data.error === "Waiting for data...") {
+            self.lastRealtimePayloadKey = null;
+            self.handleRealtimeData(data);
+            self.isConnected = true;
+            self.updateConnectionStatus(true);
+            return;
+          }
+          if (bypassPayloadDedupe) {
+            self.lastRealtimePayloadKey = null;
+          }
+          const rest = { ...data };
+          delete rest.timestamp;
+          const farmId = Number(self.dashboard?.activeFarmId ?? 1);
+          const srv = String(
+            self.dashboard?.activeServerId ??
+              (typeof localStorage !== "undefined"
+                ? localStorage.getItem("dashboard_active_server") || ""
+                : "")
+          );
+          const payloadKey =
+            JSON.stringify(rest) + "|" + farmId + "|" + srv;
+          if (self.lastRealtimePayloadKey === payloadKey) {
+            self.isConnected = true;
+            self.updateConnectionStatus(true);
+            return;
+          }
+          self.lastRealtimePayloadKey = payloadKey;
+          self.handleRealtimeData(data);
+          self.isConnected = true;
+          self.updateConnectionStatus(true);
         })
         .catch((error) => {
           console.error("[RealtimeConnector] HTTP polling error:", error);
-          this.isConnected = false;
-          this.updateConnectionStatus(false);
+          self.isConnected = false;
+          self.updateConnectionStatus(false);
         });
     };
 
-    // Poll immediately, then every 5 seconds to reduce error spam
+    const poll = () => this._httpPollData(false);
     poll();
     this.updateTimer = setInterval(poll, 5000);
+  }
+
+  /**
+   * Clears the last /api/data fingerprint so the next poll applies updates even if JSON is unchanged.
+   * Call before a manual “refresh” or after actions that must re-run DOM hooks (farm switch, etc.).
+   */
+  clearPayloadDedupeCache() {
+    this.lastRealtimePayloadKey = null;
+  }
+
+  /** One immediate /api/data fetch; bypasses same-payload dedupe (always runs handleRealtimeData if OK). */
+  refreshHttpDataNow() {
+    if (typeof this._httpPollData === "function") {
+      this._httpPollData(true);
+    }
   }
 
   startFileMonitoring() {
@@ -1016,6 +1067,7 @@ class RealtimeConnector {
 
     this.isConnected = false;
     this.updateConnectionStatus(false);
+    this.lastRealtimePayloadKey = null;
   }
 
   detectAndShowChanges(oldState) {

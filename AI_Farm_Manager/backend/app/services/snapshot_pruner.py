@@ -481,12 +481,55 @@ def _consultant_minimal_headers(root: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def prune_snapshot_home_overview(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """
+    Home / dashboard Smart panel: one JSON bundle covering fields (agronomic), slim vehicles,
+    animals, pastures, productions, and economy so the LLM can rank **three** farm-wide priorities.
+    Called with ``view=home`` after active-farm prune.
+    """
+    if not isinstance(snapshot, dict):
+        return snapshot
+    field_slice = prune_snapshot_fields_context_only(copy.deepcopy(snapshot))
+    h: dict[str, Any] = _consultant_minimal_headers(snapshot)
+
+    for key in ("fields", "allFields"):
+        if key in field_slice:
+            h[key] = field_slice[key]
+
+    if "vehicles" in field_slice:
+        h["vehicles"] = field_slice["vehicles"]
+
+    for fk in ("fields", "allFields"):
+        arr = h.get(fk)
+        if isinstance(arr, list) and len(arr) > 48:
+            h[fk] = arr[:48]
+
+    root = copy.deepcopy(snapshot)
+    for key in ("pastures", "animals"):
+        if key in root and root[key] is not None:
+            h[key] = copy.deepcopy(root[key])
+            if isinstance(h[key], list) and len(h[key]) > 96:
+                h[key] = h[key][:96]
+
+    for key in ("production", "productionPoints"):
+        if key in root:
+            h[key] = _prune_value(copy.deepcopy(root[key]), 1)
+
+    for key in ("economy", "farmInfo", "farms", "statistics", "weather"):
+        if key in root:
+            h[key] = _prune_value(copy.deepcopy(root[key]), 1)
+
+    h["_consultant_snapshot_mode"] = "home_overview"
+    return h
+
+
 def prune_snapshot_for_dashboard_view(snapshot: dict[str, Any], view: str) -> dict[str, Any]:
     """
     Reduce consultant JSON to what the Farm Dashboard user is looking at (navbar section).
 
     Call **after** ``prune_snapshot_to_active_farm``. ``view`` matches hash sections:
-    fields, vehicles, pastures, livestock, productions, economy. ``full`` / ``dashboard`` / ``landing`` = no op.
+    fields, vehicles, pastures, livestock, productions, economy, home.
+    ``full`` / ``dashboard`` / ``landing`` / ``general`` = no op.
     """
     v = (view or "full").strip().lower()
     if v in ("full", "dashboard", "landing", "general", ""):
@@ -495,6 +538,8 @@ def prune_snapshot_for_dashboard_view(snapshot: dict[str, Any], view: str) -> di
         return snapshot
 
     root = copy.deepcopy(snapshot)
+    if v == "home":
+        return prune_snapshot_home_overview(root)
     if v == "fields":
         return prune_snapshot_fields_context_only(root)
 

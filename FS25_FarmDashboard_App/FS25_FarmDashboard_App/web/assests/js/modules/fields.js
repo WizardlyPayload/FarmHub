@@ -24,6 +24,8 @@ let fieldsIsLoading      = false;
 let fieldsFilterType     = "all";
 let fieldsSearchTerm     = "";
 let fieldConsultantListenerRegistered = false;
+/** Skip re-render when /api/fields body and client scope (farm/server) unchanged */
+let lastFieldsPayloadKey = null;
 
 function ensureFieldConsultantListener() {
   if (fieldConsultantListenerRegistered || typeof window === "undefined") return;
@@ -84,6 +86,7 @@ if (typeof window !== 'undefined') {
 export function showFieldsSection() {
     fieldsFilterType = "all";
     fieldsSearchTerm = "";
+    lastFieldsPayloadKey = null;
     ensureFieldConsultantListener();
 
     document.getElementById("section-content").innerHTML = buildFieldsHTML();
@@ -132,6 +135,18 @@ async function loadFieldsData() {
         let fields = Array.isArray(raw) ? raw
                    : Array.isArray(raw.fields) ? raw.fields
                    : Object.values(raw);
+
+        const scopeKey =
+            JSON.stringify(fields) +
+            "|" +
+            String(farmId) +
+            "|" +
+            String(serverId ?? "");
+        if (lastFieldsPayloadKey === scopeKey) {
+            fieldsIsLoading = false;
+            return;
+        }
+        lastFieldsPayloadKey = scopeKey;
 
         if (window.dashboard) {
             window.dashboard.allFields = fields;

@@ -1,12 +1,15 @@
 """Proactive farm analysis: heuristics + LLM over dashboard snapshot JSON."""
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import os
 import re
 from typing import Any
 from urllib.parse import unquote
+
+from cachetools import TTLCache
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +66,36 @@ _CONSULTANT_SNAPSHOT_CHARS_GEMINI_VIEW = 48000
 _CONSULTANT_SNAPSHOT_CHARS_OPENAI = 118000
 # After prune_dashboard_snapshot_for_llm, cap rows so huge farms do not blow prompt size (field-map mode).
 _FIELD_MAP_MAX_FIELD_ROWS = 100
+
+# In-memory LLM result cache: same pruned snapshot + scope → skip provider call (~10 min).
+_CONSULTANT_LLM_INSIGHT_CACHE: TTLCache[str, tuple[list[FarmInsight], bool]] = TTLCache(
+    maxsize=512,
+    ttl=600,
+)
+
+
+def _consultant_llm_cache_key(
+    snap_str: str,
+    *,
+    server_id: str | None,
+    farm_id: int | None,
+    view: str | None,
+    context: str | None,
+    field_ref: str | None,
+    system_instruction: str | None,
+) -> str:
+    parts = "|".join(
+        [
+            snap_str,
+            (server_id or "").strip(),
+            str(farm_id) if farm_id is not None else "",
+            (view or "").strip().lower(),
+            (context or "").strip().lower(),
+            (field_ref or "").strip(),
+            hashlib.sha256((system_instruction or "").encode("utf-8")).hexdigest()[:32],
+        ]
+    )
+    return hashlib.sha256(parts.encode("utf-8")).hexdigest()
 
 # Shared body: no global "max 4" here — field map appends its own output limits (one insight per row).
 # FS25 mentor voices — Smart suggestions read like in-game NPC advice (farmer-plain English, not a corporate analyst).
@@ -269,6 +302,23 @@ Respond with ONLY valid JSON:
 - **Production** for operational tips; **Finance** for selling/stored value.
 - At most **4** insights; brief lines."""
 
+CONSULTANT_SYSTEM_VIEW_HOME = CONSULTANT_VIEW_SHARED_PREFIX + """VIEW MODE — home:
+You are the player's **farm foreman** for **Farming Simulator 25**. The JSON is a **compact overview** of the **active farm** — **fields** (with slim **vehicles** for equipment-aware wording), **animals**, **pastures**, **production** / **productionPoints** (if present), and **economy** / weather / stats — the same information the dashboard uses across **Fields, Vehicles, Livestock, Pastures, Productions,** and **Economy**.
+
+**Task:** Choose the **three most important jobs** to do **next** for this farm **as a whole**. Rank by real urgency (time-sensitive harvest, withered crop, empty feed, broken machine, full output buffer, cash crunch).
+
+**Coverage:** Prefer **three different angles** when the data supports it (e.g. a field job, a machine/logistics job, an animal/pasture or money/production job). If a section has **no** rows in the JSON (e.g. no production chains), **omit** that topic — do **not** invent animals, fields, or plants that are not listed.
+
+**Categories:** **Field** (set **field_ref** to that parcel's **farmlandId** or **id** when the job targets one field), **Animal**, **Production**, or **Finance**. **field_ref** null for fleet-wide, economy-wide, or multi-parcel advice.
+
+**Priority:** Use **High** for the most urgent of the three; **Medium** / **Low** for the others unless two items are equally urgent.
+
+Respond with ONLY valid JSON (no markdown):
+{"insights":[{"category":"Field|Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":"..." or null},...]}
+
+- Return **exactly 3** objects in **insights** (three lines). If the farm looks quiet, still give **three** useful next checks in different areas (monitor X, plan Y, prep Z) at **Low**/**Medium** priority — never return an empty array.
+- Keep **message** and **reasoning** brief (under ~200 characters each)."""
+
 CONSULTANT_SYSTEM_VIEW_ECONOMY = CONSULTANT_VIEW_SHARED_PREFIX + """VIEW MODE — economy:
 You are an FS25 **finance and market** consultant. The JSON emphasizes **economy**, **farms** / **farmInfo**, and related stats.
 
@@ -287,6 +337,7 @@ def consultant_system_instruction_for_view(view: str | None) -> str | None:
     """System prompt for ``?view=`` (Smart suggestions panel). Returns None to use default CONSULTANT_SYSTEM."""
     v = (view or "").strip().lower()
     m = {
+        "home": CONSULTANT_SYSTEM_VIEW_HOME,
         "fields": CONSULTANT_SYSTEM_VIEW_FIELDS_SMART,
         "vehicles": CONSULTANT_SYSTEM_VIEW_VEHICLES,
         "pastures": CONSULTANT_SYSTEM_VIEW_PASTURES,
@@ -313,6 +364,8 @@ def _consultant_skip_production_heuristics(system_instruction: str | None) -> bo
             "VIEW MODE — vehicles",
             "VIEW MODE — pastures",
             "VIEW MODE — livestock",
+            "VIEW MODE — economy",
+            "VIEW MODE — home",
         )
     )
 
@@ -339,10 +392,14 @@ def _coerce_pct(value: Any) -> float | None:
 def _heuristic_production_output_space(snapshot: Any, _path: str = "") -> list[FarmInsight]:
     """
     Detect production / storage outputs at or above ~90% fill — High priority.
-    Works across varying data.json shapes by scanning nested dict/list trees.
+
+    Only walks ``production`` and ``productionPoints`` subtrees so unrelated ``capacity``/``fill``
+    pairs elsewhere in the dashboard JSON (fields, vehicles, missions, etc.) do not fire false alerts.
+    Multiple near-full buffers are collapsed into a single insight.
     """
     found: list[FarmInsight] = []
     seen: set[str] = set()
+    ratio_peaks: list[float] = []
 
     def add_if_new(msg: str, reasoning: str) -> None:
         key = msg[:120]
@@ -360,7 +417,6 @@ def _heuristic_production_output_space(snapshot: Any, _path: str = "") -> list[F
 
     def walk(obj: Any, path: str) -> None:
         if isinstance(obj, dict):
-            # Common patterns: outputFill, fillLevel, fillPercent, fillRatio paired with capacity
             for k, v in obj.items():
                 kl = str(k).lower()
                 child_path = f"{path}.{k}" if path else k
@@ -388,7 +444,6 @@ def _heuristic_production_output_space(snapshot: Any, _path: str = "") -> list[F
                 elif isinstance(v, (dict, list)):
                     walk(v, child_path)
 
-            # Pair: current + max / amount + capacity
             if "capacity" in obj and any(x in obj for x in ("current", "amount", "fill", "stored", "level")):
                 cap = obj.get("capacity")
                 cur = obj.get("current") or obj.get("amount") or obj.get("fill") or obj.get("stored") or obj.get("level")
@@ -400,16 +455,32 @@ def _heuristic_production_output_space(snapshot: Any, _path: str = "") -> list[F
                 if cap_f and cap_f > 0 and cur_f is not None:
                     ratio = (cur_f / cap_f) * 100.0
                     if ratio >= 90:
-                        add_if_new(
-                            f"Storage or production fill is ~{ratio:.0f}% of capacity (near full).",
-                            "Running out of space for output; sell, move, or process goods before production stops.",
-                        )
+                        ratio_peaks.append(ratio)
 
         elif isinstance(obj, list):
             for i, item in enumerate(obj):
                 walk(item, f"{path}[{i}]")
 
-    walk(snapshot, "")
+    if not isinstance(snapshot, dict):
+        return found
+
+    for root_key in ("production", "productionPoints"):
+        sub = snapshot.get(root_key)
+        if sub is not None:
+            walk(sub, root_key)
+
+    if ratio_peaks:
+        ratio_peaks.sort(reverse=True)
+        worst = ratio_peaks[0]
+        extra = len(ratio_peaks) - 1
+        msg = f"Storage or production fill is ~{worst:.0f}% of capacity (near full)."
+        if extra > 0:
+            msg += f" ({extra} more output buffer(s) also above 90%.)"
+        add_if_new(
+            msg,
+            "Running out of space for output; sell, move, or process goods before production stops.",
+        )
+
     return found
 
 
@@ -773,6 +844,11 @@ async def generate_farm_insights(
     user_api_key: str | None = None,
     user_provider: str | None = None,
     system_instruction: str | None = None,
+    cache_server_id: str | None = None,
+    cache_farm_id: int | None = None,
+    cache_view: str | None = None,
+    cache_context: str | None = None,
+    cache_field_ref: str | None = None,
 ) -> tuple[list[FarmInsight], bool]:
     """
     Combine heuristic rules (e.g. output fill >= 90%) with LLM analysis.
@@ -806,16 +882,42 @@ async def generate_farm_insights(
         return heuristics, False
 
     sys_inst = system_instruction or CONSULTANT_SYSTEM
+    cache_key = _consultant_llm_cache_key(
+        snap_str,
+        server_id=cache_server_id,
+        farm_id=cache_farm_id,
+        view=cache_view,
+        context=cache_context,
+        field_ref=cache_field_ref,
+        system_instruction=sys_inst,
+    )
     try:
-        llm_list, llm_ok = await _llm_insights_from_snapshot(
-            snap_str,
-            settings,
-            system_instruction=sys_inst,
+        cached = _CONSULTANT_LLM_INSIGHT_CACHE.get(cache_key)
+    except Exception:
+        cached = None
+
+    if cached is not None:
+        llm_list, llm_ok = cached
+        logger.info(
+            "Consultant Cache HIT - Returning instantly to save tokens.",
         )
-    except Exception as e:
-        log_event("WARN", f"Consultant pipeline unexpected error: {e}")
-        logger.warning("Consultant fallback: pipeline error before/around LLM merge — %s", e)
-        return heuristics, False
+    else:
+        try:
+            llm_list, llm_ok = await _llm_insights_from_snapshot(
+                snap_str,
+                settings,
+                system_instruction=sys_inst,
+            )
+        except Exception as e:
+            log_event("WARN", f"Consultant pipeline unexpected error: {e}")
+            logger.warning("Consultant fallback: pipeline error before/around LLM merge — %s", e)
+            return heuristics, False
+
+        if llm_ok:
+            try:
+                _CONSULTANT_LLM_INSIGHT_CACHE[cache_key] = (llm_list, llm_ok)
+            except Exception:
+                pass
 
     if not llm_ok:
         logger.warning(
@@ -830,5 +932,8 @@ async def generate_farm_insights(
         if msg_key not in seen_msg:
             seen_msg.add(msg_key)
             merged.append(ins)
+
+    if sys_inst and "VIEW MODE — home" in sys_inst:
+        merged = merged[:3]
 
     return merged, llm_ok

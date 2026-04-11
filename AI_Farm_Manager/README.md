@@ -105,9 +105,24 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
 | GET | `/admin` | Basic auth |
 | GET | `/health` | Liveness + `data_dir` path |
 
+## Bring your own API key (BYOK)
+
+Farm Dashboard can send **`X-AI-API-Key`** (and optional **`X-AI-Provider`**: `gemini` / `openai`) so players use their own Google/OpenAI credentials. Step-by-step setup (including a free Gemini key) is in **[docs/BYOK_GUIDE.md](docs/BYOK_GUIDE.md)**.
+
+**Gemini free tier:** If Google returns **429/503**, the server cycles through **`GEMINI_MODEL_ROLLOVER`** on the **same** key before trying the next key — important for single-key BYOK. Set **`GEMINI_MODEL_ROLLOVER=0`** (or `off`) to pin a single **`GEMINI_MODEL`** with no cycling.
+
 ## Proactive Consultant API
 
 The AI Farm Manager exposes a **Smart Suggestions** layer for the **Farm Dashboard (Electron)**: the dashboard calls the backend with the same integration key you use for other Farm Dashboard features.
+
+### Performance (server + client)
+
+- **Server-side LLM cache:** Identical pruned snapshot + scope (`serverId`, `farmId`, `view`, `context`, `fieldRef`, system prompt hash) hits an in-memory **TTL** cache (~10 minutes) so repeated requests avoid another Gemini call when the farm state has not changed.
+- **Farm Dashboard polling:** The embedded UI compares a stable fingerprint of **`/api/data`** (excluding volatile `timestamp`) plus farm/server scope before re-running DOM updates, so unchanged JSON does not stutter the UI every poll.
+
+### V3 agronomy prompt
+
+Smart suggestions and field-map modes use the **FS25 mentor / agronomy** prompt stack in **`app/services/consultant.py`** (NPC voices, FS25 mechanics block, section **`VIEW MODE`** prompts). That content is the current “V3” agronomy/consultant behaviour shipped with this repo.
 
 ### Endpoint: `GET /api/v1/consultant/insights`
 

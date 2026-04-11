@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/consultant", tags=["consultant"])
 
 _ALLOWED_CONSULTANT_VIEWS = frozenset(
-    {"fields", "vehicles", "pastures", "livestock", "productions", "economy"}
+    {"home", "fields", "vehicles", "pastures", "livestock", "productions", "economy"}
 )
 
 
@@ -132,6 +132,11 @@ async def _run_consultant_core(
         user_api_key=nkey or None,
         user_provider=up,
         system_instruction=sys_inst,
+        cache_server_id=(server_id or "").strip() or None,
+        cache_farm_id=farm_id_resolved,
+        cache_view=vw,
+        cache_context=ctx,
+        cache_field_ref=field_ref_q or None,
     )
 
     if ctx == "fields" and not field_ref_q:
@@ -285,7 +290,8 @@ async def get_consultant_insights(
     view: str | None = Query(
         None,
         description=(
-            "Farm Dashboard section: fields, vehicles, pastures, livestock, productions, economy — "
+            "Farm Dashboard section: home (dashboard top 3 priorities), fields, vehicles, pastures, "
+            "livestock, productions, economy — "
             "narrows JSON + prompt to what the user is viewing (Smart suggestions). "
             "Use with context=full. Field map uses context=fields instead."
         ),

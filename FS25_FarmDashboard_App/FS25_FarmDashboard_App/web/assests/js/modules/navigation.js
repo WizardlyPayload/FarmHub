@@ -223,12 +223,14 @@ export function getCurrentSection() {
   return this.currentSection || "landing";
 }
 
-/** Show Smart suggestions row for Livestock + detail sections (Vehicles, Fields, …); hide on landing. */
+/** Show Smart suggestions row on Home (dashboard) and detail sections (Vehicles, Fields, …). */
 function updateSmartSuggestionsRowVisibility(sectionName) {
   const row = document.getElementById("ai-farm-insights-row");
   const dash = document.getElementById("dashboard-content");
   if (!row) return;
   const withSmart = [
+    "dashboard",
+    "landing",
     "livestock",
     "vehicles",
     "fields",
@@ -334,6 +336,14 @@ export function showDashboard() {
     this.loadDashboardUiPreferences();
   }
 
+  if (!this.currentSection || this.currentSection === "landing") {
+    this.currentSection = "dashboard";
+  }
+  updateSmartSuggestionsRowVisibility(this.currentSection);
+  if (typeof window.refreshFarmDashConsultantInsights === "function") {
+    window.refreshFarmDashConsultantInsights(true);
+  }
+
   // Check for hash navigation after loading dashboard
   if (window.location.hash) {
     this.handleHashChange();
@@ -414,10 +424,13 @@ export function showLanding() {
 
   document.getElementById("section-content").classList.add("d-none");
   document.getElementById("dashboard-content").classList.add("d-none");
-  document.getElementById("ai-farm-insights-row")?.classList.add("d-none");
   document.getElementById("landing-page").classList.remove("d-none");
   this.updateLandingPageCounts(); // Update counts including pastures badge
   this.updateNavbar();
+  updateSmartSuggestionsRowVisibility("dashboard");
+  if (typeof window.refreshFarmDashConsultantInsights === "function") {
+    window.refreshFarmDashConsultantInsights(true);
+  }
 }
 
 export function showSection(sectionName) {
@@ -475,7 +488,7 @@ export function showSection(sectionName) {
   if (typeof window.refreshFarmDashConsultantInsights === "function") {
     window.setTimeout(function () {
       try {
-        window.refreshFarmDashConsultantInsights();
+        window.refreshFarmDashConsultantInsights(true);
       } catch (e) {}
     }, 450);
   }

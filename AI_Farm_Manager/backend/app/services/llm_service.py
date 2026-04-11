@@ -13,6 +13,7 @@ from urllib.parse import quote
 import httpx
 
 from app.config import active_gemini_api_key, get_settings, has_gemini_credentials
+from app.services.gemini_http_client import get_gemini_async_client
 from app.services.game_reference import build_game_reference_block
 from app.services.gemini_budget import wait_gemini_budget_or_skip
 from app.services.log_buffer import log_event
@@ -23,6 +24,68 @@ _GEMINI_QUOTA_RETRY_STATUS: frozenset[int] = frozenset({429, 503})
 
 # Stripped key string of the last Gemini key that completed generateContent successfully (process-wide).
 _gemini_last_success_key: str | None = None
+
+# Default multi-model chain (3.x previews + 2.5 stable) — used when GEMINI_MODEL_ROLLOVER is unset.
+_DEFAULT_GEMINI_MODEL_ROLLOVER: tuple[str, ...] = (
+    "gemini-3.1-pro-preview",
+    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-2.5-pro",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+)
+
+
+def _gemini_model_pool(settings: dict[str, Any]) -> list[str] | None:
+    """
+    Models to cycle alongside key fallback: attempt ``i`` uses ``pool[i % len(pool)]``.
+
+    - ``GEMINI_MODEL_ROLLOVER=0`` / ``false`` / ``off`` → single model only: ``GEMINI_MODEL`` (legacy).
+    - Unset → default 6-model chain above.
+    - Non-empty comma list → custom order (e.g. ``gemini-2.5-flash,gemini-2.5-pro``).
+    """
+    raw = (os.getenv("GEMINI_MODEL_ROLLOVER") or "").strip()
+    if raw.lower() in ("0", "false", "no", "off"):
+        return None
+    if not raw:
+        return list(_DEFAULT_GEMINI_MODEL_ROLLOVER)
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    return parts if parts else list(_DEFAULT_GEMINI_MODEL_ROLLOVER)
+
+
+def _gemini_model_for_attempt(settings: dict[str, Any], attempt_index0: int) -> str:
+    pool = _gemini_model_pool(settings)
+    if pool:
+        return pool[attempt_index0 % len(pool)]
+    return (settings.get("gemini_model") or "gemini-2.5-flash").strip()
+
+
+def _gemini_single_config_model(settings: dict[str, Any]) -> str:
+    """When ``GEMINI_MODEL_ROLLOVER`` is off — single explicit ``GEMINI_MODEL`` only (no cycling)."""
+    return (settings.get("gemini_model") or "gemini-2.5-flash").strip()
+
+
+def _gemini_models_to_try_for_key(
+    settings: dict[str, Any],
+    *,
+    key_index0: int,
+    total_keys: int,
+) -> list[str]:
+    """
+    Models to attempt for one API key before rotating to the next key (or giving up).
+
+    - **Rollover disabled** (``GEMINI_MODEL_ROLLOVER=0`` / ``off``): only ``GEMINI_MODEL`` — never cycle.
+    - **Single key** (typical **BYOK**): full ``GEMINI_MODEL_ROLLOVER`` list so HTTP **429/503** can advance
+      to the next model on the **same** key (free-tier rate limits).
+    - **Multi-key server pool**: preserve legacy behaviour — one model index per key slot
+      (``pool[key_index % len(pool)]``), not the full list per key (avoids N_keys × N_models calls).
+    """
+    pool = _gemini_model_pool(settings)
+    if pool is None:
+        return [_gemini_single_config_model(settings)]
+    if total_keys <= 1:
+        return list(pool)
+    return [_gemini_model_for_attempt(settings, key_index0)]
 
 # When True (admin /admin/api/test-llm only): skip asyncio.sleep on 429 so the request finishes
 # before reverse-proxy/browser timeouts; multi-key rotation still applies.
@@ -111,7 +174,13 @@ def _strip_gemini_key(s: str) -> str:
     return (s or "").strip().replace("\ufeff", "").replace("\u200b", "").replace("\r", "")
 
 
-def _gemini_quota_rotate_warn(http_status: int, failed_key_index0: int, pool_len: int) -> str:
+def _gemini_quota_rotate_warn(
+    http_status: int,
+    failed_key_index0: int,
+    pool_len: int,
+    *,
+    model_id: str | None = None,
+) -> str:
     """
     Human-readable line when rotating after 429/503.
 
@@ -119,10 +188,11 @@ def _gemini_quota_rotate_warn(http_status: int, failed_key_index0: int, pool_len
     each new HTTP call starts from the sticky preferred key (last success) when enabled, so
     ``1/pool_len`` here means "first key in this call's sequence failed," not a global quota step.
     """
+    m = f" model={model_id!r}" if model_id else ""
     return (
         f"Gemini HTTP {http_status} — try-sequence {failed_key_index0 + 1}/{pool_len}: this key slot "
-        f"failed; next key immediately (no wait). "
-        f"(Each new request starts from the sticky preferred key when GEMINI_STICKY_LAST_SUCCESS=1.)"
+        f"failed; next key + model immediately (no wait).{m} "
+        f"(Sticky key order when GEMINI_STICKY_LAST_SUCCESS=1; models from GEMINI_MODEL_ROLLOVER.)"
     )
 
 
@@ -189,10 +259,15 @@ def _gemini_ordered_keys(settings: dict[str, Any]) -> list[str]:
     return raw
 
 
-def _gemini_generate_url_for_key(settings: dict[str, Any], api_key: str) -> str:
+def _gemini_generate_url_for_key(
+    settings: dict[str, Any],
+    api_key: str,
+    *,
+    model_override: str | None = None,
+) -> str:
     """REST URL for generateContent with an explicit API key (used for multi-key fallback)."""
     key = _strip_gemini_key(api_key)
-    model = (settings.get("gemini_model") or "gemini-2.5-flash").strip()
+    model = (model_override or settings.get("gemini_model") or "gemini-2.5-flash").strip()
     endpoint = settings.get("gemini_api_endpoint", "generativelanguage")
     api_ver = (settings.get("gemini_rest_api_version") or "v1").strip().lower()
     if api_ver not in ("v1", "v1beta"):
@@ -290,34 +365,53 @@ async def _gemini_post_with_quota_fallback(
     timeout: float,
 ) -> httpx.Response:
     """
-    POST generateContent; on HTTP 429 / 503 try the next key in the pool (sticky preferred key first).
-    Other 4xx/5xx: no key rotation (likely same failure for every key).
+    POST generateContent; on HTTP 429 / 503 try the next model (BYOK / single-key rollover) or next API key.
+
+    Other 4xx/5xx: no model cycling (same failure is raised immediately).
     """
     keys = _gemini_ordered_keys(settings)
     if not keys:
         raise RuntimeError("GEMINI_API_KEY is empty")
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        for i, key in enumerate(keys):
-            ok = await wait_gemini_budget_or_skip(key)
-            if not ok:
-                log_event(
-                    "INFO",
-                    "Gemini budget: daily request cap for this key — trying next key in pool",
-                )
-                continue
-            url = _gemini_generate_url_for_key(settings, key)
-            r = await client.post(url, json=payload)
+    client = get_gemini_async_client()
+    n_keys = len(keys)
+    for i, key in enumerate(keys):
+        ok = await wait_gemini_budget_or_skip(key)
+        if not ok:
+            log_event(
+                "INFO",
+                "Gemini budget: daily request cap for this key — trying next key in pool",
+            )
+            continue
+        models = _gemini_models_to_try_for_key(settings, key_index0=i, total_keys=n_keys)
+        for mi, model_try in enumerate(models):
+            url = _gemini_generate_url_for_key(settings, key, model_override=model_try)
+            r = await client.post(url, json=payload, timeout=timeout)
             if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
-                if i < len(keys) - 1:
-                    log_event("WARN", _gemini_quota_rotate_warn(r.status_code, i, len(keys)))
+                if mi < len(models) - 1:
+                    log_event(
+                        "WARN",
+                        f"Gemini HTTP {r.status_code} — same key, next model in rollover "
+                        f"({mi + 2}/{len(models)}), was {model_try!r} (BYOK uses full rollover list).",
+                    )
                     continue
+                if i < n_keys - 1:
+                    log_event(
+                        "WARN",
+                        _gemini_quota_rotate_warn(r.status_code, i, n_keys, model_id=model_try),
+                    )
+                    break
                 if r.status_code == 429:
                     r = await _gemini_retry_same_key_once_after_429(
-                        client, url, payload, r, pool_size=len(keys)
+                        client, url, payload, r, pool_size=n_keys
                     )
                 if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
                     log_event("ERROR", format_gemini_http_error(r))
                     r.raise_for_status()
+                if r.status_code >= 400:
+                    log_event("ERROR", format_gemini_http_error(r))
+                r.raise_for_status()
+                _gemini_record_success_for_key(key)
+                return r
             if r.status_code >= 400:
                 log_event("ERROR", format_gemini_http_error(r))
             r.raise_for_status()
@@ -337,24 +431,28 @@ async def gemini_consultant_post_with_quota_fallback(
     timeout: float = 90.0,
 ) -> httpx.Response:
     """
-    Consultant generateContent: same key fallback on 429/503; on 400 with JSON MIME, retry once
-    without JSON MIME on the **same** key (existing behaviour), then move to next key only for quota.
+    Consultant generateContent: on 400 with JSON MIME, retry once without JSON MIME on the **same**
+    model URL; on 429/503 cycle **models** for single-key/BYOK (``GEMINI_MODEL_ROLLOVER``), then keys.
     """
     keys = _gemini_ordered_keys(settings)
     if not keys:
         raise RuntimeError("GEMINI_API_KEY is empty")
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        for i, key in enumerate(keys):
-            ok = await wait_gemini_budget_or_skip(key)
-            if not ok:
-                log_event(
-                    "INFO",
-                    "Gemini budget: daily request cap for this key — trying next key in pool",
-                )
-                continue
-            url = _gemini_generate_url_for_key(settings, key)
+    client = get_gemini_async_client()
+    n_keys = len(keys)
+
+    for i, key in enumerate(keys):
+        ok = await wait_gemini_budget_or_skip(key)
+        if not ok:
+            log_event(
+                "INFO",
+                "Gemini budget: daily request cap for this key — trying next key in pool",
+            )
+            continue
+        models = _gemini_models_to_try_for_key(settings, key_index0=i, total_keys=n_keys)
+        for mi, model_try in enumerate(models):
+            url = _gemini_generate_url_for_key(settings, key, model_override=model_try)
             effective_payload: dict[str, Any] = dict(payload)
-            r = await client.post(url, json=effective_payload)
+            r = await client.post(url, json=effective_payload, timeout=timeout)
             if r.status_code == 400 and want_json_mime:
                 log_event(
                     "WARN",
@@ -364,20 +462,30 @@ async def gemini_consultant_post_with_quota_fallback(
                 ok2 = await wait_gemini_budget_or_skip(key)
                 if not ok2:
                     log_event("WARN", "Gemini budget: no slot for JSON-MIME retry — rotating key")
-                    if i < len(keys) - 1:
-                        continue
+                    if i < n_keys - 1:
+                        break
                     raise RuntimeError(
                         "Gemini consultant: daily budget exhausted for all keys before MIME retry"
                     )
                 effective_payload = {**payload, "generationConfig": dict(base_generation_config)}
-                r = await client.post(url, json=effective_payload)
+                r = await client.post(url, json=effective_payload, timeout=timeout)
             if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
-                if i < len(keys) - 1:
-                    log_event("WARN", _gemini_quota_rotate_warn(r.status_code, i, len(keys)))
+                if mi < len(models) - 1:
+                    log_event(
+                        "WARN",
+                        f"Gemini consultant HTTP {r.status_code} — same key, next model "
+                        f"({mi + 2}/{len(models)}), was {model_try!r}.",
+                    )
                     continue
+                if i < n_keys - 1:
+                    log_event(
+                        "WARN",
+                        _gemini_quota_rotate_warn(r.status_code, i, n_keys, model_id=model_try),
+                    )
+                    break
                 if r.status_code == 429:
                     r = await _gemini_retry_same_key_once_after_429(
-                        client, url, effective_payload, r, pool_size=len(keys)
+                        client, url, effective_payload, r, pool_size=n_keys
                     )
             if r.status_code >= 400:
                 log_event("WARN", format_gemini_http_error(r))
@@ -552,32 +660,38 @@ async def test_llm_connectivity(
                 },
             }
             r: httpx.Response | None = None
-            async with httpx.AsyncClient(timeout=45.0) as client:
-                for i, key in enumerate(keys):
-                    url = _gemini_generate_url_for_key(settings, key)
-                    post_payload: dict[str, Any] = payload_with_safety
-                    r = await client.post(url, json=post_payload)
-                    if r.status_code in (400, 403):
-                        post_payload = payload_no_safety
-                        r = await client.post(url, json=post_payload)
-                    if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
-                        if i < len(keys) - 1:
-                            log_event("WARN", _gemini_quota_rotate_warn(r.status_code, i, len(keys)))
-                            continue
-                        if r.status_code == 429:
-                            r = await _gemini_retry_same_key_once_after_429(
-                                client, url, post_payload, r, pool_size=len(keys)
-                            )
-                    if r.status_code < 400:
-                        _gemini_record_success_for_key(key)
-                        break
-                    return {
-                        "ok": False,
-                        "provider": "gemini",
-                        "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
-                        "detail": format_gemini_http_error(r),
-                        "model": settings.get("gemini_model"),
-                    }
+            last_model_try: str | None = None
+            client = get_gemini_async_client()
+            for i, key in enumerate(keys):
+                model_try = _gemini_model_for_attempt(settings, i)
+                last_model_try = model_try
+                url = _gemini_generate_url_for_key(settings, key, model_override=model_try)
+                post_payload: dict[str, Any] = payload_with_safety
+                r = await client.post(url, json=post_payload, timeout=45.0)
+                if r.status_code in (400, 403):
+                    post_payload = payload_no_safety
+                    r = await client.post(url, json=post_payload, timeout=45.0)
+                if r.status_code in _GEMINI_QUOTA_RETRY_STATUS:
+                    if i < len(keys) - 1:
+                        log_event(
+                            "WARN",
+                            _gemini_quota_rotate_warn(r.status_code, i, len(keys), model_id=model_try),
+                        )
+                        continue
+                    if r.status_code == 429:
+                        r = await _gemini_retry_same_key_once_after_429(
+                            client, url, post_payload, r, pool_size=len(keys)
+                        )
+                if r.status_code < 400:
+                    _gemini_record_success_for_key(key)
+                    break
+                return {
+                    "ok": False,
+                    "provider": "gemini",
+                    "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+                    "detail": format_gemini_http_error(r),
+                    "model": last_model_try or settings.get("gemini_model"),
+                }
             ms = round((time.perf_counter() - t0) * 1000, 1)
             if r is None or r.status_code >= 400:
                 return {
@@ -585,7 +699,7 @@ async def test_llm_connectivity(
                     "provider": "gemini",
                     "latency_ms": ms,
                     "detail": format_gemini_http_error(r) if r is not None else "Gemini probe failed",
-                    "model": settings.get("gemini_model"),
+                    "model": last_model_try or settings.get("gemini_model"),
                 }
             try:
                 data = r.json()
@@ -595,7 +709,7 @@ async def test_llm_connectivity(
                     "provider": "gemini",
                     "latency_ms": ms,
                     "detail": "Gemini returned non-JSON body",
-                    "model": settings.get("gemini_model"),
+                    "model": last_model_try or settings.get("gemini_model"),
                 }
             raw_snippet, empty_note = _gemini_extract_text_and_diagnostics(data)
             snippet = raw_snippet[:120]
@@ -610,7 +724,7 @@ async def test_llm_connectivity(
                 "provider": "gemini",
                 "latency_ms": ms,
                 "detail": detail,
-                "model": settings.get("gemini_model"),
+                "model": last_model_try or settings.get("gemini_model"),
             }
 
         if not (settings.get("llm_api_key") or "").strip():

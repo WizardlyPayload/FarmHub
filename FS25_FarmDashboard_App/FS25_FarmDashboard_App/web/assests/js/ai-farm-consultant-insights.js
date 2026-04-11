@@ -12,6 +12,12 @@
   var REFRESH_MS = 300000; // 5 minutes
   var insightsIntervalId = null;
   var insightsObserver = null;
+  /** Prevents overlapping GET /consultant/insights (navigation + observer + interval firing together). */
+  var insightsFetchInFlight = false;
+
+  function insightsFetchDone() {
+    insightsFetchInFlight = false;
+  }
 
   function getBaseAsync() {
     var ls = (localStorage.getItem(LS_URL) || '').replace(/\/$/, '');
@@ -54,23 +60,35 @@
     }
   }
 
+  /** Raw dashboard section (landing, fields, vehicles, …) — for stale-fetch detection. */
+  function getCurrentDashboardSection() {
+    try {
+      if (window.dashboard && typeof window.dashboard.getCurrentSection === 'function') {
+        return String(window.dashboard.getCurrentSection() || '').toLowerCase();
+      }
+    } catch (e) {}
+    return '';
+  }
+
+  /** Landing vs dashboard both use no ``view=`` param — treat as one bucket for stale checks. */
+  function insightSectionBucket(sec) {
+    var s = String(sec || '').toLowerCase();
+    if (s === 'landing' || s === 'dashboard') return 'home';
+    return s;
+  }
+
   /** Current navbar section → consultant ``view=`` param (must match sectionToViewParam inside refreshFarmInsights). */
   function getSmartPanelViewParam() {
     function sectionToViewParam(section) {
       var s = String(section || 'landing').toLowerCase();
-      if (s === 'landing' || s === 'dashboard') return '';
+      if (s === 'landing' || s === 'dashboard') return 'home';
       var allowed = ['fields', 'vehicles', 'pastures', 'livestock', 'productions', 'economy'];
       for (var i = 0; i < allowed.length; i++) {
         if (allowed[i] === s) return s;
       }
       return '';
     }
-    try {
-      if (window.dashboard && typeof window.dashboard.getCurrentSection === 'function') {
-        return sectionToViewParam(window.dashboard.getCurrentSection());
-      }
-    } catch (e) {}
-    return '';
+    return sectionToViewParam(getCurrentDashboardSection());
   }
 
   function showInsightsSkeleton() {
@@ -199,13 +217,21 @@
     }
 
     container.innerHTML = '';
+    var vwHome = '';
+    try {
+      vwHome = getSmartPanelViewParam();
+    } catch (eVh) {
+      vwHome = '';
+    }
+    if (vwHome === 'home' && insights && insights.length > 0) {
+      var intro = document.createElement('p');
+      intro.className = 'small text-info mb-3';
+      intro.innerHTML =
+        '<i class="bi bi-list-stars me-1"></i> <strong>Top 3 farm priorities</strong> — ranked from your live snapshot (fields, vehicles, animals, pastures, production, economy).';
+      container.appendChild(intro);
+    }
     if (!insights || insights.length === 0) {
-      var vw = '';
-      try {
-        vw = getSmartPanelViewParam();
-      } catch (eV) {
-        vw = '';
-      }
+      var vw = vwHome || '';
       if (vw === 'vehicles') {
         container.innerHTML =
           '<p class="text-success small mb-0"><i class="bi bi-check-circle me-1"></i> ' +
@@ -226,8 +252,14 @@
       var cat = item.category || '—';
       var msg = item.message || '';
       var reason = item.reasoning || '';
+      var rankPrefix = '';
+      try {
+        if (vwHome === 'home') rankPrefix = '#' + (i + 1) + ' · ';
+      } catch (eRank) {}
       div.innerHTML =
-        '<div class="insight-meta text-farm-accent">[' +
+        '<div class="insight-meta text-farm-accent">' +
+        rankPrefix +
+        '[' +
         String(cat) +
         '] · ' +
         String(item.priority || '') +
@@ -242,7 +274,10 @@
     }
   }
 
-  function refreshFarmInsights() {
+  function refreshFarmInsights(forceRefresh, opts) {
+    if (forceRefresh === undefined) forceRefresh = false;
+    opts = opts || {};
+    var backgroundPoll = !!opts.background;
     var container = document.getElementById('ai-insights-panel');
     if (!container) return;
 
@@ -262,7 +297,15 @@
       return;
     }
 
-    showInsightsSkeleton();
+    if (!forceRefresh && insightsFetchInFlight) {
+      pl('renderer_ok', 'smart suggestions: skipped (fetch already in flight)', {});
+      return;
+    }
+    insightsFetchInFlight = true;
+
+    if (!backgroundPoll) {
+      showInsightsSkeleton();
+    }
 
     function dbg(phase, payload) {
       try {
@@ -271,6 +314,26 @@
     }
 
     function runFetch() {
+      /** Deferred from a prior tab: do not GET /insights on Fields (per-field map only). */
+      if (getSmartPanelViewParam() === 'fields') {
+        insightsFetchDone();
+        container.removeAttribute('aria-busy');
+        var onlyFields = function () {
+          renderFieldsSmartPanelForFieldsTab();
+        };
+        if (typeof dashFlushDomWork === 'function') {
+          dashFlushDomWork(onlyFields);
+        } else {
+          onlyFields();
+        }
+        pl('renderer_ok', 'smart suggestions: skipped network on Fields tab (deferred callback)', {});
+        return;
+      }
+
+      /** If the user changes section while fetch is in flight, do not paint the old response (e.g. Home → Fields). */
+      var requestedSectionAtFetch = getCurrentDashboardSection();
+      var requestedViewAtFetch = getSmartPanelViewParam();
+
       Promise.all([getBaseAsync(), getKeyAsync()])
         .then(function (pair) {
           var base = pair[0] || 'http://127.0.0.1:8080';
@@ -375,6 +438,38 @@
         })
         .then(function (data) {
           dbg('response', { httpStatus: 200, body: data });
+          var nowSec = getCurrentDashboardSection();
+          var nowView = getSmartPanelViewParam();
+
+          if (nowSec === 'fields') {
+            var doFieldsOnly = function () {
+              renderFieldsSmartPanelForFieldsTab();
+            };
+            if (typeof dashFlushDomWork === 'function') {
+              dashFlushDomWork(doFieldsOnly);
+            } else {
+              doFieldsOnly();
+            }
+            pl('renderer_ok', 'consultant/insights response ignored on Fields tab (per-field map only)', {
+              llm_used: !!(data && data.llm_used),
+              stale_from_section: requestedSectionAtFetch,
+            });
+            return;
+          }
+
+          if (
+            insightSectionBucket(requestedSectionAtFetch) !== insightSectionBucket(nowSec) ||
+            requestedViewAtFetch !== nowView
+          ) {
+            pl('renderer_ok', 'consultant/insights stale response discarded (section or view changed)', {
+              requestedSection: requestedSectionAtFetch,
+              nowSection: nowSec,
+              requestedView: requestedViewAtFetch,
+              nowView: nowView,
+            });
+            return;
+          }
+
           var list = (data && data.insights) || [];
           var llm = !!(data && data.llm_used);
           try {
@@ -396,7 +491,9 @@
           } catch (e1) {}
         })
         .catch(function (err) {
-          if (err && err.message === '__no_key__') return;
+          if (err && err.message === '__no_key__') {
+            return;
+          }
           dbg('error', { message: String(err && err.message ? err.message : err) });
           pl('renderer_err', 'GET /api/v1/consultant/insights failed', { error: String(err.message || err) });
           container.removeAttribute('aria-busy');
@@ -407,7 +504,8 @@
           try {
             console.error('[AI Farm] Consultant insights failed:', err);
           } catch (e2) {}
-        });
+        })
+        .then(insightsFetchDone, insightsFetchDone);
     }
 
     if (typeof dashScheduleIdle === 'function') {
@@ -427,12 +525,18 @@
     window.refreshFarmDashConsultantInsights = refreshFarmInsights;
 
     var btn = document.getElementById('ai-insights-refresh-btn');
-    if (btn) btn.addEventListener('click', refreshFarmInsights);
+    if (btn) {
+      btn.addEventListener('click', function () {
+        refreshFarmInsights(true);
+      });
+    }
 
     if (insightsIntervalId != null) {
       clearInterval(insightsIntervalId);
     }
-    insightsIntervalId = setInterval(refreshFarmInsights, REFRESH_MS);
+    insightsIntervalId = setInterval(function () {
+      refreshFarmInsights(false, { background: true });
+    }, REFRESH_MS);
 
     if (typeof dashScheduleIdle === 'function') {
       dashScheduleIdle(function () {
@@ -449,7 +553,9 @@
       insightsObserver = new MutationObserver(function () {
         if (insightRowEl.classList.contains('d-none')) return;
         clearTimeout(visDebounce);
-        visDebounce = setTimeout(refreshFarmInsights, 400);
+        visDebounce = setTimeout(function () {
+          refreshFarmInsights(false);
+        }, 950);
       });
       insightsObserver.observe(insightRowEl, { attributes: true, attributeFilter: ['class'] });
     }

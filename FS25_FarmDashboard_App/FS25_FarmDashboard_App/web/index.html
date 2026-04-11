@@ -116,6 +116,26 @@
           </div>
         </div>
 
+        <!-- Smart suggestions: Home (top 3 priorities) + Livestock + section views. Placed above landing cards. -->
+        <div class="row mb-3 d-none" id="ai-farm-insights-row">
+          <div class="col-12">
+            <div class="card border-success shadow-sm bg-dark">
+              <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2 border-success bg-farm-primary">
+                <h6 class="mb-0 text-white">
+                  <i class="bi bi-lightbulb me-2 text-warning"></i> Smart suggestions
+                  <span class="badge bg-secondary ms-1" id="ai-insights-llm-badge" title="LLM used for analysis">—</span>
+                </h6>
+                <button type="button" class="btn btn-sm btn-outline-light" id="ai-insights-refresh-btn" title="Refresh from AI Farm Manager">
+                  <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                </button>
+              </div>
+              <div class="card-body py-3" id="ai-insights-panel">
+                <p class="text-muted small mb-0">Open the <strong>robot</strong> button → enter your <strong>AI server URL</strong> + <strong>link key</strong> → turn on <strong>Send farm data</strong> → <strong>Save &amp; load</strong>. Then <strong>Refresh</strong> here. (Your host must enable data sync on the server.)</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div id="landing-page" class="d-none">
           <div class="row mb-4">
             <div class="col-12 text-center">
@@ -199,26 +219,6 @@
                   <p class="card-text text-muted" data-i18n="card.productionsDesc">Production chains, storage fill levels, and active slots</p>
                   <div class="mt-3"><span class="badge bg-farm-warning" id="production-count">0 Chains</span></div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Smart suggestions: shared by Livestock (below) and Vehicles/Fields/… (section-content). Was only under dashboard-content, so Vehicles never showed this panel. -->
-        <div class="row mb-3 d-none" id="ai-farm-insights-row">
-          <div class="col-12">
-            <div class="card border-success shadow-sm bg-dark">
-              <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2 border-success bg-farm-primary">
-                <h6 class="mb-0 text-white">
-                  <i class="bi bi-lightbulb me-2 text-warning"></i> Smart suggestions
-                  <span class="badge bg-secondary ms-1" id="ai-insights-llm-badge" title="LLM used for analysis">—</span>
-                </h6>
-                <button type="button" class="btn btn-sm btn-outline-light" id="ai-insights-refresh-btn" title="Refresh from AI Farm Manager">
-                  <i class="bi bi-arrow-clockwise me-1"></i> Refresh
-                </button>
-              </div>
-              <div class="card-body py-3" id="ai-insights-panel">
-                <p class="text-muted small mb-0">Open the <strong>robot</strong> button → enter your <strong>AI server URL</strong> + <strong>link key</strong> → turn on <strong>Send farm data</strong> → <strong>Save &amp; load</strong>. Then <strong>Refresh</strong> here. (Your host must enable data sync on the server.)</p>
               </div>
             </div>
           </div>

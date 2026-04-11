@@ -106,7 +106,21 @@
 
     container.innerHTML = '';
     if (!insights || insights.length === 0) {
-      container.innerHTML = '<p class="text-muted small mb-0">No suggestions right now — check snapshot / FTP on the AI server.</p>';
+      var vw = '';
+      try {
+        vw = getSmartPanelViewParam();
+      } catch (eV) {
+        vw = '';
+      }
+      if (vw === 'vehicles') {
+        container.innerHTML =
+          '<p class="text-success small mb-0"><i class="bi bi-check-circle me-1"></i> ' +
+          "You're doing well — the fleet's looking good. No urgent fuel, damage, or maintenance flags in the snapshot. " +
+          'Tap <strong>Refresh</strong> after driving or refuelling if you want another look.</p>';
+      } else {
+        container.innerHTML =
+          '<p class="text-muted small mb-0">No suggestions right now — check snapshot / FTP on the AI server.</p>';
+      }
       return;
     }
 
@@ -337,16 +351,16 @@
       setTimeout(refreshFarmInsights, 600);
     }
 
-    var dashEl = document.getElementById('dashboard-content');
-    if (dashEl && !window.__farmdashConsultantDashObserverDone) {
+    var insightRowEl = document.getElementById('ai-farm-insights-row');
+    if (insightRowEl && !window.__farmdashConsultantDashObserverDone) {
       window.__farmdashConsultantDashObserverDone = true;
       var visDebounce;
       insightsObserver = new MutationObserver(function () {
-        if (dashEl.classList.contains('d-none')) return;
+        if (insightRowEl.classList.contains('d-none')) return;
         clearTimeout(visDebounce);
         visDebounce = setTimeout(refreshFarmInsights, 400);
       });
-      insightsObserver.observe(dashEl, { attributes: true, attributeFilter: ['class'] });
+      insightsObserver.observe(insightRowEl, { attributes: true, attributeFilter: ['class'] });
     }
   });
 })();

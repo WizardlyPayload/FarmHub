@@ -138,8 +138,9 @@ if os.path.isdir(_static):
 
 
 @app.get("/health")
+@app.get("/healthz", include_in_schema=False)
 async def health() -> dict:
-    """Liveness + how many bot profiles the running process loaded (0 = wrong/missing data/bot_servers.json)."""
+    """Liveness for Coolify / Docker / probes. Same JSON at ``/health`` and ``/healthz``."""
     import os
 
     from app.config import get_backend_root, get_data_dir, get_settings
@@ -151,6 +152,7 @@ async def health() -> dict:
     st = (os.getenv("SERVER_TOKEN") or "").strip()
     return {
         "status": "ok",
+        "service": "ai-farm-manager",
         "backend_root": str(get_backend_root()),
         "data_dir": str(get_data_dir()),
         "bot_profiles_loaded": n,

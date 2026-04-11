@@ -129,7 +129,7 @@ Supporting / integration:
 
 | Router | Prefix | Notes |
 |--------|--------|------|
-| `chat` | `/api/chat/...` | In-game bot chat — **Hank**; trigger from `TRIGGER_PREFIX` (default `!hank`) |
+| `chat` | `/api/chat/...` | In-game **Hank** (`!hank`): **multiplayer only** (host/dedicated/rented server). Not used in single-player career — see `AI_Farm_Manager/docs/IN_GAME_CHAT_BOT.md` |
 | `admin_routes` | `/admin` | HTML admin, env, LLM test |
 | `integration` | `/api/integration` | Push snapshot, instances, keys, **`GET /gemini-models`** (Google ListModels) |
 | `consultant` | `/api/v1/consultant` | **GET /insights** — Smart suggestions / farm insights |

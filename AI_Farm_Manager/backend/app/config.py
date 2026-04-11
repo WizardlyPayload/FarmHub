@@ -217,7 +217,7 @@ def get_settings() -> dict:
         "dashboard_push_mode": _b("DASHBOARD_PUSH_MODE", False),
         "bot_enabled": be,
         "llm_configured": llm_configured,
-        # In-game chat trigger — must match modsSettings ai_farm_manager_config.xml triggerPrefix (default: Hank).
+        # In-game chat trigger — must match modSettings ai_farm_manager_config.xml triggerPrefix (default: Hank).
         "trigger_prefix": os.getenv("TRIGGER_PREFIX", "!hank").strip(),
         "game_reference_enabled": _b("GAME_REFERENCE_ENABLED", True),
         # Optional override; if unset, backend uses MAIN_CODEBASE/dataS_py_extracted/l10n/l10n_en.xml

@@ -963,7 +963,7 @@ ipcMain.on('save-settings', (event, newConfig) => {
 
 ipcMain.handle('get-current-config', () => store.get('config'));
 
-/** Write AI Farm Manager mod config XML to local FS25 modsSettings (Windows; same PC as game). */
+/** Write AI Farm Manager mod config XML to local FS25 modSettings (Windows; same PC as game). */
 ipcMain.handle('get-ai-client-branding', () => {
     const b = loadBrandingFromDisk();
     const emb = String(b.embeddedFarmdashIntegrationKey || '').trim();
@@ -1034,7 +1034,7 @@ ipcMain.handle('ai-farm-install-config-xml', async (_e, { baseUrl, integrationKe
     }
     console.info('[Pipeline] main_ok: config-xml received', { bytesUtf8: Buffer.byteLength(text, 'utf8') });
     const docs = app.getPath('documents');
-    const target = path.join(docs, 'My Games', 'FarmingSimulator2025', 'modsSettings', 'ai_farm_manager_config.xml');
+    const target = path.join(docs, 'My Games', 'FarmingSimulator2025', 'modSettings', 'ai_farm_manager_config.xml');
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, text, 'utf8');
     return { ok: true, path: target };

@@ -167,6 +167,7 @@ After pulling, run **`npm install`** under `FS25_FarmDashboard_App/FS25_FarmDash
 | [docs/LLM_GEMINI_ROUTING.md](./LLM_GEMINI_ROUTING.md) | AI Farm Manager: Gemini key round-robin, model rollover, 429/503, BYOK |
 | [DEVELOPER_HANDOVER.md](../DEVELOPER_HANDOVER.md) | FarmHub stack: dashboard + backend architecture and file map |
 | [../AI_Farm_Manager/README.md](../AI_Farm_Manager/README.md) | Deploy AI Farm Manager (Docker/Coolify), API summary, BYOK |
+| [../AI_Farm_Manager/docs/IN_GAME_CHAT_BOT.md](../AI_Farm_Manager/docs/IN_GAME_CHAT_BOT.md) | **In-game Hank** — multiplayer-only; config on host/dedicated/G-Portal |
 | [../AUTHORS.md](../AUTHORS.md) | JoshWalki & WizardlyPayload |
 | This file | Full version history |
 

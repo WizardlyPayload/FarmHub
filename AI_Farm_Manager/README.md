@@ -94,13 +94,27 @@ copy .env.example .env
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 
+## In-game Hank chat (`fs25_ai_farm_manager_mod`)
+
+The **Lua mod** forwards `!hank` (or your `triggerPrefix`) from **multiplayer** chat to **`POST /api/chat/receive`** and polls **`GET /api/chat/poll`** for replies.
+
+| Topic | Detail |
+|--------|--------|
+| **Single-player career** | **Not supported** — the mod does not activate the chat bridge in solo. Use **Farm Dashboard** + AI Farm Manager for AI on your own PC. |
+| **Multiplayer** | Supported for **host**, **dedicated server**, **G-Portal** (and similar): the machine that runs the authoritative game needs **`modSettings/ai_farm_manager_config.xml`**. |
+| **Joining clients** | Cannot trigger the bridge; only the **server / host** runs it. |
+
+Full matrix and config paths: **[docs/IN_GAME_CHAT_BOT.md](docs/IN_GAME_CHAT_BOT.md)**.
+
+---
+
 ## API summary
 
 | Method | Path | Notes |
 |--------|------|-------|
 | GET | `/` | Farm snapshot (FTP) |
-| POST | `/api/chat/receive` | Lua bridge |
-| GET | `/api/chat/poll` | Lua bridge |
+| POST | `/api/chat/receive` | Lua mod — **multiplayer sessions only** (see above) |
+| GET | `/api/chat/poll` | Lua mod — **multiplayer sessions only** |
 | GET | `/api/v1/consultant/insights` | Proactive “Smart Suggestions” (Farm Dashboard) |
 | GET | `/admin` | Basic auth |
 | GET | `/health` | Liveness + `data_dir` path |

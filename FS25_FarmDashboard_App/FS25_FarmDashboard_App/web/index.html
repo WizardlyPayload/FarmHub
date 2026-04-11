@@ -888,9 +888,10 @@
             <div id="aiFarmBotPanelBody" class="border border-secondary rounded p-2 small" style="min-height: 120px;">Open this panel to load status…</div>
             <div class="mt-3 border-top border-secondary pt-3">
               <label class="form-label small mb-1">Install config automatically (this PC)</label>
-              <p class="small text-muted mb-2">Writes <code>Documents/My Games/FarmingSimulator2025/modsSettings/ai_farm_manager_config.xml</code> — no manual editing. Requires the desktop app (not a browser tab).</p>
+              <p class="small text-muted mb-2">Writes <code>Documents/My Games/FarmingSimulator2025/modSettings/ai_farm_manager_config.xml</code> — no manual editing. Requires the desktop app (not a browser tab).</p>
+              <p class="small text-muted mb-2"><strong>In-game <code>!hank</code> chat</strong> runs in <strong>multiplayer only</strong> (you host, dedicated server, or G-Portal/rented host). It does not run in single-player career. <strong>Farm Dashboard</strong> Smart suggestions on this PC work in solo or MP. For rented servers, upload the same XML to the <em>server&rsquo;s</em> <code>modSettings</code> — see <code>AI_Farm_Manager/docs/IN_GAME_CHAT_BOT.md</code> in the repo.</p>
               <select id="aiFarmBotInstanceSelect" class="form-select form-select-sm mb-2"></select>
-              <button type="button" class="btn btn-sm btn-outline-success" id="aiFarmBotInstallLocal">Write to FS25 modsSettings</button>
+              <button type="button" class="btn btn-sm btn-outline-success" id="aiFarmBotInstallLocal">Write to FS25 modSettings</button>
               <p id="aiFarmBotInstallResult" class="small text-info mt-2 mb-0"></p>
             </div>
           </div>

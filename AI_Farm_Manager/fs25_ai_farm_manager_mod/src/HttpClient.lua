@@ -76,6 +76,21 @@ local function joinPath(dir, name)
     return dir .. "/" .. name
 end
 
+--- FS25 often allows io.open only under the user profile (e.g. modSettings). /tmp or TEMP may fail on some DS/client builds.
+local function getModsSettingsDirForHttpTemp()
+    if getUserProfileAppPath == nil or type(getUserProfileAppPath) ~= "function" then
+        return nil
+    end
+    local ok, base = pcall(function()
+        return getUserProfileAppPath()
+    end)
+    if not ok or base == nil or base == "" then
+        return nil
+    end
+    base = string.gsub(base, "[/\\]+$", "")
+    return base .. "/modSettings"
+end
+
 --- FS25 Linux dedicated often allows only "w" for io.open (rejects "wb") — match that first.
 local function ioOpenForWrite(path)
     if path == nil or path == "" or io == nil or type(io.open) ~= "function" then

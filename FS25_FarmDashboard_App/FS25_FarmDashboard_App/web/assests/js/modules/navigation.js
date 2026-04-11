@@ -223,6 +223,31 @@ export function getCurrentSection() {
   return this.currentSection || "landing";
 }
 
+/** Show Smart suggestions row for Livestock + detail sections (Vehicles, Fields, …); hide on landing. */
+function updateSmartSuggestionsRowVisibility(sectionName) {
+  const row = document.getElementById("ai-farm-insights-row");
+  const dash = document.getElementById("dashboard-content");
+  if (!row) return;
+  const withSmart = [
+    "livestock",
+    "vehicles",
+    "fields",
+    "pastures",
+    "economy",
+    "productions",
+  ];
+  if (!withSmart.includes(sectionName)) {
+    row.classList.add("d-none");
+    return;
+  }
+  row.classList.remove("d-none");
+  if (sectionName === "livestock") {
+    dash?.classList.remove("d-none");
+  } else {
+    dash?.classList.add("d-none");
+  }
+}
+
 export function showInfoMessage(message) {
   this.showAlert(message, "info");
 }
@@ -389,6 +414,7 @@ export function showLanding() {
 
   document.getElementById("section-content").classList.add("d-none");
   document.getElementById("dashboard-content").classList.add("d-none");
+  document.getElementById("ai-farm-insights-row")?.classList.add("d-none");
   document.getElementById("landing-page").classList.remove("d-none");
   this.updateLandingPageCounts(); // Update counts including pastures badge
   this.updateNavbar();
@@ -442,6 +468,16 @@ export function showSection(sectionName) {
                   </div>
               `;
       document.getElementById("section-content").classList.remove("d-none");
+  }
+
+  updateSmartSuggestionsRowVisibility(sectionName);
+
+  if (typeof window.refreshFarmDashConsultantInsights === "function") {
+    window.setTimeout(function () {
+      try {
+        window.refreshFarmDashConsultantInsights();
+      } catch (e) {}
+    }, 450);
   }
 
   // Update navbar after section change

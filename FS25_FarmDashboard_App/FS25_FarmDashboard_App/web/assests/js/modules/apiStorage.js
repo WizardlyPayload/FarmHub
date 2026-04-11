@@ -288,6 +288,7 @@ export function clearSavedData() {
     if (clearBtn) clearBtn.classList.add("d-none");
     document.getElementById("folder-selection").classList.remove("d-none");
     document.getElementById("dashboard-content").classList.add("d-none");
+    document.getElementById("ai-farm-insights-row")?.classList.add("d-none");
     this.animals = [];
     this.filteredAnimals = [];
     this.lastAnimalsDataHash = null;
@@ -306,6 +307,7 @@ export function unloadData() {
     document.getElementById("folder-selection").classList.remove("d-none");
     document.getElementById("landing-page").classList.add("d-none");
     document.getElementById("dashboard-content").classList.add("d-none");
+    document.getElementById("ai-farm-insights-row")?.classList.add("d-none");
     document.getElementById("section-content").classList.add("d-none");
     this.animals = []; this.filteredAnimals = []; this.lastAnimalsDataHash = null;
     this.placeables = []; this.playerFarms = []; this.selectedFarm = null; this.selectedFarmId = null; this.savedFolderData = null;

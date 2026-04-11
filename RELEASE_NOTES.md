@@ -31,6 +31,8 @@ Use this file for **short copy-paste text** on GitHub Releases. The **full histo
 | **LAN / browser / no login** | [SECURITY.md](docs/SECURITY.md) | Trust model and firewall |
 | **Product + setup screenshot ideas** | [docs/DESCRIPTION_AND_SCREENSHOTS.md](docs/DESCRIPTION_AND_SCREENSHOTS.md) | Long description, screenshot checklist |
 | **Everything since 1.0.0** | [CHANGELOG.md](docs/CHANGELOG.md) | Full version history |
+| **AI Farm Manager (Gemini keys / BYOK)** | [docs/LLM_GEMINI_ROUTING.md](docs/LLM_GEMINI_ROUTING.md) | Server-side routing and env vars |
+| **FarmHub developer handover** | [DEVELOPER_HANDOVER.md](DEVELOPER_HANDOVER.md) | Full stack architecture |
 | **Authors** | [AUTHORS.md](AUTHORS.md) | **JoshWalki** (Josh) & **WizardlyPayload** |
 
 ### Attach to this release (recommended)

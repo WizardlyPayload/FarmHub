@@ -81,7 +81,7 @@ function AIFarmChatHooks._onAddChatMessage(mission, senderName, message, ...)
         )
     end
 
-    local prefix = cfg.triggerPrefix or "!riley"
+    local prefix = cfg.triggerPrefix or "!hank"
     local ml = string.lower(message)
     local pl = string.lower(prefix)
     if string.sub(ml, 1, #pl) ~= pl then

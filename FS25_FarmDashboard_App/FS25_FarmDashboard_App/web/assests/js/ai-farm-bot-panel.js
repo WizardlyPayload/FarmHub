@@ -161,9 +161,9 @@
         (s.localSubFolder ? ' · save <code>' + s.localSubFolder + '</code>' : '') + '</li>';
     }
     html += '</ul>';
-    html += '<h6 class="text-farm-accent mt-3">In-game chat — <strong>Scout Riley</strong> (<code>!riley</code>) per profile</h6>';
+    html += '<h6 class="text-farm-accent mt-3">In-game chat — <strong>Hank</strong> (<code>!hank</code>) per profile</h6>';
     html +=
-      '<p class="small text-muted mb-2">Each profile matches one Farm Dashboard save (set by your host in <code>/admin</code>). Uncheck saves you are not using with the mod so <code>!riley</code> only runs where you want.</p>';
+      '<p class="small text-muted mb-2">Each profile matches one Farm Dashboard save (set by your host in <code>/admin</code>). Uncheck saves you are not using with the mod so <code>!hank</code> only runs where you want.</p>';
     html += '<ul class="small list-unstyled mb-2" id="aiFarmBotProfileToggles">';
     if (bi.length === 0) {
       html += '<li class="text-muted">No bot profiles yet — your host creates them in /admin.</li>';
@@ -208,7 +208,7 @@
           introLead.innerHTML =
             '<strong>' +
             String(b.serviceName).replace(/</g, '') +
-            '</strong> — same three steps below. Optional BYOK key stays on this PC; use <strong>Write to FS25 modsSettings</strong> for the in-game <code>!riley</code> token.';
+            '</strong> — same three steps below. Optional BYOK key stays on this PC; use <strong>Write to FS25 modsSettings</strong> for the in-game <code>!hank</code> token.';
         }
         if (b.hasEmbeddedIntegrationKey) {
           if (rowKey) rowKey.classList.add('d-none');

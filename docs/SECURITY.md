@@ -61,6 +61,12 @@ The FS25 mod only writes **`data.json`** under the user profile. It does not ope
 
 ---
 
+## AI Farm Manager (optional FastAPI backend)
+
+If you run the separate **AI Farm Manager** service (VPS/Docker) for Smart suggestions or in-game chat, treat its URL like any other API: **HTTPS**, firewall, and avoid exposing **`GET /`** (farm snapshot HTML) and **`/health`** to the public internet without need. Gemini **API key routing** and rate-limit behaviour are documented in **[LLM_GEMINI_ROUTING.md](./LLM_GEMINI_ROUTING.md)** — distinct from the desktop app’s LAN dashboard on port **8766**.
+
+---
+
 ## Reporting security concerns
 
 For **public** security issues (e.g. unintended remote code execution via the app), contact the maintainers via the GitHub repository’s channels (**JoshWalki** & **WizardlyPayload** — [AUTHORS.md](../AUTHORS.md)). Include app version **2.0.0** and platform **Windows**.

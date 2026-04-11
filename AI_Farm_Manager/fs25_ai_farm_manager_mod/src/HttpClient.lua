@@ -4,7 +4,7 @@
   FS25 notes (from sdk/debugger/gameSource.zip):
   - Shipped Lua under dataS/scripts/ does not define Internet.lua / createHTTPRequest in text form;
     HTTP is provided by the engine on some builds (often dedicated server), not always on the game client.
-  - POST (postJson) / GET (poll) use engine HTTP if present, else curl. Linux DS: JSON body under $TMPDIR or /tmp (never .\\ under game/), and no cmd/.bat read path (io.open often write-only).
+  - POST (postJson) / GET (poll) use engine HTTP if present, else curl. Linux DS: temp JSON with io.open(..., "w") only (not "wb"); JSON under $TMPDIR, /tmp, or ~/.cache; no cmd/.bat read path.
 
   Curl output uses -w "\\n%{http_code}"; we parse the last line as status (handles CRLF from Windows curl).
 
@@ -74,6 +74,18 @@ local function joinPath(dir, name)
         dir = "."
     end
     return dir .. "/" .. name
+end
+
+--- FS25 Linux dedicated often allows only "w" for io.open (rejects "wb") — match that first.
+local function ioOpenForWrite(path)
+    if path == nil or path == "" or io == nil or type(io.open) ~= "function" then
+        return nil
+    end
+    local f = io.open(path, "w")
+    if f == nil then
+        f = io.open(path, "wb")
+    end
+    return f
 end
 
 --- Resolve engine createHTTPRequest if exposed as a method on Internet (some builds).
@@ -169,7 +181,7 @@ local function runCurlReadViaBatch(cmd)
     local outpath = joinPath(dir, "aifarm_http_" .. id .. ".out")
     local batpath = joinPath(dir, "aifarm_http_" .. id .. ".bat")
     local batCmd = escapePercentForBatch(cmd)
-    local fh = io.open(batpath, "wb")
+    local fh = ioOpenForWrite(batpath)
     if fh == nil then
         return false, nil
     end
@@ -222,17 +234,50 @@ local function makeTempJsonPathForCurl()
     )
 end
 
+--- Write POST body to a file curl can read; returns path or nil (tries several dirs on Linux).
+local function writeCurlPostBodyFile(jsonBody)
+    local id = "aifarm_mgr_" .. tostring(math.random(100000, 999999)) .. ".json"
+    local body = jsonBody or ""
+    if isWindowsHost() then
+        local p = makeTempJsonPathForCurl()
+        local f = ioOpenForWrite(p)
+        if f == nil then
+            return nil
+        end
+        f:write(body)
+        f:close()
+        return p
+    end
+    local dirs = {}
+    local td = getenvSafe("TMPDIR")
+    if td ~= nil and td ~= "" then
+        table.insert(dirs, string.gsub(td, "\\", "/"))
+    end
+    table.insert(dirs, "/tmp")
+    local home = getenvSafe("HOME")
+    if home ~= nil and home ~= "" then
+        table.insert(dirs, joinPath(string.gsub(home, "\\", "/"), ".cache"))
+    end
+    for _, d in ipairs(dirs) do
+        local p = joinPath(d, id)
+        local f = ioOpenForWrite(p)
+        if f ~= nil then
+            f:write(body)
+            f:close()
+            return p
+        end
+    end
+    return nil
+end
+
 --- Last-resort POST via curl (body via temp file outside game folder when possible).
 local function postJsonViaCurl(url, jsonBody, callback)
-    local tmpWin = makeTempJsonPathForCurl()
-    local tmpCurl = string.gsub(tmpWin, "\\", "/")
-    local f = io.open(tmpWin, "wb")
-    if f == nil then
+    local tmpWin = writeCurlPostBodyFile(jsonBody)
+    if tmpWin == nil then
         notify(callback, -1, nil, "curl_tmp_open_failed")
         return
     end
-    f:write(jsonBody or "")
-    f:close()
+    local tmpCurl = string.gsub(tmpWin, "\\", "/")
     local quotedUrl = '"' .. string.gsub(tostring(url), '"', '\\"') .. '"'
     local cmd = string.format(
         'curl -s -S -X POST -H "Content-Type: application/json" --data-binary "@%s" -w "\\n%%{http_code}" %s',

@@ -19,8 +19,8 @@ from app.services.subscription import assert_chat_allowed
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
-# Display name in poll queue + in-game chat (matches consultant “Scout Riley” mentor voice).
-CHAT_BOT_DISPLAY_NAME = "Scout Riley"
+# Display name in poll queue + in-game chat (classic farmer persona; matches consultant mentor voice).
+CHAT_BOT_DISPLAY_NAME = "Hank"
 
 
 class ReceiveBody(BaseModel):
@@ -63,7 +63,7 @@ async def _process_llm_job(player: str, text: str, fetch_url: str | None, server
         )
         log_pipeline(
             "chat_out",
-            "Scout Riley reply ready for GET /api/chat/poll (game mod)",
+            "Hank reply ready for GET /api/chat/poll (game mod)",
             player=player,
             reply_chars=len(reply or ""),
             latency_s=round(latency, 3) if latency else None,

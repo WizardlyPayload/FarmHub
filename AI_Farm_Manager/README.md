@@ -51,7 +51,7 @@ AI_Farm_Manager/
 
 6. **Admin “Save” and `.env`:** Compose’s `env_file` injects variables but does not always create a file **inside** the container. Saving settings from **`/admin`** will **create `/app/.env`** if needed. To persist those edits across image rebuilds, optionally mount a host file, e.g. **`- ./backend/.env:/app/.env`** (adjust paths to match your host layout).
 
-6. **Lua mod:** Set **`backendUrl`** in `ai_farm_manager_config.xml` to your public API base URL (same idea as **`PUBLIC_BASE_URL`**). Use HTTPS once a certificate is in front of the app.
+7. **Lua mod:** Set **`backendUrl`** in `ai_farm_manager_config.xml` to your public API base URL (same idea as **`PUBLIC_BASE_URL`**). Use HTTPS once a certificate is in front of the app.
 
 ## Deploy with Coolify (Hetzner)
 
@@ -109,7 +109,7 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8080
 
 Farm Dashboard can send **`X-AI-API-Key`** (and optional **`X-AI-Provider`**: `gemini` / `openai`) so players use their own Google/OpenAI credentials. Step-by-step setup (including a free Gemini key) is in **[docs/BYOK_GUIDE.md](docs/BYOK_GUIDE.md)**.
 
-**Gemini free tier:** If Google returns **429/503**, the server cycles through **`GEMINI_MODEL_ROLLOVER`** on the **same** key before trying the next key — important for single-key BYOK. Set **`GEMINI_MODEL_ROLLOVER=0`** (or `off`) to pin a single **`GEMINI_MODEL`** with no cycling.
+**Gemini (server-side behaviour):** For each request, the backend walks the **`GEMINI_MODEL_ROLLOVER`** list **top to bottom** (best model first) on **your** key when Google returns **429** or **503**; only **multi-key server pools** rotate **which key is tried first** (strict round-robin per new request). BYOK uses a **single** key — no key rotation, but the same **model stack** applies. Details: **[../docs/LLM_GEMINI_ROUTING.md](../docs/LLM_GEMINI_ROUTING.md)**. Set **`GEMINI_MODEL_ROLLOVER=0`** (or `off`) to use only **`GEMINI_MODEL`** with no fallback models.
 
 ## Proactive Consultant API
 
@@ -127,7 +127,7 @@ Smart suggestions and field-map modes use the **FS25 mentor / agronomy** prompt 
 ### Endpoint: `GET /api/v1/consultant/insights`
 
 - **Authentication:** Header **`X-FarmDash-Key`** — must match **`FARMDASH_INTEGRATION_KEY`** in `backend/.env` (same value as “Farm Dashboard link key” in the Electron app’s AI Farm Manager panel).
-- **LLM keys:** Optional header **`X-AI-API-Key`** (and **`X-AI-Provider`**: `openai` or `gemini`) for BYOK from the Farm Dashboard app. If the header is missing or empty, the server uses **`LLM_API_KEY` / `GEMINI_API_KEY`** from the environment (**`LLM_PROVIDER`**) — the same keys as in-game **`!riley`** (Scout Riley) and **`/admin`**. Keys are forwarded to the provider and are not stored by the app beyond `.env` / your host env.
+- **LLM keys:** Optional header **`X-AI-API-Key`** (and **`X-AI-Provider`**: `openai` or `gemini`) for BYOK from the Farm Dashboard app. If the header is missing or empty, the server uses **`LLM_API_KEY` / `GEMINI_API_KEY`** from the environment (**`LLM_PROVIDER`**) — the same keys as in-game **`!hank`** (Hank) and **`/admin`**. Keys are forwarded to the provider and are not stored by the app beyond `.env` / your host env.
 - **Behaviour:**
   - **Heuristics:** Flags production outputs or storage levels at or above ~**90%** capacity (high-priority alerts even when the LLM is slow, rate-limited, or disabled).
   - **LLM analysis:** Field-focused rotation and next-step advice; other areas when relevant. Field-specific rows may include **`field_ref`** (farmland id string) for per-parcel UI in the Electron app.

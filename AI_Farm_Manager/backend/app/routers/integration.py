@@ -380,7 +380,7 @@ async def patch_bot_instance_enabled(
     _: str = Depends(require_integration_or_admin),
 ) -> dict[str, Any]:
     """
-    Toggle in-game ``!bot`` for one bot profile (same as /admin) using Farm Dashboard link key.
+    Toggle in-game ``!hank`` for one bot profile (same as /admin) using Farm Dashboard link key.
     Disabled instances still receive HTTP 200 on chat but responses are not queued (see chat router).
     """
     inst = find_instance_by_id(inst_id.strip())

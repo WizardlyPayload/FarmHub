@@ -254,6 +254,59 @@ export function lookupFieldConsultantInsight(map, field) {
   return null;
 }
 
+function _parseInsightPriorityNum(p) {
+  const raw = p && typeof p === "object" && p !== null && "value" in p ? (p).value : p;
+  const t = String(raw ?? "").toLowerCase();
+  if (t === "high") return 3;
+  if (t === "low") return 1;
+  return 2;
+}
+
+/** Rough urgency for tie-break (matches field card signals only; no FS rules import). */
+function _fieldUrgencyTieBreak(field) {
+  if (!field) return 0;
+  let s = 0;
+  const fruit = String(field.fruitType ?? "").toUpperCase();
+  if (field.isWithered && fruit !== "GRASS") s += 100;
+  if (field.harvestReady) s += 80;
+  if (field.needsWork || field.needsRolling) s += 40;
+  const w = Number(field.weedLevel ?? 0);
+  if (w >= 0.5) s += 15;
+  if (field.needsPlowing || field.needsLime || field.needsCultivation) s += 10;
+  return s;
+}
+
+/**
+ * Pick the single highest-priority field insight for the Smart suggestions panel (no extra LLM call).
+ * Uses the same per-field map as the field cards (`__fieldConsultantByRef`).
+ */
+export function pickDoThisFirstFromFieldInsights(fields) {
+  const map =
+    typeof window !== "undefined" && window.__fieldConsultantByRef
+      ? window.__fieldConsultantByRef
+      : null;
+  if (!map || !Array.isArray(fields) || fields.length === 0) return null;
+  const candidates = [];
+  for (const field of fields) {
+    const ins = lookupFieldConsultantInsight(map, field);
+    if (!ins || !String(ins.message ?? "").trim()) continue;
+    candidates.push({ field, ins });
+  }
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => {
+    const pa = _parseInsightPriorityNum(a.ins.priority);
+    const pb = _parseInsightPriorityNum(b.ins.priority);
+    if (pb !== pa) return pb - pa;
+    const ua = _fieldUrgencyTieBreak(a.field);
+    const ub = _fieldUrgencyTieBreak(b.field);
+    if (ub !== ua) return ub - ua;
+    const ida = Number(a.field.farmlandId ?? a.field.id ?? 0);
+    const idb = Number(b.field.farmlandId ?? b.field.id ?? 0);
+    return ida - idb;
+  });
+  return candidates[0];
+}
+
 export async function refreshFieldConsultantCache({ force = false } = {}) {
   const now = Date.now();
 
@@ -544,6 +597,10 @@ export async function fetchConsultantInsightSingleField(fieldRef) {
   }
   const list = (data && data.insights) || [];
   return { ok: true, insights: list, llm_used: !!data.llm_used };
+}
+
+if (typeof window !== "undefined") {
+  window.pickDoThisFirstFromFieldInsights = pickDoThisFirstFromFieldInsights;
 }
 
 /* Prefetch field AI map after load (does not wait for Fields tab). Throttle still applies after first success. */

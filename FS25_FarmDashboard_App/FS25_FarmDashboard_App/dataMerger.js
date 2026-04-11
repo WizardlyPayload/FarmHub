@@ -326,10 +326,21 @@ function mergeFields(xmlFields, luaFields) {
         const luaPct   = luaField.growthStatePercentage;
         const mergedFruitType = mergeFieldFruitType(luaField, xmlField);
 
+        const windBale = {
+            windrowLiters: Number(luaField.windrowLiters ?? 0),
+            windrowArea: Number(luaField.windrowArea ?? 0),
+            hasWindrow: !!(luaField.hasWindrow || (Number(luaField.windrowLiters) > 0)),
+            windrowSamples: Array.isArray(luaField.windrowSamples) ? luaField.windrowSamples : [],
+            baleCountOnField: Number(luaField.baleCountOnField ?? 0),
+        };
+
         return {
             ...xmlField,    // XML base: soil state, ownership, crop, growthState
             ...spatialData, // Lua: map position and area
             ...pfOverlay,   // Lua: Precision Farming nitrogen/pH
+            ...windBale,    // Lua: windrow + bale counts for post-harvest rules
+            /** Savegame/XML crop id (stable hint when Lua fruit is empty after harvest). */
+            xmlFruitTypeHint: xmlField.fruitType || '',
             // Lua is authoritative: XML uses coarse heuristics (e.g. plowLevel < 1 on growing crops).
             needsWork   : luaField.needsWork ?? xmlField.needsWork ?? false,
             needsRolling: luaField.needsRolling === true,

@@ -37,6 +37,7 @@ flowchart LR
 | Path | Role |
 |------|------|
 | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/` | Electron shell, `main.js`, `package.json`, preload, **web UI** under `web/` |
+| `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/` | In-game Lua: `FieldDataCollector.lua` (fields + windrow/bale hints for JSON) |
 | `FS25_FarmDashboard_App/.../web/assests/js/` | Dashboard JS (note historic typo **assests**) |
 | `FS25_FarmDashboard_App/.../web/index.html` | Main SPA shell: landing, navbar, **Smart suggestions** row, section containers |
 | `AI_Farm_Manager/backend/` | FastAPI app (`app/main.py`, `app/routers/`, `app/services/`) |
@@ -67,6 +68,7 @@ Supporting / integration:
 | `ai-farm-bot-panel.js` | Robot panel: AI server URL, integration key, BYOK, instance enablement. |
 | `dash-ai-debug.js` | Debug logging hooks. |
 | `modules/fields.js` | Fields section UI; **5s** refresh for `/api/fields`; renders per-field AI lines via bridge. |
+| `rules-engine.js` | **Layer 1** local suggestions (`getLocalFieldSuggestion`) — swath/bale priority pipeline; used by `fields.js`. |
 
 **Script load order (see `index.html`):** pipeline helpers → realtime → **ai-farm-bot-panel** → **`app.js` (module)** → **deferred** `ai-farm-consultant-insights.js` so `window.pickDoThisFirstFromFieldInsights` exists after the bridge module loads.
 
@@ -76,7 +78,15 @@ Supporting / integration:
 - Fields, vehicles, pastures, livestock, productions, economy → matching `view`.
 - Fields tab panel uses **client-side ranking** from `__fieldConsultantByRef` (no duplicate `GET` for that tab).
 
-### 3.4 Performance characteristics (UI)
+### 3.4 Layer 1 rules (`rules-engine.js`) — offline field heuristics
+
+- **`getLocalFieldSuggestion(field)`** — single “Suggested next step” string for the Fields UI when the AI layer is unavailable. Evaluates in **fixed priority order** (see file header): withered → **harvest** → **swath/windrow** (cereal straw vs grass copy) → **bale removal** (strict integer `baleCountOnField` / `baleCount` / `bales.length`, no thresholding) → PF soil scan → mulched stubble → lime → post-harvest / fallow tillage → seed → roll → weed → fertiliser → generic `needsWork`.
+- **Windrow / swath:** `aggregateWindrowDetected(field)` treats any of `hasWindrow`, `windrowLiters` / `windrowArea` &gt; 0, or positive entries in `windrowSamples` / `windrowPerStrip` as whole-field evidence (not a single-point check).
+- **Bales on field:** **`getBaleCountStrict`**; optional **`countBalesIntersectingFieldPolygon(field, balesWorld)`** if the payload exposes world bales plus a `polygon` / `boundary` on the field.
+- **Cereal straw copy** uses **`xmlFruitTypeHint`** (from merged `fields.xml` fruit) when the live Lua fruit is empty after harvest so wheat/barley/oat straw is still recognised.
+- **Lua mod** (`FS25_FarmDashboard_Mod/.../FieldDataCollector.lua`) exports per-field **`windrowLiters`**, **`windrowArea`**, **`windrowSamples`**, **`hasWindrow`**, **`baleCountOnField`** (bales counted via `g_farmlandManager` + `g_baleManager` when present). **`dataMerger.js`** merges these from Lua into the field row and adds **`xmlFruitTypeHint`** from XML.
+
+### 3.5 Performance characteristics (UI)
 
 | Area | Default | Tuning / notes |
 |------|---------|----------------|
@@ -219,6 +229,8 @@ End-user BYOK setup: **`AI_Farm_Manager/docs/BYOK_GUIDE.md`**.
 | `FS25_FarmDashboard_App/.../ai-farm-consultant-insights.js` | Smart panel client |
 | `FS25_FarmDashboard_App/.../field-consultant-bridge.js` | Per-field consultant map |
 | `FS25_FarmDashboard_App/.../modules/navigation.js` | Section + insights row visibility |
+| `FS25_FarmDashboard_App/.../rules-engine.js` | Layer 1 local field suggestions (swath / bales / priority order) |
+| `FS25_FarmDashboard_Mod/.../FieldDataCollector.lua` | Live field JSON + windrow/bale exports for rules |
 
 ---
 

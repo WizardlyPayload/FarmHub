@@ -97,7 +97,109 @@ function FieldDataCollector:collect()
         local ok, fs = pcall(function() return _G.FieldState.new() end)
         if ok then probeState = fs end
     end
-    
+
+    --- Bale counts per farmland: walk `g_currentMission.itemSystem.items` (EasyDev-style physical items),
+    --- resolve position with `getWorldTranslation(nodeId)`, map with `g_farmlandManager:getFarmlandAtWorldPosition`.
+    --- g_baleManager is only used as a fallback when the item list is unavailable (avoids relying on it exclusively).
+    local farmlandBaleCounts = {}
+    do
+        local mission = _G.g_currentMission
+        local fm = _G.g_farmlandManager
+        if mission and fm and type(fm.getFarmlandAtWorldPosition) == "function" then
+            local BaleRef = rawget(_G, "Bale")
+            local function isPhysicalBale(it)
+                if not it then return false end
+                if BaleRef and type(it.isa) == "function" then
+                    local okb, bb = pcall(function() return it:isa(BaleRef) end)
+                    if okb and bb then return true end
+                end
+                local cn = it.className
+                if type(cn) == "string" and string.upper(cn) == "BALE" then return true end
+                return false
+            end
+            local function isHeuristicBale(it)
+                if not it then return false end
+                if isPhysicalBale(it) then return true end
+                if it.isBale == true then return true end
+                if it.baleType ~= nil then return true end
+                return false
+            end
+            local function itemWorldXZ(it)
+                if not it then return nil, nil end
+                local nid = it.nodeId or it.rootNode
+                if nid and type(getWorldTranslation) == "function" then
+                    local ox, oy, oz = getWorldTranslation(nid)
+                    if ox ~= nil and oz ~= nil then return ox, oz end
+                end
+                if type(it.getWorldPosition) == "function" then
+                    local cr = nil
+                    local okp = pcall(function() cr = { it:getWorldPosition() } end)
+                    if okp and type(cr) == "table" and cr[1] ~= nil then
+                        return cr[1], cr[3] or cr[2]
+                    end
+                end
+                if it.position then
+                    local px = it.position.x or it.position[1]
+                    local pz = it.position.z or it.position[3]
+                    if px ~= nil and pz ~= nil then return px, pz end
+                end
+                return nil, nil
+            end
+            local function incrementFarmlandForBale(it)
+                local x, z = itemWorldXZ(it)
+                if x == nil or z == nil then return end
+                local okF, fmo = pcall(function() return fm:getFarmlandAtWorldPosition(x, z) end)
+                if not okF or fmo == nil then return end
+                local fid = nil
+                if type(fmo) == "number" then
+                    fid = fmo
+                elseif type(fmo) == "table" then
+                    fid = fmo.id or fmo.farmlandId
+                end
+                fid = tonumber(fid)
+                if fid ~= nil and fid > 0 then
+                    farmlandBaleCounts[fid] = (farmlandBaleCounts[fid] or 0) + 1
+                end
+            end
+            local itemSys = mission.itemSystem
+            local items = nil
+            if itemSys and type(itemSys.items) == "table" then
+                items = itemSys.items
+            elseif itemSys and type(itemSys.getItems) == "function" then
+                local okL, r = pcall(function() return itemSys:getItems() end)
+                if okL and type(r) == "table" then items = r end
+            end
+            if type(items) == "table" then
+                for _, it in pairs(items) do
+                    if isPhysicalBale(it) then
+                        incrementFarmlandForBale(it)
+                    end
+                end
+            else
+                local bm = rawget(_G, "g_baleManager")
+                local list = nil
+                if bm then
+                    if type(bm.getBales) == "function" then
+                        local okL, r = pcall(function() return bm:getBales() end)
+                        if okL and r ~= nil then list = r end
+                    elseif type(bm.getItems) == "function" then
+                        local okL, r = pcall(function() return bm:getItems() end)
+                        if okL and r ~= nil then list = r end
+                    elseif type(bm.bales) == "table" then
+                        list = bm.bales
+                    end
+                end
+                if type(list) == "table" then
+                    for _, b in pairs(list) do
+                        if isHeuristicBale(b) then
+                            incrementFarmlandForBale(b)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
     for fieldId, field in pairs(_G.g_fieldManager.fields) do
         
         local ownerFarmId = field.farmland and field.farmland.farmId or 0
@@ -866,6 +968,101 @@ function FieldDataCollector:collect()
             else
                 fData.fruitType = "empty"
             end
+        end
+
+        -- ====================================================================
+        -- Windrow / swath + bales (whole-field — rules-engine.js Layer 1 heuristics)
+        -- Loose swaths are DensityMapHeightTypes, not FieldState properties.
+        -- Uses DensityMapHeightUtil.getFillLevelAtArea(fillTypeIndex, sx,sz, wx,wz, hx,hz)
+        -- with g_fillTypeManager indices for STRAW, GRASS_WINDROW, DRYGRASS_WINDROW.
+        -- ====================================================================
+        fData.windrowLiters = 0
+        fData.windrowArea = 0
+        fData.windrowSamples = {}
+        fData.hasWindrow = false
+        fData.baleCountOnField = 0
+
+        local myFid = field.farmland and field.farmland.id or nil
+        local function onThisField(sx, sz)
+            if not myFid or not _G.g_farmlandManager or not _G.g_farmlandManager.getFarmlandAtWorldPosition then
+                return true
+            end
+            local ok, fm = pcall(function()
+                return _G.g_farmlandManager:getFarmlandAtWorldPosition(sx, sz)
+            end)
+            if not ok or not fm then return false end
+            local fid = fm.id or fm
+            return tonumber(fid) == tonumber(myFid)
+        end
+
+        --- Axis-aligned rectangle as three corners (parallelogram API): s, s+w, s+h
+        local function fillLevelSumAtRect(dmhu, fillTypeIndex, cx, cz, half)
+            if not dmhu or not fillTypeIndex or fillTypeIndex <= 0 then return 0 end
+            local sx, sz = cx - half, cz - half
+            local wx, wz = cx + half, cz - half
+            local hx, hz = cx - half, cz + half
+            local ok, v = pcall(function()
+                return dmhu.getFillLevelAtArea(fillTypeIndex, sx, sz, wx, wz, hx, hz)
+            end)
+            if ok and v ~= nil and type(v) == "number" and v == v then
+                return math.max(0, v)
+            end
+            return 0
+        end
+
+        local dmhu = rawget(_G, "DensityMapHeightUtil")
+        if dmhu and type(dmhu.getFillLevelAtArea) == "function" then
+            local ftm = _G.g_fillTypeManager
+            local windFillNames = { "STRAW", "GRASS_WINDROW", "DRYGRASS_WINDROW" }
+            local windFillIndices = {}
+            if ftm and type(ftm.getFillTypeIndexByName) == "function" then
+                for _, nm in ipairs(windFillNames) do
+                    local okIdx, idx = pcall(function()
+                        return ftm:getFillTypeIndexByName(nm)
+                    end)
+                    if okIdx and idx ~= nil and type(idx) == "number" and idx > 0 then
+                        table.insert(windFillIndices, idx)
+                    end
+                end
+            end
+
+            --- Sparse samples (~18 m apart) so rectangle overlaps are limited; half-edge in meters.
+            local halfM = 6.0
+            local windProbeOffsets = {
+                {0, 0}, {18, 0}, {-18, 0}, {0, 18}, {0, -18},
+                {18, 18}, {-18, -18}, {18, -18}, {-18, 18},
+            }
+            local totalVol = 0
+            for _, off in ipairs(windProbeOffsets) do
+                local sx, sz = cx + off[1], cz + off[2]
+                if onThisField(sx, sz) then
+                    local cellSum = 0
+                    for _, fti in ipairs(windFillIndices) do
+                        cellSum = cellSum + fillLevelSumAtRect(dmhu, fti, sx, sz, halfM)
+                    end
+                    totalVol = totalVol + cellSum
+                    table.insert(fData.windrowSamples, cellSum)
+                end
+            end
+            fData.windrowLiters = totalVol
+            local nS = #(fData.windrowSamples)
+            if totalVol > 0 and fData.fieldAreaInSqm and fData.fieldAreaInSqm > 0 and nS > 0 then
+                local tileSq = (2 * halfM) * (2 * halfM)
+                fData.windrowArea = math.min(fData.fieldAreaInSqm, nS * tileSq)
+            else
+                fData.windrowArea = 0
+            end
+            fData.hasWindrow = (totalVol > 0)
+        else
+            fData.windrowLiters = 0
+            fData.windrowArea = 0
+            fData.hasWindrow = false
+        end
+
+        if displayId and displayId > 0 then
+            fData.baleCountOnField = farmlandBaleCounts[displayId] or 0
+        else
+            fData.baleCountOnField = 0
         end
 
         table.insert(fieldData, fData)

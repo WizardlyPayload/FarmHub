@@ -1,6 +1,6 @@
 # Farm Dashboard — Changelog
 
-All notable changes to this project are recorded here, from the first public release through **2.0.0**. For GitHub release blurbs, see [RELEASE_NOTES.md](../RELEASE_NOTES.md). For **network exposure and trust assumptions**, see [SECURITY.md](./SECURITY.md).
+All notable changes to this project are recorded here. For GitHub release blurbs, see [RELEASE_NOTES.md](../RELEASE_NOTES.md). For **network exposure and trust assumptions**, see [SECURITY.md](./SECURITY.md).
 
 ---
 
@@ -8,7 +8,7 @@ All notable changes to this project are recorded here, from the first public rel
 
 | Artifact | Where it lives | Format |
 |----------|----------------|--------|
-| **Desktop app** | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | Semver (e.g. `2.0.0`) |
+| **Desktop app** | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | Semver (e.g. `3.0.0`) |
 | **FS25 mod** | `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `2.0.0.0`) |
 | **Source headers** | First line of many `.js` / `.lua` files | `v2.0.0` (aligned with the release above) |
 
@@ -26,10 +26,30 @@ All notable changes to this project are recorded here, from the first public rel
 
 ---
 
+## 3.0.0 — Unified settings UX, modal fixes, docs (app)
+
+**App:** `3.0.0` · **Mod:** unchanged unless you bump `modDesc.xml` separately.
+
+### Dashboard (web / Electron)
+
+- **Single Settings entry** — Removed the extra navbar **folder / Servers** icon; all server & save management is under **Settings (gear) → Servers & saves**. Programmatic API: `dashboard.openUnifiedSettingsModal('servers')` (see `dashboard-settings.js`).
+- **Connection/API error panel** — “Back to Home” on the API error card opens **Settings → Servers & saves** instead of only the legacy full-screen setup window.
+- **Notification History modal** — Fixed global CSS that set `.modal-backdrop` above `.modal`, which blocked all clicks until refresh (`web/assests/css/styles.css`).
+- **Smart suggestions** — Optional **collapse** (chevron) to reach landing category cards faster; state in `localStorage`. Neutral copy when optional AI is offline; **Screen Wake Lock** script for tablet browsers.
+- **Top bar** — Unified nav title + farm dropdown overflow fix (tablet); combined **XML + Live + API** status badge.
+- **Performance** — Consultant success `console.log` only when `window.DASH_DEBUG`; skeleton pulse limited to placeholder bars.
+
+### Documentation
+
+- Root **README**, **INSTALL**, **RELEASE_NOTES**, **DEVELOPER_HANDOVER**, and app **README** updated for **v3.0.0** install and settings flow.
+
+---
+
 ## Release overview
 
 | Version | Focus |
 |---------|--------|
+| **3.0.0** | Unified Settings UX, modal/backdrop fix, Smart suggestions UX, tablet/nav polish, documentation refresh. |
 | **1.0.0** | First public release: mod + Electron app, local/FTP, XML + Lua merge, full dashboard sections. |
 | **1.1.2** | Mod shop image export pipeline, vehicle thumbnails from extracted PNGs, installer resources. |
 | **2.0.0** | Field accuracy and merge rules, single-player authority, multi-farm UI, data pipeline robustness, packaging, docs, repo hygiene, security/network documentation. |

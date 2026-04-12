@@ -2,7 +2,7 @@
 
 | Document | Description |
 |----------|-------------|
-| [CHANGELOG.md](./CHANGELOG.md) | **Full version history** from 1.0.0 through the current release. Sections **G** (mod stagger & `config.xml`), **H** (FTP polling & setup), **I** (farm switcher) under **2.0.0** explain timing and multi-farm behaviour. |
+| [CHANGELOG.md](./CHANGELOG.md) | **Full version history** — includes **3.0.0** (unified Settings UX, modal fixes) and **2.0.0** sections **G/H/I** (mod stagger, FTP polling, farm switcher). |
 | [SECURITY.md](./SECURITY.md) | **LAN / browser access**, `0.0.0.0:8766`, no login, firewall guidance, Electron trust model, `npm audit` notes. |
 | [AI_SERVER_SECURITY.md](./AI_SERVER_SECURITY.md) | **AI Farm Manager (FastAPI):** optional auth for **`GET /`**, minimal **`/health`**, **CORS** + credentials rules, public VPS checklist. |
 | [LLM_GEMINI_ROUTING.md](./LLM_GEMINI_ROUTING.md) | **AI Farm Manager:** Gemini API key **round-robin**, **model rollover** (429/503), BYOK vs multi-key, env vars — for operators and developers. |

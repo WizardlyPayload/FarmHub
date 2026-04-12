@@ -4,7 +4,7 @@ A desktop companion app plus a **Farming Simulator 25** mod that exports live fa
 
 **Public repo:** [github.com/WizardlyPayload/FS25-Farm-Dashboard](https://github.com/WizardlyPayload/FS25-Farm-Dashboard) · [**Releases**](https://github.com/WizardlyPayload/FS25-Farm-Dashboard/releases)
 
-**Current release:** **2.0.0** (app) / **2.0.0.0** (mod) — see [RELEASE_NOTES.md](RELEASE_NOTES.md) for GitHub blurbs and [docs/CHANGELOG.md](docs/CHANGELOG.md) for the full version history.
+**Current release:** **3.0.0** (app) / **2.0.0.0** (mod unless you bump separately) — see [RELEASE_NOTES.md](RELEASE_NOTES.md) for GitHub blurbs and [docs/CHANGELOG.md](docs/CHANGELOG.md) for the full version history.
 
 **Documentation:** [docs/README.md](docs/README.md) (index) · **Simple install:** [INSTALL.md](INSTALL.md) · **Product description + screenshot checklist:** [docs/DESCRIPTION_AND_SCREENSHOTS.md](docs/DESCRIPTION_AND_SCREENSHOTS.md) · **Security & LAN access:** [docs/SECURITY.md](docs/SECURITY.md) · **AI Farm Manager API hardening (VPS):** [docs/AI_SERVER_SECURITY.md](docs/AI_SERVER_SECURITY.md) · **In-game Hank chat (multiplayer only):** [AI_Farm_Manager/docs/IN_GAME_CHAT_BOT.md](AI_Farm_Manager/docs/IN_GAME_CHAT_BOT.md) · **AI Farm Manager — Gemini key/model routing:** [docs/LLM_GEMINI_ROUTING.md](docs/LLM_GEMINI_ROUTING.md) · **Developer handover (full stack):** [DEVELOPER_HANDOVER.md](DEVELOPER_HANDOVER.md) · **Release blurbs + doc map:** [RELEASE_NOTES.md](RELEASE_NOTES.md) · **Authors:** [AUTHORS.md](AUTHORS.md)
 
@@ -30,7 +30,7 @@ Do this in order the first time:
 1. **Install the FS25 mod** (see below).
 2. **Start FS25**, enable the mod on your save (or server), and **load the save at least once** so the mod can create its config/output folders and start writing data.
 3. **Install the Farm Dashboard desktop app** (the `.exe` from this repository’s **Releases** page, or from your own build).
-4. Open the app and complete **Setup** (local paths and/or FTP for hosted servers).
+4. Open the app and complete **Setup** (local paths and/or FTP for hosted servers), or use **Settings (gear) → Servers & saves** anytime after install.
 
 The app expects the mod to be in place and the game to have run with it enabled; installing the desktop app first can make first-time setup confusing if folders or `data.json` do not exist yet.
 

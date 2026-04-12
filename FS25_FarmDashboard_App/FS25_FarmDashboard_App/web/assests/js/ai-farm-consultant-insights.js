@@ -688,7 +688,9 @@
           }
           pl('renderer_ok', 'consultant/insights parsed', { count: list.length, llm_used: llm });
           try {
-            console.log('[AI Farm] Insights loaded. llm_used=' + llm + ', count=' + list.length);
+            if (typeof window !== 'undefined' && window.DASH_DEBUG) {
+              console.log('[AI Farm] Insights loaded. llm_used=' + llm + ', count=' + list.length);
+            }
           } catch (e1) {}
         })
         .catch(function (err) {

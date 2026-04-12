@@ -2,6 +2,7 @@
 // Dashboard Settings modal: visible main-menu sections + edit FS25 mod config.xml locally.
 
 import { t } from "../i18n/i18n.js";
+import { isFarmDashLocalConfigHost } from "./viewer-mode.js";
 
 const SECTION_KEYS = [
   "livestock",
@@ -517,5 +518,44 @@ export async function saveDashboardSettingsFromModal() {
     }
   } catch (e) {
     this.showAlert?.(t("settings.saveFailed") + " (mod config)", "error");
+  }
+}
+
+const UNIFIED_SETTINGS_TAB_IDS = {
+  dashboard: "app-settings-tab-dashboard",
+  servers: "app-settings-tab-servers",
+  ai: "app-settings-tab-ai",
+  mod: "app-settings-tab-mod",
+  theme: "app-settings-tab-theme",
+};
+
+/**
+ * Open the unified Settings modal and optionally activate a sidebar tab (servers, AI, etc.).
+ * Replaces the old separate navbar “folder” shortcut — all configuration lives here.
+ * @param {"dashboard"|"servers"|"ai"|"mod"|"theme"} [tabKey]
+ */
+export function openUnifiedSettingsModal(tabKey) {
+  if (!isFarmDashLocalConfigHost()) {
+    this.showAlert?.(
+      "Server and save setup is only available on the PC running Farm Dashboard.",
+      "info"
+    );
+    return;
+  }
+  const modalEl = document.getElementById("appSettingsModal");
+  if (!modalEl || typeof bootstrap === "undefined") return;
+  const key = tabKey && UNIFIED_SETTINGS_TAB_IDS[tabKey] ? tabKey : "dashboard";
+  const trigger = document.getElementById(UNIFIED_SETTINGS_TAB_IDS[key]);
+  if (trigger) {
+    try {
+      bootstrap.Tab.getOrCreateInstance(trigger).show();
+    } catch (e) {
+      /* ignore */
+    }
+  }
+  try {
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+  } catch (e) {
+    /* ignore */
   }
 }

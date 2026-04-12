@@ -198,7 +198,7 @@ function parseFieldsXml(xml, farmlandOwnership, scannedFarmlands, farmlandStats)
         // Resolve ownership via farmland.xml join
         const ownerFarmId = farmlandOwnership ? (farmlandOwnership.get(id) || 0) : 0;
 
-        // Check if this farmland has been soil-sampled (Precision Farming)
+        // Check if this farmland has been soil-sampled (savegame precisionFarming.xml)
         const isScanned   = scannedFarmlands ? scannedFarmlands.has(id) : false;
         const pfStats     = farmlandStats ? (farmlandStats[id] || null) : null;
 
@@ -245,12 +245,12 @@ function parseFieldsXml(xml, farmlandOwnership, scannedFarmlands, farmlandStats)
             isHarvested,
             isWithered, needsWork,
             suggestions,
-            // Precision farming placeholders (filled if PF data available)
+            // Soil-map placeholders (filled when savegame / live data includes them)
             isPrecisionFarming: false,
             nitrogenLevel: 0, targetNitrogen: 0,
             phValue: 0, targetPh: 0, isScanned: false,
             nitrogenText: `${sprayLevel}/2`, limeText: limeLevel >= 1 ? 'OK' : 'Needed',
-            // PF soil scan status from precisionFarming.xml
+            // Soil scan status from precisionFarming.xml (savegame file name)
             isScanned, pfStats,
         });
     }

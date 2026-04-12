@@ -1,7 +1,7 @@
 // FS25 FarmDashboard | dashboard-settings.js | v2.0.0
 // Dashboard Settings modal: visible main-menu sections + edit FS25 mod config.xml locally.
 
-import { t } from "../i18n/i18n.js";
+import { t, applyDom } from "../i18n/i18n.js";
 import { isFarmDashLocalConfigHost } from "./viewer-mode.js";
 
 const SECTION_KEYS = [
@@ -203,6 +203,68 @@ function syncAppSettingsFooterButtons() {
   if (saveDash) saveDash.classList.toggle("d-none", onTheme);
 }
 
+function renderDesktopAppUpdateStatus(payload) {
+  const el = document.getElementById("settings-desktop-update-status");
+  if (!el || !payload) return;
+  const st = payload.status;
+  if (st === "uptodate") {
+    el.textContent = t("settings.updateStatusUptodate");
+    el.className = "small text-success mb-0";
+    return;
+  }
+  if (st === "available") {
+    const v = payload.version ? String(payload.version) : "";
+    el.textContent = v ? `${t("settings.updateStatusAvailable")} ${v}` : t("settings.updateStatusAvailable");
+    el.className = "small text-info mb-0";
+    return;
+  }
+  if (st === "downloading") {
+    const pct = typeof payload.percent === "number" ? payload.percent : 0;
+    el.textContent = `${t("settings.updateStatusDownloading")} ${pct}%`;
+    el.className = "small text-warning mb-0";
+    return;
+  }
+  if (st === "error") {
+    const msg = payload.message ? String(payload.message) : "";
+    el.textContent = msg ? `${t("settings.updateStatusError")} ${msg}` : t("settings.updateStatusError");
+    el.className = "small text-danger mb-0";
+    return;
+  }
+}
+
+function wireDesktopAppUpdaterOnce() {
+  if (window.__farmdashDesktopUpdaterWired) return;
+  window.__farmdashDesktopUpdaterWired = true;
+  try {
+    const { ipcRenderer } = require("electron");
+    ipcRenderer.on("app-update-status", (_e, payload) => {
+      renderDesktopAppUpdateStatus(payload);
+    });
+    document.getElementById("settings-desktop-check-updates-btn")?.addEventListener("click", async () => {
+      const statusEl = document.getElementById("settings-desktop-update-status");
+      if (statusEl) {
+        statusEl.textContent = t("settings.updateStatusChecking");
+        statusEl.className = "small text-muted mb-0";
+      }
+      try {
+        const r = await ipcRenderer.invoke("check-desktop-app-updates");
+        if (r && r.ok === false && (r.reason === "development" || r.reason === "no_updater") && statusEl) {
+          statusEl.textContent =
+            r.reason === "no_updater" ? t("settings.updateStatusError") : t("settings.updateStatusDev");
+          statusEl.className = "small text-muted mb-0";
+        }
+      } catch (e) {
+        if (statusEl) {
+          statusEl.textContent = `${t("settings.updateStatusError")} ${String(e?.message || e)}`;
+          statusEl.className = "small text-danger mb-0";
+        }
+      }
+    });
+  } catch (_) {
+    /* browser / no electron */
+  }
+}
+
 function wireAppSettingsServerControlsOnce(dashboard) {
   if (window.__farmdashAppSettingsServersWired) return;
   window.__farmdashAppSettingsServersWired = true;
@@ -281,6 +343,7 @@ export function setupDashboardSettingsModal() {
   const modalEl = document.getElementById("appSettingsModal");
   if (!modalEl) return;
 
+  wireDesktopAppUpdaterOnce();
   wireAppSettingsServerControlsOnce(this);
 
   modalEl.addEventListener("show.bs.modal", () => {
@@ -326,6 +389,23 @@ export async function populateDashboardSettingsForm() {
   const { ipcRenderer } = require("electron");
 
   await this.loadDashboardUiPreferences();
+
+  const dashPane = document.getElementById("app-settings-pane-dashboard");
+  if (dashPane) applyDom(dashPane);
+
+  try {
+    const ver = await ipcRenderer.invoke("get-desktop-app-version");
+    const vEl = document.getElementById("settings-desktop-app-version");
+    if (vEl) vEl.textContent = ver && String(ver).trim() ? String(ver) : "—";
+  } catch (_) {
+    const vEl = document.getElementById("settings-desktop-app-version");
+    if (vEl) vEl.textContent = "—";
+  }
+  const statusEl = document.getElementById("settings-desktop-update-status");
+  if (statusEl) {
+    statusEl.textContent = "";
+    statusEl.className = "small text-muted mb-0";
+  }
 
   SECTION_KEYS.forEach((key) => {
     const el = document.getElementById(`settings-section-${key}`);

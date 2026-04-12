@@ -66,7 +66,7 @@ Initial shipping version documented in [RELEASE_NOTES.md](../RELEASE_NOTES.md).
 
 - **FS25 mod** — Background collector writing `data.json` under the user profile (`modSettings/FS25_FarmDashboard/…`), configurable update interval (default 10s).
 - **Desktop app (Electron)** — HTTP + WebSocket on port **8766**, reads local files or **FTP**, merges **live Lua JSON** with **savegame XML** (`xmlCollector.js` + `dataMerger.js`).
-- **Dashboard (web)** — Livestock, vehicles, fields (including Precision Farming–style overlays when the mod exports them), economy, pastures, productions, weather, notifications, theming.
+- **Dashboard (web)** — Livestock, vehicles, fields (including variable-rate soil overlays when exported), economy, pastures, productions, weather, notifications, theming.
 
 ### Install expectations
 

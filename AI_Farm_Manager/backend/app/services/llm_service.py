@@ -17,6 +17,7 @@ from app.config import active_gemini_api_key, get_settings, has_gemini_credentia
 from app.services.gemini_http_client import get_gemini_async_client
 from app.services.game_reference import build_game_reference_block
 from app.services.gemini_budget import wait_gemini_budget_or_skip
+from app.services.gemini_models_catalog import preferred_models_intersect_catalog
 from app.services.log_buffer import log_event
 
 # Retry: model degradation on same key (429/503), then next API key in round-robin order.
@@ -58,6 +59,34 @@ def _gemini_model_pool(settings: dict[str, Any]) -> list[str] | None:
 def _gemini_single_config_model(settings: dict[str, Any]) -> str:
     """When ``GEMINI_MODEL_ROLLOVER`` is off — single explicit ``GEMINI_MODEL`` only (no cycling)."""
     return (settings.get("gemini_model") or "gemini-2.5-flash").strip()
+
+
+def _gemini_rollover_intersect_listmodels_enabled() -> bool:
+    """When true, filter the rollover stack per API key using cached Google ListModels (see env)."""
+    v = (os.getenv("GEMINI_ROLLOVER_INTERSECT_LISTMODELS") or "").strip().lower()
+    return v in ("1", "true", "yes", "on")
+
+
+async def _gemini_models_intersect_for_key(
+    settings: dict[str, Any],
+    api_key: str,
+    base_models: list[str],
+) -> list[str]:
+    """Apply ListModels intersection for rollover; log if any configured models are dropped."""
+    ver = (settings.get("gemini_rest_api_version") or "v1").strip().lower()
+    if ver not in ("v1", "v1beta"):
+        ver = "v1"
+    out = await preferred_models_intersect_catalog(api_key, base_models, api_version=ver)
+    if out != base_models:
+        dropped = [m for m in base_models if m not in out]
+        if dropped:
+            log_event(
+                "INFO",
+                "Gemini rollover: models not in ListModels for this key — skipped",
+                dropped=dropped[:16],
+                remaining=len(out),
+            )
+    return out
 
 
 def _gemini_models_to_try_for_key(settings: dict[str, Any]) -> list[str]:
@@ -339,7 +368,8 @@ async def _gemini_post_with_quota_fallback(
         raise RuntimeError("GEMINI_API_KEY is empty")
     client = get_gemini_async_client()
     n_keys = len(keys)
-    models = _gemini_models_to_try_for_key(settings)
+    use_listmodels = _gemini_rollover_intersect_listmodels_enabled()
+    base_models = _gemini_models_to_try_for_key(settings)
     for i, key in enumerate(keys):
         ok = await wait_gemini_budget_or_skip(key)
         if not ok:
@@ -348,6 +378,11 @@ async def _gemini_post_with_quota_fallback(
                 "Gemini budget: daily request cap for this key — trying next key in pool",
             )
             continue
+        models = (
+            await _gemini_models_intersect_for_key(settings, key, base_models)
+            if use_listmodels
+            else base_models
+        )
         for mi, model_try in enumerate(models):
             url = _gemini_generate_url_for_key(settings, key, model_override=model_try)
             r = await client.post(url, json=payload, timeout=timeout)
@@ -402,7 +437,8 @@ async def gemini_consultant_post_with_quota_fallback(
         raise RuntimeError("GEMINI_API_KEY is empty")
     client = get_gemini_async_client()
     n_keys = len(keys)
-    models = _gemini_models_to_try_for_key(settings)
+    use_listmodels = _gemini_rollover_intersect_listmodels_enabled()
+    base_models = _gemini_models_to_try_for_key(settings)
 
     for i, key in enumerate(keys):
         ok = await wait_gemini_budget_or_skip(key)
@@ -412,6 +448,11 @@ async def gemini_consultant_post_with_quota_fallback(
                 "Gemini budget: daily request cap for this key — trying next key in pool",
             )
             continue
+        models = (
+            await _gemini_models_intersect_for_key(settings, key, base_models)
+            if use_listmodels
+            else base_models
+        )
         for mi, model_try in enumerate(models):
             url = _gemini_generate_url_for_key(settings, key, model_override=model_try)
             effective_payload: dict[str, Any] = dict(payload)
@@ -621,13 +662,19 @@ async def test_llm_connectivity(
                     "maxOutputTokens": max(gemini_max_out, 256),
                 },
             }
-            models_try = _gemini_models_to_try_for_key(settings)
+            use_listmodels = _gemini_rollover_intersect_listmodels_enabled()
+            base_models_try = _gemini_models_to_try_for_key(settings)
             r: httpx.Response | None = None
             last_model_try: str | None = None
             client = get_gemini_async_client()
             n_keys = len(keys)
             probe_ok = False
             for ki, key in enumerate(keys):
+                models_try = (
+                    await _gemini_models_intersect_for_key(settings, key, base_models_try)
+                    if use_listmodels
+                    else base_models_try
+                )
                 for mi, model_try in enumerate(models_try):
                     last_model_try = model_try
                     url = _gemini_generate_url_for_key(settings, key, model_override=model_try)

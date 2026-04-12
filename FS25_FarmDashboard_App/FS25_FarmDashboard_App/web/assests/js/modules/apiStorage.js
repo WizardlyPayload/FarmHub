@@ -16,6 +16,23 @@ function ensureArray(val) {
   return [];
 }
 
+/** Husbandry buildings list at `data.animals` — same coercion as merged API / Lua. */
+function ensureHusbandryArray(val) {
+  return ensureArray(val);
+}
+
+/**
+ * Animals nested under one building — must match realtime-connector `updateAnimalsData`
+ * (vanilla `animals`, RealisticLivestock `livestock`, legacy `animalList`).
+ */
+function getAnimalListFromBuilding(building) {
+  if (!building || typeof building !== "object") return [];
+  if (building.animals && Array.isArray(building.animals)) return building.animals;
+  if (building.livestock && Array.isArray(building.livestock)) return building.livestock;
+  if (building.animalList && Array.isArray(building.animalList)) return building.animalList;
+  return [];
+}
+
 const originalFetch = window.fetch;
 window.fetch = async function() {
     let [resource, config] = arguments;
@@ -283,7 +300,7 @@ export async function tryLoadApiData() {
       this.luaAvailable  = data.luaAvailable  || false;
       this.money         = data.money         || 0;
       this.gameSettings  = data.gameSettings  || {};
-      this.husbandryData = Array.isArray(data.animals) ? data.animals : [];
+      this.husbandryData = ensureHusbandryArray(data.animals);
 
       this.farms = ensureArray(data.farmInfo);
       this.playerFarms = this.farms;
@@ -302,16 +319,19 @@ export async function tryLoadApiData() {
       this.allFields = data.fields || [];
       this.fields = filterFieldsForFarmView(this.allFields, this.activeFarmId ?? 1);
 
-      if (data.animals && Array.isArray(data.animals) && data.animals.length > 0) {
+      const husbandryBuildings = ensureHusbandryArray(data.animals);
+      if (husbandryBuildings.length > 0) {
         const allAnimals = [];
-        data.animals.forEach((building) => {
-          if (!building.animals || !Array.isArray(building.animals)) return;
+        husbandryBuildings.forEach((building) => {
+          const inner = getAnimalListFromBuilding(building);
+          if (!inner.length) return;
           const ownerFarmId = building.ownerFarmId ?? building.farmId;
           const hid = building.id ?? building.buildingId;
           const hname = building.name;
-          building.animals.forEach((animal) => {
+          inner.forEach((animal) => {
             allAnimals.push({
               ...animal,
+              subType: animal.subType || animal.type || animal.animalType,
               ownerFarmId: animal.ownerFarmId ?? ownerFarmId,
               farmId: animal.farmId ?? ownerFarmId,
               husbandryId: animal.husbandryId ?? hid,

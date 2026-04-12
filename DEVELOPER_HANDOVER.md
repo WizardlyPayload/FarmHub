@@ -97,11 +97,11 @@ Supporting / integration:
 
 ### 3.4 Layer 1 rules (`rules-engine.js`) — offline field heuristics
 
-- **`getLocalFieldSuggestion(field)`** — single “Suggested next step” string for the Fields UI when the AI layer is unavailable. Evaluates in **fixed priority order** (see file header): withered → **harvest** → **swath/windrow** (cereal straw vs grass copy) → **bale removal** (strict integer `baleCountOnField` / `baleCount` / `bales.length`, no thresholding) → PF soil scan → mulched stubble → lime → post-harvest / fallow tillage → seed → roll → weed → fertiliser → generic `needsWork`.
-- **Windrow / swath:** `aggregateWindrowDetected(field)` treats any of `hasWindrow`, `windrowLiters` / `windrowArea` &gt; 0, or positive entries in `windrowSamples` / `windrowPerStrip` as whole-field evidence (not a single-point check).
+- **`getLocalFieldSuggestion(field)`** — single “Suggested next step” string for the Fields UI when the AI layer is unavailable. Evaluates in **fixed priority order** (see file header): withered → **harvest** → **loose swath/windrow** (including **`needsBaling`** / **`baleableLooseLiters`**) → **physical bale removal** (strict integer `baleCountOnField` / `baleCount` / `bales.length`, no thresholding) → **soil scan** when variable-rate maps apply but the field is not scanned → mulched stubble → lime → post-harvest / fallow tillage → seed → roll → weed → fertiliser → generic `needsWork`. Matches **FIELD MAP MODE** ordering in `consultant.py`.
+- **Windrow / swath:** `aggregateWindrowDetected(field)` is true if **`aggregateBaleableLoose(field)`** is true (`needsBaling` or `baleableLooseLiters`), or if `hasWindrow`, `windrowLiters` / `windrowArea` &gt; 0, `windrowByFillName` volumes, or positive `windrowSamples` / `windrowPerStrip` — whole-field evidence from exported field JSON.
 - **Bales on field:** **`getBaleCountStrict`**; optional **`countBalesIntersectingFieldPolygon(field, balesWorld)`** if the payload exposes world bales plus a `polygon` / `boundary` on the field.
 - **Cereal straw copy** uses **`xmlFruitTypeHint`** (from merged `fields.xml` fruit) when the live Lua fruit is empty after harvest so wheat/barley/oat straw is still recognised.
-- **Lua mod** (`FS25_FarmDashboard_Mod/.../FieldDataCollector.lua`) exports per-field **`windrowLiters`**, **`windrowArea`**, **`windrowSamples`**, **`hasWindrow`**, **`baleCountOnField`** (bales counted via `g_farmlandManager` + `g_baleManager` when present). **`dataMerger.js`** merges these from Lua into the field row and adds **`xmlFruitTypeHint`** from XML.
+- **Lua mod** (`FS25_FarmDashboard_Mod/.../FieldDataCollector.lua`) exports per-field **`windrowLiters`**, **`windrowArea`**, **`windrowSamples`**, **`hasWindrow`**, **`needsBaling`**, **`baleableLooseLiters`**, **`baleCountOnField`**. **`dataMerger.js`** merges these from Lua into the field row and adds **`xmlFruitTypeHint`** from XML.
 
 ### 3.5 Performance characteristics (UI)
 

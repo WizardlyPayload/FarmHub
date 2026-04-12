@@ -18,6 +18,7 @@ const Store     = require('electron-store');
 
 const { collectXmlData, SAVEGAME_XML_FILES } = require('./xmlCollector');
 const { mergeData }      = require('./dataMerger');
+const { initAppUpdater, checkForUpdatesNow } = require('./app-updater');
 
 const store = new Store();
 
@@ -1138,6 +1139,7 @@ app.whenReady().then(() => {
     consumeInstallLocaleFile();
     mergeBrandingIntoAiManagerConnection();
     createWindow();
+    initAppUpdater(() => mainWindow);
     const amc = store.get('aiManagerConnection');
     if (amc && amc.pushSnapshots) ensureAiSnapshotPushInterval();
 });
@@ -1150,6 +1152,10 @@ ipcMain.on('save-settings', (event, newConfig) => {
 });
 
 ipcMain.handle('get-current-config', () => store.get('config'));
+
+ipcMain.handle('get-desktop-app-version', () => app.getVersion());
+
+ipcMain.handle('check-desktop-app-updates', () => checkForUpdatesNow());
 
 /** Write AI Farm Manager mod config XML to local FS25 modSettings (Windows; same PC as game). */
 ipcMain.handle('get-ai-client-branding', () => {

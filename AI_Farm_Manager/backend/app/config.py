@@ -87,6 +87,14 @@ def _strip_key(s: str) -> str:
     return (s or "").strip().replace("\ufeff", "").replace("\u200b", "").replace("\r", "")
 
 
+def _chat_allowed_ip_set() -> frozenset[str] | None:
+    """Comma-separated IPs; None = allow all. Matches FS25 handover optional chat IP hardening."""
+    raw = (os.getenv("CHAT_ALLOWED_IPS") or "").strip()
+    if not raw:
+        return None
+    return frozenset(x.strip() for x in raw.split(",") if x.strip())
+
+
 def _parse_gemini_key_list(llm_provider: str, llm_api_key: str) -> tuple[list[str], int]:
     """
     Ordered unique Gemini keys for rotation and 429 fallback, plus a raw slot count.
@@ -239,4 +247,7 @@ def get_settings() -> dict:
         "enable_subscription_tiers": _b("ENABLE_SUBSCRIPTION_TIERS", False),
         # When X-Bot-Instance-Id is omitted, tier checks use this (0–2). Default 2 preserves today’s behaviour.
         "default_subscription_tier": _clamp_int(os.getenv("DEFAULT_SUBSCRIPTION_TIER", "2"), 0, 2, 2),
+        # In-game chat: optional IP allowlist (dedicated egress → VPS). Empty = allow any.
+        "chat_allowed_ips": _chat_allowed_ip_set(),
+        "chat_trust_x_forwarded_for": _b("CHAT_TRUST_X_FORWARDED_FOR", False),
     }

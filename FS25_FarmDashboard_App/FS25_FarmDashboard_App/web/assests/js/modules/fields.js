@@ -1,6 +1,13 @@
 // FS25 FarmDashboard | fields.js | v2.0.0
 
-import { getLocalFieldSuggestion, RULES_ENGINE_FALLBACK_ACTION } from "../rules-engine.js";
+import {
+    getLocalFieldSuggestion,
+    RULES_ENGINE_FALLBACK_ACTION,
+    getBaleCountStrict,
+    aggregateWindrowDetected,
+    aggregateBaleableLoose,
+    classifyWindrowMaterial,
+} from "../rules-engine.js";
 import {
   refreshFieldConsultantCache,
   scheduleFieldConsultantFetch,
@@ -10,7 +17,7 @@ import {
 /**
  * fields.js  —  FarmDashboard FS25
  * Live field data from the API, auto-refreshes every 5 seconds.
- * Supports standard soil + Precision Farming nitrogen/pH display.
+ * Supports standard soil plus variable-rate nitrogen/pH when the game exports soil maps.
  *
  * The API returns every field (all farms + unowned). The UI filters to the active farm
  * by default (owned-only). Pass { includeUnowned: true } to also list NPC/unowned fields.
@@ -325,8 +332,8 @@ function buildFieldCard(field) {
     const suggestion = buildSuggestion(field);
     const isPF       = field.isPrecisionFarming;
     const pfBadge    = isPF
-        ? `<span class="badge bg-info text-dark ms-1" title="Precision Farming active">
-               <i class="bi bi-cpu me-1"></i>PF
+        ? `<span class="badge bg-info text-dark ms-1" title="Soil mapping active (variable-rate N / pH)">
+               <i class="bi bi-cpu me-1"></i>Soil
            </span>`
         : "";
 
@@ -352,6 +359,7 @@ function buildFieldCard(field) {
                             <strong>${formatCropName(field.fruitType)}</strong>
                         </div>
                     </div>
+                    ${buildForageDetectionBadges(field)}
                     ${progress}
                     <div class="mt-3">${conditions}</div>
                     ${suggestion}
@@ -541,7 +549,7 @@ function buildConditions(field) {
     }
 
     // ── pH / Lime ─────────────────────────────────────────────────────────────
-    // PF: bar range from Lua (soil-type-aware): phLimeBarMin → targetPh (game optimal per soil samples).
+    // Mapped pH: bar range from Lua (soil-type-aware): phLimeBarMin → targetPh (optimal per soil samples).
     let phProgress = 0;
     let phColour   = "#6c757d";
     let phLabel    = field.limeText || (field.needsLime ? "Needed" : "Done");
@@ -619,6 +627,50 @@ function escapeFieldHtml(s) {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
+}
+
+/** Visible tags when the mod detects bales on farmland or loose windrow / swath material. */
+function buildForageDetectionBadges(field) {
+    const baleN = getBaleCountStrict(field);
+    const wind = aggregateWindrowDetected(field);
+    const baleLoose = aggregateBaleableLoose(field);
+    if (baleN <= 0 && !wind && !baleLoose) return "";
+
+    const parts = [];
+    if (baleN > 0) {
+        parts.push(
+            `<span class="badge bg-warning text-dark" title="Bales counted on this farmland (game items)"><i class="bi bi-box-seam me-1"></i>${baleN} bale${baleN === 1 ? "" : "s"}</span>`
+        );
+    }
+    if (baleLoose) {
+        const bl = Number(field.baleableLooseLiters ?? 0);
+        const sub = Number.isFinite(bl) && bl > 0 ? ` ~${Math.round(bl)} L (straw/grass/hay)` : "straw / grass / hay";
+        parts.push(
+            `<span class="badge bg-info text-dark" title="Loose material a baler can pick up (height-map fill types: straw, TEDDER grass/hay, windrows)"><i class="bi bi-circle-square me-1"></i>Bale loose · ${sub}</span>`
+        );
+    }
+    if (wind) {
+        const mat = classifyWindrowMaterial(field);
+        const lit = Number(field.windrowLiters ?? 0);
+        const matHint =
+            mat === "straw"
+                ? "Straw"
+                : mat === "grass"
+                  ? "Grass"
+                  : mat === "hay"
+                    ? "Hay"
+                    : mat === "crop_swath"
+                      ? "Swath"
+                      : "Windrow";
+        const sub =
+            lit > 0
+                ? ` ~${Math.round(lit)} (probe sum)`
+                : "on ground";
+        parts.push(
+            `<span class="badge bg-success" title="Any loose fill on field samples (includes crop swaths)"><i class="bi bi-wind me-1"></i>${matHint} · ${sub}</span>`
+        );
+    }
+    return `<div class="d-flex flex-wrap gap-1 mt-2 mb-1">${parts.join("")}</div>`;
 }
 
 /** Merged weather (XML) exposes currentSeason — WINTER means little/no arable growth in FS. */

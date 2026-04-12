@@ -28,7 +28,7 @@ A **server-side / save-side Lua mod** for Farming Simulator 25. It does **not** 
 |------|------|
 | Animals | Husbandries, clusters, Realistic Livestock–style individuals where available |
 | Vehicles | Fleet state, positions, fill levels, damage, ownership |
-| Fields | Growth, soil, weeds, Precision Farming overlays where applicable |
+| Fields | Growth, soil, weeds, variable-rate soil overlays when exported |
 | Finance | Money and related summary |
 | Weather | Current conditions and forecast-oriented data |
 | Economy | Sell points, market-style price discovery |

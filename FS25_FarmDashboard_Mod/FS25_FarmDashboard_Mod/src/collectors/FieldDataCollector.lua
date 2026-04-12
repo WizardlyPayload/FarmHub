@@ -24,7 +24,7 @@ function FieldDataCollector:collect()
     local GRASS_GROWTH_STAGES = 4
 
     -- ====================================================================
-    -- PRECISION FARMING DETECTION
+    -- VARIABLE-RATE SOIL DATA (N/pH maps when the game exposes them)
     -- ====================================================================
     local isPF = false
     local pfInstance = nil
@@ -98,9 +98,8 @@ function FieldDataCollector:collect()
         if ok then probeState = fs end
     end
 
-    --- Bale counts per farmland: walk `g_currentMission.itemSystem.items` (EasyDev-style physical items),
-    --- resolve position with `getWorldTranslation(nodeId)`, map with `g_farmlandManager:getFarmlandAtWorldPosition`.
-    --- g_baleManager is only used as a fallback when the item list is unavailable (avoids relying on it exclusively).
+    --- Bale counts per farmland: scan **all** known bale sources (item list + bale manager), dedupe by stable key.
+    --- FS25: `itemSystem.items` may exist but be empty — we must still call `g_baleManager` (previous code skipped it).
     local farmlandBaleCounts = {}
     do
         local mission = _G.g_currentMission
@@ -114,22 +113,59 @@ function FieldDataCollector:collect()
                     if okb and bb then return true end
                 end
                 local cn = it.className
-                if type(cn) == "string" and string.upper(cn) == "BALE" then return true end
+                if type(cn) == "string" then
+                    local u = string.upper(cn)
+                    if u == "BALE" or string.find(u, "BALE", 1, true) then return true end
+                end
                 return false
             end
+            --- Prefer cheap ItemSystem flags before isa(Bale) — see FarmHub/docs/FS25 Engine Interaction Modules.txt §Module 1.
             local function isHeuristicBale(it)
                 if not it then return false end
-                if isPhysicalBale(it) then return true end
                 if it.isBale == true then return true end
                 if it.baleType ~= nil then return true end
+                if it.isRoundBale == true or it.isRoundbale == true or it.isSquareBale == true then return true end
+                if isPhysicalBale(it) then return true end
                 return false
             end
+            --- Try several nodes — FS uses rootNode, componentNode, or first component for bales.
             local function itemWorldXZ(it)
                 if not it then return nil, nil end
-                local nid = it.nodeId or it.rootNode
-                if nid and type(getWorldTranslation) == "function" then
-                    local ox, oy, oz = getWorldTranslation(nid)
-                    if ox ~= nil and oz ~= nil then return ox, oz end
+                local nids = {}
+                local function push(n)
+                    if n ~= nil and n ~= 0 then table.insert(nids, n) end
+                end
+                push(it.nodeId)
+                push(it.rootNode)
+                push(it.node)
+                if it.componentNode then push(it.componentNode) end
+                if it.rootComponent then push(it.rootComponent) end
+                if it.components then
+                    local okc, t = pcall(function()
+                        if type(it.components) == "table" then
+                            return it.components[1] or it.components.main or it.components.root
+                        end
+                        return nil
+                    end)
+                    if okc then push(t) end
+                end
+                if type(getWorldTranslation) == "function" then
+                    for _, nid in ipairs(nids) do
+                        if nid ~= nil and nid ~= 0 then
+                            -- Prefer valid entities; some modded bales briefly report invalid nodes — try anyway below.
+                            if type(entityExists) ~= "function" or entityExists(nid) then
+                                local ox, oy, oz = getWorldTranslation(nid)
+                                if ox ~= nil and oz ~= nil then return ox, oz end
+                            end
+                        end
+                    end
+                    --- Last resort: first non-zero node even if entityExists is false (coords often still valid).
+                    for _, nid in ipairs(nids) do
+                        if nid ~= nil and nid ~= 0 then
+                            local ox, oy, oz = getWorldTranslation(nid)
+                            if ox ~= nil and oz ~= nil then return ox, oz end
+                        end
+                    end
                 end
                 if type(it.getWorldPosition) == "function" then
                     local cr = nil
@@ -145,55 +181,192 @@ function FieldDataCollector:collect()
                 end
                 return nil, nil
             end
+            --- Parcel id for bale tallies must match `field.farmland.id` / UI "Field N".
+            --- Courseplay (CpFieldUtil / DevHelper) exposes fieldId vs farmlandId separately; prefer farmland parcel id,
+            --- not Field:getId() first — those can differ on merged / complex maps and left counts in the wrong bucket.
+            local function fieldOrFarmlandKeyAtXZ(x, z)
+                local function keyFromFarmlandObject(fmo)
+                    if fmo == nil then return nil end
+                    if type(fmo) == "number" then
+                        local n = tonumber(fmo)
+                        return (n and n > 0) and n or nil
+                    end
+                    if type(fmo) ~= "table" then return nil end
+                    local parcel = tonumber(fmo.farmlandId or fmo.id)
+                    if parcel and parcel > 0 then return parcel end
+                    if type(fmo.getId) == "function" then
+                        local okI, ii = pcall(function() return fmo:getId() end)
+                        if okI and ii ~= nil then
+                            local n = tonumber(ii)
+                            if n and n > 0 then return n end
+                        end
+                    end
+                    if type(fmo.getField) == "function" then
+                        local okFld, fld = pcall(function() return fmo:getField() end)
+                        if okFld and fld and type(fld.getId) == "function" then
+                            local okId, fi = pcall(function() return fld:getId() end)
+                            if okId and fi ~= nil then
+                                local n = tonumber(fi)
+                                if n and n > 0 then return n end
+                            end
+                        end
+                    end
+                    return nil
+                end
+                local function tryAt(px, pz)
+                    if type(fm.getFarmlandIdAtWorldPosition) == "function" then
+                        local ok, fid = pcall(function() return fm:getFarmlandIdAtWorldPosition(px, pz) end)
+                        if ok and fid ~= nil then
+                            local n = tonumber(fid)
+                            if n and n > 0 then return n end
+                        end
+                    end
+                    local okF, fmo = pcall(function() return fm:getFarmlandAtWorldPosition(px, pz) end)
+                    if not okF or fmo == nil then return nil end
+                    return keyFromFarmlandObject(fmo)
+                end
+                --- Offsets when the bale origin sits on a parcel edge or slightly off the farmland nav mesh.
+                local offs = {
+                    { 0, 0 }, { 0.6, 0 }, { -0.6, 0 }, { 0, 0.6 }, { 0, -0.6 },
+                    { 1.2, 0 }, { -1.2, 0 }, { 0, 1.2 }, { 0, -1.2 }, { 0.85, 0.85 }, { -0.85, -0.85 },
+                }
+                for _, o in ipairs(offs) do
+                    local k = tryAt(x + o[1], z + o[2])
+                    if k ~= nil and k > 0 then return k end
+                end
+                return nil
+            end
             local function incrementFarmlandForBale(it)
                 local x, z = itemWorldXZ(it)
                 if x == nil or z == nil then return end
-                local okF, fmo = pcall(function() return fm:getFarmlandAtWorldPosition(x, z) end)
-                if not okF or fmo == nil then return end
-                local fid = nil
-                if type(fmo) == "number" then
-                    fid = fmo
-                elseif type(fmo) == "table" then
-                    fid = fmo.id or fmo.farmlandId
-                end
-                fid = tonumber(fid)
-                if fid ~= nil and fid > 0 then
-                    farmlandBaleCounts[fid] = (farmlandBaleCounts[fid] or 0) + 1
+                local key = fieldOrFarmlandKeyAtXZ(x, z)
+                if key ~= nil and key > 0 then
+                    farmlandBaleCounts[key] = (farmlandBaleCounts[key] or 0) + 1
                 end
             end
+            local baleSeen = {}
+            local function baleDedupKey(it)
+                if not it then return nil end
+                --- uniqueId is stable across saves; id is network id — prefer both for dedup.
+                local uid = rawget(it, "uniqueId")
+                local oid = rawget(it, "id")
+                if uid ~= nil then return "u:" .. tostring(uid) end
+                if oid ~= nil then return "id:" .. tostring(oid) end
+                local k = it.nodeId or it.rootNode
+                if k ~= nil then return "o:" .. tostring(k) end
+                local x, z = itemWorldXZ(it)
+                if x and z then return string.format("xz:%.1f:%.1f", x, z) end
+                return "t:" .. tostring(it)
+            end
+            --- Count only bales sitting on the ground — not on trailers, loaders, or autoload (Courseplay / base game).
+            local function baleIsOnGround(it)
+                if not it then return false end
+                if rawget(it, "mountObject") ~= nil then return false end
+                if rawget(it, "currentlyLoadedOnAPalletAutoLoaderId") ~= nil then return false end
+                return true
+            end
+            local function tryCountBale(it)
+                if not isHeuristicBale(it) then return end
+                if not baleIsOnGround(it) then return end
+                local dk = baleDedupKey(it)
+                if dk and baleSeen[dk] then return end
+                if dk then baleSeen[dk] = true end
+                incrementFarmlandForBale(it)
+            end
+            --- Module 1 (Engine Interaction doc): master list is itemSystem:getItems(); .items is a legacy/shape fallback.
             local itemSys = mission.itemSystem
             local items = nil
-            if itemSys and type(itemSys.items) == "table" then
-                items = itemSys.items
-            elseif itemSys and type(itemSys.getItems) == "function" then
+            if itemSys and type(itemSys.getItems) == "function" then
                 local okL, r = pcall(function() return itemSys:getItems() end)
                 if okL and type(r) == "table" then items = r end
             end
+            if items == nil and itemSys and type(itemSys.items) == "table" then
+                items = itemSys.items
+            end
             if type(items) == "table" then
                 for _, it in pairs(items) do
-                    if isPhysicalBale(it) then
-                        incrementFarmlandForBale(it)
+                    tryCountBale(it)
+                end
+            end
+            --- Always merge bale manager list (round/round wrapped etc.), not only when items is missing.
+            local bm = rawget(_G, "g_baleManager")
+            local list = nil
+            if bm then
+                if type(bm.getBales) == "function" then
+                    local okL, r = pcall(function() return bm:getBales() end)
+                    if okL and r ~= nil then list = r end
+                elseif type(bm.getItems) == "function" then
+                    local okL, r = pcall(function() return bm:getItems() end)
+                    if okL and r ~= nil then list = r end
+                elseif type(bm.bales) == "table" then
+                    list = bm.bales
+                end
+            end
+            if type(list) == "table" then
+                for _, b in pairs(list) do
+                    tryCountBale(b)
+                end
+            end
+            --- FS25: world bales also live in the mission slot system limited-object bucket (same source the game uses for bale limits).
+            local SlotSystem = rawget(_G, "SlotSystem")
+            if SlotSystem and mission.slotSystem and mission.slotSystem.objectLimits then
+                local lim = mission.slotSystem.objectLimits[SlotSystem.LIMITED_OBJECT_BALE]
+                if lim and type(lim.objects) == "table" then
+                    for _, b in pairs(lim.objects) do
+                        tryCountBale(b)
                     end
                 end
-            else
-                local bm = rawget(_G, "g_baleManager")
-                local list = nil
-                if bm then
-                    if type(bm.getBales) == "function" then
-                        local okL, r = pcall(function() return bm:getBales() end)
-                        if okL and r ~= nil then list = r end
-                    elseif type(bm.getItems) == "function" then
-                        local okL, r = pcall(function() return bm:getItems() end)
-                        if okL and r ~= nil then list = r end
-                    elseif type(bm.bales) == "table" then
-                        list = bm.bales
+            end
+            --- Courseplay exposes the same slot list via g_baleToCollectManager:getBales() — merge when present.
+            local btc = rawget(_G, "g_baleToCollectManager")
+            if btc and type(btc.getBales) == "function" then
+                local okBtc, bl = pcall(function() return btc:getBales() end)
+                if okBtc and type(bl) == "table" then
+                    for _, b in pairs(bl) do
+                        tryCountBale(b)
                     end
                 end
-                if type(list) == "table" then
-                    for _, b in pairs(list) do
-                        if isHeuristicBale(b) then
-                            incrementFarmlandForBale(b)
+            end
+            --- Fallback: scan mission.nodeToObject for Bale-class objects. Item / baleManager can miss bales on some MP or mod maps.
+            if type(mission.nodeToObject) == "table" then
+                for _, obj in pairs(mission.nodeToObject) do
+                    if type(obj) == "table" then
+                        local likely = false
+                        local cn = rawget(obj, "className")
+                        if type(cn) == "string" then
+                            local u = string.upper(cn)
+                            if u == "BALE" or string.find(u, "BALE", 1, true) then likely = true end
                         end
+                        if not likely then
+                            if rawget(obj, "baleType") ~= nil or rawget(obj, "isRoundBale") ~= nil
+                                or rawget(obj, "isSquareBale") ~= nil or rawget(obj, "isRoundbale") ~= nil then
+                                likely = true
+                            end
+                        end
+                        --- Do not call isa(Bale) on every node here — nodeToObject is huge; className + bale fields suffice.
+                        if likely then tryCountBale(obj) end
+                    end
+                end
+            end
+            --- Optional: log to game log.txt (throttled) when farmDashboard.settings#debugBaleScan is true in config.xml
+            do
+                local FDC = rawget(_G, "FarmDashboardDataCollector")
+                local cfg = FDC and FDC.config
+                if cfg and cfg.debugBaleScan then
+                    local t = rawget(_G, "g_time") or 0
+                    local last = rawget(_G, "_FarmDashLastBaleDebugMs") or 0
+                    if t - last >= 30000 then
+                        rawset(_G, "_FarmDashLastBaleDebugMs", t)
+                        local nb, nk, tot = 0, 0, 0
+                        for _ in pairs(baleSeen) do nb = nb + 1 end
+                        for k, c in pairs(farmlandBaleCounts) do
+                            nk = nk + 1
+                            tot = tot + (c or 0)
+                        end
+                        print(string.format(
+                            "[FarmDashboard] Bale scan: uniqueBales=%d bucketKeys=%d totalCounted=%d (itemSys+baleManager+slot+btcMgr+nodeToObject; fields[].baleCountOnField)",
+                            nb, nk, tot
+                        ))
                     end
                 end
             end
@@ -258,6 +431,13 @@ function FieldDataCollector:collect()
             needsFertilizer       = false,
             needsWeeding          = false,
             needsRolling          = false,
+            --- Loose straw / grass / hay (TEDDER + STRAW) from density probes — see windrow block; not cereal swaths alone.
+            needsBaling           = false,
+            baleableLooseLiters   = 0,
+            --- Split from windrowByFillName for JSON + forage suggestions (STRAW / GRASS_WINDROW / DRYGRASS_WINDROW — Dynamic Ground Material doc).
+            looseStrawLiters           = 0,
+            looseGrassWindrowLiters      = 0,
+            looseDryGrassWindrowLiters   = 0,
             suggestions           = {}
         }
 
@@ -580,13 +760,13 @@ function FieldDataCollector:collect()
         end
 
         -- ====================================================================
-        -- 3. PRECISION FARMING RADIUS SCANNER
+        -- 3. SOIL MAP RADIUS SCAN (N / pH sampling)
         -- ====================================================================
         local nLevel, nTarget, phLevel, phTarget = 0, 0, 0, 0
         local isScanned = false
         local sumPhBarMin, validPhBarMin = 0, 0
 
-        --- Decode PF pH map raw 1..31 scale to pH if needed (same as ptPh).
+        --- Decode soil-map pH raw 1..31 scale to pH if needed (same as ptPh).
         local function decodePhRaw(v)
             if not v or type(v) ~= "number" then return nil end
             if v >= 1 and v <= 31 and v % 1 == 0 then return (v * 0.125) + 4.375 end
@@ -594,7 +774,7 @@ function FieldDataCollector:collect()
         end
 
         --- Lower end of the "healthy" pH range for this soil type (for UI bar + lime band).
-        --- Tries PF pHMap methods; falls back to optimal − margin (per soil sample).
+        --- Tries pH map getters; falls back to optimal − margin (per soil sample).
         local function getPhBarMinForSoilType(pHMap, soilTypeIdx, optimalPh)
             local tryNames = {
                 "getMinimumPHValueForSoilTypeIndex",
@@ -640,7 +820,7 @@ function FieldDataCollector:collect()
                 local sX = cx + (offset[1] * baseRadius)
                 local sZ = cz + (offset[2] * baseRadius)
                 if not sampleOnThisFarmland(sX, sZ) then
-                    -- skip points outside this field's farmland (prevents Field 4 inheriting Field 3 PF)
+                    -- skip points outside this field's farmland (prevents neighbour field bleed in samples)
                 else
                 local soilType = callMethod(pfInstance.soilMap, "getTypeIndexAtWorldPos", sX, sZ)
                 
@@ -717,7 +897,7 @@ function FieldDataCollector:collect()
                 fData.nitrogenText       = string.format("%.0f / %.0f kg/ha", nLevel, nTarget)
                 fData.limeText           = string.format("%.1f pH", phLevel)
                 fData.fertilizationLevel = nTarget > 0 and math.min(2, (nLevel / nTarget) * 2) or 0
-                -- Lime: use PF optimal pH for sampled soil types (targetPh); band matches in-game recommendation (~0.2 below target).
+                -- Lime: use soil-map optimal pH for sampled soil types (targetPh); band ~0.2 below target.
                 local limeBand = 0.2
                 if phTarget > 0 then
                     local idealMin = phTarget - limeBand
@@ -741,7 +921,7 @@ function FieldDataCollector:collect()
                 fData.needsFertilizer = nTarget > 0 and (nLevel < nTarget * (1 - NUTRIENT_CLOSE_FRAC))
             end
         else
-            -- Non-PF: spray 0–2 and lime 0–1 — within ~5% of “full” counts as done for suggestion ordering.
+            -- Without soil maps: spray 0–2 and lime 0–1 — within ~5% of “full” counts as done for suggestion ordering.
             fData.needsFertilizer = (fData.fertilizationLevel or 0) < 1.9
             fData.needsLime       = (fData.limeLevel or 0) < 0.95
             fData.nitrogenText    = string.format("%d/2", fData.fertilizationLevel)
@@ -813,9 +993,9 @@ function FieldDataCollector:collect()
             local harvestReason = isGrass and "Grass is ready to cut" or "Crop is ready for harvest"
             table.insert(fData.suggestions, {priority = PR.harvest, type = "harvest", action = harvestAction, reason = harvestReason})
         elseif noCrop and fData.hectares > 0 then
-            --- Fallow: Soil map → mulch (arable) → plow → cultivate → lime → organic → sow (sow only after PF scan if PF).
+            --- Fallow: soil scan → mulch (arable) → plow → cultivate → lime → organic → sow (scan first when soil maps are active).
             if isPF and not isScanned then
-                table.insert(fData.suggestions, {priority = PR.fallow_soil, type = "preparation", action = "Soil Map", reason = "Scan field before lime and planting decisions"})
+                table.insert(fData.suggestions, {priority = PR.fallow_soil, type = "preparation", action = "Soil scan", reason = "Scan field before lime and planting decisions"})
             end
             if not isGrass and fData.needsPlowing and mulchLv < 1 then
                 table.insert(fData.suggestions, {
@@ -825,7 +1005,7 @@ function FieldDataCollector:collect()
             elseif fData.needsPlowing then
                 table.insert(fData.suggestions, {
                     priority = PR.fallow_plow, type = "preparation", action = "Plow field",
-                    reason = "Soil map indicates this field should be ploughed before continuing."
+                    reason = "Field data indicates this parcel should be ploughed before continuing."
                 })
             end
             if mulchLv >= 1 then
@@ -863,7 +1043,7 @@ function FieldDataCollector:collect()
             elseif isPF and not isScanned then
                 table.insert(fData.suggestions, {
                     priority = PR.fallow_wait, type = "planting", action = "Sow after soil scan",
-                    reason = "With Precision Farming, scan the field first; then lime/organic targets apply before drilling."
+                    reason = "When soil mapping is active, scan the field first; then lime and organic targets apply before drilling."
                 })
             end
         elseif not noCrop and fData.growthState > 0 and not fData.harvestReady then
@@ -873,7 +1053,7 @@ function FieldDataCollector:collect()
             --- Grass after mowing: only lime + any fertiliser (regrowth is not the same as first stage after seeding).
             if grassMownRegrowth then
                 if isPF and not isScanned then
-                    table.insert(fData.suggestions, {priority = PR.grow_soil, type = "info", action = "Soil Map", reason = "Scan for pH and nitrogen on regrowth after mowing."})
+                    table.insert(fData.suggestions, {priority = PR.grow_soil, type = "info", action = "Soil scan", reason = "Scan for pH and nitrogen on regrowth after mowing."})
                 end
                 if isPF and isScanned and limeOkGrow then
                     local tgt = phTarget > 0 and string.format("%.1f", phTarget) or "6.5"
@@ -902,7 +1082,7 @@ function FieldDataCollector:collect()
             else
                 --- Growing crop: soil → lime → roll → mechanical weeds → organic → mineral → herbicide.
                 if isPF and not isScanned then
-                    table.insert(fData.suggestions, {priority = PR.grow_soil, type = "info", action = "Soil Map", reason = "Scan field for nitrogen and pH targets"})
+                    table.insert(fData.suggestions, {priority = PR.grow_soil, type = "info", action = "Soil scan", reason = "Scan field for nitrogen and pH targets"})
                 end
                 if isPF and isScanned and limeOkGrow then
                     local tgt = phTarget > 0 and string.format("%.1f", phTarget) or "6.5"
@@ -973,26 +1153,49 @@ function FieldDataCollector:collect()
         -- ====================================================================
         -- Windrow / swath + bales (whole-field — rules-engine.js Layer 1 heuristics)
         -- Loose swaths are DensityMapHeightTypes, not FieldState properties.
+        -- Module 2 in FarmHub/docs/FS25 Engine Interaction Modules.txt shows getDensityAtWorldPos(terrainDetailHeightId);
+        -- FS25 windrow litres per material use DensityMapHeightUtil.getFillLevelAtArea(fillTypeIndex, ...) instead (fill-type channels).
         -- Uses DensityMapHeightUtil.getFillLevelAtArea(fillTypeIndex, sx,sz, wx,wz, hx,hz)
-        -- with g_fillTypeManager indices for STRAW, GRASS_WINDROW, DRYGRASS_WINDROW.
+        -- Bale-relevant: STRAW + TEDDER converter sources/targets (grass/hay families) + named windrow fallbacks
+        -- (grass ↔ hay / dry grass), optional HAY; cereal *_SWATH types are probed for totals only.
+        -- windrowByFillName: per-type summed probe volume (engine liters) for UI / classification.
+        -- needsBaling / baleableLooseLiters: straw + grass/hay only (not unthreshed crop swaths).
         -- ====================================================================
         fData.windrowLiters = 0
         fData.windrowArea = 0
         fData.windrowSamples = {}
         fData.hasWindrow = false
+        fData.windrowByFillName = {}
+        fData.needsBaling = false
+        fData.baleableLooseLiters = 0
         fData.baleCountOnField = 0
 
         local myFid = field.farmland and field.farmland.id or nil
-        local function onThisField(sx, sz)
-            if not myFid or not _G.g_farmlandManager or not _G.g_farmlandManager.getFarmlandAtWorldPosition then
-                return true
+        local function farmlandIdAtWorld(sx, sz)
+            if not _G.g_farmlandManager or not _G.g_farmlandManager.getFarmlandAtWorldPosition then
+                return nil
             end
             local ok, fm = pcall(function()
                 return _G.g_farmlandManager:getFarmlandAtWorldPosition(sx, sz)
             end)
-            if not ok or not fm then return false end
-            local fid = fm.id or fm
-            return tonumber(fid) == tonumber(myFid)
+            if not ok or not fm then return nil end
+            local fid = fm.id
+            if fid == nil and type(fm.getId) == "function" then
+                local ok2, id2 = pcall(function() return fm:getId() end)
+                if ok2 and id2 ~= nil then fid = id2 end
+            end
+            if fid == nil then fid = fm end
+            return tonumber(fid)
+        end
+        local function onThisField(sx, sz)
+            if not myFid then
+                return true
+            end
+            local fid = farmlandIdAtWorld(sx, sz)
+            if fid == nil then
+                return false
+            end
+            return fid == tonumber(myFid)
         end
 
         --- Axis-aligned rectangle as three corners (parallelogram API): s, s+w, s+h
@@ -1013,38 +1216,132 @@ function FieldDataCollector:collect()
         local dmhu = rawget(_G, "DensityMapHeightUtil")
         if dmhu and type(dmhu.getFillLevelAtArea) == "function" then
             local ftm = _G.g_fillTypeManager
-            local windFillNames = { "STRAW", "GRASS_WINDROW", "DRYGRASS_WINDROW" }
-            local windFillIndices = {}
-            if ftm and type(ftm.getFillTypeIndexByName) == "function" then
-                for _, nm in ipairs(windFillNames) do
-                    local okIdx, idx = pcall(function()
-                        return ftm:getFillTypeIndexByName(nm)
-                    end)
-                    if okIdx and idx ~= nil and type(idx) == "number" and idx > 0 then
-                        table.insert(windFillIndices, idx)
+            --- Classify bale pickup types: STRAW, TEDDER grass/hay pairs, optional HAY + GRASS_WINDROW / DRYGRASS_WINDROW names
+            local function fillDisplayName(idx)
+                if not ftm or type(ftm.getFillTypeNameByIndex) ~= "function" then
+                    return "FILL_" .. tostring(idx)
+                end
+                local okn, nn = pcall(function() return ftm:getFillTypeNameByIndex(idx) end)
+                if okn and nn and nn ~= "" then return nn end
+                return "FILL_" .. tostring(idx)
+            end
+            local function buildBaleableEntries()
+                local list = {}
+                local seen = {}
+                local function addIndex(idx)
+                    if not idx or type(idx) ~= "number" or idx <= 0 or seen[idx] then return end
+                    seen[idx] = true
+                    table.insert(list, { name = fillDisplayName(idx), index = idx, baleable = true })
+                end
+                local FillTypeT = rawget(_G, "FillType")
+                if FillTypeT and FillTypeT.STRAW then
+                    addIndex(FillTypeT.STRAW)
+                end
+                if ftm and type(ftm.getFillTypeIndexByName) == "function" then
+                    local okS, stIdx = pcall(function() return ftm:getFillTypeIndexByName("STRAW") end)
+                    if okS and stIdx and type(stIdx) == "number" and stIdx > 0 then addIndex(stIdx) end
+                    local okH, hayIdx = pcall(function() return ftm:getFillTypeIndexByName("HAY") end)
+                    if okH and hayIdx and type(hayIdx) == "number" and hayIdx > 0 then addIndex(hayIdx) end
+                end
+                if ftm and type(ftm.getConverterDataByName) == "function" then
+                    local okc, conv = pcall(function() return ftm:getConverterDataByName("TEDDER") end)
+                    if okc and type(conv) == "table" then
+                        for fromFt, to in pairs(conv) do
+                            if to and to.targetFillTypeIndex then
+                                local tgt = to.targetFillTypeIndex
+                                if fromFt and tgt and fromFt ~= tgt then
+                                    addIndex(fromFt)
+                                    addIndex(tgt)
+                                end
+                            end
+                        end
                     end
                 end
+                if ftm and type(ftm.getFillTypeIndexByName) == "function" then
+                    for _, nm in ipairs({ "GRASS_WINDROW", "DRYGRASS_WINDROW" }) do
+                        local okx, j = pcall(function() return ftm:getFillTypeIndexByName(nm) end)
+                        if okx and j and type(j) == "number" and j > 0 and not seen[j] then
+                            seen[j] = true
+                            table.insert(list, { name = nm, index = j, baleable = true })
+                        end
+                    end
+                end
+                return list
+            end
+            --- Cereal / crop swaths (combine pick-up etc.) — included in windrowLiters / hasWindrow, not in needsBaling.
+            local swathFillNames = {
+                "WHEAT_SWATH", "BARLEY_SWATH", "OAT_SWATH", "CANOLA_SWATH", "SORGHUM_SWATH", "SOYBEAN_SWATH",
+                "SUNFLOWER_SWATH", "MAIZE_SWATH", "RICE_SWATH", "COTTON_SWATH", "GREENBEAN_SWATH",
+            }
+            local function buildSwathOnlyEntries()
+                local list = {}
+                if not ftm or type(ftm.getFillTypeIndexByName) ~= "function" then return list end
+                for _, nm in ipairs(swathFillNames) do
+                    local okIdx, idx = pcall(function() return ftm:getFillTypeIndexByName(nm) end)
+                    if okIdx and idx ~= nil and type(idx) == "number" and idx > 0 then
+                        table.insert(list, { name = nm, index = idx, baleable = false })
+                    end
+                end
+                return list
+            end
+            local balePart = buildBaleableEntries()
+            local swathPart = buildSwathOnlyEntries()
+            local byIdx = {}
+            for _, ent in ipairs(balePart) do
+                byIdx[ent.index] = { name = ent.name, index = ent.index, baleable = true }
+            end
+            for _, ent in ipairs(swathPart) do
+                if not byIdx[ent.index] then
+                    byIdx[ent.index] = { name = ent.name, index = ent.index, baleable = false }
+                end
+            end
+            local windEntries = {}
+            for _, ent in pairs(byIdx) do
+                table.insert(windEntries, ent)
             end
 
-            --- Sparse samples (~18 m apart) so rectangle overlaps are limited; half-edge in meters.
+            --- Sparse grid scaled to field size (~18 m minimum step; wider on large parcels so swaths away from center are seen).
             local halfM = 6.0
+            local areaSqm = fData.fieldAreaInSqm or 0
+            local rf = math.sqrt(math.max(1, areaSqm) / math.pi)
+            local step1 = math.min(72, math.max(18, rf * 0.28))
+            local step2 = step1 * 2
             local windProbeOffsets = {
-                {0, 0}, {18, 0}, {-18, 0}, {0, 18}, {0, -18},
-                {18, 18}, {-18, -18}, {18, -18}, {-18, 18},
+                {0, 0},
+                {step1, 0}, {-step1, 0}, {0, step1}, {0, -step1},
+                {step1, step1}, {-step1, -step1}, {step1, -step1}, {-step1, step1},
+                {step2, 0}, {-step2, 0}, {0, step2}, {0, -step2},
             }
             local totalVol = 0
+            local baleVol = 0
+            local function addProbeCell(sx, sz)
+                local cellSum = 0
+                for _, ent in ipairs(windEntries) do
+                    local v = fillLevelSumAtRect(dmhu, ent.index, sx, sz, halfM)
+                    cellSum = cellSum + v
+                    fData.windrowByFillName[ent.name] = (fData.windrowByFillName[ent.name] or 0) + v
+                    if ent.baleable then
+                        baleVol = baleVol + v
+                    end
+                end
+                totalVol = totalVol + cellSum
+                table.insert(fData.windrowSamples, cellSum)
+            end
+            local samplesAdded = 0
             for _, off in ipairs(windProbeOffsets) do
                 local sx, sz = cx + off[1], cz + off[2]
                 if onThisField(sx, sz) then
-                    local cellSum = 0
-                    for _, fti in ipairs(windFillIndices) do
-                        cellSum = cellSum + fillLevelSumAtRect(dmhu, fti, sx, sz, halfM)
-                    end
-                    totalVol = totalVol + cellSum
-                    table.insert(fData.windrowSamples, cellSum)
+                    addProbeCell(sx, sz)
+                    samplesAdded = samplesAdded + 1
                 end
             end
+            --- If every probe was rejected (farmland id mismatch at center/edges, or map returns nil), still sample at field center — otherwise windrow stays blank for valid in-field material.
+            if samplesAdded == 0 then
+                addProbeCell(cx, cz)
+            end
             fData.windrowLiters = totalVol
+            fData.baleableLooseLiters = baleVol
+            fData.needsBaling = (baleVol > 0.01)
             local nS = #(fData.windrowSamples)
             if totalVol > 0 and fData.fieldAreaInSqm and fData.fieldAreaInSqm > 0 and nS > 0 then
                 local tileSq = (2 * halfM) * (2 * halfM)
@@ -1053,14 +1350,95 @@ function FieldDataCollector:collect()
                 fData.windrowArea = 0
             end
             fData.hasWindrow = (totalVol > 0)
+            --- Aggregate per fill name (terrainDetailHeight grass/straw/hay channels — see Dynamic Ground Material & Transform doc).
+            --- Cereal / crop *_SWATH channels count toward looseStrawLiters for dashboard + rules (same as loose harvest residue before baling).
+            local aggS, aggG, aggH = 0, 0, 0
+            for name, vol in pairs(fData.windrowByFillName) do
+                local u = string.upper(tostring(name))
+                local vv = tonumber(vol) or 0
+                if u == "STRAW" then
+                    aggS = aggS + vv
+                elseif string.sub(u, -6) == "_SWATH" then
+                    aggS = aggS + vv
+                elseif u == "GRASS_WINDROW" then
+                    aggG = aggG + vv
+                elseif u == "DRYGRASS_WINDROW" or u == "HAY" then
+                    aggH = aggH + vv
+                end
+            end
+            fData.looseStrawLiters = aggS
+            fData.looseGrassWindrowLiters = aggG
+            fData.looseDryGrassWindrowLiters = aggH
         else
             fData.windrowLiters = 0
             fData.windrowArea = 0
             fData.hasWindrow = false
+            fData.windrowByFillName = {}
+            fData.needsBaling = false
+            fData.baleableLooseLiters = 0
+            fData.looseStrawLiters = 0
+            fData.looseGrassWindrowLiters = 0
+            fData.looseDryGrassWindrowLiters = 0
         end
 
+        --- Match counts to this row: try farmland id, FieldManager field id, and internal index (keys may differ by map).
         if displayId and displayId > 0 then
-            fData.baleCountOnField = farmlandBaleCounts[displayId] or 0
+            local n = farmlandBaleCounts[displayId] or 0
+            if fieldId and tonumber(fieldId) and tonumber(fieldId) ~= tonumber(displayId) then
+                n = math.max(n, farmlandBaleCounts[tonumber(fieldId)] or 0)
+            end
+            if type(field.getId) == "function" then
+                local okFi, fi = pcall(function() return field:getId() end)
+                if okFi and fi ~= nil then
+                    local fk = tonumber(fi)
+                    if fk and fk > 0 then
+                        n = math.max(n, farmlandBaleCounts[fk] or 0)
+                    end
+                end
+            end
+            fData.baleCountOnField = n
+            --- When bales are counted, surface an explicit suggestion (priority before grow_herb / fallow so JSON + UI match).
+            if n > 0 then
+                local act = (n == 1) and "Collect or move 1 bale off this field"
+                    or string.format("Collect or move %d bales off this field", n)
+                table.insert(fData.suggestions, {
+                    priority = 18,
+                    type     = "maintenance",
+                    action   = act,
+                    reason   = "Physical bale(s) on this farmland — clear them before cultivation or drilling.",
+                })
+            end
+            --- Loose straw / grass windrow / hay windrow from height-map probes (Dynamic Ground Material doc).
+            local MIN_LOOSE_L = 25.0
+            local PR_FORAGE = 11
+            local sL = tonumber(fData.looseStrawLiters) or 0
+            local gL = tonumber(fData.looseGrassWindrowLiters) or 0
+            local hL = tonumber(fData.looseDryGrassWindrowLiters) or 0
+            if math.max(sL, gL, hL) >= MIN_LOOSE_L then
+                local function ins(pri, act, rsn)
+                    table.insert(fData.suggestions, { priority = pri, type = "maintenance", action = act, reason = rsn })
+                end
+                if sL >= MIN_LOOSE_L and sL >= gL and sL >= hL then
+                    ins(PR_FORAGE, "Bale loose straw or pick up with a forage wagon",
+                        "Loose straw on the field (height-map) — bale or collect before tillage or the next pass.")
+                elseif gL >= MIN_LOOSE_L and gL >= sL and gL >= hL then
+                    ins(PR_FORAGE, "Tedder to make hay, or bale wet and wrap for silage",
+                        "Fresh grass windrow (GRASS_WINDROW) — tedder to dry for hay, or bale while wet and wrap bales for silage.")
+                elseif hL >= MIN_LOOSE_L and hL >= sL and hL >= gL then
+                    ins(PR_FORAGE, "Bale hay windrow or collect dry forage",
+                        "Dried grass windrow (hay) on the field — bale or load before rain or soil work.")
+                else
+                    ins(PR_FORAGE, "Clear loose straw, grass, or hay windrows",
+                        "Multiple forage materials detected on the ground — bale straw, tedder or bale grass for silage, or bale hay as needed.")
+                end
+            end
+            if (n or 0) > 0 or math.max(sL, gL, hL) >= MIN_LOOSE_L then
+                table.sort(fData.suggestions, function(a, b)
+                    local pa, pb = a.priority or 999, b.priority or 999
+                    if pa ~= pb then return pa < pb end
+                    return tostring(a.action or "") < tostring(b.action or "")
+                end)
+            end
         else
             fData.baleCountOnField = 0
         end

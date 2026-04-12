@@ -268,7 +268,6 @@ function positionAiFarmInsightsRow(sectionName) {
 function updateSmartSuggestionsRowVisibility(sectionName) {
   const row = document.getElementById("ai-farm-insights-row");
   const dash = document.getElementById("dashboard-content");
-  if (!row) return;
   const withSmart = [
     "dashboard",
     "landing",
@@ -280,16 +279,20 @@ function updateSmartSuggestionsRowVisibility(sectionName) {
     "productions",
   ];
   if (!withSmart.includes(sectionName)) {
-    row.classList.add("d-none");
+    row?.classList.add("d-none");
     return;
   }
-  row.classList.remove("d-none");
+  row?.classList.remove("d-none");
+  // Livestock uses #dashboard-content; other sections hide it. Do not depend on #ai-farm-insights-row
+  // (if that node were missing, we would still need to toggle the livestock panel).
   if (sectionName === "livestock") {
     dash?.classList.remove("d-none");
   } else {
     dash?.classList.add("d-none");
   }
-  positionAiFarmInsightsRow(sectionName);
+  if (row) {
+    positionAiFarmInsightsRow(sectionName);
+  }
 }
 
 export function showInfoMessage(message) {

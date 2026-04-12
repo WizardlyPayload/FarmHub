@@ -18,6 +18,7 @@
     },
     "files": [
       "main.js",
+      "app-updater.js",
       "preload.js",
       "xmlCollector.js",
       "dataMerger.js",
@@ -57,10 +58,17 @@
       "shortcutName": "Farm Dashboard",
       "warningsAsErrors": false,
       "include": "build/installer.nsh"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "WizardlyPayload",
+      "repo": "FarmHub",
+      "releaseType": "release"
     }
   },
   "dependencies": {
     "basic-ftp": "^5.0.5",
+    "electron-updater": "^6.6.2",
     "chokidar": "^3.6.0",
     "cors": "^2.8.5",
     "electron-store": "^8.2.0",

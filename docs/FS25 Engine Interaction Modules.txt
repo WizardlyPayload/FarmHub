@@ -1,0 +1,267 @@
+# Developer Handover: FS25 Engine Interaction Modules
+
+**Target Environment:** GIANTS Engine 10 (Farming Simulator 25)  
+**Language:** Lua, XML  
+**Focus Areas:** Entity Tracking (Bales), Density Map Queries (Ground Swaths), UI Hooks (Chat System), Mod Initialization, and Multiplayer Networking.  
+
+---
+
+## Module 1: Bale Enumeration & Geo-Fencing
+
+**Objective:** Dynamically calculate the total count of specific bale types within a defined polygon (field boundary) prior to initiating an AI task.
+
+### Core Logic & Engine Singletons
+Bales in the GIANTS Engine are not static map objects; they are dynamically spawned entities managed by the `ItemSystem`. The logic requires fetching the master item array, filtering by the `isBale` boolean, and executing a point-in-polygon math check against the bale's world translation (XYZ coordinates).
+
+### Reference Implementation
+```lua
+-- ==========================================
+-- FUNCTION: Get Field Bale Count
+-- Context: Call this prior to AI path generation
+-- ==========================================
+function MyMod:getBalesOnField(fieldPolygon, targetFillType)
+    local allItems = g_currentMission.itemSystem:getItems()
+    local validBales = {}
+    local totalCount = 0
+
+    if allItems == nil then return totalCount, validBales end
+
+    for _, item in ipairs(allItems) do
+        -- 1. Check if the item is explicitly a bale
+        if item.isBale then
+            
+            -- 2. Validate FillType (e.g., Straw vs. Grass)
+            if item:getFillType() == targetFillType then
+                
+                -- 3. Get World Translation (Note: y is height, x/z are ground planes)
+                local x, y, z = getWorldTranslation(item.nodeId)
+                
+                -- 4. Geo-fence check: Use standard Ray-Casting algorithm or GIANTS mathUtil
+                -- Assuming 'fieldPolygon' has a custom :isPointInside(x, z) method
+                if fieldPolygon:isPointInside(x, z) then
+                    totalCount = totalCount + 1
+                    table.insert(validBales, item)
+                end
+            end
+        end
+    end
+
+    return totalCount, validBales
+end
+```
+
+### ⚠️ Developer Notes for Module 1
+* **Node ID vs. Lua Object:** Always differentiate between the `item` (the Lua table holding the metadata) and `item.nodeId` (the actual 3D engine entity ID used for coordinate fetching).
+* **Performance:** Do *not* run this loop inside the `update(dt)` function. Run it only upon task initialization or on a slow `updateTick()` (e.g., once every 2 seconds) to avoid cratering frame rates on high-bale-count servers.
+
+---
+
+## Module 2: Ground Density (Windrow) Detection
+
+**Objective:** Detect the presence of non-physical crops/swaths (like straw or grass) lying directly on the terrain.
+
+### Core Logic & Engine Singletons
+Ground materials are handled via 2D bitmaps called **Density Maps**. You must query the specific channel (e.g., straw, grass) at specific X/Z world coordinates using standard density API calls.
+
+### Reference Implementation
+```lua
+-- ==========================================
+-- FUNCTION: Check for Swath Density
+-- Context: Runs when checking terrain states
+-- ==========================================
+function MyMod:checkGroundMaterial(vehicle)
+    -- Get vehicle coordinates
+    local x, y, z = getWorldTranslation(vehicle.nodeId)
+    
+    -- Target the specific height/density map for the terrain
+    local densityMapId = g_currentMission.terrainDetailHeightId
+
+    -- Query the specific channel for the material you want
+    -- Note: Check exact naming convention in FS25 API GDN docs
+    local density, area, _ = getDensityAtWorldPos(densityMapId, x, y, z)
+
+    if density > 0 then
+       -- Swath exists at this coordinate
+       -- Insert yield bonus logic or environment tracking here
+       return true
+    end
+    
+    return false
+end
+```
+
+### ⚠️ Developer Notes for Module 2
+* **AI Pathing Limitation:** AI cannot easily follow density maps dynamically. If you are building an AI steering script, map these density points into a spline/waypoint system *first*, and then tell the vehicle to follow the generated spline.
+
+---
+
+## Module 3: Chat Interception & Server Commands
+
+**Objective:** Create a two-way interface using the in-game chat UI to listen for admin commands (`!`, `/`, `#`) and broadcast system messages.
+
+### Core Logic & Engine Singletons
+Overwrite the default `ChatWindow:onSendChat` to intercept strings before they are broadcast to the server.
+
+### Reference Implementation
+```lua
+-- ==========================================
+-- CHAT INTERCEPTION HOOK
+-- ==========================================
+
+-- Store the original GIANTS function
+local original_onSendChat = ChatWindow.onSendChat
+
+-- Overwrite with our custom listener
+ChatWindow.onSendChat = function(self, text)
+    -- 1. Check if the message is a command
+    if text:sub(1, 1) == "!" then
+        -- Process Command
+        local command = text:sub(2)
+        
+        -- Trigger network event if in multiplayer (See Module 5)
+        if g_client ~= nil then
+            g_client:getServerConnection():sendEvent(MyCustomChatEvent.new(command))
+        else
+            -- Singleplayer fallback
+            MyMod:processChatCommand(command)
+        end
+        
+        -- Return to swallow the message (prevents it showing to others in standard chat)
+        return 
+    end
+    
+    -- 2. If not a command, process normally
+    original_onSendChat(self, text)
+end
+
+-- ==========================================
+-- OUTGOING MESSAGE BROADCAST
+-- ==========================================
+function MyMod:sendServerMessage(messageText)
+    -- Inject message locally
+    if g_currentMission.chatWindow ~= nil then
+        -- Arguments: message, sender (System), isServerAdmin
+        g_currentMission.chatWindow:addMessage(messageText, "System Mod", true)
+    end
+end
+```
+
+### ⚠️ Developer Notes for Module 3
+* **Localization:** Always pass your outgoing chat strings through the `g_i18n:getText()` function so non-English players can read your mod's outputs properly.
+
+---
+
+## Module 4: Mod Initialization (modDesc.xml)
+
+**Objective:** Ensure the game engine hooks the Lua scripts upon loading the map/savegame.
+
+### Reference Implementation
+```xml
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<modDesc descVersion="80"> <author>Your Name/Team</author>
+    <version>1.0.0.0</version>
+    <title>
+        <en>My Custom Engine Hooks</en>
+    </title>
+    <description>
+        <en>Custom scripts for bale counting, density checks, chat admin, and networking.</en>
+    </description>
+
+    <iconFilename>icon.png</iconFilename>
+    <multiplayer supported="true"/>
+
+    <extraSourceFiles>
+        <sourceFile filename="src/MyCustomChatEvent.lua" />
+        <sourceFile filename="src/MyModMain.lua" />
+    </extraSourceFiles>
+</modDesc>
+```
+
+---
+
+## Module 5: Multiplayer Synchronization (EventClass)
+
+**Objective:** Safely transmit client-side chat commands to the dedicated server for processing, and broadcast results back to clients if needed.
+
+### Core Logic & Engine Singletons
+GIANTS Engine requires custom network packets to be structured as an `EventClass`. This requires serialization (`writeStream`), deserialization (`readStream`), and execution logic (`run`).
+
+### Reference Implementation (MyCustomChatEvent.lua)
+```lua
+-- ==========================================
+-- MULTIPLAYER EVENT CLASS: MyCustomChatEvent
+-- ==========================================
+MyCustomChatEvent = {}
+local MyCustomChatEvent_mt = Class(MyCustomChatEvent, Event)
+
+InitEventClass(MyCustomChatEvent, "MyCustomChatEvent")
+
+-- Required empty constructor
+function MyCustomChatEvent.emptyNew()
+    local self = Event.new(MyCustomChatEvent_mt)
+    return self
+end
+
+-- Constructor called when sending the event
+function MyCustomChatEvent.new(commandString)
+    local self = MyCustomChatEvent.emptyNew()
+    self.commandString = commandString
+    return self
+end
+
+-- Deserialize data received from the network stream
+function MyCustomChatEvent:readStream(streamId, connection)
+    self.commandString = streamReadString(streamId)
+    self:run(connection)
+end
+
+-- Serialize data to send over the network stream
+function MyCustomChatEvent:writeStream(streamId, connection)
+    streamWriteString(streamId, self.commandString)
+end
+
+-- Execution logic once data is received
+function MyCustomChatEvent:run(connection)
+    if not connection:getIsServer() then
+        -- ==========================================
+        -- SERVER-SIDE LOGIC
+        -- This block runs on the dedicated server when a client sends the event
+        -- ==========================================
+        print("Server received command: " .. tostring(self.commandString))
+        
+        -- Execute the admin logic
+        MyMod:processChatCommand(self.commandString)
+        
+        -- (Optional) Broadcast the event to all other clients so they know it happened
+        -- g_server:broadcastEvent(MyCustomChatEvent.new(self.commandString), nil, connection, nil)
+    else
+        -- ==========================================
+        -- CLIENT-SIDE LOGIC
+        -- This block runs on clients if the server broadcasts the event back out
+        -- ==========================================
+        -- Update UI or local state based on the server's command processing
+    end
+end
+```
+
+### ⚠️ Developer Notes for Module 5
+* **Security Check:** If building admin commands (like `/addMoney`), *always* verify `connection:getIsServerAdmin()` inside the server-side `run()` block to ensure a malicious client isn't spoofing the event to cheat.
+* **Data Types:** Ensure you use the correct stream functions. For strings use `streamWriteString` / `streamReadString`. For booleans use `streamWriteBool` / `streamReadBool`, etc.
+
+---
+
+## Farm Dashboard mod alignment (FS25_FarmDashboard)
+
+This codebase implements the same *intent* as the modules above; APIs differ where FS25 exposes a more specific helper.
+
+### Module 1 (bale enumeration)
+* **ItemSystem:** `FieldDataCollector.lua` uses **`g_currentMission.itemSystem:getItems()`** as the **primary** source (then falls back to `.items` if needed), filters with **`item.isBale`** and other bale heuristics, and uses **`getWorldTranslation`** on known nodes (see `itemWorldXZ`).
+* **Geo-fencing:** Instead of a custom polygon `isPointInside`, the mod assigns each bale to a **farmland / field id** via **`g_farmlandManager:getFarmlandIdAtWorldPosition`** / **`getFarmlandAtWorldPosition`** (same outcome: “which field parcel” the bale sits on).
+* **Extras (not in the short sample):** `g_baleManager`, **`SlotSystem.LIMITED_OBJECT_BALE`**, optional Courseplay **`g_baleToCollectManager:getBales()`**, and a **`nodeToObject`** sweep for objects missed by the item list — all deduped before `data.json`.
+
+### Module 2 (ground swath / windrow)
+* The sample uses **`getDensityAtWorldPos(terrainDetailHeightId, x, y, z)`** for a single combined height map.
+* Farm Dashboard windrow totals use **`DensityMapHeightUtil.getFillLevelAtArea`** with **per fill-type indices** (STRAW, TEDDER pairs, `*_SWATH`, etc.) so **`windrowByFillName`** and **`baleableLooseLiters`** match engine material channels. If you need a generic “any density here” check, Module 2’s approach still applies; for **exported litres by crop/straw type**, keep the height-util / fill-type path.
+
+### Modules 3–5 (chat, modDesc, events)
+* Not used by Farm Dashboard; no chat hooks or custom MP events in this mod.

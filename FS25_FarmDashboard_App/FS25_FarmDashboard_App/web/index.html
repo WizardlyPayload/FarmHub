@@ -781,6 +781,14 @@
                       <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-productions" checked/><label class="form-check-label" for="settings-section-productions" data-i18n="card.productions">Productions</label></div></div>
                     </div>
                     <hr class="border-secondary my-3"/>
+                    <h6 class="text-farm-accent" data-i18n="settings.desktopAppTitle">Desktop app — updates</h6>
+                    <p class="small text-muted mb-2" data-i18n="settings.desktopAppHint">The Farm Dashboard installer checks GitHub Releases for new versions. FS25 mod updates use Giants Mod Hub or in-game mods.</p>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                      <span class="small text-muted"><span data-i18n="settings.appVersionLabel">Version</span> <strong id="settings-desktop-app-version" class="text-light">—</strong></span>
+                      <button type="button" class="btn btn-sm btn-outline-farm-accent" id="settings-desktop-check-updates-btn" data-i18n="settings.checkForUpdates">Check for updates</button>
+                    </div>
+                    <div id="settings-desktop-update-status" class="small text-muted mb-0" role="status"></div>
+                    <hr class="border-secondary my-3"/>
                     <h6 class="text-farm-accent" data-i18n="settings.fieldExclusionTitle">Fields — hide parcels</h6>
                     <p class="small text-muted" data-i18n="settings.fieldExclusionHint">Only parcels your selected farm owns are listed.</p>
                     <div id="settings-field-exclusions" class="mb-0 small text-break">—</div>

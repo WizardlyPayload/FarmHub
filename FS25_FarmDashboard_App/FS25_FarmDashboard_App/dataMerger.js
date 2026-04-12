@@ -5,7 +5,7 @@
  *
  * Priority:
  *  Lua wins  → live animals, live weather/temperature, live vehicle engine state,
- *               field `needsWork` / PF overlay when a Lua row exists (XML heuristics are coarse)
+ *               field `needsWork` / soil-map overlay when a Lua row exists (XML heuristics are coarse)
  *  XML wins  → base field row from fields.xml (crop, growthState, soil flags),
  *               weather forecast, missions, farm statistics, game settings
  *  Merged    → vehicles (XML farmId/price + Lua engine/speed),
@@ -122,7 +122,7 @@ function mergeData(luaData, xmlData) {
         animals      : toArr(luaData.animals),
 
         // Fields — XML provides base (ownership via farmland.xml); prefer allFields so NPC/unowned stay in API
-        // Lua provides Precision Farming overlay (N/pH from live density maps)
+        // Lua provides variable-rate soil overlay (N/pH from live density maps when present)
         fields       : (() => {
                          const xmlBase = xmlFieldsBaseForMerge(xmlData);
                          return mergeFields(
@@ -248,16 +248,16 @@ function fixFieldOwnership(luaFields, farmlandOwnership) {
 // ─── fields ───────────────────────────────────────────────────────────────────
 
 /**
- * Merge XML fields (base data) with Lua fields (Precision Farming overlay).
+ * Merge XML fields (base data) with Lua fields (variable-rate N/pH overlay when exported).
  *
  * XML fields.xml:        fruitType, growthState, groundType, weedState,
  *                        limeLevel, sprayLevel, plowLevel, ownerFarmId
- * Lua FieldDataCollector: isPrecisionFarming, nitrogenLevel, targetNitrogen,
+ * Lua FieldDataCollector: isPrecisionFarming (soil maps active), nitrogenLevel, targetNitrogen,
  *                          phValue, targetPh, phLimeBarMin, phLimeBarMax, isScanned, nitrogenText, limeText,
  *                          posX, posZ, hectares
  *
  * Stubble mulch: Lua `mulchLevel` merged with XML `stubbleShredLevel` when both exist.
- * Lua wins for PF values (only available from runtime density map reads).
+ * Lua wins for mapped N/pH values (only available from runtime density map reads).
  *
  * Harvest / growth stage: Lua FieldDataCollector uses fruitType + engine growthState;
  * fields.xml is coarse. When both exist, Lua must override `harvestReady`, `stateName`,
@@ -276,20 +276,27 @@ function mergeFields(xmlFields, luaFields) {
     if (luaArr.length === 0) return xmlArr.map(normalizeFieldMulch);
     if (xmlArr.length === 0) return luaArr.map(normalizeFieldMulch);
 
-    // Lua uses internal FieldManager id in `id`; XML fields.xml uses map/farmland field numbers.
-    // Key by farmlandId so PF overlay matches the correct physical field (fixes wrong cross-field PF).
-    const luaMap = new Map();
+    // Lua uses internal FieldManager id in `id`; XML fields.xml id is the farmland parcel id.
+    // Index by both `farmlandId` and `id` so XML rows still match when those differ per map/engine
+    // (otherwise live-only keys like windrow/bales never merge and the dashboard looks empty vs data.json).
+    const luaByFarmlandId = new Map();
+    const luaByInternalId = new Map();
     for (const f of luaArr) {
-        const key = Number(f.farmlandId ?? f.id);
-        if (!Number.isNaN(key)) luaMap.set(key, f);
+        const fa = Number(f.farmlandId);
+        const fi = Number(f.id);
+        if (!Number.isNaN(fa) && fa > 0) luaByFarmlandId.set(fa, f);
+        if (!Number.isNaN(fi) && fi > 0) luaByInternalId.set(fi, f);
     }
 
     const merged = xmlArr.map(xmlField => {
         const xKey = Number(xmlField.farmlandId ?? xmlField.id);
-        const luaField = luaMap.get(xKey);
+        const luaField =
+            (!Number.isNaN(xKey) && luaByFarmlandId.get(xKey))
+            || (!Number.isNaN(xKey) && luaByInternalId.get(xKey))
+            || null;
         if (!luaField) return normalizeFieldMulch(xmlField);
 
-        // PF properties only available from Lua density map reads
+        // Mapped N/pH only available from Lua density map reads
         const pfOverlay = {
             isPrecisionFarming : luaField.isPrecisionFarming || false,
             nitrogenLevel      : luaField.nitrogenLevel      || 0,
@@ -331,7 +338,17 @@ function mergeFields(xmlFields, luaFields) {
             windrowArea: Number(luaField.windrowArea ?? 0),
             hasWindrow: !!(luaField.hasWindrow || (Number(luaField.windrowLiters) > 0)),
             windrowSamples: Array.isArray(luaField.windrowSamples) ? luaField.windrowSamples : [],
+            windrowByFillName:
+                luaField.windrowByFillName && typeof luaField.windrowByFillName === 'object'
+                    ? { ...luaField.windrowByFillName }
+                    : {},
             baleCountOnField: Number(luaField.baleCountOnField ?? 0),
+            /** Straw / grass / hay loose (Lua: TEDDER + STRAW probes); not cereal swaths alone. */
+            needsBaling: luaField.needsBaling === true,
+            baleableLooseLiters: Number(luaField.baleableLooseLiters ?? 0),
+            looseStrawLiters: Number(luaField.looseStrawLiters ?? 0),
+            looseGrassWindrowLiters: Number(luaField.looseGrassWindrowLiters ?? 0),
+            looseDryGrassWindrowLiters: Number(luaField.looseDryGrassWindrowLiters ?? 0),
         };
 
         // Live FieldDataCollector flags + levels (XML savegame can be stale while the game runs).
@@ -350,7 +367,7 @@ function mergeFields(xmlFields, luaFields) {
         return {
             ...xmlField,    // XML base: soil state, ownership, crop, growthState
             ...spatialData, // Lua: map position and area
-            ...pfOverlay,   // Lua: Precision Farming nitrogen/pH
+            ...pfOverlay,   // Lua: mapped nitrogen/pH when soil data is active
             ...windBale,    // Lua: windrow + bale counts for post-harvest rules
             ...luaAgronomy,
             /** Savegame/XML crop id (stable hint when Lua fruit is empty after harvest). */

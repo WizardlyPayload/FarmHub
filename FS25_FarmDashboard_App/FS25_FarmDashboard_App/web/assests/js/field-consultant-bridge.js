@@ -138,6 +138,15 @@ export function computeActiveFarmFieldsStateHash() {
         nitrogenLevel: f.nitrogenLevel,
         phValue: f.phValue,
         weedLevel: f.weedLevel,
+        baleCountOnField: f.baleCountOnField,
+        baleCount: f.baleCount,
+        hasWindrow: f.hasWindrow,
+        windrowLiters: f.windrowLiters,
+        needsBaling: f.needsBaling,
+        baleableLooseLiters: f.baleableLooseLiters,
+        looseStrawLiters: f.looseStrawLiters,
+        looseGrassWindrowLiters: f.looseGrassWindrowLiters,
+        looseDryGrassWindrowLiters: f.looseDryGrassWindrowLiters,
       }))
       .sort((a, b) => String(a.id).localeCompare(String(b.id)));
     return JSON.stringify(sig);
@@ -252,6 +261,10 @@ function _fieldUrgencyTieBreak(field) {
   const w = Number(field.weedLevel ?? 0);
   if (w >= 0.5) s += 15;
   if (field.needsPlowing || field.needsLime || field.needsCultivation) s += 10;
+  const bales = Number(field.baleCountOnField ?? field.baleCount ?? 0);
+  if (Number.isFinite(bales) && bales > 0) s += 25;
+  if (field.hasWindrow === true || Number(field.windrowLiters ?? 0) > 0) s += 20;
+  if (field.needsBaling === true || Number(field.baleableLooseLiters ?? 0) > 0) s += 12;
   return s;
 }
 

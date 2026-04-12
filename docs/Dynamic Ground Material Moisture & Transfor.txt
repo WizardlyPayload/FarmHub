@@ -1,0 +1,197 @@
+# Developer Handover: Dynamic Ground Material Moisture & Transformation
+
+**Target Environment:** GIANTS Engine 10 (Farming Simulator 25)  
+**Language:** Lua, XML  
+**Focus Areas:** Weather State Interception, Custom Density Maps (State Tracking), and Time-Sliced Terrain Modification (Rotting/Drying).  
+
+---
+
+## Architecture Overview: The "Moisture" Problem
+The biggest hurdle in creating a rotting/drying system is **memory and tracking**. The game engine does not track *when* a specific swath of grass was dropped. It just knows "there is grass here." 
+
+To solve this, the mod must:
+1. Track server weather conditions.
+2. Maintain a custom hidden "Moisture/Age" layer on the map.
+3. Process the map in small chunks over time (Time-Slicing) to prevent freezing the server.
+4. Execute bulk density swaps (Grass -> Hay) when thresholds are met.
+
+---
+
+## Module 1: Weather & Environment Tracking
+
+**Objective:** Continuously monitor the server's weather state to determine if ground materials should be gaining moisture (raining) or losing it (sunny).
+
+### Core Logic & Engine Singletons
+Hook into the `Environment` singleton, specifically the weather system, which calculates rain intensity and sun exposure. 
+
+### Reference Implementation
+```lua
+-- ==========================================
+-- FUNCTION: Update Global Weather State
+-- Context: Hook this into a slow update loop (e.g., once per in-game hour)
+-- ==========================================
+function MoistureMod:updateWeatherState()
+    -- Only run terrain state changes on the server!
+    if not g_server then return end
+
+    local environment = g_currentMission.environment
+    local isRaining = environment.weather:getIsRaining()
+    
+    -- In FS25, rain fall scale is usually a float between 0.0 and 1.0
+    local rainIntensity = environment.weather.rainFallScale or 0 
+    
+    -- Calculate drying potential based on daytime and sun
+    local isDayTime = environment.isSunOn
+    local temperature = environment.weather.currentTemperature
+    
+    if isRaining then
+        self.currentMoistureDelta = 10 * rainIntensity -- Add moisture
+    elseif isDayTime and temperature > 15 then
+        self.currentMoistureDelta = -5 -- Remove moisture (Drying)
+    else
+        self.currentMoistureDelta = 0 -- Neutral (Night time / overcast)
+    end
+end
+```
+
+---
+
+## Module 2: The Hidden "Moisture" Density Map
+
+**Objective:** Register a custom 2D grid (Density Map) to store the moisture level of the ground. 
+
+### Core Logic & Engine Singletons
+Instead of attaching scripts to millions of stalks of grass, you register a custom bit-layer to the terrain. When a mower cuts grass, it paints "Grass" to the visual layer, and your script paints "Wet" to the hidden moisture layer.
+
+### Reference Implementation
+```lua
+-- ==========================================
+-- FUNCTION: Register Custom Moisture Layer
+-- Context: Hook into Mission00:loadMission00Finished
+-- ==========================================
+function MoistureMod:registerMoistureMap()
+    if self.moistureLayerId == nil then
+        -- Create a new density map modifier layer with 4 channels (0-15 moisture states)
+        local mapWidth = g_currentMission.terrainSize
+        
+        -- Note: GIANTS API for creating bit layers dynamically can vary. 
+        -- Commonly, modders load a custom GRLE file or append to existing terrainDetail.
+        self.moistureLayerId = createBitVectorMap("MoistureMap")
+        loadBitVectorMapNew(self.moistureLayerId, mapWidth, mapWidth, 4, false)
+        
+        print("Moisture Density Map successfully initialized.")
+    end
+end
+```
+
+---
+
+## Module 3: Time-Sliced Terrain Scanning & Transformation
+
+**Objective:** Scan the terrain, apply the `currentMoistureDelta`, and convert the material if it dries out (Grass to Hay) or rots (Volume reduced to 0).
+
+### ⚠️ CRITICAL PERFORMANCE WARNING: Time-Slicing
+Do **NOT** scan the entire 2km x 2km map in a single `update()` frame. The server will hang and crash. You must use a Time-Slicing iterator that processes one small square (e.g., 64x64 meters) per frame until the whole map is done, then starts over.
+
+### Reference Implementation
+```lua
+-- ==========================================
+-- FUNCTION: Process Terrain Chunk (Time-Sliced)
+-- Context: Called inside update(dt)
+-- ==========================================
+function MoistureMod:processMapChunk()
+    if not g_server then return end
+
+    -- Determine chunk coordinates (Self-managed iterator variables)
+    local startX = self.iteratorX
+    local startZ = self.iteratorZ
+    local chunkSize = 64 -- Process 64x64 meter blocks
+    
+    local heightMapId = g_currentMission.terrainDetailHeightId
+    local grassFillType = FillType.GRASS_WINDROW
+    local hayFillType = FillType.DRYGRASS_WINDROW
+    
+    -- 1. Create a modifier for this specific chunk
+    local modifier = DensityMapModifier.new(heightMapId, startX, startZ, chunkSize, chunkSize)
+    
+    -- 2. Check if Grass exists in this chunk
+    modifier:setDensityCompareParams(DensityCompareType.EQUAL, grassFillType)
+    local grassCount = modifier:executeGet()
+    
+    if grassCount > 0 then
+        -- 3. Check our hidden Moisture layer for this chunk
+        local chunkMoisture = self:getMoistureAtChunk(startX, startZ)
+        
+        -- Apply weather delta
+        chunkMoisture = chunkMoisture + self.currentMoistureDelta
+        self:setMoistureAtChunk(startX, startZ, chunkMoisture)
+        
+        -- 4. THE MAGIC: If it's dry enough, instantly convert the grass to hay
+        if chunkMoisture <= 0 then
+            -- Replace Grass with Hay natively in the engine
+            modifier:executeSet(hayFillType)
+            print(string.format("Converted Grass to Hay at Chunk X:%s Z:%s", startX, startZ))
+            
+        -- 5. ROTTING: If it's too wet for too long, reduce volume (simulate rotting)
+        elseif chunkMoisture >= 15 then
+            -- Subtract density/volume. If it hits 0, it visually disappears.
+            modifier:executeAdd(-1) 
+        end
+    end
+    
+    -- Advance the iterator for the next frame
+    self:advanceIterator(chunkSize)
+end
+```
+
+---
+
+## Module 4: Overriding the Pickup / Yield Logic
+
+**Objective:** Prevent forage wagons and balers from picking up rotting crops, or alter their yield based on the moisture state.
+
+### Core Logic & Engine Singletons
+Overwrite the `ForageWagon:processDropArea` or the `Baler:processPickup` functions.
+
+### Reference Implementation
+```lua
+-- ==========================================
+-- FUNCTION: Intercept Baler Pickup
+-- Context: Append to Baler specialization
+-- ==========================================
+local original_processBalerArea = Baler.processBalerArea
+
+Baler.processBalerArea = function(self, workArea, dt)
+    -- Get the coordinates of the pickup header
+    local x, y, z = getWorldTranslation(workArea.start)
+    
+    -- Query our custom Moisture map
+    local localMoisture = MoistureMod:getMoistureAtCoordinate(x, z)
+    
+    if localMoisture >= 12 then
+        -- It's severely rotting. Punish the player by reducing picked-up volume by 50%
+        -- Or return 0 to completely block pickup
+        
+        local originalLiters = original_processBalerArea(self, workArea, dt)
+        return originalLiters * 0.5 
+    end
+    
+    -- Normal pickup behavior
+    return original_processBalerArea(self, workArea, dt)
+end
+```
+
+---
+
+## Module 5: Developer Reminders & Best Practices
+
+1. **Multiplayer (Server Authority):** * Terrain modification (`DensityMapModifier`) and weather state tracking must **only** be executed on the server (`if g_server then`). 
+   * The GIANTS Engine automatically syncs `terrainDetailHeightId` changes to clients. Do not attempt to sync terrain changes manually via `EventClass`; let the engine's built-in bit-stream handle the visual updates.
+2. **Savegame States:** * The custom `MoistureMap` bit-vector MUST be saved to the savegame folder (`savegame/MoistureMap.grle`). You must append to `Mission00:saveToXMLFile` to write your layer to the disk, otherwise, all grass will reset to neutral moisture when the server restarts.
+3. **Mod Compatibility:** * Be careful when overwriting `Baler.processBalerArea`. Use `Utils.appendedFunction` or `Utils.overwrittenFunction` to ensure you don't break MaizePlus, Courseplay, or other mods that also interact with pickups.
+
+---
+
+## Farm Dashboard (FS25_FarmDashboard) — loose forage detection
+
+The dashboard does **not** implement a custom moisture layer; it reads the **engine height-map** volumes the same way this doc references (`terrainDetailHeightId` / fill types). For each field it probes `DensityMapHeightUtil.getFillLevelAtArea` for **STRAW**, **GRASS_WINDROW**, **DRYGRASS_WINDROW** (and related TEDDER channels), aggregates litres into `data.json` as `looseStrawLiters`, `looseGrassWindrowLiters`, `looseDryGrassWindrowLiters`, and emits **suggested next steps**: bale straw; tedder grass to hay **or** bale wet for wrapped silage; bale/collect dry hay windrow.

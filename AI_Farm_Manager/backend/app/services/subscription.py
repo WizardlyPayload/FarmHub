@@ -9,6 +9,35 @@ from app.config import get_settings
 from app.services.bot_registry import find_instance_by_id, find_instance_by_token
 from app.services.consultant import normalize_incoming_api_key
 
+
+def chat_client_ip(request: Request) -> str:
+    """Best-effort client IP for /api/chat/* (direct socket or first X-Forwarded-For hop)."""
+    s = get_settings()
+    if s.get("chat_trust_x_forwarded_for"):
+        h = (request.headers.get("x-forwarded-for") or "").strip()
+        if h:
+            return h.split(",")[0].strip()
+    if request.client:
+        return (request.client.host or "").strip()
+    return ""
+
+
+def assert_chat_ip_allowed(request: Request) -> None:
+    """
+    Optional allowlist for in-game chat HTTP (POST /receive, GET /poll).
+    When CHAT_ALLOWED_IPS is unset or empty, all client IPs are allowed (default LAN/VPS behaviour).
+    """
+    allow = get_settings().get("chat_allowed_ips")
+    if not allow:
+        return
+    ip = chat_client_ip(request)
+    if ip in allow:
+        return
+    raise HTTPException(
+        status_code=403,
+        detail="Chat API: client IP not allowed (set CHAT_ALLOWED_IPS or fix proxy headers).",
+    )
+
 # Tier 0: dashboard only (BYOK allowed for AI elsewhere — not server-paid)
 # Tier 1: server-paid consultant API
 # Tier 2: consultant + in-game chat
@@ -61,6 +90,7 @@ def assert_chat_allowed(request: Request, server_token: str) -> None:
     """
     Tier >= 2 required for in-game chat when tiers are enabled.
     BYOK (X-AI-API-Key) bypasses — for future proxies / tooling.
+    Call assert_chat_ip_allowed(request) first on /api/chat/* when enforcing CHAT_ALLOWED_IPS.
     """
     s = get_settings()
     if not s.get("enable_subscription_tiers"):

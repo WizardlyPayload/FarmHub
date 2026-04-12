@@ -15,7 +15,7 @@ from app.services.log_buffer import log_event
 from app.services.outgoing_queue import push_message
 from app.services.rate_limit import allow
 from app.services.pipeline_log import log_pipeline
-from app.services.subscription import assert_chat_allowed
+from app.services.subscription import assert_chat_allowed, assert_chat_ip_allowed
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -177,10 +177,23 @@ async def receive_chat(
 
 
 @router.get("/poll")
-async def poll_chat(server_token: str = Query(..., min_length=1)) -> dict[str, Any]:
+async def poll_chat(
+    request: Request,
+    server_token: str = Query(..., min_length=1),
+) -> dict[str, Any]:
+    assert_chat_ip_allowed(request)
     ok, err, _, _ = resolve_auth(server_token)
     if not ok:
         raise HTTPException(status_code=401, detail=err or "Invalid server_token")
+    try:
+        assert_chat_allowed(request, server_token)
+    except HTTPException as exc:
+        log_pipeline(
+            "chat_blocked",
+            f"GET /api/chat/poll rejected ({exc.status_code}): {exc.detail}",
+            "WARN",
+        )
+        raise
     from app.services.outgoing_queue import pop_all
 
     messages = pop_all(normalize_server_token(server_token))

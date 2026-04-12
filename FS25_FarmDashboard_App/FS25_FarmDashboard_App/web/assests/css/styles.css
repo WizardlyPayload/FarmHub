@@ -1767,6 +1767,11 @@ body.farm-dash-ui.bg-dark::before {
   font-size: clamp(0.88rem, 0.35vw + 0.78rem, 1rem);
 }
 
+/* Collapse Smart suggestions body (landing + other slots) to reach category cards faster */
+#ai-farm-insights-card.farmdash-insights--collapsed #ai-insights-panel {
+  display: none !important;
+}
+
 #ai-insights-panel {
   font-size: clamp(0.8rem, 0.2vw + 0.74rem, 0.9375rem);
   overflow-wrap: break-word;

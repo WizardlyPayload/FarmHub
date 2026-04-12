@@ -1,6 +1,6 @@
 // FS25 FarmDashboard | fields.js | v2.0.0
 
-import { getLocalFieldSuggestion } from "../rules-engine.js";
+import { getLocalFieldSuggestion, RULES_ENGINE_FALLBACK_ACTION } from "../rules-engine.js";
 import {
   refreshFieldConsultantCache,
   scheduleFieldConsultantFetch,
@@ -26,6 +26,14 @@ let fieldsSearchTerm     = "";
 let fieldConsultantListenerRegistered = false;
 /** Skip re-render when /api/fields body and client scope (farm/server) unchanged */
 let lastFieldsPayloadKey = null;
+
+/** Mirrors getAPIBaseURL in apiStorage — cannot import apiStorage here (it imports this module). */
+function resolveFarmdashApiBase() {
+  if (typeof window !== "undefined" && window.location && /^https?:$/i.test(window.location.protocol || "")) {
+    return window.location.origin;
+  }
+  return "http://127.0.0.1:8766";
+}
 
 function ensureFieldConsultantListener() {
   if (fieldConsultantListenerRegistered || typeof window === "undefined") return;
@@ -89,7 +97,7 @@ export function showFieldsSection() {
     lastFieldsPayloadKey = null;
     ensureFieldConsultantListener();
 
-    document.getElementById("section-content").innerHTML = buildFieldsHTML();
+    document.getElementById("section-content-dynamic").innerHTML = buildFieldsHTML();
     document.getElementById("section-content").classList.remove("d-none");
 
     // Stop any previous refresh loop
@@ -119,7 +127,7 @@ async function loadFieldsData() {
     fieldsIsLoading = true;
 
     try {
-        const apiBase   = window.dashboard?.getAPIBaseURL?.() ?? "http://127.0.0.1:8766";
+        const apiBase   = window.dashboard?.getAPIBaseURL?.() ?? resolveFarmdashApiBase();
         const serverId  = window.dashboard?.activeServerId;
         const farmId    = window.dashboard?.activeFarmId ?? 1;
 
@@ -661,7 +669,7 @@ function buildSuggestion(field) {
     const rulesApi = pickApiFallbackSuggestion(field);
     if (
         rulesLocal &&
-        rulesLocal.action === "Review field status in game" &&
+        rulesLocal.action === RULES_ENGINE_FALLBACK_ACTION &&
         rulesApi
     ) {
         rulesLocal = rulesApi;
@@ -797,6 +805,10 @@ function buildFieldsHTML() {
                     </div>
                 </div>
             </div>
+        </div>
+
+        <div class="row ai-insights-slot-after-kpis justify-content-center">
+            <div class="col-12" id="ai-insights-slot-section"></div>
         </div>
 
         <div class="row mb-3">

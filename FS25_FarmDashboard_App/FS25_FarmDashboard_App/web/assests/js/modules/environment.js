@@ -1,5 +1,7 @@
 // FS25 FarmDashboard | environment.js | v2.0.0
 
+import { t } from "../i18n/i18n.js";
+
 export function formatGameTime(dayTimeMinutes) {
   const hours = Math.floor(dayTimeMinutes / 60);
   const minutes = Math.floor(dayTimeMinutes % 60);
@@ -37,6 +39,55 @@ export function getGameTimeDisplay() {
   return `Time format error: ${JSON.stringify(this.gameTime)}`;
 }
 
+/**
+ * Single navbar badge: XML / Live stream status + dashboard API (websocket) in one line.
+ */
+export function updateNavbarConnectionStrip() {
+  const dsBadge = document.getElementById("navbar-datasource");
+  const dsText = document.getElementById("navbar-datasource-text");
+  if (!dsBadge || !dsText) return;
+
+  const src = this.dataSource || "unknown";
+  const apiOn = !!(this.realtimeConnector && this.realtimeConnector.isConnected);
+
+  let label = "";
+  if (src === "merged") {
+    label = apiOn ? "XML + Live + API" : "XML + Live";
+  } else if (src === "xml_only") {
+    label = apiOn ? "XML only + API" : "XML only";
+  } else if (src === "lua_only") {
+    label = apiOn ? "Live + API" : "Live only";
+  } else {
+    label = apiOn ? "Connecting… + API" : "Connecting…";
+  }
+
+  dsText.textContent = label;
+  dsBadge.className = "badge text-light ms-2";
+  if (src === "merged" && apiOn) {
+    dsBadge.classList.add("bg-success");
+  } else if (src === "merged" && !apiOn) {
+    dsBadge.classList.add("bg-secondary");
+  } else if (src === "xml_only") {
+    dsBadge.classList.add("bg-warning", "text-dark");
+  } else if (src === "lua_only") {
+    dsBadge.classList.add(apiOn ? "bg-success" : "bg-info");
+  } else {
+    dsBadge.classList.add("bg-secondary");
+  }
+
+  dsBadge.classList.remove("d-none");
+
+  if (src === "xml_only") {
+    dsBadge.title =
+      "Live data missing: enable mod FS25_FarmDashboard for this save (SP / host / dedicated). " +
+      "Joining players do not write data.json. Ensure dashboard Savegame Folder matches modSettings/FS25_FarmDashboard/<folder>.";
+  } else {
+    dsBadge.title = apiOn
+      ? "Savegame XML, live mod data stream, and dashboard API are connected."
+      : "Data source status for this save (dashboard API not connected yet).";
+  }
+}
+
 export function updateGameTimeDisplay() {
   const gameTimeElement = document.getElementById("game-time-display");
   if (gameTimeElement) {
@@ -48,38 +99,18 @@ export function updateGameTimeDisplay() {
     navbarGameTime.classList.remove("d-none");
   }
 
-  // Update data source badge
-  const dsBadge = document.getElementById("navbar-datasource");
-  const dsText  = document.getElementById("navbar-datasource-text");
-  if (dsBadge && dsText) {
-    const src = this.dataSource || 'unknown';
-    const labels = {
-      merged:   'XML + Live',
-      xml_only: 'XML Only',
-      lua_only: 'Live Only',
-      unknown:  'Connecting...'
-    };
-    dsText.textContent = labels[src] || src;
-    dsBadge.className = 'badge text-light ms-2';
-    if (src === 'merged')   dsBadge.classList.add('bg-success');
-    else if (src === 'xml_only') dsBadge.classList.add('bg-warning', 'text-dark');
-    else if (src === 'lua_only') dsBadge.classList.add('bg-info');
-    else                    dsBadge.classList.add('bg-secondary');
-    dsBadge.classList.remove('d-none');
-    // Hint when Lua never arrived: mod not active for save, wrong watch folder, or MP client (no authority)
-    if (src === 'xml_only') {
-      dsBadge.title =
-        'Live data missing: enable mod FS25_FarmDashboard for this save (SP / host / dedicated). ' +
-        'Joining players do not write data.json. Ensure dashboard Savegame Folder matches modSettings/FS25_FarmDashboard/<folder>.';
-    } else {
-      dsBadge.removeAttribute('title');
-    }
-  }
+  this.updateNavbarConnectionStrip();
 
-  // Update navbar section title with map name if available
+  // Map name in navbar only on home (same bar as section views)
   const sectionTitle = document.getElementById("navbar-section-title");
-  if (sectionTitle && this.mapTitle && sectionTitle.textContent === 'Farm Dashboard') {
-    sectionTitle.textContent = this.mapTitle;
+  if (sectionTitle && this.mapTitle) {
+    const sec =
+      typeof this.getCurrentSection === "function" ? this.getCurrentSection() : "dashboard";
+    const atHome = sec === "dashboard" || sec === "landing";
+    const homeLabel = t("nav.section.dashboard");
+    if (atHome && (sectionTitle.textContent === homeLabel || sectionTitle.textContent === t("nav.brand"))) {
+      sectionTitle.textContent = this.mapTitle;
+    }
   }
 
   this.updateWeatherDisplay();

@@ -13,6 +13,8 @@ services:
       - ./data:/app/data
     # Place a `.env` next to this file (copy from `backend/.env.example`). Must include at least
     # ENCRYPTION_KEY, ADMIN_PASSWORD, SERVER_TOKEN, and your LLM / FTP settings.
+    # Optional hardening for public hosts: REQUIRE_AUTH_FOR_ROOT_HTML=1, HEALTH_RESPONSE_DETAIL=minimal
+    # (see FarmHub/docs/AI_SERVER_SECURITY.md).
     env_file:
       - .env
     restart: unless-stopped

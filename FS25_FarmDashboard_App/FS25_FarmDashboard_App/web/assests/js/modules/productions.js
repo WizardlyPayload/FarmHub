@@ -158,6 +158,9 @@ export function buildProductionsPageHTML(dashboard) {
           <p class="lead text-muted">No production chains reported for your farm yet, or the mod has not written fresh data.</p>
           <p class="text-muted small">Ensure the Farm Dashboard mod is active and production points exist on the map.</p>
         </div>
+      </div>
+      <div class="row ai-insights-slot-after-kpis justify-content-center">
+        <div class="col-12" id="ai-insights-slot-section"></div>
       </div>`;
   }
 
@@ -169,18 +172,28 @@ export function buildProductionsPageHTML(dashboard) {
         <p class="text-muted mb-0">${chains.length} chain${chains.length === 1 ? "" : "s"} · Farm ${farmId}</p>
       </div>
     </div>
+    <div class="row ai-insights-slot-after-kpis justify-content-center">
+      <div class="col-12" id="ai-insights-slot-section"></div>
+    </div>
     <div class="row">
       <div class="col-12">${cards}</div>
     </div>`;
 }
 
+function setProductionsSectionHtml(dashboard) {
+  const landing = document.getElementById("ai-insights-slot-landing");
+  const row = document.getElementById("ai-farm-insights-row");
+  if (row && landing) landing.appendChild(row);
+  const el = document.getElementById("section-content-dynamic");
+  if (el) el.innerHTML = buildProductionsPageHTML(dashboard);
+  const slot = document.getElementById("ai-insights-slot-section");
+  if (row && slot) slot.appendChild(row);
+}
+
 export function showProductionsSection() {
   this.currentSection = "productions";
-  const el = document.getElementById("section-content");
-  if (el) {
-    el.innerHTML = buildProductionsPageHTML(this);
-    el.classList.remove("d-none");
-  }
+  setProductionsSectionHtml(this);
+  document.getElementById("section-content")?.classList.remove("d-none");
   document.getElementById("landing-page")?.classList.add("d-none");
   document.getElementById("dashboard-content")?.classList.add("d-none");
   this.updateNavbar();
@@ -189,6 +202,5 @@ export function showProductionsSection() {
 /** Call after realtime production JSON updates */
 export function refreshProductionsIfVisible() {
   if (this.currentSection !== "productions") return;
-  const el = document.getElementById("section-content");
-  if (el) el.innerHTML = buildProductionsPageHTML(this);
+  setProductionsSectionHtml(this);
 }

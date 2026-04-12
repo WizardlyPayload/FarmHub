@@ -1,6 +1,6 @@
 # FS25 Farm Dashboard — Release notes
 
-Use this file for **short copy-paste text** on GitHub Releases. The **full history** is in [docs/CHANGELOG.md](docs/CHANGELOG.md). **Security and LAN access** are summarized in [docs/SECURITY.md](docs/SECURITY.md). **Authors:** [AUTHORS.md](AUTHORS.md) — **JoshWalki** (Josh) & **WizardlyPayload**.
+Use this file for **short copy-paste text** on GitHub Releases. The **full history** is in [docs/CHANGELOG.md](docs/CHANGELOG.md). **Security and LAN access** (Farm Dashboard): [docs/SECURITY.md](docs/SECURITY.md). **AI Farm Manager API hardening** (optional VPS settings): [docs/AI_SERVER_SECURITY.md](docs/AI_SERVER_SECURITY.md). **Authors:** [AUTHORS.md](AUTHORS.md) — **JoshWalki** (Josh) & **WizardlyPayload**.
 
 ---
 

@@ -70,12 +70,233 @@ function collectFieldExclusionsFromForm() {
   return byServer;
 }
 
+/** In-memory copy of servers list while Settings is open (mirrors first-run setup). */
+let _appSettingsServersDraft = null;
+
+function gatherFtpPollingFromForm() {
+  const delay = parseInt(document.getElementById("app-settings-sm-ftp-delay")?.value, 10);
+  const interval = parseInt(document.getElementById("app-settings-sm-ftp-interval")?.value, 10);
+  const sched = document.querySelector('input[name="app-settings-sm-ftp-schedule"]:checked');
+  return {
+    initialDelaySeconds: Math.min(600, Math.max(0, Number.isFinite(delay) ? delay : 0)),
+    intervalMinutes: Math.min(25, Math.max(1, Number.isFinite(interval) ? interval : 5)),
+    scheduleMode: sched?.value === "staggered" ? "staggered" : "sync",
+  };
+}
+
+function applyFtpPollingToForm(fp) {
+  const f = fp || {};
+  const d = document.getElementById("app-settings-sm-ftp-delay");
+  if (d) d.value = String(f.initialDelaySeconds ?? 0);
+  const i = document.getElementById("app-settings-sm-ftp-interval");
+  if (i) i.value = String(f.intervalMinutes ?? 5);
+  const mode = f.scheduleMode === "staggered" ? "staggered" : "sync";
+  const sync = document.getElementById("app-settings-sm-ftp-sched-sync");
+  const stag = document.getElementById("app-settings-sm-ftp-sched-stag");
+  if (sync && stag) {
+    if (mode === "staggered") stag.checked = true;
+    else sync.checked = true;
+  }
+}
+
+function toggleAppSettingsServerMode() {
+  const mode = document.querySelector('input[name="app-settings-sm-mode"]:checked')?.value;
+  const local = document.getElementById("app-settings-sm-local-fields");
+  const ftp = document.getElementById("app-settings-sm-ftp-fields");
+  if (local && ftp) {
+    local.classList.toggle("d-none", mode !== "local");
+    ftp.classList.toggle("d-none", mode !== "ftp");
+  }
+}
+
+function renderAppSettingsServerList() {
+  const list = document.getElementById("app-settings-sm-list");
+  const empty = document.getElementById("app-settings-sm-empty");
+  if (!list || !empty) return;
+  const servers = _appSettingsServersDraft || [];
+  empty.classList.toggle("d-none", servers.length > 0);
+  list.innerHTML = "";
+  servers.forEach((srv, idx) => {
+    const info =
+      srv.mode === "local"
+        ? "Local: " + (srv.localSubFolder || srv.name)
+        : "FTP: " + (srv.ftpHost || "") + (srv.httpFeedHost ? " + HTTP" : "");
+    const row = document.createElement("div");
+    row.className =
+      "d-flex justify-content-between align-items-start border border-secondary rounded p-2 mb-2 bg-black bg-opacity-25 gap-2";
+    row.innerHTML = `<div class="min-w-0"><strong>${escHtml(srv.name)}</strong><br/><span class="small text-muted text-break">${escHtml(
+      info
+    )}</span></div>`;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-sm btn-outline-danger flex-shrink-0";
+    btn.textContent = t("setup.remove");
+    btn.addEventListener("click", () => {
+      if (!_appSettingsServersDraft) return;
+      _appSettingsServersDraft.splice(idx, 1);
+      renderAppSettingsServerList();
+    });
+    row.appendChild(btn);
+    list.appendChild(row);
+  });
+}
+
+async function loadAppSettingsServerDraft() {
+  try {
+    const { ipcRenderer } = require("electron");
+    const cfg = await ipcRenderer.invoke("get-current-config");
+    _appSettingsServersDraft = JSON.parse(JSON.stringify(cfg?.servers || []));
+    applyFtpPollingToForm(cfg?.ftpPolling);
+    renderAppSettingsServerList();
+  } catch (e) {
+    console.warn("[dashboard-settings] server draft", e);
+    _appSettingsServersDraft = null;
+    renderAppSettingsServerList();
+  }
+}
+
+function addAppSettingsServerFromForm(dashboard) {
+  const name = document.getElementById("app-settings-sm-server-name")?.value?.trim();
+  const mode = document.querySelector('input[name="app-settings-sm-mode"]:checked')?.value;
+  if (!name) {
+    dashboard.showAlert?.("Enter a display name.", "error");
+    return;
+  }
+  if (!_appSettingsServersDraft) _appSettingsServersDraft = [];
+  const srv = { id: "srv_" + Date.now(), name, mode };
+  if (mode === "local") {
+    srv.localPath = document.getElementById("app-settings-sm-local-path")?.value?.trim() || "";
+    srv.localSubFolder = document.getElementById("app-settings-sm-local-sub")?.value?.trim() || "";
+  } else {
+    srv.ftpHost = document.getElementById("app-settings-sm-ftp-host")?.value?.trim() || "";
+    srv.ftpPort = document.getElementById("app-settings-sm-ftp-port")?.value || "21";
+    srv.ftpUser = document.getElementById("app-settings-sm-ftp-user")?.value?.trim() || "";
+    srv.ftpPass = document.getElementById("app-settings-sm-ftp-pass")?.value || "";
+    srv.ftpBasePath = document.getElementById("app-settings-sm-ftp-base")?.value?.trim() || "profile";
+    srv.localSubFolder = document.getElementById("app-settings-sm-ftp-sub")?.value?.trim() || "savegame1";
+    const feedHost = document.getElementById("app-settings-sm-http-host")?.value?.trim() || "";
+    const feedCode = document.getElementById("app-settings-sm-http-code")?.value?.trim() || "";
+    if (feedHost && feedCode) {
+      srv.httpFeedHost = feedHost;
+      srv.httpFeedPort = parseInt(document.getElementById("app-settings-sm-http-port")?.value, 10) || 8080;
+      srv.httpFeedCode = feedCode;
+    }
+    if (!srv.ftpHost || !srv.ftpUser || !srv.ftpPass) {
+      dashboard.showAlert?.("FTP host, user and password are required.", "error");
+      return;
+    }
+  }
+  _appSettingsServersDraft.push(srv);
+  renderAppSettingsServerList();
+  const sn = document.getElementById("app-settings-sm-server-name");
+  if (sn) sn.value = "";
+}
+
+function syncAppSettingsFooterButtons() {
+  const active = document.querySelector("#app-settings-sidebar .nav-link.active");
+  const id = active?.id || "";
+  const saveDash = document.getElementById("dashboard-settings-save-btn");
+  const saveTheme = document.getElementById("app-settings-save-theme-btn");
+  const onTheme = id === "app-settings-tab-theme";
+  if (saveTheme) saveTheme.classList.toggle("d-none", !onTheme);
+  if (saveDash) saveDash.classList.toggle("d-none", onTheme);
+}
+
+function wireAppSettingsServerControlsOnce(dashboard) {
+  if (window.__farmdashAppSettingsServersWired) return;
+  window.__farmdashAppSettingsServersWired = true;
+
+  document.querySelectorAll('input[name="app-settings-sm-mode"]').forEach((r) => {
+    r.addEventListener("change", () => toggleAppSettingsServerMode());
+  });
+  toggleAppSettingsServerMode();
+
+  document.getElementById("app-settings-sm-add-btn")?.addEventListener("click", () => {
+    addAppSettingsServerFromForm(dashboard);
+  });
+
+  document.getElementById("app-settings-open-setup-btn")?.addEventListener("click", () => {
+    dashboard.openSetup?.();
+  });
+
+  document.getElementById("app-settings-sm-detect-btn")?.addEventListener("click", () => {
+    const btn = document.getElementById("app-settings-sm-detect-btn");
+    const prev = btn?.textContent;
+    if (btn) btn.textContent = "…";
+    try {
+      const { ipcRenderer } = require("electron");
+      ipcRenderer
+        .invoke("scan-local-saves")
+        .then((found) => {
+          if (!found || found.length === 0) {
+            dashboard.showAlert?.("No saves found. Run the mod at least once.", "info");
+            return;
+          }
+          if (!_appSettingsServersDraft) _appSettingsServersDraft = [];
+          const fresh = found.filter(
+            (f) => !_appSettingsServersDraft.some((s) => s.localSubFolder === f.localSubFolder)
+          );
+          if (fresh.length > 0) {
+            _appSettingsServersDraft = _appSettingsServersDraft.concat(fresh);
+            renderAppSettingsServerList();
+            dashboard.showAlert?.(`Imported ${fresh.length} save(s).`, "success");
+          } else {
+            dashboard.showAlert?.("All detected saves are already listed.", "info");
+          }
+        })
+        .catch((e) => dashboard.showAlert?.(String(e.message || e), "error"))
+        .finally(() => {
+          if (btn && prev) btn.textContent = prev;
+        });
+    } catch (e) {
+      if (btn && prev) btn.textContent = prev;
+    }
+  });
+
+  document.getElementById("app-settings-sm-mod-img-btn")?.addEventListener("click", () => {
+    const btn = document.getElementById("app-settings-sm-mod-img-btn");
+    const prev = btn?.textContent;
+    if (btn) btn.textContent = "…";
+    let cleanup = null;
+    try {
+      const { ipcRenderer } = require("electron");
+      if (typeof window.attachModExportProgress === "function") {
+        cleanup = window.attachModExportProgress(ipcRenderer);
+      }
+      ipcRenderer
+        .invoke("export-mod-store-images")
+        .catch((e) => dashboard.showAlert?.(String(e.message || e), "error"))
+        .finally(() => {
+          if (typeof cleanup === "function") cleanup();
+          if (btn && prev) btn.textContent = prev;
+        });
+    } catch (e) {
+      if (btn && prev) btn.textContent = prev;
+    }
+  });
+}
+
 export function setupDashboardSettingsModal() {
-  const modalEl = document.getElementById("dashboardSettingsModal");
+  const modalEl = document.getElementById("appSettingsModal");
   if (!modalEl) return;
+
+  wireAppSettingsServerControlsOnce(this);
 
   modalEl.addEventListener("show.bs.modal", () => {
     this.populateDashboardSettingsForm();
+  });
+
+  modalEl.addEventListener("shown.bs.modal", () => {
+    syncAppSettingsFooterButtons();
+  });
+
+  document.querySelectorAll('#app-settings-sidebar [data-bs-toggle="tab"]').forEach((btn) => {
+    btn.addEventListener("shown.bs.tab", () => {
+      syncAppSettingsFooterButtons();
+      if (btn.id === "app-settings-tab-theme") {
+        this.loadThemeEditor?.();
+      }
+    });
   });
 
   const saveBtn = document.getElementById("dashboard-settings-save-btn");
@@ -98,95 +319,6 @@ function escHtml(s) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
-}
-
-/** Live check for Dashboard Settings → AI section (same logic as AI Farm Manager status). */
-async function refreshSettingsAiConnectionStatus() {
-  const el = document.getElementById("settings-ai-connection-status");
-  if (!el) return;
-  el.className = "alert small py-2 mb-3";
-  el.innerHTML = '<span class="text-muted">Checking connection to AI server…</span>';
-  try {
-    const { ipcRenderer } = require("electron");
-    const c = await ipcRenderer.invoke("get-ai-manager-connection");
-    const base = (c?.baseUrl || "").replace(/\/$/, "");
-    const key = (c?.integrationKey || "").trim();
-    if (!base) {
-      el.classList.add("alert-secondary");
-      el.innerHTML =
-        "<strong>AI server URL missing.</strong> Open <strong>AI Farm Manager</strong> (robot icon) and paste the <code>https://…</code> address from your host.";
-      return;
-    }
-    if (!key) {
-      el.classList.add("alert-secondary");
-      el.innerHTML =
-        "<strong>Link key missing.</strong> Paste the secret <strong>link key</strong> from your host in AI Farm Manager, then <strong>Save &amp; load</strong>.";
-      return;
-    }
-    if (typeof globalThis.pipelineLog === "function") {
-      globalThis.pipelineLog("renderer_out", "GET /api/integration/overview (Dashboard Settings)", { base });
-    }
-    if (typeof globalThis.dashAiDebug === "function") {
-      globalThis.dashAiDebug("dashboard-settings", "request", {
-        url: `${base}/api/integration/overview`,
-        method: "GET",
-        headers: { "X-FarmDash-Key": "(redacted)" },
-      });
-    }
-    const r = await fetch(base + "/api/integration/overview", {
-      headers: { "X-FarmDash-Key": encodeURIComponent(key) },
-    });
-    if (typeof globalThis.pipelineLog === "function") {
-      globalThis.pipelineLog("renderer_out", "integration/overview response (settings)", { httpStatus: r.status });
-    }
-    if (!r.ok) {
-      if (typeof globalThis.dashAiDebug === "function") {
-        globalThis.dashAiDebug("dashboard-settings", "error", { status: r.status });
-      }
-      el.classList.add("alert-warning");
-      el.innerHTML =
-        "<strong>Cannot reach AI server</strong> (HTTP " +
-        r.status +
-        "). Check URL, link key, and that the server is online.";
-      return;
-    }
-    const data = await r.json();
-    if (typeof globalThis.dashAiDebug === "function") {
-      globalThis.dashAiDebug("dashboard-settings", "response", { body: data });
-    }
-    const push = data.farmDashboardPushMode;
-    const fd = data.farmDashboardServers || [];
-    const fdErr = data.farmDashboardError;
-    const n = fd.length;
-    if (push) {
-      if (n > 0) {
-        el.classList.add("alert-success");
-        el.innerHTML =
-          "<strong>Farm data:</strong> syncing — Smart suggestions should work. Use <strong>Refresh</strong> on the suggestions card if needed.";
-      } else {
-        el.classList.add("alert-warning");
-        el.innerHTML =
-          "<strong>Farm data:</strong> not received yet. In AI Farm Manager keep <strong>Send farm data</strong> on, click <strong>Save &amp; load</strong>. Your host must set <code>DASHBOARD_PUSH_MODE=1</code> on the AI server.";
-      }
-    } else if (fdErr) {
-      el.classList.add("alert-warning");
-      el.innerHTML =
-        "<strong>Farm data:</strong> the AI server is not set up to read your dashboard. Your host must enable push mode or configure a dashboard URL — see the yellow banner in AI Farm Manager.";
-    } else {
-      el.classList.add("alert-success");
-      el.innerHTML =
-        "<strong>Farm data:</strong> linked (" + n + " save(s) visible to the server).";
-    }
-  } catch (e) {
-    if (typeof globalThis.pipelineLog === "function") {
-      globalThis.pipelineLog("renderer_err", "integration/overview (settings) failed", {
-        error: String(e?.message || e),
-      });
-    }
-    el.classList.add("alert-secondary");
-    el.innerHTML =
-      "Could not check (offline?). Open <strong>AI Farm Manager</strong> → <strong>Test dashboard → LLM</strong> to verify the link.";
-  }
 }
 
 export async function populateDashboardSettingsForm() {
@@ -289,7 +421,7 @@ export async function populateDashboardSettingsForm() {
     }
   }
 
-  await refreshSettingsAiConnectionStatus();
+  await loadAppSettingsServerDraft();
 }
 
 export async function saveDashboardSettingsFromModal() {
@@ -310,6 +442,18 @@ export async function saveDashboardSettingsFromModal() {
   } catch (e) {
     this.showAlert?.(t("settings.saveFailed") + " (UI)", "error");
     return;
+  }
+
+  try {
+    const cfg = await ipcRenderer.invoke("get-current-config");
+    ipcRenderer.send("save-settings", {
+      ...cfg,
+      isConfigured: true,
+      servers: _appSettingsServersDraft !== null ? _appSettingsServersDraft : cfg?.servers || [],
+      ftpPolling: { ...(cfg?.ftpPolling || {}), ...gatherFtpPollingFromForm() },
+    });
+  } catch (e) {
+    console.warn("[dashboard-settings] save-settings", e);
   }
 
   if (document.getElementById("settings-consultant-byok-key")) {
@@ -363,9 +507,7 @@ export async function saveDashboardSettingsFromModal() {
     });
     if (res?.ok) {
       this.showAlert?.(t("settings.saved"), "success");
-      const modal = bootstrap.Modal.getInstance(
-        document.getElementById("dashboardSettingsModal")
-      );
+      const modal = bootstrap.Modal.getInstance(document.getElementById("appSettingsModal"));
       modal?.hide();
     } else {
       this.showAlert?.(

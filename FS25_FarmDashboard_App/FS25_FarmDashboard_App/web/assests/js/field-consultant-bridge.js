@@ -1,14 +1,12 @@
 /**
- * Throttled fetch of /api/v1/consultant/insights → per-field AI lines (field_ref map).
- * Requires Farm Dashboard link key + AI backend URL (same as AI Farm bot panel).
- * BYOK: X-AI-API-Key from Electron store (Dashboard Settings).
+ * Throttled fetch via GET /api/farmdash-ai/consultant/insights → per-field AI lines (field_ref map).
+ * Credentials live in Electron store on the host; LAN clients reuse cached responses (see main.js).
  */
 
 import { getFieldStableId } from "./rules-engine.js";
+import { getFarmdashAiConsultantInsightsProxyUrl } from "./modules/viewer-mode.js";
 
 const MIN_INTERVAL_MS = 8 * 60 * 1000; // 8 minutes — avoid hammering VPS (same farm + same state only)
-const LS_URL = "farmdash_ai_manager_base_url";
-const LS_KEY = "farmdash_ai_integration_key";
 
 /** In-memory consultant map per server+farm — instant restore when switching farms if field state unchanged */
 const fieldConsultantFarmCache = new Map();
@@ -34,46 +32,6 @@ function emitFieldConsultantLoading(loading) {
 function dashDebug(label, phase, payload) {
   if (typeof globalThis.dashAiDebug === "function") {
     globalThis.dashAiDebug(label, phase, payload);
-  }
-}
-
-async function getBase() {
-  const ls = (localStorage.getItem(LS_URL) || "").replace(/\/$/, "");
-  if (ls) return ls;
-  try {
-    const { ipcRenderer } = require("electron");
-    const c = await ipcRenderer.invoke("get-ai-manager-connection");
-    if (c?.baseUrl) return String(c.baseUrl).replace(/\/$/, "");
-  } catch {
-    /* ignore */
-  }
-  return "http://127.0.0.1:8080";
-}
-
-async function getIntegrationKey() {
-  const ls = localStorage.getItem(LS_KEY) || "";
-  if (ls) return ls;
-  try {
-    const { ipcRenderer } = require("electron");
-    const c = await ipcRenderer.invoke("get-ai-manager-connection");
-    return (c?.integrationKey || "").trim();
-  } catch {
-    return "";
-  }
-}
-
-async function getByokHeaders() {
-  try {
-    const { ipcRenderer } = require("electron");
-    const c = await ipcRenderer.invoke("get-consultant-byok-credentials");
-    if (!c?.apiKey) return {};
-    const h = { "X-AI-API-Key": c.apiKey };
-    if (c.provider === "gemini" || c.provider === "openai") {
-      h["X-AI-Provider"] = c.provider;
-    }
-    return h;
-  } catch {
-    return {};
   }
 }
 
@@ -133,7 +91,7 @@ export function indexFieldConsultantInsights(insights) {
 /**
  * serverId + farmId — cache key for per-farm AI insight maps.
  */
-function getConsultantFarmCacheKey() {
+export function getConsultantFarmCacheKey() {
   const sid =
     (typeof window !== "undefined" &&
       window.dashboard &&
@@ -151,7 +109,7 @@ function getConsultantFarmCacheKey() {
  * Stable fingerprint of active-farm field agronomic state for client-side deduplication (saves LLM tokens).
  * Include anything that should invalidate cached AI lines when it changes.
  */
-function computeActiveFarmFieldsStateHash() {
+export function computeActiveFarmFieldsStateHash() {
   try {
     const d = typeof window !== "undefined" ? window.dashboard : null;
     if (!d) return "";
@@ -224,6 +182,27 @@ function tryApplyFieldConsultantFarmCache(cacheKey, stateHash, force) {
     });
   }
   return true;
+}
+
+/**
+ * Restore per-field AI map from localStorage after app restart (see consultant-disk-cache.js).
+ * @param {{ cacheKey: string, stateHash: string, byRef: Record<string, unknown>, llmUsed?: boolean }} payload
+ * @returns {boolean} true if DOM was updated from disk snapshot
+ */
+export function hydrateFieldConsultantFromDiskEntry(payload) {
+  const cacheKey = payload?.cacheKey;
+  const stateHash = payload?.stateHash;
+  const byRef = payload?.byRef;
+  if (!cacheKey || !stateHash || !byRef || typeof byRef !== "object") return false;
+  fieldConsultantFarmCache.set(cacheKey, {
+    byRef: { ...byRef },
+    llmUsed: !!payload.llmUsed,
+    stateHash,
+  });
+  lastNetworkKey = cacheKey;
+  lastNetworkStateHash = stateHash;
+  lastNetworkFetchAt = Date.now();
+  return tryApplyFieldConsultantFarmCache(cacheKey, stateHash, false);
 }
 
 export function lookupFieldConsultantInsight(map, field) {
@@ -307,18 +286,14 @@ export function pickDoThisFirstFromFieldInsights(fields) {
   return candidates[0];
 }
 
+function notifyConsultantFailure(status, bodyText, opts) {
+  if (typeof window.farmdashNotifyConsultantHttpError === "function") {
+    window.farmdashNotifyConsultantHttpError(status, bodyText, opts || {});
+  }
+}
+
 export async function refreshFieldConsultantCache({ force = false } = {}) {
   const now = Date.now();
-
-  const intKey = await getIntegrationKey();
-  if (!intKey) {
-    if (typeof window !== "undefined") {
-      window.__fieldConsultantByRef = {};
-      window.dispatchEvent(new CustomEvent("field-consultant-updated"));
-    }
-    dashDebug("field-consultant-bridge", "skip", { reason: "no_integration_key" });
-    return { skipped: true, reason: "no_integration_key" };
-  }
 
   const cacheKey = getConsultantFarmCacheKey();
   const stateHash = computeActiveFarmFieldsStateHash();
@@ -368,10 +343,13 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
   const hashWhenQueued = stateHash;
   const requestCacheKey = cacheKey;
   try {
-    const extra = await getByokHeaders();
-    const base = await getBase();
+    const base = getFarmdashAiConsultantInsightsProxyUrl();
+    if (!base) {
+      dashDebug("field-consultant-bridge", "skip", { reason: "no_origin" });
+      return { skipped: true, reason: "no_origin" };
+    }
     if (typeof globalThis.pipelineLog === "function") {
-      globalThis.pipelineLog("renderer_out", "GET /api/v1/consultant/insights (field map)", { base });
+      globalThis.pipelineLog("renderer_out", "GET /api/farmdash-ai/consultant/insights (field map)", { base });
     }
     const qs = new URLSearchParams();
     const sid =
@@ -390,12 +368,8 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
     if (farmId) qs.set("farmId", farmId);
     qs.set("view", "fields");
     qs.set("context", "fields");
-    const url = `${base}/api/v1/consultant/insights?${qs.toString()}`;
-    const reqHeaders = {
-      "X-FarmDash-Key": encodeURIComponent(intKey),
-      Accept: "application/json",
-      ...extra,
-    };
+    const url = `${base}?${qs.toString()}`;
+    const reqHeaders = { Accept: "application/json" };
     dashDebug("field-consultant-bridge", "request", {
       url,
       method: "GET",
@@ -438,6 +412,7 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
       if (typeof globalThis.pipelineLog === "function") {
         globalThis.pipelineLog("renderer_err", "consultant/insights HTTP error (field map)", { status: r.status });
       }
+      notifyConsultantFailure(r.status, errText, { silent: true });
       return { ok: false, status: r.status };
     }
 
@@ -522,6 +497,7 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
       globalThis.pipelineLog("renderer_err", "field consultant fetch failed", { error: String(e?.message || e) });
     }
     console.warn("[field-consultant-bridge]", e);
+    notifyConsultantFailure(0, String(e?.message || e), { silent: true });
     return { ok: false, error: String(e.message || e) };
   } finally {
     inFlight = false;
@@ -552,10 +528,8 @@ export function scheduleFieldConsultantFetch(options) {
 export async function fetchConsultantInsightSingleField(fieldRef) {
   const ref = fieldRef != null ? String(fieldRef).trim() : "";
   if (!ref) return { ok: false, error: "missing_field_ref" };
-  const intKey = await getIntegrationKey();
-  if (!intKey) return { ok: false, reason: "no_integration_key" };
-  const base = await getBase();
-  const extra = await getByokHeaders();
+  const base = getFarmdashAiConsultantInsightsProxyUrl();
+  if (!base) return { ok: false, reason: "no_origin" };
   const qs = new URLSearchParams();
   const sid =
     (typeof window !== "undefined" &&
@@ -572,12 +546,8 @@ export async function fetchConsultantInsightSingleField(fieldRef) {
     "";
   if (farmId) qs.set("farmId", farmId);
   qs.set("fieldRef", ref);
-  const url = `${base}/api/v1/consultant/insights?${qs.toString()}`;
-  const h = {
-    "X-FarmDash-Key": encodeURIComponent(intKey),
-    Accept: "application/json",
-    ...extra,
-  };
+  const url = `${base}?${qs.toString()}`;
+  const h = { Accept: "application/json" };
   if (typeof globalThis.dashAiDebug === "function") {
     globalThis.dashAiDebug("field-consultant-single-field", "request", {
       url,
@@ -589,6 +559,13 @@ export async function fetchConsultantInsightSingleField(fieldRef) {
     if (typeof globalThis.dashAiDebug === "function") {
       globalThis.dashAiDebug("field-consultant-single-field", "error", { status: r.status });
     }
+    let errText = "";
+    try {
+      errText = await r.text();
+    } catch (e) {
+      errText = String(e);
+    }
+    notifyConsultantFailure(r.status, errText, { silent: true });
     return { ok: false, status: r.status };
   }
   const data = await r.json();
@@ -611,7 +588,6 @@ if (typeof window !== "undefined") {
     };
     idle(function () {
       try {
-        if (!localStorage.getItem(LS_KEY)) return;
         scheduleFieldConsultantFetch();
       } catch (e) {
         /* ignore */

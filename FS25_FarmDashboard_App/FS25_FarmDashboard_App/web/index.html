@@ -6,39 +6,130 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="author" content="JoshWalki, WizardlyPayload" />
     <title data-i18n="page.title">Farming Dashboard</title>
+    <!-- First paint: dark slate (no white flash) before Bootstrap / styles.css; splash visible immediately -->
+    <style id="farmdash-boot-paint">
+      html { background-color: #0f172a; }
+      body.farm-dash-ui.has-farmdash-splash {
+        background-color: #0f172a !important;
+        opacity: 1 !important;
+      }
+      #splash-screen.farm-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #0f172a;
+      }
+      #splash-screen .farm-splash__bg {
+        position: absolute;
+        inset: 0;
+        background-color: #0f172a;
+        background-position: center;
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-image: url("assests/img/Dashboard%20PIctures/Background.png");
+      }
+      #splash-screen .farm-splash__scrim {
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(165deg, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0.58) 45%, rgba(15, 23, 42, 0.78) 100%);
+      }
+      #splash-screen .farm-splash__inner { position: relative; z-index: 1; max-width: 28rem; width: 100%; }
+      #splash-screen .farm-splash__panel {
+        padding: 2rem 1.75rem 2.25rem;
+        border-radius: 1.25rem;
+        background: rgba(15, 23, 42, 0.55);
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+    </style>
+    <link rel="preload" as="image" href="assests/img/Dashboard%20PIctures/Background.png" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css"/>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/dataTables.bootstrap5.min.css"/>
     <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.bootstrap5.min.css"/>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.1/font/bootstrap-icons.min.css"/>
     <link rel="stylesheet" href="assests/css/styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
 
-  <body class="bg-dark text-light" data-bs-theme="dark" style="opacity: 0; transition: opacity 0.2s ease-in-out;">
-    
+  <body class="bg-dark text-light farm-dash-ui has-farmdash-splash" data-bs-theme="dark">
     <script>
-      window.addEventListener('DOMContentLoaded', () => {
-          document.body.style.opacity = '1';
-      });
+      (function () {
+        try {
+          var h = String(location.hostname || "").toLowerCase();
+          var local = !h || h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]";
+          if (!local) {
+            document.body.classList.add("farmdash-remote-viewer");
+            window.__farmDashRemoteViewer = true;
+          } else {
+            window.__farmDashRemoteViewer = false;
+          }
+        } catch (e) {
+          window.__farmDashRemoteViewer = false;
+        }
+      })();
     </script>
+    <!-- Full-screen dynamic background (crossfades on section change) -->
+    <div id="farm-dash-bg" class="farm-dash-bg-root" aria-hidden="true">
+      <div class="farm-dash-bg-plane farm-dash-bg-plane-a"></div>
+      <div class="farm-dash-bg-plane farm-dash-bg-plane-b"></div>
+    </div>
 
-    <nav class="navbar navbar-expand-lg navbar-dark bg-farm-primary shadow-lg d-none" id="main-navbar">
-      <div class="container-fluid">
-        <div class="navbar-brand d-flex align-items-center">
-          <i class="bi bi-speedometer2 me-2"></i>
-          <span id="navbar-section-title" data-i18n="nav.brand">Farm Dashboard</span>
-          
-          <div id="server-tabs-container" class="ms-4 me-2 d-flex align-items-center"></div>
-          <div id="farm-dropdown-container" class="ms-2 d-none align-items-center"></div>
+    <!-- First-load splash: same home backdrop + glass panel + progress (see splash-screen.js) -->
+    <div id="splash-screen" class="farm-splash" role="status" aria-live="polite" aria-busy="true">
+      <div class="farm-splash__bg" aria-hidden="true"></div>
+      <div class="farm-splash__scrim" aria-hidden="true"></div>
+      <div class="farm-splash__inner text-center px-3">
+        <div class="farm-splash__panel">
+          <div class="farm-splash-icon-wrap mb-3">
+            <img
+              class="farm-splash-app-img"
+              src="assests/img/Dashboard%20PIctures/logo.png"
+              width="128"
+              height="128"
+              alt=""
+              onerror="this.classList.add('d-none'); var s=document.getElementById('farm-splash-logo-fallback'); if(s) s.classList.remove('d-none');"
+            />
+            <div id="farm-splash-logo-fallback" class="farm-splash-logo-fallback d-none mx-auto" aria-hidden="true">
+              <i class="bi bi-speedometer2"></i>
+            </div>
+          </div>
+          <h1 class="h4 text-white farm-splash-app-name mb-1">Farm Dashboard</h1>
+          <p class="text-muted small mb-4" data-i18n="splash.loading">Loading your farm data…</p>
+          <div class="farm-splash-progress mx-auto">
+            <div id="farm-splash-progress-bar" class="farm-splash-progress-bar"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <nav class="navbar navbar-expand-lg navbar-dark shadow-lg d-none farm-top-nav farm-navbar-unified" id="main-navbar">
+      <div class="container-fluid farm-navbar-inner px-2 px-sm-3">
+        <div class="farm-navbar-brand-cluster d-flex align-items-center gap-2 flex-shrink-0">
+          <i class="bi bi-speedometer2 flex-shrink-0 farm-navbar-brand-icon" aria-hidden="true"></i>
+          <span id="navbar-section-title" class="farm-navbar-title text-truncate">Farm Dashboard</span>
+        </div>
 
-          <div class="badge bg-farm-accent text-light ms-2 d-none" id="navbar-game-time">
+        <div class="farm-navbar-saves d-flex align-items-center gap-2 flex-grow-1 min-w-0">
+          <div id="server-tabs-container" class="farm-server-tabs-wrap d-flex align-items-center min-w-0"></div>
+          <div id="farm-dropdown-container" class="farm-farm-dropdown-wrap d-none align-items-center flex-shrink-0"></div>
+        </div>
+
+        <div class="farm-navbar-badges d-flex flex-wrap align-items-center gap-1 flex-shrink-0">
+          <div class="badge bg-farm-accent text-light d-none" id="navbar-game-time">
             <i class="bi bi-clock me-1"></i>
             <span data-i18n="nav.loading">Loading...</span>
           </div>
-          <div class="badge bg-secondary text-light ms-2 d-none" id="navbar-datasource" data-i18n-title="nav.dataSource" title="Data source">
-            <i class="bi bi-database me-1"></i>
+          <div class="badge bg-secondary text-light d-none" id="navbar-datasource" data-i18n-title="nav.dataSource" title="Data source">
             <span id="navbar-datasource-text">--</span>
           </div>
-          <div class="badge bg-info text-light ms-2 d-none" id="navbar-weather" style="cursor: pointer;">
+          <div class="badge bg-info text-light d-none" id="navbar-weather" style="cursor: pointer;">
             <i class="bi bi-thermometer-half me-1"></i>
             <span id="navbar-temperature">--°C</span>
             <i class="bi bi-cloud ms-2 me-1"></i>
@@ -46,34 +137,19 @@
           </div>
         </div>
 
-        <div class="navbar-nav ms-auto d-flex flex-row gap-2 align-items-center">
-          <div id="nav-connection-status" class="d-none me-3">
-            <span class="badge bg-success">
-              <i class="bi bi-wifi me-1"></i>
-              <span id="nav-connection-text" data-i18n="nav.online">Online</span>
-            </span>
-          </div>
-
-          <div id="notification-bell" class="d-none me-3">
+        <div class="navbar-nav farm-navbar-actions ms-auto d-flex flex-row flex-wrap gap-2 align-items-center flex-shrink-0">
+          <div id="notification-bell" class="d-none me-1 me-md-3">
             <button class="btn btn-outline-light btn-sm position-relative" id="notification-bell-btn" data-bs-toggle="modal" data-bs-target="#notificationHistoryModal">
               <i class="bi bi-bell"></i>
               <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="notification-count">0</span>
             </button>
           </div>
 
-          <button class="btn btn-outline-light btn-sm me-2" data-bs-toggle="modal" data-bs-target="#themeSettingsModal" data-i18n-title="nav.theme" title="Theme Settings">
-            <i class="bi bi-palette-fill"></i>
-          </button>
-
-          <button class="btn btn-outline-warning btn-sm me-2" id="nav-servers-btn" type="button" data-i18n-title="nav.servers" title="Servers &amp; saves">
+          <button class="btn btn-outline-warning btn-sm me-2 farmdash-local-only" id="nav-servers-btn" type="button" data-i18n-title="nav.servers" title="Servers &amp; saves">
             <i class="bi bi-folder2-open"></i>
           </button>
 
-          <button class="btn btn-outline-success btn-sm me-2" type="button" data-bs-toggle="modal" data-bs-target="#aiFarmBotModal" title="AI Farm Manager bot">
-            <i class="bi bi-robot"></i>
-          </button>
-
-          <button class="btn btn-outline-light btn-sm me-2" type="button" data-bs-toggle="modal" data-bs-target="#dashboardSettingsModal" data-i18n-title="nav.dashboardSettings" title="Dashboard Settings">
+          <button class="btn btn-outline-light btn-sm me-2 farmdash-local-only" type="button" data-bs-toggle="modal" data-bs-target="#appSettingsModal" data-i18n-title="nav.unifiedSettings" title="Settings">
             <i class="bi bi-gear-fill"></i>
           </button>
 
@@ -84,8 +160,8 @@
       </div>
     </nav>
 
-    <main class="main-content position-relative max-height-vh-100 h-100 border-radius-lg">
-      <div class="container-fluid py-4">
+    <main class="main-content farm-dash-main position-relative max-height-vh-100 h-100 border-radius-lg">
+      <div class="container-fluid py-4 farm-dash-shell">
         <div class="row mb-4">
           <div class="col-12">
             <div id="folder-selection" class="card shadow-sm border-farm-accent">
@@ -93,146 +169,172 @@
                 <h5 class="card-title text-warning mb-0"><i class="bi bi-exclamation-triangle me-2"></i><span data-i18n="folder.title">Oops — something went wrong</span></h5>
               </div>
               <div class="card-body">
-                <p class="mb-2" data-i18n="folder.p1" data-i18n-html>
+                <p class="mb-2 farmdash-local-only" data-i18n="folder.p1" data-i18n-html>
                   We couldn&apos;t connect to the dashboard API. Check that the game is running with the mod, or go back to
                   <strong>Home</strong> to add or change server settings and browse local saves.
                 </p>
-                <p class="small text-muted mb-3" data-i18n="folder.p2" data-i18n-html>
+                <p class="mb-2 farmdash-remote-only small text-light">
+                  We couldn&apos;t connect to the dashboard API. Ask the PC running Farm Dashboard to start the app and game with the mod, or fix the network connection.
+                </p>
+                <p class="small text-muted mb-3 farmdash-local-only" data-i18n="folder.p2" data-i18n-html>
                   <i class="bi bi-info-circle me-1"></i>If this keeps happening, try restarting
                   <code class="text-light">start-dashboard.bat</code> or your server.
                 </p>
-                <div class="d-flex flex-wrap align-items-center gap-3">
+                <p class="small text-muted mb-3 farmdash-remote-only">
+                  <i class="bi bi-info-circle me-1"></i>This device only mirrors the dashboard; server and save setup is done on the host PC.
+                </p>
+                <div class="d-flex flex-wrap align-items-center gap-3 farmdash-local-only">
                   <button type="button" class="btn btn-farm-accent" id="folder-error-back-home-btn">
                     <i class="bi bi-house-door me-1"></i><span data-i18n="folder.backHome">Back to Home</span>
                   </button>
                   <a href="#" class="text-farm-accent text-decoration-underline" id="folder-error-back-home-link" data-i18n="folder.returnLink">Return to home</a>
                 </div>
                 <!-- Hidden: folder picker / path / clear — used by refresh & offline flows (apiStorage.js, navigation.js) -->
-                <input type="file" class="d-none" id="folder-input" webkitdirectory directory multiple/>
+                <input type="file" class="d-none farmdash-local-only" id="folder-input" webkitdirectory directory multiple/>
                 <span id="folder-path" class="d-none" data-i18n="folder.noFolder">No folder selected</span>
-                <button type="button" id="clear-folder-btn" class="btn btn-danger d-none"><i class="bi bi-trash me-1"></i><span data-i18n="folder.clearData">Clear Saved Data</span></button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Smart suggestions: Home (top 3 priorities) + Livestock + section views. Placed above landing cards. -->
-        <div class="row mb-3 d-none" id="ai-farm-insights-row">
-          <div class="col-12">
-            <div class="card border-success shadow-sm bg-dark">
-              <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2 border-success bg-farm-primary">
-                <h6 class="mb-0 text-white">
-                  <i class="bi bi-lightbulb me-2 text-warning"></i> Smart suggestions
-                  <span class="badge bg-secondary ms-1" id="ai-insights-llm-badge" title="LLM used for analysis">—</span>
-                </h6>
-                <button type="button" class="btn btn-sm btn-outline-light" id="ai-insights-refresh-btn" title="Refresh from AI Farm Manager">
-                  <i class="bi bi-arrow-clockwise me-1"></i> Refresh
-                </button>
-              </div>
-              <div class="card-body py-3" id="ai-insights-panel">
-                <p class="text-muted small mb-0">Open the <strong>robot</strong> button → enter your <strong>AI server URL</strong> + <strong>link key</strong> → turn on <strong>Send farm data</strong> → <strong>Save &amp; load</strong>. Then <strong>Refresh</strong> here. (Your host must enable data sync on the server.)</p>
+                <button type="button" id="clear-folder-btn" class="btn btn-danger d-none farmdash-local-only"><i class="bi bi-trash me-1"></i><span data-i18n="folder.clearData">Clear Saved Data</span></button>
               </div>
             </div>
           </div>
         </div>
 
         <div id="landing-page" class="d-none">
-          <div class="row mb-4">
-            <div class="col-12 text-center">
-              <h2 class="text-farm-accent mb-3"><i class="bi bi-speedometer2 me-2"></i><span data-i18n="landing.title">Farm Management Dashboard</span></h2>
-              <p class="lead text-muted" data-i18n="landing.lead">Select a section below to manage your farm data</p>
-              <div class="badge bg-farm-primary fs-6 mt-2" id="game-time-display"><i class="bi bi-clock me-1"></i><span data-i18n="landing.gameLoading">Loading game time...</span></div>
-              <div class="mt-3">
-                <button type="button" class="btn btn-sm btn-outline-farm-accent" id="landing-import-mod-images" title="Scan local FS25 mods folder">
-                  <i class="bi bi-images me-1"></i><span data-i18n="landing.importMods">Import mod shop images</span>
-                </button>
+          <div class="row mb-4 justify-content-center">
+            <div class="col-12 col-xl-10">
+              <div class="farm-landing-hero-glass text-center">
+                <h2 class="farm-landing-hero-title mb-2"><i class="bi bi-speedometer2 me-2 text-farm-accent"></i><span data-i18n="landing.title">Farm Management Dashboard</span></h2>
+                <p class="farm-landing-hero-lead mb-3" data-i18n="landing.lead">Select a section below to manage your farm data</p>
+                <div class="d-flex flex-wrap justify-content-center align-items-center gap-3">
+                  <div class="badge farm-landing-time-badge fs-6" id="game-time-display"><i class="bi bi-clock me-1"></i><span data-i18n="landing.gameLoading">Loading game time...</span></div>
+                  <button type="button" class="btn btn-sm farm-btn-accent-outline farmdash-local-only" id="landing-import-mod-images" title="Scan local FS25 mods folder">
+                    <i class="bi bi-images me-1"></i><span data-i18n="landing.importMods">Import mod shop images</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="row g-4">
-            <div class="col-md-6 col-lg-4" data-dashboard-section="livestock">
-              <div class="card bg-secondary h-100 dashboard-nav-card" onclick="dashboard.showSection('livestock')">
-                <div class="card-body text-center p-4">
-                  <div class="mb-3"><i class="bi bi-clipboard-data display-1 text-farm-accent"></i></div>
-                  <h4 class="card-title text-farm-accent" data-i18n="card.livestock">Livestock</h4>
-                  <p class="card-text text-muted" data-i18n="card.livestockDesc">Manage your animals, track health, breeding, and locations</p>
-                  <div class="mt-3"><span class="badge bg-farm-success" id="livestock-count" data-i18n="card.loading">Loading...</span></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="col-md-6 col-lg-4" data-dashboard-section="vehicles">
-              <div class="card bg-secondary h-100 dashboard-nav-card" onclick="dashboard.showSection('vehicles')">
-                <div class="card-body text-center p-4">
-                  <div class="mb-3"><i class="bi bi-truck display-1 text-farm-accent"></i></div>
-                  <h4 class="card-title text-farm-accent" data-i18n="card.vehicles">Vehicles</h4>
-                  <p class="card-text text-muted" data-i18n="card.vehiclesDesc">View your fleet, maintenance status, and operating times</p>
-                  <div class="mt-3"><span class="badge bg-farm-secondary" id="vehicle-count" data-i18n="card.loading">Loading...</span></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="col-md-6 col-lg-4" data-dashboard-section="fields">
-              <div class="card bg-secondary h-100 dashboard-nav-card" onclick="dashboard.showSection('fields')">
-                <div class="card-body text-center p-4">
-                  <div class="mb-3"><i class="bi bi-geo-alt display-1 text-farm-accent"></i></div>
-                  <h4 class="card-title text-farm-accent" data-i18n="card.fields">Fields</h4>
-                  <p class="card-text text-muted" data-i18n="card.fieldsDesc">Monitor crop growth, soil conditions, and field management</p>
-                  <div class="mt-3"><span class="badge bg-farm-warning" id="field-count" data-i18n="card.loading">Loading...</span></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="col-md-6 col-lg-4" data-dashboard-section="economy">
-              <div class="card bg-secondary h-100 dashboard-nav-card" onclick="dashboard.showSection('economy')">
-                <div class="card-body text-center p-4">
-                  <div class="mb-3"><i class="bi bi-graph-up display-1 text-farm-accent"></i></div>
-                  <h4 class="card-title text-farm-accent" data-i18n="card.economy">Economy</h4>
-                  <p class="card-text text-muted" data-i18n="card.economyDesc">Track commodity prices, market trends, and finances</p>
-                  <div class="mt-3"><span class="badge bg-farm-info" id="economy-info" data-i18n="card.marketBadge">Market Data</span></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="col-md-6 col-lg-4" data-dashboard-section="pastures">
-              <div class="card bg-secondary h-100 dashboard-nav-card" onclick="dashboard.showSection('pastures')">
-                <div class="card-body text-center p-4">
-                  <div class="mb-3"><i class="bi bi-diagram-3 display-1 text-farm-accent"></i></div>
-                  <h4 class="card-title text-farm-accent" data-i18n="card.pastures">Pastures</h4>
-                  <p class="card-text text-muted" data-i18n="card.pasturesDesc">Manage pastures, livestock, and grazing conditions</p>
-                  <div class="mt-3">
-                    <span class="badge bg-farm-success" id="pasture-count" data-i18n="card.loading">Loading...</span>
-                    <span class="badge bg-farm-danger ms-2 d-none" id="pasture-warnings-badge">
-                      <i class="bi bi-exclamation-triangle me-1"></i><span id="pasture-warnings-count">0</span> <span data-i18n="card.pasturesWarnings">Warnings</span>
-                    </span>
+          <!-- Smart suggestions: below dashboard title, above category cards -->
+          <div class="row mt-2 mb-3 justify-content-center">
+            <div class="col-12" id="ai-insights-slot-landing">
+              <div class="row mb-0 d-none" id="ai-farm-insights-row">
+                <div class="col-12">
+                  <div class="card border-success shadow-sm farm-glass-panel farm-glass-panel--insights">
+                    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2 border-success bg-farm-primary">
+                      <h6 class="mb-0 text-white">
+                        <i class="bi bi-lightbulb me-2 text-warning"></i> Smart suggestions
+                        <span class="badge bg-secondary ms-1" id="ai-insights-llm-badge" title="LLM used for analysis">—</span>
+                      </h6>
+                      <button type="button" class="btn btn-sm btn-outline-light" id="ai-insights-refresh-btn" title="Refresh from AI Farm Manager">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                      </button>
+                    </div>
+                    <div class="card-body py-3" id="ai-insights-panel">
+                      <p class="text-muted small mb-0">Open <strong>Settings → AI Farm Manager</strong> → enter your <strong>AI server URL</strong> + <strong>link key</strong> → turn on <strong>Send farm data</strong> → <strong>Save &amp; load</strong>. Then <strong>Refresh</strong> here. (Your host must enable data sync on the server.)</p>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
+
+          <div class="row g-4 justify-content-center">
+            <div class="col-md-6 col-lg-4" data-dashboard-section="livestock">
+              <button type="button" class="farm-landing-card w-100" onclick="dashboard.showSection('livestock')" style="--farm-card-img: url('assests/img/Dashboard%20PIctures/livestock.png')" aria-label="Livestock">
+                <span class="farm-landing-card-media" style="background-image: url('assests/img/Dashboard%20PIctures/livestock.png')" aria-hidden="true"></span>
+                <span class="farm-landing-card-gradient" aria-hidden="true"></span>
+                <span class="farm-landing-card-body">
+                  <span class="farm-landing-card-text-strip">
+                    <span class="farm-landing-card-title" data-i18n="card.livestock">Livestock</span>
+                    <span class="farm-landing-card-desc" data-i18n="card.livestockDesc">Manage your animals, track health, breeding, and locations</span>
+                    <span class="badge farm-landing-card-badge" id="livestock-count" data-i18n="card.loading">Loading...</span>
+                  </span>
+                </span>
+              </button>
+            </div>
+
+            <div class="col-md-6 col-lg-4" data-dashboard-section="vehicles">
+              <button type="button" class="farm-landing-card w-100" onclick="dashboard.showSection('vehicles')" style="--farm-card-img: url('assests/img/Dashboard%20PIctures/vehicles.png')" aria-label="Vehicles">
+                <span class="farm-landing-card-media" style="background-image: url('assests/img/Dashboard%20PIctures/vehicles.png')" aria-hidden="true"></span>
+                <span class="farm-landing-card-gradient" aria-hidden="true"></span>
+                <span class="farm-landing-card-body">
+                  <span class="farm-landing-card-text-strip">
+                    <span class="farm-landing-card-title" data-i18n="card.vehicles">Vehicles</span>
+                    <span class="farm-landing-card-desc" data-i18n="card.vehiclesDesc">View your fleet, maintenance status, and operating times</span>
+                    <span class="badge farm-landing-card-badge" id="vehicle-count" data-i18n="card.loading">Loading...</span>
+                  </span>
+                </span>
+              </button>
+            </div>
+
+            <div class="col-md-6 col-lg-4" data-dashboard-section="fields">
+              <button type="button" class="farm-landing-card w-100" onclick="dashboard.showSection('fields')" style="--farm-card-img: url('assests/img/Dashboard%20PIctures/fields.png')" aria-label="Fields">
+                <span class="farm-landing-card-media" style="background-image: url('assests/img/Dashboard%20PIctures/fields.png')" aria-hidden="true"></span>
+                <span class="farm-landing-card-gradient" aria-hidden="true"></span>
+                <span class="farm-landing-card-body">
+                  <span class="farm-landing-card-text-strip">
+                    <span class="farm-landing-card-title" data-i18n="card.fields">Fields</span>
+                    <span class="farm-landing-card-desc" data-i18n="card.fieldsDesc">Monitor crop growth, soil conditions, and field management</span>
+                    <span class="badge farm-landing-card-badge" id="field-count" data-i18n="card.loading">Loading...</span>
+                  </span>
+                </span>
+              </button>
+            </div>
+
+            <div class="col-md-6 col-lg-4" data-dashboard-section="economy">
+              <button type="button" class="farm-landing-card w-100" onclick="dashboard.showSection('economy')" style="--farm-card-img: url('assests/img/Dashboard%20PIctures/economy.png')" aria-label="Economy">
+                <span class="farm-landing-card-media" style="background-image: url('assests/img/Dashboard%20PIctures/economy.png')" aria-hidden="true"></span>
+                <span class="farm-landing-card-gradient" aria-hidden="true"></span>
+                <span class="farm-landing-card-body">
+                  <span class="farm-landing-card-text-strip">
+                    <span class="farm-landing-card-title" data-i18n="card.economy">Economy</span>
+                    <span class="farm-landing-card-desc" data-i18n="card.economyDesc">Track commodity prices, market trends, and finances</span>
+                    <span class="badge farm-landing-card-badge" id="economy-info" data-i18n="card.marketBadge">Market Data</span>
+                  </span>
+                </span>
+              </button>
+            </div>
+
+            <div class="col-md-6 col-lg-4" data-dashboard-section="pastures">
+              <button type="button" class="farm-landing-card w-100" onclick="dashboard.showSection('pastures')" style="--farm-card-img: url('assests/img/Dashboard%20PIctures/pastures.png')" aria-label="Pastures">
+                <span class="farm-landing-card-media" style="background-image: url('assests/img/Dashboard%20PIctures/pastures.png')" aria-hidden="true"></span>
+                <span class="farm-landing-card-gradient" aria-hidden="true"></span>
+                <span class="farm-landing-card-body">
+                  <span class="farm-landing-card-text-strip">
+                    <span class="farm-landing-card-title" data-i18n="card.pastures">Pastures</span>
+                    <span class="farm-landing-card-desc" data-i18n="card.pasturesDesc">Manage pastures, livestock, and grazing conditions</span>
+                    <span class="d-flex flex-wrap gap-2 justify-content-center mt-1">
+                      <span class="badge farm-landing-card-badge" id="pasture-count" data-i18n="card.loading">Loading...</span>
+                      <span class="badge bg-danger bg-opacity-90 d-none" id="pasture-warnings-badge">
+                        <i class="bi bi-exclamation-triangle me-1"></i><span id="pasture-warnings-count">0</span> <span data-i18n="card.pasturesWarnings">Warnings</span>
+                      </span>
+                    </span>
+                  </span>
+                </span>
+              </button>
+            </div>
 
             <div class="col-md-6 col-lg-4" data-dashboard-section="productions">
-              <div class="card bg-secondary h-100 dashboard-nav-card" onclick="dashboard.showSection('productions')">
-                <div class="card-body text-center p-4">
-                  <div class="mb-3"><i class="bi bi-building-gear display-1 text-farm-accent"></i></div>
-                  <h4 class="card-title text-farm-accent" data-i18n="card.productions">Productions</h4>
-                  <p class="card-text text-muted" data-i18n="card.productionsDesc">Production chains, storage fill levels, and active slots</p>
-                  <div class="mt-3"><span class="badge bg-farm-warning" id="production-count">0 Chains</span></div>
-                </div>
-              </div>
+              <button type="button" class="farm-landing-card w-100" onclick="dashboard.showSection('productions')" style="--farm-card-img: url('assests/img/Dashboard%20PIctures/productions.png')" aria-label="Productions">
+                <span class="farm-landing-card-media" style="background-image: url('assests/img/Dashboard%20PIctures/productions.png')" aria-hidden="true"></span>
+                <span class="farm-landing-card-gradient" aria-hidden="true"></span>
+                <span class="farm-landing-card-body">
+                  <span class="farm-landing-card-text-strip">
+                    <span class="farm-landing-card-title" data-i18n="card.productions">Productions</span>
+                    <span class="farm-landing-card-desc" data-i18n="card.productionsDesc">Production chains, storage fill levels, and active slots</span>
+                    <span class="badge farm-landing-card-badge" id="production-count">0 Chains</span>
+                  </span>
+                </span>
+              </button>
             </div>
           </div>
         </div>
 
-        <div id="section-content" class="d-none">
-          <div class="row mb-4">
-            <div class="col-12">
-              <button class="btn btn-outline-farm-accent" onclick="dashboard.showLanding()"><i class="bi bi-arrow-left me-2"></i><span data-i18n="section.back">Back to Dashboard</span></button>
-            </div>
-          </div>
+        <div id="section-content" class="d-none farm-glass-page">
+          <div id="section-content-dynamic"></div>
         </div>
 
-        <div id="dashboard-content" class="d-none">
+        <div id="dashboard-content" class="d-none farm-glass-page">
           <div class="row mb-4">
             <div class="col-12 text-center"><h2 class="text-farm-accent"><i class="bi bi-clipboard-data me-2"></i><span data-i18n="livestock.heading">Livestock Management</span></h2></div>
           </div>
@@ -280,6 +382,10 @@
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div class="row ai-insights-slot-after-kpis justify-content-center">
+                <div class="col-12" id="ai-insights-slot-dashboard"></div>
               </div>
 
               <div class="row mb-4">
@@ -573,136 +679,6 @@
         </div>
       </div>
 
-    <div class="modal fade" id="dashboardSettingsModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content bg-dark text-light">
-          <div class="modal-header border-bottom border-secondary">
-            <h5 class="modal-title"><i class="bi bi-gear-fill me-2 text-farm-accent"></i><span data-i18n="settings.modalTitle">Dashboard Settings</span></h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <h6 class="text-farm-accent" data-i18n="settings.sectionsTitle">Main menu — show sections</h6>
-            <p class="small text-muted" data-i18n="settings.sectionsHint">Uncheck a section to hide it from the home screen. You can turn it back on here anytime.</p>
-            <div class="row g-2 mb-4">
-              <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-livestock" checked/><label class="form-check-label" for="settings-section-livestock" data-i18n="card.livestock">Livestock</label></div></div>
-              <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-vehicles" checked/><label class="form-check-label" for="settings-section-vehicles" data-i18n="card.vehicles">Vehicles</label></div></div>
-              <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-fields" checked/><label class="form-check-label" for="settings-section-fields" data-i18n="card.fields">Fields</label></div></div>
-              <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-economy" checked/><label class="form-check-label" for="settings-section-economy" data-i18n="card.economy">Economy</label></div></div>
-              <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-pastures" checked/><label class="form-check-label" for="settings-section-pastures" data-i18n="card.pastures">Pastures</label></div></div>
-              <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-productions" checked/><label class="form-check-label" for="settings-section-productions" data-i18n="card.productions">Productions</label></div></div>
-            </div>
-
-            <hr class="border-secondary my-3"/>
-
-            <h6 class="text-farm-accent" data-i18n="settings.fieldExclusionTitle">Fields — hide parcels</h6>
-            <p class="small text-muted" data-i18n="settings.fieldExclusionHint">Only parcels your selected farm owns are listed. Hide any that still appear as fields after a pasture or farmyard. Switch farm in the header and reopen Settings for another farm.</p>
-            <div id="settings-field-exclusions" class="mb-3 small text-break">—</div>
-
-            <hr class="border-secondary my-3"/>
-
-            <h6 class="text-farm-accent"><i class="bi bi-robot me-2"></i>AI farm assistant</h6>
-            <p class="small text-muted mb-2">Smart suggestions need your <strong>AI server</strong> plus <strong>farm data</strong> reaching that server (outbound from this app — still secure).</p>
-            <div id="settings-ai-connection-status" class="alert alert-secondary small py-2 mb-3" role="status">
-              <span class="text-muted">Open this dialog again to check connection status.</span>
-            </div>
-            <button type="button" class="btn btn-sm btn-outline-success mb-3" data-bs-toggle="modal" data-bs-target="#aiFarmBotModal" data-bs-dismiss="modal">Open AI Farm Manager…</button>
-
-            <hr class="border-secondary"/>
-
-            <h6 class="text-farm-accent" data-i18n="settings.modTitle">FS25 mod — config.xml (this PC)</h6>
-            <p class="small text-muted" data-i18n="settings.modHint">These options match the in-game mod’s config file. Restart the game or reload the save for changes to apply. Editing applies to the default Documents path on this computer.</p>
-            <p class="small font-monospace text-break mb-2" id="settings-mod-config-path">—</p>
-            <div class="row g-3 mb-3">
-              <div class="col-md-6">
-                <label class="form-label" for="settings-mod-update-interval" data-i18n="settings.updateInterval">Update interval (ms)</label>
-                <input type="number" class="form-control bg-secondary text-light border-secondary" id="settings-mod-update-interval" min="1000" max="600000" step="1000" value="10000"/>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label" for="settings-mod-collection-cycle" data-i18n="settings.collectionCycle">Collection cycle (ms)</label>
-                <input type="number" class="form-control bg-secondary text-light border-secondary" id="settings-mod-collection-cycle" min="5000" max="1800000" step="1000" value="60000"/>
-              </div>
-            </div>
-            <p class="small text-muted mb-2" data-i18n="settings.modModules">Data modules (in-game collectors)</p>
-            <div class="row g-2">
-              <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-mod-animals" checked/><label class="form-check-label" for="settings-mod-animals" data-i18n="settings.modAnimals">Animals</label></div></div>
-              <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-mod-vehicles" checked/><label class="form-check-label" for="settings-mod-vehicles" data-i18n="settings.modVehicles">Vehicles</label></div></div>
-              <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-mod-weather" checked/><label class="form-check-label" for="settings-mod-weather" data-i18n="settings.modWeather">Weather</label></div></div>
-              <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-mod-fields" checked/><label class="form-check-label" for="settings-mod-fields" data-i18n="settings.modFields">Fields</label></div></div>
-              <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-mod-finance" checked/><label class="form-check-label" for="settings-mod-finance" data-i18n="settings.modFinance">Finance</label></div></div>
-              <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-mod-economy" checked/><label class="form-check-label" for="settings-mod-economy" data-i18n="settings.modEconomy">Economy</label></div></div>
-              <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-mod-production" checked/><label class="form-check-label" for="settings-mod-production" data-i18n="settings.modProduction">Production</label></div></div>
-            </div>
-          </div>
-          <div class="modal-footer border-top border-secondary">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.close">Close</button>
-            <button type="button" class="btn btn-farm-accent" id="dashboard-settings-save-btn" data-i18n="settings.save">Save</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="modal fade" id="themeSettingsModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content bg-dark text-light">
-          <div class="modal-header border-bottom border-secondary">
-            <h5 class="modal-title"><i class="bi bi-palette me-2 text-farm-accent"></i><span data-i18n="theme.modalTitle">Theme & Color Settings</span></h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <div class="mb-3">
-              <label class="form-label" data-i18n="theme.language">Language</label>
-              <select class="form-select bg-secondary text-light border-secondary mb-3" id="farmdash-language-select"></select>
-            </div>
-            <div class="mb-3">
-              <label class="form-label" data-i18n="theme.selectTab">Select Tab to Customize:</label>
-              <select class="form-select bg-secondary text-light border-secondary" id="theme-tab-selector" onchange="dashboard.loadThemeEditor()">
-                <option value="global" data-i18n="theme.tabGlobal">Global Default</option>
-                <option value="livestock" data-i18n="theme.tabLivestock">Livestock Tab</option>
-                <option value="vehicles" data-i18n="theme.tabVehicles">Vehicles Tab</option>
-                <option value="fields" data-i18n="theme.tabFields">Fields Tab</option>
-                <option value="economy" data-i18n="theme.tabEconomy">Economy Tab</option>
-                <option value="pastures" data-i18n="theme.tabPastures">Pastures Tab</option>
-              </select>
-            </div>
-
-            <div class="row g-3 mt-2">
-              <div class="col-md-6">
-                <label class="form-label" data-i18n="theme.bg">Background Color</label>
-                <input type="color" class="form-control form-control-color bg-secondary border-0 w-100" id="color-bg">
-              </div>
-              <div class="col-md-6">
-                <label class="form-label" data-i18n="theme.panel">Panel / Card Color</label>
-                <input type="color" class="form-control form-control-color bg-secondary border-0 w-100" id="color-panel">
-              </div>
-              <div class="col-md-6">
-                <label class="form-label" data-i18n="theme.primary">Primary Header Color</label>
-                <input type="color" class="form-control form-control-color bg-secondary border-0 w-100" id="color-primary">
-              </div>
-              <div class="col-md-6">
-                <label class="form-label" data-i18n="theme.accent">Accent / Button Color</label>
-                <input type="color" class="form-control form-control-color bg-secondary border-0 w-100" id="color-accent">
-              </div>
-            </div>
-
-            <hr class="border-secondary my-4">
-            
-            <div class="d-flex justify-content-between">
-              <button type="button" class="btn btn-warning btn-sm" onclick="dashboard.applyThemeToAllTabs()">
-                <i class="bi bi-layers-fill me-1"></i> <span data-i18n="theme.copyAll">Copy to All Tabs</span>
-              </button>
-              <button type="button" class="btn btn-outline-danger btn-sm" onclick="dashboard.resetThemeToDefaults()">
-                <i class="bi bi-arrow-counterclockwise me-1"></i> <span data-i18n="theme.reset">Reset Defaults</span>
-              </button>
-            </div>
-          </div>
-          <div class="modal-footer border-top border-secondary">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="theme.close">Close</button>
-            <button type="button" class="btn btn-farm-accent" onclick="dashboard.saveCurrentTheme()" data-i18n="theme.save">Save Theme</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
       <script>
         if (typeof module === 'object') {
           window.tempModule = module;
@@ -728,11 +704,14 @@
         }
       </script>
 
+      <script src="assests/js/splash-screen.js"></script>
+      <script src="assests/js/screen-wake-lock.js"></script>
       <script src="assests/js/pipeline-log.js"></script>
       <script src="assests/js/dash-ai-debug.js"></script>
       <script src="assests/js/realtime-connector.js"></script>
       <script src="assests/js/modExportProgress.js"></script>
       <script src="assests/js/ai-farm-bot-panel.js"></script>
+      <script src="assests/js/ai-upsell-modal.js"></script>
       <script type="module" src="assests/js/app.js"></script>
       <script defer src="assests/js/ai-farm-consultant-insights.js"></script>
       
@@ -748,6 +727,361 @@
         });
       </script>
     </main>
+
+    <div class="modal fade farmdash-local-only" id="appSettingsModal" tabindex="-1" aria-hidden="true" aria-labelledby="appSettingsModalTitle">
+      <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-md-down">
+        <div class="modal-content bg-dark text-light">
+          <div class="modal-header border-bottom border-secondary">
+            <h5 class="modal-title" id="appSettingsModalTitle">
+              <i class="bi bi-gear-fill me-2 text-farm-accent"></i><span data-i18n="settings.unifiedModalTitle">Settings</span>
+            </h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body p-0">
+            <div class="row g-0">
+              <div class="col-12 col-md-4 col-lg-3 border-bottom border-md-end border-secondary bg-body-secondary bg-opacity-10">
+                <nav class="nav flex-column nav-pills p-2 gap-1" id="app-settings-sidebar" role="tablist">
+                  <button class="nav-link text-start active rounded py-2 px-3" id="app-settings-tab-dashboard" data-bs-toggle="tab" data-bs-target="#app-settings-pane-dashboard" type="button" role="tab" aria-controls="app-settings-pane-dashboard" aria-selected="true">
+                    <i class="bi bi-grid-3x3-gap me-2"></i><span data-i18n="settings.sidebarDashboard">Dashboard</span>
+                  </button>
+                  <button class="nav-link text-start rounded py-2 px-3" id="app-settings-tab-servers" data-bs-toggle="tab" data-bs-target="#app-settings-pane-servers" type="button" role="tab" aria-controls="app-settings-pane-servers" aria-selected="false">
+                    <i class="bi bi-hdd-network me-2 text-info"></i><span data-i18n="settings.sidebarServers">Servers & saves</span>
+                  </button>
+                  <button class="nav-link text-start rounded py-2 px-3" id="app-settings-tab-ai" data-bs-toggle="tab" data-bs-target="#app-settings-pane-ai" type="button" role="tab" aria-controls="app-settings-pane-ai" aria-selected="false">
+                    <i class="bi bi-robot me-2 text-success"></i><span data-i18n="settings.sidebarAi">AI Farm Manager</span>
+                  </button>
+                  <button class="nav-link text-start rounded py-2 px-3" id="app-settings-tab-mod" data-bs-toggle="tab" data-bs-target="#app-settings-pane-mod" type="button" role="tab" aria-controls="app-settings-pane-mod" aria-selected="false">
+                    <i class="bi bi-cpu me-2 text-warning"></i><span data-i18n="settings.sidebarMod">FS25 mod</span>
+                  </button>
+                  <button class="nav-link text-start rounded py-2 px-3" id="app-settings-tab-theme" data-bs-toggle="tab" data-bs-target="#app-settings-pane-theme" type="button" role="tab" aria-controls="app-settings-pane-theme" aria-selected="false">
+                    <i class="bi bi-palette me-2 text-farm-accent"></i><span data-i18n="settings.sidebarAppearance">Appearance</span>
+                  </button>
+                </nav>
+              </div>
+              <div class="col-12 col-md-8 col-lg-9 p-3 p-md-4 app-settings-pane-scroll">
+                <div class="tab-content" id="app-settings-tab-content">
+                  <div class="tab-pane fade show active" id="app-settings-pane-dashboard" role="tabpanel" aria-labelledby="app-settings-tab-dashboard" tabindex="0">
+                    <h6 class="text-farm-accent" data-i18n="settings.sectionsTitle">Main menu — show sections</h6>
+                    <p class="small text-muted" data-i18n="settings.sectionsHint">Uncheck a section to hide it from the home screen.</p>
+                    <div class="row g-2 mb-4">
+                      <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-livestock" checked/><label class="form-check-label" for="settings-section-livestock" data-i18n="card.livestock">Livestock</label></div></div>
+                      <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-vehicles" checked/><label class="form-check-label" for="settings-section-vehicles" data-i18n="card.vehicles">Vehicles</label></div></div>
+                      <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-fields" checked/><label class="form-check-label" for="settings-section-fields" data-i18n="card.fields">Fields</label></div></div>
+                      <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-economy" checked/><label class="form-check-label" for="settings-section-economy" data-i18n="card.economy">Economy</label></div></div>
+                      <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-pastures" checked/><label class="form-check-label" for="settings-section-pastures" data-i18n="card.pastures">Pastures</label></div></div>
+                      <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-productions" checked/><label class="form-check-label" for="settings-section-productions" data-i18n="card.productions">Productions</label></div></div>
+                    </div>
+                    <hr class="border-secondary my-3"/>
+                    <h6 class="text-farm-accent" data-i18n="settings.fieldExclusionTitle">Fields — hide parcels</h6>
+                    <p class="small text-muted" data-i18n="settings.fieldExclusionHint">Only parcels your selected farm owns are listed.</p>
+                    <div id="settings-field-exclusions" class="mb-0 small text-break">—</div>
+                    <hr class="border-secondary my-3"/>
+                    <h6 class="text-farm-accent small text-uppercase mb-2">Connection status</h6>
+                    <div id="settings-ai-connection-status" class="alert alert-secondary small py-2 mb-0" role="status">
+                      <span class="text-muted">Open the <strong>AI Farm Manager</strong> tab to refresh connection status.</span>
+                    </div>
+                  </div>
+
+                  <div class="tab-pane fade" id="app-settings-pane-servers" role="tabpanel" aria-labelledby="app-settings-tab-servers" tabindex="0">
+                    <h6 class="text-farm-accent" data-i18n="setup.serverManager">Server Manager</h6>
+                    <p class="small text-muted" data-i18n="settings.serverManagerIntro">Same options as first-run setup. Use <strong>Save</strong> to apply.</p>
+                    <div class="d-flex flex-wrap gap-2 mb-3">
+                      <button type="button" class="btn btn-sm btn-outline-info" id="app-settings-open-setup-btn" data-i18n="settings.openFullSetup">Open full setup window</button>
+                      <button type="button" class="btn btn-sm btn-outline-success" id="app-settings-sm-detect-btn" data-i18n="setup.autoDetect">Auto-Detect Local Saves</button>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" id="app-settings-sm-mod-img-btn" data-i18n="setup.modImages">Scan FS25 mods for dashboard images</button>
+                    </div>
+                    <p class="small text-muted mb-2" data-i18n="setup.modImagesHint">Copies shop PNGs from FS25 mods into the dashboard.</p>
+                    <hr class="border-secondary my-3"/>
+                    <h6 class="text-farm-accent small" data-i18n="setup.ftpHeading">FTP polling</h6>
+                    <p class="small text-muted" data-i18n="setup.ftpPollHint">Applies to dedicated (FTP) servers.</p>
+                    <div class="row g-2 mb-3">
+                      <div class="col-md-6">
+                        <label class="form-label small" for="app-settings-sm-ftp-delay" data-i18n="setup.delayLabel">Delay before first poll (seconds)</label>
+                        <input type="number" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-ftp-delay" min="0" max="600" value="0"/>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label small" for="app-settings-sm-ftp-interval" data-i18n="setup.pollLabel">Poll every (minutes)</label>
+                        <input type="number" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-ftp-interval" min="1" max="25" value="5"/>
+                      </div>
+                    </div>
+                    <div class="d-flex flex-column gap-2 mb-3 small">
+                      <div class="form-check"><input class="form-check-input" type="radio" name="app-settings-sm-ftp-schedule" id="app-settings-sm-ftp-sched-sync" value="sync" checked/><label class="form-check-label" for="app-settings-sm-ftp-sched-sync" data-i18n="setup.scheduleSync">Each cycle: poll all FTP servers at once</label></div>
+                      <div class="form-check"><input class="form-check-input" type="radio" name="app-settings-sm-ftp-schedule" id="app-settings-sm-ftp-sched-stag" value="staggered"/><label class="form-check-label" for="app-settings-sm-ftp-sched-stag" data-i18n="setup.scheduleStaggered">Staggered</label></div>
+                    </div>
+                    <h6 class="text-farm-accent small" data-i18n="setup.serverManager">Configured servers</h6>
+                    <div id="app-settings-sm-empty" class="text-muted small mb-2" style="white-space: pre-line" data-i18n="setup.emptyServers">No servers yet.</div>
+                    <div id="app-settings-sm-list" class="mb-3"></div>
+                    <hr class="border-secondary my-3"/>
+                    <h6 class="text-farm-accent small" data-i18n="setup.addManual">Add Server Manually</h6>
+                    <div class="mb-2">
+                      <label class="form-label small" for="app-settings-sm-server-name" data-i18n="setup.displayName">Display Name</label>
+                      <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-server-name" autocomplete="off"/>
+                    </div>
+                    <div class="d-flex flex-wrap gap-3 mb-2 small">
+                      <div class="form-check"><input class="form-check-input" type="radio" name="app-settings-sm-mode" id="app-settings-sm-mode-local" value="local" checked/><label class="form-check-label" for="app-settings-sm-mode-local" data-i18n="setup.modeLocal">Local PC</label></div>
+                      <div class="form-check"><input class="form-check-input" type="radio" name="app-settings-sm-mode" id="app-settings-sm-mode-ftp" value="ftp"/><label class="form-check-label" for="app-settings-sm-mode-ftp" data-i18n="setup.modeFtp">Dedicated Server (FTP)</label></div>
+                    </div>
+                    <div id="app-settings-sm-local-fields">
+                      <div class="mb-2">
+                        <label class="form-label small" for="app-settings-sm-local-path"><span data-i18n="setup.localPath">modSettings Base Path</span></label>
+                        <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-local-path" autocomplete="off"/>
+                        <div class="form-text small" data-i18n="setup.localHint">Leave blank for default Documents path.</div>
+                      </div>
+                      <div class="mb-2">
+                        <label class="form-label small" for="app-settings-sm-local-sub"><span data-i18n="setup.saveFolder">Savegame Folder</span></label>
+                        <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-local-sub" autocomplete="off"/>
+                      </div>
+                    </div>
+                    <div id="app-settings-sm-ftp-fields" class="d-none">
+                      <div class="row g-2 mb-2">
+                        <div class="col-md-8">
+                          <label class="form-label small" for="app-settings-sm-ftp-host" data-i18n="setup.ftpHost">FTP Host / IP</label>
+                          <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-ftp-host" autocomplete="off"/>
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label small" for="app-settings-sm-ftp-port" data-i18n="setup.ftpPort">Port</label>
+                          <input type="number" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-ftp-port" value="21"/>
+                        </div>
+                      </div>
+                      <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                          <label class="form-label small" for="app-settings-sm-ftp-user" data-i18n="setup.ftpUser">Username</label>
+                          <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-ftp-user" autocomplete="off"/>
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label small" for="app-settings-sm-ftp-pass" data-i18n="setup.ftpPass">Password</label>
+                          <input type="password" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-ftp-pass" autocomplete="new-password"/>
+                        </div>
+                      </div>
+                      <div class="mb-2">
+                        <label class="form-label small" for="app-settings-sm-ftp-base" data-i18n="setup.basePath">Base Profile Path</label>
+                        <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-ftp-base" value="profile" autocomplete="off"/>
+                      </div>
+                      <div class="mb-2">
+                        <label class="form-label small" for="app-settings-sm-ftp-sub" data-i18n="setup.slotFolder">Savegame Slot Folder</label>
+                        <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-ftp-sub" placeholder="savegame1" autocomplete="off"/>
+                      </div>
+                      <hr class="border-secondary my-2"/>
+                      <h6 class="small text-muted"><span data-i18n="setup.httpHeading">HTTP Feed</span></h6>
+                      <p class="small text-muted" data-i18n="setup.httpHint">Optional Giants HTTP feed.</p>
+                      <div class="row g-2 mb-2">
+                        <div class="col-md-8">
+                          <label class="form-label small" for="app-settings-sm-http-host" data-i18n="setup.httpHost">Server IP / Host</label>
+                          <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-http-host" autocomplete="off"/>
+                        </div>
+                        <div class="col-md-4">
+                          <label class="form-label small" for="app-settings-sm-http-port" data-i18n="setup.httpPort">HTTP Port</label>
+                          <input type="number" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-http-port" value="8080"/>
+                        </div>
+                      </div>
+                      <div class="mb-2">
+                        <label class="form-label small" for="app-settings-sm-http-code" data-i18n="setup.feedCode">Feed Access Code</label>
+                        <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-http-code" autocomplete="off"/>
+                      </div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-farm-accent" id="app-settings-sm-add-btn">+ <span data-i18n="setup.addServer">Add Server</span></button>
+                  </div>
+
+                  <div class="tab-pane fade" id="app-settings-pane-ai" role="tabpanel" aria-labelledby="app-settings-tab-ai" tabindex="0">
+                    <div class="border border-success border-opacity-50 rounded p-2 p-md-3 bg-body-secondary bg-opacity-25">
+                      <p class="small mb-1 text-light" id="aiFarmBotIntroLead">Three things — only the <strong>outbound farm snapshot</strong> leaves this PC (encrypted HTTPS). Your <strong>link key</strong> proves this app is allowed; it is not your mod token.</p>
+                      <ol class="small text-muted ps-3 mb-3" id="aiFarmBotSteps">
+                        <li><strong class="text-light">AI server URL</strong> — <code class="text-muted">https://…</code> from your host</li>
+                        <li><strong class="text-light">Link key</strong> — secret string from your host (like a password for this integration)</li>
+                        <li><strong class="text-light">Send farm data</strong> — must be <strong>on</strong> for Smart suggestions; your host enables matching mode on the server</li>
+                      </ol>
+                      <div id="aiFarmBotConnectionBanner" class="alert small py-2 px-3 mb-3 d-none" role="status"></div>
+                      <div class="card bg-secondary bg-opacity-25 border border-success border-opacity-50 mb-3">
+                        <div class="card-body py-3">
+                          <h6 class="text-success mb-2"><i class="bi bi-key-fill me-1"></i> Optional: your OpenAI / Gemini key (BYOK)</h6>
+                          <p class="small text-muted mb-2">For tips when the host does not pay for LLM, or to use your own quota. Stays on this PC only.</p>
+                          <div class="row g-2">
+                            <div class="col-md-4">
+                              <label class="form-label small mb-0" for="aiFarmBotByokProvider">Provider</label>
+                              <select id="aiFarmBotByokProvider" class="form-select form-select-sm">
+                                <option value="openai">OpenAI</option>
+                                <option value="gemini">Google Gemini</option>
+                              </select>
+                            </div>
+                            <div class="col-md-8">
+                              <label class="form-label small mb-0" for="aiFarmBotByokKey">API key</label>
+                              <input type="password" class="form-control form-control-sm font-monospace" id="aiFarmBotByokKey" placeholder="sk-… or AIza…" autocomplete="off" spellcheck="false"/>
+                            </div>
+                          </div>
+                          <div class="form-check mt-2 mb-0">
+                            <input class="form-check-input" type="checkbox" id="aiFarmBotClearByok"/>
+                            <label class="form-check-label small" for="aiFarmBotClearByok">Remove saved AI key from this computer</label>
+                          </div>
+                        </div>
+                      </div>
+                      <div class="card bg-secondary bg-opacity-25 border border-secondary mb-3" id="aiFarmBotGeminiModelsCard">
+                        <div class="card-body py-2">
+                          <h6 class="text-light mb-2 small"><i class="bi bi-list-ul me-1"></i> Gemini models (live list)</h6>
+                          <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="aiFarmBotGeminiModelsRefresh">Fetch list</button>
+                            <button type="button" class="btn btn-sm btn-outline-warning" id="aiFarmBotGeminiModelsForce">Force refresh</button>
+                            <span class="small text-muted" id="aiFarmBotGeminiModelsMeta">—</span>
+                          </div>
+                          <select id="aiFarmBotGeminiModelSelect" class="form-select form-select-sm font-monospace" aria-label="Gemini model ids">
+                            <option value="">— click Fetch list —</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="d-none mb-2" id="aiFarmBotSubscriptionTierRow" aria-hidden="true">
+                        <label class="form-label small mb-0" for="aiFarmBotCurrentTierText">Current plan</label>
+                        <p class="small mb-0 text-muted font-monospace" id="aiFarmBotCurrentTierText">—</p>
+                      </div>
+                      <div class="row g-2 mb-2">
+                        <div class="col-12" id="aiFarmBotRowBackendUrl">
+                          <label class="form-label small" for="aiFarmBotBaseUrl">AI server URL</label>
+                          <input type="text" class="form-control form-control-sm w-100" id="aiFarmBotBaseUrl" placeholder="https://your-ai-server.example.com (no path)" autocomplete="off"/>
+                        </div>
+                        <div class="col-12 d-none" id="aiFarmBotRowIntegrationKey">
+                          <label class="form-label small" for="aiFarmBotIntegrationKey">Link key (from your host)</label>
+                          <div class="input-group input-group-sm">
+                            <input type="password" class="form-control font-monospace" id="aiFarmBotIntegrationKey" placeholder="only if not embedded in your installer" autocomplete="off" spellcheck="false"/>
+                            <button type="button" class="btn btn-outline-secondary" id="aiFarmBotToggleKey" title="Show or hide key" aria-pressed="false">
+                              <i class="bi bi-eye" id="aiFarmBotToggleKeyIcon" aria-hidden="true"></i>
+                            </button>
+                          </div>
+                        </div>
+                        <div class="col-12">
+                          <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="aiFarmBotPushSnapshots" checked/>
+                            <label class="form-check-label small" for="aiFarmBotPushSnapshots"><strong>Send farm data to the AI server</strong> — <em>required for Smart suggestions.</em></label>
+                          </div>
+                        </div>
+                      </div>
+                      <p class="small text-muted mb-2 d-none" id="aiFarmBotBrandedNote">This installer is already linked to your host.</p>
+                      <div class="d-flex flex-wrap gap-2 mb-2">
+                        <button type="button" class="btn btn-sm btn-success" id="aiFarmBotSaveSettings">Save &amp; load</button>
+                        <button type="button" class="btn btn-sm btn-outline-light" id="aiFarmBotRefresh">Refresh</button>
+                        <button type="button" class="btn btn-sm btn-outline-info" id="aiFarmBotLlmPing">Test dashboard → LLM</button>
+                      </div>
+                      <p id="aiFarmBotLlmPingResult" class="small text-muted mb-3" aria-live="polite"></p>
+                      <div id="aiFarmBotPanelBody" class="border border-secondary rounded p-2 small" style="min-height: 120px;">Open this tab to load status…</div>
+                      <div class="mt-3 border-top border-secondary pt-3">
+                        <label class="form-label small mb-1">Install config automatically (this PC)</label>
+                        <p class="small text-muted mb-2">Writes <code>Documents/My Games/FarmingSimulator2025/modSettings/ai_farm_manager_config.xml</code></p>
+                        <select id="aiFarmBotInstanceSelect" class="form-select form-select-sm mb-2"></select>
+                        <button type="button" class="btn btn-sm btn-outline-success" id="aiFarmBotInstallLocal">Write to FS25 modSettings</button>
+                        <p id="aiFarmBotInstallResult" class="small text-info mt-2 mb-0"></p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="tab-pane fade" id="app-settings-pane-mod" role="tabpanel" aria-labelledby="app-settings-tab-mod" tabindex="0">
+                    <h6 class="text-farm-accent" data-i18n="settings.modTitle">FS25 mod — config.xml (this PC)</h6>
+                    <p class="small text-muted" data-i18n="settings.modHint">These options match the in-game mod’s config file.</p>
+                    <p class="small font-monospace text-break mb-2" id="settings-mod-config-path">—</p>
+                    <div class="row g-3 mb-3">
+                      <div class="col-md-6">
+                        <label class="form-label" for="settings-mod-update-interval" data-i18n="settings.updateInterval">Update interval (ms)</label>
+                        <input type="number" class="form-control bg-secondary text-light border-secondary" id="settings-mod-update-interval" min="1000" max="600000" step="1000" value="10000"/>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" for="settings-mod-collection-cycle" data-i18n="settings.collectionCycle">Collection cycle (ms)</label>
+                        <input type="number" class="form-control bg-secondary text-light border-secondary" id="settings-mod-collection-cycle" min="5000" max="1800000" step="1000" value="60000"/>
+                      </div>
+                    </div>
+                    <p class="small text-muted mb-2" data-i18n="settings.modModules">Data modules</p>
+                    <div class="row g-2">
+                      <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-mod-animals" checked/><label class="form-check-label" for="settings-mod-animals" data-i18n="settings.modAnimals">Animals</label></div></div>
+                      <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-mod-vehicles" checked/><label class="form-check-label" for="settings-mod-vehicles" data-i18n="settings.modVehicles">Vehicles</label></div></div>
+                      <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-mod-weather" checked/><label class="form-check-label" for="settings-mod-weather" data-i18n="settings.modWeather">Weather</label></div></div>
+                      <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-mod-fields" checked/><label class="form-check-label" for="settings-mod-fields" data-i18n="settings.modFields">Fields</label></div></div>
+                      <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-mod-finance" checked/><label class="form-check-label" for="settings-mod-finance" data-i18n="settings.modFinance">Finance</label></div></div>
+                      <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-mod-economy" checked/><label class="form-check-label" for="settings-mod-economy" data-i18n="settings.modEconomy">Economy</label></div></div>
+                      <div class="col-md-4"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-mod-production" checked/><label class="form-check-label" for="settings-mod-production" data-i18n="settings.modProduction">Production</label></div></div>
+                    </div>
+                  </div>
+
+                  <div class="tab-pane fade" id="app-settings-pane-theme" role="tabpanel" aria-labelledby="app-settings-tab-theme" tabindex="0">
+                    <div class="mb-3">
+                      <label class="form-label" data-i18n="theme.language">Language</label>
+                      <select class="form-select bg-secondary text-light border-secondary mb-3" id="farmdash-language-select"></select>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label" data-i18n="theme.selectTab">Select Tab to Customize:</label>
+                      <select class="form-select bg-secondary text-light border-secondary" id="theme-tab-selector" onchange="dashboard.loadThemeEditor()">
+                        <option value="global" data-i18n="theme.tabGlobal">Global Default</option>
+                        <option value="livestock" data-i18n="theme.tabLivestock">Livestock Tab</option>
+                        <option value="vehicles" data-i18n="theme.tabVehicles">Vehicles Tab</option>
+                        <option value="fields" data-i18n="theme.tabFields">Fields Tab</option>
+                        <option value="economy" data-i18n="theme.tabEconomy">Economy Tab</option>
+                        <option value="pastures" data-i18n="theme.tabPastures">Pastures Tab</option>
+                      </select>
+                    </div>
+                    <div class="row g-3 mt-2">
+                      <div class="col-md-6">
+                        <label class="form-label" data-i18n="theme.bg">Background Color</label>
+                        <input type="color" class="form-control form-control-color bg-secondary border-0 w-100" id="color-bg">
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" data-i18n="theme.panel">Panel / Card Color</label>
+                        <input type="color" class="form-control form-control-color bg-secondary border-0 w-100" id="color-panel">
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" data-i18n="theme.primary">Primary Header Color</label>
+                        <input type="color" class="form-control form-control-color bg-secondary border-0 w-100" id="color-primary">
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label" data-i18n="theme.accent">Accent / Button Color</label>
+                        <input type="color" class="form-control form-control-color bg-secondary border-0 w-100" id="color-accent">
+                      </div>
+                    </div>
+                    <hr class="border-secondary my-4"/>
+                    <div class="d-flex justify-content-between flex-wrap gap-2">
+                      <button type="button" class="btn btn-warning btn-sm" onclick="dashboard.applyThemeToAllTabs()">
+                        <i class="bi bi-layers-fill me-1"></i> <span data-i18n="theme.copyAll">Copy to All Tabs</span>
+                      </button>
+                      <button type="button" class="btn btn-outline-danger btn-sm" onclick="dashboard.resetThemeToDefaults()">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i> <span data-i18n="theme.reset">Reset Defaults</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer border-top border-secondary flex-wrap gap-2">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.close">Close</button>
+            <div class="ms-auto d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-farm-accent d-none" id="app-settings-save-theme-btn" onclick="dashboard.saveCurrentTheme()"><span data-i18n="theme.save">Save Theme</span></button>
+              <button type="button" class="btn btn-farm-accent" id="dashboard-settings-save-btn" data-i18n="settings.save">Save</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI upsell: hosted plan + BYOK (see ai-upsell-modal.js + window.FARMDASH_AI_MARKETING) -->
+    <div class="modal fade" id="farmdashAiUpsellModal" tabindex="-1" aria-hidden="true" aria-labelledby="farmdashAiUpsellTitle">
+      <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-dark text-light border border-secondary">
+          <div class="modal-header border-secondary">
+            <h5 class="modal-title" id="farmdashAiUpsellTitle">AI Farm Manager</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div id="farmdashAiUpsellBody"></div>
+            <hr class="border-secondary my-3" />
+            <p class="small text-muted mb-2" id="farmdashAiUpsellSetupHint"></p>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <a href="#" class="btn btn-sm btn-farm-accent" id="farmdashAiUpsellSubscribeBtn">Premium / hosted plan</a>
+              <a href="#" class="btn btn-sm btn-outline-light" id="farmdashAiUpsellByokBtn">BYOK setup guide</a>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-info mt-3 farmdash-local-only" id="farmdashAiUpsellOpenRobot">
+              Open AI Farm Manager &amp; Settings
+            </button>
+            <p class="small text-muted mt-2 mb-0 farmdash-remote-only">Use the PC running Farm Dashboard (localhost) to change AI connection and BYOK.</p>
+          </div>
+          <div class="modal-footer border-secondary">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <div class="modal fade" id="notificationHistoryModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-lg">
@@ -790,114 +1124,6 @@
             <div class="row" id="forecast-days"></div>
           </div>
           <div class="modal-footer border-farm-accent"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.close">Close</button></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="modal fade" id="aiFarmBotModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content bg-dark text-light border border-success">
-          <div class="modal-header border-success">
-            <h5 class="modal-title"><i class="bi bi-robot me-2 text-success"></i> AI Farm Manager</h5>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-          </div>
-          <div class="modal-body">
-            <p class="small mb-1 text-light" id="aiFarmBotIntroLead">Three things — only the <strong>outbound farm snapshot</strong> leaves this PC (encrypted HTTPS). Your <strong>link key</strong> proves this app is allowed; it is not your mod token.</p>
-            <ol class="small text-muted ps-3 mb-3" id="aiFarmBotSteps">
-              <li><strong class="text-light">AI server URL</strong> — <code class="text-muted">https://…</code> from your host</li>
-              <li><strong class="text-light">Link key</strong> — secret string from your host (like a password for this integration)</li>
-              <li><strong class="text-light">Send farm data</strong> — must be <strong>on</strong> for Smart suggestions; your host enables matching mode on the server</li>
-            </ol>
-            <div id="aiFarmBotConnectionBanner" class="alert small py-2 px-3 mb-3 d-none" role="status"></div>
-            <div class="card bg-secondary bg-opacity-25 border border-success border-opacity-50 mb-3">
-              <div class="card-body py-3">
-                <h6 class="text-success mb-2"><i class="bi bi-key-fill me-1"></i> Optional: your OpenAI / Gemini key (BYOK)</h6>
-                <p class="small text-muted mb-2">For tips when the host does not pay for LLM, or to use your own quota. Stays on this PC only.</p>
-                <p class="small text-info mb-2 mb-md-3"><strong>Using the AI server’s keys only?</strong> Leave the API key field empty and use <strong>Remove saved AI key</strong> below. If you paste a key here, Smart suggestions use <em>this</em> key — not your host’s rotated <code>GEMINI_API_KEYS</code> on the VPS.</p>
-                <div class="row g-2">
-                  <div class="col-md-4">
-                    <label class="form-label small mb-0" for="aiFarmBotByokProvider">Provider</label>
-                    <select id="aiFarmBotByokProvider" class="form-select form-select-sm">
-                      <option value="openai">OpenAI</option>
-                      <option value="gemini">Google Gemini</option>
-                    </select>
-                  </div>
-                  <div class="col-md-8">
-                    <label class="form-label small mb-0" for="aiFarmBotByokKey">API key</label>
-                    <input type="password" class="form-control form-control-sm font-monospace" id="aiFarmBotByokKey" placeholder="sk-… or AIza…" autocomplete="off" spellcheck="false"/>
-                  </div>
-                </div>
-                <div class="form-check mt-2 mb-0">
-                  <input class="form-check-input" type="checkbox" id="aiFarmBotClearByok"/>
-                  <label class="form-check-label small" for="aiFarmBotClearByok">Remove saved AI key from this computer</label>
-                </div>
-              </div>
-            </div>
-            <div class="card bg-secondary bg-opacity-25 border border-secondary mb-3" id="aiFarmBotGeminiModelsCard">
-              <div class="card-body py-2">
-                <h6 class="text-light mb-2 small"><i class="bi bi-list-ul me-1"></i> Gemini models (live list)</h6>
-                <p class="small text-muted mb-2">Calls Google <strong>ListModels</strong> for IDs that support <code>generateContent</code>. Use the same id in your host <code>GEMINI_MODEL</code> / <code>GEMINI_MODEL_ROLLOVER</code>. Cached on the AI server ~1h — use <strong>Force refresh</strong> to pull an updated list.</p>
-                <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-                  <button type="button" class="btn btn-sm btn-outline-secondary" id="aiFarmBotGeminiModelsRefresh">Fetch list</button>
-                  <button type="button" class="btn btn-sm btn-outline-warning" id="aiFarmBotGeminiModelsForce" title="Bypass server cache and query Google again">Force refresh</button>
-                  <span class="small text-muted" id="aiFarmBotGeminiModelsMeta">—</span>
-                </div>
-                <select id="aiFarmBotGeminiModelSelect" class="form-select form-select-sm font-monospace" aria-label="Gemini model ids from Google">
-                  <option value="">— click Fetch list —</option>
-                </select>
-              </div>
-            </div>
-            <!-- Subscription tier: remove d-none on #aiFarmBotSubscriptionTierRow when billing exposes tier on /api/integration/overview -->
-            <div class="d-none mb-2" id="aiFarmBotSubscriptionTierRow" aria-hidden="true">
-              <label class="form-label small mb-0" for="aiFarmBotCurrentTierText">Current plan</label>
-              <p class="small mb-0 text-muted font-monospace" id="aiFarmBotCurrentTierText">—</p>
-              <p class="small text-muted mb-0">0 = Free (BYOK) · 1 = Web Consultant · 2 = Full (consultant + in-game bot)</p>
-            </div>
-            <!--
-            <p class="small text-warning">Comment block kept for designers: duplicate tier row with badge styling when un-hiding.</p>
-            -->
-            <div class="row g-2 mb-2">
-              <div class="col-12" id="aiFarmBotRowBackendUrl">
-                <label class="form-label small" for="aiFarmBotBaseUrl">AI server URL</label>
-                <input type="text" class="form-control form-control-sm w-100" id="aiFarmBotBaseUrl" placeholder="https://your-ai-server.example.com (no path)" autocomplete="off"/>
-                <span class="form-text text-muted">Only if your installer did not embed a default.</span>
-              </div>
-              <div class="col-12 d-none" id="aiFarmBotRowIntegrationKey">
-                <label class="form-label small" for="aiFarmBotIntegrationKey">Link key (from your host)</label>
-                <div class="input-group input-group-sm">
-                  <input type="password" class="form-control font-monospace" id="aiFarmBotIntegrationKey" placeholder="only if not embedded in your installer" autocomplete="off" spellcheck="false"/>
-                  <button type="button" class="btn btn-outline-secondary" id="aiFarmBotToggleKey" title="Show or hide key" aria-pressed="false">
-                    <i class="bi bi-eye" id="aiFarmBotToggleKeyIcon" aria-hidden="true"></i>
-                  </button>
-                </div>
-              </div>
-              <div class="col-12">
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" id="aiFarmBotPushSnapshots" checked/>
-                  <label class="form-check-label small" for="aiFarmBotPushSnapshots"><strong>Send farm data to the AI server</strong> — <em>required for Smart suggestions.</em> Outbound HTTPS only; no open ports on this PC. Your host sets push mode on the server.</label>
-                </div>
-              </div>
-            </div>
-            <p class="small text-muted mb-2 d-none" id="aiFarmBotBrandedNote">This installer is already linked to your host — you do not need a separate connection key.</p>
-            <div class="d-flex flex-wrap gap-2 mb-2">
-              <button type="button" class="btn btn-sm btn-success" id="aiFarmBotSaveSettings">Save &amp; load</button>
-              <button type="button" class="btn btn-sm btn-outline-light" id="aiFarmBotRefresh">Refresh</button>
-              <button type="button" class="btn btn-sm btn-outline-info" id="aiFarmBotLlmPing" title="Verifies Farm Dashboard → AI server → LLM (same path as consultant; optional BYOK below)">Test dashboard → LLM</button>
-            </div>
-            <p id="aiFarmBotLlmPingResult" class="small text-muted mb-3 mb-md-2" aria-live="polite"></p>
-            <div id="aiFarmBotPanelBody" class="border border-secondary rounded p-2 small" style="min-height: 120px;">Open this panel to load status…</div>
-            <div class="mt-3 border-top border-secondary pt-3">
-              <label class="form-label small mb-1">Install config automatically (this PC)</label>
-              <p class="small text-muted mb-2">Writes <code>Documents/My Games/FarmingSimulator2025/modSettings/ai_farm_manager_config.xml</code> — no manual editing. Requires the desktop app (not a browser tab).</p>
-              <p class="small text-muted mb-2"><strong>In-game <code>!hank</code> chat</strong> runs in <strong>multiplayer only</strong> (you host, dedicated server, or G-Portal/rented host). It does not run in single-player career. <strong>Farm Dashboard</strong> Smart suggestions on this PC work in solo or MP. For rented servers, upload the same XML to the <em>server&rsquo;s</em> <code>modSettings</code> — see <code>AI_Farm_Manager/docs/IN_GAME_CHAT_BOT.md</code> in the repo.</p>
-              <select id="aiFarmBotInstanceSelect" class="form-select form-select-sm mb-2"></select>
-              <button type="button" class="btn btn-sm btn-outline-success" id="aiFarmBotInstallLocal">Write to FS25 modSettings</button>
-              <p id="aiFarmBotInstallResult" class="small text-info mt-2 mb-0"></p>
-            </div>
-          </div>
-          <div class="modal-footer border-secondary">
-            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
-          </div>
         </div>
       </div>
     </div>

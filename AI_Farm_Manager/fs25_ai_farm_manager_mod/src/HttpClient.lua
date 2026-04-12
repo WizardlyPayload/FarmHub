@@ -4,7 +4,7 @@
   FS25 notes (from sdk/debugger/gameSource.zip):
   - Shipped Lua under dataS/scripts/ does not define Internet.lua / createHTTPRequest in text form;
     HTTP is provided by the engine on some builds (often dedicated server), not always on the game client.
-  - POST (postJson) / GET (poll) use engine HTTP if present, else curl. Linux DS: temp JSON with io.open(..., "w") only (not "wb"); JSON under $TMPDIR, /tmp, or ~/.cache; no cmd/.bat read path.
+  - POST (postJson) / GET (poll) use engine HTTP if present, else curl. Linux: POST body first via inline shell-quoted JSON (no temp file); fallback temp file under modSettings / tmp. Windows: temp file + curl.
 
   Curl output uses -w "\\n%{http_code}"; we parse the last line as status (handles CRLF from Windows curl).
 
@@ -249,12 +249,16 @@ local function makeTempJsonPathForCurl()
     )
 end
 
---- Write POST body to a file curl can read; returns path or nil (tries several dirs on Linux).
+--- Write POST body to a file curl can read; returns path or nil (tries several dirs).
+--- FS25 DS/client often restricts io.open to the user profile (modSettings); /tmp and TEMP may fail first.
 local function writeCurlPostBodyFile(jsonBody)
     local id = "aifarm_mgr_" .. tostring(math.random(100000, 999999)) .. ".json"
     local body = jsonBody or ""
-    if isWindowsHost() then
-        local p = makeTempJsonPathForCurl()
+
+    local function tryPath(p)
+        if p == nil or p == "" then
+            return nil
+        end
         local f = ioOpenForWrite(p)
         if f == nil then
             return nil
@@ -263,6 +267,33 @@ local function writeCurlPostBodyFile(jsonBody)
         f:close()
         return p
     end
+
+    -- Prefer modSettings (same sandbox as config XML); required on many builds where only "w" works under profile.
+    local ms = getModsSettingsDirForHttpTemp()
+    if ms ~= nil then
+        local p = tryPath(joinPath(ms, id))
+        if p ~= nil then
+            return p
+        end
+    end
+
+    if isWindowsHost() then
+        if os ~= nil and type(os.tmpname) == "function" then
+            local base = os.tmpname()
+            if base ~= nil and base ~= "" then
+                local p = tryPath(base .. ".json")
+                if p ~= nil then
+                    return p
+                end
+            end
+        end
+        local p = tryPath(makeTempJsonPathForCurl())
+        if p ~= nil then
+            return p
+        end
+        return nil
+    end
+
     local dirs = {}
     local td = getenvSafe("TMPDIR")
     if td ~= nil and td ~= "" then
@@ -274,19 +305,56 @@ local function writeCurlPostBodyFile(jsonBody)
         table.insert(dirs, joinPath(string.gsub(home, "\\", "/"), ".cache"))
     end
     for _, d in ipairs(dirs) do
-        local p = joinPath(d, id)
-        local f = ioOpenForWrite(p)
-        if f ~= nil then
-            f:write(body)
-            f:close()
+        local p = tryPath(joinPath(d, id))
+        if p ~= nil then
             return p
         end
     end
     return nil
 end
 
---- Last-resort POST via curl (body via temp file outside game folder when possible).
+--- POSIX shell single-quote: wrap s so it is safe inside '...' (handles embedded ').
+local function shSingleQuote(s)
+    s = tostring(s or "")
+    return "'" .. string.gsub(s, "'", "'\\''") .. "'"
+end
+
+--- Linux DS: POST JSON without a temp file (avoids io.open write restrictions and curl @file paths).
+--- Chat payloads are small; stays under typical argv limits.
+local function postJsonViaCurlInlinePosix(url, jsonBody, callback)
+    if jsonBody == nil or #jsonBody > 20000 then
+        return false
+    end
+    local u = tostring(url or "")
+    local cmd = "curl -s -S -X POST -H "
+        .. shSingleQuote("Content-Type: application/json")
+        .. " --data-binary "
+        .. shSingleQuote(jsonBody)
+        .. " -w "
+        .. shSingleQuote("\n%{http_code}")
+        .. " "
+        .. shSingleQuote(u)
+    local okPop, all = runCurlReadAny(cmd)
+    if not okPop or all == nil then
+        return false
+    end
+    local body, code = parseCurlHttpOutput(all)
+    if code == nil then
+        notify(callback, -1, all, "curl_parse_failed")
+        return true
+    end
+    notify(callback, code, body, nil)
+    return true
+end
+
+--- Last-resort POST via curl (Linux prefers inline body; else temp file for --data-binary @path).
 local function postJsonViaCurl(url, jsonBody, callback)
+    if not isWindowsHost() then
+        if postJsonViaCurlInlinePosix(url, jsonBody, callback) then
+            return
+        end
+    end
+
     local tmpWin = writeCurlPostBodyFile(jsonBody)
     if tmpWin == nil then
         notify(callback, -1, nil, "curl_tmp_open_failed")

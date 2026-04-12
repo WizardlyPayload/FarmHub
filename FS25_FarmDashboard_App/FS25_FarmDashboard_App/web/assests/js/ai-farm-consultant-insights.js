@@ -1,11 +1,7 @@
 /**
- * AI Farm Manager — proactive consultant insights (GET /api/v1/consultant/insights).
- * Reuses the same localStorage keys as ai-farm-bot-panel.js (AI backend URL + Farm Dashboard link key).
+ * AI Farm Manager — proactive consultant insights via Farm Dashboard proxy (GET /api/farmdash-ai/consultant/insights).
  */
 (function () {
-  var LS_URL = 'farmdash_ai_manager_base_url';
-  var LS_KEY = 'farmdash_ai_integration_key';
-
   function pl(stage, message, meta) {
     if (typeof pipelineLog === 'function') pipelineLog(stage, message, meta);
   }
@@ -19,45 +15,217 @@
     insightsFetchInFlight = false;
   }
 
-  function getBaseAsync() {
-    var ls = (localStorage.getItem(LS_URL) || '').replace(/\/$/, '');
-    if (ls) return Promise.resolve(ls);
+  function buildConsultantInsightsQuery(viewParam) {
+    var parts = [];
+    var sid = '';
     try {
-      return require('electron').ipcRenderer.invoke('get-ai-manager-connection').then(function (c) {
-        if (c && c.baseUrl) return String(c.baseUrl).replace(/\/$/, '');
-        return 'http://127.0.0.1:8080';
-      });
-    } catch (e) {
-      return Promise.resolve('http://127.0.0.1:8080');
+      sid =
+        (window.dashboard && window.dashboard.activeServerId) ||
+        localStorage.getItem('dashboard_active_server') ||
+        '';
+    } catch (e0) {
+      sid = '';
+    }
+    if (sid) parts.push('serverId=' + encodeURIComponent(sid));
+    var farmId = '';
+    try {
+      if (window.dashboard && window.dashboard.activeFarmId != null) {
+        farmId = String(window.dashboard.activeFarmId);
+      }
+    } catch (eFarm) {
+      farmId = '';
+    }
+    if (farmId) parts.push('farmId=' + encodeURIComponent(farmId));
+    var vp = viewParam ? String(viewParam) : '';
+    if (vp) parts.push('view=' + encodeURIComponent(vp));
+    return parts.length ? parts.join('&') : '';
+  }
+
+  var INSIGHTS_CACHE_TTL_MS = 300000; // 5 min — aligned with background refresh
+  var insightResultCache = {};
+
+  function getInsightFarmId() {
+    try {
+      if (window.dashboard && window.dashboard.activeFarmId != null) {
+        return String(window.dashboard.activeFarmId);
+      }
+    } catch (e) {}
+    return '1';
+  }
+
+  function normalizeCacheViewKey(vp) {
+    var s = String(vp || '').toLowerCase();
+    if (s === 'landing' || s === 'dashboard' || s === '') return 'home';
+    return s;
+  }
+
+  /** Cache key includes farm so switching farms never shows another farm’s suggestions. */
+  function insightCacheStorageKey(viewKey) {
+    return getInsightFarmId() + ':' + normalizeCacheViewKey(viewKey);
+  }
+
+  function insightCacheGet(viewKey) {
+    var k = insightCacheStorageKey(viewKey);
+    var c = insightResultCache[k];
+    if (!c || !c.ts) return null;
+    if (Date.now() - c.ts > INSIGHTS_CACHE_TTL_MS) return null;
+    return c;
+  }
+
+  function insightCacheSet(viewKey, insights, llmUsed) {
+    var k = insightCacheStorageKey(viewKey);
+    insightResultCache[k] = {
+      insights: insights || [],
+      llm_used: !!llmUsed,
+      ts: Date.now(),
+    };
+  }
+
+  /** Persisted across restarts by consultant-disk-cache.js (localStorage). */
+  function insightCacheGetAllForSave() {
+    var out = {};
+    for (var k in insightResultCache) {
+      if (!insightResultCache.hasOwnProperty(k)) continue;
+      var c = insightResultCache[k];
+      if (!c || !c.insights) continue;
+      out[k] = { insights: c.insights, llm_used: !!c.llm_used };
+    }
+    return out;
+  }
+
+  function insightCacheMergeFromDisk(entries) {
+    if (!entries || typeof entries !== 'object') return;
+    for (var k in entries) {
+      if (!entries.hasOwnProperty(k)) continue;
+      var e = entries[k];
+      if (e && e.insights) {
+        insightResultCache[k] = {
+          insights: e.insights,
+          llm_used: !!e.llm_used,
+          ts: Date.now(),
+        };
+      }
     }
   }
 
-  function getKeyAsync() {
-    var ls = localStorage.getItem(LS_KEY) || '';
-    if (ls) return Promise.resolve(ls);
-    try {
-      return require('electron').ipcRenderer.invoke('get-ai-manager-connection').then(function (c) {
-        return (c && c.integrationKey) || '';
-      });
-    } catch (e2) {
-      return Promise.resolve('');
-    }
+  try {
+    window.__farmdashInsightCacheGetAll = insightCacheGetAllForSave;
+    window.__farmdashInsightCacheMergeFromDisk = insightCacheMergeFromDisk;
+  } catch (eReg) {}
+
+  function clearFarmDashInsightCache() {
+    insightResultCache = {};
   }
 
-  function getByokHeadersSync() {
-    try {
-      var ipc = require('electron').ipcRenderer;
-      return ipc.invoke('get-consultant-byok-credentials').then(function (c) {
-        if (!c || !c.apiKey) return {};
-        var h = { 'X-AI-API-Key': c.apiKey };
-        if (c.provider === 'gemini' || c.provider === 'openai') {
-          h['X-AI-Provider'] = c.provider;
+  /**
+   * GET consultant insights via Farm Dashboard only (localhost forwards to AI; LAN uses cache — see main.js).
+   * @param {string} viewParam view= query
+   * @param {{ silent?: boolean }} fetchOpts silent:true = preload / background (no upsell modal)
+   */
+  function fetchInsightsForView(viewParam, fetchOpts) {
+    fetchOpts = fetchOpts || {};
+    var proxyBase =
+      typeof window !== 'undefined' && window.location && window.location.origin
+        ? window.location.origin + '/api/farmdash-ai/consultant/insights'
+        : '';
+    if (!proxyBase) return Promise.reject(new Error('__no_origin__'));
+    var q = buildConsultantInsightsQuery(viewParam);
+    var apiURL = q ? proxyBase + '?' + q : proxyBase;
+    return fetch(apiURL, { method: 'GET', headers: { Accept: 'application/json' } })
+      .then(function (r) {
+        if (!r.ok) {
+          return r.text().then(function (t) {
+            if (typeof window.farmdashNotifyConsultantHttpError === 'function' && !fetchOpts.silent) {
+              window.farmdashNotifyConsultantHttpError(r.status, t, { silent: true });
+            }
+            return Promise.reject(new Error('HTTP ' + r.status + (t ? ': ' + t.slice(0, 120) : '')));
+          });
         }
-        return h;
+        return r.json();
+      })
+      .then(function (data) {
+        return {
+          insights: (data && data.insights) || [],
+          llm_used: !!(data && data.llm_used),
+        };
+      })
+      .catch(function (e) {
+        var msg = String(e && e.message ? e.message : e);
+        if (!fetchOpts.silent && msg.indexOf('HTTP ') !== 0) {
+          if (typeof window.farmdashNotifyConsultantHttpError === 'function') {
+            window.farmdashNotifyConsultantHttpError(0, msg, { silent: true });
+          }
+        }
+        throw e;
       });
-    } catch (e) {
-      return Promise.resolve({});
+  }
+
+  /**
+   * Parallel: section views. Sequential: home after parallel completes. Fills insightResultCache.
+   */
+  function preloadAllAIInsights() {
+    if (window.__farmdashSkipPreloadAiInsights) {
+      pl('renderer_ok', 'preloadAllAIInsights: skipped (restored from disk cache)', {});
+      try {
+        var cur = getSmartPanelViewParam();
+        if (cur === 'fields') {
+          if (typeof dashFlushDomWork === 'function') {
+            dashFlushDomWork(function () {
+              renderFieldsSmartPanelForFieldsTab();
+            });
+          } else {
+            renderFieldsSmartPanelForFieldsTab();
+          }
+        } else {
+          var ck = insightCacheGet(cur);
+          if (ck && ck.insights) {
+            if (typeof dashFlushDomWork === 'function') {
+              dashFlushDomWork(function () {
+                renderInsights(ck.insights, ck.llm_used);
+              });
+            } else {
+              renderInsights(ck.insights, ck.llm_used);
+            }
+          }
+        }
+      } catch (eDisk) {}
+      return Promise.resolve();
     }
+    var parallelViews = ['fields', 'vehicles', 'pastures', 'livestock', 'productions', 'economy'];
+    pl('renderer_in', 'preloadAllAIInsights: parallel', { views: parallelViews });
+    return Promise.all(
+      parallelViews.map(function (v) {
+        return fetchInsightsForView(v, { silent: true })
+          .then(function (data) {
+            insightCacheSet(v, data.insights, data.llm_used);
+            return v;
+          })
+          .catch(function (err) {
+            pl('renderer_err', 'preloadAllAIInsights parallel view failed', {
+              view: v,
+              err: String(err && err.message ? err.message : err),
+            });
+            return null;
+          });
+      })
+    )
+      .then(function () {
+        return fetchInsightsForView('home', { silent: true });
+      })
+      .then(function (data) {
+        insightCacheSet('home', data.insights, data.llm_used);
+        pl('renderer_ok', 'preloadAllAIInsights: home stored', {});
+        try {
+          var cur = getSmartPanelViewParam();
+          if (cur === 'home' && document.getElementById('ai-insights-panel')) {
+            renderInsights(data.insights, data.llm_used);
+          }
+        } catch (ePaint) {}
+      })
+      .catch(function (err) {
+        if (err && (err.message === '__no_key__' || err.message === '__no_origin__')) return;
+        pl('renderer_err', 'preloadAllAIInsights failed', { err: String(err && err.message ? err.message : err) });
+      });
   }
 
   /** Raw dashboard section (landing, fields, vehicles, …) — for stale-fetch detection. */
@@ -97,15 +265,39 @@
     container.setAttribute('aria-busy', 'true');
     container.innerHTML =
       '<div class="ai-insights-thinking-placeholder">' +
-      '<p class="small text-info mb-3">' +
-      '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' +
-      'AI thinking… fetching suggestions from your host.' +
+      '<p class="small text-muted mb-2">' +
+      '<span class="spinner-border spinner-border-sm text-secondary me-2" role="status" aria-hidden="true"></span>' +
+      'Loading Smart suggestions…' +
       '</p>' +
-      '<div class="placeholder-glow">' +
+      '<p class="small text-muted mb-3 mb-md-2 opacity-90">Your farm data on screen is unchanged.</p>' +
+      '<div class="ai-insights-skeleton-pulse">' +
       '<span class="placeholder col-12 bg-secondary mb-2 rounded d-block" style="height: 3rem;"></span>' +
       '<span class="placeholder col-10 bg-secondary mb-2 rounded d-block" style="height: 0.9rem;"></span>' +
       '<span class="placeholder col-11 bg-secondary rounded d-block" style="height: 0.9rem;"></span>' +
       '</div></div>';
+  }
+
+  /**
+   * AI unavailable or declined — neutral copy (no red errors; full dashboard works without AI).
+   */
+  function renderSmartSuggestionsUnavailableNeutral() {
+    var container = document.getElementById('ai-insights-panel');
+    var badge = document.getElementById('ai-insights-llm-badge');
+    if (!container) return;
+    container.removeAttribute('aria-busy');
+    if (badge) {
+      badge.textContent = '—';
+      badge.className = 'badge ms-1 bg-secondary';
+      badge.title =
+        'Optional — Smart suggestions need an AI host or BYOK in settings. The dashboard does not require them.';
+    }
+    container.innerHTML =
+      '<p class="small text-muted mb-2">' +
+      '<i class="bi bi-lightbulb me-1"></i> <strong>Smart suggestions</strong> are optional. When connected, this panel ranks tips from your live snapshot — fields, fleet, animals, pastures, production, and economy.' +
+      '</p>' +
+      '<p class="small text-muted mb-0">' +
+      'Nothing is wrong with your dashboard if you skip AI. Connect an AI Farm Manager host or add BYOK in settings whenever you want these tips.' +
+      '</p>';
   }
 
   function escapeInsightHtml(s) {
@@ -197,8 +389,8 @@
     if (!container) return;
     container.setAttribute('aria-busy', 'true');
     container.innerHTML =
-      '<p class="small text-info mb-0">' +
-      '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' +
+      '<p class="small text-muted mb-0">' +
+      '<span class="spinner-border spinner-border-sm text-secondary me-2" role="status" aria-hidden="true"></span>' +
       'Loading per-field AI tips… then we&rsquo;ll show what to do first.</p>';
   }
 
@@ -239,7 +431,8 @@
           'Tap <strong>Refresh</strong> after driving or refuelling if you want another look.</p>';
       } else {
         container.innerHTML =
-          '<p class="text-muted small mb-0">No suggestions right now — check snapshot / FTP on the AI server.</p>';
+          '<p class="text-muted small mb-0">No ranked tips for this view right now. ' +
+          'When Smart suggestions are connected, priorities from your live snapshot appear here.</p>';
       }
       return;
     }
@@ -297,6 +490,24 @@
       return;
     }
 
+    if (!forceRefresh && !opts.background) {
+      var ck = insightCacheGet(getSmartPanelViewParam());
+      if (ck) {
+        var doCached = function () {
+          renderInsights(ck.insights, ck.llm_used);
+        };
+        if (typeof dashFlushDomWork === 'function') {
+          dashFlushDomWork(doCached);
+        } else {
+          doCached();
+        }
+        pl('renderer_ok', 'smart suggestions: served from eager-load cache', {
+          view: normalizeCacheViewKey(getSmartPanelViewParam()),
+        });
+        return;
+      }
+    }
+
     if (!forceRefresh && insightsFetchInFlight) {
       pl('renderer_ok', 'smart suggestions: skipped (fetch already in flight)', {});
       return;
@@ -334,71 +545,34 @@
       var requestedSectionAtFetch = getCurrentDashboardSection();
       var requestedViewAtFetch = getSmartPanelViewParam();
 
-      Promise.all([getBaseAsync(), getKeyAsync()])
-        .then(function (pair) {
-          var base = pair[0] || 'http://127.0.0.1:8080';
-          var key = pair[1] || '';
-          if (!key) {
-            var badge = document.getElementById('ai-insights-llm-badge');
-            if (badge) {
-              badge.textContent = '—';
-              badge.className = 'badge ms-1 bg-secondary';
-            }
-            container.removeAttribute('aria-busy');
-            container.innerHTML =
-              '<p class="text-warning small mb-0">Open <i class="bi bi-robot"></i> <strong>AI Farm Manager</strong> and click <strong>Save &amp; load</strong>.</p>';
-            return Promise.reject(new Error('__no_key__'));
+      function runSmartSuggestionsHttpFetch() {
+        var proxyBase =
+          typeof window !== 'undefined' && window.location && window.location.origin
+            ? window.location.origin + '/api/farmdash-ai/consultant/insights'
+            : '';
+        if (!proxyBase) {
+          var badgeP = document.getElementById('ai-insights-llm-badge');
+          if (badgeP) {
+            badgeP.textContent = '—';
+            badgeP.className = 'badge ms-1 bg-secondary';
           }
-          var apiURL = base + '/api/v1/consultant/insights';
-          var sid = '';
-          try {
-            sid =
-              (window.dashboard && window.dashboard.activeServerId) ||
-              localStorage.getItem('dashboard_active_server') ||
-              '';
-          } catch (e0) {
-            sid = '';
-          }
-          if (sid) {
-            apiURL += (apiURL.indexOf('?') >= 0 ? '&' : '?') + 'serverId=' + encodeURIComponent(sid);
-          }
-          var farmId = '';
-          try {
-            if (window.dashboard && window.dashboard.activeFarmId != null) {
-              farmId = String(window.dashboard.activeFarmId);
-            }
-          } catch (eFarm) {
-            farmId = '';
-          }
-          if (farmId) {
-            apiURL += (apiURL.indexOf('?') >= 0 ? '&' : '?') + 'farmId=' + encodeURIComponent(farmId);
-          }
-          var viewParam = getSmartPanelViewParam();
-          if (viewParam) {
-            apiURL += (apiURL.indexOf('?') >= 0 ? '&' : '?') + 'view=' + encodeURIComponent(viewParam);
-          }
-          return getByokHeadersSync().then(function (extra) {
-            var hdrs = Object.assign(
-              {
-                'X-FarmDash-Key': encodeURIComponent(key),
-                Accept: 'application/json',
-              },
-              extra
-            );
-            dbg('request', {
-              url: apiURL,
-              method: 'GET',
-              headers:
-                typeof window !== 'undefined' && typeof window.dashRedactHeaders === 'function'
-                  ? window.dashRedactHeaders(hdrs)
-                  : hdrs,
-            });
-            return fetch(apiURL, {
-              method: 'GET',
-              headers: hdrs,
-            });
-          });
-        })
+          container.removeAttribute('aria-busy');
+          container.innerHTML =
+            '<p class="text-muted small mb-0">Could not resolve the dashboard URL for optional Smart suggestions. The rest of the app still works.</p>';
+          return Promise.reject(new Error('__no_origin__'));
+        }
+        var viewParamPx = getSmartPanelViewParam();
+        var qPx = buildConsultantInsightsQuery(viewParamPx);
+        var apiURLpx = qPx ? proxyBase + '?' + qPx : proxyBase;
+        dbg('request', {
+          url: apiURLpx,
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        });
+        return fetch(apiURLpx, { method: 'GET', headers: { Accept: 'application/json' } });
+      }
+
+      runSmartSuggestionsHttpFetch()
         .then(async function (r) {
           pl('renderer_out', 'GET /api/v1/consultant/insights (Smart suggestions)', { httpStatus: r.status });
           var errText = '';
@@ -423,6 +597,9 @@
               }
             } catch (eRep) {}
             dbg('error', { httpStatus: r.status, body: errText.slice(0, 4000) });
+            if (typeof window.farmdashNotifyConsultantHttpError === 'function') {
+              window.farmdashNotifyConsultantHttpError(r.status, errText, { silent: true });
+            }
             if (r.status === 401) throw new Error('401 — wrong key or FARMDASH_INTEGRATION_KEY not set on AI server');
             if (r.status === 503) {
               var msg503 = 'Snapshot unavailable (FTP / DASHBOARD_JSON_URL)';
@@ -472,11 +649,35 @@
 
           var list = (data && data.insights) || [];
           var llm = !!(data && data.llm_used);
+          var aiErr =
+            data && data.farmdash_ai_error != null && String(data.farmdash_ai_error).trim() !== '';
           try {
             if (typeof dashReportConsultantProblem === 'function') {
               dashReportConsultantProblem('smart-suggestions', { status: 200, llm_used: llm, detail: '' });
             }
           } catch (eLlm) {}
+          var vpStore = requestedViewAtFetch || getSmartPanelViewParam();
+          if (aiErr && (!list || list.length === 0)) {
+            insightCacheSet(vpStore, [], false);
+            try {
+              document.dispatchEvent(new CustomEvent('consultant-insights-fetched'));
+            } catch (eEv) {}
+            var doNeutral = function () {
+              renderSmartSuggestionsUnavailableNeutral();
+            };
+            if (typeof dashFlushDomWork === 'function') {
+              dashFlushDomWork(doNeutral);
+            } else {
+              doNeutral();
+            }
+            pl('renderer_ok', 'consultant/insights: optional AI unavailable (server flag), neutral UI', {});
+            return;
+          }
+          insightCacheSet(vpStore, list, llm);
+          try {
+            document.dispatchEvent(new CustomEvent('consultant-insights-fetched'));
+          } catch (eEv) {}
+
           var doRender = function () {
             renderInsights(list, llm);
           };
@@ -491,18 +692,29 @@
           } catch (e1) {}
         })
         .catch(function (err) {
-          if (err && err.message === '__no_key__') {
+          if (err && (err.message === '__no_key__' || err.message === '__no_origin__')) {
             return;
           }
-          dbg('error', { message: String(err && err.message ? err.message : err) });
-          pl('renderer_err', 'GET /api/v1/consultant/insights failed', { error: String(err.message || err) });
-          container.removeAttribute('aria-busy');
-          container.innerHTML =
-            '<p class="text-danger small mb-0"><i class="bi bi-exclamation-triangle me-1"></i> ' +
-            String(err.message || err) +
-            '</p>';
+          var msg = String(err && err.message ? err.message : err);
+          dbg('error', { message: msg });
+          pl('renderer_err', 'GET /api/farmdash-ai/consultant/insights failed', { error: msg });
+          if (msg.indexOf('HTTP ') !== 0 && typeof window.farmdashNotifyConsultantHttpError === 'function') {
+            window.farmdashNotifyConsultantHttpError(0, msg, { silent: true });
+          }
+          var doFailNeutral = function () {
+            renderSmartSuggestionsUnavailableNeutral();
+          };
+          if (typeof dashFlushDomWork === 'function') {
+            dashFlushDomWork(doFailNeutral);
+          } else {
+            doFailNeutral();
+          }
           try {
-            console.error('[AI Farm] Consultant insights failed:', err);
+            if (typeof window !== 'undefined' && window.DASH_DEBUG) {
+              console.warn('[AI Farm] Consultant insights unavailable:', msg);
+            } else {
+              console.debug('[AI Farm] Consultant insights optional path skipped:', msg.slice(0, 160));
+            }
           } catch (e2) {}
         })
         .then(insightsFetchDone, insightsFetchDone);
@@ -523,6 +735,38 @@
 
     /** Called after AI Farm Manager “Test dashboard → LLM” succeeds — insights otherwise refresh every 5 min only. */
     window.refreshFarmDashConsultantInsights = refreshFarmInsights;
+    window.preloadAllAIInsights = preloadAllAIInsights;
+    window.clearFarmDashInsightCache = clearFarmDashInsightCache;
+
+    document.addEventListener(
+      'farmdash-first-data-ready',
+      function () {
+        setTimeout(function () {
+          /** Hydrate AI cache from localStorage before preload (consultant-disk-cache.js may load async). */
+          function runPreload() {
+            preloadAllAIInsights();
+          }
+          if (typeof window.__farmdashHydrateConsultantDisk === 'function') {
+            try {
+              window.__farmdashHydrateConsultantDisk();
+            } catch (eH) {}
+            setTimeout(runPreload, 420);
+          } else {
+            import('./assests/js/consultant-disk-cache.js')
+              .then(function (m) {
+                try {
+                  if (m.hydrateConsultantDiskCacheIfFresh) m.hydrateConsultantDiskCacheIfFresh();
+                } catch (e2) {}
+              })
+              .catch(function () {})
+              .finally(function () {
+                setTimeout(runPreload, 420);
+              });
+          }
+        }, 10);
+      },
+      false
+    );
 
     var btn = document.getElementById('ai-insights-refresh-btn');
     if (btn) {

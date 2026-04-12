@@ -2,20 +2,21 @@
  * FS25 FarmDashboard — Layer 1 local heuristic suggestions (offline-safe).
  * Parses field objects from merged /api/fields data (same shape as data.json fields).
  *
- * Evaluation order (highest → lowest priority):
- *   1) Withered / reset
- *   2) Needs harvesting (ripe)
- *   3) Needs baling / collection (whole-field swath / windrow, cereal vs grass)
- *   4) Needs bale removal (strict bale count > 0, swath cleared)
- *   5) Precision Farming soil scan (when PF enabled and not scanned)
- *   6) Needs mulching (mulched stubble pipeline)
- *   7) Needs lime (pH low)
- *   8) Plowing / cultivating
- *   9) Seeding
- *  10) Rolling
- *  11) Weeding
- *  12) Fertilizer
+ * Priority pipeline (highest → lowest) aligns with FieldDataCollector.lua suggestion PR order:
+ *
+ *   A) Blockers: withered → harvest-ready → swath/windrow → bales → PF soil scan (if PF)
+ *   B) Fallow (no crop): mulch stubble → plough → lime (before seed) → cultivate mulched soil →
+ *      pre-drill N / organic → sow when soil + PF allow
+ *   C) Growing crop: roll (first stage) → lime → weeds (mechanical vs herbicide by stage) → fert
+ *   D) Catch-all: stones / needsWork → tend growing crop → fallback
  */
+
+/**
+ * When Layer 1 cannot pick a sharper rule, `fields.js` may substitute XML/Lua `suggestions[]`
+ * if present — compare against this exact action string.
+ */
+export const RULES_ENGINE_FALLBACK_ACTION =
+  "Use in-game field hints — saved data doesn’t show one clear job";
 
 /** Stable id for matching VPS consultant `field_ref` (farmlandId preferred). */
 export function getFieldStableId(field) {
@@ -104,6 +105,15 @@ function fruitUpper(field) {
 function isGrassCrop(field) {
   if (fruitUpper(field) === "GRASS") return true;
   return false;
+}
+
+/** Same notion as FieldDataCollector: no planted crop (`fruitTypeIndex == 0`). */
+function hasNoCrop(field) {
+  return (Number(field.fruitTypeIndex ?? 0) || 0) === 0;
+}
+
+function mulchLevelNum(field) {
+  return Number(field.mulchLevel ?? field.stubbleShredLevel ?? 0) || 0;
 }
 
 /** Whole-field swath / windrow: any aggregate or per-sample evidence from Lua or JSON. */
@@ -197,13 +207,82 @@ function isCerealStrawContext(field) {
   return false;
 }
 
-function needsFertilizerRule(field) {
+/**
+ * Fallow: safe to drill seed — plough + PF scan OK, and **lime / starter N prep done**
+ * (lime always before seed; never sow while `needsLime` or fallow nutrient prep is still true).
+ */
+function canSowFallow(field) {
+  const plowOk = !field.needsPlowing || Number(field.plowLevel ?? 0) >= 1;
+  const pfOk = !field.isPrecisionFarming || field.isScanned;
+  if (field.needsLime) return false;
+  if (needsFallowNutrientPrep(field)) return false;
+  return plowOk && pfOk;
+}
+
+/** Lime on bare / prepared soil before drilling (shared by fallow pipeline + edge paths). */
+function fallowLimeBeforeSeedSuggestion(field) {
+  const ph = Number(field.phValue ?? 0);
+  const pht = Number(field.targetPh ?? 0);
+  const detail =
+    field.isPrecisionFarming && pht > 0
+      ? `pH is about ${ph.toFixed(1)} vs ~${pht.toFixed(1)} target — spread lime on prepared soil, then drill seed (not after seeding).`
+      : "pH is below target for the next crop — lime before you drill or plant seed, so pH is right from emergence.";
+  return {
+    action: "Spread lime before drilling seed",
+    reason: detail,
+    source: "rules",
+  };
+}
+
+/** Growing crop: use live `needsFertilizer` when present, else spray / PF N heuristics. */
+function needsGrowingFertilizer(field) {
   const gs = field.growthState || 0;
   if (gs <= 0) return false;
+  if (typeof field.needsFertilizer === "boolean") return field.needsFertilizer;
   if (field.isPrecisionFarming && field.isScanned && field.targetNitrogen > 0) {
     return field.nitrogenLevel / field.targetNitrogen < 0.6;
   }
   return (field.fertilizationLevel || 0) < 1;
+}
+
+/** Bare field before first crop: mirror non-PF spray steps + PF N target when scanned. */
+function needsFallowNutrientPrep(field) {
+  if (!hasNoCrop(field)) return false;
+  if (typeof field.needsFertilizer === "boolean") return field.needsFertilizer;
+  if (field.isPrecisionFarming) {
+    if (!field.isScanned || !field.targetNitrogen) return false;
+    return field.nitrogenLevel < field.targetNitrogen * 0.95;
+  }
+  return (field.fertilizationLevel || 0) < 1.9;
+}
+
+/** Short crop name for sentences, e.g. WINTER_WHEAT → "winter wheat". */
+function displayCropLabel(field) {
+  const ft = fruitUpper(field);
+  if (!ft || ft === "UNKNOWN" || ft === "EMPTY") return "this crop";
+  if (ft === "MULCHED_STUBBLE") return "mulched stubble";
+  return ft
+    .toLowerCase()
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function suggestionForNeedsWork(field) {
+  const stones = Number(field.stoneLevel ?? 0);
+  if (Number.isFinite(stones) && stones > 0) {
+    return {
+      action: "Pick stones or roll to bury them",
+      reason: "Stone level is up — clear rocks so drills and harvesters don’t get blocked.",
+      source: "rules",
+    };
+  }
+  return {
+    action: "Finish flagged soil work (see field icons)",
+    reason:
+      "needsWork is set — match the in-field icons (stones, lime, N, weeds, plough, roll) to the right tool.",
+    source: "rules",
+  };
 }
 
 /**
@@ -212,166 +291,292 @@ function needsFertilizerRule(field) {
 export function getLocalFieldSuggestion(field) {
   if (!field) return null;
 
+  // ── A1. Withered (reset before anything else) ─────────────────────────────
   if (fieldShowsWithered(field)) {
+    const lost = displayCropLabel(field);
+    const reason =
+      lost === "this crop"
+        ? "The standing crop has withered — till the soil and plant something new."
+        : `Your ${lost} has withered — till the soil and plant something new.`;
     return {
-      action: "Plow or cultivate and replant",
-      reason: "Crop has withered — reset soil work and sow again.",
+      action: "Start over: cultivate, then re-seed this parcel",
+      reason,
       source: "rules",
     };
   }
 
+  // ── A2. Harvest-ready ───────────────────────────────────────────────────────
   if (effectiveHarvestReady(field)) {
+    const ft = fruitUpper(field);
+    if (ft === "GRASS") {
+      return {
+        action: "Mow or collect — grass is ready to cut",
+        reason: "Grass has reached cutting stage — bail silage/hay, wrap, or pick up before it gets rank.",
+        source: "rules",
+      };
+    }
+    const label = displayCropLabel(field);
     return {
-      action: "Harvest when ready",
-      reason: "Crop is ready to harvest before weather or stage penalties.",
+      action: `Combine-harvest — ${label} is ready`,
+      reason: `${label} is at harvest stage — get it off the field before rain, lodging, or withering costs yield.`,
       source: "rules",
     };
   }
 
+  // ── A3. Swath / windrow (blocks tillage) ───────────────────────────────────
   const swath = aggregateWindrowDetected(field);
   if (swath) {
     if (isGrassCrop(field)) {
       return {
-        action: "Grass mown. Tedder for hay, or windrow and bale for silage.",
-        reason: "Grass mown — finish hay or silage prep (tedder / windrow / bale) before tillage.",
+        action: "Finish grass: tedder for hay, or merge and bale for silage",
+        reason: "Mown grass is still on the ground — dry/ted if you want hay, or bale wet for silage before you till.",
         source: "rules",
       };
     }
     if (isCerealStrawContext(field)) {
       return {
-        action: "Straw swath detected. Needs baling or collecting with a forage wagon.",
-        reason: "Straw swath on the field — bale or pick up with a forage wagon before soil work.",
+        action: "Bale straw or pick it up with a forage wagon",
+        reason: "Loose straw is lying on the field — clear it so cultivation and the next crop aren’t blocked.",
         source: "rules",
       };
     }
     return {
-      action: "Bale or collect swath with a forage wagon",
-      reason: "Swath or windrow on the field — clear it before cultivation.",
+      action: "Clear the swath (baler or forage wagon)",
+      reason: "Windrow or swath is covering the soil — remove it before you work ground for the next pass.",
       source: "rules",
     };
   }
 
+  // ── A4. Bales on field ────────────────────────────────────────────────────
   const baleN = getBaleCountStrict(field);
   if (baleN > 0) {
+    const n = baleN === 1 ? "a bale" : `${baleN} bales`;
     return {
-      action: "Bales detected on field. Collect and remove them to clear the area for fieldwork.",
-      reason: "Bales still on the field — remove them so you can cultivate and plant.",
+      action: `Move ${n} off the field first`,
+      reason: "Bales block cultivators and planters — load, sell, or stack them out of the way.",
       source: "rules",
     };
   }
 
+  // ── A5. Precision Farming — scan before lime / N / sow (Lua fallow_soil / grow_soil) ──
   if (field.isPrecisionFarming && !field.isScanned) {
     return {
-      action: "Run a soil scan (Precision Farming)",
-      reason: "pH and nitrogen recommendations need scan data.",
+      action: "Run a Precision Farming soil scan on this field",
+      reason: "PF needs scan data before pH, nitrogen maps, and drilling advice match this parcel.",
       source: "rules",
     };
   }
 
-  if (isMulchedEmptyField(field)) {
-    return {
-      action: "Cultivate or direct drill",
-      reason: "Mulched stubble — till or no-till into the next crop.",
-      source: "rules",
-    };
-  }
+  const noCrop = hasNoCrop(field);
+  const grass = isGrassCrop(field);
+  const mulch = mulchLevelNum(field);
+  /** Match Lua `needsPlowing = plowLevel < 1` when the flag isn’t explicitly false. */
+  const needsPlow = field.needsPlowing === false ? false : Number(field.plowLevel ?? 0) < 1;
 
-  if (field.needsLime) {
-    return {
-      action: "Apply lime",
-      reason: "Soil pH is below target — spread lime to improve yields.",
-      source: "rules",
-    };
-  }
-
-  if (isPostHarvestField(field) || fieldIsAlreadyHarvested(field)) {
-    return {
-      action: "Cultivate or mulch, then plant",
-      reason: "Post-harvest pipeline: prepare seedbed and choose the next crop.",
-      source: "rules",
-    };
-  }
-
-  {
-    const fr = (field.fruitType || "").toLowerCase();
-    const noCrop =
-      !field.fruitType || fr === "unknown" || fr === "empty" || fr === "mulched_stubble";
-    if (
-      noCrop &&
-      (field.growthState || 0) === 0 &&
-      field.needsPlowing &&
-      Number(field.plowLevel || 0) < 1
-    ) {
+  // ── B. Fallow soil pipeline (matches Lua: mulch → plough → cultivate → lime → N → sow) ──
+  if (noCrop) {
+    // B1. Mulch stubble before plough (arable only, when plough still needed)
+    if (needsPlow && !grass && mulch < 1) {
       return {
-        action: "Plow or cultivate",
-        reason: "Fallow field — plough or cultivate before drilling.",
+        action: "Mulch stubble before you plough",
+        reason:
+          "Soil map says this field needs ploughing — shred harvest residue first (not for grass reseeding).",
+        source: "rules",
+      };
+    }
+
+    // B2. Primary tillage
+    if (needsPlow) {
+      return {
+        action: "Plough or deep-cultivate this field",
+        reason: "plowLevel / needsPlowing says primary tillage is still due before a clean seedbed.",
+        source: "rules",
+      };
+    }
+
+    // B3. Lime on prepared / fallow ground — before drilling seed (and typically before last cultivation passes).
+    if (field.needsLime) {
+      return fallowLimeBeforeSeedSuggestion(field);
+    }
+
+    // B4. Work mulched stubble into the soil (Lua fallow_cult — after plough / lime when pH is OK).
+    if (mulch >= 1) {
+      return {
+        action: "Cultivate to work in mulched stubble",
+        reason:
+          "Stubble is mulched — mix it in for an even seedbed. Lime (if needed) should already be planned before seed.",
+        source: "rules",
+      };
+    }
+
+    // B5. Build nitrogen / starter fert before first crop (optional organic first in rotation)
+    if (needsFallowNutrientPrep(field)) {
+      if (field.isPrecisionFarming && field.targetNitrogen > 0) {
+        const n = Number(field.nitrogenLevel ?? 0);
+        const t = Number(field.targetNitrogen ?? 0);
+        return {
+          action: "Build soil N (manure/slurry or bag) before you drill",
+          reason: `PF target ~${Math.round(t)} kg N/ha — you’re near ${Math.round(n)}; add organic first if you use it, then mineral.`,
+          source: "rules",
+        };
+      }
+      return {
+        action: "Fertilize — spray / nutrient level is low for drilling",
+        reason:
+          "Non-PF spray step isn’t full — build N after lime, before you drill seed (or in an early pass right after drilling if that’s your routine).",
+        source: "rules",
+      };
+    }
+
+    // B6. Sow only when lime + starter N prep are satisfied (see canSowFallow).
+    if (canSowFallow(field)) {
+      return {
+        action: "Sow or plant your next crop",
+        reason: mulch >= 1
+          ? "Lime and N prep are in a good place for drilling — put seed in after mulch/cultivation work."
+          : "Lime and N prep are in a good place for drilling — seed while moisture and soil conditions hold.",
         source: "rules",
       };
     }
   }
 
+  // ── Mulched empty without full fallow detection (legacy shape) ───────────
+  if (isMulchedEmptyField(field)) {
+    return {
+      action: "No-till drill or cultivate, then sow the next crop",
+      reason: "Stubble is mulched and there’s no active crop — seed directly or work the soil first.",
+      source: "rules",
+    };
+  }
+
+  // ── Post-harvest stubble (has crop index may still be 0 on some saves) ───
+  if (isPostHarvestField(field) || fieldIsAlreadyHarvested(field)) {
+    return {
+      action: "Work the stubble, then line up the next crop",
+      reason: "Harvest is done — mulch, plough, or drill depending on rotation; follow the fallow steps above next.",
+      source: "rules",
+    };
+  }
+
+  // ── C. Growing crop — maintenance order: roll → lime → weed → fert ───────
+  if (!noCrop) {
+    if (field.needsRolling) {
+      return {
+        action: "Roll — first growth stage / seedbed finish",
+        reason: "rollerLevel says rolling isn’t complete — roll once early for soil contact and stone knock-down.",
+        source: "rules",
+      };
+    }
+
+    if (field.needsLime) {
+      const ph = Number(field.phValue ?? 0);
+      const pht = Number(field.targetPh ?? 0);
+      const label = displayCropLabel(field);
+      const detail =
+        field.isPrecisionFarming && pht > 0
+          ? `${label}: pH ~${ph.toFixed(1)} vs target ~${pht.toFixed(1)} — lime now only if the crop stage still allows; best timing is before seeding next time.`
+          : `${label}: pH is low — lime now only if stage still permits; on future fields, lime before drilling seed.`;
+      return {
+        action: "Spread lime (emerged crop — pre-drill is ideal next season)",
+        reason: detail,
+        source: "rules",
+      };
+    }
+
+    if (field.needsWeeding) {
+      const label = displayCropLabel(field);
+      const gs = field.growthState || 0;
+      if (gs <= 2) {
+        return {
+          action: "Weed mechanically (hoe / weeder)",
+          reason: `Early growth (stage ${gs}) — weeds are high for ${label}; mechanical tools before herbicide is ideal.`,
+          source: "rules",
+        };
+      }
+      return {
+        action: "Spray herbicide — weeds past mechanical window",
+        reason: `Growth stage ${gs} — weed pressure on ${label} is best handled with a sprayer now.`,
+        source: "rules",
+      };
+    }
+
+    if (needsGrowingFertilizer(field)) {
+      const label = displayCropLabel(field);
+      if (field.isPrecisionFarming && field.isScanned && field.targetNitrogen > 0) {
+        const n = Number(field.nitrogenLevel ?? 0);
+        const t = Number(field.targetNitrogen ?? 0);
+        return {
+          action: "Top up nitrogen for this growth stage",
+          reason: `PF: ~${Math.round(n)} / ~${Math.round(t)} kg N/ha — ${label} is under-fed for where it is in growth.`,
+          source: "rules",
+        };
+      }
+      return {
+        action: "Fertilize — N or spray level is low",
+        reason: `${label} needs more nutrient for this stage — mineral or organic, then roll in if needed.`,
+        source: "rules",
+      };
+    }
+  }
+
+  // ── Empty seedbed without going through fallow branch (XML-only / edge) ───
   if (isSoilTilledField(field)) {
+    if (field.needsLime && hasNoCrop(field)) {
+      return fallowLimeBeforeSeedSuggestion(field);
+    }
+    if (hasNoCrop(field) && needsFallowNutrientPrep(field)) {
+      if (field.isPrecisionFarming && field.targetNitrogen > 0) {
+        const n = Number(field.nitrogenLevel ?? 0);
+        const t = Number(field.targetNitrogen ?? 0);
+        return {
+          action: "Build soil N (manure/slurry or bag) before you drill",
+          reason: `PF target ~${Math.round(t)} kg N/ha — you’re near ${Math.round(n)}; finish after lime, before seed.`,
+          source: "rules",
+        };
+      }
+      return {
+        action: "Fertilize — spray / nutrient level is low for drilling",
+        reason: "Bring spray/N up after lime and before drilling seed.",
+        source: "rules",
+      };
+    }
     return {
-      action: "Plant a crop",
-      reason: "Soil is plowed/cultivated and ready for seeding.",
+      action: "Sow — seedbed is worked and empty",
+      reason:
+        "Ground reads cultivated/plowed with no crop — drill seed only after any required lime and starter N prep for this field.",
       source: "rules",
     };
   }
 
-  if (field.needsRolling) {
-    return {
-      action: "Roll field",
-      reason: "Soil needs rolling (seedbed / maintenance).",
-      source: "rules",
-    };
-  }
-
-  if (field.needsWeeding) {
-    return {
-      action: "Weed the field",
-      reason: "Weeds above threshold — hoe, weeder, or herbicide as appropriate for growth stage.",
-      source: "rules",
-    };
-  }
-
-  if (needsFertilizerRule(field)) {
-    return {
-      action: "Fertilize (solid or liquid)",
-      reason: "Nitrogen / fertilization is below a healthy level for this growth stage.",
-      source: "rules",
-    };
-  }
-
+  // ── needsWork — stones or generic icon queue ──────────────────────────────
   if (field.needsWork) {
-    return {
-      action: "Complete field maintenance",
-      reason: "Stones, compaction, or other work flagged — use the right tool for the job.",
-      source: "rules",
-    };
+    return suggestionForNeedsWork(field);
   }
 
+  // ── Growing — nothing flagged; remind to monitor ─────────────────────────
   const gs = field.growthState || 0;
   const fruit = (field.fruitType || "").toLowerCase();
-  const noCrop = !field.fruitType || fruit === "unknown" || fruit === "empty";
-  if (noCrop && gs === 0) {
+  const noCropLoose = !field.fruitType || fruit === "unknown" || fruit === "empty";
+  if (noCropLoose && gs === 0) {
     return {
-      action: "Plow or cultivate, then plant",
-      reason: "Field is empty — prepare soil and sow.",
+      action: "Prepare soil, then drill or plant",
+      reason: "Field reads empty — plough/cultivate as needed, then put a crop in.",
       source: "rules",
     };
   }
 
   if (gs > 0) {
+    const label = displayCropLabel(field);
     return {
-      action: "Monitor growth until harvest",
-      reason: "Crop is growing — maintain N/lime and plan harvest window.",
+      action: `Tend ${label} until it’s harvest-ready`,
+      reason: `Crop is growing — roll, weed, and fertilize when the HUD shows those jobs; plan the harvest window.`,
       source: "rules",
     };
   }
 
   return {
-    action: "Review field status in game",
-    reason: "Heuristic engine has no sharper rule for this state.",
+    action: RULES_ENGINE_FALLBACK_ACTION,
+    reason: "The offline rules don’t match this odd state — the in-game field menu shows the live task list.",
     source: "rules",
   };
 }

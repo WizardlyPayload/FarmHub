@@ -428,6 +428,13 @@ class RealtimeConnector {
     }
 
     this.previousData = newState;
+
+    if (typeof window.farmDashNotifyDataReady === "function") {
+      if (!window.__farmDashRealtimeMergeNotified) {
+        window.__farmDashRealtimeMergeNotified = true;
+        window.farmDashNotifyDataReady();
+      }
+    }
   }
 
   updateAnimalsData(animalsData) {
@@ -954,30 +961,16 @@ class RealtimeConnector {
       }
     }
 
-    // Update navbar connection badge
-    const navStatus = document.getElementById("nav-connection-status");
-    const navStatusBadge = navStatus?.querySelector(".badge");
     const notificationBell = document.getElementById("notification-bell");
-
-    if (navStatus) {
+    const dash = this.dashboard;
+    if (dash && typeof dash.updateNavbarConnectionStrip === "function") {
+      dash.updateNavbarConnectionStrip();
+    }
+    if (notificationBell) {
       if (connected) {
-        navStatus.classList.remove("d-none");
-        if (navStatusBadge) {
-          navStatusBadge.className = "badge bg-success";
-          navStatusBadge.innerHTML =
-            '<i class="bi bi-wifi me-1"></i><span id="nav-connection-text">API Connected</span>';
-        }
-        // Show notification bell when API is connected
-        if (notificationBell) {
-          notificationBell.classList.remove("d-none");
-        }
+        notificationBell.classList.remove("d-none");
       } else {
-        // Hide the badge when disconnected instead of showing offline
-        navStatus.classList.add("d-none");
-        // Hide notification bell when API is disconnected
-        if (notificationBell) {
-          notificationBell.classList.add("d-none");
-        }
+        notificationBell.classList.add("d-none");
       }
     }
   }

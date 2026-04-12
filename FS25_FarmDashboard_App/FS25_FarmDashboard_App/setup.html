@@ -337,6 +337,18 @@
   </style>
 </head>
 <body>
+<script>
+(function () {
+  try {
+    var h = String(location.hostname || "").toLowerCase();
+    var local = !h || h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]";
+    if (!local) {
+      var q = location.search || "";
+      window.location.replace("/" + q);
+    }
+  } catch (e) {}
+})();
+</script>
 
 <div class="setup-lang-corner">
   <label for="setup-lang-select" class="setup-lang-corner-label" data-setup-i18n="setup.langHeading">Language</label>
@@ -501,7 +513,15 @@ Use Auto-Detect or add one manually →</div>
 // alert() in Electron opens a native OS dialog which permanently loses
 // renderer focus. Replaced with an in-page toast that never steals focus.
 
-const { ipcRenderer } = require('electron');
+// Electron desktop: ipcRenderer. Tablet/browser on LAN: null (use HTTP API instead).
+let ipcRenderer = null;
+try {
+  if (typeof require !== 'undefined') {
+    ipcRenderer = require('electron').ipcRenderer;
+  }
+} catch (e) {
+  ipcRenderer = null;
+}
 let servers = [];
 
 // ── toast (never steals focus unlike alert) ──────────────────────────────
@@ -580,6 +600,10 @@ function renderServers() {
 
 // ── auto-detect ──────────────────────────────────────────────────────────
 function autoDetectSaves() {
+  if (!ipcRenderer) {
+    toast('Auto-detect only runs on the PC with Farming Simulator saves. Use the Farm Dashboard app on that computer, or add a server manually below.', 'info');
+    return;
+  }
   const btn = document.getElementById('detectBtn');
   btn.textContent = '🔍 Scanning...';
   // no btn.disabled — can cause focus loss in Electron
@@ -609,6 +633,10 @@ window.autoDetectSaves = autoDetectSaves;
 
 // ── mod shop images (PowerShell export; progress modal + native summary dialog) ─────
 function scanModImagesForDashboard() {
+  if (!ipcRenderer) {
+    toast('Mod image scan runs on the Windows PC with the game installed (desktop app only).', 'info');
+    return;
+  }
   const btn = document.getElementById('modImagesBtn');
   const prev = btn ? btn.textContent : '';
   if (btn) btn.textContent = '⏳ Scanning mods...';
@@ -677,7 +705,9 @@ window.addServer = addServer;
 // ── launch ───────────────────────────────────────────────────────────────
 function saveAndLaunch() {
   if (servers.length === 0) { toast('Add at least one server first.', 'error'); return; }
-  document.getElementById('launchBtn').textContent = '⏳ Starting...';
+  var launchBtn = document.getElementById('launchBtn');
+  var launchHtml = launchBtn ? launchBtn.innerHTML : '';
+  if (launchBtn) launchBtn.textContent = '⏳ Starting...';
   var delaySec = parseInt(document.getElementById('ftpInitialDelay').value, 10);
   if (isNaN(delaySec)) delaySec = 0;
   delaySec = Math.min(600, Math.max(0, delaySec));
@@ -690,7 +720,30 @@ function saveAndLaunch() {
     intervalMinutes: intervalMin,
     scheduleMode: scheduleEl && scheduleEl.value === 'staggered' ? 'staggered' : 'sync'
   };
-  ipcRenderer.send('save-settings', { isConfigured: true, servers: servers, ftpPolling: ftpPolling });
+  var payload = { isConfigured: true, servers: servers, ftpPolling: ftpPolling };
+  if (ipcRenderer) {
+    ipcRenderer.send('save-settings', payload);
+    return;
+  }
+  var api = (window.location && window.location.origin ? window.location.origin : '') + '/api/setup-config';
+  fetch(api, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+    .then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok) throw new Error((data && data.error) || r.statusText || 'Save failed');
+        return data;
+      });
+    })
+    .then(function () {
+      window.location.href = '/';
+    })
+    .catch(function (e) {
+      toast('Could not save: ' + (e.message || String(e)), 'error');
+      if (launchBtn) launchBtn.innerHTML = launchHtml;
+    });
 }
 window.saveAndLaunch = saveAndLaunch;
 
@@ -707,13 +760,22 @@ function loadFtpPollingFromConfig(cfg) {
   });
 }
 
-ipcRenderer.invoke('get-current-config').then(function(cfg) {
+function applyLoadedSetupConfig(cfg) {
   if (cfg && cfg.servers) {
     servers = cfg.servers;
     renderServers();
   }
   loadFtpPollingFromConfig(cfg || {});
-});
+}
+
+if (ipcRenderer) {
+  ipcRenderer.invoke('get-current-config').then(applyLoadedSetupConfig);
+} else {
+  fetch((window.location && window.location.origin ? window.location.origin : '') + '/api/setup-config')
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('Config load failed')); })
+    .then(applyLoadedSetupConfig)
+    .catch(function () { /* first visit or empty */ });
+}
 </script>
 </body>
 </html>

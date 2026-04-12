@@ -14,6 +14,18 @@ All notable changes to this project are recorded here, from the first public rel
 
 ---
 
+## Unreleased (source)
+
+### AI Farm Manager — API security hardening
+
+- **`GET /`** (Jinja farm snapshot HTML): optional **`REQUIRE_AUTH_FOR_ROOT_HTML=1`** — same auth as **`/api/integration/*`** (header `X-FarmDash-Key`, optional `?farmdash_key=`, or admin Basic). Default remains open for trusted LAN-style deploys.
+- **`/health` / `/healthz`**: optional **`HEALTH_RESPONSE_DETAIL=minimal`** — returns only `status` + `service` (paths and registry metadata omitted). Full detail remains the default.
+- **CORS**: **`CORS_ORIGINS=*`** now sets **`allow_credentials=false`** (browser-safe). Explicit origin lists may use credentials when needed.
+- **Code:** shared **`app/deps/integration_auth.py`** (`require_integration_or_admin`, `resolve_root_html_auth`).
+- **Docs:** [docs/AI_SERVER_SECURITY.md](./AI_SERVER_SECURITY.md); [SECURITY.md](./SECURITY.md) and [DEVELOPER_HANDOVER.md](../DEVELOPER_HANDOVER.md) updated; **`backend/.env.example`** uses placeholder tokens and documents the new variables.
+
+---
+
 ## Release overview
 
 | Version | Focus |

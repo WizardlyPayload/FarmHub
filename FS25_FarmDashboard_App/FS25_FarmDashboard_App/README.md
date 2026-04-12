@@ -1,6 +1,6 @@
 # FS25 Farm Dashboard
 
-**Version 2.0.0** — Real-time farm management dashboard for *Farming Simulator 25*, with local save folders and dedicated (FTP) servers.
+**Version 3.0.0** — Real-time farm management dashboard for *Farming Simulator 25*, with local save folders and dedicated (FTP) servers.
 
 **Authors:** JoshWalki, WizardlyPayload  
 
@@ -18,7 +18,7 @@
 
 ### 1. Run the installer
 
-1. Run **`FS25 Farm Dashboard Setup 2.0.0.exe`** (or the current release build).
+1. Run **`FS25 Farm Dashboard Setup 3.0.0.exe`** (or the current release build from `npm run dist`).
 2. **The first screen is language selection** — choose the language used for the rest of the installer, the **first-run Server Manager** setup, and the default **Dashboard** language (you can change language again inside the app under **Theme & Color Settings**).
 3. The installer installs the app and **automatically runs an ImageMagick helper** so DDS→PNG conversion works without manual downloads when possible (bundled/offline installer, **winget**, **Chocolatey**, or a **download** fallback — see `build/install-imagemagick.ps1`).
 
@@ -29,6 +29,8 @@ If the app is not configured yet, the **Server Manager** window opens:
 1. **Language** is shown at the **very top** (same list as the installer). If you already picked a language in the installer, it is applied here; you can change it and the page reloads in the new language.
 2. Add servers (**Auto-Detect Local Saves** and/or **Add Server Manually** for FTP).
 3. Click **Launch Dashboard** to start the embedded server and open the dashboard.
+
+After that, **all** server/save/FTP changes can be made from the dashboard **Settings (gear) → Servers & saves** (same options as first-run setup, plus **Open full setup window** if you prefer the legacy full-screen wizard).
 
 Settings are stored with the app (Electron Store). The dashboard remembers your language in **localStorage** (`farmdash_locale`) and in the main process store (`locale`).
 
@@ -63,7 +65,7 @@ npm start
 npm run dist
 ```
 
-Output: `release/FS25 Farm Dashboard Setup 2.0.0.exe` (and unpacked app under `release/win-unpacked/`).
+Output: `release/FS25 Farm Dashboard Setup 3.0.0.exe` (and unpacked app under `release/win-unpacked/`; version follows `package.json`).
 
 **NSIS include:** `build/installer.nsh` (language welcome page + ImageMagick `customInstall`). `package.json` → `build.nsis.include`.
 
@@ -84,9 +86,9 @@ Output: `release/FS25 Farm Dashboard Setup 2.0.0.exe` (and unpacked app under `r
 
 ---
 
-## Release notes — v2.0.0
+## Release notes — v3.0.0
 
-See **`docs/RELEASE_v2.0.0.md`** for the full changelog. Summary:
+See **[../../docs/CHANGELOG.md](../../docs/CHANGELOG.md)** §3.0.0 and **[../../RELEASE_NOTES.md](../../RELEASE_NOTES.md)**. Earlier packaged notes: **`docs/RELEASE_v2.0.0.md`**. Summary (v2 era):
 
 - **Language first:** NSIS installer welcome page + Server Manager language bar; shared `locale` store and `translations.json` pipeline.
 - **Dashboard i18n:** EU/EEA-oriented locales with English fallback per string.

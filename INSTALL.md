@@ -43,7 +43,7 @@ The mod creates its folders and starts writing **`data.json`** only **after** th
 
 1. Run the **FS25 Farm Dashboard** installer (`.exe` from [Releases](https://github.com/WizardlyPayload/FS25-Farm-Dashboard/releases) or your own build).
 2. Start **Farm Dashboard** from the Start menu or desktop shortcut.
-3. The first time it opens, complete **Setup** (local folder to your FS25 profile, or **FTP** if you use a hosted/dedicated server).
+3. The first time it opens, complete **Setup** (local folder to your FS25 profile, or **FTP** if you use a hosted/dedicated server). Later, you can change servers and polling from **Settings (gear icon) → Servers & saves** in the dashboard — you no longer need a separate shortcut for that.
 4. Open your browser to **http://localhost:8766** (or the address the app shows).
 
 ---

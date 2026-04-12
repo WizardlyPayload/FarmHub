@@ -27,11 +27,6 @@ export function setupEventListeners() {
     clearFolderBtn.addEventListener("click", () => this.clearSavedData());
   }
 
-  const navServersBtn = document.getElementById("nav-servers-btn");
-  if (navServersBtn) {
-    navServersBtn.addEventListener("click", () => this.openSetup());
-  }
-
   const landingModImagesBtn = document.getElementById("landing-import-mod-images");
   if (landingModImagesBtn && typeof require === "function") {
     let modShopExportInFlight = false;
@@ -65,13 +60,15 @@ export function setupEventListeners() {
   }
   const folderErrorBackBtn = document.getElementById("folder-error-back-home-btn");
   if (folderErrorBackBtn) {
-    folderErrorBackBtn.addEventListener("click", () => this.openSetup());
+    folderErrorBackBtn.addEventListener("click", () =>
+      this.openUnifiedSettingsModal?.("servers")
+    );
   }
   const folderErrorBackLink = document.getElementById("folder-error-back-home-link");
   if (folderErrorBackLink) {
     folderErrorBackLink.addEventListener("click", (e) => {
       e.preventDefault();
-      this.openSetup();
+      this.openUnifiedSettingsModal?.("servers");
     });
   }
 

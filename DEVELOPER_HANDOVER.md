@@ -2,6 +2,8 @@
 
 This document describes the **FarmHub** workspace: the **FS25 Farm Dashboard** (Electron/desktop + embedded web UI) and the **AI Farm Manager** backend (FastAPI on a VPS or local machine). It is intended for onboarding, audits, and maintenance.
 
+**App v3.0.0:** Servers/saves configuration is consolidated in **Settings → Servers & saves** (`openUnifiedSettingsModal` in `dashboard-settings.js`); the duplicate navbar folder shortcut was removed. See [docs/CHANGELOG.md](docs/CHANGELOG.md) §3.0.0.
+
 **Deep dive (Gemini):** [docs/LLM_GEMINI_ROUTING.md](docs/LLM_GEMINI_ROUTING.md) · **AI API hardening (public deploys):** [docs/AI_SERVER_SECURITY.md](docs/AI_SERVER_SECURITY.md)
 
 | § | Topic |
@@ -220,6 +222,7 @@ The **Smart suggestions** and field-map consultant behaviour come from **`app/se
 | **Frontend** | **In-flight guard** + **`.then(done, done)`** cleanup for consultant GET. |
 | **Frontend** | **Refresh** / **navigation** use **`forceRefresh`** on insights so loading state shows; background 5 min poll does not flash skeleton. |
 | **Frontend** | **Observer debounce** ~**950ms** when showing the insights row. |
+| **Frontend (app v3)** | **Unified Settings** — `openUnifiedSettingsModal(tab)` opens `#appSettingsModal` on a chosen tab; **no** duplicate “folder” navbar control. **Modal stacking** — global backdrop rule removed so Bootstrap’s modal stays above the dimmer (fixes frozen Notification History). **Smart suggestions** — optional collapse + **Screen Wake Lock** helper for tablets. **Consultant** — noisy `console.log` gated behind `window.DASH_DEBUG`. |
 
 ### 7.1 Further ideas (optional)
 
@@ -257,6 +260,7 @@ End-user BYOK setup: **`AI_Farm_Manager/docs/BYOK_GUIDE.md`**.
 | `FS25_FarmDashboard_App/.../ai-farm-consultant-insights.js` | Smart panel client |
 | `FS25_FarmDashboard_App/.../field-consultant-bridge.js` | Per-field consultant map |
 | `FS25_FarmDashboard_App/.../modules/navigation.js` | Section + insights row visibility |
+| `FS25_FarmDashboard_App/.../modules/dashboard-settings.js` | Unified Settings modal, `openUnifiedSettingsModal`, servers draft + save |
 | `FS25_FarmDashboard_App/.../rules-engine.js` | Layer 1 local field suggestions (swath / bales / priority order) |
 | `FS25_FarmDashboard_Mod/.../FieldDataCollector.lua` | Live field JSON + windrow/bale exports for rules |
 

@@ -349,6 +349,14 @@ function mergeFields(xmlFields, luaFields) {
             looseStrawLiters: Number(luaField.looseStrawLiters ?? 0),
             looseGrassWindrowLiters: Number(luaField.looseGrassWindrowLiters ?? 0),
             looseDryGrassWindrowLiters: Number(luaField.looseDryGrassWindrowLiters ?? 0),
+            hasLooseStraw: luaField.hasLooseStraw === true,
+            hasLooseGrassWindrow: luaField.hasLooseGrassWindrow === true,
+            hasLooseHayWindrow: luaField.hasLooseHayWindrow === true,
+            hasLooseForage: luaField.hasLooseForage === true,
+            /** Lua: DensityMapHeightUtil reachable; fill types probed; STRAW-only centre probe (diagnostics). */
+            windrowUtilAvailable: luaField.windrowUtilAvailable === true,
+            windrowFillTypesRegistered: Number(luaField.windrowFillTypesRegistered ?? 0),
+            windrowCenterProbeTotalL: Number(luaField.windrowCenterProbeTotalL ?? 0),
         };
 
         // Live FieldDataCollector flags + levels (XML savegame can be stale while the game runs).

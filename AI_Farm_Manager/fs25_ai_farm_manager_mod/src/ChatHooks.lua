@@ -12,10 +12,33 @@ AIFarmChatHooks = {}
 AIFarmChatHooks._installed = false
 AIFarmChatHooks._installMissingLogged = false
 AIFarmChatHooks._prefixHintShown = false
+AIFarmChatHooks._missingCfgLogged = false
+AIFarmChatHooks._missingBackendLogged = false
+AIFarmChatHooks._mpClientLogHintLogged = false
 
 --- In-game chat bot is multiplayer-only — same gate as AIFarmBridge:isChatBridgeActive().
 function AIFarmChatHooks.shouldHandleChat()
     return AIFarmBridge:isChatBridgeActive()
+end
+
+--- Multiplayer **non-authority** sessions never install Mission00.addChatMessage (see main.lua registerWhenReady).
+--- Log once so joining players know "Trigger matched" / CHAT_LOG only appear in **server** logs (host PC or G-Portal).
+function AIFarmChatHooks.logMpClientLogHintOnce()
+    local md = g_currentMission and g_currentMission.missionDynamicInfo
+    if md == nil or md.isMultiplayer ~= true then
+        return
+    end
+    if AIFarmBridge:isAuthority() then
+        return
+    end
+    if AIFarmChatHooks._mpClientLogHintLogged then
+        return
+    end
+    AIFarmChatHooks._mpClientLogHintLogged = true
+    Logging.info(
+        "[AIFarmManager] This machine is not the multiplayer host: Hank (!hank) runs only on the server process. "
+            .. "Open **server.log** (G-Portal / host PC Documents/log.txt), not this joining PC's log.txt, for Trigger matched / CHAT_LOG."
+    )
 end
 
 --- Broadcast a bot line to all players (server only).
@@ -67,16 +90,48 @@ function AIFarmChatHooks.install()
 end
 
 function AIFarmChatHooks._onAddChatMessage(mission, senderName, message, ...)
-    if not AIFarmChatHooks.shouldHandleChat() then return end
     if senderName == nil or message == nil then return end
     -- Ignore our own bot lines to prevent loops.
     if senderName == AIFarmBridge.BOT_SENDER then return end
 
+    -- Chat pipeline may invoke this on clients too; only the server forwards to the API.
+    local onServer = true
+    if mission ~= nil and mission.getIsServer ~= nil then
+        local ok, s = pcall(function()
+            return mission:getIsServer()
+        end)
+        if ok then
+            onServer = s
+        end
+    end
+    if not onServer then
+        return
+    end
+
     local cfg = AIFarmBridge.config
+    local prefix = (cfg and cfg.triggerPrefix) or "!hank"
+    local ml = string.lower(message)
+    local pl = string.lower(prefix)
+    local triggerCandidate = (string.sub(ml, 1, #pl) == pl)
+
+    if not AIFarmChatHooks.shouldHandleChat() then
+        return
+    end
+
     if cfg == nil then
+        if triggerCandidate and not AIFarmChatHooks._missingCfgLogged then
+            AIFarmChatHooks._missingCfgLogged = true
+            Logging.warning("[AIFarmManager] Config not loaded — cannot forward Hank chat.")
+        end
         return
     end
     if cfg.backendUrl == nil or cfg.backendUrl == "" then
+        if triggerCandidate and not AIFarmChatHooks._missingBackendLogged then
+            AIFarmChatHooks._missingBackendLogged = true
+            Logging.warning(
+                "[AIFarmManager] backendUrl missing in ai_farm_manager_config.xml — Hank chat not forwarded."
+            )
+        end
         return
     end
 
@@ -88,10 +143,7 @@ function AIFarmChatHooks._onAddChatMessage(mission, senderName, message, ...)
         )
     end
 
-    local prefix = cfg.triggerPrefix or "!hank"
-    local ml = string.lower(message)
-    local pl = string.lower(prefix)
-    if string.sub(ml, 1, #pl) ~= pl then
+    if not triggerCandidate then
         if cfg.debugChat and not AIFarmChatHooks._prefixHintShown then
             AIFarmChatHooks._prefixHintShown = true
             Logging.info(

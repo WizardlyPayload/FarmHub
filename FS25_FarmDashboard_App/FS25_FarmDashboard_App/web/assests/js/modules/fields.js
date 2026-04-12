@@ -352,7 +352,7 @@ function buildFieldCard(field) {
                     <div class="row mb-2">
                         <div class="col-6">
                             <small class="text-muted d-block">Area</small>
-                            <strong>${(field.hectares || 0).toFixed(2)} ha</strong>
+                            <strong>${formatFieldHectares(field)}</strong>
                         </div>
                         <div class="col-6">
                             <small class="text-muted d-block">Crop</small>
@@ -632,9 +632,10 @@ function escapeFieldHtml(s) {
 /** Visible tags when the mod detects bales on farmland or loose windrow / swath material. */
 function buildForageDetectionBadges(field) {
     const baleN = getBaleCountStrict(field);
+    const hasForage = field.hasLooseForage === true;
     const wind = aggregateWindrowDetected(field);
     const baleLoose = aggregateBaleableLoose(field);
-    if (baleN <= 0 && !wind && !baleLoose) return "";
+    if (baleN <= 0 && !wind && !baleLoose && !hasForage) return "";
 
     const parts = [];
     if (baleN > 0) {
@@ -642,14 +643,29 @@ function buildForageDetectionBadges(field) {
             `<span class="badge bg-warning text-dark" title="Bales counted on this farmland (game items)"><i class="bi bi-box-seam me-1"></i>${baleN} bale${baleN === 1 ? "" : "s"}</span>`
         );
     }
-    if (baleLoose) {
-        const bl = Number(field.baleableLooseLiters ?? 0);
-        const sub = Number.isFinite(bl) && bl > 0 ? ` ~${Math.round(bl)} L (straw/grass/hay)` : "straw / grass / hay";
+    if (field.hasLooseStraw === true) {
         parts.push(
-            `<span class="badge bg-info text-dark" title="Loose material a baler can pick up (height-map fill types: straw, TEDDER grass/hay, windrows)"><i class="bi bi-circle-square me-1"></i>Bale loose · ${sub}</span>`
+            `<span class="badge bg-info text-dark" title="Loose straw detected on field samples"><i class="bi bi-circle-square me-1"></i>Loose straw</span>`
         );
     }
-    if (wind) {
+    if (field.hasLooseGrassWindrow === true) {
+        parts.push(
+            `<span class="badge bg-info text-dark" title="Grass windrow detected on field samples"><i class="bi bi-circle-square me-1"></i>Grass windrow</span>`
+        );
+    }
+    if (field.hasLooseHayWindrow === true) {
+        parts.push(
+            `<span class="badge bg-info text-dark" title="Hay / dry grass windrow detected on field samples"><i class="bi bi-circle-square me-1"></i>Hay windrow</span>`
+        );
+    }
+    if (!hasForage && baleLoose) {
+        const bl = Number(field.baleableLooseLiters ?? 0);
+        const sub = Number.isFinite(bl) && bl > 0 ? ` ~${Math.round(bl)} L` : "present";
+        parts.push(
+            `<span class="badge bg-info text-dark" title="Loose material a baler can pick up (height-map)"><i class="bi bi-circle-square me-1"></i>Bale loose · ${sub}</span>`
+        );
+    }
+    if (!hasForage && wind) {
         const mat = classifyWindrowMaterial(field);
         const lit = Number(field.windrowLiters ?? 0);
         const matHint =
@@ -693,6 +709,41 @@ function getWinterFieldSeasonalNote(field) {
     return "Winter: arable growth is minimal — field readings may look unchanged until spring. Suggestions still reflect soil prep and planning.";
 }
 
+/**
+ * VPS LLM lines can be cached while field cards already updated (or vice versa). Drop AI text that
+ * clearly contradicts harvest/growth badges (e.g. "get the combine" on a harvested bar).
+ */
+function aiFieldInsightContradictsCard(field, ai) {
+    if (!ai || !field) return false;
+    const msg = `${String(ai.message || "")} ${String(ai.reasoning || "")}`;
+    if (!msg.trim()) return false;
+    const lower = msg.toLowerCase();
+
+    const soundsLikeHarvestRun = /\b(combine|harvester|forage harvester)\b/i.test(msg)
+        || /\b(bring it in|ready to go|ready to harvest)\b/i.test(lower);
+
+    if (shouldSuppressHarvestSuggestions(field) && soundsLikeHarvestRun) return true;
+
+    const gs = Number(field.growthState || 0);
+    const maxGs = Math.max(1, Number(field.maxGrowthState) || 1);
+    const midGrow = gs > 0 && gs < maxGs && !fieldIsAlreadyHarvested(field) && !effectiveHarvestReady(field);
+    if (midGrow && soundsLikeHarvestRun) return true;
+
+    if (gs >= 1 && !fieldIsAlreadyHarvested(field) && /\b(all plowed|plowed up|ready for a new crop)\b/i.test(lower)) {
+        return true;
+    }
+    return false;
+}
+
+/** Hectares come from live Lua + merge; without FS running they are often missing → avoid fake "0.00". */
+function formatFieldHectares(field) {
+    const ha = Number(field?.hectares);
+    if (Number.isFinite(ha) && ha > 0.001) {
+        return `${ha.toFixed(2)} ha`;
+    }
+    return '<span class="text-muted" title="Area is supplied when Farming Simulator is running and the dashboard mod can read field geometry. If the game is closed, area may be unavailable.">—</span>';
+}
+
 // ── Suggested Next Step: Layer 1 rules (local) + optional Layer 2 AI (VPS, field_ref) ──
 function pickApiFallbackSuggestion(field) {
     if (!field.suggestions || field.suggestions.length === 0) return null;
@@ -730,7 +781,10 @@ function buildSuggestion(field) {
 
     const aiMap = typeof window !== "undefined" && window.__fieldConsultantByRef ? window.__fieldConsultantByRef : null;
     const ai = lookupFieldConsultantInsight(aiMap, field);
-    const useAi = !!(ai && (ai.message || "").trim());
+    let useAi = !!(ai && (ai.message || "").trim());
+    if (useAi && aiFieldInsightContradictsCard(field, ai)) {
+        useAi = false;
+    }
 
     const action = useAi ? String(ai.message).trim() : (rules ? rules.action : "");
     const detail = useAi ? String(ai.reasoning || "").trim() : (rules ? rules.reason : "");

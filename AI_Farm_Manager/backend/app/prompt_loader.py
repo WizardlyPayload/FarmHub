@@ -1,4 +1,7 @@
-"""Optional multiline system prompt from prompts/system_prompt.txt (overrides env)."""
+"""In-game chat bot (Hank): multiline system prompt from prompts/system_prompt.txt (overrides SYSTEM_PROMPT env).
+
+Farm Dashboard consultant / field-map insights use built-in prompts in app/services/consultant.py — not this file.
+"""
 from __future__ import annotations
 
 import os

@@ -230,6 +230,7 @@ def get_settings() -> dict:
         "game_reference_enabled": _b("GAME_REFERENCE_ENABLED", True),
         # Optional override; if unset, backend uses MAIN_CODEBASE/dataS_py_extracted/l10n/l10n_en.xml
         "game_reference_l10n": os.getenv("GAME_REFERENCE_L10N", "").strip() or None,
+        # In-game Hank chat LLM only (see llm_service). Consultant uses consultant.py prompts.
         "system_prompt": read_system_prompt(
             os.getenv(
                 "SYSTEM_PROMPT",

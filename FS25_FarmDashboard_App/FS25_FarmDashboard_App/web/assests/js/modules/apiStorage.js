@@ -8,6 +8,12 @@
 import { filterFieldsForFarmView } from './fields.js';
 import { isFarmDashLocalConfigHost } from './viewer-mode.js';
 
+/** `/api/servers` may return numeric ids; localStorage always uses strings — strict `===` breaks lookups. */
+function sameServerId(a, b) {
+  if (a == null || b == null) return false;
+  return String(a) === String(b);
+}
+
 /** Lua / JSON may yield {} instead of [] — never assign a non-array to `farms` (breaks .filter). */
 function ensureArray(val) {
   if (val == null) return [];
@@ -78,7 +84,7 @@ export function getAPIBaseURL() {
 
 /** Farm switcher: FTP (always) or local when the save has more than one player farm. */
 export function isFarmDropdownEnabled() {
-    const srv = (this.availableServers || []).find(s => s.id === this.activeServerId);
+    const srv = (this.availableServers || []).find(s => sameServerId(s.id, this.activeServerId));
     if (!srv) return false;
     if (srv.mode === 'ftp') return true;
     const farms = this.playerFarms || [];
@@ -96,11 +102,15 @@ export async function loadServersAndTabs() {
             if (!Array.isArray(this.availableServers)) this.availableServers = [];
             if (this.availableServers.length > 0) {
                 const savedServerId = localStorage.getItem('dashboard_active_server');
-                if (savedServerId && this.availableServers.find(s => s.id === savedServerId)) {
-                    this.activeServerId = savedServerId;
+                const matched = savedServerId
+                    ? this.availableServers.find(s => sameServerId(s.id, savedServerId))
+                    : null;
+                if (matched) {
+                    this.activeServerId = matched.id;
+                    localStorage.setItem('dashboard_active_server', String(this.activeServerId));
                 } else {
                     this.activeServerId = this.availableServers[0].id;
-                    localStorage.setItem('dashboard_active_server', this.activeServerId);
+                    localStorage.setItem('dashboard_active_server', String(this.activeServerId));
                 }
                 this.renderServerTabs();
             } else {
@@ -120,7 +130,7 @@ export function renderServerTabs() {
 
     let html = '<div class="btn-group shadow-sm" role="group">';
     this.availableServers.forEach(server => {
-        const isActive = server.id === this.activeServerId ? 'btn-farm-accent text-dark' : 'btn-outline-light';
+        const isActive = sameServerId(server.id, this.activeServerId) ? 'btn-farm-accent text-dark' : 'btn-outline-light';
         html += `<button type="button" class="btn ${isActive} btn-sm fw-bold" onclick="dashboard.switchServer('${server.id}')">
                     <i class="bi bi-hdd-network me-1"></i>${server.name}
                  </button>`;
@@ -134,15 +144,17 @@ export function renderServerTabs() {
  * Fetches `/api/data` for the new `activeServerId` and refreshes the current view.
  */
 export async function switchServer(serverId) {
-  if (this.activeServerId === serverId) return;
+  if (sameServerId(this.activeServerId, serverId)) return;
   if (this._switchingServer) return;
 
   const prevId = this.activeServerId;
   this._switchingServer = true;
 
   try {
-    localStorage.setItem("dashboard_active_server", serverId);
-    this.activeServerId = serverId;
+    const match = (this.availableServers || []).find(s => sameServerId(s.id, serverId));
+    const canonicalId = match ? match.id : serverId;
+    localStorage.setItem("dashboard_active_server", String(canonicalId));
+    this.activeServerId = canonicalId;
     this.renderServerTabs();
 
     const ok = await this.tryLoadApiData();
@@ -265,6 +277,21 @@ export function applyEmptyApiState() {
   this.renderFarmDropdown();
 }
 
+/**
+ * RealtimeConnector starts an immediate /api/data poll on window load, often before tryLoadApiData()
+ * restores activeFarmId from localStorage — first poll can filter the wrong farm. After REST merge,
+ * force one dedupe-bypassed poll so UI matches the selected farm/server.
+ */
+export function resyncRealtimeAfterBootstrap() {
+  const rc = this.realtimeConnector;
+  if (rc && typeof rc.clearPayloadDedupeCache === "function" && typeof rc.refreshHttpDataNow === "function") {
+    rc.clearPayloadDedupeCache();
+    rc.refreshHttpDataNow();
+    return;
+  }
+  this._pendingRealtimeBootstrapResync = true;
+}
+
 export async function tryLoadApiData() {
   try {
     if (!this.activeServerId) return false;
@@ -305,11 +332,10 @@ export async function tryLoadApiData() {
       this.farms = ensureArray(data.farmInfo);
       this.playerFarms = this.farms;
       const mpFarmSwitch = this.isFarmDropdownEnabled();
-      let savedFarmId = mpFarmSwitch
-          ? localStorage.getItem(`dashboard_active_farm_${this.activeServerId}`)
-          : null;
-      if (mpFarmSwitch && savedFarmId && this.farms.find(f => f.id === parseInt(savedFarmId))) {
-          this.activeFarmId = parseInt(savedFarmId);
+      const farmKey = `dashboard_active_farm_${String(this.activeServerId)}`;
+      let savedFarmId = mpFarmSwitch ? localStorage.getItem(farmKey) : null;
+      if (mpFarmSwitch && savedFarmId && this.farms.find(f => Number(f.id) === Number(savedFarmId))) {
+          this.activeFarmId = parseInt(savedFarmId, 10);
       } else if (this.farms.length > 0) {
           const defaultFarm = this.farms.find(f => f.id > 0) || this.farms[0];
           this.activeFarmId = defaultFarm.id;
@@ -351,6 +377,7 @@ export async function tryLoadApiData() {
       } else {
         this.animals = [];
       }
+      this.resyncRealtimeAfterBootstrap();
       if (typeof window.farmDashNotifyDataReady === "function") {
         window.farmDashNotifyDataReady();
       }
@@ -544,7 +571,7 @@ export function switchFarm(farmId, event) {
     if (event) event.preventDefault();
     if (this.activeFarmId === farmId) return;
     this.activeFarmId = farmId;
-    localStorage.setItem(`dashboard_active_farm_${this.activeServerId}`, farmId);
+    localStorage.setItem(`dashboard_active_farm_${String(this.activeServerId)}`, String(farmId));
     this.renderFarmDropdown();
 
     if (this.realtimeConnector?.updateAnimalsData && this.husbandryData) {

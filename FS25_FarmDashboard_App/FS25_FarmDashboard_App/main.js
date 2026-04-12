@@ -102,7 +102,15 @@ function getSetupLoadOptions() {
 
 function loadSetupWindow() {
     if (!mainWindow) return;
-    mainWindow.loadFile(path.join(__dirname, 'setup.html'), getSetupLoadOptions());
+    const opts = getSetupLoadOptions();
+    const q = opts && opts.query && opts.query.lang
+        ? ('?lang=' + encodeURIComponent(opts.query.lang))
+        : '';
+    if (server.listening) {
+        mainWindow.loadURL(`http://127.0.0.1:${PORT}/setup.html${q}`);
+    } else {
+        mainWindow.loadFile(path.join(__dirname, 'setup.html'), opts);
+    }
 }
 
 /** PowerShell 5.1 `Set-Content -Encoding utf8` writes UTF-8 BOM; JSON.parse rejects it. */
@@ -398,8 +406,56 @@ function allowLanModExportHttp() {
 expressApp.use(cors());
 expressApp.use(express.json());
 expressApp.use(express.static(path.join(__dirname, 'web')));
+/** setup.html uses src="web/assests/..." — same paths work over http://host:8766/… and file:// */
+expressApp.use('/web', express.static(path.join(__dirname, 'web')));
+/** Same icon as the Windows desktop app (electron-builder `icon.ico`) — splash screen in web/index.html */
+expressApp.get('/app-brand-icon.ico', (req, res) => {
+    const icoPath = path.join(__dirname, 'icon.ico');
+    if (fs.existsSync(icoPath)) {
+        res.type('image/x-icon');
+        return res.sendFile(icoPath);
+    }
+    const pngFallback = path.join(__dirname, 'web', 'assests', 'img', 'app-icon.png');
+    if (fs.existsSync(pngFallback)) {
+        res.type('image/png');
+        return res.sendFile(pngFallback);
+    }
+    res.status(404).end();
+});
 expressApp.get('/', (req, res) => res.sendFile(path.join(__dirname, 'web', 'index.html')));
 expressApp.get('/setup.html', (req, res) => res.sendFile(path.join(__dirname, 'setup.html')));
+
+/** Full config for setup.html when opened in a normal browser (tablet on LAN — no Electron require). */
+expressApp.get('/api/setup-config', (req, res) => {
+    try {
+        res.json(store.get('config') || {});
+    } catch (e) {
+        console.error('[api/setup-config GET]', e);
+        res.status(500).json({ error: String(e.message || e) });
+    }
+});
+
+/**
+ * Save first-run / Server Manager config from a browser (e.g. tablet on home Wi‑Fi).
+ * Same effect as ipcRenderer.send('save-settings', …) in the desktop app.
+ * Only use on trusted networks; anyone who can reach this port can change server list.
+ */
+expressApp.post('/api/setup-config', (req, res) => {
+    try {
+        const body = req.body;
+        if (!body || typeof body !== 'object') {
+            return res.status(400).json({ ok: false, error: 'Expected JSON body' });
+        }
+        if (!Array.isArray(body.servers)) {
+            return res.status(400).json({ ok: false, error: 'servers array required' });
+        }
+        applyFarmdashSetupConfig(body);
+        res.json({ ok: true });
+    } catch (e) {
+        console.error('[api/setup-config POST]', e);
+        res.status(500).json({ ok: false, error: String(e.message || e) });
+    }
+});
 
 expressApp.get('/api/servers', (req, res) => {
     const config = store.get('config');
@@ -484,6 +540,121 @@ expressApp.get('/api/weather',    (req, res) => res.json(getDataForServer(req)?.
 expressApp.get('/api/economy',    (req, res) => res.json(getDataForServer(req)?.economy    || {}));
 expressApp.get('/api/farmlands',  (req, res) => res.json(getDataForServer(req)?.xmlFarmlands || []));
 expressApp.get('/api/status',     (req, res) => res.json({ status: 'online' }));
+
+/**
+ * LAN / tablet browsers: forward consultant insights through the host PC so clients use the same
+ * AI URL + integration key + BYOK as Electron (no duplicate LLM config on the tablet, no 127.0.0.1:8080 on wrong device).
+ */
+function getAiManagerConnectionForProxy() {
+    const b = loadBrandingFromDisk();
+    const c = store.get('aiManagerConnection') || {};
+    const embKey = String(b.embeddedFarmdashIntegrationKey || '').trim();
+    const defUrl = String(b.defaultAiBackendUrl || '').trim().replace(/\/$/, '');
+    return {
+        baseUrl: (c.baseUrl || defUrl || '').replace(/\/$/, ''),
+        integrationKey: (c.integrationKey || embKey || '').trim(),
+    };
+}
+
+function getConsultantByokHeadersForProxy() {
+    const raw = store.get('consultantByok');
+    const r = raw && typeof raw === 'object' ? raw : {};
+    const apiKey = r.apiKey && String(r.apiKey).trim() ? String(r.apiKey).trim() : '';
+    if (!apiKey) return {};
+    let provider = r.provider === 'gemini' ? 'gemini' : 'openai';
+    if (apiKey.startsWith('AIza')) provider = 'gemini';
+    else if (apiKey.startsWith('sk-')) provider = 'openai';
+    return {
+        'X-AI-API-Key': apiKey,
+        'X-AI-Provider': provider,
+    };
+}
+
+/** Only the Farm Dashboard on this PC (localhost) may forward to the AI backend — LAN/tablet reads this cache only. */
+const consultantInsightsProxyCache = new Map();
+const CONSULTANT_PROXY_CACHE_TTL_MS = 8 * 60 * 1000;
+
+function consultantInsightsCacheKey(query) {
+    const q = query && typeof query === 'object' ? query : {};
+    const keys = Object.keys(q).sort();
+    return keys
+        .map((k) => {
+            const raw = q[k];
+            const v = raw === undefined ? '' : Array.isArray(raw) ? raw[0] : raw;
+            return `${k}=${String(v)}`;
+        })
+        .join('&');
+}
+
+expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
+    try {
+        const conn = getAiManagerConnectionForProxy();
+        const cacheKey = consultantInsightsCacheKey(req.query || {});
+        const fromLocalhost = isLocalhostSocket(req);
+
+        if (!conn.baseUrl || !conn.integrationKey) {
+            return res.status(503).json({
+                detail:
+                    'AI Farm Manager is not configured on this PC. On this machine: open Farm Dashboard → robot (AI Farm Manager) or Settings → AI Farm Manager → set server URL and link key → Save.',
+                insights: [],
+                llm_used: false,
+                farmdash_ai_error: 'not_configured',
+            });
+        }
+
+        if (!fromLocalhost) {
+            const ent = consultantInsightsProxyCache.get(cacheKey);
+            if (ent && Date.now() - ent.ts < CONSULTANT_PROXY_CACHE_TTL_MS) {
+                res.status(ent.status);
+                if (ent.contentType) res.setHeader('Content-Type', ent.contentType);
+                else res.type('application/json');
+                return res.send(ent.text);
+            }
+            return res.status(503).json({
+                detail:
+                    'AI insights are fetched once on the PC running Farm Dashboard (open it via localhost on the host). This device shows cached results only — it does not call the LLM separately.',
+                insights: [],
+                llm_used: false,
+                farmdash_ai_error: 'lan_cache_miss',
+                cache_miss: true,
+            });
+        }
+
+        const target = new URL('/api/v1/consultant/insights', `${conn.baseUrl}/`);
+        const q = req.query || {};
+        for (const key of Object.keys(q)) {
+            const val = q[key];
+            if (val === undefined) continue;
+            const v = Array.isArray(val) ? val[0] : val;
+            target.searchParams.append(key, String(v));
+        }
+        const hdrs = {
+            Accept: 'application/json',
+            'X-FarmDash-Key': encodeURIComponent(conn.integrationKey),
+            ...getConsultantByokHeadersForProxy(),
+        };
+        const fr = await fetch(target.toString(), { method: 'GET', headers: hdrs, cache: 'no-store' });
+        const text = await fr.text();
+        const ct = fr.headers.get('content-type') || 'application/json';
+        consultantInsightsProxyCache.set(cacheKey, {
+            status: fr.status,
+            text,
+            contentType: ct,
+            ts: Date.now(),
+        });
+        res.status(fr.status);
+        res.setHeader('Content-Type', ct);
+        return res.send(text);
+    } catch (e) {
+        console.error('[api/farmdash-ai/consultant/insights]', e);
+        return res.status(500).json({
+            detail: e && e.message ? String(e.message) : String(e),
+            insights: [],
+            llm_used: false,
+            farmdash_ai_error: 'proxy_exception',
+        });
+    }
+});
 
 /** Curated PNGs under items/ + exported mod shop PNGs under items_mod_extract/ (for vehicle image matching). */
 expressApp.get('/api/item-image-filenames', (req, res) => {
@@ -903,12 +1074,28 @@ function bootServer(config) {
     }
 }
 
+/** Same persistence + boot as ipcMain save-settings — used by POST /api/setup-config (tablet / browser on LAN). */
+function applyFarmdashSetupConfig(newConfig) {
+    const prev = store.get('config') || {};
+    const merged = {
+        ...prev,
+        ...newConfig,
+        servers: newConfig.servers
+    };
+    if (newConfig.ftpPolling) {
+        merged.ftpPolling = { ...(prev.ftpPolling || {}), ...newConfig.ftpPolling };
+    }
+    store.set('config', merged);
+    bootServer(merged);
+}
+
 // ── Electron window ───────────────────────────────────────────────────────────
 
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1400, height: 900,
         title: 'FS25 Farm Dashboard',
+        backgroundColor: '#0f172a',
         autoHideMenuBar: true,
         webPreferences: {
             nodeIntegration: true,
@@ -925,8 +1112,19 @@ function createWindow() {
     });
 
     const config = store.get('config');
-    if (config?.isConfigured) bootServer(config);
-    else loadSetupWindow();
+    if (config?.isConfigured) {
+        bootServer(config);
+    } else {
+        // First-run setup: still listen on LAN so phones/tablets can open http://<this-pc>:8766/setup.html
+        if (!server.listening) {
+            server.listen(PORT, '0.0.0.0', () => {
+                console.log(`Server listening on http://0.0.0.0:${PORT} (waiting for setup)`);
+                loadSetupWindow();
+            });
+        } else {
+            loadSetupWindow();
+        }
+    }
 }
 
 process.on('uncaughtException', (err) => {
@@ -948,17 +1146,7 @@ app.on('window-all-closed', () => { stopAllWatchers(); if (process.platform !== 
 // ── IPC ───────────────────────────────────────────────────────────────────────
 
 ipcMain.on('save-settings', (event, newConfig) => {
-    const prev = store.get('config') || {};
-    const merged = {
-        ...prev,
-        ...newConfig,
-        servers: newConfig.servers
-    };
-    if (newConfig.ftpPolling) {
-        merged.ftpPolling = { ...(prev.ftpPolling || {}), ...newConfig.ftpPolling };
-    }
-    store.set('config', merged);
-    bootServer(merged);
+    applyFarmdashSetupConfig(newConfig);
 });
 
 ipcMain.handle('get-current-config', () => store.get('config'));

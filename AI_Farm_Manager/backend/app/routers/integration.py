@@ -4,15 +4,14 @@ from __future__ import annotations
 import logging
 import os
 from typing import Any
-from urllib.parse import unquote
 
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from fastapi.responses import Response
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel, Field
 
 from app.config import active_gemini_api_key, get_settings, has_gemini_credentials
+from app.deps.integration_auth import require_integration_or_admin
 from app.services.bot_registry import (
     delete_instance,
     find_instance_by_id,
@@ -31,20 +30,6 @@ from app.services.pipeline_log import log_pipeline
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/integration", tags=["integration"])
-_security = HTTPBasic(auto_error=False)
-
-
-def _parse_integration_key(header_val: str | None) -> str:
-    """
-    Browsers only allow ISO-8859-1 in fetch() header values. The client may send
-    encodeURIComponent(FARMDASH_INTEGRATION_KEY) so Unicode is safe — decode here.
-    """
-    if not header_val:
-        return ""
-    try:
-        return unquote(header_val)
-    except Exception:
-        return header_val
 
 
 def _farm_dashboard_origin() -> str | None:
@@ -81,28 +66,6 @@ def _farm_dashboard_connect_hint(origin: str, error: str | None) -> str | None:
         "(3) run AI Farm Manager on the same machine as Farm Dashboard. "
         "Same PC but AI in Docker only: http://host.docker.internal:8766/api/data . "
         "Keep Farm Dashboard running on the PC with the game save."
-    )
-
-
-async def require_integration_or_admin(
-    x_farmdash_key: str | None = Header(default=None, alias="X-FarmDash-Key"),
-    credentials: HTTPBasicCredentials | None = Depends(_security),
-) -> str:
-    expected_key = (os.getenv("FARMDASH_INTEGRATION_KEY") or "").strip()
-    got = _parse_integration_key(x_farmdash_key).strip()
-    if expected_key and (got == expected_key or x_farmdash_key == expected_key):
-        return "integration"
-    s = get_settings()
-    user, pw = s["admin_username"], s["admin_password"]
-    if pw and credentials and credentials.username == user and credentials.password == pw:
-        return "admin"
-    raise HTTPException(
-        status_code=401,
-        detail=(
-            "Unauthorized — send header X-FarmDash-Key with the same value as FARMDASH_INTEGRATION_KEY "
-            "in backend/.env (Farm Dashboard: robot panel → Farm Dashboard link key), or use Admin Basic auth"
-        ),
-        headers={"WWW-Authenticate": "Basic realm=integration"},
     )
 
 

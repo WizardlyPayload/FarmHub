@@ -1,5 +1,14 @@
 // FS25 FarmDashboard | notifications.js | v2.0.0
 
+function escapeNotificationHtml(s) {
+  if (s == null) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 export function addNotificationToHistory(notification) {
   // Add timestamp if not present
   if (!notification.timestamp) {
@@ -62,21 +71,21 @@ export function displayNotificationHistory() {
       const iconClass = this.getNotificationIcon(notification.type);
       const bgClass = this.getNotificationBgClass(notification.type);
 
+      const titleSafe = escapeNotificationHtml(notification.title);
+      const bodyRaw = notification.messageHtml || notification.message;
+      const bodySafe = notification.messageHtml ? bodyRaw : escapeNotificationHtml(bodyRaw);
+
       return `
       <div class="notification-item border-bottom border-secondary pb-3 mb-3">
         <div class="d-flex align-items-start">
           <div class="notification-icon me-3">
-            <div class="rounded-circle d-flex align-items-center justify-center" style="width: 40px; height: 40px;">
+            <div class="rounded-circle d-flex align-items-center justify-content-center ${bgClass}" style="width: 40px; height: 40px;">
               <i class="${iconClass} text-white"></i>
             </div>
           </div>
           <div class="notification-content flex-grow-1">
-            <div class="notification-title fw-bold mb-1">${
-              notification.title
-            }</div>
-            <div class="notification-message text-muted mb-2">${
-              notification.messageHtml || notification.message
-            }</div>
+            <div class="notification-title fw-bold mb-1">${titleSafe}</div>
+            <div class="notification-message text-muted mb-2">${bodySafe}</div>
             <div class="notification-time text-muted small">
               <i class="bi bi-clock me-1"></i>
               ${timeAgo}
@@ -101,7 +110,7 @@ export function getNotificationIcon(type) {
       return "bi bi-dash";
     case "info":
     case "updated":
-      return "bi bi-info-"; // Note: Kept exactly as in your original file
+      return "bi bi-info-circle";
     case "danger":
     case "error":
       return "bi bi-exclamation-triangle-fill";

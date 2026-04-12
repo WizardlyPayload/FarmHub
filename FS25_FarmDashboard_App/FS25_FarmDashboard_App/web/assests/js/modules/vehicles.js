@@ -1,5 +1,7 @@
 // FS25 FarmDashboard | vehicles.js | v2.0.0
 
+import { getAPIBaseURL } from "./apiStorage.js";
+
 /** When local `_514_...SILOKING...1000+.png` is not shipped under items/, thumb onerror swaps to wiki. */
 const SILOKING_TRAILEDLINE_WIKI_THUMB =
   "https://farmingsimulator.wiki.gg/images/thumb/d/d6/Siloking_trailedline_4.0_system_1000%2B.png/300px-Siloking_trailedline_4.0_system_1000%2B.png";
@@ -509,6 +511,10 @@ export function showVehiclesSection() {
                 </div>
             </div>
 
+            <div class="row ai-insights-slot-after-kpis justify-content-center">
+                <div class="col-12" id="ai-insights-slot-section"></div>
+            </div>
+
             <div class="row mb-4">
                 <div class="col-12">
                     <div class="card shadow-lg border-farm-accent">
@@ -569,7 +575,7 @@ export function showVehiclesSection() {
                 </div>
         `;
 
-  document.getElementById("section-content").innerHTML = vehiclesHTML;
+  document.getElementById("section-content-dynamic").innerHTML = vehiclesHTML;
   document.getElementById("section-content").classList.remove("d-none");
 
   // Load and display vehicles
@@ -2229,7 +2235,7 @@ export async function loadVehicles() {
     const base =
       typeof window !== "undefined" && window.dashboard?.getAPIBaseURL
         ? window.dashboard.getAPIBaseURL()
-        : "http://127.0.0.1:8766";
+        : getAPIBaseURL();
     const response = await fetch(`${base}/api/vehicles`);
     if (response.ok) {
       const allVehicles = await response.json();

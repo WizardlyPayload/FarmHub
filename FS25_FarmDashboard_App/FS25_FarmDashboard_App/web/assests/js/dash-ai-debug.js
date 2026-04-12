@@ -103,25 +103,37 @@
       return;
     }
     if (st === 503 || (typeof st === "number" && st >= 500)) {
-      console.error(
-        "[FarmDash AI]",
-        sourceLabel,
-        "HTTP " + st + " — snapshot/LLM unavailable or server error.",
-        detail || body
-      );
+      var msg5 =
+        "[FarmDash AI] " +
+        sourceLabel +
+        " — optional AI endpoint HTTP " +
+        st +
+        " (dashboard core is unaffected).";
+      if (g.DASH_DEBUG) {
+        console.warn(msg5, detail || body);
+      } else {
+        console.debug(msg5);
+      }
       return;
     }
     if (info && info.parseError) {
-      console.error("[FarmDash AI]", sourceLabel, "Response JSON parse failed:", info.parseError);
+      if (g.DASH_DEBUG) {
+        console.error("[FarmDash AI]", sourceLabel, "Response JSON parse failed:", info.parseError);
+      } else {
+        console.debug("[FarmDash AI]", sourceLabel, "JSON parse failed (optional AI path).");
+      }
       return;
     }
     if (llm === false) {
-      console.warn(
-        "[FarmDash AI]",
-        sourceLabel,
-        "llm_used=false — rules/heuristics only (no LLM). Set keys on the AI host and/or BYOK in the robot panel.",
-        detail
-      );
+      var msgLlm =
+        "[FarmDash AI] " +
+        sourceLabel +
+        " — llm_used=false (heuristics only; optional LLM — configure AI host or BYOK if desired).";
+      if (g.DASH_DEBUG) {
+        console.warn(msgLlm, detail);
+      } else {
+        console.debug(msgLlm);
+      }
     }
   };
 

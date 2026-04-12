@@ -334,11 +334,25 @@ function mergeFields(xmlFields, luaFields) {
             baleCountOnField: Number(luaField.baleCountOnField ?? 0),
         };
 
+        // Live FieldDataCollector flags + levels (XML savegame can be stale while the game runs).
+        const luaAgronomy = {
+            needsPlowing: luaField.needsPlowing ?? xmlField.needsPlowing,
+            needsLime: luaField.needsLime ?? xmlField.needsLime,
+            needsWeeding: luaField.needsWeeding ?? xmlField.needsWeeding,
+            needsFertilizer: luaField.needsFertilizer ?? xmlField.needsFertilizer,
+            plowLevel: luaField.plowLevel ?? xmlField.plowLevel,
+            weedLevel: luaField.weedLevel ?? xmlField.weedLevel,
+            fertilizationLevel: luaField.fertilizationLevel ?? xmlField.fertilizationLevel,
+            limeLevel: luaField.limeLevel ?? xmlField.limeLevel,
+            sprayLevel: luaField.sprayLevel ?? xmlField.sprayLevel,
+        };
+
         return {
             ...xmlField,    // XML base: soil state, ownership, crop, growthState
             ...spatialData, // Lua: map position and area
             ...pfOverlay,   // Lua: Precision Farming nitrogen/pH
             ...windBale,    // Lua: windrow + bale counts for post-harvest rules
+            ...luaAgronomy,
             /** Savegame/XML crop id (stable hint when Lua fruit is empty after harvest). */
             xmlFruitTypeHint: xmlField.fruitType || '',
             // Lua is authoritative: XML uses coarse heuristics (e.g. plowLevel < 1 on growing crops).

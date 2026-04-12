@@ -2,7 +2,7 @@
 
 This document describes the **FarmHub** workspace: the **FS25 Farm Dashboard** (Electron/desktop + embedded web UI) and the **AI Farm Manager** backend (FastAPI on a VPS or local machine). It is intended for onboarding, audits, and maintenance.
 
-**Deep dive (Gemini):** [docs/LLM_GEMINI_ROUTING.md](docs/LLM_GEMINI_ROUTING.md)
+**Deep dive (Gemini):** [docs/LLM_GEMINI_ROUTING.md](docs/LLM_GEMINI_ROUTING.md) · **AI API hardening (public deploys):** [docs/AI_SERVER_SECURITY.md](docs/AI_SERVER_SECURITY.md)
 
 | § | Topic |
 |---|--------|
@@ -172,10 +172,12 @@ Summary:
 | `GEMINI_MODEL` | Single model when **`GEMINI_MODEL_ROLLOVER`** is off |
 | `GEMINI_MODEL_ROLLOVER` | Comma-separated IDs (best first), or `0`/`off` for `GEMINI_MODEL` only |
 | `GEMINI_ROTATION_WINDOW_SEC` | Time window for **`active_gemini_api_key`** (ListModels / diagnostics), not for per-request RR |
+| `REQUIRE_AUTH_FOR_ROOT_HTML` | When `1`, **`GET /`** requires integration key or admin Basic ([docs/AI_SERVER_SECURITY.md](docs/AI_SERVER_SECURITY.md)) |
+| `HEALTH_RESPONSE_DETAIL` | `full` (default) or `minimal` for **`/health`** JSON ([docs/AI_SERVER_SECURITY.md](docs/AI_SERVER_SECURITY.md)) |
+| `CORS_ORIGINS` | Comma origins or `*`; `*` implies no credentialed CORS ([docs/AI_SERVER_SECURITY.md](docs/AI_SERVER_SECURITY.md)) |
 | `GEMINI_REST_API_VERSION` | `v1` / `v1beta` |
 | `DASHBOARD_JSON_URL` / FTP | Ingest dashboard JSON if not using push |
 | `FARMDASH_INTEGRATION_KEY` / `X-FarmDash-Key` | Farm Dashboard → AI auth |
-| `CORS_ORIGINS` | Browser origins if not `*` |
 
 See `app/config.py` for the full merged settings dict.
 
@@ -198,8 +200,9 @@ The **Smart suggestions** and field-map consultant behaviour come from **`app/se
 ## 6. Deployment notes
 
 - **AI Farm Manager:** Docker/Coolify using `AI_Farm_Manager/docker-compose.yml`; set env vars there; expose HTTPS; health checks if configured.
+- **Public / VPS API hardening (optional):** See [docs/AI_SERVER_SECURITY.md](docs/AI_SERVER_SECURITY.md). Key env vars: **`REQUIRE_AUTH_FOR_ROOT_HTML`** (protects **`GET /`** snapshot HTML), **`HEALTH_RESPONSE_DETAIL=minimal`** (slim **`/health`**), **`CORS_ORIGINS`** (explicit origins if browsers need credentialed CORS; `*` disables credentials by design).
 - **Farm Dashboard app:** `npm` scripts in `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` (build Electron as per your pipeline).
-- **Secrets:** Never commit real API keys; use host env or encrypted bot storage (`encryption.py`, `bot_servers.json` patterns).
+- **Secrets:** Never commit real API keys; use host env or encrypted bot storage (`encryption.py`, `bot_servers.json` patterns). Use unique random values for **`SERVER_TOKEN`**, **`FARMDASH_INTEGRATION_KEY`**, and **`ADMIN_PASSWORD`** — do not copy `.env.example` literals.
 
 ---
 
@@ -212,6 +215,7 @@ The **Smart suggestions** and field-map consultant behaviour come from **`app/se
 | **Backend** | **Pre-create** HTTP client at startup (`get_gemini_async_client()` in lifespan). |
 | **Backend** | **Consultant LLM cache** — `cachetools.TTLCache` (~10 min, max ~512 entries); keys hash pruned snapshot + scope; evicts by TTL and cap (**no** unbounded growth). |
 | **Backend** | **Gemini routing** — multi-key: **round-robin** start index per request; **429/503:** step through **`GEMINI_MODEL_ROLLOVER`** (best→fallback) on each key before rotating keys; BYOK uses one key + same model stack ([docs/LLM_GEMINI_ROUTING.md](docs/LLM_GEMINI_ROUTING.md)). |
+| **Backend** | **Public API hardening** — optional **`REQUIRE_AUTH_FOR_ROOT_HTML`**, **`HEALTH_RESPONSE_DETAIL`**, spec-safe **`CORS_ORIGINS=*`** ([docs/AI_SERVER_SECURITY.md](docs/AI_SERVER_SECURITY.md)). |
 | **Frontend** | **`/api/data` dedupe** — skip `handleRealtimeData` when merged JSON (no `timestamp`) + farm/server unchanged; **`refreshHttpDataNow()`** bypasses dedupe for a forced refresh. |
 | **Frontend** | **In-flight guard** + **`.then(done, done)`** cleanup for consultant GET. |
 | **Frontend** | **Refresh** / **navigation** use **`forceRefresh`** on insights so loading state shows; background 5 min poll does not flash skeleton. |
@@ -243,7 +247,8 @@ End-user BYOK setup: **`AI_Farm_Manager/docs/BYOK_GUIDE.md`**.
 
 | File | Responsibility |
 |------|----------------|
-| `AI_Farm_Manager/backend/app/main.py` | App factory, lifespan, gzip, routers |
+| `AI_Farm_Manager/backend/app/main.py` | App factory, lifespan, gzip, CORS, **`GET /`**, **`/health`**, routers |
+| `AI_Farm_Manager/backend/app/deps/integration_auth.py` | **`require_integration_or_admin`**, optional **`resolve_root_html_auth`** for protected **`GET /`** |
 | `AI_Farm_Manager/backend/app/services/llm_service.py` | Gemini POST, keys, models, chat |
 | `AI_Farm_Manager/backend/app/services/gemini_http_client.py` | Shared async HTTP client |
 | `AI_Farm_Manager/backend/app/services/consultant.py` | Prompts, `generate_farm_insights`, heuristics |

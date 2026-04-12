@@ -464,8 +464,9 @@
                 window.refreshFarmDashConsultantInsights();
               }
             } else {
-              llmPingOut.textContent = (j.detail || j.message || 'LLM check failed') + '';
-              llmPingOut.className = 'small text-warning mb-3 mb-md-2';
+              llmPingOut.textContent =
+                (j.detail || j.message || 'Optional AI not configured or declined.') + '';
+              llmPingOut.className = 'small text-muted mb-3 mb-md-2';
             }
           })
           .catch(function (e) {
@@ -474,8 +475,9 @@
                 dashAiDebug('llm-ping', 'error', { message: String(e && e.message ? e.message : e) });
               }
             } catch (ePingErr) {}
-            llmPingOut.textContent = String(e.message || e);
-            llmPingOut.className = 'small text-danger mb-3 mb-md-2';
+            llmPingOut.textContent =
+              'Optional AI check did not complete — the dashboard still works. ' + String(e.message || e);
+            llmPingOut.className = 'small text-muted mb-3 mb-md-2';
           });
       }
 
@@ -647,14 +649,22 @@
         }
       });
     }
-    var modal = document.getElementById('aiFarmBotModal');
-    if (modal) {
-      modal.addEventListener('shown.bs.modal', function () {
-        applyBrandingUi();
-        populateByokFromStore();
-        loadPanel();
-        tryHydrateGeminiModelsFromLs();
+    function runAiFarmManagerPanelOpen() {
+      applyBrandingUi();
+      populateByokFromStore();
+      loadPanel();
+      tryHydrateGeminiModelsFromLs();
+    }
+    var appModal = document.getElementById('appSettingsModal');
+    var aiTab = document.getElementById('app-settings-tab-ai');
+    if (appModal) {
+      appModal.addEventListener('shown.bs.modal', function () {
+        var pane = document.getElementById('app-settings-pane-ai');
+        if (pane && pane.classList.contains('active')) runAiFarmManagerPanelOpen();
       });
+    }
+    if (aiTab) {
+      aiTab.addEventListener('shown.bs.tab', runAiFarmManagerPanelOpen);
     }
     if (installBtn && installOut) {
       installBtn.addEventListener('click', function () {

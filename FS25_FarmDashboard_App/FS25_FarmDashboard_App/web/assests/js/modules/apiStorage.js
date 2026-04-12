@@ -6,6 +6,7 @@
  */
 
 import { filterFieldsForFarmView } from './fields.js';
+import { isFarmDashLocalConfigHost } from './viewer-mode.js';
 
 /** Lua / JSON may yield {} instead of [] — never assign a non-array to `farms` (breaks .filter). */
 function ensureArray(val) {
@@ -47,7 +48,14 @@ window.WebSocket = function(url, protocols) {
     return ws;
 };
 
+/**
+ * Base URL for REST calls. When the UI is served over http(s) (LAN IP, localhost, etc.),
+ * use the same origin so tablets/remote clients hit the host machine, not 127.0.0.1 on the client.
+ */
 export function getAPIBaseURL() {
+  if (typeof window !== "undefined" && window.location && /^https?:$/i.test(window.location.protocol || "")) {
+    return window.location.origin;
+  }
   return "http://127.0.0.1:8766";
 }
 
@@ -92,7 +100,7 @@ export async function loadServersAndTabs() {
 export function renderServerTabs() {
     const container = document.getElementById("server-tabs-container");
     if (!container) return;
-    
+
     let html = '<div class="btn-group shadow-sm" role="group">';
     this.availableServers.forEach(server => {
         const isActive = server.id === this.activeServerId ? 'btn-farm-accent text-dark' : 'btn-outline-light';
@@ -104,17 +112,62 @@ export function renderServerTabs() {
     container.innerHTML = html;
 }
 
-export function switchServer(serverId) {
-    if (this.activeServerId === serverId) return;
-    localStorage.setItem('dashboard_active_server', serverId);
-    
-    // Fast snappy fade-out
-    document.body.style.transition = 'opacity 0.15s ease-in-out';
-    document.body.style.opacity = '0';
-    
-    setTimeout(() => {
-        window.location.reload();
-    }, 150);
+/**
+ * Switch active save/server in memory — no full page reload (avoids splash and reload cost).
+ * Fetches `/api/data` for the new `activeServerId` and refreshes the current view.
+ */
+export async function switchServer(serverId) {
+  if (this.activeServerId === serverId) return;
+  if (this._switchingServer) return;
+
+  const prevId = this.activeServerId;
+  this._switchingServer = true;
+
+  try {
+    localStorage.setItem("dashboard_active_server", serverId);
+    this.activeServerId = serverId;
+    this.renderServerTabs();
+
+    const ok = await this.tryLoadApiData();
+    if (!ok) {
+      this.activeServerId = prevId;
+      if (prevId) localStorage.setItem("dashboard_active_server", prevId);
+      else localStorage.removeItem("dashboard_active_server");
+      this.renderServerTabs();
+      if (this.showAlert) {
+        this.showAlert(
+          "Could not load data for this save. Check that the server has data or try again.",
+          "warning"
+        );
+      }
+      return;
+    }
+
+    /** One merge already ran in tryLoadApiData; avoid a second GET here. */
+    if (this.realtimeConnector) {
+      this.realtimeConnector.clearPayloadDedupeCache?.();
+      this.realtimeConnector.previousData = null;
+    }
+
+    const currentSection = this.getCurrentSection ? this.getCurrentSection() : null;
+    if (currentSection && currentSection !== "landing" && currentSection !== "dashboard") {
+      if (this.showSection) this.showSection(currentSection);
+    } else {
+      if (this.updateLandingPageCounts) this.updateLandingPageCounts();
+    }
+    if (this.updateNavbar) this.updateNavbar();
+
+    if (typeof window.clearFarmDashInsightCache === "function") {
+      window.clearFarmDashInsightCache();
+    }
+    if (typeof window.preloadAllAIInsights === "function") {
+      window.preloadAllAIInsights();
+    } else if (typeof window.refreshFarmDashConsultantInsights === "function") {
+      window.refreshFarmDashConsultantInsights(true);
+    }
+  } finally {
+    this._switchingServer = false;
+  }
 }
 
 export async function checkAPIAvailability() {
@@ -126,30 +179,44 @@ export async function checkAPIAvailability() {
       const loaded = await this.tryLoadApiData();
       if (loaded) {
         this.isDataLoaded = true;
-        document.getElementById("folder-selection").classList.add("d-none");
-        document.getElementById("landing-page").classList.remove("d-none");
-        document.getElementById("main-navbar").classList.remove("d-none");
-        if (this.updateLandingPageCounts) this.updateLandingPageCounts();
-        if (this.updateNavbar) this.updateNavbar();
-        if (window.location.hash) this.handleHashChange();
+        /** Sets Smart suggestions row visible + refresh (was missing vs folder-only path). */
+        if (typeof this.showDashboard === "function") {
+          this.showDashboard();
+        } else {
+          document.getElementById("folder-selection").classList.add("d-none");
+          document.getElementById("landing-page").classList.remove("d-none");
+          document.getElementById("main-navbar").classList.remove("d-none");
+          if (this.updateLandingPageCounts) this.updateLandingPageCounts();
+          if (this.updateNavbar) this.updateNavbar();
+          if (window.location.hash) this.handleHashChange();
+        }
         return;
       }
       // API is online but no server in config — still show the app (Settings / Home to fix)
       if (!this.activeServerId) {
         this.applyEmptyApiState();
         this.isDataLoaded = true;
-        document.getElementById("folder-selection").classList.add("d-none");
-        document.getElementById("landing-page").classList.remove("d-none");
-        document.getElementById("main-navbar").classList.remove("d-none");
-        if (this.updateLandingPageCounts) this.updateLandingPageCounts();
-        if (this.updateNavbar) this.updateNavbar();
+        if (typeof this.showDashboard === "function") {
+          this.showDashboard();
+        } else {
+          document.getElementById("folder-selection").classList.add("d-none");
+          document.getElementById("landing-page").classList.remove("d-none");
+          document.getElementById("main-navbar").classList.remove("d-none");
+          if (this.updateLandingPageCounts) this.updateLandingPageCounts();
+          if (this.updateNavbar) this.updateNavbar();
+          if (window.location.hash) this.handleHashChange();
+        }
         if (this.showAlert) {
           this.showAlert(
-            "No server configured. Use Settings (gear) or Back to Home to add a server and local saves.",
+            isFarmDashLocalConfigHost()
+              ? "No server configured. Use Settings (gear) or Back to Home to add a server and local saves."
+              : "No server configured on the host PC. Add servers and saves on the machine running Farm Dashboard, then reload.",
             "warning"
           );
         }
-        if (window.location.hash) this.handleHashChange();
+        if (typeof window.farmDashNotifyDataReady === "function") {
+          window.farmDashNotifyDataReady();
+        }
         return;
       }
     }
@@ -164,6 +231,7 @@ export function applyEmptyApiState() {
   this.weather = {};
   this.production = {};
   this.pastures = [];
+  this.husbandryData = [];
   this.mapTitle = null;
   this.savegameName = null;
   this.dataSource = "unknown";
@@ -193,6 +261,9 @@ export async function tryLoadApiData() {
           errMsg === "Waiting for data..." || /waiting\s+for\s+data/i.test(errMsg);
         if (waiting) {
           this.applyEmptyApiState();
+          if (typeof window.farmDashNotifyDataReady === "function") {
+            window.farmDashNotifyDataReady();
+          }
           return true;
         }
         return false;
@@ -212,7 +283,8 @@ export async function tryLoadApiData() {
       this.luaAvailable  = data.luaAvailable  || false;
       this.money         = data.money         || 0;
       this.gameSettings  = data.gameSettings  || {};
-      
+      this.husbandryData = Array.isArray(data.animals) ? data.animals : [];
+
       this.farms = ensureArray(data.farmInfo);
       this.playerFarms = this.farms;
       const mpFarmSwitch = this.isFarmDropdownEnabled();
@@ -258,6 +330,9 @@ export async function tryLoadApiData() {
         this.animals = uniqueAnimals;
       } else {
         this.animals = [];
+      }
+      if (typeof window.farmDashNotifyDataReady === "function") {
+        window.farmDashNotifyDataReady();
       }
       return true;
     }
@@ -434,7 +509,7 @@ export function renderFarmDropdown() {
             <button class="btn btn-farm-accent btn-sm dropdown-toggle fw-bold text-dark" type="button" id="farmDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
                 <i class="bi bi-house-door me-1"></i>${currentFarm.name}
             </button>
-            <ul class="dropdown-menu dropdown-menu-dark shadow border-farm-accent" aria-labelledby="farmDropdownBtn">
+            <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow border-farm-accent" aria-labelledby="farmDropdownBtn">
     `;
     playerFarms.forEach(farm => {
         const isActive = farm.id === this.activeFarmId ? 'active bg-farm-accent text-dark fw-bold' : '';
@@ -460,30 +535,33 @@ export function switchFarm(farmId, event) {
         this.fields = filterFieldsForFarmView(this.allFields, farmId);
     }
 
-    const sectionContent = document.getElementById("section-content");
-    const dashboardContent = document.getElementById("dashboard-content");
-    
-    // Snappy fade-out 0.15s
-    if (sectionContent) { sectionContent.style.transition = 'opacity 0.15s ease-in-out'; sectionContent.style.opacity = '0'; }
-    if (dashboardContent) { dashboardContent.style.transition = 'opacity 0.15s ease-in-out'; dashboardContent.style.opacity = '0'; }
+    const currentSection = this.getCurrentSection ? this.getCurrentSection() : null;
+    if (currentSection && currentSection !== 'landing' && currentSection !== 'dashboard') {
+        if (this.showSection) this.showSection(currentSection);
+    } else {
+        if (this.updateLandingPageCounts) this.updateLandingPageCounts();
+    }
+    if (this.updateNavbar) this.updateNavbar();
 
-    setTimeout(() => {
-        const currentSection = this.getCurrentSection ? this.getCurrentSection() : null;
-        if (currentSection && currentSection !== 'landing') {
-            if(this.showSection) this.showSection(currentSection);
-        } else {
-            if(this.updateLandingPageCounts) this.updateLandingPageCounts();
-        }
-        if (sectionContent) sectionContent.style.opacity = '1';
-        if (dashboardContent) dashboardContent.style.opacity = '1';
-        
-        setTimeout(() => {
-            if (sectionContent) { sectionContent.style.transition = ''; sectionContent.style.opacity = ''; }
-            if (dashboardContent) { dashboardContent.style.transition = ''; dashboardContent.style.opacity = ''; }
-        }, 150);
-    }, 150);
+    if (typeof window.clearFarmDashInsightCache === 'function') {
+        window.clearFarmDashInsightCache();
+    }
+    if (typeof window.preloadAllAIInsights === 'function') {
+        window.preloadAllAIInsights();
+    } else if (typeof window.refreshFarmDashConsultantInsights === 'function') {
+        window.refreshFarmDashConsultantInsights(true);
+    }
 }
 export function openSetup() {
+  if (!isFarmDashLocalConfigHost()) {
+    if (this.showAlert) {
+      this.showAlert(
+        "Server and save setup is only available on the PC running Farm Dashboard.",
+        "info"
+      );
+    }
+    return;
+  }
   if (typeof window.electronAPI?.openSetup === "function") {
     window.electronAPI.openSetup();
     return;

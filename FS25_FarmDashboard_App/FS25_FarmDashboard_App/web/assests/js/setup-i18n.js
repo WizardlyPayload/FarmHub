@@ -1,6 +1,14 @@
-// FS25 FarmDashboard | setup.html i18n (first-run wizard). Loads strings from web/locales/translations.json via main process.
+// FS25 FarmDashboard | setup.html i18n (first-run wizard).
+// Desktop: translations via ipcRenderer. Tablet/browser on LAN: fetch /locales/translations.json
 (function () {
-  const { ipcRenderer } = require('electron');
+  let ipcRenderer = null;
+  try {
+    if (typeof require !== 'undefined') {
+      ipcRenderer = require('electron').ipcRenderer;
+    }
+  } catch (e) {
+    ipcRenderer = null;
+  }
 
   const LOCALE_NAMES = {
     en: 'English',
@@ -64,9 +72,19 @@
     });
   }
 
+  async function loadCatalog() {
+    if (ipcRenderer) {
+      catalog = await ipcRenderer.invoke('get-translations-json');
+      return;
+    }
+    const res = await fetch('/locales/translations.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('translations ' + res.status);
+    catalog = await res.json();
+  }
+
   async function init() {
     try {
-      catalog = await ipcRenderer.invoke('get-translations-json');
+      await loadCatalog();
     } catch (e) {
       console.warn('[setup-i18n]', e);
       return;
@@ -74,7 +92,13 @@
     const q = new URLSearchParams(window.location.search).get('lang');
     let stored = 'en';
     try {
-      stored = (await ipcRenderer.invoke('get-stored-locale')) || 'en';
+      if (ipcRenderer) {
+        stored = (await ipcRenderer.invoke('get-stored-locale')) || 'en';
+      } else {
+        try {
+          stored = localStorage.getItem('farmdash_locale') || 'en';
+        } catch (_) {}
+      }
     } catch (_) {}
     lang = q && LOCALE_NAMES[q] ? q : stored;
     if (!LOCALE_NAMES[lang]) lang = 'en';
@@ -94,7 +118,8 @@
       sel.addEventListener('change', () => {
         const next = sel.value;
         try {
-          ipcRenderer.send('set-stored-locale', next);
+          if (ipcRenderer) ipcRenderer.send('set-stored-locale', next);
+          else localStorage.setItem('farmdash_locale', next);
         } catch (_) {}
         try {
           const url = new URL(window.location.href);

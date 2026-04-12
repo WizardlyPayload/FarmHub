@@ -222,11 +222,11 @@ function parseFieldsXml(xml, farmlandOwnership, scannedFarmlands, farmlandStats)
             const harvestAction = ftU === 'GRASS' ? 'Harvest grass' : `Harvest ${fruitType}`;
             suggestions.push({ priority: 1, action: harvestAction, type: 'harvest' });
         }
-        else if (isEmpty && plowLevel > 0) suggestions.push({ priority: 2, action: 'Cultivate or direct drilling', type: 'planting' });
-        else if (!isEmpty && weedState > 2) suggestions.push({ priority: 3, action: 'Spray weeds',       type: 'maintenance' });
-        if (limeLevel < 1)           suggestions.push({ priority: 4, action: 'Apply lime',               type: 'maintenance' });
-        if (sprayLevel < 1 && !isEmpty) suggestions.push({ priority: 4, action: 'Fertilize',             type: 'maintenance' });
-        if (plowLevel < 1 && isEmpty)   suggestions.push({ priority: 5, action: 'Plow field',            type: 'preparation' });
+        else if (isEmpty && plowLevel > 0) suggestions.push({ priority: 2, action: 'Cultivate or no-till drill into worked soil', type: 'planting' });
+        else if (!isEmpty && weedState > 2) suggestions.push({ priority: 3, action: 'Spray or mechanical-weed — weeds are high',       type: 'maintenance' });
+        if (limeLevel < 1)           suggestions.push({ priority: 4, action: 'Spread lime — pH is low',               type: 'maintenance' });
+        if (sprayLevel < 1 && !isEmpty) suggestions.push({ priority: 4, action: 'Fertilize — nutrient level is low',             type: 'maintenance' });
+        if (plowLevel < 1 && isEmpty)   suggestions.push({ priority: 5, action: 'Plow or disc — primary tillage needed',            type: 'preparation' });
         suggestions.sort((a, b) => a.priority - b.priority);
 
         fields.push({

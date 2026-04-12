@@ -1,6 +1,10 @@
 // FS25 FarmDashboard | navigation.js | v2.0.0
 
 import { t } from "../i18n/i18n.js";
+import {
+  initFarmDashboardBackground,
+  setFarmDashboardBackground,
+} from "./farm-dashboard-bg.js";
 
 function sectionHiddenMessage() {
   try {
@@ -70,6 +74,14 @@ export function setupEventListeners() {
       this.openSetup();
     });
   }
+
+  window.addEventListener("farmdash-locale-changed", () => {
+    try {
+      this.updateNavbar();
+    } catch (e) {
+      /* ignore */
+    }
+  });
 
   // Notification history event listeners
   const clearNotificationsBtn = document.getElementById(
@@ -169,39 +181,39 @@ export function updateNavbar() {
 
   if (!sectionTitleElement || !homeButton) return;
 
-  // Update section title and show/hide home button
+  // Update section title and show/hide home button (i18n + same layout on every page)
   switch (currentSection) {
     case "landing":
     case "dashboard":
-      sectionTitleElement.textContent = "Farm Dashboard";
+      sectionTitleElement.textContent = this.mapTitle || t("nav.section.dashboard");
       homeButton.classList.add("d-none");
       break;
     case "livestock":
-      sectionTitleElement.textContent = "Livestock Management";
+      sectionTitleElement.textContent = t("nav.section.livestock");
       homeButton.classList.remove("d-none");
       break;
     case "vehicles":
-      sectionTitleElement.textContent = "Vehicle Management";
+      sectionTitleElement.textContent = t("nav.section.vehicles");
       homeButton.classList.remove("d-none");
       break;
     case "fields":
-      sectionTitleElement.textContent = "Field Management";
+      sectionTitleElement.textContent = t("nav.section.fields");
       homeButton.classList.remove("d-none");
       break;
     case "economy":
-      sectionTitleElement.textContent = "Economy";
+      sectionTitleElement.textContent = t("nav.section.economy");
       homeButton.classList.remove("d-none");
       break;
     case "pastures":
-      sectionTitleElement.textContent = "Pasture Management";
+      sectionTitleElement.textContent = t("nav.section.pastures");
       homeButton.classList.remove("d-none");
       break;
     case "productions":
-      sectionTitleElement.textContent = "Productions";
+      sectionTitleElement.textContent = t("nav.section.productions");
       homeButton.classList.remove("d-none");
       break;
     default:
-      sectionTitleElement.textContent = "Farm Dashboard";
+      sectionTitleElement.textContent = t("nav.section.dashboard");
       homeButton.classList.add("d-none");
   }
 
@@ -221,6 +233,38 @@ export function getCurrentSection() {
   // Previously this inspected DOM visibility and returned hardcoded strings
   // ("livestock", "other-section") which broke farm-switching and navbar logic.
   return this.currentSection || "landing";
+}
+
+/** Move insights row to landing so replacing #section-content-dynamic cannot destroy it. */
+function parkAiFarmInsightsRow() {
+  const row = document.getElementById("ai-farm-insights-row");
+  const landing = document.getElementById("ai-insights-slot-landing");
+  if (row && landing) landing.appendChild(row);
+}
+
+/**
+ * Mount #ai-farm-insights-row in the slot for the active view (home, livestock, or injected section).
+ */
+function positionAiFarmInsightsRow(sectionName) {
+  const row = document.getElementById("ai-farm-insights-row");
+  if (!row) return;
+  const landing = document.getElementById("ai-insights-slot-landing");
+  const dashSlot = document.getElementById("ai-insights-slot-dashboard");
+  const sectionSlot = document.getElementById("ai-insights-slot-section");
+  if (sectionName === "livestock" && dashSlot) {
+    dashSlot.appendChild(row);
+    return;
+  }
+  if (
+    ["vehicles", "fields", "economy", "pastures", "productions"].includes(
+      sectionName
+    ) &&
+    sectionSlot
+  ) {
+    sectionSlot.appendChild(row);
+    return;
+  }
+  if (landing) landing.appendChild(row);
 }
 
 /** Show Smart suggestions row on Home (dashboard) and detail sections (Vehicles, Fields, …). */
@@ -248,6 +292,7 @@ function updateSmartSuggestionsRowVisibility(sectionName) {
   } else {
     dash?.classList.add("d-none");
   }
+  positionAiFarmInsightsRow(sectionName);
 }
 
 export function showInfoMessage(message) {
@@ -328,6 +373,8 @@ export function showDashboard() {
   this.isDataLoaded = true;
   document.getElementById("folder-selection").classList.add("d-none");
   document.getElementById("landing-page").classList.remove("d-none");
+  initFarmDashboardBackground();
+  setFarmDashboardBackground("home");
   this.showNavbar(); // Make sure navbar is visible
   this.updateLandingPageCounts();
   this.updateNavbar();
@@ -422,6 +469,9 @@ export function showLanding() {
     window.history.replaceState(null, null, window.location.pathname);
   }
 
+  setFarmDashboardBackground("home");
+
+  parkAiFarmInsightsRow();
   document.getElementById("section-content").classList.add("d-none");
   document.getElementById("dashboard-content").classList.add("d-none");
   document.getElementById("landing-page").classList.remove("d-none");
@@ -443,15 +493,25 @@ export function showSection(sectionName) {
   // Track current section
   this.currentSection = sectionName;
 
+  if (sectionName !== "landing" && sectionName !== "dashboard") {
+    setFarmDashboardBackground(sectionName);
+  }
+
   // Update URL hash without triggering hashchange event
   if (window.location.hash.substring(1) !== sectionName) {
     window.history.replaceState(null, null, `#${sectionName}`);
   }
 
+  parkAiFarmInsightsRow();
   document.getElementById("landing-page").classList.add("d-none");
   document.getElementById("section-content").classList.add("d-none");
 
   switch (sectionName) {
+    case "dashboard":
+    case "landing":
+      // Home / card grid — same as showLanding(); must not fall through to default
+      this.showLanding();
+      break;
     case "livestock":
       // Show the existing livestock dashboard
       document.getElementById("dashboard-content").classList.remove("d-none");
@@ -473,14 +533,18 @@ export function showSection(sectionName) {
     case "productions":
       this.showProductionsSection();
       break;
-    default:
-      document.getElementById("section-content").innerHTML = `
+    default: {
+      const dyn = document.getElementById("section-content-dynamic");
+      if (dyn) {
+        dyn.innerHTML = `
                   <div class="text-center">
                       <h3 class="text-warning">Section Under Development</h3>
                       <p class="text-muted">The ${sectionName} section is coming soon!</p>
                   </div>
               `;
+      }
       document.getElementById("section-content").classList.remove("d-none");
+    }
   }
 
   updateSmartSuggestionsRowVisibility(sectionName);

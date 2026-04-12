@@ -1,16 +1,32 @@
-/* Root variables for farm-inspired colors */
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,500&display=swap");
+
+/* Root variables — overridden at runtime by theming.js for user colour customisation */
 :root {
-  --farm-primary: #2d5016; /* Deep forest green */
-  --farm-secondary: #8b4513; /* Saddle brown */
-  --farm-success: #556b2f; /* Dark olive green */
-  --farm-info: #4682b4; /* Steel blue */
-  --farm-warning: #cd853f; /* Peru/harvest gold */
-  --farm-danger: #8b0000; /* Dark red */
-  --farm-dark: #1a1a1a; /* Rich dark background */
-  --farm-darker: #121212; /* Deeper dark */
-  --farm-light: #f5f5dc; /* Beige for text */
-  --farm-muted: #a0a0a0; /* Muted gray */
-  --farm-accent: #daa520; /* Golden rod accent */
+  --farm-radius: 1rem;
+  --farm-radius-sm: 0.65rem;
+  --farm-font: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --farm-primary: #2f6f4e;
+  --farm-secondary: #8b5a3c;
+  --farm-success: #5a7d3e;
+  --farm-info: #3d7ea8;
+  --farm-warning: #c97c3a;
+  --farm-danger: #8b1538;
+  --farm-dark: #171f1c;
+  --farm-darker: #0e1210;
+  --farm-light: #f4f7f5;
+  --farm-muted: #98a39a;
+  --farm-accent: #e8c547;
+  --farm-bg-gradient: linear-gradient(
+    168deg,
+    var(--farm-darker) 0%,
+    #141a17 40%,
+    #121a16 100%
+  );
+  --farm-surface-glow: radial-gradient(
+    900px 420px at 18% -12%,
+    rgba(232, 197, 71, 0.07) 0%,
+    transparent 58%
+  );
   /* Thumbnail + modal backdrop: dark charcoal + subtle grid (FS25 shop style). PNG override: assests/img/textures/shop-icon-backdrop.png */
   --vehicle-shop-thumb-overlay: linear-gradient(
     165deg,
@@ -25,23 +41,6 @@
 body.bg-dark { background-color: var(--farm-darker) !important; }
 .bg-secondary, .card.bg-secondary, .modal-content.bg-dark { background-color: var(--farm-dark) !important; }
 /* --------------------------------- */
-
-/* API Connection Badge Animation */
-@keyframes pulse-success {
-  0% {
-    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
-  }
-  70% {
-    box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
-  }
-}
-
-#nav-connection-status .badge {
-  animation: pulse-success 2s infinite;
-}
 
 /* Birth Warning Badge Animation */
 @keyframes pulse-warning {
@@ -60,24 +59,237 @@ body.bg-dark { background-color: var(--farm-darker) !important; }
   animation: pulse-warning 2s infinite;
 }
 
-/* Main background */
+/* Main background — gradient from theme engine */
 body.bg-dark {
-  background: linear-gradient(
-    135deg,
-    #1a1a1a 0%,
-    #2d2d2d 25%,
-    #1a1a1a 50%,
-    #2d2d2d 75%,
-    #1a1a1a 100%
-  ) !important;
+  font-family: var(--farm-font);
+  background: var(--farm-bg-gradient) !important;
   background-attachment: fixed;
   min-height: 100vh;
   color: var(--farm-light) !important;
+  letter-spacing: 0.01em;
 }
 
-/* card backgrounds */
+body.bg-dark::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: var(--farm-surface-glow);
+}
+
+body.bg-dark > #splash-screen {
+  z-index: 99999;
+}
+
+/* Navbar above main so dropdowns (e.g. farm picker) aren’t covered by #ai-farm-insights-row */
+body.bg-dark > #main-navbar {
+  position: relative;
+  z-index: 1030;
+}
+
+body.bg-dark > main {
+  position: relative;
+  z-index: 0;
+}
+
+/*
+ * Never raise <main> above .modal — that stacks landing cards on top of dialogs.
+ * Do NOT raise .modal-backdrop above Bootstrap’s .modal (default 1055 vs 1050). A backdrop
+ * z-index of 1070 with modals still at 1055 made the dimmer capture all clicks — UI felt frozen
+ * until refresh (e.g. Notification History).
+ */
+
+#main-navbar .dropdown-menu {
+  z-index: 1070;
+  max-height: min(70vh, 22rem);
+  overflow-y: auto;
+}
+
+/* Primary surfaces: headers, summary KPIs, modal bars */
 .bg-farm-primary {
-  background: transparent !important;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--farm-primary) 92%, #000 8%) 0%,
+    color-mix(in srgb, var(--farm-primary) 55%, var(--farm-accent) 45%) 100%
+  ) !important;
+  box-shadow: 0 6px 24px color-mix(in srgb, var(--farm-primary) 35%, transparent);
+}
+
+#main-navbar.navbar-dark {
+  background: linear-gradient(
+    105deg,
+    color-mix(in srgb, var(--farm-darker) 82%, var(--farm-primary) 18%) 0%,
+    color-mix(in srgb, var(--farm-darker) 94%, var(--farm-accent) 6%) 100%
+  ) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--farm-accent) 22%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.35);
+}
+
+/* One consistent top bar on landing, livestock, and all section views */
+#main-navbar.farm-navbar-unified {
+  min-height: 3.25rem;
+  align-items: center;
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+#main-navbar.farm-navbar-unified .farm-navbar-inner {
+  align-items: center;
+  width: 100%;
+}
+
+#main-navbar.farm-navbar-unified .farm-navbar-brand-icon {
+  font-size: 1.15rem;
+  opacity: 0.95;
+}
+
+#main-navbar.farm-navbar-unified .farm-navbar-title {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: rgba(248, 250, 252, 0.98);
+}
+
+#main-navbar.farm-navbar-unified .btn-sm {
+  line-height: 1.35;
+}
+
+/*
+ * Top bar: horizontal scroll lives only in .farm-server-tabs-wrap.
+ * Do NOT set overflow-x: hidden on the navbar — it forces overflow-y to "auto" in CSS,
+ * which traps Bootstrap dropdowns (farm picker) inside a scrollable nav on tablets.
+ */
+.farm-top-nav {
+  overflow: visible;
+  max-width: 100%;
+}
+
+.farm-navbar-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 0.4rem;
+  column-gap: 0.5rem;
+  max-width: 100%;
+  overflow: visible;
+}
+
+/* Farm dropdown must paint above main content; row is positioning context */
+.farm-farm-dropdown-wrap {
+  position: relative;
+  z-index: 1060;
+}
+
+.farm-navbar-brand-cluster {
+  min-width: 0;
+}
+
+.farm-navbar-title {
+  max-width: min(42vw, 11rem);
+}
+
+@media (min-width: 576px) {
+  .farm-navbar-title {
+    max-width: min(50vw, 16rem);
+  }
+}
+
+@media (min-width: 992px) {
+  .farm-navbar-title {
+    max-width: 20rem;
+  }
+}
+
+.farm-navbar-saves {
+  flex: 1 1 10rem;
+  min-width: 0;
+  overflow: visible;
+}
+
+.farm-server-tabs-wrap {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.farm-server-tabs-wrap::-webkit-scrollbar {
+  height: 4px;
+}
+
+.farm-server-tabs-wrap::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--farm-accent) 45%, transparent);
+  border-radius: 4px;
+}
+
+.farm-server-tabs-wrap .btn-group {
+  flex-wrap: nowrap;
+  width: max-content;
+}
+
+.farm-navbar-badges {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.farm-navbar-badges .badge {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.25;
+}
+
+@media (max-width: 575.98px) {
+  .farm-navbar-badges .badge {
+    font-size: 0.7rem;
+  }
+}
+
+.farm-navbar-actions {
+  margin-left: auto !important;
+}
+
+/* Tablet / narrow browser: title + actions on row 1; servers/saves strip full width below (no horizontal page zoom) */
+@media (max-width: 991.98px) {
+  .farm-navbar-inner {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 0.5rem;
+    row-gap: 0.45rem;
+  }
+
+  .farm-navbar-brand-cluster {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .farm-navbar-actions {
+    grid-column: 2;
+    grid-row: 1;
+    margin-left: 0 !important;
+    justify-content: flex-end;
+  }
+
+  .farm-navbar-saves {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    flex-basis: auto;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .farm-navbar-badges {
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
 }
 
 .bg-farm-info {
@@ -143,6 +355,19 @@ body.bg-dark {
 .text-farm-accent {
   color: var(--farm-accent) !important;
 }
+
+.bg-farm-accent {
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--farm-accent) 94%, #fff 6%),
+    color-mix(in srgb, var(--farm-accent) 72%, var(--farm-primary) 28%)
+  ) !important;
+  color: #141816 !important;
+}
+
+.bg-farm-accent.text-light {
+  color: #141816 !important;
+}
 .text-farm-light {
   color: var(--farm-light) !important;
 }
@@ -192,16 +417,97 @@ body.bg-dark {
 
 /* Enhanced card styling */
 .card {
-  background-color: rgba(40, 40, 40, 0.95) !important;
-  border: none !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4) !important;
-  backdrop-filter: blur(10px);
-  transition: all 0.3s ease;
+  background-color: color-mix(
+    in srgb,
+    var(--farm-dark) 94%,
+    transparent
+  ) !important;
+  border: 1px solid color-mix(in srgb, var(--farm-accent) 14%, transparent) !important;
+  border-radius: var(--farm-radius) !important;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
 }
 
 .card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6) !important;
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.48),
+    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent) !important;
+  border-color: color-mix(in srgb, var(--farm-accent) 28%, transparent) !important;
+}
+
+/* Landing & home navigation tiles (beat Bootstrap .card.bg-secondary) */
+.card.farm-dash-tile.bg-secondary {
+  border-radius: 1.25rem !important;
+  border: 1px solid color-mix(in srgb, var(--farm-accent) 16%, transparent) !important;
+  background: linear-gradient(
+    165deg,
+    color-mix(in srgb, var(--farm-dark) 96%, var(--farm-accent) 4%) 0%,
+    color-mix(in srgb, var(--farm-darker) 97%, var(--farm-primary) 3%) 100%
+  ) !important;
+}
+
+.farm-dash-tile-icon-wrap {
+  width: 5rem;
+  height: 5rem;
+  margin: 0 auto 1rem;
+  border-radius: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--farm-accent) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--farm-accent) 28%, transparent);
+}
+
+.farm-dash-tile .display-1 {
+  font-size: 2.65rem !important;
+  line-height: 1;
+}
+
+.farm-landing-hero {
+  padding: 1.5rem 1rem 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.farm-landing-hero .farm-landing-title {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-size: clamp(1.65rem, 4vw, 2.25rem);
+}
+
+.farm-landing-hero .lead {
+  max-width: 36rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.farm-panel-highlight {
+  border-radius: var(--farm-radius) !important;
+  border: 1px solid color-mix(in srgb, var(--farm-accent) 20%, transparent) !important;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--farm-dark) 97%, var(--farm-accent) 3%) 0%,
+    color-mix(in srgb, var(--farm-darker) 98%, var(--farm-primary) 2%) 100%
+  ) !important;
+}
+
+.farm-panel-highlight .card-header {
+  border-bottom: 1px solid color-mix(in srgb, var(--farm-accent) 12%, transparent) !important;
+}
+
+/* Headers that use white text without an explicit Bootstrap bg */
+.card > .card-header.text-white:not(.bg-transparent) {
+  background: linear-gradient(
+    95deg,
+    color-mix(in srgb, var(--farm-darker) 72%, var(--farm-primary) 28%) 0%,
+    color-mix(in srgb, var(--farm-darker) 88%, transparent) 100%
+  );
+  border-bottom: 1px solid color-mix(in srgb, var(--farm-accent) 14%, transparent);
+  border-radius: var(--farm-radius) var(--farm-radius) 0 0 !important;
 }
 
 /* Status badges with farm theme */
@@ -350,23 +656,28 @@ th {
 
 /* Navigation pills enhancement */
 .nav-pills .nav-link {
-  background-color: rgba(40, 40, 40, 0.8);
-  border: none;
+  background-color: color-mix(in srgb, var(--farm-dark) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--farm-accent) 10%, transparent);
   color: var(--farm-light);
   margin: 0 5px;
-  transition: all 0.3s ease;
+  border-radius: var(--farm-radius-sm) !important;
+  transition: background-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .nav-pills .nav-link:hover {
-  background-color: rgba(85, 107, 47, 0.6);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(85, 107, 47, 0.3);
+  background-color: color-mix(in srgb, var(--farm-accent) 16%, var(--farm-dark));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--farm-primary) 25%, transparent);
 }
 
 .nav-pills .nav-link.active {
-  background-color: var(--farm-primary) !important;
-  border-color: none;
-  box-shadow: 0 4px 16px rgba(85, 107, 47, 0.4);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--farm-primary) 90%, #000 10%),
+    color-mix(in srgb, var(--farm-primary) 50%, var(--farm-accent) 50%)
+  ) !important;
+  border-color: color-mix(in srgb, var(--farm-accent) 35%, transparent);
+  box-shadow: 0 4px 18px color-mix(in srgb, var(--farm-primary) 35%, transparent);
 }
 
 /* DataTables dark theme integration */
@@ -420,13 +731,13 @@ th {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3b3b3b;
+  background: color-mix(in srgb, var(--farm-primary) 35%, #3b3b3b);
   border-radius: 6px;
   border: none;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #333333;
+  background: color-mix(in srgb, var(--farm-accent) 25%, #3b3b3b);
 }
 
 /* Responsive adjustments */
@@ -457,14 +768,16 @@ th {
 /* Dashboard Navigation Cards */
 .dashboard-nav-card {
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease;
   border: 2px solid transparent;
 }
 
 .dashboard-nav-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
-  border-color: var(--farm-primary);
+  transform: translateY(-6px);
+  box-shadow:
+    0 16px 36px rgba(0, 0, 0, 0.42),
+    0 0 0 1px color-mix(in srgb, var(--farm-accent) 35%, transparent);
+  border-color: color-mix(in srgb, var(--farm-accent) 45%, transparent);
 }
 
 .dashboard-nav-card .display-1 {
@@ -1056,20 +1369,24 @@ th {
   z-index: 1060 !important; /* Standard modal z-index */
 }
 
-/* Dashboard / theme settings: width tracks narrow browser windows */
-#dashboardSettingsModal .modal-dialog.modal-lg,
-#themeSettingsModal .modal-dialog.modal-lg {
-  max-width: min(800px, calc(100vw - 1rem));
+/* Unified Settings: sidebar + panes; wide dialog for AI + theme */
+#appSettingsModal .modal-dialog.modal-xl {
+  max-width: min(1140px, calc(100vw - 1rem));
+  width: calc(100vw - 1rem);
+  margin: 0.75rem auto;
 }
-
-/* AI Farm Manager bot: nearly full viewport width so long integration keys fit */
-#aiFarmBotModal .modal-dialog.modal-lg {
-  width: calc(100vw - 2rem);
-  max-width: calc(100vw - 2rem);
-  margin: 1rem auto;
-}
-#aiFarmBotModal .modal-content {
+#appSettingsModal .modal-content {
   min-height: 0;
+}
+#appSettingsModal .app-settings-pane-scroll {
+  max-height: min(75vh, 720px);
+  overflow-y: auto;
+}
+@media (max-width: 767.98px) {
+  #appSettingsModal #app-settings-sidebar .nav-link {
+    font-size: 0.9rem;
+    padding: 0.45rem 0.65rem;
+  }
 }
 #aiFarmBotIntegrationKey {
   min-width: 0;
@@ -1159,4 +1476,502 @@ th {
 .animal-link:active {
   transform: translateY(0);
   background-color: rgba(218, 165, 32, 0.3);
+}
+
+/* --- Splash (first /api/data merge only; not AI) — home photo + glass panel --- */
+.farm-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+}
+.farm-splash__bg {
+  position: absolute;
+  inset: 0;
+  background-image: url("assests/img/Dashboard%20PIctures/Background.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.farm-splash__scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    165deg,
+    rgba(15, 23, 42, 0.82) 0%,
+    rgba(15, 23, 42, 0.55) 45%,
+    rgba(15, 23, 42, 0.72) 100%
+  );
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+.farm-splash__inner {
+  position: relative;
+  z-index: 1;
+  max-width: 28rem;
+  width: 100%;
+}
+.farm-splash__panel {
+  padding: 2rem 1.75rem 2.25rem;
+  border-radius: 1.25rem;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.farm-splash.fade-out {
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+.farm-splash.fade-out .farm-splash__bg,
+.farm-splash.fade-out .farm-splash__scrim {
+  transition: opacity 0.5s ease;
+}
+.farm-splash-app-name {
+  letter-spacing: 0.02em;
+  font-weight: 600;
+}
+.farm-splash-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 132px;
+  animation: farmSplashPulse 2.2s ease-in-out infinite;
+}
+.farm-splash-app-img {
+  width: 128px;
+  height: 128px;
+  border-radius: 22%;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 23, 42, 0.35);
+}
+.farm-splash-logo-fallback {
+  width: 128px;
+  height: 128px;
+  border-radius: 22%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3.25rem;
+  color: var(--farm-accent);
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--farm-darker) 88%, var(--farm-primary) 12%),
+    rgba(15, 23, 42, 0.95)
+  );
+  border: 1px solid color-mix(in srgb, var(--farm-accent) 35%, transparent);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+.farm-splash-icon-fallback {
+  width: 128px;
+  height: 128px;
+  border-radius: 22%;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.75rem;
+  letter-spacing: 0.06em;
+  color: #f8f5e8;
+  background: linear-gradient(145deg, #2a2418, #1a1814);
+  border: 1px solid rgba(218, 165, 32, 0.35);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+@keyframes farmSplashPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(218, 165, 32, 0));
+  }
+  50% {
+    opacity: 0.94;
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 14px rgba(218, 165, 32, 0.4));
+  }
+}
+.farm-splash-progress {
+  height: 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  max-width: 280px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.farm-splash-progress-bar {
+  height: 100%;
+  width: 0%;
+  border-radius: 5px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--farm-primary) 55%, #000 45%),
+    var(--farm-accent)
+  );
+  box-shadow: 0 0 12px color-mix(in srgb, var(--farm-accent) 45%, transparent);
+  animation: farmSplashProgressFill 5.5s ease-out forwards;
+}
+.farm-splash-progress-bar.farm-splash-progress-bar--done {
+  animation: none;
+  width: 100%;
+  transition: width 0.35s ease-out;
+}
+@keyframes farmSplashProgressFill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 92%;
+  }
+}
+
+/* AI insight skeleton — pulse bars only (never the whole panel; avoids flashing blue behind the card) */
+@keyframes aiSkeletonPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+.ai-insights-skeleton-pulse .placeholder {
+  animation: aiSkeletonPulse 1.35s ease-in-out infinite;
+}
+
+/* ========== Premium dynamic backgrounds + glass UI (landing + sections) ========== */
+body.farm-dash-ui.bg-dark {
+  background: transparent !important;
+  font-family: "Inter", var(--farm-font);
+}
+
+body.farm-dash-ui.bg-dark::before {
+  opacity: 0.2;
+}
+
+.farm-dash-bg-root {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.farm-dash-bg-plane {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 0.55s ease-in-out;
+  will-change: opacity;
+}
+
+.farm-dash-bg-plane--visible {
+  opacity: 1;
+}
+
+.farm-dash-main {
+  z-index: 1;
+}
+
+.farm-dash-shell {
+  position: relative;
+  z-index: 1;
+}
+
+/* Glass panels: lighter so background photography reads through */
+.farm-glass-page {
+  padding: 1.25rem 1.35rem 1.75rem;
+  border-radius: 1.25rem;
+  background: rgba(15, 23, 42, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.farm-glass-page .card {
+  background: rgba(23, 31, 28, 0.42);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.farm-glass-page .table {
+  --bs-table-bg: transparent;
+}
+
+.farm-glass-panel {
+  background: rgba(15, 23, 42, 0.5) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(11px);
+  -webkit-backdrop-filter: blur(11px);
+  border-radius: 1rem !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.28);
+}
+
+.farm-glass-panel--insights .card-header {
+  background: linear-gradient(
+    95deg,
+    rgba(47, 111, 78, 0.72) 0%,
+    rgba(15, 23, 42, 0.75) 100%
+  ) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.farm-glass-panel--insights .card-body {
+  background: transparent !important;
+}
+
+/* Smart suggestions: below summary KPI row (or header on Productions), above main tools/content */
+.ai-insights-slot-after-kpis {
+  margin-top: 0.25rem;
+  margin-bottom: 1.25rem;
+}
+@media (min-width: 768px) {
+  .ai-insights-slot-after-kpis {
+    margin-bottom: 1.5rem;
+  }
+}
+
+/* Smart suggestions: fluid width + responsive type (matches container-fluid columns) */
+#ai-insights-slot-landing,
+#ai-insights-slot-dashboard,
+#ai-insights-slot-section {
+  min-width: 0;
+}
+
+#ai-farm-insights-row {
+  width: 100%;
+  max-width: 100%;
+}
+
+#ai-farm-insights-row .farm-glass-panel--insights {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+#ai-farm-insights-row .card-header {
+  min-width: 0;
+}
+
+#ai-farm-insights-row .card-header h6 {
+  font-size: clamp(0.88rem, 0.35vw + 0.78rem, 1rem);
+}
+
+#ai-insights-panel {
+  font-size: clamp(0.8rem, 0.2vw + 0.74rem, 0.9375rem);
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+}
+
+/* Landing hero */
+.farm-landing-hero-glass {
+  padding: 1.75rem 1.5rem;
+  border-radius: 1.25rem;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+}
+
+.farm-landing-hero-title {
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-size: clamp(1.5rem, 3.8vw, 2.1rem);
+  color: #f8fafc;
+}
+
+.farm-landing-hero-lead {
+  color: rgba(226, 232, 240, 0.88);
+  font-size: 1.05rem;
+  max-width: 40rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.farm-landing-time-badge {
+  background: rgba(47, 111, 78, 0.85) !important;
+  color: #f8fafc !important;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.farm-btn-accent-outline {
+  border-color: rgba(232, 197, 71, 0.65) !important;
+  color: #fde68a !important;
+  background: rgba(15, 23, 42, 0.4) !important;
+}
+
+.farm-btn-accent-outline:hover {
+  background: rgba(232, 197, 71, 0.15) !important;
+  color: #fff !important;
+  border-color: var(--farm-accent) !important;
+}
+
+/* Premium image cards */
+.farm-landing-card {
+  position: relative;
+  display: block;
+  border: 3px solid rgba(148, 163, 184, 0.48);
+  border-radius: 1.1rem;
+  overflow: hidden;
+  min-height: 240px;
+  cursor: pointer;
+  text-align: left;
+  transform: translateZ(0);
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.35s ease,
+    border-color 0.35s ease;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  background: #0f172a;
+}
+
+.farm-landing-card:focus-visible {
+  outline: 3px solid var(--farm-accent);
+  outline-offset: 3px;
+}
+
+.farm-landing-card:hover {
+  transform: scale(1.025);
+  border-color: rgba(232, 197, 71, 0.65);
+  box-shadow:
+    0 16px 56px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(232, 197, 71, 0.2);
+}
+
+.farm-landing-card-media {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  /* Prefer explicit url on element; --farm-card-img on parent is fallback */
+  background-image: var(--farm-card-img);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: #1e293b;
+  transition:
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.35s ease;
+}
+
+.farm-landing-card:hover .farm-landing-card-media {
+  transform: scale(1.07);
+  filter: brightness(1.1) saturate(1.05);
+}
+
+/* Light vignette so most of the card photo stays visible */
+.farm-landing-card-gradient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    rgba(2, 6, 23, 0.55) 0%,
+    rgba(15, 23, 42, 0.18) 38%,
+    transparent 62%
+  );
+  z-index: 1;
+}
+
+.farm-landing-card-body {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 240px;
+  width: 100%;
+  margin-top: auto;
+  padding: 0;
+  gap: 0;
+}
+
+/* Bottom stack: loose padding; each line uses the same glass chip as the title */
+.farm-landing-card-text-strip {
+  width: 100%;
+  padding: 0.75rem 0.65rem 1rem;
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+  background: transparent;
+  border-radius: 0 0 1.05rem 1.05rem;
+}
+
+/* Shared glassmorphism for title + description (same recipe) */
+.farm-landing-card-text-strip .farm-landing-card-title,
+.farm-landing-card-text-strip .farm-landing-card-desc {
+  display: block;
+  width: 100%;
+  max-width: 22rem;
+  margin: 0;
+  padding: 0.55rem 0.95rem;
+  background: rgba(15, 23, 42, 0.62);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 0.75rem;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.farm-landing-card-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #f8fafc;
+  letter-spacing: -0.02em;
+  text-shadow: none;
+}
+
+.farm-landing-card-desc {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: rgba(241, 245, 249, 0.96);
+  text-align: center;
+  text-shadow: none;
+}
+
+.farm-landing-card-badge {
+  margin-top: 0.15rem;
+  font-weight: 600;
+  font-size: 0.8rem;
+  padding: 0.4em 0.75em;
+  background: rgba(232, 197, 71, 0.95) !important;
+  color: #0f172a !important;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+@media (max-width: 576px) {
+  .farm-landing-card,
+  .farm-landing-card-body {
+    min-height: 200px;
+  }
+}
+
+/* Remote viewers (LAN IP / tablet): hide server manager, settings, local-only tools */
+body.farmdash-remote-viewer .farmdash-local-only {
+  display: none !important;
+}
+
+.farmdash-remote-only {
+  display: none !important;
+}
+
+body.farmdash-remote-viewer .farmdash-remote-only {
+  display: block !important;
 }

@@ -59,6 +59,10 @@ export function showEconomySection() {
               </div>
           </div>
 
+          <div class="row ai-insights-slot-after-kpis justify-content-center">
+              <div class="col-12" id="ai-insights-slot-section"></div>
+          </div>
+
           <ul class="nav nav-tabs mb-4" id="economyTabs" role="tablist">
               <li class="nav-item" role="presentation">
                   <button class="nav-link active" id="purchases-tab" data-bs-toggle="tab" data-bs-target="#purchases" type="button" role="tab">
@@ -139,7 +143,7 @@ export function showEconomySection() {
           </div>
       `;
 
-  document.getElementById("section-content").innerHTML = economyHTML;
+  document.getElementById("section-content-dynamic").innerHTML = economyHTML;
   document.getElementById("section-content").classList.remove("d-none");
 
   // Load economy data

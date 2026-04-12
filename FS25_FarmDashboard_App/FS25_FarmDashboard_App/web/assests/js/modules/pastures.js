@@ -132,6 +132,9 @@ export function showPasturesSection() {
               </div>
           </div>
 
+          <div class="row ai-insights-slot-after-kpis justify-content-center">
+              <div class="col-12" id="ai-insights-slot-section"></div>
+          </div>
 
           <div class="row">
               <div class="col-12">
@@ -154,7 +157,7 @@ export function showPasturesSection() {
           </div>
       `;
 
-  document.getElementById("section-content").innerHTML = pasturesHTML;
+  document.getElementById("section-content-dynamic").innerHTML = pasturesHTML;
   document.getElementById("section-content").classList.remove("d-none");
 
   // Update pasture data display

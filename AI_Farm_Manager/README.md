@@ -47,7 +47,7 @@ AI_Farm_Manager/
    docker compose up -d --build
    ```
 
-5. **Verify:** `curl -s https://YOUR_HOST/health` (or `http://SERVER_IP:8000/health` if no TLS yet) — expect `"status":"ok"` and `"data_dir":".../app/data"`.
+5. **Verify:** `curl -s https://YOUR_HOST/health` (or `http://SERVER_IP:8000/health` if no TLS yet) — expect `"status":"ok"`. With default **`HEALTH_RESPONSE_DETAIL=full`**, the JSON also includes **`data_dir`** and registry metadata; with **`HEALTH_RESPONSE_DETAIL=minimal`**, only **`status`** and **`service`** are returned (see [../docs/AI_SERVER_SECURITY.md](../docs/AI_SERVER_SECURITY.md)).
 
 6. **Admin “Save” and `.env`:** Compose’s `env_file` injects variables but does not always create a file **inside** the container. Saving settings from **`/admin`** will **create `/app/.env`** if needed. To persist those edits across image rebuilds, optionally mount a host file, e.g. **`- ./backend/.env:/app/.env`** (adjust paths to match your host layout).
 
@@ -77,9 +77,11 @@ AI_Farm_Manager/
 
 - Optional **`DATA_DIR`** env forces the data directory (e.g. **`/app/data`**).
 
+- **Public / internet-facing API:** Optional **`REQUIRE_AUTH_FOR_ROOT_HTML`**, **`HEALTH_RESPONSE_DETAIL`**, and **CORS** rules are documented in **[../docs/AI_SERVER_SECURITY.md](../docs/AI_SERVER_SECURITY.md)** (protect **`GET /`**, slim **`/health`**, spec-correct wildcard CORS).
+
 ## Farm snapshot & dashboard
 
-- With **`GPORTAL_FTP_*`** set, **`ftp_service`** polls FTP into memory; **`GET /`** (Jinja **`dashboard.html`**) reads **`ftp_service.get_dashboard_dict()`**. Set **`GPORTAL_FTP_PORT`** when the host does not use port **21** (many G-Portal FTP endpoints use a custom port).
+- With **`GPORTAL_FTP_*`** set, **`ftp_service`** polls FTP into memory; **`GET /`** (Jinja **`dashboard.html`**) reads **`ftp_service.get_dashboard_dict()`**. On a **public** host, set **`REQUIRE_AUTH_FOR_ROOT_HTML=1`** so this page requires the Farm Dashboard integration key or admin Basic (see security doc). Set **`GPORTAL_FTP_PORT`** when the host does not use port **21** (many G-Portal FTP endpoints use a custom port).
 
 - **`lifespan`** in **`app/main.py`** starts the FTP background loop when FTP is configured.
 

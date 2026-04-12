@@ -72,6 +72,30 @@
     "nav.dashboardSettings": {
       "en": "Dashboard settings"
     },
+    "nav.unifiedSettings": {
+      "en": "Settings"
+    },
+    "nav.section.dashboard": {
+      "en": "Farm Dashboard"
+    },
+    "nav.section.livestock": {
+      "en": "Livestock Management"
+    },
+    "nav.section.vehicles": {
+      "en": "Vehicle Management"
+    },
+    "nav.section.fields": {
+      "en": "Field Management"
+    },
+    "nav.section.economy": {
+      "en": "Economy"
+    },
+    "nav.section.pastures": {
+      "en": "Pasture Management"
+    },
+    "nav.section.productions": {
+      "en": "Productions"
+    },
     "nav.home": {
       "en": "Home",
       "de": "Start",
@@ -104,6 +128,30 @@
     "settings.modalTitle": {
       "en": "Dashboard Settings"
     },
+    "settings.unifiedModalTitle": {
+      "en": "Settings"
+    },
+    "settings.sidebarDashboard": {
+      "en": "Dashboard"
+    },
+    "settings.sidebarServers": {
+      "en": "Servers & saves"
+    },
+    "settings.serverManagerIntro": {
+      "en": "Same options as first-run setup: manage saves, FTP polling, and tools. Use Save to apply; open the full setup window if you prefer the dedicated screen."
+    },
+    "settings.openFullSetup": {
+      "en": "Open full setup window"
+    },
+    "settings.sidebarAi": {
+      "en": "AI Farm Manager"
+    },
+    "settings.sidebarMod": {
+      "en": "FS25 mod"
+    },
+    "settings.sidebarAppearance": {
+      "en": "Appearance"
+    },
     "settings.sectionsTitle": {
       "en": "Main menu — show sections"
     },
@@ -111,16 +159,16 @@
       "en": "Uncheck a section to hide it from the home screen. You can turn it back on here anytime."
     },
     "settings.fieldExclusionTitle": {
-      "en": "Fields — hide parcels from the dashboard"
+      "en": "Fields — hide parcels"
     },
     "settings.fieldExclusionHint": {
-      "en": "Only parcels your selected farm owns are listed (same as the Fields page). If the game still shows one after a pasture or farmyard, hide it here. Per server / save. Switch farm in the header and reopen Settings to manage another farm. Uncheck to show again."
+      "en": "Only parcels your selected farm owns are listed. Hide any that still appear as fields after a pasture or farmyard. Switch farm in the header and reopen Settings for another farm."
     },
     "settings.fieldExclusionEmpty": {
-      "en": "No field list yet — load your save in FS25 with the mod active so fields appear, then open this dialog again."
+      "en": "No owned field parcels to configure for this farm."
     },
     "settings.fieldExclusionHide": {
-      "en": "Hide from dashboard"
+      "en": "hide from Fields"
     },
     "settings.modTitle": {
       "en": "FS25 mod — config.xml (this PC)"
@@ -168,7 +216,7 @@
       "en": "Could not save settings."
     },
     "settings.sectionHidden": {
-      "en": "That section is turned off in Dashboard Settings."
+      "en": "That section is turned off in Settings → Dashboard."
     },
     "folder.title": {
       "en": "Oops — something went wrong",
@@ -260,6 +308,11 @@
       "en": "Scanning mods…",
       "de": "Mods werden gescannt…",
       "fr": "Analyse des mods…"
+    },
+    "splash.loading": {
+      "en": "Loading your farm data…",
+      "de": "Farmdaten werden geladen…",
+      "fr": "Chargement des données de la ferme…"
     },
     "card.livestock": {
       "en": "Livestock",

@@ -26,8 +26,8 @@ AIFarmBridge._hookDeferAccum = 0
 AIFarmBridge._hookAttempts = 0
 AIFarmBridge._hookGiveUpLogged = false
 AIFarmBridge._configWarned = false
-AIFarmBridge._httpWarned = false
 AIFarmBridge._postOkLogged = false
+AIFarmBridge._lastHttpFailSig = nil
 AIFarmBridge._spChatInfoLogged = false
 
 --- Match FarmDashboard / dedicated: SP + host + dedicated; not MP clients.
@@ -155,10 +155,11 @@ function AIFarmBridge.onPlayerChat(playerName, message)
     AIFarmHttp.postJson(url, body, function(status, _, err)
         if status == nil or status < 200 or status >= 300 then
             AIFarmBridge:setTransportBackoff()
-            if not AIFarmBridge._httpWarned then
-                AIFarmBridge._httpWarned = true
+            local sig = tostring(status) .. "|" .. tostring(err)
+            if AIFarmBridge._lastHttpFailSig ~= sig then
+                AIFarmBridge._lastHttpFailSig = sig
                 Logging.warning(
-                    "[AIFarmManager] HTTP POST failed (status=%s err=%s) url=%s — set backendUrl to your public API (HTTPS URL of your VPS or reverse proxy, no trailing slash).",
+                    "[AIFarmManager] HTTP POST failed (status=%s err=%s) url=%s — check backendUrl; curl_tmp_open_failed=temps blocked; curl_transport_failed=popen/curl output blocked or network.",
                     tostring(status),
                     tostring(err),
                     tostring(url)
@@ -166,7 +167,7 @@ function AIFarmBridge.onPlayerChat(playerName, message)
             end
         else
             AIFarmBridge:clearTransportBackoff()
-            AIFarmBridge._httpWarned = false
+            AIFarmBridge._lastHttpFailSig = nil
             if not AIFarmBridge._postOkLogged then
                 AIFarmBridge._postOkLogged = true
                 Logging.info("[AIFarmManager] Backend HTTP OK — replies will appear when the API returns them (poll).")

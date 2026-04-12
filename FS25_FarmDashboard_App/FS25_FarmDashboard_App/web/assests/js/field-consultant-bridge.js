@@ -128,7 +128,11 @@ export function computeActiveFarmFieldsStateHash() {
         id: f.farmlandId ?? f.id,
         fruitType: f.fruitType,
         growthState: f.growthState,
+        maxGrowthState: f.maxGrowthState,
         growthLabel: f.growthLabel,
+        /** Invalidate VPS field-consultant cache when Lua fills area after FS runs (0 ha with game off). */
+        hectares: f.hectares,
+        isHarvested: !!(f.isHarvested || f.growthLabel === "harvested"),
         needsPlowing: f.needsPlowing,
         needsLime: f.needsLime,
         needsCultivation: f.needsCultivation,
@@ -147,6 +151,10 @@ export function computeActiveFarmFieldsStateHash() {
         looseStrawLiters: f.looseStrawLiters,
         looseGrassWindrowLiters: f.looseGrassWindrowLiters,
         looseDryGrassWindrowLiters: f.looseDryGrassWindrowLiters,
+        hasLooseStraw: f.hasLooseStraw === true,
+        hasLooseGrassWindrow: f.hasLooseGrassWindrow === true,
+        hasLooseHayWindrow: f.hasLooseHayWindrow === true,
+        hasLooseForage: f.hasLooseForage === true,
       }))
       .sort((a, b) => String(a.id).localeCompare(String(b.id)));
     return JSON.stringify(sig);
@@ -263,8 +271,9 @@ function _fieldUrgencyTieBreak(field) {
   if (field.needsPlowing || field.needsLime || field.needsCultivation) s += 10;
   const bales = Number(field.baleCountOnField ?? field.baleCount ?? 0);
   if (Number.isFinite(bales) && bales > 0) s += 25;
-  if (field.hasWindrow === true || Number(field.windrowLiters ?? 0) > 0) s += 20;
-  if (field.needsBaling === true || Number(field.baleableLooseLiters ?? 0) > 0) s += 12;
+  if (field.hasLooseForage === true) s += 20;
+  else if (field.hasWindrow === true || Number(field.windrowLiters ?? 0) > 0) s += 20;
+  if (field.needsBaling === true || field.hasLooseForage === true || Number(field.baleableLooseLiters ?? 0) > 0) s += 12;
   return s;
 }
 

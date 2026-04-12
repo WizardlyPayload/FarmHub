@@ -179,11 +179,15 @@
     </section>
 
     <section class="card full">
-      <h2>System prompt</h2>
+      <h2>In-game chat bot (Hank) — system prompt</h2>
       <form method="post" action="/admin/api/settings" class="form">
         <textarea name="system_prompt" rows="14" spellcheck="false">{{ system_prompt }}</textarea>
-        <p class="muted small">Stored in <code>prompts/system_prompt.txt</code> when you save (multiline safe).</p>
-        <button type="submit" class="btn primary">Save prompt</button>
+        <p class="muted small">
+          Used only for <strong>in-game <code>!hank</code></strong> replies (<code>POST /api/chat/receive</code> → LLM).
+          Stored in <code>prompts/system_prompt.txt</code> when you save (multiline safe).
+          <strong>Field map / Smart suggestions</strong> use the built-in consultant prompts in <code>app/services/consultant.py</code> — not this box.
+        </p>
+        <button type="submit" class="btn primary">Save chat prompt</button>
       </form>
     </section>
 

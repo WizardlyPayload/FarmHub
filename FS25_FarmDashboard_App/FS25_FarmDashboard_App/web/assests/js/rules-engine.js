@@ -4,7 +4,7 @@
  *
  * Priority pipeline (highest → lowest) aligns with FieldDataCollector.lua suggestion PR order:
  *
- *   A) Blockers: withered → harvest-ready → loose straw/grass/hay litres (looseStrawLiters / looseGrassWindrowLiters / looseDryGrassWindrowLiters) →
+ *   A) Blockers: withered → harvest-ready → loose straw/grass/hay presence (hasLooseStraw / hasLooseGrassWindrow / hasLooseHayWindrow; legacy litre fields optional) →
  *      generic swath/windrow (incl. needsBaling / baleableLooseLiters) → physical bales on field → soil scan when variable-rate maps apply but not scanned
  *   B) Fallow (no crop): mulch stubble → plough → lime (before seed) → cultivate mulched soil →
  *      pre-drill N / organic → sow when soil prep + scan data allow
@@ -118,11 +118,12 @@ function mulchLevelNum(field) {
 }
 
 /**
- * Loose straw / grass / hay (baler-relevant) — matches Farm Dashboard Lua `needsBaling` / `baleableLooseLiters`
- * (TEDDER fill types + STRAW; excludes unthreshed crop swaths).
+ * Loose straw / grass / hay — prefer Lua `hasLooseForage` / `needsBaling`; fallback `baleableLooseLiters`
+ * (TEDDER + STRAW; excludes unthreshed crop swaths from the forage flags).
  */
 export function aggregateBaleableLoose(field) {
   if (!field || typeof field !== "object") return false;
+  if (field.hasLooseForage === true) return true;
   if (field.needsBaling === true) return true;
   const v = Number(field.baleableLooseLiters ?? 0);
   return Number.isFinite(v) && v > 0;
@@ -134,6 +135,7 @@ export function aggregateBaleableLoose(field) {
  */
 export function aggregateWindrowDetected(field) {
   if (!field || typeof field !== "object") return false;
+  if (field.hasLooseForage === true) return true;
   if (aggregateBaleableLoose(field)) return true;
   if (field.hasWindrow === true || field.hasSwath === true) return true;
   const byName = field.windrowByFillName;
@@ -366,7 +368,67 @@ export function getLocalFieldSuggestion(field) {
     };
   }
 
-  // ── A2.5 Loose forage by channel (Lua looseStrawLiters / looseGrassWindrowLiters / looseDryGrassWindrowLiters)
+  // ── A2.5 Loose forage (presence: Lua hasLooseStraw / hasLooseGrassWindrow / hasLooseHayWindrow — next stage when all false)
+  const hs = field.hasLooseStraw === true;
+  const hg = field.hasLooseGrassWindrow === true;
+  const hh = field.hasLooseHayWindrow === true;
+  if (hs || hg || hh) {
+    if (hs && !hg && !hh) {
+      return {
+        action: "Bale loose straw or pick up with a forage wagon",
+        reason: "Loose straw on the field — bale or collect before tillage or the next pass.",
+        source: "rules",
+      };
+    }
+    if (hg && !hs && !hh) {
+      return {
+        action: "Tedder to make hay, or bale wet and wrap for silage",
+        reason: "Fresh grass windrow on the field — tedder or bale before the next stage.",
+        source: "rules",
+      };
+    }
+    if (hh && !hs && !hg) {
+      return {
+        action: "Bale hay windrow or collect dry forage",
+        reason: "Hay / dry grass windrow on the field — bale or load before the next stage.",
+        source: "rules",
+      };
+    }
+    if (hs && hg && hh) {
+      return {
+        action: "Clear loose straw, grass, and hay windrows",
+        reason: "Straw, grass, and hay windrows on the ground — clear forage before continuing.",
+        source: "rules",
+      };
+    }
+    if (hs && hg) {
+      return {
+        action: "Clear loose straw and grass windrows",
+        reason: "Straw and grass windrows on the field — bale or collect before continuing.",
+        source: "rules",
+      };
+    }
+    if (hs && hh) {
+      return {
+        action: "Clear loose straw and hay",
+        reason: "Straw and hay on the field — bale or collect before continuing.",
+        source: "rules",
+      };
+    }
+    if (hg && hh) {
+      return {
+        action: "Clear grass and hay windrows",
+        reason: "Grass and hay windrows on the field — finish before the next stage.",
+        source: "rules",
+      };
+    }
+    return {
+      action: "Clear loose forage on the field",
+      reason: "Loose forage material detected — bale or collect before the next field stage.",
+      source: "rules",
+    };
+  }
+  // Legacy: older JSON without boolean flags (litre thresholds)
   const MIN_LOOSE_CH = 25;
   const ls = Number(field.looseStrawLiters ?? 0);
   const lg = Number(field.looseGrassWindrowLiters ?? 0);
@@ -375,28 +437,27 @@ export function getLocalFieldSuggestion(field) {
     if (ls >= lg && ls >= lh && ls >= MIN_LOOSE_CH) {
       return {
         action: "Bale loose straw or pick up with a forage wagon",
-        reason: `About ${Math.round(ls)} L straw on the ground — bale or collect before tillage or the next pass.`,
+        reason: "Loose straw on the ground — bale or collect before tillage or the next pass.",
         source: "rules",
       };
     }
     if (lg >= ls && lg >= lh && lg >= MIN_LOOSE_CH) {
       return {
         action: "Tedder to make hay, or bale wet and wrap for silage",
-        reason: `About ${Math.round(lg)} L grass windrow — tedder to dry for hay, or bale while wet and wrap bales for silage.`,
+        reason: "Grass windrow on the field — tedder or bale before the next stage.",
         source: "rules",
       };
     }
     if (lh >= ls && lh >= lg && lh >= MIN_LOOSE_CH) {
       return {
         action: "Bale hay windrow or collect dry forage",
-        reason: `About ${Math.round(lh)} L hay windrow — bale or load before rain or soil work.`,
+        reason: "Hay windrow on the field — bale or load before the next stage.",
         source: "rules",
       };
     }
     return {
       action: "Clear loose straw, grass, or hay windrows",
-      reason:
-        "Multiple forage windrow types detected — bale straw, tedder or bale grass for silage, or bale hay as needed.",
+      reason: "Multiple forage windrow types — clear before the next field stage.",
       source: "rules",
     };
   }

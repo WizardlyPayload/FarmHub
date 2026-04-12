@@ -106,6 +106,9 @@ function AIFarmBridge:loadMap()
     end
 
     self:registerWhenReady()
+    if g_currentMission ~= nil then
+        AIFarmChatHooks.logMpClientLogHintOnce()
+    end
 end
 
 function AIFarmBridge:deleteMap()
@@ -116,10 +119,12 @@ function AIFarmBridge:deleteMap()
     self._hookAttempts = 0
     self._hookDeferAccum = 0
     self._hookGiveUpLogged = false
+    AIFarmChatHooks._mpClientLogHintLogged = false
 end
 
 function AIFarmBridge:onStartMission()
     self:registerWhenReady()
+    AIFarmChatHooks.logMpClientLogHintOnce()
 end
 
 function AIFarmBridge:setTransportBackoff()

@@ -29,6 +29,8 @@ class LivestockDashboard {
     this.maxNotifications   = 10;
     this.selectedFarmId     = 1;
     this.activeFarmId       = 1;
+    /** Set by apiStorage when REST merge finishes before RealtimeConnector exists — poll once with correct farm. */
+    this._pendingRealtimeBootstrapResync = false;
     // Merged data fields
     this.mapTitle           = null;
     this.savegameName       = null;

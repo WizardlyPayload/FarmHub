@@ -4,5 +4,5 @@
     <backendUrl>http://127.0.0.1:8765</backendUrl>
     <serverToken>voXZHU9HY6P-A1753y6lHJEaGyACi7SyGDXUdZLvsu4</serverToken>
     <triggerPrefix>!hank</triggerPrefix>
-    <debugChat>false</debugChat>
+    <debugChat>true</debugChat>
 </aiFarmManager>

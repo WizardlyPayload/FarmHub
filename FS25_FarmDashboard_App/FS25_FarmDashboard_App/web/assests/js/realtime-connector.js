@@ -222,6 +222,12 @@ class RealtimeConnector {
     const poll = () => this._httpPollData(false);
     poll();
     this.updateTimer = setInterval(poll, 5000);
+
+    if (this.dashboard._pendingRealtimeBootstrapResync) {
+      this.dashboard._pendingRealtimeBootstrapResync = false;
+      this.clearPayloadDedupeCache();
+      this.refreshHttpDataNow();
+    }
   }
 
   /**

@@ -438,6 +438,15 @@ function FieldDataCollector:collect()
             looseStrawLiters           = 0,
             looseGrassWindrowLiters      = 0,
             looseDryGrassWindrowLiters   = 0,
+            --- Presence only (rules / next-stage workflow): any probe volume above noise floor for that channel — no need to expose litres in UI.
+            hasLooseStraw                = false,
+            hasLooseGrassWindrow         = false,
+            hasLooseHayWindrow           = false,
+            hasLooseForage               = false,
+            --- Windrow probe diagnostics (see windrow block): util reachable; fill-type count; sum of all probed types at field centre (large sample) — if 0 everywhere but material visible in-game, dedicated/Lua may not see height-map litres.
+            windrowUtilAvailable         = false,
+            windrowFillTypesRegistered   = 0,
+            windrowCenterProbeTotalL     = 0,
             suggestions           = {}
         }
 
@@ -1213,7 +1222,70 @@ function FieldDataCollector:collect()
             return 0
         end
 
-        local dmhu = rawget(_G, "DensityMapHeightUtil")
+        --- Same entry point as stock / Moisture System (`DensityMapHeightUtil.getFillLevelAtArea`).
+        --- Try several bindings: global can be absent from `rawget(_G,…)` in some loads; mission may expose an instance.
+        local function resolveDensityMapHeightUtil()
+            local function tryUtil(u)
+                if u == nil or type(u) ~= "table" then
+                    return nil
+                end
+                local fn = u.getFillLevelAtArea
+                if type(fn) == "function" then
+                    return u
+                end
+                return nil
+            end
+            local mission = _G.g_currentMission
+            local function add(u)
+                local t = tryUtil(u)
+                if t then return t end
+                return nil
+            end
+            local a = add(rawget(_G, "DensityMapHeightUtil"))
+            if a then return a end
+            local okb, bare = pcall(function()
+                return DensityMapHeightUtil
+            end)
+            if okb then
+                a = add(bare)
+                if a then return a end
+            end
+            a = add(rawget(_G, "g_densityMapHeightUtil"))
+            if a then return a end
+            if mission then
+                a = add(mission.densityMapHeightUtil)
+                if a then return a end
+                a = add(mission.densityHeightUtil)
+                if a then return a end
+                if type(mission.getDensityMapHeightUtil) == "function" then
+                    local ok, r = pcall(function() return mission:getDensityMapHeightUtil() end)
+                    if ok then
+                        a = add(r)
+                        if a then return a end
+                    end
+                end
+                local mgr = rawget(_G, "g_densityMapHeightManager")
+                if mgr then
+                    if type(mgr.getDensityMapHeightUtil) == "function" then
+                        local ok2, r2 = pcall(function() return mgr:getDensityMapHeightUtil() end)
+                        if ok2 then
+                            a = add(r2)
+                            if a then return a end
+                        end
+                    end
+                    if type(mgr.getUtil) == "function" then
+                        local ok3, r3 = pcall(function() return mgr:getUtil() end)
+                        if ok3 then
+                            a = add(r3)
+                            if a then return a end
+                        end
+                    end
+                end
+            end
+            return nil
+        end
+
+        local dmhu = resolveDensityMapHeightUtil()
         if dmhu and type(dmhu.getFillLevelAtArea) == "function" then
             local ftm = _G.g_fillTypeManager
             --- Classify bale pickup types: STRAW, TEDDER grass/hay pairs, optional HAY + GRASS_WINDROW / DRYGRASS_WINDROW names
@@ -1295,22 +1367,58 @@ function FieldDataCollector:collect()
                     byIdx[ent.index] = { name = ent.name, index = ent.index, baleable = false }
                 end
             end
+            --- Align with Easy Dev Controls (`EasyDevControlsObjectsFrame`): `g_densityMapHeightManager:getDensityMapHeightTypes()`
+            --- lists every fill type registered on the terrain detail height map (straw, windrows, chaff heaps, etc.).
+            --- Probing only TEDDER + hardcoded swaths can miss types; merging the manager list matches what the game uses for map / tip visibility.
+            do
+                local dmm = rawget(_G, "g_densityMapHeightManager")
+                if dmm and type(dmm.getIsValid) == "function" and dmm:getIsValid() and type(dmm.getDensityMapHeightTypes) == "function" then
+                    local okList, htypes = pcall(function() return dmm:getDensityMapHeightTypes() end)
+                    if okList and type(htypes) == "table" then
+                        local FillTypeT = rawget(_G, "FillType")
+                        local skipTarp = FillTypeT and FillTypeT.TARP or nil
+                        for _, heightType in ipairs(htypes) do
+                            if heightType and type(heightType.fillTypeIndex) == "number" and heightType.fillTypeIndex > 0 then
+                                local fidx = heightType.fillTypeIndex
+                                if skipTarp and fidx == skipTarp then
+                                    -- Easy Dev skips TARP for ground tip lists
+                                elseif not byIdx[fidx] then
+                                    byIdx[fidx] = { name = fillDisplayName(fidx), index = fidx, baleable = false }
+                                end
+                            end
+                        end
+                    end
+                end
+            end
             local windEntries = {}
             for _, ent in pairs(byIdx) do
                 table.insert(windEntries, ent)
             end
 
+            fData.windrowUtilAvailable = true
+            fData.windrowFillTypesRegistered = #windEntries
+            do
+                local ctot = 0
+                for _, ent in ipairs(windEntries) do
+                    ctot = ctot + fillLevelSumAtRect(dmhu, ent.index, cx, cz, 12.0)
+                end
+                --- One large sample at field centre across STRAW / windrows / swaths — matches what balers read from the same height-map channels.
+                fData.windrowCenterProbeTotalL = ctot
+            end
+
             --- Sparse grid scaled to field size (~18 m minimum step; wider on large parcels so swaths away from center are seen).
-            local halfM = 6.0
+            local halfM = 9.0
             local areaSqm = fData.fieldAreaInSqm or 0
             local rf = math.sqrt(math.max(1, areaSqm) / math.pi)
             local step1 = math.min(72, math.max(18, rf * 0.28))
             local step2 = step1 * 2
+            local step3 = math.min(90, step1 * 3)
             local windProbeOffsets = {
                 {0, 0},
                 {step1, 0}, {-step1, 0}, {0, step1}, {0, -step1},
                 {step1, step1}, {-step1, -step1}, {step1, -step1}, {-step1, step1},
                 {step2, 0}, {-step2, 0}, {0, step2}, {0, -step2},
+                {step3, 0}, {-step3, 0}, {0, step3}, {0, -step3},
             }
             local totalVol = 0
             local baleVol = 0
@@ -1341,7 +1449,7 @@ function FieldDataCollector:collect()
             end
             fData.windrowLiters = totalVol
             fData.baleableLooseLiters = baleVol
-            fData.needsBaling = (baleVol > 0.01)
+            --- needsBaling set after hasLoose* from straw/grass/hay aggregates (see below)
             local nS = #(fData.windrowSamples)
             if totalVol > 0 and fData.fieldAreaInSqm and fData.fieldAreaInSqm > 0 and nS > 0 then
                 local tileSq = (2 * halfM) * (2 * halfM)
@@ -1369,6 +1477,14 @@ function FieldDataCollector:collect()
             fData.looseStrawLiters = aggS
             fData.looseGrassWindrowLiters = aggG
             fData.looseDryGrassWindrowLiters = aggH
+            --- Noise floor (L) — any amount above this counts as "present" for workflow; not shown as a quantity to the player.
+            local PRESENCE_EPS = 0.01
+            fData.hasLooseStraw = (aggS > PRESENCE_EPS)
+            fData.hasLooseGrassWindrow = (aggG > PRESENCE_EPS)
+            fData.hasLooseHayWindrow = (aggH > PRESENCE_EPS)
+            fData.hasLooseForage = fData.hasLooseStraw or fData.hasLooseGrassWindrow or fData.hasLooseHayWindrow
+            --- Align "needs baling / clear forage" step with straw+grass+hay presence (not cereal swath-only heaps).
+            fData.needsBaling = fData.hasLooseForage
         else
             fData.windrowLiters = 0
             fData.windrowArea = 0
@@ -1379,6 +1495,13 @@ function FieldDataCollector:collect()
             fData.looseStrawLiters = 0
             fData.looseGrassWindrowLiters = 0
             fData.looseDryGrassWindrowLiters = 0
+            fData.hasLooseStraw = false
+            fData.hasLooseGrassWindrow = false
+            fData.hasLooseHayWindrow = false
+            fData.hasLooseForage = false
+            fData.windrowUtilAvailable = false
+            fData.windrowFillTypesRegistered = 0
+            fData.windrowCenterProbeTotalL = 0
         end
 
         --- Match counts to this row: try farmland id, FieldManager field id, and internal index (keys may differ by map).
@@ -1408,31 +1531,42 @@ function FieldDataCollector:collect()
                     reason   = "Physical bale(s) on this farmland — clear them before cultivation or drilling.",
                 })
             end
-            --- Loose straw / grass windrow / hay windrow from height-map probes (Dynamic Ground Material doc).
-            local MIN_LOOSE_L = 25.0
+            --- Loose straw / grass / hay: presence-only (next workflow stage when all false).
             local PR_FORAGE = 11
-            local sL = tonumber(fData.looseStrawLiters) or 0
-            local gL = tonumber(fData.looseGrassWindrowLiters) or 0
-            local hL = tonumber(fData.looseDryGrassWindrowLiters) or 0
-            if math.max(sL, gL, hL) >= MIN_LOOSE_L then
+            local hs = fData.hasLooseStraw == true
+            local hg = fData.hasLooseGrassWindrow == true
+            local hh = fData.hasLooseHayWindrow == true
+            if hs or hg or hh then
                 local function ins(pri, act, rsn)
                     table.insert(fData.suggestions, { priority = pri, type = "maintenance", action = act, reason = rsn })
                 end
-                if sL >= MIN_LOOSE_L and sL >= gL and sL >= hL then
+                if hs and not hg and not hh then
                     ins(PR_FORAGE, "Bale loose straw or pick up with a forage wagon",
-                        "Loose straw on the field (height-map) — bale or collect before tillage or the next pass.")
-                elseif gL >= MIN_LOOSE_L and gL >= sL and gL >= hL then
+                        "Loose straw on the field — bale or collect before tillage or the next pass.")
+                elseif hg and not hs and not hh then
                     ins(PR_FORAGE, "Tedder to make hay, or bale wet and wrap for silage",
-                        "Fresh grass windrow (GRASS_WINDROW) — tedder to dry for hay, or bale while wet and wrap bales for silage.")
-                elseif hL >= MIN_LOOSE_L and hL >= sL and hL >= gL then
+                        "Fresh grass windrow on the field — tedder to dry for hay, or bale while wet and wrap bales for silage.")
+                elseif hh and not hs and not hg then
                     ins(PR_FORAGE, "Bale hay windrow or collect dry forage",
-                        "Dried grass windrow (hay) on the field — bale or load before rain or soil work.")
-                else
+                        "Hay / dry grass windrow on the field — bale or load before rain or soil work.")
+                elseif hs and hg and hh then
                     ins(PR_FORAGE, "Clear loose straw, grass, or hay windrows",
-                        "Multiple forage materials detected on the ground — bale straw, tedder or bale grass for silage, or bale hay as needed.")
+                        "Straw, grass, and hay windrows detected on the ground — clear forage before the next field stage.")
+                elseif hs and hg then
+                    ins(PR_FORAGE, "Clear loose straw and grass windrows",
+                        "Straw and grass windrows on the field — bale or collect before continuing.")
+                elseif hs and hh then
+                    ins(PR_FORAGE, "Clear loose straw and hay",
+                        "Straw and hay windrows on the field — bale or collect before continuing.")
+                elseif hg and hh then
+                    ins(PR_FORAGE, "Clear grass and hay windrows",
+                        "Grass and hay windrows on the field — finish drying/baling before the next stage.")
+                else
+                    ins(PR_FORAGE, "Clear loose forage on the field",
+                        "Loose forage material detected — bale or collect before the next field stage.")
                 end
             end
-            if (n or 0) > 0 or math.max(sL, gL, hL) >= MIN_LOOSE_L then
+            if (n or 0) > 0 or (fData.hasLooseForage == true) then
                 table.sort(fData.suggestions, function(a, b)
                     local pa, pb = a.priority or 999, b.priority or 999
                     if pa ~= pb then return pa < pb end

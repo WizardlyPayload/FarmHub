@@ -202,7 +202,7 @@ Rules:
 - If the JSON has no usable field data, return {"insights":[]}."""
 
 # Appended when Farm Dashboard calls GET …/insights?context=fields (per-parcel field map).
-# Uses CONSULTANT_SYSTEM_BASE (no "at most 4") + field-map tail — otherwise models stop at 4 insights.
+# Built-in consultant (not the admin chat prompt). Must contain "FIELD MAP MODE" for _consultant_field_map_mode().
 CONSULTANT_SYSTEM_FIELDS_FOCUS = (
     CONSULTANT_SYSTEM_BASE
     + """

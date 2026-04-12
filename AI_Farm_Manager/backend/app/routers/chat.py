@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -91,6 +94,11 @@ async def receive_chat(
             error=err,
             token_len=len((body.server_token or "").strip()),
         )
+        logger.warning(
+            "POST /api/chat/receive auth failed: %s (token_len=%s)",
+            err,
+            len((body.server_token or "").strip()),
+        )
         raise HTTPException(status_code=401, detail=err or "Invalid server_token")
 
     try:
@@ -109,12 +117,19 @@ async def receive_chat(
     prefix = settings["trigger_prefix"]
     msg = body.message.strip()
 
+    trigger_matched = msg.lower().startswith(prefix.lower())
     log_pipeline(
         "chat_receive",
         "POST /api/chat/receive — authenticated; evaluating trigger and bot flags",
         player=body.player,
         trigger_prefix=prefix,
-        trigger_matched=msg.lower().startswith(prefix.lower()),
+        trigger_matched=trigger_matched,
+    )
+    logger.info(
+        "POST /api/chat/receive ok player=%r trigger_prefix=%r trigger_matched=%s",
+        body.player,
+        prefix,
+        trigger_matched,
     )
 
     if not settings["bot_enabled"]:

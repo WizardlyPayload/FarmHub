@@ -75,6 +75,9 @@
     "nav.unifiedSettings": {
       "en": "Settings"
     },
+    "suggestions.toggle": {
+      "en": "Show or hide Smart suggestions"
+    },
     "nav.section.dashboard": {
       "en": "Farm Dashboard"
     },

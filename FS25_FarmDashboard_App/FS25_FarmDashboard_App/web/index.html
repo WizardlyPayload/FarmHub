@@ -219,13 +219,26 @@
             <div class="col-12" id="ai-insights-slot-landing">
               <div class="row mb-0 d-none" id="ai-farm-insights-row">
                 <div class="col-12">
-                  <div class="card border-success shadow-sm farm-glass-panel farm-glass-panel--insights">
+                  <div class="card border-success shadow-sm farm-glass-panel farm-glass-panel--insights" id="ai-farm-insights-card">
                     <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2 border-success bg-farm-primary">
-                      <h6 class="mb-0 text-white">
-                        <i class="bi bi-lightbulb me-2 text-warning"></i> Smart suggestions
-                        <span class="badge bg-secondary ms-1" id="ai-insights-llm-badge" title="LLM used for analysis">—</span>
-                      </h6>
-                      <button type="button" class="btn btn-sm btn-outline-light" id="ai-insights-refresh-btn" title="Refresh from AI Farm Manager">
+                      <div class="d-flex align-items-center gap-2 min-w-0 flex-grow-1">
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-outline-light flex-shrink-0 ai-insights-collapse-toggle"
+                          id="ai-insights-collapse-btn"
+                          aria-expanded="true"
+                          aria-controls="ai-insights-panel"
+                          data-i18n-title="suggestions.toggle"
+                          title="Show or hide Smart suggestions"
+                        >
+                          <i class="bi bi-chevron-up" id="ai-insights-collapse-icon" aria-hidden="true"></i>
+                        </button>
+                        <h6 class="mb-0 text-white text-truncate">
+                          <i class="bi bi-lightbulb me-2 text-warning"></i> Smart suggestions
+                          <span class="badge bg-secondary ms-1" id="ai-insights-llm-badge" title="LLM used for analysis">—</span>
+                        </h6>
+                      </div>
+                      <button type="button" class="btn btn-sm btn-outline-light flex-shrink-0" id="ai-insights-refresh-btn" title="Refresh from AI Farm Manager">
                         <i class="bi bi-arrow-clockwise me-1"></i> Refresh
                       </button>
                     </div>

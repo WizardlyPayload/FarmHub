@@ -768,6 +768,44 @@
       false
     );
 
+    var LS_INSIGHTS_COLLAPSED = 'farmdash_smart_suggestions_collapsed';
+
+    function applySmartSuggestionsCollapsed(collapsed) {
+      var card = document.getElementById('ai-farm-insights-card');
+      var btn = document.getElementById('ai-insights-collapse-btn');
+      var icon = document.getElementById('ai-insights-collapse-icon');
+      if (!card) return;
+      card.classList.toggle('farmdash-insights--collapsed', !!collapsed);
+      if (btn) {
+        btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      }
+      if (icon) {
+        icon.className = 'bi ' + (collapsed ? 'bi-chevron-down' : 'bi-chevron-up');
+      }
+      try {
+        localStorage.setItem(LS_INSIGHTS_COLLAPSED, collapsed ? '1' : '0');
+      } catch (eLs) {}
+    }
+
+    function readSmartSuggestionsCollapsed() {
+      try {
+        return localStorage.getItem(LS_INSIGHTS_COLLAPSED) === '1';
+      } catch (e) {
+        return false;
+      }
+    }
+
+    applySmartSuggestionsCollapsed(readSmartSuggestionsCollapsed());
+
+    var collapseBtn = document.getElementById('ai-insights-collapse-btn');
+    if (collapseBtn) {
+      collapseBtn.addEventListener('click', function () {
+        var card = document.getElementById('ai-farm-insights-card');
+        var next = !(card && card.classList.contains('farmdash-insights--collapsed'));
+        applySmartSuggestionsCollapsed(next);
+      });
+    }
+
     var btn = document.getElementById('ai-insights-refresh-btn');
     if (btn) {
       btn.addEventListener('click', function () {

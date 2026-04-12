@@ -161,6 +161,36 @@
     "settings.sectionsHint": {
       "en": "Uncheck a section to hide it from the home screen. You can turn it back on here anytime."
     },
+    "settings.desktopAppTitle": {
+      "en": "Desktop app — updates"
+    },
+    "settings.desktopAppHint": {
+      "en": "The installer checks GitHub Releases for new Farm Dashboard versions. FS25 mod updates use Giants Mod Hub or the in-game mod browser — not this screen."
+    },
+    "settings.appVersionLabel": {
+      "en": "Version"
+    },
+    "settings.checkForUpdates": {
+      "en": "Check for updates"
+    },
+    "settings.updateStatusDev": {
+      "en": "Auto-update runs in the installed app only (not this dev session)."
+    },
+    "settings.updateStatusChecking": {
+      "en": "Checking for updates…"
+    },
+    "settings.updateStatusUptodate": {
+      "en": "You are on the latest release."
+    },
+    "settings.updateStatusAvailable": {
+      "en": "Update available:"
+    },
+    "settings.updateStatusDownloading": {
+      "en": "Downloading update…"
+    },
+    "settings.updateStatusError": {
+      "en": "Update check failed."
+    },
     "settings.fieldExclusionTitle": {
       "en": "Fields — hide parcels"
     },

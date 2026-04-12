@@ -135,6 +135,14 @@ def prune_field_entry(field: dict[str, Any]) -> dict[str, Any] | None:
         "plowLevel",
         "limeLevel",
         "fertilizerLevel",
+        # Loose bales / windrows on parcel (Farm Dashboard mod + merged API)
+        "baleCountOnField",
+        "baleCount",
+        "hasWindrow",
+        "windrowLiters",
+        "windrowByFillName",
+        "needsBaling",
+        "baleableLooseLiters",
     )
     out: dict[str, Any] = {}
     for key in keep_keys:

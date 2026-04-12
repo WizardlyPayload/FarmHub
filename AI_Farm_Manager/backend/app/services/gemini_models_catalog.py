@@ -152,3 +152,33 @@ async def fetch_gemini_models_catalog(
         force_refresh=force_refresh,
     )
     return payload
+
+
+async def preferred_models_intersect_catalog(
+    api_key: str,
+    preferred_order: list[str],
+    *,
+    api_version: str = "v1",
+) -> list[str]:
+    """
+    Keep only model IDs that ListModels reports for this key, preserving ``preferred_order``.
+
+    Uses the same TTL cache as :func:`fetch_gemini_models_catalog`. If ListModels fails or the
+    intersection would be empty, returns ``preferred_order`` unchanged so rollover still runs.
+    """
+    if not preferred_order:
+        return preferred_order
+    cat = await fetch_gemini_models_catalog(api_key, api_version=api_version, force_refresh=False)
+    if not cat.get("ok"):
+        return preferred_order
+    rows = cat.get("models") or []
+    avail: set[str] = set()
+    for m in rows:
+        if isinstance(m, dict):
+            mid = (m.get("id") or "").strip()
+            if mid:
+                avail.add(mid)
+    if not avail:
+        return preferred_order
+    out = [m for m in preferred_order if m in avail]
+    return out if out else preferred_order

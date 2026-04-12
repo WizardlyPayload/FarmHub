@@ -48,6 +48,8 @@ function FarmDashboardDataCollector:loadConfig()
         enableFinance       = true,
         enableEconomy       = true,
         enableProduction    = true,
+        --- When true, FieldDataCollector prints a throttled line to log.txt after bale scans (see FieldDataCollector.lua).
+        debugBaleScan       = false,
     }
 
     local configPath = getUserProfileAppPath() .. "modSettings/FS25_FarmDashboard/config.xml"
@@ -70,6 +72,7 @@ function FarmDashboardDataCollector:loadConfig()
             self.config.enableFinance    = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#finance"),    true)
             self.config.enableEconomy    = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#economy"),    true)
             self.config.enableProduction = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#production"), true)
+            self.config.debugBaleScan = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#debugBaleScan"), false)
             delete(xmlFile)
         end
     else
@@ -77,6 +80,7 @@ function FarmDashboardDataCollector:loadConfig()
         local xmlFile = createXMLFile("FarmDashboardConfig", configPath, "farmDashboard")
         setXMLInt(xmlFile, "farmDashboard.settings#updateInterval", self.config.interval)
         setXMLInt(xmlFile, "farmDashboard.settings#collectionCycleMs", self.config.collectionCycleMs)
+        setXMLBool(xmlFile, "farmDashboard.settings#debugBaleScan", false)
         setXMLBool(xmlFile, "farmDashboard.modules#animals",    true)
         setXMLBool(xmlFile, "farmDashboard.modules#vehicles",   true)
         setXMLBool(xmlFile, "farmDashboard.modules#weather",    true)

@@ -65,7 +65,12 @@ npm start
 npm run dist
 ```
 
-Output: `release/FS25 Farm Dashboard Setup 3.0.0.exe` (and unpacked app under `release/win-unpacked/`; version follows `package.json`).
+Output (folder is **next to** `package.json` in this app):  
+`FS25_FarmDashboard_App/FS25_FarmDashboard_App/release/` — e.g. `FS25 Farm Dashboard Setup 3.0.0.exe`, `latest.yml`, and `win-unpacked/` (version follows `package.json`).
+
+That `release/` directory is **gitignored** in the FarmHub repo: Git Desktop syncs **source** only; the installer files are produced locally when you run `npm run dist` and are **not** pushed as normal commits.
+
+**Auto-update (desktop app):** Packaged builds use `electron-updater` against **GitHub Releases** (`package.json` → `build.publish`, repo `WizardlyPayload/FarmHub`). After each `npm run dist`, create or edit a **GitHub Release** (browser or `gh release`) and attach **`latest.yml`** and the **`.exe`** from your local `release/` folder so tags match `package.json` `version`. The in-game **FS25 Farm Dashboard mod** is updated separately via Giants Mod Hub / the in-game mod browser, not this mechanism.
 
 **NSIS include:** `build/installer.nsh` (language welcome page + ImageMagick `customInstall`). `package.json` → `build.nsis.include`.
 
@@ -76,6 +81,7 @@ Output: `release/FS25 Farm Dashboard Setup 3.0.0.exe` (and unpacked app under `r
 | Path | Purpose |
 |------|--------|
 | `main.js` | Electron main: Express/WS, FTP polling, IPC, locale file consumption |
+| `app-updater.js` | GitHub Releases auto-update (`electron-updater`) for the packaged Windows app |
 | `setup.html` | First-run Server Manager (language-first) |
 | `web/index.html` | Dashboard UI |
 | `web/locales/translations.json` | Generated UI strings (do not edit by hand — regenerate from `build-translations.mjs`) |

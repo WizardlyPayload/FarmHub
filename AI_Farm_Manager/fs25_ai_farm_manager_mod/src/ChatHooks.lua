@@ -32,6 +32,14 @@ function AIFarmChatHooks.broadcastBot(text, displayName)
         local ev = ChatEvent.new(msg, displayName, farmId, 0)
         g_server:broadcastEvent(ev)
     end)
+    if ok then
+        -- G-Portal / dedicated server.log mirroring (FS25 chat handover §6.1)
+        print(string.format(
+            "CHAT_LOG: [AIFarmManager] broadcast sender=%s msg_len=%d",
+            tostring(displayName),
+            msg and #tostring(msg) or 0
+        ))
+    end
     if not ok then
         -- One-time diagnostic only; avoid spamming dedicated logs.
         if not AIFarmChatHooks._broadcastFail then
@@ -100,6 +108,11 @@ function AIFarmChatHooks._onAddChatMessage(mission, senderName, message, ...)
         preview = string.sub(preview, 1, 100) .. "…"
     end
     Logging.info("[AIFarmManager] Trigger matched, forwarding: %s", preview)
+    print(string.format(
+        "CHAT_LOG: [AIFarmManager] trigger player=%s msg_len=%d",
+        tostring(senderName),
+        message and #tostring(message) or 0
+    ))
 
     AIFarmBridge.onPlayerChat(senderName, message)
 end

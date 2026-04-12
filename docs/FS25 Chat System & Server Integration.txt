@@ -1,0 +1,170 @@
+# Developer Handover: FS25 Chat System & Server Integration
+
+**Target Environment:** GIANTS Engine 10 (Farming Simulator 25)
+**Language:** Lua, XML, WebAPI
+**Topic:** Chat Architecture, Multiplayer Networking, and Dedicated Server (G-Portal) Compatibility
+
+---
+
+## 1. Architecture Overview: The Chat Lifecycle
+
+In the GIANTS Engine, the chat system operates on a strict **Client -> Server -> Clients** broadcast loop. To manipulate the chat effectively, code must be injected at the correct stage:
+
+1.  **Input (Client):** User types in the UI and presses Enter.
+2.  **Transmission (Client to Server):** The client packages the string into a `ChatEvent` and sends it to the server.
+3.  **Processing (Server):** The server receives the event, verifies the sender, and logs it.
+4.  **Broadcast (Server to Clients):** The server duplicates the event and sends it to all connected clients.
+5.  **Render (Clients):** Each client receives the broadcast and draws the text on their screen.
+
+---
+
+## 2. Multiplayer Topology Matrix
+
+The game executes logic differently based on the server type. A mod designed for chat must handle the "Headless" state of dedicated servers to prevent fatal null-pointer exceptions.
+
+| State | g_server | g_client | g_dedicatedServer | UI Object (chatWindow) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Singleplayer** | True | True | False | Exists |
+| **Listen Server (Host)** | True | True | False | Exists |
+| **Dedicated (G-Portal)** | True | False | True | **NIL (Does not exist)** |
+
+---
+
+## 3. Core Implementation Modules
+
+### Module A: Client-Side Command Interception
+Captures user input and "swallows" it if it starts with a command prefix (e.g., `/pay`), preventing it from appearing in public chat.
+
+```lua
+-- Hooking the standard chat window
+local original_onSendChat = ChatWindow.onSendChat
+
+ChatWindow.onSendChat = function(self, text)
+    if string.sub(text, 1, 1) == "/" then
+        local commandText = string.sub(text, 2)
+        
+        if g_client ~= nil then
+            -- Send secure event to the server
+            g_client:getServerConnection():sendEvent(MyCustomChatEvent.new(commandText))
+        end
+        
+        -- Return early to 'swallow' the message
+        return 
+    end
+    original_onSendChat(self, text)
+end
+```
+
+### Module B: The Dedicated Server "Safe" Broadcast
+On G-Portal servers, `g_currentMission.chatWindow` is `nil`. Calling functions on it will crash the server.
+
+```lua
+function MyMod:safeBroadcast(message)
+    if g_server ~= nil then
+        -- 1. Sync across network to all players
+        g_server:broadcastEvent(ChatEvent.new(message, "System", true))
+        
+        -- 2. Local Rendering (Skip if Dedicated/G-Portal)
+        if not g_dedicatedServer and g_currentMission.chatWindow ~= nil then
+             g_currentMission.chatWindow:addMessage(message, "System", true)
+        end
+        
+        -- 3. Print to G-Portal console log
+        print("CHAT_LOG: " .. message)
+    end
+end
+```
+
+---
+
+## 4. Server-Side Processing & Security
+Admin commands must be validated on the server side to prevent exploits.
+
+```lua
+function MyMod:executeServerCommand(commandArgs, senderConnection)
+    -- Security Check: Is the sender an Admin?
+    if not senderConnection:getIsServerAdmin() then
+        g_server:broadcastEvent(ChatEvent.new("Permission denied.", "System"), nil, senderConnection, nil)
+        return
+    end
+
+    -- Process Example: /giveMoney
+    if commandArgs[1] == "giveMoney" then
+        local amount = tonumber(commandArgs[2])
+        g_currentMission:addMoney(amount, senderConnection:getFarmId(), MoneyType.OTHER, true, true)
+        print(string.format("ADMIN: %s spawned %s money.", senderConnection:getLogName(), amount))
+    end
+end
+```
+
+---
+
+## 5. Network Event Class (Synchronization Template)
+Required for transmitting custom data between clients and the server instance.
+
+```lua
+MyCustomChatEvent = {}
+local MyCustomChatEvent_mt = Class(MyCustomChatEvent, Event)
+InitEventClass(MyCustomChatEvent, "MyCustomChatEvent")
+
+function MyCustomChatEvent.emptyNew() return Event.new(MyCustomChatEvent_mt) end
+
+function MyCustomChatEvent.new(commandString)
+    local self = MyCustomChatEvent.emptyNew()
+    self.commandString = commandString
+    return self
+end
+
+function MyCustomChatEvent:readStream(streamId, connection)
+    self.commandString = streamReadString(streamId)
+    self:run(connection)
+end
+
+function MyCustomChatEvent:writeStream(streamId, connection)
+    streamWriteString(streamId, self.commandString)
+end
+
+function MyCustomChatEvent:run(connection)
+    if not connection:getIsServer() then
+        -- Execute command on the server
+        MyMod:executeServerCommand({self.commandString}, connection)
+    end
+end
+```
+
+---
+
+## 6. External Integration (WebAPI & Logs)
+
+1.  **G-Portal Log Mirroring:** All `print()` statements appear in the G-Portal `server.log`. External Discord bots use this to mirror in-game chat.
+2.  **WebAPI Injection:** Messages from the G-Portal dashboard enter directly as `ChatEvent`. If filtering is needed, hook `g_server:broadcastEvent`.
+3.  **Headless Constraints:** The server machine has no keyboard input. All logic must be triggered by clients via `Event` classes.
+
+---
+
+## 7. QA Checklist for Handover
+
+- [ ] ModDesc version set to 80+ (FS25).
+- [ ] No `chatWindow` calls exist without a `not g_dedicatedServer` check.
+- [ ] Commands are successfully "swallowed" on the client.
+- [ ] Admin validation is performed inside the `Event:run` function.
+- [ ] `print()` is used for all major server actions for log parsing.
+
+---
+
+## 8. How this maps to the AI Farm Manager in-game chat bot (Hank)
+
+The **FS25 AI Farm Manager** mod (`fs25_ai_farm_manager_mod`) uses a pattern that matches **§1** (client → server → broadcast) but **does not** use **§3 Module A** (`ChatWindow.onSendChat` swallow). Instead it hooks **after** the chat line exists in the mission pipeline.
+
+| Handover concept | Hank / AI Farm Manager implementation |
+| :--- | :--- |
+| **Input** | Player types in the normal chat UI (e.g. `!hank what is growing?`). The line is processed by the game like any chat message. |
+| **Interception point** | **`Mission00.addChatMessage`** is wrapped with `Utils.appendedFunction` (`ChatHooks.lua`). When a new line is added, the hook runs: filter by **`triggerPrefix`** (default `!hank`), ignore lines from the bot sender (`Hank`) to avoid loops. This is **observation**, not **swallow** — other players still see the trigger message unless you later add a `ChatWindow.onSendChat` hook (§3 Module A). |
+| **Who runs the bridge** | **Server authority only** (`AIFarmBridge:isAuthority()` + `isMultiplayer`). **MP clients** do not POST to the API; only host / dedicated runs HTTP **`POST /api/chat/receive`**. Matches **§6**: headless server has no keyboard; the **client** typed chat, the **server** received it and the hook runs on the server in MP. |
+| **Outbound / broadcast** | Replies are injected with **`g_server:broadcastEvent(ChatEvent.new(...))`** only (`AIFarmChatHooks.broadcastBot`). There is **no** `g_currentMission.chatWindow:addMessage` call — so **§3 Module B** local UI branch is unnecessary and **G-Portal / dedicated** stays safe (no `nil` chatWindow crash). |
+| **External integration** | Backend queues replies; game **polls** **`GET /api/chat/poll`** (~3s) and broadcasts each line. This is app-side queue + HTTP, not WebAPI injection from G-Portal dashboard (§6.2), but the **same broadcast primitive** (`ChatEvent`) applies once the mod has text to show. |
+| **Security** | Trigger handling is **not** a privileged admin command in-game; the **Python API** validates **`server_token`**, rate limits, and optional IP allowlists (`assert_chat_allowed`). For admin-style commands you would still follow **§4** inside a dedicated `Event:run` on the server. |
+
+**Single-player:** the Hank bridge is **off** by design; use Farm Dashboard + consultant on the PC (`IN_GAME_CHAT_BOT.md`).
+
+**Files:** `FarmHub/AI_Farm_Manager/fs25_ai_farm_manager_mod/src/ChatHooks.lua`, `main.lua`; backend `app/routers/chat.py` (`/receive`, `/poll`).

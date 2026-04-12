@@ -20,7 +20,7 @@ A **server-side / save-side Lua mod** for Farming Simulator 25. It does **not** 
 |------|------|
 | **Animals** | Husbandries, clusters, Realistic Livestock–style individuals where available |
 | **Vehicles** | Fleet state, positions, fill levels, damage, ownership |
-| **Fields** | Growth, soil, weeds, Precision Farming overlays where applicable |
+| **Fields** | Growth, soil, weeds, variable-rate N/pH when the save exports soil maps |
 | **Finance** | Money and related summary |
 | **Weather** | Current conditions and forecast-oriented data |
 | **Economy** | Sell points, market-style price discovery |
@@ -162,7 +162,7 @@ Commit the `docs/screenshots/*.png` files to git, or attach them to **GitHub Rel
 
 ## One-paragraph “store” description (copy-paste)
 
-**FS25 Farm Dashboard** pairs a lightweight **Farming Simulator 25 mod** with a **Windows desktop app**. The mod exports live farm data from your save or server to `data.json`; the app serves a rich **browser dashboard** on your PC—livestock, vehicles, fields (with Precision Farming context), economy, pastures, and production chains—with optional **FTP** support for dedicated hosts. Install the mod, load your save once, then install the desktop app and open **http://localhost:8766** to manage your operation from a second screen.
+**FS25 Farm Dashboard** pairs a lightweight **Farming Simulator 25 mod** with a **Windows desktop app**. The mod exports live farm data from your save or server to `data.json`; the app serves a rich **browser dashboard** on your PC—livestock, vehicles, fields (with soil-map context when available), economy, pastures, and production chains—with optional **FTP** support for dedicated hosts. Install the mod, load your save once, then install the desktop app and open **http://localhost:8766** to manage your operation from a second screen.
 
 ---
 

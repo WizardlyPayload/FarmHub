@@ -364,7 +364,6 @@
     var priClass = String(priStr).toLowerCase();
     var msg = String(ins.message || '').trim();
     var excerpt = msg.length > 220 ? msg.slice(0, 217) + '…' : msg;
-    var reason = String(ins.reasoning || '').trim();
 
     var div = document.createElement('div');
     div.className = 'insight-card priority-' + (priClass || 'medium');
@@ -376,10 +375,7 @@
       escapeInsightHtml(fname) +
       ' — ' +
       escapeInsightHtml(excerpt) +
-      '</strong>' +
-      (reason
-        ? '<p class="small text-muted mb-0 mt-1">' + escapeInsightHtml(reason) + '</p>'
-        : '<p class="small text-muted mb-0 mt-1">Highest priority among the AI tips already shown on your field cards.</p>');
+      '</strong>';
     container.innerHTML = '';
     container.appendChild(div);
   }

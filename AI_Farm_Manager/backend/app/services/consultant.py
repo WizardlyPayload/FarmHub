@@ -182,7 +182,7 @@ CONSULTANT_SYSTEM = CONSULTANT_SYSTEM_BASE + _CONSULTANT_OUTPUT_TAIL_SUMMARY
 _CONSULTANT_OUTPUT_TAIL_FIELD_MAP = """
 Output limits (field map only — applies after FIELD MAP MODE rules above):
 - **priority** must be exactly **Low**, **Medium**, or **High** (spell **Medium** in full — not Med).
-- Keep **message** and **reasoning** brief (aim under 180 characters each).
+- Set **reasoning** to **""** on every row; keep **message** brief (aim under ~220 characters).
 - The **`insights` array length MUST equal the number of field objects in this request** — never stop at 4, 6, or any smaller number than the field row count."""
 
 CONSULTANT_SYSTEM_SINGLE_FIELD = """You are an expert Farming Simulator 25 **single-field** consultant.
@@ -198,7 +198,7 @@ Rules:
 - **field_ref** must be the parcel's **farmlandId** or **id** from the JSON (numeric string or number), matching CONSULTANT_SYSTEM rules for field_ref.
 - If **vehicles** appears in the JSON, match tasks to owned machines; otherwise plain task language — never "Consider purchasing to …".
 - Grass/forage: no grain combines; late growth + weeds: sprayer not mechanical weeder; never echo "weed level" or "(level N)" for weeds.
-- Keep **message** and **reasoning** brief (under 180 characters each).
+- Put the full suggestion in **message** only; set **reasoning** to **""** (the dashboard shows one line).
 - If the JSON has no usable field data, return {"insights":[]}."""
 
 # Appended when Farm Dashboard calls GET …/insights?context=fields (per-parcel field map).
@@ -214,13 +214,14 @@ CRITICAL — COVERAGE:
 - Count those field objects; ensure your `insights` array length matches that count exactly. Do not summarize, merge, or skip fields.
 - **Every** insight MUST use "category":"Field" and a non-null **field_ref** copied from that parcel's **farmlandId** or **id** in the JSON (number or string, no name, no # prefix).
 - Do **not** return Animal, Production, or Finance categories here — the UI ignores them for per-field lines.
-- Keep **message** and **reasoning** brief (aim under 180 characters each) so the full JSON still completes.
+- The dashboard shows **only** the **message** string on each field card (no second line). Put the full NPC-voiced suggestion in **message** only; set **reasoning** to **""** (empty string) for every row — do not duplicate or extend the tip in **reasoning**.
+- Keep **message** brief (aim under ~220 characters) so the full JSON still completes.
 
 FIELD MAP — equipment + wording (each per-field **message**):
 - **Offline rules alignment:** The dashboard’s local rules (when AI is unavailable) use this **priority**: (1) loose windrow/swath — **hasWindrow**, **windrowLiters**, and/or **needsBaling** / **baleableLooseLiters**; (2) **physical bales** on the parcel; (3) **soil scan** when variable-rate maps apply but the field is not scanned. Mention the highest-priority issue that still applies.
 - **Loose windrows / swath:** If **hasWindrow** is true or **windrowLiters** > 0, mention clearing straw/grass/swath before the next soil pass when relevant.
 - **Baler-relevant loose material:** If **needsBaling** is true or **baleableLooseLiters** > 0, the parcel has straw/grass/hay on the ground (not only unthreshed crop swath) — mention baling or pickup before tillage when relevant.
-- **Bales on the parcel:** If the field row includes **baleCountOnField** (or **baleCount**) with a number **greater than zero**, mention **how many bales** are still on that farmland in **message** or **reasoning** (e.g. "3 bales to load") and advise moving them before tillage/planting. Never invent a count — use the JSON only.
+- **Bales on the parcel:** If the field row includes **baleCountOnField** (or **baleCount**) with a number **greater than zero**, mention **how many bales** are still on that farmland in **message** (e.g. "3 bales to load") and advise moving them before tillage/planting. Never invent a count — use the JSON only.
 - The JSON includes a slim **vehicles** list (player-owned equipment). Match **task + crop type** to the right machine class — **not** "buy" or "purchase" for that same job.
 - **Grain harvest (wheat, barley, canola, maize grain, sorghum grain, etc.):** a **grain combine** is appropriate when named from **vehicles** if it matches cereals.
 - **Grass / meadow:** never assign a **grain combine** — use **mower, baler, tedder, forage harvester, loading wagon** from **vehicles** only when names/types fit; otherwise **mow or bale the grass** / **use forage equipment** with no combine.

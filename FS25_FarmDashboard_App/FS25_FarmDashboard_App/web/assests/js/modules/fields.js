@@ -787,7 +787,6 @@ function buildSuggestion(field) {
     }
 
     const action = useAi ? String(ai.message).trim() : (rules ? rules.action : "");
-    const detail = useAi ? String(ai.reasoning || "").trim() : (rules ? rules.reason : "");
     const layer = useAi ? "ai" : "rules";
 
     const layerBadge =
@@ -819,9 +818,6 @@ function buildSuggestion(field) {
             <span class="${layer === "ai" ? "text-info" : "text-warning"} fw-bold d-block" style="font-size:0.85rem;">
                 <i class="bi ${layer === "ai" ? "bi-stars" : "bi-tools"} me-1"></i>${escapeFieldHtml(action)}
             </span>
-            ${detail ? `<span class="d-block text-light small mt-1 opacity-75">
-                <i class="bi bi-info-circle me-1"></i>${escapeFieldHtml(detail)}
-            </span>` : ""}
         </div>`;
 }
 

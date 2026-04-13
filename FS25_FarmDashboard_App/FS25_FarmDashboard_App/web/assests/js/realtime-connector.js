@@ -111,13 +111,29 @@ class RealtimeConnector {
       });
   }
 
-  connectWebSocket() {
+  async connectWebSocket() {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       return;
     }
 
     try {
-      this.ws = new WebSocket(this.wsEndpoint);
+      let wsUrl = this.wsEndpoint;
+      const h = typeof window !== "undefined" && window.location ? window.location.hostname : "";
+      if (h && h !== "127.0.0.1" && h !== "localhost") {
+        try {
+          const tr = await fetch(`${this.httpEndpoint}/api/lan-ws-token`, { cache: "no-store" });
+          if (tr.ok) {
+            const j = await tr.json();
+            if (j && j.token) {
+              const sep = wsUrl.includes("?") ? "&" : "?";
+              wsUrl = `${wsUrl}${sep}t=${encodeURIComponent(j.token)}`;
+            }
+          }
+        } catch (_) {
+          /* fall through — WS may fail; HTTP polling remains */
+        }
+      }
+      this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
         this.isConnected = true;

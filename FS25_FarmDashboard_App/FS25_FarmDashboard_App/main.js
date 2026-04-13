@@ -6,6 +6,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
+const url  = require('url');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 
@@ -17,6 +18,13 @@ const chokidar  = require('chokidar');
 const ftp       = require('basic-ftp');
 const Store     = require('electron-store');
 
+const LAN_ACCESS_DEFAULTS = {
+    lanAccessEnabled: false,
+    lanUsername:      'admin',
+    lanPassword:      'farmhub',
+    lanAllowedIPs:    '',
+};
+
 const {
     collectXmlData,
     SAVEGAME_XML_FILES,
@@ -26,9 +34,18 @@ const { mergeData, buildFieldLiveFingerprints } = require('./dataMerger');
 const { loadServerCache, saveServerCache, appendFieldHistory } = require('./serverDataCache');
 const { initAppUpdater, checkForUpdatesNow } = require('./app-updater');
 
-const store = new Store();
+const store = new Store({ defaults: { ...LAN_ACCESS_DEFAULTS } });
 
 /** Random secret for POST /api/setup-config (browser cannot save config without this header). */
+/** Opaque token for WebSocket `?t=` — browsers cannot send Basic auth on WS handshakes. */
+function ensureLanWsSecret() {
+    let s = store.get('lanWsSecret');
+    if (typeof s === 'string' && s.length >= 16) return s;
+    s = crypto.randomBytes(24).toString('hex');
+    store.set('lanWsSecret', s);
+    return s;
+}
+
 function ensureSetupWriteToken() {
     let t = store.get('farmdashSetupWriteToken');
     if (typeof t === 'string' && t.length >= 16) return t;
@@ -427,17 +444,99 @@ ipcMain.handle('export-mod-store-images', (event) => runExportModStoreImages(eve
 
 // ── Express / WebSocket ───────────────────────────────────────────────────────
 const expressApp = express();
-const server     = http.createServer(expressApp);
-const wss        = new WebSocket.Server({ server });
 const PORT       = 8766;
 const clients    = new Set();
+/** @type {import('http').Server | null} */
+let server = null;
+/** @type {import('ws').WebSocketServer | null} */
+let wss = null;
+
+function getLanSecurityFromStore() {
+    return {
+        lanAccessEnabled: store.get('lanAccessEnabled', LAN_ACCESS_DEFAULTS.lanAccessEnabled),
+        lanUsername:      store.get('lanUsername', LAN_ACCESS_DEFAULTS.lanUsername),
+        lanPassword:      store.get('lanPassword', LAN_ACCESS_DEFAULTS.lanPassword),
+        lanAllowedIPs:    store.get('lanAllowedIPs', LAN_ACCESS_DEFAULTS.lanAllowedIPs),
+    };
+}
+
+/** `0.0.0.0` when LAN access is enabled; else localhost only. */
+function getLanBindAddress() {
+    return getLanSecurityFromStore().lanAccessEnabled ? '0.0.0.0' : '127.0.0.1';
+}
+
+function requestRemoteAddress(req) {
+    const a = req.socket?.remoteAddress || req.connection?.remoteAddress || '';
+    return String(a || '');
+}
+
+function isLoopbackIp(ip) {
+    const s = String(ip || '').trim();
+    if (s === '127.0.0.1' || s === '::1') return true;
+    if (s === '::ffff:127.0.0.1') return true;
+    return false;
+}
+
+function normalizeIpForAllowlist(ip) {
+    let s = String(ip || '').trim();
+    if (s.startsWith('::ffff:')) s = s.slice(7);
+    return s;
+}
+
+/**
+ * LAN security for non-loopback clients: optional IP allowlist + HTTP Basic (same creds as Settings).
+ * Loopback always allowed. Used by Express middleware and WebSocket `verifyClient`.
+ */
+function checkLanAccessForRequest(req) {
+    const rawIp = requestRemoteAddress(req);
+    const expressIp = req.ip ? String(req.ip) : '';
+    if (isLoopbackIp(expressIp) || isLoopbackIp(rawIp)) {
+        return { ok: true };
+    }
+
+    const cfg = getLanSecurityFromStore();
+    const allowRaw = (cfg.lanAllowedIPs || '').trim();
+    if (allowRaw) {
+        const allowed = allowRaw.split(',').map((x) => normalizeIpForAllowlist(x)).filter(Boolean);
+        const nip = normalizeIpForAllowlist(expressIp || rawIp);
+        if (!allowed.some((a) => a === nip)) {
+            return { ok: false, code: 403, message: 'Forbidden: IP not allowed' };
+        }
+    }
+
+    const auth = req.headers?.authorization || '';
+    const m = /^Basic\s+(\S+)/i.exec(auth);
+    if (!m) {
+        return { ok: false, code: 401, message: 'Unauthorized', wwwAuthenticate: true };
+    }
+    let decoded = '';
+    try {
+        decoded = Buffer.from(m[1], 'base64').toString('utf8');
+    } catch (_) {
+        return { ok: false, code: 401, message: 'Unauthorized', wwwAuthenticate: true };
+    }
+    const colon = decoded.indexOf(':');
+    const u = colon >= 0 ? decoded.slice(0, colon) : decoded;
+    const p = colon >= 0 ? decoded.slice(colon + 1) : '';
+    if (u !== cfg.lanUsername || p !== cfg.lanPassword) {
+        return { ok: false, code: 401, message: 'Unauthorized', wwwAuthenticate: true };
+    }
+    return { ok: true };
+}
+
+function lanAccessHttpMiddleware(req, res, next) {
+    if (req.method === 'OPTIONS') return next();
+    const r = checkLanAccessForRequest(req);
+    if (r.ok) return next();
+    if (r.wwwAuthenticate) {
+        res.setHeader('WWW-Authenticate', 'Basic realm="Farm Dashboard"');
+    }
+    return res.status(r.code || 403).send(r.message || 'Forbidden');
+}
 
 /** TCP client is loopback — used to block LAN from triggering heavy/sensitive HTTP actions. */
 function isLocalhostSocket(req) {
-    const a = String(req.socket?.remoteAddress || req.connection?.remoteAddress || '');
-    if (a === '127.0.0.1' || a === '::1') return true;
-    if (a.startsWith('::ffff:') && a.endsWith('127.0.0.1')) return true;
-    return false;
+    return isLoopbackIp(requestRemoteAddress(req));
 }
 
 /** Allow POST /api/export-mod-store-images from LAN (default: localhost only). Power users: set env FARMDASH_ALLOW_LAN_EXPORT=1 */
@@ -447,6 +546,7 @@ function allowLanModExportHttp() {
 
 expressApp.use(cors());
 expressApp.use(express.json());
+expressApp.use(lanAccessHttpMiddleware);
 expressApp.use(express.static(path.join(__dirname, 'web')));
 /** setup.html uses src="web/assests/..." — same paths work over http://host:8766/… and file:// */
 expressApp.use('/web', express.static(path.join(__dirname, 'web')));
@@ -606,6 +706,11 @@ expressApp.get('/api/economy',    (req, res) => res.json(getDataForServer(req)?.
 expressApp.get('/api/farmlands',  (req, res) => res.json(getDataForServer(req)?.xmlFarmlands || []));
 expressApp.get('/api/status',     (req, res) => res.json({ status: 'online' }));
 
+/** For WebSocket clients that cannot send Basic auth on the upgrade request (browsers). */
+expressApp.get('/api/lan-ws-token', (req, res) => {
+    res.json({ token: ensureLanWsSecret() });
+});
+
 /**
  * LAN / tablet browsers: forward consultant insights through the host PC so clients use the same
  * AI URL + integration key + BYOK as Electron (no duplicate LLM config on the tablet, no 127.0.0.1:8080 on wrong device).
@@ -759,10 +864,90 @@ expressApp.post('/api/export-mod-store-images', async (req, res) => {
     }
 });
 
-wss.on('connection', ws => {
-    clients.add(ws);
-    ws.on('close', () => clients.delete(ws));
-});
+function checkWebSocketLanAccess(info) {
+    const req = info.req;
+    const rawIp = requestRemoteAddress(req);
+    const expressIp = req.ip ? String(req.ip) : '';
+    if (isLoopbackIp(expressIp) || isLoopbackIp(rawIp)) return true;
+
+    const cfg = getLanSecurityFromStore();
+    const allowRaw = (cfg.lanAllowedIPs || '').trim();
+    const nip = normalizeIpForAllowlist(expressIp || rawIp);
+    if (allowRaw) {
+        const allowed = allowRaw.split(',').map((x) => normalizeIpForAllowlist(x)).filter(Boolean);
+        if (!allowed.some((a) => a === nip)) return false;
+    }
+
+    try {
+        const parsed = url.parse(req.url || '', true);
+        const t = parsed.query && (parsed.query.t || parsed.query.token);
+        if (t && String(t) === ensureLanWsSecret()) return true;
+    } catch (_) {
+        /* ignore */
+    }
+
+    return checkLanAccessForRequest(req).ok;
+}
+
+function attachWebSocketServer(httpSrv) {
+    wss = new WebSocket.Server({
+        server: httpSrv,
+        verifyClient: (info) => checkWebSocketLanAccess(info),
+    });
+    wss.on('connection', (ws) => {
+        clients.add(ws);
+        ws.on('close', () => clients.delete(ws));
+    });
+}
+
+/**
+ * Starts HTTP + WebSocket on ``bindHost`` (``127.0.0.1`` or ``0.0.0.0``).
+ * Call after ``closeHttpServer`` when rebinding (e.g. LAN toggle).
+ */
+function listenFarmdashHttp(bindHost, onListening) {
+    clients.clear();
+    server = http.createServer(expressApp);
+    attachWebSocketServer(server);
+    server.listen(PORT, bindHost, () => {
+        console.log(`[HTTP/WS] listening on http://${bindHost === '0.0.0.0' ? '0.0.0.0 (all interfaces)' : bindHost}:${PORT}`);
+        if (typeof onListening === 'function') onListening();
+    });
+}
+
+function closeHttpServer(done) {
+    if (!wss && (!server || !server.listening)) {
+        server = null;
+        if (typeof done === 'function') done();
+        return;
+    }
+    const w = wss;
+    wss = null;
+    if (w) {
+        try {
+            w.close(() => {
+                server = null;
+                if (typeof done === 'function') done();
+            });
+        } catch (_) {
+            server = null;
+            if (typeof done === 'function') done();
+        }
+    } else if (server) {
+        server.close(() => {
+            server = null;
+            if (typeof done === 'function') done();
+        });
+    } else if (typeof done === 'function') done();
+}
+
+function restartHttpServer(done) {
+    const bind = getLanBindAddress();
+    closeHttpServer(() => {
+        listenFarmdashHttp(bind, () => {
+            if (typeof done === 'function') done();
+        });
+    });
+}
 
 function broadcast(serverId, data) {
     const payload = cloneMergedDataWithFieldExclusions(data, serverId) || data;
@@ -856,6 +1041,7 @@ function schedulePersistServerCache(serverId) {
             const userData = app.getPath('userData');
             saveServerCache(userData, serverId, {
                 mergedSnapshot: state.mergedData,
+                lastKnownSaveSlot: state.lastSaveSlot || null,
                 fieldLiveByFarmlandId: state.fieldLiveCache || {},
                 fieldHistory: state.fieldHistory || {},
                 lastLuaAt: state.lastLuaReceivedAt || null,
@@ -887,6 +1073,14 @@ function hydrateServerCacheFromDisk(serverId) {
         ...(state.mergedData.dataTimestamps || {}),
         loadedFromDiskCacheAt: new Date().toISOString(),
     };
+    if (disk.lastKnownSaveSlot && typeof disk.lastKnownSaveSlot === 'string') {
+        state.lastSaveSlot = disk.lastKnownSaveSlot;
+    } else {
+        const slot = state.mergedData.serverInfo && state.mergedData.serverInfo.saveSlot;
+        if (typeof slot === 'string' && slot.length > 0) {
+            state.lastSaveSlot = slot;
+        }
+    }
     if (state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
         state.mergedData.fieldStatusHistory = state.fieldHistory;
     }
@@ -1218,8 +1412,12 @@ async function pollFtp(srv) {
             user: srv.ftpUser, password: srv.ftpPass, secure: false
         });
 
-        const basePath   = srv.ftpBasePath || 'profile';
-        const folderName = srv.localSubFolder || 'savegame1';
+        const basePath = srv.ftpBasePath || 'profile';
+        const st = serverStates[srv.id];
+        const folderName =
+            (st && st.lastSaveSlot) ||
+            srv.localSubFolder ||
+            'savegame1';
         const remotePath = `${basePath}/modSettings/FS25_FarmDashboard/${folderName}/data.json`;
 
         const tmpPath   = path.join(userDataPath, `data_${srv.id}.json.tmp`);
@@ -1360,13 +1558,12 @@ function bootServer(config) {
 
     startFtpPollingCoordinator(config, ftpServers);
 
-    if (!server.listening) {
-        server.listen(PORT, '127.0.0.1', () => {
-            console.log(`Server listening on http://127.0.0.1:${PORT}`);
-            if (mainWindow) mainWindow.loadURL(`http://localhost:${PORT}`);
+    if (!server || !server.listening) {
+        listenFarmdashHttp(getLanBindAddress(), () => {
+            if (mainWindow) mainWindow.loadURL(`http://127.0.0.1:${PORT}`);
         });
-    } else {
-        if (mainWindow) mainWindow.loadURL(`http://localhost:${PORT}`);
+    } else if (mainWindow) {
+        mainWindow.loadURL(`http://127.0.0.1:${PORT}`);
     }
 }
 
@@ -1413,9 +1610,9 @@ function createWindow() {
         bootServer(config);
     } else {
         // First-run setup: still listen on LAN so phones/tablets can open http://<this-pc>:8766/setup.html
-        if (!server.listening) {
-            server.listen(PORT, '127.0.0.1', () => {
-                console.log(`Server listening on http://127.0.0.1:${PORT} (waiting for setup)`);
+        if (!server || !server.listening) {
+            listenFarmdashHttp(getLanBindAddress(), () => {
+                console.log(`[HTTP/WS] ready (waiting for setup)`);
                 loadSetupWindow();
             });
         } else {
@@ -1448,6 +1645,23 @@ ipcMain.on('save-settings', (event, newConfig) => {
 });
 
 ipcMain.handle('get-current-config', () => store.get('config'));
+
+ipcMain.handle('get-lan-access-settings', () => getLanSecurityFromStore());
+
+ipcMain.handle('save-lan-access-settings', (_e, payload) => {
+    store.set('lanAccessEnabled', !!payload?.lanAccessEnabled);
+    store.set('lanUsername', String(payload?.lanUsername ?? LAN_ACCESS_DEFAULTS.lanUsername));
+    store.set('lanPassword', String(payload?.lanPassword ?? LAN_ACCESS_DEFAULTS.lanPassword));
+    store.set('lanAllowedIPs', String(payload?.lanAllowedIPs ?? '').trim());
+    return new Promise((resolve) => {
+        restartHttpServer(() => {
+            resolve({
+                ok: true,
+                bind: getLanBindAddress(),
+            });
+        });
+    });
+});
 
 ipcMain.handle('get-desktop-app-version', () => app.getVersion());
 

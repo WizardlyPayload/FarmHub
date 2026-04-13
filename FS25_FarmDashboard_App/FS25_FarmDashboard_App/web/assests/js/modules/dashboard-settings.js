@@ -503,6 +503,23 @@ export async function populateDashboardSettingsForm() {
   }
 
   await loadAppSettingsServerDraft();
+
+  try {
+    const lan = await ipcRenderer.invoke("get-lan-access-settings");
+    const lanEn = document.getElementById("settings-lan-enabled");
+    if (lanEn) lanEn.checked = !!lan.lanAccessEnabled;
+    const lanU = document.getElementById("settings-lan-username");
+    if (lanU) lanU.value = lan.lanUsername || "admin";
+    const lanP = document.getElementById("settings-lan-password");
+    if (lanP) {
+      lanP.value = typeof lan.lanPassword === "string" ? lan.lanPassword : "";
+      lanP.placeholder = "••••••••";
+    }
+    const lanIps = document.getElementById("settings-lan-allowed-ips");
+    if (lanIps) lanIps.value = lan.lanAllowedIPs || "";
+  } catch (e) {
+    console.warn("[dashboard-settings] LAN access", e);
+  }
 }
 
 export async function saveDashboardSettingsFromModal() {
@@ -580,17 +597,15 @@ export async function saveDashboardSettingsFromModal() {
     production: !!document.getElementById("settings-mod-production")?.checked,
   };
 
+  let modSaveOk = false;
   try {
     const res = await ipcRenderer.invoke("save-mod-config", {
       updateInterval: Number.isFinite(ui) ? ui : 10000,
       collectionCycleMs: Number.isFinite(cc) ? cc : 60000,
       modules,
     });
-    if (res?.ok) {
-      this.showAlert?.(t("settings.saved"), "success");
-      const modal = bootstrap.Modal.getInstance(document.getElementById("appSettingsModal"));
-      modal?.hide();
-    } else {
+    modSaveOk = !!res?.ok;
+    if (!modSaveOk) {
       this.showAlert?.(
         (res?.error || t("settings.saveFailed")) + " (mod config)",
         "error"
@@ -598,6 +613,35 @@ export async function saveDashboardSettingsFromModal() {
     }
   } catch (e) {
     this.showAlert?.(t("settings.saveFailed") + " (mod config)", "error");
+  }
+
+  if (document.getElementById("settings-lan-enabled")) {
+    try {
+      const prevLan = await ipcRenderer.invoke("get-lan-access-settings");
+      const pwRaw = document.getElementById("settings-lan-password")?.value ?? "";
+      const lanRes = await ipcRenderer.invoke("save-lan-access-settings", {
+        lanAccessEnabled: !!document.getElementById("settings-lan-enabled")?.checked,
+        lanUsername:
+          document.getElementById("settings-lan-username")?.value?.trim() || "admin",
+        lanPassword: pwRaw !== "" ? pwRaw : prevLan.lanPassword,
+        lanAllowedIPs: document.getElementById("settings-lan-allowed-ips")?.value?.trim() || "",
+      });
+      if (!lanRes?.ok) {
+        this.showAlert?.(
+          lanRes?.error || "LAN access could not be applied (HTTP server restart failed).",
+          "warning"
+        );
+      }
+    } catch (le) {
+      console.warn("[dashboard-settings] save LAN", le);
+      this.showAlert?.("LAN access could not be saved.", "warning");
+    }
+  }
+
+  if (modSaveOk) {
+    this.showAlert?.(t("settings.saved"), "success");
+    const modal = bootstrap.Modal.getInstance(document.getElementById("appSettingsModal"));
+    modal?.hide();
   }
 }
 

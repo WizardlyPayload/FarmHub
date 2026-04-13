@@ -6,6 +6,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 
 const express   = require('express');
@@ -16,11 +17,25 @@ const chokidar  = require('chokidar');
 const ftp       = require('basic-ftp');
 const Store     = require('electron-store');
 
-const { collectXmlData, SAVEGAME_XML_FILES } = require('./xmlCollector');
-const { mergeData }      = require('./dataMerger');
+const {
+    collectXmlData,
+    SAVEGAME_XML_FILES,
+    FTP_SAVEGAME_XML_DOWNLOAD_ORDER,
+} = require('./xmlCollector');
+const { mergeData, buildFieldLiveFingerprints } = require('./dataMerger');
+const { loadServerCache, saveServerCache, appendFieldHistory } = require('./serverDataCache');
 const { initAppUpdater, checkForUpdatesNow } = require('./app-updater');
 
 const store = new Store();
+
+/** Random secret for POST /api/setup-config (browser cannot save config without this header). */
+function ensureSetupWriteToken() {
+    let t = store.get('farmdashSetupWriteToken');
+    if (typeof t === 'string' && t.length >= 16) return t;
+    t = crypto.randomBytes(32).toString('hex');
+    store.set('farmdashSetupWriteToken', t);
+    return t;
+}
 
 /** Optional release branding — copy branding.example.json → branding.json (do not commit secrets). */
 let _brandingLoaded = false;
@@ -127,6 +142,32 @@ let ftpPollingTimers = [];
 const AI_SNAPSHOT_PUSH_MIN_MS = 30000;
 let lastAiSnapshotPushAt = {};
 let aiSnapshotPushInterval = null;
+/** Debounce writing serverLiveCache JSON to disk after merge. */
+const serverCacheSaveTimers = {};
+
+/** Avoid flooding the console when the AI Farm Manager host is down (many UI polls hit the proxy). */
+let lastAiBackendUnreachableLogAt = 0;
+const AI_BACKEND_ERROR_LOG_THROTTLE_MS = 60000;
+
+function logAiBackendUnreachableOnce(context, err, baseUrlHint) {
+    const now = Date.now();
+    if (now - lastAiBackendUnreachableLogAt < AI_BACKEND_ERROR_LOG_THROTTLE_MS) return;
+    lastAiBackendUnreachableLogAt = now;
+    const c = err && err.cause;
+    const code = c && c.code ? c.code : '';
+    let detail = err && err.message ? String(err.message) : String(err);
+    if (code === 'ECONNREFUSED') {
+        detail =
+            'connection refused (nothing is listening on that host:port - start the AI Farm Manager service on the VPS or open the firewall for that port)';
+    } else if (code === 'ENOTFOUND') {
+        detail = 'host not found (check AI server URL / DNS)';
+    } else if (code === 'ETIMEDOUT') {
+        detail = 'connection timed out (firewall or wrong host)';
+    }
+    console.warn(
+        `[AI backend] ${context}: ${detail}` + (baseUrlHint ? ` | ${baseUrlHint}` : '')
+    );
+}
 
 /** PowerShell script: repo tools/ or packaged resources/tools/ */
 function getModExportScriptPath() {
@@ -424,7 +465,25 @@ expressApp.get('/app-brand-icon.ico', (req, res) => {
     res.status(404).end();
 });
 expressApp.get('/', (req, res) => res.sendFile(path.join(__dirname, 'web', 'index.html')));
-expressApp.get('/setup.html', (req, res) => res.sendFile(path.join(__dirname, 'setup.html')));
+expressApp.get('/setup.html', (req, res) => {
+    try {
+        ensureSetupWriteToken();
+        const token = String(store.get('farmdashSetupWriteToken') || '');
+        const p = path.join(__dirname, 'setup.html');
+        let html = fs.readFileSync(p, 'utf8');
+        const inj = `<script>window.__FARMDASH_SETUP_TOKEN=${JSON.stringify(token)};</script>`;
+        const i = html.indexOf('</head>');
+        if (i === -1) {
+            html = inj + html;
+        } else {
+            html = html.slice(0, i) + inj + html.slice(i);
+        }
+        res.type('html').send(html);
+    } catch (e) {
+        console.error('[setup.html]', e);
+        res.status(500).end();
+    }
+});
 
 /** Full config for setup.html when opened in a normal browser (tablet on LAN — no Electron require). */
 expressApp.get('/api/setup-config', (req, res) => {
@@ -437,12 +496,17 @@ expressApp.get('/api/setup-config', (req, res) => {
 });
 
 /**
- * Save first-run / Server Manager config from a browser (e.g. tablet on home Wi‑Fi).
- * Same effect as ipcRenderer.send('save-settings', …) in the desktop app.
- * Only use on trusted networks; anyone who can reach this port can change server list.
+ * Save first-run / Server Manager config from a browser (same effect as ipcRenderer `save-settings`).
+ * Requires ``X-Setup-Token`` (see ``ensureSetupWriteToken`` / setup page injection).
  */
 expressApp.post('/api/setup-config', (req, res) => {
     try {
+        ensureSetupWriteToken();
+        const expected = String(store.get('farmdashSetupWriteToken') || '');
+        const got = String(req.headers['x-setup-token'] || '').trim();
+        if (!expected || got !== expected) {
+            return res.status(403).json({ ok: false, error: 'Forbidden' });
+        }
         const body = req.body;
         if (!body || typeof body !== 'object') {
             return res.status(400).json({ ok: false, error: 'Expected JSON body' });
@@ -647,12 +711,14 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
         res.setHeader('Content-Type', ct);
         return res.send(text);
     } catch (e) {
-        console.error('[api/farmdash-ai/consultant/insights]', e);
-        return res.status(500).json({
-            detail: e && e.message ? String(e.message) : String(e),
+        const conn = getAiManagerConnectionForProxy();
+        logAiBackendUnreachableOnce('GET /api/farmdash-ai/consultant/insights (proxy)', e, conn.baseUrl);
+        return res.status(503).json({
+            detail:
+                'Cannot reach AI Farm Manager. Start the service on your VPS, confirm the URL/port in Farm Dashboard AI settings, and ensure outbound access from this PC (or disable AI until it is back).',
             insights: [],
             llm_used: false,
-            farmdash_ai_error: 'proxy_exception',
+            farmdash_ai_error: 'unreachable',
         });
     }
 });
@@ -759,7 +825,7 @@ async function maybePushSnapshotToAiManager(serverId) {
             console.warn('[Pipeline] push_out: POST push-snapshot failed', r.status, t.slice(0, 300));
         }
     } catch (e) {
-        console.warn('[Pipeline] push_out: POST push-snapshot error', e && e.message ? e.message : e);
+        logAiBackendUnreachableOnce('POST push-snapshot', e, base);
     }
 }
 
@@ -781,12 +847,67 @@ function stopAiSnapshotPushInterval() {
     }
 }
 
+function schedulePersistServerCache(serverId) {
+    clearTimeout(serverCacheSaveTimers[serverId]);
+    serverCacheSaveTimers[serverId] = setTimeout(() => {
+        const state = serverStates[serverId];
+        if (!state || !state.mergedData) return;
+        try {
+            const userData = app.getPath('userData');
+            saveServerCache(userData, serverId, {
+                mergedSnapshot: state.mergedData,
+                fieldLiveByFarmlandId: state.fieldLiveCache || {},
+                fieldHistory: state.fieldHistory || {},
+                lastLuaAt: state.lastLuaReceivedAt || null,
+                lastXmlAt: state.lastXmlReceivedAt || null,
+                savedAt: new Date().toISOString(),
+            });
+        } catch (e) {
+            console.warn('[Cache] persist failed', serverId, e.message);
+        }
+    }, 600);
+}
+
+function hydrateServerCacheFromDisk(serverId) {
+    let disk;
+    try {
+        disk = loadServerCache(app.getPath('userData'), serverId);
+    } catch (_) {
+        disk = null;
+    }
+    if (!disk || !disk.mergedSnapshot) return;
+    const state = serverStates[serverId];
+    if (!state) return;
+    state.fieldLiveCache = disk.fieldLiveByFarmlandId || {};
+    state.fieldHistory = disk.fieldHistory || {};
+    state.lastLuaReceivedAt = disk.lastLuaAt || null;
+    state.lastXmlReceivedAt = disk.lastXmlAt || null;
+    state.mergedData = JSON.parse(JSON.stringify(disk.mergedSnapshot));
+    state.mergedData.dataTimestamps = {
+        ...(state.mergedData.dataTimestamps || {}),
+        loadedFromDiskCacheAt: new Date().toISOString(),
+    };
+    if (state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
+        state.mergedData.fieldStatusHistory = state.fieldHistory;
+    }
+    broadcast(serverId, state.mergedData);
+    console.log(`[Cache] [${serverId}] Restored last merged snapshot from disk (use until live Lua/XML return)`);
+}
+
 function rebuildMerged(serverId) {
     const state = serverStates[serverId];
     if (!state) return;
-    state.mergedData = mergeData(state.luaData, state.xmlData);
+    state.mergedData = mergeData(state.luaData, state.xmlData, {
+        fieldLiveCache: state.fieldLiveCache || {},
+        lastLuaAt: state.lastLuaReceivedAt || null,
+        lastXmlAt: state.lastXmlReceivedAt || null,
+    });
+    if (state.mergedData && state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
+        state.mergedData.fieldStatusHistory = state.fieldHistory;
+    }
     broadcast(serverId, state.mergedData);
     maybePushSnapshotToAiManager(serverId);
+    schedulePersistServerCache(serverId);
 }
 
 function processLuaData(serverId, raw) {
@@ -796,6 +917,16 @@ function processLuaData(serverId, raw) {
         if (!state) return;
 
         state.luaData = data;
+
+        const nowIso = new Date().toISOString();
+        state.lastLuaReceivedAt = nowIso;
+        try {
+            const fps = buildFieldLiveFingerprints(data.fields || [], nowIso);
+            state.fieldLiveCache = { ...(state.fieldLiveCache || {}), ...fps };
+            state.fieldHistory = appendFieldHistory(state.fieldHistory || {}, fps);
+        } catch (e) {
+            console.warn('[Cache] fingerprint', serverId, e.message);
+        }
 
         // If we don't have XML yet (or saveSlot changed), trigger XML poll now
         const saveSlot = data.serverInfo?.saveSlot;
@@ -822,7 +953,7 @@ async function downloadFtpSavegameXml(srv, saveSlot) {
         ? String(srv.ftpSavegameRemoteDir).replace(/\\/g, '/').replace(/\/$/, '')
         : `${String(srv.ftpBasePath || 'profile').replace(/\\/g, '/').replace(/\/$/, '')}/${slot}`;
 
-    const client = new ftp.Client();
+    const client = new ftp.Client(120000);
     client.ftp.verbose = false;
     try {
         await client.access({
@@ -830,15 +961,130 @@ async function downloadFtpSavegameXml(srv, saveSlot) {
             user: srv.ftpUser, password: srv.ftpPass, secure: false
         });
 
-        let ok = 0;
-        for (const name of SAVEGAME_XML_FILES) {
+        const retryOpts = { maxAttempts: 5, retryDelayMs: 400 };
+        const retryOptsCooldown = { maxAttempts: 6, retryDelayMs: 600 };
+
+        async function pullOne(name) {
             const remotePath = `${remoteDir}/${name}`;
             const tmpPath = path.join(localDir, `${name}.tmp`);
             const finalPath = path.join(localDir, name);
-            if (await safeDownload(client, remotePath, tmpPath, finalPath)) ok++;
+            return safeDownload(client, remotePath, tmpPath, finalPath, retryOpts);
         }
+
+        let ok = 0;
+        const missing = [];
+        for (const name of FTP_SAVEGAME_XML_DOWNLOAD_ORDER) {
+            if (await pullOne(name)) {
+                ok++;
+            } else {
+                missing.push(name);
+            }
+        }
+
+        // Second pass: careerSavegame / farmland often stay busy until other files finish flushing on host FTP.
+        if (missing.length > 0) {
+            await new Promise((r) => setTimeout(r, 3500));
+            const still = [];
+            for (const name of missing) {
+                if (await pullOne(name)) {
+                    ok++;
+                } else {
+                    still.push(name);
+                }
+            }
+            missing.length = 0;
+            missing.push(...still);
+        }
+
+        // Third try: only files still missing, longer per-file retries (host may have been mid-save).
+        if (missing.length > 0) {
+            const still = [];
+            for (const name of missing) {
+                const remotePath = `${remoteDir}/${name}`;
+                const tmpPath = path.join(localDir, `${name}.tmp`);
+                const finalPath = path.join(localDir, name);
+                if (await safeDownload(client, remotePath, tmpPath, finalPath, retryOptsCooldown)) {
+                    ok++;
+                } else {
+                    still.push(name);
+                }
+            }
+            missing.length = 0;
+            missing.push(...still);
+        }
+
+        // Fourth pass: FTP listing may use different casing than Giants' default names.
+        if (missing.length > 0) {
+            let lowerToExact = null;
+            try {
+                const entries = await client.list(remoteDir);
+                lowerToExact = new Map();
+                for (const ent of entries) {
+                    if (ent.name) lowerToExact.set(ent.name.toLowerCase(), ent.name);
+                }
+            } catch (_) {
+                lowerToExact = null;
+            }
+            if (lowerToExact && lowerToExact.size > 0) {
+                const still = [];
+                for (const name of missing) {
+                    const exact = lowerToExact.get(name.toLowerCase());
+                    if (exact && exact !== name) {
+                        const remotePath = `${remoteDir}/${exact}`;
+                        const tmpPath = path.join(localDir, `${name}.tmp`);
+                        const finalPath = path.join(localDir, name);
+                        console.log(`[FTP] [${srv.id}] Retrying with server name: ${exact}`);
+                        if (await safeDownload(client, remotePath, tmpPath, finalPath, retryOptsCooldown)) {
+                            ok++;
+                        } else {
+                            still.push(name);
+                        }
+                    } else {
+                        still.push(name);
+                    }
+                }
+                missing.length = 0;
+                missing.push(...still);
+            }
+        }
+
         if (ok > 0) {
             console.log(`[FTP] [${srv.id}] Cached ${ok}/${SAVEGAME_XML_FILES.length} savegame XML -> ${localDir}`);
+            if (missing.length) {
+                const noPf = missing.filter((n) => n !== 'precisionFarming.xml');
+                const pfOnly = missing.length > 0 && noPf.length === 0;
+                let hint = '';
+                if (noPf.length) {
+                    hint =
+                        ` Still missing (not optional): ${noPf.join(', ')}. ` +
+                        'If this repeats every poll, check FTP path / permissions for those names on the host.';
+                }
+                if (missing.includes('precisionFarming.xml')) {
+                    hint +=
+                        (hint ? ' ' : '') +
+                        'precisionFarming.xml is only present with Precision Farming on the save.';
+                }
+                if (pfOnly) {
+                    hint = 'Only precisionFarming.xml missing (expected without Precision Farming DLC).';
+                }
+                console.log(`[FTP] [${srv.id}] ${hint || `Missing: ${missing.join(', ')}`}`);
+
+                const criticalLeft = missing.filter((n) => n !== 'precisionFarming.xml');
+                if (criticalLeft.length > 0) {
+                    const parts = [];
+                    for (const name of criticalLeft) {
+                        const rp = `${remoteDir}/${name}`;
+                        try {
+                            const sz = await client.size(rp);
+                            parts.push(`${name}=${sz}B`);
+                        } catch (err) {
+                            const em = err && err.message ? String(err.message) : String(err);
+                            parts.push(`${name}=no SIZE (${em.slice(0, 60)})`);
+                        }
+                    }
+                    console.log(`[FTP] [${srv.id}] Remote SIZE check: ${parts.join('; ')} (0B = empty file on host; ERR = wrong path or no access)`);
+                }
+            }
         } else {
             console.warn(`[FTP] [${srv.id}] No XML files found under ${remoteDir}/`);
         }
@@ -867,8 +1113,14 @@ async function triggerXmlPoll(serverId) {
         const xmlData = await collectXmlData(srv, saveSlot);
         if (xmlData) {
             serverStates[serverId].xmlData = xmlData;
+            serverStates[serverId].lastXmlReceivedAt = new Date().toISOString();
             rebuildMerged(serverId);
             console.log(`[XML] [${serverId}] XML data updated (slot=${effectiveSlot})`);
+        } else if (srv.mode === 'ftp') {
+            console.warn(
+                `[XML] [${serverId}] Parsed XML is empty (no usable savegame in ftpXmlCache for slot=${effectiveSlot}). ` +
+                'If Lua never loads, the slot may be wrong — set this server\'s save slot to match the host (e.g. savegame3).'
+            );
         }
     } catch (e) {
         console.warn(`[XML] [${serverId}] XML poll failed:`, e.message);
@@ -920,20 +1172,44 @@ function startLocalWatching(srv) {
 
 // ── FTP polling ───────────────────────────────────────────────────────────────
 
-async function safeDownload(client, remotePath, localTmp, localFinal) {
-    try {
-        await client.downloadTo(localTmp, remotePath);
-        if (fs.existsSync(localTmp) && fs.statSync(localTmp).size > 0) {
-            if (fs.existsSync(localFinal)) fs.unlinkSync(localFinal);
-            fs.renameSync(localTmp, localFinal);
-            return true;
+/**
+ * Download a single remote file with optional retries. Dedicated servers often write savegame XML in a
+ * burst; FTP during that window can see locked files, partial writes, or zero-byte reads — different
+ * files fail on each poll. Retries with short backoff usually clear it.
+ */
+async function safeDownload(client, remotePath, localTmp, localFinal, options = {}) {
+    const maxAttempts = Math.max(1, parseInt(options.maxAttempts, 10) || 1);
+    const retryDelayMs = Math.max(0, parseInt(options.retryDelayMs, 10) || 300);
+    let lastErr = '';
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            try {
+                if (fs.existsSync(localTmp)) fs.unlinkSync(localTmp);
+            } catch (_) {
+                /* ignore */
+            }
+            await client.downloadTo(localTmp, remotePath);
+            if (fs.existsSync(localTmp) && fs.statSync(localTmp).size > 0) {
+                if (fs.existsSync(localFinal)) fs.unlinkSync(localFinal);
+                fs.renameSync(localTmp, localFinal);
+                return true;
+            }
+            lastErr = 'empty or zero-byte after download';
+        } catch (e) {
+            lastErr = e && e.message ? String(e.message) : String(e);
         }
-    } catch (e) {}
+        if (attempt < maxAttempts) {
+            await new Promise((r) => setTimeout(r, retryDelayMs * attempt));
+        }
+    }
+    if (maxAttempts > 1 && lastErr && options.logFailures) {
+        console.warn(`[FTP] ${path.basename(localFinal)}: failed after ${maxAttempts} tries — ${lastErr.slice(0, 120)}`);
+    }
     return false;
 }
 
 async function pollFtp(srv) {
-    const client = new ftp.Client();
+    const client = new ftp.Client(120000);
     client.ftp.verbose = false;
     const userDataPath = app.getPath('userData');
     try {
@@ -949,11 +1225,17 @@ async function pollFtp(srv) {
         const tmpPath   = path.join(userDataPath, `data_${srv.id}.json.tmp`);
         const finalPath = path.join(userDataPath, `data_${srv.id}.json`);
 
-        if (await safeDownload(client, remotePath, tmpPath, finalPath)) {
+        if (await safeDownload(client, remotePath, tmpPath, finalPath, { maxAttempts: 4, retryDelayMs: 350 })) {
             processLuaData(srv.id, fs.readFileSync(finalPath, 'utf8'));
+        } else {
+            console.warn(
+                `[FTP] [${srv.id}] Could not download live Lua data.json from:\n  ${remotePath}\n` +
+                '  Fix: game running on host, FS25_FarmDashboard mod enabled, and this server\'s ' +
+                '"Local folder" in app settings matches modSettings/FS25_FarmDashboard/<that folder>/data.json on FTP.'
+            );
         }
     } catch (err) {
-        console.warn(`[FTP] ${srv.name}: ${err.message}`);
+        console.warn(`[FTP] [${srv.id}] ${srv.name}: ${err.message}`);
     } finally {
         client.close();
     }
@@ -1039,6 +1321,10 @@ function startFtpPollingCoordinator(config, ftpServers) {
 
 function stopAllWatchers() {
     clearFtpPollingTimers();
+    Object.keys(serverCacheSaveTimers).forEach((k) => {
+        clearTimeout(serverCacheSaveTimers[k]);
+        delete serverCacheSaveTimers[k];
+    });
     for (const state of Object.values(serverStates)) {
         if (state.watcher) state.watcher.close();
         for (const t of (state.intervals || [])) { clearTimeout(t); clearInterval(t); }
@@ -1057,17 +1343,26 @@ function bootServer(config) {
 
     servers.forEach(srv => {
         serverStates[srv.id] = {
-            luaData: null, xmlData: null, mergedData: null,
-            watcher: null, intervals: [], lastSaveSlot: null
+            luaData: null,
+            xmlData: null,
+            mergedData: null,
+            watcher: null,
+            intervals: [],
+            lastSaveSlot: null,
+            lastLuaReceivedAt: null,
+            lastXmlReceivedAt: null,
+            fieldLiveCache: {},
+            fieldHistory: {},
         };
+        hydrateServerCacheFromDisk(srv.id);
         if (srv.mode === 'local') startLocalWatching(srv);
     });
 
     startFtpPollingCoordinator(config, ftpServers);
 
     if (!server.listening) {
-        server.listen(PORT, '0.0.0.0', () => {
-            console.log(`Server listening on http://0.0.0.0:${PORT}`);
+        server.listen(PORT, '127.0.0.1', () => {
+            console.log(`Server listening on http://127.0.0.1:${PORT}`);
             if (mainWindow) mainWindow.loadURL(`http://localhost:${PORT}`);
         });
     } else {
@@ -1093,6 +1388,7 @@ function applyFarmdashSetupConfig(newConfig) {
 // ── Electron window ───────────────────────────────────────────────────────────
 
 function createWindow() {
+    ensureSetupWriteToken();
     mainWindow = new BrowserWindow({
         width: 1400, height: 900,
         title: 'FS25 Farm Dashboard',
@@ -1118,8 +1414,8 @@ function createWindow() {
     } else {
         // First-run setup: still listen on LAN so phones/tablets can open http://<this-pc>:8766/setup.html
         if (!server.listening) {
-            server.listen(PORT, '0.0.0.0', () => {
-                console.log(`Server listening on http://0.0.0.0:${PORT} (waiting for setup)`);
+            server.listen(PORT, '127.0.0.1', () => {
+                console.log(`Server listening on http://127.0.0.1:${PORT} (waiting for setup)`);
                 loadSetupWindow();
             });
         } else {

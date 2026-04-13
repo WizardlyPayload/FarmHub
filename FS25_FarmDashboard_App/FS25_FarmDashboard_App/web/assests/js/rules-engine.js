@@ -108,9 +108,24 @@ function isGrassCrop(field) {
   return false;
 }
 
-/** Same notion as FieldDataCollector: no planted crop (`fruitTypeIndex == 0`). */
+/**
+ * True bare / unplanted parcel — used for fallow pipeline (mulch → plough → lime → N → sow).
+ * Must not treat “missing fruitTypeIndex” (NaN) as empty when fruitType or growth proves a crop exists
+ * (common with XML-only or merged exports) — that produced silly “sow this field” on standing crops.
+ */
 function hasNoCrop(field) {
-  return (Number(field.fruitTypeIndex ?? 0) || 0) === 0;
+  const gs = Number(field.growthState ?? 0);
+  if (Number.isFinite(gs) && gs > 0) return false;
+
+  const ft = fruitUpper(field);
+  if (ft && ft !== "UNKNOWN" && ft !== "EMPTY" && ft !== "MULCHED_STUBBLE") return false;
+
+  const rawIdx = field.fruitTypeIndex;
+  if (rawIdx !== undefined && rawIdx !== null && String(rawIdx).trim() !== "") {
+    const n = Number(rawIdx);
+    if (Number.isFinite(n) && n > 0) return false;
+  }
+  return true;
 }
 
 function mulchLevelNum(field) {
@@ -129,9 +144,14 @@ export function aggregateBaleableLoose(field) {
   return Number.isFinite(v) && v > 0;
 }
 
+/** Ignore float noise / stale probes — only “clear swath” when material is non-trivial. */
+const MIN_WINDROW_LITERS = 120;
+const MIN_WINDROW_AREA = 0.0005;
+const MIN_WINDROW_SAMPLE = 15;
+
 /**
- * Whole-field swath / windrow — any probe evidence, or baler-relevant loose material (`needsBaling` /
- * `baleableLooseLiters`), aligned with field-map consultant prompts and `FieldDataCollector` exports.
+ * Whole-field swath / windrow — probe evidence above noise floor, or explicit game flags /
+ * baler-relevant loose material (`needsBaling` / `baleableLooseLiters`).
  */
 export function aggregateWindrowDetected(field) {
   if (!field || typeof field !== "object") return false;
@@ -140,17 +160,24 @@ export function aggregateWindrowDetected(field) {
   if (field.hasWindrow === true || field.hasSwath === true) return true;
   const byName = field.windrowByFillName;
   if (byName && typeof byName === "object") {
+    let sum = 0;
     for (const k of Object.keys(byName)) {
-      if (Number(byName[k]) > 0) return true;
+      const v = Number(byName[k]) || 0;
+      sum += v;
+      if (v >= MIN_WINDROW_LITERS) return true;
     }
+    if (sum >= MIN_WINDROW_LITERS * 2) return true;
   }
   const liters = Number(field.windrowLiters ?? field.windrowVolume ?? field.swathLiters ?? 0);
   const area = Number(field.windrowArea ?? field.swathArea ?? 0);
-  if (Number.isFinite(liters) && liters > 0) return true;
-  if (Number.isFinite(area) && area > 0) return true;
+  if (Number.isFinite(liters) && liters >= MIN_WINDROW_LITERS) return true;
+  if (Number.isFinite(area) && area >= MIN_WINDROW_AREA) return true;
   const samples = field.windrowSamples;
-  if (Array.isArray(samples) && samples.some((v) => Number(v) > 0)) return true;
-  if (Array.isArray(field.windrowPerStrip) && field.windrowPerStrip.some((v) => Number(v) > 0)) {
+  if (Array.isArray(samples) && samples.some((v) => Number(v) >= MIN_WINDROW_SAMPLE)) return true;
+  if (
+    Array.isArray(field.windrowPerStrip) &&
+    field.windrowPerStrip.some((v) => Number(v) >= MIN_WINDROW_SAMPLE)
+  ) {
     return true;
   }
   return false;
@@ -298,7 +325,8 @@ function needsFallowNutrientPrep(field) {
     if (!field.isScanned || !field.targetNitrogen) return false;
     return field.nitrogenLevel < field.targetNitrogen * 0.95;
   }
-  return (field.fertilizationLevel || 0) < 1.9;
+  // Match growing-crop threshold (< 1 “step”) — 1.9 was almost always true and nagged “fertilize” on fallow.
+  return (field.fertilizationLevel || 0) < 1;
 }
 
 /** Short crop name for sentences, e.g. WINTER_WHEAT → "winter wheat". */

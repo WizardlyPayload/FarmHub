@@ -48,7 +48,9 @@ def _raise_if_invalid_view(view: str | None) -> None:
         raise HTTPException(status_code=400, detail="Invalid view parameter")
 
 
-async def _load_snapshot_for_consultant(server_id: str | None) -> tuple[dict[str, Any], str]:
+async def _load_snapshot_for_consultant(
+    server_id: str | None, farm_id: int | None = None
+) -> tuple[dict[str, Any], str]:
     settings = get_settings()
     base = (settings.get("dashboard_json_url") or "").strip()
     env_sid = (settings.get("dashboard_server_id") or "").strip()
@@ -57,7 +59,7 @@ async def _load_snapshot_for_consultant(server_id: str | None) -> tuple[dict[str
     if not fetch_url:
         fetch_url = settings.get("dashboard_fetch_url") or settings.get("dashboard_json_url") or ""
 
-    raw, err = await fetch_dashboard_json(fetch_url or None)
+    raw, err = await fetch_dashboard_json(fetch_url or None, farm_id=farm_id)
     if raw is None:
         logger.warning(
             "consultant: no snapshot (serverId query=%r fetch_url=%r err=%s)",
@@ -186,7 +188,7 @@ async def compute_consultant_insights(
     Uses server env LLM keys when ``user_api_key`` is empty (same as Farm Dashboard without BYOK).
     """
     _raise_if_invalid_view(view)
-    snapshot, sid = await _load_snapshot_for_consultant(server_id)
+    snapshot, sid = await _load_snapshot_for_consultant(server_id, farm_id)
     farm_resolved = resolve_consultant_farm_id(snapshot, farm_id)
     snapshot = prune_snapshot_to_active_farm(snapshot, farm_resolved)
     logger.info(
@@ -220,7 +222,7 @@ async def compute_consultant_insights_first_owned_field(
     Load snapshot, pick the first owned parcel (same rules as Farm Dashboard field list), then run the
     **single-field** consultant (``CONSULTANT_SYSTEM_SINGLE_FIELD``) — “next job” for that field.
     """
-    snapshot, sid = await _load_snapshot_for_consultant(server_id)
+    snapshot, sid = await _load_snapshot_for_consultant(server_id, active_farm_id)
     af = resolve_consultant_farm_id(snapshot, active_farm_id)
     snapshot = prune_snapshot_to_active_farm(snapshot, af)
     ref, row = pick_first_owned_field_row(snapshot, af)

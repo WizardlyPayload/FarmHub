@@ -60,6 +60,33 @@ const SAVEGAME_XML_FILES = [
     'precisionFarming.xml',
 ];
 
+/**
+ * FTP-only download order (same files as SAVEGAME_XML_FILES).
+ * On dedicated hosts, careerSavegame.xml / farmland.xml are often written or locked first during a save;
+ * fetching them after the bulk of the folder reduces persistent 0-byte / busy failures.
+ * precisionFarming.xml last (optional DLC file).
+ */
+const FTP_SAVEGAME_XML_DOWNLOAD_ORDER = [
+    'fields.xml',
+    'farms.xml',
+    'environment.xml',
+    'missions.xml',
+    'vehicles.xml',
+    'economy.xml',
+    'placeables.xml',
+    'careerSavegame.xml',
+    'farmland.xml',
+    'precisionFarming.xml',
+];
+
+(function assertFtpOrderMatchesCanonical() {
+    const a = new Set(SAVEGAME_XML_FILES);
+    const b = new Set(FTP_SAVEGAME_XML_DOWNLOAD_ORDER);
+    if (a.size !== b.size || SAVEGAME_XML_FILES.some((f) => !b.has(f))) {
+        throw new Error('FTP_SAVEGAME_XML_DOWNLOAD_ORDER must list the same files as SAVEGAME_XML_FILES');
+    }
+})();
+
 function getSavegamePath(srv, saveSlot) {
     const slot = saveSlot || srv.localSubFolder || 'savegame1';
 
@@ -227,7 +254,13 @@ function parseFieldsXml(xml, farmlandOwnership, scannedFarmlands, farmlandStats)
         if (limeLevel < 1)           suggestions.push({ priority: 4, action: 'Spread lime — pH is low',               type: 'maintenance' });
         if (sprayLevel < 1 && !isEmpty) suggestions.push({ priority: 4, action: 'Fertilize — nutrient level is low',             type: 'maintenance' });
         if (plowLevel < 1 && isEmpty)   suggestions.push({ priority: 5, action: 'Plow or disc — primary tillage needed',            type: 'preparation' });
-        suggestions.sort((a, b) => a.priority - b.priority);
+            suggestions.sort((a, b) => a.priority - b.priority);
+
+        // Savegame precisionFarming.xml: soil samples / stats — drives PF UI when Lua is absent or stale.
+        const hasPfStats = pfStats && typeof pfStats === 'object';
+        const pfActive =
+            !!isScanned ||
+            (hasPfStats && (pfStats.numSoilSamples > 0 || Object.keys(pfStats).length > 0));
 
         fields.push({
             id, ownerFarmId, farmlandId: id,
@@ -245,8 +278,7 @@ function parseFieldsXml(xml, farmlandOwnership, scannedFarmlands, farmlandStats)
             isHarvested,
             isWithered, needsWork,
             suggestions,
-            // Soil-map placeholders (filled when savegame / live data includes them)
-            isPrecisionFarming: false,
+            isPrecisionFarming: pfActive,
             nitrogenLevel: 0, targetNitrogen: 0,
             phValue: 0, targetPh: 0, isScanned: false,
             nitrogenText: `${sprayLevel}/2`, limeText: limeLevel >= 1 ? 'OK' : 'Needed',
@@ -604,4 +636,9 @@ async function collectXmlData(srv, saveSlot) {
     };
 }
 
-module.exports = { collectXmlData, getSavegamePath, SAVEGAME_XML_FILES };
+module.exports = {
+    collectXmlData,
+    getSavegamePath,
+    SAVEGAME_XML_FILES,
+    FTP_SAVEGAME_XML_DOWNLOAD_ORDER,
+};

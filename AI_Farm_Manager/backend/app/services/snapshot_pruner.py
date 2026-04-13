@@ -2,7 +2,33 @@
 from __future__ import annotations
 
 import copy
+import json
 from typing import Any
+
+# LLM context block cap (``dashboard_service.build_dashboard_context_block``); trim dicts, never slice JSON text.
+DEFAULT_LLM_CONTEXT_MAX_UTF8_BYTES = 120_000
+
+# Root keys dropped first when UTF-8 JSON still exceeds budget (historical / debug / bulky logs).
+_STRUCTURED_TRUNC_DROP_ORDER: tuple[str, ...] = (
+    "fieldStatusHistory",
+    "_fieldHistory",
+    "fieldHistory",
+    "missions",
+    "debug",
+    "rawLua",
+    "fullXmlDump",
+    "debugInfo",
+    "statistics",
+    "economy",
+    "weather",
+    "productionPoints",
+    "production",
+    "animals",
+    "pastures",
+    "vehicles",
+    "allFields",
+    "fields",
+)
 
 # Keys removed entirely (physics / pose / dense geometry).
 _DROP_KEYS: frozenset[str] = frozenset(
@@ -98,7 +124,9 @@ def _prune_value(obj: Any, depth: int) -> Any:
             if pv is not None:
                 out_d[k] = pv
         return out_d
-    return str(obj)[:400]
+    # Non-JSON-native value: emit a short string (never slice whole-document JSON).
+    s = str(obj)
+    return s[:400] + ("…" if len(s) > 400 else "")
 
 
 def prune_field_entry(field: dict[str, Any]) -> dict[str, Any] | None:
@@ -263,12 +291,65 @@ def prune_dashboard_snapshot_for_llm(data: Any) -> Any:
 
 def pruned_json_bytes_estimate(data: Any) -> int:
     """Rough UTF-8 length after prune (for metrics only)."""
-    import json
-
     try:
-        return len(json.dumps(data, ensure_ascii=False, default=str))
+        return len(json.dumps(data, ensure_ascii=False, default=str).encode("utf-8"))
     except Exception:
         return 0
+
+
+def _snapshot_utf8_json_len(data: Any) -> int:
+    try:
+        return len(json.dumps(data, ensure_ascii=False, default=str).encode("utf-8"))
+    except Exception:
+        return DEFAULT_LLM_CONTEXT_MAX_UTF8_BYTES + 1
+
+
+def truncate_snapshot_dict_to_max_utf8_bytes(data: Any, max_bytes: int) -> Any:
+    """
+    Ensure JSON serialization fits ``max_bytes`` UTF-8 by removing entire low-priority root keys / arrays.
+    Output is always valid JSON when serialized (no string slicing of ``json.dumps`` output).
+    """
+    if max_bytes < 1:
+        return data
+    root: Any = copy.deepcopy(data)
+
+    def sz() -> int:
+        return _snapshot_utf8_json_len(root)
+
+    if sz() <= max_bytes:
+        return root
+
+    if isinstance(root, list):
+        while len(root) > 0 and sz() > max_bytes:
+            root.pop()
+        return root
+
+    if not isinstance(root, dict):
+        return root
+
+    for key in _STRUCTURED_TRUNC_DROP_ORDER:
+        if key in root and sz() > max_bytes:
+            root.pop(key, None)
+
+    # Shrink arrays from the end (whole elements only).
+    for _ in range(50000):
+        if sz() <= max_bytes:
+            return root
+        trimmed = False
+        for arr_key in ("fields", "allFields", "vehicles", "animals", "pastures"):
+            arr = root.get(arr_key)
+            if isinstance(arr, list) and len(arr) > 0:
+                root[arr_key] = arr[:-1]
+                trimmed = True
+                break
+        if trimmed:
+            continue
+        victim = next(iter(root.keys()), None)
+        if victim is None:
+            return {"_truncated": True}
+        root.pop(victim)
+
+    return root if sz() <= max_bytes else {"_truncated": True, "error": "snapshot exceeds budget"}
 
 
 def _field_row_matches_ref(row: dict[str, Any], target: str) -> bool:

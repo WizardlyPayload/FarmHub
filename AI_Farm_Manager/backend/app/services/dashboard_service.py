@@ -11,7 +11,11 @@ from app.services import ftp_service
 from app.services import snapshot_push_service
 from app.services.log_buffer import log_event
 from app.services.pipeline_log import log_pipeline
-from app.services.snapshot_pruner import prune_dashboard_snapshot_for_llm
+from app.services.snapshot_pruner import (
+    DEFAULT_LLM_CONTEXT_MAX_UTF8_BYTES,
+    prune_dashboard_snapshot_for_llm,
+    truncate_snapshot_dict_to_max_utf8_bytes,
+)
 
 
 def _log_snapshot_selected(source: str, raw: str, **extra: Any) -> None:
@@ -59,7 +63,9 @@ def server_id_from_dashboard_url(url: str | None) -> str:
         return ""
 
 
-async def fetch_dashboard_json(url: str | None, timeout: float = 8.0) -> tuple[str | None, str | None]:
+async def fetch_dashboard_json(
+    url: str | None, timeout: float = 8.0, farm_id: int | None = None
+) -> tuple[str | None, str | None]:
     """
     Returns (json_string, error_message).
 
@@ -76,11 +82,13 @@ async def fetch_dashboard_json(url: str | None, timeout: float = 8.0) -> tuple[s
     push_wait_detail: str | None = None
     if snapshot_push_service.is_push_mode_enabled():
         sid = server_id_from_dashboard_url(url)
-        pushed, perr, chosen_push_sid = snapshot_push_service.get_snapshot_json(sid)
+        pushed, perr, chosen_push_sid = snapshot_push_service.get_snapshot_json(sid, farm_id=farm_id)
         if pushed is not None:
             extra: dict[str, Any] = {"server_id_query": sid or ""}
             if chosen_push_sid:
                 extra["chosen_push_server_id"] = chosen_push_sid
+            if farm_id is not None:
+                extra["farm_id_query"] = farm_id
             _log_snapshot_selected("push", pushed, **extra)
             return pushed, None
         push_wait_detail = perr
@@ -125,15 +133,18 @@ def build_dashboard_context_block(raw_json: str | None, err: str | None) -> str:
                     )
             if isinstance(data, dict):
                 pruned = prune_dashboard_snapshot_for_llm(data)
+                pruned = truncate_snapshot_dict_to_max_utf8_bytes(
+                    pruned, DEFAULT_LLM_CONTEXT_MAX_UTF8_BYTES
+                )
                 payload = json.dumps(pruned, ensure_ascii=False, default=str)
             elif isinstance(data, list):
                 pruned = prune_dashboard_snapshot_for_llm(data)
+                pruned = truncate_snapshot_dict_to_max_utf8_bytes(
+                    pruned, DEFAULT_LLM_CONTEXT_MAX_UTF8_BYTES
+                )
                 payload = json.dumps(pruned, ensure_ascii=False, default=str)
         except Exception:
             payload = raw_json
-        cap = 120000
-        if len(payload) > cap:
-            payload = payload[:cap] + "\n…(truncated)"
         return (
             waiting_note
             + "Current farm dashboard snapshot (JSON; pruned for token efficiency). Use it for factual answers; "

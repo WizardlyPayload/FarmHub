@@ -1,15 +1,18 @@
-"""Shared auth: Farm Dashboard integration key and/or admin Basic (used by integration routes and optional GET /)."""
+"""Shared auth: Farm Dashboard integration key and/or admin Basic (integration routes and protected HTML)."""
 from __future__ import annotations
 
 import os
 from urllib.parse import unquote
 
-from fastapi import Depends, Header, HTTPException, Query
+from fastapi import Depends, Header, HTTPException
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from app.config import get_settings
 
 _security = HTTPBasic(auto_error=False)
+
+
+integration_http_basic = _security
 
 
 def _parse_integration_key(header_val: str | None) -> str:
@@ -25,25 +28,27 @@ def _parse_integration_key(header_val: str | None) -> str:
         return header_val
 
 
-def _env_bool(name: str, default: bool = False) -> bool:
-    v = (os.getenv(name) or str(default)).lower().strip()
-    return v in ("1", "true", "yes", "on")
+def _integration_key_matches(got: str, x_raw: str | None) -> bool:
+    """True when header matches FARMDASH_INTEGRATION_KEY or legacy SERVER_TOKEN (same header)."""
+    fd = (os.getenv("FARMDASH_INTEGRATION_KEY") or "").strip()
+    st = (os.getenv("SERVER_TOKEN") or "").strip()
+    if fd and (got == fd or x_raw == fd):
+        return True
+    if st and (got == st or x_raw == st):
+        return True
+    return False
 
 
 async def require_integration_or_admin(
     x_farmdash_key: str | None = Header(default=None, alias="X-FarmDash-Key"),
-    farmdash_key_query: str | None = Query(default=None, alias="farmdash_key"),
     credentials: HTTPBasicCredentials | None = Depends(_security),
 ) -> str:
     """
-    Accept ``X-FarmDash-Key`` (preferred), optional query ``?farmdash_key=`` for GET bookmarks,
-    or admin HTTP Basic when ``ADMIN_PASSWORD`` is set.
+    Require ``X-FarmDash-Key`` matching ``FARMDASH_INTEGRATION_KEY`` or ``SERVER_TOKEN``, or admin HTTP Basic.
+    Query-string secrets are not accepted.
     """
-    expected_key = (os.getenv("FARMDASH_INTEGRATION_KEY") or "").strip()
     got = _parse_integration_key(x_farmdash_key).strip()
-    if not got and farmdash_key_query:
-        got = _parse_integration_key(farmdash_key_query).strip()
-    if expected_key and (got == expected_key or x_farmdash_key == expected_key):
+    if _integration_key_matches(got, x_farmdash_key):
         return "integration"
     s = get_settings()
     user, pw = s["admin_username"], s["admin_password"]
@@ -53,26 +58,20 @@ async def require_integration_or_admin(
         status_code=401,
         detail=(
             "Unauthorized — send header X-FarmDash-Key with the same value as FARMDASH_INTEGRATION_KEY "
-            "in backend/.env (Farm Dashboard: robot panel → Farm Dashboard link key), "
-            "optional ?farmdash_key= for GET requests, or use Admin Basic auth"
+            "(or SERVER_TOKEN) in backend/.env, or use Admin Basic auth"
         ),
         headers={"WWW-Authenticate": "Basic realm=integration"},
     )
 
 
-async def resolve_root_html_auth(
-    x_farmdash_key: str | None = Header(default=None, alias="X-FarmDash-Key"),
-    farmdash_key_query: str | None = Query(default=None, alias="farmdash_key"),
-    credentials: HTTPBasicCredentials | None = Depends(_security),
-) -> str:
-    """
-    When ``REQUIRE_AUTH_FOR_ROOT_HTML=1``, same rules as ``require_integration_or_admin``.
-    Otherwise no-op (returns ``open``) so LAN/dev ``GET /`` stays unchanged.
-    """
-    if not _env_bool("REQUIRE_AUTH_FOR_ROOT_HTML", False):
-        return "open"
-    return await require_integration_or_admin(
-        x_farmdash_key,
-        farmdash_key_query,
-        credentials,
-    )
+def integration_or_admin_authenticated(
+    x_farmdash_key: str | None,
+    credentials: HTTPBasicCredentials | None,
+) -> bool:
+    """True if the same credentials would pass :func:`require_integration_or_admin` (no query params)."""
+    got = _parse_integration_key(x_farmdash_key).strip()
+    if _integration_key_matches(got, x_farmdash_key):
+        return True
+    s = get_settings()
+    user, pw = s["admin_username"], s["admin_password"]
+    return bool(pw and credentials and credentials.username == user and credentials.password == pw)

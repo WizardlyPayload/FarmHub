@@ -75,17 +75,135 @@ function xmlFieldsBaseForMerge(xmlData) {
 }
 
 
-function mergeData(luaData, xmlData) {
+/**
+ * Build compact per-field snapshots from live Lua rows (for cache + anti-regression when Lua stops).
+ */
+function buildFieldLiveFingerprints(luaFields, receivedAt) {
+    const iso = receivedAt || new Date().toISOString();
+    const out = {};
+    for (const f of toArr(luaFields)) {
+        const id = Number(f.farmlandId || f.id);
+        if (!id || Number.isNaN(id)) continue;
+        out[id] = {
+            at: iso,
+            growthState: Number(f.growthState),
+            maxGrowthState: Number(f.maxGrowthState),
+            growthLabel: String(f.growthLabel || ''),
+            fruitType: String(f.fruitType || ''),
+            harvestReady: !!f.harvestReady,
+            isHarvested: !!f.isHarvested,
+            needsWork: !!f.needsWork,
+        };
+    }
+    return out;
+}
+
+function fieldAdvanceScore(f) {
+    if (!f) return -1;
+    if (f.harvestReady || f.isHarvested) return 10000 + Number(f.growthState || 0);
+    const gl = String(f.growthLabel || '').toLowerCase();
+    if (gl.includes('harvest')) return 9000 + Number(f.growthState || 0);
+    return Number(f.growthState || 0);
+}
+
+/**
+ * When there is no live Lua (empty server / paused), XML can lag behind the last live session.
+ * If cached live fingerprints show a more advanced state for the same crop, prefer those growth fields.
+ */
+function applyFieldLiveCacheAntiRegress(xmlFields, fieldLiveCache, lastLuaAt, lastXmlAt) {
+    const hasCache = fieldLiveCache && Object.keys(fieldLiveCache).length > 0;
+    const luaNewer =
+        lastLuaAt &&
+        lastXmlAt &&
+        !Number.isNaN(Date.parse(lastLuaAt)) &&
+        !Number.isNaN(Date.parse(lastXmlAt)) &&
+        Date.parse(lastLuaAt) > Date.parse(lastXmlAt);
+
+    return xmlFields.map((xmlField) => {
+        const base = normalizeFieldMulch(xmlField);
+        if (!hasCache) {
+            return { ...base, _fieldDataSource: 'savegame_xml' };
+        }
+        const id = Number(xmlField.farmlandId ?? xmlField.id);
+        const cache = fieldLiveCache[id];
+        if (!cache) {
+            return { ...base, _fieldDataSource: 'savegame_xml' };
+        }
+        const xmlCrop = String(xmlField.fruitType || '').toUpperCase();
+        const cacheCrop = String(cache.fruitType || '').toUpperCase();
+        if (xmlCrop && cacheCrop && xmlCrop !== 'UNKNOWN' && cacheCrop !== 'UNKNOWN' && xmlCrop !== cacheCrop) {
+            return { ...base, _fieldDataSource: 'savegame_xml', _fieldCropRotated: true };
+        }
+        const xc = fieldAdvanceScore(xmlField);
+        const lc = fieldAdvanceScore(cache);
+        if (lc > xc + 0.5 || (luaNewer && lc >= xc)) {
+            return {
+                ...base,
+                growthLabel: cache.growthLabel || xmlField.growthLabel,
+                growthState: Number.isFinite(Number(cache.growthState)) ? cache.growthState : xmlField.growthState,
+                maxGrowthState: Number.isFinite(Number(cache.maxGrowthState)) ? cache.maxGrowthState : xmlField.maxGrowthState,
+                fruitType: cache.fruitType || xmlField.fruitType,
+                harvestReady:
+                    typeof cache.harvestReady === 'boolean' ? cache.harvestReady : xmlField.harvestReady,
+                isHarvested: cache.isHarvested ?? xmlField.isHarvested,
+                needsWork: cache.needsWork ?? xmlField.needsWork,
+                _fieldDataSource: 'last_live_cache',
+                _fieldDataNote:
+                    'Showing last live field state; savegame XML looks older (empty/paused server). Resume play or reconnect to refresh.',
+            };
+        }
+        return { ...base, _fieldDataSource: 'savegame_xml' };
+    });
+}
+
+function attachDataTimestamps(obj, options) {
+    const lastLuaAt = options.lastLuaAt || null;
+    const lastXmlAt = options.lastXmlAt || null;
+    const mergeComputedAt = new Date().toISOString();
+    let liveNewerThanXml = null;
+    if (lastLuaAt && lastXmlAt) {
+        const a = Date.parse(lastLuaAt);
+        const b = Date.parse(lastXmlAt);
+        if (!Number.isNaN(a) && !Number.isNaN(b)) liveNewerThanXml = a > b;
+    }
+    return {
+        ...obj,
+        dataTimestamps: {
+            lastLuaReceivedAt: lastLuaAt,
+            lastXmlReceivedAt: lastXmlAt,
+            mergeComputedAt,
+            liveNewerThanXml,
+        },
+    };
+}
+
+function mergeData(luaData, xmlData, options = {}) {
+    const fieldLiveCache = options.fieldLiveCache || {};
+    const lastLuaAt = options.lastLuaAt || null;
+    const lastXmlAt = options.lastXmlAt || null;
+
     if (!luaData && !xmlData) return null;
-    if (!luaData) return buildFromXmlOnly(xmlData);
-    if (!xmlData)  return buildFromLuaOnly(luaData);
+    if (!luaData) {
+        const base = buildFromXmlOnly(xmlData);
+        const fields = applyFieldLiveCacheAntiRegress(
+            toArr((xmlData.allFields && xmlData.allFields.length > 0) ? xmlData.allFields : (xmlData.fields || [])),
+            fieldLiveCache,
+            lastLuaAt,
+            lastXmlAt
+        );
+        return attachDataTimestamps({ ...base, fields }, { lastLuaAt, lastXmlAt });
+    }
+    if (!xmlData) {
+        const base = buildFromLuaOnly(luaData);
+        return attachDataTimestamps(base, { lastLuaAt, lastXmlAt });
+    }
 
     let allowedFarmIds = farmIdsOwningFarmland(toArr(xmlData.farmlandsArray));
     if (allowedFarmIds.size === 0) {
         allowedFarmIds = farmIdsFromLuaFields(luaData.fields);
     }
 
-    return {
+    const mergedCore = {
         dataSource   : 'merged',
         xmlAvailable : true,
         luaAvailable : true,
@@ -125,11 +243,19 @@ function mergeData(luaData, xmlData) {
         // Lua provides variable-rate soil overlay (N/pH from live density maps when present)
         fields       : (() => {
                          const xmlBase = xmlFieldsBaseForMerge(xmlData);
+                         const luaArr = toArr(luaData.fields);
+                         if (luaArr.length === 0) {
+                             const xf =
+                                 xmlBase.length > 0
+                                     ? xmlBase
+                                     : fixFieldOwnership(luaArr, xmlData.farmlandOwnership);
+                             return applyFieldLiveCacheAntiRegress(xf, fieldLiveCache, lastLuaAt, lastXmlAt);
+                         }
                          return mergeFields(
                              xmlBase.length > 0
-                               ? xmlBase
-                               : fixFieldOwnership(toArr(luaData.fields), xmlData.farmlandOwnership),
-                             toArr(luaData.fields)
+                                 ? xmlBase
+                                 : fixFieldOwnership(luaArr, xmlData.farmlandOwnership),
+                             luaArr
                          );
                        })(),
 
@@ -149,6 +275,8 @@ function mergeData(luaData, xmlData) {
         xmlFarmlands : toArr(xmlData.farmlandsArray),
         xmlEconomy   : xmlData.economy        || {},
     };
+
+    return attachDataTimestamps(mergedCore, { lastLuaAt, lastXmlAt });
 }
 
 // ─── farms ────────────────────────────────────────────────────────────────────
@@ -296,18 +424,31 @@ function mergeFields(xmlFields, luaFields) {
             || null;
         if (!luaField) return normalizeFieldMulch(xmlField);
 
-        // Mapped N/pH only available from Lua density map reads
+        // PF: Lua has live N/pH maps. XML has savegame precisionFarming.xml (scan + stats). Stale data.json
+        // often has isPrecisionFarming false — do not wipe XML PF flags or pfStats.
+        const xmlPf =
+            !!xmlField.isScanned ||
+            !!xmlField.isPrecisionFarming ||
+            !!(xmlField.pfStats &&
+                typeof xmlField.pfStats === 'object' &&
+                (xmlField.pfStats.numSoilSamples > 0 || Object.keys(xmlField.pfStats).length > 0));
+        const luaPf = !!luaField.isPrecisionFarming;
+
         const pfOverlay = {
-            isPrecisionFarming : luaField.isPrecisionFarming || false,
-            nitrogenLevel      : luaField.nitrogenLevel      || 0,
-            targetNitrogen     : luaField.targetNitrogen     || 0,
-            phValue            : luaField.phValue            || 0,
-            targetPh           : luaField.targetPh           || 0,
-            phLimeBarMin       : luaField.phLimeBarMin       ?? 0,
-            phLimeBarMax       : luaField.phLimeBarMax       ?? 0,
-            isScanned          : luaField.isScanned          || false,
+            isPrecisionFarming : luaPf || xmlPf,
+            nitrogenLevel      : luaField.nitrogenLevel      ?? xmlField.nitrogenLevel      ?? 0,
+            targetNitrogen     : luaField.targetNitrogen     ?? xmlField.targetNitrogen     ?? 0,
+            phValue            : luaField.phValue            ?? xmlField.phValue            ?? 0,
+            targetPh           : luaField.targetPh           ?? xmlField.targetPh           ?? 0,
+            phLimeBarMin       : luaField.phLimeBarMin       ?? xmlField.phLimeBarMin       ?? 0,
+            phLimeBarMax       : luaField.phLimeBarMax       ?? xmlField.phLimeBarMax       ?? 0,
+            isScanned          : !!(luaField.isScanned || xmlField.isScanned),
             nitrogenText       : luaField.nitrogenText       || xmlField.nitrogenText || '',
             limeText           : luaField.limeText           || xmlField.limeText     || '',
+            pfStats:
+                luaField.pfStats != null && typeof luaField.pfStats === 'object'
+                    ? luaField.pfStats
+                    : xmlField.pfStats,
         };
 
         // Spatial data from Lua (g_fieldManager has actual map coords & hectares)
@@ -548,4 +689,4 @@ function buildFromXmlOnly(xml) {
     };
 }
 
-module.exports = { mergeData };
+module.exports = { mergeData, buildFieldLiveFingerprints };

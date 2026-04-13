@@ -193,6 +193,8 @@ class RealtimeConnector {
           }
           const rest = { ...data };
           delete rest.timestamp;
+          delete rest.dataTimestamps;
+          delete rest.fieldStatusHistory;
           const farmId = Number(self.dashboard?.activeFarmId ?? 1);
           const srv = String(
             self.dashboard?.activeServerId ??

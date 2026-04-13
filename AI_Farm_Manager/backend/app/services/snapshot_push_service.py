@@ -26,6 +26,21 @@ def _norm_sid(server_id: str | None) -> str:
     return (server_id or "").strip()
 
 
+def _active_farm_id_from_raw(raw: str) -> int | None:
+    """Parse ``activeFarmId`` from a dashboard JSON string (for disambiguating multi-push RAM)."""
+    try:
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            return None
+        v = data.get("activeFarmId")
+        if v is None:
+            return None
+        n = int(v)
+        return n if n >= 1 else None
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return None
+
+
 def store_push(
     server_id: str | None,
     snapshot: dict[str, Any],
@@ -59,7 +74,7 @@ def store_push(
     return True, None
 
 
-def get_snapshot_json(server_id: str | None) -> tuple[str | None, str | None, str]:
+def get_snapshot_json(server_id: str | None, farm_id: int | None = None) -> tuple[str | None, str | None, str]:
     """
     When push mode is on: return stored JSON for server_id, or resolve an ambiguous id.
 
@@ -67,6 +82,10 @@ def get_snapshot_json(server_id: str | None) -> tuple[str | None, str | None, st
 
     - Exactly one pushed server → use it.
     - Multiple pushed servers → use the **newest** by push time (monotonic), so PC merges still beat FTP.
+
+    When ``server_id`` is **non-empty** but not in RAM (stale ``DASHBOARD_SERVER_ID`` or request arrived before
+    that PC's push): if ``farm_id`` is set, prefer the in-RAM push whose JSON ``activeFarmId`` equals
+    ``farm_id`` (newest among ties) before falling back to global newest.
 
     Returns ``(json, error_hint, chosen_server_id)``. ``chosen_server_id`` is which RAM key was used, or "".
     """
@@ -87,14 +106,38 @@ def get_snapshot_json(server_id: str | None) -> tuple[str | None, str | None, st
         # Requested id from DASHBOARD_SERVER_ID / URL does not match any RAM key (stale env or another farm).
         # Still prefer real PC pushes over FTP whenever we have any snapshot.
         if sid != "" and len(_snapshots) > 0:
+            fid = int(farm_id) if farm_id is not None else None
+            if fid is not None and fid >= 1:
+                matched: list[tuple[str, str, float]] = []
+                for k, (raw, ts) in _snapshots.items():
+                    if _active_farm_id_from_raw(raw) == fid:
+                        matched.append((k, raw, ts))
+                if matched:
+                    best_sid, raw, _ts = max(matched, key=lambda x: x[2])
+                    log_pipeline(
+                        "push_resolve",
+                        "serverId not in RAM; using push whose activeFarmId matches farmId query",
+                        requested_server_id=sid,
+                        chosen_server_id=best_sid,
+                        farm_id_query=fid,
+                        candidates=len(_snapshots),
+                    )
+                    return raw, None, best_sid
+                log_pipeline(
+                    "push_resolve",
+                    "serverId not in RAM; no push matched farmId — using newest PC push (fix DASHBOARD_SERVER_ID)",
+                    requested_server_id=sid,
+                    farm_id_query=fid,
+                    candidates=len(_snapshots),
+                )
+            else:
+                log_pipeline(
+                    "push_resolve",
+                    "serverId from env/URL not in push RAM; using newest PC push (fix DASHBOARD_SERVER_ID to match this farm)",
+                    requested_server_id=sid,
+                    candidates=len(_snapshots),
+                )
             best_sid, raw = _newest_push()
-            log_pipeline(
-                "push_resolve",
-                "serverId from env/URL not in push RAM; using newest PC push (fix DASHBOARD_SERVER_ID to match this farm)",
-                requested_server_id=sid,
-                chosen_server_id=best_sid,
-                candidates=len(_snapshots),
-            )
             return raw, None, best_sid
         if sid != "":
             return None, err, ""

@@ -5,6 +5,9 @@
  * Handles all data fetching and Multi-Server state management
  */
 
+/** Must match ``_schemaVersion`` written with ``serverLiveCache/*.json`` (see serverDataCache.js). */
+export const SERVER_LIVE_CACHE_SCHEMA_VERSION = '1.0';
+
 import { filterFieldsForFarmView } from './fields.js';
 import { isFarmDashLocalConfigHost } from './viewer-mode.js';
 

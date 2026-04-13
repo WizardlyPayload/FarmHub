@@ -728,7 +728,10 @@ function saveAndLaunch() {
   var api = (window.location && window.location.origin ? window.location.origin : '') + '/api/setup-config';
   fetch(api, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Setup-Token': (typeof window.__FARMDASH_SETUP_TOKEN === 'string' ? window.__FARMDASH_SETUP_TOKEN : '')
+    },
     body: JSON.stringify(payload)
   })
     .then(function (r) {

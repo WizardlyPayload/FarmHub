@@ -209,6 +209,9 @@ function mergeData(luaData, xmlData, options = {}) {
         luaAvailable : true,
         lastUpdated  : new Date().toISOString(),
 
+        /** From live Lua (save slot name e.g. savegame3) — used for FTP polling + cache restore */
+        serverInfo   : luaData.serverInfo || {},
+
         // Identity
         mapTitle     : xmlData.career?.mapTitle     || luaData.serverInfo?.mapName || 'Unknown Map',
         savegameName : xmlData.career?.savegameName || '',
@@ -637,6 +640,7 @@ function buildFromLuaOnly(lua) {
     return {
         dataSource: 'lua_only', xmlAvailable: false, luaAvailable: true,
         lastUpdated: new Date().toISOString(),
+        serverInfo: lua.serverInfo || {},
         mapTitle: lua.serverInfo?.mapName || 'Unknown Map',
         savegameName: '', settings: {}, mods: [],
         gameTime: lua.gameTime || {},
@@ -660,6 +664,7 @@ function buildFromXmlOnly(xml) {
     return {
         dataSource: 'xml_only', xmlAvailable: true, luaAvailable: false,
         lastUpdated: new Date().toISOString(),
+        serverInfo: {},
         mapTitle: xml.career?.mapTitle || 'Unknown Map',
         savegameName: xml.career?.savegameName || '',
         saveDate: xml.career?.saveDate || '',

@@ -437,18 +437,46 @@ function isSoilTilledField(field) {
     return false;
 }
 
+/** Grass: map shows 4 growth steps; higher engine stages = after cut / regrowth. */
+function grassStageCapForBar(field) {
+    let max = Math.max(1, Number(field.maxGrowthState) || 4);
+    if ((field.fruitType || "").toUpperCase() === "GRASS" && max > 4) max = 4;
+    return max;
+}
+
+/**
+ * Mown / second-growth bars — always show engine stage vs map cap (not only “mown · regrowing”).
+ * Spinach uses the same when the save reports regrowth-style labels.
+ */
+function tryRegrowthProgressBar(field) {
+    const ftU = (field.fruitType || "").toUpperCase();
+    const gl = String(field.growthLabel || "").toLowerCase();
+    const rawGs = Number(field.growthState) || 0;
+    const pct = Math.min(100, Math.max(0, field.growthStatePercentage || 0));
+    const bg = greenGradientForPercent(pct);
+    const fg = contrastForBg(bg);
+
+    if (ftU === "GRASS") {
+        const cap = grassStageCapForBar(field);
+        if (gl === "mown_regrowth" || rawGs > cap) {
+            return barHTML(pct, bg, `Mown · regrowing · stage ${rawGs}/${cap}`, fg);
+        }
+    }
+    if (ftU === "SPINACH" && (gl === "mown_regrowth" || gl.includes("regrow") || gl.includes("mown"))) {
+        const cap = Math.max(1, Number(field.maxGrowthState) || 1);
+        return barHTML(pct, bg, `Spinach · regrowing · stage ${rawGs}/${cap}`, fg);
+    }
+    return null;
+}
+
 // ── Progress bar ──────────────────────────────────────────────────────────────
 function buildProgressBar(field) {
     if (fieldShowsWithered(field)) {
         return barHTML(100, "#8b0000", "Withered", "#fff");
     }
 
-    if (String(field.growthLabel || "") === "mown_regrowth") {
-        const pct = Math.min(100, Math.max(0, field.growthStatePercentage || 0));
-        const bg = greenGradientForPercent(pct);
-        const fg = contrastForBg(bg);
-        return barHTML(pct, bg, "Mown · regrowing", fg);
-    }
+    const regrowthBar = tryRegrowthProgressBar(field);
+    if (regrowthBar) return regrowthBar;
 
     if (isGrowingBarField(field)) {
         const pct = Math.min(100, Math.max(0, field.growthStatePercentage || 0));
@@ -456,17 +484,15 @@ function buildProgressBar(field) {
         const ftU = (field.fruitType || "").toUpperCase();
         if (ftU === "GRASS" && max > 4) max = 4;
         const rawGs = Number(field.growthState) || 0;
-        // FS25 grass: engine indices above the 4 map stages = mown / regrowth — do not clamp to max or it shows "4/4".
-        if (ftU === "GRASS" && rawGs > max) {
-            const bg = greenGradientForPercent(Math.min(100, pct));
-            const fg = contrastForBg(bg);
-            return barHTML(pct, bg, "Mown · regrowing", fg);
-        }
         let cur = rawGs;
         if (cur > max) cur = max;
         const bg = greenGradientForPercent(pct);
         const fg = contrastForBg(bg);
-        return barHTML(pct, bg, `Growing · Stage ${cur}/${max}`, fg);
+        const label =
+            ftU === "SPINACH"
+                ? `Spinach · growing · stage ${cur}/${max}`
+                : `Growing · Stage ${cur}/${max}`;
+        return barHTML(pct, bg, label, fg);
     }
 
     if (effectiveHarvestReady(field)) {
@@ -495,13 +521,20 @@ function buildProgressBar(field) {
     if (ftU === "GRASS" && max > 4) max = 4;
     const rawGs = Number(field.growthState) || 0;
     if (ftU === "GRASS" && rawGs > max) {
+        const cap = grassStageCapForBar(field);
         const bg = greenGradientForPercent(Math.min(100, pct));
-        return barHTML(pct, bg, "Mown · regrowing", contrastForBg(bg));
+        return barHTML(
+            pct,
+            bg,
+            `Mown · regrowing · stage ${rawGs}/${cap}`,
+            contrastForBg(bg)
+        );
     }
     let cur = rawGs;
     if (cur > max) cur = max;
     const bg = greenGradientForPercent(pct);
-    return barHTML(pct, bg, `Stage ${cur}/${max}`, contrastForBg(bg));
+    const tail = ftU === "SPINACH" ? `Spinach · stage ${cur}/${max}` : `Stage ${cur}/${max}`;
+    return barHTML(pct, bg, tail, contrastForBg(bg));
 }
 
 function barHTML(pct, bg, label, textColour = "white") {
@@ -540,12 +573,23 @@ function buildConditions(field) {
             else if (ratio < 0.90) nColour = "#ffc107";
             else if (ratio <= 1.10) nColour = "#198754";
             else                    nColour = "#0dcaf0";
+            const nl = Number(field.nitrogenLevel ?? 0);
+            const tn = Number(field.targetNitrogen ?? 0);
+            if (tn > 0) {
+                const gap = Math.max(0, tn - nl);
+                nLabel =
+                    gap > 1
+                        ? `N ${Math.round(nl)}/${Math.round(tn)} kg/ha · need ~${Math.round(gap)} more`
+                        : `N ${Math.round(nl)}/${Math.round(tn)} kg/ha`;
+            }
         }
     } else {
-        nProgress = (field.fertilizationLevel / 2) * 100;
-        nColour   = field.fertilizationLevel === 0 ? "#dc3545"
-                  : field.fertilizationLevel === 1 ? "#ffc107"
+        const fl = Number(field.fertilizationLevel ?? 0);
+        nProgress = (fl / 2) * 100;
+        nColour   = fl === 0 ? "#dc3545"
+                  : fl === 1 ? "#ffc107"
                   : "#198754";
+        nLabel = `Fertilization ${fl}/2 (full = 2)`;
     }
 
     // ── pH / Lime ─────────────────────────────────────────────────────────────
@@ -587,10 +631,18 @@ function buildConditions(field) {
             else if (ratio < 0.98) phColour = "#ffc107";
             else if (ratio <= 1.05) phColour = "#198754";
             else                    phColour = "#0dcaf0";
+            if (Number.isFinite(tgt) && tgt > 0) {
+                const gap = tgt - pvOk;
+                phLabel =
+                    gap > 0.05
+                        ? `pH ${pvOk.toFixed(1)} → target ~${tgt.toFixed(1)} · need ~${gap.toFixed(1)} ↑`
+                        : `pH ${pvOk.toFixed(1)} ≈ target ~${tgt.toFixed(1)}`;
+            }
         }
     } else {
         phProgress = field.needsLime ? 0 : 100;
         phColour   = field.needsLime ? "#dc3545" : "#198754";
+        phLabel = field.needsLime ? "Lime needed (soil)" : "Lime OK";
     }
 
     return `

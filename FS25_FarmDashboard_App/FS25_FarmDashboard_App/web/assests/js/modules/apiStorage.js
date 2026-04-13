@@ -11,6 +11,30 @@ export const SERVER_LIVE_CACHE_SCHEMA_VERSION = '1.0';
 import { filterFieldsForFarmView } from './fields.js';
 import { isFarmDashLocalConfigHost } from './viewer-mode.js';
 
+/** When the farm picker / saved id does not own any fields (multi-farm dedicated), pick the farm with the most field rows. */
+function inferFarmIdFromFieldOwnership(fields, farms) {
+  if (!Array.isArray(fields) || fields.length === 0) return null;
+  const counts = new Map();
+  for (const f of fields) {
+    if (!f || typeof f !== 'object') continue;
+    const oid = Number(f.ownerFarmId ?? f.farmId ?? 0);
+    if (!oid || Number.isNaN(oid)) continue;
+    counts.set(oid, (counts.get(oid) || 0) + 1);
+  }
+  let best = null;
+  let bestN = -1;
+  for (const [id, n] of counts) {
+    if (n > bestN) {
+      bestN = n;
+      best = id;
+    }
+  }
+  if (best != null) return best;
+  const arr = ensureArray(farms);
+  const pl = arr.find((x) => x && Number(x.id) > 0);
+  return pl ? Number(pl.id) : null;
+}
+
 /** `/api/servers` may return numeric ids; localStorage always uses strings — strict `===` breaks lookups. */
 function sameServerId(a, b) {
   if (a == null || b == null) return false;
@@ -347,6 +371,19 @@ export async function tryLoadApiData() {
 
       this.allFields = data.fields || [];
       this.fields = filterFieldsForFarmView(this.allFields, this.activeFarmId ?? 1);
+      if (this.fields.length === 0 && this.allFields.length > 0) {
+        const inferred = inferFarmIdFromFieldOwnership(this.allFields, this.farms);
+        if (inferred != null && inferred !== Number(this.activeFarmId)) {
+          this.activeFarmId = inferred;
+          try {
+            localStorage.setItem(farmKey, String(inferred));
+          } catch (_) {
+            /* ignore */
+          }
+          this.fields = filterFieldsForFarmView(this.allFields, this.activeFarmId);
+          if (typeof this.renderFarmDropdown === 'function') this.renderFarmDropdown();
+        }
+      }
 
       const husbandryBuildings = ensureHusbandryArray(data.animals);
       if (husbandryBuildings.length > 0) {

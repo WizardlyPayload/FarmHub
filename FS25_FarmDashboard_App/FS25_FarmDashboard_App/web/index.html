@@ -800,6 +800,28 @@
                   </div>
 
                   <div class="tab-pane fade" id="app-settings-pane-servers" role="tabpanel" aria-labelledby="app-settings-tab-servers" tabindex="0">
+                    <h6 class="text-farm-accent">Remote / LAN access</h6>
+                    <p class="small text-muted mb-2">Allow tablets and other PCs on your network to open this dashboard at <code class="text-light">http://&lt;this-PC-LAN-IP&gt;:8766</code>. Local use from this app always stays on <strong>127.0.0.1</strong> and does not require a password. Changing these options restarts the built-in web server.</p>
+                    <div class="form-check mb-3">
+                      <input class="form-check-input" type="checkbox" id="settings-lan-enabled"/>
+                      <label class="form-check-label" for="settings-lan-enabled">Enable LAN access (listen on all interfaces)</label>
+                    </div>
+                    <div class="row g-2 mb-3">
+                      <div class="col-md-6">
+                        <label class="form-label small" for="settings-lan-username">LAN username</label>
+                        <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="settings-lan-username" autocomplete="username" value="admin"/>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label small" for="settings-lan-password">LAN password</label>
+                        <input type="password" class="form-control form-control-sm bg-secondary text-light border-secondary" id="settings-lan-password" autocomplete="new-password" placeholder="Required for remote browsers"/>
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label small" for="settings-lan-allowed-ips">Allowed IP addresses (optional, comma-separated)</label>
+                        <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="settings-lan-allowed-ips" placeholder="e.g. 192.168.1.50, 192.168.1.51" autocomplete="off"/>
+                        <div class="form-text text-muted small">Leave empty to allow any LAN IP (still requires username and password). If set, only listed IPs may connect remotely.</div>
+                      </div>
+                    </div>
+                    <hr class="border-secondary my-3"/>
                     <h6 class="text-farm-accent" data-i18n="setup.serverManager">Server Manager</h6>
                     <p class="small text-muted" data-i18n="settings.serverManagerIntro">Same options as first-run setup. Use <strong>Save</strong> to apply.</p>
                     <div class="d-flex flex-wrap gap-2 mb-3">

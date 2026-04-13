@@ -672,6 +672,24 @@ export function getLocalFieldSuggestion(field) {
     }
 
     if (field.needsLime) {
+      // Permanent grass (incl. mown regrowth): never use arable “pre-drill” wording — grass isn’t drilled like a cereal.
+      if (isGrassCrop(field)) {
+        const ph = Number(field.phValue ?? 0);
+        const pht = Number(field.targetPh ?? 0);
+        if (field.isPrecisionFarming && field.isScanned && pht > 0) {
+          return {
+            action: "Lime pasture only if the pH map shows a real gap",
+            reason: `Mapped pH ~${ph.toFixed(1)} vs target ~${pht.toFixed(1)} — grass tolerates a wider band than arable; lime after cuts only when the scan says pH is short, not as a drill-window task.`,
+            source: "rules",
+          };
+        }
+        return {
+          action: "Check pasture pH before liming mown grass",
+          reason:
+            "Low lime flags on permanent grass often follow mowing — correct pH gradually; avoid treating pasture like pre-drill arable land.",
+          source: "rules",
+        };
+      }
       const ph = Number(field.phValue ?? 0);
       const pht = Number(field.targetPh ?? 0);
       const label = displayCropLabel(field);
@@ -708,15 +726,22 @@ export function getLocalFieldSuggestion(field) {
       if (field.isPrecisionFarming && field.isScanned && field.targetNitrogen > 0) {
         const n = Number(field.nitrogenLevel ?? 0);
         const t = Number(field.targetNitrogen ?? 0);
+        const gap = Math.max(0, t - n);
+        const pct =
+          t > 0 ? Math.round(Math.min(100, Math.max(0, (n / t) * 100))) : 0;
         return {
-          action: "Top up nitrogen for this growth stage",
-          reason: `About ${Math.round(n)} / ${Math.round(t)} kg N/ha — ${label} is under-fed for where it is in growth.`,
+          action:
+            gap > 1
+              ? `Add ~${Math.round(gap)} kg N/ha to reach target`
+              : "Top up nitrogen for this growth stage",
+          reason: `Mapped N ${Math.round(n)} / ${Math.round(t)} kg N/ha (${pct}% of target) — ${label} needs more N for this stage.`,
           source: "rules",
         };
       }
+      const fl = Number(field.fertilizationLevel ?? 0);
       return {
-        action: "Fertilize — N or spray level is low",
-        reason: `${label} needs more nutrient for this stage — mineral or organic, then roll in if needed.`,
+        action: `Fertilize — spray / nutrient step ${fl}/2 (below full for this stage)`,
+        reason: `${label} needs a higher fertilization level for this growth stage — solid, liquid, or organic per your rotation.`,
         source: "rules",
       };
     }

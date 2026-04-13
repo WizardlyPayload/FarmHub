@@ -24,10 +24,18 @@ function loadServerCache(userData, serverId) {
         if (!fs.existsSync(p)) return null;
         const raw = fs.readFileSync(p, 'utf8');
         const data = JSON.parse(raw);
-        if (!data || typeof data !== 'object' || data._schemaVersion !== CACHE_SCHEMA_VERSION) {
+        if (!data || typeof data !== 'object') {
             return null;
         }
-        return data;
+        // Current format
+        if (data._schemaVersion === CACHE_SCHEMA_VERSION) {
+            return data;
+        }
+        // Pre-1.0 files: no _schemaVersion but same payload shape — hydrate then rewrite on next save
+        if (data.mergedSnapshot != null && typeof data.mergedSnapshot === 'object') {
+            return data;
+        }
+        return null;
     } catch (e) {
         console.warn('[serverDataCache] load failed', serverId, e.message);
         return null;

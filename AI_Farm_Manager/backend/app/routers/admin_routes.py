@@ -93,6 +93,7 @@ async def admin_page(request: Request, _: str = Depends(require_admin)) -> HTMLR
         "llm_configured": bool(s.get("llm_configured")),
         "openai_base_configured": bool(s.get("openai_base_configured")),
         "public_base_url": (s.get("public_base_url") or "").strip(),
+        "farmdash_invite_base_url": (s.get("farmdash_invite_base_url") or "").strip(),
         "farmdash_integration_key_masked": _mask_secret(os.getenv("FARMDASH_INTEGRATION_KEY")),
         "encryption_key_configured": bool(s.get("encryption_key_configured")),
         "overview": overview,
@@ -188,6 +189,7 @@ async def admin_save_settings(
     trigger_prefix: str | None = Form(None),
     dashboard_json_url: str | None = Form(None),
     dashboard_server_id: str | None = Form(None),
+    dashboard_push_mode: str | None = Form(None),
     llm_api_key: str | None = Form(None),
     llm_model: str | None = Form(None),
     llm_provider: str | None = Form(None),
@@ -196,6 +198,7 @@ async def admin_save_settings(
     gemini_model: str | None = Form(None),
     gemini_api_endpoint: str | None = Form(None),
     system_prompt: str | None = Form(None),
+    farmdash_invite_base_url: str | None = Form(None),
     redirect_tab: str | None = Form(None),
 ) -> RedirectResponse:
     updates: dict[str, str] = {}
@@ -207,6 +210,13 @@ async def admin_save_settings(
         updates["DASHBOARD_JSON_URL"] = dashboard_json_url.strip()
     if dashboard_server_id is not None:
         updates["DASHBOARD_SERVER_ID"] = dashboard_server_id.strip()
+    # Farm tab only — enables POST /api/integration/push-snapshot (PC → server). Written to .env + reloads os.environ.
+    if dashboard_push_mode is not None:
+        v = (dashboard_push_mode or "").strip().lower()
+        updates["DASHBOARD_PUSH_MODE"] = "1" if v in ("1", "true", "on", "yes") else "0"
+    # Client connections tab — URL players paste in Farm Dashboard (http://host:port, no path).
+    if farmdash_invite_base_url is not None:
+        updates["FARMDASH_INVITE_BASE_URL"] = farmdash_invite_base_url.strip().rstrip("/")
     if llm_api_key is not None and llm_api_key.strip():
         updates["LLM_API_KEY"] = llm_api_key.strip()
     if llm_model is not None and llm_model.strip():

@@ -121,13 +121,45 @@ function loadBrandingFromDisk() {
     return _brandingCache;
 }
 
+/** Strip BOM / zero-width chars from pasted link keys (common cause of 401). */
+function sanitizeFarmdashIntegrationKey(raw) {
+    return String(raw || '')
+        .replace(/^\uFEFF/, '')
+        .replace(/[\u200b\u200c\u200d\u2060]/g, '')
+        .trim();
+}
+
+/**
+ * Hosted AI Farm Manager exposes routes at `{origin}/api/...`. If the user pastes e.g.
+ * `http://192.168.1.10:8081/health` or `.../admin`, fetches would hit `/health/api/integration/overview`
+ * and return 404. Normalize to scheme + host + port only.
+ */
+function normalizeAiFarmManagerHostedBaseUrl(raw) {
+    const s = String(raw || '').trim();
+    if (!s) return '';
+    try {
+        const withScheme = /^https?:\/\//i.test(s) ? s : `http://${s}`;
+        const u = new URL(withScheme);
+        if (u.pathname && u.pathname !== '/') {
+            console.info(
+                '[AI hosted] Base URL had a path (%s); using API root %s instead.',
+                s,
+                u.origin
+            );
+        }
+        return u.origin;
+    } catch {
+        return s.replace(/\/$/, '');
+    }
+}
+
 function mergeBrandingIntoAiManagerConnection() {
     const b = loadBrandingFromDisk();
     const cur = store.get('aiManagerConnection') || {};
     const next = { ...cur };
     let changed = false;
     const defUrl = String(b.defaultAiBackendUrl || '').trim().replace(/\/$/, '');
-    const embKey = String(b.embeddedFarmdashIntegrationKey || '').trim();
+    const embKey = sanitizeFarmdashIntegrationKey(b.embeddedFarmdashIntegrationKey || '');
     if (defUrl && !next.baseUrl) {
         next.baseUrl = defUrl;
         changed = true;
@@ -142,8 +174,8 @@ function mergeBrandingIntoAiManagerConnection() {
     }
     if (changed) {
         store.set('aiManagerConnection', {
-            baseUrl: next.baseUrl || '',
-            integrationKey: next.integrationKey || '',
+            baseUrl: normalizeAiFarmManagerHostedBaseUrl(next.baseUrl || ''),
+            integrationKey: sanitizeFarmdashIntegrationKey(next.integrationKey || ''),
             pushSnapshots: !!next.pushSnapshots,
         });
     }
@@ -802,11 +834,11 @@ expressApp.get('/api/lan-ws-token', (req, res) => {
 function getAiManagerConnectionForProxy() {
     const b = loadBrandingFromDisk();
     const c = store.get('aiManagerConnection') || {};
-    const embKey = String(b.embeddedFarmdashIntegrationKey || '').trim();
+    const embKey = sanitizeFarmdashIntegrationKey(b.embeddedFarmdashIntegrationKey || '');
     const defUrl = String(b.defaultAiBackendUrl || '').trim().replace(/\/$/, '');
     return {
-        baseUrl: (c.baseUrl || defUrl || '').replace(/\/$/, ''),
-        integrationKey: (c.integrationKey || embKey || '').trim(),
+        baseUrl: normalizeAiFarmManagerHostedBaseUrl(c.baseUrl || defUrl || ''),
+        integrationKey: sanitizeFarmdashIntegrationKey(c.integrationKey || embKey || ''),
     };
 }
 
@@ -937,20 +969,25 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
         const byokPairs = getConsultantByokCredentialPairs();
 
         /**
-         * BYOK: generate Smart suggestions on this PC via OpenAI/Gemini only — do not call a hosted AI server.
-         * Pruned per-view snapshots + content-hash cache avoid redundant LLM calls; credentials round-robin.
+         * BYOK: generate Smart suggestions on this PC via OpenAI/Gemini/Ollama — does not call a hosted server.
+         * If there is no local merged farm JSON yet but Hosted AI (URL + link key) is configured, we **fall through**
+         * so Smart suggestions can still use the VPS (snapshot from push / FTP). Otherwise BYOK would block hosted forever.
          */
         if (byokPairs.length > 0 && fromLocalDashboard) {
             const snap = buildConsultantSnapshotForInsightsRequest(req);
             if (!snap) {
-                return res.status(503).json({
-                    detail:
-                        'No farm snapshot yet. Start FS25 with the mod connected, or wait until the dashboard loads save data — then try Smart suggestions again.',
-                    insights: [],
-                    llm_used: false,
-                    farmdash_ai_error: 'no_snapshot',
-                });
-            }
+                const canHostedFallback = !!(conn.baseUrl && conn.integrationKey);
+                if (!canHostedFallback) {
+                    return res.status(503).json({
+                        detail:
+                            'No farm snapshot yet. Start FS25 with the mod connected, or wait until the dashboard loads save data — then try Smart suggestions again. Or add your AI Farm Manager URL + link key under Settings → Hosted AI so suggestions can use data already on the server.',
+                        insights: [],
+                        llm_used: false,
+                        farmdash_ai_error: 'no_snapshot',
+                    });
+                }
+                /* fall through to hosted proxy */
+            } else {
             const view = String((req.query && req.query.view) || 'home');
             const context = String((req.query && req.query.context) || '');
             const sid = resolveServerIdForRequest(req);
@@ -1022,6 +1059,7 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
                     farmdash_ai_error: 'byok_llm_failed',
                 });
             }
+            }
         }
 
         if (byokPairs.length > 0 && !fromLocalDashboard) {
@@ -1079,7 +1117,7 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
         }
         const hdrs = {
             Accept: 'application/json',
-            'X-FarmDash-Key': encodeURIComponent(conn.integrationKey),
+            'X-FarmDash-Key': conn.integrationKey,
             ...getConsultantByokHeadersForProxy(),
         };
         const fr = await fetch(target.toString(), { method: 'GET', headers: hdrs, cache: 'no-store' });
@@ -1320,8 +1358,8 @@ function buildDataPayloadForAiPush(serverId) {
 async function maybePushSnapshotToAiManager(serverId) {
     const conn = store.get('aiManagerConnection') || {};
     if (!conn.pushSnapshots) return;
-    const base = String(conn.baseUrl || '').trim().replace(/\/$/, '');
-    const key = String(conn.integrationKey || '').trim();
+    const base = normalizeAiFarmManagerHostedBaseUrl(String(conn.baseUrl || '').trim());
+    const key = sanitizeFarmdashIntegrationKey(conn.integrationKey || '');
     if (!base || !key) return;
     const now = Date.now();
     if ((lastAiSnapshotPushAt[serverId] || 0) + AI_SNAPSHOT_PUSH_MIN_MS > now) return;
@@ -1335,7 +1373,7 @@ async function maybePushSnapshotToAiManager(serverId) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-FarmDash-Key': encodeURIComponent(key),
+                'X-FarmDash-Key': key,
             },
             body,
         });
@@ -1348,6 +1386,12 @@ async function maybePushSnapshotToAiManager(serverId) {
         } else {
             const t = await r.text();
             console.warn('[Pipeline] push_out: POST push-snapshot failed', r.status, t.slice(0, 300));
+            if (r.status === 401) {
+                console.warn(
+                    '[Pipeline] 401: Link key rejected by AI server — it must exactly match FARMDASH_INTEGRATION_KEY, ' +
+                        'SERVER_TOKEN, or a key from Admin → Client connections. Re-paste in Settings → Hosted AI → Save.'
+                );
+            }
         }
     } catch (e) {
         logAiBackendUnreachableOnce('POST push-snapshot', e, base);
@@ -1898,6 +1942,21 @@ async function stopAllWatchers() {
     serverStates = {};
 }
 
+/** True if the main window is already showing this app’s dashboard origin (avoid full reload on Settings → Save). */
+function shouldLoadDashboardUrl() {
+    if (!mainWindow || mainWindow.isDestroyed()) return true;
+    try {
+        const u = mainWindow.webContents.getURL();
+        if (!u) return true;
+        const portSeg = `:${PORT}`;
+        const isLocalDashboard =
+            (u.startsWith('http://127.0.0.1') || u.startsWith('http://localhost')) && u.includes(portSeg);
+        return !isLocalDashboard;
+    } catch (_) {
+        return true;
+    }
+}
+
 async function bootServer(config) {
     await stopAllWatchers();
 
@@ -1920,18 +1979,35 @@ async function bootServer(config) {
             fieldLiveCache: {},
             fieldHistory: {},
         };
-        hydrateServerCacheFromDisk(srv.id);
-        if (srv.mode === 'local') startLocalWatching(srv);
     });
 
-    startFtpPollingCoordinator(config, ftpServers);
+    // Bring up HTTP + dashboard UI before disk cache hydration and watchers. Hydration can parse large
+    // JSON synchronously (30s+ on slow disks) and previously blocked listenFarmdashHttp → loadURL entirely.
+    const runDeferredBootWork = () => {
+        try {
+            servers.forEach((srv) => {
+                hydrateServerCacheFromDisk(srv.id);
+                if (srv.mode === 'local') startLocalWatching(srv);
+            });
+            startFtpPollingCoordinator(config, ftpServers);
+        } catch (e) {
+            console.error('[bootServer] deferred work failed:', e);
+        }
+    };
+
+    const loadDashboardThenDeferHeavyWork = () => {
+        // Reloading http://127.0.0.1:8766 on every save-settings tears down the renderer (Settings modal open)
+        // and often shows a blank/blue window until load completes — skip when already on this URL.
+        if (shouldLoadDashboardUrl() && mainWindow) {
+            mainWindow.loadURL(`http://127.0.0.1:${PORT}`);
+        }
+        setImmediate(runDeferredBootWork);
+    };
 
     if (!server || !server.listening) {
-        listenFarmdashHttp(getLanBindAddress(), () => {
-            if (mainWindow) mainWindow.loadURL(`http://127.0.0.1:${PORT}`);
-        });
-    } else if (mainWindow) {
-        mainWindow.loadURL(`http://127.0.0.1:${PORT}`);
+        listenFarmdashHttp(getLanBindAddress(), loadDashboardThenDeferHeavyWork);
+    } else {
+        loadDashboardThenDeferHeavyWork();
     }
 }
 
@@ -2128,24 +2204,24 @@ ipcMain.handle('get-ai-manager-connection', () => {
         push = true;
     }
     return {
-        baseUrl: (c.baseUrl || defUrl || '').replace(/\/$/, ''),
-        integrationKey: (c.integrationKey || embKey || '').trim(),
+        baseUrl: normalizeAiFarmManagerHostedBaseUrl(c.baseUrl || defUrl || ''),
+        integrationKey: sanitizeFarmdashIntegrationKey(c.integrationKey || embKey || ''),
         pushSnapshots: !!push,
     };
 });
 
 ipcMain.handle('save-ai-manager-connection', (_e, payload) => {
     const b = loadBrandingFromDisk();
-    const embKey = String(b.embeddedFarmdashIntegrationKey || '').trim();
+    const embKey = sanitizeFarmdashIntegrationKey(b.embeddedFarmdashIntegrationKey || '');
     const defUrl = String(b.defaultAiBackendUrl || '').trim().replace(/\/$/, '');
-    let baseUrl = String(payload?.baseUrl || '').trim().replace(/\/$/, '');
-    let integrationKey = String(payload?.integrationKey || '').trim();
+    let baseUrl = normalizeAiFarmManagerHostedBaseUrl(String(payload?.baseUrl || '').trim());
+    let integrationKey = sanitizeFarmdashIntegrationKey(payload?.integrationKey || '');
     if (!integrationKey && embKey) {
         integrationKey = embKey;
     }
     /** Branded default URL/key stay effective if the user saves with hidden/empty fields (BYOK-only save). */
     if (!baseUrl && defUrl) {
-        baseUrl = defUrl;
+        baseUrl = normalizeAiFarmManagerHostedBaseUrl(defUrl);
     }
     const pushSnapshots = !!payload?.pushSnapshots;
     store.set('aiManagerConnection', { baseUrl, integrationKey, pushSnapshots });
@@ -2159,7 +2235,7 @@ ipcMain.handle('save-ai-manager-connection', (_e, payload) => {
 });
 
 ipcMain.handle('ai-farm-install-config-xml', async (_e, { baseUrl, integrationKey, instanceId }) => {
-    const base = String(baseUrl || '').replace(/\/$/, '');
+    const base = normalizeAiFarmManagerHostedBaseUrl(String(baseUrl || '').trim());
     const url = `${base}/api/integration/config-xml`;
     console.info('[Pipeline] main_out: POST /api/integration/config-xml -> AI server', {
         base,
@@ -2169,8 +2245,7 @@ ipcMain.handle('ai-farm-install-config-xml', async (_e, { baseUrl, integrationKe
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            // ASCII-only header value (encodeURIComponent) — Node fetch rejects non–ISO-8859-1 like the browser
-            'X-FarmDash-Key': encodeURIComponent(String(integrationKey || '')),
+            'X-FarmDash-Key': sanitizeFarmdashIntegrationKey(String(integrationKey || '')),
         },
         body: JSON.stringify({ instance_id: String(instanceId || '') }),
     });

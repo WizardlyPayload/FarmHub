@@ -12,6 +12,7 @@
 
 services:
   web:
+<<<<<<< HEAD
     build:
       context: .
       dockerfile: Dockerfile
@@ -64,6 +65,13 @@ services:
     # volumes:
     #   - /mnt/YOUR_POOL/appdata/farmhub/data:/app/data
     #   - /mnt/YOUR_POOL/appdata/farmhub/.env:/app/.env
+=======
+    build: .
+    ports:
+      - "${APP_PORT:-8081}:8000"  # <-- This lets you change the port in Portainer
+    env_file:
+      - stack.env                 # <-- This tells the app to use Portainer's UI variables
+>>>>>>> b0dd62a4ccff6cd4a01697412b433762b9409dfe
     restart: unless-stopped
     healthcheck:
       # Always hits the container’s internal port (8000), not the host 8081

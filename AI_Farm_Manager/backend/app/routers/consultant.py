@@ -8,7 +8,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.config import get_settings
-from app.routers.integration import require_integration_or_admin
+from app.deps.integration_auth import get_farmdash_connection_bucket
+from app.services.connection_registry import DEFAULT_BUCKET_ID
 from app.schemas.insights import FarmInsightsResponse, InsightCategory
 from app.services.consultant import (
     CONSULTANT_SYSTEM_FIELDS_FOCUS,
@@ -49,7 +50,10 @@ def _raise_if_invalid_view(view: str | None) -> None:
 
 
 async def _load_snapshot_for_consultant(
-    server_id: str | None, farm_id: int | None = None
+    server_id: str | None,
+    farm_id: int | None = None,
+    *,
+    connection_bucket_id: str = DEFAULT_BUCKET_ID,
 ) -> tuple[dict[str, Any], str]:
     settings = get_settings()
     base = (settings.get("dashboard_json_url") or "").strip()
@@ -59,7 +63,11 @@ async def _load_snapshot_for_consultant(
     if not fetch_url:
         fetch_url = settings.get("dashboard_fetch_url") or settings.get("dashboard_json_url") or ""
 
-    raw, err = await fetch_dashboard_json(fetch_url or None, farm_id=farm_id)
+    raw, err = await fetch_dashboard_json(
+        fetch_url or None,
+        farm_id=farm_id,
+        connection_bucket_id=connection_bucket_id,
+    )
     if raw is None:
         logger.warning(
             "consultant: no snapshot (serverId query=%r fetch_url=%r err=%s)",
@@ -190,6 +198,7 @@ async def compute_consultant_insights(
     user_api_key: str | None = None,
     user_provider: str | None = None,
     user_openai_base_url: str | None = None,
+    connection_bucket_id: str = DEFAULT_BUCKET_ID,
 ) -> FarmInsightsResponse:
     """
     Shared implementation for ``GET /api/v1/consultant/insights`` and admin “test” (same snapshot + LLM path).
@@ -197,7 +206,9 @@ async def compute_consultant_insights(
     Uses server env LLM keys when ``user_api_key`` is empty (same as Farm Dashboard without BYOK).
     """
     _raise_if_invalid_view(view)
-    snapshot, sid = await _load_snapshot_for_consultant(server_id, farm_id)
+    snapshot, sid = await _load_snapshot_for_consultant(
+        server_id, farm_id, connection_bucket_id=connection_bucket_id
+    )
     farm_resolved = resolve_consultant_farm_id(snapshot, farm_id)
     snapshot = prune_snapshot_to_active_farm(snapshot, farm_resolved)
     logger.info(
@@ -228,12 +239,15 @@ async def compute_consultant_insights_first_owned_field(
     user_api_key: str | None = None,
     user_provider: str | None = None,
     user_openai_base_url: str | None = None,
+    connection_bucket_id: str = DEFAULT_BUCKET_ID,
 ) -> tuple[FarmInsightsResponse, dict[str, Any]]:
     """
     Load snapshot, pick the first owned parcel (same rules as Farm Dashboard field list), then run the
     **single-field** consultant (``CONSULTANT_SYSTEM_SINGLE_FIELD``) — “next job” for that field.
     """
-    snapshot, sid = await _load_snapshot_for_consultant(server_id, active_farm_id)
+    snapshot, sid = await _load_snapshot_for_consultant(
+        server_id, active_farm_id, connection_bucket_id=connection_bucket_id
+    )
     af = resolve_consultant_farm_id(snapshot, active_farm_id)
     snapshot = prune_snapshot_to_active_farm(snapshot, af)
     ref, row = pick_first_owned_field_row(snapshot, af)
@@ -310,7 +324,7 @@ async def get_consultant_insights(
             "Use with context=full. Field map uses context=fields instead."
         ),
     ),
-    _: str = Depends(require_integration_or_admin),
+    connection_bucket_id: str = Depends(get_farmdash_connection_bucket),
     _subscription: None = Depends(assert_consultant_allowed),
 ) -> FarmInsightsResponse:
     """
@@ -356,4 +370,5 @@ async def get_consultant_insights(
         user_api_key=user_key or None,
         user_provider=user_prov,
         user_openai_base_url=user_ob,
+        connection_bucket_id=connection_bucket_id,
     )

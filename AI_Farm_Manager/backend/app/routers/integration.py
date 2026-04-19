@@ -11,7 +11,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from app.config import active_gemini_api_key, get_settings, has_gemini_credentials
-from app.deps.integration_auth import require_integration_or_admin
+from app.deps.integration_auth import get_farmdash_connection_bucket, require_integration_or_admin
 from app.services.bot_registry import (
     delete_instance,
     find_instance_by_id,
@@ -20,7 +20,7 @@ from app.services.bot_registry import (
     upsert_instance,
 )
 from app.services.mod_config_xml import build_mod_config_xml, resolve_backend_url_for_xml
-from app.services import snapshot_push_service
+from app.services import ftp_service, snapshot_push_service
 from app.services.consultant import normalize_incoming_api_key, resolve_consultant_llm_settings
 from app.services.gemini_models_catalog import fetch_gemini_models_catalog
 from app.services.llm_service import test_llm_connectivity
@@ -30,6 +30,32 @@ from app.services.pipeline_log import log_pipeline
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/integration", tags=["integration"])
+
+
+def _snapshot_pipeline_debug() -> dict[str, Any]:
+    """
+    Why Smart suggestions can fail even when the LLM (Gemini/Ollama) works: snapshot != LLM.
+    Shown on GET /api/integration/overview for troubleshooting.
+    """
+    s = get_settings()
+    dash = (s.get("dashboard_json_url") or "").strip()
+    push_on = snapshot_push_service.is_push_mode_enabled()
+    ftp_on = ftp_service.is_ftp_mode_enabled()
+    out: dict[str, Any] = {
+        "pc_push_mode": push_on,
+        "dashboard_json_url_configured": bool(dash),
+        "ftp_poll_configured": ftp_on,
+        "llm_provider": (s.get("llm_provider") or ""),
+        "note": (
+            "Consultant needs farm JSON from push, FTP, or HTTP — not from a file path on disk. "
+            "Switching Gemini→Ollama only changes the LLM; it does not load dashboard data."
+        ),
+    }
+    if push_on:
+        st = snapshot_push_service.push_debug_stats()
+        out["push_by_connection"] = st.get("by_connection")
+        out["push_connection_buckets"] = st.get("connection_count")
+    return out
 
 
 def _farm_dashboard_origin() -> str | None:
@@ -94,6 +120,7 @@ async def get_overview_payload() -> dict[str, Any]:
                 "farmDashboardConnectHint": hint,
                 "farmDashboardServerCount": len(meta),
                 "farmDashboardPushMode": True,
+                "snapshotPipeline": _snapshot_pipeline_debug(),
             }
         )
         return base_out
@@ -105,14 +132,14 @@ async def get_overview_payload() -> dict[str, Any]:
 
     if origin is None:
         farm_error = (
-            "Snapshot source not configured on the AI server — add DASHBOARD_PUSH_MODE=1 (recommended for VPS) "
-            "or DASHBOARD_JSON_URL in /admin."
+            "Snapshot source not configured — set DASHBOARD_PUSH_MODE=1 (PC→server push), "
+            "or G-Portal FTP env vars, or DASHBOARD_JSON_URL pointing at http://host:8766/api/data reachable from this container."
         )
         connect_hint = (
-            "VPS + Farm Dashboard on your PC: set DASHBOARD_PUSH_MODE=1 in AI Farm Manager, restart the container, "
-            'then in this app enable “Send farm data to the AI server” and Save (outbound only). '
-            "Do not use 127.0.0.1 on the VPS for a remote PC’s dashboard. "
-            "Local dev with app + AI on one machine: DASHBOARD_JSON_URL=http://127.0.0.1:8766/api/data in /admin."
+            "Coolify “just worked” because env + networking matched. On TrueNAS: (1) DASHBOARD_PUSH_MODE=1 + same "
+            "FARMDASH_INTEGRATION_KEY in Portainer and in Farm Desktop + Send farm data; "
+            "(2) or FTP; (3) or DASHBOARD_JSON_URL=http://host.docker.internal:8766/api/data only if AI runs in Docker on the same PC as the game. "
+            "A data.json file on disk is not read unless FTP pulls it or the app pushes JSON."
         )
     else:
         try:
@@ -135,6 +162,7 @@ async def get_overview_payload() -> dict[str, Any]:
             "farmDashboardConnectHint": connect_hint,
             "farmDashboardServerCount": len(farm_servers),
             "farmDashboardPushMode": False,
+            "snapshotPipeline": _snapshot_pipeline_debug(),
         }
     )
     return base_out
@@ -267,7 +295,7 @@ async def integration_gemini_models(
 async def integration_push_snapshot(
     request: Request,
     server_id: str | None = Query(None, alias="serverId"),
-    _: str = Depends(require_integration_or_admin),
+    connection_bucket_id: str = Depends(get_farmdash_connection_bucket),
 ) -> dict[str, Any]:
     """
     Farm Dashboard (desktop) POSTs JSON here on an outbound connection — no open ports on the gaming PC.
@@ -301,7 +329,7 @@ async def integration_push_snapshot(
     if not snap:
         raise HTTPException(400, "Missing snapshot object")
 
-    ok, err = snapshot_push_service.store_push(server_id, snap, servers)
+    ok, err = snapshot_push_service.store_push(connection_bucket_id, server_id, snap, servers)
     if not ok:
         raise HTTPException(400, err or "Invalid snapshot")
     sid_out = (server_id or "").strip() or None

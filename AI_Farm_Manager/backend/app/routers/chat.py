@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from app.config import get_settings
 from app.services.bot_registry import normalize_server_token, resolve_auth
+from app.services.connection_registry import DEFAULT_BUCKET_ID
 from app.services.dashboard_service import build_dashboard_context_block, fetch_dashboard_json
 from app.services.llm_service import FALLBACK_REPLY, run_llm
 from app.services.log_buffer import log_event
@@ -43,7 +44,10 @@ async def _process_llm_job(player: str, text: str, fetch_url: str | None, server
         log_event("WARN", "LLM skipped — missing API key or bot disabled", player=player)
         return
 
-    raw, err = await fetch_dashboard_json(fetch_url or "")
+    raw, err = await fetch_dashboard_json(
+        fetch_url or "",
+        connection_bucket_id=DEFAULT_BUCKET_ID,
+    )
     ctx = build_dashboard_context_block(raw, err)
     if raw is None:
         log_pipeline(

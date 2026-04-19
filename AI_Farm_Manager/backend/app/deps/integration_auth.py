@@ -4,10 +4,11 @@ from __future__ import annotations
 import os
 from urllib.parse import unquote
 
-from fastapi import Depends, Header, HTTPException
+from fastapi import Depends, Header, HTTPException, Request
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from app.config import get_settings
+from app.services.connection_registry import find_by_key_plain
 
 _security = HTTPBasic(auto_error=False)
 
@@ -28,13 +29,20 @@ def _parse_integration_key(header_val: str | None) -> str:
         return header_val
 
 
+def parse_integration_key_header(header_val: str | None) -> str:
+    """Decoded ``X-FarmDash-Key`` value for routing (connection registry + default bucket)."""
+    return _parse_integration_key(header_val).strip()
+
+
 def _integration_key_matches(got: str, x_raw: str | None) -> bool:
-    """True when header matches FARMDASH_INTEGRATION_KEY or legacy SERVER_TOKEN (same header)."""
+    """True for env keys, or a key registered in ``farmdash_connections.json`` (multi-tenant)."""
     fd = (os.getenv("FARMDASH_INTEGRATION_KEY") or "").strip()
     st = (os.getenv("SERVER_TOKEN") or "").strip()
     if fd and (got == fd or x_raw == fd):
         return True
     if st and (got == st or x_raw == st):
+        return True
+    if got and find_by_key_plain(got):
         return True
     return False
 
@@ -57,11 +65,22 @@ async def require_integration_or_admin(
     raise HTTPException(
         status_code=401,
         detail=(
-            "Unauthorized — send header X-FarmDash-Key with the same value as FARMDASH_INTEGRATION_KEY "
-            "(or SERVER_TOKEN) in backend/.env, or use Admin Basic auth"
+            "Unauthorized — send header X-FarmDash-Key with FARMDASH_INTEGRATION_KEY, SERVER_TOKEN, "
+            "a key from Admin → Client connections, or use Admin Basic auth"
         ),
         headers={"WWW-Authenticate": "Basic realm=integration"},
     )
+
+
+def get_farmdash_connection_bucket(
+    request: Request,
+    _: str = Depends(require_integration_or_admin),
+) -> str:
+    """Resolve RAM bucket for push/consultant (``__default__`` or registered connection UUID)."""
+    from app.services.connection_registry import resolve_connection_bucket_id
+
+    got = parse_integration_key_header(request.headers.get("X-FarmDash-Key"))
+    return resolve_connection_bucket_id(got)
 
 
 def integration_or_admin_authenticated(

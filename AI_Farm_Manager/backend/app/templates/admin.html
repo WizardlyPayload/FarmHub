@@ -14,6 +14,7 @@
 
   <nav class="admin-tabs" role="tablist" aria-label="Admin sections">
     <button type="button" role="tab" id="tab-btn-overview" class="tab-btn" data-tab="overview" aria-selected="{% if active_tab == 'overview' %}true{% else %}false{% endif %}" tabindex="{% if active_tab == 'overview' %}0{% else %}-1{% endif %}">Overview</button>
+    <button type="button" role="tab" id="tab-btn-clients" class="tab-btn" data-tab="clients" aria-selected="{% if active_tab == 'clients' %}true{% else %}false{% endif %}" tabindex="{% if active_tab == 'clients' %}0{% else %}-1{% endif %}">Client connections</button>
     <button type="button" role="tab" id="tab-btn-farm" class="tab-btn" data-tab="farm" aria-selected="{% if active_tab == 'farm' %}true{% else %}false{% endif %}" tabindex="{% if active_tab == 'farm' %}0{% else %}-1{% endif %}">Farm Dashboard &amp; data</button>
     <button type="button" role="tab" id="tab-btn-bot" class="tab-btn" data-tab="bot" aria-selected="{% if active_tab == 'bot' %}true{% else %}false{% endif %}" tabindex="{% if active_tab == 'bot' %}0{% else %}-1{% endif %}">Chat bot &amp; LLM</button>
     <button type="button" role="tab" id="tab-btn-hank" class="tab-btn" data-tab="hank" aria-selected="{% if active_tab == 'hank' %}true{% else %}false{% endif %}" tabindex="{% if active_tab == 'hank' %}0{% else %}-1{% endif %}">In-game Hank</button>
@@ -58,6 +59,64 @@
       </div>
     </section>
 
+    <!-- Client connections (multi-dashboard link keys) -->
+    <section class="tab-panel card full" id="panel-clients" role="tabpanel" aria-labelledby="tab-btn-clients" {% if active_tab != 'clients' %}hidden{% endif %}>
+      <h2 class="subh" style="margin-top:0;">Client connections</h2>
+      <p class="muted small">Each row is a <strong>separate link key</strong> for a Farm Dashboard on someone’s PC. The LLM (Gemini / OpenAI / Ollama) is configured once on the <strong>Chat bot &amp; LLM</strong> tab — these keys only gate <strong>who may push farm JSON</strong> and isolate snapshots in RAM.</p>
+
+      {% if revealed_new_key %}
+      <div class="callout" style="border-left: 3px solid #238636;">
+        <strong>Copy this link key now</strong> (shown once in this banner; also saved under <code>data/farmdash_connections.json</code> on the server — protect that file).
+        <p class="mb-0 mt-1"><code id="copyOnceKey" style="user-select:all;">{{ revealed_new_key }}</code>
+        <button type="button" class="btn" style="margin-left:0.5rem;" onclick="navigator.clipboard.writeText(document.getElementById('copyOnceKey').textContent)">Copy</button></p>
+      </div>
+      {% endif %}
+
+      <section class="card inner-card">
+        <h3 class="subh" style="margin-top:0;">Give a player only two things</h3>
+        <ol class="small muted" style="margin:0;padding-left:1.25rem;line-height:1.6;">
+          <li><strong>Server URL</strong> — e.g. <code>http://YOUR_IP:8081</code> (or your HTTPS host).</li>
+          <li><strong>Link key</strong> — create below, or use the global <code>FARMDASH_INTEGRATION_KEY</code> for a single shared key.</li>
+        </ol>
+        <p class="small muted mb-0">On their PC: Farm Dashboard → <strong>Settings → AI Farm Manager → Hosted AI</strong> → paste URL + key → enable <strong>Send farm data</strong> → <strong>Save &amp; load</strong>. Server needs <code>DASHBOARD_PUSH_MODE=1</code>.</p>
+      </section>
+
+      <h3 class="subh">Registered connections</h3>
+      {% if farmdash_connections and farmdash_connections|length > 0 %}
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr><th>Label</th><th>Masked key</th><th>Id</th><th>Created</th><th></th></tr></thead>
+          <tbody>
+            {% for c in farmdash_connections %}
+            <tr>
+              <td>{{ c.label }}</td>
+              <td class="mono">{{ c.integration_key_masked }}</td>
+              <td class="mono small">{{ c.id }}</td>
+              <td class="small">{{ c.created_utc }}</td>
+              <td>
+                <form method="post" action="/admin/api/connections/delete" class="inline-form" onsubmit="return confirm('Revoke this connection? PCs using this key must get a new one.');">
+                  <input type="hidden" name="connection_id" value="{{ c.id }}"/>
+                  <input type="hidden" name="redirect_tab" value="clients"/>
+                  <button type="submit" class="btn danger">Revoke</button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="muted small">No extra connections yet — only the global env key applies, or add one below.</p>
+      {% endif %}
+
+      <h3 class="subh">Add connection</h3>
+      <form method="post" action="/admin/api/connections/create" class="form" style="max-width:28rem;">
+        <input type="hidden" name="redirect_tab" value="clients"/>
+        <label class="row"><span>Label (for your reference)</span><input type="text" name="label" placeholder="e.g. Josh — gaming PC" required/></label>
+        <button type="submit" class="btn primary">Create &amp; show link key</button>
+      </form>
+    </section>
+
     <!-- Farm Dashboard & data -->
     <section class="tab-panel card full" id="panel-farm" role="tabpanel" aria-labelledby="tab-btn-farm" {% if active_tab != 'farm' %}hidden{% endif %}>
       <h2 class="subh" style="margin-top:0;">Farm Dashboard &amp; snapshot data</h2>
@@ -68,6 +127,19 @@
         <div class="readonly-row"><span class="readonly-k">FARMDASH_INTEGRATION_KEY</span><code class="readonly-v">{{ farmdash_integration_key_masked }}</code></div>
         <div class="readonly-row"><span class="readonly-k">ENCRYPTION_KEY</span><code class="readonly-v">{% if encryption_key_configured %}configured (masked){% else %}(not set){% endif %}</code></div>
       </div>
+
+      {% if overview.snapshotPipeline %}
+      <div class="readonly-block" style="margin-top: 0.75rem;">
+        <strong>Snapshot pipeline (why Smart suggestions can fail while the LLM still works)</strong>
+        <p class="muted small mb-1">Gemini vs Ollama only changes <em>who answers</em>. The farm JSON for suggestions must still arrive via <strong>push</strong>, <strong>FTP</strong>, or <strong>HTTP URL</strong> — not from a random <code>data.json</code> path unless FTP pulls it.</p>
+        <dl class="small" style="margin: 0;">
+          {% for k, v in overview.snapshotPipeline.items() %}
+          <dt style="color:#8b949e;margin-top:0.35rem;">{{ k }}</dt>
+          <dd style="margin-left:0;"><code style="word-break:break-all;">{{ v }}</code></dd>
+          {% endfor %}
+        </dl>
+      </div>
+      {% endif %}
 
       <section class="card inner-card" style="border-left: 4px solid #6ea8fe;">
         <h3 class="subh" style="margin-top:0;">How data reaches this server</h3>

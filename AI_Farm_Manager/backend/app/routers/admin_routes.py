@@ -87,6 +87,7 @@ async def admin_page(request: Request, _: str = Depends(require_admin)) -> HTMLR
         "has_gemini_key": has_gemini_credentials(s),
         "dashboard_push_mode": bool(s.get("dashboard_push_mode")),
         "llm_configured": bool(s.get("llm_configured")),
+        "openai_base_configured": bool(s.get("openai_base_configured")),
         "public_base_url": (s.get("public_base_url") or "").strip(),
         "farmdash_integration_key_masked": _mask_secret(os.getenv("FARMDASH_INTEGRATION_KEY")),
         "encryption_key_configured": bool(s.get("encryption_key_configured")),

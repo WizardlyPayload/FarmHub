@@ -6,23 +6,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: farmhub-local-build:latest  # Forces Portainer to name the locally baked image
     ports:
       - "8000:8000"
     volumes:
-      # Customer configs + encrypted bot_servers.json — backup this directory
+      # On TrueNAS, it is much safer to use an absolute path for persistent data.
+      # Replace the left side with a real folder path on your NAS pool.
+      # Example: /mnt/tank/appdata/farmhub/data:/app/data
       - ./data:/app/data
-      # Persist admin UI saves: `/admin` merges into `/app/.env`. Without this, the file lives in the
-      # container layer and is lost on recreate. Create the host file first: `touch .env` (same dir as this compose file).
-      # If you only use Coolify's Environment UI, you can omit this — but then prefer editing env there, not /admin.
-      - ./.env:/app/.env
-    # Place a `.env` next to this file (copy from `backend/.env.example`). Must include at least
-    # ENCRYPTION_KEY, ADMIN_PASSWORD, SERVER_TOKEN, and your LLM / FTP settings.
-    # Optional hardening for public hosts: REQUIRE_AUTH_FOR_ROOT_HTML=1, HEALTH_RESPONSE_DETAIL=minimal
-    # (see FarmHub/docs/AI_SERVER_SECURITY.md).
-    env_file:
-      - .env
     restart: unless-stopped
-    # Mirrors Dockerfile HEALTHCHECK — Coolify can also set HTTP health path `/health` on port 8000.
     healthcheck:
       test:
         [

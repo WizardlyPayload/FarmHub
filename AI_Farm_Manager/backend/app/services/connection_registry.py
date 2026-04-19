@@ -15,7 +15,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from app.config import get_data_dir
+from app.paths import get_data_dir
 
 logger = logging.getLogger(__name__)
 

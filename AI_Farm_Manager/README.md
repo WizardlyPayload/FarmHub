@@ -53,6 +53,25 @@ AI_Farm_Manager/
 
 7. **Lua mod:** Set **`backendUrl`** in `ai_farm_manager_config.xml` to your public API base URL (same idea as **`PUBLIC_BASE_URL`**). Use HTTPS once a certificate is in front of the app.
 
+## Deploy with Portainer (Docker Compose stack)
+
+Use the **`AI_Farm_Manager`** folder as the **build context** (where **`Dockerfile`** and **`docker-compose.yml`** live). In **Stacks → Add stack → Web editor** (or Git), paste or reference the same `docker-compose.yml`.
+
+**Minimum environment (Stack → Environment variables)** — without these the container often **exits on startup** and **nothing answers on the host port**:
+
+| Variable | Notes |
+|----------|--------|
+| **`ENCRYPTION_KEY`** | **Required.** Fernet key: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+| **`ADMIN_PASSWORD`** | Password for `/admin` |
+| **`SERVER_TOKEN`** | Same value as `<serverToken>` in the Lua mod XML (if you use the mod) |
+| **`FARMDASH_INTEGRATION_KEY`** | Farm Dashboard “link key” (or generate after first run per your workflow) |
+
+Optional: **`APP_PORT`** (default **8081**) maps the **host** side; the **container always listens on 8000** (`8081:8000`).
+
+**If port 8081 is dead:** open **Containers → your service → Logs**. If you see `ENCRYPTION_KEY is not set`, add the variable and redeploy. **Published ports** appear on the container row when the container is running; a restart loop can make the UI look empty.
+
+**Quick check:** `curl -s http://YOUR_SERVER_IP:8081/health`
+
 ## Deploy with Coolify (Hetzner)
 
 1. Install **Coolify** on the VPS (see [Coolify docs](https://coolify.io/docs)).

@@ -36,7 +36,7 @@ AI_Farm_Manager/
    - **`ADMIN_PASSWORD`** — `/admin` login.
    - **`SERVER_TOKEN`** — must match `<serverToken>` in the Lua mod XML.
    - **`PUBLIC_BASE_URL`** — `https://your-domain-or-ip` **without trailing slash** — this becomes **`backendUrl`** in generated `ai_farm_manager_config.xml` so the mod points at your VPS or reverse proxy.
-   - LLM / FTP variables as needed. For a **local OpenAI-compatible** server (e.g. **Ollama** on the same LAN), set **`LLM_PROVIDER=openai`**, **`OPENAI_BASE_URL`** (e.g. `http://192.168.1.10:11434` — the backend normalizes `/v1`), **`LLM_MODEL`** to your pulled model name, and **`LLM_API_KEY`** to a placeholder such as **`ollama`** if the server does not require auth. See **[../docs/LLM_OPENAI_COMPATIBLE.md](../docs/LLM_OPENAI_COMPATIBLE.md)**.
+   - LLM / FTP variables as needed. For a **local OpenAI-compatible** server (e.g. **Ollama** on the same LAN), set **`LLM_PROVIDER=openai`**, **`OPENAI_BASE_URL`** or **`OLLAMA_BASE_URL`** (same effect — e.g. `http://192.168.1.10:11434`; the backend normalizes `/v1`), **`LLM_MODEL`** to your pulled model name, and **`LLM_API_KEY`** to a placeholder such as **`ollama`** if the server does not require auth. See **[../docs/LLM_OPENAI_COMPATIBLE.md](../docs/LLM_OPENAI_COMPATIBLE.md)**.
 
 3. **Data volume:** The compose file mounts **`./data:/app/data`**. All customer registry data (`bot_servers.json` with encrypted `ftp_pass` / `llm_api_key` per tenant) lives under **`./data` on the host**. **Back up this directory.**
 

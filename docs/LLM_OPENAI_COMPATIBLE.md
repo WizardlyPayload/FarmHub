@@ -14,7 +14,8 @@ Gemini routing and quotas **do not** apply to these paths. `LLM_PROVIDER` stays 
 | Variable | Purpose |
 |----------|---------|
 | `OPENAI_BASE_URL` | Optional. Base URL for an OpenAI-compatible API. **Empty** = default OpenAI cloud (`api.openai.com`). Examples: `http://192.168.1.10:11434` (Ollama), `http://localhost:11434`. |
-| `LLM_API_KEY` | OpenAI API key **or** placeholder when using a local server that ignores auth (e.g. `ollama`). If `OPENAI_BASE_URL` is set and this is empty, the backend uses an internal placeholder for the SDK. |
+| `OLLAMA_BASE_URL` | Optional **alias** for `OPENAI_BASE_URL` (same behaviour). Useful in Portainer/TrueNAS stacks where you want the variable name to say “Ollama”. If both are set, `OPENAI_BASE_URL` wins. |
+| `LLM_API_KEY` | OpenAI API key **or** placeholder when using a local server that ignores auth (e.g. `ollama`). If `OPENAI_BASE_URL` (or `OLLAMA_BASE_URL`) is set and this is empty, the backend uses an internal placeholder for the SDK. |
 | `LLM_MODEL` | Model id as understood by the **compatible server** (e.g. Ollama model name). |
 | `LLM_PROVIDER` | Use **`openai`** for the OpenAI-compatible path (not `gemini`). |
 

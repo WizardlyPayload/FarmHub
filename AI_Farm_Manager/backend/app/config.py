@@ -193,6 +193,11 @@ def normalize_openai_base_url_for_sdk(raw: str | None) -> str:
     return s
 
 
+def raw_openai_or_ollama_base_url() -> str:
+    """``OPENAI_BASE_URL`` or ``OLLAMA_BASE_URL`` (Portainer-friendly alias for local Ollama)."""
+    return (os.getenv("OPENAI_BASE_URL") or os.getenv("OLLAMA_BASE_URL") or "").strip()
+
+
 @lru_cache
 def get_settings() -> dict:
     llm_provider = os.getenv("LLM_PROVIDER", "openai").lower().strip()
@@ -219,8 +224,9 @@ def get_settings() -> dict:
                 n_r,
             )
     be = _bot_enabled()
-    openai_base_url = normalize_openai_base_url_for_sdk(os.getenv("OPENAI_BASE_URL", ""))
-    openai_base_configured = bool((os.getenv("OPENAI_BASE_URL") or "").strip())
+    _openai_raw = raw_openai_or_ollama_base_url()
+    openai_base_url = normalize_openai_base_url_for_sdk(_openai_raw)
+    openai_base_configured = bool(_openai_raw)
     if llm_provider == "gemini":
         llm_configured = be and bool(gemini_api_keys or gemini_api_key)
     else:

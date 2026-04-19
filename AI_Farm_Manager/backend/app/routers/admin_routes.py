@@ -10,7 +10,13 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from app.config import get_backend_root, get_settings, has_gemini_credentials, reload_backend_dotenv
+from app.config import (
+    get_backend_root,
+    get_settings,
+    has_gemini_credentials,
+    raw_openai_or_ollama_base_url,
+    reload_backend_dotenv,
+)
 from app.prompt_loader import write_system_prompt
 from app.routers.consultant import compute_consultant_insights
 from app.routers.integration import get_overview_payload
@@ -73,7 +79,7 @@ async def admin_page(request: Request, _: str = Depends(require_admin)) -> HTMLR
         "dashboard_server_id": s.get("dashboard_server_id", ""),
         "llm_model": s["llm_model"],
         "llm_provider": s["llm_provider"],
-        "openai_base_url": os.getenv("OPENAI_BASE_URL", ""),
+        "openai_base_url": raw_openai_or_ollama_base_url(),
         "gemini_model": s.get("gemini_model", "gemini-2.5-flash"),
         "gemini_api_endpoint": s.get("gemini_api_endpoint", "generativelanguage"),
         "system_prompt": s["system_prompt"],

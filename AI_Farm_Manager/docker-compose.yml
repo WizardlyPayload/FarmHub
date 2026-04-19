@@ -6,23 +6,20 @@
 # Local Ollama: set OLLAMA_BASE_URL to your API base, e.g. http://192.168.x.x:11434
 # (backend normalizes /v1). Default model below is llama3.2 — change in Portainer if you use another tag.
 #
-# Volumes: relative ./data and ./.env are COMMENTED OUT by default because bind paths on TrueNAS
-# often fail during deploy if the path does not exist. Add binds in Portainer (absolute NAS paths)
-# when you want persistence — e.g. /mnt/pool/appdata/farmhub/data:/app/data
+# Volumes: no bind mounts by default (TrueNAS paths often break if missing). Add in Portainer when ready.
 
 services:
   web:
-<<<<<<< HEAD
     build:
       context: .
       dockerfile: Dockerfile
     image: farmhub-ai-farm-manager:latest
     ports:
-      # Host 8081 → app listens on 8000 inside the container (avoids NAS port 8000 clashes)
-      - "8081:8000"
+      # Host port (set APP_PORT in Portainer, default 8081) → app listens on 8000 inside the container
+      - "${APP_PORT:-8081}:8000"
+    # Optional: load from a file on the host (only if that path exists on your NAS)
     # env_file:
-    #   - .env
-    # ↑ Optional: uncomment only if you keep a real .env file next to this compose on a host where that path exists.
+    #   - stack.env
     environment:
       PORT: ${PORT:-8000}
       # Required for at-rest encryption of secrets in data/
@@ -36,7 +33,8 @@ services:
       FARMDASH_INTEGRATION_KEY: ${FARMDASH_INTEGRATION_KEY}
       # In-game bot + LLM (Ollama: use openai provider + local base URL)
       ENABLE_AI_BOT: ${ENABLE_AI_BOT:-true}
-      TRIGGER_PREFIX: ${TRIGGER_PREFIX:-!hank}
+      # Quote default so YAML does not treat `!` as a tag
+      TRIGGER_PREFIX: "${TRIGGER_PREFIX:-!hank}"
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
       LLM_MODEL: ${LLM_MODEL:-llama3.2}
       LLM_API_KEY: ${LLM_API_KEY:-ollama}
@@ -54,7 +52,7 @@ services:
       GEMINI_REST_API_VERSION: ${GEMINI_REST_API_VERSION:-v1}
       # URLs / CORS
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
-      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      CORS_ORIGINS: "${CORS_ORIGINS:-*}"
       # Optional data dir override (default /app/data inside container)
       DATA_DIR: ${DATA_DIR:-}
       # Optional hardening (see docs/AI_SERVER_SECURITY.md)
@@ -65,16 +63,9 @@ services:
     # volumes:
     #   - /mnt/YOUR_POOL/appdata/farmhub/data:/app/data
     #   - /mnt/YOUR_POOL/appdata/farmhub/.env:/app/.env
-=======
-    build: .
-    ports:
-      - "${APP_PORT:-8081}:8000"  # <-- This lets you change the port in Portainer
-    env_file:
-      - stack.env                 # <-- This tells the app to use Portainer's UI variables
->>>>>>> b0dd62a4ccff6cd4a01697412b433762b9409dfe
     restart: unless-stopped
     healthcheck:
-      # Always hits the container’s internal port (8000), not the host 8081
+      # Always hits the container’s internal port (8000), not the host APP_PORT
       test:
         [
           "CMD",

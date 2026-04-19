@@ -22,6 +22,19 @@
     return localStorage.getItem(LS_KEY) || '';
   }
 
+  /** Same as main process normalizeAiFarmManagerHostedBaseUrl — API is at /api/... on origin only. */
+  function normalizeHostedAiBaseUrl(b) {
+    var s = String(b || '').trim().replace(/\/$/, '');
+    if (!s) return '';
+    try {
+      var href = /^https?:\/\//i.test(s) ? s : 'http://' + s;
+      var u = new URL(href);
+      return u.origin;
+    } catch (e) {
+      return s;
+    }
+  }
+
   function populateInstanceSelect(data) {
     var sel = document.getElementById('aiFarmBotInstanceSelect');
     if (!sel) return;
@@ -75,7 +88,7 @@
       } else if (data.farmDashboardConnectHint) {
         el.classList.add('alert-warning');
         el.innerHTML =
-          '<i class="bi bi-exclamation-triangle me-1"></i><strong>Not sending yet.</strong> Keep <strong>Send farm data</strong> on, click <strong>Save &amp; load</strong>. Your host must set <code>DASHBOARD_PUSH_MODE=1</code> on the AI server.';
+          '<i class="bi bi-exclamation-triangle me-1"></i><strong>Not sending yet.</strong> Keep <strong>Send farm data</strong> on, click <strong>Save &amp; load</strong>. Your host must turn <strong>Push mode</strong> on in AI Farm Manager admin (<strong>Farm Dashboard &amp; data</strong>) or set <code>DASHBOARD_PUSH_MODE=1</code> on the server.';
       } else {
         el.classList.add('alert-warning');
         el.innerHTML =
@@ -84,7 +97,7 @@
     } else if (fdErr) {
       el.classList.add('alert-warning');
       el.innerHTML =
-        '<i class="bi bi-link-45deg me-1"></i><strong>Farm data not configured on the AI server.</strong> Ask your host to enable <strong>push mode</strong> (recommended) or set a dashboard URL in AI admin. <span class="d-block small mt-1">' +
+        '<i class="bi bi-link-45deg me-1"></i><strong>Farm data not configured on the AI server.</strong> Ask your host to turn <strong>Push mode</strong> on in admin (<strong>Farm Dashboard &amp; data</strong>) or set a dashboard URL there. <span class="d-block small mt-1">' +
         esc(fdErr) +
         '</span>';
     } else {
@@ -641,7 +654,7 @@
     container.innerHTML = '<p class="text-muted">Loading…</p>';
 
     function doFetch(base, key) {
-      var b = (base || '').replace(/\/$/, '') || 'http://127.0.0.1:8080';
+      var b = normalizeHostedAiBaseUrl(base || '') || 'http://127.0.0.1:8080';
       if (!key) {
         render(
           container,
@@ -668,6 +681,11 @@
             base: b,
           });
           if (r.status === 401) throw new Error('401 — contact your host (link key mismatch).');
+          if (r.status === 404) {
+            throw new Error(
+              'HTTP 404 — wrong URL path. Use the server root only (e.g. http://192.168.1.10:8081), not /health, /admin, or /api. Re-save after fixing.'
+            );
+          }
           if (!r.ok) throw new Error('HTTP ' + r.status);
           return r.json();
         })
@@ -736,6 +754,30 @@
         if (keyIn && c && c.integrationKey) keyIn.value = c.integrationKey;
         var pushCb = document.getElementById('aiFarmBotPushSnapshots');
         if (pushCb && c) pushCb.checked = !!c.pushSnapshots;
+      });
+    }
+
+    var quickApply = document.getElementById('aiFarmHostedQuickApply');
+    var quickHost = document.getElementById('aiFarmHostedQuickHost');
+    var quickPort = document.getElementById('aiFarmHostedQuickPort');
+    var quickHttps = document.getElementById('aiFarmHostedQuickHttps');
+    if (quickApply && urlIn) {
+      quickApply.addEventListener('click', function () {
+        var h = quickHost && quickHost.value ? String(quickHost.value).trim() : '';
+        var p = quickPort && quickPort.value != null ? parseInt(String(quickPort.value), 10) : NaN;
+        if (!h) {
+          if (quickHost) quickHost.focus();
+          return;
+        }
+        if (!Number.isFinite(p) || p < 1 || p > 65535) {
+          if (quickPort) quickPort.focus();
+          return;
+        }
+        var scheme = quickHttps && quickHttps.checked ? 'https' : 'http';
+        urlIn.value = scheme + '://' + h + ':' + p;
+        try {
+          urlIn.dispatchEvent(new Event('input', { bubbles: true }));
+        } catch (eEv) {}
       });
     }
 

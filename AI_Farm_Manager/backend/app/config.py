@@ -245,6 +245,8 @@ def get_settings() -> dict:
         "cors_origins": os.getenv("CORS_ORIGINS", "*"),
         # Used in generated mod config XML (backendUrl). Set on VPS to https://your-domain (no path).
         "public_base_url": os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/"),
+        # Shown in Admin → Client connections — what players paste as Farm Dashboard "Server URL" (http://IP:PORT, no path).
+        "farmdash_invite_base_url": os.getenv("FARMDASH_INVITE_BASE_URL", "").strip().rstrip("/"),
         # Fernet key for encrypting ftp_pass / llm_api_key in bot_servers.json (never store the raw key in git).
         "encryption_key_configured": bool(os.getenv("ENCRYPTION_KEY", "").strip()),
         # Subscription tiers (0=free local, 1=consultant, 2=+chat). When false, all routes behave as tier 2.

@@ -922,7 +922,7 @@
                   </div>
 
                   <div class="tab-pane fade" id="app-settings-pane-ai" role="tabpanel" aria-labelledby="app-settings-tab-ai" tabindex="0">
-                    <p class="small text-muted mb-2" data-i18n="settings.aiFmIntro" data-i18n-html>Dashboard <strong>Smart suggestions</strong> can use <strong>Ollama</strong> (this PC or any machine on your network), <strong>BYOK</strong> (OpenAI / Gemini / other APIs), or your host&rsquo;s <strong>server</strong> (paid tier: URL + link key). <strong>Precedence:</strong> if a local / BYOK connection is saved, this PC uses it first; otherwise the hosted connection applies when set.</p>
+                    <p class="small text-muted mb-2" data-i18n="settings.aiFmIntro" data-i18n-html>Dashboard <strong>Smart suggestions</strong> can use <strong>Ollama</strong> (this PC or LAN), <strong>BYOK</strong> (OpenAI / Gemini), or <strong>Hosted AI</strong> (your server URL + link key). <strong>Precedence:</strong> when Ollama/BYOK is saved, tips run on this PC <em>if</em> farm data is loaded here (game + mod). If there is no local snapshot yet but <strong>Hosted AI</strong> is configured, suggestions use the server (e.g. data you already push to the VPS).</p>
 
                     <ul class="nav nav-pills nav-fill gap-2 mb-3 flex-column flex-sm-row" id="ai-fm-subtabs" role="tablist">
                       <li class="nav-item" role="presentation">
@@ -1094,6 +1094,27 @@
                             <li><strong class="text-light">Link key</strong> — secret string from your host (for this integration)</li>
                             <li><strong class="text-light">Send farm data</strong> — must be <strong>on</strong> for hosted features; your host enables matching mode on the server</li>
                           </ol>
+                          <div class="rounded border border-success border-opacity-50 p-2 p-md-3 mb-3 bg-dark bg-opacity-25">
+                            <h6 class="text-success mb-2 small"><i class="bi bi-lightning-charge me-1"></i>Quick connect (host gave you IP + port + key)</h6>
+                            <p class="small text-muted mb-2">If you were sent a <strong>public IP</strong> and <strong>port</strong> instead of one full URL, fill these and click <strong>Fill server URL</strong>. Then paste your <strong>link key</strong> below and save.</p>
+                            <div class="row g-2 align-items-end">
+                              <div class="col-md-5">
+                                <label class="form-label small mb-0" for="aiFarmHostedQuickHost">Host or IP</label>
+                                <input type="text" class="form-control form-control-sm font-monospace" id="aiFarmHostedQuickHost" placeholder="e.g. 203.0.113.5" autocomplete="off" spellcheck="false"/>
+                              </div>
+                              <div class="col-md-3">
+                                <label class="form-label small mb-0" for="aiFarmHostedQuickPort">Port</label>
+                                <input type="number" class="form-control form-control-sm font-monospace" id="aiFarmHostedQuickPort" min="1" max="65535" value="8081" autocomplete="off"/>
+                              </div>
+                              <div class="col-md-4">
+                                <div class="form-check mt-2 mt-md-4">
+                                  <input class="form-check-input" type="checkbox" id="aiFarmHostedQuickHttps"/>
+                                  <label class="form-check-label small" for="aiFarmHostedQuickHttps">Use HTTPS (reverse proxy / TLS)</label>
+                                </div>
+                              </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-success mt-2" id="aiFarmHostedQuickApply">Fill server URL from host + port</button>
+                          </div>
                           <div class="d-none mb-2" id="aiFarmBotSubscriptionTierRow" aria-hidden="true">
                             <label class="form-label small mb-0" for="aiFarmBotCurrentTierText">Current plan</label>
                             <p class="small mb-0 text-muted font-monospace" id="aiFarmBotCurrentTierText">—</p>

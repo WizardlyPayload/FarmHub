@@ -46,7 +46,8 @@
         </div>
       </div>
       <div class="callout">
-        <strong>Tip:</strong> Use <strong>Farm Dashboard &amp; data</strong> for JSON URL, server id, and link key info.
+        <strong>Tip:</strong> <strong>Farm Dashboard &amp; data</strong> sets <em>global defaults</em> (pull URL + optional default <code>serverId</code>).
+        <strong>Client connections</strong> is where you set <em>per connected dashboard</em> routing (one optional <code>serverId</code> + JSON URL override per link key).
         Use <strong>Chat bot &amp; LLM</strong> for API keys, Ollama base URL, and Smart suggestions test — keep them separate so you do not paste a dashboard URL into an API key field.
       </div>
       <div class="callout" style="border-left: 3px solid #d29922;">
@@ -62,23 +63,49 @@
     <!-- Client connections (multi-dashboard link keys) -->
     <section class="tab-panel card full" id="panel-clients" role="tabpanel" aria-labelledby="tab-btn-clients" {% if active_tab != 'clients' %}hidden{% endif %}>
       <h2 class="subh" style="margin-top:0;">Client connections</h2>
-      <p class="muted small">Each connection has a <strong>link key</strong> plus optional <strong>snapshot routing</strong> (default Farm Dashboard <code>serverId</code>, optional HTTP URL). The LLM is configured once on <strong>Chat bot &amp; LLM</strong>. Requests must use that client’s key in <code>X-FarmDash-Key</code> so <strong>their</strong> pushed JSON and <strong>their</strong> Smart suggestions stay separate from other clients.</p>
+      <p class="muted small">No file editing on your PC: save your <strong>public server URL</strong> once below, then create a <strong>link key</strong> per player. Optional per-client routing is further down — most hosts only need URL + key.</p>
+
+      <section class="card inner-card" style="border-left: 3px solid #3fb950;">
+        <h3 class="subh" style="margin-top:0;">Farm Dashboard invite URL (set once)</h3>
+        <p class="muted small" style="margin-bottom:0.75rem;">What players paste as <strong>Server URL</strong> — root only: <code>http://YOUR_PUBLIC_IP:PORT</code> or <code>https://your-domain</code>. No <code>/admin</code>, <code>/api</code>, or <code>/health</code>.</p>
+        <form method="post" action="/admin/api/settings" class="form" style="max-width:42rem;">
+          <input type="hidden" name="redirect_tab" value="clients"/>
+          <label class="row"><span>Invite base URL</span>
+            <input type="text" name="farmdash_invite_base_url" value="{{ farmdash_invite_base_url }}" placeholder="http://203.0.113.5:8081" autocomplete="off"/></label>
+          <p class="muted small" style="margin: -0.35rem 0 0.5rem 0;">Saved to <code>{{ env_file_path }}</code> as <code>FARMDASH_INVITE_BASE_URL</code> (or set the same variable in Docker / Coolify).</p>
+          <button type="submit" class="btn primary">Save invite URL</button>
+        </form>
+      </section>
+
+      <p class="muted small" style="margin-top:1rem;">Each <strong>connection</strong> below is one <strong>link key</strong>. The LLM is configured once on <strong>Chat bot &amp; LLM</strong>. In-game <strong>!hank</strong> chat (optional) uses <strong>Mod &amp; servers</strong> — not required for hosted Smart suggestions.</p>
 
       {% if revealed_new_key %}
       <div class="callout" style="border-left: 3px solid #238636;">
-        <strong>Copy this link key now</strong> (shown once in this banner; also saved under <code>data/farmdash_connections.json</code> on the server — protect that file).
-        <p class="mb-0 mt-1"><code id="copyOnceKey" style="user-select:all;">{{ revealed_new_key }}</code>
-        <button type="button" class="btn" style="margin-left:0.5rem;" onclick="navigator.clipboard.writeText(document.getElementById('copyOnceKey').textContent)">Copy</button></p>
+        <strong>New player — copy everything below</strong> (link key is also stored in <code>data/farmdash_connections.json</code> on this server).
+        {% if not farmdash_invite_base_url %}
+        <p class="warn small mb-2" style="margin-top:0.5rem;"><strong>Set “Farm Dashboard invite URL” above</strong> so the Server URL line is complete — or tell them your <code>http://IP:PORT</code> manually.</p>
+        {% endif %}
+        <pre id="copyPlayerInvite" class="small" style="white-space:pre-wrap;word-break:break-all;margin:0.5rem 0;padding:0.75rem;background:#0d1117;border-radius:6px;">Farm Dashboard → Settings → AI Farm Manager → Hosted AI
+
+Server URL: {{ farmdash_invite_base_url or "— set Invite base URL above —" }}
+Link key: {{ revealed_new_key }}
+
+Turn on “Send farm data”, then Save &amp; load.</pre>
+        <p class="mb-0">
+          <button type="button" class="btn" onclick="navigator.clipboard.writeText(document.getElementById('copyPlayerInvite').textContent)">Copy instructions + key</button>
+          <button type="button" class="btn" style="margin-left:0.35rem;" onclick="navigator.clipboard.writeText(document.getElementById('copyOnceKey').textContent)">Copy link key only</button>
+        </p>
+        <p class="mb-0 mt-1"><code id="copyOnceKey" style="user-select:all;">{{ revealed_new_key }}</code></p>
       </div>
       {% endif %}
 
       <section class="card inner-card">
         <h3 class="subh" style="margin-top:0;">Give a player only two things</h3>
         <ol class="small muted" style="margin:0;padding-left:1.25rem;line-height:1.6;">
-          <li><strong>Server URL</strong> — e.g. <code>http://YOUR_IP:8081</code> (or your HTTPS host).</li>
-          <li><strong>Link key</strong> — create below, or use the global <code>FARMDASH_INTEGRATION_KEY</code> for a single shared key.</li>
+          <li><strong>Server URL</strong> — the <strong>Invite base URL</strong> you saved above (or <code>http://YOUR_IP:PORT</code>).</li>
+          <li><strong>Link key</strong> — <strong>Create &amp; show link key</strong> below (one per player), or one shared <code>FARMDASH_INTEGRATION_KEY</code> for everyone.</li>
         </ol>
-        <p class="small muted mb-0">On their PC: Farm Dashboard → <strong>Settings → AI Farm Manager → Hosted AI</strong> → paste URL + key → enable <strong>Send farm data</strong> → <strong>Save &amp; load</strong>. Server needs <code>DASHBOARD_PUSH_MODE=1</code>.</p>
+        <p class="small muted mb-0">On their PC: Farm Dashboard → <strong>Settings → AI Farm Manager → Hosted AI</strong> — or use <strong>Quick connect (IP + port)</strong> on that tab if they only have IP + port + key. Enable <strong>Send farm data</strong> → <strong>Save &amp; load</strong>. On this server: <strong>Farm Dashboard &amp; data</strong> → <strong>Push mode</strong> on.</p>
       </section>
 
       <h3 class="subh">Registered connections</h3>
@@ -106,8 +133,8 @@
         </table>
       </div>
 
-      <h3 class="subh">Per-client snapshot routing</h3>
-      <p class="muted small">Use when a player has a fixed Farm Dashboard save id or a special HTTP source. <strong>Push mode</strong> still isolates RAM by link key; <strong>default server id</strong> picks the right buffer when their app does not send <code>?serverId=</code>. Leave URL empty to use the global <strong>Farm Dashboard JSON URL</strong> on the Farm tab.</p>
+      <h3 class="subh">Per-client snapshot routing (one block per connected dashboard)</h3>
+      <p class="muted small">This is the per-<strong>link-key</strong> equivalent of the global <strong>Farm Dashboard &amp; data</strong> form. Use when a player has a fixed Farm Dashboard save id or a special HTTP source. <strong>Push mode</strong> still isolates RAM by link key; <strong>default server id</strong> picks the right buffer when their app does not send <code>?serverId=</code>. Leave URL empty to use the global <strong>Farm Dashboard JSON URL</strong> on the Farm tab.</p>
       {% for c in farmdash_connections %}
       <section class="card inner-card" style="margin-bottom: 0.75rem;">
         <h4 class="subh" style="margin-top:0;">{{ c.label }} <span class="mono small muted">({{ c.id }})</span></h4>
@@ -139,6 +166,13 @@
       <h2 class="subh" style="margin-top:0;">Farm Dashboard &amp; snapshot data</h2>
       <p class="muted small">These settings control <strong>where this backend gets <code>/api/data</code>-shaped JSON</strong> (consultant, Hank context). They do <strong>not</strong> set LLM API keys — use the <strong>Chat bot &amp; LLM</strong> tab for that.</p>
 
+      <div class="callout" style="border-left: 3px solid #58a6ff;">
+        <strong>One form here — not one per PC.</strong> This page sets <strong>global defaults</strong> (fallback for pull mode and when a client leaves overrides empty).
+        <strong>Each connected Farm Dashboard</strong> (each player’s <strong>link key</strong>) gets its own optional <code>serverId</code> and JSON URL on
+        <a href="/admin?tab=clients">Client connections</a> under <em>Per-client snapshot routing</em>.
+        In <strong>push mode</strong>, snapshots are already isolated per key; per-client <code>serverId</code> only matters when the app does not send <code>?serverId=</code>.
+      </div>
+
       <div class="readonly-block">
         <div class="readonly-row"><span class="readonly-k">PUBLIC_BASE_URL</span><code class="readonly-v">{{ public_base_url or "(not set — set for generated mod XML / links)" }}</code></div>
         <div class="readonly-row"><span class="readonly-k">FARMDASH_INTEGRATION_KEY</span><code class="readonly-v">{{ farmdash_integration_key_masked }}</code></div>
@@ -161,17 +195,29 @@
       <section class="card inner-card" style="border-left: 4px solid #6ea8fe;">
         <h3 class="subh" style="margin-top:0;">How data reaches this server</h3>
         <p class="muted small" style="margin-bottom:0;">
-          <strong>Recommended (VPS):</strong> <code>DASHBOARD_PUSH_MODE=1</code> in this server’s environment, leave <strong>Farm Dashboard JSON URL</strong> empty below, and on the PC enable <strong>Send farm data to the AI server</strong> (Settings → AI Farm Manager) with the same <strong>link key</strong> as <code>FARMDASH_INTEGRATION_KEY</code> above.
+          <strong>Recommended (VPS):</strong> turn <strong>Push mode</strong> <em>On</em> in the form below (writes <code>DASHBOARD_PUSH_MODE=1</code>), leave <strong>Farm Dashboard JSON URL</strong> empty, and on the PC enable <strong>Send farm data to the AI server</strong> (Farm Dashboard → Settings → AI Farm Manager → Hosted AI) with the same <strong>link key</strong> as <code>FARMDASH_INTEGRATION_KEY</code> (or a per-client key from Client connections).
           <br/><br/>
           <strong>Alternative:</strong> G-Portal FTP, or an HTTP URL to Farm Dashboard — must be reachable <strong>from this backend</strong> (not <code>127.0.0.1</code> from inside Docker unless you use host networking).
         </p>
         {% if dashboard_push_mode %}
         <p class="muted small" style="margin: 0.75rem 0 0 0;"><strong>Push mode is on</strong> — snapshots are expected from the desktop app; HTTP URL below is often unused.</p>
+        {% else %}
+        <p class="muted small" style="margin: 0.75rem 0 0 0;"><strong>Push mode is off</strong> — Farm Dashboard cannot POST snapshots until you enable it below (or set <code>DASHBOARD_PUSH_MODE=1</code> in environment).</p>
         {% endif %}
       </section>
 
       <form method="post" action="/admin/api/settings" class="form">
         <input type="hidden" name="redirect_tab" value="farm"/>
+        <label class="row">
+          <span>Push mode — accept farm data from PCs (<code>DASHBOARD_PUSH_MODE</code>)</span>
+          <span class="inline">
+            <label><input type="radio" name="dashboard_push_mode" value="true" {% if dashboard_push_mode %}checked{% endif %}/> On</label>
+            <label><input type="radio" name="dashboard_push_mode" value="false" {% if not dashboard_push_mode %}checked{% endif %}/> Off</label>
+          </span>
+        </label>
+        <p class="muted small" style="margin: -0.35rem 0 0.75rem 0;">
+          When <strong>On</strong>, this server accepts <code>POST /api/integration/push-snapshot</code> from Farm Dashboard. Saves to <code>{{ env_file_path }}</code> and applies immediately (no restart). If your host only injects env at container start and does not mount a writable <code>.env</code>, set <code>DASHBOARD_PUSH_MODE=1</code> there instead.
+        </p>
         <label class="row">
           <span>Farm Dashboard JSON URL (optional)</span>
           <input type="url" name="dashboard_json_url" value="{{ dashboard_url }}" placeholder="http://127.0.0.1:8766/api/data"/>

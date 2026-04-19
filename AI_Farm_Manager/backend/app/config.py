@@ -201,6 +201,9 @@ def raw_openai_or_ollama_base_url() -> str:
 @lru_cache
 def get_settings() -> dict:
     llm_provider = os.getenv("LLM_PROVIDER", "openai").lower().strip()
+    # Portainer users often set LLM_PROVIDER=ollama; routing still uses the OpenAI-compatible SDK path.
+    if llm_provider == "ollama":
+        llm_provider = "openai"
     llm_api_key = os.getenv("LLM_API_KEY", "")
     gemini_api_key = _strip_key(os.getenv("GEMINI_API_KEY", ""))
     gemini_api_keys, gemini_key_raw_slots = _parse_gemini_key_list(llm_provider, llm_api_key)
@@ -238,6 +241,7 @@ def get_settings() -> dict:
         "server_token": os.getenv("SERVER_TOKEN", ""),
         "llm_api_key": llm_api_key,
         "openai_base_url": openai_base_url,
+        "openai_base_configured": openai_base_configured,
         "llm_model": os.getenv("LLM_MODEL", "gpt-4o-mini"),
         "llm_provider": llm_provider,
         "gemini_api_key": gemini_api_key,

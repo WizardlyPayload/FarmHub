@@ -37,11 +37,11 @@
         </div>
         <div class="status-pill {% if llm_configured %}ok{% else %}warn{% endif %}">
           <span class="status-label">LLM ready</span>
-          <span class="status-value">{% if llm_configured %}Keys/base URL look OK for {{ llm_provider }}{% else %}Configure keys or OPENAI_BASE_URL on Chat bot tab{% endif %}</span>
+          <span class="status-value">{% if llm_configured %}Keys/base URL look OK{% if llm_provider == 'gemini' %} (Gemini){% elif openai_base_configured %} (OpenAI-compatible — e.g. Ollama){% else %} (OpenAI cloud){% endif %}{% else %}Set LLM_API_KEY and/or OPENAI_BASE_URL or OLLAMA_BASE_URL on Chat bot tab{% endif %}</span>
         </div>
         <div class="status-pill neutral">
           <span class="status-label">Provider / model</span>
-          <span class="status-value">{{ llm_provider }} · {% if llm_provider == 'gemini' %}{{ gemini_model }}{% else %}{{ llm_model }}{% endif %}</span>
+          <span class="status-value">{% if llm_provider == 'gemini' %}Gemini · {{ gemini_model }}{% else %}openai (SDK) · {{ llm_model }}{% if openai_base_configured %} @ local / LAN{% endif %}{% endif %}</span>
         </div>
       </div>
       <div class="callout">
@@ -49,13 +49,12 @@
         Use <strong>Chat bot &amp; LLM</strong> for API keys, Ollama base URL, and Smart suggestions test — keep them separate so you do not paste a dashboard URL into an API key field.
       </div>
       <div class="callout" style="border-left: 3px solid #d29922;">
-        <strong>Why saves might “not stick” (Docker / Coolify):</strong>
+        <strong>Why saves might “not stick” (Docker / Portainer / TrueNAS / Coolify):</strong>
         Admin writes settings to <code>{{ env_file_path }}</code>
-        {% if env_file_exists %}(file exists){% else %}(no file yet — it will be created on first save){% endif %}.
-        Coolify and Docker inject environment variables at container start. The app now loads <code>.env</code> with
-        <strong>override</strong> so file values beat duplicate keys after a restart — but the file must
-        <strong>persist</strong>. Bind-mount <code>./.env:/app/.env</code> (see <code>docker-compose.yml</code>; run <code>touch .env</code> on the host first)
-        or manage variables only in Coolify’s <strong>Environment</strong> UI and treat /admin as optional.
+        {% if env_file_exists %}(file exists){% else %}(no file yet — created on first save if the path is writable){% endif %}.
+        The platform injects environment at container start; the app loads <code>.env</code> with <strong>override</strong> when a file exists.
+        For persistence, bind-mount a host file to <code>/app/.env</code> or set variables only in <strong>Portainer / Coolify Environment</strong> (recommended on TrueNAS when no bind mount).
+        <strong>LLM_PROVIDER</strong> must be <code>openai</code> or <code>gemini</code> — not <code>ollama</code>; use <code>OLLAMA_BASE_URL</code> / <code>OPENAI_BASE_URL</code> for Ollama.
       </div>
     </section>
 

@@ -7,6 +7,8 @@
  * from the Gemini API docs.
  */
 
+const { slimFieldForConsultantLlm } = require('./consultantSnapshotPrune');
+
 const OPENAI_MODEL = process.env.FARMDASH_BYOK_OPENAI_MODEL || 'gpt-4o-mini';
 /** Default; override if Google renames — do not use deprecated 1.5 Flash. */
 const GEMINI_MODEL = process.env.FARMDASH_BYOK_GEMINI_MODEL || 'gemini-2.0-flash';
@@ -17,8 +19,28 @@ const GEMINI_MODEL = process.env.FARMDASH_BYOK_GEMINI_MODEL || 'gemini-2.0-flash
 const LOCAL_OPENAI_COMPAT_DEFAULT_MODEL =
     process.env.FARMDASH_BYOK_LOCAL_MODEL || 'llama3.2';
 
+/** Full cloud OpenAI chat (large context models). */
 const MAX_SNAPSHOT_CHARS_OPENAI = 118000;
 const MAX_SNAPSHOT_CHARS_GEMINI = 65000;
+/**
+ * Ollama / LM Studio / vLLM often use num_ctx 4096. The **chat template + system + user JSON** must fit;
+ * large JSON (e.g. 14k chars) can still tokenize to 8k+ tokens and trigger truncation + slow runs.
+ * Defaults assume num_ctx=4096; raise FARMDASH_* caps only after increasing OLLAMA_CONTEXT_LENGTH on the server.
+ */
+const MAX_SNAPSHOT_CHARS_OPENAI_COMPAT =
+    Number(process.env.FARMDASH_BYOK_OPENAI_COMPAT_MAX_CHARS) || 5200;
+/** Parallel Ollama shard calls — default 1 so a single-GPU box does not pile up long generations. */
+const OLLAMA_SHARD_CONCURRENCY = Math.min(
+    4,
+    Math.max(1, Number(process.env.FARMDASH_OLLAMA_SHARD_CONCURRENCY) || 1)
+);
+/** Serialized JSON length per shard request (chars). Keep low so prompt tokens stay under num_ctx. */
+const OLLAMA_SHARD_MAX_JSON_CHARS =
+    Number(process.env.FARMDASH_OLLAMA_SHARD_MAX_JSON_CHARS) || 4500;
+/** Field-map mode: fields per Ollama shard (each insight = one field). Smaller = fewer prompt tokens. */
+const OLLAMA_FIELD_MAP_BATCH = Math.max(1, Number(process.env.FARMDASH_OLLAMA_FIELD_MAP_BATCH) || 4);
+/** Non-map fields view: fields per shard. */
+const OLLAMA_FIELDS_VIEW_BATCH = Math.max(1, Number(process.env.FARMDASH_OLLAMA_FIELDS_VIEW_BATCH) || 4);
 const MAX_FIELD_MAP_ROWS = 80;
 
 const BASE_JSON_RULES = `You MUST respond with ONLY valid JSON (no markdown fences) in this exact shape:
@@ -27,6 +49,11 @@ const BASE_JSON_RULES = `You MUST respond with ONLY valid JSON (no markdown fenc
 Rules:
 - category Field — only for parcel-specific tips; set field_ref to that parcel's farmlandId or id (number or string). Omit or null for general tips.
 - priority must be exactly Low, Medium, or High (spell Medium in full).
+- **message** must be plain English: one short imperative sentence. No fictional character names, no roleplay, no "Name:/" or "Name: /" prefixes.
+- **Ground truth:** Every tip must follow the JSON snapshot for that parcel. If growthState / harvestReady / fruitType / nitrogenLevel vs targetNitrogen / pH or lime hints contradict an action, do not recommend that action.
+- Harvested, mulched stubble, empty, or growthState 0 with no active crop: do not advise mid-season spray, herbicide on a standing crop, or sowing as if the crop is already growing.
+- Late growth (high growthState or growth stage): do not advise sowing or planting that same crop.
+- Large nitrogen shortfall vs target (when JSON shows it): prioritize fertilizing (solid/slurry/liquid N) before generic mowing or cosmetic maintenance.
 - Never write "weed level" or numeric weed severity — say weeds / needs spraying.
 - Grass/meadow forage: never assign a grain combine; use mower/baler/forage harvester language.
 - Late growth + weeds: herbicide/sprayer not mechanical weeder.
@@ -38,12 +65,15 @@ function viewInstruction(view, context) {
     const ctx = String(context || '').toLowerCase();
 
     if (ctx === 'fields' && v === 'fields') {
-        return `FIELD MAP MODE: You MUST output exactly ONE insight per field object in the JSON "fields" array (same length as fields.length). Each insight: category "Field", field_ref set to that field's farmlandId or id, reasoning "". Put the full tip in message with a mentor prefix (Ben:/Walter:/Katie:/etc.). At most ${MAX_FIELD_MAP_ROWS} fields are included if the farm is huge.`;
+        return `FIELD MAP MODE: Output exactly ONE insight per object in "fields" (insights.length MUST equal fields.length). Order insights in the same order as the "fields" array.
+Each item: category "Field"; field_ref = that field's farmlandId or id; reasoning "".
+For EACH field, read only that object's keys (e.g. fruitType, growthState, growthStatePercentage, harvestReady, growthLabel, nitrogenLevel, targetNitrogen, nitrogenText, needsWork, lime/pH hints). The **message** must describe the single most important next action consistent with those values — not a generic farming essay.
+Hard rules: (1) If harvested / mulched / no standing crop, do not recommend spraying or weeding a standing crop, or sowing as if the crop were not yet planted. (2) If the crop is already well along (late growthState), never recommend sowing that crop. (3) If nitrogen is far below target, mention fertilizing before routine mowing. (4) Plain English only — no mentor names or "Name:/" prefixes. At most ${MAX_FIELD_MAP_ROWS} fields if the farm is huge.`;
     }
 
     const map = {
         home: `VIEW home: Return exactly 3 insights — the top priorities for this farm next (different angles if possible: field work, fleet/logistics, animals/money/production).`,
-        fields: `VIEW fields: Focus on crops, growth, soil, harvest readiness; prefer Field category with field_ref when one parcel is meant. At most 4 insights.`,
+        fields: `VIEW fields: Focus on crops, growth, soil, harvest readiness; prefer Field category with field_ref when one parcel is meant. Ground every tip in the JSON (growth, harvest state, N, pH). At most 4 insights.`,
         vehicles: `VIEW vehicles: Fleet only — maintenance, fuel, damage, hours. Use Production category. If fleet looks fine, one reassuring insight. At most 3 insights.`,
         pastures: `VIEW pastures: Grazing, pasture levels, manure, herd on pasture. At most 4 insights.`,
         livestock: `VIEW livestock: Barn animals, feed, water, health, production. At most 4 insights.`,
@@ -59,6 +89,53 @@ function buildSystemPrompt(view, context) {
 ${viewInstruction(view, context)}
 
 ${BASE_JSON_RULES}`;
+}
+
+/** Legacy prompts asked for "Ben:/" style prefixes; strip so cards stay readable if the model still emits them. */
+function stripLeadingMentorPrefix(text) {
+    if (typeof text !== 'string') return text;
+    const t = text.trim();
+    const stripped = t.replace(/^[A-Za-z][A-Za-z0-9\s]{0,28}:\s*\/?\s*/, '').trim();
+    return stripped || t;
+}
+
+function sanitizeConsultantInsights(insights) {
+    if (!Array.isArray(insights)) return [];
+    return insights.map((ins) => {
+        if (!ins || typeof ins !== 'object') return ins;
+        const next = { ...ins };
+        if (typeof next.message === 'string') next.message = stripLeadingMentorPrefix(next.message);
+        if (typeof next.reasoning === 'string') next.reasoning = stripLeadingMentorPrefix(next.reasoning);
+        return next;
+    });
+}
+
+function isFieldMapView(view, context) {
+    return String(context || '').toLowerCase() === 'fields' && String(view || '').toLowerCase() === 'fields';
+}
+
+function consultantLlmTemperature(view, context) {
+    return isFieldMapView(view, context) ? 0.22 : 0.35;
+}
+
+/** Drop heavy field keys before Ollama; keeps prompts within num_ctx. */
+function slimFieldsList(fields) {
+    if (!Array.isArray(fields)) return [];
+    const out = [];
+    for (const row of fields) {
+        const s = slimFieldForConsultantLlm(row);
+        if (s) out.push(s);
+    }
+    return out;
+}
+
+function slimSnapshotForOllama(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') return snapshot;
+    const o = JSON.parse(JSON.stringify(snapshot));
+    if (Array.isArray(o.fields)) {
+        o.fields = slimFieldsList(o.fields);
+    }
+    return o;
 }
 
 function truncateSnapshotString(s, max) {
@@ -144,44 +221,66 @@ function normalizeOpenAiCompatBase(raw) {
     return s.toLowerCase().includes('/v1') ? s : `${s}/v1`;
 }
 
-async function callOpenAiChat(system, userText, apiKey, modelId, openaiBaseUrl) {
+/** Use smaller snapshot for self-hosted OpenAI-compatible APIs; full MAX_SNAPSHOT_CHARS_OPENAI for api.openai.com only. */
+function openAiCompatSnapshotCharCap(openaiBaseUrl) {
+    try {
+        const b = normalizeOpenAiCompatBase(openaiBaseUrl);
+        if (!b) return MAX_SNAPSHOT_CHARS_OPENAI;
+        const origin = b.replace(/\/v1\/?$/i, '');
+        const host = new URL(origin).hostname.toLowerCase();
+        if (host === 'api.openai.com') return MAX_SNAPSHOT_CHARS_OPENAI;
+    } catch {
+        /* fall through */
+    }
+    return Math.min(MAX_SNAPSHOT_CHARS_OPENAI, MAX_SNAPSHOT_CHARS_OPENAI_COMPAT);
+}
+
+async function callOpenAiChat(system, userText, apiKey, modelId, openaiBaseUrl, maxTokensOpt, temperatureOpt) {
     const model = (modelId && String(modelId).trim()) || OPENAI_MODEL;
     const base = normalizeOpenAiCompatBase(openaiBaseUrl);
     const url = base ? `${base}/chat/completions` : 'https://api.openai.com/v1/chat/completions';
     const authKey = (apiKey && String(apiKey).trim()) || 'ollama';
+    const maxTok =
+        maxTokensOpt != null && Number.isFinite(Number(maxTokensOpt)) ? Math.max(256, Number(maxTokensOpt)) : 4096;
+    const temp =
+        temperatureOpt != null && Number.isFinite(Number(temperatureOpt))
+            ? Math.min(1, Math.max(0, Number(temperatureOpt)))
+            : 0.35;
     const messages = [
         { role: 'system', content: system },
         { role: 'user', content: `Farm snapshot JSON:\n${userText}` },
     ];
     const payloadWithFormat = {
         model,
-        temperature: 0.35,
-        max_tokens: 4096,
+        temperature: temp,
+        max_tokens: maxTok,
         response_format: { type: 'json_object' },
         messages,
     };
     const payloadPlain = {
         model,
-        temperature: 0.35,
-        max_tokens: 4096,
+        temperature: temp,
+        max_tokens: maxTok,
         messages,
     };
-    let r = await fetch(url, {
+    const fetchInitBase = {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${authKey}`,
         },
+    };
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+        fetchInitBase.signal = AbortSignal.timeout(900000);
+    }
+    let r = await fetch(url, {
+        ...fetchInitBase,
         body: JSON.stringify(payloadWithFormat),
     });
     let txt = await r.text();
     if (!r.ok && base && (r.status === 400 || r.status === 422)) {
         const retry = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${authKey}`,
-            },
+            ...fetchInitBase,
             body: JSON.stringify(payloadPlain),
         });
         txt = await retry.text();
@@ -196,8 +295,12 @@ async function callOpenAiChat(system, userText, apiKey, modelId, openaiBaseUrl) 
     return String(out);
 }
 
-async function callGeminiGenerate(system, userText, apiKey, modelId) {
+async function callGeminiGenerate(system, userText, apiKey, modelId, temperatureOpt) {
     const mid = modelId != null ? modelId : GEMINI_MODEL;
+    const temp =
+        temperatureOpt != null && Number.isFinite(Number(temperatureOpt))
+            ? Math.min(1, Math.max(0, Number(temperatureOpt)))
+            : 0.35;
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
         mid
     )}:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -208,7 +311,7 @@ async function callGeminiGenerate(system, userText, apiKey, modelId) {
             systemInstruction: { parts: [{ text: system }] },
             contents: [{ parts: [{ text: `Farm snapshot JSON:\n${userText}` }] }],
             generationConfig: {
-                temperature: 0.35,
+                temperature: temp,
                 maxOutputTokens: 8192,
                 responseMimeType: 'application/json',
             },
@@ -236,9 +339,15 @@ async function runByokConsultantLlm(opts) {
         throw new Error('Missing API key or OpenAI-compatible base URL');
     }
     const prep = prepareSnapshotPayload(snapshot, view, context);
-    const max = provider === 'gemini' ? MAX_SNAPSHOT_CHARS_GEMINI : MAX_SNAPSHOT_CHARS_OPENAI;
+    const max =
+        provider === 'gemini'
+            ? MAX_SNAPSHOT_CHARS_GEMINI
+            : openaiBaseUrl && String(openaiBaseUrl).trim()
+              ? openAiCompatSnapshotCharCap(openaiBaseUrl)
+              : MAX_SNAPSHOT_CHARS_OPENAI;
     const userJson = truncateSnapshotString(JSON.stringify(prep), max);
     const system = buildSystemPrompt(view, context);
+    const temp = consultantLlmTemperature(view, context);
 
     const mid = modelId && String(modelId).trim() ? String(modelId).trim() : '';
     /** Cloud OpenAI: default gpt-4o-mini inside callOpenAiChat. Local /v1 servers: must not use that default. */
@@ -251,17 +360,19 @@ async function runByokConsultantLlm(opts) {
     }
     const raw =
         provider === 'gemini'
-            ? await callGeminiGenerate(system, userJson, apiKey, mid || null)
+            ? await callGeminiGenerate(system, userJson, apiKey, mid || null, temp)
             : await callOpenAiChat(
                   system,
                   userJson,
                   apiKey,
                   openaiChatModel || null,
-                  openaiBaseUrl || null
+                  openaiBaseUrl || null,
+                  undefined,
+                  temp
               );
 
     const parsed = extractJsonObject(raw);
-    const insights = Array.isArray(parsed.insights) ? parsed.insights : [];
+    const insights = sanitizeConsultantInsights(Array.isArray(parsed.insights) ? parsed.insights : []);
     return {
         insights,
         llm_used: true,
@@ -269,9 +380,329 @@ async function runByokConsultantLlm(opts) {
     };
 }
 
+const SHARD_JSON_RULES = `Reply with ONLY JSON: {"insights":[{"category":"Field|Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null}]}
+category Field → set field_ref to farmlandId or id. Plain English messages; no "Name:/" prefixes.`;
+
+function ollamaShardViewBlurb(view, context) {
+    const v = String(view || 'home').toLowerCase();
+    const ctx = String(context || '').toLowerCase();
+    if (ctx === 'fields' && v === 'fields') {
+        return 'FIELD MAP: Exactly one insight per object in fields[] (same length and order). Each message must match that row JSON (growth, harvest, N, pH).';
+    }
+    const map = {
+        home: 'Pick the most urgent actionable items visible in this shard.',
+        fields: 'Crops/soil/harvest; use field_ref for a specific parcel.',
+        vehicles: 'Fleet only.',
+        pastures: 'Pastures and grazing.',
+        livestock: 'Barn animals.',
+        productions: 'Production chains.',
+        economy: 'Only use inventory/finance shown in JSON.',
+    };
+    return map[v] || map.home;
+}
+
+function chunkArray(arr, size) {
+    if (!Array.isArray(arr) || size < 1) return [];
+    const out = [];
+    for (let i = 0; i < arr.length; i += size) {
+        out.push(arr.slice(i, i + size));
+    }
+    return out;
+}
+
+function baseShardMeta(snap) {
+    const o = snap && typeof snap === 'object' ? snap : {};
+    return {
+        activeFarmId: o.activeFarmId,
+        _consultant_farm_scope: o._consultant_farm_scope,
+        _prunedView: o._prunedView,
+        gameTime: o.gameTime,
+        timestamp: o.timestamp,
+        _field_map_mode: o._field_map_mode,
+    };
+}
+
+function buildOllamaShardSystemPrompt(view, context, shardLabel, shardIndex, shardTotal) {
+    const v = String(view || 'home').toLowerCase();
+    const ctx = String(context || '').toLowerCase();
+    const fieldMap = ctx === 'fields' && v === 'fields';
+    const blurb = ollamaShardViewBlurb(view, context);
+    const tail = fieldMap
+        ? `Insights count must equal fields.length in this JSON.`
+        : `At most 3 insights for this response.`;
+    return `FS25 farm consultant — shard "${shardLabel}" (${shardIndex + 1}/${shardTotal}). User message is JSON only.
+
+${blurb}
+
+${SHARD_JSON_RULES}
+${tail}`;
+}
+
+/**
+ * Split pruned snapshot into several small payloads so each Ollama request stays under num_ctx.
+ */
+function buildOllamaShards(pruned, view, context) {
+    const v = String(view || 'home').toLowerCase();
+    const ctx = String(context || '').toLowerCase();
+    const meta = baseShardMeta(pruned);
+    const shards = [];
+
+    if (ctx === 'fields' && v === 'fields') {
+        const fields = slimFieldsList(Array.isArray(pruned.fields) ? pruned.fields : []);
+        const batches = chunkArray(fields, OLLAMA_FIELD_MAP_BATCH);
+        const vehSlim = Array.isArray(pruned.vehicles) ? pruned.vehicles.slice(0, 12) : [];
+        for (let b = 0; b < batches.length; b++) {
+            shards.push({
+                label: `field map ${b + 1}/${batches.length}`,
+                snapshot: {
+                    ...meta,
+                    fields: batches[b],
+                    vehicles: vehSlim,
+                    _field_map_mode: true,
+                },
+            });
+        }
+        return shards.length ? shards : [{ label: 'field map', snapshot: slimSnapshotForOllama(pruned) }];
+    }
+
+    if (v === 'fields') {
+        const fields = slimFieldsList(Array.isArray(pruned.fields) ? pruned.fields : []);
+        const batches = chunkArray(fields, OLLAMA_FIELDS_VIEW_BATCH);
+        const vehSlim = Array.isArray(pruned.vehicles) ? pruned.vehicles.slice(0, 16) : [];
+        for (let b = 0; b < batches.length; b++) {
+            shards.push({
+                label: `fields ${b + 1}/${batches.length}`,
+                snapshot: { ...meta, fields: batches[b], vehicles: vehSlim },
+            });
+        }
+        return shards.length ? shards : [{ label: 'fields', snapshot: slimSnapshotForOllama(pruned) }];
+    }
+
+    if (v === 'vehicles') {
+        const veh = Array.isArray(pruned.vehicles) ? pruned.vehicles : [];
+        if (veh.length === 0) {
+            return [{ label: 'fleet', snapshot: pruned }];
+        }
+        if (veh.length <= 16) {
+            return [{ label: 'fleet', snapshot: pruned }];
+        }
+        const batches = chunkArray(veh, 12);
+        for (let b = 0; b < batches.length; b++) {
+            shards.push({
+                label: `vehicles ${b + 1}/${batches.length}`,
+                snapshot: { ...meta, vehicles: batches[b] },
+            });
+        }
+        return shards;
+    }
+
+    if (v === 'livestock') {
+        const animals = Array.isArray(pruned.animals) ? pruned.animals : [];
+        if (animals.length === 0) {
+            return [{ label: 'livestock', snapshot: pruned }];
+        }
+        if (animals.length <= 10) {
+            return [{ label: 'livestock', snapshot: pruned }];
+        }
+        const batches = chunkArray(animals, 8);
+        for (let b = 0; b < batches.length; b++) {
+            shards.push({
+                label: `animals ${b + 1}/${batches.length}`,
+                snapshot: { ...meta, animals: batches[b] },
+            });
+        }
+        return shards;
+    }
+
+    if (v === 'pastures') {
+        const past = Array.isArray(pruned.pastures) ? pruned.pastures : [];
+        const anim = Array.isArray(pruned.animals) ? pruned.animals : [];
+        if (past.length === 0) {
+            return [{ label: 'pastures', snapshot: pruned }];
+        }
+        if (past.length <= 5) {
+            return [{ label: 'pastures', snapshot: pruned }];
+        }
+        const batches = chunkArray(past, 4);
+        for (let b = 0; b < batches.length; b++) {
+            shards.push({
+                label: `pastures ${b + 1}/${batches.length}`,
+                snapshot: { ...meta, pastures: batches[b], animals: anim.slice(0, 16) },
+            });
+        }
+        return shards;
+    }
+
+    if (v === 'productions') {
+        const prod = pruned.production && typeof pruned.production === 'object' ? pruned.production : {};
+        const chains = Array.isArray(prod.chains) ? prod.chains : [];
+        if (chains.length === 0) {
+            return [{ label: 'production', snapshot: pruned }];
+        }
+        if (chains.length <= 5) {
+            return [{ label: 'production', snapshot: pruned }];
+        }
+        const batches = chunkArray(chains, 4);
+        for (let b = 0; b < batches.length; b++) {
+            shards.push({
+                label: `chains ${b + 1}/${batches.length}`,
+                snapshot: { ...meta, production: { ...prod, chains: batches[b] } },
+            });
+        }
+        return shards;
+    }
+
+    if (v === 'economy') {
+        return [
+            {
+                label: 'economy-held-prices',
+                snapshot: {
+                    ...meta,
+                    _consultant_held_fill_types: pruned._consultant_held_fill_types,
+                    _consultant_finance_facts: pruned._consultant_finance_facts,
+                    _consultant_economy_inventory_scope: pruned._consultant_economy_inventory_scope,
+                    economy: pruned.economy,
+                    money: pruned.money,
+                    finance: pruned.finance,
+                },
+            },
+            {
+                label: 'economy-fields-production',
+                snapshot: {
+                    ...meta,
+                    fields: slimFieldsList(Array.isArray(pruned.fields) ? pruned.fields.slice(0, 28) : []),
+                    production: pruned.production,
+                    productionPoints: pruned.productionPoints,
+                },
+            },
+        ];
+    }
+
+    const fields = slimFieldsList(Array.isArray(pruned.fields) ? pruned.fields : []);
+    const vehicles = pruned.vehicles || [];
+    const animals = pruned.animals || [];
+    const pastures = pruned.pastures || [];
+    const prod = pruned.production;
+    const slimProd =
+        prod && typeof prod === 'object' && Array.isArray(prod.chains)
+            ? { ...prod, chains: prod.chains.slice(0, 8) }
+            : prod;
+
+    shards.push({ label: 'crops', snapshot: { ...meta, fields: fields.slice(0, 10) } });
+    shards.push({ label: 'fleet', snapshot: { ...meta, vehicles: vehicles.slice(0, 16) } });
+    shards.push({ label: 'herd', snapshot: { ...meta, animals: animals.slice(0, 12) } });
+    shards.push({
+        label: 'pastures-weather',
+        snapshot: { ...meta, pastures: pastures.slice(0, 8), weather: pruned.weather },
+    });
+    shards.push({ label: 'production', snapshot: { ...meta, production: slimProd } });
+    return shards;
+}
+
+function priorityRank(p) {
+    const s = String(p || '')
+        .toLowerCase()
+        .trim();
+    if (s === 'high') return 0;
+    if (s === 'medium') return 1;
+    if (s === 'low') return 2;
+    return 3;
+}
+
+function mergeShardInsights(insights, view, context) {
+    const v = String(view || 'home').toLowerCase();
+    const ctx = String(context || '').toLowerCase();
+    const list = Array.isArray(insights) ? insights.filter((x) => x && typeof x === 'object') : [];
+    list.sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority));
+
+    let cap = 6;
+    if (ctx === 'fields' && v === 'fields') {
+        cap = 80;
+    } else if (v === 'home') {
+        cap = 3;
+    } else if (v === 'vehicles') {
+        cap = 3;
+    } else if (v === 'fields' || v === 'pastures' || v === 'livestock' || v === 'productions') {
+        cap = 4;
+    } else if (v === 'economy') {
+        cap = 4;
+    }
+
+    return list.slice(0, cap);
+}
+
+/**
+ * Several small /v1/chat/completions calls (Ollama on LAN) — fits default num_ctx; merge insights.
+ */
+async function runByokConsultantLlmOllamaSharded(opts) {
+    const { snapshot, view, context, apiKey, modelId, openaiBaseUrl } = opts;
+    const hasBase = !!(openaiBaseUrl && String(openaiBaseUrl).trim());
+    if (!hasBase) {
+        return runByokConsultantLlm(opts);
+    }
+
+    const mid =
+        modelId && String(modelId).trim()
+            ? String(modelId).trim()
+            : LOCAL_OPENAI_COMPAT_DEFAULT_MODEL;
+
+    const shards = buildOllamaShards(snapshot, view, context);
+    if (shards.length <= 1) {
+        return runByokConsultantLlm({ ...opts, snapshot: slimSnapshotForOllama(opts.snapshot) });
+    }
+
+    const v = String(view || 'home').toLowerCase();
+    const ctx = String(context || '').toLowerCase();
+
+    const all = [];
+    for (let i = 0; i < shards.length; i += OLLAMA_SHARD_CONCURRENCY) {
+        const wave = shards.slice(i, i + OLLAMA_SHARD_CONCURRENCY);
+        const waveResults = await Promise.all(
+            wave.map(async (sh, j) => {
+                const idx = i + j;
+                const prep = prepareSnapshotPayload(sh.snapshot, view, context);
+                const userJson = truncateSnapshotString(JSON.stringify(prep), OLLAMA_SHARD_MAX_JSON_CHARS);
+                const system = buildOllamaShardSystemPrompt(view, context, sh.label, idx, shards.length);
+                const shardTemp =
+                    sh.snapshot && sh.snapshot._field_map_mode === true
+                        ? consultantLlmTemperature(view, context)
+                        : 0.35;
+                const nFields = sh.snapshot && Array.isArray(sh.snapshot.fields) ? sh.snapshot.fields.length : 0;
+                let maxTok = 768;
+                if (ctx === 'fields' && v === 'fields' && sh.snapshot && sh.snapshot._field_map_mode) {
+                    maxTok = Math.min(1536, 128 + nFields * 140);
+                } else if (v === 'home') {
+                    maxTok = 512;
+                }
+                const raw = await callOpenAiChat(
+                    system,
+                    userJson,
+                    apiKey,
+                    mid,
+                    openaiBaseUrl,
+                    maxTok,
+                    shardTemp
+                );
+                const parsed = extractJsonObject(raw);
+                return sanitizeConsultantInsights(Array.isArray(parsed.insights) ? parsed.insights : []);
+            })
+        );
+        for (const part of waveResults) {
+            all.push(...part);
+        }
+    }
+
+    return {
+        insights: sanitizeConsultantInsights(mergeShardInsights(all, view, context)),
+        llm_used: true,
+    };
+}
+
 module.exports = {
     runByokConsultantLlm,
+    runByokConsultantLlmOllamaSharded,
     OPENAI_MODEL,
     GEMINI_MODEL,
     LOCAL_OPENAI_COMPAT_DEFAULT_MODEL,
+    MAX_SNAPSHOT_CHARS_OPENAI_COMPAT,
 };

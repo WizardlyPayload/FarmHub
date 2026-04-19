@@ -418,27 +418,26 @@ async function refreshSettingsDashboardAiConnectionLine() {
     el.textContent = "—";
     return;
   }
-  const conn = await api.getAiManagerConnection().catch(() => ({}));
-  const meta = await api.getConsultantByokMeta().catch(() => ({}));
-  const base = conn?.baseUrl && String(conn.baseUrl).trim();
-  const ikey = conn?.integrationKey && String(conn.integrationKey).trim();
-  const hasHosted = !!(base && ikey);
-  const hasByok = !!meta?.hasKey;
+  const st = (await api.getAiSuggestionSettings?.().catch(() => null)) || null;
+  const mode = st?.mode || "";
   const chatNote =
-    '<span class="d-block small text-muted mt-2">In-game <strong>!hank</strong> chat is separate (hosted bot profiles only) — see <strong>In-game chat</strong> in that tab; BYOK does not enable chat.</span>';
+    '<span class="d-block small text-muted mt-2">In-game <strong>!hank</strong> only when <strong>Hosted AI server</strong> is the active Smart suggestions mode.</span>';
   let html = "";
-  if (hasByok && hasHosted) {
+  if (mode === "hosted") {
     html =
-      '<span class="badge bg-info text-dark me-1">BYOK</span> and <span class="badge text-bg-warning text-dark me-1">Hosted</span> saved. On <strong>this PC</strong>, <strong>BYOK</strong> is used first for Smart suggestions; hosted supports sync and other devices.';
-  } else if (hasByok) {
+      '<span class="badge text-bg-warning text-dark me-1">Hosted AI</span> — Smart suggestions + snapshot push + in-game chat (with server bot profiles).';
+  } else if (mode === "gemini_byok") {
     html =
-      '<span class="badge bg-info text-dark me-1">BYOK</span> — mid tier (on-device Smart suggestions). Add hosted URL + link key for premium tier; <strong>chat bot</strong> needs hosted, not BYOK alone.';
-  } else if (hasHosted) {
+      '<span class="badge bg-info text-dark me-1">Gemini (your key)</span> — Smart suggestions run on this PC only. No data push to a server.';
+  } else if (mode === "openai_compat") {
     html =
-      '<span class="badge text-bg-warning text-dark me-1">Hosted AI</span> — premium Smart suggestions when the server returns LLM output. Optional: add BYOK for on-device tips.';
+      '<span class="badge bg-secondary me-1">OpenAI-compatible</span> — Smart suggestions via your LM Studio / vLLM URL on this PC. No data push.';
+  } else if (mode === "ollama") {
+    html =
+      '<span class="badge bg-secondary me-1">Ollama</span> — Smart suggestions on this PC via your local model. No data push.';
   } else {
     html =
-      'Open <strong>AI Farm Manager</strong> (sidebar tab): <strong>Smart suggestions</strong> — <strong>Hosted</strong> (premium) or <strong>BYOK</strong> (mid). Without either, <span class="badge bg-secondary">Rules</span> may still show on Fields (basic tier).';
+      'Choose one Smart suggestions mode under <strong>AI Farm Manager</strong> (Hosted, Gemini, OpenAI-compatible, or Ollama). Until then, <span class="badge bg-secondary">Rules</span> may still show on Fields.';
   }
   el.className = "alert alert-secondary small py-2 mb-0";
   el.innerHTML = html + chatNote;

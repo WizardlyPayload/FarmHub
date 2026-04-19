@@ -16,6 +16,7 @@ All project documentation lives under **`docs/`** (repository root: **FarmHub** 
 | [SECURITY.md](./SECURITY.md) | LAN access, Basic Auth, IP allowlist, Electron hardening |
 | [DESCRIPTION_AND_SCREENSHOTS.md](./DESCRIPTION_AND_SCREENSHOTS.md) | Product copy + screenshot checklist |
 | [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md) | Architecture, consultant flow, file map, deployment |
+| [**GEMINI_PROJECT_CONTEXT.md**](./GEMINI_PROJECT_CONTEXT.md) | **Full project breakdown for external AI planning** (Gemini, audits) — complements handover |
 | [SALES_HANDOVER.md](./SALES_HANDOVER.md) | **Sales & partnerships:** ICP, messaging, tiers, objections — not replaced by USER_MANUAL |
 | [AI_SERVER_SECURITY.md](./AI_SERVER_SECURITY.md) | AI Farm Manager (FastAPI) — VPS hardening |
 | [LLM_GEMINI_ROUTING.md](./LLM_GEMINI_ROUTING.md) | Gemini keys, model rollover, env vars |

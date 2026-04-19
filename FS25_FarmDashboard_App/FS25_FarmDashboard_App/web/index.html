@@ -720,6 +720,7 @@
       <script src="assests/js/realtime-connector.js"></script>
       <script src="assests/js/modExportProgress.js"></script>
       <script src="assests/js/ai-farm-bot-panel.js"></script>
+      <script src="assests/js/ai-suggestion-mode.js"></script>
       <script src="assests/js/ai-upsell-modal.js"></script>
       <script type="module" src="assests/js/app.js"></script>
       <script defer src="assests/js/ai-farm-consultant-insights.js"></script>
@@ -922,22 +923,41 @@
                   </div>
 
                   <div class="tab-pane fade" id="app-settings-pane-ai" role="tabpanel" aria-labelledby="app-settings-tab-ai" tabindex="0">
-                    <p class="small text-muted mb-2" data-i18n="settings.aiFmIntro" data-i18n-html>Dashboard <strong>Smart suggestions</strong> can use <strong>Ollama</strong> (this PC or LAN), <strong>BYOK</strong> (OpenAI / Gemini), or <strong>Hosted AI</strong> (your server URL + link key). <strong>Precedence:</strong> when Ollama/BYOK is saved, tips run on this PC <em>if</em> farm data is loaded here (game + mod). If there is no local snapshot yet but <strong>Hosted AI</strong> is configured, suggestions use the server (e.g. data you already push to the VPS).</p>
+                    <p class="small text-muted mb-2">Pick <strong>one</strong> Smart suggestions source. Saving applies only the active block — other modes stay disabled and do not send farm data or API keys.</p>
 
-                    <ul class="nav nav-pills nav-fill gap-2 mb-3 flex-column flex-sm-row" id="ai-fm-subtabs" role="tablist">
+                    <div class="card border-primary mb-3 bg-dark" id="ai-suggestion-mode-card">
+                      <div class="card-body py-3">
+                        <h6 class="text-primary mb-2">Active mode</h6>
+                        <div class="btn-group flex-wrap w-100 mb-2" role="group" aria-label="AI suggestion mode">
+                          <input type="radio" class="btn-check" name="aiSuggestionModeRadio" id="aiModeHosted" value="hosted" autocomplete="off"/>
+                          <label class="btn btn-outline-warning btn-sm" for="aiModeHosted">Hosted AI server</label>
+                          <input type="radio" class="btn-check" name="aiSuggestionModeRadio" id="aiModeGemini" value="gemini_byok" autocomplete="off"/>
+                          <label class="btn btn-outline-info btn-sm" for="aiModeGemini">Gemini (your key)</label>
+                          <input type="radio" class="btn-check" name="aiSuggestionModeRadio" id="aiModeOpenaiCompat" value="openai_compat" autocomplete="off"/>
+                          <label class="btn btn-outline-secondary btn-sm" for="aiModeOpenaiCompat">OpenAI-compatible</label>
+                          <input type="radio" class="btn-check" name="aiSuggestionModeRadio" id="aiModeOllama" value="ollama" autocomplete="off"/>
+                          <label class="btn btn-outline-success btn-sm" for="aiModeOllama">Ollama local</label>
+                        </div>
+                        <p class="small text-muted mb-0" id="aiModeHint"></p>
+                        <button type="button" class="btn btn-sm btn-primary mt-2" id="aiSuggestionModeSaveBtn">Save Smart suggestions mode</button>
+                        <span class="small text-success ms-2 d-none" id="aiSuggestionModeSaveHint" aria-live="polite"></span>
+                      </div>
+                    </div>
+
+                    <ul class="nav nav-pills nav-fill gap-2 mb-3 flex-column flex-sm-row d-none" id="ai-fm-subtabs" role="tablist" aria-hidden="true">
                       <li class="nav-item" role="presentation">
-                        <button class="nav-link active w-100 text-start" id="ai-fm-subtab-ollama-btn" data-bs-toggle="pill" data-bs-target="#ai-fm-pane-ollama" type="button" role="tab" aria-controls="ai-fm-pane-ollama" aria-selected="true" data-i18n="settings.aiFmSubtabOllama">Ollama — local or network</button>
+                        <button class="nav-link active w-100 text-start" id="ai-fm-subtab-ollama-btn" data-bs-toggle="pill" data-bs-target="#ai-fm-pane-ollama-wrap" type="button" role="tab" aria-controls="ai-fm-pane-ollama-wrap" aria-selected="true" data-i18n="settings.aiFmSubtabOllama">Ollama — local or network</button>
                       </li>
                       <li class="nav-item" role="presentation">
-                        <button class="nav-link w-100 text-start" id="ai-fm-subtab-byok-btn" data-bs-toggle="pill" data-bs-target="#ai-fm-pane-byok" type="button" role="tab" aria-controls="ai-fm-pane-byok" aria-selected="false" data-i18n="settings.aiFmSubtabByok">BYOK — Smart suggestions on this PC</button>
+                        <button class="nav-link w-100 text-start" id="ai-fm-subtab-byok-btn" data-bs-toggle="pill" data-bs-target="#ai-fm-pane-gemini-wrap" type="button" role="tab" aria-controls="ai-fm-pane-gemini-wrap" aria-selected="false" data-i18n="settings.aiFmSubtabByok">BYOK — Smart suggestions on this PC</button>
                       </li>
                       <li class="nav-item" role="presentation">
-                        <button class="nav-link w-100 text-start" id="ai-fm-subtab-hosted-btn" data-bs-toggle="pill" data-bs-target="#ai-fm-pane-hosted" type="button" role="tab" aria-controls="ai-fm-pane-hosted" aria-selected="false" data-i18n="settings.aiFmSubtabHosted">Hosted AI — server, paid tier &amp; chat</button>
+                        <button class="nav-link w-100 text-start" id="ai-fm-subtab-hosted-btn" data-bs-toggle="pill" data-bs-target="#ai-fm-pane-hosted-wrap" type="button" role="tab" aria-controls="ai-fm-pane-hosted-wrap" aria-selected="false" data-i18n="settings.aiFmSubtabHosted">Hosted AI — server, paid tier &amp; chat</button>
                       </li>
                     </ul>
 
                     <div class="tab-content" id="ai-fm-subtab-content">
-                      <div class="tab-pane fade show active" id="ai-fm-pane-ollama" role="tabpanel" aria-labelledby="ai-fm-subtab-ollama-btn" tabindex="0">
+                      <div class="tab-pane fade show active" id="ai-fm-pane-ollama-wrap" role="tabpanel" aria-labelledby="ai-fm-subtab-ollama-btn" tabindex="0">
                         <div class="card bg-dark border-success border-opacity-50 mb-3">
                           <div class="card-body py-3">
                             <div class="mb-2"><span class="badge bg-success bg-opacity-75">Ollama</span> <span class="badge bg-secondary ms-1">Smart suggestions</span></div>
@@ -1013,7 +1033,7 @@
                           </div>
                         </div>
                       </div>
-                      <div class="tab-pane fade" id="ai-fm-pane-byok" role="tabpanel" aria-labelledby="ai-fm-subtab-byok-btn" tabindex="0">
+                      <div class="tab-pane fade" id="ai-fm-pane-gemini-wrap" role="tabpanel" aria-labelledby="ai-fm-subtab-byok-btn" tabindex="0">
                         <div class="card bg-dark border-info border-opacity-50 mb-3">
                           <div class="card-body py-3">
                             <div class="mb-2"><span class="badge bg-info text-dark">Mid · BYOK</span> <span class="badge bg-secondary ms-1">Basic · Rules</span></div>
@@ -1080,12 +1100,22 @@
                         </div>
                       </div>
 
-                      <div class="tab-pane fade" id="ai-fm-pane-hosted" role="tabpanel" aria-labelledby="ai-fm-subtab-hosted-btn" tabindex="0">
+                        <div class="tab-pane fade" id="ai-fm-pane-hosted-wrap" role="tabpanel" aria-labelledby="ai-fm-subtab-hosted-btn" tabindex="0">
                         <div class="card bg-dark border-warning border-opacity-50 mb-3">
                           <div class="card-body py-3">
                             <div class="mb-2"><span class="badge text-bg-warning text-dark">Premium · Hosted AI</span></div>
                             <p class="small text-muted mb-0" data-i18n="settings.aiFmHostedBlurb" data-i18n-html>Use this tab only if your subscription includes the <strong>hosted AI Farm Manager</strong>: enter <strong>server URL</strong> + <strong>link key</strong>, enable <strong>Send farm data</strong>, then <strong>Save &amp; load</strong>. Same connection powers <strong>hosted Smart suggestions</strong>, server-side LLM, and <strong>in-game !hank</strong> (multiplayer).</p>
                           </div>
+                        </div>
+                        <div class="alert alert-secondary border-secondary small py-2 mb-3" role="note">
+                          <strong class="d-block mb-1">You only fill in this screen — nothing else is required on your PC</strong>
+                          <p class="mb-2 text-muted">Your host should give you <strong>two</strong> things: a <strong>server address</strong> (looks like <code>https://…:8081</code>) and a <strong>link key</strong> (a long secret for Farm Dashboard). You do <em>not</em> need Portainer, SSH, or terminal commands.</p>
+                          <ol class="mb-2 ps-3 text-muted">
+                            <li>Paste the <strong>AI server URL</strong> and (if you see it) the <strong>Link key</strong>.</li>
+                            <li>Turn on <strong>Send farm data to the AI server</strong>.</li>
+                            <li>Click <strong>Save hosted connection</strong>, then <strong>Test server &amp; link key</strong>. If the test fails, ask your host to resend the key — then paste it and save again.</li>
+                          </ol>
+                          <p class="mb-0 small text-muted">If your installer already hid the key field, use <strong>My host sent a new link key</strong> only when they rotated the secret.</p>
                         </div>
                         <div class="border border-warning border-opacity-50 rounded p-2 p-md-3 bg-body-secondary bg-opacity-25 mb-3">
                           <p class="small mb-1 text-light" id="aiFarmBotIntroLead">For <strong>hosted</strong> Smart suggestions, three things — only the <strong>outbound farm snapshot</strong> leaves this PC (encrypted HTTPS). Your <strong>link key</strong> proves this app is allowed; it is not your in-game <code>!hank</code> token.</p>
@@ -1141,11 +1171,17 @@
                             </div>
                           </div>
                           <p class="small text-muted mb-2 d-none" id="aiFarmBotBrandedNote">This installer is already linked to your host.</p>
+                          <p class="small mb-2 d-none" id="aiFarmHostedOverrideWrap">
+                            <button type="button" class="btn btn-sm btn-outline-warning" id="aiFarmHostedShowKeyOverride">My host sent a new link key</button>
+                            <span class="text-muted ms-1">Shows the key field so you can paste an updated secret, then Save.</span>
+                          </p>
                           <div class="d-flex flex-wrap gap-2 mb-2">
                             <button type="button" class="btn btn-sm btn-success" id="aiFarmBotSaveSettings" data-i18n="settings.aiFmHostedSaveBtn">Save hosted connection</button>
+                            <button type="button" class="btn btn-sm btn-outline-primary" id="aiFarmHostedTestConn" title="Checks that your address and key match the server">Test server &amp; link key</button>
                             <button type="button" class="btn btn-sm btn-outline-light" id="aiFarmBotRefresh" data-i18n="settings.aiFmRefreshBtn">Refresh status</button>
                             <button type="button" class="btn btn-sm btn-outline-info" id="aiFarmBotLlmPing" data-i18n="settings.aiFmLlmPingBtn">Test dashboard → LLM</button>
                           </div>
+                          <p id="aiFarmHostedTestResult" class="small mb-2" aria-live="polite"></p>
                           <p id="aiFarmBotLlmPingResult" class="small text-muted mb-0" aria-live="polite"></p>
                         </div>
 

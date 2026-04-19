@@ -72,9 +72,12 @@ async def admin_page(request: Request, _: str = Depends(require_admin)) -> HTMLR
     revealed_key = connection_registry.take_pending_key_for_admin(reveal_cid) if reveal_cid else None
     _env_path = get_backend_root() / ".env"
     # Explicit render avoids rare Jinja2 cache / TemplateResponse arg issues on some Starlette+Jinja builds.
+    _base = str(request.base_url).rstrip("/")
+    _invite = (s.get("farmdash_invite_base_url") or "").strip().rstrip("/")
     ctx: dict[str, Any] = {
         "request": request,
         "active_tab": active_tab,
+        "client_server_url_display": _invite or _base,
         "env_file_path": str(_env_path),
         "env_file_exists": _env_path.is_file(),
         "bot_enabled": s["bot_enabled"],
@@ -436,7 +439,10 @@ async def admin_connection_create(
     label: str = Form(""),
     redirect_tab: str | None = Form(None),
 ) -> RedirectResponse:
-    row = connection_registry.create_connection(label)
+    try:
+        row = connection_registry.create_connection(label)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
     push_log("INFO", "Farm Dashboard connection created", connection_id=row["id"])
     tab = (redirect_tab or "clients").strip().lower()
     if tab not in ("clients",):

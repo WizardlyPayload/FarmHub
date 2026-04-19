@@ -20,6 +20,7 @@ from app.paths import get_data_dir
 logger = logging.getLogger(__name__)
 
 DEFAULT_BUCKET_ID = "__default__"
+MAX_REGISTERED_CLIENT_CONNECTIONS = 128
 # One-time plaintext key display after Admin “Create connection” (in-memory; lost on process restart).
 _pending_key_reveal: dict[str, str] = {}
 
@@ -138,6 +139,12 @@ def resolve_connection_bucket_id(integration_key_plain: str) -> str:
 def create_connection(label: str) -> dict[str, Any]:
     """Generate a new integration key; returns full row (including plaintext key once)."""
     doc = load_document()
+    conns = doc.get("connections")
+    n = len(conns) if isinstance(conns, list) else 0
+    if n >= MAX_REGISTERED_CLIENT_CONNECTIONS:
+        raise ValueError(
+            f"Maximum of {MAX_REGISTERED_CLIENT_CONNECTIONS} client connections reached — revoke an unused key first."
+        )
     key = secrets.token_urlsafe(32)
     row = {
         "id": str(uuid.uuid4()),

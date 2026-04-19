@@ -69,7 +69,11 @@ async def _load_snapshot_for_consultant(
         )
         raise HTTPException(
             status_code=503,
-            detail=err or "Dashboard snapshot unavailable — configure FTP or DASHBOARD_JSON_URL",
+            detail=err
+            or (
+                "Dashboard snapshot unavailable — enable DASHBOARD_PUSH_MODE=1 (PC → server push), "
+                "or configure G-Portal FTP, or set DASHBOARD_JSON_URL to a reachable Farm Dashboard /api/data URL."
+            ),
         )
 
     try:

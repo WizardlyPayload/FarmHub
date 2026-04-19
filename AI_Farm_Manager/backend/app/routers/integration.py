@@ -161,9 +161,12 @@ async def integration_llm_ping(
     """
     user_key = normalize_incoming_api_key(request.headers.get("X-AI-API-Key"))
     user_prov = (request.headers.get("X-AI-Provider") or "").strip().lower() or None
+    if user_prov == "openai_compat":
+        user_prov = "openai"
     if user_prov and user_prov not in ("openai", "gemini"):
         user_prov = None
-    merged = resolve_consultant_llm_settings(user_key or None, user_prov)
+    user_ob = (request.headers.get("X-AI-OpenAI-Base-URL") or "").strip() or None
+    merged = resolve_consultant_llm_settings(user_key or None, user_prov, user_ob)
     if merged is None:
         log_event(
             "WARN",
@@ -171,7 +174,10 @@ async def integration_llm_ping(
         )
         return {
             "ok": False,
-            "detail": "No LLM API key — set keys on the server or BYOK in Farm Dashboard (robot panel).",
+            "detail": (
+                "No LLM credentials — set LLM_API_KEY or OPENAI_BASE_URL on the server, "
+                "or BYOK + optional OpenAI-compatible base URL in Farm Dashboard."
+            ),
         }
     out = await test_llm_connectivity(
         probe_message='Hi — are you there? Reply in one short sentence (max 20 words).',
@@ -214,9 +220,12 @@ async def integration_gemini_models(
     """
     user_key = normalize_incoming_api_key(request.headers.get("X-AI-API-Key"))
     user_prov = (request.headers.get("X-AI-Provider") or "").strip().lower() or None
+    if user_prov == "openai_compat":
+        user_prov = "openai"
     if user_prov and user_prov not in ("openai", "gemini"):
         user_prov = None
-    merged = resolve_consultant_llm_settings(user_key or None, user_prov)
+    user_ob = (request.headers.get("X-AI-OpenAI-Base-URL") or "").strip() or None
+    merged = resolve_consultant_llm_settings(user_key or None, user_prov, user_ob)
     base = get_settings()
     byok = bool(user_key)
     cand: dict[str, Any] = merged if merged is not None else base

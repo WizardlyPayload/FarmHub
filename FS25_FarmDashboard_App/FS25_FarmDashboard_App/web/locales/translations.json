@@ -149,6 +149,81 @@
     "settings.sidebarAi": {
       "en": "AI Farm Manager"
     },
+    "settings.aiFmIntro": {
+      "en": "Dashboard <strong>Smart suggestions</strong> can use <strong>Ollama</strong> (this PC or any machine on your network), <strong>BYOK</strong> (OpenAI / Gemini / other APIs), or your host's <strong>server</strong> (paid tier: URL + link key). <strong>Precedence:</strong> if a local / BYOK connection is saved, this PC uses it first; otherwise the hosted connection applies when set."
+    },
+    "settings.aiFmSubtabOllama": {
+      "en": "Ollama — local or network"
+    },
+    "settings.aiFmSubtabByok": {
+      "en": "BYOK — Smart suggestions on this PC"
+    },
+    "settings.aiFmSubtabHosted": {
+      "en": "Hosted AI — server, paid tier & chat"
+    },
+    "settings.aiFmByokBlurb": {
+      "en": "Paste your <strong>OpenAI</strong> or <strong>Gemini</strong> key, or choose <strong>Local / OpenAI-compatible</strong> for <strong>Ollama</strong> (base URL e.g. <code>http://127.0.0.1:11434</code>, key <code>ollama</code> or blank, then pick a model). No hosted <strong>link key</strong> is required for BYOK. Tips run <strong>on this PC</strong>. If no LLM is available, the dashboard falls back to <strong>Rules</strong> heuristics on Fields."
+    },
+    "settings.aiFmByokCardTitle": {
+      "en": "Your OpenAI / Gemini key (BYOK)"
+    },
+    "settings.aiFmByokCardLead": {
+      "en": "<strong>On-device Smart suggestions:</strong> keys stay in this app's store; only OpenAI or Google sees them. No hosted server required for this tier."
+    },
+    "settings.aiFmByokSaveBtn": {
+      "en": "Save BYOK"
+    },
+    "settings.aiFmByokRemoveKey": {
+      "en": "Remove saved AI key from this computer"
+    },
+    "settings.aiFmHostedBlurb": {
+      "en": "Use this tab only if your subscription includes the <strong>hosted AI Farm Manager</strong>: enter <strong>server URL</strong> + <strong>link key</strong>, enable <strong>Send farm data</strong>, then <strong>Save hosted connection</strong>. Same connection powers <strong>hosted Smart suggestions</strong>, server-side LLM, and <strong>in-game !hank</strong> (multiplayer)."
+    },
+    "settings.aiFmServerUrlLabel": {
+      "en": "AI server URL"
+    },
+    "settings.aiFmLinkKeyLabel": {
+      "en": "Link key (from your host)"
+    },
+    "settings.aiFmPushLabel": {
+      "en": "<strong>Send farm data to the AI server</strong> — <em>required for hosted Smart suggestions and chat features.</em>"
+    },
+    "settings.aiFmHostedSaveBtn": {
+      "en": "Save hosted connection"
+    },
+    "settings.aiFmRefreshBtn": {
+      "en": "Refresh status"
+    },
+    "settings.aiFmLlmPingBtn": {
+      "en": "Test dashboard → LLM"
+    },
+    "settings.aiTiersTitle": {
+      "en": "Smart suggestions — three tiers"
+    },
+    "settings.aiSmartSectionTitle": {
+      "en": "Smart suggestions"
+    },
+    "settings.aiSmartSectionHint": {
+      "en": "Dashboard tips (home grid &amp; fields): use <strong>BYOK</strong> below, or <strong>hosted</strong> URL + link key + Send farm data. This block does <strong>not</strong> turn on in-game chat — that is separate below."
+    },
+    "settings.aiChatSectionTitle": {
+      "en": "In-game chat (!hank)"
+    },
+    "settings.aiChatSectionHint": {
+      "en": "<strong>Hosted service only.</strong> In-game <strong>!hank</strong> uses bot profiles your host creates on the server. <strong>BYOK</strong> (other tab) does not enable chat."
+    },
+    "settings.aiChatInstallLabel": {
+      "en": "Install chat token (this PC)"
+    },
+    "settings.aiChatInstallHint": {
+      "en": "Writes <code class=\"text-light\">Documents/My Games/FarmingSimulator2025/modSettings/ai_farm_manager_config.xml</code> for in-game <strong>!hank</strong> — requires a <strong>hosted</strong> bot profile from your AI server."
+    },
+    "settings.aiChatInstallBtn": {
+      "en": "Write to FS25 modSettings"
+    },
+    "settings.aiConnectionStatusHint": {
+      "en": "Open the AI Farm Manager tab — use the <strong>BYOK</strong> or <strong>Hosted AI</strong> sub-tab depending on your plan."
+    },
     "settings.sidebarMod": {
       "en": "FS25 mod"
     },

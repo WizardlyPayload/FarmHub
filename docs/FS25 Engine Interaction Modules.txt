@@ -257,7 +257,7 @@ This codebase implements the same *intent* as the modules above; APIs differ whe
 ### Module 1 (bale enumeration)
 * **ItemSystem:** `FieldDataCollector.lua` uses **`g_currentMission.itemSystem:getItems()`** as the **primary** source (then falls back to `.items` if needed), filters with **`item.isBale`** and other bale heuristics, and uses **`getWorldTranslation`** on known nodes (see `itemWorldXZ`).
 * **Geo-fencing:** Instead of a custom polygon `isPointInside`, the mod assigns each bale to a **farmland / field id** via **`g_farmlandManager:getFarmlandIdAtWorldPosition`** / **`getFarmlandAtWorldPosition`** (same outcome: “which field parcel” the bale sits on).
-* **Extras (not in the short sample):** `g_baleManager`, **`SlotSystem.LIMITED_OBJECT_BALE`**, optional Courseplay **`g_baleToCollectManager:getBales()`**, and a **`nodeToObject`** sweep for objects missed by the item list — all deduped before `data.json`.
+* **Extras (not in the short sample):** `g_baleManager`, **`SlotSystem.LIMITED_OBJECT_BALE`**, optional **`g_baleToCollectManager:getBales()`** when the mission exposes it, and a **`nodeToObject`** sweep for objects missed by the item list — all deduped before `data.json`.
 
 ### Module 2 (ground swath / windrow)
 * The sample uses **`getDensityAtWorldPos(terrainDetailHeightId, x, y, z)`** for a single combined height map.

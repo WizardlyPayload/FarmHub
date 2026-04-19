@@ -182,7 +182,7 @@ function FieldDataCollector:collect()
                 return nil, nil
             end
             --- Parcel id for bale tallies must match `field.farmland.id` / UI "Field N".
-            --- Courseplay (CpFieldUtil / DevHelper) exposes fieldId vs farmlandId separately; prefer farmland parcel id,
+            --- Some maps expose field id vs farmland parcel id separately; prefer **farmland** parcel id for bucket keys,
             --- not Field:getId() first — those can differ on merged / complex maps and left counts in the wrong bucket.
             local function fieldOrFarmlandKeyAtXZ(x, z)
                 local function keyFromFarmlandObject(fmo)
@@ -258,7 +258,7 @@ function FieldDataCollector:collect()
                 if x and z then return string.format("xz:%.1f:%.1f", x, z) end
                 return "t:" .. tostring(it)
             end
-            --- Count only bales sitting on the ground — not on trailers, loaders, or autoload (Courseplay / base game).
+            --- Count only bales sitting on the ground — not on trailers, loaders, or autoload trailers (base game).
             local function baleIsOnGround(it)
                 if not it then return false end
                 if rawget(it, "mountObject") ~= nil then return false end
@@ -317,7 +317,7 @@ function FieldDataCollector:collect()
                     end
                 end
             end
-            --- Courseplay exposes the same slot list via g_baleToCollectManager:getBales() — merge when present.
+            --- Optional `g_baleToCollectManager:getBales()` merges the same slot list when the mission exposes it.
             local btc = rawget(_G, "g_baleToCollectManager")
             if btc and type(btc.getBales) == "function" then
                 local okBtc, bl = pcall(function() return btc:getBales() end)
@@ -1367,7 +1367,7 @@ function FieldDataCollector:collect()
                     byIdx[ent.index] = { name = ent.name, index = ent.index, baleable = false }
                 end
             end
-            --- Align with Easy Dev Controls (`EasyDevControlsObjectsFrame`): `g_densityMapHeightManager:getDensityMapHeightTypes()`
+            --- Align with the engine object list: `g_densityMapHeightManager:getDensityMapHeightTypes()`
             --- lists every fill type registered on the terrain detail height map (straw, windrows, chaff heaps, etc.).
             --- Probing only TEDDER + hardcoded swaths can miss types; merging the manager list matches what the game uses for map / tip visibility.
             do
@@ -1381,7 +1381,7 @@ function FieldDataCollector:collect()
                             if heightType and type(heightType.fillTypeIndex) == "number" and heightType.fillTypeIndex > 0 then
                                 local fidx = heightType.fillTypeIndex
                                 if skipTarp and fidx == skipTarp then
-                                    -- Easy Dev skips TARP for ground tip lists
+                                    -- Skip TARP for ground material lists (matches engine ground-tip visibility)
                                 elseif not byIdx[fidx] then
                                     byIdx[fidx] = { name = fillDisplayName(fidx), index = fidx, baleable = false }
                                 end

@@ -128,7 +128,7 @@
       var msgLlm =
         "[FarmDash AI] " +
         sourceLabel +
-        " — llm_used=false (heuristics only; optional LLM — configure AI host or BYOK if desired).";
+        " — llm_used=false (Basic · Rules tier; for Premium · Hosted or Mid · BYOK, configure Settings → AI Farm Manager).";
       if (g.DASH_DEBUG) {
         console.warn(msgLlm, detail);
       } else {

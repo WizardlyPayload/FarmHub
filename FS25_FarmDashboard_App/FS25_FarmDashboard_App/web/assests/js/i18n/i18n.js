@@ -53,12 +53,10 @@ async function pickInitialLocale() {
     if (saved && LOCALE_NAMES[saved]) return saved;
   } catch (_) {}
   try {
-    if (typeof require === 'function') {
-      const { ipcRenderer } = require('electron');
-      if (ipcRenderer && ipcRenderer.invoke) {
-        const s = await ipcRenderer.invoke('get-stored-locale');
-        if (s && LOCALE_NAMES[s]) return s;
-      }
+    const api = typeof window !== 'undefined' ? window.farmDashAPI : null;
+    if (api && typeof api.getStoredLocale === 'function') {
+      const s = await api.getStoredLocale();
+      if (s && LOCALE_NAMES[s]) return s;
     }
   } catch (_) {}
   const nav = typeof navigator !== 'undefined' ? navigator.language || navigator.userLanguage : FALLBACK;
@@ -137,9 +135,9 @@ export function setLocale(code, reloadUi = false) {
     localStorage.setItem(STORAGE_KEY, currentLocale);
   } catch (_) {}
   try {
-    if (typeof require === 'function') {
-      const { ipcRenderer } = require('electron');
-      if (ipcRenderer && ipcRenderer.send) ipcRenderer.send('set-stored-locale', currentLocale);
+    const api = typeof window !== 'undefined' ? window.farmDashAPI : null;
+    if (api && typeof api.setStoredLocale === 'function') {
+      api.setStoredLocale(currentLocale);
     }
   } catch (_) {}
   if (typeof document !== 'undefined') {

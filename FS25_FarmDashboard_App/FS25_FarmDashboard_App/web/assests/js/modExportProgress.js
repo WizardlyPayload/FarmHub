@@ -110,18 +110,25 @@
   }
 
   /**
-   * @param {import('electron').IpcRenderer} ipcRenderer
+   * @param {object | null} farmDashApi — window.farmDashAPI from preload (context isolation)
    * @returns {() => void} cleanup — call when export invoke settles (then/catch/finally)
    */
-  window.attachModExportProgress = function (ipcRenderer) {
+  window.attachModExportProgress = function (farmDashApi) {
     resetUi();
     showModal();
-    const handler = (_e, payload) => {
+    if (
+      !farmDashApi ||
+      typeof farmDashApi.subscribeExportModStoreImagesProgress !== "function"
+    ) {
+      return function cleanup() {
+        hideModal();
+      };
+    }
+    const unsub = farmDashApi.subscribeExportModStoreImagesProgress((payload) => {
       onProgress(payload);
-    };
-    ipcRenderer.on("export-mod-store-images-progress", handler);
+    });
     return function cleanup() {
-      ipcRenderer.removeListener("export-mod-store-images-progress", handler);
+      if (typeof unsub === "function") unsub();
       hideModal();
     };
   };

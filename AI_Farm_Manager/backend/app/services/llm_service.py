@@ -20,6 +20,30 @@ from app.services.gemini_budget import wait_gemini_budget_or_skip
 from app.services.gemini_models_catalog import preferred_models_intersect_catalog
 from app.services.log_buffer import log_event
 
+
+def effective_openai_api_key(settings: dict[str, Any]) -> str:
+    """Non-empty API key, or a placeholder when only ``openai_base_url`` is set (e.g. Ollama)."""
+    k = (settings.get("llm_api_key") or "").strip()
+    if k:
+        return k
+    if (settings.get("openai_base_url") or "").strip():
+        return "ollama"
+    return ""
+
+
+def async_openai_client(settings: dict[str, Any]) -> Any:
+    """``AsyncOpenAI`` against OpenAI cloud or an OpenAI-compatible server (Ollama, vLLM, …)."""
+    from openai import AsyncOpenAI
+
+    key = effective_openai_api_key(settings)
+    if not key:
+        raise RuntimeError("LLM_API_KEY not set")
+    base = (settings.get("openai_base_url") or "").strip()
+    if base:
+        return AsyncOpenAI(api_key=key, base_url=base)
+    return AsyncOpenAI(api_key=key)
+
+
 # Retry: model degradation on same key (429/503), then next API key in round-robin order.
 _GEMINI_QUOTA_RETRY_STATUS: frozenset[int] = frozenset({429, 503})
 
@@ -563,13 +587,7 @@ async def run_llm(
 
 
 async def _openai(settings: dict[str, Any], user_message: str, dashboard_context: str) -> str:
-    from openai import AsyncOpenAI
-
-    key = settings["llm_api_key"]
-    if not key:
-        raise RuntimeError("LLM_API_KEY not set")
-
-    client = AsyncOpenAI(api_key=key)
+    client = async_openai_client(settings)
     model = settings["llm_model"]
     system = settings["system_prompt"]
 
@@ -751,16 +769,15 @@ async def test_llm_connectivity(
                 "model": last_model_try or settings.get("gemini_model"),
             }
 
-        if not (settings.get("llm_api_key") or "").strip():
+        if not effective_openai_api_key(settings):
             return {
                 "ok": False,
                 "provider": "openai",
                 "latency_ms": None,
-                "detail": "LLM_API_KEY not set",
+                "detail": "LLM_API_KEY not set (set LLM_API_KEY or OPENAI_BASE_URL for local Ollama)",
             }
-        from openai import AsyncOpenAI
 
-        client = AsyncOpenAI(api_key=settings["llm_api_key"])
+        client = async_openai_client(settings)
         model = settings["llm_model"]
         resp = await client.chat.completions.create(
             model=model,

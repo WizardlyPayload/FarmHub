@@ -8,6 +8,19 @@ import { getFarmdashAiConsultantInsightsProxyUrl } from "./modules/viewer-mode.j
 
 const MIN_INTERVAL_MS = 8 * 60 * 1000; // 8 minutes — avoid hammering VPS (same farm + same state only)
 
+/**
+ * Smart suggestions source: **hosted** = AI Farm Manager server (subscription); **byok** = on-device key;
+ * **rules** = heuristics / non-LLM fallback (often on Fields when LLM is off).
+ */
+export function deriveSuggestionTier(data) {
+  if (!data || typeof data !== "object") return "rules";
+  if (data.farmdash_byok_local === true || data.suggestion_tier === "byok") return "byok";
+  const st = data.suggestion_tier;
+  if (st === "hosted" || st === "premium") return "hosted";
+  if (st === "rules") return "rules";
+  return data.llm_used ? "hosted" : "rules";
+}
+
 /** In-memory consultant map per server+farm — instant restore when switching farms if field state unchanged */
 const fieldConsultantFarmCache = new Map();
 
@@ -182,6 +195,8 @@ function tryApplyFieldConsultantFarmCache(cacheKey, stateHash, force) {
     if (typeof window === "undefined") return;
     window.__fieldConsultantByRef = { ...entry.byRef };
     window.__fieldConsultantLlmUsed = !!entry.llmUsed;
+    window.__fieldConsultantSuggestionTier =
+      entry.suggestionTier || (entry.llmUsed ? "hosted" : "rules");
     window.__lastFieldStateHash = stateHash;
     window.__fieldConsultantAppliedKey = cacheKey;
     window.__fieldConsultantAppliedHash = stateHash;
@@ -203,7 +218,7 @@ function tryApplyFieldConsultantFarmCache(cacheKey, stateHash, force) {
 
 /**
  * Restore per-field AI map from localStorage after app restart (see consultant-disk-cache.js).
- * @param {{ cacheKey: string, stateHash: string, byRef: Record<string, unknown>, llmUsed?: boolean }} payload
+ * @param {{ cacheKey: string, stateHash: string, byRef: Record<string, unknown>, llmUsed?: boolean, suggestionTier?: string }} payload
  * @returns {boolean} true if DOM was updated from disk snapshot
  */
 export function hydrateFieldConsultantFromDiskEntry(payload) {
@@ -214,6 +229,7 @@ export function hydrateFieldConsultantFromDiskEntry(payload) {
   fieldConsultantFarmCache.set(cacheKey, {
     byRef: { ...byRef },
     llmUsed: !!payload.llmUsed,
+    suggestionTier: payload.suggestionTier || (!!payload.llmUsed ? "hosted" : "rules"),
     stateHash,
   });
   lastNetworkKey = cacheKey;
@@ -487,6 +503,7 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
       }
       window.__fieldConsultantByRef = byRef;
       window.__fieldConsultantLlmUsed = !!data.llm_used;
+      window.__fieldConsultantSuggestionTier = deriveSuggestionTier(data);
       window.__lastFieldStateHash = cacheStateHash;
       window.__fieldConsultantAppliedKey = requestCacheKey;
       window.__fieldConsultantAppliedHash = cacheStateHash;
@@ -501,6 +518,7 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
     fieldConsultantFarmCache.set(requestCacheKey, {
       byRef: { ...byRef },
       llmUsed: !!data.llm_used,
+      suggestionTier: deriveSuggestionTier(data),
       stateHash: cacheStateHash,
     });
     lastNetworkFetchAt = Date.now();
@@ -600,6 +618,7 @@ export async function fetchConsultantInsightSingleField(fieldRef) {
 
 if (typeof window !== "undefined") {
   window.pickDoThisFirstFromFieldInsights = pickDoThisFirstFromFieldInsights;
+  window.farmdashDeriveSuggestionTier = deriveSuggestionTier;
 }
 
 /* Prefetch field AI map after load (does not wait for Fields tab). Throttle still applies after first success. */

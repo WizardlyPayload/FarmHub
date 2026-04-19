@@ -92,6 +92,7 @@ async def _run_consultant_core(
     view: str | None = None,
     user_api_key: str | None = None,
     user_provider: str | None = None,
+    user_openai_base_url: str | None = None,
     consultant_out_message: str = "Responded with Smart suggestions",
 ) -> FarmInsightsResponse:
     ctx = (context or "full").strip().lower()
@@ -125,6 +126,8 @@ async def _run_consultant_core(
             work = prune_snapshot_for_dashboard_view(work, vw)
 
     up = (user_provider or "").strip().lower() or None
+    if up == "openai_compat":
+        up = "openai"
     if up and up not in ("openai", "gemini"):
         up = None
 
@@ -133,6 +136,7 @@ async def _run_consultant_core(
         work,
         user_api_key=nkey or None,
         user_provider=up,
+        user_openai_base_url=user_openai_base_url,
         system_instruction=sys_inst,
         cache_server_id=(server_id or "").strip() or None,
         cache_farm_id=farm_id_resolved,
@@ -181,6 +185,7 @@ async def compute_consultant_insights(
     view: str | None = None,
     user_api_key: str | None = None,
     user_provider: str | None = None,
+    user_openai_base_url: str | None = None,
 ) -> FarmInsightsResponse:
     """
     Shared implementation for ``GET /api/v1/consultant/insights`` and admin “test” (same snapshot + LLM path).
@@ -208,6 +213,7 @@ async def compute_consultant_insights(
         view=view,
         user_api_key=user_api_key,
         user_provider=user_provider,
+        user_openai_base_url=user_openai_base_url,
     )
 
 
@@ -217,6 +223,7 @@ async def compute_consultant_insights_first_owned_field(
     active_farm_id: int | None = None,
     user_api_key: str | None = None,
     user_provider: str | None = None,
+    user_openai_base_url: str | None = None,
 ) -> tuple[FarmInsightsResponse, dict[str, Any]]:
     """
     Load snapshot, pick the first owned parcel (same rules as Farm Dashboard field list), then run the
@@ -255,6 +262,7 @@ async def compute_consultant_insights_first_owned_field(
         view=None,
         user_api_key=user_api_key,
         user_provider=user_provider,
+        user_openai_base_url=user_openai_base_url,
         consultant_out_message="Responded — first owned field (next job)",
     )
     meta = {
@@ -329,8 +337,11 @@ async def get_consultant_insights(
     )
     user_key = normalize_incoming_api_key(request.headers.get("X-AI-API-Key"))
     user_prov = (request.headers.get("X-AI-Provider") or "").strip().lower() or None
+    if user_prov == "openai_compat":
+        user_prov = "openai"
     if user_prov and user_prov not in ("openai", "gemini"):
         user_prov = None
+    user_ob = (request.headers.get("X-AI-OpenAI-Base-URL") or "").strip() or None
 
     return await compute_consultant_insights(
         server_id=serverId,
@@ -340,4 +351,5 @@ async def get_consultant_insights(
         view=view,
         user_api_key=user_key or None,
         user_provider=user_prov,
+        user_openai_base_url=user_ob,
     )

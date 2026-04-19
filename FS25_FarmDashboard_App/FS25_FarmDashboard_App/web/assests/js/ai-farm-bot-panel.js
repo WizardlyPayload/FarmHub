@@ -10,6 +10,11 @@
     if (typeof pipelineLog === 'function') pipelineLog(stage, message, meta);
   }
 
+  /** Preload IPC bridge (context isolation — no require('electron') in page). */
+  function fdApi() {
+    return typeof window !== 'undefined' && window.farmDashAPI ? window.farmDashAPI : null;
+  }
+
   function getBase() {
     return (localStorage.getItem(LS_URL) || '').replace(/\/$/, '');
   }
@@ -189,7 +194,7 @@
     }
     html += '</ul>';
     html +=
-      '<p class="small text-muted mb-0">Use <strong>Write to FS25 modSettings</strong> to install the mod token for each save you play.</p>';
+      '<p class="small text-muted mb-0">For the in-game token, use <strong>In-game chat (!hank)</strong> below → <strong>Write to FS25 modSettings</strong> (hosted bot profiles only).</p>';
     container.innerHTML = html;
     populateInstanceSelect(data);
     wireBotEnableToggles(container, base, key);
@@ -200,47 +205,431 @@
     var rowKey = document.getElementById('aiFarmBotRowIntegrationKey');
     var note = document.getElementById('aiFarmBotBrandedNote');
     var introLead = document.getElementById('aiFarmBotIntroLead');
-    try {
-      var ipc = require('electron').ipcRenderer;
-      ipc.invoke('get-ai-client-branding').then(function (b) {
-        if (!b) return;
-        if (introLead && b.serviceName) {
-          introLead.innerHTML =
-            '<strong>' +
-            String(b.serviceName).replace(/</g, '') +
-            '</strong> — same three steps below. Optional BYOK key stays on this PC; use <strong>Write to FS25 modSettings</strong> for the in-game <code>!hank</code> token.';
-        }
-        if (b.hasEmbeddedIntegrationKey) {
-          if (rowKey) rowKey.classList.add('d-none');
-          if (note) note.classList.remove('d-none');
-        } else {
-          if (rowKey) rowKey.classList.remove('d-none');
-          if (note) note.classList.add('d-none');
-        }
-        if (b.hasDefaultBackendUrl) {
-          if (rowUrl) rowUrl.classList.add('d-none');
-        } else {
-          if (rowUrl) rowUrl.classList.remove('d-none');
-        }
-      });
-    } catch (e) {
+    var a = fdApi();
+    if (!a) {
       if (rowKey) rowKey.classList.remove('d-none');
       if (rowUrl) rowUrl.classList.remove('d-none');
+      return;
+    }
+    a.getAiClientBranding().then(function (b) {
+      if (!b) return;
+      if (introLead && b.serviceName) {
+        introLead.innerHTML =
+          '<strong>' +
+          String(b.serviceName).replace(/</g, '') +
+          '</strong> — use the <strong>Hosted AI</strong> sub-tab for URL + link key + Send farm data. <strong>BYOK</strong> is on the other sub-tab. In-game <code>!hank</code>: <strong>In-game chat</strong> section + <strong>Write to FS25 modSettings</strong>.';
+      }
+      if (b.hasEmbeddedIntegrationKey) {
+        if (rowKey) rowKey.classList.add('d-none');
+        if (note) note.classList.remove('d-none');
+      } else {
+        if (rowKey) rowKey.classList.remove('d-none');
+        if (note) note.classList.add('d-none');
+      }
+      if (b.hasDefaultBackendUrl) {
+        if (rowUrl) rowUrl.classList.add('d-none');
+      } else {
+        if (rowUrl) rowUrl.classList.remove('d-none');
+      }
+    });
+  }
+
+  function fillModelSelect(selectId, models, selectedId, emptyPhrase) {
+    var sel = document.getElementById(selectId);
+    if (!sel) return;
+    sel.innerHTML = '';
+    var placeholder = document.createElement('option');
+    placeholder.value = '';
+    placeholder.textContent =
+      models && models.length
+        ? '— choose a model —'
+        : emptyPhrase || '— paste key, then Refresh models —';
+    sel.appendChild(placeholder);
+    var list = models || [];
+    for (var i = 0; i < list.length; i++) {
+      var row = list[i];
+      var id = (row && row.id) || '';
+      if (!id) continue;
+      var o = document.createElement('option');
+      o.value = id;
+      var dn = (row && row.displayName) || '';
+      o.textContent = dn && dn !== id ? id + ' — ' + dn : id;
+      sel.appendChild(o);
+    }
+    if (selectedId) {
+      sel.value = selectedId;
+      if (sel.value !== selectedId) {
+        var o2 = document.createElement('option');
+        o2.value = selectedId;
+        o2.textContent = selectedId + ' (saved)';
+        sel.appendChild(o2);
+        sel.value = selectedId;
+      }
+    }
+  }
+
+  function fillByokModelSelect(models, selectedId) {
+    fillModelSelect('aiFarmBotByokModelSelect', models, selectedId);
+  }
+
+  function fillOllamaModelSelect(models, selectedId) {
+    fillModelSelect(
+      'ollamaFmModelSelect',
+      models,
+      selectedId,
+      '— set connection, then Refresh models —'
+    );
+  }
+
+  function getOllamaPortNumber() {
+    var locEl = document.getElementById('ollamaFmLocation');
+    var v = locEl ? locEl.value : 'this_pc';
+    var el =
+      v === 'this_pc'
+        ? document.getElementById('ollamaFmPortLocal')
+        : document.getElementById('ollamaFmPortNetwork');
+    var p = el && el.value !== '' ? parseInt(String(el.value), 10) : 11434;
+    if (!Number.isFinite(p) || p < 1 || p > 65535) p = 11434;
+    return p;
+  }
+
+  function buildOllamaEffectiveBaseUrl() {
+    var locEl = document.getElementById('ollamaFmLocation');
+    var v = locEl ? locEl.value : 'this_pc';
+    if (v === 'custom') {
+      var cu = document.getElementById('ollamaFmCustomUrl');
+      return cu ? String(cu.value || '').trim() : '';
+    }
+    var port = getOllamaPortNumber();
+    if (v === 'this_pc') {
+      return 'http://127.0.0.1:' + port;
+    }
+    var hEl = document.getElementById('ollamaFmNetworkHost');
+    var host = hEl ? String(hEl.value || '').trim() : '';
+    if (!host) return '';
+    host = host.replace(/^https?:\/\//i, '').split('/')[0];
+    return 'http://' + host + ':' + port;
+  }
+
+  function syncOllamaFormVisibility() {
+    var locEl = document.getElementById('ollamaFmLocation');
+    var v = locEl ? locEl.value : 'this_pc';
+    var rowPc = document.getElementById('ollamaFmRowThisPc');
+    var rowNet = document.getElementById('ollamaFmRowNetwork');
+    var rowCust = document.getElementById('ollamaFmRowCustom');
+    if (rowPc) rowPc.classList.toggle('d-none', v !== 'this_pc');
+    if (rowNet) rowNet.classList.toggle('d-none', v !== 'network');
+    if (rowCust) rowCust.classList.toggle('d-none', v !== 'custom');
+    updateOllamaPreview();
+  }
+
+  function updateOllamaPreview() {
+    var p = document.getElementById('ollamaFmPreview');
+    if (!p) return;
+    var u = buildOllamaEffectiveBaseUrl();
+    p.textContent = u
+      ? 'Effective URL: ' + u + '  (API uses …/v1/chat/completions)'
+      : '— choose connection or enter custom URL —';
+  }
+
+  function applyCredToOllamaForm(cred) {
+    var url = cred && cred.openaiBaseUrl ? String(cred.openaiBaseUrl).trim() : '';
+    var locEl = document.getElementById('ollamaFmLocation');
+    var pl = document.getElementById('ollamaFmPortLocal');
+    var pn = document.getElementById('ollamaFmPortNetwork');
+    var hostEl = document.getElementById('ollamaFmNetworkHost');
+    var customEl = document.getElementById('ollamaFmCustomUrl');
+    if (!locEl) return;
+    if (!url) {
+      locEl.value = 'this_pc';
+      if (pl) pl.value = '11434';
+      if (pn) pn.value = '11434';
+      if (hostEl) hostEl.value = '';
+      if (customEl) customEl.value = '';
+      syncOllamaFormVisibility();
+      return;
+    }
+    try {
+      var raw = /^https?:\/\//i.test(url) ? url : 'http://' + url;
+      var uu = new URL(raw);
+      var path = uu.pathname && uu.pathname !== '/' ? uu.pathname : '';
+      if (path && path !== '/v1' && path.indexOf('/v1/') !== 0) {
+        locEl.value = 'custom';
+        if (customEl) customEl.value = url;
+        if (pl) pl.value = '11434';
+        if (pn) pn.value = '11434';
+        syncOllamaFormVisibility();
+        return;
+      }
+      var host = uu.hostname;
+      var port = uu.port ? parseInt(uu.port, 10) : 11434;
+      if (!Number.isFinite(port) || port < 1) port = 11434;
+      if (host === '127.0.0.1' || host === 'localhost') {
+        locEl.value = 'this_pc';
+        if (pl) pl.value = String(port);
+      } else {
+        locEl.value = 'network';
+        if (hostEl) hostEl.value = host;
+        if (pn) pn.value = String(port);
+      }
+    } catch (e1) {
+      locEl.value = 'custom';
+      if (customEl) customEl.value = url;
+    }
+    syncOllamaFormVisibility();
+  }
+
+  function populateOllamaFromStore() {
+    try {
+      var a = fdApi();
+      if (!a) return;
+      var bearerEl = document.getElementById('ollamaFmBearer');
+      if (bearerEl) {
+        bearerEl.value = '';
+        bearerEl.placeholder = 'Leave blank for no auth or to keep saved key';
+      }
+      Promise.all([a.getConsultantByokMeta(), a.getConsultantByokCredentials()]).then(function (tuple) {
+        var m = tuple[0] || {};
+        var cred = tuple[1] || {};
+        applyCredToOllamaForm(cred);
+        if (m && m.hasKey && bearerEl) {
+          bearerEl.placeholder = 'Leave blank to keep saved API key / token';
+        }
+        var metaEl = document.getElementById('ollamaFmModelsMeta');
+        if (metaEl) metaEl.textContent = 'Loading models…';
+        var mid = (cred.modelId && String(cred.modelId)) || '';
+        return a.listSavedByokProviderModels().then(function (r) {
+          return { r: r, cred: cred, mid: mid, m: m };
+        });
+      })
+        .then(function (x) {
+          if (!x) return;
+          var r = x.r;
+          var cred = x.cred || {};
+          var mid = x.mid || '';
+          var metaEl2 = document.getElementById('ollamaFmModelsMeta');
+          if (!r || !r.ok) {
+            fillOllamaModelSelect([], mid);
+            if (metaEl2)
+              metaEl2.textContent = r && r.error ? String(r.error) : 'Could not list models — check connection.';
+            return;
+          }
+          fillOllamaModelSelect(r.models || [], mid);
+          var n = (r.models && r.models.length) || 0;
+          if (metaEl2) {
+            if (n === 0 && r.emptyHint) {
+              metaEl2.textContent = r.emptyHint;
+            } else {
+              metaEl2.textContent =
+                n + ' model(s) — pick one, then Save Ollama' + (mid ? ' · saved: ' + mid : '');
+            }
+          }
+        })
+        .catch(function () {
+          var mx = document.getElementById('ollamaFmModelsMeta');
+          if (mx) mx.textContent = 'Could not load models.';
+        });
+    } catch (eO) {}
+  }
+
+  function runOllamaRefreshModels() {
+    var meta = document.getElementById('ollamaFmModelsMeta');
+    var base = buildOllamaEffectiveBaseUrl();
+    var bearerEl = document.getElementById('ollamaFmBearer');
+    var keyRaw = bearerEl ? bearerEl.value.trim() : '';
+    if (meta) meta.textContent = 'Loading…';
+    if (!base) {
+      if (meta) meta.textContent = 'Enter hostname, IP, or custom URL first.';
+      fillOllamaModelSelect([], '');
+      return;
+    }
+    try {
+      var a = fdApi();
+      if (!a) {
+        if (meta) meta.textContent = 'Desktop app required.';
+        return;
+      }
+      a
+        .listByokProviderModels({
+          provider: 'openai',
+          apiKey: keyRaw,
+          openaiBaseUrl: base,
+        })
+        .then(function (r) {
+          return a.getConsultantByokCredentials().then(function (cred) {
+            return { r: r, cred: cred || {} };
+          });
+        })
+        .then(function (x) {
+          var r = x.r;
+          var cred = x.cred || {};
+          var savedModel = (cred.modelId && String(cred.modelId)) || '';
+          if (!r || !r.ok) {
+            if (meta) meta.textContent = (r && r.error) ? String(r.error) : 'Failed to list models.';
+            fillOllamaModelSelect([], savedModel);
+            return;
+          }
+          fillOllamaModelSelect(r.models || [], savedModel);
+          if (meta) {
+            var n = (r.models && r.models.length) || 0;
+            if (n === 0 && r.emptyHint) {
+              meta.textContent = r.emptyHint;
+            } else {
+              meta.textContent =
+                n + ' model(s) — pick one, then Save Ollama' + (keyRaw ? '' : ' (default auth)');
+            }
+          }
+        })
+        .catch(function (e) {
+          if (meta) meta.textContent = String(e && e.message ? e.message : e);
+          fillOllamaModelSelect([], '');
+        });
+    } catch (eG) {
+      if (meta) meta.textContent = String(eG && eG.message ? eG.message : eG);
+    }
+  }
+
+  function syncByokOpenaiCompatRow() {
+    var provEl = document.getElementById('aiFarmBotByokProvider');
+    var row = document.getElementById('aiFarmBotByokOpenaiBaseRow');
+    if (!row) return;
+    if (provEl && provEl.value === 'openai_compat') {
+      row.classList.remove('d-none');
+    } else {
+      row.classList.add('d-none');
+    }
+  }
+
+  function runByokRefreshModels() {
+    var meta = document.getElementById('aiFarmBotByokModelsMeta');
+    var provEl = document.getElementById('aiFarmBotByokProvider');
+    var keyEl = document.getElementById('aiFarmBotByokKey');
+    var baseEl = document.getElementById('aiFarmBotByokOpenaiBase');
+    var prov = provEl && provEl.value === 'gemini' ? 'gemini' : 'openai';
+    var keyRaw = keyEl ? keyEl.value.trim() : '';
+    var openaiBase = baseEl ? String(baseEl.value || '').trim() : '';
+    if (meta) meta.textContent = 'Loading…';
+    try {
+      var a = fdApi();
+      if (!a) {
+        if (meta) meta.textContent = 'Desktop app required for BYOK model list.';
+        return;
+      }
+      var p = (keyRaw || openaiBase
+        ? a.listByokProviderModels({
+            provider: prov,
+            apiKey: keyRaw,
+            openaiBaseUrl: openaiBase || undefined,
+          })
+        : a.listSavedByokProviderModels());
+      p.then(function (r) {
+          return a.getConsultantByokCredentials().then(function (cred) {
+            return { r: r, cred: cred || {} };
+          });
+        })
+        .then(function (x) {
+          var r = x.r;
+          var cred = x.cred || {};
+          var savedModel = (cred.modelId && String(cred.modelId)) || '';
+          if (!r || !r.ok) {
+            if (meta) meta.textContent = (r && r.error) ? String(r.error) : 'Failed to list models.';
+            fillByokModelSelect([], savedModel);
+            return;
+          }
+          fillByokModelSelect(r.models || [], savedModel);
+          if (meta) {
+            var n = (r.models && r.models.length) || 0;
+            if (n === 0 && r.emptyHint) {
+              meta.textContent = r.emptyHint;
+            } else {
+              meta.textContent =
+                n +
+                ' models — pick one, then Save BYOK' +
+                (keyRaw ? '' : ' (using saved key)');
+            }
+          }
+        })
+        .catch(function (e) {
+          if (meta) meta.textContent = String(e && e.message ? e.message : e);
+          fillByokModelSelect([], '');
+        });
+    } catch (eG) {
+      if (meta) meta.textContent = String(eG && eG.message ? eG.message : eG);
     }
   }
 
   function populateByokFromStore() {
     try {
-      var ipc = require('electron').ipcRenderer;
+      var a = fdApi();
+      if (!a) return;
       var clearCb = document.getElementById('aiFarmBotClearByok');
       if (clearCb) clearCb.checked = false;
-      ipc.invoke('get-consultant-byok-meta').then(function (m) {
+      Promise.all([a.getConsultantByokMeta(), a.getConsultantByokCredentials()]).then(function (tuple) {
+        var m = tuple[0] || {};
+        var cred = tuple[1] || {};
         var prov = document.getElementById('aiFarmBotByokProvider');
         var keyEl = document.getElementById('aiFarmBotByokKey');
-        if (prov) prov.value = m && m.provider === 'gemini' ? 'gemini' : 'openai';
+        var baseEl = document.getElementById('aiFarmBotByokOpenaiBase');
+        if (prov) {
+          if (cred.provider === 'gemini') prov.value = 'gemini';
+          else if (cred.provider === 'openai_compat') prov.value = 'openai_compat';
+          else prov.value = 'openai';
+        }
+        if (baseEl) baseEl.value = cred.openaiBaseUrl ? String(cred.openaiBaseUrl) : '';
+        syncByokOpenaiCompatRow();
         if (keyEl) {
           keyEl.value = '';
-          keyEl.placeholder = m && m.hasKey ? '•••• leave blank to keep saved key' : 'sk-… or AIza…';
+          keyEl.placeholder =
+            m && m.hasKey ? '•••• leave blank to keep saved key' : 'sk-… or AIza… or ollama';
+        }
+        var csvEl = document.getElementById('aiFarmBotByokModelIdsCsv');
+        var addEl = document.getElementById('aiFarmBotByokAdditionalKeys');
+        if (csvEl) csvEl.value = '';
+        if (addEl) addEl.value = '';
+        if (m && (m.hasKey || m.hasOpenaiBaseUrl)) {
+          var metaEl = document.getElementById('aiFarmBotByokModelsMeta');
+          if (metaEl) metaEl.textContent = 'Loading models…';
+          a
+            .listSavedByokProviderModels()
+            .then(function (r) {
+              return a.getConsultantByokCredentials().then(function (cred) {
+                return { r: r, cred: cred || {} };
+              });
+            })
+            .then(function (x) {
+              var r = x.r;
+              var cred = x.cred || {};
+              var metaEl2 = document.getElementById('aiFarmBotByokModelsMeta');
+              var mid = (cred.modelId && String(cred.modelId)) || '';
+              var csvEl2 = document.getElementById('aiFarmBotByokModelIdsCsv');
+              var addEl2 = document.getElementById('aiFarmBotByokAdditionalKeys');
+              if (csvEl2) csvEl2.value = cred.modelIdsCsv ? String(cred.modelIdsCsv) : '';
+              if (addEl2) addEl2.value = cred.additionalKeys ? String(cred.additionalKeys) : '';
+              if (!r || !r.ok) {
+                fillByokModelSelect([], mid);
+                if (metaEl2)
+                  metaEl2.textContent = r && r.error ? String(r.error) : 'Could not load model list.';
+                return;
+              }
+              fillByokModelSelect(r.models || [], mid);
+              if (metaEl2) {
+                var nSaved = (r.models && r.models.length) || 0;
+                if (nSaved === 0 && r.emptyHint) {
+                  metaEl2.textContent = r.emptyHint;
+                } else {
+                  var extraK = m && typeof m.extraKeyLines === 'number' ? m.extraKeyLines : 0;
+                  metaEl2.textContent =
+                    nSaved +
+                    ' models' +
+                    (mid ? ' · saved: ' + mid : ' · choose a model and Save BYOK') +
+                    (extraK ? ' · +' + extraK + ' extra key line(s)' : '');
+                }
+              }
+            });
+        } else {
+          fillByokModelSelect([], '');
+          var mx = document.getElementById('aiFarmBotByokModelsMeta');
+          if (mx) mx.textContent = 'Enter your API key or local base URL, then click Refresh models.';
         }
       });
     } catch (e2) {}
@@ -311,10 +700,10 @@
         });
     }
 
-    try {
-      var ipc = require('electron').ipcRenderer;
-      ipc
-        .invoke('get-ai-manager-connection')
+    var a = fdApi();
+    if (a) {
+      a
+        .getAiManagerConnection()
         .then(function (c) {
           var base = (c && c.baseUrl) || getBase() || '';
           var key = (c && c.integrationKey) || getKey() || '';
@@ -325,7 +714,7 @@
         .catch(function () {
           doFetch(getBase() || 'http://127.0.0.1:8080', getKey());
         });
-    } catch (e3) {
+    } else {
       doFetch(getBase() || 'http://127.0.0.1:8080', getKey());
     }
   }
@@ -340,15 +729,15 @@
 
     if (urlIn) urlIn.value = getBase() || '';
     if (keyIn) keyIn.value = getKey();
-    try {
-      var ipcSync = require('electron').ipcRenderer;
-      ipcSync.invoke('get-ai-manager-connection').then(function (c) {
+    var aSync = fdApi();
+    if (aSync) {
+      aSync.getAiManagerConnection().then(function (c) {
         if (urlIn && c && c.baseUrl) urlIn.value = c.baseUrl;
         if (keyIn && c && c.integrationKey) keyIn.value = c.integrationKey;
         var pushCb = document.getElementById('aiFarmBotPushSnapshots');
         if (pushCb && c) pushCb.checked = !!c.pushSnapshots;
       });
-    } catch (eSync) {}
+    }
 
     if (saveBtn) {
       saveBtn.addEventListener('click', async function () {
@@ -359,40 +748,199 @@
         if (baseVal) localStorage.setItem(LS_URL, baseVal);
         if (keyVal) localStorage.setItem(LS_KEY, keyVal);
 
+        var saveErr = null;
         try {
-          var ipc0 = require('electron').ipcRenderer;
-          await ipc0.invoke('save-ai-manager-connection', {
+          var ipc0 = fdApi();
+          if (!ipc0) throw new Error('Desktop app API unavailable');
+          await ipc0.saveAiManagerConnection({
             baseUrl: baseVal,
             integrationKey: keyVal,
             pushSnapshots: pushSnapshots,
           });
-
-          var clearByok = document.getElementById('aiFarmBotClearByok');
-          var byokKeyEl = document.getElementById('aiFarmBotByokKey');
-          var byokKeyRaw = byokKeyEl ? byokKeyEl.value.trim() : '';
-          var byokProv =
-            document.getElementById('aiFarmBotByokProvider') &&
-            document.getElementById('aiFarmBotByokProvider').value === 'gemini'
-              ? 'gemini'
-              : 'openai';
-          if (clearByok && clearByok.checked) {
-            await ipc0.invoke('save-consultant-byok-credentials', { clear: true });
-          } else {
-            var meta = await ipc0.invoke('get-consultant-byok-meta');
-            if (byokKeyRaw || (meta && meta.hasKey)) {
-              await ipc0.invoke('save-consultant-byok-credentials', {
-                apiKey: byokKeyRaw,
-                provider: byokProv,
-              });
-            }
+        } catch (e0) {
+          saveErr = e0;
+          var ban = document.getElementById('aiFarmBotConnectionBanner');
+          if (ban) {
+            ban.classList.remove('d-none', 'alert-success', 'alert-warning', 'alert-info', 'alert-secondary');
+            ban.classList.add('alert-danger');
+            ban.innerHTML =
+              '<strong>Save failed.</strong> ' +
+              esc(String(e0 && e0.message ? e0.message : e0));
           }
-        } catch (e0) {}
+        }
 
-        loadPanel();
-        populateByokFromStore();
+        if (!saveErr) {
+          loadPanel();
+        }
       });
     }
     if (refreshBtn) refreshBtn.addEventListener('click', loadPanel);
+
+    var hostedSubBtn = document.getElementById('ai-fm-subtab-hosted-btn');
+    if (hostedSubBtn) {
+      hostedSubBtn.addEventListener('shown.bs.tab', function () {
+        loadPanel();
+      });
+    }
+    var byokSubBtn = document.getElementById('ai-fm-subtab-byok-btn');
+    if (byokSubBtn) {
+      byokSubBtn.addEventListener('shown.bs.tab', function () {
+        populateByokFromStore();
+      });
+    }
+
+    var ollamaSubBtn = document.getElementById('ai-fm-subtab-ollama-btn');
+    if (ollamaSubBtn) {
+      ollamaSubBtn.addEventListener('shown.bs.tab', function () {
+        populateOllamaFromStore();
+      });
+    }
+
+    var ollamaLocEl = document.getElementById('ollamaFmLocation');
+    if (ollamaLocEl) {
+      ollamaLocEl.addEventListener('change', syncOllamaFormVisibility);
+    }
+    ['ollamaFmPortLocal', 'ollamaFmPortNetwork', 'ollamaFmNetworkHost', 'ollamaFmCustomUrl'].forEach(function (oid) {
+      var el = document.getElementById(oid);
+      if (el) {
+        el.addEventListener('input', updateOllamaPreview);
+        el.addEventListener('change', updateOllamaPreview);
+      }
+    });
+    if (document.getElementById('ollamaFmLocation')) {
+      syncOllamaFormVisibility();
+    }
+
+    var ollamaRefreshBtn = document.getElementById('ollamaFmRefreshModels');
+    if (ollamaRefreshBtn) ollamaRefreshBtn.addEventListener('click', runOllamaRefreshModels);
+
+    var ollamaSaveBtn = document.getElementById('ollamaFmSave');
+    if (ollamaSaveBtn) {
+      ollamaSaveBtn.addEventListener('click', async function () {
+        var base = buildOllamaEffectiveBaseUrl();
+        var hint = document.getElementById('ollamaFmSaveHint');
+        var modelSel = document.getElementById('ollamaFmModelSelect');
+        var modelId = modelSel && modelSel.value != null ? String(modelSel.value).trim() : '';
+        var bearerEl = document.getElementById('ollamaFmBearer');
+        var bearerRaw = bearerEl ? bearerEl.value.trim() : '';
+        if (!base) {
+          if (hint) {
+            hint.textContent = 'Set where Ollama runs (hostname, IP, or custom URL).';
+            hint.classList.remove('d-none');
+          }
+          return;
+        }
+        try {
+          var ipcO = fdApi();
+          if (!ipcO) throw new Error('Desktop app API unavailable');
+          await ipcO.saveConsultantByokCredentials({
+            apiKey: bearerRaw || 'ollama',
+            provider: 'openai_compat',
+            openaiBaseUrl: base,
+            modelId: modelId,
+          });
+          if (hint) {
+            hint.textContent = 'Ollama saved for Smart suggestions.';
+            hint.classList.remove('d-none');
+          }
+          setTimeout(function () {
+            if (hint) hint.classList.add('d-none');
+          }, 5000);
+          populateByokFromStore();
+          populateOllamaFromStore();
+          if (typeof window.refreshFarmDashConsultantInsights === 'function') {
+            window.refreshFarmDashConsultantInsights();
+          }
+        } catch (eOs) {
+          if (hint) {
+            hint.textContent = String(eOs && eOs.message ? eOs.message : eOs);
+            hint.classList.remove('d-none');
+          }
+        }
+      });
+    }
+
+    var byokRefreshBtn = document.getElementById('aiFarmBotByokRefreshModels');
+    if (byokRefreshBtn) byokRefreshBtn.addEventListener('click', runByokRefreshModels);
+
+    var byokProvChange = document.getElementById('aiFarmBotByokProvider');
+    if (byokProvChange) {
+      byokProvChange.addEventListener('change', function () {
+        syncByokOpenaiCompatRow();
+        var mx = document.getElementById('aiFarmBotByokModelsMeta');
+        if (mx) mx.textContent = 'Provider changed — click Refresh models for an updated list.';
+        fillByokModelSelect([], '');
+      });
+    }
+
+    var byokSaveBtn = document.getElementById('aiFarmBotByokSave');
+    if (byokSaveBtn) {
+      byokSaveBtn.addEventListener('click', async function () {
+        var clearByok = document.getElementById('aiFarmBotClearByok');
+        var byokKeyEl = document.getElementById('aiFarmBotByokKey');
+        var byokKeyRaw = byokKeyEl ? byokKeyEl.value.trim() : '';
+        var provElB = document.getElementById('aiFarmBotByokProvider');
+        var byokProv =
+          provElB && provElB.value === 'gemini'
+            ? 'gemini'
+            : provElB && provElB.value === 'openai_compat'
+              ? 'openai_compat'
+              : 'openai';
+        var baseElB = document.getElementById('aiFarmBotByokOpenaiBase');
+        var openaiBaseSave = baseElB ? String(baseElB.value || '').trim() : '';
+        var modelSel = document.getElementById('aiFarmBotByokModelSelect');
+        var modelId = modelSel && modelSel.value != null ? String(modelSel.value).trim() : '';
+        var hint = document.getElementById('aiFarmBotByokSaveHint');
+        try {
+          var ipcB = fdApi();
+          if (!ipcB) throw new Error('Desktop app API unavailable');
+          if (clearByok && clearByok.checked) {
+            await ipcB.saveConsultantByokCredentials({ clear: true });
+            if (hint) {
+              hint.textContent = 'BYOK removed from this PC.';
+              hint.classList.remove('d-none');
+            }
+            fillByokModelSelect([], '');
+            populateByokFromStore();
+            populateOllamaFromStore();
+            return;
+          }
+          var metaB = await ipcB.getConsultantByokMeta();
+          if (!byokKeyRaw && !(metaB && metaB.hasKey) && !(byokProv === 'openai_compat' && openaiBaseSave)) {
+            if (hint) {
+              hint.textContent =
+                'Paste an API key, or choose Local / OpenAI-compatible and enter a base URL (or check Remove saved key if clearing).';
+              hint.classList.remove('d-none');
+            }
+            return;
+          }
+          var csvElB = document.getElementById('aiFarmBotByokModelIdsCsv');
+          var addElB = document.getElementById('aiFarmBotByokAdditionalKeys');
+          await ipcB.saveConsultantByokCredentials({
+            apiKey: byokKeyRaw,
+            provider: byokProv,
+            openaiBaseUrl: byokProv === 'openai_compat' ? openaiBaseSave : '',
+            modelId: modelId,
+            modelIdsCsv: csvElB ? csvElB.value : undefined,
+            additionalKeys: addElB ? addElB.value : undefined,
+          });
+          if (hint) {
+            hint.textContent = 'BYOK saved.';
+            hint.classList.remove('d-none');
+          }
+          setTimeout(function () {
+            if (hint) hint.classList.add('d-none');
+          }, 5000);
+          populateByokFromStore();
+          populateOllamaFromStore();
+        } catch (eByok) {
+          if (hint) {
+            hint.textContent = String(eByok && eByok.message ? eByok.message : eByok);
+            hint.classList.remove('d-none');
+          }
+        }
+      });
+    }
 
     var llmPingBtn = document.getElementById('aiFarmBotLlmPing');
     var llmPingOut = document.getElementById('aiFarmBotLlmPingResult');
@@ -405,8 +953,10 @@
         var h = { 'X-FarmDash-Key': '' };
         if (byok && byok.apiKey) {
           h['X-AI-API-Key'] = byok.apiKey;
-          if (byok.provider === 'gemini' || byok.provider === 'openai') {
-            h['X-AI-Provider'] = byok.provider;
+          h['X-AI-Provider'] = byok.provider === 'gemini' ? 'gemini' : 'openai';
+          var ob = byok.openaiBaseUrl && String(byok.openaiBaseUrl).trim();
+          if (ob) {
+            h['X-AI-OpenAI-Base-URL'] = ob;
           }
         }
         return h;
@@ -482,10 +1032,11 @@
       }
 
       try {
-        var ipc = require('electron').ipcRenderer;
+        var ipc = fdApi();
+        if (!ipc) throw new Error('no api');
         Promise.all([
-          ipc.invoke('get-ai-manager-connection'),
-          ipc.invoke('get-consultant-byok-credentials'),
+          ipc.getAiManagerConnection(),
+          ipc.getConsultantByokCredentials(),
         ])
           .then(function (arr) {
             var c = arr[0];
@@ -503,139 +1054,6 @@
     }
     if (llmPingBtn) llmPingBtn.addEventListener('click', runDashboardLlmPing);
 
-    var LS_GEMINI_MODELS = 'farmdash_gemini_models_cache_v2';
-    function geminiModelsMergeHeaders(byok) {
-      var h = {};
-      if (byok && byok.apiKey) {
-        h['X-AI-API-Key'] = byok.apiKey;
-        if (byok.provider === 'gemini' || byok.provider === 'openai') {
-          h['X-AI-Provider'] = byok.provider;
-        }
-      }
-      return h;
-    }
-    function fillGeminiModelSelect(models) {
-      var sel = document.getElementById('aiFarmBotGeminiModelSelect');
-      if (!sel) return;
-      sel.innerHTML = '';
-      var placeholder = document.createElement('option');
-      placeholder.value = '';
-      placeholder.textContent =
-        models && models.length ? '— select a model id to copy —' : '— no models —';
-      sel.appendChild(placeholder);
-      if (!models || !models.length) return;
-      for (var i = 0; i < models.length; i++) {
-        var m = models[i];
-        var id = (m && m.id) || '';
-        if (!id) continue;
-        var o = document.createElement('option');
-        o.value = id;
-        var dn = (m && m.displayName) || '';
-        o.textContent = dn && dn !== id ? id + ' — ' + dn : id;
-        sel.appendChild(o);
-      }
-    }
-    function tryHydrateGeminiModelsFromLs() {
-      var meta = document.getElementById('aiFarmBotGeminiModelsMeta');
-      try {
-        var raw = localStorage.getItem(LS_GEMINI_MODELS);
-        if (!raw) return;
-        var o = JSON.parse(raw);
-        var base = (getBase() || '').replace(/\/$/, '');
-        if (!o.base || String(o.base).replace(/\/$/, '') !== base) return;
-        fillGeminiModelSelect(o.models || []);
-        if (meta && o.fetchedAt) {
-          meta.textContent =
-            String((o.models && o.models.length) || 0) +
-            ' models · ' +
-            o.fetchedAt +
-            (o.fromCache ? ' (last fetch)' : '');
-        }
-      } catch (eH) {}
-    }
-    function runGeminiModelsFetch(force) {
-      var meta = document.getElementById('aiFarmBotGeminiModelsMeta');
-      if (meta) meta.textContent = 'Loading…';
-      function doFetch(base, key, headers) {
-        var b = (base || '').replace(/\/$/, '') || 'http://127.0.0.1:8080';
-        if (!key) {
-          if (meta) meta.textContent = 'Save link key first.';
-          fillGeminiModelSelect([]);
-          return;
-        }
-        headers['X-FarmDash-Key'] = encodeURIComponent(key);
-        var url = b + '/api/integration/gemini-models' + (force ? '?refresh=1' : '');
-        fetch(url, { headers: headers })
-          .then(function (r) {
-            pl('renderer_out', 'GET /api/integration/gemini-models', {
-              httpStatus: r.status,
-              force: !!force,
-            });
-            return r.text().then(function (txt) {
-              try {
-                return { status: r.status, body: JSON.parse(txt) };
-              } catch (eJ) {
-                throw new Error('HTTP ' + r.status + (txt ? ': ' + txt.slice(0, 160) : ''));
-              }
-            });
-          })
-          .then(function (x) {
-            var j = x.body || {};
-            if (!j.ok) {
-              if (meta) meta.textContent = (j.detail || 'Request failed') + '';
-              fillGeminiModelSelect([]);
-              return;
-            }
-            var models = j.models || [];
-            fillGeminiModelSelect(models);
-            var parts = [];
-            parts.push(String(models.length) + ' models');
-            if (j.fetchedAt) parts.push(j.fetchedAt);
-            if (j.fromCache) parts.push('server cache');
-            if (j.apiVersion) parts.push(j.apiVersion);
-            if (meta) meta.textContent = parts.join(' · ');
-            try {
-              localStorage.setItem(
-                LS_GEMINI_MODELS,
-                JSON.stringify({
-                  base: b,
-                  fetchedAt: j.fetchedAt,
-                  models: models,
-                  fromCache: j.fromCache,
-                }),
-              );
-            } catch (eLs) {}
-          })
-          .catch(function (e) {
-            if (meta) meta.textContent = String(e.message || e);
-            fillGeminiModelSelect([]);
-          });
-      }
-      try {
-        var ipc = require('electron').ipcRenderer;
-        Promise.all([
-          ipc.invoke('get-ai-manager-connection'),
-          ipc.invoke('get-consultant-byok-credentials'),
-        ])
-          .then(function (arr) {
-            var c = arr[0];
-            var byok = arr[1];
-            var base = (c && c.baseUrl) || getBase() || '';
-            var key = (c && c.integrationKey) || getKey() || '';
-            doFetch(base, key, geminiModelsMergeHeaders(byok || {}));
-          })
-          .catch(function () {
-            doFetch(getBase(), getKey(), geminiModelsMergeHeaders({}));
-          });
-      } catch (eG) {
-        doFetch(getBase(), getKey(), geminiModelsMergeHeaders({}));
-      }
-    }
-    var gemRefresh = document.getElementById('aiFarmBotGeminiModelsRefresh');
-    var gemForce = document.getElementById('aiFarmBotGeminiModelsForce');
-    if (gemRefresh) gemRefresh.addEventListener('click', function () { runGeminiModelsFetch(false); });
-    if (gemForce) gemForce.addEventListener('click', function () { runGeminiModelsFetch(true); });
-
     var toggleKeyBtn = document.getElementById('aiFarmBotToggleKey');
     var toggleKeyIcon = document.getElementById('aiFarmBotToggleKeyIcon');
     if (toggleKeyBtn && keyIn) {
@@ -651,9 +1069,9 @@
     }
     function runAiFarmManagerPanelOpen() {
       applyBrandingUi();
+      populateOllamaFromStore();
       populateByokFromStore();
       loadPanel();
-      tryHydrateGeminiModelsFromLs();
     }
     var appModal = document.getElementById('appSettingsModal');
     var aiTab = document.getElementById('app-settings-tab-ai');
@@ -674,27 +1092,22 @@
           installOut.textContent = 'Select a bot profile.';
           return;
         }
-        var ipc;
-        try {
-          ipc = require('electron').ipcRenderer;
-        } catch (e1) {
-          ipc = null;
-        }
+        var ipc = fdApi();
         if (!ipc) {
           installOut.textContent = 'Use the desktop app. Or download XML from your host’s admin.';
           return;
         }
         installOut.textContent = 'Writing…';
         ipc
-          .invoke('get-ai-manager-connection')
+          .getAiManagerConnection()
           .then(function (c) {
             var base = (c && c.baseUrl) || getBase() || '';
             var key = (c && c.integrationKey) || getKey() || '';
             if (!key) {
-              installOut.textContent = 'Save settings first (connection not ready).';
+              installOut.textContent = 'Save hosted connection first (Hosted AI tab — URL + link key).';
               return Promise.reject(new Error('__skip_install__'));
             }
-            return ipc.invoke('ai-farm-install-config-xml', {
+            return ipc.aiFarmInstallConfigXml({
               baseUrl: base,
               integrationKey: key,
               instanceId: id,

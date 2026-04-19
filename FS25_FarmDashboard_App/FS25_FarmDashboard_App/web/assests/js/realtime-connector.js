@@ -44,12 +44,18 @@ class RealtimeConnector {
   constructor(dashboard) {
     this.dashboard = dashboard;
     this.ws = null;
-    // Use dynamic endpoints based on current host
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname;
-    const wsProtocol = protocol === "https:" ? "wss:" : "ws:";
-    this.httpEndpoint = `${protocol}//${hostname}:8766`;
-    this.wsEndpoint = `${wsProtocol}//${hostname}:8766`; // WebSocket uses same port as HTTP
+    // Same host:port as the page (LAN tablet, localhost, or custom bind) — do not assume :8766 only.
+    const loc = typeof window !== "undefined" && window.location ? window.location : null;
+    const wsProto = loc && loc.protocol === "https:" ? "wss:" : "ws:";
+    if (loc && /^https?:$/i.test(String(loc.protocol || ""))) {
+      this.httpEndpoint = loc.origin;
+      this.wsEndpoint = `${wsProto}//${loc.host}`;
+    } else {
+      const protocol = loc ? loc.protocol : "http:";
+      const hostname = loc && loc.hostname ? loc.hostname : "127.0.0.1";
+      this.httpEndpoint = `${protocol}//${hostname}:8766`;
+      this.wsEndpoint = `${wsProto}//${hostname}:8766`;
+    }
     this.isConnected = false;
     this.reconnectInterval = 5000;
     this.reconnectTimer = null;
@@ -264,71 +270,38 @@ class RealtimeConnector {
   }
 
   startFileMonitoring() {
-    const checkFile = () => {
-      const fileInput = document.createElement("input");
-      fileInput.type = "file";
-      fileInput.accept = ".json";
-
-      const dataPath = this.getModSettingsPath();
-      if (dataPath) {
-        this.loadFileData(dataPath);
+    const poll = () => {
+      const api =
+        typeof window !== "undefined" && window.farmDashAPI
+          ? window.farmDashAPI
+          : null;
+      if (!api || typeof api.readLocalFarmdashDataJson !== "function") {
+        return;
       }
-    };
-
-    checkFile();
-    setInterval(checkFile, this.fileCheckInterval);
-  }
-
-  getModSettingsPath() {
-    if (window.require && window.require("fs")) {
-      const fs = window.require("fs");
-      const path = window.require("path");
-      const os = window.require("os");
-
-      const userHome = os.homedir();
-      const modSettingsPath = path.join(
-        userHome,
-        "Documents",
-        "My Games",
-        "FarmingSimulator2025",
-        "modSettings",
-        "FS25_FarmDashboard",
-        "data.json"
-      );
-
-      return modSettingsPath;
-    }
-    return null;
-  }
-
-  loadFileData(filePath) {
-    if (window.require && window.require("fs")) {
-      const fs = window.require("fs");
-
-      fs.readFile(filePath, "utf8", (err, data) => {
-        if (!err) {
-          try {
-            const jsonData = JSON.parse(data);
-            if (
-              JSON.stringify(jsonData) !== JSON.stringify(this.lastFileData)
-            ) {
-              this.lastFileData = jsonData;
-              this.handleRealtimeData(jsonData);
-              this.isConnected = true;
-              this.updateConnectionStatus(true);
-            }
-          } catch (error) {
-            console.error(
-              "[RealtimeConnector] Error parsing file data:",
-              error
-            );
+      api
+        .readLocalFarmdashDataJson()
+        .then((res) => {
+          if (!res || !res.ok || res.data == null) {
+            this.isConnected = false;
+            this.updateConnectionStatus(false);
+            return;
           }
-        } else {
+          const jsonData = res.data;
+          if (JSON.stringify(jsonData) !== JSON.stringify(this.lastFileData)) {
+            this.lastFileData = jsonData;
+            this.handleRealtimeData(jsonData);
+            this.isConnected = true;
+            this.updateConnectionStatus(true);
+          }
+        })
+        .catch(() => {
           this.isConnected = false;
           this.updateConnectionStatus(false);
-        }
-      });
-    }
+        });
+    };
+
+    poll();
+    setInterval(poll, this.fileCheckInterval);
   }
 
   /**

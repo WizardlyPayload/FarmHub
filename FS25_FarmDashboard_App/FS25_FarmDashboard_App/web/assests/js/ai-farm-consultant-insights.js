@@ -72,11 +72,33 @@
     return c;
   }
 
-  function insightCacheSet(viewKey, insights, llmUsed) {
+  /** @param {'hosted'|'byok'|'rules'|undefined} suggestionTier */
+  function normalizeSuggestionTier(suggestionTier, llmUsed) {
+    if (suggestionTier === 'hosted' || suggestionTier === 'byok' || suggestionTier === 'rules') {
+      return suggestionTier;
+    }
+    return llmUsed ? 'hosted' : 'rules';
+  }
+
+  function deriveTierFromResponse(data) {
+    if (typeof window !== 'undefined' && typeof window.farmdashDeriveSuggestionTier === 'function') {
+      return window.farmdashDeriveSuggestionTier(data);
+    }
+    if (!data || typeof data !== 'object') return 'rules';
+    if (data.farmdash_byok_local === true || data.suggestion_tier === 'byok') return 'byok';
+    var st = data.suggestion_tier;
+    if (st === 'hosted' || st === 'premium') return 'hosted';
+    if (st === 'rules') return 'rules';
+    return data.llm_used ? 'hosted' : 'rules';
+  }
+
+  function insightCacheSet(viewKey, insights, llmUsed, suggestionTier) {
     var k = insightCacheStorageKey(viewKey);
+    var tier = normalizeSuggestionTier(suggestionTier, !!llmUsed);
     insightResultCache[k] = {
       insights: insights || [],
       llm_used: !!llmUsed,
+      suggestion_tier: tier,
       ts: Date.now(),
     };
   }
@@ -88,7 +110,11 @@
       if (!insightResultCache.hasOwnProperty(k)) continue;
       var c = insightResultCache[k];
       if (!c || !c.insights) continue;
-      out[k] = { insights: c.insights, llm_used: !!c.llm_used };
+      out[k] = {
+        insights: c.insights,
+        llm_used: !!c.llm_used,
+        suggestion_tier: c.suggestion_tier || normalizeSuggestionTier(undefined, c.llm_used),
+      };
     }
     return out;
   }
@@ -102,6 +128,7 @@
         insightResultCache[k] = {
           insights: e.insights,
           llm_used: !!e.llm_used,
+          suggestion_tier: normalizeSuggestionTier(e.suggestion_tier, e.llm_used),
           ts: Date.now(),
         };
       }
@@ -147,6 +174,7 @@
         return {
           insights: (data && data.insights) || [],
           llm_used: !!(data && data.llm_used),
+          suggestion_tier: deriveTierFromResponse(data),
         };
       })
       .catch(function (e) {
@@ -181,44 +209,45 @@
           if (ck && ck.insights) {
             if (typeof dashFlushDomWork === 'function') {
               dashFlushDomWork(function () {
-                renderInsights(ck.insights, ck.llm_used);
+                renderInsights(ck.insights, ck.llm_used, ck.suggestion_tier);
               });
             } else {
-              renderInsights(ck.insights, ck.llm_used);
+              renderInsights(ck.insights, ck.llm_used, ck.suggestion_tier);
             }
           }
         }
       } catch (eDisk) {}
       return Promise.resolve();
     }
-    var parallelViews = ['fields', 'vehicles', 'pastures', 'livestock', 'productions', 'economy'];
-    pl('renderer_in', 'preloadAllAIInsights: parallel', { views: parallelViews });
-    return Promise.all(
-      parallelViews.map(function (v) {
-        return fetchInsightsForView(v, { silent: true })
-          .then(function (data) {
-            insightCacheSet(v, data.insights, data.llm_used);
-            return v;
-          })
-          .catch(function (err) {
-            pl('renderer_err', 'preloadAllAIInsights parallel view failed', {
-              view: v,
-              err: String(err && err.message ? err.message : err),
+    var sequentialViews = ['fields', 'livestock', 'vehicles', 'pastures', 'productions', 'economy'];
+    pl('renderer_in', 'preloadAllAIInsights: sequential (one view at a time)', { views: sequentialViews });
+    return sequentialViews
+      .reduce(function (chain, v) {
+        return chain.then(function () {
+          return fetchInsightsForView(v, { silent: true })
+            .then(function (data) {
+              insightCacheSet(v, data.insights, data.llm_used, data.suggestion_tier);
+              return v;
+            })
+            .catch(function (err) {
+              pl('renderer_err', 'preloadAllAIInsights view failed', {
+                view: v,
+                err: String(err && err.message ? err.message : err),
+              });
+              return null;
             });
-            return null;
-          });
-      })
-    )
+        });
+      }, Promise.resolve())
       .then(function () {
         return fetchInsightsForView('home', { silent: true });
       })
       .then(function (data) {
-        insightCacheSet('home', data.insights, data.llm_used);
+        insightCacheSet('home', data.insights, data.llm_used, data.suggestion_tier);
         pl('renderer_ok', 'preloadAllAIInsights: home stored', {});
         try {
           var cur = getSmartPanelViewParam();
           if (cur === 'home' && document.getElementById('ai-insights-panel')) {
-            renderInsights(data.insights, data.llm_used);
+            renderInsights(data.insights, data.llm_used, data.suggestion_tier);
           }
         } catch (ePaint) {}
       })
@@ -278,7 +307,7 @@
   }
 
   /**
-   * AI unavailable or declined — neutral copy (no red errors; full dashboard works without AI).
+   * AI unavailable or declined — neutral copy only (no warning banners; full dashboard works without AI).
    */
   function renderSmartSuggestionsUnavailableNeutral() {
     var container = document.getElementById('ai-insights-panel');
@@ -296,7 +325,7 @@
       '<i class="bi bi-lightbulb me-1"></i> <strong>Smart suggestions</strong> are optional. When connected, this panel ranks tips from your live snapshot — fields, fleet, animals, pastures, production, and economy.' +
       '</p>' +
       '<p class="small text-muted mb-0">' +
-      'Nothing is wrong with your dashboard if you skip AI. Connect an AI Farm Manager host or add BYOK in settings whenever you want these tips.' +
+      'Use <strong>Settings → AI Farm Manager → BYOK</strong>: OpenAI/Gemini key, or <strong>Local / OpenAI-compatible</strong> with your Ollama URL (e.g. <code class="small">http://127.0.0.1:11434</code>) + model. Ensure the game is running with the mod so farm data loads, then click <strong>Refresh</strong> above.' +
       '</p>';
   }
 
@@ -329,14 +358,24 @@
         ? window.pickDoThisFirstFromFieldInsights(fields)
         : null;
     var llmUsed = !!window.__fieldConsultantLlmUsed;
+    var fieldTier =
+      typeof window.__fieldConsultantSuggestionTier === 'string'
+        ? window.__fieldConsultantSuggestionTier
+        : normalizeSuggestionTier(undefined, llmUsed);
 
     if (badge) {
       if (picked) {
-        badge.textContent = llmUsed ? 'AI' : 'Rules';
-        badge.className = 'badge ms-1 ' + (llmUsed ? 'bg-success' : 'bg-secondary');
-        badge.title = llmUsed
-          ? 'Do-this-first is picked from your per-field AI tips (same response as the field cards).'
-          : 'Do-this-first is ranked from per-field tips (heuristics).';
+        applySmartSourceBadge(badge, fieldTier);
+        if (fieldTier === 'byok') {
+          badge.title =
+            'Mid tier (BYOK) — per-field tips from your on-device LLM; same payload as field cards.';
+        } else if (fieldTier === 'hosted') {
+          badge.title =
+            'Premium (hosted AI) — per-field tips from your AI Farm Manager server; same payload as field cards.';
+        } else {
+          badge.title =
+            'Basic (rules) — do-this-first ranked from heuristics when the LLM is not used.';
+        }
       } else {
         badge.textContent = 'Fields';
         badge.className = 'badge ms-1 bg-info text-dark';
@@ -390,18 +429,51 @@
       'Loading per-field AI tips… then we&rsquo;ll show what to do first.</p>';
   }
 
-  function renderInsights(insights, llmUsed) {
+  function applySmartSourceBadge(badge, tier) {
+    if (!badge) return;
+    if (tier === 'byok') {
+      badge.textContent = 'BYOK';
+      badge.className = 'badge ms-1 bg-info text-dark';
+      badge.title =
+        'Mid tier — your OpenAI/Gemini key; LLM runs on this PC (Settings → AI Farm Manager → BYOK).';
+    } else if (tier === 'hosted') {
+      badge.textContent = 'Hosted';
+      badge.className = 'badge ms-1 text-bg-warning text-dark';
+      badge.title =
+        'Premium tier — AI Farm Manager on your subscription server (URL + link key + Send farm data).';
+    } else {
+      badge.textContent = 'Rules';
+      badge.className = 'badge ms-1 bg-secondary';
+      badge.title =
+        'Basic tier — heuristic / rules-based tips when no LLM is used (common on Fields).';
+    }
+  }
+
+  function tierBadgeInlineHtml(tier) {
+    if (tier === 'byok') {
+      return (
+        '<span class="badge bg-info text-dark" title="Mid tier — your API key on this PC">Mid · BYOK</span>'
+      );
+    }
+    if (tier === 'hosted') {
+      return (
+        '<span class="badge text-bg-warning text-dark" title="Premium — hosted AI Farm Manager server">Premium · Hosted AI</span>'
+      );
+    }
+    return (
+      '<span class="badge bg-secondary" title="Basic — rules/heuristics when LLM is off">Basic · Rules</span>'
+    );
+  }
+
+  function renderInsights(insights, llmUsed, suggestionTier) {
     var container = document.getElementById('ai-insights-panel');
     var badge = document.getElementById('ai-insights-llm-badge');
     if (!container) return;
     container.removeAttribute('aria-busy');
 
+    var tier = normalizeSuggestionTier(suggestionTier, !!llmUsed);
     if (badge) {
-      badge.textContent = llmUsed ? 'AI' : 'Rules';
-      badge.className = 'badge ms-1 ' + (llmUsed ? 'bg-success' : 'bg-secondary');
-      badge.title = llmUsed
-        ? 'LLM suggestions (server API key and/or BYOK in AI Farm Manager)'
-        : 'Heuristics only — configure LLM on the AI server or add BYOK in the robot panel';
+      applySmartSourceBadge(badge, tier);
     }
 
     container.innerHTML = '';
@@ -415,7 +487,10 @@
       var intro = document.createElement('p');
       intro.className = 'small text-info mb-3';
       intro.innerHTML =
-        '<i class="bi bi-list-stars me-1"></i> <strong>Top 3 farm priorities</strong> — ranked from your live snapshot (fields, vehicles, animals, pastures, production, economy).';
+        '<i class="bi bi-list-stars me-1"></i> <strong>Top 3 farm priorities</strong> — ranked from your live snapshot (fields, vehicles, animals, pastures, production, economy). ' +
+        '<span class="ms-1 align-middle">' +
+        tierBadgeInlineHtml(tier) +
+        '</span>';
       container.appendChild(intro);
     }
     if (!insights || insights.length === 0) {
@@ -490,7 +565,7 @@
       var ck = insightCacheGet(getSmartPanelViewParam());
       if (ck) {
         var doCached = function () {
-          renderInsights(ck.insights, ck.llm_used);
+          renderInsights(ck.insights, ck.llm_used, ck.suggestion_tier);
         };
         if (typeof dashFlushDomWork === 'function') {
           dashFlushDomWork(doCached);
@@ -601,7 +676,11 @@
               var msg503 = 'Snapshot unavailable (FTP / DASHBOARD_JSON_URL)';
               try {
                 var j503 = JSON.parse(errText);
-                if (j503 && j503.detail) msg503 = String(j503.detail);
+                if (j503 && j503.farmdash_ai_error === 'not_configured') {
+                  msg503 = 'optional: BYOK or hosted AI not set (Settings → AI Farm Manager)';
+                } else if (j503 && j503.detail != null && String(j503.detail).trim() !== '') {
+                  msg503 = String(j503.detail);
+                }
               } catch (eParse503) {}
               throw new Error(msg503);
             }
@@ -654,7 +733,7 @@
           } catch (eLlm) {}
           var vpStore = requestedViewAtFetch || getSmartPanelViewParam();
           if (aiErr && (!list || list.length === 0)) {
-            insightCacheSet(vpStore, [], false);
+            insightCacheSet(vpStore, [], false, 'rules');
             try {
               document.dispatchEvent(new CustomEvent('consultant-insights-fetched'));
             } catch (eEv) {}
@@ -669,13 +748,14 @@
             pl('renderer_ok', 'consultant/insights: optional AI unavailable (server flag), neutral UI', {});
             return;
           }
-          insightCacheSet(vpStore, list, llm);
+          var tier = deriveTierFromResponse(data);
+          insightCacheSet(vpStore, list, llm, tier);
           try {
             document.dispatchEvent(new CustomEvent('consultant-insights-fetched'));
           } catch (eEv) {}
 
           var doRender = function () {
-            renderInsights(list, llm);
+            renderInsights(list, llm, tier);
           };
           if (typeof dashFlushDomWork === 'function') {
             dashFlushDomWork(doRender);

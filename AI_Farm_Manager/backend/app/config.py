@@ -16,8 +16,10 @@ from app.services.dashboard_service import build_dashboard_fetch_url
 logger = logging.getLogger(__name__)
 
 # Always load backend/.env (not only when CWD happens to be the backend folder).
+# override=True: values in `.env` win over duplicate keys already injected by Docker / Coolify / systemd.
+# Without this, Coolify's env blocks admin-saved keys on every process restart until the file is ignored.
 _backend_root = Path(__file__).resolve().parent.parent
-load_dotenv(_backend_root / ".env")
+load_dotenv(_backend_root / ".env", override=True)
 
 
 def get_backend_root() -> Path:
@@ -172,6 +174,25 @@ def has_gemini_credentials(settings: dict[str, Any]) -> bool:
     return bool(active_gemini_api_key(settings))
 
 
+def normalize_openai_base_url_for_sdk(raw: str | None) -> str:
+    """
+    Normalized OpenAI-compatible API base for ``AsyncOpenAI(base_url=…)``.
+
+    Empty string means use the default OpenAI cloud endpoint (omit ``base_url``).
+
+    Accepts e.g. ``http://192.168.1.10:11434`` — appends ``/v1`` when the path does not already
+    include ``/v1`` (Ollama and most proxies expose ``…/v1/chat/completions``).
+    """
+    s = (raw or "").strip()
+    if not s:
+        return ""
+    s = s.rstrip("/")
+    low = s.lower()
+    if "/v1" not in low:
+        s = f"{s}/v1"
+    return s
+
+
 @lru_cache
 def get_settings() -> dict:
     llm_provider = os.getenv("LLM_PROVIDER", "openai").lower().strip()
@@ -198,16 +219,19 @@ def get_settings() -> dict:
                 n_r,
             )
     be = _bot_enabled()
+    openai_base_url = normalize_openai_base_url_for_sdk(os.getenv("OPENAI_BASE_URL", ""))
+    openai_base_configured = bool((os.getenv("OPENAI_BASE_URL") or "").strip())
     if llm_provider == "gemini":
         llm_configured = be and bool(gemini_api_keys or gemini_api_key)
     else:
-        llm_configured = be and bool(llm_api_key)
+        llm_configured = be and (bool(_strip_key(llm_api_key)) or openai_base_configured)
 
     rotation_window = _clamp_int(os.getenv("GEMINI_ROTATION_WINDOW_SEC", "900"), 60, 86400, 900)
 
     return {
         "server_token": os.getenv("SERVER_TOKEN", ""),
         "llm_api_key": llm_api_key,
+        "openai_base_url": openai_base_url,
         "llm_model": os.getenv("LLM_MODEL", "gpt-4o-mini"),
         "llm_provider": llm_provider,
         "gemini_api_key": gemini_api_key,

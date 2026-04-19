@@ -1,4 +1,37 @@
 (function () {
+  const TAB_IDS = ["overview", "farm", "bot", "hank", "mod", "logs"];
+
+  function selectTab(name) {
+    if (TAB_IDS.indexOf(name) < 0) name = "overview";
+    TAB_IDS.forEach(function (tab) {
+      var btn = document.querySelector('.tab-btn[data-tab="' + tab + '"]');
+      var panel = document.getElementById("panel-" + tab);
+      var on = tab === name;
+      if (btn) {
+        btn.setAttribute("aria-selected", on ? "true" : "false");
+        btn.tabIndex = on ? 0 : -1;
+      }
+      if (panel) panel.hidden = !on;
+    });
+    try {
+      var u = new URL(window.location.href);
+      u.searchParams.set("tab", name);
+      history.replaceState(null, "", u.pathname + u.search + window.location.hash);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
+  var initial = typeof window.__ADMIN_ACTIVE_TAB__ === "string" ? window.__ADMIN_ACTIVE_TAB__ : "overview";
+  if (window.location.hash === "#bots") initial = "mod";
+  selectTab(initial);
+
+  document.querySelectorAll(".tab-btn[data-tab]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      selectTab(btn.getAttribute("data-tab") || "overview");
+    });
+  });
+
   const testBtn = document.getElementById("adminTestLlmBtn");
   const testOut = document.getElementById("adminTestLlmResult");
   if (testBtn && testOut) {

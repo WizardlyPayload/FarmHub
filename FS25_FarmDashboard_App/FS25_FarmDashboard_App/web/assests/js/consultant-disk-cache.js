@@ -117,6 +117,10 @@ export function saveConsultantDiskCache() {
       stateHash: fieldHash,
       byRef: { ...fieldByRef },
       llmUsed: !!window.__fieldConsultantLlmUsed,
+      suggestionTier:
+        typeof window.__fieldConsultantSuggestionTier === "string"
+          ? window.__fieldConsultantSuggestionTier
+          : undefined,
     },
     views,
     savedAt: Date.now(),
@@ -172,6 +176,7 @@ export function hydrateConsultantDiskCacheIfFresh() {
     stateHash: ent.field.stateHash,
     byRef: ent.field.byRef,
     llmUsed: ent.field.llmUsed,
+    suggestionTier: ent.field.suggestionTier,
   });
   if (!ok) {
     return false;

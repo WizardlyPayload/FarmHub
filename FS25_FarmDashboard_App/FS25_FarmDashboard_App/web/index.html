@@ -239,7 +239,7 @@
                       </button>
                     </div>
                     <div class="card-body py-3" id="ai-insights-panel">
-                      <p class="text-muted small mb-0">Open <strong>Settings → AI Farm Manager</strong> → enter your <strong>AI server URL</strong> + <strong>link key</strong> → turn on <strong>Send farm data</strong> → <strong>Save &amp; load</strong>. Then <strong>Refresh</strong> here. (Your host must enable data sync on the server.)</p>
+                      <p class="text-muted small mb-0">Optional Smart suggestions: <strong class="text-warning">Premium · Hosted AI</strong> (your AI Farm Manager URL + link key + Send farm data), <strong class="text-info">Mid · BYOK</strong> (your OpenAI/Gemini key in Settings — runs on this PC), or <strong class="text-secondary">Basic · Rules</strong> (heuristics, often on Fields). Configure under <strong>Settings → AI Farm Manager</strong>, then <strong>Refresh</strong> here.</p>
                     </div>
                   </div>
                 </div>
@@ -795,7 +795,7 @@
                     <hr class="border-secondary my-3"/>
                     <h6 class="text-farm-accent small text-uppercase mb-2">Connection status</h6>
                     <div id="settings-ai-connection-status" class="alert alert-secondary small py-2 mb-0" role="status">
-                      <span class="text-muted">Open the <strong>AI Farm Manager</strong> tab to refresh connection status.</span>
+                      <span class="text-muted" data-i18n="settings.aiConnectionStatusHint" data-i18n-html>Open the <strong>AI Farm Manager</strong> tab — use the <strong>BYOK</strong> or <strong>Hosted AI</strong> sub-tab depending on your plan.</span>
                     </div>
                   </div>
 
@@ -922,89 +922,227 @@
                   </div>
 
                   <div class="tab-pane fade" id="app-settings-pane-ai" role="tabpanel" aria-labelledby="app-settings-tab-ai" tabindex="0">
-                    <div class="border border-success border-opacity-50 rounded p-2 p-md-3 bg-body-secondary bg-opacity-25">
-                      <p class="small mb-1 text-light" id="aiFarmBotIntroLead">Three things — only the <strong>outbound farm snapshot</strong> leaves this PC (encrypted HTTPS). Your <strong>link key</strong> proves this app is allowed; it is not your mod token.</p>
-                      <ol class="small text-muted ps-3 mb-3" id="aiFarmBotSteps">
-                        <li><strong class="text-light">AI server URL</strong> — <code class="text-muted">https://…</code> from your host</li>
-                        <li><strong class="text-light">Link key</strong> — secret string from your host (like a password for this integration)</li>
-                        <li><strong class="text-light">Send farm data</strong> — must be <strong>on</strong> for Smart suggestions; your host enables matching mode on the server</li>
-                      </ol>
-                      <div id="aiFarmBotConnectionBanner" class="alert small py-2 px-3 mb-3 d-none" role="status"></div>
-                      <div class="card bg-secondary bg-opacity-25 border border-success border-opacity-50 mb-3">
-                        <div class="card-body py-3">
-                          <h6 class="text-success mb-2"><i class="bi bi-key-fill me-1"></i> Optional: your OpenAI / Gemini key (BYOK)</h6>
-                          <p class="small text-muted mb-2">For tips when the host does not pay for LLM, or to use your own quota. Stays on this PC only.</p>
-                          <div class="row g-2">
-                            <div class="col-md-4">
-                              <label class="form-label small mb-0" for="aiFarmBotByokProvider">Provider</label>
-                              <select id="aiFarmBotByokProvider" class="form-select form-select-sm">
-                                <option value="openai">OpenAI</option>
-                                <option value="gemini">Google Gemini</option>
+                    <p class="small text-muted mb-2" data-i18n="settings.aiFmIntro" data-i18n-html>Dashboard <strong>Smart suggestions</strong> can use <strong>Ollama</strong> (this PC or any machine on your network), <strong>BYOK</strong> (OpenAI / Gemini / other APIs), or your host&rsquo;s <strong>server</strong> (paid tier: URL + link key). <strong>Precedence:</strong> if a local / BYOK connection is saved, this PC uses it first; otherwise the hosted connection applies when set.</p>
+
+                    <ul class="nav nav-pills nav-fill gap-2 mb-3 flex-column flex-sm-row" id="ai-fm-subtabs" role="tablist">
+                      <li class="nav-item" role="presentation">
+                        <button class="nav-link active w-100 text-start" id="ai-fm-subtab-ollama-btn" data-bs-toggle="pill" data-bs-target="#ai-fm-pane-ollama" type="button" role="tab" aria-controls="ai-fm-pane-ollama" aria-selected="true" data-i18n="settings.aiFmSubtabOllama">Ollama — local or network</button>
+                      </li>
+                      <li class="nav-item" role="presentation">
+                        <button class="nav-link w-100 text-start" id="ai-fm-subtab-byok-btn" data-bs-toggle="pill" data-bs-target="#ai-fm-pane-byok" type="button" role="tab" aria-controls="ai-fm-pane-byok" aria-selected="false" data-i18n="settings.aiFmSubtabByok">BYOK — Smart suggestions on this PC</button>
+                      </li>
+                      <li class="nav-item" role="presentation">
+                        <button class="nav-link w-100 text-start" id="ai-fm-subtab-hosted-btn" data-bs-toggle="pill" data-bs-target="#ai-fm-pane-hosted" type="button" role="tab" aria-controls="ai-fm-pane-hosted" aria-selected="false" data-i18n="settings.aiFmSubtabHosted">Hosted AI — server, paid tier &amp; chat</button>
+                      </li>
+                    </ul>
+
+                    <div class="tab-content" id="ai-fm-subtab-content">
+                      <div class="tab-pane fade show active" id="ai-fm-pane-ollama" role="tabpanel" aria-labelledby="ai-fm-subtab-ollama-btn" tabindex="0">
+                        <div class="card bg-dark border-success border-opacity-50 mb-3">
+                          <div class="card-body py-3">
+                            <div class="mb-2"><span class="badge bg-success bg-opacity-75">Ollama</span> <span class="badge bg-secondary ms-1">Smart suggestions</span></div>
+                            <p class="small text-muted mb-0">Use Ollama on <strong>this PC</strong>, a <strong>NAS</strong>, or any <strong>server</strong> on your LAN. The dashboard talks to it over HTTP (same settings as &ldquo;OpenAI-compatible&rdquo; BYOK). Save here or under BYOK &mdash; they share one saved connection.</p>
+                          </div>
+                        </div>
+                        <div class="card bg-secondary bg-opacity-25 border border-success border-opacity-40 mb-0">
+                          <div class="card-body py-3">
+                            <h6 class="text-success mb-3"><i class="bi bi-cpu-fill me-1"></i>Where is Ollama running?</h6>
+                            <div class="mb-3">
+                              <label class="form-label small mb-1" for="ollamaFmLocation">Connection</label>
+                              <select id="ollamaFmLocation" class="form-select form-select-sm">
+                                <option value="this_pc">This PC — same machine as Farm Dashboard (127.0.0.1)</option>
+                                <option value="network">Another device — NAS, home server, or PC (hostname or IP)</option>
+                                <option value="custom">Custom base URL — advanced (reverse proxy, HTTPS, odd port)</option>
                               </select>
                             </div>
-                            <div class="col-md-8">
-                              <label class="form-label small mb-0" for="aiFarmBotByokKey">API key</label>
-                              <input type="password" class="form-control form-control-sm font-monospace" id="aiFarmBotByokKey" placeholder="sk-… or AIza…" autocomplete="off" spellcheck="false"/>
+                            <div class="row g-2 d-none" id="ollamaFmRowThisPc">
+                              <div class="col-sm-4">
+                                <label class="form-label small mb-0" for="ollamaFmPortLocal">Port</label>
+                                <input type="number" class="form-control form-control-sm font-monospace" id="ollamaFmPortLocal" min="1" max="65535" value="11434" autocomplete="off"/>
+                              </div>
+                              <div class="col-sm-8">
+                                <p class="small text-muted mb-0 mt-4 pt-sm-2">Default <code class="small">11434</code>. Only change if you configured Ollama differently.</p>
+                              </div>
+                            </div>
+                            <div class="row g-2 d-none" id="ollamaFmRowNetwork">
+                              <div class="col-md-8">
+                                <label class="form-label small mb-0" for="ollamaFmNetworkHost">Hostname or IP</label>
+                                <input type="text" class="form-control form-control-sm font-monospace" id="ollamaFmNetworkHost" placeholder="e.g. nas.local, 192.168.1.50, ollama.lan" autocomplete="off" spellcheck="false"/>
+                              </div>
+                              <div class="col-md-4">
+                                <label class="form-label small mb-0" for="ollamaFmPortNetwork">Port</label>
+                                <input type="number" class="form-control form-control-sm font-monospace" id="ollamaFmPortNetwork" min="1" max="65535" value="11434" autocomplete="off"/>
+                              </div>
+                              <div class="col-12">
+                                <p class="small text-muted mb-0">On that machine: bind Ollama to all interfaces (<code class="small">OLLAMA_HOST=0.0.0.0:11434</code>) and allow TCP <strong>11434</strong> in its firewall.</p>
+                              </div>
+                            </div>
+                            <div class="d-none" id="ollamaFmRowCustom">
+                              <label class="form-label small mb-0" for="ollamaFmCustomUrl">Full base URL</label>
+                              <input type="text" class="form-control form-control-sm font-monospace mb-1" id="ollamaFmCustomUrl" placeholder="https://ollama.example.com:443 or http://192.168.1.10:11434" autocomplete="off" spellcheck="false"/>
+                              <p class="small text-muted mb-0">No trailing <code class="small">/v1</code> needed — the app adds it. Use this for HTTPS or non-standard setups.</p>
+                            </div>
+                            <p class="small font-monospace text-info mt-2 mb-2" id="ollamaFmPreview">—</p>
+                            <hr class="border-secondary opacity-50 my-3"/>
+                            <h6 class="text-light mb-2 small">Optional</h6>
+                            <div class="row g-2 mb-2">
+                              <div class="col-12">
+                                <label class="form-label small mb-0" for="ollamaFmBearer">API key / Bearer token</label>
+                                <input type="password" class="form-control form-control-sm font-monospace" id="ollamaFmBearer" placeholder="Leave blank for default Ollama (no auth)" autocomplete="off" spellcheck="false"/>
+                                <p class="small text-muted mb-0 mt-1">Only if your Ollama is behind authentication. Saved like BYOK; leave blank to use the usual <code class="small">ollama</code> placeholder.</p>
+                              </div>
+                            </div>
+                            <div class="row g-2 align-items-end">
+                              <div class="col-md-4">
+                                <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="ollamaFmRefreshModels" title="List models from Ollama">
+                                  <i class="bi bi-arrow-clockwise me-1"></i>Refresh models
+                                </button>
+                              </div>
+                              <div class="col-md-8">
+                                <label class="form-label small mb-0" for="ollamaFmModelSelect">Model</label>
+                                <select id="ollamaFmModelSelect" class="form-select form-select-sm font-monospace" aria-label="Ollama model">
+                                  <option value="">— set connection above, then Refresh models —</option>
+                                </select>
+                              </div>
+                            </div>
+                            <p class="small text-muted mt-2 mb-2" id="ollamaFmModelsMeta">Choose where Ollama runs, then <strong>Refresh models</strong>.</p>
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                              <button type="button" class="btn btn-sm btn-success" id="ollamaFmSave"><i class="bi bi-save me-1"></i>Save Ollama</button>
+                              <span class="small text-info d-none" id="ollamaFmSaveHint" aria-live="polite"></span>
                             </div>
                           </div>
-                          <div class="form-check mt-2 mb-0">
-                            <input class="form-check-input" type="checkbox" id="aiFarmBotClearByok"/>
-                            <label class="form-check-label small" for="aiFarmBotClearByok">Remove saved AI key from this computer</label>
+                        </div>
+                      </div>
+                      <div class="tab-pane fade" id="ai-fm-pane-byok" role="tabpanel" aria-labelledby="ai-fm-subtab-byok-btn" tabindex="0">
+                        <div class="card bg-dark border-info border-opacity-50 mb-3">
+                          <div class="card-body py-3">
+                            <div class="mb-2"><span class="badge bg-info text-dark">Mid · BYOK</span> <span class="badge bg-secondary ms-1">Basic · Rules</span></div>
+                            <p class="small text-muted mb-0" data-i18n="settings.aiFmByokBlurb" data-i18n-html>Paste your <strong>OpenAI</strong> or <strong>Gemini</strong> key below — no <strong>server URL</strong> or <strong>link key</strong> needed here. Tips run <strong>on this PC</strong>. If no LLM is available, the dashboard falls back to <strong>Rules</strong> heuristics on Fields.</p>
+                          </div>
+                        </div>
+                        <div class="card bg-secondary bg-opacity-25 border border-info border-opacity-50" id="aiFarmBotByokCard">
+                          <div class="card-body py-3">
+                            <h6 class="text-info mb-2"><i class="bi bi-key-fill me-1"></i><span data-i18n="settings.aiFmByokCardTitle">Your OpenAI / Gemini key (BYOK)</span></h6>
+                            <p class="small text-info mb-2" data-i18n="settings.aiFmByokCardLead" data-i18n-html><strong>On-device Smart suggestions:</strong> keys stay in this app&rsquo;s store; only OpenAI or Google sees them. No hosted server required for this tier.</p>
+                            <p class="small text-muted mb-2">Pick a <strong>model</strong> your key can use — <strong>Refresh models</strong> after pasting the key. Optional: <strong>extra models</strong> (comma-separated) and <strong>extra API keys</strong> (one per line).</p>
+                            <div class="row g-2">
+                              <div class="col-md-4">
+                                <label class="form-label small mb-0" for="aiFarmBotByokProvider">Provider</label>
+                                <select id="aiFarmBotByokProvider" class="form-select form-select-sm">
+                                  <option value="openai">OpenAI (cloud)</option>
+                                  <option value="openai_compat">Local / OpenAI-compatible (Ollama, vLLM…)</option>
+                                  <option value="gemini">Google Gemini</option>
+                                </select>
+                              </div>
+                              <div class="col-md-8">
+                                <label class="form-label small mb-0" for="aiFarmBotByokKey">API key</label>
+                                <input type="password" class="form-control form-control-sm font-monospace" id="aiFarmBotByokKey" placeholder="sk-… or AIza…" autocomplete="off" spellcheck="false"/>
+                              </div>
+                            </div>
+                            <div class="row g-2 mt-1 d-none" id="aiFarmBotByokOpenaiBaseRow">
+                              <div class="col-12">
+                                <label class="form-label small mb-0" for="aiFarmBotByokOpenaiBase">OpenAI-compatible base URL</label>
+                                <input type="text" class="form-control form-control-sm font-monospace" id="aiFarmBotByokOpenaiBase" placeholder="http://192.168.1.10:11434 (LAN Ollama — /v1 added automatically)" autocomplete="off" spellcheck="false"/>
+                                <p class="small text-muted mb-0 mt-1">If Ollama runs on <strong>another PC or server</strong>, put <strong>that machine’s</strong> address here (e.g. <code class="small">http://192.168.1.50:11434</code>) — not <code class="small">127.0.0.1</code> unless Ollama is on this same PC. On the Ollama host, bind to all interfaces (<code class="small">OLLAMA_HOST=0.0.0.0:11434</code>) and allow TCP <strong>11434</strong> in the firewall. API key blank or <code class="small">ollama</code> if no auth.</p>
+                              </div>
+                            </div>
+                            <div class="row g-2 align-items-end mt-2">
+                              <div class="col-md-4">
+                                <button type="button" class="btn btn-sm btn-outline-secondary w-100" id="aiFarmBotByokRefreshModels" title="List models your API key can use">
+                                  <i class="bi bi-arrow-clockwise me-1"></i>Refresh models
+                                </button>
+                              </div>
+                              <div class="col-md-8">
+                                <label class="form-label small mb-0" for="aiFarmBotByokModelSelect">Model for Smart suggestions</label>
+                                <select id="aiFarmBotByokModelSelect" class="form-select form-select-sm font-monospace" aria-label="BYOK model">
+                                  <option value="">— paste key, then Refresh models —</option>
+                                </select>
+                              </div>
+                            </div>
+                            <p class="small text-muted mt-2 mb-2" id="aiFarmBotByokModelsMeta">Enter your API key, choose provider, then click <strong>Refresh models</strong>.</p>
+                            <div class="mb-2">
+                              <label class="form-label small mb-0" for="aiFarmBotByokModelIdsCsv">Extra models (optional, comma-separated)</label>
+                              <input type="text" class="form-control form-control-sm font-monospace" id="aiFarmBotByokModelIdsCsv" placeholder="e.g. gpt-4o-mini, gpt-4o" autocomplete="off" spellcheck="false" title="Round-robin with the model chosen above"/>
+                            </div>
+                            <div class="mb-2">
+                              <label class="form-label small mb-0" for="aiFarmBotByokAdditionalKeys">Extra API keys (optional, one per line)</label>
+                              <textarea class="form-control form-control-sm font-monospace" id="aiFarmBotByokAdditionalKeys" rows="2" placeholder="Additional sk-… or AIza… keys" autocomplete="off" spellcheck="false"></textarea>
+                            </div>
+                            <div class="d-flex flex-wrap gap-2 align-items-center">
+                              <button type="button" class="btn btn-sm btn-success" id="aiFarmBotByokSave"><i class="bi bi-save me-1"></i><span data-i18n="settings.aiFmByokSaveBtn">Save BYOK</span></button>
+                              <span class="small text-info d-none" id="aiFarmBotByokSaveHint" aria-live="polite"></span>
+                            </div>
+                            <div class="form-check mt-3 mb-0">
+                              <input class="form-check-input" type="checkbox" id="aiFarmBotClearByok"/>
+                              <label class="form-check-label small" for="aiFarmBotClearByok" data-i18n="settings.aiFmByokRemoveKey">Remove saved AI key from this computer</label>
+                            </div>
                           </div>
                         </div>
                       </div>
-                      <div class="card bg-secondary bg-opacity-25 border border-secondary mb-3" id="aiFarmBotGeminiModelsCard">
-                        <div class="card-body py-2">
-                          <h6 class="text-light mb-2 small"><i class="bi bi-list-ul me-1"></i> Gemini models (live list)</h6>
-                          <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="aiFarmBotGeminiModelsRefresh">Fetch list</button>
-                            <button type="button" class="btn btn-sm btn-outline-warning" id="aiFarmBotGeminiModelsForce">Force refresh</button>
-                            <span class="small text-muted" id="aiFarmBotGeminiModelsMeta">—</span>
-                          </div>
-                          <select id="aiFarmBotGeminiModelSelect" class="form-select form-select-sm font-monospace" aria-label="Gemini model ids">
-                            <option value="">— click Fetch list —</option>
-                          </select>
-                        </div>
-                      </div>
-                      <div class="d-none mb-2" id="aiFarmBotSubscriptionTierRow" aria-hidden="true">
-                        <label class="form-label small mb-0" for="aiFarmBotCurrentTierText">Current plan</label>
-                        <p class="small mb-0 text-muted font-monospace" id="aiFarmBotCurrentTierText">—</p>
-                      </div>
-                      <div class="row g-2 mb-2">
-                        <div class="col-12" id="aiFarmBotRowBackendUrl">
-                          <label class="form-label small" for="aiFarmBotBaseUrl">AI server URL</label>
-                          <input type="text" class="form-control form-control-sm w-100" id="aiFarmBotBaseUrl" placeholder="https://your-ai-server.example.com (no path)" autocomplete="off"/>
-                        </div>
-                        <div class="col-12 d-none" id="aiFarmBotRowIntegrationKey">
-                          <label class="form-label small" for="aiFarmBotIntegrationKey">Link key (from your host)</label>
-                          <div class="input-group input-group-sm">
-                            <input type="password" class="form-control font-monospace" id="aiFarmBotIntegrationKey" placeholder="only if not embedded in your installer" autocomplete="off" spellcheck="false"/>
-                            <button type="button" class="btn btn-outline-secondary" id="aiFarmBotToggleKey" title="Show or hide key" aria-pressed="false">
-                              <i class="bi bi-eye" id="aiFarmBotToggleKeyIcon" aria-hidden="true"></i>
-                            </button>
+
+                      <div class="tab-pane fade" id="ai-fm-pane-hosted" role="tabpanel" aria-labelledby="ai-fm-subtab-hosted-btn" tabindex="0">
+                        <div class="card bg-dark border-warning border-opacity-50 mb-3">
+                          <div class="card-body py-3">
+                            <div class="mb-2"><span class="badge text-bg-warning text-dark">Premium · Hosted AI</span></div>
+                            <p class="small text-muted mb-0" data-i18n="settings.aiFmHostedBlurb" data-i18n-html>Use this tab only if your subscription includes the <strong>hosted AI Farm Manager</strong>: enter <strong>server URL</strong> + <strong>link key</strong>, enable <strong>Send farm data</strong>, then <strong>Save &amp; load</strong>. Same connection powers <strong>hosted Smart suggestions</strong>, server-side LLM, and <strong>in-game !hank</strong> (multiplayer).</p>
                           </div>
                         </div>
-                        <div class="col-12">
-                          <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="aiFarmBotPushSnapshots" checked/>
-                            <label class="form-check-label small" for="aiFarmBotPushSnapshots"><strong>Send farm data to the AI server</strong> — <em>required for Smart suggestions.</em></label>
+                        <div class="border border-warning border-opacity-50 rounded p-2 p-md-3 bg-body-secondary bg-opacity-25 mb-3">
+                          <p class="small mb-1 text-light" id="aiFarmBotIntroLead">For <strong>hosted</strong> Smart suggestions, three things — only the <strong>outbound farm snapshot</strong> leaves this PC (encrypted HTTPS). Your <strong>link key</strong> proves this app is allowed; it is not your in-game <code>!hank</code> token.</p>
+                          <ol class="small text-muted ps-3 mb-3" id="aiFarmBotSteps">
+                            <li><strong class="text-light">AI server URL</strong> — <code class="text-muted">https://…</code> from your host</li>
+                            <li><strong class="text-light">Link key</strong> — secret string from your host (for this integration)</li>
+                            <li><strong class="text-light">Send farm data</strong> — must be <strong>on</strong> for hosted features; your host enables matching mode on the server</li>
+                          </ol>
+                          <div class="d-none mb-2" id="aiFarmBotSubscriptionTierRow" aria-hidden="true">
+                            <label class="form-label small mb-0" for="aiFarmBotCurrentTierText">Current plan</label>
+                            <p class="small mb-0 text-muted font-monospace" id="aiFarmBotCurrentTierText">—</p>
+                          </div>
+                          <div class="row g-2 mb-2">
+                            <div class="col-12" id="aiFarmBotRowBackendUrl">
+                              <label class="form-label small" for="aiFarmBotBaseUrl" data-i18n="settings.aiFmServerUrlLabel">AI server URL</label>
+                              <input type="text" class="form-control form-control-sm w-100" id="aiFarmBotBaseUrl" placeholder="https://your-ai-server.example.com (no path)" autocomplete="off"/>
+                            </div>
+                            <div class="col-12 d-none" id="aiFarmBotRowIntegrationKey">
+                              <label class="form-label small" for="aiFarmBotIntegrationKey" data-i18n="settings.aiFmLinkKeyLabel">Link key (from your host)</label>
+                              <div class="input-group input-group-sm">
+                                <input type="password" class="form-control font-monospace" id="aiFarmBotIntegrationKey" placeholder="only if not embedded in your installer" autocomplete="off" spellcheck="false"/>
+                                <button type="button" class="btn btn-outline-secondary" id="aiFarmBotToggleKey" title="Show or hide key" aria-pressed="false">
+                                  <i class="bi bi-eye" id="aiFarmBotToggleKeyIcon" aria-hidden="true"></i>
+                                </button>
+                              </div>
+                            </div>
+                            <div class="col-12">
+                              <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="aiFarmBotPushSnapshots" checked/>
+                                <label class="form-check-label small" for="aiFarmBotPushSnapshots" data-i18n="settings.aiFmPushLabel" data-i18n-html><strong>Send farm data to the AI server</strong> — <em>required for hosted Smart suggestions and chat features.</em></label>
+                              </div>
+                            </div>
+                          </div>
+                          <p class="small text-muted mb-2 d-none" id="aiFarmBotBrandedNote">This installer is already linked to your host.</p>
+                          <div class="d-flex flex-wrap gap-2 mb-2">
+                            <button type="button" class="btn btn-sm btn-success" id="aiFarmBotSaveSettings" data-i18n="settings.aiFmHostedSaveBtn">Save hosted connection</button>
+                            <button type="button" class="btn btn-sm btn-outline-light" id="aiFarmBotRefresh" data-i18n="settings.aiFmRefreshBtn">Refresh status</button>
+                            <button type="button" class="btn btn-sm btn-outline-info" id="aiFarmBotLlmPing" data-i18n="settings.aiFmLlmPingBtn">Test dashboard → LLM</button>
+                          </div>
+                          <p id="aiFarmBotLlmPingResult" class="small text-muted mb-0" aria-live="polite"></p>
+                        </div>
+
+                        <h6 class="text-warning mb-2 d-flex align-items-center gap-2"><i class="bi bi-chat-dots" aria-hidden="true"></i><span data-i18n="settings.aiChatSectionTitle">In-game chat (!hank)</span></h6>
+                        <div class="alert alert-warning small py-2 px-3 mb-3 border-warning bg-warning bg-opacity-10" role="note">
+                          <p class="mb-0" data-i18n="settings.aiChatSectionHint" data-i18n-html><strong>Hosted service only.</strong> In-game <strong>!hank</strong> uses bot profiles your host creates on the server. <strong>BYOK</strong> (other tab) does not enable chat.</p>
+                        </div>
+                        <div class="border border-warning border-opacity-50 rounded p-2 p-md-3 bg-body-secondary bg-opacity-25">
+                          <div id="aiFarmBotConnectionBanner" class="alert small py-2 px-3 mb-3 d-none" role="status"></div>
+                          <div id="aiFarmBotPanelBody" class="border border-secondary rounded p-2 small" style="min-height: 120px;">Open the <strong>Hosted AI</strong> sub-tab to load status…</div>
+                          <div class="mt-3 border-top border-secondary pt-3">
+                            <label class="form-label small mb-1" data-i18n="settings.aiChatInstallLabel">Install chat token (this PC)</label>
+                            <p class="small text-muted mb-2" data-i18n="settings.aiChatInstallHint" data-i18n-html>Writes <code>Documents/My Games/FarmingSimulator2025/modSettings/ai_farm_manager_config.xml</code> for in-game <strong>!hank</strong> — requires a <strong>hosted</strong> bot profile from your AI server.</p>
+                            <select id="aiFarmBotInstanceSelect" class="form-select form-select-sm mb-2" aria-label="Bot profile for mod XML"></select>
+                            <button type="button" class="btn btn-sm btn-outline-success" id="aiFarmBotInstallLocal" data-i18n="settings.aiChatInstallBtn">Write to FS25 modSettings</button>
+                            <p id="aiFarmBotInstallResult" class="small text-info mt-2 mb-0"></p>
                           </div>
                         </div>
-                      </div>
-                      <p class="small text-muted mb-2 d-none" id="aiFarmBotBrandedNote">This installer is already linked to your host.</p>
-                      <div class="d-flex flex-wrap gap-2 mb-2">
-                        <button type="button" class="btn btn-sm btn-success" id="aiFarmBotSaveSettings">Save &amp; load</button>
-                        <button type="button" class="btn btn-sm btn-outline-light" id="aiFarmBotRefresh">Refresh</button>
-                        <button type="button" class="btn btn-sm btn-outline-info" id="aiFarmBotLlmPing">Test dashboard → LLM</button>
-                      </div>
-                      <p id="aiFarmBotLlmPingResult" class="small text-muted mb-3" aria-live="polite"></p>
-                      <div id="aiFarmBotPanelBody" class="border border-secondary rounded p-2 small" style="min-height: 120px;">Open this tab to load status…</div>
-                      <div class="mt-3 border-top border-secondary pt-3">
-                        <label class="form-label small mb-1">Install config automatically (this PC)</label>
-                        <p class="small text-muted mb-2">Writes <code>Documents/My Games/FarmingSimulator2025/modSettings/ai_farm_manager_config.xml</code></p>
-                        <select id="aiFarmBotInstanceSelect" class="form-select form-select-sm mb-2"></select>
-                        <button type="button" class="btn btn-sm btn-outline-success" id="aiFarmBotInstallLocal">Write to FS25 modSettings</button>
-                        <p id="aiFarmBotInstallResult" class="small text-info mt-2 mb-0"></p>
                       </div>
                     </div>
                   </div>

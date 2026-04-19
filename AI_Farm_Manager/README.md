@@ -31,12 +31,12 @@ AI_Farm_Manager/
 
 1. **Server:** Ubuntu 22.04+ (e.g. Hetzner Cloud). Open **port 8000** (or put **Caddy/Traefik** in front on **443**).
 
-2. **Copy environment:** From `backend/.env.example`, create a **`.env` file in the same directory as `docker-compose.yml`** (the `AI_Farm_Manager` folder). Set at minimum:
+2. **Copy environment:** From `backend/.env.example`, create a **`.env` file in the same directory as `docker-compose.yml`** (the `AI_Farm_Manager` folder) **or** inject the same variables via your host (TrueNAS, Coolify, Docker UI — a file is not required). Set at minimum:
    - **`ENCRYPTION_KEY`** — Fernet key (see `.env.example`); required so tenant secrets are never stored plaintext.
    - **`ADMIN_PASSWORD`** — `/admin` login.
    - **`SERVER_TOKEN`** — must match `<serverToken>` in the Lua mod XML.
    - **`PUBLIC_BASE_URL`** — `https://your-domain-or-ip` **without trailing slash** — this becomes **`backendUrl`** in generated `ai_farm_manager_config.xml` so the mod points at your VPS or reverse proxy.
-   - LLM / FTP variables as needed.
+   - LLM / FTP variables as needed. For a **local OpenAI-compatible** server (e.g. **Ollama** on the same LAN), set **`LLM_PROVIDER=openai`**, **`OPENAI_BASE_URL`** (e.g. `http://192.168.1.10:11434` — the backend normalizes `/v1`), **`LLM_MODEL`** to your pulled model name, and **`LLM_API_KEY`** to a placeholder such as **`ollama`** if the server does not require auth. See **[../docs/LLM_OPENAI_COMPATIBLE.md](../docs/LLM_OPENAI_COMPATIBLE.md)**.
 
 3. **Data volume:** The compose file mounts **`./data:/app/data`**. All customer registry data (`bot_servers.json` with encrypted `ftp_pass` / `llm_api_key` per tenant) lives under **`./data` on the host**. **Back up this directory.**
 
@@ -106,7 +106,7 @@ The **Lua mod** forwards `!hank` (or your `triggerPrefix`) from **multiplayer** 
 | **Multiplayer** | Supported for **host**, **dedicated server**, **G-Portal** (and similar): the machine that runs the authoritative game needs **`modSettings/ai_farm_manager_config.xml`**. |
 | **Joining clients** | Cannot trigger the bridge; only the **server / host** runs it. |
 
-Full matrix and config paths: **[docs/IN_GAME_CHAT_BOT.md](docs/IN_GAME_CHAT_BOT.md)**.
+Full matrix and config paths: **[../docs/AI_IN_GAME_CHAT.md](../docs/AI_IN_GAME_CHAT.md)**.
 
 ---
 
@@ -123,7 +123,7 @@ Full matrix and config paths: **[docs/IN_GAME_CHAT_BOT.md](docs/IN_GAME_CHAT_BOT
 
 ## Bring your own API key (BYOK)
 
-Farm Dashboard can send **`X-AI-API-Key`** (and optional **`X-AI-Provider`**: `gemini` / `openai`) so players use their own Google/OpenAI credentials. Step-by-step setup (including a free Gemini key) is in **[docs/BYOK_GUIDE.md](docs/BYOK_GUIDE.md)**.
+Farm Dashboard can send **`X-AI-API-Key`** (and optional **`X-AI-Provider`**: `gemini` / `openai`, plus optional **`X-AI-OpenAI-Base-URL`** for OpenAI-compatible LAN servers) so players use their own Google/OpenAI/local credentials. Step-by-step setup (including a free Gemini key and **Ollama** / compatible URLs) is in **[../docs/AI_FARM_MANAGER_BYOK.md](../docs/AI_FARM_MANAGER_BYOK.md)** and **[../docs/LLM_OPENAI_COMPATIBLE.md](../docs/LLM_OPENAI_COMPATIBLE.md)**.
 
 **Gemini (server-side behaviour):** For each request, the backend walks the **`GEMINI_MODEL_ROLLOVER`** list **top to bottom** (best model first) on **your** key when Google returns **429** or **503**; only **multi-key server pools** rotate **which key is tried first** (strict round-robin per new request). BYOK uses a **single** key — no key rotation, but the same **model stack** applies. Details: **[../docs/LLM_GEMINI_ROUTING.md](../docs/LLM_GEMINI_ROUTING.md)**. Set **`GEMINI_MODEL_ROLLOVER=0`** (or `off`) to use only **`GEMINI_MODEL`** with no fallback models.
 
@@ -143,7 +143,7 @@ Smart suggestions and field-map modes use the **FS25 mentor / agronomy** prompt 
 ### Endpoint: `GET /api/v1/consultant/insights`
 
 - **Authentication:** Header **`X-FarmDash-Key`** — must match **`FARMDASH_INTEGRATION_KEY`** in `backend/.env` (same value as “Farm Dashboard link key” in the Electron app’s AI Farm Manager panel).
-- **LLM keys:** Optional header **`X-AI-API-Key`** (and **`X-AI-Provider`**: `openai` or `gemini`) for BYOK from the Farm Dashboard app. If the header is missing or empty, the server uses **`LLM_API_KEY` / `GEMINI_API_KEY`** from the environment (**`LLM_PROVIDER`**) — the same keys as in-game **`!hank`** (Hank) and **`/admin`**. Keys are forwarded to the provider and are not stored by the app beyond `.env` / your host env.
+- **LLM keys:** Optional header **`X-AI-API-Key`** (and **`X-AI-Provider`**: `openai` or `gemini`; optional **`X-AI-OpenAI-Base-URL`**) for BYOK from the Farm Dashboard app. If the header is missing or empty, the server uses **`LLM_API_KEY` / `GEMINI_API_KEY`** / **`OPENAI_BASE_URL`** from the environment (**`LLM_PROVIDER`**) — the same keys as in-game **`!hank`** (Hank) and **`/admin`**. Keys are forwarded to the provider and are not stored by the app beyond `.env` / your host env.
 - **Behaviour:**
   - **Heuristics:** Flags production outputs or storage levels at or above ~**90%** capacity (high-priority alerts even when the LLM is slow, rate-limited, or disabled).
   - **LLM analysis:** Field-focused rotation and next-step advice; other areas when relevant. Field-specific rows may include **`field_ref`** (farmland id string) for per-parcel UI in the Electron app.

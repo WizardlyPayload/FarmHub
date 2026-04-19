@@ -9,30 +9,103 @@
 <body>
   <header class="top">
     <h1>AI Farm Manager</h1>
-    <p class="muted">Settings and live logs (HTTP Basic auth)</p>
+    <p class="muted">Configure your server in sections — Farm Dashboard data is separate from chat bot &amp; LLM settings.</p>
   </header>
 
+  <nav class="admin-tabs" role="tablist" aria-label="Admin sections">
+    <button type="button" role="tab" id="tab-btn-overview" class="tab-btn" data-tab="overview" aria-selected="{% if active_tab == 'overview' %}true{% else %}false{% endif %}" tabindex="{% if active_tab == 'overview' %}0{% else %}-1{% endif %}">Overview</button>
+    <button type="button" role="tab" id="tab-btn-farm" class="tab-btn" data-tab="farm" aria-selected="{% if active_tab == 'farm' %}true{% else %}false{% endif %}" tabindex="{% if active_tab == 'farm' %}0{% else %}-1{% endif %}">Farm Dashboard &amp; data</button>
+    <button type="button" role="tab" id="tab-btn-bot" class="tab-btn" data-tab="bot" aria-selected="{% if active_tab == 'bot' %}true{% else %}false{% endif %}" tabindex="{% if active_tab == 'bot' %}0{% else %}-1{% endif %}">Chat bot &amp; LLM</button>
+    <button type="button" role="tab" id="tab-btn-hank" class="tab-btn" data-tab="hank" aria-selected="{% if active_tab == 'hank' %}true{% else %}false{% endif %}" tabindex="{% if active_tab == 'hank' %}0{% else %}-1{% endif %}">In-game Hank</button>
+    <button type="button" role="tab" id="tab-btn-mod" class="tab-btn" data-tab="mod" aria-selected="{% if active_tab == 'mod' %}true{% else %}false{% endif %}" tabindex="{% if active_tab == 'mod' %}0{% else %}-1{% endif %}">Mod &amp; servers</button>
+    <button type="button" role="tab" id="tab-btn-logs" class="tab-btn" data-tab="logs" aria-selected="{% if active_tab == 'logs' %}true{% else %}false{% endif %}" tabindex="{% if active_tab == 'logs' %}0{% else %}-1{% endif %}">Logs</button>
+  </nav>
+
   <main class="grid">
-    <section class="card full" style="border-left: 4px solid #6ea8fe;">
-      <h2 class="subh" style="margin-top:0;">Where things run</h2>
-      <p class="muted small" style="margin-bottom:0;">
-        <strong>Farm Dashboard</strong> (Electron, usually port <code>8766</code>) often runs on <strong>your PC</strong> next to the game.
-        <strong>AI Farm Manager</strong> (this page) may run on a <strong>cloud VPS</strong>.
-        Your PC calls the VPS (robot panel → <strong>AI backend URL</strong>) — <strong>no inbound ports required on your PC</strong> if you use
-        <strong>PC push mode</strong>: set <code>DASHBOARD_PUSH_MODE=1</code> in this server’s environment, leave <strong>Farm Dashboard JSON URL</strong> empty,
-        and in Farm Dashboard enable <strong>Push snapshots to AI server</strong> (same panel). Snapshots are POSTed outbound from your PC.
-        Alternatively the VPS can use <strong>G-Portal FTP</strong> or (if you accept it) an HTTP URL/tunnel to your PC.
-      </p>
-      {% if dashboard_push_mode %}
-      <p class="muted small" style="margin: 0.75rem 0 0 0;"><strong>Push mode is on</strong> — snapshots are expected from the desktop app, not from <code>DASHBOARD_JSON_URL</code>.</p>
-      {% endif %}
+    <!-- Overview -->
+    <section class="tab-panel card full" id="panel-overview" role="tabpanel" aria-labelledby="tab-btn-overview" {% if active_tab != 'overview' %}hidden{% endif %}>
+      <h2 class="subh" style="margin-top:0;">At a glance</h2>
+      <p class="muted small">Farm Dashboard usually runs on <strong>your PC</strong> (game + Electron). This backend may run on a <strong>NAS/VPS</strong>. The desktop app calls <strong>outbound</strong> to here — no port forward on the PC when using <strong>push mode</strong>.</p>
+      <div class="status-grid" aria-label="Server status">
+        <div class="status-pill {% if dashboard_push_mode %}ok{% else %}neutral{% endif %}">
+          <span class="status-label">PC push mode</span>
+          <span class="status-value">{% if dashboard_push_mode %}On (DASHBOARD_PUSH_MODE){% else %}Off — set env or pull via URL/FTP{% endif %}</span>
+        </div>
+        <div class="status-pill {% if bot_enabled %}ok{% else %}warn{% endif %}">
+          <span class="status-label">In-game bot</span>
+          <span class="status-value">{% if bot_enabled %}Enabled{% else %}Disabled{% endif %} (ENABLE_AI_BOT)</span>
+        </div>
+        <div class="status-pill {% if llm_configured %}ok{% else %}warn{% endif %}">
+          <span class="status-label">LLM ready</span>
+          <span class="status-value">{% if llm_configured %}Keys/base URL look OK for {{ llm_provider }}{% else %}Configure keys or OPENAI_BASE_URL on Chat bot tab{% endif %}</span>
+        </div>
+        <div class="status-pill neutral">
+          <span class="status-label">Provider / model</span>
+          <span class="status-value">{{ llm_provider }} · {% if llm_provider == 'gemini' %}{{ gemini_model }}{% else %}{{ llm_model }}{% endif %}</span>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>Tip:</strong> Use <strong>Farm Dashboard &amp; data</strong> for JSON URL, server id, and link key info.
+        Use <strong>Chat bot &amp; LLM</strong> for API keys, Ollama base URL, and Smart suggestions test — keep them separate so you do not paste a dashboard URL into an API key field.
+      </div>
+      <div class="callout" style="border-left: 3px solid #d29922;">
+        <strong>Why saves might “not stick” (Docker / Coolify):</strong>
+        Admin writes settings to <code>{{ env_file_path }}</code>
+        {% if env_file_exists %}(file exists){% else %}(no file yet — it will be created on first save){% endif %}.
+        Coolify and Docker inject environment variables at container start. The app now loads <code>.env</code> with
+        <strong>override</strong> so file values beat duplicate keys after a restart — but the file must
+        <strong>persist</strong>. Bind-mount <code>./.env:/app/.env</code> (see <code>docker-compose.yml</code>; run <code>touch .env</code> on the host first)
+        or manage variables only in Coolify’s <strong>Environment</strong> UI and treat /admin as optional.
+      </div>
     </section>
-    <section class="card">
-      <h2>Bot &amp; integrations</h2>
-      <p class="muted small" style="margin: -0.25rem 0 0.75rem 0;">
-        <strong>Farm Dashboard link key</strong> — set in <code>backend/.env</code> only as <code>FARMDASH_INTEGRATION_KEY=…</code>, and paste the same value into the Farm Dashboard app (robot button → <strong>Farm Dashboard link key</strong>). Not your LLM API keys below. Not on this form.
-      </p>
+
+    <!-- Farm Dashboard & data -->
+    <section class="tab-panel card full" id="panel-farm" role="tabpanel" aria-labelledby="tab-btn-farm" {% if active_tab != 'farm' %}hidden{% endif %}>
+      <h2 class="subh" style="margin-top:0;">Farm Dashboard &amp; snapshot data</h2>
+      <p class="muted small">These settings control <strong>where this backend gets <code>/api/data</code>-shaped JSON</strong> (consultant, Hank context). They do <strong>not</strong> set LLM API keys — use the <strong>Chat bot &amp; LLM</strong> tab for that.</p>
+
+      <div class="readonly-block">
+        <div class="readonly-row"><span class="readonly-k">PUBLIC_BASE_URL</span><code class="readonly-v">{{ public_base_url or "(not set — set for generated mod XML / links)" }}</code></div>
+        <div class="readonly-row"><span class="readonly-k">FARMDASH_INTEGRATION_KEY</span><code class="readonly-v">{{ farmdash_integration_key_masked }}</code></div>
+        <div class="readonly-row"><span class="readonly-k">ENCRYPTION_KEY</span><code class="readonly-v">{% if encryption_key_configured %}configured (masked){% else %}(not set){% endif %}</code></div>
+      </div>
+
+      <section class="card inner-card" style="border-left: 4px solid #6ea8fe;">
+        <h3 class="subh" style="margin-top:0;">How data reaches this server</h3>
+        <p class="muted small" style="margin-bottom:0;">
+          <strong>Recommended (VPS):</strong> <code>DASHBOARD_PUSH_MODE=1</code> in this server’s environment, leave <strong>Farm Dashboard JSON URL</strong> empty below, and on the PC enable <strong>Send farm data to the AI server</strong> (Settings → AI Farm Manager) with the same <strong>link key</strong> as <code>FARMDASH_INTEGRATION_KEY</code> above.
+          <br/><br/>
+          <strong>Alternative:</strong> G-Portal FTP, or an HTTP URL to Farm Dashboard — must be reachable <strong>from this backend</strong> (not <code>127.0.0.1</code> from inside Docker unless you use host networking).
+        </p>
+        {% if dashboard_push_mode %}
+        <p class="muted small" style="margin: 0.75rem 0 0 0;"><strong>Push mode is on</strong> — snapshots are expected from the desktop app; HTTP URL below is often unused.</p>
+        {% endif %}
+      </section>
+
       <form method="post" action="/admin/api/settings" class="form">
+        <input type="hidden" name="redirect_tab" value="farm"/>
+        <label class="row">
+          <span>Farm Dashboard JSON URL (optional)</span>
+          <input type="url" name="dashboard_json_url" value="{{ dashboard_url }}" placeholder="http://127.0.0.1:8766/api/data"/>
+        </label>
+        <p class="muted small" style="margin: -0.35rem 0 0.5rem 0;">
+          Pull path for dashboard JSON when not using push/FTP. For Docker on another machine, <code>127.0.0.1</code> points at the container, not your PC — use LAN IP, tunnel, or push mode.
+        </p>
+        <label class="row">
+          <span>Default Farm Dashboard server id (optional)</span>
+          <input type="text" name="dashboard_server_id" value="{{ dashboard_server_id }}" placeholder="Same as ?serverId= in Farm Dashboard when using multiple saves"/>
+        </label>
+        <button type="submit" class="btn primary">Save dashboard data settings</button>
+      </form>
+    </section>
+
+    <!-- Chat bot & LLM -->
+    <section class="tab-panel card full" id="panel-bot" role="tabpanel" aria-labelledby="tab-btn-bot" {% if active_tab != 'bot' %}hidden{% endif %}>
+      <h2 class="subh" style="margin-top:0;">Chat bot &amp; LLM</h2>
+      <p class="muted small"><strong>In-game Hank</strong>, <strong>Smart suggestions</strong>, and LLM probes use these keys and models. This is separate from <strong>Farm Dashboard JSON URL</strong> on the other tab.</p>
+
+      <form method="post" action="/admin/api/settings" class="form">
+        <input type="hidden" name="redirect_tab" value="bot"/>
         <label class="row">
           <span>Bot enabled</span>
           <span class="inline">
@@ -41,72 +114,86 @@
           </span>
         </label>
         <label class="row">
-          <span>Trigger prefix</span>
+          <span>Trigger prefix (in-game)</span>
           <input type="text" name="trigger_prefix" value="{{ trigger_prefix }}" maxlength="32" required/>
-        </label>
-        <label class="row">
-          <span>Farm Dashboard JSON URL</span>
-          <input type="url" name="dashboard_json_url" value="{{ dashboard_url }}" placeholder="http://127.0.0.1:8766/api/data"/>
-        </label>
-        <p class="muted small" style="margin: -0.35rem 0 0.5rem 0;">
-          Used to pull <code>/api/data</code> for the bot and to list servers from the same host’s <code>/api/servers</code>.
-          Must be reachable <strong>from this backend</strong>: plain <code>127.0.0.1</code> only works when AI Farm Manager runs on the same OS as Farm Dashboard (not inside a remote VPS or container — use <code>host.docker.internal</code>, your LAN IP, FTP mode, or a tunnel).
-        </p>
-        <label class="row">
-          <span>Farm Dashboard server ID (optional)</span>
-          <input type="text" name="dashboard_server_id" value="{{ dashboard_server_id }}" placeholder="Only if you use multiple servers in Farm Dashboard — same as ?serverId="/>
         </label>
         <label class="row">
           <span>LLM provider</span>
           <select name="llm_provider">
-            <option value="openai" {% if llm_provider == 'openai' %}selected{% endif %}>OpenAI</option>
+            <option value="openai" {% if llm_provider == 'openai' %}selected{% endif %}>OpenAI-compatible / OpenAI cloud</option>
             <option value="gemini" {% if llm_provider == 'gemini' %}selected{% endif %}>Google Gemini</option>
           </select>
         </label>
+        <h3 class="subh">OpenAI path</h3>
         <label class="row">
-          <span>OpenAI API key</span>
-          <input type="password" name="llm_api_key" placeholder="{% if has_llm_key %}•••• (unchanged if empty){% else %}sk-…{% endif %}"/>
+          <span>LLM API key (OpenAI or placeholder e.g. ollama)</span>
+          <input type="password" name="llm_api_key" autocomplete="new-password" placeholder="{% if has_llm_key %}•••• leave blank to keep{% else %}sk-… or ollama{% endif %}"/>
         </label>
         <label class="row">
-          <span>OpenAI model</span>
-          <input type="text" name="llm_model" value="{{ llm_model }}"/>
+          <span>Model id</span>
+          <input type="text" name="llm_model" value="{{ llm_model }}" placeholder="gpt-4o-mini or local model name"/>
         </label>
+        <label class="row">
+          <span>OpenAI-compatible base URL (optional — Ollama, LAN)</span>
+          <input type="text" name="openai_base_url" value="{{ openai_base_url }}" placeholder="http://192.168.x.x:11434 — empty = OpenAI cloud"/>
+        </label>
+        <h3 class="subh">Gemini path</h3>
         <label class="row">
           <span>Gemini API key</span>
-          <input type="password" name="gemini_api_key" placeholder="{% if has_gemini_key %}•••• (unchanged if empty){% else %}optional{% endif %}"/>
+          <input type="password" name="gemini_api_key" autocomplete="new-password" placeholder="{% if has_gemini_key %}•••• leave blank to keep{% else %}optional{% endif %}"/>
         </label>
         <label class="row">
           <span>Gemini endpoint</span>
           <select name="gemini_api_endpoint">
             <option value="generativelanguage" {% if gemini_api_endpoint == 'generativelanguage' %}selected{% endif %}>AI Studio (generativelanguage.googleapis.com)</option>
-            <option value="aiplatform" {% if gemini_api_endpoint == 'aiplatform' %}selected{% endif %}>AI Platform / Vertex publisher (aiplatform.googleapis.com)</option>
+            <option value="aiplatform" {% if gemini_api_endpoint == 'aiplatform' %}selected{% endif %}>AI Platform / Vertex</option>
           </select>
         </label>
         <label class="row">
           <span>Gemini model</span>
           <input type="text" name="gemini_model" value="{{ gemini_model }}" placeholder="gemini-2.5-flash"/>
         </label>
-        <p class="muted small" style="margin: -0.35rem 0 0.5rem 0;">Use an id from Google’s API for your key (e.g. <code>gemini-2.5-flash</code>, <code>gemini-2.0-flash</code>). If you see HTTP 404, try <code>GEMINI_REST_API_VERSION=v1beta</code> or another model name.</p>
-        <button type="submit" class="btn primary">Save settings</button>
-        <p class="muted small" style="margin-top: 0.75rem;">
-          <label class="row" style="margin-bottom: 0.5rem; max-width: 28rem;">
-            <span>Optional <code>serverId</code> (Farm Dashboard save / push buffer)</span>
-            <input type="text" name="admin_test_llm_server_id" id="adminTestLlmServerId" value="{{ dashboard_server_id|e }}" placeholder="srv_…" autocomplete="off"/>
-          </label>
-          <button type="button" class="btn" id="adminTestLlmBtn">Test Smart suggestions (consultant pipeline)</button>
+        <p class="muted small" style="margin: -0.35rem 0 0.5rem 0;">If you see HTTP 404 on Gemini, try another model id or <code>GEMINI_REST_API_VERSION=v1beta</code> in env.</p>
+        <button type="submit" class="btn primary">Save bot &amp; LLM settings</button>
+      </form>
+
+      <div class="card inner-card" style="margin-top: 1rem;">
+        <h3 class="subh" style="margin-top:0;">Test Smart suggestions (consultant)</h3>
+        <p class="muted small">Runs <code>GET /api/v1/consultant/insights</code> with <strong>server-side</strong> keys (not BYOK). Usually 10–90s.</p>
+        <label class="row" style="max-width: 28rem;">
+          <span>Optional <code>serverId</code> (match Farm Dashboard save / push buffer)</span>
+          <input type="text" name="admin_test_llm_server_id" id="adminTestLlmServerId" value="{{ dashboard_server_id|e }}" placeholder="Leave blank to use default / push buffer" autocomplete="off"/>
+        </label>
+        <p style="margin-top: 0.5rem;">
+          <button type="button" class="btn" id="adminTestLlmBtn">Run consultant test</button>
           <span id="adminTestLlmResult" class="muted small" style="margin-left: 0.5rem; display: inline-block; max-width: 42rem; vertical-align: top;"></span>
         </p>
-        <p class="muted small" style="margin-top: 0.25rem;">Runs the same request as Farm Dashboard <strong>Smart suggestions</strong> (<code>GET /api/v1/consultant/insights?context=full</code>). Usually 10–90s depending on snapshot size; this admin endpoint skips Gemini “wait on 429” delays so the page doesn’t hit proxy timeouts. Server API keys only (not BYOK).</p>
+      </div>
+    </section>
+
+    <!-- In-game Hank prompt only -->
+    <section class="tab-panel card full" id="panel-hank" role="tabpanel" aria-labelledby="tab-btn-hank" {% if active_tab != 'hank' %}hidden{% endif %}>
+      <h2 class="subh" style="margin-top:0;">In-game Hank — system prompt only</h2>
+      <p class="muted small">Used for <strong><code>!hank</code> / chat</strong> replies only. <strong>Smart suggestions</strong> use built-in consultant prompts in code — not this box.</p>
+      <form method="post" action="/admin/api/settings" class="form">
+        <input type="hidden" name="redirect_tab" value="hank"/>
+        <label class="row">
+          <span>System prompt</span>
+          <textarea name="system_prompt" rows="16" spellcheck="false">{{ system_prompt }}</textarea>
+        </label>
+        <p class="muted small">Saved to <code>prompts/system_prompt.txt</code> when you submit.</p>
+        <button type="submit" class="btn primary">Save Hank prompt</button>
       </form>
     </section>
 
-    <section class="card full" id="bots">
-      <h2>Multi-server bot (Farm Dashboard)</h2>
+    <!-- Mod & servers -->
+    <section class="tab-panel card full" id="panel-mod" role="tabpanel" aria-labelledby="tab-btn-mod" data-legacy-hash="bots" {% if active_tab != 'mod' %}hidden{% endif %}>
+      <h2 class="subh" style="margin-top:0;">Multi-server bot &amp; mod XML</h2>
       <p class="muted small">
-        Add one profile per dedicated game server. Each profile gets its own <code>server_token</code> and message queue.
-        Map the <strong>Farm Dashboard server id</strong> so the LLM pulls <code>/api/data?serverId=…</code> for the correct save.
-        <strong>Do not edit XML by hand:</strong> use <strong>Download XML</strong> per profile, or Farm Dashboard’s <strong>Install config</strong> (writes <code>modSettings/ai_farm_manager_config.xml</code> for you).
-        Set <code>PUBLIC_BASE_URL</code> in <code>.env</code> so generated files point at your real API (HTTPS) hostname.
+        One profile per dedicated server. Each gets its own <code>server_token</code> and queue.
+        Map the <strong>Farm Dashboard server id</strong> so the LLM uses the right save.
+        Prefer <strong>Download XML</strong> or Farm Dashboard <strong>Install config</strong> over hand-editing.
+        Set <code>PUBLIC_BASE_URL</code> in <code>.env</code> so generated XML points at your real API host.
       </p>
       {% if overview.farmDashboardError %}
       <p class="warn">Farm Dashboard unreachable at {{ overview.farmDashboardOrigin }} — {{ overview.farmDashboardError }}</p>
@@ -178,26 +265,17 @@
       </form>
     </section>
 
-    <section class="card full">
-      <h2>In-game chat bot (Hank) — system prompt</h2>
-      <form method="post" action="/admin/api/settings" class="form">
-        <textarea name="system_prompt" rows="14" spellcheck="false">{{ system_prompt }}</textarea>
-        <p class="muted small">
-          Used only for <strong>in-game <code>!hank</code></strong> replies (<code>POST /api/chat/receive</code> → LLM).
-          Stored in <code>prompts/system_prompt.txt</code> when you save (multiline safe).
-          <strong>Field map / Smart suggestions</strong> use the built-in consultant prompts in <code>app/services/consultant.py</code> — not this box.
-        </p>
-        <button type="submit" class="btn primary">Save chat prompt</button>
-      </form>
-    </section>
-
-    <section class="card full">
-      <h2>Live logs</h2>
+    <!-- Logs -->
+    <section class="tab-panel card full" id="panel-logs" role="tabpanel" aria-labelledby="tab-btn-logs" {% if active_tab != 'logs' %}hidden{% endif %}>
+      <h2 class="subh" style="margin-top:0;">Live logs</h2>
       <p class="muted small">Recent backend events (chat triggers, LLM latency, errors). Polls every 2s.</p>
       <pre id="logBox" class="logbox" aria-live="polite"></pre>
     </section>
   </main>
 
+  <script>
+    window.__ADMIN_ACTIVE_TAB__ = "{{ active_tab }}";
+  </script>
   <script src="/static/admin.js" defer></script>
 </body>
 </html>

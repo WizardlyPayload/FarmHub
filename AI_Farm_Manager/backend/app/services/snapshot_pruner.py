@@ -612,6 +612,218 @@ def prune_snapshot_home_overview(snapshot: dict[str, Any]) -> dict[str, Any]:
     return h
 
 
+_ECONOMY_FIELD_KEYS: frozenset[str] = frozenset(
+    {
+        "farmlandId",
+        "id",
+        "name",
+        "label",
+        "hectares",
+        "fruitTypeIndex",
+        "fruitTypeName",
+        "growthState",
+        "harvestReady",
+        "baleCountOnField",
+        "baleCount",
+        "needsBaling",
+        "baleableLooseLiters",
+        "hasWindrow",
+        "windrowLiters",
+        "needsWork",
+        "xmlFruitTypeHint",
+    }
+)
+
+
+def _slim_field_rows_for_economy_view(fields: Any, max_rows: int = 48) -> list[dict[str, Any]]:
+    """Harvest readiness, bales/swaths, crop identity — matches Farm Dashboard BYOK pruner."""
+    if not isinstance(fields, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for row in fields[:max_rows]:
+        if not isinstance(row, dict):
+            continue
+        slim = {k: copy.deepcopy(row[k]) for k in _ECONOMY_FIELD_KEYS if k in row}
+        if slim:
+            out.append(slim)
+    return out
+
+
+_MIN_HELD_LITERS = 1.0
+
+_ECONOMY_MARKET_PRICE_SKIP: frozenset[str] = frozenset(
+    {
+        "AIR",
+        "DIESEL",
+        "DEF",
+        "BALE_WRAP",
+        "BALE_TWINE",
+        "UNKNOWN",
+    }
+)
+
+
+def _norm_fill_type(name: Any) -> str:
+    if name is None:
+        return ""
+    s = str(name).strip().upper()
+    return s
+
+
+def _merge_fill_level_map(
+    levels: Any,
+    held: dict[str, dict[str, Any]],
+    source: str,
+) -> None:
+    if not isinstance(levels, dict):
+        return
+    for raw_key, v in levels.items():
+        key = _norm_fill_type(raw_key)
+        if not key or key == "UNKNOWN":
+            continue
+        liters = float("nan")
+        if isinstance(v, (int, float)):
+            liters = float(v)
+        elif isinstance(v, dict) and isinstance(v.get("level"), (int, float)):
+            liters = float(v["level"])
+        if not (liters == liters) or liters < _MIN_HELD_LITERS:
+            continue
+        rec = held.setdefault(key, {"liters": 0.0, "sources": set()})
+        rec["liters"] += liters
+        rec["sources"].add(source)
+
+
+def _chain_owned_by_farm(chain: dict[str, Any], farm_id: int) -> bool:
+    o = chain.get("ownerFarmId", chain.get("farmId", chain.get("playerFarmId")))
+    if o is None:
+        return True
+    try:
+        return int(o) == farm_id
+    except (TypeError, ValueError):
+        return False
+
+
+def _collect_held_fill_types_for_economy_view(
+    root: dict[str, Any],
+    farm_id: int,
+    fields_for_farm: list[dict[str, Any]],
+) -> tuple[dict[str, dict[str, Any]], frozenset[str]]:
+    """Physical stock: production I/O, vehicles, animals, harvest/bale/windrow fields (matches JS pruner)."""
+    held: dict[str, dict[str, Any]] = {}
+
+    prod = root.get("production")
+    if isinstance(prod, dict):
+        chains = prod.get("chains")
+        if isinstance(chains, list):
+            for ch in chains:
+                if not isinstance(ch, dict) or not _chain_owned_by_farm(ch, farm_id):
+                    continue
+                _merge_fill_level_map(ch.get("inputFillLevels"), held, "production.input")
+                _merge_fill_level_map(ch.get("outputFillLevels"), held, "production.output")
+
+    ppts = root.get("productionPoints")
+    if isinstance(ppts, list):
+        for pt in ppts:
+            if not isinstance(pt, dict) or not _chain_owned_by_farm(pt, farm_id):
+                continue
+            _merge_fill_level_map(pt.get("inputFillLevels"), held, "productionPoint.input")
+            _merge_fill_level_map(pt.get("outputFillLevels"), held, "productionPoint.output")
+            _merge_fill_level_map(pt.get("storageFillLevels"), held, "productionPoint.storage")
+
+    veh = root.get("vehicles")
+    if isinstance(veh, list):
+        for ve in veh:
+            if isinstance(ve, dict):
+                _merge_fill_level_map(ve.get("fillLevels"), held, "vehicle")
+
+    an = root.get("animals")
+    if isinstance(an, list):
+        for a in an:
+            if isinstance(a, dict):
+                _merge_fill_level_map(a.get("fillLevels"), held, "animal.fillLevels")
+                _merge_fill_level_map(a.get("storageData"), held, "animal.storage")
+
+    for f in fields_for_farm:
+        if not isinstance(f, dict):
+            continue
+        hr = f.get("harvestReady") is True
+        try:
+            bales_n = float(f.get("baleCountOnField", f.get("baleCount", 0)) or 0)
+        except (TypeError, ValueError):
+            bales_n = 0.0
+        try:
+            wind = float(f.get("windrowLiters", 0) or 0)
+        except (TypeError, ValueError):
+            wind = 0.0
+        try:
+            loose_b = float(f.get("baleableLooseLiters", 0) or 0)
+        except (TypeError, ValueError):
+            loose_b = 0.0
+        bales = bales_n > 0
+        windrow = wind >= _MIN_HELD_LITERS
+        loose_bale = loose_b >= _MIN_HELD_LITERS
+        if not hr and not bales and not windrow and not loose_bale:
+            continue
+        ft = _norm_fill_type(f.get("fruitTypeName") or f.get("fruitType") or f.get("xmlFruitTypeHint"))
+        if not ft:
+            continue
+        rec = held.setdefault(ft, {"liters": 0.0, "sources": set()})
+        if rec["liters"] < _MIN_HELD_LITERS:
+            rec["liters"] = _MIN_HELD_LITERS
+        rec["sources"].add("field:harvest_ready" if hr else "field:bale_or_windrow")
+
+    held_types = frozenset(held.keys())
+    return held, held_types
+
+
+def _held_fill_types_to_list(held: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for fill_type, rec in held.items():
+        liters = float(rec.get("liters", 0) or 0)
+        src = rec.get("sources")
+        sources = sorted(src) if isinstance(src, set) else []
+        rows.append(
+            {
+                "fillType": fill_type,
+                "litersApprox": round(liters, 3),
+                "sources": sources,
+            }
+        )
+    rows.sort(key=lambda x: x.get("litersApprox", 0), reverse=True)
+    return rows
+
+
+def _economy_subset_for_held_inventory(econ: Any, held_types: frozenset[str]) -> Any:
+    """Strip global sell-point matrices; keep price rows only for held fill types."""
+    if not isinstance(econ, dict):
+        return econ
+    out = copy.deepcopy(econ)
+    out.pop("sellPoints", None)
+
+    price_types = frozenset(t for t in held_types if t not in _ECONOMY_MARKET_PRICE_SKIP)
+
+    def _filter_price_map(obj: Any) -> dict[str, Any]:
+        if not isinstance(obj, dict):
+            return {}
+        nxt: dict[str, Any] = {}
+        for k, v in obj.items():
+            if _norm_fill_type(k) in price_types:
+                nxt[k] = v
+        return nxt
+
+    mp = out.get("marketPrices")
+    if isinstance(mp, dict):
+        mp2 = copy.deepcopy(mp)
+        crops = mp2.get("crops")
+        if isinstance(crops, dict):
+            mp2["crops"] = _filter_price_map(crops)
+        out["marketPrices"] = mp2
+    ftp = out.get("fillTypePrices")
+    if isinstance(ftp, dict):
+        out["fillTypePrices"] = _filter_price_map(ftp)
+    return out
+
+
 def prune_snapshot_for_dashboard_view(snapshot: dict[str, Any], view: str) -> dict[str, Any]:
     """
     Reduce consultant JSON to what the Farm Dashboard user is looking at (navbar section).
@@ -652,9 +864,41 @@ def prune_snapshot_for_dashboard_view(snapshot: dict[str, Any], view: str) -> di
             h["productionPoints"] = copy.deepcopy(root["productionPoints"])
         return h
     if v == "economy":
-        for k in ("economy", "farmInfo", "farms", "statistics", "weather"):
+        farm_id = resolve_consultant_farm_id(root, None)
+        fe = root.get("fields")
+        fields_list = fe if isinstance(fe, list) else []
+        held_map, held_types = _collect_held_fill_types_for_economy_view(root, farm_id, fields_list)
+        held_list = _held_fill_types_to_list(held_map)
+        fin = root.get("finance")
+        finance_facts: dict[str, Any] = {}
+        if isinstance(fin, dict):
+            for fk in ("money", "loan", "loanMax", "netWorth"):
+                if fk in fin:
+                    finance_facts[fk] = copy.deepcopy(fin[fk])
+        if "money" not in finance_facts and root.get("money") is not None:
+            finance_facts["money"] = copy.deepcopy(root.get("money"))
+        h["_consultant_held_fill_types"] = held_list
+        h["_consultant_economy_inventory_scope"] = (
+            "Only fill types in _consultant_held_fill_types represent physical stock "
+            "(storage, vehicles, animals, or harvest-ready/bale/windrow fields). "
+            "Do not advise selling or pricing any other commodity."
+        )
+        if finance_facts:
+            h["_consultant_finance_facts"] = finance_facts
+        for k in ("farmInfo", "farms", "statistics", "weather"):
             if k in root:
                 h[k] = copy.deepcopy(root[k])
+        if "economy" in root:
+            h["economy"] = _economy_subset_for_held_inventory(copy.deepcopy(root["economy"]), held_types)
+        for k in ("finance", "money"):
+            if k in root:
+                h[k] = copy.deepcopy(root[k])
+        if isinstance(fe, list) and fe:
+            h["fields"] = _slim_field_rows_for_economy_view(fe)
+        if "production" in root:
+            h["production"] = copy.deepcopy(root["production"])
+        if "productionPoints" in root:
+            h["productionPoints"] = copy.deepcopy(root["productionPoints"])
         return h
 
     return root

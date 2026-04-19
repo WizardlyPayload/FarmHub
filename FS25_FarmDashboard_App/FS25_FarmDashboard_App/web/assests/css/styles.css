@@ -1394,6 +1394,22 @@ th {
   font-size: 0.9rem;
 }
 
+/* AI Farm Manager — inner BYOK / Hosted pills */
+#appSettingsModal #ai-fm-subtabs .nav-link {
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+#appSettingsModal #ai-fm-subtabs .nav-link:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+#appSettingsModal #ai-fm-subtabs .nav-link.active {
+  color: #0f172a;
+  background: var(--bs-warning);
+  border-color: var(--bs-warning);
+}
+
 /* AI Farm panel: long server ids / masked tokens wrap instead of squashing layout */
 #aiFarmBotPanelBody {
   overflow-wrap: anywhere;

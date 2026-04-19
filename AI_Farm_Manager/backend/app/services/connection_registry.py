@@ -74,6 +74,8 @@ def list_connections() -> list[dict[str, Any]]:
                 "label": c.get("label") or "",
                 "integration_key_masked": _mask(key),
                 "created_utc": c.get("created_utc") or "",
+                "dashboard_server_id": (c.get("dashboard_server_id") or "").strip(),
+                "dashboard_json_url": (c.get("dashboard_json_url") or "").strip(),
             }
         )
     return out
@@ -160,6 +162,34 @@ def take_pending_key_for_admin(connection_id: str) -> str | None:
     if not cid:
         return None
     return _pending_key_reveal.pop(cid, None)
+
+
+def update_connection_settings(
+    connection_id: str,
+    *,
+    dashboard_server_id: str,
+    dashboard_json_url: str,
+) -> bool:
+    """
+    Per-client snapshot routing (optional overrides).
+
+    When set, ``dashboard_server_id`` is the default Farm Dashboard ``serverId`` (srv_…) for this key
+    when the client does not pass ``?serverId=``. Empty string clears the override (inherit global env).
+
+    ``dashboard_json_url`` overrides global ``DASHBOARD_JSON_URL`` for HTTP pull / synthetic push URL
+    building for this client only. Empty = inherit global.
+    """
+    doc = load_document()
+    cid = (connection_id or "").strip()
+    for c in doc.get("connections") or []:
+        if not isinstance(c, dict) or str(c.get("id")) != cid:
+            continue
+        c["dashboard_server_id"] = dashboard_server_id.strip()
+        c["dashboard_json_url"] = dashboard_json_url.strip()
+        save_document(doc)
+        logger.info("Updated Farm Dashboard connection routing id=%s", cid)
+        return True
+    return False
 
 
 def delete_connection(connection_id: str) -> bool:

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.config import get_settings
 from app.deps.integration_auth import get_farmdash_connection_bucket
-from app.services.connection_registry import DEFAULT_BUCKET_ID
+from app.services.connection_registry import DEFAULT_BUCKET_ID, get_connection
 from app.schemas.insights import FarmInsightsResponse, InsightCategory
 from app.services.consultant import (
     CONSULTANT_SYSTEM_FIELDS_FOCUS,
@@ -58,7 +58,17 @@ async def _load_snapshot_for_consultant(
     settings = get_settings()
     base = (settings.get("dashboard_json_url") or "").strip()
     env_sid = (settings.get("dashboard_server_id") or "").strip()
-    sid = (server_id or "").strip() or env_sid
+    bucket = (connection_bucket_id or DEFAULT_BUCKET_ID).strip() or DEFAULT_BUCKET_ID
+    client_sid = ""
+    if bucket != DEFAULT_BUCKET_ID:
+        row = get_connection(bucket)
+        if row:
+            url_o = (row.get("dashboard_json_url") or "").strip()
+            if url_o:
+                base = url_o
+            client_sid = (row.get("dashboard_server_id") or "").strip()
+    q_sid = (server_id or "").strip()
+    sid = q_sid or client_sid or env_sid
     fetch_url = build_dashboard_fetch_url(base, sid if sid else None)
     if not fetch_url:
         fetch_url = settings.get("dashboard_fetch_url") or settings.get("dashboard_json_url") or ""

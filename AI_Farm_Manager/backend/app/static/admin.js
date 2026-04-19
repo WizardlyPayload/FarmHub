@@ -46,8 +46,11 @@
       try {
         var sidEl = document.getElementById("adminTestLlmServerId");
         var sid = sidEl && sidEl.value ? String(sidEl.value).trim() : "";
+        var cidEl = document.getElementById("adminTestLlmConnectionId");
+        var cid = cidEl && cidEl.value ? String(cidEl.value).trim() : "";
         var qs = new URLSearchParams();
         if (sid) qs.set("serverId", sid);
+        if (cid) qs.set("connectionId", cid);
         qs.set("context", "full");
         var url = "/admin/api/test-llm?" + qs.toString();
         const r = await fetch(url, { credentials: "same-origin", signal: ac.signal });

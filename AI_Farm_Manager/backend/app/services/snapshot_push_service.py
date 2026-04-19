@@ -93,8 +93,11 @@ def get_snapshot_json(server_id: str | None, farm_id: int | None = None) -> tupl
         return None, None, ""
     sid = _norm_sid(server_id)
     err = (
-        "No snapshot received yet from Farm Dashboard. On the PC: open AI Farm Manager panel → enable "
-        '"Push snapshots to AI server" → Save. On the VPS: set DASHBOARD_PUSH_MODE=1.'
+        "No snapshot received yet from Farm Dashboard. On the PC: Settings → AI Farm Manager → Hosted AI: "
+        "turn on Send farm data to the AI server, set server URL + link key (same value as VPS FARMDASH_INTEGRATION_KEY), "
+        "then Save & load. Start FS25 with the mod so the dashboard loads save data. On the VPS: set "
+        "DASHBOARD_PUSH_MODE=1 and restart the API. If it still fails: check the desktop app console for "
+        "POST /api/integration/push-snapshot — HTTP 401 means wrong link key; 503 means push mode is off on the server."
     )
     def _newest_push() -> tuple[str, str]:
         best_sid, (raw, _ts) = max(_snapshots.items(), key=lambda kv: kv[1][1])

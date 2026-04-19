@@ -13,7 +13,7 @@ It does **not** apply to the **Farm Dashboard** (Electron app), Smart suggestion
 | **Single-player career** | **Not supported.** The mod does not register the chat hook or poll the API. Use **Farm Dashboard** on your PC for AI features. |
 | **Multiplayer — you host** (listen server) | Supported. Install the mod, place `ai_farm_manager_config.xml` on **the host PC** under `modSettings`. |
 | **Dedicated server** (your hardware, Linux, etc.) | Supported. Place the XML on the **server’s** FS profile `modSettings` (same machine that runs the dedicated process). |
-| **Rented server** (G-Portal, Nitrado, etc.) | Supported when the provider runs a normal FS dedicated/MP host. Upload `ai_farm_manager_config.xml` to **that host’s** `modSettings` using their file/FTP tools — **not** on each player’s home PC. |
+| **Rented dedicated / MP host** | Supported when the provider runs a normal FS dedicated/MP host. Upload `ai_farm_manager_config.xml` to **that host’s** `modSettings` using their file/FTP tools — **not** on each player’s home PC. |
 | **Joining as a client** | **Not supported** for *sending* triggers — only the **server / host** runs the bridge. Clients see bot replies in chat like everyone else. |
 
 ---

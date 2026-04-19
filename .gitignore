@@ -6,8 +6,12 @@ venv/
 
 # Electron / electron-builder output
 release/
+release-build/
+release-*/
 dist/
 out/
+electron-pack-out/
+electron-pack-out-alt/
 
 # Logs and local env
 *.log

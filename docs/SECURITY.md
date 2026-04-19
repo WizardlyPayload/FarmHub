@@ -1,26 +1,36 @@
 # FS25 Farm Dashboard — Security & network notes
 
-**Authors:** **JoshWalki** (Josh) / Wizardlypayload and **WizardlyPayload** — see [AUTHORS.md](../AUTHORS.md).
+**Authors:** **JoshWalki** (Josh) / Wizardlypayload and **WizardlyPayload** — see [AUTHORS.md](./AUTHORS.md).
 
-This document describes how the **desktop app** exposes data, what is **not** protected, and how that fits a **home / LAN** setup. It is written for **2.0.0**; review again after major upgrades.
+This document describes how the **desktop app** exposes data, what is **optional** vs **default-locked**, and how that fits a **home / LAN** setup. It is written for **3.1.0**; review again after major upgrades.
 
 ---
 
 ## Network: browser access on your LAN (important)
 
-The app binds the HTTP server to **`0.0.0.0` on port `8766`**, not only `127.0.0.1`.
+The embedded HTTP server listens on **port `8766`**. **Binding and access control depend on Settings:**
+
+- **LAN access disabled (default):** the server binds to **`127.0.0.1` only** — only processes on the same PC can open the dashboard (e.g. `http://localhost:8766`). Other devices on the network **cannot** connect.
+- **LAN access enabled** (**Settings → Remote / LAN access**): the server binds to **`0.0.0.0`** so other devices on the LAN can reach the PC. In that mode you should treat the service as **exposed on your network**.
 
 | Access | Typical URL |
 |--------|-------------|
 | Same PC | `http://localhost:8766` |
-| Phone / tablet / another PC **on the same network** | `http://<this-PCs-LAN-IP>:8766` (e.g. `http://192.168.1.50:8766`) |
+| Phone / tablet / another PC **on the same network** (only when LAN access is enabled) | `http://<this-PCs-LAN-IP>:8766` (e.g. `http://192.168.1.50:8766`) |
+
+**When LAN access is enabled**, the app can enforce:
+
+- **HTTP Basic Authentication** — username and password configured in **Settings** (stored locally). Browsers will prompt for credentials when opening the dashboard from another device.
+- **Optional IP allowlist** — if you list allowed IPs (comma-separated), clients whose address does not match receive **403 Forbidden**. Empty allowlist means **no IP filtering** (only Basic Auth applies, if you rely on it).
+
+**Loopback bypass:** requests from **`127.0.0.1`**, **`::1`**, and **`::ffff:127.0.0.1`** skip LAN auth middleware so the desktop app and local browser are not blocked.
 
 **CORS** is enabled for the API routes so a normal browser can load the dashboard from that origin.
 
 **Implications**
 
-- Anyone who can reach **port 8766** on that machine (same Wi‑Fi, Ethernet, or routed LAN) can **read the same farm data** the app serves (merged JSON: animals, fields, money, vehicles, etc.). There is **no login** and **no per-client access control** in the app.
-- This is **by design** for convenience (tablet on the sofa, second monitor, teammate on LAN). It is **not** suitable to expose directly to the **public internet** without extra layers (VPN, reverse proxy with auth, firewall rules).
+- With **LAN access on**, anyone who can reach **port 8766** and pass **Basic Auth / IP rules** sees the same farm data the app serves (merged JSON: animals, fields, money, vehicles, etc.). **Configure credentials and firewall** to match your trust model.
+- LAN access is aimed at **home / trusted LAN** use (tablet, second monitor, teammate). It is **not** a substitute for a hardened **public internet** deployment — use a **VPN**, **reverse proxy with TLS + auth**, and **firewall rules** if you expose services beyond the LAN.
 
 **Recommendations**
 
@@ -42,9 +52,9 @@ in the environment before starting the app (advanced / lab use only). **GET** ro
 
 ## Electron & web stack (threat model)
 
-The dashboard window loads **local** HTML/JS served by Express. Typical settings include **`nodeIntegration: true`**, relaxed **`webSecurity`**, and **no context isolation** — this matches a **single-user, trusted local tool**, not a website that loads third-party ads or untrusted URLs.
+The dashboard window loads **local** HTML/JS served by Express. **Phase 2 hardening** uses **`nodeIntegration: false`**, **`contextIsolation: true`**, and a **`preload.js`** script that exposes a narrow **`window.farmDashAPI`** bridge for IPC — the renderer does not get **`require('electron')`** or Node **`fs`**.
 
-**Do not** point the Electron window at arbitrary remote sites with this configuration. **Do not** load untrusted content in the same window.
+**`webSecurity`** may still be relaxed for local asset behaviour; treat the app as a **single-user, trusted local tool**. **Do not** point the Electron window at arbitrary remote sites. **Do not** load untrusted content in the same window.
 
 ---
 
@@ -79,4 +89,4 @@ Gemini **API key routing** and rate limits: **[LLM_GEMINI_ROUTING.md](./LLM_GEMI
 
 ## Reporting security concerns
 
-For **public** security issues (e.g. unintended remote code execution via the app), contact the maintainers via the GitHub repository’s channels (**JoshWalki** & **WizardlyPayload** — [AUTHORS.md](../AUTHORS.md)). Include app version **2.0.0** and platform **Windows**.
+For **public** security issues (e.g. unintended remote code execution via the app), contact the maintainers via the GitHub repository’s channels (**JoshWalki** & **WizardlyPayload** — [AUTHORS.md](./AUTHORS.md)). Include app version **3.1.0** and platform **Windows**.

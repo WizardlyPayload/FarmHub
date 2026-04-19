@@ -649,18 +649,9 @@ export function openSetup() {
     }
     return;
   }
-  if (typeof window.electronAPI?.openSetup === "function") {
-    window.electronAPI.openSetup();
+  if (typeof window.farmDashAPI?.openSetup === "function") {
+    window.farmDashAPI.openSetup();
     return;
-  }
-  try {
-    const { ipcRenderer } = require("electron");
-    if (ipcRenderer && typeof ipcRenderer.send === "function") {
-      ipcRenderer.send("open-setup");
-      return;
-    }
-  } catch (e) {
-    /* not in Electron renderer */
   }
   window.location.href = "/setup.html";
 }

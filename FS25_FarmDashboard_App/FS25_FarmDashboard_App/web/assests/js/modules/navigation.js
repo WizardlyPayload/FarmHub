@@ -28,7 +28,7 @@ export function setupEventListeners() {
   }
 
   const landingModImagesBtn = document.getElementById("landing-import-mod-images");
-  if (landingModImagesBtn && typeof require === "function") {
+  if (landingModImagesBtn && typeof window !== "undefined" && window.farmDashAPI) {
     let modShopExportInFlight = false;
     landingModImagesBtn.addEventListener("click", async () => {
       if (modShopExportInFlight) return;
@@ -38,12 +38,12 @@ export function setupEventListeners() {
         `<i class="bi bi-hourglass-split me-1"></i>${t("landing.scanning")}`;
       let cleanupProgress = null;
       try {
-        const { ipcRenderer } = require("electron");
-        if (ipcRenderer && typeof ipcRenderer.invoke === "function") {
+        const api = window.farmDashAPI;
+        if (api && typeof api.exportModStoreImages === "function") {
           if (typeof window.attachModExportProgress === "function") {
-            cleanupProgress = window.attachModExportProgress(ipcRenderer);
+            cleanupProgress = window.attachModExportProgress(api);
           }
-          await ipcRenderer.invoke("export-mod-store-images");
+          await api.exportModStoreImages();
         }
       } catch (e) {
         console.error("[landing-import-mod-images]", e);

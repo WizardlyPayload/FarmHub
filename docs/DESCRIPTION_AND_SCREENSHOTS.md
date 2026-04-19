@@ -2,7 +2,7 @@
 
 This document describes the **in-game mod** and **desktop application**, lists every major **UI surface** in the project, and tells you **exactly which screenshots to take** and where to save them so you can drop them into GitHub or a release page.
 
-**Version history:** [CHANGELOG.md](./CHANGELOG.md) · **Short release blurbs:** [RELEASE_NOTES.md](../RELEASE_NOTES.md) · **Security / LAN:** [SECURITY.md](./SECURITY.md) · **Authors:** [AUTHORS.md](../AUTHORS.md) (JoshWalki & WizardlyPayload)
+**Version history:** [CHANGELOG.md](./CHANGELOG.md) · **Short release blurbs:** [RELEASE_NOTES.md](./RELEASE_NOTES.md) · **Security / LAN:** [SECURITY.md](./SECURITY.md) · **Authors:** [AUTHORS.md](./AUTHORS.md) (JoshWalki & WizardlyPayload)
 
 > **Note:** Screenshots must be captured on **your PC** while FS25 and the dashboard app are running with real data. Place image files under `docs/screenshots/` (create the folder) using the filenames below. Then uncomment or add the Markdown image lines in your README.
 
@@ -18,7 +18,7 @@ A **server-side / save-side Lua mod** for Farming Simulator 25. It does **not** 
 
 | Area | Role |
 |------|------|
-| **Animals** | Husbandries, clusters, Realistic Livestock–style individuals where available |
+| **Animals** | Husbandries, clusters, per-animal detail where the game exports it |
 | **Vehicles** | Fleet state, positions, fill levels, damage, ownership |
 | **Fields** | Growth, soil, weeds, variable-rate N/pH when the save exports soil maps |
 | **Finance** | Money and related summary |
@@ -78,7 +78,7 @@ Two different “schedules” are involved (see [CHANGELOG.md §2.0.0 — **G** 
 | **In-game mod** | **Staggered collection**: one data module (animals, vehicles, fields, …) per slice over **`collectionCycleMs`** (default ~60s; tunable in **`config.xml`**). Writes **`data.json`** after each slice. |
 | **Desktop app (FTP)** | **FTP polling**: how often the app downloads remote **`data.json`**, plus **sync** (all FTP servers at once) vs **staggered** (spread across the interval). Set on **Setup** under **FTP polling**. |
 
-**Setup** also includes **Scan FS25 mods for dashboard images** (mod shop PNG export) and **scan local saves** for paths. Full detail: [RELEASE_NOTES.md — “Where this release is documented”](../RELEASE_NOTES.md).
+**Setup** also includes **Scan FS25 mods for dashboard images** (mod shop PNG export) and **scan local saves** for paths. Full detail: [RELEASE_NOTES.md](./RELEASE_NOTES.md) — “Where this release is documented”.
 
 ### “Screenshots” for the desktop app
 
@@ -166,4 +166,4 @@ Commit the `docs/screenshots/*.png` files to git, or attach them to **GitHub Rel
 
 ---
 
-*Document revision: 2.0 — aligned with app **2.0.0** / mod **2.0.0.0** (see [CHANGELOG.md](./CHANGELOG.md)). Authors: **JoshWalki** & **WizardlyPayload** ([AUTHORS.md](../AUTHORS.md)).*
+*Document revision: 2.0 — aligned with app **2.0.0** / mod **2.0.0.0** (see [CHANGELOG.md](./CHANGELOG.md)). Authors: **JoshWalki** & **WizardlyPayload** ([AUTHORS.md](./AUTHORS.md)).*

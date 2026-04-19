@@ -31,10 +31,13 @@ def _sanitize_consultant_user_copy(text: str) -> str:
     s = re.sub(r"\s{2,}", " ", s).strip()
     return s
 
-from app.config import get_settings, has_gemini_credentials
+from app.config import get_settings, has_gemini_credentials, normalize_openai_base_url_for_sdk
 from app.schemas.insights import FarmInsight, InsightCategory, InsightPriority
 from app.services.log_buffer import log_event
-from app.services.llm_service import gemini_consultant_post_with_quota_fallback
+from app.services.llm_service import (
+    async_openai_client,
+    gemini_consultant_post_with_quota_fallback,
+)
 from app.services.snapshot_pruner import (
     cap_field_rows_in_snapshot,
     prune_dashboard_snapshot_for_llm,
@@ -126,7 +129,7 @@ CONSULTANT_FS25_MECHANICS_BLOCK = """
 - **Straw / stubble:** Chopping vs **swathing**, baling, **mulching**—only when crop type and phase fit.
 - **Rolling:** **Field rollers** for certain crops/phases (e.g. pushing stones, firming)—mention only when it matches FS25 behaviour for that crop context.
 - **Withering / overdue harvest:** Stressed or **ready too long** crops can fail—use for urgency when snapshot suggests it.
-- **Seasons / weather:** **Soil temp**, **moisture**, wrong season for crop—if JSON or growth state implies timing risk, say so briefly.
+- **In-game season / weather:** **Soil temp**, **moisture**, wrong time of year for crop—if JSON or growth state implies timing risk, say so briefly.
 - **Missions vs own fields:** **Contracts** differ in pay, equipment wear, and rules—only when giving contract-style advice.
 - **Animals / feed:** TMR mix ratios, **cleanliness**, **pasture** vs barn—when Animal data appears.
 - **Forestry / wood:** Saplings, **stump grinding**, sell points—when trees/logs appear in snapshot.
@@ -327,16 +330,20 @@ Respond with ONLY valid JSON (no markdown):
 - Keep **message** and **reasoning** brief (under ~200 characters each)."""
 
 CONSULTANT_SYSTEM_VIEW_ECONOMY = CONSULTANT_VIEW_SHARED_PREFIX + """VIEW MODE — economy:
-You are an FS25 **finance and market** consultant. The JSON emphasizes **economy**, **farms** / **farmInfo**, and related stats.
+You are an FS25 consultant for the **Economic Dashboard** tab. The snapshot includes **`_consultant_held_fill_types`** (ground-truth physical stock with liters and source), **`_consultant_finance_facts`** (cash/loan — use these numbers exactly), **economy** prices **pre-filtered** to those held fill types only, plus **production** / **productionPoints**, and slim **fields** (harvest, bales, swaths).
 
-**Voice:** **Grandpa Walter** (practical money sense, “I've seen markets turn…”) or plain farmer talk—avoid spreadsheet jargon.
+**Voice:** **Grandpa Walter** or plain farmer talk—avoid spreadsheet jargon.
 
-Focus: loan pressure, cash flow, crop/stock prices, best times to sell, storage vs market opportunity.
+**Scope (strict):** Name a product for sell/haul/market tips **only** if it appears in **`_consultant_held_fill_types`** or is explicitly present in **production** / **fields** rows. Never invent "best price for Barley/Apples/etc." from memory—the old full commodity list is **not** in this JSON.
+
+**Stored product:** silos, production chains, vehicle tanks, animal storage. **Bales / windrows** from **fields**. **Harvest-ready** parcels: set **field_ref** to **farmlandId** / **id**.
+
+Do **not** advise buying equipment or "investing spare cash" unless **finance facts** show a clearly positive balance and the tip ties to moving **listed** stock.
 
 Respond with ONLY valid JSON:
-{"insights":[{"category":"Finance|Production","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null},...]}
+{"insights":[{"category":"Field|Finance|Production","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null},...]}
 
-- **Finance** for money/market tips; **Production** only if tied to selling processed goods.
+- **Field** when the job is a specific parcel (harvest/bale); **Production** for silo/plant storage; **Finance** for selling/moving **those** stocks or obvious cash blockers.
 - At most **4** insights; brief lines."""
 
 
@@ -648,13 +655,9 @@ async def _openai_consultant(
     *,
     system_instruction: str = CONSULTANT_SYSTEM,
 ) -> str:
-    from openai import AsyncOpenAI
     from openai import BadRequestError
 
-    key = settings.get("llm_api_key") or ""
-    if not key:
-        raise RuntimeError("LLM_API_KEY not set")
-    client = AsyncOpenAI(api_key=key)
+    client = async_openai_client(settings)
     model = settings["llm_model"]
     messages = [
         {"role": "system", "content": system_instruction},
@@ -768,9 +771,10 @@ def _consultant_llm_settings_for_byok(
     user_api_key: str,
     user_provider: str | None,
 ) -> dict[str, Any]:
-    """Build settings dict for one consultant LLM call (BYOK key or server env key)."""
+    """Build settings dict for BYOK consultant / LLM (OpenAI cloud unless ``openai_base_url`` is set later)."""
     base = get_settings()
     merged: dict[str, Any] = dict(base)
+    merged["openai_base_url"] = ""
     key = normalize_incoming_api_key(user_api_key)
     p = (user_provider or "").strip().lower()
     if p not in ("openai", "gemini", "", None):
@@ -796,31 +800,48 @@ def _consultant_llm_settings_for_byok(
 def resolve_consultant_llm_settings(
     user_api_key: str | None,
     user_provider: str | None,
+    user_openai_base_url: str | None = None,
 ) -> dict[str, Any] | None:
     """
     Same API key routing as :func:`generate_farm_insights` (BYOK or server env).
-    Returns ``None`` if no LLM key is available.
+    ``user_openai_base_url`` (e.g. ``X-AI-OpenAI-Base-URL``) targets an OpenAI-compatible server
+    (Ollama, vLLM) for OpenAI-path calls; when unset under BYOK, requests use OpenAI's cloud API.
+
+    Returns ``None`` if no LLM credentials are available.
     """
-    key = normalize_incoming_api_key(user_api_key)
+    key_in = normalize_incoming_api_key(user_api_key)
     prov = (user_provider or "").strip().lower() or None
-    if prov not in ("openai", "gemini", "", None):
+    if prov not in ("openai", "gemini", "openai_compat", "", None):
         prov = None
+    if prov == "openai_compat":
+        prov = "openai"
 
-    if not key:
-        base = get_settings()
-        prov_base = (base.get("llm_provider") or "openai").strip().lower()
-        if prov_base == "gemini":
-            if not has_gemini_credentials(base):
-                return None
-            # Do not route through _consultant_llm_settings_for_byok — that would replace
-            # gemini_api_keys with a one-element list and drop GEMINI_API_KEYS rotation / quota pool.
-            return dict(base)
-        key = normalize_incoming_api_key(base.get("llm_api_key"))
-        if not key:
+    user_base_raw = (user_openai_base_url or "").strip()
+    user_base_norm = normalize_openai_base_url_for_sdk(user_base_raw) if user_base_raw else None
+
+    base = get_settings()
+    prov_base = (base.get("llm_provider") or "openai").strip().lower()
+
+    if key_in:
+        merged = _consultant_llm_settings_for_byok(key_in, prov)
+        merged["openai_base_url"] = user_base_norm or ""
+        return merged
+
+    if prov_base == "gemini":
+        if not has_gemini_credentials(base):
             return None
-        prov = prov_base if prov_base in ("openai", "gemini") else None
+        return dict(base)
 
-    return _consultant_llm_settings_for_byok(key, prov)
+    key_srv = normalize_incoming_api_key(base.get("llm_api_key") or "")
+    srv_ob = (base.get("openai_base_url") or "").strip()
+    if not key_srv and not srv_ob:
+        return None
+
+    merged = dict(base)
+    merged["llm_provider"] = "openai"
+    if user_base_norm:
+        merged["openai_base_url"] = user_base_norm
+    return merged
 
 
 def _parse_consultant_llm_json_text(text: str) -> tuple[dict[str, Any] | None, str | None]:
@@ -859,6 +880,7 @@ async def generate_farm_insights(
     *,
     user_api_key: str | None = None,
     user_provider: str | None = None,
+    user_openai_base_url: str | None = None,
     system_instruction: str | None = None,
     cache_server_id: str | None = None,
     cache_farm_id: int | None = None,
@@ -877,7 +899,11 @@ async def generate_farm_insights(
         heuristics = []
     else:
         heuristics = _heuristic_production_output_space(snapshot_data)
-    settings = resolve_consultant_llm_settings(user_api_key, user_provider)
+    settings = resolve_consultant_llm_settings(
+        user_api_key,
+        user_provider,
+        user_openai_base_url,
+    )
     if settings is None:
         logger.warning(
             "Consultant fallback: llm_used=false — no LLM API key (empty BYOK and server env missing "

@@ -103,8 +103,9 @@
       );
       parts.push(
         "<p class=\"small text-muted mb-0\">" +
-          "<strong>Hosted AI:</strong> subscribe via the button below if your operator provides a plan. " +
-          "<strong>BYOK:</strong> add your own Gemini/OpenAI key under <strong>Dashboard Settings</strong> (gear) → consultant / BYOK, or use the BYOK guide link.</p>"
+          "<strong>Premium · Hosted AI:</strong> AI server URL + link key in <strong>Settings → AI Farm Manager</strong>. " +
+          "<strong>Mid · BYOK:</strong> your OpenAI/Gemini key in the same tab. " +
+          "<strong>Basic · Rules:</strong> heuristics only until an LLM is configured. See the BYOK guide link if needed.</p>"
       );
     } else if (variant === "payment") {
       parts.push(
@@ -156,7 +157,7 @@
       );
     } else {
       parts.push(
-        "<p>The response used <strong>rules / heuristics only</strong> — the cloud LLM did not run. For full AI: <strong>subscribe</strong> (hosted) or add <strong>BYOK</strong> in <strong>Dashboard Settings</strong> or the robot panel.</p>"
+        "<p>The response used <strong>Basic · Rules</strong> (heuristics) — the LLM did not run. For <strong>Premium · Hosted</strong> or <strong>Mid · BYOK</strong>, use <strong>Settings → AI Farm Manager</strong>.</p>"
       );
     }
     if (detail && variant !== "payment" && variant !== "no_key" && variant !== "not_configured" && variant !== "lan_cache_miss" && variant !== "unreachable") {
@@ -166,8 +167,7 @@
 
     if (setupHint) {
       setupHint.innerHTML =
-        "<strong>Quick links:</strong> use <em>Premium / hosted plan</em> if your operator sells access, or <em>BYOK setup</em> for your own API key. " +
-        "Full steps: AI Farm Manager panel → connection fields → Save; optional BYOK in Settings → AI / consultant.";
+        "<strong>Quick links:</strong> <em>Premium · Hosted</em> (URL + link key) or <em>Mid · BYOK</em> (your API key) under <strong>Settings → AI Farm Manager</strong> → Save &amp; load.";
     }
 
     function wireLink(btn, url, emptyTitle, activeClass) {

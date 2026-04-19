@@ -188,7 +188,7 @@ end
 1. **Multiplayer (Server Authority):** * Terrain modification (`DensityMapModifier`) and weather state tracking must **only** be executed on the server (`if g_server then`). 
    * The GIANTS Engine automatically syncs `terrainDetailHeightId` changes to clients. Do not attempt to sync terrain changes manually via `EventClass`; let the engine's built-in bit-stream handle the visual updates.
 2. **Savegame States:** * The custom `MoistureMap` bit-vector MUST be saved to the savegame folder (`savegame/MoistureMap.grle`). You must append to `Mission00:saveToXMLFile` to write your layer to the disk, otherwise, all grass will reset to neutral moisture when the server restarts.
-3. **Mod Compatibility:** * Be careful when overwriting `Baler.processBalerArea`. Use `Utils.appendedFunction` or `Utils.overwrittenFunction` to ensure you don't break MaizePlus, Courseplay, or other mods that also interact with pickups.
+3. **Mod Compatibility:** * Be careful when overwriting `Baler.processBalerArea`. Use `Utils.appendedFunction` or `Utils.overwrittenFunction` so you do not break other scripts that hook the same baler pickup pipeline.
 
 ---
 

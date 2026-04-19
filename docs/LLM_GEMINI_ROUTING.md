@@ -1,6 +1,9 @@
 # AI Farm Manager — Gemini LLM routing
 
-This document describes how **Google Gemini** requests choose **API keys** and **models** in `AI_Farm_Manager/backend/app/services/llm_service.py`. OpenAI (`LLM_PROVIDER=openai`) does not use this logic.
+This document describes how **Google Gemini** requests choose **API keys** and **models** in `AI_Farm_Manager/backend/app/services/llm_service.py`.
+
+- **OpenAI cloud** and **OpenAI-compatible** servers (Ollama, LAN, `OPENAI_BASE_URL`) **do not** use this Gemini-specific routing — see **[LLM_OPENAI_COMPATIBLE.md](./LLM_OPENAI_COMPATIBLE.md)**.
+- **`LLM_PROVIDER=openai`** selects the OpenAI SDK path; **`OPENAI_BASE_URL`** chooses cloud vs compatible server.
 
 ---
 

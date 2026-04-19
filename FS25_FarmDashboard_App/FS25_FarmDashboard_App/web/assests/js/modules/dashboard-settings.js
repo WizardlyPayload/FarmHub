@@ -4,6 +4,14 @@
 import { t, applyDom } from "../i18n/i18n.js";
 import { isFarmDashLocalConfigHost } from "./viewer-mode.js";
 
+/** Preload IPC bridge (`preload.js`). Null in a plain browser tab (no Electron). */
+export function getFarmDashApi() {
+  if (typeof window !== "undefined" && window.farmDashAPI) {
+    return window.farmDashAPI;
+  }
+  return null;
+}
+
 const SECTION_KEYS = [
   "livestock",
   "vehicles",
@@ -26,12 +34,16 @@ export function isDashboardSectionEnabled(name) {
 
 export async function loadDashboardUiPreferences() {
   try {
-    const { ipcRenderer } = require("electron");
-    const prefs = await ipcRenderer.invoke("get-ui-preferences");
-    this.sectionVisibility = {
-      ...DEFAULT_SECTION_VISIBILITY,
-      ...(prefs?.sections || {}),
-    };
+    const api = getFarmDashApi();
+    if (!api) {
+      this.sectionVisibility = { ...DEFAULT_SECTION_VISIBILITY };
+    } else {
+      const prefs = await api.getUiPreferences();
+      this.sectionVisibility = {
+        ...DEFAULT_SECTION_VISIBILITY,
+        ...(prefs?.sections || {}),
+      };
+    }
   } catch (e) {
     console.warn("[dashboard-settings] load UI prefs", e);
     this.sectionVisibility = { ...DEFAULT_SECTION_VISIBILITY };
@@ -144,8 +156,13 @@ function renderAppSettingsServerList() {
 
 async function loadAppSettingsServerDraft() {
   try {
-    const { ipcRenderer } = require("electron");
-    const cfg = await ipcRenderer.invoke("get-current-config");
+    const api = getFarmDashApi();
+    if (!api) {
+      _appSettingsServersDraft = [];
+      renderAppSettingsServerList();
+      return;
+    }
+    const cfg = await api.getCurrentConfig();
     _appSettingsServersDraft = JSON.parse(JSON.stringify(cfg?.servers || []));
     applyFtpPollingToForm(cfg?.ftpPolling);
     renderAppSettingsServerList();
@@ -235,34 +252,31 @@ function renderDesktopAppUpdateStatus(payload) {
 function wireDesktopAppUpdaterOnce() {
   if (window.__farmdashDesktopUpdaterWired) return;
   window.__farmdashDesktopUpdaterWired = true;
-  try {
-    const { ipcRenderer } = require("electron");
-    ipcRenderer.on("app-update-status", (_e, payload) => {
-      renderDesktopAppUpdateStatus(payload);
-    });
-    document.getElementById("settings-desktop-check-updates-btn")?.addEventListener("click", async () => {
-      const statusEl = document.getElementById("settings-desktop-update-status");
-      if (statusEl) {
-        statusEl.textContent = t("settings.updateStatusChecking");
+  const api = getFarmDashApi();
+  if (!api) return;
+  api.onAppUpdateStatus((payload) => {
+    renderDesktopAppUpdateStatus(payload);
+  });
+  document.getElementById("settings-desktop-check-updates-btn")?.addEventListener("click", async () => {
+    const statusEl = document.getElementById("settings-desktop-update-status");
+    if (statusEl) {
+      statusEl.textContent = t("settings.updateStatusChecking");
+      statusEl.className = "small text-muted mb-0";
+    }
+    try {
+      const r = await api.checkDesktopAppUpdates();
+      if (r && r.ok === false && (r.reason === "development" || r.reason === "no_updater") && statusEl) {
+        statusEl.textContent =
+          r.reason === "no_updater" ? t("settings.updateStatusError") : t("settings.updateStatusDev");
         statusEl.className = "small text-muted mb-0";
       }
-      try {
-        const r = await ipcRenderer.invoke("check-desktop-app-updates");
-        if (r && r.ok === false && (r.reason === "development" || r.reason === "no_updater") && statusEl) {
-          statusEl.textContent =
-            r.reason === "no_updater" ? t("settings.updateStatusError") : t("settings.updateStatusDev");
-          statusEl.className = "small text-muted mb-0";
-        }
-      } catch (e) {
-        if (statusEl) {
-          statusEl.textContent = `${t("settings.updateStatusError")} ${String(e?.message || e)}`;
-          statusEl.className = "small text-danger mb-0";
-        }
+    } catch (e) {
+      if (statusEl) {
+        statusEl.textContent = `${t("settings.updateStatusError")} ${String(e?.message || e)}`;
+        statusEl.className = "small text-danger mb-0";
       }
-    });
-  } catch (_) {
-    /* browser / no electron */
-  }
+    }
+  });
 }
 
 function wireAppSettingsServerControlsOnce(dashboard) {
@@ -287,12 +301,19 @@ function wireAppSettingsServerControlsOnce(dashboard) {
     const prev = btn?.textContent;
     if (btn) btn.textContent = "…";
     try {
-      const { ipcRenderer } = require("electron");
-      ipcRenderer
-        .invoke("scan-local-saves")
-        .then((found) => {
+      const api = getFarmDashApi();
+      if (!api) {
+        if (btn && prev) btn.textContent = prev;
+        return;
+      }
+      api
+        .scanLocalSaves()
+        .then((res) => {
+          const found = res && res.saves ? res.saves : Array.isArray(res) ? res : [];
           if (!found || found.length === 0) {
-            dashboard.showAlert?.("No saves found. Run the mod at least once.", "info");
+            const searched = res && res.searchedRoots ? res.searchedRoots : [];
+            const hint = searched.length ? ` Checked: ${searched.slice(0, 2).join(" · ")}` : "";
+            dashboard.showAlert?.("No saves found. Run the mod at least once." + hint, "info");
             return;
           }
           if (!_appSettingsServersDraft) _appSettingsServersDraft = [];
@@ -322,12 +343,16 @@ function wireAppSettingsServerControlsOnce(dashboard) {
     if (btn) btn.textContent = "…";
     let cleanup = null;
     try {
-      const { ipcRenderer } = require("electron");
-      if (typeof window.attachModExportProgress === "function") {
-        cleanup = window.attachModExportProgress(ipcRenderer);
+      const api = getFarmDashApi();
+      if (!api) {
+        if (btn && prev) btn.textContent = prev;
+        return;
       }
-      ipcRenderer
-        .invoke("export-mod-store-images")
+      if (typeof window.attachModExportProgress === "function") {
+        cleanup = window.attachModExportProgress(api);
+      }
+      api
+        .exportModStoreImages()
         .catch((e) => dashboard.showAlert?.(String(e.message || e), "error"))
         .finally(() => {
           if (typeof cleanup === "function") cleanup();
@@ -385,16 +410,64 @@ function escHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
+async function refreshSettingsDashboardAiConnectionLine() {
+  const el = document.getElementById("settings-ai-connection-status");
+  if (!el) return;
+  const api = getFarmDashApi();
+  if (!api) {
+    el.textContent = "—";
+    return;
+  }
+  const conn = await api.getAiManagerConnection().catch(() => ({}));
+  const meta = await api.getConsultantByokMeta().catch(() => ({}));
+  const base = conn?.baseUrl && String(conn.baseUrl).trim();
+  const ikey = conn?.integrationKey && String(conn.integrationKey).trim();
+  const hasHosted = !!(base && ikey);
+  const hasByok = !!meta?.hasKey;
+  const chatNote =
+    '<span class="d-block small text-muted mt-2">In-game <strong>!hank</strong> chat is separate (hosted bot profiles only) — see <strong>In-game chat</strong> in that tab; BYOK does not enable chat.</span>';
+  let html = "";
+  if (hasByok && hasHosted) {
+    html =
+      '<span class="badge bg-info text-dark me-1">BYOK</span> and <span class="badge text-bg-warning text-dark me-1">Hosted</span> saved. On <strong>this PC</strong>, <strong>BYOK</strong> is used first for Smart suggestions; hosted supports sync and other devices.';
+  } else if (hasByok) {
+    html =
+      '<span class="badge bg-info text-dark me-1">BYOK</span> — mid tier (on-device Smart suggestions). Add hosted URL + link key for premium tier; <strong>chat bot</strong> needs hosted, not BYOK alone.';
+  } else if (hasHosted) {
+    html =
+      '<span class="badge text-bg-warning text-dark me-1">Hosted AI</span> — premium Smart suggestions when the server returns LLM output. Optional: add BYOK for on-device tips.';
+  } else {
+    html =
+      'Open <strong>AI Farm Manager</strong> (sidebar tab): <strong>Smart suggestions</strong> — <strong>Hosted</strong> (premium) or <strong>BYOK</strong> (mid). Without either, <span class="badge bg-secondary">Rules</span> may still show on Fields (basic tier).';
+  }
+  el.className = "alert alert-secondary small py-2 mb-0";
+  el.innerHTML = html + chatNote;
+}
+
 export async function populateDashboardSettingsForm() {
-  const { ipcRenderer } = require("electron");
+  const api = getFarmDashApi();
 
   await this.loadDashboardUiPreferences();
 
   const dashPane = document.getElementById("app-settings-pane-dashboard");
   if (dashPane) applyDom(dashPane);
 
+  SECTION_KEYS.forEach((key) => {
+    const el = document.getElementById(`settings-section-${key}`);
+    if (el) el.checked = this.sectionVisibility?.[key] !== false;
+  });
+
+  if (!api) {
+    try {
+      await refreshSettingsDashboardAiConnectionLine();
+    } catch (e) {
+      console.warn("[dashboard-settings] AI connection status line", e);
+    }
+    return;
+  }
+
   try {
-    const ver = await ipcRenderer.invoke("get-desktop-app-version");
+    const ver = await api.getDesktopAppVersion();
     const vEl = document.getElementById("settings-desktop-app-version");
     if (vEl) vEl.textContent = ver && String(ver).trim() ? String(ver) : "—";
   } catch (_) {
@@ -407,16 +480,11 @@ export async function populateDashboardSettingsForm() {
     statusEl.className = "small text-muted mb-0";
   }
 
-  SECTION_KEYS.forEach((key) => {
-    const el = document.getElementById(`settings-section-${key}`);
-    if (el) el.checked = this.sectionVisibility?.[key] !== false;
-  });
-
   const exContainer = document.getElementById("settings-field-exclusions");
   if (exContainer) {
     try {
       const farmId = Number(this.activeFarmId ?? 1);
-      const opt = await ipcRenderer.invoke("get-field-exclusion-options", {
+      const opt = await api.getFieldExclusionOptions({
         activeFarmId: farmId,
       });
       const rows = opt?.rows || [];
@@ -454,7 +522,7 @@ export async function populateDashboardSettingsForm() {
   }
 
   try {
-    const mod = await ipcRenderer.invoke("get-mod-config");
+    const mod = await api.getModConfig();
     const pathEl = document.getElementById("settings-mod-config-path");
     if (pathEl) pathEl.textContent = mod.path || "—";
 
@@ -488,7 +556,7 @@ export async function populateDashboardSettingsForm() {
     if (byokClear) byokClear.checked = false;
     if (byokKey) byokKey.value = "";
     try {
-      const meta = await ipcRenderer.invoke("get-consultant-byok-meta");
+      const meta = await api.getConsultantByokMeta();
       if (byokProv) {
         byokProv.value = meta?.provider === "gemini" ? "gemini" : "openai";
       }
@@ -505,7 +573,7 @@ export async function populateDashboardSettingsForm() {
   await loadAppSettingsServerDraft();
 
   try {
-    const lan = await ipcRenderer.invoke("get-lan-access-settings");
+    const lan = await api.getLanAccessSettings();
     const lanEn = document.getElementById("settings-lan-enabled");
     if (lanEn) lanEn.checked = !!lan.lanAccessEnabled;
     const lanU = document.getElementById("settings-lan-username");
@@ -520,10 +588,20 @@ export async function populateDashboardSettingsForm() {
   } catch (e) {
     console.warn("[dashboard-settings] LAN access", e);
   }
+
+  try {
+    await refreshSettingsDashboardAiConnectionLine();
+  } catch (e) {
+    console.warn("[dashboard-settings] AI connection status line", e);
+  }
 }
 
 export async function saveDashboardSettingsFromModal() {
-  const { ipcRenderer } = require("electron");
+  const api = getFarmDashApi();
+  if (!api) {
+    this.showAlert?.(t("settings.saveFailed"), "error");
+    return;
+  }
 
   const sections = {};
   SECTION_KEYS.forEach((key) => {
@@ -534,7 +612,7 @@ export async function saveDashboardSettingsFromModal() {
   const excludedFarmlandIdsByServer = collectFieldExclusionsFromForm();
 
   try {
-    await ipcRenderer.invoke("save-ui-preferences", { sections, excludedFarmlandIdsByServer });
+    await api.saveUiPreferences({ sections, excludedFarmlandIdsByServer });
     this.sectionVisibility = { ...DEFAULT_SECTION_VISIBILITY, ...sections };
     this.applyDashboardSectionVisibility();
   } catch (e) {
@@ -543,8 +621,8 @@ export async function saveDashboardSettingsFromModal() {
   }
 
   try {
-    const cfg = await ipcRenderer.invoke("get-current-config");
-    ipcRenderer.send("save-settings", {
+    const cfg = await api.getCurrentConfig();
+    api.saveSettings({
       ...cfg,
       isConfigured: true,
       servers: _appSettingsServersDraft !== null ? _appSettingsServersDraft : cfg?.servers || [],
@@ -564,11 +642,11 @@ export async function saveDashboardSettingsFromModal() {
         : "openai";
     try {
       if (byokClear) {
-        await ipcRenderer.invoke("save-consultant-byok-credentials", { clear: true });
+        await api.saveConsultantByokCredentials({ clear: true });
       } else {
-        const meta = await ipcRenderer.invoke("get-consultant-byok-meta");
+        const meta = await api.getConsultantByokMeta();
         if (byokKey || meta?.hasKey) {
-          await ipcRenderer.invoke("save-consultant-byok-credentials", {
+          await api.saveConsultantByokCredentials({
             apiKey: byokKey,
             provider: byokProv,
           });
@@ -599,7 +677,7 @@ export async function saveDashboardSettingsFromModal() {
 
   let modSaveOk = false;
   try {
-    const res = await ipcRenderer.invoke("save-mod-config", {
+    const res = await api.saveModConfig({
       updateInterval: Number.isFinite(ui) ? ui : 10000,
       collectionCycleMs: Number.isFinite(cc) ? cc : 60000,
       modules,
@@ -617,9 +695,9 @@ export async function saveDashboardSettingsFromModal() {
 
   if (document.getElementById("settings-lan-enabled")) {
     try {
-      const prevLan = await ipcRenderer.invoke("get-lan-access-settings");
+      const prevLan = await api.getLanAccessSettings();
       const pwRaw = document.getElementById("settings-lan-password")?.value ?? "";
-      const lanRes = await ipcRenderer.invoke("save-lan-access-settings", {
+      const lanRes = await api.saveLanAccessSettings({
         lanAccessEnabled: !!document.getElementById("settings-lan-enabled")?.checked,
         lanUsername:
           document.getElementById("settings-lan-username")?.value?.trim() || "admin",

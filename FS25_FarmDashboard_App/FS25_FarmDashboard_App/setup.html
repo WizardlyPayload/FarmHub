@@ -414,8 +414,8 @@ Use Auto-Detect or add one manually →</div>
     </div>
 
     <div class="radio-group">
-      <label><input type="radio" name="mode" value="local" checked onchange="toggleMode()"> <span data-setup-i18n="setup.modeLocal">Local PC</span></label>
-      <label><input type="radio" name="mode" value="ftp"   onchange="toggleMode()"> <span data-setup-i18n="setup.modeFtp">Dedicated Server (FTP)</span></label>
+      <label><input type="radio" name="mode" value="local" checked> <span data-setup-i18n="setup.modeLocal">Local PC</span></label>
+      <label><input type="radio" name="mode" value="ftp"> <span data-setup-i18n="setup.modeFtp">Dedicated Server (FTP)</span></label>
     </div>
 
     <!-- LOCAL -->
@@ -508,20 +508,19 @@ Use Auto-Detect or add one manually →</div>
 <script src="web/assests/js/setup-i18n.js"></script>
 <script src="web/assests/js/modExportProgress.js"></script>
 <script>
-// nodeIntegration is true so require('electron') works here.
+(function () {
+  'use strict';
+// Context isolation: IPC via preload only (window.farmDashAPI). No require('electron') in the page.
 // We only removed alert() — that was the sole cause of the input-lock bug.
 // alert() in Electron opens a native OS dialog which permanently loses
 // renderer focus. Replaced with an in-page toast that never steals focus.
+//
+// IIFE: do not use top-level `const farmDashAPI` — that name can collide with
+// window.farmDashAPI / other scripts in the shared global lexical scope and
+// abort parsing (then onclick handlers are undefined).
 
-// Electron desktop: ipcRenderer. Tablet/browser on LAN: null (use HTTP API instead).
-let ipcRenderer = null;
-try {
-  if (typeof require !== 'undefined') {
-    ipcRenderer = require('electron').ipcRenderer;
-  }
-} catch (e) {
-  ipcRenderer = null;
-}
+// Desktop: preload bridge on window.farmDashAPI. Tablet/browser on LAN: null.
+const fdApi = (typeof window !== 'undefined' && window.farmDashAPI) ? window.farmDashAPI : null;
 let servers = [];
 
 // ── toast (never steals focus unlike alert) ──────────────────────────────
@@ -559,6 +558,22 @@ function toggleMode() {
   document.getElementById('ftp-fields').style.display   = mode === 'ftp'   ? 'block' : 'none';
 }
 window.toggleMode = toggleMode;
+
+/**
+ * Electron uses contextIsolation — inline onchange="toggleMode()" does not reliably run.
+ * Match dashboard-settings.js: wire change listeners + sync panels on load.
+ */
+function wireSetupServerModeRadios() {
+  document.querySelectorAll('input[name="mode"]').forEach(function (r) {
+    r.addEventListener('change', toggleMode);
+  });
+  toggleMode();
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', wireSetupServerModeRadios);
+} else {
+  wireSetupServerModeRadios();
+}
 
 // ── render server list ───────────────────────────────────────────────────
 function escHtml(s) {
@@ -600,7 +615,7 @@ function renderServers() {
 
 // ── auto-detect ──────────────────────────────────────────────────────────
 function autoDetectSaves() {
-  if (!ipcRenderer) {
+  if (!fdApi || typeof fdApi.scanLocalSaves !== 'function') {
     toast('Auto-detect only runs on the PC with Farming Simulator saves. Use the Farm Dashboard app on that computer, or add a server manually below.', 'info');
     return;
   }
@@ -608,9 +623,16 @@ function autoDetectSaves() {
   btn.textContent = '🔍 Scanning...';
   // no btn.disabled — can cause focus loss in Electron
 
-  ipcRenderer.invoke('scan-local-saves').then(function(found) {
+  fdApi.scanLocalSaves().then(function(res) {
+    var found = (res && res.saves) ? res.saves : (Array.isArray(res) ? res : []);
+    var searched = (res && res.searchedRoots) ? res.searchedRoots : [];
     if (!found || found.length === 0) {
-      toast('No saves found. Make sure the mod has run at least once.', 'info');
+      var extra = '';
+      if (searched.length) {
+        extra = ' Paths checked: ' + searched.slice(0, 3).join(' · ');
+        if (searched.length > 3) extra += ' …';
+      }
+      toast('No data.json under FS25_FarmDashboard. Load a save in-game with this mod enabled.' + extra, 'info');
     } else {
       var fresh = found.filter(function(f) {
         return !servers.some(function(s) { return s.localSubFolder === f.localSubFolder; });
@@ -633,7 +655,7 @@ window.autoDetectSaves = autoDetectSaves;
 
 // ── mod shop images (PowerShell export; progress modal + native summary dialog) ─────
 function scanModImagesForDashboard() {
-  if (!ipcRenderer) {
+  if (!fdApi || typeof fdApi.exportModStoreImages !== 'function') {
     toast('Mod image scan runs on the Windows PC with the game installed (desktop app only).', 'info');
     return;
   }
@@ -642,9 +664,9 @@ function scanModImagesForDashboard() {
   if (btn) btn.textContent = '⏳ Scanning mods...';
   var cleanupProgress = null;
   if (typeof window.attachModExportProgress === 'function') {
-    cleanupProgress = window.attachModExportProgress(ipcRenderer);
+    cleanupProgress = window.attachModExportProgress(fdApi);
   }
-  ipcRenderer.invoke('export-mod-store-images').then(function() {
+  fdApi.exportModStoreImages().then(function() {
     /* success: native dialog already shown in main process */
   }).catch(function(e) {
     toast('Mod images: ' + (e.message || e), 'error');
@@ -721,8 +743,8 @@ function saveAndLaunch() {
     scheduleMode: scheduleEl && scheduleEl.value === 'staggered' ? 'staggered' : 'sync'
   };
   var payload = { isConfigured: true, servers: servers, ftpPolling: ftpPolling };
-  if (ipcRenderer) {
-    ipcRenderer.send('save-settings', payload);
+  if (fdApi && typeof fdApi.saveSettings === 'function') {
+    fdApi.saveSettings(payload);
     return;
   }
   var api = (window.location && window.location.origin ? window.location.origin : '') + '/api/setup-config';
@@ -771,14 +793,15 @@ function applyLoadedSetupConfig(cfg) {
   loadFtpPollingFromConfig(cfg || {});
 }
 
-if (ipcRenderer) {
-  ipcRenderer.invoke('get-current-config').then(applyLoadedSetupConfig);
+if (fdApi && typeof fdApi.getCurrentConfig === 'function') {
+  fdApi.getCurrentConfig().then(applyLoadedSetupConfig);
 } else {
   fetch((window.location && window.location.origin ? window.location.origin : '') + '/api/setup-config')
     .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('Config load failed')); })
     .then(applyLoadedSetupConfig)
     .catch(function () { /* first visit or empty */ });
 }
+})();
 </script>
 </body>
 </html>

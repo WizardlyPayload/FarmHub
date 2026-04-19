@@ -1,13 +1,8 @@
 // FS25 FarmDashboard | setup.html i18n (first-run wizard).
-// Desktop: translations via ipcRenderer. Tablet/browser on LAN: fetch /locales/translations.json
+// Desktop: translations via preload (farmDashAPI). Tablet/browser on LAN: fetch /locales/translations.json
 (function () {
-  let ipcRenderer = null;
-  try {
-    if (typeof require !== 'undefined') {
-      ipcRenderer = require('electron').ipcRenderer;
-    }
-  } catch (e) {
-    ipcRenderer = null;
+  function farmApi() {
+    return typeof window !== 'undefined' && window.farmDashAPI ? window.farmDashAPI : null;
   }
 
   const LOCALE_NAMES = {
@@ -73,8 +68,9 @@
   }
 
   async function loadCatalog() {
-    if (ipcRenderer) {
-      catalog = await ipcRenderer.invoke('get-translations-json');
+    const api = farmApi();
+    if (api && typeof api.getTranslationsJson === 'function') {
+      catalog = await api.getTranslationsJson();
       return;
     }
     const res = await fetch('/locales/translations.json', { cache: 'no-store' });
@@ -92,8 +88,9 @@
     const q = new URLSearchParams(window.location.search).get('lang');
     let stored = 'en';
     try {
-      if (ipcRenderer) {
-        stored = (await ipcRenderer.invoke('get-stored-locale')) || 'en';
+      const api = farmApi();
+      if (api && typeof api.getStoredLocale === 'function') {
+        stored = (await api.getStoredLocale()) || 'en';
       } else {
         try {
           stored = localStorage.getItem('farmdash_locale') || 'en';
@@ -118,8 +115,12 @@
       sel.addEventListener('change', () => {
         const next = sel.value;
         try {
-          if (ipcRenderer) ipcRenderer.send('set-stored-locale', next);
-          else localStorage.setItem('farmdash_locale', next);
+          const api = farmApi();
+          if (api && typeof api.setStoredLocale === 'function') {
+            api.setStoredLocale(next);
+          } else {
+            localStorage.setItem('farmdash_locale', next);
+          }
         } catch (_) {}
         try {
           const url = new URL(window.location.href);

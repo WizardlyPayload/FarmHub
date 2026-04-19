@@ -1,6 +1,6 @@
 // FS25 FarmDashboard | main.js | v2.0.0
 // Authors: JoshWalki, WizardlyPayload
-// Electron main: Express + WS on 8766, chokidar/FTP → mergeData → renderer.
+// Electron main: Express + WS on 8766, local fs.watch + FTP → mergeData → renderer.
 
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
@@ -14,7 +14,6 @@ const express   = require('express');
 const http      = require('http');
 const WebSocket = require('ws');
 const cors      = require('cors');
-const chokidar  = require('chokidar');
 const ftp       = require('basic-ftp');
 const Store     = require('electron-store');
 
@@ -33,8 +32,47 @@ const {
 const { mergeData, buildFieldLiveFingerprints } = require('./dataMerger');
 const { loadServerCache, saveServerCache, appendFieldHistory } = require('./serverDataCache');
 const { initAppUpdater, checkForUpdatesNow } = require('./app-updater');
+const { runByokConsultantLlm } = require('./localConsultantLlm');
+const { pruneMergedDataForView, hashPrunedSnapshot } = require('./consultantSnapshotPrune');
 
 const store = new Store({ defaults: { ...LAN_ACCESS_DEFAULTS } });
+
+/** .../Documents/My Games/FarmingSimulator2025 — Electron's documents path matches the game (incl. OneDrive redirects). */
+function getFs25DocumentsRoot() {
+    let docs;
+    try {
+        docs = app.getPath('documents');
+    } catch {
+        docs = path.join(os.homedir(), 'Documents');
+    }
+    return path.join(docs, 'My Games', 'FarmingSimulator2025');
+}
+
+/**
+ * All plausible modSettings/FS25_FarmDashboard bases on Windows (game uses getUserProfileAppPath() —
+ * often matches Explorer “Documents”, but OneDrive / USERPROFILE vs os.homedir() can diverge).
+ */
+function collectFarmDashboardModSettingsRoots() {
+    const roots = new Set();
+    const add = (p) => {
+        if (!p || typeof p !== 'string') return;
+        try {
+            roots.add(path.normalize(p));
+        } catch (_) { /* ignore */ }
+    };
+    try {
+        add(path.join(getFs25DocumentsRoot(), 'modSettings', 'FS25_FarmDashboard'));
+    } catch (e) {
+        console.warn('[paths] getFs25DocumentsRoot:', e.message);
+    }
+    add(path.join(os.homedir(), 'Documents', 'My Games', 'FarmingSimulator2025', 'modSettings', 'FS25_FarmDashboard'));
+    const up = process.env.USERPROFILE;
+    if (up) {
+        add(path.join(up, 'Documents', 'My Games', 'FarmingSimulator2025', 'modSettings', 'FS25_FarmDashboard'));
+        add(path.join(up, 'OneDrive', 'Documents', 'My Games', 'FarmingSimulator2025', 'modSettings', 'FS25_FarmDashboard'));
+    }
+    return [...roots];
+}
 
 /** Random secret for POST /api/setup-config (browser cannot save config without this header). */
 /** Opaque token for WebSocket `?t=` — browsers cannot send Basic auth on WS handshakes. */
@@ -253,7 +291,7 @@ async function runExportModStoreImages(progressSender) {
         return { ok: false, error: err };
     }
 
-    const modsRoot = path.join(os.homedir(), 'Documents', 'My Games', 'FarmingSimulator2025', 'mods');
+    const modsRoot = path.join(getFs25DocumentsRoot(), 'mods');
     const outputDir = path.join(__dirname, 'web', 'assests', 'img', 'items_mod_extract');
     const summaryJson = path.join(app.getPath('temp'), 'farmdash-mod-export-summary.json');
     try {
@@ -444,6 +482,7 @@ ipcMain.handle('export-mod-store-images', (event) => runExportModStoreImages(eve
 
 // ── Express / WebSocket ───────────────────────────────────────────────────────
 const expressApp = express();
+expressApp.set('trust proxy', false);
 const PORT       = 8766;
 const clients    = new Set();
 /** @type {import('http').Server | null} */
@@ -475,6 +514,46 @@ function isLoopbackIp(ip) {
     if (s === '127.0.0.1' || s === '::1') return true;
     if (s === '::ffff:127.0.0.1') return true;
     return false;
+}
+
+let _localIfaceIpCache = null;
+let _localIfaceIpCacheAt = 0;
+
+/** Normalize IPv4-mapped IPv6 to dotted quad for comparison. */
+function normalizeSocketIp(ip) {
+    let s = String(ip || '').trim();
+    if (s.startsWith('::ffff:')) s = s.slice(7);
+    return s;
+}
+
+/** True if the HTTP client address is this machine (loopback or one of our NIC IPs). Fixes opening http://192.168.x.x:8766 on the same PC. */
+function getCachedLocalInterfaceIps() {
+    const now = Date.now();
+    if (_localIfaceIpCache && now - _localIfaceIpCacheAt < 60000) return _localIfaceIpCache;
+    const set = new Set();
+    try {
+        const ifs = os.networkInterfaces();
+        for (const name of Object.keys(ifs)) {
+            for (const a of ifs[name] || []) {
+                if (a.internal) continue;
+                if (a.family === 'IPv4' || a.family === 4) set.add(a.address);
+                if (a.family === 'IPv6' || a.family === 6) set.add(a.address);
+            }
+        }
+    } catch (_) {
+        /* ignore */
+    }
+    _localIfaceIpCache = set;
+    _localIfaceIpCacheAt = now;
+    return set;
+}
+
+function isRequestFromThisMachine(req) {
+    const raw = requestRemoteAddress(req);
+    if (isLoopbackIp(raw)) return true;
+    const nip = normalizeSocketIp(raw);
+    if (!nip) return false;
+    return getCachedLocalInterfaceIps().has(nip);
 }
 
 function normalizeIpForAllowlist(ip) {
@@ -539,6 +618,11 @@ function isLocalhostSocket(req) {
     return isLoopbackIp(requestRemoteAddress(req));
 }
 
+/** Local dashboard UI (this PC): loopback or same host opened via LAN IP. */
+function isLocalDashboardClient(req) {
+    return isRequestFromThisMachine(req);
+}
+
 /** Allow POST /api/export-mod-store-images from LAN (default: localhost only). Power users: set env FARMDASH_ALLOW_LAN_EXPORT=1 */
 function allowLanModExportHttp() {
     return process.env.FARMDASH_ALLOW_LAN_EXPORT === '1';
@@ -599,7 +683,7 @@ expressApp.get('/api/setup-config', (req, res) => {
  * Save first-run / Server Manager config from a browser (same effect as ipcRenderer `save-settings`).
  * Requires ``X-Setup-Token`` (see ``ensureSetupWriteToken`` / setup page injection).
  */
-expressApp.post('/api/setup-config', (req, res) => {
+expressApp.post('/api/setup-config', async (req, res) => {
     try {
         ensureSetupWriteToken();
         const expected = String(store.get('farmdashSetupWriteToken') || '');
@@ -614,7 +698,7 @@ expressApp.post('/api/setup-config', (req, res) => {
         if (!Array.isArray(body.servers)) {
             return res.status(400).json({ ok: false, error: 'servers array required' });
         }
-        applyFarmdashSetupConfig(body);
+        await applyFarmdashSetupConfig(body);
         res.json({ ok: true });
     } catch (e) {
         console.error('[api/setup-config POST]', e);
@@ -727,17 +811,106 @@ function getAiManagerConnectionForProxy() {
 }
 
 function getConsultantByokHeadersForProxy() {
-    const raw = store.get('consultantByok');
-    const r = raw && typeof raw === 'object' ? raw : {};
-    const apiKey = r.apiKey && String(r.apiKey).trim() ? String(r.apiKey).trim() : '';
-    if (!apiKey) return {};
-    let provider = r.provider === 'gemini' ? 'gemini' : 'openai';
-    if (apiKey.startsWith('AIza')) provider = 'gemini';
-    else if (apiKey.startsWith('sk-')) provider = 'openai';
-    return {
-        'X-AI-API-Key': apiKey,
-        'X-AI-Provider': provider,
+    const pairs = getConsultantByokCredentialPairs();
+    const first = pairs[0];
+    if (!first || !first.apiKey) return {};
+    const h = {
+        'X-AI-API-Key': first.apiKey,
+        'X-AI-Provider': first.provider === 'gemini' ? 'gemini' : 'openai',
     };
+    const b = first.openaiBaseUrl && String(first.openaiBaseUrl).trim();
+    if (b) {
+        h['X-AI-OpenAI-Base-URL'] = b;
+    }
+    return h;
+}
+
+/** Round-robin index for (key × model) pairs — spreads load across free-tier keys/models. */
+let byokCredentialRoundRobin = 0;
+
+/**
+ * Build all (apiKey, provider, modelId) pairs: primary + additional keys × selected models (CSV).
+ */
+function getConsultantByokCredentialPairs() {
+    const raw = store.get('consultantByok');
+    if (!raw || typeof raw !== 'object') return [];
+    const modelSlots = [];
+    if (raw.modelId && String(raw.modelId).trim()) modelSlots.push(String(raw.modelId).trim());
+    if (raw.modelIdsCsv && String(raw.modelIdsCsv).trim()) {
+        String(raw.modelIdsCsv)
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .forEach((m) => {
+                if (!modelSlots.includes(m)) modelSlots.push(m);
+            });
+    }
+    if (modelSlots.length === 0) modelSlots.push(null);
+
+    const keys = [];
+    const pk = raw.apiKey && String(raw.apiKey).trim() ? String(raw.apiKey).trim() : '';
+    if (pk) keys.push(pk);
+    String(raw.additionalKeys || '')
+        .split(/[\r\n]+/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .forEach((k) => keys.push(k));
+
+    const rawOb =
+        raw.openaiBaseUrl && String(raw.openaiBaseUrl).trim() ? String(raw.openaiBaseUrl).trim() : '';
+    if (keys.length === 0 && rawOb) {
+        keys.push('ollama');
+    }
+
+    const pairs = [];
+    for (const apiKey of keys) {
+        let provider = raw.provider === 'gemini' ? 'gemini' : 'openai';
+        if (apiKey.startsWith('AIza')) provider = 'gemini';
+        else if (apiKey.startsWith('sk-')) provider = 'openai';
+        if (rawOb && provider !== 'gemini') provider = 'openai';
+        for (const mid of modelSlots) {
+            pairs.push({
+                apiKey,
+                provider,
+                modelId: mid || undefined,
+                openaiBaseUrl: rawOb || undefined,
+            });
+        }
+    }
+    return pairs;
+}
+
+function pickNextConsultantByokCredentialPair() {
+    const pairs = getConsultantByokCredentialPairs();
+    if (!pairs.length) return null;
+    const i = byokCredentialRoundRobin % pairs.length;
+    byokCredentialRoundRobin += 1;
+    return pairs[i];
+}
+
+/** In-memory: last LLM JSON per view lane; skip provider call if pruned snapshot hash unchanged. */
+const byokInsightHashCache = new Map();
+const BYOK_HASH_CACHE_MAX = 96;
+
+function buildConsultantSnapshotForInsightsRequest(req) {
+    const sid = resolveServerIdForRequest(req);
+    const state = serverStates[sid];
+    const d = state?.mergedData;
+    if (!d) return null;
+    const farmRaw = req.query?.farmId ?? req.query?.farm_id ?? '1';
+    let farmId = parseInt(String(farmRaw), 10);
+    if (!Number.isFinite(farmId) || farmId < 1) farmId = 1;
+    let payload = cloneMergedDataWithFieldExclusions(d, sid);
+    payload = JSON.parse(JSON.stringify(payload));
+    payload.activeFarmId = farmId;
+    payload._consultant_farm_scope = farmId;
+    if (Array.isArray(payload.vehicles)) {
+        payload.vehicles = payload.vehicles.filter((v) => {
+            const o = v.ownerFarmId != null ? v.ownerFarmId : v.farmId;
+            return o == null || Number(o) === farmId;
+        });
+    }
+    return payload;
 }
 
 /** Only the Farm Dashboard on this PC (localhost) may forward to the AI backend — LAN/tablet reads this cache only. */
@@ -760,19 +933,125 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
     try {
         const conn = getAiManagerConnectionForProxy();
         const cacheKey = consultantInsightsCacheKey(req.query || {});
-        const fromLocalhost = isLocalhostSocket(req);
+        const fromLocalDashboard = isLocalDashboardClient(req);
+        const byokPairs = getConsultantByokCredentialPairs();
+
+        /**
+         * BYOK: generate Smart suggestions on this PC via OpenAI/Gemini only — do not call a hosted AI server.
+         * Pruned per-view snapshots + content-hash cache avoid redundant LLM calls; credentials round-robin.
+         */
+        if (byokPairs.length > 0 && fromLocalDashboard) {
+            const snap = buildConsultantSnapshotForInsightsRequest(req);
+            if (!snap) {
+                return res.status(503).json({
+                    detail:
+                        'No farm snapshot yet. Start FS25 with the mod connected, or wait until the dashboard loads save data — then try Smart suggestions again.',
+                    insights: [],
+                    llm_used: false,
+                    farmdash_ai_error: 'no_snapshot',
+                });
+            }
+            const view = String((req.query && req.query.view) || 'home');
+            const context = String((req.query && req.query.context) || '');
+            const sid = resolveServerIdForRequest(req);
+            const farmId = Number(snap.activeFarmId) || 1;
+            const pruned = pruneMergedDataForView(snap, view, context, farmId);
+            const contentHash = hashPrunedSnapshot(pruned);
+            const laneKey = `${sid}|${farmId}|${view}|${context}`;
+            const prevLane = byokInsightHashCache.get(laneKey);
+            if (prevLane && prevLane.hash === contentHash) {
+                consultantInsightsProxyCache.set(cacheKey, {
+                    status: 200,
+                    text: prevLane.jsonText,
+                    contentType: 'application/json',
+                    ts: Date.now(),
+                });
+                res.status(200);
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('X-FarmDash-Byok-Snapshot-Cache', 'hash-hit');
+                return res.send(prevLane.jsonText);
+            }
+
+            const cred = pickNextConsultantByokCredentialPair();
+            if (!cred) {
+                return res.status(503).json({
+                    detail: 'No BYOK credentials configured.',
+                    insights: [],
+                    llm_used: false,
+                    farmdash_ai_error: 'not_configured',
+                });
+            }
+            try {
+                const out = await runByokConsultantLlm({
+                    snapshot: pruned,
+                    view,
+                    context,
+                    provider: cred.provider,
+                    apiKey: cred.apiKey,
+                    modelId: cred.modelId || undefined,
+                    openaiBaseUrl: cred.openaiBaseUrl || undefined,
+                });
+                const bodyObj = {
+                    insights: out.insights || [],
+                    llm_used: true,
+                    farmdash_byok_local: true,
+                    suggestion_tier: 'byok',
+                };
+                const text = JSON.stringify(bodyObj);
+                if (byokInsightHashCache.size >= BYOK_HASH_CACHE_MAX) {
+                    const firstK = byokInsightHashCache.keys().next().value;
+                    byokInsightHashCache.delete(firstK);
+                }
+                byokInsightHashCache.set(laneKey, { hash: contentHash, jsonText: text });
+                consultantInsightsProxyCache.set(cacheKey, {
+                    status: 200,
+                    text,
+                    contentType: 'application/json',
+                    ts: Date.now(),
+                });
+                res.status(200);
+                res.setHeader('Content-Type', 'application/json');
+                res.setHeader('X-FarmDash-Byok-Snapshot-Cache', 'miss');
+                return res.send(text);
+            } catch (e) {
+                console.warn('[consultant BYOK local]', e && e.message ? e.message : e);
+                return res.status(503).json({
+                    detail: String(e && e.message ? e.message : e),
+                    insights: [],
+                    llm_used: false,
+                    farmdash_ai_error: 'byok_llm_failed',
+                });
+            }
+        }
+
+        if (byokPairs.length > 0 && !fromLocalDashboard) {
+            const ent = consultantInsightsProxyCache.get(cacheKey);
+            if (ent && Date.now() - ent.ts < CONSULTANT_PROXY_CACHE_TTL_MS) {
+                res.status(ent.status);
+                if (ent.contentType) res.setHeader('Content-Type', ent.contentType);
+                else res.type('application/json');
+                return res.send(ent.text);
+            }
+            return res.status(503).json({
+                detail:
+                    'Smart suggestions (your API key) are generated on the PC running Farm Dashboard. Open the app there on localhost first so it can cache results — LAN viewers reuse that cache.',
+                insights: [],
+                llm_used: false,
+                farmdash_ai_error: 'lan_cache_miss',
+                cache_miss: true,
+            });
+        }
 
         if (!conn.baseUrl || !conn.integrationKey) {
             return res.status(503).json({
-                detail:
-                    'AI Farm Manager is not configured on this PC. On this machine: open Farm Dashboard → robot (AI Farm Manager) or Settings → AI Farm Manager → set server URL and link key → Save.',
+                detail: '',
                 insights: [],
                 llm_used: false,
                 farmdash_ai_error: 'not_configured',
             });
         }
 
-        if (!fromLocalhost) {
+        if (!fromLocalDashboard) {
             const ent = consultantInsightsProxyCache.get(cacheKey);
             if (ent && Date.now() - ent.ts < CONSULTANT_PROXY_CACHE_TTL_MS) {
                 res.status(ent.status);
@@ -804,8 +1083,21 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
             ...getConsultantByokHeadersForProxy(),
         };
         const fr = await fetch(target.toString(), { method: 'GET', headers: hdrs, cache: 'no-store' });
-        const text = await fr.text();
+        let text = await fr.text();
         const ct = fr.headers.get('content-type') || 'application/json';
+        if (fr.ok && /json/i.test(ct) && text.length > 0 && text.length < 6 * 1024 * 1024) {
+            try {
+                const o = JSON.parse(text);
+                if (o && typeof o === 'object' && !o.farmdash_byok_local) {
+                    if (o.suggestion_tier == null || o.suggestion_tier === '') {
+                        o.suggestion_tier = o.llm_used ? 'hosted' : 'rules';
+                    }
+                    text = JSON.stringify(o);
+                }
+            } catch (_) {
+                /* pass through raw body */
+            }
+        }
         consultantInsightsProxyCache.set(cacheKey, {
             status: fr.status,
             text,
@@ -900,44 +1192,88 @@ function attachWebSocketServer(httpSrv) {
     });
 }
 
+/** Serializes bind so concurrent ``bootServer`` / ``restartHttpServer`` cannot orphan a listener (EADDRINUSE). */
+let httpListenChain = Promise.resolve();
+
 /**
  * Starts HTTP + WebSocket on ``bindHost`` (``127.0.0.1`` or ``0.0.0.0``).
- * Call after ``closeHttpServer`` when rebinding (e.g. LAN toggle).
+ * Always closes any existing ``server`` before creating a new one.
  */
 function listenFarmdashHttp(bindHost, onListening) {
-    clients.clear();
-    server = http.createServer(expressApp);
-    attachWebSocketServer(server);
-    server.listen(PORT, bindHost, () => {
-        console.log(`[HTTP/WS] listening on http://${bindHost === '0.0.0.0' ? '0.0.0.0 (all interfaces)' : bindHost}:${PORT}`);
-        if (typeof onListening === 'function') onListening();
+    httpListenChain = httpListenChain.then(
+        () =>
+            new Promise((resolve, reject) => {
+                const doListen = () => {
+                    try {
+                        clients.clear();
+                        server = http.createServer(expressApp);
+                        attachWebSocketServer(server);
+                        let settled = false;
+                        const finish = () => {
+                            if (settled) return;
+                            settled = true;
+                            resolve();
+                        };
+                        server.once('error', (err) => {
+                            console.error('[HTTP/WS] server error:', err && err.code ? err.code : err.message || err);
+                            finish();
+                        });
+                        server.listen(PORT, bindHost, () => {
+                            console.log(`[HTTP/WS] listening on http://${bindHost === '0.0.0.0' ? '0.0.0.0 (all interfaces)' : bindHost}:${PORT}`);
+                            if (typeof onListening === 'function') onListening();
+                            finish();
+                        });
+                    } catch (e) {
+                        console.error('[HTTP/WS] listen setup failed', e);
+                        reject(e);
+                    }
+                };
+                if (server) {
+                    closeHttpServer(doListen);
+                } else {
+                    doListen();
+                }
+            })
+    ).catch((e) => {
+        console.error('[HTTP/WS] listen chain', e && e.message ? e.message : e);
     });
 }
 
 function closeHttpServer(done) {
-    if (!wss && (!server || !server.listening)) {
+    const httpSrv = server;
+    const wsSrv = wss;
+    if (!wsSrv && (!httpSrv || !httpSrv.listening)) {
         server = null;
+        wss = null;
         if (typeof done === 'function') done();
         return;
     }
-    const w = wss;
     wss = null;
-    if (w) {
+    const finish = () => {
+        server = null;
+        if (typeof done === 'function') done();
+    };
+    if (wsSrv) {
         try {
-            w.close(() => {
-                server = null;
-                if (typeof done === 'function') done();
+            wsSrv.close(() => {
+                if (httpSrv && httpSrv.listening) {
+                    httpSrv.close(finish);
+                } else {
+                    finish();
+                }
             });
         } catch (_) {
-            server = null;
-            if (typeof done === 'function') done();
+            if (httpSrv && httpSrv.listening) {
+                httpSrv.close(finish);
+            } else {
+                finish();
+            }
         }
-    } else if (server) {
-        server.close(() => {
-            server = null;
-            if (typeof done === 'function') done();
-        });
-    } else if (typeof done === 'function') done();
+    } else if (httpSrv && httpSrv.listening) {
+        httpSrv.close(finish);
+    } else {
+        finish();
+    }
 }
 
 function restartHttpServer(done) {
@@ -969,10 +1305,14 @@ function buildServersPayloadForAiPush() {
 }
 
 function buildDataPayloadForAiPush(serverId) {
-    const state = serverStates[serverId];
+    // Treat '' as a real id (heartbeat before any server tab has loaded). Do not use `sid || first` — '' is falsy.
+    const key =
+        serverId === undefined || serverId === null
+            ? (Object.keys(serverStates)[0] || '')
+            : String(serverId);
+    const state = serverStates[key];
     const d = state?.mergedData;
-    const sid = serverId || Object.keys(serverStates)[0];
-    const clone = d ? cloneMergedDataWithFieldExclusions(d, sid) : null;
+    const clone = d ? cloneMergedDataWithFieldExclusions(d, key) : null;
     const ts = new Date().toISOString();
     return clone ? { ...clone, timestamp: ts } : { error: 'Waiting for data...', timestamp: ts };
 }
@@ -1017,7 +1357,15 @@ async function maybePushSnapshotToAiManager(serverId) {
 function pushAllSnapshotsToAiManager() {
     const conn = store.get('aiManagerConnection') || {};
     if (!conn.pushSnapshots) return;
-    Object.keys(serverStates).forEach(sid => { maybePushSnapshotToAiManager(sid); });
+    const keys = Object.keys(serverStates);
+    // If no server tab has merged data yet, still POST so the VPS can auth and register push mode (otherwise RAM stays empty).
+    if (keys.length === 0) {
+        maybePushSnapshotToAiManager('');
+        return;
+    }
+    keys.forEach((sid) => {
+        maybePushSnapshotToAiManager(sid);
+    });
 }
 
 function ensureAiSnapshotPushInterval() {
@@ -1328,11 +1676,7 @@ function startLocalWatching(srv) {
 
     let basePath = srv.localPath;
     if (!basePath) {
-        basePath = path.join(
-            os.homedir(),
-            'Documents', 'My Games', 'FarmingSimulator2025',
-            'modSettings', 'FS25_FarmDashboard'
-        );
+        basePath = path.join(getFs25DocumentsRoot(), 'modSettings', 'FS25_FarmDashboard');
     }
 
     const folderName = srv.localSubFolder ||
@@ -1348,15 +1692,29 @@ function startLocalWatching(srv) {
 
     console.log(`[Local] Watching: ${luaJsonPath}`);
 
-    const watcher = chokidar.watch(luaJsonPath, { usePolling: true, interval: 1000 });
-    state.watcher = watcher;
-
     const readFile = () => {
         if (fs.existsSync(luaJsonPath)) processLuaData(srv.id, fs.readFileSync(luaJsonPath, 'utf8'));
     };
 
-    watcher.on('add',    readFile);
-    watcher.on('change', readFile);
+    // fs.watch + persistent:false — avoids chokidar polling handles that kept Windows folders "in use".
+    let fw;
+    try {
+        fw = fs.watch(luaJsonPath, { persistent: false }, () => readFile());
+        fw.on('error', (err) => {
+            console.warn(`[Local] watch error [${srv.id}]:`, err && err.message ? err.message : err);
+            try {
+                fw.close();
+            } catch (_) { /* ignore */ }
+            state.watcher = null;
+            state.intervals.push(setTimeout(() => startLocalWatching(srv), 5000));
+        });
+    } catch (e) {
+        console.warn(`[Local] fs.watch failed [${srv.id}]:`, e.message);
+        state.intervals.push(setTimeout(() => startLocalWatching(srv), 5000));
+        return;
+    }
+    state.watcher = fw;
+    readFile();
 
     // XML poll immediately then every 60s (XML changes on save, not every 10s)
     triggerXmlPoll(srv.id);
@@ -1517,21 +1875,31 @@ function startFtpPollingCoordinator(config, ftpServers) {
 
 // ── Boot / teardown ───────────────────────────────────────────────────────────
 
-function stopAllWatchers() {
+/** Stops local file watchers, FTP timers, and cache debouncers. Chokidar.close() was async; quit now awaits this. */
+async function stopAllWatchers() {
     clearFtpPollingTimers();
     Object.keys(serverCacheSaveTimers).forEach((k) => {
         clearTimeout(serverCacheSaveTimers[k]);
         delete serverCacheSaveTimers[k];
     });
-    for (const state of Object.values(serverStates)) {
-        if (state.watcher) state.watcher.close();
-        for (const t of (state.intervals || [])) { clearTimeout(t); clearInterval(t); }
+    const states = Object.values(serverStates);
+    for (const state of states) {
+        if (state.watcher) {
+            try {
+                state.watcher.close();
+            } catch (_) { /* ignore */ }
+            state.watcher = null;
+        }
+        for (const t of (state.intervals || [])) {
+            clearTimeout(t);
+            clearInterval(t);
+        }
     }
     serverStates = {};
 }
 
-function bootServer(config) {
-    stopAllWatchers();
+async function bootServer(config) {
+    await stopAllWatchers();
 
     const servers = config.servers || (config.mode ? [{
         id: 'srv_legacy', name: 'My Server', ...config
@@ -1568,7 +1936,7 @@ function bootServer(config) {
 }
 
 /** Same persistence + boot as ipcMain save-settings — used by POST /api/setup-config (tablet / browser on LAN). */
-function applyFarmdashSetupConfig(newConfig) {
+async function applyFarmdashSetupConfig(newConfig) {
     const prev = store.get('config') || {};
     const merged = {
         ...prev,
@@ -1579,7 +1947,7 @@ function applyFarmdashSetupConfig(newConfig) {
         merged.ftpPolling = { ...(prev.ftpPolling || {}), ...newConfig.ftpPolling };
     }
     store.set('config', merged);
-    bootServer(merged);
+    await bootServer(merged);
 }
 
 // ── Electron window ───────────────────────────────────────────────────────────
@@ -1592,10 +1960,11 @@ function createWindow() {
         backgroundColor: '#0f172a',
         autoHideMenuBar: true,
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
-            webSecurity: false
-        }
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, 'preload.js'),
+            webSecurity: false,
+        },
     });
 
     mainWindow.webContents.on('render-process-gone', (_event, details) => {
@@ -1607,16 +1976,33 @@ function createWindow() {
 
     const config = store.get('config');
     if (config?.isConfigured) {
-        bootServer(config);
+        void bootServer(config).catch((e) => console.error('[bootServer]', e));
     } else {
-        // First-run setup: still listen on LAN so phones/tablets can open http://<this-pc>:8766/setup.html
+        // Show setup immediately (do not wait for HTTP — blank window felt like a hang on cold start).
+        const opts = getSetupLoadOptions();
+        mainWindow.loadFile(path.join(__dirname, 'setup.html'), opts);
+        // Still bring up HTTP + WS for LAN setup and dashboard after save.
         if (!server || !server.listening) {
             listenFarmdashHttp(getLanBindAddress(), () => {
                 console.log(`[HTTP/WS] ready (waiting for setup)`);
-                loadSetupWindow();
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    const token = String(store.get('farmdashSetupWriteToken') || '');
+                    mainWindow.webContents
+                        .executeJavaScript(
+                            `if(typeof window!=='undefined'){window.__FARMDASH_SETUP_TOKEN=${JSON.stringify(token)};}0`,
+                            true
+                        )
+                        .catch(() => {});
+                }
             });
-        } else {
-            loadSetupWindow();
+        } else if (mainWindow && !mainWindow.isDestroyed()) {
+            const token = String(store.get('farmdashSetupWriteToken') || '');
+            mainWindow.webContents
+                .executeJavaScript(
+                    `if(typeof window!=='undefined'){window.__FARMDASH_SETUP_TOKEN=${JSON.stringify(token)};}0`,
+                    true
+                )
+                .catch(() => {});
         }
     }
 }
@@ -1636,15 +2022,67 @@ app.whenReady().then(() => {
     const amc = store.get('aiManagerConnection');
     if (amc && amc.pushSnapshots) ensureAiSnapshotPushInterval();
 });
-app.on('window-all-closed', () => { stopAllWatchers(); if (process.platform !== 'darwin') app.quit(); });
+app.on('window-all-closed', () => {
+    stopAllWatchers()
+        .then(() => {
+            if (process.platform !== 'darwin') {
+                return new Promise((resolve) => closeHttpServer(() => resolve()));
+            }
+        })
+        .then(() => {
+            if (process.platform !== 'darwin') app.quit();
+        })
+        .catch((e) => {
+            console.error('[shutdown]', e);
+            if (process.platform !== 'darwin') app.quit();
+        });
+});
 
 // ── IPC ───────────────────────────────────────────────────────────────────────
 
-ipcMain.on('save-settings', (event, newConfig) => {
-    applyFarmdashSetupConfig(newConfig);
+ipcMain.on('save-settings', async (event, newConfig) => {
+    try {
+        await applyFarmdashSetupConfig(newConfig);
+    } catch (e) {
+        console.error('[save-settings]', e);
+    }
 });
 
 ipcMain.handle('get-current-config', () => store.get('config'));
+
+/** Fallback when HTTP `/api/status` is unreachable — read default local `data.json` (same path logic as former `fs` in renderer). */
+ipcMain.handle('read-local-farmdash-data-json', () => {
+    try {
+        const bases = collectFarmDashboardModSettingsRoots();
+        for (const base of bases) {
+            if (!fs.existsSync(base)) continue;
+            let folders;
+            try {
+                folders = fs.readdirSync(base, { withFileTypes: true });
+            } catch {
+                continue;
+            }
+            for (const dirent of folders) {
+                if (!dirent.isDirectory()) continue;
+                const p = path.join(base, dirent.name, 'data.json');
+                if (!fs.existsSync(p)) continue;
+                const raw = fs.readFileSync(p, 'utf8');
+                const data = JSON.parse(stripUtf8Bom(raw));
+                return { ok: true, path: p, data };
+            }
+        }
+        const fallback = path.join(
+            getFs25DocumentsRoot(),
+            'modSettings',
+            'FS25_FarmDashboard',
+            'savegame1',
+            'data.json'
+        );
+        return { ok: false, path: fallback, error: 'not_found' };
+    } catch (e) {
+        return { ok: false, error: String(e && e.message ? e.message : e) };
+    }
+});
 
 ipcMain.handle('get-lan-access-settings', () => getLanSecurityFromStore());
 
@@ -1699,10 +2137,15 @@ ipcMain.handle('get-ai-manager-connection', () => {
 ipcMain.handle('save-ai-manager-connection', (_e, payload) => {
     const b = loadBrandingFromDisk();
     const embKey = String(b.embeddedFarmdashIntegrationKey || '').trim();
+    const defUrl = String(b.defaultAiBackendUrl || '').trim().replace(/\/$/, '');
     let baseUrl = String(payload?.baseUrl || '').trim().replace(/\/$/, '');
     let integrationKey = String(payload?.integrationKey || '').trim();
     if (!integrationKey && embKey) {
         integrationKey = embKey;
+    }
+    /** Branded default URL/key stay effective if the user saves with hidden/empty fields (BYOK-only save). */
+    if (!baseUrl && defUrl) {
+        baseUrl = defUrl;
     }
     const pushSnapshots = !!payload?.pushSnapshots;
     store.set('aiManagerConnection', { baseUrl, integrationKey, pushSnapshots });
@@ -1737,8 +2180,7 @@ ipcMain.handle('ai-farm-install-config-xml', async (_e, { baseUrl, integrationKe
         throw new Error(text || `HTTP ${res.status}`);
     }
     console.info('[Pipeline] main_ok: config-xml received', { bytesUtf8: Buffer.byteLength(text, 'utf8') });
-    const docs = app.getPath('documents');
-    const target = path.join(docs, 'My Games', 'FarmingSimulator2025', 'modSettings', 'ai_farm_manager_config.xml');
+    const target = path.join(getFs25DocumentsRoot(), 'modSettings', 'ai_farm_manager_config.xml');
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, text, 'utf8');
     return { ok: true, path: target };
@@ -1801,32 +2243,296 @@ ipcMain.handle('get-ui-preferences', () => {
     };
 });
 
+function filterOpenAiModelsForByok(dataArray) {
+    const exclude =
+        /embedding|whisper|dall-e|moderation|tts|davinci|babbage|curie|ada|realtime|transcribe|audio|instruct|search|similarity/i;
+    const out = [];
+    for (const row of dataArray || []) {
+        const id = row && row.id ? String(row.id) : '';
+        if (!id || exclude.test(id)) continue;
+        if (!/^gpt-|^o[0-9]|^chatgpt-/i.test(id)) continue;
+        out.push({ id, displayName: id });
+    }
+    out.sort((a, b) => a.id.localeCompare(b.id));
+    return out;
+}
+
+function filterGeminiModelsForByok(json) {
+    const arr = json && json.models ? json.models : [];
+    const out = [];
+    for (const m of arr) {
+        const methods = m.supportedGenerationMethods;
+        if (!Array.isArray(methods) || !methods.includes('generateContent')) continue;
+        const name = m.name ? String(m.name) : '';
+        const id = name.replace(/^models\//, '');
+        if (!id) continue;
+        const displayName = m.displayName ? String(m.displayName) : id;
+        out.push({ id, displayName });
+    }
+    out.sort((a, b) => a.id.localeCompare(b.id));
+    return out;
+}
+
+function filterOpenAiModelsForCompat(dataArray) {
+    const exclude =
+        /embedding|whisper|dall-e|moderation|tts|davinci|babbage|curie|ada|realtime|transcribe|audio|instruct|search|similarity|rerank/i;
+    const out = [];
+    for (const row of dataArray || []) {
+        const id =
+            row && row.id != null && String(row.id).trim()
+                ? String(row.id).trim()
+                : row && row.name != null && String(row.name).trim()
+                  ? String(row.name).trim()
+                  : '';
+        if (!id || exclude.test(id)) continue;
+        out.push({ id, displayName: id });
+    }
+    out.sort((a, b) => a.id.localeCompare(b.id));
+    return out;
+}
+
+/**
+ * OpenAI-compatible servers differ: some use `data`, some `models`; rows may use `id` or `name`.
+ */
+function normalizeOpenAiCompatibleModelsJson(parsed) {
+    if (!parsed || typeof parsed !== 'object') return [];
+    const raw = Array.isArray(parsed.data)
+        ? parsed.data
+        : Array.isArray(parsed.models)
+          ? parsed.models
+          : [];
+    return raw.map((row) => {
+        if (!row || typeof row !== 'object') return null;
+        const id =
+            row.id != null && String(row.id).trim()
+                ? String(row.id).trim()
+                : row.name != null && String(row.name).trim()
+                  ? String(row.name).trim()
+                  : '';
+        return id ? { id, name: row.name, ...row } : null;
+    }).filter(Boolean);
+}
+
+/** Accept `127.0.0.1:11434` as well as `http://127.0.0.1:11434`. */
+function normalizeByokOpenAiBaseUrl(raw) {
+    let s = String(raw || '').trim();
+    if (!s) return '';
+    if (!/^https?:\/\//i.test(s)) {
+        s = `http://${s}`;
+    }
+    return s.replace(/\/$/, '');
+}
+
+/** Shown when OpenAI-compat URL is set but no models are returned (wrong host, empty server, or firewall). */
+function byokRemoteOllamaHint(baseRaw) {
+    let host = 'SERVER_IP:11434';
+    try {
+        const u = new URL(normalizeByokOpenAiBaseUrl(baseRaw));
+        host = u.host;
+    } catch (_) {
+        /* keep default */
+    }
+    return (
+        '0 models. If Ollama runs on another machine, use that machine’s IP/hostname in the base URL (http://' +
+        host +
+        ') — not 127.0.0.1 unless Ollama is on this PC. On the Ollama server: set OLLAMA_HOST=0.0.0.0:11434, ' +
+        'open firewall TCP 11434, run ollama pull <model>.'
+    );
+}
+
+/** Ollama native API — works when `/v1/models` is empty or missing (some builds). */
+async function fetchOllamaTagsModelRows(baseUrl) {
+    let origin = normalizeByokOpenAiBaseUrl(baseUrl);
+    origin = origin.replace(/\/v1\/?$/i, '');
+    if (!origin) return [];
+    const url = `${origin}/api/tags`;
+    const r = await fetch(url, { headers: { Accept: 'application/json' } });
+    const txt = await r.text();
+    if (!r.ok) {
+        return [];
+    }
+    let data;
+    try {
+        data = JSON.parse(txt);
+    } catch {
+        return [];
+    }
+    const models = Array.isArray(data.models) ? data.models : [];
+    return models
+        .map((m) => {
+            const name = m && (m.name != null ? String(m.name).trim() : '');
+            return name ? { id: name, name } : null;
+        })
+        .filter(Boolean);
+}
+
+async function listByokProviderModelsInternal(provider, apiKey, openaiBaseUrl) {
+    const key = String(apiKey || '').trim();
+    const baseRaw = normalizeByokOpenAiBaseUrl(openaiBaseUrl);
+    const p = provider === 'gemini' ? 'gemini' : 'openai';
+    if (p === 'openai' && baseRaw) {
+        try {
+            let root = baseRaw.replace(/\/$/, '');
+            if (!root.toLowerCase().includes('/v1')) {
+                root = `${root}/v1`;
+            }
+            const authKey = key || 'ollama';
+            const modelsUrl = `${root}/models`;
+            const r = await fetch(modelsUrl, {
+                headers: { Authorization: `Bearer ${authKey}` },
+            });
+            const txt = await r.text();
+            if (!r.ok) {
+                if (r.status === 404) {
+                    const tagRows404 = await fetchOllamaTagsModelRows(baseRaw);
+                    const filtered404 = filterOpenAiModelsForCompat(tagRows404);
+                    if (filtered404.length > 0) {
+                        console.log(
+                            '[BYOK] GET /v1/models returned 404; listed ' +
+                                filtered404.length +
+                                ' model(s) via Ollama /api/tags.'
+                        );
+                        return { ok: true, models: filtered404 };
+                    }
+                }
+                return { ok: false, error: `OpenAI-compatible ${r.status}: ${txt.slice(0, 280)}`, models: [] };
+            }
+            let data;
+            try {
+                data = JSON.parse(txt);
+            } catch (e) {
+                return {
+                    ok: false,
+                    error: `Invalid JSON from ${modelsUrl}: ${String(e && e.message ? e.message : e).slice(0, 200)}`,
+                    models: [],
+                };
+            }
+            let rows = normalizeOpenAiCompatibleModelsJson(data);
+            let filtered = filterOpenAiModelsForCompat(rows);
+            if (filtered.length === 0) {
+                const tagRows = await fetchOllamaTagsModelRows(baseRaw);
+                filtered = filterOpenAiModelsForCompat(tagRows);
+                if (filtered.length > 0) {
+                    console.log(
+                        '[BYOK] /v1/models returned no usable rows; using Ollama /api/tags fallback (' +
+                            filtered.length +
+                            ' model(s)).'
+                    );
+                }
+            }
+            const emptyHint = filtered.length === 0 ? byokRemoteOllamaHint(baseRaw) : undefined;
+            return { ok: true, models: filtered, emptyHint };
+        } catch (e) {
+            const msg = e && e.message ? String(e.message) : String(e);
+            return {
+                ok: false,
+                error: `Cannot reach ${baseRaw}: ${msg.slice(0, 280)}`,
+                models: [],
+            };
+        }
+    }
+    if (!key) {
+        return { ok: false, error: 'no_key', models: [] };
+    }
+    if (p === 'openai') {
+        const r = await fetch('https://api.openai.com/v1/models', {
+            headers: { Authorization: `Bearer ${key}` },
+        });
+        const txt = await r.text();
+        if (!r.ok) {
+            return { ok: false, error: `OpenAI ${r.status}: ${txt.slice(0, 280)}`, models: [] };
+        }
+        const data = JSON.parse(txt);
+        return { ok: true, models: filterOpenAiModelsForByok(data.data) };
+    }
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`;
+    const r = await fetch(url);
+    const txt = await r.text();
+    if (!r.ok) {
+        return { ok: false, error: `Gemini ${r.status}: ${txt.slice(0, 280)}`, models: [] };
+    }
+    const data = JSON.parse(txt);
+    return { ok: true, models: filterGeminiModelsForByok(data) };
+}
+
 // ── AI Consultant BYOK (stored in electron-store; never committed) ─────────────
 ipcMain.handle('get-consultant-byok-credentials', () => {
     const raw = store.get('consultantByok');
     const r = raw && typeof raw === 'object' ? raw : {};
     const apiKey = r.apiKey && String(r.apiKey).trim() ? String(r.apiKey).trim() : '';
-    let provider = r.provider === 'gemini' ? 'gemini' : 'openai';
+    const openaiBaseUrl = r.openaiBaseUrl && String(r.openaiBaseUrl).trim() ? String(r.openaiBaseUrl).trim() : '';
+    let provider = r.provider === 'gemini' ? 'gemini' : r.provider === 'openai_compat' ? 'openai_compat' : 'openai';
     if (apiKey) {
         if (apiKey.startsWith('AIza')) provider = 'gemini';
         else if (apiKey.startsWith('sk-')) provider = 'openai';
     }
-    return { apiKey: apiKey || null, provider };
+    if (openaiBaseUrl && provider !== 'gemini') {
+        provider = 'openai_compat';
+    }
+    const modelId = r.modelId && String(r.modelId).trim() ? String(r.modelId).trim() : '';
+    const modelIdsCsv = r.modelIdsCsv && String(r.modelIdsCsv).trim() ? String(r.modelIdsCsv).trim() : '';
+    const additionalKeys = r.additionalKeys && String(r.additionalKeys).trim() ? String(r.additionalKeys).trim() : '';
+    return {
+        apiKey: apiKey || null,
+        provider,
+        openaiBaseUrl: openaiBaseUrl || null,
+        modelId: modelId || null,
+        modelIdsCsv: modelIdsCsv || null,
+        additionalKeys: additionalKeys || null,
+    };
 });
 
 ipcMain.handle('get-consultant-byok-meta', () => {
     const raw = store.get('consultantByok');
     const r = raw && typeof raw === 'object' ? raw : {};
     const apiKey = r.apiKey && String(r.apiKey).trim() ? String(r.apiKey).trim() : '';
-    let provider = r.provider === 'gemini' ? 'gemini' : 'openai';
+    const openaiBaseUrl = r.openaiBaseUrl && String(r.openaiBaseUrl).trim() ? String(r.openaiBaseUrl).trim() : '';
+    let provider = r.provider === 'gemini' ? 'gemini' : r.provider === 'openai_compat' ? 'openai_compat' : 'openai';
     if (apiKey) {
         if (apiKey.startsWith('AIza')) provider = 'gemini';
         else if (apiKey.startsWith('sk-')) provider = 'openai';
     }
+    if (openaiBaseUrl && provider !== 'gemini') {
+        provider = 'openai_compat';
+    }
+    const modelId = r.modelId && String(r.modelId).trim() ? String(r.modelId).trim() : '';
+    const extraLines = String(r.additionalKeys || '')
+        .split(/[\r\n]+/)
+        .map((s) => s.trim())
+        .filter(Boolean).length;
     return {
         hasKey: apiKey.length > 0,
+        hasOpenaiBaseUrl: openaiBaseUrl.length > 0,
         provider,
+        modelId: modelId || null,
+        extraKeyLines: extraLines,
     };
+});
+
+ipcMain.handle('list-byok-provider-models', async (_e, { provider, apiKey, openaiBaseUrl }) => {
+    try {
+        return await listByokProviderModelsInternal(provider, apiKey, openaiBaseUrl);
+    } catch (e) {
+        return { ok: false, error: String(e && e.message ? e.message : e), models: [] };
+    }
+});
+
+ipcMain.handle('list-saved-byok-provider-models', async () => {
+    const raw = store.get('consultantByok') || {};
+    const apiKey = raw.apiKey && String(raw.apiKey).trim() ? String(raw.apiKey).trim() : '';
+    const openaiBaseUrl = raw.openaiBaseUrl && String(raw.openaiBaseUrl).trim() ? String(raw.openaiBaseUrl).trim() : '';
+    if (!apiKey && !openaiBaseUrl) {
+        return { ok: false, error: 'no_saved_key', models: [] };
+    }
+    let provider = raw.provider === 'gemini' ? 'gemini' : 'openai';
+    if (apiKey.startsWith('AIza')) provider = 'gemini';
+    else if (apiKey.startsWith('sk-')) provider = 'openai';
+    if (openaiBaseUrl && provider !== 'gemini') provider = 'openai';
+    try {
+        return await listByokProviderModelsInternal(provider, apiKey, openaiBaseUrl);
+    } catch (e) {
+        return { ok: false, error: String(e && e.message ? e.message : e), models: [] };
+    }
 });
 
 ipcMain.handle('save-consultant-byok-credentials', (_e, payload) => {
@@ -1838,17 +2544,61 @@ ipcMain.handle('save-consultant-byok-credentials', (_e, payload) => {
     const rawPrev = store.get('consultantByok');
     const prev = rawPrev && typeof rawPrev === 'object' ? rawPrev : {};
     const prevKey = prev.apiKey && String(prev.apiKey).trim() ? String(prev.apiKey).trim() : '';
+    const prevOb = prev.openaiBaseUrl && String(prev.openaiBaseUrl).trim() ? String(prev.openaiBaseUrl).trim() : '';
     const incoming = payload && payload.apiKey != null ? String(payload.apiKey).trim() : '';
-    const apiKey = incoming || prevKey;
-    let provider = payload && payload.provider === 'gemini' ? 'gemini' : 'openai';
+    let apiKey = incoming || prevKey;
+    const explicitOb = Object.prototype.hasOwnProperty.call(payload || {}, 'openaiBaseUrl');
+    const incomingOb = explicitOb ? String(payload.openaiBaseUrl || '').trim() : '';
+    const openaiBaseUrl = explicitOb ? incomingOb : prevOb;
+    let provider =
+        payload && payload.provider === 'gemini'
+            ? 'gemini'
+            : payload && payload.provider === 'openai_compat'
+              ? 'openai_compat'
+              : 'openai';
     if (apiKey) {
         if (apiKey.startsWith('AIza')) provider = 'gemini';
         else if (apiKey.startsWith('sk-')) provider = 'openai';
     }
-    if (!apiKey) {
+    if (openaiBaseUrl && provider !== 'gemini') {
+        provider = 'openai_compat';
+    }
+    if (!apiKey && openaiBaseUrl) {
+        apiKey = 'ollama';
+    }
+    if (!apiKey && !openaiBaseUrl) {
         return { ok: false, error: 'empty_key' };
     }
-    store.set('consultantByok', { apiKey, provider });
+    const explicitModel = payload && Object.prototype.hasOwnProperty.call(payload, 'modelId');
+    const next = { apiKey, provider };
+    if (openaiBaseUrl) {
+        next.openaiBaseUrl = openaiBaseUrl;
+    } else {
+        delete next.openaiBaseUrl;
+    }
+    if (explicitModel) {
+        const m = String(payload.modelId || '').trim();
+        if (m) next.modelId = m;
+    } else if (prev.modelId && String(prev.modelId).trim()) {
+        next.modelId = String(prev.modelId).trim();
+    }
+    const explicitCsv = payload && Object.prototype.hasOwnProperty.call(payload, 'modelIdsCsv');
+    const explicitAdd = payload && Object.prototype.hasOwnProperty.call(payload, 'additionalKeys');
+    if (explicitCsv) {
+        const csv = String(payload.modelIdsCsv || '').trim();
+        if (csv) next.modelIdsCsv = csv;
+        else delete next.modelIdsCsv;
+    } else if (prev.modelIdsCsv && String(prev.modelIdsCsv).trim()) {
+        next.modelIdsCsv = String(prev.modelIdsCsv).trim();
+    }
+    if (explicitAdd) {
+        const ak = String(payload.additionalKeys || '').trim();
+        if (ak) next.additionalKeys = ak;
+        else delete next.additionalKeys;
+    } else if (prev.additionalKeys && String(prev.additionalKeys).trim()) {
+        next.additionalKeys = String(prev.additionalKeys).trim();
+    }
+    store.set('consultantByok', next);
     return { ok: true };
 });
 
@@ -1903,7 +2653,7 @@ ipcMain.handle('get-field-exclusion-options', (_e, payload) => {
 
 // ── FS25 mod config.xml (same folder as documented modSettings path) ───────────
 function getModConfigDir() {
-    return path.join(os.homedir(), 'Documents', 'My Games', 'FarmingSimulator2025', 'modSettings', 'FS25_FarmDashboard');
+    return path.join(getFs25DocumentsRoot(), 'modSettings', 'FS25_FarmDashboard');
 }
 
 function getModConfigPath() {
@@ -1976,33 +2726,53 @@ ipcMain.handle('save-mod-config', (_e, cfg) => {
 });
 
 ipcMain.handle('scan-local-saves', async () => {
-    const userHome = os.homedir();
-    const basePath = path.join(
-        userHome, 'Documents', 'My Games', 'FarmingSimulator2025',
-        'modSettings', 'FS25_FarmDashboard'
-    );
-    if (!fs.existsSync(basePath)) return [];
-
+    /**
+     * FS25 + mod write under .../modSettings/FS25_FarmDashboard/<slot>/data.json
+     * Try every plausible Documents root (Electron, homedir, USERPROFILE, OneDrive).
+     */
+    const roots = collectFarmDashboardModSettingsRoots();
     const foundSaves = [];
-    const folders = fs.readdirSync(basePath, { withFileTypes: true });
+    const seenJson = new Set();
+    const searchedRoots = [];
+    const missingRoots = [];
 
-    for (const dirent of folders) {
-        if (!dirent.isDirectory()) continue;
-        const jsonPath = path.join(basePath, dirent.name, 'data.json');
-        if (!fs.existsSync(jsonPath)) continue;
+    for (const basePath of roots) {
+        searchedRoots.push(basePath);
+        if (!fs.existsSync(basePath)) {
+            missingRoots.push(basePath);
+            console.log('[scan-local-saves] (skip missing)', basePath);
+            continue;
+        }
+        let folders;
         try {
-            const parsed  = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-            const mapName = parsed.serverInfo?.mapName || 'Unknown Map';
-            foundSaves.push({
-                id: 'srv_' + Date.now() + Math.floor(Math.random() * 1000),
-                name: `${mapName} (${dirent.name})`,
-                mode: 'local',
-                localPath: basePath,
-                localSubFolder: dirent.name
-            });
+            folders = fs.readdirSync(basePath, { withFileTypes: true });
         } catch (e) {
-            console.warn(`[scan-local-saves] Error parsing ${dirent.name}:`, e.message);
+            console.warn('[scan-local-saves] readdir', basePath, e.message);
+            continue;
+        }
+        for (const dirent of folders) {
+            if (!dirent.isDirectory()) continue;
+            const jsonPath = path.join(basePath, dirent.name, 'data.json');
+            const dedupeKey = path.normalize(jsonPath).toLowerCase();
+            if (seenJson.has(dedupeKey)) continue;
+            if (!fs.existsSync(jsonPath)) continue;
+            seenJson.add(dedupeKey);
+            try {
+                const raw = stripUtf8Bom(fs.readFileSync(jsonPath, 'utf8'));
+                const parsed = JSON.parse(raw);
+                const mapName = parsed.serverInfo?.mapName || 'Unknown Map';
+                foundSaves.push({
+                    id: 'srv_' + Date.now() + Math.floor(Math.random() * 1000),
+                    name: `${mapName} (${dirent.name})`,
+                    mode: 'local',
+                    localPath: basePath,
+                    localSubFolder: dirent.name,
+                });
+            } catch (e) {
+                console.warn(`[scan-local-saves] parse ${jsonPath}:`, e.message);
+            }
         }
     }
-    return foundSaves;
+    console.log('[scan-local-saves] found', foundSaves.length, 'save profile(s) under FS25_FarmDashboard');
+    return { saves: foundSaves, searchedRoots, missingRoots };
 });

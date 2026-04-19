@@ -29,6 +29,15 @@ security = HTTPBasic(auto_error=False)
 _templates = Jinja2Templates(directory=os.path.join(os.path.dirname(__file__), "..", "templates"))
 
 
+def _mask_secret(raw: str | None, head: int = 4, tail: int = 4) -> str:
+    s = (raw or "").strip()
+    if not s:
+        return "(not set — add FARMDASH_INTEGRATION_KEY to the server environment)"
+    if len(s) <= head + tail + 1:
+        return "•" * min(len(s), 12) + " (short key)"
+    return f"{s[:head]}…{s[-tail:]} ({len(s)} chars)"
+
+
 def require_admin(credentials: HTTPBasicCredentials | None = Depends(security)) -> str:
     s = get_settings()
     user = s["admin_username"]
@@ -48,27 +57,46 @@ def require_admin(credentials: HTTPBasicCredentials | None = Depends(security)) 
 async def admin_page(request: Request, _: str = Depends(require_admin)) -> HTMLResponse:
     s = get_settings()
     overview = await get_overview_payload()
+    qtab = (request.query_params.get("tab") or "").strip().lower()
+    allowed_tabs = ("overview", "farm", "bot", "hank", "mod", "logs")
+    active_tab = qtab if qtab in allowed_tabs else "overview"
+    _env_path = get_backend_root() / ".env"
     # Explicit render avoids rare Jinja2 cache / TemplateResponse arg issues on some Starlette+Jinja builds.
     ctx: dict[str, Any] = {
         "request": request,
+        "active_tab": active_tab,
+        "env_file_path": str(_env_path),
+        "env_file_exists": _env_path.is_file(),
         "bot_enabled": s["bot_enabled"],
         "trigger_prefix": s["trigger_prefix"],
         "dashboard_url": s["dashboard_json_url"],
         "dashboard_server_id": s.get("dashboard_server_id", ""),
         "llm_model": s["llm_model"],
         "llm_provider": s["llm_provider"],
+        "openai_base_url": os.getenv("OPENAI_BASE_URL", ""),
         "gemini_model": s.get("gemini_model", "gemini-2.5-flash"),
         "gemini_api_endpoint": s.get("gemini_api_endpoint", "generativelanguage"),
         "system_prompt": s["system_prompt"],
-        "has_llm_key": bool(s["llm_api_key"]),
+        "has_llm_key": bool(s["llm_api_key"]) or bool((s.get("openai_base_url") or "").strip()),
         "has_gemini_key": has_gemini_credentials(s),
         "dashboard_push_mode": bool(s.get("dashboard_push_mode")),
+        "llm_configured": bool(s.get("llm_configured")),
+        "public_base_url": (s.get("public_base_url") or "").strip(),
+        "farmdash_integration_key_masked": _mask_secret(os.getenv("FARMDASH_INTEGRATION_KEY")),
+        "encryption_key_configured": bool(s.get("encryption_key_configured")),
         "overview": overview,
     }
     for cp in _templates.context_processors:
         ctx.update(cp(request))
     html = _templates.env.get_template("admin.html").render(ctx)
     return HTMLResponse(html)
+
+
+def _admin_redirect_url(tab: str | None) -> str:
+    allowed = ("overview", "farm", "bot", "hank", "mod", "logs")
+    if tab and tab.strip().lower() in allowed:
+        return f"/admin?tab={tab.strip().lower()}"
+    return "/admin"
 
 
 class SettingsUpdate(BaseModel):
@@ -114,7 +142,23 @@ def _write_env_updates(updates: dict[str, str]) -> None:
         if k not in seen:
             out.append(f"{k}={v}\n")
 
-    env_path.write_text("".join(out), encoding="utf-8")
+    try:
+        env_path.write_text("".join(out), encoding="utf-8")
+    except OSError as e:
+        push_log(
+            "WARN",
+            "Admin could not write .env",
+            path=str(env_path),
+            error=str(e),
+        )
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                f"Cannot write settings file ({env_path}): {e}. "
+                "Use a writable path (e.g. bind-mount host .env to /app/.env in Docker) "
+                "or change variables only in Coolify / compose environment."
+            ),
+        ) from e
     reload_backend_dotenv(override=True)
     get_settings.cache_clear()
 
@@ -130,10 +174,12 @@ async def admin_save_settings(
     llm_api_key: str | None = Form(None),
     llm_model: str | None = Form(None),
     llm_provider: str | None = Form(None),
+    openai_base_url: str | None = Form(None),
     gemini_api_key: str | None = Form(None),
     gemini_model: str | None = Form(None),
     gemini_api_endpoint: str | None = Form(None),
     system_prompt: str | None = Form(None),
+    redirect_tab: str | None = Form(None),
 ) -> RedirectResponse:
     updates: dict[str, str] = {}
     if bot_enabled is not None:
@@ -150,6 +196,8 @@ async def admin_save_settings(
         updates["LLM_MODEL"] = llm_model.strip()
     if llm_provider is not None and llm_provider.strip():
         updates["LLM_PROVIDER"] = llm_provider.strip().lower()
+    if openai_base_url is not None:
+        updates["OPENAI_BASE_URL"] = openai_base_url.strip()
     if gemini_api_key is not None and gemini_api_key.strip():
         updates["GEMINI_API_KEY"] = gemini_api_key.strip()
     if gemini_model is not None and gemini_model.strip():
@@ -164,7 +212,7 @@ async def admin_save_settings(
         _write_env_updates(updates)
         push_log("INFO", "Admin updated settings", keys=list(updates.keys()))
 
-    return RedirectResponse(url="/admin", status_code=303)
+    return RedirectResponse(url=_admin_redirect_url(redirect_tab), status_code=303)
 
 
 @router.get("/admin/api/test-llm")
@@ -324,7 +372,7 @@ async def admin_bot_save(
         push_log("INFO", "Admin saved bot instance", label=label)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
-    return RedirectResponse(url="/admin#bots", status_code=303)
+    return RedirectResponse(url=_admin_redirect_url("mod"), status_code=303)
 
 
 @router.post("/admin/api/bot/delete")
@@ -335,4 +383,4 @@ async def admin_bot_delete(
     if not delete_instance(instance_id.strip()):
         raise HTTPException(404, "Instance not found")
     push_log("INFO", "Admin deleted bot instance", instance_id=instance_id)
-    return RedirectResponse(url="/admin#bots", status_code=303)
+    return RedirectResponse(url=_admin_redirect_url("mod"), status_code=303)

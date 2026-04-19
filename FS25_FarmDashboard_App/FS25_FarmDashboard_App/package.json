@@ -1,20 +1,30 @@
 {
   "name": "fs25-farm-dashboard",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Real-time Farm Management Dashboard for FS25",
   "author": "JoshWalki / Wizardlypayload & WizardlyPayload",
   "main": "main.js",
   "scripts": {
     "export-fields-csv": "node tools/export-fields-to-csv.mjs",
+    "unlock-install": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/stop-farmdash-install-lock.ps1",
+    "unlock-install:delete": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/stop-farmdash-install-lock.ps1 -DeleteInstallFolder",
+    "clean:build-out": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/remove-build-output-folders.ps1",
+    "clean:build-out:search": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/remove-build-output-folders.ps1 -StopWindowsSearch",
     "start": "electron .",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder --win"
+    "pack": "node tools/run-electron-builder.mjs pack",
+    "pack:in-repo": "electron-builder --dir",
+    "pack:fresh": "node tools/electron-builder-fresh-output.mjs pack",
+    "pack:alt": "electron-builder --dir --config.directories.output=../electron-pack-out-alt",
+    "dist": "node tools/run-electron-builder.mjs dist",
+    "dist:in-repo": "electron-builder --win",
+    "dist:fresh": "node tools/electron-builder-fresh-output.mjs dist",
+    "dist:alt": "electron-builder --win --config.directories.output=../electron-pack-out-alt"
   },
   "build": {
     "appId": "com.farmdashboard.app",
     "productName": "FS25 Farm Dashboard",
     "directories": {
-      "output": "release/"
+      "output": "../electron-pack-out"
     },
     "files": [
       "main.js",
@@ -22,6 +32,9 @@
       "preload.js",
       "xmlCollector.js",
       "dataMerger.js",
+      "serverDataCache.js",
+      "localConsultantLlm.js",
+      "consultantSnapshotPrune.js",
       "setup.html",
       "web/**/*",
       "node_modules/**/*"
@@ -69,7 +82,6 @@
   "dependencies": {
     "basic-ftp": "^5.0.5",
     "electron-updater": "^6.6.2",
-    "chokidar": "^3.6.0",
     "cors": "^2.8.5",
     "electron-store": "^8.2.0",
     "express": "^4.19.2",

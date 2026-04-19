@@ -100,10 +100,32 @@ async def fetch_dashboard_json(
     if ftp_service.is_ftp_mode_enabled():
         return None, mem_err or "Dashboard snapshot not available"
 
+    u = (url or "").strip()
+    is_push_scheme = u.lower().startswith("push:")
+    # Synthetic push:// URLs are not HTTP — do not call httpx. If the buffer is empty, surface the push hint.
+    if is_push_scheme:
+        if push_wait_detail:
+            return None, push_wait_detail
+        if snapshot_push_service.is_push_mode_enabled():
+            return (
+                None,
+                "No Farm Dashboard snapshot in push buffer yet — enable Send farm data on the desktop app "
+                "or wait for the first POST.",
+            )
+        return (
+            None,
+            "DASHBOARD_SERVER_ID is set but PC push is off — set DASHBOARD_PUSH_MODE=1 (and matching env on "
+            "the desktop), or set DASHBOARD_JSON_URL for HTTP pull / use FTP.",
+        )
+
     if not url:
         if push_wait_detail:
             return None, push_wait_detail
-        return None, "DASHBOARD_JSON_URL is not configured"
+        return (
+            None,
+            "No dashboard JSON source — set DASHBOARD_PUSH_MODE=1 for PC push, or configure FTP, or set "
+            "DASHBOARD_JSON_URL (reachable from this server).",
+        )
     try:
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
             r = await client.get(url)

@@ -1,10 +1,11 @@
 """Shared auth: Farm Dashboard integration key and/or admin Basic (integration routes and protected HTML)."""
 from __future__ import annotations
 
+import logging
 import os
 from urllib.parse import unquote
 
-from fastapi import Depends, Header, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 from app.config import get_settings
@@ -14,6 +15,8 @@ _security = HTTPBasic(auto_error=False)
 
 
 integration_http_basic = _security
+
+_logger = logging.getLogger(__name__)
 
 
 def _parse_integration_key(header_val: str | None) -> str:
@@ -48,20 +51,30 @@ def _integration_key_matches(got: str, x_raw: str | None) -> bool:
 
 
 async def require_integration_or_admin(
-    x_farmdash_key: str | None = Header(default=None, alias="X-FarmDash-Key"),
+    request: Request,
     credentials: HTTPBasicCredentials | None = Depends(_security),
 ) -> str:
     """
     Require ``X-FarmDash-Key`` matching ``FARMDASH_INTEGRATION_KEY`` or ``SERVER_TOKEN``, or admin HTTP Basic.
     Query-string secrets are not accepted.
     """
-    got = _parse_integration_key(x_farmdash_key).strip()
-    if _integration_key_matches(got, x_farmdash_key):
+    # Read from ASGI scope (case-insensitive); avoids edge cases with Header() injection on some clients.
+    x_raw = request.headers.get("x-farmdash-key")
+    got = _parse_integration_key(x_raw).strip()
+    if _integration_key_matches(got, x_raw):
         return "integration"
     s = get_settings()
     user, pw = s["admin_username"], s["admin_password"]
     if pw and credentials and credentials.username == user and credentials.password == pw:
         return "admin"
+    _logger.warning(
+        "integration auth failed path=%s key_present=%s key_len=%s farmdash_key_env_set=%s server_token_set=%s",
+        request.url.path,
+        bool(got),
+        len(got) if got else 0,
+        bool((os.getenv("FARMDASH_INTEGRATION_KEY") or "").strip()),
+        bool((os.getenv("SERVER_TOKEN") or "").strip()),
+    )
     raise HTTPException(
         status_code=401,
         detail=(
@@ -79,17 +92,18 @@ def get_farmdash_connection_bucket(
     """Resolve RAM bucket for push/consultant (``__default__`` or registered connection UUID)."""
     from app.services.connection_registry import resolve_connection_bucket_id
 
-    got = parse_integration_key_header(request.headers.get("X-FarmDash-Key"))
+    got = parse_integration_key_header(request.headers.get("x-farmdash-key"))
     return resolve_connection_bucket_id(got)
 
 
 def integration_or_admin_authenticated(
-    x_farmdash_key: str | None,
+    request: Request,
     credentials: HTTPBasicCredentials | None,
 ) -> bool:
     """True if the same credentials would pass :func:`require_integration_or_admin` (no query params)."""
-    got = _parse_integration_key(x_farmdash_key).strip()
-    if _integration_key_matches(got, x_farmdash_key):
+    x_raw = request.headers.get("x-farmdash-key")
+    got = _parse_integration_key(x_raw).strip()
+    if _integration_key_matches(got, x_raw):
         return True
     s = get_settings()
     user, pw = s["admin_username"], s["admin_password"]

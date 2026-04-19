@@ -309,7 +309,7 @@
   /**
    * AI unavailable or declined — neutral copy only (no warning banners; full dashboard works without AI).
    */
-  function renderSmartSuggestionsUnavailableNeutral() {
+  function renderSmartSuggestionsUnavailableNeutral(detailOpt) {
     var container = document.getElementById('ai-insights-panel');
     var badge = document.getElementById('ai-insights-llm-badge');
     if (!container) return;
@@ -320,12 +320,24 @@
       badge.title =
         'Optional — Smart suggestions need an AI host or BYOK in settings. The dashboard does not require them.';
     }
+    var detail = detailOpt != null ? String(detailOpt).trim() : '';
+    if (detail.length > 420) detail = detail.slice(0, 417) + '…';
+    var errBlock =
+      detail !== ''
+        ? '<div class="alert alert-warning py-2 px-3 small mb-2" role="status"><strong>Smart suggestions did not load.</strong><br/><span class="font-monospace text-break">' +
+          String(detail)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;') +
+          '</span></div>'
+        : '';
     container.innerHTML =
+      errBlock +
       '<p class="small text-muted mb-2">' +
       '<i class="bi bi-lightbulb me-1"></i> <strong>Smart suggestions</strong> are optional. When connected, this panel ranks tips from your live snapshot — fields, fleet, animals, pastures, production, and economy.' +
       '</p>' +
       '<p class="small text-muted mb-0">' +
-      'Use <strong>Settings → AI Farm Manager → BYOK</strong>: OpenAI/Gemini key, or <strong>Local / OpenAI-compatible</strong> with your Ollama URL (e.g. <code class="small">http://127.0.0.1:11434</code>) + model. Ensure the game is running with the mod so farm data loads, then click <strong>Refresh</strong> above.' +
+      '<strong>Hosted AI:</strong> fix <strong>link key</strong> (must match the server), turn on <strong>Send farm data</strong>, and ensure the AI server accepts pushes. <strong>Ollama/BYOK:</strong> if local LLM returns bad JSON, clear BYOK or add Hosted URL so the app can use your server instead. Then click <strong>Refresh</strong> above.' +
       '</p>';
   }
 
@@ -780,7 +792,7 @@
             window.farmdashNotifyConsultantHttpError(0, msg, { silent: true });
           }
           var doFailNeutral = function () {
-            renderSmartSuggestionsUnavailableNeutral();
+            renderSmartSuggestionsUnavailableNeutral(msg);
           };
           if (typeof dashFlushDomWork === 'function') {
             dashFlushDomWork(doFailNeutral);

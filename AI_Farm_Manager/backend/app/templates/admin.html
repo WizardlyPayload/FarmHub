@@ -67,7 +67,10 @@
 
       <section class="card inner-card" style="border-left: 3px solid #3fb950;">
         <h3 class="subh" style="margin-top:0;">Farm Dashboard invite URL (set once)</h3>
-        <p class="muted small" style="margin-bottom:0.75rem;">What players paste as <strong>Server URL</strong> — root only: <code>http://YOUR_PUBLIC_IP:PORT</code> or <code>https://your-domain</code>. No <code>/admin</code>, <code>/api</code>, or <code>/health</code>.</p>
+        <p class="muted small mb-2"><strong>Copy for players (server address):</strong> <code id="copyClientServerUrl" style="user-select:all;word-break:break-all;">{{ client_server_url_display }}</code>
+          <button type="button" class="btn" style="margin-left:0.35rem;padding:0.15rem 0.5rem;font-size:0.85rem;" onclick="navigator.clipboard.writeText(document.getElementById('copyClientServerUrl').textContent)">Copy</button>
+        </p>
+        <p class="muted small" style="margin-bottom:0.75rem;">What players paste as <strong>Server URL</strong> — root only: <code>http://YOUR_PUBLIC_IP:PORT</code> or <code>https://your-domain</code>. No <code>/admin</code>, <code>/api</code>, or <code>/health</code>. TrueNAS / LAN: use your host’s IP or hostname here.</p>
         <form method="post" action="/admin/api/settings" class="form" style="max-width:42rem;">
           <input type="hidden" name="redirect_tab" value="clients"/>
           <label class="row"><span>Invite base URL</span>
@@ -153,11 +156,11 @@ Turn on “Send farm data”, then Save &amp; load.</pre>
       <p class="muted small">No extra connections yet — only the global env key applies, or add one below.</p>
       {% endif %}
 
-      <h3 class="subh">Add connection</h3>
+      <h3 class="subh">Add new client</h3>
       <form method="post" action="/admin/api/connections/create" class="form" style="max-width:28rem;">
         <input type="hidden" name="redirect_tab" value="clients"/>
         <label class="row"><span>Label (for your reference)</span><input type="text" name="label" placeholder="e.g. Josh — gaming PC" required/></label>
-        <button type="submit" class="btn primary">Create &amp; show link key</button>
+        <button type="submit" class="btn primary">Add New Client — generate link key</button>
       </form>
     </section>
 

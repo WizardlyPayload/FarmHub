@@ -32,7 +32,7 @@ const {
 const { mergeData, buildFieldLiveFingerprints } = require('./dataMerger');
 const { loadServerCache, saveServerCache, appendFieldHistory } = require('./serverDataCache');
 const { initAppUpdater, checkForUpdatesNow } = require('./app-updater');
-const { runByokConsultantLlm } = require('./localConsultantLlm');
+const { runByokConsultantLlm, runByokConsultantLlmOllamaSharded } = require('./localConsultantLlm');
 const { pruneMergedDataForView, hashPrunedSnapshot } = require('./consultantSnapshotPrune');
 
 const store = new Store({ defaults: { ...LAN_ACCESS_DEFAULTS } });
@@ -154,6 +154,11 @@ function normalizeAiFarmManagerHostedBaseUrl(raw) {
 }
 
 function mergeBrandingIntoAiManagerConnection() {
+    ensureAiSuggestionModeMigrated();
+    const mode = getAiSuggestionMode();
+    if (mode && mode !== AI_SUGGESTION_MODE.HOSTED) {
+        return;
+    }
     const b = loadBrandingFromDisk();
     const cur = store.get('aiManagerConnection') || {};
     const next = { ...cur };
@@ -831,11 +836,143 @@ expressApp.get('/api/lan-ws-token', (req, res) => {
  * LAN / tablet browsers: forward consultant insights through the host PC so clients use the same
  * AI URL + integration key + BYOK as Electron (no duplicate LLM config on the tablet, no 127.0.0.1:8080 on wrong device).
  */
+/** Mutually exclusive Smart suggestion modes (Settings → AI Farm Manager). */
+const AI_SUGGESTION_MODE = {
+    HOSTED: 'hosted',
+    GEMINI_BYOK: 'gemini_byok',
+    OLLAMA: 'ollama',
+    /** LM Studio, vLLM, etc. — OpenAI-compatible HTTP API with arbitrary base URL + bearer key (not the Ollama preset tab). */
+    OPENAI_COMPAT: 'openai_compat',
+};
+
+/**
+ * One-time migration from legacy overlapping BYOK + hosted config.
+ */
+function ensureAiSuggestionModeMigrated() {
+    if (store.get('aiSuggestionModeMigratedV1')) return;
+    if (store.get('aiSuggestionMode')) {
+        store.set('aiSuggestionModeMigratedV1', true);
+        return;
+    }
+    const c = store.get('aiManagerConnection') || {};
+    const b = loadBrandingFromDisk();
+    const embKey = sanitizeFarmdashIntegrationKey(b.embeddedFarmdashIntegrationKey || '');
+    const defUrl = String(b.defaultAiBackendUrl || '').trim().replace(/\/$/, '');
+    const url = normalizeAiFarmManagerHostedBaseUrl(c.baseUrl || defUrl || '');
+    const key = sanitizeFarmdashIntegrationKey(c.integrationKey || embKey || '');
+    const byok = store.get('consultantByok') || {};
+    const apiKey = byok.apiKey && String(byok.apiKey).trim() ? String(byok.apiKey).trim() : '';
+    const ob = byok.openaiBaseUrl && String(byok.openaiBaseUrl).trim() ? String(byok.openaiBaseUrl).trim() : '';
+    let prov = byok.provider === 'gemini' ? 'gemini' : byok.provider === 'openai_compat' ? 'openai_compat' : 'openai';
+    if (apiKey.startsWith('AIza')) prov = 'gemini';
+    else if (apiKey.startsWith('sk-')) prov = 'openai';
+    if (ob && prov !== 'gemini') prov = 'openai_compat';
+
+    const hasHosted = !!(url && key);
+    if (hasHosted && c.pushSnapshots !== false) {
+        store.set('aiSuggestionMode', AI_SUGGESTION_MODE.HOSTED);
+    } else if (apiKey && prov === 'gemini') {
+        store.set('aiSuggestionMode', AI_SUGGESTION_MODE.GEMINI_BYOK);
+        if (!store.get('aiGeminiByok')) {
+            store.set('aiGeminiByok', {
+                apiKey,
+                modelId: String(byok.modelId || '').trim(),
+                modelIdsCsv: String(byok.modelIdsCsv || '').trim(),
+            });
+        }
+    } else if (ob || prov === 'openai_compat' || (apiKey === 'ollama' && ob)) {
+        store.set('aiSuggestionMode', AI_SUGGESTION_MODE.OLLAMA);
+        if (!store.get('aiOllamaLocal')) {
+            store.set('aiOllamaLocal', {
+                baseUrl: ob || 'http://127.0.0.1:11434',
+                modelId: String(byok.modelId || '').trim() || 'llama3.2',
+            });
+        }
+    } else if (hasHosted) {
+        store.set('aiSuggestionMode', AI_SUGGESTION_MODE.HOSTED);
+    } else if (apiKey || ob) {
+        store.set('aiSuggestionMode', AI_SUGGESTION_MODE.GEMINI_BYOK);
+        if (!store.get('aiGeminiByok')) {
+            store.set('aiGeminiByok', {
+                apiKey,
+                modelId: String(byok.modelId || '').trim(),
+                modelIdsCsv: String(byok.modelIdsCsv || '').trim(),
+            });
+        }
+    }
+    store.set('aiSuggestionModeMigratedV1', true);
+    syncConsultantByokMirrorFromMode();
+}
+
+function getAiSuggestionMode() {
+    ensureAiSuggestionModeMigrated();
+    return String(store.get('aiSuggestionMode') || '').trim();
+}
+
+/** Keep legacy `consultantByok` in sync for model-list IPC when a local LLM mode is active. */
+function syncConsultantByokMirrorFromMode() {
+    const mode = getAiSuggestionMode();
+    if (mode === AI_SUGGESTION_MODE.GEMINI_BYOK) {
+        const g = store.get('aiGeminiByok') || {};
+        store.set('consultantByok', {
+            provider: 'gemini',
+            apiKey: String(g.apiKey || '').trim(),
+            modelId: String(g.modelId || '').trim(),
+            modelIdsCsv: String(g.modelIdsCsv || '').trim(),
+        });
+        return;
+    }
+    if (mode === AI_SUGGESTION_MODE.OLLAMA) {
+        const o = store.get('aiOllamaLocal') || {};
+        store.set('consultantByok', {
+            provider: 'openai_compat',
+            apiKey: 'ollama',
+            openaiBaseUrl: String(o.baseUrl || '').trim(),
+            modelId: String(o.modelId || '').trim() || 'llama3.2',
+        });
+        return;
+    }
+    if (mode === AI_SUGGESTION_MODE.OPENAI_COMPAT) {
+        const x = store.get('aiOpenaiCompatByok') || {};
+        store.set('consultantByok', {
+            provider: 'openai_compat',
+            apiKey: String(x.apiKey || '').trim(),
+            openaiBaseUrl: String(x.baseUrl || '').trim(),
+            modelId: String(x.modelId || '').trim(),
+            modelIdsCsv: String(x.modelIdsCsv || '').trim(),
+            additionalKeys: String(x.additionalKeys || '').trim(),
+        });
+        return;
+    }
+    store.delete('consultantByok');
+}
+
+function clearInactiveAiSuggestionStores(activeMode) {
+    if (activeMode !== AI_SUGGESTION_MODE.HOSTED) {
+        store.set('aiManagerConnection', { baseUrl: '', integrationKey: '', pushSnapshots: false });
+        stopAiSnapshotPushInterval();
+    }
+    if (activeMode !== AI_SUGGESTION_MODE.GEMINI_BYOK) {
+        store.delete('aiGeminiByok');
+    }
+    if (activeMode !== AI_SUGGESTION_MODE.OLLAMA) {
+        store.delete('aiOllamaLocal');
+    }
+    if (activeMode !== AI_SUGGESTION_MODE.OPENAI_COMPAT) {
+        store.delete('aiOpenaiCompatByok');
+    }
+}
+
 /**
  * Effective Hosted AI URL + link key for this process (electron-store + branding.json defaults).
- * Must be the single source for proxy, snapshot push, and IPC — otherwise push can send a different key than the UI.
+ * Only when mode === hosted — otherwise returns empty (no push, no hosted proxy).
  */
 function resolveAiManagerConnectionForHttp() {
+    ensureAiSuggestionModeMigrated();
+    const mode = getAiSuggestionMode();
+    if (mode !== AI_SUGGESTION_MODE.HOSTED) {
+        return { baseUrl: '', integrationKey: '', pushSnapshots: false };
+    }
     const b = loadBrandingFromDisk();
     const c = store.get('aiManagerConnection') || {};
     const embKey = sanitizeFarmdashIntegrationKey(b.embeddedFarmdashIntegrationKey || '');
@@ -851,79 +988,102 @@ function resolveAiManagerConnectionForHttp() {
     };
 }
 
+/** Same URL + key resolution as Save hosted connection (form + branding fallbacks). */
+function effectiveHostedConnectionFromSavePayload(payload) {
+    const b = loadBrandingFromDisk();
+    const embKey = sanitizeFarmdashIntegrationKey(b.embeddedFarmdashIntegrationKey || '');
+    const defUrl = String(b.defaultAiBackendUrl || '').trim().replace(/\/$/, '');
+    let baseUrl = normalizeAiFarmManagerHostedBaseUrl(String(payload?.baseUrl || '').trim());
+    let integrationKey = sanitizeFarmdashIntegrationKey(payload?.integrationKey || '');
+    if (!integrationKey && embKey) {
+        integrationKey = embKey;
+    }
+    if (!baseUrl && defUrl) {
+        baseUrl = normalizeAiFarmManagerHostedBaseUrl(defUrl);
+    }
+    return { baseUrl, integrationKey };
+}
+
 function getAiManagerConnectionForProxy() {
     const x = resolveAiManagerConnectionForHttp();
     return { baseUrl: x.baseUrl, integrationKey: x.integrationKey };
 }
 
 function getConsultantByokHeadersForProxy() {
-    const pairs = getConsultantByokCredentialPairs();
-    const first = pairs[0];
-    if (!first || !first.apiKey) return {};
-    const h = {
-        'X-AI-API-Key': first.apiKey,
-        'X-AI-Provider': first.provider === 'gemini' ? 'gemini' : 'openai',
-    };
-    const b = first.openaiBaseUrl && String(first.openaiBaseUrl).trim();
-    if (b) {
-        h['X-AI-OpenAI-Base-URL'] = b;
-    }
-    return h;
+    /** Hosted tier uses only X-FarmDash-Key; do not mix BYOK headers into the hosted pipeline. */
+    return {};
 }
 
 /** Round-robin index for (key × model) pairs — spreads load across free-tier keys/models. */
 let byokCredentialRoundRobin = 0;
 
 /**
- * Build all (apiKey, provider, modelId) pairs: primary + additional keys × selected models (CSV).
+ * Build (apiKey, provider, modelId) pairs for the **active** local-LLM mode only (Gemini BYOK or Ollama).
  */
 function getConsultantByokCredentialPairs() {
-    const raw = store.get('consultantByok');
-    if (!raw || typeof raw !== 'object') return [];
-    const modelSlots = [];
-    if (raw.modelId && String(raw.modelId).trim()) modelSlots.push(String(raw.modelId).trim());
-    if (raw.modelIdsCsv && String(raw.modelIdsCsv).trim()) {
-        String(raw.modelIdsCsv)
-            .split(',')
-            .map((s) => s.trim())
-            .filter(Boolean)
-            .forEach((m) => {
-                if (!modelSlots.includes(m)) modelSlots.push(m);
-            });
-    }
-    if (modelSlots.length === 0) modelSlots.push(null);
-
-    const keys = [];
-    const pk = raw.apiKey && String(raw.apiKey).trim() ? String(raw.apiKey).trim() : '';
-    if (pk) keys.push(pk);
-    String(raw.additionalKeys || '')
-        .split(/[\r\n]+/)
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .forEach((k) => keys.push(k));
-
-    const rawOb =
-        raw.openaiBaseUrl && String(raw.openaiBaseUrl).trim() ? String(raw.openaiBaseUrl).trim() : '';
-    if (keys.length === 0 && rawOb) {
-        keys.push('ollama');
-    }
-
-    const pairs = [];
-    for (const apiKey of keys) {
-        let provider = raw.provider === 'gemini' ? 'gemini' : 'openai';
-        if (apiKey.startsWith('AIza')) provider = 'gemini';
-        else if (apiKey.startsWith('sk-')) provider = 'openai';
-        if (rawOb && provider !== 'gemini') provider = 'openai';
-        for (const mid of modelSlots) {
-            pairs.push({
-                apiKey,
-                provider,
-                modelId: mid || undefined,
-                openaiBaseUrl: rawOb || undefined,
-            });
+    const mode = getAiSuggestionMode();
+    if (mode === AI_SUGGESTION_MODE.GEMINI_BYOK) {
+        const g = store.get('aiGeminiByok') || {};
+        const apiKey = String(g.apiKey || '').trim();
+        if (!apiKey) return [];
+        const modelSlots = [];
+        if (g.modelId && String(g.modelId).trim()) modelSlots.push(String(g.modelId).trim());
+        if (g.modelIdsCsv && String(g.modelIdsCsv).trim()) {
+            String(g.modelIdsCsv)
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean)
+                .forEach((m) => {
+                    if (!modelSlots.includes(m)) modelSlots.push(m);
+                });
         }
+        if (modelSlots.length === 0) modelSlots.push(null);
+        return modelSlots.map((mid) => ({
+            apiKey,
+            provider: 'gemini',
+            modelId: mid || undefined,
+            openaiBaseUrl: undefined,
+        }));
     }
-    return pairs;
+    if (mode === AI_SUGGESTION_MODE.OLLAMA) {
+        const o = store.get('aiOllamaLocal') || {};
+        const base = String(o.baseUrl || '').trim();
+        const modelId = String(o.modelId || '').trim() || 'llama3.2';
+        if (!base) return [];
+        return [
+            {
+                apiKey: 'ollama',
+                provider: 'openai',
+                modelId,
+                openaiBaseUrl: base,
+            },
+        ];
+    }
+    if (mode === AI_SUGGESTION_MODE.OPENAI_COMPAT) {
+        const x = store.get('aiOpenaiCompatByok') || {};
+        const base = String(x.baseUrl || '').trim();
+        const apiKey = String(x.apiKey || '').trim();
+        if (!base || !apiKey) return [];
+        const modelSlots = [];
+        if (x.modelId && String(x.modelId).trim()) modelSlots.push(String(x.modelId).trim());
+        if (x.modelIdsCsv && String(x.modelIdsCsv).trim()) {
+            String(x.modelIdsCsv)
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean)
+                .forEach((m) => {
+                    if (!modelSlots.includes(m)) modelSlots.push(m);
+                });
+        }
+        if (modelSlots.length === 0) modelSlots.push(null);
+        return modelSlots.map((mid) => ({
+            apiKey,
+            provider: 'openai',
+            modelId: mid || undefined,
+            openaiBaseUrl: base,
+        }));
+    }
+    return [];
 }
 
 function pickNextConsultantByokCredentialPair() {
@@ -977,31 +1137,59 @@ function consultantInsightsCacheKey(query) {
 
 expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
     try {
+        ensureAiSuggestionModeMigrated();
+        const mode = getAiSuggestionMode();
         const conn = getAiManagerConnectionForProxy();
         const cacheKey = consultantInsightsCacheKey(req.query || {});
         const fromLocalDashboard = isLocalDashboardClient(req);
-        const byokPairs = getConsultantByokCredentialPairs();
 
-        /**
-         * BYOK: generate Smart suggestions on this PC via OpenAI/Gemini/Ollama — does not call a hosted server.
-         * If there is no local merged farm JSON yet but Hosted AI (URL + link key) is configured, we **fall through**
-         * so Smart suggestions can still use the VPS (snapshot from push / FTP). Otherwise BYOK would block hosted forever.
-         */
-        if (byokPairs.length > 0 && fromLocalDashboard) {
+        if (!mode) {
+            return res.status(503).json({
+                detail:
+                    'Select a Smart suggestions source in Settings → AI Farm Manager: Hosted AI (server URL + link key), Gemini API key, or local Ollama.',
+                insights: [],
+                llm_used: false,
+                farmdash_ai_error: 'not_configured',
+            });
+        }
+
+        const runLocalByokPath = async () => {
+            const byokPairs = getConsultantByokCredentialPairs();
+            if (byokPairs.length === 0) {
+                return res.status(503).json({
+                    detail: 'Configure your API key or Ollama URL in Settings → AI Farm Manager for the selected mode.',
+                    insights: [],
+                    llm_used: false,
+                    farmdash_ai_error: 'not_configured',
+                });
+            }
+            if (!fromLocalDashboard) {
+                const ent = consultantInsightsProxyCache.get(cacheKey);
+                if (ent && Date.now() - ent.ts < CONSULTANT_PROXY_CACHE_TTL_MS) {
+                    res.status(ent.status);
+                    if (ent.contentType) res.setHeader('Content-Type', ent.contentType);
+                    else res.type('application/json');
+                    return res.send(ent.text);
+                }
+                return res.status(503).json({
+                    detail:
+                        'Smart suggestions run on the PC with Farm Dashboard. Open the dashboard on this machine via localhost first so results can be cached for tablets.',
+                    insights: [],
+                    llm_used: false,
+                    farmdash_ai_error: 'lan_cache_miss',
+                    cache_miss: true,
+                });
+            }
             const snap = buildConsultantSnapshotForInsightsRequest(req);
             if (!snap) {
-                const canHostedFallback = !!(conn.baseUrl && conn.integrationKey);
-                if (!canHostedFallback) {
-                    return res.status(503).json({
-                        detail:
-                            'No farm snapshot yet. Start FS25 with the mod connected, or wait until the dashboard loads save data — then try Smart suggestions again. Or add your AI Farm Manager URL + link key under Settings → Hosted AI so suggestions can use data already on the server.',
-                        insights: [],
-                        llm_used: false,
-                        farmdash_ai_error: 'no_snapshot',
-                    });
-                }
-                /* fall through to hosted proxy */
-            } else {
+                return res.status(503).json({
+                    detail:
+                        'No farm snapshot yet. Start FS25 with the mod connected and wait until data loads — then try Smart suggestions again.',
+                    insights: [],
+                    llm_used: false,
+                    farmdash_ai_error: 'no_snapshot',
+                });
+            }
             const view = String((req.query && req.query.view) || 'home');
             const context = String((req.query && req.query.context) || '');
             const sid = resolveServerIdForRequest(req);
@@ -1022,30 +1210,33 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
                 res.setHeader('X-FarmDash-Byok-Snapshot-Cache', 'hash-hit');
                 return res.send(prevLane.jsonText);
             }
-
             const cred = pickNextConsultantByokCredentialPair();
             if (!cred) {
-                if (conn.baseUrl && conn.integrationKey) {
-                    /* fall through to hosted proxy */
-                } else {
-                    return res.status(503).json({
-                        detail: 'No BYOK credentials configured.',
-                        insights: [],
-                        llm_used: false,
-                        farmdash_ai_error: 'not_configured',
-                    });
-                }
-            } else {
+                return res.status(503).json({
+                    detail: 'Missing credentials for this mode.',
+                    insights: [],
+                    llm_used: false,
+                    farmdash_ai_error: 'not_configured',
+                });
+            }
             try {
-                const out = await runByokConsultantLlm({
+                const prov =
+                    cred.provider === 'gemini'
+                        ? 'gemini'
+                        : 'openai';
+                const llmOpts = {
                     snapshot: pruned,
                     view,
                     context,
-                    provider: cred.provider,
+                    provider: prov,
                     apiKey: cred.apiKey,
                     modelId: cred.modelId || undefined,
                     openaiBaseUrl: cred.openaiBaseUrl || undefined,
-                });
+                };
+                const out =
+                    mode === AI_SUGGESTION_MODE.OLLAMA && prov === 'openai'
+                        ? await runByokConsultantLlmOllamaSharded(llmOpts)
+                        : await runByokConsultantLlm(llmOpts);
                 const bodyObj = {
                     insights: out.insights || [],
                     llm_used: true,
@@ -1070,39 +1261,29 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
                 return res.send(text);
             } catch (e) {
                 console.warn('[consultant BYOK local]', e && e.message ? e.message : e);
-                if (conn.baseUrl && conn.integrationKey) {
-                    console.info(
-                        '[consultant] BYOK LLM failed — trying hosted AI Farm Manager instead (same request).'
-                    );
-                    /* fall through to hosted proxy below */
-                } else {
-                    return res.status(503).json({
-                        detail: String(e && e.message ? e.message : e),
-                        insights: [],
-                        llm_used: false,
-                        farmdash_ai_error: 'byok_llm_failed',
-                    });
-                }
+                return res.status(503).json({
+                    detail: String(e && e.message ? e.message : e),
+                    insights: [],
+                    llm_used: false,
+                    farmdash_ai_error: 'byok_llm_failed',
+                });
             }
-            }
-            }
+        };
+
+        if (
+            mode === AI_SUGGESTION_MODE.GEMINI_BYOK ||
+            mode === AI_SUGGESTION_MODE.OLLAMA ||
+            mode === AI_SUGGESTION_MODE.OPENAI_COMPAT
+        ) {
+            return runLocalByokPath();
         }
 
-        if (byokPairs.length > 0 && !fromLocalDashboard) {
-            const ent = consultantInsightsProxyCache.get(cacheKey);
-            if (ent && Date.now() - ent.ts < CONSULTANT_PROXY_CACHE_TTL_MS) {
-                res.status(ent.status);
-                if (ent.contentType) res.setHeader('Content-Type', ent.contentType);
-                else res.type('application/json');
-                return res.send(ent.text);
-            }
+        if (mode !== AI_SUGGESTION_MODE.HOSTED) {
             return res.status(503).json({
-                detail:
-                    'Smart suggestions (your API key) are generated on the PC running Farm Dashboard. Open the app there on localhost first so it can cache results — LAN viewers reuse that cache.',
+                detail: 'Unknown AI suggestion mode.',
                 insights: [],
                 llm_used: false,
-                farmdash_ai_error: 'lan_cache_miss',
-                cache_miss: true,
+                farmdash_ai_error: 'not_configured',
             });
         }
 
@@ -1125,7 +1306,7 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
             }
             return res.status(503).json({
                 detail:
-                    'AI insights are fetched once on the PC running Farm Dashboard (open it via localhost on the host). This device shows cached results only — it does not call the LLM separately.',
+                    'AI insights are fetched on the PC running Farm Dashboard (localhost). This device shows cached results only.',
                 insights: [],
                 llm_used: false,
                 farmdash_ai_error: 'lan_cache_miss',
@@ -1144,7 +1325,6 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
         const hdrs = {
             Accept: 'application/json',
             'X-FarmDash-Key': conn.integrationKey,
-            ...getConsultantByokHeadersForProxy(),
         };
         const fr = await fetch(target.toString(), { method: 'GET', headers: hdrs, cache: 'no-store' });
         let text = await fr.text();
@@ -1176,7 +1356,7 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
         logAiBackendUnreachableOnce('GET /api/farmdash-ai/consultant/insights (proxy)', e, conn.baseUrl);
         return res.status(503).json({
             detail:
-                'Cannot reach AI Farm Manager. Start the service on your VPS, confirm the URL/port in Farm Dashboard AI settings, and ensure outbound access from this PC (or disable AI until it is back).',
+                'Cannot reach AI Farm Manager. Check the server URL in Settings → AI Farm Manager (Hosted AI) and network access.',
             insights: [],
             llm_used: false,
             farmdash_ai_error: 'unreachable',
@@ -2118,6 +2298,7 @@ process.on('unhandledRejection', (reason) => {
 
 app.whenReady().then(() => {
     consumeInstallLocaleFile();
+    ensureAiSuggestionModeMigrated();
     mergeBrandingIntoAiManagerConnection();
     createWindow();
     initAppUpdater(() => mainWindow);
@@ -2229,21 +2410,99 @@ ipcMain.handle('get-ai-manager-connection', () => {
     };
 });
 
+ipcMain.handle('get-ai-suggestion-settings', () => {
+    ensureAiSuggestionModeMigrated();
+    const mode = getAiSuggestionMode();
+    const h = store.get('aiManagerConnection') || {};
+    const g = store.get('aiGeminiByok') || {};
+    const o = store.get('aiOllamaLocal') || {};
+    const oc = store.get('aiOpenaiCompatByok') || {};
+    return {
+        mode: mode || '',
+        hosted: {
+            baseUrl: h.baseUrl || '',
+            integrationKey: h.integrationKey || '',
+            pushSnapshots: h.pushSnapshots !== false,
+        },
+        gemini: {
+            apiKey: g.apiKey || '',
+            modelId: g.modelId || '',
+            modelIdsCsv: g.modelIdsCsv || '',
+        },
+        ollama: {
+            baseUrl: o.baseUrl || '',
+            modelId: o.modelId || '',
+        },
+        openai_compat: {
+            baseUrl: oc.baseUrl || '',
+            apiKey: oc.apiKey || '',
+            modelId: oc.modelId || '',
+            modelIdsCsv: oc.modelIdsCsv || '',
+            additionalKeys: oc.additionalKeys || '',
+        },
+    };
+});
+
+ipcMain.handle('save-ai-suggestion-settings', (_e, payload) => {
+    const mode = String(payload?.mode || '').trim();
+    if (
+        mode !== AI_SUGGESTION_MODE.HOSTED &&
+        mode !== AI_SUGGESTION_MODE.GEMINI_BYOK &&
+        mode !== AI_SUGGESTION_MODE.OLLAMA &&
+        mode !== AI_SUGGESTION_MODE.OPENAI_COMPAT
+    ) {
+        return { ok: false, error: 'invalid_mode' };
+    }
+    clearInactiveAiSuggestionStores(mode);
+    store.set('aiSuggestionMode', mode);
+    if (mode === AI_SUGGESTION_MODE.HOSTED) {
+        const hosted = payload?.hosted || {};
+        const { baseUrl, integrationKey } = effectiveHostedConnectionFromSavePayload(hosted);
+        const pushSnapshots = hosted.pushSnapshots !== false;
+        store.set('aiManagerConnection', { baseUrl, integrationKey, pushSnapshots });
+        if (pushSnapshots && baseUrl && integrationKey) {
+            ensureAiSnapshotPushInterval();
+            pushAllSnapshotsToAiManager();
+        } else {
+            stopAiSnapshotPushInterval();
+        }
+    } else if (mode === AI_SUGGESTION_MODE.GEMINI_BYOK) {
+        const gem = payload?.gemini || {};
+        store.set('aiGeminiByok', {
+            apiKey: String(gem.apiKey || '').trim(),
+            modelId: String(gem.modelId || '').trim(),
+            modelIdsCsv: String(gem.modelIdsCsv || '').trim(),
+        });
+        stopAiSnapshotPushInterval();
+    } else if (mode === AI_SUGGESTION_MODE.OPENAI_COMPAT) {
+        const oc = payload?.openai_compat || {};
+        store.set('aiOpenaiCompatByok', {
+            baseUrl: String(oc.baseUrl || '').trim(),
+            apiKey: String(oc.apiKey || '').trim(),
+            modelId: String(oc.modelId || '').trim(),
+            modelIdsCsv: String(oc.modelIdsCsv || '').trim(),
+            additionalKeys: String(oc.additionalKeys || '').trim(),
+        });
+        stopAiSnapshotPushInterval();
+    } else {
+        const ol = payload?.ollama || {};
+        store.set('aiOllamaLocal', {
+            baseUrl: String(ol.baseUrl || '').trim(),
+            modelId: String(ol.modelId || '').trim() || 'llama3.2',
+        });
+        stopAiSnapshotPushInterval();
+    }
+    syncConsultantByokMirrorFromMode();
+    return { ok: true };
+});
+
 ipcMain.handle('save-ai-manager-connection', (_e, payload) => {
-    const b = loadBrandingFromDisk();
-    const embKey = sanitizeFarmdashIntegrationKey(b.embeddedFarmdashIntegrationKey || '');
-    const defUrl = String(b.defaultAiBackendUrl || '').trim().replace(/\/$/, '');
-    let baseUrl = normalizeAiFarmManagerHostedBaseUrl(String(payload?.baseUrl || '').trim());
-    let integrationKey = sanitizeFarmdashIntegrationKey(payload?.integrationKey || '');
-    if (!integrationKey && embKey) {
-        integrationKey = embKey;
-    }
-    /** Branded default URL/key stay effective if the user saves with hidden/empty fields (BYOK-only save). */
-    if (!baseUrl && defUrl) {
-        baseUrl = normalizeAiFarmManagerHostedBaseUrl(defUrl);
-    }
+    const { baseUrl, integrationKey } = effectiveHostedConnectionFromSavePayload(payload || {});
     const pushSnapshots = !!payload?.pushSnapshots;
+    store.set('aiSuggestionMode', AI_SUGGESTION_MODE.HOSTED);
+    clearInactiveAiSuggestionStores(AI_SUGGESTION_MODE.HOSTED);
     store.set('aiManagerConnection', { baseUrl, integrationKey, pushSnapshots });
+    syncConsultantByokMirrorFromMode();
     if (pushSnapshots && baseUrl && integrationKey) {
         ensureAiSnapshotPushInterval();
         pushAllSnapshotsToAiManager();
@@ -2251,6 +2510,63 @@ ipcMain.handle('save-ai-manager-connection', (_e, payload) => {
         stopAiSnapshotPushInterval();
     }
     return { ok: true };
+});
+
+/**
+ * Hosted AI: verify URL + link key against the server (GET /api/integration/overview — returns 401 if key is wrong).
+ * Uses the same URL/key rules as Save (including embedded installer key when the field is hidden).
+ */
+ipcMain.handle('test-hosted-ai-connection', async (_e, payload) => {
+    const { baseUrl, integrationKey } = effectiveHostedConnectionFromSavePayload(payload || {});
+    if (!baseUrl) {
+        return {
+            ok: false,
+            message:
+                'Enter the AI server address first (or use Host + port and “Fill server URL”), then click Test again.',
+        };
+    }
+    if (!integrationKey) {
+        return {
+            ok: false,
+            message:
+                'No link key. Click “My host sent a new link key” and paste the secret your host emailed you, then Test again.',
+        };
+    }
+    const url = `${baseUrl.replace(/\/$/, '')}/api/integration/overview`;
+    const ac = new AbortController();
+    const t = setTimeout(() => ac.abort(), 25000);
+    try {
+        const res = await fetch(url, {
+            method: 'GET',
+            headers: { 'X-FarmDash-Key': integrationKey },
+            signal: ac.signal,
+        });
+        clearTimeout(t);
+        if (res.status === 401) {
+            return {
+                ok: false,
+                message:
+                    'The link key does not match the AI server. Ask whoever runs the server to resend the Farm Dashboard / integration key, paste it in Link key, click Save hosted connection, then Test again.',
+                status: 401,
+            };
+        }
+        if (!res.ok) {
+            return {
+                ok: false,
+                message: `The server replied with error ${res.status}. Check the address and that the AI Farm Manager app is running.`,
+                status: res.status,
+            };
+        }
+        return {
+            ok: true,
+            message:
+                'Success — your server accepted the link key. Click Save hosted connection if you changed anything, then you are done.',
+        };
+    } catch (e) {
+        clearTimeout(t);
+        const msg = e && e.name === 'AbortError' ? 'Connection timed out. Check the address and your network.' : String(e.message || e);
+        return { ok: false, message: `Could not reach the server: ${msg}` };
+    }
 });
 
 ipcMain.handle('ai-farm-install-config-xml', async (_e, { baseUrl, integrationKey, instanceId }) => {
@@ -2551,6 +2867,52 @@ async function listByokProviderModelsInternal(provider, apiKey, openaiBaseUrl) {
 
 // ── AI Consultant BYOK (stored in electron-store; never committed) ─────────────
 ipcMain.handle('get-consultant-byok-credentials', () => {
+    ensureAiSuggestionModeMigrated();
+    const mode = getAiSuggestionMode();
+    if (mode === AI_SUGGESTION_MODE.GEMINI_BYOK) {
+        const g = store.get('aiGeminiByok') || {};
+        const apiKey = g.apiKey && String(g.apiKey).trim() ? String(g.apiKey).trim() : '';
+        const modelId = g.modelId && String(g.modelId).trim() ? String(g.modelId).trim() : '';
+        const modelIdsCsv = g.modelIdsCsv && String(g.modelIdsCsv).trim() ? String(g.modelIdsCsv).trim() : '';
+        return {
+            apiKey: apiKey || null,
+            provider: 'gemini',
+            openaiBaseUrl: null,
+            modelId: modelId || null,
+            modelIdsCsv: modelIdsCsv || null,
+            additionalKeys: null,
+        };
+    }
+    if (mode === AI_SUGGESTION_MODE.OLLAMA) {
+        const o = store.get('aiOllamaLocal') || {};
+        const base = o.baseUrl && String(o.baseUrl).trim() ? String(o.baseUrl).trim() : '';
+        const modelId = o.modelId && String(o.modelId).trim() ? String(o.modelId).trim() : '';
+        return {
+            apiKey: base ? 'ollama' : null,
+            provider: 'openai_compat',
+            openaiBaseUrl: base || null,
+            modelId: modelId || null,
+            modelIdsCsv: null,
+            additionalKeys: null,
+        };
+    }
+    if (mode === AI_SUGGESTION_MODE.OPENAI_COMPAT) {
+        const x = store.get('aiOpenaiCompatByok') || {};
+        const base = x.baseUrl && String(x.baseUrl).trim() ? String(x.baseUrl).trim() : '';
+        const apiKey = x.apiKey && String(x.apiKey).trim() ? String(x.apiKey).trim() : '';
+        const modelId = x.modelId && String(x.modelId).trim() ? String(x.modelId).trim() : '';
+        const modelIdsCsv = x.modelIdsCsv && String(x.modelIdsCsv).trim() ? String(x.modelIdsCsv).trim() : '';
+        const additionalKeys =
+            x.additionalKeys && String(x.additionalKeys).trim() ? String(x.additionalKeys).trim() : '';
+        return {
+            apiKey: apiKey || null,
+            provider: 'openai_compat',
+            openaiBaseUrl: base || null,
+            modelId: modelId || null,
+            modelIdsCsv: modelIdsCsv || null,
+            additionalKeys: additionalKeys || null,
+        };
+    }
     const raw = store.get('consultantByok');
     const r = raw && typeof raw === 'object' ? raw : {};
     const apiKey = r.apiKey && String(r.apiKey).trim() ? String(r.apiKey).trim() : '';
@@ -2577,6 +2939,49 @@ ipcMain.handle('get-consultant-byok-credentials', () => {
 });
 
 ipcMain.handle('get-consultant-byok-meta', () => {
+    ensureAiSuggestionModeMigrated();
+    const mode = getAiSuggestionMode();
+    if (mode === AI_SUGGESTION_MODE.GEMINI_BYOK) {
+        const g = store.get('aiGeminiByok') || {};
+        const apiKey = String(g.apiKey || '').trim();
+        const modelId = String(g.modelId || '').trim();
+        return {
+            hasKey: apiKey.length > 0,
+            hasOpenaiBaseUrl: false,
+            provider: 'gemini',
+            modelId: modelId || null,
+            extraKeyLines: 0,
+        };
+    }
+    if (mode === AI_SUGGESTION_MODE.OLLAMA) {
+        const o = store.get('aiOllamaLocal') || {};
+        const base = String(o.baseUrl || '').trim();
+        const modelId = String(o.modelId || '').trim();
+        return {
+            hasKey: base.length > 0,
+            hasOpenaiBaseUrl: base.length > 0,
+            provider: 'openai_compat',
+            modelId: modelId || null,
+            extraKeyLines: 0,
+        };
+    }
+    if (mode === AI_SUGGESTION_MODE.OPENAI_COMPAT) {
+        const x = store.get('aiOpenaiCompatByok') || {};
+        const base = String(x.baseUrl || '').trim();
+        const apiKey = String(x.apiKey || '').trim();
+        const modelId = String(x.modelId || '').trim();
+        const extraLines = String(x.additionalKeys || '')
+            .split(/[\r\n]+/)
+            .map((s) => s.trim())
+            .filter(Boolean).length;
+        return {
+            hasKey: apiKey.length > 0,
+            hasOpenaiBaseUrl: base.length > 0,
+            provider: 'openai_compat',
+            modelId: modelId || null,
+            extraKeyLines: extraLines,
+        };
+    }
     const raw = store.get('consultantByok');
     const r = raw && typeof raw === 'object' ? raw : {};
     const apiKey = r.apiKey && String(r.apiKey).trim() ? String(r.apiKey).trim() : '';
@@ -2612,7 +3017,23 @@ ipcMain.handle('list-byok-provider-models', async (_e, { provider, apiKey, opena
 });
 
 ipcMain.handle('list-saved-byok-provider-models', async () => {
-    const raw = store.get('consultantByok') || {};
+    ensureAiSuggestionModeMigrated();
+    const mode = getAiSuggestionMode();
+    let raw = store.get('consultantByok') || {};
+    if (mode === AI_SUGGESTION_MODE.GEMINI_BYOK) {
+        const g = store.get('aiGeminiByok') || {};
+        raw = { provider: 'gemini', apiKey: g.apiKey, openaiBaseUrl: '' };
+    } else if (mode === AI_SUGGESTION_MODE.OLLAMA) {
+        const o = store.get('aiOllamaLocal') || {};
+        raw = { provider: 'openai_compat', apiKey: 'ollama', openaiBaseUrl: o.baseUrl };
+    } else if (mode === AI_SUGGESTION_MODE.OPENAI_COMPAT) {
+        const x = store.get('aiOpenaiCompatByok') || {};
+        raw = {
+            provider: 'openai_compat',
+            apiKey: x.apiKey,
+            openaiBaseUrl: x.baseUrl,
+        };
+    }
     const apiKey = raw.apiKey && String(raw.apiKey).trim() ? String(raw.apiKey).trim() : '';
     const openaiBaseUrl = raw.openaiBaseUrl && String(raw.openaiBaseUrl).trim() ? String(raw.openaiBaseUrl).trim() : '';
     if (!apiKey && !openaiBaseUrl) {
@@ -2633,6 +3054,19 @@ ipcMain.handle('save-consultant-byok-credentials', (_e, payload) => {
     const clear = payload && payload.clear === true;
     if (clear) {
         store.delete('consultantByok');
+        store.delete('aiGeminiByok');
+        store.delete('aiOllamaLocal');
+        store.delete('aiOpenaiCompatByok');
+        const m = getAiSuggestionMode();
+        if (
+            m === AI_SUGGESTION_MODE.GEMINI_BYOK ||
+            m === AI_SUGGESTION_MODE.OLLAMA ||
+            m === AI_SUGGESTION_MODE.OPENAI_COMPAT
+        ) {
+            store.delete('aiSuggestionMode');
+        }
+        stopAiSnapshotPushInterval();
+        syncConsultantByokMirrorFromMode();
         return { ok: true, cleared: true };
     }
     const rawPrev = store.get('consultantByok');
@@ -2664,35 +3098,51 @@ ipcMain.handle('save-consultant-byok-credentials', (_e, payload) => {
         return { ok: false, error: 'empty_key' };
     }
     const explicitModel = payload && Object.prototype.hasOwnProperty.call(payload, 'modelId');
-    const next = { apiKey, provider };
-    if (openaiBaseUrl) {
-        next.openaiBaseUrl = openaiBaseUrl;
-    } else {
-        delete next.openaiBaseUrl;
-    }
-    if (explicitModel) {
-        const m = String(payload.modelId || '').trim();
-        if (m) next.modelId = m;
-    } else if (prev.modelId && String(prev.modelId).trim()) {
-        next.modelId = String(prev.modelId).trim();
-    }
     const explicitCsv = payload && Object.prototype.hasOwnProperty.call(payload, 'modelIdsCsv');
-    const explicitAdd = payload && Object.prototype.hasOwnProperty.call(payload, 'additionalKeys');
-    if (explicitCsv) {
-        const csv = String(payload.modelIdsCsv || '').trim();
-        if (csv) next.modelIdsCsv = csv;
-        else delete next.modelIdsCsv;
-    } else if (prev.modelIdsCsv && String(prev.modelIdsCsv).trim()) {
-        next.modelIdsCsv = String(prev.modelIdsCsv).trim();
+    const modelId = explicitModel
+        ? String(payload.modelId || '').trim()
+        : prev.modelId && String(prev.modelId).trim()
+          ? String(prev.modelId).trim()
+          : '';
+    const modelIdsCsv = explicitCsv
+        ? String(payload.modelIdsCsv || '').trim()
+        : prev.modelIdsCsv && String(prev.modelIdsCsv).trim()
+          ? String(prev.modelIdsCsv).trim()
+          : '';
+
+    if (provider === 'gemini' || (apiKey && apiKey.startsWith('AIza'))) {
+        clearInactiveAiSuggestionStores(AI_SUGGESTION_MODE.GEMINI_BYOK);
+        store.set('aiSuggestionMode', AI_SUGGESTION_MODE.GEMINI_BYOK);
+        store.set('aiGeminiByok', {
+            apiKey,
+            modelId,
+            modelIdsCsv,
+        });
+    } else if (provider === 'openai_compat' && openaiBaseUrl) {
+        const addl =
+            payload && Object.prototype.hasOwnProperty.call(payload, 'additionalKeys')
+                ? String(payload.additionalKeys || '').trim()
+                : prev.additionalKeys && String(prev.additionalKeys).trim()
+                  ? String(prev.additionalKeys).trim()
+                  : '';
+        clearInactiveAiSuggestionStores(AI_SUGGESTION_MODE.OPENAI_COMPAT);
+        store.set('aiSuggestionMode', AI_SUGGESTION_MODE.OPENAI_COMPAT);
+        store.set('aiOpenaiCompatByok', {
+            baseUrl: openaiBaseUrl,
+            apiKey,
+            modelId,
+            modelIdsCsv,
+            additionalKeys: addl,
+        });
+    } else {
+        clearInactiveAiSuggestionStores(AI_SUGGESTION_MODE.OLLAMA);
+        store.set('aiSuggestionMode', AI_SUGGESTION_MODE.OLLAMA);
+        store.set('aiOllamaLocal', {
+            baseUrl: openaiBaseUrl || 'http://127.0.0.1:11434',
+            modelId: modelId || 'llama3.2',
+        });
     }
-    if (explicitAdd) {
-        const ak = String(payload.additionalKeys || '').trim();
-        if (ak) next.additionalKeys = ak;
-        else delete next.additionalKeys;
-    } else if (prev.additionalKeys && String(prev.additionalKeys).trim()) {
-        next.additionalKeys = String(prev.additionalKeys).trim();
-    }
-    store.set('consultantByok', next);
+    syncConsultantByokMirrorFromMode();
     return { ok: true };
 });
 

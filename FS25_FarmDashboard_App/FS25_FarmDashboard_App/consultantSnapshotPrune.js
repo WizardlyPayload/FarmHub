@@ -341,8 +341,51 @@ function pruneMergedDataForView(full, view, context, farmId) {
     };
 }
 
+/**
+ * Strip verbose field blobs before sending to local LLMs with tiny num_ctx (e.g. Ollama 4096).
+ * Keeps keys the consultant prompts reference; drops huge geometry / debug payloads if present.
+ */
+const CONSULTANT_LLM_FIELD_KEYS = [
+    'farmlandId',
+    'id',
+    'name',
+    'label',
+    'hectares',
+    'fruitType',
+    'fruitTypeIndex',
+    'fruitTypeName',
+    'xmlFruitTypeHint',
+    'growthState',
+    'growthStatePercentage',
+    'growthLabel',
+    'harvestReady',
+    'isHarvested',
+    'nitrogenLevel',
+    'targetNitrogen',
+    'nitrogenText',
+    'needsWork',
+    'phValue',
+    'limeText',
+    'needsLime',
+    'phLimeBarMin',
+    'phLimeBarMax',
+];
+
+function slimFieldForConsultantLlm(row) {
+    if (!row || typeof row !== 'object') return null;
+    const o = {};
+    for (const k of CONSULTANT_LLM_FIELD_KEYS) {
+        if (row[k] !== undefined) o[k] = row[k];
+    }
+    if (Object.keys(o).length === 0) {
+        return { farmlandId: row.farmlandId, id: row.id };
+    }
+    return o;
+}
+
 module.exports = {
     pruneMergedDataForView,
     hashPrunedSnapshot,
     stableStringify,
+    slimFieldForConsultantLlm,
 };

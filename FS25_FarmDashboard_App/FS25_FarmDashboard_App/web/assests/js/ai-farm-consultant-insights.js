@@ -158,7 +158,11 @@
     if (!proxyBase) return Promise.reject(new Error('__no_origin__'));
     var q = buildConsultantInsightsQuery(viewParam);
     var apiURL = q ? proxyBase + '?' + q : proxyBase;
-    return fetch(apiURL, { method: 'GET', headers: { Accept: 'application/json' } })
+    var fetchOpts = { method: 'GET', headers: { Accept: 'application/json' } };
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+      fetchOpts.signal = AbortSignal.timeout(900000);
+    }
+    return fetch(apiURL, fetchOpts)
       .then(function (r) {
         if (!r.ok) {
           return r.text().then(function (t) {
@@ -261,16 +265,17 @@
   function getCurrentDashboardSection() {
     try {
       if (window.dashboard && typeof window.dashboard.getCurrentSection === 'function') {
-        return String(window.dashboard.getCurrentSection() || '').toLowerCase();
+        /** Match navigation.js: never return empty — avoids stale-check false positives vs getSmartPanelViewParam(). */
+        return String(window.dashboard.getCurrentSection() || 'landing').toLowerCase();
       }
     } catch (e) {}
-    return '';
+    return 'landing';
   }
 
   /** Landing vs dashboard both use no ``view=`` param — treat as one bucket for stale checks. */
   function insightSectionBucket(sec) {
     var s = String(sec || '').toLowerCase();
-    if (s === 'landing' || s === 'dashboard') return 'home';
+    if (!s || s === 'landing' || s === 'dashboard') return 'home';
     return s;
   }
 
@@ -731,6 +736,36 @@
               requestedView: requestedViewAtFetch,
               nowView: nowView,
             });
+            /**
+             * Without this, the panel can stay on “Loading Smart suggestions…” forever: the in-flight
+             * fetch was for a previous tab; we discarded the JSON but never painted for the tab the
+             * user is on now (common when Home/Landing preload finishes after navigating to Livestock).
+             */
+            try {
+              var panelStale = document.getElementById('ai-insights-panel');
+              if (panelStale) panelStale.removeAttribute('aria-busy');
+              if (nowSec === 'fields') {
+                var doFieldsStale = function () {
+                  renderFieldsSmartPanelForFieldsTab();
+                };
+                if (typeof dashFlushDomWork === 'function') dashFlushDomWork(doFieldsStale);
+                else doFieldsStale();
+              } else {
+                var ckStale = insightCacheGet(nowView);
+                if (ckStale) {
+                  var doPaintStale = function () {
+                    renderInsights(ckStale.insights, ckStale.llm_used, ckStale.suggestion_tier);
+                  };
+                  if (typeof dashFlushDomWork === 'function') dashFlushDomWork(doPaintStale);
+                  else doPaintStale();
+                }
+                setTimeout(function () {
+                  try {
+                    refreshFarmInsights(true);
+                  } catch (eRf) {}
+                }, 0);
+              }
+            } catch (eStaleUi) {}
             return;
           }
 

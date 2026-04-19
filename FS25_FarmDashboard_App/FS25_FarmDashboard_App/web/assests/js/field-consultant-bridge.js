@@ -87,13 +87,25 @@ function insightCategoryIsField(cat) {
   return s.toLowerCase() === "field";
 }
 
+/** Legacy LLM prompts asked for "Ben:/" prefixes; strip for display (matches server localConsultantLlm.js). */
+function stripMentorPrefixMessage(msg) {
+  if (typeof msg !== "string") return msg;
+  const t = msg.trim();
+  const stripped = t.replace(/^[A-Za-z][A-Za-z0-9\s]{0,28}:\s*\/?\s*/, "").trim();
+  return stripped || t;
+}
+
 export function indexFieldConsultantInsights(insights) {
   const map = {};
   if (!Array.isArray(insights)) return map;
   for (const ins of insights) {
     if (!ins || !insightCategoryIsField(ins.category)) continue;
     if (normalizeFieldRefKey(ins.field_ref) === "") continue;
-    addInsightKeys(map, ins.field_ref, ins);
+    const cleaned =
+      typeof ins.message === "string"
+        ? { ...ins, message: stripMentorPrefixMessage(ins.message) }
+        : ins;
+    addInsightKeys(map, ins.field_ref, cleaned);
   }
   return map;
 }
@@ -416,11 +428,15 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
           ? globalThis.dashRedactHeaders(reqHeaders)
           : reqHeaders,
     });
-    const r = await fetch(url, {
+    const fetchOpts = {
       method: "GET",
       headers: reqHeaders,
       cache: "no-store",
-    });
+    };
+    if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+      fetchOpts.signal = AbortSignal.timeout(900000);
+    }
+    const r = await fetch(url, fetchOpts);
     if (typeof globalThis.pipelineLog === "function") {
       globalThis.pipelineLog("renderer_out", "consultant/insights response (field map)", { httpStatus: r.status });
     }

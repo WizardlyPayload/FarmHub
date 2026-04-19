@@ -222,6 +222,8 @@
     if (!a) {
       if (rowKey) rowKey.classList.remove('d-none');
       if (rowUrl) rowUrl.classList.remove('d-none');
+      var owNo = document.getElementById('aiFarmHostedOverrideWrap');
+      if (owNo) owNo.classList.add('d-none');
       return;
     }
     a.getAiClientBranding().then(function (b) {
@@ -232,12 +234,15 @@
           String(b.serviceName).replace(/</g, '') +
           '</strong> — use the <strong>Hosted AI</strong> sub-tab for URL + link key + Send farm data. <strong>BYOK</strong> is on the other sub-tab. In-game <code>!hank</code>: <strong>In-game chat</strong> section + <strong>Write to FS25 modSettings</strong>.';
       }
+      var ow = document.getElementById('aiFarmHostedOverrideWrap');
       if (b.hasEmbeddedIntegrationKey) {
         if (rowKey) rowKey.classList.add('d-none');
         if (note) note.classList.remove('d-none');
+        if (ow) ow.classList.remove('d-none');
       } else {
         if (rowKey) rowKey.classList.remove('d-none');
         if (note) note.classList.add('d-none');
+        if (ow) ow.classList.add('d-none');
       }
       if (b.hasDefaultBackendUrl) {
         if (rowUrl) rowUrl.classList.add('d-none');
@@ -816,6 +821,53 @@
         }
       });
     }
+
+    var testConnBtn = document.getElementById('aiFarmHostedTestConn');
+    var testConnOut = document.getElementById('aiFarmHostedTestResult');
+    var showKeyOverrideBtn = document.getElementById('aiFarmHostedShowKeyOverride');
+    if (showKeyOverrideBtn) {
+      showKeyOverrideBtn.addEventListener('click', function () {
+        var rowKeyO = document.getElementById('aiFarmBotRowIntegrationKey');
+        if (rowKeyO) rowKeyO.classList.remove('d-none');
+        if (keyIn) {
+          try {
+            keyIn.focus();
+          } catch (eF) {}
+        }
+      });
+    }
+    if (testConnBtn && testConnOut) {
+      testConnBtn.addEventListener('click', async function () {
+        testConnOut.textContent = 'Testing…';
+        testConnOut.className = 'small text-muted mb-2';
+        var pushCb = document.getElementById('aiFarmBotPushSnapshots');
+        var pushSnapshots = !!(pushCb && pushCb.checked);
+        var baseVal = urlIn ? urlIn.value.trim().replace(/\/$/, '') : '';
+        var keyVal = keyIn && !keyIn.closest('.d-none') ? keyIn.value.trim() : '';
+        try {
+          var ipcT = fdApi();
+          if (!ipcT || typeof ipcT.testHostedAiConnection !== 'function') {
+            throw new Error('Restart the Farm Dashboard app after updating, then try Test again.');
+          }
+          var r = await ipcT.testHostedAiConnection({
+            baseUrl: baseVal,
+            integrationKey: keyVal,
+            pushSnapshots: pushSnapshots,
+          });
+          if (r && r.ok) {
+            testConnOut.className = 'small text-success mb-2';
+            testConnOut.textContent = r.message || 'OK';
+          } else {
+            testConnOut.className = 'small text-warning mb-2';
+            testConnOut.textContent = (r && r.message) || 'Test did not succeed.';
+          }
+        } catch (eT) {
+          testConnOut.className = 'small text-danger mb-2';
+          testConnOut.textContent = String(eT && eT.message ? eT.message : eT);
+        }
+      });
+    }
+
     if (refreshBtn) refreshBtn.addEventListener('click', loadPanel);
 
     var hostedSubBtn = document.getElementById('ai-fm-subtab-hosted-btn');
@@ -875,12 +927,21 @@
         try {
           var ipcO = fdApi();
           if (!ipcO) throw new Error('Desktop app API unavailable');
-          await ipcO.saveConsultantByokCredentials({
-            apiKey: bearerRaw || 'ollama',
-            provider: 'openai_compat',
-            openaiBaseUrl: base,
-            modelId: modelId,
-          });
+          if (typeof ipcO.saveAiSuggestionSettings === 'function') {
+            await ipcO.saveAiSuggestionSettings({
+              mode: 'ollama',
+              ollama: { baseUrl: base, modelId: modelId || 'llama3.2' },
+            });
+            var rOll = document.getElementById('aiModeOllama');
+            if (rOll) rOll.checked = true;
+          } else {
+            await ipcO.saveConsultantByokCredentials({
+              apiKey: bearerRaw || 'ollama',
+              provider: 'openai_compat',
+              openaiBaseUrl: base,
+              modelId: modelId,
+            });
+          }
           if (hint) {
             hint.textContent = 'Ollama saved for Smart suggestions.';
             hint.classList.remove('d-none');
@@ -958,14 +1019,46 @@
           }
           var csvElB = document.getElementById('aiFarmBotByokModelIdsCsv');
           var addElB = document.getElementById('aiFarmBotByokAdditionalKeys');
-          await ipcB.saveConsultantByokCredentials({
-            apiKey: byokKeyRaw,
-            provider: byokProv,
-            openaiBaseUrl: byokProv === 'openai_compat' ? openaiBaseSave : '',
-            modelId: modelId,
-            modelIdsCsv: csvElB ? csvElB.value : undefined,
-            additionalKeys: addElB ? addElB.value : undefined,
-          });
+          if (
+            byokProv === 'gemini' &&
+            typeof ipcB.saveAiSuggestionSettings === 'function'
+          ) {
+            await ipcB.saveAiSuggestionSettings({
+              mode: 'gemini_byok',
+              gemini: {
+                apiKey: byokKeyRaw,
+                modelId: modelId,
+                modelIdsCsv: csvElB ? String(csvElB.value || '').trim() : '',
+              },
+            });
+            var rGm = document.getElementById('aiModeGemini');
+            if (rGm) rGm.checked = true;
+          } else if (
+            byokProv === 'openai_compat' &&
+            typeof ipcB.saveAiSuggestionSettings === 'function'
+          ) {
+            await ipcB.saveAiSuggestionSettings({
+              mode: 'openai_compat',
+              openai_compat: {
+                baseUrl: openaiBaseSave,
+                apiKey: byokKeyRaw,
+                modelId: modelId,
+                modelIdsCsv: csvElB ? String(csvElB.value || '').trim() : '',
+                additionalKeys: addElB ? String(addElB.value || '').trim() : '',
+              },
+            });
+            var rOc = document.getElementById('aiModeOpenaiCompat');
+            if (rOc) rOc.checked = true;
+          } else {
+            await ipcB.saveConsultantByokCredentials({
+              apiKey: byokKeyRaw,
+              provider: byokProv,
+              openaiBaseUrl: byokProv === 'openai_compat' ? openaiBaseSave : '',
+              modelId: modelId,
+              modelIdsCsv: csvElB ? csvElB.value : undefined,
+              additionalKeys: addElB ? addElB.value : undefined,
+            });
+          }
           if (hint) {
             hint.textContent = 'BYOK saved.';
             hint.classList.remove('d-none');

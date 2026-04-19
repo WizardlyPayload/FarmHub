@@ -78,8 +78,9 @@ async def require_integration_or_admin(
     raise HTTPException(
         status_code=401,
         detail=(
-            "Unauthorized — send header X-FarmDash-Key with FARMDASH_INTEGRATION_KEY, SERVER_TOKEN, "
-            "a key from Admin → Client connections, or use Admin Basic auth"
+            "Unauthorized — send header X-FarmDash-Key matching a key created in Admin → Client connections "
+            "(Add New Client), or the server’s legacy FARMDASH_INTEGRATION_KEY / SERVER_TOKEN, "
+            "or use Admin Basic auth"
         ),
         headers={"WWW-Authenticate": "Basic realm=integration"},
     )

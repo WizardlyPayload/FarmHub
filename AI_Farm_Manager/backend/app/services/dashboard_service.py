@@ -9,6 +9,7 @@ import httpx
 
 from app.services import ftp_service
 from app.services import snapshot_push_service
+from app.services.connection_registry import DEFAULT_BUCKET_ID
 from app.services.log_buffer import log_event
 from app.services.pipeline_log import log_pipeline
 from app.services.snapshot_pruner import (
@@ -64,7 +65,11 @@ def server_id_from_dashboard_url(url: str | None) -> str:
 
 
 async def fetch_dashboard_json(
-    url: str | None, timeout: float = 8.0, farm_id: int | None = None
+    url: str | None,
+    timeout: float = 8.0,
+    farm_id: int | None = None,
+    *,
+    connection_bucket_id: str | None = None,
 ) -> tuple[str | None, str | None]:
     """
     Returns (json_string, error_message).
@@ -78,11 +83,16 @@ async def fetch_dashboard_json(
 
     If push mode is on but no snapshot has arrived yet, we **fall through** to FTP/HTTP so mixed setups
     still work; once a push exists, it wins on future requests.
+
+    ``connection_bucket_id`` isolates PC push RAM per registered client key (see Admin → Client connections).
     """
+    bucket = (connection_bucket_id or DEFAULT_BUCKET_ID).strip() or DEFAULT_BUCKET_ID
     push_wait_detail: str | None = None
     if snapshot_push_service.is_push_mode_enabled():
         sid = server_id_from_dashboard_url(url)
-        pushed, perr, chosen_push_sid = snapshot_push_service.get_snapshot_json(sid, farm_id=farm_id)
+        pushed, perr, chosen_push_sid = snapshot_push_service.get_snapshot_json(
+            bucket, sid, farm_id=farm_id
+        )
         if pushed is not None:
             extra: dict[str, Any] = {"server_id_query": sid or ""}
             if chosen_push_sid:

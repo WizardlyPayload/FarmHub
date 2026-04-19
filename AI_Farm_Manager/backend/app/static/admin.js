@@ -1,5 +1,5 @@
 (function () {
-  const TAB_IDS = ["overview", "farm", "bot", "hank", "mod", "logs"];
+  const TAB_IDS = ["overview", "clients", "farm", "bot", "hank", "mod", "logs"];
 
   function selectTab(name) {
     if (TAB_IDS.indexOf(name) < 0) name = "overview";

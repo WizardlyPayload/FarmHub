@@ -20,6 +20,7 @@ from app.config import (
 from app.prompt_loader import write_system_prompt
 from app.routers.consultant import compute_consultant_insights
 from app.routers.integration import get_overview_payload
+from app.services import connection_registry
 from app.services.bot_registry import delete_instance, find_instance_by_id, upsert_instance
 from app.services.mod_config_xml import build_mod_config_xml, resolve_backend_url_for_xml
 from app.services.log_buffer import get_recent_logs
@@ -64,8 +65,10 @@ async def admin_page(request: Request, _: str = Depends(require_admin)) -> HTMLR
     s = get_settings()
     overview = await get_overview_payload()
     qtab = (request.query_params.get("tab") or "").strip().lower()
-    allowed_tabs = ("overview", "farm", "bot", "hank", "mod", "logs")
+    allowed_tabs = ("overview", "clients", "farm", "bot", "hank", "mod", "logs")
     active_tab = qtab if qtab in allowed_tabs else "overview"
+    reveal_cid = (request.query_params.get("reveal") or "").strip()
+    revealed_key = connection_registry.take_pending_key_for_admin(reveal_cid) if reveal_cid else None
     _env_path = get_backend_root() / ".env"
     # Explicit render avoids rare Jinja2 cache / TemplateResponse arg issues on some Starlette+Jinja builds.
     ctx: dict[str, Any] = {
@@ -92,6 +95,9 @@ async def admin_page(request: Request, _: str = Depends(require_admin)) -> HTMLR
         "farmdash_integration_key_masked": _mask_secret(os.getenv("FARMDASH_INTEGRATION_KEY")),
         "encryption_key_configured": bool(s.get("encryption_key_configured")),
         "overview": overview,
+        "farmdash_connections": connection_registry.list_connections(),
+        "revealed_new_key": revealed_key,
+        "reveal_connection_id": reveal_cid if revealed_key else "",
     }
     for cp in _templates.context_processors:
         ctx.update(cp(request))
@@ -99,10 +105,13 @@ async def admin_page(request: Request, _: str = Depends(require_admin)) -> HTMLR
     return HTMLResponse(html)
 
 
-def _admin_redirect_url(tab: str | None) -> str:
-    allowed = ("overview", "farm", "bot", "hank", "mod", "logs")
+def _admin_redirect_url(tab: str | None, *, reveal: str | None = None) -> str:
+    allowed = ("overview", "clients", "farm", "bot", "hank", "mod", "logs")
     if tab and tab.strip().lower() in allowed:
-        return f"/admin?tab={tab.strip().lower()}"
+        u = f"/admin?tab={tab.strip().lower()}"
+        if reveal and reveal.strip():
+            u += f"&reveal={reveal.strip()}"
+        return u
     return "/admin"
 
 
@@ -391,3 +400,32 @@ async def admin_bot_delete(
         raise HTTPException(404, "Instance not found")
     push_log("INFO", "Admin deleted bot instance", instance_id=instance_id)
     return RedirectResponse(url=_admin_redirect_url("mod"), status_code=303)
+
+
+@router.post("/admin/api/connections/create")
+async def admin_connection_create(
+    _: str = Depends(require_admin),
+    label: str = Form(""),
+    redirect_tab: str | None = Form(None),
+) -> RedirectResponse:
+    row = connection_registry.create_connection(label)
+    push_log("INFO", "Farm Dashboard connection created", connection_id=row["id"])
+    tab = (redirect_tab or "clients").strip().lower()
+    if tab not in ("clients",):
+        tab = "clients"
+    return RedirectResponse(
+        url=_admin_redirect_url(tab, reveal=row["id"]),
+        status_code=303,
+    )
+
+
+@router.post("/admin/api/connections/delete")
+async def admin_connection_delete(
+    _: str = Depends(require_admin),
+    connection_id: str = Form(...),
+    redirect_tab: str | None = Form(None),
+) -> RedirectResponse:
+    if not connection_registry.delete_connection(connection_id.strip()):
+        raise HTTPException(404, "Connection not found")
+    push_log("INFO", "Farm Dashboard connection deleted", connection_id=connection_id.strip())
+    return RedirectResponse(url=_admin_redirect_url(redirect_tab or "clients"), status_code=303)

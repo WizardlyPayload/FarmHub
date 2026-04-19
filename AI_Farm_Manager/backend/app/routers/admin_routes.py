@@ -21,6 +21,7 @@ from app.prompt_loader import write_system_prompt
 from app.routers.consultant import compute_consultant_insights
 from app.routers.integration import get_overview_payload
 from app.services import connection_registry
+from app.services.connection_registry import DEFAULT_BUCKET_ID
 from app.services.bot_registry import delete_instance, find_instance_by_id, upsert_instance
 from app.services.mod_config_xml import build_mod_config_xml, resolve_backend_url_for_xml
 from app.services.log_buffer import get_recent_logs
@@ -234,6 +235,10 @@ async def admin_save_settings(
 @router.get("/admin/api/test-llm")
 async def admin_test_llm(
     _: str = Depends(require_admin),
+    connectionId: str | None = Query(
+        None,
+        description="Optional: Farmdash connection UUID — use that client's per-connection snapshot routing (Admin → Client connections).",
+    ),
     serverId: str | None = Query(
         None,
         description="Same as Farm Dashboard consultant ?serverId= (else DASHBOARD_SERVER_ID / push buffer).",
@@ -260,6 +265,18 @@ async def admin_test_llm(
         ctx = "full"
     # Avoid multi-minute stalls from GEMINI 429 sleep × keys (proxies often timeout & the button looks "broken").
     _tok = gemini_admin_test_no_429_wait_begin()
+    bucket = DEFAULT_BUCKET_ID
+    cid = (connectionId or "").strip()
+    if cid:
+        if connection_registry.get_connection(cid):
+            bucket = cid
+        else:
+            return {
+                "ok": False,
+                "mode": "consultant_insights",
+                "detail": f"Unknown connectionId {cid!r}",
+                "status_code": 404,
+            }
     try:
         resp = await compute_consultant_insights(
             server_id=serverId,
@@ -269,6 +286,7 @@ async def admin_test_llm(
             view=view,
             user_api_key=None,
             user_provider=None,
+            connection_bucket_id=bucket,
         )
     except HTTPException as e:
         det = e.detail
@@ -417,6 +435,28 @@ async def admin_connection_create(
         url=_admin_redirect_url(tab, reveal=row["id"]),
         status_code=303,
     )
+
+
+@router.post("/admin/api/connections/update")
+async def admin_connection_update(
+    _: str = Depends(require_admin),
+    connection_id: str = Form(...),
+    dashboard_server_id: str = Form(""),
+    dashboard_json_url: str = Form(""),
+    redirect_tab: str | None = Form(None),
+) -> RedirectResponse:
+    if not connection_registry.update_connection_settings(
+        connection_id.strip(),
+        dashboard_server_id=dashboard_server_id,
+        dashboard_json_url=dashboard_json_url,
+    ):
+        raise HTTPException(404, "Connection not found")
+    push_log(
+        "INFO",
+        "Farm Dashboard connection routing updated",
+        connection_id=connection_id.strip(),
+    )
+    return RedirectResponse(url=_admin_redirect_url(redirect_tab or "clients"), status_code=303)
 
 
 @router.post("/admin/api/connections/delete")

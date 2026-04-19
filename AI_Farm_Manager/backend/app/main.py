@@ -5,7 +5,7 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Header, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
@@ -166,14 +166,14 @@ if os.path.isdir(_static):
 @app.get("/health")
 @app.get("/healthz", include_in_schema=False)
 async def health(
-    x_farmdash_key: str | None = Header(default=None, alias="X-FarmDash-Key"),
+    request: Request,
     credentials: HTTPBasicCredentials | None = Depends(integration_http_basic),
 ) -> dict:
     """Liveness for Coolify / Docker / probes. Same JSON at ``/health`` and ``/healthz``."""
     from app.config import get_backend_root, get_data_dir, get_settings
     from app.services.bot_registry import get_registry_path, load_registry
 
-    if not integration_or_admin_authenticated(x_farmdash_key, credentials):
+    if not integration_or_admin_authenticated(request, credentials):
         return {"status": "ok"}
 
     reg = load_registry()

@@ -831,15 +831,29 @@ expressApp.get('/api/lan-ws-token', (req, res) => {
  * LAN / tablet browsers: forward consultant insights through the host PC so clients use the same
  * AI URL + integration key + BYOK as Electron (no duplicate LLM config on the tablet, no 127.0.0.1:8080 on wrong device).
  */
-function getAiManagerConnectionForProxy() {
+/**
+ * Effective Hosted AI URL + link key for this process (electron-store + branding.json defaults).
+ * Must be the single source for proxy, snapshot push, and IPC — otherwise push can send a different key than the UI.
+ */
+function resolveAiManagerConnectionForHttp() {
     const b = loadBrandingFromDisk();
     const c = store.get('aiManagerConnection') || {};
     const embKey = sanitizeFarmdashIntegrationKey(b.embeddedFarmdashIntegrationKey || '');
     const defUrl = String(b.defaultAiBackendUrl || '').trim().replace(/\/$/, '');
+    let push = c.pushSnapshots;
+    if (push === undefined && b.pushSnapshotsDefault === true) {
+        push = true;
+    }
     return {
         baseUrl: normalizeAiFarmManagerHostedBaseUrl(c.baseUrl || defUrl || ''),
         integrationKey: sanitizeFarmdashIntegrationKey(c.integrationKey || embKey || ''),
+        pushSnapshots: !!push,
     };
+}
+
+function getAiManagerConnectionForProxy() {
+    const x = resolveAiManagerConnectionForHttp();
+    return { baseUrl: x.baseUrl, integrationKey: x.integrationKey };
 }
 
 function getConsultantByokHeadersForProxy() {
@@ -1011,13 +1025,17 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
 
             const cred = pickNextConsultantByokCredentialPair();
             if (!cred) {
-                return res.status(503).json({
-                    detail: 'No BYOK credentials configured.',
-                    insights: [],
-                    llm_used: false,
-                    farmdash_ai_error: 'not_configured',
-                });
-            }
+                if (conn.baseUrl && conn.integrationKey) {
+                    /* fall through to hosted proxy */
+                } else {
+                    return res.status(503).json({
+                        detail: 'No BYOK credentials configured.',
+                        insights: [],
+                        llm_used: false,
+                        farmdash_ai_error: 'not_configured',
+                    });
+                }
+            } else {
             try {
                 const out = await runByokConsultantLlm({
                     snapshot: pruned,
@@ -1052,12 +1070,20 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
                 return res.send(text);
             } catch (e) {
                 console.warn('[consultant BYOK local]', e && e.message ? e.message : e);
-                return res.status(503).json({
-                    detail: String(e && e.message ? e.message : e),
-                    insights: [],
-                    llm_used: false,
-                    farmdash_ai_error: 'byok_llm_failed',
-                });
+                if (conn.baseUrl && conn.integrationKey) {
+                    console.info(
+                        '[consultant] BYOK LLM failed — trying hosted AI Farm Manager instead (same request).'
+                    );
+                    /* fall through to hosted proxy below */
+                } else {
+                    return res.status(503).json({
+                        detail: String(e && e.message ? e.message : e),
+                        insights: [],
+                        llm_used: false,
+                        farmdash_ai_error: 'byok_llm_failed',
+                    });
+                }
+            }
             }
             }
         }
@@ -1356,10 +1382,10 @@ function buildDataPayloadForAiPush(serverId) {
 }
 
 async function maybePushSnapshotToAiManager(serverId) {
-    const conn = store.get('aiManagerConnection') || {};
+    const conn = resolveAiManagerConnectionForHttp();
     if (!conn.pushSnapshots) return;
-    const base = normalizeAiFarmManagerHostedBaseUrl(String(conn.baseUrl || '').trim());
-    const key = sanitizeFarmdashIntegrationKey(conn.integrationKey || '');
+    const base = conn.baseUrl;
+    const key = conn.integrationKey;
     if (!base || !key) return;
     const now = Date.now();
     if ((lastAiSnapshotPushAt[serverId] || 0) + AI_SNAPSHOT_PUSH_MIN_MS > now) return;
@@ -1399,7 +1425,7 @@ async function maybePushSnapshotToAiManager(serverId) {
 }
 
 function pushAllSnapshotsToAiManager() {
-    const conn = store.get('aiManagerConnection') || {};
+    const conn = resolveAiManagerConnectionForHttp();
     if (!conn.pushSnapshots) return;
     const keys = Object.keys(serverStates);
     // If no server tab has merged data yet, still POST so the VPS can auth and register push mode (otherwise RAM stays empty).
@@ -2095,8 +2121,8 @@ app.whenReady().then(() => {
     mergeBrandingIntoAiManagerConnection();
     createWindow();
     initAppUpdater(() => mainWindow);
-    const amc = store.get('aiManagerConnection');
-    if (amc && amc.pushSnapshots) ensureAiSnapshotPushInterval();
+    const conn = resolveAiManagerConnectionForHttp();
+    if (conn.pushSnapshots) ensureAiSnapshotPushInterval();
 });
 app.on('window-all-closed', () => {
     stopAllWatchers()
@@ -2195,18 +2221,11 @@ ipcMain.handle('get-ai-client-branding', () => {
 });
 
 ipcMain.handle('get-ai-manager-connection', () => {
-    const b = loadBrandingFromDisk();
-    const c = store.get('aiManagerConnection') || {};
-    const embKey = String(b.embeddedFarmdashIntegrationKey || '').trim();
-    const defUrl = String(b.defaultAiBackendUrl || '').trim().replace(/\/$/, '');
-    let push = c.pushSnapshots;
-    if (push === undefined && b.pushSnapshotsDefault === true) {
-        push = true;
-    }
+    const x = resolveAiManagerConnectionForHttp();
     return {
-        baseUrl: normalizeAiFarmManagerHostedBaseUrl(c.baseUrl || defUrl || ''),
-        integrationKey: sanitizeFarmdashIntegrationKey(c.integrationKey || embKey || ''),
-        pushSnapshots: !!push,
+        baseUrl: x.baseUrl,
+        integrationKey: x.integrationKey,
+        pushSnapshots: x.pushSnapshots,
     };
 });
 

@@ -3,17 +3,11 @@
 
 services:
   web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: farmhub-local-build:latest  # Forces Portainer to name the locally baked image
+    build: .
     ports:
-      - "8000:8000"
-    volumes:
-      # On TrueNAS, it is much safer to use an absolute path for persistent data.
-      # Replace the left side with a real folder path on your NAS pool.
-      # Example: /mnt/tank/appdata/farmhub/data:/app/data
-      - ./data:/app/data
+      - "${APP_PORT:-8081}:8000"  # <-- This lets you change the port in Portainer
+    env_file:
+      - stack.env                 # <-- This tells the app to use Portainer's UI variables
     restart: unless-stopped
     healthcheck:
       test:

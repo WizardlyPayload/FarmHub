@@ -5,44 +5,13 @@ import logging
 import os
 import time
 from functools import lru_cache
-from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
-
+from app.paths import get_backend_root, get_data_dir, reload_backend_dotenv
 from app.prompt_loader import read_system_prompt
 from app.services.dashboard_service import build_dashboard_fetch_url
 
 logger = logging.getLogger(__name__)
-
-# Always load backend/.env (not only when CWD happens to be the backend folder).
-# override=True: values in `.env` win over duplicate keys already injected by Docker / Coolify / systemd.
-# Without this, Coolify's env blocks admin-saved keys on every process restart until the file is ignored.
-_backend_root = Path(__file__).resolve().parent.parent
-load_dotenv(_backend_root / ".env", override=True)
-
-
-def get_backend_root() -> Path:
-    """Directory containing `data/`, `.env`, and the `app` package (the `backend` folder)."""
-    return _backend_root
-
-
-def reload_backend_dotenv(*, override: bool = True) -> None:
-    """Re-read `backend/.env` into `os.environ` (e.g. after admin UI writes the file)."""
-    load_dotenv(_backend_root / ".env", override=override)
-
-
-def get_data_dir() -> Path:
-    """
-    Persistent data directory for `bot_servers.json` and other runtime files.
-
-    Docker Compose maps `./data:/app/data` so this resolves to `/app/data` in the container.
-    Override with `DATA_DIR` if needed (absolute path recommended).
-    """
-    override = (os.getenv("DATA_DIR") or "").strip()
-    if override:
-        return Path(override).resolve()
-    return get_backend_root() / "data"
 
 
 def _dashboard_fetch_url() -> str:

@@ -3,6 +3,13 @@
 # Stack variables: set these in Portainer → Stack → Environment (or the container’s Env tab).
 # Syntax ${VAR} passes host/Portainer values into the container (Compose interpolation).
 #
+# PORTAINER TROUBLESHOOTING — “nothing on 8081” / “no ports shown”
+# - The app MUST have ENCRYPTION_KEY set (Fernet string). If missing, uvicorn exits immediately:
+#   check Logs for: ENCRYPTION_KEY is not set. No process listens → connection refused on the host port.
+# - Published port: host ${APP_PORT:-8081} → container 8000. In UI: Container → scroll to “Published ports”.
+#   If the container is crash-looping, ports may look wrong or the service stays “starting”.
+# - After deploy: curl http://HOST:8081/health (or your APP_PORT) — expect JSON with "status":"ok".
+#
 # Local Ollama: set OLLAMA_BASE_URL to your API base, e.g. http://192.168.x.x:11434
 # (backend normalizes /v1). Default model below is llama3.2 — change in Portainer if you use another tag.
 #

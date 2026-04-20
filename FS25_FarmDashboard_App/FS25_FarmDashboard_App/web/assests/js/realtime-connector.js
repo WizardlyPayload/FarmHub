@@ -70,6 +70,11 @@ class RealtimeConnector {
     this.lastChangeCheck = 0;
     /** Skip handleRealtimeData when merged JSON unchanged (ignores volatile `timestamp`). */
     this.lastRealtimePayloadKey = null;
+    /** Milliseconds between /api/data polls when the tab is visible (hidden tab pauses polling). */
+    this.httpPollIntervalMs = 8000;
+    this._httpPollVisibilityHooked = false;
+    /** Throttle expensive landing tile refresh while user is deep in another tab. */
+    this._lastLandingCountsFromAnimalsAt = 0;
   }
 
   // Helper function to generate consistent hash from string
@@ -245,7 +250,24 @@ class RealtimeConnector {
 
     const poll = () => this._httpPollData(false);
     poll();
-    this.updateTimer = setInterval(poll, 5000);
+    this.updateTimer = setInterval(poll, this.httpPollIntervalMs);
+
+    if (typeof document !== "undefined" && !this._httpPollVisibilityHooked) {
+      this._httpPollVisibilityHooked = true;
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") {
+          if (this.updateTimer) {
+            clearInterval(this.updateTimer);
+            this.updateTimer = null;
+          }
+        } else if (typeof this._httpPollData === "function") {
+          this._httpPollData(false);
+          if (!this.updateTimer) {
+            this.updateTimer = setInterval(() => this._httpPollData(false), this.httpPollIntervalMs);
+          }
+        }
+      });
+    }
 
     if (this.dashboard._pendingRealtimeBootstrapResync) {
       this.dashboard._pendingRealtimeBootstrapResync = false;
@@ -662,13 +684,20 @@ class RealtimeConnector {
     this.dashboard.animals = formattedAnimals;
     this.dashboard.filteredAnimals = formattedAnimals;
 
-    // Update pasture data since it depends on animals
-    if (this.dashboard.parsePastureData) {
+    const landingEl = typeof document !== "undefined" ? document.getElementById("landing-page") : null;
+    const landingVisible = landingEl && !landingEl.classList.contains("d-none");
+    const nowLc = typeof performance !== "undefined" ? performance.now() : Date.now();
+    const staleLanding =
+      !this._lastLandingCountsFromAnimalsAt || nowLc - this._lastLandingCountsFromAnimalsAt > 20000;
+    const needPastureParse =
+      this.dashboard.currentSection === "pastures" || landingVisible || staleLanding;
+
+    if (this.dashboard.parsePastureData && needPastureParse) {
       this.dashboard.parsePastureData();
     }
 
-    // Update landing page counts
-    if (this.dashboard.updateLandingPageCounts) {
+    if (this.dashboard.updateLandingPageCounts && (landingVisible || staleLanding)) {
+      this._lastLandingCountsFromAnimalsAt = nowLc;
       this.dashboard.updateLandingPageCounts();
     }
 
@@ -767,8 +796,11 @@ class RealtimeConnector {
       this.dashboard.husbandryTotals = productionData.husbandryTotals;
     }
 
-    // Always try to refresh the farm storage cards if they exist
-    if (this.dashboard.updateFarmStorageDisplay) {
+    const sec = this.dashboard.currentSection;
+    if (
+      this.dashboard.updateFarmStorageDisplay &&
+      (sec === "dashboard" || sec === "landing" || !sec || sec === "productions")
+    ) {
       this.dashboard.updateFarmStorageDisplay();
     }
 
@@ -827,8 +859,11 @@ class RealtimeConnector {
         0;
     }
 
-    // Update milk values if pastures are displayed
-    if (this.dashboard.updateMilkValues) {
+    // Pasture milk-value widgets only when that section is open (saves work on every /api/data tick).
+    if (
+      this.dashboard.currentSection === "pastures" &&
+      this.dashboard.updateMilkValues
+    ) {
       this.dashboard.updateMilkValues();
     }
   }

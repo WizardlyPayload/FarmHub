@@ -5,6 +5,7 @@ import {
   initFarmDashboardBackground,
   setFarmDashboardBackground,
 } from "./farm-dashboard-bg.js";
+import { stopFieldsRefresh } from "./fields.js";
 
 function sectionHiddenMessage() {
   try {
@@ -388,7 +389,7 @@ export function showDashboard() {
   }
   updateSmartSuggestionsRowVisibility(this.currentSection);
   if (typeof window.refreshFarmDashConsultantInsights === "function") {
-    window.refreshFarmDashConsultantInsights(true);
+    window.refreshFarmDashConsultantInsights(false);
   }
 
   // Check for hash navigation after loading dashboard
@@ -461,6 +462,11 @@ export function updateLandingPageCounts() {
 }
 
 export function showLanding() {
+  if (this.currentSection === "fields") {
+    try {
+      stopFieldsRefresh();
+    } catch (_) {}
+  }
   // Track current section
   this.currentSection = "dashboard";
 
@@ -479,7 +485,7 @@ export function showLanding() {
   this.updateNavbar();
   updateSmartSuggestionsRowVisibility("dashboard");
   if (typeof window.refreshFarmDashConsultantInsights === "function") {
-    window.refreshFarmDashConsultantInsights(true);
+    window.refreshFarmDashConsultantInsights(false);
   }
 }
 
@@ -490,8 +496,15 @@ export function showSection(sectionName) {
     return;
   }
 
+  const prevSection = this.currentSection;
   // Track current section
   this.currentSection = sectionName;
+
+  if (prevSection === "fields" && sectionName !== "fields") {
+    try {
+      stopFieldsRefresh();
+    } catch (_) {}
+  }
 
   if (sectionName !== "landing" && sectionName !== "dashboard") {
     setFarmDashboardBackground(sectionName);
@@ -552,7 +565,7 @@ export function showSection(sectionName) {
   if (typeof window.refreshFarmDashConsultantInsights === "function") {
     window.setTimeout(function () {
       try {
-        window.refreshFarmDashConsultantInsights(true);
+        window.refreshFarmDashConsultantInsights(false);
       } catch (e) {}
     }, 450);
   }

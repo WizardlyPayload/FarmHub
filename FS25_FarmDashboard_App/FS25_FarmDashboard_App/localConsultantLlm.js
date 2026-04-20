@@ -1,11 +1,15 @@
 /**
  * FS25 FarmDashboard — Smart suggestions via BYOK (OpenAI / Gemini) on this PC only.
  * Does not call a hosted AI Farm Manager server; keys never leave except to the chosen provider.
+ * Shared domain reference: FarmHub/shared/consultant_playbook.md (same as hosted consultant).
  *
  * Gemini: we do not fall back to `gemini-1.5-flash` — Google has retired that model family for new
  * projects; use `gemini-2.0-flash` (default) or set FARMDASH_BYOK_GEMINI_MODEL to a current model id
  * from the Gemini API docs.
  */
+
+const fs = require('fs');
+const path = require('path');
 
 const {
     slimFieldForConsultantLlm,
@@ -74,10 +78,19 @@ function isAbortError(err) {
 const BYOK_ACTIONABILITY_RULES = `
 Actionability:
 - **message** = one clear **next in-game action** (imperative: verb + what + where). Name **farmlandId** / crop / machine from JSON when you can. Avoid analyst filler: no "review usage", "could indicate", "may suggest", "consider monitoring" without a concrete job.
-- **reasoning** = one **fact from the JSON** that backs the message (growthLabel, fruitType, tank %, vehicle name). No hedge stacks.
+- **reasoning** = one **fact from the JSON** that backs the message (fruitType, growthState vs maxGrowthState or growthStatePercentage, tank %, vehicle name). No hedge stacks. Never quote raw engine tokens like **GROWTH_01** or snake_case growth enums — plain English only.
 - **category** must be **exactly one** of: Field, Animal, Production, Finance — never "Field|Animal|..." or pipe-separated schema text.
 - **Sprayer / full tank:** do not claim "overuse" from a full tank; say which spray job or field is next using snapshot rows.
+- **Match machines to jobs:** for herbicide/spray/liquid fert, name a **vehicles** row only if its name/type clearly fits a **sprayer**. Do not assign spraying to trucks, flatbeds, bale/pallet trailers, or tippers unless JSON clearly marks sprayer gear.
+- **No tank busywork:** do not tell the player to check or verify a tank that JSON shows as **full** or **>85%**. Do not invent water-tank checks on bale/pallet trailers.
+- **No field irrigation / soil moisture:** FS25 vanilla has **no** parcel **soil moisture** HUD and **no** player **field irrigation** from moisture readings. Never advise **irrigation**, **soil moisture checks**, or confuse **growthStatePercentage** (crop growth) with moisture. Do not use barn water on cropland — barn feed/water is **Animal** / husbandry only.
+- **Hay windrows:** **DRYGRASS_WINDROW** is **dried grass hay (hay windrow)** — use **bale / pickup / loading wagon / forage harvester / ted**, not **combine grain harvest** language. Never paste raw ALLCAPS fill-type enums in text.
+- **Category honesty:** vehicle-only tips (refuel, repair, wrong rig) → **Production** with **field_ref** null, not **Field**.
 `;
+
+function isFieldMapView(view, context) {
+    return String(context || '').toLowerCase() === 'fields' && String(view || '').toLowerCase() === 'fields';
+}
 
 const BASE_JSON_RULES = `You MUST respond with ONLY valid JSON (no markdown fences). Use **one literal category per row** (not alternatives joined with |):
 {"insights":[{"category":"Field","priority":"High","message":"...","reasoning":"...","field_ref":"27"},{"category":"Production","priority":"Medium","message":"...","reasoning":"...","field_ref":null}]}
@@ -91,11 +104,28 @@ Rules:
 - Late growth (high growthState or growth stage): do not advise sowing or planting that same crop.
 - Large nitrogen shortfall vs target (when JSON shows it): prioritize fertilizing (solid/slurry/liquid N) before generic mowing or cosmetic maintenance.
 - Never write "weed level" or numeric weed severity — say weeds / needs spraying.
+- Never write internal growth codes (**GROWTH_01**, etc.) or snake_case **growthLabel** values — say **early growth**, **young crop**, or **stage X of Y** from **growthState** / **maxGrowthState** or **growthStatePercentage**.
+- Do **not** advise **watering farmland**, **irrigating fields**, or **low soil moisture** on parcels; barn **Available Food** / water fills are **husbandry**, not field irrigation. **growthStatePercentage** is crop growth progress, not soil water.
+- **DRYGRASS_WINDROW** is **hay (dried grass windrow)** — prefer **bale, ted, or pick up with wagon/forage harvester**, not cereal **combine harvest** wording. Do not echo raw fill-type enum strings.
 - Grass/meadow forage: never assign a grain combine; use mower/baler/forage harvester language.
 - Late growth + weeds: herbicide/sprayer not mechanical weeder.
 - Use vehicles from JSON only for this farm (ownerFarmId matches activeFarmId); do not tell players to buy a machine when a suitable one is listed.
+- **Animal feed & water:** only advise refilling barn food, TMR, silage/hay, troughs, or water when JSON shows that fill **below 75%** of capacity (values **0–1** are fractions — compare to **0.75**; values **0–100** are percent — compare to **75**). Barn fillLevels in JSON are usually **liters** (e.g. 4500), not a 0–100 percent; use **pastures._consultant_feed_water_pct** (**foodPctOfCapacity** / **waterPctOfCapacity**, 0–100) when present. If every channel is **≥ 75%** or you cannot prove **below 75%**, do not suggest filling food or water — pick another animal or farm topic.
 - **Never** output tips about JSON, APIs, or data quality: do **not** say that **farmlandId**, **id**, **field_ref**, or **activeFarmId** are "missing" or "not set", and do not complain that farm data is unavailable — players cannot fix those. If a section of the snapshot is thin, give **general, cautious FS25 advice** (e.g. check contracts, review growth stages) instead.
 - Keep message and reasoning useful (under ~280 characters each when possible so parcel ids and crop names fit).
+
+${BYOK_ACTIONABILITY_RULES}`;
+
+/** Field map (context=fields & view=fields): mentor voice on cards; no JSON-debug wording. */
+const BASE_JSON_RULES_FIELD_MAP = `You MUST respond with ONLY valid JSON (no markdown fences). One row per field object, same order as "fields" in the user JSON.
+{"insights":[{"category":"Field","priority":"High","message":"Walter: Field 21's soil is sour — spread lime before you drill.","reasoning":"","field_ref":"21"}]}
+
+Rules:
+- **category** must be **Field** every row. **field_ref** = that parcel's farmlandId or id. **reasoning** must be **""** (empty string) on every row — the UI shows **message** only.
+- **message** = **one** warm, spoken line as if a local mentor is talking (**Ben:** / **Walter:** / **David:** / **Katie:** / **Noah:** / **Hank:** then the advice). Pick the voice by topic (lime/pH/rotation → Walter; machines → Ben; risk → David; grass/forage → Katie; wood → Noah; quick cab nudge → Hank).
+- Write like a **farmer**, not a debugger: **forbidden** phrases include "needsLime is true", "phValue of", "growthLabel '", "targetNitrogen of", "isHarvested is true", "needsWork is false", bare "21 with pH", **farmlandId:**, **field_ref:**, or **(farmlandId: N)** — use **field_ref** in JSON only. Instead: "Field 21 could use lime — pH is low." / "Field 22 is cleared after harvest — plan your next pass." / "Nitrogen on field 20 looks fine for now."
+- Never paste raw **GROWTH_xx** or snake_case **growthLabel** tokens; use human growth wording.
+- Grass/forage: no grain combines for grass hay; spray/herbicide only with a real **sprayer** from **vehicles** when you name kit.
 
 ${BYOK_ACTIONABILITY_RULES}`;
 
@@ -105,29 +135,56 @@ function viewInstruction(view, context) {
 
     if (ctx === 'fields' && v === 'fields') {
         return `FIELD MAP MODE: Output exactly ONE insight per object in "fields" (insights.length MUST equal fields.length). Order insights in the same order as the "fields" array.
-Each item: category "Field"; field_ref = that field's farmlandId or id; reasoning "".
-For EACH field, read only that object's keys (e.g. fruitType, growthState, growthStatePercentage, harvestReady, growthLabel, nitrogenLevel, targetNitrogen, nitrogenText, needsWork, lime/pH hints). The **message** must describe the single most important next action consistent with those values — not a generic farming essay.
-Hard rules: (1) If harvested / mulched / no standing crop, do not recommend spraying or weeding a standing crop, or sowing as if the crop were not yet planted. (2) If the crop is already well along (late growthState), never recommend sowing that crop. (3) If nitrogen is far below target, mention fertilizing before routine mowing. (4) Plain English only — no mentor names or "Name:/" prefixes. At most ${MAX_FIELD_MAP_ROWS} fields if the farm is huge.`;
+Each item: category "Field"; field_ref = that field's farmlandId or id; reasoning "" (always empty — cards show **message** only).
+For EACH field, read that row's keys (fruitType, growthState, growthStatePercentage, harvestReady, growthLabel, nitrogenLevel, targetNitrogen, needsLime, phValue, needsWork, etc.). The **message** must be **one short line in a mentor's voice** (starts with **Ben:** / **Walter:** / **David:** / **Katie:** / **Noah:** or **Hank:**) giving the **next job** in plain farmer English — never JSON-style dumps ("needsLime is true", "phValue of 5.644", "growthLabel 'harvested'", "targetNitrogen of 0", "isHarvested is true"). Say **field 21** / **parcel 22** naturally, not naked numbers with "with pH".
+Hard rules: (1) If harvested / mulched / no standing crop, do not recommend spraying or weeding a standing crop, or sowing as if the crop were not yet planted. (2) If the crop is already well along (late growthState), never recommend sowing that crop. (3) If nitrogen is far below target, mention fertilizing before routine mowing; if N is fine, say so in plain words — do not invent urgency. (4) Never output **GROWTH_xx** or raw **growthLabel** enum strings in text. (5) For spray/herbicide, only name a **vehicles** row that is plausibly a sprayer — not trucks or bale/pallet trailers. At most ${MAX_FIELD_MAP_ROWS} fields if the farm is huge.`;
     }
 
     const map = {
-        home: `VIEW home: Return exactly 3 insights — the **most urgent next actions** for this farm (field + fleet + animals/production/money when JSON supports). Each **message** must be a concrete imperative (what to do next), not vague analysis. Each **reasoning** cites one JSON fact (parcel id, crop, fill %, machine name).`,
+        home: `VIEW home: Return exactly 3 insights — the **most urgent next actions** for this farm (field + fleet + animals/production/money when JSON supports). Each **message** must be a concrete imperative (what to do next), not vague analysis. Each **reasoning** cites one JSON fact (parcel id, crop, fill %, machine name). For animals: only suggest refilling feed or water when JSON **proves** a level **below 75%** of capacity — prefer **pastures._consultant_feed_water_pct**; barn **fillLevels** are often **liters**, not percent; never nag when **foodPctOfCapacity** / **waterPctOfCapacity** is **≥ 75** or unknown.`,
         fields: `VIEW fields: Focus on crops, growth, soil, harvest readiness; prefer Field category with field_ref when one parcel is meant. Ground every tip in the JSON (growth, harvest state, N, pH). Say the **job** (spray, harvest, lime, spread N) and **which parcel** when data allows — not generic "levels are low". At most 4 insights.`,
-        vehicles: `VIEW vehicles: Fleet only — maintenance, fuel, damage, hours. Use Production category. If fleet looks fine, one reassuring insight. At most 3 insights.`,
-        pastures: `VIEW pastures: Grazing, pasture levels, manure, herd on pasture. At most 4 insights.`,
-        livestock: `VIEW livestock: Barn animals, feed, water, health, production. At most 4 insights.`,
+        vehicles: `VIEW vehicles: **Fleet only** — refuel, repair, damage, attachments, operating hours, parking. **Do not** advise field or cropland work (harvest, sow, spray, cultivate, lime, N on parcels, weeds on fields, bales on land, growth stages). Never use category **Field** or a non-null **field_ref**. Use **Production** (machines) or **Finance** (buy/sell equipment). If the fleet looks fine, one reassuring insight. At most 3 insights.`,
+        pastures: `VIEW pastures: Grazing, pasture levels, manure, herd on pasture. **DRYGRASS_WINDROW** on pasture is **hay windrow** (dried grass) — advise **bale / ted / pickup**, not **combine grain harvest**; do not echo raw fill-type enums. Only suggest topping pasture feed or water when JSON shows **below 75%** of capacity — use **_consultant_feed_water_pct** on pasture rows when present; **fillLevels** numbers are usually **liters**, not %. At most 4 insights.`,
+        livestock: `VIEW livestock: Barn animals — health, reproduction, milk/wool, cleanliness, overcrowding. Feed/water: **only** if JSON shows **below 75%** of capacity (0–1 vs 0.75 or percent vs 75); use **pastures._consultant_feed_water_pct** when present; raw **fillLevels** are typically **liters** (do not treat 4500 as 45%). If all **≥ 75%** or unproven, do not suggest filling food or water. At most 4 insights.`,
         productions: `VIEW productions: Chains, fill levels, bottlenecks. At most 4 insights.`,
         economy: `VIEW economy — **inventory-backed only**. The JSON includes **_consultant_held_fill_types** (liters + source) and **_consultant_finance_facts** — treat these as ground truth. **Only** name a fill type for sell/haul tips if it appears in **_consultant_held_fill_types** (or is clearly the same stock from **production** / **fields**). The **economy** price section is already filtered to those types; do **not** infer crops from memory or from removed sell-point tables. No equipment shopping, no "invest spare cash" unless **_consultant_finance_facts** shows a comfortable positive balance and you tie it to moving listed stock. At most 4 insights; **field_ref** when one parcel is meant.`,
     };
     return map[v] || map.home;
 }
 
+/** @type {string|undefined} */
+let _consultantPlaybookCache;
+
+function loadConsultantDataPlaybook() {
+    if (_consultantPlaybookCache !== undefined) return _consultantPlaybookCache;
+    const candidates = [
+        path.join(__dirname, '..', '..', 'shared', 'consultant_playbook.md'),
+        path.join(__dirname, 'consultant_playbook.md'),
+    ];
+    for (const p of candidates) {
+        try {
+            if (fs.existsSync(p)) {
+                const raw = fs.readFileSync(p, 'utf8').trim();
+                if (raw) {
+                    _consultantPlaybookCache = `\n**FarmDash data playbook (always apply):**\n${raw}\n\n`;
+                    return _consultantPlaybookCache;
+                }
+            }
+        } catch {
+            /* try next */
+        }
+    }
+    _consultantPlaybookCache = '';
+    return _consultantPlaybookCache;
+}
+
 function buildSystemPrompt(view, context) {
+    const rules = isFieldMapView(view, context) ? BASE_JSON_RULES_FIELD_MAP : BASE_JSON_RULES;
+    const playbook = loadConsultantDataPlaybook();
     return `You are an expert Farming Simulator 25 farm consultant. Analyze the JSON snapshot for the active farm only.
+${playbook}${viewInstruction(view, context)}
 
-${viewInstruction(view, context)}
-
-${BASE_JSON_RULES}`;
+${rules}`;
 }
 
 /** Legacy prompts asked for "Ben:/" style prefixes; strip so cards stay readable if the model still emits them. */
@@ -136,6 +193,64 @@ function stripLeadingMentorPrefix(text) {
     const t = text.trim();
     const stripped = t.replace(/^[A-Za-z][A-Za-z0-9\s]{0,28}:\s*\/?\s*/, '').trim();
     return stripped || t;
+}
+
+/** Strip internal FS tokens and weed-level noise from consultant strings (matches Python _sanitize_consultant_user_copy). */
+function sanitizeConsultantUserCopy(text) {
+    if (typeof text !== 'string' || !text) return text;
+    let s = text;
+    s = s.replace(/\bweeds?\s*\(\s*level\s*\d+\s*\)/gi, 'weeds');
+    s = s.replace(/\bweed\s*level\s*[:]?\s*\d+/gi, 'weeds');
+    s = s.replace(/\bweeds?\s+at\s+level\s+\d+/gi, 'weeds');
+    s = s.replace(/\bgrowth\s+label\s+['']?GROWTH_\d+/gi, 'growth stage');
+    s = s.replace(/\bGROWTH_\d+\b/gi, 'early growth stage');
+    s = s.replace(/\bmulched_fallow\b/gi, 'mulched stubble');
+    s = s.replace(/\bneedsLime\s+is\s+true\b/gi, 'needs lime');
+    s = s.replace(/\bneedsLime\s+is\s+false\b/gi, 'lime not flagged');
+    s = s.replace(/\bisHarvested\s+is\s+true\b/gi, 'crop is harvested');
+    s = s.replace(/\bneedsWork\s+is\s+false\b/gi, 'no urgent tillage pass flagged');
+    s = s.replace(/\bneedsWork\s+is\s+true\b/gi, 'soil still wants work');
+    const fillPlain = [
+        [/DRYGRASS_WINDROW/gi, 'dried grass hay windrow'],
+        [/WETGRASS_WINDROW/gi, 'wet grass windrow'],
+        [/GRASS_WINDROW/gi, 'grass windrow'],
+        [/DRYGRASS\b/gi, 'dried grass'],
+        [/TOTAL_MIXED_RATION/gi, 'TMR'],
+        [/PIGFOOD/gi, 'pig feed'],
+    ];
+    for (const [re, nice] of fillPlain) {
+        s = s.replace(re, nice);
+    }
+    s = s.replace(/\bavailable\s+food\s+filllevel\b/gi, 'animal feed fill level');
+    s = s.replace(/\bfilllevel\b/gi, 'fill level');
+    s = s.replace(/\(\s*farmlandId\s*:\s*\d{1,7}\s*\)/gi, '');
+    s = s.replace(/\bfarmlandId\s*:\s*\d{1,7}\b/gi, '');
+    s = s.replace(/\bfield_?ref\s*:\s*\d{1,7}\b/gi, '');
+    s = s.replace(/\b(\d+\.\d+)\b/g, (m, num) => {
+        const v = parseFloat(num);
+        if (!Number.isFinite(v)) return m;
+        const r = Math.round(v * 10) / 10;
+        if (Math.abs(r - Math.round(r)) < 1e-6) return String(Math.round(r));
+        return r.toFixed(1);
+    });
+    s = s.replace(/\s{2,}/g, ' ').trim();
+    return s;
+}
+
+function isLowQualityInsightBlob(message, reasoning) {
+    const blob = `${String(message || '')}\n${String(reasoning || '')}`.toLowerCase();
+    if (/full water tank/.test(blob) && /\b(check|verify|ensure|monitor)\b/.test(blob)) return true;
+    if (/bale/.test(blob) && /pallet/.test(blob) && /trailer/.test(blob) && /water/.test(blob)) {
+        if (/\b(check|verify|ensure|tank level)\b/.test(blob)) return true;
+    }
+    if (/\bwater(ing)?\b/.test(blob) && /\b(farmland|parcel)\b/.test(blob)) {
+        if (blob.includes('available food') || blob.includes('sheep barn') || (blob.includes('barn') && blob.includes('fill')))
+            return true;
+    }
+    if (blob.includes('available food') && blob.includes('farmland')) return true;
+    if (/\b(soil\s+moisture|irrigation\s+needs?)\b/.test(blob)) return true;
+    if (/\birrigate\b/.test(blob) && /\b(farmland|parcel|field)\b/.test(blob)) return true;
+    return false;
 }
 
 /** LLMs sometimes echo schema/debug lines instead of gameplay tips — drop them. */
@@ -171,8 +286,50 @@ function normalizeInsightCategory(raw) {
     return 'Production';
 }
 
-function sanitizeConsultantInsights(insights) {
+function barnFeedInsightBlobIsGarbage(ins) {
+    const blob = `${String(ins && ins.message ? ins.message : '')}\n${String(ins && ins.reasoning ? ins.reasoning : '')}`.toLowerCase();
+    if (!blob.trim()) return false;
+    if (/\bfill\s+level\s+is\s+at\s+\d{4,}\b/.test(blob) && /\b(low\s+(supply|hay|feed)|indicates\s+low|needs?\s+(more\s+)?feed)\b/.test(blob))
+        return true;
+    if (/\bdried\s+grass\s+hay\s+windrow\b/.test(blob) && /\b\d{4,}\b/.test(blob) && /\b(low\s+supply|indicates\s+low|check\s+food)\b/.test(blob))
+        return true;
+    return false;
+}
+
+function vehiclesTabInsightBlobIsGarbage(ins) {
+    const blob = `${String(ins && ins.message ? ins.message : '')}\n${String(ins && ins.reasoning ? ins.reasoning : '')}`.toLowerCase();
+    if (!blob.trim()) return false;
+    if (/\brefuel\b/.test(blob) && /\bunknown\b/.test(blob)) return true;
+    if (/\brefuel\b/.test(blob) && /\bnon-zero\b/.test(blob) && /\bdiesel\b/.test(blob) && /\bpartially\s+fuel/i.test(blob))
+        return true;
+    if (/\bfill\s*level\b/.test(blob) && /\bindicating\b/.test(blob)) return true;
+    if (/\bnon-empty\b/.test(blob) && /\bunknown\b/.test(blob) && /\bfill\b/.test(blob)) return true;
+    if (/\b(load|stack|move)\b/.test(blob) && /\b(hay|straw|bales?|silage)\b/.test(blob) && /\b(trailer|wagon|truck|transport)\b/.test(blob))
+        return true;
+    if (/\btransport\s+the\s+bales\b/.test(blob)) return true;
+    return false;
+}
+
+/** Vehicles tab Smart suggestions: fleet care only (no field rows, parcel refs, hay logistics, bogus refuel). */
+function filterInsightsForVehiclesView(insights) {
     if (!Array.isArray(insights)) return [];
+    return insights.filter((ins) => {
+        if (!ins || typeof ins !== 'object') return false;
+        const cat = String(ins.category || '')
+            .trim()
+            .toLowerCase();
+        if (cat === 'field') return false;
+        const frRaw = ins.field_ref != null ? ins.field_ref : ins.fieldRef;
+        const fr = frRaw != null ? String(frRaw).trim() : '';
+        if (fr) return false;
+        if (vehiclesTabInsightBlobIsGarbage(ins)) return false;
+        return true;
+    });
+}
+
+function sanitizeConsultantInsights(insights, view, context) {
+    if (!Array.isArray(insights)) return [];
+    const skipLowQualityDrop = isFieldMapView(view, context);
     return insights
         .filter((ins) => {
             if (!ins || typeof ins !== 'object') return false;
@@ -183,14 +340,26 @@ function sanitizeConsultantInsights(insights) {
         .map((ins) => {
             const next = { ...ins };
             next.category = normalizeInsightCategory(next.category);
-            if (typeof next.message === 'string') next.message = stripLeadingMentorPrefix(next.message);
-            if (typeof next.reasoning === 'string') next.reasoning = stripLeadingMentorPrefix(next.reasoning);
+            const preserveMentor = isFieldMapView(view, context);
+            if (typeof next.message === 'string') {
+                const m0 = preserveMentor ? next.message : stripLeadingMentorPrefix(next.message);
+                next.message = sanitizeConsultantUserCopy(m0);
+            }
+            if (typeof next.reasoning === 'string') {
+                const r0 = preserveMentor ? next.reasoning : stripLeadingMentorPrefix(next.reasoning);
+                next.reasoning = sanitizeConsultantUserCopy(r0);
+            }
             return next;
+        })
+        .filter((ins) => {
+            const m = typeof ins.message === 'string' ? ins.message : '';
+            const r = typeof ins.reasoning === 'string' ? ins.reasoning : '';
+            if (barnFeedInsightBlobIsGarbage(ins)) return false;
+            if (skipLowQualityDrop) return true;
+            if (!String(m).trim()) return false;
+            if (isLowQualityInsightBlob(m, r)) return false;
+            return true;
         });
-}
-
-function isFieldMapView(view, context) {
-    return String(context || '').toLowerCase() === 'fields' && String(view || '').toLowerCase() === 'fields';
 }
 
 function consultantLlmTemperature(view, context) {
@@ -616,7 +785,14 @@ async function runByokConsultantLlm(opts) {
                   undefined,
                   temp
               );
-    const insights = sanitizeConsultantInsights(Array.isArray(parsed.insights) ? parsed.insights : []);
+    let insights = sanitizeConsultantInsights(
+        Array.isArray(parsed.insights) ? parsed.insights : [],
+        view,
+        context
+    );
+    if (String(view || '').toLowerCase() === 'vehicles') {
+        insights = filterInsightsForVehiclesView(insights);
+    }
     return {
         insights,
         llm_used: true,
@@ -624,22 +800,27 @@ async function runByokConsultantLlm(opts) {
     };
 }
 
-const SHARD_JSON_RULES = `Reply with ONLY JSON. One literal **category** per row (Field, Animal, Production, or Finance — never pipe-separated):
+const SHARD_JSON_RULES_DEFAULT = `Reply with ONLY JSON. One literal **category** per row (Field, Animal, Production, or Finance — never pipe-separated):
 {"insights":[{"category":"Field","priority":"High","message":"...","reasoning":"...","field_ref":"12"}]}
 category Field → set field_ref to farmlandId or id. Plain English messages; no "Name:/" prefixes.
 Never complain about missing JSON keys, farmlandId, field_ref, or activeFarmId in the message text — only gameplay advice.
+${BYOK_ACTIONABILITY_RULES}`;
+
+const SHARD_JSON_RULES_FIELD_MAP = `Reply with ONLY JSON. **Field map:** one insight per object in this shard's **fields[]**, same order and count. category Field; field_ref = farmlandId or id; reasoning "" every row.
+Each **message** starts with **Ben:** / **Walter:** / **David:** / **Katie:** / **Noah:** or **Hank:** then one farmer sentence — **never** JSON-debug style ("needsLime is true", "phValue of", "growthLabel '", "isHarvested is true", bare "21 with pH").
+Never complain about missing JSON keys in the message text — only gameplay advice.
 ${BYOK_ACTIONABILITY_RULES}`;
 
 function ollamaShardViewBlurb(view, context) {
     const v = String(view || 'home').toLowerCase();
     const ctx = String(context || '').toLowerCase();
     if (ctx === 'fields' && v === 'fields') {
-        return 'FIELD MAP: Exactly one insight per object in fields[] (same length and order). Each message must match that row JSON (growth, harvest, N, pH).';
+        return 'FIELD MAP: One insight per field row, mentor voice (Name: …), plain farmer English — no JSON key dumps.';
     }
     const map = {
         home: 'Pick the most urgent actionable items visible in this shard.',
         fields: 'Crops/soil/harvest; use field_ref for a specific parcel.',
-        vehicles: 'Fleet only.',
+        vehicles: 'Fleet only — no field harvest/spray/plant jobs.',
         pastures: 'Pastures and grazing.',
         livestock: 'Barn animals.',
         productions: 'Production chains.',
@@ -677,11 +858,12 @@ function buildOllamaShardSystemPrompt(view, context, shardLabel, shardIndex, sha
     const tail = fieldMap
         ? `Insights count must equal fields.length in this JSON.`
         : `At most 3 insights for this response.`;
+    const shardRules = fieldMap ? SHARD_JSON_RULES_FIELD_MAP : SHARD_JSON_RULES_DEFAULT;
     return `FS25 farm consultant — shard "${shardLabel}" (${shardIndex + 1}/${shardTotal}). User message is JSON only.
 
 ${blurb}
 
-${SHARD_JSON_RULES}
+${shardRules}
 ${tail}`;
 }
 
@@ -870,7 +1052,10 @@ function priorityRank(p) {
 function mergeShardInsights(insights, view, context) {
     const v = String(view || 'home').toLowerCase();
     const ctx = String(context || '').toLowerCase();
-    const list = Array.isArray(insights) ? insights.filter((x) => x && typeof x === 'object') : [];
+    let list = Array.isArray(insights) ? insights.filter((x) => x && typeof x === 'object') : [];
+    if (v === 'vehicles') {
+        list = filterInsightsForVehiclesView(list);
+    }
     list.sort((a, b) => priorityRank(a.priority) - priorityRank(b.priority));
 
     let cap = 6;
@@ -931,7 +1116,14 @@ async function runByokConsultantLlmOllamaCompact(opts) {
         maxTok,
         shardTemp
     );
-    const insights = sanitizeConsultantInsights(Array.isArray(parsed.insights) ? parsed.insights : []);
+    let insights = sanitizeConsultantInsights(
+        Array.isArray(parsed.insights) ? parsed.insights : [],
+        view,
+        context
+    );
+    if (v === 'vehicles') {
+        insights = filterInsightsForVehiclesView(insights);
+    }
     return {
         insights,
         llm_used: true,
@@ -1008,7 +1200,11 @@ async function runByokConsultantLlmOllamaSharded(opts) {
                     maxTok,
                     shardTemp
                 );
-                return sanitizeConsultantInsights(Array.isArray(parsed.insights) ? parsed.insights : []);
+                return sanitizeConsultantInsights(
+                    Array.isArray(parsed.insights) ? parsed.insights : [],
+                    view,
+                    context
+                );
             })
         );
         for (const part of waveResults) {
@@ -1017,7 +1213,7 @@ async function runByokConsultantLlmOllamaSharded(opts) {
     }
 
     return {
-        insights: sanitizeConsultantInsights(mergeShardInsights(all, view, context)),
+        insights: sanitizeConsultantInsights(mergeShardInsights(all, view, context), view, context),
         llm_used: true,
     };
 }

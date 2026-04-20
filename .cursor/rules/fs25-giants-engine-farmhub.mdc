@@ -1,0 +1,39 @@
+---
+description: GIANTS FS25 Lua single-thread, g_currentMission, farmlands vs density maps, safe JSON export — FarmHub grounding.
+alwaysApply: true
+---
+
+# FS25 / GIANTS engine — FarmHub project grounding
+
+## Single-thread & `g_currentMission`
+
+- Game Lua is **single-threaded**. Long work in one `update(dt)` **blocks the sim** (stutter / hitch).
+- **Never** walk deep into `g_currentMission` or serialize whole engine graphs to JSON. Build **small plain tables** (numbers, strings, shallow nested dicts/lists) for export only.
+- **OOM risk** comes from deep traversal + huge strings, not from “having JSON” per se. Aggregate in Lua (totals, counts, flags) before JSON.
+
+## Farmlands vs fields / density maps
+
+- **Farmland** = economy / ownership tile (`farmlandId`, buy/sell in PDA). Use it for **who owns** bales, land, consultant ownership filters.
+- **Field / crop state** = **density maps** (bit channels per world cell). Read via engine helpers (`DensityMapHeightUtil`, `DensityMapFilterLua`, field probes) at **sampled** X/Z — not `field.getCrop()` as a single scalar.
+- **Dashboard JSON must not** ship large coordinate dumps (windrows, weeds). Export **aggregates** (e.g. `windrowLiters`, `baleCountOnField`, booleans), not hundreds of `(x,z)` points — that pattern crushes LLM/token budgets downstream.
+
+## Mod export loop (this repo)
+
+- **`FarmDashboard.lua`**: `g_currentMission:addUpdateable`, **`isAuthority()`** — writes **SP + MP host/dedicated only**; MP clients skip export (arrays may be nil / stale).
+- **`FarmDashboardDataCollector.lua`**: **Staggered collectors** over `collectionCycleMs` (default **60s**), **one module per slice** — avoids one-frame megascan.
+- **Writes**: `modSettings/FS25_FarmDashboard/<saveSlot>/data.json` (+ `saveFile` fallback); **`toJSON`** is custom (no `json.encode`).
+- **`FieldDataCollector.lua`**: heavy paths wrapped in **`pcall`** (mod conflicts / API differences).
+
+## Mod conflicts & MP testing
+
+- Third-party mods (e.g. **Precision Farming**, rotation extensions) can **replace or wrap** density / filter APIs. **Always `pcall`** density and filter calls; on failure **skip that metric** and keep the game running.
+- **Test new export logic in single-player first**, then MP host; do not rely on full state on MP **client**.
+
+## Known gaps / hardening (when touching Lua export)
+
+- **`toJSON` has no max depth or cycle detection** — only safe if every collector outputs **acyclic plain data**. If adding new fields, never stash **userdata**, **function**, or **engine object references** in the assembled table.
+- Prefer extending existing **aggregate-first** patterns in collectors over new per-point arrays.
+
+## Dashboard / AI (Node/Python)
+
+- **Prune** heavy keys and **cap field rows** before LLM (`consultantSnapshotPrune.js`, `snapshot_pruner.py`). Consultant copy must not assume mechanics FS25 does not expose (e.g. parcel soil moisture / irrigation).

@@ -637,7 +637,7 @@ export function getLocalFieldSuggestion(field) {
         action: "Sow or plant your next crop",
         reason: mulch >= 1
           ? "Lime and N prep are in a good place for drilling — put seed in after mulch/cultivation work."
-          : "Lime and N prep are in a good place for drilling — seed while moisture and soil conditions hold.",
+          : "Lime and N prep are in a good place for drilling — seed before the window for tillage closes.",
         source: "rules",
       };
     }

@@ -149,7 +149,6 @@ def prune_field_entry(field: dict[str, Any]) -> dict[str, Any] | None:
         "needsCultivation",
         "nitrogenLevel",
         "phValue",
-        "moisture",
         "weedLevel",
         "stoneLevel",
         "isOwned",
@@ -182,6 +181,9 @@ def prune_field_entry(field: dict[str, Any]) -> dict[str, Any] | None:
         if k in out or k in _DROP_KEYS:
             continue
         kl = k.lower()
+        # FS25 base has no player soil-moisture HUD; stray keys / mods confuse the LLM with irrigation.
+        if kl == "moisture" or kl.endswith("soilmoisture") or kl.endswith("_moisture"):
+            continue
         if "position" in kl or "rotation" in kl:
             continue
         if kl.startswith("pf") or kl.startswith("precision"):
@@ -420,24 +422,25 @@ _CONSULTANT_FIELD_MAP_MAX_ROWS = 80  # match ``consultantSnapshotPrune.js`` MAX_
 
 def _field_row_belongs_to_farm(row: dict[str, Any], farm_id: int) -> bool:
     """
-    Matches Node ``consultantSnapshotPrune.filterFieldsForFarm`` (one row):
-    ``farmId ?? playerFarmId ?? ownerFarmId``; if all unset, include the row (same as JS).
+    True when the parcel counts as this farm's land for consultant views.
+
+    Uses the same rule as the Farm Dashboard Fields list (``filterFieldsForFarmView`` in
+    ``fields.js``): ``ownerFarmId`` if set, otherwise ``farmId``. We intentionally **do not**
+    use ``playerFarmId`` here — on some saves it matches the active session while the parcel
+    is not owned by that farm, which made Smart suggestions name fields the player does not own.
     """
-    fid = None
-    for key in ("farmId", "playerFarmId", "ownerFarmId"):
-        v = row.get(key)
-        if v is None:
-            continue
-        if isinstance(v, str) and not v.strip():
-            continue
-        fid = v
-        break
-    if fid is None:
-        return True
+    if farm_id <= 0:
+        return False
+    oid_raw = row.get("ownerFarmId")
+    if oid_raw is None or (isinstance(oid_raw, str) and not str(oid_raw).strip()):
+        oid_raw = row.get("farmId")
+    if oid_raw is None or (isinstance(oid_raw, str) and not str(oid_raw).strip()):
+        return False
     try:
-        return int(fid) == farm_id
+        oid = int(oid_raw)
     except (TypeError, ValueError):
-        return True
+        return False
+    return oid > 0 and oid == farm_id
 
 
 def resolve_consultant_farm_id(snapshot: dict[str, Any], farm_id_query: int | None) -> int:
@@ -468,14 +471,14 @@ def prune_snapshot_to_active_farm(
     field_map_relax_empty_fields: bool = False,
 ) -> dict[str, Any]:
     """
-    Keep only rows for the farm the player is viewing. **Field rows** use the same key order as the
-    Node consultant pruner (``farmId ?? playerFarmId ?? ownerFarmId``; unset ids → keep row).
-    Vehicles/animals/production still use ``_owner_farm_id``. Drops other farms' vehicles, animals, production chains.
+    Keep only rows for the farm the player is viewing. **Field rows** use **ownerFarmId** first
+    (same as Farm Dashboard ``filterFieldsForFarmView`` / Node ``fieldRowOwnedByFarm``); rows with no
+    resolvable owner are dropped. Vehicles/animals/production still use ``_owner_farm_id``.
 
     **Field ``isOwned``:** In Lua this flag is ``ownerFarmId == currentFarmId`` (the farm **active in the game
     session**). Farm Dashboard can switch ``activeFarmId`` to preview another farm without changing the
     save's current farm, so raw JSON may show ``isOwned: false`` on parcels that still belong to the
-    selected farm. After filtering by ``ownerFarmId``, we set ``isOwned`` to **True** on each kept field
+    selected farm. After filtering by ownership keys, we set ``isOwned`` to **True** on each kept field
     row so the consultant does not suggest buying land the player already owns for that farm view.
 
     Call for consultant paths so the LLM is not given the whole map / other saves' data is already split by server.
@@ -515,7 +518,7 @@ def prune_snapshot_to_active_farm(
     if field_map_relax_empty_fields and isinstance(root.get("fields"), list) and len(root["fields"]) == 0 and pre_fields:
         kept_fb: list[dict[str, Any]] = []
         for f in pre_fields[:_CONSULTANT_FIELD_MAP_MAX_ROWS]:
-            if isinstance(f, dict):
+            if isinstance(f, dict) and _field_row_belongs_to_farm(f, farm_id):
                 fc = copy.deepcopy(f)
                 fc["isOwned"] = True
                 kept_fb.append(fc)

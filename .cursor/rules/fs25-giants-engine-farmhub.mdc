@@ -13,9 +13,9 @@ alwaysApply: true
 
 ## Farmlands vs fields / density maps
 
-- **Farmland** = economy / ownership tile (`farmlandId`, buy/sell in PDA). Use it for **who owns** bales, land, consultant ownership filters.
+- **Farmland** = economy / ownership tile (`farmlandId`, buy/sell in PDA). Use it for **who owns** bales, land, and dashboard ownership filters.
 - **Field / crop state** = **density maps** (bit channels per world cell). Read via engine helpers (`DensityMapHeightUtil`, `DensityMapFilterLua`, field probes) at **sampled** X/Z — not `field.getCrop()` as a single scalar.
-- **Dashboard JSON must not** ship large coordinate dumps (windrows, weeds). Export **aggregates** (e.g. `windrowLiters`, `baleCountOnField`, booleans), not hundreds of `(x,z)` points — that pattern crushes LLM/token budgets downstream.
+- **Dashboard JSON must not** ship large coordinate dumps (windrows, weeds). Export **aggregates** (e.g. `windrowLiters`, `baleCountOnField`, booleans), not hundreds of `(x,z)` points — large arrays bloat the file and slow the desktop merge on every write.
 
 ## Mod export loop (this repo)
 
@@ -34,6 +34,6 @@ alwaysApply: true
 - **`toJSON` has no max depth or cycle detection** — only safe if every collector outputs **acyclic plain data**. If adding new fields, never stash **userdata**, **function**, or **engine object references** in the assembled table.
 - Prefer extending existing **aggregate-first** patterns in collectors over new per-point arrays.
 
-## Dashboard / AI (Node/Python)
+## Dashboard merge (Node)
 
-- **Prune** heavy keys and **cap field rows** before LLM (`consultantSnapshotPrune.js`, `snapshot_pruner.py`). Consultant copy must not assume mechanics FS25 does not expose (e.g. parcel soil moisture / irrigation).
+- **Prune** heavy keys where practical. Field rules and UI copy must not assume mechanics FS25 does not expose (e.g. parcel soil moisture / irrigation) unless the mod actually exports them.

@@ -413,34 +413,9 @@ function escHtml(s) {
 async function refreshSettingsDashboardAiConnectionLine() {
   const el = document.getElementById("settings-ai-connection-status");
   if (!el) return;
-  const api = getFarmDashApi();
-  if (!api) {
-    el.textContent = "—";
-    return;
-  }
-  const st = (await api.getAiSuggestionSettings?.().catch(() => null)) || null;
-  const mode = st?.mode || "";
-  const chatNote =
-    '<span class="d-block small text-muted mt-2">In-game <strong>!hank</strong> only when <strong>Hosted AI server</strong> is the active Smart suggestions mode.</span>';
-  let html = "";
-  if (mode === "hosted") {
-    html =
-      '<span class="badge text-bg-warning text-dark me-1">Hosted AI</span> — Smart suggestions + snapshot push + in-game chat (with server bot profiles).';
-  } else if (mode === "gemini_byok") {
-    html =
-      '<span class="badge bg-info text-dark me-1">Gemini (your key)</span> — Smart suggestions run on this PC only. No data push to a server.';
-  } else if (mode === "openai_compat") {
-    html =
-      '<span class="badge bg-secondary me-1">OpenAI-compatible</span> — Smart suggestions via your LM Studio / vLLM URL on this PC. No data push.';
-  } else if (mode === "ollama") {
-    html =
-      '<span class="badge bg-secondary me-1">Ollama</span> — Smart suggestions on this PC via your local model. No data push.';
-  } else {
-    html =
-      'Choose one Smart suggestions mode under <strong>AI Farm Manager</strong> (Hosted, Gemini, OpenAI-compatible, or Ollama). Until then, <span class="badge bg-secondary">Rules</span> may still show on Fields.';
-  }
   el.className = "alert alert-secondary small py-2 mb-0";
-  el.innerHTML = html + chatNote;
+  el.innerHTML =
+    '<span class="badge bg-secondary me-1">Rules</span> Parcel tips use the <strong>offline rules engine</strong> only (Fields tab and field cards).';
 }
 
 export async function populateDashboardSettingsForm() {
@@ -460,7 +435,7 @@ export async function populateDashboardSettingsForm() {
     try {
       await refreshSettingsDashboardAiConnectionLine();
     } catch (e) {
-      console.warn("[dashboard-settings] AI connection status line", e);
+      console.warn("[dashboard-settings] field rules status line", e);
     }
     return;
   }
@@ -548,27 +523,6 @@ export async function populateDashboardSettingsForm() {
     console.warn("[dashboard-settings] mod config", e);
   }
 
-  const byokClear = document.getElementById("settings-consultant-byok-clear");
-  const byokKey = document.getElementById("settings-consultant-byok-key");
-  const byokProv = document.getElementById("settings-consultant-byok-provider");
-  if (byokClear || byokKey || byokProv) {
-    if (byokClear) byokClear.checked = false;
-    if (byokKey) byokKey.value = "";
-    try {
-      const meta = await api.getConsultantByokMeta();
-      if (byokProv) {
-        byokProv.value = meta?.provider === "gemini" ? "gemini" : "openai";
-      }
-      if (byokKey && meta?.hasKey) {
-        byokKey.placeholder = "Leave blank to keep saved key (••••••••)";
-      } else if (byokKey) {
-        byokKey.placeholder = "Paste API key to enable VPS consultant LLM";
-      }
-    } catch (e) {
-      console.warn("[dashboard-settings] consultant BYOK", e);
-    }
-  }
-
   await loadAppSettingsServerDraft();
 
   try {
@@ -591,7 +545,7 @@ export async function populateDashboardSettingsForm() {
   try {
     await refreshSettingsDashboardAiConnectionLine();
   } catch (e) {
-    console.warn("[dashboard-settings] AI connection status line", e);
+    console.warn("[dashboard-settings] field rules status line", e);
   }
 }
 
@@ -629,31 +583,6 @@ export async function saveDashboardSettingsFromModal() {
     });
   } catch (e) {
     console.warn("[dashboard-settings] save-settings", e);
-  }
-
-  if (document.getElementById("settings-consultant-byok-key")) {
-    const byokClear = document.getElementById("settings-consultant-byok-clear")?.checked;
-    const byokKeyRaw = document.getElementById("settings-consultant-byok-key")?.value || "";
-    const byokKey = byokKeyRaw.trim();
-    const byokProv =
-      document.getElementById("settings-consultant-byok-provider")?.value === "gemini"
-        ? "gemini"
-        : "openai";
-    try {
-      if (byokClear) {
-        await api.saveConsultantByokCredentials({ clear: true });
-      } else {
-        const meta = await api.getConsultantByokMeta();
-        if (byokKey || meta?.hasKey) {
-          await api.saveConsultantByokCredentials({
-            apiKey: byokKey,
-            provider: byokProv,
-          });
-        }
-      }
-    } catch (e) {
-      console.warn("[dashboard-settings] save BYOK", e);
-    }
   }
 
   const ui = parseInt(
@@ -725,15 +654,14 @@ export async function saveDashboardSettingsFromModal() {
 const UNIFIED_SETTINGS_TAB_IDS = {
   dashboard: "app-settings-tab-dashboard",
   servers: "app-settings-tab-servers",
-  ai: "app-settings-tab-ai",
   mod: "app-settings-tab-mod",
   theme: "app-settings-tab-theme",
 };
 
 /**
- * Open the unified Settings modal and optionally activate a sidebar tab (servers, AI, etc.).
+ * Open the unified Settings modal and optionally activate a sidebar tab (servers, mod, etc.).
  * Replaces the old separate navbar “folder” shortcut — all configuration lives here.
- * @param {"dashboard"|"servers"|"ai"|"mod"|"theme"} [tabKey]
+ * @param {"dashboard"|"servers"|"mod"|"theme"} [tabKey]
  */
 export function openUnifiedSettingsModal(tabKey) {
   if (!isFarmDashLocalConfigHost()) {

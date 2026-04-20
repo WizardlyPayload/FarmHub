@@ -511,10 +511,6 @@ export function showVehiclesSection() {
                 </div>
             </div>
 
-            <div class="row ai-insights-slot-after-kpis justify-content-center">
-                <div class="col-12" id="ai-insights-slot-section"></div>
-            </div>
-
             <div class="row mb-4">
                 <div class="col-12">
                     <div class="card shadow-lg border-farm-accent">

@@ -2,7 +2,7 @@
 
 **Authors:** **JoshWalki** (Josh) / Wizardlypayload and **WizardlyPayload** — see [AUTHORS.md](./AUTHORS.md).
 
-This document describes how the **desktop app** exposes data, what is **optional** vs **default-locked**, and how that fits a **home / LAN** setup. It is written for **3.1.0**; review again after major upgrades.
+This document describes how the **desktop app** exposes data, what is **optional** vs **default-locked**, and how that fits a **home / LAN** setup. It is written for **3.0.0**; review again after major upgrades.
 
 ---
 
@@ -71,22 +71,6 @@ The FS25 mod only writes **`data.json`** under the user profile. It does not ope
 
 ---
 
-## AI Farm Manager (optional FastAPI backend)
-
-If you run the separate **AI Farm Manager** service (VPS/Docker) for Smart suggestions or in-game chat, treat its URL like any other API: **HTTPS**, firewall, and **harden** what is exposed on the public internet.
-
-**Full checklist (env vars, `GET /`, `/health`, CORS):** **[AI_SERVER_SECURITY.md](./AI_SERVER_SECURITY.md)**.
-
-Summary:
-
-- Optional **`REQUIRE_AUTH_FOR_ROOT_HTML=1`** — requires **`X-FarmDash-Key`** / **`?farmdash_key=`** / admin Basic for **`GET /`** (farm snapshot HTML), same as integration routes.
-- Optional **`HEALTH_RESPONSE_DETAIL=minimal`** — **`/health`** returns only `status` + `service` name (reduces path disclosure); Docker/Coolify probes still work.
-- **`CORS_ORIGINS=*`** — wildcard origin is paired with **no credentials** (spec-correct). Use **explicit origins** if browsers must send credentialed requests.
-
-Gemini **API key routing** and rate limits: **[LLM_GEMINI_ROUTING.md](./LLM_GEMINI_ROUTING.md)** — distinct from the desktop app’s LAN dashboard on port **8766**.
-
----
-
 ## Reporting security concerns
 
-For **public** security issues (e.g. unintended remote code execution via the app), contact the maintainers via the GitHub repository’s channels (**JoshWalki** & **WizardlyPayload** — [AUTHORS.md](./AUTHORS.md)). Include app version **3.1.0** and platform **Windows**.
+For **public** security issues (e.g. unintended remote code execution via the app), contact the maintainers via the GitHub repository’s channels (**JoshWalki** & **WizardlyPayload** — [AUTHORS.md](./AUTHORS.md)). Include app version **3.0.0** and platform **Windows**.

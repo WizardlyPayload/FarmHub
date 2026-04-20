@@ -12,12 +12,6 @@ export function isFarmDashLocalConfigHost() {
   return _hostnameImpliesLocalConfigHost();
 }
 
-/** Same-origin path; main.js forwards to AI Farm Manager with host-stored credentials. */
-export function getFarmdashAiConsultantInsightsProxyUrl() {
-  if (typeof window === "undefined" || !window.location?.origin) return "";
-  return `${window.location.origin}/api/farmdash-ai/consultant/insights`;
-}
-
 function _hostnameImpliesLocalConfigHost() {
   try {
     const h = String(typeof window !== "undefined" && window.location?.hostname != null

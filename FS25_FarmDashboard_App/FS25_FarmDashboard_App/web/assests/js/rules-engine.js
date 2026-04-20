@@ -108,6 +108,16 @@ function isGrassCrop(field) {
   return false;
 }
 
+/** Legumes / N-fixing crops — do not suggest sidedress N from soil-map gaps (maps still show low mineral N). */
+function isLegumeSkipGrowingNFertilizer(field) {
+  const ft = fruitUpper(field);
+  if (!ft) return false;
+  if (ft === "SOYBEAN" || ft === "SOY_BEAN" || ft === "SOYBEANS") return true;
+  if (ft === "PEA" || ft === "GREENPEA" || ft === "FABA_BEAN" || ft === "LUPINE" || ft === "LUPIN") return true;
+  if (ft === "CHICKPEA" || ft === "LENTIL" || ft === "DRYBEAN" || ft === "FIELD_BEAN") return true;
+  return false;
+}
+
 /**
  * True bare / unplanted parcel — used for fallow pipeline (mulch → plough → lime → N → sow).
  * Must not treat “missing fruitTypeIndex” (NaN) as empty when fruitType or growth proves a crop exists
@@ -308,6 +318,7 @@ function fallowLimeBeforeSeedSuggestion(field) {
 
 /** Growing crop: use live `needsFertilizer` when present, else spray / mapped N heuristics when scanned. */
 function needsGrowingFertilizer(field) {
+  if (isLegumeSkipGrowingNFertilizer(field)) return false;
   const gs = field.growthState || 0;
   if (gs <= 0) return false;
   if (typeof field.needsFertilizer === "boolean") return field.needsFertilizer;
@@ -315,6 +326,133 @@ function needsGrowingFertilizer(field) {
     return field.nitrogenLevel / field.targetNitrogen < 0.6;
   }
   return (field.fertilizationLevel || 0) < 1;
+}
+
+/**
+ * One growing-crop maintenance suggestion: pick the job with the largest deficit vs targets.
+ * Tie order (when urgencies match): lime → nitrogen → weeds → roll.
+ * @param {object} field
+ * @returns {{ action: string, reason: string, source: 'rules' } | null}
+ */
+function pickGrowingCropMaintenanceSuggestion(field) {
+  /** Lower `tie` wins on equal urgency. */
+  const candidates = [];
+
+  if (field.needsRolling) {
+    const gs = field.growthState || 0;
+    const urgency = gs <= 2 ? 0.95 : gs <= 4 ? 0.52 : 0.28;
+    candidates.push({
+      urgency,
+      tie: 4,
+      apply() {
+        return {
+          action: "Roll — first growth stage / seedbed finish",
+          reason:
+            "rollerLevel says rolling isn’t complete — roll once early for soil contact and stone knock-down.",
+          source: "rules",
+        };
+      },
+    });
+  }
+
+  if (field.needsLime && !isGrassCrop(field)) {
+    const ph = Number(field.phValue ?? 0);
+    const pht = Number(field.targetPh ?? 0);
+    let urgency = 0.42;
+    if (field.isPrecisionFarming && field.isScanned && pht > 0) {
+      urgency = Math.min(1.25, Math.max(0, (pht - ph) / 0.75));
+    }
+    const label = displayCropLabel(field);
+    candidates.push({
+      urgency,
+      tie: 1,
+      apply() {
+        const detail =
+          field.isPrecisionFarming && pht > 0
+            ? `${label}: pH ~${ph.toFixed(1)} vs target ~${pht.toFixed(1)} — this is the tightest gap to fix first on the scan.`
+            : `${label}: pH is low — lime is the priority fix before chasing other passes.`;
+        return {
+          action: "Spread lime (emerged crop — pre-drill is ideal next season)",
+          reason: detail,
+          source: "rules",
+        };
+      },
+    });
+  }
+
+  if (field.needsWeeding) {
+    const w = Math.min(1, Math.max(0, Number(field.weedLevel ?? 0)));
+    const urgency = Math.min(1.15, w + 0.08);
+    const label = displayCropLabel(field);
+    const gs = field.growthState || 0;
+    candidates.push({
+      urgency,
+      tie: 3,
+      apply() {
+        if (gs <= 2) {
+          return {
+            action: "Weed mechanically (hoe / weeder)",
+            reason: `Early growth (stage ${gs}) — weeds are the worst issue for ${label} right now; mechanical pass before herbicide.`,
+            source: "rules",
+          };
+        }
+        return {
+          action: "Spray herbicide — weeds past mechanical window",
+          reason: `Growth stage ${gs} — weed pressure on ${label} is the priority pass now.`,
+          source: "rules",
+        };
+      },
+    });
+  }
+
+  if (needsGrowingFertilizer(field)) {
+    const label = displayCropLabel(field);
+    let urgency = 0.5;
+    if (field.isPrecisionFarming && field.isScanned && field.targetNitrogen > 0) {
+      const n = Number(field.nitrogenLevel ?? 0);
+      const t = Number(field.targetNitrogen ?? 0);
+      if (t > 0 && Number.isFinite(n)) {
+        urgency = Math.min(1.25, Math.max(0, 1 - n / t));
+      }
+    } else {
+      const fl = Number(field.fertilizationLevel ?? 0);
+      urgency = Math.min(1, (2 - fl) / 2);
+    }
+    candidates.push({
+      urgency,
+      tie: 2,
+      apply() {
+        if (field.isPrecisionFarming && field.isScanned && field.targetNitrogen > 0) {
+          const n = Number(field.nitrogenLevel ?? 0);
+          const t = Number(field.targetNitrogen ?? 0);
+          const gap = Math.max(0, t - n);
+          const pct =
+            t > 0 ? Math.round(Math.min(100, Math.max(0, (n / t) * 100))) : 0;
+          return {
+            action:
+              gap > 1
+                ? `Add ~${Math.round(gap)} kg N/ha to reach target`
+                : "Top up nitrogen for this growth stage",
+            reason: `Mapped N ${Math.round(n)} / ${Math.round(t)} kg N/ha (${pct}% of target) — ${label} is shortest on N versus the map; do this pass before other tweaks.`,
+            source: "rules",
+          };
+        }
+        const fl = Number(field.fertilizationLevel ?? 0);
+        return {
+          action: `Fertilize — spray / nutrient step ${fl}/2 (below full for this stage)`,
+          reason: `${label} is lowest on fertilization for this stage — one nutrient pass is the next job.`,
+          source: "rules",
+        };
+      },
+    });
+  }
+
+  if (candidates.length === 0) return null;
+  candidates.sort((a, b) => {
+    if (Math.abs(b.urgency - a.urgency) > 0.02) return b.urgency - a.urgency;
+    return a.tie - b.tie;
+  });
+  return candidates[0].apply();
 }
 
 /** Bare field before first crop: mirror base spray steps + mapped N target when soil data is scanned. */
@@ -633,11 +771,19 @@ export function getLocalFieldSuggestion(field) {
 
     // B6. Sow only when lime + starter N prep are satisfied (see canSowFallow).
     if (canSowFallow(field)) {
+      if (field.isPrecisionFarming && field.isScanned) {
+        return {
+          action: "Direct-drill your next crop (no-till)",
+          reason:
+            mulch >= 1
+              ? "With Precision Farming on, this parcel is ready to plant — one pass with the drill through mulch/residue is the next job."
+              : "With Precision Farming on, this parcel is ready to plant — one pass with the drill is the next job; skip extra cultivation if your setup allows.",
+          source: "rules",
+        };
+      }
       return {
         action: "Sow or plant your next crop",
-        reason: mulch >= 1
-          ? "Lime and N prep are in a good place for drilling — put seed in after mulch/cultivation work."
-          : "Lime and N prep are in a good place for drilling — seed before the window for tillage closes.",
+        reason: "Soil prep for this field is satisfied for drilling — the next job is putting seed in.",
         source: "rules",
       };
     }
@@ -645,105 +791,95 @@ export function getLocalFieldSuggestion(field) {
 
   // ── Mulched empty without full fallow detection (legacy shape) ───────────
   if (isMulchedEmptyField(field)) {
-    return {
-      action: "No-till drill or cultivate, then sow the next crop",
-      reason: "Stubble is mulched and there’s no active crop — seed directly or work the soil first.",
-      source: "rules",
-    };
-  }
-
-  // ── Post-harvest stubble (has crop index may still be 0 on some saves) ───
-  if (isPostHarvestField(field) || fieldIsAlreadyHarvested(field)) {
-    return {
-      action: "Work the stubble, then line up the next crop",
-      reason: "Harvest is done — mulch, plough, or drill depending on rotation; follow the fallow steps above next.",
-      source: "rules",
-    };
-  }
-
-  // ── C. Growing crop — maintenance order: roll → lime → weed → fert ───────
-  if (!noCrop) {
-    if (field.needsRolling) {
+    if (field.isPrecisionFarming && field.isScanned) {
       return {
-        action: "Roll — first growth stage / seedbed finish",
-        reason: "rollerLevel says rolling isn’t complete — roll once early for soil contact and stone knock-down.",
+        action: "Direct-drill your next crop (no-till)",
+        reason:
+          "Precision Farming is on and there’s no standing crop — the next job is planting with a direct drill; skip a full cultivation pass if your setup allows.",
+        source: "rules",
+      };
+    }
+    return {
+      action: "Cultivate mulched stubble, then drill or plant the next crop",
+      reason:
+        "Stubble is mulched and there’s no active crop — shallow cultivation before drilling is the usual path without Precision Farming maps guiding no-till.",
+      source: "rules",
+    };
+  }
+
+  // ── Post-harvest stubble (fruit type may still show on the card after combine) ───
+  if (isPostHarvestField(field) || fieldIsAlreadyHarvested(field)) {
+    if (field.needsLime) {
+      return fallowLimeBeforeSeedSuggestion(field);
+    }
+
+    if (needsPlow && !grass && mulch < 1) {
+      return {
+        action: "Mulch stubble before you plough",
+        reason:
+          "Harvest residue is still standing and primary tillage is due — shred stubble so the plough or deep cultivator can work cleanly.",
         source: "rules",
       };
     }
 
-    if (field.needsLime) {
-      // Permanent grass (incl. mown regrowth): never use arable “pre-drill” wording — grass isn’t drilled like a cereal.
-      if (isGrassCrop(field)) {
-        const ph = Number(field.phValue ?? 0);
-        const pht = Number(field.targetPh ?? 0);
-        if (field.isPrecisionFarming && field.isScanned && pht > 0) {
-          return {
-            action: "Lime pasture only if the pH map shows a real gap",
-            reason: `Mapped pH ~${ph.toFixed(1)} vs target ~${pht.toFixed(1)} — grass tolerates a wider band than arable; lime after cuts only when the scan says pH is short, not as a drill-window task.`,
-            source: "rules",
-          };
-        }
+    if (field.isPrecisionFarming && field.isScanned) {
+      if (needsPlow) {
         return {
-          action: "Check pasture pH before liming mown grass",
+          action: "Plough or deep-cultivate — primary tillage before the next crop",
           reason:
-            "Low lime flags on permanent grass often follow mowing — correct pH gradually; avoid treating pasture like pre-drill arable land.",
+            "Precision Farming is enabled and this parcel still needs full inversion or deep tillage — maps and flags say ploughing isn’t satisfied yet.",
           source: "rules",
         };
       }
+      return {
+        action: "Direct-drill your next crop (no-till)",
+        reason:
+          "Precision Farming is on and ploughing isn’t flagged — harvest is done, so the next job is planting with a direct drill and keeping tillage minimal.",
+        source: "rules",
+      };
+    }
+
+    if (needsPlow) {
+      return {
+        action: "Plough or deep-cultivate, then finish the seedbed",
+        reason:
+          "Harvest is done and the save still flags primary tillage — work the soil deep, then cultivate and drill (or follow your rotation’s cultivation step).",
+        source: "rules",
+      };
+    }
+
+    return {
+      action: "Cultivate stubble, then drill or plant the next crop",
+      reason:
+        "Harvest is done and ploughing isn’t flagged — shallow cultivation before the next seeding matches this field state (use in-game no-till if you prefer).",
+      source: "rules",
+    };
+  }
+
+  // ── C. Growing crop — one job: worst deficit vs scan/targets (lime first on tie) ──
+  if (!noCrop) {
+    // Permanent grass + lime: keep pasture-specific wording (not mixed into arable deficit ranks).
+    if (field.needsLime && isGrassCrop(field)) {
       const ph = Number(field.phValue ?? 0);
       const pht = Number(field.targetPh ?? 0);
-      const label = displayCropLabel(field);
-      const detail =
-        field.isPrecisionFarming && pht > 0
-          ? `${label}: pH ~${ph.toFixed(1)} vs target ~${pht.toFixed(1)} — lime now only if the crop stage still allows; best timing is before seeding next time.`
-          : `${label}: pH is low — lime now only if stage still permits; on future fields, lime before drilling seed.`;
-      return {
-        action: "Spread lime (emerged crop — pre-drill is ideal next season)",
-        reason: detail,
-        source: "rules",
-      };
-    }
-
-    if (field.needsWeeding) {
-      const label = displayCropLabel(field);
-      const gs = field.growthState || 0;
-      if (gs <= 2) {
+      if (field.isPrecisionFarming && field.isScanned && pht > 0) {
         return {
-          action: "Weed mechanically (hoe / weeder)",
-          reason: `Early growth (stage ${gs}) — weeds are high for ${label}; mechanical tools before herbicide is ideal.`,
+          action: "Lime pasture only if the pH map shows a real gap",
+          reason: `Mapped pH ~${ph.toFixed(1)} vs target ~${pht.toFixed(1)} — grass tolerates a wider band than arable; lime after cuts only when the scan says pH is short, not as a drill-window task.`,
           source: "rules",
         };
       }
       return {
-        action: "Spray herbicide — weeds past mechanical window",
-        reason: `Growth stage ${gs} — weed pressure on ${label} is best handled with a sprayer now.`,
+        action: "Check pasture pH before liming mown grass",
+        reason:
+          "Low lime flags on permanent grass often follow mowing — correct pH gradually; avoid treating pasture like pre-drill arable land.",
         source: "rules",
       };
     }
 
-    if (needsGrowingFertilizer(field)) {
-      const label = displayCropLabel(field);
-      if (field.isPrecisionFarming && field.isScanned && field.targetNitrogen > 0) {
-        const n = Number(field.nitrogenLevel ?? 0);
-        const t = Number(field.targetNitrogen ?? 0);
-        const gap = Math.max(0, t - n);
-        const pct =
-          t > 0 ? Math.round(Math.min(100, Math.max(0, (n / t) * 100))) : 0;
-        return {
-          action:
-            gap > 1
-              ? `Add ~${Math.round(gap)} kg N/ha to reach target`
-              : "Top up nitrogen for this growth stage",
-          reason: `Mapped N ${Math.round(n)} / ${Math.round(t)} kg N/ha (${pct}% of target) — ${label} needs more N for this stage.`,
-          source: "rules",
-        };
-      }
-      const fl = Number(field.fertilizationLevel ?? 0);
-      return {
-        action: `Fertilize — spray / nutrient step ${fl}/2 (below full for this stage)`,
-        reason: `${label} needs a higher fertilization level for this growth stage — solid, liquid, or organic per your rotation.`,
-        source: "rules",
-      };
+    const growingPick = pickGrowingCropMaintenanceSuggestion(field);
+    if (growingPick) {
+      return growingPick;
     }
   }
 
@@ -796,8 +932,9 @@ export function getLocalFieldSuggestion(field) {
   if (gs > 0) {
     const label = displayCropLabel(field);
     return {
-      action: `Tend ${label} until it’s harvest-ready`,
-      reason: `Crop is growing — roll, weed, and fertilize when the HUD shows those jobs; plan the harvest window.`,
+      action: `Monitor ${label} toward harvest`,
+      reason:
+        `Crop is growing and no soil job is flagged here right now — watch the in-field HUD for the next pass and plan the harvest window.`,
       source: "rules",
     };
   }

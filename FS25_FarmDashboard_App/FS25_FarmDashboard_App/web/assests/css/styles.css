@@ -82,7 +82,7 @@ body.bg-dark > #splash-screen {
   z-index: 99999;
 }
 
-/* Navbar above main so dropdowns (e.g. farm picker) aren’t covered by #ai-farm-insights-row */
+/* Navbar above main so dropdowns (e.g. farm picker) stack correctly */
 body.bg-dark > #main-navbar {
   position: relative;
   z-index: 1030;
@@ -1394,53 +1394,6 @@ th {
   font-size: 0.9rem;
 }
 
-/* AI Farm Manager — inner BYOK / Hosted pills */
-#appSettingsModal #ai-fm-subtabs .nav-link {
-  color: rgba(255, 255, 255, 0.75);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-#appSettingsModal #ai-fm-subtabs .nav-link:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
-}
-#appSettingsModal #ai-fm-subtabs .nav-link.active {
-  color: #0f172a;
-  background: var(--bs-warning);
-  border-color: var(--bs-warning);
-}
-
-/* AI Farm panel: long server ids / masked tokens wrap instead of squashing layout */
-#aiFarmBotPanelBody {
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-#aiFarmBotPanelBody code {
-  word-break: break-all;
-}
-
-/* AI Farm Manager — proactive consultant insights */
-#ai-insights-panel .insight-card {
-  border-left: 4px solid var(--bs-secondary);
-  padding: 0.65rem 0.75rem;
-  margin-bottom: 0.5rem;
-  border-radius: 0.25rem;
-  background: rgba(255, 255, 255, 0.04);
-}
-#ai-insights-panel .insight-card.priority-high {
-  border-left-color: var(--bs-danger);
-}
-#ai-insights-panel .insight-card.priority-medium {
-  border-left-color: var(--bs-warning);
-}
-#ai-insights-panel .insight-card.priority-low {
-  border-left-color: var(--bs-info);
-}
-#ai-insights-panel .insight-meta {
-  font-size: 0.75rem;
-  opacity: 0.85;
-}
-
 /* Fields: Layer 1 rules vs Layer 2 AI consultant */
 .field-suggestion-card.field-suggestion-layer-ai {
   box-shadow: 0 0 0 1px rgba(13, 202, 240, 0.25);
@@ -1648,20 +1601,6 @@ th {
   }
 }
 
-/* AI insight skeleton — pulse bars only (never the whole panel; avoids flashing blue behind the card) */
-@keyframes aiSkeletonPulse {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 0.9;
-  }
-}
-.ai-insights-skeleton-pulse .placeholder {
-  animation: aiSkeletonPulse 1.35s ease-in-out infinite;
-}
-
 /* ========== Premium dynamic backgrounds + glass UI (landing + sections) ========== */
 body.farm-dash-ui.bg-dark {
   background: transparent !important;
@@ -1731,67 +1670,6 @@ body.farm-dash-ui.bg-dark::before {
   -webkit-backdrop-filter: blur(11px);
   border-radius: 1rem !important;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.28);
-}
-
-.farm-glass-panel--insights .card-header {
-  background: linear-gradient(
-    95deg,
-    rgba(47, 111, 78, 0.72) 0%,
-    rgba(15, 23, 42, 0.75) 100%
-  ) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
-}
-
-.farm-glass-panel--insights .card-body {
-  background: transparent !important;
-}
-
-/* Smart suggestions: below summary KPI row (or header on Productions), above main tools/content */
-.ai-insights-slot-after-kpis {
-  margin-top: 0.25rem;
-  margin-bottom: 1.25rem;
-}
-@media (min-width: 768px) {
-  .ai-insights-slot-after-kpis {
-    margin-bottom: 1.5rem;
-  }
-}
-
-/* Smart suggestions: fluid width + responsive type (matches container-fluid columns) */
-#ai-insights-slot-landing,
-#ai-insights-slot-dashboard,
-#ai-insights-slot-section {
-  min-width: 0;
-}
-
-#ai-farm-insights-row {
-  width: 100%;
-  max-width: 100%;
-}
-
-#ai-farm-insights-row .farm-glass-panel--insights {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-}
-
-#ai-farm-insights-row .card-header {
-  min-width: 0;
-}
-
-#ai-farm-insights-row .card-header h6 {
-  font-size: clamp(0.88rem, 0.35vw + 0.78rem, 1rem);
-}
-
-/* Collapse Smart suggestions body (landing + other slots) to reach category cards faster */
-#ai-farm-insights-card.farmdash-insights--collapsed #ai-insights-panel {
-  display: none !important;
-}
-
-#ai-insights-panel {
-  font-size: clamp(0.8rem, 0.2vw + 0.74rem, 0.9375rem);
-  overflow-wrap: break-word;
-  word-wrap: break-word;
 }
 
 /* Landing hero */

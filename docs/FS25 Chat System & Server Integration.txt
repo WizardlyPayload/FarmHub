@@ -152,19 +152,6 @@ end
 
 ---
 
-## 8. How this maps to the AI Farm Manager in-game chat bot (Hank)
+## 8. Third-party chat integrations (out of scope for Farm Dashboard 3.0.0)
 
-The **FS25 AI Farm Manager** mod (`fs25_ai_farm_manager_mod`) uses a pattern that matches **§1** (client → server → broadcast) but **does not** use **§3 Module A** (`ChatWindow.onSendChat` swallow). Instead it hooks **after** the chat line exists in the mission pipeline.
-
-| Handover concept | Hank / AI Farm Manager implementation |
-| :--- | :--- |
-| **Input** | Player types in the normal chat UI (e.g. `!hank what is growing?`). The line is processed by the game like any chat message. |
-| **Interception point** | **`Mission00.addChatMessage`** is wrapped with `Utils.appendedFunction` (`ChatHooks.lua`). When a new line is added, the hook runs: filter by **`triggerPrefix`** (default `!hank`), ignore lines from the bot sender (`Hank`) to avoid loops. This is **observation**, not **swallow** — other players still see the trigger message unless you later add a `ChatWindow.onSendChat` hook (§3 Module A). |
-| **Who runs the bridge** | **Server authority only** (`AIFarmBridge:isAuthority()` + `isMultiplayer`). **MP clients** do not POST to the API; only host / dedicated runs HTTP **`POST /api/chat/receive`**. The **`Mission00.addChatMessage` hook is only installed on the server** (`registerWhenReady` skips clients), so **`Trigger matched` / `CHAT_LOG` never appear in a joining player’s local `log.txt`** — use **host PC log** or **G-Portal `server.log`**. The mod logs a one-time hint for MP clients at mission start. Matches **§6**: headless server has no keyboard; the **client** typed chat, the **server** received it and the hook runs on the server in MP. |
-| **Outbound / broadcast** | Replies are injected with **`g_server:broadcastEvent(ChatEvent.new(...))`** only (`AIFarmChatHooks.broadcastBot`). There is **no** `g_currentMission.chatWindow:addMessage` call — so **§3 Module B** local UI branch is unnecessary and **G-Portal / dedicated** stays safe (no `nil` chatWindow crash). |
-| **External integration** | Backend queues replies; game **polls** **`GET /api/chat/poll`** (~3s) and broadcasts each line. This is app-side queue + HTTP, not WebAPI injection from G-Portal dashboard (§6.2), but the **same broadcast primitive** (`ChatEvent`) applies once the mod has text to show. |
-| **Security** | Trigger handling is **not** a privileged admin command in-game; the **Python API** validates **`server_token`**, rate limits, and optional IP allowlists (`assert_chat_allowed`). For admin-style commands you would still follow **§4** inside a dedicated `Event:run` on the server. |
-
-**Single-player:** the Hank bridge is **off** by design; use Farm Dashboard + consultant on the PC (`IN_GAME_CHAT_BOT.md`).
-
-**Files:** `FarmHub/AI_Farm_Manager/fs25_ai_farm_manager_mod/src/ChatHooks.lua`, `main.lua`; backend `app/routers/chat.py` (`/receive`, `/poll`).
+Sections **§1–§7** describe **GIANTS FS25** chat flow for your own Lua work. Separate third-party mods or hosted services may add multiplayer chat bots using **`Mission00.addChatMessage` hooks**, HTTP bridges, and **`ChatEvent`** broadcasts similar to the patterns above. Those stacks are **not** part of the **Farm Dashboard** app + mod shipped from this **FarmHub** tree; treat them as independent products if you encounter them in the wild.

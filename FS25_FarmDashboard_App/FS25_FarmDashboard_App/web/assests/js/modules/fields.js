@@ -7,13 +7,12 @@ import {
     aggregateWindrowDetected,
     aggregateBaleableLoose,
     classifyWindrowMaterial,
-    getFieldStableId,
 } from "../rules-engine.js";
 import {
     refreshFieldConsultantCache,
     scheduleFieldConsultantFetch,
-    lookupFieldConsultantInsight,
 } from "../field-consultant-bridge.js";
+import { buildToolGuidanceLines } from "../field-suggestion-tools.js";
 
 /**
  * fields.js  —  FarmDashboard FS25
@@ -374,6 +373,7 @@ function buildFieldCard(field) {
                         </div>
                     </div>
                     ${buildForageDetectionBadges(field)}
+                    ${buildWindrowVolumeBadge(field)}
                     ${progress}
                     <div class="mt-3">${conditions}</div>
                     ${suggestion}
@@ -698,30 +698,39 @@ function escapeFieldHtml(s) {
 }
 
 /**
- * Remove internal parcel ids models echo into **message** (field_ref / farmlandId belong in JSON only).
+ * Mod export: `windrowLiters` + `windrowType` (Straw / Grass / Hay). Shown only when both are meaningful.
  */
-function stripConsultantInternalIdsFromLine(text, field) {
-    let s = String(text || "");
-    const ids = new Set();
-    if (field && field.farmlandId != null && String(field.farmlandId).trim() !== "") ids.add(String(field.farmlandId).trim());
-    if (field && field.id != null && String(field.id).trim() !== "") ids.add(String(field.id).trim());
-    try {
-        const stable = field ? String(getFieldStableId(field) || "").trim() : "";
-        if (stable) ids.add(stable);
-    } catch (e) {
-        /* ignore */
+function buildWindrowVolumeBadge(field) {
+    const L = Number(field?.windrowLiters ?? 0);
+    if (!Number.isFinite(L) || L <= 0) return "";
+    const typ = field?.windrowType;
+    if (typ == null || typ === "") return "";
+    const raw = String(typ).trim();
+    if (!raw) return "";
+    const tl = raw.toLowerCase();
+    let badgeClass = "bg-warning text-dark";
+    let emoji = "🌾";
+    if (tl === "grass") {
+        badgeClass = "bg-success";
+        emoji = "🌿";
+    } else if (tl === "hay") {
+        badgeClass = "bg-info text-dark";
+        emoji = "🍂";
+    } else if (tl === "straw") {
+        badgeClass = "bg-warning text-dark";
+        emoji = "🌾";
+    } else {
+        badgeClass = "bg-secondary";
+        emoji = "🌾";
     }
-    for (const id of ids) {
-        if (!id || !/^\d+$/.test(id)) continue;
-        s = s.replace(new RegExp(`\\(\\s*farmlandId\\s*:\\s*${id}\\s*\\)`, "gi"), "");
-        s = s.replace(new RegExp(`\\bfarmlandId\\s*:\\s*${id}\\b`, "gi"), "");
-        s = s.replace(new RegExp(`\\bfield_?ref\\s*:\\s*${id}\\b`, "gi"), "");
-    }
-    s = s.replace(/\(\s*farmlandId\s*:\s*\d{1,7}\s*\)/gi, "");
-    s = s.replace(/\bfarmlandId\s*:\s*\d{1,7}\b/gi, "");
-    s = s.replace(/\bfield_?ref\s*:\s*\d{1,7}\b/gi, "");
-    s = s.replace(/\s{2,}/g, " ").replace(/\s+([.,;:])/g, "$1").trim();
-    return s;
+    const label = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+    const vol = Math.round(L).toLocaleString(undefined, { maximumFractionDigits: 0 });
+    return `<div class="d-flex flex-wrap gap-1 mt-2 mb-1">
+        <span class="badge ${badgeClass}" title="Tipped material on field (height-map total from mod)">
+            <span aria-hidden="true">${emoji}</span>
+            <span class="ms-1">${escapeFieldHtml(label)}: ${escapeFieldHtml(vol)} L</span>
+        </span>
+    </div>`;
 }
 
 /** Visible tags when the mod detects bales on farmland or loose windrow / swath material. */
@@ -804,44 +813,6 @@ function getWinterFieldSeasonalNote(field) {
     return "Winter: arable growth is minimal — field readings may look unchanged until spring. Suggestions still reflect soil prep and planning.";
 }
 
-/**
- * Cached LLM lines can disagree with live badges (e.g. harvest copy on a harvested bar). Prefer rules then.
- */
-function aiFieldInsightContradictsCard(field, ai) {
-    if (!ai || !field) return false;
-    const msg = `${String(ai.message || "")} ${String(ai.reasoning || "")}`;
-    if (!msg.trim()) return false;
-    const lower = msg.toLowerCase();
-
-    const soundsLikeHarvestRun = /\b(combine|harvester|forage harvester)\b/i.test(msg)
-        || /\b(bring it in|ready to go|ready to harvest)\b/i.test(lower);
-
-    if (shouldSuppressHarvestSuggestions(field) && soundsLikeHarvestRun) return true;
-
-    /** Card shows harvested / stubble — never advise running a new cut ("Harvest field …"). */
-    if (shouldSuppressHarvestSuggestions(field) && !effectiveHarvestReady(field)) {
-        if (/\bharvest\b/i.test(lower) && !/\bafter\s+harvest\b/i.test(lower) && !/\bpost[\s-]*harvest\b/i.test(lower)) {
-            if (
-                /\bharvest\s+(?:the\s+)?(?:field|parcel|crop)\b/i.test(msg) ||
-                /\bgo\s+harvest\b/i.test(lower) ||
-                /\b(time\s+to|need\s+to)\s+harvest\b/i.test(lower)
-            ) {
-                return true;
-            }
-        }
-    }
-
-    const gs = Number(field.growthState || 0);
-    const maxGs = Math.max(1, Number(field.maxGrowthState) || 1);
-    const midGrow = gs > 0 && gs < maxGs && !fieldIsAlreadyHarvested(field) && !effectiveHarvestReady(field);
-    if (midGrow && soundsLikeHarvestRun) return true;
-
-    if (gs >= 1 && !fieldIsAlreadyHarvested(field) && /\b(all plowed|plowed up|ready for a new crop)\b/i.test(lower)) {
-        return true;
-    }
-    return false;
-}
-
 /** Hectares come from live Lua + merge; without FS running they are often missing → avoid fake "0.00". */
 function formatFieldHectares(field) {
     const ha = Number(field?.hectares);
@@ -851,7 +822,7 @@ function formatFieldHectares(field) {
     return '<span class="text-muted" title="Area is supplied when Farming Simulator is running and the dashboard mod can read field geometry. If the game is closed, area may be unavailable.">—</span>';
 }
 
-// ── Suggested next step: Layer 1 rules + game suggestions[]; optional Layer 2 consultant map ──
+// ── Suggested next step: offline rules + game suggestions[] ──
 function pickApiFallbackSuggestion(field) {
     if (!field.suggestions || field.suggestions.length === 0) return null;
     let sorted = [...field.suggestions].sort((a, b) => (a.priority || 9) - (b.priority || 9));
@@ -886,27 +857,22 @@ function buildSuggestion(field) {
     }
     const rules = rulesLocal || rulesApi;
 
-    const aiMap = typeof window !== "undefined" && window.__fieldConsultantByRef ? window.__fieldConsultantByRef : null;
-    const ai = lookupFieldConsultantInsight(aiMap, field);
-    let useAi = !!(ai && (ai.message || "").trim());
-    if (useAi && aiFieldInsightContradictsCard(field, ai)) {
-        useAi = false;
-    }
-    const aiLineRaw = useAi ? String(ai.message || "").trim() : "";
-    const aiLine = useAi ? stripConsultantInternalIdsFromLine(aiLineRaw, field) : "";
-    if (useAi && !aiLine) {
-        useAi = false;
-    }
+    const action = rules ? rules.action : "";
 
-    const action = useAi ? aiLine : (rules ? rules.action : "");
-    const layer = useAi ? "ai" : "rules";
+    const dash = typeof window !== "undefined" ? window.dashboard : null;
+    const toolLines = action
+            ? buildToolGuidanceLines(
+                  dash?.vehicles,
+                  Number(dash?.activeFarmId) || 1,
+                  action,
+                  field
+              )
+            : [];
+    const rulesReason = rules && typeof rules.reason === "string" ? rules.reason.trim() : "";
 
-    const layerBadge =
-        layer === "ai"
-            ? `<span class="badge bg-info text-dark ms-1 field-suggestion-layer-ai" title="AI field map (hosted or BYOK)"><i class="bi bi-stars me-1"></i>AI</span>`
-            : `<span class="badge bg-secondary ms-1 field-suggestion-layer-rules" title="Local rules / game data"><i class="bi bi-diagram-3 me-1"></i>Rules</span>`;
+    const layerBadge = `<span class="badge bg-secondary ms-1 field-suggestion-layer-rules" title="Local rules / game data"><i class="bi bi-diagram-3 me-1"></i>Rules</span>`;
 
-    const borderClass = layer === "ai" ? "border-info" : "border-warning";
+    const borderClass = "border-warning";
 
     if (!action && !seasonalNote) return "";
 
@@ -919,7 +885,7 @@ function buildSuggestion(field) {
     }
 
     return `
-        <div class="mt-3 p-2 bg-dark rounded border-start ${borderClass} border-3 field-suggestion-card field-suggestion-layer-${layer}">
+        <div class="mt-3 p-2 bg-dark rounded border-start ${borderClass} border-3 field-suggestion-card field-suggestion-layer-rules">
             ${seasonalNote ? `<div class="text-info small mb-2 border-bottom border-secondary pb-2">
                 <i class="bi bi-snow me-1"></i>${escapeFieldHtml(seasonalNote)}
             </div>` : ""}
@@ -927,9 +893,27 @@ function buildSuggestion(field) {
                 <small class="text-muted d-block mb-0">Suggested next step</small>
                 ${layerBadge}
             </div>
-            <span class="${layer === "ai" ? "text-info" : "text-warning"} fw-bold d-block" style="font-size:0.85rem;">
-                <i class="bi ${layer === "ai" ? "bi-stars" : "bi-tools"} me-1"></i>${escapeFieldHtml(action)}
+            <span class="text-warning fw-bold d-block" style="font-size:0.85rem;">
+                <i class="bi bi-tools me-1"></i>${escapeFieldHtml(action)}
             </span>
+            ${
+                rulesReason
+                    ? `<div class="text-muted small mt-2 lh-sm">${escapeFieldHtml(rulesReason)}</div>`
+                    : ""
+            }
+            ${
+                toolLines.length
+                    ? `<div class="mt-2 pt-2 border-top border-secondary">
+                    <small class="text-secondary text-uppercase d-block mb-1" style="letter-spacing:0.04em;">Tools & shop</small>
+                    ${toolLines
+                        .map(
+                            (line) =>
+                                `<div class="small text-light opacity-90 lh-sm mb-1"><i class="bi bi-wrench-adjustable me-1 text-warning"></i>${escapeFieldHtml(line)}</div>`
+                        )
+                        .join("")}
+                </div>`
+                    : ""
+            }
         </div>`;
 }
 
@@ -951,10 +935,10 @@ export function searchFields(term) {
     renderFields(fieldsFilterType, fieldsSearchTerm);
 }
 
-/** Refresh per-field consultant map (``force`` clears farm cache) and re-paint cards when the event fires. */
+/** Refresh field-card rules cache (``force`` clears farm cache) and re-paint when the event fires. */
 export function refreshFieldConsultantAI() {
     return refreshFieldConsultantCache({ force: true, fromUserClick: true }).catch((e) => {
-        console.warn("[fields] AI consultant refresh", e);
+        console.warn("[fields] rules refresh", e);
     });
 }
 
@@ -1021,14 +1005,10 @@ function buildFieldsHTML() {
             </div>
         </div>
 
-        <div class="row ai-insights-slot-after-kpis justify-content-center">
-            <div class="col-12" id="ai-insights-slot-section"></div>
-        </div>
-
         <div class="row mb-3">
             <div class="col-md-6 d-flex gap-2 flex-wrap align-items-center">
-                <button type="button" class="btn btn-outline-success btn-sm" onclick="dashboard.refreshFieldConsultantAI()" title="Re-fetch AI field map (hosted/BYOK); falls back to rules if unavailable">
-                    <i class="bi bi-stars me-1"></i>AI field tips
+                <button type="button" class="btn btn-outline-success btn-sm" onclick="dashboard.refreshFieldConsultantAI()" title="Recompute offline rules tips from current field data">
+                    <i class="bi bi-tools me-1"></i>Refresh rules
                 </button>
                 <button class="btn btn-outline-primary active"
                         onclick="dashboard.filterFields('all')">All</button>

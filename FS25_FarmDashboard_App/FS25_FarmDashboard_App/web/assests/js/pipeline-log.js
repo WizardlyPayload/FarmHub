@@ -1,5 +1,5 @@
 /**
- * Farm Dashboard ↔ AI Farm Manager — DevTools console tracing.
+ * Farm Dashboard — DevTools console tracing (data / merge pipeline).
  * Open DevTools (F12) → Console → filter: Pipeline
  */
 (function (g) {

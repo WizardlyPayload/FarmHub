@@ -10,7 +10,7 @@ export const SERVER_LIVE_CACHE_SCHEMA_VERSION = '1.0';
 
 import { filterFieldsForFarmView, invalidateFieldsClientCache } from './fields.js';
 
-/** Clear per-farm / per-field UI caches so rapid farm or save switches cannot paint stale AI or field cards. */
+/** Clear per-farm / per-field UI caches so rapid farm or save switches cannot paint stale field cards. */
 function resetCrossFarmVisualizationCaches(dashboard) {
   try {
     invalidateFieldsClientCache();
@@ -232,14 +232,6 @@ export async function switchServer(serverId) {
     }
     if (this.updateNavbar) this.updateNavbar();
 
-    if (typeof window.clearFarmDashInsightCache === "function") {
-      window.clearFarmDashInsightCache();
-    }
-    if (typeof window.preloadAllAIInsights === "function") {
-      window.preloadAllAIInsights();
-    } else if (typeof window.refreshFarmDashConsultantInsights === "function") {
-      window.refreshFarmDashConsultantInsights(true);
-    }
   } finally {
     this._switchingServer = false;
   }
@@ -254,7 +246,6 @@ export async function checkAPIAvailability() {
       const loaded = await this.tryLoadApiData();
       if (loaded) {
         this.isDataLoaded = true;
-        /** Sets Smart suggestions row visible + refresh (was missing vs folder-only path). */
         if (typeof this.showDashboard === "function") {
           this.showDashboard();
         } else {
@@ -469,7 +460,6 @@ export function clearSavedData() {
     if (clearBtn) clearBtn.classList.add("d-none");
     document.getElementById("folder-selection").classList.remove("d-none");
     document.getElementById("dashboard-content").classList.add("d-none");
-    document.getElementById("ai-farm-insights-row")?.classList.add("d-none");
     this.animals = [];
     this.filteredAnimals = [];
     this.lastAnimalsDataHash = null;
@@ -488,7 +478,6 @@ export function unloadData() {
     document.getElementById("folder-selection").classList.remove("d-none");
     document.getElementById("landing-page").classList.add("d-none");
     document.getElementById("dashboard-content").classList.add("d-none");
-    document.getElementById("ai-farm-insights-row")?.classList.add("d-none");
     document.getElementById("section-content").classList.add("d-none");
     this.animals = []; this.filteredAnimals = []; this.lastAnimalsDataHash = null;
     this.placeables = []; this.playerFarms = []; this.selectedFarm = null; this.selectedFarmId = null; this.savedFolderData = null;
@@ -653,14 +642,6 @@ export function switchFarm(farmId, event) {
     }
     if (this.updateNavbar) this.updateNavbar();
 
-    if (typeof window.clearFarmDashInsightCache === 'function') {
-        window.clearFarmDashInsightCache();
-    }
-    if (typeof window.preloadAllAIInsights === 'function') {
-        window.preloadAllAIInsights();
-    } else if (typeof window.refreshFarmDashConsultantInsights === 'function') {
-        window.refreshFarmDashConsultantInsights(true);
-    }
 }
 export function openSetup() {
   if (!isFarmDashLocalConfigHost()) {

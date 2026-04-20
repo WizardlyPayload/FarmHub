@@ -4,13 +4,13 @@ Desktop companion for **Farming Simulator 25**: a Windows app plus an in-game mo
 
 **Releases:** [github.com/WizardlyPayload/FS25-Farm-Dashboard/releases](https://github.com/WizardlyPayload/FS25-Farm-Dashboard/releases)
 
-**Current line:** App **3.1.0** · Mod **2.0.0.0** (bump `modDesc.xml` only if you ship a new mod build).
+**Current line:** App **3.0.0** · Mod **2.0.0.0** (bump `modDesc.xml` only if you ship a new mod build).
 
 ---
 
 ## Documentation (single folder)
 
-**Everything is under [`docs/`](docs/README.md):** install order, changelog, security, AI stack, release notes, authors.
+**Everything is under [`docs/`](docs/README.md):** install order, changelog, security, release notes, authors.
 
 | Quick link | |
 |------------|--|
@@ -29,7 +29,6 @@ Desktop companion for **Farming Simulator 25**: a Windows app plus an in-game mo
 |------|------|
 | `FS25_FarmDashboard_Mod/` | FS25 mod (Lua) → game `mods` folder |
 | `FS25_FarmDashboard_App/` | Electron app + web UI + merger + FTP |
-| `AI_Farm_Manager/` | Optional FastAPI backend (Smart suggestions / chat API) |
 | `tools/` | Build helpers (e.g. mod shop image export) — see below |
 
 ---
@@ -52,7 +51,7 @@ npm install
 npm run dist
 ```
 
-Default **`npm run dist`** (via `tools/run-electron-builder.mjs`) writes the installer under **`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out`** to avoid file locks on `app.asar` inside the repo. See **[docs/CHANGELOG.md](docs/CHANGELOG.md)** §3.0.0 (introduced) and §**3.1.0** (current app line).
+Default **`npm run dist`** (via `tools/run-electron-builder.mjs`) writes the installer under **`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out`** to avoid file locks on `app.asar` inside the repo. See **[docs/CHANGELOG.md](docs/CHANGELOG.md)** §**3.0.0**.
 
 ```bash
 npm start

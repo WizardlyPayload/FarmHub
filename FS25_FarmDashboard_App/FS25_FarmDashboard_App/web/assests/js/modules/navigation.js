@@ -233,66 +233,13 @@ export function getCurrentSection() {
   return this.currentSection || "landing";
 }
 
-/** Move insights row to landing so replacing #section-content-dynamic cannot destroy it. */
-function parkAiFarmInsightsRow() {
-  const row = document.getElementById("ai-farm-insights-row");
-  const landing = document.getElementById("ai-insights-slot-landing");
-  if (row && landing) landing.appendChild(row);
-}
-
-/**
- * Mount #ai-farm-insights-row in the slot for the active view (home, livestock, or injected section).
- */
-function positionAiFarmInsightsRow(sectionName) {
-  const row = document.getElementById("ai-farm-insights-row");
-  if (!row) return;
-  const landing = document.getElementById("ai-insights-slot-landing");
-  const dashSlot = document.getElementById("ai-insights-slot-dashboard");
-  const sectionSlot = document.getElementById("ai-insights-slot-section");
-  if (sectionName === "livestock" && dashSlot) {
-    dashSlot.appendChild(row);
-    return;
-  }
-  if (
-    ["vehicles", "fields", "economy", "pastures", "productions"].includes(
-      sectionName
-    ) &&
-    sectionSlot
-  ) {
-    sectionSlot.appendChild(row);
-    return;
-  }
-  if (landing) landing.appendChild(row);
-}
-
-/** Show Smart suggestions row on Home (dashboard) and detail sections (Vehicles, Fields, …). */
-function updateSmartSuggestionsRowVisibility(sectionName) {
-  const row = document.getElementById("ai-farm-insights-row");
+/** Livestock uses #dashboard-content; other sections keep it hidden. */
+function updateLivestockDashboardShellVisibility(sectionName) {
   const dash = document.getElementById("dashboard-content");
-  const withSmart = [
-    "dashboard",
-    "landing",
-    "livestock",
-    "vehicles",
-    "fields",
-    "pastures",
-    "economy",
-    "productions",
-  ];
-  if (!withSmart.includes(sectionName)) {
-    row?.classList.add("d-none");
-    return;
-  }
-  row?.classList.remove("d-none");
-  // Livestock uses #dashboard-content; other sections hide it. Do not depend on #ai-farm-insights-row
-  // (if that node were missing, we would still need to toggle the livestock panel).
   if (sectionName === "livestock") {
     dash?.classList.remove("d-none");
   } else {
     dash?.classList.add("d-none");
-  }
-  if (row) {
-    positionAiFarmInsightsRow(sectionName);
   }
 }
 
@@ -387,10 +334,7 @@ export function showDashboard() {
   if (!this.currentSection || this.currentSection === "landing") {
     this.currentSection = "dashboard";
   }
-  updateSmartSuggestionsRowVisibility(this.currentSection);
-  if (typeof window.refreshFarmDashConsultantInsights === "function") {
-    window.refreshFarmDashConsultantInsights(false);
-  }
+  updateLivestockDashboardShellVisibility(this.currentSection);
 
   // Check for hash navigation after loading dashboard
   if (window.location.hash) {
@@ -477,16 +421,12 @@ export function showLanding() {
 
   setFarmDashboardBackground("home");
 
-  parkAiFarmInsightsRow();
   document.getElementById("section-content").classList.add("d-none");
   document.getElementById("dashboard-content").classList.add("d-none");
   document.getElementById("landing-page").classList.remove("d-none");
   this.updateLandingPageCounts(); // Update counts including pastures badge
   this.updateNavbar();
-  updateSmartSuggestionsRowVisibility("dashboard");
-  if (typeof window.refreshFarmDashConsultantInsights === "function") {
-    window.refreshFarmDashConsultantInsights(false);
-  }
+  updateLivestockDashboardShellVisibility("dashboard");
 }
 
 export function showSection(sectionName) {
@@ -515,7 +455,6 @@ export function showSection(sectionName) {
     window.history.replaceState(null, null, `#${sectionName}`);
   }
 
-  parkAiFarmInsightsRow();
   document.getElementById("landing-page").classList.add("d-none");
   document.getElementById("section-content").classList.add("d-none");
 
@@ -560,15 +499,7 @@ export function showSection(sectionName) {
     }
   }
 
-  updateSmartSuggestionsRowVisibility(sectionName);
-
-  if (typeof window.refreshFarmDashConsultantInsights === "function") {
-    window.setTimeout(function () {
-      try {
-        window.refreshFarmDashConsultantInsights(false);
-      } catch (e) {}
-    }, 450);
-  }
+  updateLivestockDashboardShellVisibility(sectionName);
 
   // Update navbar after section change
   this.updateNavbar();

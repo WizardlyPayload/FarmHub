@@ -53,15 +53,20 @@ function dashDebug(label, phase, payload) {
  */
 export function normalizeFieldRefKey(ref) {
   if (ref == null || ref === "") return "";
-  let s = String(ref).trim();
-  if (!s) return "";
+  const original = String(ref).trim();
+  if (!original) return "";
+  let s = original;
   s = s.replace(/^field\s*#?\s*/i, "");
   s = s.replace(/^parcel\s*#?\s*/i, "");
   s = s.replace(/^farmland\s*#?\s*/i, "");
   s = s.replace(/^#+/, "").trim();
   if (!s) return "";
-  const first = s.split(/\s+/)[0] || s;
-  return first.length > 64 ? first.slice(0, 64) : first;
+  const first = (s.split(/\s+/)[0] || s).trim();
+  let out = first.length > 64 ? first.slice(0, 64) : first;
+  if (/^\d+$/.test(out)) return out;
+  const m = original.match(/\b(\d{1,7})\b/);
+  if (m) return m[1];
+  return out;
 }
 
 /** Register insight under all plausible string keys for numeric ids. */
@@ -85,7 +90,7 @@ function insightCategoryIsField(cat) {
     typeof cat === "object" && cat !== null && "value" in cat ? (cat).value : cat;
   const s = String(raw).trim().replace(/^["']|["']$/g, "");
   const t = s.toLowerCase();
-  return t === "field" || t === "fields" || t === "farmland";
+  return t === "field" || t === "fields" || t === "farmland" || t === "crop" || t === "crops";
 }
 
 /**
@@ -507,8 +512,8 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
         messageLen: x && x.message ? String(x.message).length : 0,
       }));
       console.error(
-        "[field-consultant-bridge] LLM returned insights but none are usable for the field map. " +
-          "Need category Field + numeric field_ref (farmlandId/id). Sample:",
+        "[field-consultant-bridge] LLM returned insights but none map to parcels after normalization. " +
+          "Expect category Field (or empty) plus field_ref matching farmlandId/id (Ollama 3B often omangles JSON — try qwen2.5:3b or Gemini BYOK). Sample:",
         sample
       );
     }

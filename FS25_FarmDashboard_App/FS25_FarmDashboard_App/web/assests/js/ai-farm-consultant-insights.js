@@ -149,8 +149,8 @@
    * @param {string} viewParam view= query
    * @param {{ silent?: boolean }} fetchOpts silent:true = preload / background (no upsell modal)
    */
-  function fetchInsightsForView(viewParam, fetchOpts) {
-    fetchOpts = fetchOpts || {};
+  function fetchInsightsForView(viewParam, opts) {
+    opts = opts || {};
     var proxyBase =
       typeof window !== 'undefined' && window.location && window.location.origin
         ? window.location.origin + '/api/farmdash-ai/consultant/insights'
@@ -158,15 +158,15 @@
     if (!proxyBase) return Promise.reject(new Error('__no_origin__'));
     var q = buildConsultantInsightsQuery(viewParam);
     var apiURL = q ? proxyBase + '?' + q : proxyBase;
-    var fetchOpts = { method: 'GET', headers: { Accept: 'application/json' } };
+    var httpOpts = { method: 'GET', headers: { Accept: 'application/json' } };
     if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
-      fetchOpts.signal = AbortSignal.timeout(900000);
+      httpOpts.signal = AbortSignal.timeout(900000);
     }
-    return fetch(apiURL, fetchOpts)
+    return fetch(apiURL, httpOpts)
       .then(function (r) {
         if (!r.ok) {
           return r.text().then(function (t) {
-            if (typeof window.farmdashNotifyConsultantHttpError === 'function' && !fetchOpts.silent) {
+            if (typeof window.farmdashNotifyConsultantHttpError === 'function' && !opts.silent) {
               window.farmdashNotifyConsultantHttpError(r.status, t, { silent: true });
             }
             return Promise.reject(new Error('HTTP ' + r.status + (t ? ': ' + t.slice(0, 120) : '')));
@@ -183,7 +183,7 @@
       })
       .catch(function (e) {
         var msg = String(e && e.message ? e.message : e);
-        if (!fetchOpts.silent && msg.indexOf('HTTP ') !== 0) {
+        if (!opts.silent && msg.indexOf('HTTP ') !== 0) {
           if (typeof window.farmdashNotifyConsultantHttpError === 'function') {
             window.farmdashNotifyConsultantHttpError(0, msg, { silent: true });
           }
@@ -223,7 +223,8 @@
       } catch (eDisk) {}
       return Promise.resolve();
     }
-    var sequentialViews = ['fields', 'livestock', 'vehicles', 'pastures', 'productions', 'economy'];
+    /** Omit ``fields`` — per-parcel map is fetched only by ``field-consultant-bridge`` (``view=fields&context=fields``). */
+    var sequentialViews = ['livestock', 'vehicles', 'pastures', 'productions', 'economy'];
     pl('renderer_in', 'preloadAllAIInsights: sequential (one view at a time)', { views: sequentialViews });
     return sequentialViews
       .reduce(function (chain, v) {
@@ -877,7 +878,7 @@
             } catch (eH) {}
             setTimeout(runPreload, 420);
           } else {
-            import('./assests/js/consultant-disk-cache.js')
+            import('./consultant-disk-cache.js')
               .then(function (m) {
                 try {
                   if (m.hydrateConsultantDiskCacheIfFresh) m.hydrateConsultantDiskCacheIfFresh();

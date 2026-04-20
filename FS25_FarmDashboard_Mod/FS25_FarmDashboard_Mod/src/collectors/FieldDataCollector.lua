@@ -2,7 +2,58 @@
 
 FieldDataCollector = {}
 
+--- Serialized as JSON `null` (see `FarmDashboardDataCollector:toJSON` string handling).
+local FD_JSON_NULL_STR = "__FD_JSON_NULL__"
+
+--- Cached `g_fillTypeManager:getFillTypeIndexByName` for STRAW / GRASS_WINDROW / DRYGRASS_WINDROW (refreshed in collect when mission is up).
+FieldDataCollector._windrowFillIdxCache = nil
+
+function FieldDataCollector:cacheWindrowFillTypeIndices()
+    local ftm = rawget(_G, "g_fillTypeManager")
+    if not ftm or type(ftm.getFillTypeIndexByName) ~= "function" then
+        return nil
+    end
+    if FieldDataCollector._windrowFillIdxCache ~= nil then
+        return FieldDataCollector._windrowFillIdxCache
+    end
+    local c = { STRAW = nil, GRASS_WINDROW = nil, DRYGRASS_WINDROW = nil }
+    for _, nm in ipairs({ "STRAW", "GRASS_WINDROW", "DRYGRASS_WINDROW" }) do
+        local ok, idx = pcall(function()
+            return ftm:getFillTypeIndexByName(nm)
+        end)
+        if ok and type(idx) == "number" and idx > 0 then
+            c[nm] = idx
+        end
+    end
+    FieldDataCollector._windrowFillIdxCache = c
+    return c
+end
+
+--- Dominant tipped windrow class for JSON `windrowType` (Straw / Grass / Hay), or FD_JSON_NULL_STR → JSON null.
+local function classifyWindrowTypeForJson(strawL, grassL, hayL, totalL)
+    local EPS = 0.01
+    totalL = tonumber(totalL) or 0
+    if totalL <= EPS then
+        return FD_JSON_NULL_STR
+    end
+    local s = math.max(0, tonumber(strawL) or 0)
+    local g = math.max(0, tonumber(grassL) or 0)
+    local h = math.max(0, tonumber(hayL) or 0)
+    local m = math.max(s, g, h)
+    if m <= EPS then
+        return FD_JSON_NULL_STR
+    end
+    if s >= g and s >= h then
+        return "Straw"
+    elseif g >= h then
+        return "Grass"
+    else
+        return "Hay"
+    end
+end
+
 function FieldDataCollector:init()
+    FieldDataCollector._windrowFillIdxCache = nil
     print("[FarmDashboard] Field data collector initialized (Hybrid: NPC State + Physical HUD Probe)")
 end
 
@@ -1171,6 +1222,7 @@ function FieldDataCollector:collect()
         -- needsBaling / baleableLooseLiters: straw + grass/hay only (not unthreshed crop swaths).
         -- ====================================================================
         fData.windrowLiters = 0
+        fData.windrowType = FD_JSON_NULL_STR
         fData.windrowArea = 0
         fData.windrowSamples = {}
         fData.hasWindrow = false
@@ -1178,6 +1230,8 @@ function FieldDataCollector:collect()
         fData.needsBaling = false
         fData.baleableLooseLiters = 0
         fData.baleCountOnField = 0
+
+        FieldDataCollector:cacheWindrowFillTypeIndices()
 
         local myFid = field.farmland and field.farmland.id or nil
         local function farmlandIdAtWorld(sx, sz)
@@ -1447,7 +1501,7 @@ function FieldDataCollector:collect()
             if samplesAdded == 0 then
                 addProbeCell(cx, cz)
             end
-            fData.windrowLiters = totalVol
+            fData.windrowLiters = math.floor(math.max(0, tonumber(totalVol) or 0) + 0.5)
             fData.baleableLooseLiters = baleVol
             --- needsBaling set after hasLoose* from straw/grass/hay aggregates (see below)
             local nS = #(fData.windrowSamples)
@@ -1457,7 +1511,7 @@ function FieldDataCollector:collect()
             else
                 fData.windrowArea = 0
             end
-            fData.hasWindrow = (totalVol > 0)
+            fData.hasWindrow = (fData.windrowLiters > 0)
             --- Aggregate per fill name (terrainDetailHeight grass/straw/hay channels — see Dynamic Ground Material & Transform doc).
             --- Cereal / crop *_SWATH channels count toward looseStrawLiters for dashboard + rules (same as loose harvest residue before baling).
             local aggS, aggG, aggH = 0, 0, 0
@@ -1485,8 +1539,11 @@ function FieldDataCollector:collect()
             fData.hasLooseForage = fData.hasLooseStraw or fData.hasLooseGrassWindrow or fData.hasLooseHayWindrow
             --- Align "needs baling / clear forage" step with straw+grass+hay presence (not cereal swath-only heaps).
             fData.needsBaling = fData.hasLooseForage
+            --- Single dominant class for dashboard (Straw / Grass / Hay); JSON null when empty (see FD_JSON_NULL_STR).
+            fData.windrowType = classifyWindrowTypeForJson(aggS, aggG, aggH, fData.windrowLiters)
         else
             fData.windrowLiters = 0
+            fData.windrowType = FD_JSON_NULL_STR
             fData.windrowArea = 0
             fData.hasWindrow = false
             fData.windrowByFillName = {}

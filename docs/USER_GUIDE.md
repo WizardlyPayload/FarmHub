@@ -1,57 +1,29 @@
 # FS25 Farm Dashboard — User guide
 
-Short reference for **Smart suggestions**, **field workflows**, and **advanced crops** in the dashboard and optional AI features.
+Short reference for **field work**, **windrows / bales**, and **offline rules** on field cards.
 
-**Full illustrated manual (installation stages, where to click, screenshot filenames):** **[USER_MANUAL.md](./USER_MANUAL.md)**
-
----
-
-## Smart suggestions and AI
-
-The dashboard can show **Smart suggestions** on the home grid and field views. Depending on your setup, suggestions come from different **tiers**:
-
-
-| Tier                            | What it means                                                                                                                                                                          |
-| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Hosted**                      | Your **AI Farm Manager** server (URL + link key in **AI Farm Manager**) runs the heavy LLM when the response includes real model output. Premium path when the host provides cloud AI. |
-| **BYOK** (“Bring your own key”) | You paste an **OpenAI** or **Gemini** API key in the app; mid-tier **on-device** LLM runs on **this PC** for eligible requests. Optional alongside Hosted.                             |
-| **Rules**                       | **No LLM** — local heuristics only (e.g. swaths, bales, basic next steps). Still useful offline or when AI is unavailable.                                                             |
-
-
-You can use **Hosted**, **BYOK**, both, or rely on **Rules** alone. In **Settings → AI Farm Manager** there are two **sub-tabs**:
-
-
-| Sub-tab                                  | Use it when…                                                                                                                                                                                                                                                     |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **BYOK — Smart suggestions on this PC**  | You only need **OpenAI / Gemini** keys for dashboard tips. **No server URL or link key** here.                                                                                                                                                                   |
-| **Hosted AI — server, paid tier & chat** | Your plan includes the **hosted AI Farm Manager**: enter **server URL** + **link key**, **Send farm data**, **Save hosted connection**, refresh status, test LLM, and (below that) **In-game chat (!hank)** — bot profiles and `**ai_farm_manager_config.xml`**. |
-
-
-### In-game chat (!hank) vs Smart suggestions
-
-**In-game chat** (the **!hank** bot in multiplayer) is **not** the same as BYOK. **BYOK alone does not enable** chat — use the **Hosted AI** sub-tab for server linking and the **In-game chat** block for profiles and the mod XML token.
+**Full illustrated manual:** **[USER_MANUAL.md](./USER_MANUAL.md)**
 
 ---
 
-## Field workflows — swaths and bales
+## Field rules (offline)
 
-The dashboard **tracks physical work on the field**, not abstract “task lists”:
+The dashboard applies **local heuristics** (`rules-engine.js`) on **field cards**: one primary suggestion per field, based on merged **Lua + XML** data (growth, swaths, bales, Precision Farming hints where present, fleet vs shop tools). Suggestions are computed **entirely on this PC** inside the dashboard from merged game data.
 
-- **Swaths / windrows** — Unfinished harvesting or baling may show as loose material that **needs baling** or follow-up work.
-- **Bales** — The UI counts **bales still on the field**. Until they are **removed** (picked up, sold, or moved off the field), the field may show **“Needs work”** or similar warnings.
+---
 
-**Practical tip:** Finish **baling** and **clear bales from the field** to satisfy those warnings. The mod and merger report what the game actually sees (windrow volume, bale counts, etc.).
+## Field workflows — swaths, windrows, and bales
+
+- **Swaths / windrows** — Unfinished harvesting or baling may show as loose material. The mod exports **`windrowLiters`** and **`windrowType`** (`Straw`, `Grass`, `Hay`, or omitted). The UI shows a compact **volume badge** when data is present.
+- **Bales** — The UI counts **bales still on the field**. Clear or move them before cultivation or soil work when the card warns you.
+
+**Practical tip:** Finish **baling** and **clear bales** to satisfy “needs work” style warnings. Numbers come from what the game actually sees (sampling + merge).
 
 ---
 
 ## Advanced crops (FS25)
 
-Smart suggestions and the consultant layer are aware of **FS25-specific crop behaviour**, for example:
-
-- **Spinach** — Regrowth and repeat harvest patterns differ from standard cereals.
-- **Grass** — Silage vs hay stages and grass management are reflected in context sent to the AI and in local rules where applicable.
-
-Exact wording on screen comes from the **AI Farm Manager** prompts and local **rules** layer; keep the game and mod updated for best accuracy.
+Rules respect **FS25-specific** behaviour where the merge exposes it (e.g. grass vs arable, regrowth crops). Wording on screen comes from the **rules layer** and mod **`suggestions`** — keep the game and mod updated for best accuracy.
 
 ---
 

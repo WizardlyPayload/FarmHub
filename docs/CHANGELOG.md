@@ -8,28 +8,30 @@ All notable changes to this project are recorded here. For GitHub release blurbs
 
 | Artifact | Where it lives | Format |
 |----------|----------------|--------|
-| **Desktop app** | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | Semver (e.g. `3.1.0`) |
+| **Desktop app** | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | Semver (e.g. `3.0.0`) |
 | **FS25 mod** | `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `2.0.0.0`) |
-| **Source headers** | First line of many `.js` / `.lua` files | `v2.0.0` (aligned with the release above) |
+| **Source headers** | First line of many `.js` / `.lua` files | Often `v2.0.0` historically; bump only when you intentionally resync headers |
 
 ---
 
-## 3.0.0 — Unified settings, LAN security, BYOK & consultant polish, AI server hardening, build/install reliability
+## 3.0.0 — Farm Dashboard (rules-first), windrow UX, docs aligned to shipping SKU
 
-**App:** `3.0.0` · **Mod:** `2.0.0.0` unchanged on this line unless you ship a new mod build.
+**App:** `3.0.0` (`package.json`) · **Mod:** `2.0.0.0` unless you ship a new mod build.
 
-Narrative release notes (incl. Cursor-session history where git history is unavailable): **[RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md)**.
+Narrative: **[RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md)** · GitHub blurb: **[RELEASE_NOTES.md](./RELEASE_NOTES.md)**.
+
+### Product scope (documentation + supported surface)
+
+- **Offline field guidance** — **`rules-engine.js`** and field-card UI provide **local** “suggested next step” style hints from merged Lua + XML. No external model or subscription is part of the **3.0.0** manuals in this tree.
+- **Windrows** — Mod exports **`windrowLiters`** / **`windrowType`**; **`dataMerger.js`** normalizes; **`fields.js`** shows a **volume badge** when data exists.
 
 ### Dashboard (web / Electron)
 
-- **Single Settings entry** — Removed the extra navbar **folder / Servers** icon; all server & save management is under **Settings (gear) → Servers & saves**. Programmatic API: `dashboard.openUnifiedSettingsModal('servers')` (see `dashboard-settings.js`).
-- **Connection/API error panel** — “Back to Home” on the API error card opens **Settings → Servers & saves** instead of only the legacy full-screen setup window.
-- **Notification History modal** — Fixed global CSS that set `.modal-backdrop` above `.modal`, which blocked all clicks until refresh (`web/assests/css/styles.css`).
-- **Smart suggestions** — Optional **collapse** (chevron) to reach landing category cards faster; state in `localStorage`. Neutral copy when optional AI is offline; **Screen Wake Lock** script for tablet browsers. Local **BYOK** path via `localConsultantLlm.js` (direct Gemini/OpenAI; keys not sent to your VPS for those calls). Insight **disk cache** (`consultant-disk-cache.js`) and pruned payloads (`consultantSnapshotPrune.js`).
-- **Field consultant UI** — Single visible line per field card (primary `message` only); backend **`consultant.py`** field-map prompts ask models to avoid duplicating content in `reasoning`.
-- **Top bar** — Unified nav title + farm dropdown overflow fix (tablet); combined **XML + Live + API** status badge.
-- **Performance** — Consultant success `console.log` only when `window.DASH_DEBUG`; skeleton pulse limited to placeholder bars.
-- **LAN access (tablet use)** — Optional bind to all interfaces with **HTTP Basic** + **IP allowlist** for remote clients; **127.0.0.1** bypass (`main.js`). See [SECURITY.md](./SECURITY.md).
+- **Single Settings entry** — Server & save management under **Settings (gear) → Servers & saves** (`dashboard.openUnifiedSettingsModal('servers')` in `dashboard-settings.js` where present).
+- **Connection/API error panel** — “Back to Home” on the API error card opens **Settings → Servers & saves** instead of only legacy full-screen setup-only flows.
+- **Notification History modal** — CSS fix so `.modal-backdrop` does not stack above `.modal` and block clicks (`web/assests/css/styles.css`).
+- **Top bar** — Farm dropdown overflow fixes for narrow layouts; combined **XML + Live + API** status badge where implemented.
+- **LAN access** — Optional bind with **HTTP Basic** + **IP allowlist**; loopback bypass in `main.js`. See [SECURITY.md](./SECURITY.md).
 
 ### Windows build, installer, uninstall
 
@@ -38,66 +40,14 @@ Narrative release notes (incl. Cursor-session history where git history is unava
 - **Uninstall** — Optional **wipe all user profile data** (settings/caches) vs keep data (`build/installer.nsh`, `FarmDashWipeUserData`).
 - **Supporting scripts** — `clean:build-out`, `unlock-install`, `remove-build-output-folders.ps1`, `stop-farmdash-install-lock.ps1` for repeatable builds.
 
-### AI Farm Manager — API security hardening (optional VPS)
-
-- **`GET /`** (Jinja farm snapshot HTML): optional **`REQUIRE_AUTH_FOR_ROOT_HTML=1`** — same auth as **`/api/integration/*`** (header `X-FarmDash-Key`, optional `?farmdash_key=`, or admin Basic). Default remains open for trusted LAN-style deploys.
-- **`/health` / `/healthz`**: optional **`HEALTH_RESPONSE_DETAIL=minimal`** — returns only `status` + `service` (paths and registry metadata omitted). Full detail remains the default.
-- **CORS**: **`CORS_ORIGINS=*`** sets **`allow_credentials=false`** (browser-safe). Explicit origin lists may use credentials when needed.
-- **Code:** shared **`app/deps/integration_auth.py`** (`require_integration_or_admin`, `resolve_root_html_auth`).
-- **Docs:** [AI_SERVER_SECURITY.md](./AI_SERVER_SECURITY.md); [SECURITY.md](./SECURITY.md) and [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md); **`backend/.env.example`** placeholder tokens.
-
 ### Documentation
 
-- Root **README**, **INSTALL**, **RELEASE_NOTES**, **DEVELOPER_HANDOVER**, app **README**, and **`docs/RELEASE_v3.0.0.md`** for the full 2.0→3.0 story.
+- **USER_MANUAL**, **USER_GUIDE**, **RELEASE_NOTES**, **RELEASE_v3.0.0**, **DEVELOPER_HANDOVER**, **GEMINI_PROJECT_CONTEXT**, **SALES_HANDOVER**, **docs/README**, root **README**, app **README** — rewritten for **3.0.0** without optional cloud-stack assumptions.
+- **Stub pages** — Legacy filenames under `docs/` (see [docs/README.md](./README.md) “Retired placeholder docs”) return short redirects instead of long obsolete guides.
 
----
+### Historical note
 
-## 3.1.0 — Local OpenAI-compatible LLM (Ollama, LAN), BYOK base URL, documentation sync
-
-**App:** `3.1.0` (`package.json`) · **Mod:** `2.0.0.0` unchanged unless you ship a new mod build.
-
-This release adds **first-class support** for **OpenAI-compatible** HTTP APIs (e.g. **Ollama** on TrueNAS/LAN, **vLLM**, **LM Studio**) alongside existing **OpenAI cloud** and **Gemini** paths. It does **not** replace Gemini routing ([LLM_GEMINI_ROUTING.md](./LLM_GEMINI_ROUTING.md)).
-
-**Authoritative detail:** [LLM_OPENAI_COMPATIBLE.md](./LLM_OPENAI_COMPATIBLE.md) (env, headers, file manifest).
-
-### AI Farm Manager (backend)
-
-- **`OPENAI_BASE_URL`** — Optional; normalized with `/v1` when missing from the path (`app/config.py` — `normalize_openai_base_url_for_sdk`).
-- **`llm_configured`** — True with **`ENABLE_AI_BOT`** when **`LLM_API_KEY`** or **`OPENAI_BASE_URL`** is set (OpenAI provider path).
-- **`llm_service.py`** — `effective_openai_api_key()`, `async_openai_client()` for Hank chat and LLM probes.
-- **`consultant.py` / `routers/consultant.py`** — `resolve_consultant_llm_settings(..., user_openai_base_url)`; HTTP header **`X-AI-OpenAI-Base-URL`** on **`GET /api/v1/consultant/insights`**.
-- **`routers/integration.py`** — **`GET /api/integration/llm-ping`** and **`GET /gemini-models`** pass through optional **`X-AI-OpenAI-Base-URL`** for merged settings.
-- **`admin_routes.py`**, **`templates/admin.html`** — Optional admin field for **`OPENAI_BASE_URL`** (persists via existing admin `.env` writer **only if** you use `/admin` saves).
-
-### Farm Dashboard (Electron + web)
-
-- **`web/index.html`** — BYOK provider **Local / OpenAI-compatible**; base URL field.
-- **`main.js`** — BYOK **`openaiBaseUrl`** in store; **`X-AI-OpenAI-Base-URL`** on hosted proxy; **`GET …/v1/models`** for local model lists; placeholder key **`ollama`** when only base URL is set.
-- **`localConsultantLlm.js`** — On-device consultant calls with optional custom base; retry without **`response_format`** on local 400/422.
-- **`web/assests/js/ai-farm-bot-panel.js`** — UI, **Refresh models**, **LLM ping** headers.
-
-### Documentation touched in this wave
-
-| Document |
-|----------|
-| [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md) |
-| [CHANGELOG.md](./CHANGELOG.md) (this section) |
-| [README.md](./README.md) (docs index) |
-| [RELEASE_NOTES.md](./RELEASE_NOTES.md) |
-| [RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md) (follow-up § for **3.1.0**) |
-| [AI_FARM_MANAGER_BYOK.md](./AI_FARM_MANAGER_BYOK.md) |
-| [LLM_GEMINI_ROUTING.md](./LLM_GEMINI_ROUTING.md) |
-| [LLM_OPENAI_COMPATIBLE.md](./LLM_OPENAI_COMPATIBLE.md) (**new**) |
-| [AI_SERVER_SECURITY.md](./AI_SERVER_SECURITY.md) |
-| [SECURITY.md](./SECURITY.md) (desktop app version line) |
-| [SMART_SUGGESTIONS_TIERS.md](./SMART_SUGGESTIONS_TIERS.md) |
-| [USER_MANUAL.md](./USER_MANUAL.md) |
-| [../AI_Farm_Manager/README.md](../AI_Farm_Manager/README.md) |
-| [../README.md](../README.md) (repo root) |
-| [../FS25_FarmDashboard_App/FS25_FarmDashboard_App/README.md](../FS25_FarmDashboard_App/FS25_FarmDashboard_App/README.md) |
-| [../FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json](../FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json) → **`version`: `3.1.0`** |
-
-**Code reference (implementation):** paths listed in [LLM_OPENAI_COMPATIBLE.md §3](./LLM_OPENAI_COMPATIBLE.md).
+Git history or older branches may contain experiments and code paths not described here. **CHANGELOG** §3.0.0 reflects the **supported** FarmHub **3.0.0** documentation and product story for this repository snapshot.
 
 ---
 
@@ -105,8 +55,7 @@ This release adds **first-class support** for **OpenAI-compatible** HTTP APIs (e
 
 | Version | Focus |
 |---------|--------|
-| **3.1.0** | Local **OpenAI-compatible** LLM (`OPENAI_BASE_URL`, Ollama/LAN), BYOK base URL + headers, docs — see §3.1.0 above and [LLM_OPENAI_COMPATIBLE.md](./LLM_OPENAI_COMPATIBLE.md). |
-| **3.0.0** | Unified Settings, LAN security, local BYOK + consultant/cache polish, AI server hardening, default build output outside repo, NSIS taskkill + optional uninstall wipe — see [RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md). |
+| **3.0.0** | Rules-first field UX, windrow export/merge/UI, unified Settings, LAN security, default build output outside repo, NSIS upgrade/uninstall hardening — see §3.0.0 above and [RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md). |
 | **1.0.0** | First public release: mod + Electron app, local/FTP, XML + Lua merge, full dashboard sections. |
 | **1.1.2** | Mod shop image export pipeline, vehicle thumbnails from extracted PNGs, installer resources. |
 | **2.0.0** | Field accuracy and merge rules, single-player authority, multi-farm UI, data pipeline robustness, packaging, docs, repo hygiene, security/network documentation. |
@@ -251,13 +200,10 @@ After pulling, run **`npm install`** under `FS25_FarmDashboard_App/FS25_FarmDash
 | [README.md](../README.md) | Install, build, LAN browser access, troubleshooting, GitHub workflow |
 | [INSTALL.md](./INSTALL.md) | Basic install order: mod in every target save **before** the desktop app |
 | [RELEASE_NOTES.md](./RELEASE_NOTES.md) | Short copy-paste text for GitHub Releases |
-| [RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md) | Long-form **3.0.0** release (2.0 → 3.0 narrative) |
+| [RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md) | Long-form **3.0.0** release narrative |
 | [DESCRIPTION_AND_SCREENSHOTS.md](./DESCRIPTION_AND_SCREENSHOTS.md) | Long-form product description + screenshot checklist |
 | [SECURITY.md](./SECURITY.md) | Network exposure, LAN browser use, trust model |
-| [LLM_GEMINI_ROUTING.md](./LLM_GEMINI_ROUTING.md) | AI Farm Manager: Gemini key round-robin, model rollover, 429/503, BYOK |
-| [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md) | FarmHub stack: dashboard + backend architecture and file map |
-| [../AI_Farm_Manager/README.md](../AI_Farm_Manager/README.md) | Deploy AI Farm Manager (Docker/Coolify), API summary, BYOK |
-| [AI_IN_GAME_CHAT.md](./AI_IN_GAME_CHAT.md) | **In-game Hank** — multiplayer-only; config on host/dedicated/G-Portal |
+| [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md) | FarmHub: dashboard + mod architecture and file map |
 | [AUTHORS.md](./AUTHORS.md) | JoshWalki & WizardlyPayload |
 | This file | Full version history |
 

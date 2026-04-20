@@ -220,7 +220,7 @@ const en = {
   'settings.serverManagerIntro':
     'Same options as first-run setup: manage saves, FTP polling, and tools. Use Save to apply; open the full setup window if you prefer the dedicated screen.',
   'settings.openFullSetup': 'Open full setup window',
-  'settings.sidebarAi': 'AI Farm Manager',
+  'settings.sidebarAi': 'Field suggestions',
   'settings.sidebarMod': 'FS25 mod',
   'settings.sidebarAppearance': 'Appearance',
   'settings.sectionsTitle': 'Main menu — show sections',

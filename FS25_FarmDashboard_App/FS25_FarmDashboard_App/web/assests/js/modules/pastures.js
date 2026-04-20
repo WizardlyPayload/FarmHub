@@ -132,10 +132,6 @@ export function showPasturesSection() {
               </div>
           </div>
 
-          <div class="row ai-insights-slot-after-kpis justify-content-center">
-              <div class="col-12" id="ai-insights-slot-section"></div>
-          </div>
-
           <div class="row">
               <div class="col-12">
                   <div class="card bg-secondary">

@@ -1,3 +1,0 @@
-# Runtime — mounted at /app/data in Docker; never commit tenant data
-bot_servers.json
-*.tmp

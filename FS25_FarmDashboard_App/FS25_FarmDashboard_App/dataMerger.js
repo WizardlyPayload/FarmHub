@@ -27,11 +27,31 @@ function toArr(val) {
     return [];
 }
 
+/**
+ * Lua / JSON: "Straw" | "Grass" | "Hay", or null when empty.
+ * Internal Lua→JSON sentinel (if ever re-stringified) is stripped here.
+ */
+function normalizeWindrowTypeFromLua(luaField) {
+    if (!luaField || typeof luaField !== 'object') return null;
+    const t = luaField.windrowType;
+    if (t == null || t === '') return null;
+    const s = String(t).trim();
+    if (s === '' || s === '__FD_JSON_NULL__') return null;
+    return s;
+}
+
 /** Normalise stubble/mulch levels from XML or Lua for consistent UI (`isMulched` when level >= 1). */
 function normalizeFieldMulch(f) {
     if (!f || typeof f !== 'object') return f;
     const s = Number(f.stubbleShredLevel ?? f.mulchLevel ?? 0);
-    const out = { ...f, mulchLevel: s, stubbleShredLevel: s, isMulched: s >= 1 };
+    const out = {
+        ...f,
+        mulchLevel: s,
+        stubbleShredLevel: s,
+        isMulched: s >= 1,
+        windrowLiters: Number(f.windrowLiters ?? 0),
+        windrowType: normalizeWindrowTypeFromLua(f),
+    };
     if (String(f.fruitType || '').toUpperCase() === 'GRASS') {
         out.isWithered = false;
     }
@@ -479,6 +499,7 @@ function mergeFields(xmlFields, luaFields) {
 
         const windBale = {
             windrowLiters: Number(luaField.windrowLiters ?? 0),
+            windrowType: normalizeWindrowTypeFromLua(luaField),
             windrowArea: Number(luaField.windrowArea ?? 0),
             hasWindrow: !!(luaField.hasWindrow || (Number(luaField.windrowLiters) > 0)),
             windrowSamples: Array.isArray(luaField.windrowSamples) ? luaField.windrowSamples : [],

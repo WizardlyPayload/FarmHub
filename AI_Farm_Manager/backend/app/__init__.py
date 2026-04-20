@@ -1,1 +1,0 @@
-# AI Farm Manager backend

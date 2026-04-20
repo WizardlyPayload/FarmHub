@@ -1,4 +1,4 @@
-# FarmHub — Cursor session memory (human + AI)
+# FarmHub — Cursor session memory
 
 **Purpose:** One file to **@-mention in new Cursor chats** (`@CURSOR_SESSION_MEMORY.md` or `@docs/CURSOR_SESSION_MEMORY.md`) so assistants start from **your** accumulated decisions—not from an empty thread.
 
@@ -8,10 +8,9 @@
 
 | Doc | Use |
 |-----|-----|
-| [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md) | Architecture, consultant flow, key files |
-| [GEMINI_PROJECT_CONTEXT.md](./GEMINI_PROJECT_CONTEXT.md) | Full-stack overview for planning |
-| [SMART_SUGGESTIONS_TIERS.md](./SMART_SUGGESTIONS_TIERS.md) | Hosted vs BYOK vs rules |
-| [LLM_OPENAI_COMPATIBLE.md](./LLM_OPENAI_COMPATIBLE.md) | Ollama / OpenAI-compatible |
+| [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md) | Architecture, data flow, key files |
+| [GEMINI_PROJECT_CONTEXT.md](./GEMINI_PROJECT_CONTEXT.md) | Full project overview for planning |
+| [USER_MANUAL.md](./USER_MANUAL.md) | Supported **3.0.0** end-user behaviour |
 
 **GitHub repo root:** `FarmHub` — [WizardlyPayload/FarmHub](https://github.com/WizardlyPayload/FarmHub). A parent folder named e.g. `MAIN CODEBASE` may **not** be the Git root; clone/work in **`FarmHub`**.
 
@@ -19,7 +18,7 @@
 
 ## Ground rules for assistants (read before editing)
 
-1. **Confirm mode:** Smart suggestions **Hosted** → Python `AI_Farm_Manager/`. **Ollama / Gemini BYOK / OpenAI-compat** → Electron `main.js` + `localConsultantLlm.js` (no hosted server for the LLM call).
+1. **Shipping line:** Farm Dashboard **3.0.0** — field guidance is **offline rules** + mod **`suggestions`**; see [CHANGELOG.md](./CHANGELOG.md) §3.0.0.
 2. **Prefer small diffs** tied to a reported symptom; do not “fix” unrelated subsystems.
 3. **Web assets path** is `web/assests/` (historic typo—match existing imports).
 
@@ -32,7 +31,7 @@ _Add dated bullets after each session or when you export a chat. Replace this pl
 ### Template (copy per thread)
 
 - **Date:** YYYY-MM-DD  
-- **Topic:** (e.g. Ollama field map, LAN consultant, push snapshot)  
+- **Topic:** (e.g. windrow merge, LAN auth, FTP stagger)  
 - **Decisions:** …  
 - **Files touched:** …  
 - **Still broken / TODO:** …  

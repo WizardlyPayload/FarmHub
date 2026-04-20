@@ -425,6 +425,10 @@ end
 
 --- @param depth number|nil nil = compact (legacy); 0+ = pretty-print with 2-space indent
 function FarmDashboardDataCollector:toJSON(data, depth)
+    --- FieldDataCollector.lua uses this sentinel so `windrowType` can become JSON `null`.
+    if type(data) == "string" and data == "__FD_JSON_NULL__" then
+        return "null"
+    end
     local compact = (depth == nil)
     local level   = compact and 0 or depth
     local ind     = (not compact) and string.rep("  ", level) or ""

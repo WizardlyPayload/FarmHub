@@ -899,7 +899,7 @@ export function searchFields(term) {
 
 /** Refresh per-field consultant map (``force`` clears farm cache) and re-paint cards when the event fires. */
 export function refreshFieldConsultantAI() {
-    return refreshFieldConsultantCache({ force: true }).catch((e) => {
+    return refreshFieldConsultantCache({ force: true, fromUserClick: true }).catch((e) => {
         console.warn("[fields] AI consultant refresh", e);
     });
 }

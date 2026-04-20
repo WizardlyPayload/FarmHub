@@ -422,7 +422,7 @@ function notifyConsultantFailure(status, bodyText, opts) {
   }
 }
 
-export async function refreshFieldConsultantCache({ force = false } = {}) {
+export async function refreshFieldConsultantCache({ force = false, fromUserClick = false } = {}) {
   if (!FARMDASH_FIELD_CONSULTANT_NETWORK_ENABLED) {
     return { skipped: true, reason: "rules_only" };
   }
@@ -553,7 +553,7 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
       if (typeof globalThis.pipelineLog === "function") {
         globalThis.pipelineLog("renderer_err", "consultant/insights HTTP error (field map)", { status: r.status });
       }
-      notifyConsultantFailure(r.status, errText, { silent: true });
+      notifyConsultantFailure(r.status, errText, { silent: !fromUserClick });
       return { ok: false, status: r.status };
     }
 
@@ -643,6 +643,11 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
         llm_used: !!data.llm_used,
       });
     }
+    if (fromUserClick && !data.llm_used && typeof window.showFarmdashAiUpsellModal === "function") {
+      try {
+        window.showFarmdashAiUpsellModal({ variant: "rules_only", detail: "" });
+      } catch (eUp) {}
+    }
     return { ok: true, llm_used: !!data.llm_used };
   } catch (e) {
     dashDebug("field-consultant-bridge", "error", { exception: String(e?.message || e), stack: e?.stack });
@@ -650,7 +655,7 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
       globalThis.pipelineLog("renderer_err", "field consultant fetch failed", { error: String(e?.message || e) });
     }
     console.warn("[field-consultant-bridge]", e);
-    notifyConsultantFailure(0, String(e?.message || e), { silent: true });
+    notifyConsultantFailure(0, String(e?.message || e), { silent: !fromUserClick });
     return { ok: false, error: String(e.message || e) };
   } finally {
     inFlight = false;
@@ -659,7 +664,7 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
     }
     if (pendingFieldConsultantForce) {
       pendingFieldConsultantForce = false;
-      const run = () => refreshFieldConsultantCache({ force: true }).catch(() => {});
+      const run = () => refreshFieldConsultantCache({ force: true, fromUserClick: false }).catch(() => {});
       if (typeof globalThis.dashScheduleIdle === "function") {
         globalThis.dashScheduleIdle(run, 0);
       } else {

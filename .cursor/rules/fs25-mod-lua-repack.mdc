@@ -1,0 +1,16 @@
+---
+description: After editing FS25 FarmDashboard Lua under FS25_FarmDashboard_Mod, repack the mod zip for deploy/tests.
+globs: FarmHub/FS25_FarmDashboard_Mod/**/*.lua
+---
+
+# FS25 Farm Dashboard mod — repack after Lua changes
+
+The game loads **`FS25_FarmDashboard.zip`** (or an extracted folder) under **`mods/`**. Edits under `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/src/` are **not** picked up until you rebuild the archive (or copy files to the server’s mod tree).
+
+From repo root **`FarmHub`** (parent of `FS25_FarmDashboard_Mod` and `tools`):
+
+```powershell
+.\tools\Zip-FarmDashboardMod.ps1
+```
+
+Output: **`FS25_FarmDashboard_Mod/FS25_FarmDashboard.zip`** with **`modDesc.xml`**, optional **`icon.png`**, and **`src/`** at the **zip root** (no extra wrapper folder). Upload/replace on dedicated host and restart if needed.

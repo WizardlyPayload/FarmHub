@@ -7,6 +7,7 @@ import {
     aggregateWindrowDetected,
     aggregateBaleableLoose,
     classifyWindrowMaterial,
+    getFieldStableId,
 } from "../rules-engine.js";
 import {
     refreshFieldConsultantCache,
@@ -117,9 +118,10 @@ export function showFieldsSection() {
     // Stop any previous refresh loop
     stopFieldsRefresh();
 
-    // Load immediately, then poll every 5 seconds
+    // Initial load; live updates come from RealtimeConnector (/api/data → updateFieldsData).
+    // Light safety poll only while this tab is open (avoids duplicate full fetch every 5s + consultant reschedule).
     loadFieldsData();
-    fieldsRefreshTimer = setInterval(loadFieldsData, 5000);
+    fieldsRefreshTimer = setInterval(loadFieldsData, 45000);
 }
 
 // Called by navigation when leaving the section
@@ -127,7 +129,13 @@ export function showFieldsErrorState() {
     stopFieldsRefresh();
 }
 
-function stopFieldsRefresh() {
+/** Call after farm switch so the next load is not skipped by a stale payload fingerprint. */
+export function invalidateFieldsClientCache() {
+    lastFieldsPayloadKey = null;
+}
+
+/** Stop the Fields-tab poll when leaving the section (otherwise /api/fields + renders keep running in background). */
+export function stopFieldsRefresh() {
     if (fieldsRefreshTimer) {
         clearInterval(fieldsRefreshTimer);
         fieldsRefreshTimer = null;
@@ -181,7 +189,6 @@ async function loadFieldsData() {
         renderFields(fieldsFilterType, fieldsSearchTerm);
         updateFieldStats();
         updateLandingCount();
-        scheduleFieldConsultantFetch();
 
     } catch (err) {
         console.error("[Fields] Load error:", err);
@@ -674,6 +681,8 @@ function buildConditions(field) {
 /** No harvest tips after harvest or when mulched stubble (XML/Lua can leave harvestReady true). */
 function shouldSuppressHarvestSuggestions(field) {
     if (fieldIsAlreadyHarvested(field)) return true;
+    /** Same bar/badge bucket as ``buildProgressBar`` "Harvested" — stubble pipeline, not ready-to-cut. */
+    if (isPostHarvestField(field)) return true;
     if (field.growthLabel === "mulched_fallow" || field.fruitType === "mulched_stubble") return true;
     if (field.isMulched === true) return true;
     if (fieldIsMulched(field) && (field.growthState || 0) === 0) return true;
@@ -686,6 +695,33 @@ function escapeFieldHtml(s) {
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;");
+}
+
+/**
+ * Remove internal parcel ids models echo into **message** (field_ref / farmlandId belong in JSON only).
+ */
+function stripConsultantInternalIdsFromLine(text, field) {
+    let s = String(text || "");
+    const ids = new Set();
+    if (field && field.farmlandId != null && String(field.farmlandId).trim() !== "") ids.add(String(field.farmlandId).trim());
+    if (field && field.id != null && String(field.id).trim() !== "") ids.add(String(field.id).trim());
+    try {
+        const stable = field ? String(getFieldStableId(field) || "").trim() : "";
+        if (stable) ids.add(stable);
+    } catch (e) {
+        /* ignore */
+    }
+    for (const id of ids) {
+        if (!id || !/^\d+$/.test(id)) continue;
+        s = s.replace(new RegExp(`\\(\\s*farmlandId\\s*:\\s*${id}\\s*\\)`, "gi"), "");
+        s = s.replace(new RegExp(`\\bfarmlandId\\s*:\\s*${id}\\b`, "gi"), "");
+        s = s.replace(new RegExp(`\\bfield_?ref\\s*:\\s*${id}\\b`, "gi"), "");
+    }
+    s = s.replace(/\(\s*farmlandId\s*:\s*\d{1,7}\s*\)/gi, "");
+    s = s.replace(/\bfarmlandId\s*:\s*\d{1,7}\b/gi, "");
+    s = s.replace(/\bfield_?ref\s*:\s*\d{1,7}\b/gi, "");
+    s = s.replace(/\s{2,}/g, " ").replace(/\s+([.,;:])/g, "$1").trim();
+    return s;
 }
 
 /** Visible tags when the mod detects bales on farmland or loose windrow / swath material. */
@@ -782,6 +818,19 @@ function aiFieldInsightContradictsCard(field, ai) {
 
     if (shouldSuppressHarvestSuggestions(field) && soundsLikeHarvestRun) return true;
 
+    /** Card shows harvested / stubble — never advise running a new cut ("Harvest field …"). */
+    if (shouldSuppressHarvestSuggestions(field) && !effectiveHarvestReady(field)) {
+        if (/\bharvest\b/i.test(lower) && !/\bafter\s+harvest\b/i.test(lower) && !/\bpost[\s-]*harvest\b/i.test(lower)) {
+            if (
+                /\bharvest\s+(?:the\s+)?(?:field|parcel|crop)\b/i.test(msg) ||
+                /\bgo\s+harvest\b/i.test(lower) ||
+                /\b(time\s+to|need\s+to)\s+harvest\b/i.test(lower)
+            ) {
+                return true;
+            }
+        }
+    }
+
     const gs = Number(field.growthState || 0);
     const maxGs = Math.max(1, Number(field.maxGrowthState) || 1);
     const midGrow = gs > 0 && gs < maxGs && !fieldIsAlreadyHarvested(field) && !effectiveHarvestReady(field);
@@ -843,8 +892,13 @@ function buildSuggestion(field) {
     if (useAi && aiFieldInsightContradictsCard(field, ai)) {
         useAi = false;
     }
+    const aiLineRaw = useAi ? String(ai.message || "").trim() : "";
+    const aiLine = useAi ? stripConsultantInternalIdsFromLine(aiLineRaw, field) : "";
+    if (useAi && !aiLine) {
+        useAi = false;
+    }
 
-    const action = useAi ? String(ai.message).trim() : (rules ? rules.action : "");
+    const action = useAi ? aiLine : (rules ? rules.action : "");
     const layer = useAi ? "ai" : "rules";
 
     const layerBadge =

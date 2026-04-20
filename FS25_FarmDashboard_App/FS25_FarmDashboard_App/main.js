@@ -1238,18 +1238,49 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
             });
             const contentHash = hashPrunedSnapshot(pruned);
             const laneKey = `${sid}|${farmId}|${view}|${context}|${fieldRefQ}|${fieldIdQ}`;
-            const prevLane = byokInsightHashCache.get(laneKey);
-            if (prevLane && prevLane.hash === contentHash) {
-                consultantInsightsProxyCache.set(cacheKey, {
-                    status: 200,
-                    text: prevLane.jsonText,
-                    contentType: 'application/json',
-                    ts: Date.now(),
+            const vLc = String(view || '').toLowerCase();
+            const ctxLc = String(context || '').toLowerCase();
+            const isFieldMapLane = vLc === 'fields' && ctxLc === 'fields';
+            const prunedFieldRows = Array.isArray(pruned.fields) ? pruned.fields.length : 0;
+            if (isFieldMapLane && prunedFieldRows === 0) {
+                const emptyBody = JSON.stringify({
+                    insights: [],
+                    llm_used: false,
+                    farmdash_byok_local: true,
+                    suggestion_tier: 'rules',
+                    farmdash_ai_error: 'field_map_no_rows',
                 });
                 res.status(200);
                 res.setHeader('Content-Type', 'application/json');
-                res.setHeader('X-FarmDash-Byok-Snapshot-Cache', 'hash-hit');
-                return res.send(prevLane.jsonText);
+                res.setHeader('X-FarmDash-Byok-Field-Map', 'no-pruned-fields');
+                return res.send(emptyBody);
+            }
+            const prevLane = byokInsightHashCache.get(laneKey);
+            if (prevLane && prevLane.hash === contentHash) {
+                if (isFieldMapLane && prevLane.jsonText) {
+                    try {
+                        const prevParsed = JSON.parse(prevLane.jsonText);
+                        const prevIns = prevParsed && prevParsed.insights;
+                        if (Array.isArray(prevIns) && prevIns.length === 0) {
+                            byokInsightHashCache.delete(laneKey);
+                        }
+                    } catch (eInv) {
+                        byokInsightHashCache.delete(laneKey);
+                    }
+                }
+                const laneAfter = byokInsightHashCache.get(laneKey);
+                if (laneAfter && laneAfter.hash === contentHash) {
+                    consultantInsightsProxyCache.set(cacheKey, {
+                        status: 200,
+                        text: laneAfter.jsonText,
+                        contentType: 'application/json',
+                        ts: Date.now(),
+                    });
+                    res.status(200);
+                    res.setHeader('Content-Type', 'application/json');
+                    res.setHeader('X-FarmDash-Byok-Snapshot-Cache', 'hash-hit');
+                    return res.send(laneAfter.jsonText);
+                }
             }
             const cred = pickNextConsultantByokCredentialPair();
             if (!cred) {
@@ -1287,11 +1318,19 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
                     suggestion_tier: 'byok',
                 };
                 const text = JSON.stringify(bodyObj);
+                const insightCount = Array.isArray(bodyObj.insights) ? bodyObj.insights.length : 0;
+                /** Never hash-cache an empty field-map payload — same snapshot hash would replay 0 insights forever. */
+                const cacheableForHash =
+                    !isFieldMapLane || insightCount > 0;
                 if (byokInsightHashCache.size >= BYOK_HASH_CACHE_MAX) {
                     const firstK = byokInsightHashCache.keys().next().value;
                     byokInsightHashCache.delete(firstK);
                 }
-                byokInsightHashCache.set(laneKey, { hash: contentHash, jsonText: text });
+                if (cacheableForHash) {
+                    byokInsightHashCache.set(laneKey, { hash: contentHash, jsonText: text });
+                } else {
+                    byokInsightHashCache.delete(laneKey);
+                }
                 consultantInsightsProxyCache.set(cacheKey, {
                     status: 200,
                     text,

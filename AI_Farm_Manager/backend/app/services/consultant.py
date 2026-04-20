@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+from pathlib import Path
 from typing import Any
 from urllib.parse import unquote
 
@@ -25,6 +26,78 @@ _META_INSIGHT_SKIP = (
 )
 
 
+def _vehicles_tab_insight_blob_is_garbage(message: str, reasoning: str) -> bool:
+    """
+    Drop LLM rows that are not fleet-care (forage logistics, bogus refuel from UNKNOWN fill, analyst filler).
+    """
+    blob = f"{message or ''}\n{reasoning or ''}"
+    if not blob.strip():
+        return False
+    low = blob.lower()
+    # UNKNOWN height/fill channel is not diesel — never justify refuel from it
+    if re.search(r"\brefuel\b", low) and re.search(r"\bunknown\b", low):
+        return True
+    # "non-zero DIESEL ... partially fueled" is backwards / nonsense for urgent refuel
+    if re.search(r"\brefuel\b", low) and re.search(r"\bnon-zero\b", low) and re.search(r"\bdiesel\b", low):
+        if re.search(r"partially\s+fuel", low):
+            return True
+    if re.search(r"\bfill\s*level\b", low) and re.search(r"\bindicating\b", low):
+        return True
+    if re.search(r"\bnon-empty\b", low) and re.search(r"\bunknown\b", low) and re.search(r"\bfill\b", low):
+        return True
+    # Hay / bale logistics — belongs on Fields / home, not the Vehicles-only panel
+    if re.search(r"\b(load|stack|move)\b", low) and re.search(r"\b(hay|straw|bales?|silage)\b", low):
+        if re.search(r"\b(trailer|wagon|truck|transport)\b", low):
+            return True
+    if re.search(r"\btransport\s+the\s+bales\b", low):
+        return True
+    return False
+
+
+def _filter_insights_for_vehicles_tab(insights: list[FarmInsight]) -> list[FarmInsight]:
+    """Vehicles tab Smart suggestions: fleet care only — no field rows, parcel ids, or cargo/forage busywork."""
+    out: list[FarmInsight] = []
+    for ins in insights:
+        if ins.category == InsightCategory.FIELD:
+            continue
+        fr = (ins.field_ref or "").strip() if ins.field_ref else ""
+        if fr:
+            continue
+        if _vehicles_tab_insight_blob_is_garbage(str(ins.message or ""), str(ins.reasoning or "")):
+            continue
+        out.append(ins)
+    return out
+
+
+def _insight_bogus_barn_feed_liters_misread_as_low(message: str, reasoning: str) -> bool:
+    """
+    Drop tips that treat barn fillLevels in liters (e.g. 4500 L) as a low % / urgent feed.
+    """
+    blob = f"{message or ''}\n{reasoning or ''}"
+    if not blob.strip():
+        return False
+    low = blob.lower()
+    if re.search(r"\bfill\s+level\s+is\s+at\s+\d{4,}\b", low) and re.search(
+        r"\b(low\s+(supply|hay|feed)|indicates\s+low|need(s)?\s+(more\s+)?feed)\b",
+        low,
+    ):
+        return True
+    if re.search(r"\bdried\s+grass\s+hay\s+windrow\b", low) and re.search(r"\b\d{4,}\b", low):
+        if re.search(r"\b(low\s+supply|indicates\s+low|check\s+food)\b", low):
+            return True
+    return False
+
+
+def _filter_insights_bogus_barn_feed_misread(insights: list[FarmInsight]) -> list[FarmInsight]:
+    """Remove LLM rows that nag about feed when snapshot used raw liters without a real sub-75% ratio."""
+    out: list[FarmInsight] = []
+    for ins in insights:
+        if _insight_bogus_barn_feed_liters_misread_as_low(str(ins.message or ""), str(ins.reasoning or "")):
+            continue
+        out.append(ins)
+    return out
+
+
 def _is_schema_meta_insight(text: str) -> bool:
     """Drop LLM lines that nag about JSON/schema instead of giving farming advice."""
     s = (text or "").strip()
@@ -38,7 +111,7 @@ def _is_schema_meta_insight(text: str) -> bool:
 
 def _sanitize_consultant_user_copy(text: str) -> str:
     """
-    Strip internal game counters the UI should not echo (e.g. weed level digits).
+    Strip internal game counters / engine tokens the UI should not echo (weed levels, GROWTH_xx).
     Keeps meaning where possible.
     """
     if not text:
@@ -48,8 +121,71 @@ def _sanitize_consultant_user_copy(text: str) -> str:
     s = re.sub(r"(?i)\bweeds?\s*\(\s*level\s*\d+\s*\)", "weeds", s)
     s = re.sub(r"(?i)\bweed\s*level\s*[:]?\s*\d+", "weeds", s)
     s = re.sub(r"(?i)\bweeds?\s+at\s+level\s+\d+", "weeds", s)
+    # FS internal growth stage enums — never show raw GROWTH_01 style strings to players
+    s = re.sub(r"(?i)\bgrowth\s+label\s+['\"]?GROWTH_\d+", "growth stage", s)
+    s = re.sub(r"(?i)\bGROWTH_\d+\b", "early growth stage", s)
+    s = re.sub(r"(?i)\bmulched_fallow\b", "mulched stubble", s)
+    # JSON-echo phrases models sometimes paste into user-facing strings
+    s = re.sub(r"(?i)\bneedsLime\s+is\s+true\b", "needs lime", s)
+    s = re.sub(r"(?i)\bneedsLime\s+is\s+false\b", "lime not flagged", s)
+    s = re.sub(r"(?i)\bisHarvested\s+is\s+true\b", "crop is harvested", s)
+    s = re.sub(r"(?i)\bneedsWork\s+is\s+false\b", "no urgent tillage pass flagged", s)
+    s = re.sub(r"(?i)\bneedsWork\s+is\s+true\b", "soil still wants work", s)
+    # Fill-type enums → plain language (hay windrow is not "combine harvest" wording)
+    _fill_plain = (
+        ("DRYGRASS_WINDROW", "dried grass hay windrow"),
+        ("WETGRASS_WINDROW", "wet grass windrow"),
+        ("GRASS_WINDROW", "grass windrow"),
+        ("DRYGRASS", "dried grass"),
+        ("TOTAL_MIXED_RATION", "TMR"),
+        ("PIGFOOD", "pig feed"),
+    )
+    for raw, nice in _fill_plain:
+        s = re.sub(rf"(?i)\b{re.escape(raw)}\b", nice, s)
+    s = re.sub(r"(?i)available\s+food\s+filllevel", "animal feed fill level", s)
+    s = re.sub(r"(?i)\bfilllevel\b", "fill level", s)
+    s = re.sub(r"(?i)\(\s*farmlandId\s*:\s*\d{1,7}\s*\)", "", s)
+    s = re.sub(r"(?i)\bfarmlandId\s*:\s*\d{1,7}\b", "", s)
+    s = re.sub(r"(?i)\bfield_?ref\s*:\s*\d{1,7}\b", "", s)
+
+    def _round_one_decimal(m: re.Match[str]) -> str:
+        try:
+            v = float(m.group(1))
+        except ValueError:
+            return m.group(0)
+        r = round(v, 1)
+        if abs(r - round(r)) < 1e-9:
+            return str(int(round(r)))
+        return f"{r:.1f}"
+
+    s = re.sub(r"\b(\d+\.\d+)\b", _round_one_decimal, s)
     s = re.sub(r"\s{2,}", " ", s).strip()
     return s
+
+
+def _should_drop_low_quality_insight(message: str, reasoning: str) -> bool:
+    """
+    Drop obvious nonsense rows (e.g. "check water" on a bale trailer with a full tank).
+    Conservative patterns only — prefer prompts + sanitization for the rest.
+    """
+    blob = f"{message}\n{reasoning}".lower()
+    if "full water tank" in blob and re.search(r"\b(check|verify|ensure|monitor)\b", blob):
+        return True
+    if "bale" in blob and "pallet" in blob and "trailer" in blob and "water" in blob:
+        if re.search(r"\b(check|verify|ensure|tank level)\b", blob):
+            return True
+    # FS25 has no "water the farmland" from barn tanks; models confuse husbandry with fields
+    if re.search(r"\bwater(ing)?\b", blob) and re.search(r"\b(farmland|parcel)\b", blob):
+        if "available food" in blob or "sheep barn" in blob or "barn" in blob:
+            return True
+    if "available food" in blob and "farmland" in blob:
+        return True
+    # Vanilla FS25: no soil-moisture / irrigation UI; models invent this from growth % or old prompts.
+    if re.search(r"\b(soil\s+moisture|irrigation\s+needs?)\b", blob):
+        return True
+    if re.search(r"\birrigate\b", blob) and re.search(r"\b(farmland|parcel|field)\b", blob):
+        return True
+    return False
 
 from app.config import get_settings, has_gemini_credentials, normalize_openai_base_url_for_sdk
 from app.schemas.insights import FarmInsight, InsightCategory, InsightPriority
@@ -122,6 +258,25 @@ def _consultant_llm_cache_key(
 
 # Shared body: no global "max 4" here — field map appends its own output limits (one insight per row).
 # FS25 mentor voices — Smart suggestions read like in-game NPC advice (farmer-plain English, not a corporate analyst).
+def _load_consultant_data_playbook() -> str:
+    """
+    Optional shared reference (FS25 scope, snapshot semantics, agronomic phrasing).
+    Lives at ``FarmHub/shared/consultant_playbook.md`` — prepended to every consultant system prompt.
+    """
+    try:
+        repo_shared = Path(__file__).resolve().parents[4] / "shared" / "consultant_playbook.md"
+        if repo_shared.is_file():
+            raw = repo_shared.read_text(encoding="utf-8").strip()
+            if raw:
+                return "\n**FarmDash data playbook (always apply):**\n" + raw + "\n\n"
+    except OSError as e:
+        logger.debug("Consultant playbook not loaded: %s", e)
+    return ""
+
+
+CONSULTANT_DATA_PLAYBOOK = _load_consultant_data_playbook()
+
+
 CONSULTANT_NPC_VOICE_INTRO = """**Voice — FS25 locals (every insight):** The player must hear one of these mentors—plain, warm, **farmer-like** language (short sentences, contractions OK, no stiff analyst tone). Put **all** of that personality in **message** whenever the UI shows a single line (empty **reasoning**): do **not** write a dry **message** and save the character voice for **reasoning**. When both fields are shown, keep the same voice in both. Pick **one** mentor per insight that best matches the topic.
 
 - **Grandpa Walter** — Retired farmer who passed the farm to you; mentor and link to the past. Traditional crops, rotation, soil, lime, family land; short yarns about old-school ways (horses, how his granddad worked the ground) when it fits the word limit.
@@ -149,10 +304,12 @@ CONSULTANT_FS25_MECHANICS_BLOCK = """
 - **Straw / stubble:** Chopping vs **swathing**, baling, **mulching**—only when crop type and phase fit.
 - **Rolling:** **Field rollers** for certain crops/phases (e.g. pushing stones, firming)—mention only when it matches FS25 behaviour for that crop context.
 - **Withering / overdue harvest:** Stressed or **ready too long** crops can fail—use for urgency when snapshot suggests it.
-- **In-game season / weather:** **Soil temp**, **moisture**, wrong time of year for crop—if JSON or growth state implies timing risk, say so briefly.
+- **In-game season / weather:** Wrong time of year for crop or winter soil work—if JSON or growth state implies timing risk, say so briefly. **FS25 has no parcel soil-moisture reading or field-irrigation mechanic** in vanilla gameplay — never advise **soil moisture checks**, **irrigation**, or mistaking **growthStatePercentage** (crop growth bar) for moisture.
 - **Missions vs own fields:** **Contracts** differ in pay, equipment wear, and rules—only when giving contract-style advice.
-- **Animals / feed:** TMR mix ratios, **cleanliness**, **pasture** vs barn—when Animal data appears.
+- **Animals / feed & water:** TMR mix ratios, **cleanliness**, **pasture** vs barn—when Animal data appears. **Only** advise refilling barn food, TMR, silage/hay, troughs, or water when JSON shows that fill **under 75%** of capacity (if a number is **0–1**, treat it as a **fraction** and compare to **0.75**; if it is **0–100**, compare to **75**). If **every** animal feed and water level is **≥ 75%**, do **not** suggest filling food—choose another animal topic (health, reproduction, milk/wool output, cleanliness, pasture rotation) or stay silent on feed. **Barn `fillLevels` are usually liters** (often **hundreds–thousands**, e.g. 4500) — **not** a 0–100 percent; **never** call those literals "low" without **fill ÷ capacity**. When a **pastures** row includes **`_consultant_feed_water_pct`**, use **`foodPctOfCapacity`** / **`waterPctOfCapacity`** (0–100) for the 75% rule; if both are **≥ 75** (or missing and you cannot prove **below 75%**), **do not** suggest topping feed or water.
 - **Forestry / wood:** Saplings, **stump grinding**, sell points—when trees/logs appear in snapshot.
+- **No irrigating crop fields:** FS25 does **not** have players **water-irrigate arable farmland** or "water the field" using barn or trailer tanks for **crop health**. **Never** advise **watering farmland**, **water the parcel**, or routing **husbandry / barn "available water"** onto fields. **Barn water and food** are **Animal** / husbandry topics (troughs, pens)—**not** **Field** jobs. Do **not** use **Available Food** or barn **fillLevel** readings to justify **field** watering or fertilizer on land.
+- **Hay and grass windrows (not cereal harvest):** **DRYGRASS_WINDROW** is **dried grass hay (a hay windrow)** — typical work is **bale**, **pick up with a loading wagon or forage harvester**, **collect**, or **ted** if still wet; do **not** call it a **combine grain harvest** unless JSON clearly shows a standing cereal harvest. **GRASS_WINDROW** / **WETGRASS_WINDROW** → **mow / ted / bale / pickup** wording. Never paste raw **ALLCAPS fill-type enum** strings in **message** or **reasoning** — use **hay windrow**, **grass swath**, **silage**, **straw**, etc.
 
 Do **not** fabricate HUD numbers; stay inside character limits for **message** / **reasoning**.
 
@@ -161,22 +318,31 @@ Do **not** fabricate HUD numbers; stay inside character limits for **message** /
 CONSULTANT_ACTIONABILITY_BLOCK = """
 **Actionability (non-negotiable):**
 - **message** = the **next in-game action** the player should take (imperative: verb + object + where). Good: "Combine maize on parcel 27 before it lodges" / "Spread solid N on empty parcels 3 and 5, then drill spring barley" / "Refuel the Lexion — diesel under 20% in JSON". Bad: "Review herbicide usage", "could indicate inefficiency", "levels are low suggesting", "consider monitoring", "may warrant attention".
-- **reasoning** = **one concrete fact** from the JSON that supports **message** (e.g. `growthLabel` + **fruitType** on **farmlandId**, tank fill %, animal headcount, a **vehicles** row name). No stacks of hedges ("might", "could suggest") unless the snapshot is genuinely ambiguous — then say what to **check in the HUD**.
+- **reasoning** = **one concrete fact** from the JSON that supports **message** (e.g. **fruitType** on **farmlandId**, **growthState**/**maxGrowthState** or **growthStatePercentage**, tank fill %, animal headcount, a **vehicles** row name). No stacks of hedges ("might", "could suggest") unless the snapshot is genuinely ambiguous — then say what to **check in the HUD**. Do **not** quote raw engine tokens like **GROWTH_01** or snake_case **growthLabel** enums — use plain words (**early growth**, **young crop**, **stage 2 of 9**).
+- **Plain language — no engine tokens in message or reasoning:** Never write internal enums such as **GROWTH_01**, **mulched_fallow**, or quoted `growthLabel` codes — describe the situation in farmer English using **growthStatePercentage**, **growthState** vs **maxGrowthState**, or **harvestReady** / **fruitType**.
+- **Match machines to jobs:** For **spraying / herbicide / liquid fertilizer**, name a row from **vehicles** only when its **name** or type clearly fits (**sprayer**, self-propelled sprayer, trailed sprayer, spraying rig). **Do not** assign spraying to a **truck**, **flatbed**, **bale trailer**, **pallet trailer**, or **tipper** unless JSON clearly marks that row as sprayer equipment. If no sprayer fits, say **use a sprayer** / **your sprayer** without inventing a wrong rig.
 - **Sprayer / herbicide / full tank:** Do not infer "overuse" from a full tank alone — say which **field job** is next (unsprayed weeds on parcel X, finish contract Y) using **fields** + **vehicles**; if JSON does not name a target, say "finish remaining spray work on your tagged weed fields" without analyst filler.
+- **Tank busywork:** Do **not** tell the player to **check**, **verify**, or **monitor** a tank that JSON shows as **full** or **>85%** — that is not urgent. Do not invent **water-tank** checks on **bale/pallet trailers** or other unrelated implements as a substitute for real field work.
+- **Barn vs field:** If JSON cites **Sheep Barn**, **Cow Barn**, **Available Food**, or **husbandry** **fillLevel**, the tip belongs in **Animal** (feed/water/troughs), **not** **Field** with fake "water the farmland" jobs.
 - **Low nitrogen on empty / fallow parcels:** Name the **work** (spread N / manure / slurry, then cultivate/sow) and **field_ref** for the worst parcel or say "empty parcels 3,5" if several tie — not abstract "nitrogen is low indicating need for fertilizer".
 - **category** on **each** insight must be **exactly one** of these four strings: `Field`, `Animal`, `Production`, `Finance`. Never output schema placeholders like `Field|Animal|Production|Finance`, never join alternatives with `|`, never use slash lists as the category value.
+- **Category vs topic:** If the insight is **only** about servicing a **vehicle** (refuel, repair, wrong tool choice), use **Production** with **field_ref** null — not **Field** unless the **job is on the parcel** (spray/harvest/lime that field).
 
 """
 
 # ``?view=`` Smart suggestions replace ``CONSULTANT_SYSTEM`` entirely — prepend voice + mechanics so those panels match full-farm quality.
 CONSULTANT_VIEW_SHARED_PREFIX = (
-    CONSULTANT_NPC_VOICE_INTRO + CONSULTANT_FS25_MECHANICS_BLOCK + CONSULTANT_ACTIONABILITY_BLOCK
+    CONSULTANT_DATA_PLAYBOOK
+    + CONSULTANT_NPC_VOICE_INTRO
+    + CONSULTANT_FS25_MECHANICS_BLOCK
+    + CONSULTANT_ACTIONABILITY_BLOCK
 )
 
 CONSULTANT_SYSTEM_BASE = (
     """You are helping the player run their farm in **Farming Simulator 25**—sound like the game's local mentors (see **Voice** below), not a dry textbook. Analyze the provided game state JSON.
 
 """
+    + CONSULTANT_DATA_PLAYBOOK
     + CONSULTANT_NPC_VOICE_INTRO
     + """
 Focus especially on **fields** (arable parcels):
@@ -228,9 +394,14 @@ Output limits (field map only — applies after FIELD MAP MODE rules above):
 - Set **reasoning** to **""** on every row; keep **message** brief (aim under ~260 characters including the `Name:` prefix).
 - The **`insights` array length MUST equal the number of field objects in this request** — never stop at 4, 6, or any smaller number than the field row count."""
 
-CONSULTANT_SYSTEM_SINGLE_FIELD = """You are an expert Farming Simulator 25 **single-field** consultant.
+CONSULTANT_SYSTEM_SINGLE_FIELD = (
+    CONSULTANT_DATA_PLAYBOOK
+    + """You are an expert Farming Simulator 25 **single-field** consultant.
 
-""" + CONSULTANT_NPC_VOICE_INTRO + CONSULTANT_FS25_MECHANICS_BLOCK + """
+"""
+    + CONSULTANT_NPC_VOICE_INTRO
+    + CONSULTANT_FS25_MECHANICS_BLOCK
+    + """
 You receive JSON for **one field parcel only** (plus minimal farm context). You MUST NOT invent or assume data for other fields.
 
 Respond with ONLY valid JSON (no markdown) in this exact shape:
@@ -243,6 +414,7 @@ Rules:
 - Grass/forage: no grain combines; late growth + weeds: sprayer not mechanical weeder; never echo "weed level" or "(level N)" for weeds.
 - Put the full mentor-voiced suggestion in **message** (prefix with one of **`Ben:`** / **`Walter:`** / **`David:`** / **`Katie:`** / **`Noah:`** / **`Hank:`** — pick by topic per **Voice** rules); set **reasoning** to **""** (the dashboard shows one line).
 - If the JSON has no usable field data, return {"insights":[]}."""
+)
 
 # Appended when Farm Dashboard calls GET …/insights?context=fields (per-parcel field map).
 # Built-in consultant (not the admin chat prompt). Must contain "FIELD MAP MODE" for _consultant_field_map_mode().
@@ -259,6 +431,7 @@ CRITICAL — COVERAGE:
 - Do **not** return Animal, Production, or Finance categories here — the UI ignores them for per-field lines.
 - The dashboard shows **only** the **message** string on each field card (no second line). Put the **full** NPC personality in **message** (same warmth and mentor voice as before—**not** a terse bullet); set **reasoning** to **""** (empty string) for every row — do not duplicate or extend the tip in **reasoning**.
 - **Every** **message** must begin with a speaker tag and colon from the **full mentor cast**: **`Ben:`**, **`Walter:`**, **`David:`**, **`Katie:`**, **`Noah:`**, or **`Hank:`** — choose by topic (machinery→Ben; soil/rotation→Walter; caution→David; pasture/forage/grass-as-feed→Katie; trees/wood→Noah; quick cab nudge→Hank), then the advice in that character’s voice.
+- **Forbidden in message:** JSON or debugger phrasing such as **"needsLime is true"**, **"phValue of 5.644"**, **"growthLabel 'harvested'"**, **"targetNitrogen of 0"**, **"isHarvested is true"**, **"needsWork is false"**, or a bare parcel id plus a stat (**"21 with pH"**). Do **not** echo **farmlandId:**, **field_ref:**, or **(farmlandId: N)** in **message** — those belong in JSON **field_ref** only; the card already shows which field. Do **not** tell the player to **harvest** or **combine** a parcel whose JSON shows **harvested** / **isHarvested** / post-cut stubble — advise **next soil work** (cultivate, lime, drill, clear swaths) instead. Write **one spoken sentence** a farmer would say on the radio (e.g. *Walter: Field 21 is sour — get lime on before you drill.*).
 - Keep **message** within ~260 characters so the full JSON still completes.
 
 FIELD MAP — equipment + wording (each per-field **message**):
@@ -266,7 +439,7 @@ FIELD MAP — equipment + wording (each per-field **message**):
 - **Loose windrows / swath:** If **hasWindrow** is true or **windrowLiters** > 0, mention clearing straw/grass/swath before the next soil pass when relevant.
 - **Baler-relevant loose material:** If **needsBaling** is true or **baleableLooseLiters** > 0, the parcel has straw/grass/hay on the ground (not only unthreshed crop swath) — mention baling or pickup before tillage when relevant.
 - **Bales on the parcel:** If the field row includes **baleCountOnField** (or **baleCount**) with a number **greater than zero**, mention **how many bales** are still on that farmland in **message** (e.g. "3 bales to load") and advise moving them before tillage/planting. Never invent a count — use the JSON only.
-- The JSON includes a slim **vehicles** list (player-owned equipment). Match **task + crop type** to the right machine class — **not** "buy" or "purchase" for that same job.
+- The JSON includes a slim **vehicles** list (player-owned equipment). Match **task + crop type** to the right machine class — **not** "buy" or "purchase" for that same job. **Never** paste raw **GROWTH_xx** tokens in **message** — use plain growth wording. For herbicide/spraying, name a **sprayer-class** vehicle from **vehicles** only; never assign spray work to generic **trucks** or **bale/pallet trailers**.
 - **Grain harvest (wheat, barley, canola, maize grain, sorghum grain, etc.):** a **grain combine** is appropriate when named from **vehicles** if it matches cereals.
 - **Grass / meadow:** never assign a **grain combine** — use **mower, baler, tedder, forage harvester, loading wagon** from **vehicles** only when names/types fit; otherwise **mow or bale the grass** / **use forage equipment** with no combine.
 - **Weeds:** Do **not** output "weed level", "weeds (level N)", or numeric weed counts — say **weeds** / **needs a spray** only. Use **growthLabel** / stage (e.g. `x/y`): if **late** (last 1–2 stages or ~last third of growth), **do not** recommend **mechanical weeders** (rotary hoe, etc.); recommend **herbicide** and a **sprayer** from **vehicles**. Early/mid growth: mechanical weeder OK if listed and appropriate.
@@ -294,6 +467,8 @@ Respond with ONLY valid JSON (no markdown):
 - At most **4** insights; keep **message** and **reasoning** under ~260 characters each."""
 
 CONSULTANT_SYSTEM_VIEW_VEHICLES = CONSULTANT_VIEW_SHARED_PREFIX + """VIEW MODE — vehicles:
+**VIEW LOCK (this tab):** The player is on **Vehicles** only. **Do not** give insights whose **main action** is **field or cropland work** (harvest, sow, plant, spray, cultivate, plow, lime, spread N, weed control on a parcel, rolling, mulching, bales **on fields**, growth stages, or naming a **farmlandId / parcel** as the job). **Never** use **category** `Field` or a non-null **field_ref** for agronomic work. **Production** here means **machines** (fuel, repair, damage, attachments, hours, refuel before a long haul), **not** plants or field operations. You may mention a combine/sprayer **by name** only for **fleet care** (refuel, repair, check attachments) — **not** "go cut parcel 5" or "spray field 12".
+
 You are an FS25 **fleet / vehicle** consultant. The JSON is **vehicles only** for the active farm.
 
 **Farm scope:** Every row in **vehicles** is already filtered to **this** farm (**ownerFarmId** / **farmId** matches **activeFarmId** / **`_consultant_farm_scope`**). Do not mention or assume machines owned by other farms, MP partners, or the shop unless the JSON explicitly lists them here.
@@ -301,6 +476,8 @@ You are an FS25 **fleet / vehicle** consultant. The JSON is **vehicles only** fo
 **Voice:** Lean **Helper Ben** (machinery expert). Walter OK for old-truck yarns if it fits.
 
 Focus: **fleet maintenance** — refuel before long jobs, repair damage before it worsens, check attachments/hoses, watch operating hours, park/strategy; name **specific machines from the JSON** when giving tips.
+
+**Vehicles tab only — hard bans:** Do **not** advise **loading hay/straw/bales onto trailers** or other **field/forage logistics** here (that belongs on Fields / home). Do **not** recommend **refuel** based on **UNKNOWN** or mystery fill channels — only **DIESEL** / **DEF** / **AdBlue** (or clearly named fuel) **percent or liters** when **low** (e.g. under ~20–25% or clearly emptying). Never claim a machine is "partially fueled" or needs refuel just because diesel is **non-zero** or a trailer has **any** non-empty fill.
 
 **All clear:** If fuel levels are healthy, damage is low/none, and nothing stands out in the snapshot, return **exactly one** insight with **Production** category and a warm, reassuring **message** (e.g. fleet is in good shape / keep up the routine) and short **reasoning** with one optional gentle habit (e.g. top up before harvest season). Do **not** invent problems.
 
@@ -320,7 +497,8 @@ You are an FS25 **pasture / grazing** consultant. Data includes **pastures** and
 
 **Voice:** Prefer **Animal Farmer Katie**. **Neighbor David** OK for light “I almost let the fence go…” warnings.
 
-Focus: pasture food levels, grass / grazing quality, manure or slurry storage needing emptying, herd health on pasture, overcrowding.
+Focus: grass / grazing quality, manure or slurry storage needing emptying, herd health on pasture, overcrowding. **Only** mention topping up **pasture** feed or water when JSON shows that level **below 75%** of capacity (0–1 fraction vs **0.75**, or percent vs **75**); if pasture supplies are **≥ 75%**, do not nag about filling. **`fillLevels` in liters** (large integers) are **not** percents — prefer **`_consultant_feed_water_pct.foodPctOfCapacity`** / **`waterPctOfCapacity`** when present; if those are **≥ 75** or absent with no proof of **below 75%**, do **not** suggest feed/water top-ups.
+- **Hay / grass on pasture:** **DRYGRASS_WINDROW** is **dried grass hay (hay windrow)** — use **bale, ted, or pick up** (loading wagon / forage harvester), **not** cereal **combine harvest** language. Do not paste raw fill-type enum strings.
 
 **category** must be **exactly one** of `Animal`, `Production`, or `Finance` per row (no `|` lists).
 
@@ -336,7 +514,7 @@ You are an FS25 **barn / husbandry** consultant. The JSON is **animals / buildin
 
 **Voice:** Prefer **Animal Farmer Katie** for herd and barn care; **David** for rookie mistakes.
 
-Focus: animals needing food or water, low health, reproduction, production outputs (milk, wool), overcrowding, animals worth selling.
+Focus: low health, reproduction, production outputs (milk, wool), overcrowding, animals worth selling, cleanliness. **Food / water:** advise refilling barn feed, TMR, or water **only** when JSON shows that fill **below 75%** of capacity (0–1 fraction → compare to **0.75**; percent → **75**). If all feeds and water are **≥ 75%**, do **not** suggest filling food or water. Raw **`fillLevels`** are typically **liters** — do not treat values like **4500** as "45%" or low without **÷ capacity**. On **pastures** rows, use **`_consultant_feed_water_pct`** when present; if **`foodPctOfCapacity`** / **`waterPctOfCapacity`** is **≥ 75** or you cannot show **below 75%**, skip feed/water advice.
 
 **category** must be **exactly one** of `Animal`, `Production`, or `Finance` per row (no `|` lists).
 
@@ -365,7 +543,7 @@ Respond with ONLY valid JSON:
 CONSULTANT_SYSTEM_VIEW_HOME = CONSULTANT_VIEW_SHARED_PREFIX + """VIEW MODE — home:
 You are the player's **farm foreman** for **Farming Simulator 25**. The JSON is a **compact overview** of the **active farm** — **fields** (with slim **vehicles** for equipment-aware wording), **animals**, **pastures**, **production** / **productionPoints** (if present), and **economy** / weather / stats — the same information the dashboard uses across **Fields, Vehicles, Livestock, Pastures, Productions,** and **Economy**.
 
-**Task:** Choose the **three most important jobs** to do **next** for this farm **as a whole**. Rank by real urgency (time-sensitive harvest, withered crop, empty feed, broken machine, full output buffer, cash crunch).
+**Task:** Choose the **three most important jobs** to do **next** for this farm **as a whole**. Rank by real urgency (time-sensitive harvest, withered crop, animal feed/water **only if JSON proves any channel below 75%** of capacity — use **`pastures`._consultant_feed_water_pct** or true ratio, **not** raw liter counts alone, broken machine, full output buffer, cash crunch).
 
 **Coverage:** Prefer **three different angles** when the data supports it (e.g. a field job, a machine/logistics job, an animal/pasture or money/production job). If a section has **no** rows in the JSON (e.g. no production chains), **omit** that topic — do **not** invent animals, fields, or plants that are not listed.
 
@@ -706,6 +884,14 @@ async def _llm_insights_from_snapshot(
             if _is_schema_meta_insight(msg) or _is_schema_meta_insight(reas):
                 dropped_validation += 1
                 continue
+            # Field map mode must keep insight count aligned with field rows — no heuristic drops here.
+            if not _consultant_field_map_mode(system_instruction):
+                if _should_drop_low_quality_insight(msg, reas):
+                    dropped_validation += 1
+                    continue
+                if not (msg or "").strip():
+                    dropped_validation += 1
+                    continue
             out.append(
                 FarmInsight(
                     category=cat,
@@ -1054,6 +1240,11 @@ async def generate_farm_insights(
         if msg_key not in seen_msg:
             seen_msg.add(msg_key)
             merged.append(ins)
+
+    merged = _filter_insights_bogus_barn_feed_misread(merged)
+
+    if (cache_view or "").strip().lower() == "vehicles":
+        merged = _filter_insights_for_vehicles_tab(merged)
 
     if sys_inst and "VIEW MODE — home" in sys_inst:
         merged = merged[:3]

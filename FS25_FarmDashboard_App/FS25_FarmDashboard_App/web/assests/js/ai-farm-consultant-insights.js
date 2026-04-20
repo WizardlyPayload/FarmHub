@@ -10,9 +10,19 @@
   var insightsObserver = null;
   /** Prevents overlapping GET /consultant/insights (navigation + observer + interval firing together). */
   var insightsFetchInFlight = false;
+  /** When a foreground refresh was skipped while a fetch ran, run one retry after the in-flight request finishes. */
+  var pendingInsightsRefresh = false;
 
   function insightsFetchDone() {
     insightsFetchInFlight = false;
+    if (pendingInsightsRefresh) {
+      pendingInsightsRefresh = false;
+      try {
+        setTimeout(function () {
+          refreshFarmInsights(false, { background: false });
+        }, 0);
+      } catch (ePending) {}
+    }
   }
 
   function buildConsultantInsightsQuery(viewParam) {
@@ -101,6 +111,193 @@
       suggestion_tier: tier,
       ts: Date.now(),
     };
+  }
+
+  /** Round long floats in consultant text to one decimal (e.g. nitrogen / diesel %). */
+  function formatConsultantNumbersOneDecimal(text) {
+    if (text == null || typeof text !== 'string') return text;
+    return text.replace(/\b(\d+\.\d+)\b/g, function (m, num) {
+      var v = parseFloat(num);
+      if (!Number.isFinite(v)) return m;
+      var r = Math.round(v * 10) / 10;
+      if (Math.abs(r - Math.round(r)) < 1e-6) return String(Math.round(r));
+      return r.toFixed(1);
+    });
+  }
+
+  function formatInsightNumericFields(ins) {
+    if (!ins || typeof ins !== 'object') return ins;
+    var o = {};
+    for (var k in ins) {
+      if (ins.hasOwnProperty(k)) o[k] = ins[k];
+    }
+    if (typeof o.message === 'string') o.message = formatConsultantNumbersOneDecimal(o.message);
+    if (typeof o.reasoning === 'string') o.reasoning = formatConsultantNumbersOneDecimal(o.reasoning);
+    return o;
+  }
+
+  function formatInsightsList(arr) {
+    if (!Array.isArray(arr)) return [];
+    var out = [];
+    for (var i = 0; i < arr.length; i++) {
+      out.push(formatInsightNumericFields(arr[i]));
+    }
+    return out;
+  }
+
+  function vehiclesTabInsightBlobIsGarbage(ins) {
+    var blob = (
+      String((ins && ins.message) || '') +
+      '\n' +
+      String((ins && ins.reasoning) || '')
+    ).toLowerCase();
+    if (!blob.trim()) return false;
+    if (/\brefuel\b/.test(blob) && /\bunknown\b/.test(blob)) return true;
+    if (
+      /\brefuel\b/.test(blob) &&
+      /\bnon-zero\b/.test(blob) &&
+      /\bdiesel\b/.test(blob) &&
+      /\bpartially\s+fuel/i.test(blob)
+    ) {
+      return true;
+    }
+    if (/\bfill\s*level\b/.test(blob) && /\bindicating\b/.test(blob)) return true;
+    if (/\bnon-empty\b/.test(blob) && /\bunknown\b/.test(blob) && /\bfill\b/.test(blob)) return true;
+    if (
+      /\b(load|stack|move)\b/.test(blob) &&
+      /\b(hay|straw|bales?|silage)\b/.test(blob) &&
+      /\b(trailer|wagon|truck|transport)\b/.test(blob)
+    ) {
+      return true;
+    }
+    if (/\btransport\s+the\s+bales\b/.test(blob)) return true;
+    return false;
+  }
+
+  /** Match server ``_filter_insights_bogus_barn_feed_misread`` — liters mistaken for low %. */
+  function barnFeedInsightBlobIsGarbage(ins) {
+    var blob = (
+      String((ins && ins.message) || '') +
+      '\n' +
+      String((ins && ins.reasoning) || '')
+    ).toLowerCase();
+    if (!blob.trim()) return false;
+    if (
+      /\bfill\s+level\s+is\s+at\s+\d{4,}\b/.test(blob) &&
+      /\b(low\s+(supply|hay|feed)|indicates\s+low|needs?\s+(more\s+)?feed)\b/.test(blob)
+    ) {
+      return true;
+    }
+    if (
+      /\bdried\s+grass\s+hay\s+windrow\b/.test(blob) &&
+      /\b\d{4,}\b/.test(blob) &&
+      /\b(low\s+supply|indicates\s+low|check\s+food)\b/.test(blob)
+    ) {
+      return true;
+    }
+    return false;
+  }
+
+  function filterInsightsBogusBarnFeedMisread(arr) {
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(function (ins) {
+      return !barnFeedInsightBlobIsGarbage(ins);
+    });
+  }
+
+  /** Match server ``_filter_insights_for_vehicles_tab`` + garbage patterns (hosted cache / disk restore). */
+  function filterInsightsForVehiclesPanel(arr) {
+    if (!Array.isArray(arr)) return [];
+    return arr.filter(function (ins) {
+      if (!ins || typeof ins !== 'object') return false;
+      var cat = insightCategoryString(ins);
+      if (cat === 'field') return false;
+      var frRaw = ins.field_ref != null ? ins.field_ref : ins.fieldRef;
+      var fr = frRaw != null ? String(frRaw).trim() : '';
+      if (fr) return false;
+      if (vehiclesTabInsightBlobIsGarbage(ins)) return false;
+      return true;
+    });
+  }
+
+  function insightCategoryString(ins) {
+    if (!ins || typeof ins !== 'object') return '';
+    var c = ins.category;
+    if (c != null && typeof c === 'object' && 'value' in c) return String(c.value || '').toLowerCase();
+    return String(c || '').toLowerCase();
+  }
+
+  /** Parcel id for home→field-card merge (align loosely with ``field-consultant-bridge`` indexing). */
+  function insightRefForHomeFieldMerge(ins) {
+    if (!ins || typeof ins !== 'object') return '';
+    var direct =
+      ins.field_ref != null
+        ? String(ins.field_ref).trim()
+        : ins.fieldRef != null
+          ? String(ins.fieldRef).trim()
+          : '';
+    if (direct) return direct.replace(/^#+/, '').trim();
+    var msg = String(ins.message || '');
+    var m =
+      msg.match(/\bfarmlandId\s*[:\s]*(\d{1,7})\b/i) ||
+      msg.match(/\b(?:parcel|field)\s*#?\s*(\d{1,7})\b/i) ||
+      msg.match(/\bf(?:ield)?\s*#?\s*(\d{1,7})\b/i);
+    return m ? String(m[1]).trim() : '';
+  }
+
+  function insightEligibleForHomeFieldMerge(ins) {
+    var cat = insightCategoryString(ins);
+    if (cat === 'field' || cat === 'fields' || cat === 'farmland' || cat === 'crop' || cat === 'crops') return true;
+    if (cat === '' || cat === 'production' || cat === 'animal' || cat === 'finance') return true;
+    return false;
+  }
+
+  /**
+   * Home / landing Smart suggestions often include Field rows; merge them onto ``__fieldConsultantByRef``
+   * so field cards show the same tip without a separate field-map LLM pass. Does not overwrite non-empty map entries.
+   */
+  function mergeHomeFieldInsightsIntoFieldConsultantMap(insights) {
+    if (!Array.isArray(insights) || insights.length === 0) return;
+    if (typeof window === 'undefined') return;
+    var map = window.__fieldConsultantByRef;
+    if (!map || typeof map !== 'object') {
+      window.__fieldConsultantByRef = {};
+      map = window.__fieldConsultantByRef;
+    }
+    var added = false;
+    for (var i = 0; i < insights.length; i++) {
+      var raw = insights[i];
+      if (!raw) continue;
+      if (!insightEligibleForHomeFieldMerge(raw)) continue;
+      if (typeof raw.message !== 'string' || !String(raw.message).trim()) continue;
+      var ref = insightRefForHomeFieldMerge(raw);
+      if (!ref) continue;
+      var ins = formatInsightNumericFields(raw);
+      function tryKey(kk) {
+        if (!kk) return;
+        var cur = map[kk];
+        if (cur && String(cur.message || '').trim()) return;
+        map[kk] = {
+          category: 'Field',
+          priority: ins.priority,
+          message: ins.message,
+          reasoning: typeof ins.reasoning === 'string' ? ins.reasoning : '',
+          field_ref: ins.field_ref != null ? ins.field_ref : ins.fieldRef,
+        };
+        added = true;
+      }
+      tryKey(ref);
+      var n = Number(ref);
+      if (Number.isFinite(n)) {
+        tryKey(String(n));
+        tryKey(String(Math.trunc(n)));
+      }
+    }
+    if (added) {
+      try {
+        window.dispatchEvent(new CustomEvent('field-consultant-updated'));
+      } catch (eEv) {}
+    }
   }
 
   /** Persisted across restarts by consultant-disk-cache.js (localStorage). */
@@ -193,7 +390,9 @@
   }
 
   /**
-   * Parallel: section views. Sequential: home after parallel completes. Fills insightResultCache.
+   * Warm Smart suggestions only for the **current** navbar view (not every tab).
+   * Other views fetch on first navigate via ``refreshFarmInsights(false)`` cache miss.
+   * ``fields`` uses the field map bridge, not this list endpoint.
    */
   function preloadAllAIInsights() {
     if (window.__farmdashSkipPreloadAiInsights) {
@@ -223,42 +422,50 @@
       } catch (eDisk) {}
       return Promise.resolve();
     }
-    /** Omit ``fields`` — per-parcel map is fetched only by ``field-consultant-bridge`` (``view=fields&context=fields``). */
-    var sequentialViews = ['livestock', 'vehicles', 'pastures', 'productions', 'economy'];
-    pl('renderer_in', 'preloadAllAIInsights: sequential (one view at a time)', { views: sequentialViews });
-    return sequentialViews
-      .reduce(function (chain, v) {
-        return chain.then(function () {
-          return fetchInsightsForView(v, { silent: true })
-            .then(function (data) {
-              insightCacheSet(v, data.insights, data.llm_used, data.suggestion_tier);
-              return v;
-            })
-            .catch(function (err) {
-              pl('renderer_err', 'preloadAllAIInsights view failed', {
-                view: v,
-                err: String(err && err.message ? err.message : err),
-              });
-              return null;
-            });
-        });
-      }, Promise.resolve())
-      .then(function () {
-        return fetchInsightsForView('home', { silent: true });
-      })
+    var v = getSmartPanelViewParam();
+    if (v === 'fields') {
+      pl('renderer_ok', 'preloadAllAIInsights: fields tab uses field map only', {});
+      return Promise.resolve();
+    }
+    var farmAtPreload = getInsightFarmId();
+    pl('renderer_in', 'preloadAllAIInsights: active view only', { view: v, farm: farmAtPreload });
+    return fetchInsightsForView(v, { silent: true })
       .then(function (data) {
-        insightCacheSet('home', data.insights, data.llm_used, data.suggestion_tier);
-        pl('renderer_ok', 'preloadAllAIInsights: home stored', {});
+        if (getInsightFarmId() !== farmAtPreload) {
+          pl('renderer_ok', 'preloadAllAIInsights: discard result (farm changed mid-flight)', {});
+          return;
+        }
+        var preInsights = formatInsightsList(data.insights || []);
+        preInsights = filterInsightsBogusBarnFeedMisread(preInsights);
+        if (normalizeCacheViewKey(v) === 'vehicles') {
+          preInsights = filterInsightsForVehiclesPanel(preInsights);
+        }
+        insightCacheSet(v, preInsights, data.llm_used, data.suggestion_tier);
+        if (normalizeCacheViewKey(v) === 'home') {
+          mergeHomeFieldInsightsIntoFieldConsultantMap(preInsights);
+        }
         try {
-          var cur = getSmartPanelViewParam();
-          if (cur === 'home' && document.getElementById('ai-insights-panel')) {
-            renderInsights(data.insights, data.llm_used, data.suggestion_tier);
+          if (document.getElementById('ai-insights-panel')) {
+            var curNow = getSmartPanelViewParam();
+            if (curNow === v) {
+              if (typeof dashFlushDomWork === 'function') {
+                dashFlushDomWork(function () {
+                  renderInsights(preInsights, data.llm_used, data.suggestion_tier);
+                });
+              } else {
+                renderInsights(preInsights, data.llm_used, data.suggestion_tier);
+              }
+            }
           }
         } catch (ePaint) {}
+        pl('renderer_ok', 'preloadAllAIInsights: view stored', { view: v });
       })
       .catch(function (err) {
         if (err && (err.message === '__no_key__' || err.message === '__no_origin__')) return;
-        pl('renderer_err', 'preloadAllAIInsights failed', { err: String(err && err.message ? err.message : err) });
+        pl('renderer_err', 'preloadAllAIInsights failed', {
+          view: v,
+          err: String(err && err.message ? err.message : err),
+        });
       });
   }
 
@@ -549,13 +756,21 @@
     }
 
     container.innerHTML = '';
+    var rows = formatInsightsList(insights || []);
+    rows = filterInsightsBogusBarnFeedMisread(rows);
     var vwHome = '';
     try {
       vwHome = getSmartPanelViewParam();
     } catch (eVh) {
       vwHome = '';
     }
-    if (vwHome === 'home' && insights && insights.length > 0) {
+    if (normalizeCacheViewKey(vwHome) === 'vehicles') {
+      rows = filterInsightsForVehiclesPanel(rows);
+    }
+    if (normalizeCacheViewKey(vwHome) === 'home' && rows.length > 0) {
+      mergeHomeFieldInsightsIntoFieldConsultantMap(rows);
+    }
+    if (normalizeCacheViewKey(vwHome) === 'home' && rows.length > 0) {
       var intro = document.createElement('p');
       intro.className = 'small text-info mb-3';
       intro.innerHTML =
@@ -565,8 +780,8 @@
         '</span>';
       container.appendChild(intro);
     }
-    if (!insights || insights.length === 0) {
-      var vw = vwHome || '';
+    if (!rows || rows.length === 0) {
+      var vw = normalizeCacheViewKey(vwHome);
       if (vw === 'vehicles') {
         container.innerHTML =
           '<p class="text-success small mb-0"><i class="bi bi-check-circle me-1"></i> ' +
@@ -580,8 +795,8 @@
       return;
     }
 
-    for (var i = 0; i < insights.length; i++) {
-      var item = insights[i];
+    for (var i = 0; i < rows.length; i++) {
+      var item = rows[i];
       var pri = (item.priority && String(item.priority).toLowerCase()) || 'medium';
       var div = document.createElement('div');
       div.className = 'insight-card priority-' + pri;
@@ -590,7 +805,7 @@
       var reason = item.reasoning || '';
       var rankPrefix = '';
       try {
-        if (vwHome === 'home') rankPrefix = '#' + (i + 1) + ' · ';
+        if (normalizeCacheViewKey(vwHome) === 'home') rankPrefix = '#' + (i + 1) + ' · ';
       } catch (eRank) {}
       div.innerHTML =
         '<div class="insight-meta text-farm-accent">' +
@@ -693,6 +908,9 @@
     }
 
     if (!forceRefresh && insightsFetchInFlight) {
+      if (!backgroundPoll) {
+        pendingInsightsRefresh = true;
+      }
       pl('renderer_ok', 'smart suggestions: skipped (fetch already in flight)', {});
       return;
     }
@@ -725,9 +943,10 @@
         return;
       }
 
-      /** If the user changes section while fetch is in flight, do not paint the old response (e.g. Home → Fields). */
+      /** If the user changes section or farm while fetch is in flight, do not paint the old response. */
       var requestedSectionAtFetch = getCurrentDashboardSection();
       var requestedViewAtFetch = getSmartPanelViewParam();
+      var requestedFarmAtFetch = getInsightFarmId();
 
       function runSmartSuggestionsHttpFetch() {
         var proxyBase =
@@ -824,13 +1043,16 @@
 
           if (
             insightSectionBucket(requestedSectionAtFetch) !== insightSectionBucket(nowSec) ||
-            requestedViewAtFetch !== nowView
+            requestedViewAtFetch !== nowView ||
+            requestedFarmAtFetch !== getInsightFarmId()
           ) {
-            pl('renderer_ok', 'consultant/insights stale response discarded (section or view changed)', {
+            pl('renderer_ok', 'consultant/insights stale response discarded (section, view, or farm changed)', {
               requestedSection: requestedSectionAtFetch,
               nowSection: nowSec,
               requestedView: requestedViewAtFetch,
               nowView: nowView,
+              requestedFarm: requestedFarmAtFetch,
+              nowFarm: getInsightFarmId(),
             });
             /**
              * Without this, the panel can stay on “Loading Smart suggestions…” forever: the in-flight
@@ -865,7 +1087,8 @@
             return;
           }
 
-          var list = (data && data.insights) || [];
+          var list = formatInsightsList((data && data.insights) || []);
+          list = filterInsightsBogusBarnFeedMisread(list);
           var llm = !!(data && data.llm_used);
           var aiErr =
             data && data.farmdash_ai_error != null && String(data.farmdash_ai_error).trim() !== '';
@@ -875,6 +1098,9 @@
             }
           } catch (eLlm) {}
           var vpStore = requestedViewAtFetch || getSmartPanelViewParam();
+          if (normalizeCacheViewKey(vpStore) === 'vehicles') {
+            list = filterInsightsForVehiclesPanel(list);
+          }
           if (aiErr && (!list || list.length === 0)) {
             insightCacheSet(vpStore, [], false, 'rules');
             try {
@@ -893,6 +1119,9 @@
           }
           var tier = deriveTierFromResponse(data);
           insightCacheSet(vpStore, list, llm, tier);
+          if (normalizeCacheViewKey(vpStore) === 'home') {
+            mergeHomeFieldInsightsIntoFieldConsultantMap(list);
+          }
           try {
             document.dispatchEvent(new CustomEvent('consultant-insights-fetched'));
           } catch (eEv) {}
@@ -1063,7 +1292,7 @@
         clearTimeout(visDebounce);
         visDebounce = setTimeout(function () {
           refreshFarmInsights(false);
-        }, 950);
+        }, 2000);
       });
       insightsObserver.observe(insightRowEl, { attributes: true, attributeFilter: ['class'] });
     }

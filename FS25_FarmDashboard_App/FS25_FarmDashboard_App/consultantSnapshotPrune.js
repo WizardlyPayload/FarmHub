@@ -75,12 +75,22 @@ function filterVehiclesByFarm(vehicles, farmId) {
     });
 }
 
+/**
+ * True when a field row is owned by the dashboard farm — same as Fields tab ``filterFieldsForFarmView``:
+ * ``ownerFarmId`` if present, else ``farmId`` (no ``playerFarmId``, which can match the session farm
+ * on parcels the UI does not list as yours).
+ */
+function fieldRowOwnedByFarm(f, farmId) {
+    if (!f || typeof f !== 'object') return false;
+    const fid = Number(farmId);
+    if (!Number.isFinite(fid) || fid < 1) return false;
+    const oid = Number(f.ownerFarmId ?? f.farmId ?? 0);
+    return oid === fid && oid > 0;
+}
+
 function filterFieldsForFarm(fields, farmId) {
     if (!Array.isArray(fields)) return [];
-    return fields.filter((f) => {
-        const fid = f.farmId ?? f.playerFarmId ?? f.ownerFarmId;
-        return fid == null || Number(fid) === farmId;
-    });
+    return fields.filter((f) => fieldRowOwnedByFarm(f, farmId));
 }
 
 function filterAnimalsForFarm(animals, farmId) {
@@ -572,6 +582,37 @@ function slimAnimalForConsultantLlm(a) {
 
 const CONSULTANT_LLM_PASTURE_KEYS = ['id', 'name', 'farmId', 'ownerFarmId', 'herdSize', 'grass', 'grassPct', 'manure'];
 
+/**
+ * Precompute barn/pasture food & water as % of capacity so the LLM does not treat liter counts (e.g. 4500 L)
+ * as a 0–100 fullness score. Omitted when totals look inconsistent (ratio ≫ 100%).
+ */
+function pastureFeedWaterPctHintForConsultant(p) {
+    const fr = p && p.foodReport;
+    if (!fr || typeof fr !== 'object' || fr.hasRealData !== true) return undefined;
+    const foodL = Math.max(
+        Number(fr.availableFood) || 0,
+        Number(fr.food) || 0,
+        Number(fr.totalMixedRation) || 0,
+    );
+    const capL = Number(fr.totalCapacity) || 0;
+    const hint = {};
+    if (capL >= 400 && foodL >= 0 && capL > 0) {
+        const ratio = foodL / capL;
+        if (ratio <= 1.2) {
+            hint.foodPctOfCapacity = Math.min(100, Math.round(ratio * 1000) / 10);
+        }
+    }
+    const w = Number(fr.water) || 0;
+    const wc = Number(fr.waterCapacity) || 0;
+    if (wc >= 100 && w >= 0 && wc > 0) {
+        const rw = w / wc;
+        if (rw <= 1.2) {
+            hint.waterPctOfCapacity = Math.min(100, Math.round(rw * 1000) / 10);
+        }
+    }
+    return Object.keys(hint).length ? hint : undefined;
+}
+
 function slimPastureForConsultantLlm(p) {
     if (!p || typeof p !== 'object') return null;
     const o = {};
@@ -580,6 +621,10 @@ function slimPastureForConsultantLlm(p) {
     }
     if (p.fillLevels && typeof p.fillLevels === 'object') {
         o.fillLevels = slimFillLevelsMap(p.fillLevels, 8);
+    }
+    const pctHint = pastureFeedWaterPctHintForConsultant(p);
+    if (pctHint) {
+        o._consultant_feed_water_pct = pctHint;
     }
     return Object.keys(o).length ? o : null;
 }
@@ -707,9 +752,6 @@ function pruneMergedDataForView(full, view, context, farmId, options) {
 
     const fieldsRaw = Array.isArray(full.fields) ? full.fields : [];
     let fieldsAll = filterFieldsForFarm(fieldsRaw, farmId);
-    if (ctx === 'fields' && v === 'fields' && !singleRef && fieldsAll.length === 0 && fieldsRaw.length > 0) {
-        fieldsAll = fieldsRaw.slice(0, MAX_FIELD_MAP);
-    }
 
     const localHeavy = options && options.localCompatHeavyStrip === true;
     const maxJsonChars =
@@ -737,6 +779,9 @@ function pruneMergedDataForView(full, view, context, farmId, options) {
         let row = fieldsAll.find((f) => fieldMatchesRef(f, singleRef));
         if (!row) {
             row = fieldsRaw.find((f) => fieldMatchesRef(f, singleRef));
+        }
+        if (row && !fieldRowOwnedByFarm(row, farmId)) {
+            row = null;
         }
         const sf = row ? slimFieldForConsultantLlm(row) : null;
         out = {

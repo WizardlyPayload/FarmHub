@@ -135,24 +135,14 @@ function insightRowUsableForFieldMap(ins) {
   return t === "production" || t === "animal" || t === "finance";
 }
 
-/** Legacy LLM prompts asked for "Ben:/" prefixes; strip for display (matches server localConsultantLlm.js). */
-function stripMentorPrefixMessage(msg) {
-  if (typeof msg !== "string") return msg;
-  const t = msg.trim();
-  const stripped = t.replace(/^[A-Za-z][A-Za-z0-9\s]{0,28}:\s*\/?\s*/, "").trim();
-  return stripped || t;
-}
-
 export function indexFieldConsultantInsights(insights) {
   const map = {};
   if (!Array.isArray(insights)) return map;
   for (const ins of insights) {
     if (!ins || !insightRowUsableForFieldMap(ins)) continue;
     const refNorm = pickInsightFieldRefForIndexing(ins);
-    const cleaned =
-      typeof ins.message === "string"
-        ? { ...ins, message: stripMentorPrefixMessage(ins.message) }
-        : ins;
+    /** Preserve mentor prefix on field cards (matches FIELD MAP prompts). */
+    const cleaned = ins && typeof ins === "object" ? { ...ins } : ins;
     addInsightKeys(map, refNorm, cleaned);
   }
   return map;
@@ -372,6 +362,33 @@ function _sortFieldInsightCandidates(candidates) {
   return candidates[0];
 }
 
+/** True if normalized ref matches any parcel in ``fieldList`` (owned-farm rows only when caller passes filtered list). */
+function fieldRefBelongsToFieldList(refNorm, fieldList) {
+  if (!refNorm || !Array.isArray(fieldList)) return false;
+  for (const field of fieldList) {
+    if (!field || typeof field !== "object") continue;
+    const candidates = [];
+    const push = (v) => {
+      if (v == null || v === "") return;
+      candidates.push(v);
+    };
+    push(field.farmlandId);
+    push(field.id);
+    push(getFieldStableId(field));
+    const tried = new Set();
+    for (const v of candidates) {
+      const k = normalizeFieldRefKey(v);
+      if (!k || tried.has(k)) continue;
+      tried.add(k);
+      if (k === refNorm) return true;
+      const rn = Number(refNorm);
+      const vn = Number(v);
+      if (Number.isFinite(rn) && Number.isFinite(vn) && rn === vn) return true;
+    }
+  }
+  return false;
+}
+
 export function pickDoThisFirstFromFieldInsights(fields) {
   const map =
     typeof window !== "undefined" && window.__fieldConsultantByRef
@@ -392,7 +409,7 @@ export function pickDoThisFirstFromFieldInsights(fields) {
 
   /**
    * No row matched the map (empty `dashboard.fields`, slow /api/fields, or LLM field_ref ids don’t match game ids).
-   * Still surface the strongest map entry so Smart suggestions and “do this first” aren’t blank.
+   * Only surface map entries that still correspond to an **owned** parcel in ``fieldList`` — never unrelated refs.
    */
   const seen = new Set();
   const fromMapOnly = [];
@@ -400,7 +417,7 @@ export function pickDoThisFirstFromFieldInsights(fields) {
     const ins = map[k];
     if (!ins || !String(ins.message ?? "").trim()) continue;
     const ref = normalizeFieldRefKey(ins.field_ref) || normalizeFieldRefKey(k);
-    if (!ref) continue;
+    if (!ref || !fieldRefBelongsToFieldList(ref, fieldList)) continue;
     const dedupe = ref + "\0" + String(ins.message).slice(0, 120);
     if (seen.has(dedupe)) continue;
     seen.add(dedupe);
@@ -604,7 +621,29 @@ export async function refreshFieldConsultantCache({ force = false, fromUserClick
         dashDebug("field-consultant-bridge", "skip", { reason: "response_stale_farm_switch" });
         return;
       }
-      window.__fieldConsultantByRef = byRef;
+      const nIdx = indexedKeys.length;
+      /** API returned rows but none keyed to parcels — do not replace map (would wipe home-merge / prior good cache). */
+      if (list.length > 0 && nIdx === 0) {
+        dashDebug("field-consultant-bridge", "skip", {
+          reason: "field_map_index_miss",
+          insightCount: list.length,
+        });
+        return;
+      }
+      /** Empty insights (cached miss-generation, no rows in pruned snapshot, or model returned []) — keep existing map. */
+      if (list.length === 0 && nIdx === 0) {
+        dashDebug("field-consultant-bridge", "skip", {
+          reason: "field_map_empty_insights",
+          llm_used: !!data.llm_used,
+        });
+        return;
+      }
+      const prev =
+        window.__fieldConsultantByRef && typeof window.__fieldConsultantByRef === "object"
+          ? { ...window.__fieldConsultantByRef }
+          : {};
+      /** Partial field-map responses merge on top of existing keys (e.g. home Smart suggestions) instead of wiping other parcels. */
+      window.__fieldConsultantByRef = { ...prev, ...byRef };
       window.__fieldConsultantLlmUsed = !!data.llm_used;
       window.__fieldConsultantSuggestionTier = deriveSuggestionTier(data);
       window.__lastFieldStateHash = cacheStateHash;
@@ -628,20 +667,37 @@ export async function refreshFieldConsultantCache({ force = false, fromUserClick
       finishFieldConsultantDomAndLoading();
     }
 
-    fieldConsultantFarmCache.set(requestCacheKey, {
-      byRef: { ...byRef },
-      llmUsed: !!data.llm_used,
-      suggestionTier: deriveSuggestionTier(data),
-      stateHash: cacheStateHash,
-    });
-    lastNetworkFetchAt = Date.now();
-    lastNetworkKey = requestCacheKey;
-    lastNetworkStateHash = cacheStateHash;
-    if (typeof globalThis.pipelineLog === "function") {
-      globalThis.pipelineLog("renderer_ok", "field consultant cache updated", {
-        insightCount: list.length,
-        llm_used: !!data.llm_used,
+    if (indexedKeys.length > 0) {
+      const ent = fieldConsultantFarmCache.get(requestCacheKey);
+      const prevCached = ent && typeof ent.byRef === "object" ? { ...ent.byRef } : {};
+      const cacheByRef = { ...prevCached, ...byRef };
+      fieldConsultantFarmCache.set(requestCacheKey, {
+        byRef: cacheByRef,
+        llmUsed: !!data.llm_used,
+        suggestionTier: deriveSuggestionTier(data),
+        stateHash: cacheStateHash,
       });
+      lastNetworkFetchAt = Date.now();
+      lastNetworkKey = requestCacheKey;
+      lastNetworkStateHash = cacheStateHash;
+    }
+    if (typeof globalThis.pipelineLog === "function") {
+      let msg = "field consultant cache updated";
+      const meta = {
+        insightCount: list.length,
+        indexedKeys: indexedKeys.length,
+        llm_used: !!data.llm_used,
+      };
+      if (indexedKeys.length > 0) {
+        meta.cacheChanged = true;
+      } else if (list.length === 0) {
+        msg = "field consultant: empty insights (per-parcel cache unchanged)";
+        meta.cacheChanged = false;
+      } else {
+        msg = "field consultant: insights not keyed to parcels (cache unchanged)";
+        meta.cacheChanged = false;
+      }
+      globalThis.pipelineLog("renderer_ok", msg, meta);
     }
     if (fromUserClick && !data.llm_used && typeof window.showFarmdashAiUpsellModal === "function") {
       try {

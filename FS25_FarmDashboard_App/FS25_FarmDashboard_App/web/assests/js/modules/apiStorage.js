@@ -8,7 +8,29 @@
 /** Must match ``_schemaVersion`` written with ``serverLiveCache/*.json`` (see serverDataCache.js). */
 export const SERVER_LIVE_CACHE_SCHEMA_VERSION = '1.0';
 
-import { filterFieldsForFarmView } from './fields.js';
+import { filterFieldsForFarmView, invalidateFieldsClientCache } from './fields.js';
+
+/** Clear per-farm / per-field UI caches so rapid farm or save switches cannot paint stale AI or field cards. */
+function resetCrossFarmVisualizationCaches(dashboard) {
+  try {
+    invalidateFieldsClientCache();
+  } catch (_) {}
+  if (typeof window !== 'undefined') {
+    window.__fieldConsultantByRef = {};
+    window.__fieldConsultantLlmUsed = false;
+    window.__fieldConsultantSuggestionTier = undefined;
+    window.__fieldConsultantAppliedKey = null;
+    window.__fieldConsultantAppliedHash = null;
+    window.__lastFieldStateHash = null;
+  }
+  if (dashboard && dashboard.realtimeConnector) {
+    dashboard.realtimeConnector.previousData = null;
+    dashboard.realtimeConnector._lastLandingCountsFromAnimalsAt = 0;
+    if (typeof dashboard.realtimeConnector.clearPayloadDedupeCache === 'function') {
+      dashboard.realtimeConnector.clearPayloadDedupeCache();
+    }
+  }
+}
 import { isFarmDashLocalConfigHost } from './viewer-mode.js';
 
 /** When the farm picker / saved id does not own any fields (multi-farm dedicated), pick the farm with the most field rows. */
@@ -200,10 +222,7 @@ export async function switchServer(serverId) {
     }
 
     /** One merge already ran in tryLoadApiData; avoid a second GET here. */
-    if (this.realtimeConnector) {
-      this.realtimeConnector.clearPayloadDedupeCache?.();
-      this.realtimeConnector.previousData = null;
-    }
+    resetCrossFarmVisualizationCaches(this);
 
     const currentSection = this.getCurrentSection ? this.getCurrentSection() : null;
     if (currentSection && currentSection !== "landing" && currentSection !== "dashboard") {
@@ -362,10 +381,10 @@ export async function tryLoadApiData() {
       const farmKey = `dashboard_active_farm_${String(this.activeServerId)}`;
       let savedFarmId = mpFarmSwitch ? localStorage.getItem(farmKey) : null;
       if (mpFarmSwitch && savedFarmId && this.farms.find(f => Number(f.id) === Number(savedFarmId))) {
-          this.activeFarmId = parseInt(savedFarmId, 10);
+          this.activeFarmId = Number(parseInt(savedFarmId, 10));
       } else if (this.farms.length > 0) {
-          const defaultFarm = this.farms.find(f => f.id > 0) || this.farms[0];
-          this.activeFarmId = defaultFarm.id;
+          const defaultFarm = this.farms.find(f => Number(f.id) > 0) || this.farms[0];
+          this.activeFarmId = Number(defaultFarm.id);
       }
       this.renderFarmDropdown();
 
@@ -373,8 +392,8 @@ export async function tryLoadApiData() {
       this.fields = filterFieldsForFarmView(this.allFields, this.activeFarmId ?? 1);
       if (this.fields.length === 0 && this.allFields.length > 0) {
         const inferred = inferFarmIdFromFieldOwnership(this.allFields, this.farms);
-        if (inferred != null && inferred !== Number(this.activeFarmId)) {
-          this.activeFarmId = inferred;
+        if (inferred != null && Number(inferred) !== Number(this.activeFarmId)) {
+          this.activeFarmId = Number(inferred);
           try {
             localStorage.setItem(farmKey, String(inferred));
           } catch (_) {
@@ -585,12 +604,13 @@ export function renderFarmDropdown() {
         return;
     }
     if (!Array.isArray(this.farms) || this.farms.length === 0) return;
-    const playerFarms = this.farms.filter(f => f.id > 0);
+    const playerFarms = this.farms.filter(f => Number(f.id) > 0);
     if (playerFarms.length === 0) {
         container.classList.remove("d-flex"); container.classList.add("d-none"); return;
     }
     container.classList.remove("d-none"); container.classList.add("d-flex");
-    let currentFarm = playerFarms.find(f => f.id === this.activeFarmId) || playerFarms[0];
+    let currentFarm =
+      playerFarms.find(f => Number(f.id) === Number(this.activeFarmId)) || playerFarms[0];
     let html = `
         <div class="dropdown">
             <button class="btn btn-farm-accent btn-sm dropdown-toggle fw-bold text-dark" type="button" id="farmDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false">
@@ -599,8 +619,8 @@ export function renderFarmDropdown() {
             <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow border-farm-accent" aria-labelledby="farmDropdownBtn">
     `;
     playerFarms.forEach(farm => {
-        const isActive = farm.id === this.activeFarmId ? 'active bg-farm-accent text-dark fw-bold' : '';
-        html += `<li><a class="dropdown-item ${isActive}" href="#" onclick="dashboard.switchFarm(${farm.id}, event)">${farm.name}</a></li>`;
+        const isActive = Number(farm.id) === Number(this.activeFarmId) ? 'active bg-farm-accent text-dark fw-bold' : '';
+        html += `<li><a class="dropdown-item ${isActive}" href="#" onclick="dashboard.switchFarm(${Number(farm.id)}, event)">${farm.name}</a></li>`;
     });
     html += `</ul></div>`;
     container.innerHTML = html;
@@ -609,9 +629,12 @@ export function renderFarmDropdown() {
 export function switchFarm(farmId, event) {
     if (!this.isFarmDropdownEnabled()) return;
     if (event) event.preventDefault();
-    if (this.activeFarmId === farmId) return;
-    this.activeFarmId = farmId;
-    localStorage.setItem(`dashboard_active_farm_${String(this.activeServerId)}`, String(farmId));
+    const fid = Number(farmId);
+    if (!Number.isFinite(fid) || fid <= 0) return;
+    if (Number(this.activeFarmId) === fid) return;
+    this.activeFarmId = fid;
+    localStorage.setItem(`dashboard_active_farm_${String(this.activeServerId)}`, String(fid));
+    resetCrossFarmVisualizationCaches(this);
     this.renderFarmDropdown();
 
     if (this.realtimeConnector?.updateAnimalsData && this.husbandryData) {
@@ -619,7 +642,7 @@ export function switchFarm(farmId, event) {
     }
 
     if (this.allFields && this.allFields.length) {
-        this.fields = filterFieldsForFarmView(this.allFields, farmId);
+        this.fields = filterFieldsForFarmView(this.allFields, fid);
     }
 
     const currentSection = this.getCurrentSection ? this.getCurrentSection() : null;

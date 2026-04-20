@@ -1,16 +1,21 @@
 // FS25 FarmDashboard | farm-dashboard-bg.js
-// Full-screen dynamic backgrounds (section-tinted gradients). Optional PNGs were never shipped in-repo;
-// to use images instead, add files under assests/img/Dashboard Pictures/ and switch bgStyle() below to url(...).
+// Full-screen dynamic backgrounds (crossfade on section change).
 
-/** @type {Record<string, string>} CSS background-image values (gradients only — avoids 404s). */
+/** Space in folder name → %20 so `url(...)` resolves in Electron and browsers. */
+const IMG_BASE = "assests/img/Dashboard%20PIctures";
+
+/**
+ * Optional per-tab PNGs in the same folder (livestock.png, vehicles.png, …).
+ * All keys default to Background.png so one asset is enough; swap paths when you add art.
+ */
 export const FARM_DASHBOARD_BG_KEYS = {
-  home: "linear-gradient(168deg, #0e1210 0%, #141a17 42%, #121a16 100%)",
-  livestock: "linear-gradient(168deg, #0f172a 0%, #14532d 38%, #0e1210 100%)",
-  vehicles: "linear-gradient(168deg, #0f172a 0%, #1e3a5f 40%, #0e1210 100%)",
-  fields: "linear-gradient(168deg, #0f172a 0%, #1a3d2e 42%, #0e1210 100%)",
-  economy: "linear-gradient(168deg, #0f172a 0%, #422006 40%, #0e1210 100%)",
-  pastures: "linear-gradient(168deg, #0f172a 0%, #134e4a 40%, #0e1210 100%)",
-  productions: "linear-gradient(168deg, #0f172a 0%, #3d2a0f 42%, #0e1210 100%)",
+  home: `${IMG_BASE}/Background.png`,
+  livestock: `${IMG_BASE}/Background.png`,
+  vehicles: `${IMG_BASE}/Background.png`,
+  fields: `${IMG_BASE}/Background.png`,
+  economy: `${IMG_BASE}/Background.png`,
+  pastures: `${IMG_BASE}/Background.png`,
+  productions: `${IMG_BASE}/Background.png`,
 };
 
 let _inited = false;
@@ -18,8 +23,9 @@ let _front = 0;
 /** @type {HTMLElement[]} */
 let _planes = [];
 
-function bgStyle(key) {
-  return FARM_DASHBOARD_BG_KEYS[key] || FARM_DASHBOARD_BG_KEYS.home;
+function bgUrl(key) {
+  const rel = FARM_DASHBOARD_BG_KEYS[key] || FARM_DASHBOARD_BG_KEYS.home;
+  return `url("${rel}")`;
 }
 
 export function initFarmDashboardBackground() {
@@ -30,8 +36,8 @@ export function initFarmDashboardBackground() {
   const b = root.querySelector(".farm-dash-bg-plane-b");
   if (!a || !b) return;
   _planes = [a, b];
-  a.style.backgroundImage = bgStyle("home");
-  b.style.backgroundImage = bgStyle("home");
+  a.style.backgroundImage = bgUrl("home");
+  b.style.backgroundImage = bgUrl("home");
   a.classList.add("farm-dash-bg-plane--visible");
   _front = 0;
   _inited = true;
@@ -47,7 +53,7 @@ export function setFarmDashboardBackground(key) {
   const next = _planes[nextIdx];
   const cur = _planes[_front];
   const k = FARM_DASHBOARD_BG_KEYS[key] ? key : "home";
-  next.style.backgroundImage = bgStyle(k);
+  next.style.backgroundImage = bgUrl(k);
   next.classList.add("farm-dash-bg-plane--visible");
   cur.classList.remove("farm-dash-bg-plane--visible");
   _front = nextIdx;

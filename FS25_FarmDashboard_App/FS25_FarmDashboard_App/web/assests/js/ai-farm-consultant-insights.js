@@ -362,7 +362,19 @@
     return String(ins.priority);
   }
 
-  /** Fields tab only: one card — which existing per-field AI tip to do first (no extra GET /insights). */
+  function showFieldsSmartLoadingPlaceholder() {
+    var container = document.getElementById('ai-insights-panel');
+    if (!container) return;
+    container.setAttribute('aria-busy', 'true');
+    container.innerHTML =
+      '<p class="small text-muted mb-0">' +
+      '<span class="spinner-border spinner-border-sm text-secondary me-2" role="status" aria-hidden="true"></span>' +
+      'Loading per-field AI tips…</p>';
+  }
+
+  /**
+   * Fields tab: prefer consultant map (same as field cards); if empty or unmappable, use offline rules.
+   */
   function renderFieldsSmartPanelForFieldsTab() {
     var container = document.getElementById('ai-insights-panel');
     var badge = document.getElementById('ai-insights-llm-badge');
@@ -371,80 +383,122 @@
 
     var fields =
       window.dashboard && Array.isArray(window.dashboard.fields) ? window.dashboard.fields : [];
-    var picked =
+    if (
+      fields.length === 0 &&
+      window.dashboard &&
+      Array.isArray(window.dashboard.allFields) &&
+      window.dashboard.allFields.length > 0 &&
+      typeof window.filterFieldsForFarmView === 'function'
+    ) {
+      fields = window.filterFieldsForFarmView(
+        window.dashboard.allFields,
+        window.dashboard.activeFarmId != null ? window.dashboard.activeFarmId : 1
+      );
+    }
+
+    var fromConsultant =
       typeof window.pickDoThisFirstFromFieldInsights === 'function'
         ? window.pickDoThisFirstFromFieldInsights(fields)
         : null;
-    var llmUsed = !!window.__fieldConsultantLlmUsed;
-    var fieldTier =
-      typeof window.__fieldConsultantSuggestionTier === 'string'
-        ? window.__fieldConsultantSuggestionTier
-        : normalizeSuggestionTier(undefined, llmUsed);
+    var fromRules =
+      !fromConsultant && typeof window.pickDoThisFirstFieldRulesOnly === 'function'
+        ? window.pickDoThisFirstFieldRulesOnly(fields)
+        : null;
 
-    if (badge) {
-      if (picked) {
+    if (fromConsultant) {
+      var ins = fromConsultant.ins;
+      var field = fromConsultant.field;
+      var llmUsed = !!window.__fieldConsultantLlmUsed;
+      var fieldTier =
+        typeof window.__fieldConsultantSuggestionTier === 'string'
+          ? window.__fieldConsultantSuggestionTier
+          : normalizeSuggestionTier(undefined, llmUsed);
+      if (badge) {
         applySmartSourceBadge(badge, fieldTier);
-        if (fieldTier === 'byok') {
-          badge.title =
-            'Mid tier (BYOK) — per-field tips from your on-device LLM; same payload as field cards.';
-        } else if (fieldTier === 'hosted') {
-          badge.title =
-            'Premium (hosted AI) — per-field tips from your AI Farm Manager server; same payload as field cards.';
-        } else {
-          badge.title =
-            'Basic (rules) — do-this-first ranked from heuristics when the LLM is not used.';
-        }
-      } else {
-        badge.textContent = 'Fields';
-        badge.className = 'badge ms-1 bg-info text-dark';
         badge.title =
-          'Waiting for per-field AI tips. Open the Fields section or tap AI field tips on that page.';
+          fieldTier === 'byok'
+            ? 'Per-field tips from your on-device LLM (same as field cards).'
+            : fieldTier === 'hosted'
+              ? 'Per-field tips from your hosted AI server (same as field cards).'
+              : 'Heuristic / rules tier when the consultant did not use an LLM.';
       }
-    }
+      var fname = field.name || 'Field ' + (field.farmlandId != null ? field.farmlandId : field.id);
+      var priStr = priorityLabelFromInsight(ins);
+      var priClass = String(priStr).toLowerCase();
+      var msg = String(ins.message || '').trim();
+      var excerpt = msg.length > 220 ? msg.slice(0, 217) + '…' : msg;
+      var reasoning = String(ins.reasoning || '').trim();
+      var reasonHtml =
+        reasoning.length > 0
+          ? '<p class="small text-muted mb-0 mt-2">' + escapeInsightHtml(reasoning) + '</p>'
+          : '';
 
-    if (!picked) {
-      var noFields = fields.length === 0;
-      container.innerHTML = noFields
-        ? '<p class="small text-muted mb-0"><i class="bi bi-hourglass-split me-1"></i> ' +
-          'Waiting for field data… then tap <strong>AI field tips</strong> on the Fields page. ' +
-          'This panel will show which task to do first (from the same tips as each field card).</p>'
-        : '<p class="small text-muted mb-0"><i class="bi bi-info-circle me-1"></i> ' +
-          'No per-field AI tips yet. On <strong>Fields</strong>, tap <strong>AI field tips</strong> — ' +
-          'we&rsquo;ll rank them here as <strong>do this first</strong> (no extra server call).</p>';
+      var divA = document.createElement('div');
+      divA.className = 'insight-card priority-' + (priClass || 'medium');
+      divA.innerHTML =
+        '<div class="insight-meta text-farm-accent">[Field] · ' +
+        escapeInsightHtml(priStr) +
+        ' — do this first</div>' +
+        '<strong class="d-block mt-1"><i class="bi bi-flag-fill text-warning me-1"></i>' +
+        escapeInsightHtml(fname) +
+        ' — ' +
+        escapeInsightHtml(excerpt) +
+        '</strong>' +
+        reasonHtml;
+      container.innerHTML = '';
+      container.appendChild(divA);
       return;
     }
 
-    var field = picked.field;
-    var ins = picked.ins;
-    var fname = field.name || 'Field ' + (field.farmlandId != null ? field.farmlandId : field.id);
-    var priStr = priorityLabelFromInsight(ins);
-    var priClass = String(priStr).toLowerCase();
-    var msg = String(ins.message || '').trim();
-    var excerpt = msg.length > 220 ? msg.slice(0, 217) + '…' : msg;
+    if (fromRules) {
+      if (badge) {
+        applySmartSourceBadge(badge, 'rules');
+        badge.title =
+          'Offline rules — consultant map empty or tips could not be matched to parcels yet (same engine as field cards).';
+      }
+      var fieldR = fromRules.field;
+      var fnameR = fieldR.name || 'Field ' + (fieldR.farmlandId != null ? fieldR.farmlandId : fieldR.id);
+      var scoreR =
+        typeof window.fieldRulesUrgencyScore === 'function' ? window.fieldRulesUrgencyScore(fieldR) : 0;
+      var priStrR = scoreR >= 80 ? 'High' : scoreR >= 40 ? 'Medium' : 'Low';
+      var priClassR = priStrR.toLowerCase();
+      var msgR = String(fromRules.action || '').trim();
+      var reasonR = String(fromRules.reason || '').trim();
+      var excerptR = msgR.length > 220 ? msgR.slice(0, 217) + '…' : msgR;
+      var reasonHtmlR =
+        reasonR.length > 0
+          ? '<p class="small text-muted mb-0 mt-2">' + escapeInsightHtml(reasonR) + '</p>'
+          : '';
 
-    var div = document.createElement('div');
-    div.className = 'insight-card priority-' + (priClass || 'medium');
-    div.innerHTML =
-      '<div class="insight-meta text-farm-accent">[Field] · ' +
-      escapeInsightHtml(priStr) +
-      ' — do this first</div>' +
-      '<strong class="d-block mt-1"><i class="bi bi-flag-fill text-warning me-1"></i>' +
-      escapeInsightHtml(fname) +
-      ' — ' +
-      escapeInsightHtml(excerpt) +
-      '</strong>';
-    container.innerHTML = '';
-    container.appendChild(div);
-  }
+      var divR = document.createElement('div');
+      divR.className = 'insight-card priority-' + (priClassR || 'medium');
+      divR.innerHTML =
+        '<div class="insight-meta text-farm-accent">[Field] · ' +
+        escapeInsightHtml(priStrR) +
+        ' — do this first (rules fallback)</div>' +
+        '<strong class="d-block mt-1"><i class="bi bi-flag-fill text-warning me-1"></i>' +
+        escapeInsightHtml(fnameR) +
+        ' — ' +
+        escapeInsightHtml(excerptR) +
+        '</strong>' +
+        reasonHtmlR;
+      container.innerHTML = '';
+      container.appendChild(divR);
+      return;
+    }
 
-  function showFieldsSmartLoadingPlaceholder() {
-    var container = document.getElementById('ai-insights-panel');
-    if (!container) return;
-    container.setAttribute('aria-busy', 'true');
-    container.innerHTML =
-      '<p class="small text-muted mb-0">' +
-      '<span class="spinner-border spinner-border-sm text-secondary me-2" role="status" aria-hidden="true"></span>' +
-      'Loading per-field AI tips… then we&rsquo;ll show what to do first.</p>';
+    if (badge) {
+      badge.textContent = 'Fields';
+      badge.className = 'badge ms-1 bg-info text-dark';
+      badge.title = 'Waiting for field data or consultant tips — use Refresh or AI field tips on the Fields page.';
+    }
+    var noFields = fields.length === 0;
+    container.innerHTML = noFields
+      ? '<p class="small text-muted mb-0"><i class="bi bi-hourglass-split me-1"></i> ' +
+        'Waiting for field data from the game or API.</p>'
+      : '<p class="small text-muted mb-0"><i class="bi bi-info-circle me-1"></i> ' +
+        'No ranked field tip yet. Open <strong>Fields</strong> and tap <strong>AI field tips</strong>, or use <strong>Refresh</strong> above — ' +
+        'we need a consultant response or a clear rules match.</p>';
   }
 
   function applySmartSourceBadge(badge, tier) {
@@ -564,9 +618,43 @@
     if (!container) return;
 
     /**
-     * Fields tab: no second GET /insights — show one “do this first” card from per-field map (__fieldConsultantByRef).
+     * Fields tab: field-map fetch (``view=fields&context=fields``) + Smart panel from map, with rules fallback.
+     * On forced refresh, avoid painting an empty panel before ``__fieldConsultantByRef`` updates.
      */
     if (getSmartPanelViewParam() === 'fields') {
+      if (forceRefresh) {
+        try {
+          showFieldsSmartLoadingPlaceholder();
+          if (window.dashboard && typeof window.dashboard.refreshFieldConsultantAI === 'function') {
+            window.dashboard.refreshFieldConsultantAI();
+          } else {
+            import('./field-consultant-bridge.js')
+              .then(function (m) {
+                if (m.refreshFieldConsultantCache) {
+                  return m.refreshFieldConsultantCache({ force: true });
+                }
+                return null;
+              })
+              .catch(function () {});
+          }
+        } catch (eFld) {}
+        var mapKeys =
+          window.__fieldConsultantByRef && typeof window.__fieldConsultantByRef === 'object'
+            ? Object.keys(window.__fieldConsultantByRef)
+            : [];
+        if (mapKeys.length > 0) {
+          var doStale = function () {
+            renderFieldsSmartPanelForFieldsTab();
+          };
+          if (typeof dashFlushDomWork === 'function') {
+            dashFlushDomWork(doStale);
+          } else {
+            doStale();
+          }
+        }
+        pl('renderer_ok', 'smart suggestions Fields tab: consultant refresh kicked', {});
+        return;
+      }
       var doRenderFields = function () {
         renderFieldsSmartPanelForFieldsTab();
       };
@@ -575,8 +663,12 @@
       } else {
         doRenderFields();
       }
-      pl('renderer_ok', 'smart suggestions Fields tab: do-this-first from per-field map', {});
+      pl('renderer_ok', 'smart suggestions Fields tab: do-this-first', {});
       return;
+    }
+
+    if (forceRefresh) {
+      insightsFetchInFlight = false;
     }
 
     if (!forceRefresh && !opts.background) {

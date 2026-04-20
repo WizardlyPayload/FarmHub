@@ -6,6 +6,11 @@
 import { getFieldStableId } from "./rules-engine.js";
 import { getFarmdashAiConsultantInsightsProxyUrl } from "./modules/viewer-mode.js";
 
+/**
+ * When false, no field-map HTTP calls run; Fields UI falls back to `rules-engine` only.
+ */
+export const FARMDASH_FIELD_CONSULTANT_NETWORK_ENABLED = true;
+
 const MIN_INTERVAL_MS = 8 * 60 * 1000; // 8 minutes — avoid hammering VPS (same farm + same state only)
 
 /**
@@ -25,6 +30,8 @@ export function deriveSuggestionTier(data) {
 const fieldConsultantFarmCache = new Map();
 
 let inFlight = false;
+/** When user forces refresh while a fetch is running, run one more forced pass after the current one finishes. */
+let pendingFieldConsultantForce = false;
 let debounceId = null;
 /** Last successful *network* fetch for throttle (same cache key + same state hash) */
 let lastNetworkFetchAt = 0;
@@ -94,12 +101,29 @@ function insightCategoryIsField(cat) {
 }
 
 /**
- * Index into per-field map: need field_ref + message; category Field preferred but some LLMs omit or
- * mislabel (Ollama) — accept null/empty category when field_ref is set.
+ * Resolve parcel id for indexing (``field_ref``, camelCase ``fieldRef``, or text in **message**).
+ */
+function pickInsightFieldRefForIndexing(ins) {
+  if (!ins || typeof ins !== "object") return "";
+  const direct = ins.field_ref != null ? ins.field_ref : ins.fieldRef;
+  let out = normalizeFieldRefKey(direct);
+  if (out) return out;
+  const msg = String(ins.message || "");
+  const m =
+    msg.match(/\bfarmlandId\s*[:\s]*(\d{1,7})\b/i) ||
+    msg.match(/\b(?:parcel|field)\s*#?\s*(\d{1,7})\b/i) ||
+    msg.match(/\bf(?:ield)?\s*#?\s*(\d{1,7})\b/i);
+  return m ? normalizeFieldRefKey(m[1]) : "";
+}
+
+/**
+ * Index into per-field map: need a resolvable parcel id + message.
+ * Hosted/BYOK models often use **Production** / **Animal** / **Finance** for parcel-tied tips — still index them.
  */
 function insightRowUsableForFieldMap(ins) {
   if (!ins || typeof ins !== "object") return false;
-  if (normalizeFieldRefKey(ins.field_ref) === "") return false;
+  const refNorm = pickInsightFieldRefForIndexing(ins);
+  if (refNorm === "") return false;
   if (typeof ins.message !== "string" || !String(ins.message).trim()) return false;
   if (insightCategoryIsField(ins.category)) return true;
   const raw =
@@ -107,7 +131,8 @@ function insightRowUsableForFieldMap(ins) {
       ? ins.category.value
       : ins.category;
   if (raw == null || String(raw).trim() === "") return true;
-  return false;
+  const t = String(raw).trim().toLowerCase();
+  return t === "production" || t === "animal" || t === "finance";
 }
 
 /** Legacy LLM prompts asked for "Ben:/" prefixes; strip for display (matches server localConsultantLlm.js). */
@@ -123,11 +148,12 @@ export function indexFieldConsultantInsights(insights) {
   if (!Array.isArray(insights)) return map;
   for (const ins of insights) {
     if (!ins || !insightRowUsableForFieldMap(ins)) continue;
+    const refNorm = pickInsightFieldRefForIndexing(ins);
     const cleaned =
       typeof ins.message === "string"
         ? { ...ins, message: stripMentorPrefixMessage(ins.message) }
         : ins;
-    addInsightKeys(map, ins.field_ref, cleaned);
+    addInsightKeys(map, refNorm, cleaned);
   }
   return map;
 }
@@ -331,19 +357,7 @@ function _fieldUrgencyTieBreak(field) {
  * Pick the single highest-priority field insight for the Smart suggestions panel (no extra LLM call).
  * Uses the same per-field map as the field cards (`__fieldConsultantByRef`).
  */
-export function pickDoThisFirstFromFieldInsights(fields) {
-  const map =
-    typeof window !== "undefined" && window.__fieldConsultantByRef
-      ? window.__fieldConsultantByRef
-      : null;
-  if (!map || !Array.isArray(fields) || fields.length === 0) return null;
-  const candidates = [];
-  for (const field of fields) {
-    const ins = lookupFieldConsultantInsight(map, field);
-    if (!ins || !String(ins.message ?? "").trim()) continue;
-    candidates.push({ field, ins });
-  }
-  if (candidates.length === 0) return null;
+function _sortFieldInsightCandidates(candidates) {
   candidates.sort((a, b) => {
     const pa = _parseInsightPriorityNum(a.ins.priority);
     const pb = _parseInsightPriorityNum(b.ins.priority);
@@ -358,6 +372,50 @@ export function pickDoThisFirstFromFieldInsights(fields) {
   return candidates[0];
 }
 
+export function pickDoThisFirstFromFieldInsights(fields) {
+  const map =
+    typeof window !== "undefined" && window.__fieldConsultantByRef
+      ? window.__fieldConsultantByRef
+      : null;
+  if (!map) return null;
+
+  const fieldList = Array.isArray(fields) ? fields : [];
+  const candidates = [];
+  for (const field of fieldList) {
+    const ins = lookupFieldConsultantInsight(map, field);
+    if (!ins || !String(ins.message ?? "").trim()) continue;
+    candidates.push({ field, ins });
+  }
+  if (candidates.length > 0) {
+    return _sortFieldInsightCandidates(candidates);
+  }
+
+  /**
+   * No row matched the map (empty `dashboard.fields`, slow /api/fields, or LLM field_ref ids don’t match game ids).
+   * Still surface the strongest map entry so Smart suggestions and “do this first” aren’t blank.
+   */
+  const seen = new Set();
+  const fromMapOnly = [];
+  for (const k of Object.keys(map)) {
+    const ins = map[k];
+    if (!ins || !String(ins.message ?? "").trim()) continue;
+    const ref = normalizeFieldRefKey(ins.field_ref) || normalizeFieldRefKey(k);
+    if (!ref) continue;
+    const dedupe = ref + "\0" + String(ins.message).slice(0, 120);
+    if (seen.has(dedupe)) continue;
+    seen.add(dedupe);
+    const n = Number(ref);
+    const synthetic = {
+      name: Number.isFinite(n) && String(n) === ref ? `Field ${n}` : `Field ${ref}`,
+      farmlandId: Number.isFinite(n) ? n : ref,
+      id: Number.isFinite(n) ? n : ref,
+    };
+    fromMapOnly.push({ field: synthetic, ins });
+  }
+  if (fromMapOnly.length === 0) return null;
+  return _sortFieldInsightCandidates(fromMapOnly);
+}
+
 function notifyConsultantFailure(status, bodyText, opts) {
   if (typeof window.farmdashNotifyConsultantHttpError === "function") {
     window.farmdashNotifyConsultantHttpError(status, bodyText, opts || {});
@@ -365,6 +423,10 @@ function notifyConsultantFailure(status, bodyText, opts) {
 }
 
 export async function refreshFieldConsultantCache({ force = false } = {}) {
+  if (!FARMDASH_FIELD_CONSULTANT_NETWORK_ENABLED) {
+    return { skipped: true, reason: "rules_only" };
+  }
+
   const now = Date.now();
 
   const cacheKey = getConsultantFarmCacheKey();
@@ -380,7 +442,8 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
   }
 
   if (inFlight) {
-    dashDebug("field-consultant-bridge", "skip", { reason: "in_flight" });
+    if (force) pendingFieldConsultantForce = true;
+    dashDebug("field-consultant-bridge", "skip", { reason: "in_flight", queuedForce: !!force });
     return { skipped: true, reason: "in_flight" };
   }
 
@@ -414,6 +477,8 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
   emitFieldConsultantLoading(true);
   const hashWhenQueued = stateHash;
   const requestCacheKey = cacheKey;
+  /** When true, ``emitFieldConsultantLoading(false)`` runs after DOM apply (avoids painting “empty” before ``__fieldConsultantByRef`` updates). */
+  let deferLoadingSpinnerEnd = false;
   try {
     const base = getFarmdashAiConsultantInsightsProxyUrl();
     if (!base) {
@@ -547,10 +612,20 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
       window.__fieldConsultantAppliedHash = cacheStateHash;
       window.dispatchEvent(new CustomEvent("field-consultant-updated"));
     }
+
+    deferLoadingSpinnerEnd = true;
+    function finishFieldConsultantDomAndLoading() {
+      try {
+        applyFieldConsultantDom();
+      } catch (eApply) {
+        dashDebug("field-consultant-bridge", "error", { applyDom: String(eApply?.message || eApply) });
+      }
+      emitFieldConsultantLoading(false);
+    }
     if (typeof globalThis.dashFlushDomWork === "function") {
-      globalThis.dashFlushDomWork(applyFieldConsultantDom);
+      globalThis.dashFlushDomWork(finishFieldConsultantDomAndLoading);
     } else {
-      applyFieldConsultantDom();
+      finishFieldConsultantDomAndLoading();
     }
 
     fieldConsultantFarmCache.set(requestCacheKey, {
@@ -579,7 +654,18 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
     return { ok: false, error: String(e.message || e) };
   } finally {
     inFlight = false;
-    emitFieldConsultantLoading(false);
+    if (!deferLoadingSpinnerEnd) {
+      emitFieldConsultantLoading(false);
+    }
+    if (pendingFieldConsultantForce) {
+      pendingFieldConsultantForce = false;
+      const run = () => refreshFieldConsultantCache({ force: true }).catch(() => {});
+      if (typeof globalThis.dashScheduleIdle === "function") {
+        globalThis.dashScheduleIdle(run, 0);
+      } else {
+        setTimeout(run, 0);
+      }
+    }
   }
 }
 
@@ -587,6 +673,7 @@ export async function refreshFieldConsultantCache({ force = false } = {}) {
  * Debounced field-map consultant fetch. `{ force: true }` clears this farm’s memory entry and bypasses throttle.
  */
 export function scheduleFieldConsultantFetch(options) {
+  if (!FARMDASH_FIELD_CONSULTANT_NETWORK_ENABLED) return;
   const force = options && options.force;
   if (debounceId) clearTimeout(debounceId);
   debounceId = setTimeout(() => {
@@ -604,6 +691,9 @@ export function scheduleFieldConsultantFetch(options) {
  * Strict per-field LLM (server sends only one parcel JSON). Prefer throttling if calling many times.
  */
 export async function fetchConsultantInsightSingleField(fieldRef) {
+  if (!FARMDASH_FIELD_CONSULTANT_NETWORK_ENABLED) {
+    return { ok: false, reason: "rules_only" };
+  }
   const ref = fieldRef != null ? String(fieldRef).trim() : "";
   if (!ref) return { ok: false, error: "missing_field_ref" };
   const base = getFarmdashAiConsultantInsightsProxyUrl();
@@ -659,15 +749,18 @@ if (typeof window !== "undefined") {
   window.farmdashDeriveSuggestionTier = deriveSuggestionTier;
 }
 
-/* Prefetch field AI map after load (does not wait for Fields tab). Throttle still applies after first success. */
+/* Prefetch field map after load (Fields tab + cards share ``__fieldConsultantByRef``). */
 if (typeof window !== "undefined") {
   window.addEventListener("load", function () {
-    var idle = typeof globalThis.dashScheduleIdle === "function" ? globalThis.dashScheduleIdle : function (fn, t) {
-      setTimeout(fn, t || 0);
-    };
+    var idle =
+      typeof globalThis.dashScheduleIdle === "function"
+        ? globalThis.dashScheduleIdle
+        : function (fn, t) {
+            setTimeout(fn, t || 0);
+          };
     idle(function () {
       try {
-        scheduleFieldConsultantFetch();
+        if (FARMDASH_FIELD_CONSULTANT_NETWORK_ENABLED) scheduleFieldConsultantFetch();
       } catch (e) {
         /* ignore */
       }

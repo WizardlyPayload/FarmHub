@@ -9,9 +9,9 @@ import {
     classifyWindrowMaterial,
 } from "../rules-engine.js";
 import {
-  refreshFieldConsultantCache,
-  scheduleFieldConsultantFetch,
-  lookupFieldConsultantInsight,
+    refreshFieldConsultantCache,
+    scheduleFieldConsultantFetch,
+    lookupFieldConsultantInsight,
 } from "../field-consultant-bridge.js";
 
 /**
@@ -30,9 +30,24 @@ let fieldsIsLoading      = false;
 /** Persists across API refreshes until user leaves the fields section (then reset to all). */
 let fieldsFilterType     = "all";
 let fieldsSearchTerm     = "";
-let fieldConsultantListenerRegistered = false;
 /** Skip re-render when /api/fields body and client scope (farm/server) unchanged */
 let lastFieldsPayloadKey = null;
+let fieldConsultantListenerRegistered = false;
+
+function ensureFieldConsultantListener() {
+    if (fieldConsultantListenerRegistered || typeof window === "undefined") return;
+    fieldConsultantListenerRegistered = true;
+    window.addEventListener("field-consultant-updated", () => {
+        if (document.getElementById("fields-list")) {
+            renderFields(fieldsFilterType, fieldsSearchTerm);
+        }
+    });
+    window.addEventListener("field-consultant-loading", (ev) => {
+        const on = ev.detail && ev.detail.loading;
+        const row = document.getElementById("field-ai-thinking-row");
+        if (row) row.classList.toggle("d-none", !on);
+    });
+}
 
 /** Mirrors getAPIBaseURL in apiStorage — cannot import apiStorage here (it imports this module). */
 function resolveFarmdashApiBase() {
@@ -40,21 +55,6 @@ function resolveFarmdashApiBase() {
     return window.location.origin;
   }
   return "http://127.0.0.1:8766";
-}
-
-function ensureFieldConsultantListener() {
-  if (fieldConsultantListenerRegistered || typeof window === "undefined") return;
-  fieldConsultantListenerRegistered = true;
-  window.addEventListener("field-consultant-updated", () => {
-    if (document.getElementById("fields-list")) {
-      renderFields(fieldsFilterType, fieldsSearchTerm);
-    }
-  });
-  window.addEventListener("field-consultant-loading", (ev) => {
-    const on = ev.detail && ev.detail.loading;
-    const row = document.getElementById("field-ai-thinking-row");
-    if (row) row.classList.toggle("d-none", !on);
-  });
 }
 
 /** Single field bar: purple when mulched (map-style), matches progress bar */
@@ -104,11 +104,11 @@ export function showFieldsSection() {
     lastFieldsPayloadKey = null;
     ensureFieldConsultantListener();
     try {
-      const m = typeof window !== "undefined" ? window.__fieldConsultantByRef : null;
-      const empty = !m || typeof m !== "object" || Object.keys(m).length === 0;
-      if (empty) scheduleFieldConsultantFetch({ force: true });
+        const m = typeof window !== "undefined" ? window.__fieldConsultantByRef : null;
+        const empty = !m || typeof m !== "object" || Object.keys(m).length === 0;
+        if (empty) scheduleFieldConsultantFetch({ force: true });
     } catch (e) {
-      /* ignore */
+        /* ignore */
     }
 
     document.getElementById("section-content-dynamic").innerHTML = buildFieldsHTML();
@@ -769,8 +769,7 @@ function getWinterFieldSeasonalNote(field) {
 }
 
 /**
- * VPS LLM lines can be cached while field cards already updated (or vice versa). Drop AI text that
- * clearly contradicts harvest/growth badges (e.g. "get the combine" on a harvested bar).
+ * Cached LLM lines can disagree with live badges (e.g. harvest copy on a harvested bar). Prefer rules then.
  */
 function aiFieldInsightContradictsCard(field, ai) {
     if (!ai || !field) return false;
@@ -803,7 +802,7 @@ function formatFieldHectares(field) {
     return '<span class="text-muted" title="Area is supplied when Farming Simulator is running and the dashboard mod can read field geometry. If the game is closed, area may be unavailable.">—</span>';
 }
 
-// ── Suggested Next Step: Layer 1 rules (local) + optional Layer 2 AI (VPS, field_ref) ──
+// ── Suggested next step: Layer 1 rules + game suggestions[]; optional Layer 2 consultant map ──
 function pickApiFallbackSuggestion(field) {
     if (!field.suggestions || field.suggestions.length === 0) return null;
     let sorted = [...field.suggestions].sort((a, b) => (a.priority || 9) - (b.priority || 9));
@@ -850,7 +849,7 @@ function buildSuggestion(field) {
 
     const layerBadge =
         layer === "ai"
-            ? `<span class="badge bg-info text-dark ms-1 field-suggestion-layer-ai" title="AI Consultant (VPS + your API key)"><i class="bi bi-stars me-1"></i>AI</span>`
+            ? `<span class="badge bg-info text-dark ms-1 field-suggestion-layer-ai" title="AI field map (hosted or BYOK)"><i class="bi bi-stars me-1"></i>AI</span>`
             : `<span class="badge bg-secondary ms-1 field-suggestion-layer-rules" title="Local rules / game data"><i class="bi bi-diagram-3 me-1"></i>Rules</span>`;
 
     const borderClass = layer === "ai" ? "border-info" : "border-warning";
@@ -898,7 +897,7 @@ export function searchFields(term) {
     renderFields(fieldsFilterType, fieldsSearchTerm);
 }
 
-/** Manual refresh of VPS field consultant map (force=true clears farm memory cache; else rate-limit per farm when state unchanged). */
+/** Refresh per-field consultant map (``force`` clears farm cache) and re-paint cards when the event fires. */
 export function refreshFieldConsultantAI() {
     return refreshFieldConsultantCache({ force: true }).catch((e) => {
         console.warn("[fields] AI consultant refresh", e);
@@ -974,7 +973,7 @@ function buildFieldsHTML() {
 
         <div class="row mb-3">
             <div class="col-md-6 d-flex gap-2 flex-wrap align-items-center">
-                <button type="button" class="btn btn-outline-success btn-sm" onclick="dashboard.refreshFieldConsultantAI()" title="Refresh AI field tips (per-farm memory when unchanged; max once per 8 min per farm+state unless forced)">
+                <button type="button" class="btn btn-outline-success btn-sm" onclick="dashboard.refreshFieldConsultantAI()" title="Re-fetch AI field map (hosted/BYOK); falls back to rules if unavailable">
                     <i class="bi bi-stars me-1"></i>AI field tips
                 </button>
                 <button class="btn btn-outline-primary active"

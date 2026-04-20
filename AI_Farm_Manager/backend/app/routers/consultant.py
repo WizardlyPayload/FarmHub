@@ -220,7 +220,12 @@ async def compute_consultant_insights(
         server_id, farm_id, connection_bucket_id=connection_bucket_id
     )
     farm_resolved = resolve_consultant_farm_id(snapshot, farm_id)
-    snapshot = prune_snapshot_to_active_farm(snapshot, farm_resolved)
+    ctx_for_prune = (context or "full").strip().lower()
+    vw_for_prune = (view or "").strip().lower() or None
+    field_map_relax = ctx_for_prune == "fields" and vw_for_prune == "fields"
+    snapshot = prune_snapshot_to_active_farm(
+        snapshot, farm_resolved, field_map_relax_empty_fields=field_map_relax
+    )
     logger.info(
         "consultant: snapshot bytes_utf8≈%s server_id_query=%r farm_id_resolved=%s context=%s fieldRef=%s",
         approx_json_bytes(snapshot),

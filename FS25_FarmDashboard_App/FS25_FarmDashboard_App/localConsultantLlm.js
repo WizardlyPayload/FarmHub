@@ -7,7 +7,14 @@
  * from the Gemini API docs.
  */
 
-const { slimFieldForConsultantLlm } = require('./consultantSnapshotPrune');
+const {
+    slimFieldForConsultantLlm,
+    slimVehicleForConsultantLlm,
+    slimAnimalForConsultantLlm,
+    slimPastureForConsultantLlm,
+    slimProductionForConsultantLlm,
+    applyLocalConsultantPayloadDiet,
+} = require('./consultantSnapshotPrune');
 
 const OPENAI_MODEL = process.env.FARMDASH_BYOK_OPENAI_MODEL || 'gpt-4o-mini';
 /** Default; override if Google renames — do not use deprecated 1.5 Flash. */
@@ -28,7 +35,7 @@ const MAX_SNAPSHOT_CHARS_GEMINI = 65000;
  * Defaults assume num_ctx=4096; raise FARMDASH_* caps only after increasing OLLAMA_CONTEXT_LENGTH on the server.
  */
 const MAX_SNAPSHOT_CHARS_OPENAI_COMPAT =
-    Number(process.env.FARMDASH_BYOK_OPENAI_COMPAT_MAX_CHARS) || 5200;
+    Number(process.env.FARMDASH_BYOK_OPENAI_COMPAT_MAX_CHARS) || 7200;
 /** Parallel Ollama shard calls — default 1 so a single-GPU box does not pile up long generations. */
 const OLLAMA_SHARD_CONCURRENCY = Math.min(
     4,
@@ -36,12 +43,33 @@ const OLLAMA_SHARD_CONCURRENCY = Math.min(
 );
 /** Serialized JSON length per shard request (chars). Keep low so prompt tokens stay under num_ctx. */
 const OLLAMA_SHARD_MAX_JSON_CHARS =
-    Number(process.env.FARMDASH_OLLAMA_SHARD_MAX_JSON_CHARS) || 4500;
+    Number(process.env.FARMDASH_OLLAMA_SHARD_MAX_JSON_CHARS) || 7200;
 /** Field-map mode: fields per Ollama shard (each insight = one field). Smaller = fewer prompt tokens. */
-const OLLAMA_FIELD_MAP_BATCH = Math.max(1, Number(process.env.FARMDASH_OLLAMA_FIELD_MAP_BATCH) || 4);
+const OLLAMA_FIELD_MAP_BATCH = Math.max(1, Number(process.env.FARMDASH_OLLAMA_FIELD_MAP_BATCH) || 3);
 /** Non-map fields view: fields per shard. */
-const OLLAMA_FIELDS_VIEW_BATCH = Math.max(1, Number(process.env.FARMDASH_OLLAMA_FIELDS_VIEW_BATCH) || 4);
+const OLLAMA_FIELDS_VIEW_BATCH = Math.max(1, Number(process.env.FARMDASH_OLLAMA_FIELDS_VIEW_BATCH) || 3);
 const MAX_FIELD_MAP_ROWS = 80;
+
+/** OpenAI-compat + Gemini BYOK fetch timeout (ms). Override e.g. slow local models. */
+const LOCAL_BYOK_FETCH_TIMEOUT_MS = Math.max(
+    1000,
+    Number(process.env.FARMDASH_LOCAL_BYOK_FETCH_TIMEOUT_MS) || 300000
+);
+
+function byokError(message, code) {
+    const e = new Error(message);
+    e.farmdash_ai_error = code;
+    return e;
+}
+
+function isAbortError(err) {
+    return (
+        !!err &&
+        (err.name === 'AbortError' ||
+            err.code === 20 ||
+            (typeof DOMException !== 'undefined' && err instanceof DOMException && err.name === 'AbortError'))
+    );
+}
 
 const BASE_JSON_RULES = `You MUST respond with ONLY valid JSON (no markdown fences) in this exact shape:
 {"insights":[{"category":"Field|Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null}]}
@@ -58,6 +86,7 @@ Rules:
 - Grass/meadow forage: never assign a grain combine; use mower/baler/forage harvester language.
 - Late growth + weeds: herbicide/sprayer not mechanical weeder.
 - Use vehicles from JSON only for this farm (ownerFarmId matches activeFarmId); do not tell players to buy a machine when a suitable one is listed.
+- **Never** output tips about JSON, APIs, or data quality: do **not** say that **farmlandId**, **id**, **field_ref**, or **activeFarmId** are "missing" or "not set", and do not complain that farm data is unavailable — players cannot fix those. If a section of the snapshot is thin, give **general, cautious FS25 advice** (e.g. check contracts, review growth stages) instead.
 - Keep message and reasoning brief.`;
 
 function viewInstruction(view, context) {
@@ -99,15 +128,33 @@ function stripLeadingMentorPrefix(text) {
     return stripped || t;
 }
 
+/** LLMs sometimes echo schema/debug lines instead of gameplay tips — drop them. */
+function isSchemaMetaInsight(text) {
+    if (typeof text !== 'string' || text.length < 10) return false;
+    const t = text.toLowerCase();
+    if (/farmlandid\s+and\s+id\s+are\s+not\s+set/i.test(t)) return true;
+    if (/not\s+set\s+for\s+all\s+fields/.test(t)) return true;
+    if (/missing\s+field_ref/.test(t)) return true;
+    if (/no\s+corresponding\s+farm\s+data/.test(t)) return true;
+    if (t.includes('activefarmid') && (t.includes('field_ref') || t.includes('no corresponding'))) return true;
+    return false;
+}
+
 function sanitizeConsultantInsights(insights) {
     if (!Array.isArray(insights)) return [];
-    return insights.map((ins) => {
-        if (!ins || typeof ins !== 'object') return ins;
-        const next = { ...ins };
-        if (typeof next.message === 'string') next.message = stripLeadingMentorPrefix(next.message);
-        if (typeof next.reasoning === 'string') next.reasoning = stripLeadingMentorPrefix(next.reasoning);
-        return next;
-    });
+    return insights
+        .filter((ins) => {
+            if (!ins || typeof ins !== 'object') return false;
+            const m = typeof ins.message === 'string' ? ins.message : '';
+            const r = typeof ins.reasoning === 'string' ? ins.reasoning : '';
+            return !isSchemaMetaInsight(m) && !isSchemaMetaInsight(r);
+        })
+        .map((ins) => {
+            const next = { ...ins };
+            if (typeof next.message === 'string') next.message = stripLeadingMentorPrefix(next.message);
+            if (typeof next.reasoning === 'string') next.reasoning = stripLeadingMentorPrefix(next.reasoning);
+            return next;
+        });
 }
 
 function isFieldMapView(view, context) {
@@ -129,11 +176,56 @@ function slimFieldsList(fields) {
     return out;
 }
 
+function slimVehiclesList(vehicles) {
+    if (!Array.isArray(vehicles)) return [];
+    const out = [];
+    for (const row of vehicles) {
+        const s = slimVehicleForConsultantLlm(row);
+        if (s) out.push(s);
+    }
+    return out;
+}
+
+function slimAnimalsList(animals) {
+    if (!Array.isArray(animals)) return [];
+    const out = [];
+    for (const row of animals) {
+        const s = slimAnimalForConsultantLlm(row);
+        if (s) out.push(s);
+    }
+    return out;
+}
+
+function slimPasturesList(pastures) {
+    if (!Array.isArray(pastures)) return [];
+    const out = [];
+    for (const row of pastures) {
+        const s = slimPastureForConsultantLlm(row);
+        if (s) out.push(s);
+    }
+    return out;
+}
+
 function slimSnapshotForOllama(snapshot) {
     if (!snapshot || typeof snapshot !== 'object') return snapshot;
     const o = JSON.parse(JSON.stringify(snapshot));
     if (Array.isArray(o.fields)) {
         o.fields = slimFieldsList(o.fields);
+    }
+    if (Array.isArray(o.vehicles)) {
+        o.vehicles = slimVehiclesList(o.vehicles);
+    }
+    if (Array.isArray(o.animals)) {
+        o.animals = slimAnimalsList(o.animals);
+    }
+    if (Array.isArray(o.pastures)) {
+        o.pastures = slimPasturesList(o.pastures);
+    }
+    if (o.production && typeof o.production === 'object') {
+        o.production = slimProductionForConsultantLlm(o.production, 8);
+    }
+    if (Array.isArray(o.productionPoints)) {
+        o.productionPoints = o.productionPoints.slice(0, 12);
     }
     return o;
 }
@@ -148,6 +240,9 @@ function prepareSnapshotPayload(payload, view, context) {
     const o = JSON.parse(JSON.stringify(payload));
     const ctx = String(context || '').toLowerCase();
     const v = String(view || '').toLowerCase();
+    if (o._single_field_mode) {
+        return o;
+    }
     if (ctx === 'fields' && v === 'fields' && Array.isArray(o.fields) && o.fields.length > MAX_FIELD_MAP_ROWS) {
         o.fields = o.fields.slice(0, MAX_FIELD_MAP_ROWS);
         o._consultant_truncated_fields = true;
@@ -235,7 +330,11 @@ function openAiCompatSnapshotCharCap(openaiBaseUrl) {
     return Math.min(MAX_SNAPSHOT_CHARS_OPENAI, MAX_SNAPSHOT_CHARS_OPENAI_COMPAT);
 }
 
-async function callOpenAiChat(system, userText, apiKey, modelId, openaiBaseUrl, maxTokensOpt, temperatureOpt) {
+/**
+ * @param {{ preferJsonObjectFormat?: boolean }} [options]
+ */
+async function callOpenAiChat(system, userText, apiKey, modelId, openaiBaseUrl, maxTokensOpt, temperatureOpt, options) {
+    const preferJsonObjectFormat = !options || options.preferJsonObjectFormat !== false;
     const model = (modelId && String(modelId).trim()) || OPENAI_MODEL;
     const base = normalizeOpenAiCompatBase(openaiBaseUrl);
     const url = base ? `${base}/chat/completions` : 'https://api.openai.com/v1/chat/completions';
@@ -271,31 +370,84 @@ async function callOpenAiChat(system, userText, apiKey, modelId, openaiBaseUrl, 
         },
     };
     if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
-        fetchInitBase.signal = AbortSignal.timeout(900000);
+        fetchInitBase.signal = AbortSignal.timeout(LOCAL_BYOK_FETCH_TIMEOUT_MS);
     }
-    let r = await fetch(url, {
-        ...fetchInitBase,
-        body: JSON.stringify(payloadWithFormat),
-    });
-    let txt = await r.text();
-    if (!r.ok && base && (r.status === 400 || r.status === 422)) {
-        const retry = await fetch(url, {
-            ...fetchInitBase,
-            body: JSON.stringify(payloadPlain),
-        });
-        txt = await retry.text();
-        r = retry;
+
+    const post = async (payload) => {
+        try {
+            const r = await fetch(url, {
+                ...fetchInitBase,
+                body: JSON.stringify(payload),
+            });
+            const txt = await r.text();
+            return { r, txt };
+        } catch (err) {
+            if (isAbortError(err)) {
+                throw byokError('OpenAI-compatible: request timed out', 'timeout');
+            }
+            if (err && err.farmdash_ai_error) throw err;
+            throw byokError(`OpenAI-compatible: ${err && err.message ? err.message : err}`, 'network_error');
+        }
+    };
+
+    let payloadFirst = preferJsonObjectFormat ? payloadWithFormat : payloadPlain;
+    let { r, txt } = await post(payloadFirst);
+    if (!r.ok && preferJsonObjectFormat && base && (r.status === 400 || r.status === 422)) {
+        const second = await post(payloadPlain);
+        r = second.r;
+        txt = second.txt;
     }
     if (!r.ok) {
-        throw new Error(`OpenAI HTTP ${r.status}: ${txt.slice(0, 400)}`);
+        throw byokError(`OpenAI HTTP ${r.status}: ${txt.slice(0, 400)}`, `http_${r.status}`);
     }
-    const data = JSON.parse(txt);
+    let data;
+    try {
+        data = JSON.parse(txt);
+    } catch (pe) {
+        throw byokError(`OpenAI: invalid JSON in response body: ${pe && pe.message ? pe.message : pe}`, 'protocol_error');
+    }
     const out = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
-    if (!out) throw new Error('OpenAI: empty response');
+    if (!out) throw byokError('OpenAI: empty response', 'empty_response');
     return String(out);
 }
 
-async function callGeminiGenerate(system, userText, apiKey, modelId, temperatureOpt) {
+/**
+ * JSON mode first; on parse failure, one completion without `response_format` (mirrors Python retry).
+ */
+async function completeOpenAiConsultantJson(
+    system,
+    userText,
+    apiKey,
+    modelId,
+    openaiBaseUrl,
+    maxTokensOpt,
+    temperatureOpt
+) {
+    let raw = await callOpenAiChat(system, userText, apiKey, modelId, openaiBaseUrl, maxTokensOpt, temperatureOpt, {
+        preferJsonObjectFormat: true,
+    });
+    try {
+        return extractJsonObject(raw);
+    } catch {
+        raw = await callOpenAiChat(system, userText, apiKey, modelId, openaiBaseUrl, maxTokensOpt, temperatureOpt, {
+            preferJsonObjectFormat: false,
+        });
+        try {
+            return extractJsonObject(raw);
+        } catch (e2) {
+            throw byokError(
+                `Model did not return valid JSON after retry: ${e2 && e2.message ? e2.message : e2}`,
+                'parse_failed'
+            );
+        }
+    }
+}
+
+/**
+ * @param {{ preferJsonMime?: boolean }} [options]
+ */
+async function callGeminiGenerate(system, userText, apiKey, modelId, temperatureOpt, options) {
+    const preferJsonMime = !options || options.preferJsonMime !== false;
     const mid = modelId != null ? modelId : GEMINI_MODEL;
     const temp =
         temperatureOpt != null && Number.isFinite(Number(temperatureOpt))
@@ -304,28 +456,67 @@ async function callGeminiGenerate(system, userText, apiKey, modelId, temperature
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
         mid
     )}:generateContent?key=${encodeURIComponent(apiKey)}`;
-    const r = await fetch(url, {
+    const generationConfig = {
+        temperature: temp,
+        maxOutputTokens: 8192,
+    };
+    if (preferJsonMime) {
+        generationConfig.responseMimeType = 'application/json';
+    }
+    const fetchInit = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             systemInstruction: { parts: [{ text: system }] },
             contents: [{ parts: [{ text: `Farm snapshot JSON:\n${userText}` }] }],
-            generationConfig: {
-                temperature: temp,
-                maxOutputTokens: 8192,
-                responseMimeType: 'application/json',
-            },
+            generationConfig,
         }),
-    });
-    const txt = await r.text();
-    if (!r.ok) {
-        throw new Error(`Gemini HTTP ${r.status}: ${txt.slice(0, 400)}`);
+    };
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+        fetchInit.signal = AbortSignal.timeout(LOCAL_BYOK_FETCH_TIMEOUT_MS);
     }
-    const data = JSON.parse(txt);
+    let r;
+    let txt;
+    try {
+        r = await fetch(url, fetchInit);
+        txt = await r.text();
+    } catch (err) {
+        if (isAbortError(err)) {
+            throw byokError('Gemini: request timed out', 'timeout');
+        }
+        if (err && err.farmdash_ai_error) throw err;
+        throw byokError(`Gemini: ${err && err.message ? err.message : err}`, 'network_error');
+    }
+    if (!r.ok) {
+        throw byokError(`Gemini HTTP ${r.status}: ${txt.slice(0, 400)}`, `http_${r.status}`);
+    }
+    let data;
+    try {
+        data = JSON.parse(txt);
+    } catch (pe) {
+        throw byokError(`Gemini: invalid JSON in response body: ${pe && pe.message ? pe.message : pe}`, 'protocol_error');
+    }
     const parts = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts;
     const out = parts && parts[0] && parts[0].text;
-    if (!out) throw new Error('Gemini: empty response');
+    if (!out) throw byokError('Gemini: empty response', 'empty_response');
     return String(out);
+}
+
+async function completeGeminiConsultantJson(system, userText, apiKey, modelId, temperatureOpt) {
+    let raw = await callGeminiGenerate(system, userText, apiKey, modelId, temperatureOpt, { preferJsonMime: true });
+    try {
+        return extractJsonObject(raw);
+    } catch {
+        raw = await callGeminiGenerate(system, userText, apiKey, modelId, temperatureOpt, { preferJsonMime: false });
+        try {
+            return extractJsonObject(raw);
+        } catch (e2) {
+            throw byokError(
+                `Model did not return valid JSON after retry: ${e2 && e2.message ? e2.message : e2}`,
+                'parse_failed'
+            );
+        }
+    }
 }
 
 /**
@@ -338,7 +529,14 @@ async function runByokConsultantLlm(opts) {
     if ((!apiKey || !String(apiKey).trim()) && !hasBase) {
         throw new Error('Missing API key or OpenAI-compatible base URL');
     }
-    const prep = prepareSnapshotPayload(snapshot, view, context);
+    const snapForPrompt =
+        snapshot && typeof snapshot === 'object'
+            ? applyLocalConsultantPayloadDiet(snapshot, {
+                  localCompatHeavyStrip: !!opts.localCompatHeavyStrip,
+                  maxJsonChars: opts.localMaxJsonChars,
+              })
+            : snapshot;
+    const prep = prepareSnapshotPayload(snapForPrompt, view, context);
     const max =
         provider === 'gemini'
             ? MAX_SNAPSHOT_CHARS_GEMINI
@@ -358,10 +556,10 @@ async function runByokConsultantLlm(opts) {
             openaiChatModel = LOCAL_OPENAI_COMPAT_DEFAULT_MODEL;
         }
     }
-    const raw =
+    const parsed =
         provider === 'gemini'
-            ? await callGeminiGenerate(system, userJson, apiKey, mid || null, temp)
-            : await callOpenAiChat(
+            ? await completeGeminiConsultantJson(system, userJson, apiKey, mid || null, temp)
+            : await completeOpenAiConsultantJson(
                   system,
                   userJson,
                   apiKey,
@@ -370,8 +568,6 @@ async function runByokConsultantLlm(opts) {
                   undefined,
                   temp
               );
-
-    const parsed = extractJsonObject(raw);
     const insights = sanitizeConsultantInsights(Array.isArray(parsed.insights) ? parsed.insights : []);
     return {
         insights,
@@ -381,7 +577,8 @@ async function runByokConsultantLlm(opts) {
 }
 
 const SHARD_JSON_RULES = `Reply with ONLY JSON: {"insights":[{"category":"Field|Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null}]}
-category Field → set field_ref to farmlandId or id. Plain English messages; no "Name:/" prefixes.`;
+category Field → set field_ref to farmlandId or id. Plain English messages; no "Name:/" prefixes.
+Never complain about missing JSON keys, farmlandId, field_ref, or activeFarmId in the message text — only gameplay advice.`;
 
 function ollamaShardViewBlurb(view, context) {
     const v = String(view || 'home').toLowerCase();
@@ -450,7 +647,9 @@ function buildOllamaShards(pruned, view, context) {
     if (ctx === 'fields' && v === 'fields') {
         const fields = slimFieldsList(Array.isArray(pruned.fields) ? pruned.fields : []);
         const batches = chunkArray(fields, OLLAMA_FIELD_MAP_BATCH);
-        const vehSlim = Array.isArray(pruned.vehicles) ? pruned.vehicles.slice(0, 12) : [];
+        const vehSlim = slimVehiclesList(
+            Array.isArray(pruned.vehicles) ? pruned.vehicles.slice(0, 12) : []
+        );
         for (let b = 0; b < batches.length; b++) {
             shards.push({
                 label: `field map ${b + 1}/${batches.length}`,
@@ -468,7 +667,9 @@ function buildOllamaShards(pruned, view, context) {
     if (v === 'fields') {
         const fields = slimFieldsList(Array.isArray(pruned.fields) ? pruned.fields : []);
         const batches = chunkArray(fields, OLLAMA_FIELDS_VIEW_BATCH);
-        const vehSlim = Array.isArray(pruned.vehicles) ? pruned.vehicles.slice(0, 16) : [];
+        const vehSlim = slimVehiclesList(
+            Array.isArray(pruned.vehicles) ? pruned.vehicles.slice(0, 16) : []
+        );
         for (let b = 0; b < batches.length; b++) {
             shards.push({
                 label: `fields ${b + 1}/${batches.length}`,
@@ -481,16 +682,16 @@ function buildOllamaShards(pruned, view, context) {
     if (v === 'vehicles') {
         const veh = Array.isArray(pruned.vehicles) ? pruned.vehicles : [];
         if (veh.length === 0) {
-            return [{ label: 'fleet', snapshot: pruned }];
+            return [{ label: 'fleet', snapshot: slimSnapshotForOllama(pruned) }];
         }
         if (veh.length <= 16) {
-            return [{ label: 'fleet', snapshot: pruned }];
+            return [{ label: 'fleet', snapshot: slimSnapshotForOllama(pruned) }];
         }
         const batches = chunkArray(veh, 12);
         for (let b = 0; b < batches.length; b++) {
             shards.push({
                 label: `vehicles ${b + 1}/${batches.length}`,
-                snapshot: { ...meta, vehicles: batches[b] },
+                snapshot: { ...meta, vehicles: slimVehiclesList(batches[b]) },
             });
         }
         return shards;
@@ -499,16 +700,16 @@ function buildOllamaShards(pruned, view, context) {
     if (v === 'livestock') {
         const animals = Array.isArray(pruned.animals) ? pruned.animals : [];
         if (animals.length === 0) {
-            return [{ label: 'livestock', snapshot: pruned }];
+            return [{ label: 'livestock', snapshot: slimSnapshotForOllama(pruned) }];
         }
         if (animals.length <= 10) {
-            return [{ label: 'livestock', snapshot: pruned }];
+            return [{ label: 'livestock', snapshot: slimSnapshotForOllama(pruned) }];
         }
         const batches = chunkArray(animals, 8);
         for (let b = 0; b < batches.length; b++) {
             shards.push({
                 label: `animals ${b + 1}/${batches.length}`,
-                snapshot: { ...meta, animals: batches[b] },
+                snapshot: { ...meta, animals: slimAnimalsList(batches[b]) },
             });
         }
         return shards;
@@ -518,16 +719,20 @@ function buildOllamaShards(pruned, view, context) {
         const past = Array.isArray(pruned.pastures) ? pruned.pastures : [];
         const anim = Array.isArray(pruned.animals) ? pruned.animals : [];
         if (past.length === 0) {
-            return [{ label: 'pastures', snapshot: pruned }];
+            return [{ label: 'pastures', snapshot: slimSnapshotForOllama(pruned) }];
         }
         if (past.length <= 5) {
-            return [{ label: 'pastures', snapshot: pruned }];
+            return [{ label: 'pastures', snapshot: slimSnapshotForOllama(pruned) }];
         }
         const batches = chunkArray(past, 4);
         for (let b = 0; b < batches.length; b++) {
             shards.push({
                 label: `pastures ${b + 1}/${batches.length}`,
-                snapshot: { ...meta, pastures: batches[b], animals: anim.slice(0, 16) },
+                snapshot: {
+                    ...meta,
+                    pastures: slimPasturesList(batches[b]),
+                    animals: slimAnimalsList(anim.slice(0, 16)),
+                },
             });
         }
         return shards;
@@ -537,16 +742,19 @@ function buildOllamaShards(pruned, view, context) {
         const prod = pruned.production && typeof pruned.production === 'object' ? pruned.production : {};
         const chains = Array.isArray(prod.chains) ? prod.chains : [];
         if (chains.length === 0) {
-            return [{ label: 'production', snapshot: pruned }];
+            return [{ label: 'production', snapshot: slimSnapshotForOllama(pruned) }];
         }
         if (chains.length <= 5) {
-            return [{ label: 'production', snapshot: pruned }];
+            return [{ label: 'production', snapshot: slimSnapshotForOllama(pruned) }];
         }
         const batches = chunkArray(chains, 4);
         for (let b = 0; b < batches.length; b++) {
             shards.push({
                 label: `chains ${b + 1}/${batches.length}`,
-                snapshot: { ...meta, production: { ...prod, chains: batches[b] } },
+                snapshot: {
+                    ...meta,
+                    production: slimProductionForConsultantLlm({ ...prod, chains: batches[b] }, batches[b].length),
+                },
             });
         }
         return shards;
@@ -571,29 +779,29 @@ function buildOllamaShards(pruned, view, context) {
                 snapshot: {
                     ...meta,
                     fields: slimFieldsList(Array.isArray(pruned.fields) ? pruned.fields.slice(0, 28) : []),
-                    production: pruned.production,
-                    productionPoints: pruned.productionPoints,
+                    production: slimProductionForConsultantLlm(pruned.production, 6),
+                    productionPoints: Array.isArray(pruned.productionPoints)
+                        ? pruned.productionPoints.slice(0, 12)
+                        : pruned.productionPoints,
                 },
             },
         ];
     }
 
     const fields = slimFieldsList(Array.isArray(pruned.fields) ? pruned.fields : []);
-    const vehicles = pruned.vehicles || [];
-    const animals = pruned.animals || [];
-    const pastures = pruned.pastures || [];
+    const vehicles = slimVehiclesList((pruned.vehicles || []).slice(0, 16));
+    const animals = slimAnimalsList((pruned.animals || []).slice(0, 12));
+    const pastures = slimPasturesList((pruned.pastures || []).slice(0, 8));
     const prod = pruned.production;
     const slimProd =
-        prod && typeof prod === 'object' && Array.isArray(prod.chains)
-            ? { ...prod, chains: prod.chains.slice(0, 8) }
-            : prod;
+        prod && typeof prod === 'object' ? slimProductionForConsultantLlm(prod, 6) : prod;
 
     shards.push({ label: 'crops', snapshot: { ...meta, fields: fields.slice(0, 10) } });
-    shards.push({ label: 'fleet', snapshot: { ...meta, vehicles: vehicles.slice(0, 16) } });
-    shards.push({ label: 'herd', snapshot: { ...meta, animals: animals.slice(0, 12) } });
+    shards.push({ label: 'fleet', snapshot: { ...meta, vehicles } });
+    shards.push({ label: 'herd', snapshot: { ...meta, animals } });
     shards.push({
         label: 'pastures-weather',
-        snapshot: { ...meta, pastures: pastures.slice(0, 8), weather: pruned.weather },
+        snapshot: { ...meta, pastures, weather: pruned.weather },
     });
     shards.push({ label: 'production', snapshot: { ...meta, production: slimProd } });
     return shards;
@@ -632,6 +840,56 @@ function mergeShardInsights(insights, view, context) {
 }
 
 /**
+ * Single Ollama request using the same compact system prompt + JSON cap as multi-shard calls,
+ * so we never send BASE_JSON_RULES + huge user JSON (which exceeded num_ctx and caused truncation).
+ */
+async function runByokConsultantLlmOllamaCompact(opts) {
+    const { snapshot, view, context, apiKey, modelId, openaiBaseUrl } = opts;
+    const mid =
+        modelId && String(modelId).trim()
+            ? String(modelId).trim()
+            : LOCAL_OPENAI_COMPAT_DEFAULT_MODEL;
+    const snapForPrompt =
+        snapshot && typeof snapshot === 'object'
+            ? applyLocalConsultantPayloadDiet(snapshot, {
+                  localCompatHeavyStrip: !!opts.localCompatHeavyStrip,
+                  maxJsonChars: opts.localMaxJsonChars,
+              })
+            : snapshot;
+    const prep = prepareSnapshotPayload(snapForPrompt, view, context);
+    const userJson = truncateSnapshotString(JSON.stringify(prep), OLLAMA_SHARD_MAX_JSON_CHARS);
+    const system = buildOllamaShardSystemPrompt(view, context, 'full', 0, 1);
+    const v = String(view || 'home').toLowerCase();
+    const ctx = String(context || '').toLowerCase();
+    const nFields = Array.isArray(prep.fields) ? prep.fields.length : 0;
+    let maxTok = 768;
+    if (ctx === 'fields' && v === 'fields' && prep._field_map_mode) {
+        maxTok = Math.min(1536, 128 + nFields * 140);
+    } else if (v === 'home') {
+        maxTok = 512;
+    }
+    const shardTemp =
+        ctx === 'fields' && v === 'fields' && prep._field_map_mode
+            ? consultantLlmTemperature(view, context)
+            : 0.35;
+    const parsed = await completeOpenAiConsultantJson(
+        system,
+        userJson,
+        apiKey,
+        mid,
+        openaiBaseUrl,
+        maxTok,
+        shardTemp
+    );
+    const insights = sanitizeConsultantInsights(Array.isArray(parsed.insights) ? parsed.insights : []);
+    return {
+        insights,
+        llm_used: true,
+        detail: parsed.detail,
+    };
+}
+
+/**
  * Several small /v1/chat/completions calls (Ollama on LAN) — fits default num_ctx; merge insights.
  */
 async function runByokConsultantLlmOllamaSharded(opts) {
@@ -646,9 +904,20 @@ async function runByokConsultantLlmOllamaSharded(opts) {
             ? String(modelId).trim()
             : LOCAL_OPENAI_COMPAT_DEFAULT_MODEL;
 
-    const shards = buildOllamaShards(snapshot, view, context);
+    const snapForShards =
+        snapshot && typeof snapshot === 'object'
+            ? applyLocalConsultantPayloadDiet(snapshot, {
+                  localCompatHeavyStrip: !!opts.localCompatHeavyStrip,
+                  maxJsonChars: opts.localMaxJsonChars,
+              })
+            : snapshot;
+
+    const shards = buildOllamaShards(snapForShards, view, context);
     if (shards.length <= 1) {
-        return runByokConsultantLlm({ ...opts, snapshot: slimSnapshotForOllama(opts.snapshot) });
+        const snap = shards[0]?.snapshot
+            ? shards[0].snapshot
+            : slimSnapshotForOllama(snapForShards);
+        return runByokConsultantLlmOllamaCompact({ ...opts, snapshot: snap });
     }
 
     const v = String(view || 'home').toLowerCase();
@@ -660,7 +929,13 @@ async function runByokConsultantLlmOllamaSharded(opts) {
         const waveResults = await Promise.all(
             wave.map(async (sh, j) => {
                 const idx = i + j;
-                const prep = prepareSnapshotPayload(sh.snapshot, view, context);
+                let prep = prepareSnapshotPayload(sh.snapshot, view, context);
+                if (opts.localCompatHeavyStrip) {
+                    prep = applyLocalConsultantPayloadDiet(prep, {
+                        localCompatHeavyStrip: true,
+                        maxJsonChars: opts.localMaxJsonChars,
+                    });
+                }
                 const userJson = truncateSnapshotString(JSON.stringify(prep), OLLAMA_SHARD_MAX_JSON_CHARS);
                 const system = buildOllamaShardSystemPrompt(view, context, sh.label, idx, shards.length);
                 const shardTemp =
@@ -674,7 +949,7 @@ async function runByokConsultantLlmOllamaSharded(opts) {
                 } else if (v === 'home') {
                     maxTok = 512;
                 }
-                const raw = await callOpenAiChat(
+                const parsed = await completeOpenAiConsultantJson(
                     system,
                     userJson,
                     apiKey,
@@ -683,7 +958,6 @@ async function runByokConsultantLlmOllamaSharded(opts) {
                     maxTok,
                     shardTemp
                 );
-                const parsed = extractJsonObject(raw);
                 return sanitizeConsultantInsights(Array.isArray(parsed.insights) ? parsed.insights : []);
             })
         );

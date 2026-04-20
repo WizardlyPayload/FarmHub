@@ -16,6 +16,26 @@ logger = logging.getLogger(__name__)
 from pydantic import ValidationError
 
 
+_META_INSIGHT_SKIP = (
+    # e.g. "FarmlandId and id are not set for all fields"
+    re.compile(r"farmlandid\s+and\s+id\s+are\s+not\s+set", re.I),
+    re.compile(r"not\s+set\s+for\s+all\s+fields", re.I),
+    re.compile(r"missing\s+field_ref", re.I),
+    re.compile(r"no\s+corresponding\s+farm\s+data", re.I),
+)
+
+
+def _is_schema_meta_insight(text: str) -> bool:
+    """Drop LLM lines that nag about JSON/schema instead of giving farming advice."""
+    s = (text or "").strip()
+    if len(s) < 10:
+        return False
+    if any(p.search(s) for p in _META_INSIGHT_SKIP):
+        return True
+    low = s.lower()
+    return "activefarmid" in low and ("field_ref" in low or "no corresponding" in low)
+
+
 def _sanitize_consultant_user_copy(text: str) -> str:
     """
     Strip internal game counters the UI should not echo (e.g. weed level digits).
@@ -169,6 +189,7 @@ Equipment and natural language (message + reasoning):
 - **Never** repeat internal counters in user text: do **not** write "weed level", "weeds (level N)", or any numeric weed severity — say **weeds** / **heavy weeds** / **needs spraying** only.
 - If vehicles are absent or none match the task, describe the farm job plainly (**Harvest when ready**, **Spray weeds**, **Lime if needed**) without assuming they must purchase equipment.
 - **Never** write broken phrases like "Consider purchasing to harvest" or "Consider purchasing to plan" — they are ungrammatical. Use full sentences: e.g. "Harvest when ready, then plow before the next crop." Only mention buying/leasing if a tool is clearly missing from **vehicles** and phrase it as a normal conditional sentence.
+- **Never** tell the player to fix JSON, APIs, or internal identifiers: do **not** say that **farmlandId**, **id**, **field_ref**, or **activeFarmId** are missing or "not set", and do not say farm data is unavailable — those read as developer errors. If data is sparse, give cautious general FS25 tips instead.
 
 For farm-wide or non-parcel field advice, omit **field_ref** or set it to null.
 
@@ -318,6 +339,8 @@ You are the player's **farm foreman** for **Farming Simulator 25**. The JSON is 
 **Task:** Choose the **three most important jobs** to do **next** for this farm **as a whole**. Rank by real urgency (time-sensitive harvest, withered crop, empty feed, broken machine, full output buffer, cash crunch).
 
 **Coverage:** Prefer **three different angles** when the data supports it (e.g. a field job, a machine/logistics job, an animal/pasture or money/production job). If a section has **no** rows in the JSON (e.g. no production chains), **omit** that topic — do **not** invent animals, fields, or plants that are not listed.
+
+**Never** output meta-errors about snapshot shape (e.g. "farmlandId not set", "missing field_ref", "activeFarmId has no farm data") — the player cannot act on those. Use real tasks only.
 
 **Categories:** **Field** (set **field_ref** to that parcel's **farmlandId** or **id** when the job targets one field), **Animal**, **Production**, or **Finance**. **field_ref** null for fleet-wide, economy-wide, or multi-parcel advice.
 
@@ -626,6 +649,9 @@ async def _llm_insights_from_snapshot(
             )
             msg = _sanitize_consultant_user_copy(str(item.get("message", ""))[:2000])
             reas = _sanitize_consultant_user_copy(str(item.get("reasoning", ""))[:4000])
+            if _is_schema_meta_insight(msg) or _is_schema_meta_insight(reas):
+                dropped_validation += 1
+                continue
             out.append(
                 FarmInsight(
                     category=cat,

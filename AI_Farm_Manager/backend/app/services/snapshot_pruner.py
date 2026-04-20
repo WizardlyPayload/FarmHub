@@ -415,6 +415,31 @@ def _owner_farm_id(row: dict[str, Any]) -> int:
         return 0
 
 
+_CONSULTANT_FIELD_MAP_MAX_ROWS = 80  # match ``consultantSnapshotPrune.js`` MAX_FIELD_MAP
+
+
+def _field_row_belongs_to_farm(row: dict[str, Any], farm_id: int) -> bool:
+    """
+    Matches Node ``consultantSnapshotPrune.filterFieldsForFarm`` (one row):
+    ``farmId ?? playerFarmId ?? ownerFarmId``; if all unset, include the row (same as JS).
+    """
+    fid = None
+    for key in ("farmId", "playerFarmId", "ownerFarmId"):
+        v = row.get(key)
+        if v is None:
+            continue
+        if isinstance(v, str) and not v.strip():
+            continue
+        fid = v
+        break
+    if fid is None:
+        return True
+    try:
+        return int(fid) == farm_id
+    except (TypeError, ValueError):
+        return True
+
+
 def resolve_consultant_farm_id(snapshot: dict[str, Any], farm_id_query: int | None) -> int:
     """
     Farm Dashboard farm selector (or ``?farmId=``). Falls back to snapshot ``activeFarmId`` / ``activeFarm.id`` / 1.
@@ -436,10 +461,16 @@ def resolve_consultant_farm_id(snapshot: dict[str, Any], farm_id_query: int | No
         return 1
 
 
-def prune_snapshot_to_active_farm(snapshot: dict[str, Any], farm_id: int) -> dict[str, Any]:
+def prune_snapshot_to_active_farm(
+    snapshot: dict[str, Any],
+    farm_id: int,
+    *,
+    field_map_relax_empty_fields: bool = False,
+) -> dict[str, Any]:
     """
-    Keep only rows for the farm the player is viewing (same rule as ``filterFieldsForFarmView``:
-    ``ownerFarmId`` / ``farmId`` must match). Drops other farms' fields, vehicles, animals, production chains.
+    Keep only rows for the farm the player is viewing. **Field rows** use the same key order as the
+    Node consultant pruner (``farmId ?? playerFarmId ?? ownerFarmId``; unset ids → keep row).
+    Vehicles/animals/production still use ``_owner_farm_id``. Drops other farms' vehicles, animals, production chains.
 
     **Field ``isOwned``:** In Lua this flag is ``ownerFarmId == currentFarmId`` (the farm **active in the game
     session**). Farm Dashboard can switch ``activeFarmId`` to preview another farm without changing the
@@ -452,6 +483,7 @@ def prune_snapshot_to_active_farm(snapshot: dict[str, Any], farm_id: int) -> dic
     if not isinstance(snapshot, dict) or farm_id <= 0:
         return snapshot
     root = copy.deepcopy(snapshot)
+    pre_fields: list[Any] = copy.deepcopy(root["fields"]) if isinstance(root.get("fields"), list) else []
     root["activeFarmId"] = farm_id
     root["_consultant_farm_scope"] = farm_id
     if isinstance(root.get("activeFarm"), dict):
@@ -465,7 +497,7 @@ def prune_snapshot_to_active_farm(snapshot: dict[str, Any], farm_id: int) -> dic
         root["activeFarm"] = afm
 
     def keep_owned_field(f: dict[str, Any]) -> bool:
-        return _owner_farm_id(f) == farm_id
+        return _field_row_belongs_to_farm(f, farm_id)
 
     for key in ("fields", "allFields"):
         arr = root.get(key)
@@ -479,6 +511,15 @@ def prune_snapshot_to_active_farm(snapshot: dict[str, Any], farm_id: int) -> dic
             fc["isOwned"] = True
             kept.append(fc)
         root[key] = kept
+
+    if field_map_relax_empty_fields and isinstance(root.get("fields"), list) and len(root["fields"]) == 0 and pre_fields:
+        kept_fb: list[dict[str, Any]] = []
+        for f in pre_fields[:_CONSULTANT_FIELD_MAP_MAX_ROWS]:
+            if isinstance(f, dict):
+                fc = copy.deepcopy(f)
+                fc["isOwned"] = True
+                kept_fb.append(fc)
+        root["fields"] = kept_fb
 
     if isinstance(root.get("vehicles"), list):
         root["vehicles"] = [

@@ -167,7 +167,7 @@
         if (!r.ok) {
           return r.text().then(function (t) {
             if (typeof window.farmdashNotifyConsultantHttpError === 'function' && !opts.silent) {
-              window.farmdashNotifyConsultantHttpError(r.status, t, { silent: true });
+              window.farmdashNotifyConsultantHttpError(r.status, t, {});
             }
             return Promise.reject(new Error('HTTP ' + r.status + (t ? ': ' + t.slice(0, 120) : '')));
           });
@@ -185,7 +185,7 @@
         var msg = String(e && e.message ? e.message : e);
         if (!opts.silent && msg.indexOf('HTTP ') !== 0) {
           if (typeof window.farmdashNotifyConsultantHttpError === 'function') {
-            window.farmdashNotifyConsultantHttpError(0, msg, { silent: true });
+            window.farmdashNotifyConsultantHttpError(0, msg, {});
           }
         }
         throw e;
@@ -614,6 +614,9 @@
     if (forceRefresh === undefined) forceRefresh = false;
     opts = opts || {};
     var backgroundPoll = !!opts.background;
+    /** Only true when the user clicks Smart suggestions refresh — allows upsell / help modal (not background poll). */
+    var manualRefresh = opts.manualRefresh === true;
+    var silentHttpNotify = backgroundPoll || !manualRefresh;
     var container = document.getElementById('ai-insights-panel');
     if (!container) return;
 
@@ -631,7 +634,7 @@
             import('./field-consultant-bridge.js')
               .then(function (m) {
                 if (m.refreshFieldConsultantCache) {
-                  return m.refreshFieldConsultantCache({ force: true });
+                  return m.refreshFieldConsultantCache({ force: true, fromUserClick: true });
                 }
                 return null;
               })
@@ -779,7 +782,7 @@
             } catch (eRep) {}
             dbg('error', { httpStatus: r.status, body: errText.slice(0, 4000) });
             if (typeof window.farmdashNotifyConsultantHttpError === 'function') {
-              window.farmdashNotifyConsultantHttpError(r.status, errText, { silent: true });
+              window.farmdashNotifyConsultantHttpError(r.status, errText, { silent: silentHttpNotify });
             }
             if (r.status === 401) throw new Error('401 — wrong key or FARMDASH_INTEGRATION_KEY not set on AI server');
             if (r.status === 503) {
@@ -908,6 +911,11 @@
               console.log('[AI Farm] Insights loaded. llm_used=' + llm + ', count=' + list.length);
             }
           } catch (e1) {}
+          if (manualRefresh && !llm && typeof window.showFarmdashAiUpsellModal === 'function') {
+            try {
+              window.showFarmdashAiUpsellModal({ variant: 'rules_only', detail: '' });
+            } catch (eUp) {}
+          }
         })
         .catch(function (err) {
           if (err && (err.message === '__no_key__' || err.message === '__no_origin__')) {
@@ -917,7 +925,7 @@
           dbg('error', { message: msg });
           pl('renderer_err', 'GET /api/farmdash-ai/consultant/insights failed', { error: msg });
           if (msg.indexOf('HTTP ') !== 0 && typeof window.farmdashNotifyConsultantHttpError === 'function') {
-            window.farmdashNotifyConsultantHttpError(0, msg, { silent: true });
+            window.farmdashNotifyConsultantHttpError(0, msg, { silent: silentHttpNotify });
           }
           var doFailNeutral = function () {
             renderSmartSuggestionsUnavailableNeutral(msg);
@@ -1027,7 +1035,7 @@
     var btn = document.getElementById('ai-insights-refresh-btn');
     if (btn) {
       btn.addEventListener('click', function () {
-        refreshFarmInsights(true);
+        refreshFarmInsights(true, { manualRefresh: true });
       });
     }
 

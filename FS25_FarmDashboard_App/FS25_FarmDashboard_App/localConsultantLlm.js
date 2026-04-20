@@ -422,9 +422,25 @@ async function callOpenAiChat(system, userText, apiKey, modelId, openaiBaseUrl, 
         }
     };
 
+    let isCloudOpenAiHost = false;
+    if (base) {
+        try {
+            const origin = base.replace(/\/v1\/?$/i, '');
+            isCloudOpenAiHost = new URL(origin).hostname.toLowerCase() === 'api.openai.com';
+        } catch {
+            /* self-hosted / odd URL — not cloud */
+        }
+    }
+
     let payloadFirst = preferJsonObjectFormat ? payloadWithFormat : payloadPlain;
     let { r, txt } = await post(payloadFirst);
-    if (!r.ok && preferJsonObjectFormat && base && (r.status === 400 || r.status === 422)) {
+    /** Ollama/LM Studio/vLLM may reject `response_format` with 404/500/etc.; cloud OpenAI uses 400/422. */
+    const retryWithoutJsonObjectFormat =
+        !r.ok &&
+        preferJsonObjectFormat &&
+        base &&
+        (isCloudOpenAiHost ? r.status === 400 || r.status === 422 : r.status >= 400);
+    if (retryWithoutJsonObjectFormat) {
         const second = await post(payloadPlain);
         r = second.r;
         txt = second.txt;

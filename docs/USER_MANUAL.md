@@ -395,6 +395,8 @@ See [SECURITY.md](./SECURITY.md) for the trust model.
 
 ---
 
+<a id="section-10-hosted-ai"></a>
+
 ## 10. Hosted Smart AI and multiplayer chat — why subscribe
 
 This section explains **what you get** when you use the **hosted Smart AI** service (subscription or partner plan) and **why** it is priced as a service — **not** how to rent a VPS or install Docker. Server setup is intentionally out of scope here; use your host’s onboarding or [SALES_HANDOVER.md](./SALES_HANDOVER.md) for B2B integration talk tracks.

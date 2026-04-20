@@ -17,6 +17,7 @@ All project documentation lives under **`docs/`** (repository root: **FarmHub** 
 | [DESCRIPTION_AND_SCREENSHOTS.md](./DESCRIPTION_AND_SCREENSHOTS.md) | Product copy + screenshot checklist |
 | [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md) | Architecture, consultant flow, file map, deployment |
 | [**GEMINI_PROJECT_CONTEXT.md**](./GEMINI_PROJECT_CONTEXT.md) | **Full project breakdown for external AI planning** (Gemini, audits) — complements handover |
+| [**CURSOR_SESSION_MEMORY.md**](./CURSOR_SESSION_MEMORY.md) | **@-mention in new Cursor chats:** paste short summaries from old threads + session decisions (companion to handover, not a full spec) |
 | [SALES_HANDOVER.md](./SALES_HANDOVER.md) | **Sales & partnerships:** ICP, messaging, tiers, objections — not replaced by USER_MANUAL |
 | [AI_SERVER_SECURITY.md](./AI_SERVER_SECURITY.md) | AI Farm Manager (FastAPI) — VPS hardening |
 | [LLM_GEMINI_ROUTING.md](./LLM_GEMINI_ROUTING.md) | Gemini keys, model rollover, env vars |

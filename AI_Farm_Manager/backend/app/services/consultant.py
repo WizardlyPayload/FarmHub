@@ -158,21 +158,39 @@ Do **not** fabricate HUD numbers; stay inside character limits for **message** /
 
 """
 
+CONSULTANT_ACTIONABILITY_BLOCK = """
+**Actionability (non-negotiable):**
+- **message** = the **next in-game action** the player should take (imperative: verb + object + where). Good: "Combine maize on parcel 27 before it lodges" / "Spread solid N on empty parcels 3 and 5, then drill spring barley" / "Refuel the Lexion — diesel under 20% in JSON". Bad: "Review herbicide usage", "could indicate inefficiency", "levels are low suggesting", "consider monitoring", "may warrant attention".
+- **reasoning** = **one concrete fact** from the JSON that supports **message** (e.g. `growthLabel` + **fruitType** on **farmlandId**, tank fill %, animal headcount, a **vehicles** row name). No stacks of hedges ("might", "could suggest") unless the snapshot is genuinely ambiguous — then say what to **check in the HUD**.
+- **Sprayer / herbicide / full tank:** Do not infer "overuse" from a full tank alone — say which **field job** is next (unsprayed weeds on parcel X, finish contract Y) using **fields** + **vehicles**; if JSON does not name a target, say "finish remaining spray work on your tagged weed fields" without analyst filler.
+- **Low nitrogen on empty / fallow parcels:** Name the **work** (spread N / manure / slurry, then cultivate/sow) and **field_ref** for the worst parcel or say "empty parcels 3,5" if several tie — not abstract "nitrogen is low indicating need for fertilizer".
+- **category** on **each** insight must be **exactly one** of these four strings: `Field`, `Animal`, `Production`, `Finance`. Never output schema placeholders like `Field|Animal|Production|Finance`, never join alternatives with `|`, never use slash lists as the category value.
+
+"""
+
 # ``?view=`` Smart suggestions replace ``CONSULTANT_SYSTEM`` entirely — prepend voice + mechanics so those panels match full-farm quality.
-CONSULTANT_VIEW_SHARED_PREFIX = CONSULTANT_NPC_VOICE_INTRO + CONSULTANT_FS25_MECHANICS_BLOCK
+CONSULTANT_VIEW_SHARED_PREFIX = (
+    CONSULTANT_NPC_VOICE_INTRO + CONSULTANT_FS25_MECHANICS_BLOCK + CONSULTANT_ACTIONABILITY_BLOCK
+)
 
-CONSULTANT_SYSTEM_BASE = """You are helping the player run their farm in **Farming Simulator 25**—sound like the game's local mentors (see **Voice** below), not a dry textbook. Analyze the provided game state JSON.
+CONSULTANT_SYSTEM_BASE = (
+    """You are helping the player run their farm in **Farming Simulator 25**—sound like the game's local mentors (see **Voice** below), not a dry textbook. Analyze the provided game state JSON.
 
-""" + CONSULTANT_NPC_VOICE_INTRO + """
+"""
+    + CONSULTANT_NPC_VOICE_INTRO
+    + """
 Focus especially on **fields** (arable parcels):
 - Current crop, growth stage, harvest readiness, withered state, soil work (plow/cultivate), lime/pH, nitrogen (mapped targets when present).
 - Suggest a **smart next crop or rotation** where relevant (e.g. after harvest or for empty fields), using the current and previous crop context in the JSON.
 
 Also mention when relevant: production bottlenecks, animals, and market/stored crop opportunities — but **prioritize actionable field advice**.
 
-""" + CONSULTANT_FS25_MECHANICS_BLOCK + """
-You MUST respond with ONLY valid JSON (no markdown, no prose before or after) in this exact shape:
-{"insights":[{"category":"Field|Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":"..."},...]}
+"""
+    + CONSULTANT_FS25_MECHANICS_BLOCK
+    + CONSULTANT_ACTIONABILITY_BLOCK
+    + """
+You MUST respond with ONLY valid JSON (no markdown, no prose before or after). Shape (each row uses **one** literal **category** — never pipe-separated alternatives):
+{"insights":[{"category":"Field","priority":"High","message":"…","reasoning":"…","field_ref":"27"},{"category":"Production","priority":"Medium","message":"…","reasoning":"…","field_ref":null}]}
 
 JSON rules: escape double quotes inside **message** and **reasoning** as \\" — do not break the JSON with raw " characters inside strings.
 
@@ -194,12 +212,13 @@ Equipment and natural language (message + reasoning):
 For farm-wide or non-parcel field advice, omit **field_ref** or set it to null.
 
 Use at least one Field insight when the snapshot lists fields; use an empty array only if there is no usable data."""
+)
 
 _CONSULTANT_OUTPUT_TAIL_SUMMARY = """
 Output limits (farm-wide / default consultant — so the JSON always completes):
 - Return **at most 4** insights.
 - **priority** must be exactly **Low**, **Medium**, or **High** (spell **Medium** in full — not Med).
-- Keep **message** and **reasoning** **brief** (aim under 180 characters each). Do not write long paragraphs."""
+- Keep **message** and **reasoning** tight but **useful** (aim under ~260 characters each so you can name parcels, crops, or machines from the JSON). Do not write long paragraphs."""
 
 CONSULTANT_SYSTEM = CONSULTANT_SYSTEM_BASE + _CONSULTANT_OUTPUT_TAIL_SUMMARY
 
@@ -215,7 +234,7 @@ CONSULTANT_SYSTEM_SINGLE_FIELD = """You are an expert Farming Simulator 25 **sin
 You receive JSON for **one field parcel only** (plus minimal farm context). You MUST NOT invent or assume data for other fields.
 
 Respond with ONLY valid JSON (no markdown) in this exact shape:
-{"insights":[{"category":"Field","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":"..."}]}
+{"insights":[{"category":"Field","priority":"High","message":"...","reasoning":"...","field_ref":"..."}]}
 
 Rules:
 - Return **at most 2** insights; **category** must always be **Field**.
@@ -266,11 +285,13 @@ Focus: crops, growth, harvest readiness, withered, soil (plow/cultivate/lime/map
 Use **vehicles** when present: prefer "use your …" over purchase hints; never "Consider purchasing to [verb]".
 Grass/forage: not grain combines; late growth + weeds: sprayer not hoe; never echo weed level numbers in text.
 
+**category** must be **exactly one** of: `Field`, `Production`, `Finance` per row (no `|` lists).
+
 Respond with ONLY valid JSON (no markdown):
-{"insights":[{"category":"Field|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":"..." or null},...]}
+{"insights":[{"category":"Field","priority":"High","message":"…","reasoning":"…","field_ref":"12"},...]}
 
 - Prefer **Field** category with **field_ref** = that parcel's **farmlandId** or **id** when the tip targets one parcel.
-- At most **4** insights; keep **message** and **reasoning** brief (under 180 characters each)."""
+- At most **4** insights; keep **message** and **reasoning** under ~260 characters each."""
 
 CONSULTANT_SYSTEM_VIEW_VEHICLES = CONSULTANT_VIEW_SHARED_PREFIX + """VIEW MODE — vehicles:
 You are an FS25 **fleet / vehicle** consultant. The JSON is **vehicles only** for the active farm.
@@ -285,12 +306,14 @@ Focus: **fleet maintenance** — refuel before long jobs, repair damage before i
 
 Otherwise return **up to 3** distinct, actionable insights (prioritize highest need first).
 
+**category** must be **exactly one** of `Production` or `Finance` per row (no `|` lists).
+
 Respond with ONLY valid JSON:
-{"insights":[{"category":"Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null},...]}
+{"insights":[{"category":"Production","priority":"High","message":"…","reasoning":"…","field_ref":null},...]}
 
 - Use **Production** for operational equipment advice (fuel, repair, use). Use **Finance** only for buy/sell/cost tips.
 - **field_ref** must be **null** (not applicable to vehicles).
-- **At most 3** insights (or **1** when the fleet already looks fine); brief **message** and **reasoning** (under 180 characters each)."""
+- **At most 3** insights (or **1** when the fleet already looks fine); **message** and **reasoning** under ~260 characters each."""
 
 CONSULTANT_SYSTEM_VIEW_PASTURES = CONSULTANT_VIEW_SHARED_PREFIX + """VIEW MODE — pastures:
 You are an FS25 **pasture / grazing** consultant. Data includes **pastures** and may include **animals** for context.
@@ -299,12 +322,14 @@ You are an FS25 **pasture / grazing** consultant. Data includes **pastures** and
 
 Focus: pasture food levels, grass / grazing quality, manure or slurry storage needing emptying, herd health on pasture, overcrowding.
 
+**category** must be **exactly one** of `Animal`, `Production`, or `Finance` per row (no `|` lists).
+
 Respond with ONLY valid JSON:
-{"insights":[{"category":"Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null},...]}
+{"insights":[{"category":"Animal","priority":"High","message":"…","reasoning":"…","field_ref":null},...]}
 
 - **Animal** for herd / grazing tips; **Production** for storage / manure / outputs; **Finance** if about selling.
 - **field_ref** usually null unless a specific **farmland** is clearly implicated.
-- At most **4** insights; brief lines."""
+- At most **4** insights; **message** and **reasoning** under ~260 characters each."""
 
 CONSULTANT_SYSTEM_VIEW_LIVESTOCK = CONSULTANT_VIEW_SHARED_PREFIX + """VIEW MODE — livestock:
 You are an FS25 **barn / husbandry** consultant. The JSON is **animals / buildings** for the active farm.
@@ -313,12 +338,14 @@ You are an FS25 **barn / husbandry** consultant. The JSON is **animals / buildin
 
 Focus: animals needing food or water, low health, reproduction, production outputs (milk, wool), overcrowding, animals worth selling.
 
+**category** must be **exactly one** of `Animal`, `Production`, or `Finance` per row (no `|` lists).
+
 Respond with ONLY valid JSON:
-{"insights":[{"category":"Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null},...]}
+{"insights":[{"category":"Animal","priority":"High","message":"…","reasoning":"…","field_ref":null},...]}
 
 - Prefer **Animal** for herd tips; **Production** for facility throughput; **Finance** for cull/sell/value.
 - **field_ref** null unless a **field/parcel** is clearly relevant.
-- At most **4** insights; brief lines."""
+- At most **4** insights; **message** and **reasoning** under ~260 characters each."""
 
 CONSULTANT_SYSTEM_VIEW_PRODUCTIONS = CONSULTANT_VIEW_SHARED_PREFIX + """VIEW MODE — productions:
 You are an FS25 **production chain** consultant. The JSON emphasizes **production** and **productionPoints**.
@@ -327,11 +354,13 @@ You are an FS25 **production chain** consultant. The JSON emphasizes **productio
 
 Focus: bottlenecks, missing inputs, full outputs, stalled chains, which plant to clear or feed next.
 
+**category** must be **exactly one** of `Production` or `Finance` per row (no `|` lists).
+
 Respond with ONLY valid JSON:
-{"insights":[{"category":"Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null},...]}
+{"insights":[{"category":"Production","priority":"High","message":"…","reasoning":"…","field_ref":null},...]}
 
 - **Production** for operational tips; **Finance** for selling/stored value.
-- At most **4** insights; brief lines."""
+- At most **4** insights; **message** and **reasoning** under ~260 characters each."""
 
 CONSULTANT_SYSTEM_VIEW_HOME = CONSULTANT_VIEW_SHARED_PREFIX + """VIEW MODE — home:
 You are the player's **farm foreman** for **Farming Simulator 25**. The JSON is a **compact overview** of the **active farm** — **fields** (with slim **vehicles** for equipment-aware wording), **animals**, **pastures**, **production** / **productionPoints** (if present), and **economy** / weather / stats — the same information the dashboard uses across **Fields, Vehicles, Livestock, Pastures, Productions,** and **Economy**.
@@ -346,11 +375,13 @@ You are the player's **farm foreman** for **Farming Simulator 25**. The JSON is 
 
 **Priority:** Use **High** for the most urgent of the three; **Medium** / **Low** for the others unless two items are equally urgent.
 
-Respond with ONLY valid JSON (no markdown):
-{"insights":[{"category":"Field|Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":"..." or null},...]}
+**category** must be **exactly one** of: `Field`, `Animal`, `Production`, `Finance` per row — never `Field|Animal|…` or any combined string.
 
-- Return **exactly 3** objects in **insights** (three lines). If the farm looks quiet, still give **three** useful next checks in different areas (monitor X, plan Y, prep Z) at **Low**/**Medium** priority — never return an empty array.
-- Keep **message** and **reasoning** brief (under ~200 characters each)."""
+Respond with ONLY valid JSON (no markdown). Example shape (your rows must use real copy from the snapshot):
+{"insights":[{"category":"Field","priority":"High","message":"…","reasoning":"…","field_ref":"27"},{"category":"Production","priority":"Medium","message":"…","reasoning":"…","field_ref":null},{"category":"Animal","priority":"Low","message":"…","reasoning":"…","field_ref":null}]}
+
+- Return **exactly 3** objects in **insights** (three lines). If the farm looks quiet, still give **three** concrete next checks (named systems from JSON — e.g. "Walk contracts board", "Top off diesel before harvest week") at **Low**/**Medium** — never return an empty array.
+- Keep **message** and **reasoning** under ~280 characters each so parcel ids, crop names, or machine names can appear."""
 
 CONSULTANT_SYSTEM_VIEW_ECONOMY = CONSULTANT_VIEW_SHARED_PREFIX + """VIEW MODE — economy:
 You are an FS25 consultant for the **Economic Dashboard** tab. The snapshot includes **`_consultant_held_fill_types`** (ground-truth physical stock with liters and source), **`_consultant_finance_facts`** (cash/loan — use these numbers exactly), **economy** prices **pre-filtered** to those held fill types only, plus **production** / **productionPoints**, and slim **fields** (harvest, bales, swaths).
@@ -363,11 +394,13 @@ You are an FS25 consultant for the **Economic Dashboard** tab. The snapshot incl
 
 Do **not** advise buying equipment or "investing spare cash" unless **finance facts** show a clearly positive balance and the tip ties to moving **listed** stock.
 
+**category** must be **exactly one** of: `Field`, `Finance`, `Production` per row (no `|` lists).
+
 Respond with ONLY valid JSON:
-{"insights":[{"category":"Field|Finance|Production","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null},...]}
+{"insights":[{"category":"Finance","priority":"Medium","message":"…","reasoning":"…","field_ref":null},...]}
 
 - **Field** when the job is a specific parcel (harvest/bale); **Production** for silo/plant storage; **Finance** for selling/moving **those** stocks or obvious cash blockers.
-- At most **4** insights; brief lines."""
+- At most **4** insights; keep lines concrete (under ~260 characters each)."""
 
 
 def consultant_system_instruction_for_view(view: str | None) -> str | None:
@@ -522,10 +555,32 @@ def _heuristic_production_output_space(snapshot: Any, _path: str = "") -> list[F
 
 
 def _parse_category(raw: Any) -> InsightCategory:
-    s = str(raw or "").strip().title()
+    """
+    Map LLM output to InsightCategory. Models often echo schema text like
+    ``Field|Animal|Production|Finance`` — take the first recognizable token.
+    """
+    s0 = str(raw or "").strip()
+    if not s0:
+        return InsightCategory.PRODUCTION
+    # Strip common schema-echo patterns
+    if "|" in s0:
+        for part in (p.strip() for p in s0.split("|") if p.strip()):
+            pt = part.title()
+            for c in InsightCategory:
+                if c.value == pt:
+                    return c
+        s0 = s0.split("|", 1)[0].strip()
+    s = s0.title()
     for c in InsightCategory:
         if c.value == s:
             return c
+    low = s0.lower()
+    if "field" in low and not any(x in low for x in ("animal", "finance", "production")):
+        return InsightCategory.FIELD
+    if "animal" in low:
+        return InsightCategory.ANIMAL
+    if "finance" in low:
+        return InsightCategory.FINANCE
     original = str(raw).strip() if raw is not None else ""
     logger.warning(
         "Consultant: unknown LLM category %r — defaulting to Production",
@@ -642,11 +697,10 @@ async def _llm_insights_from_snapshot(
             continue
         try:
             cat = _parse_category(item.get("category"))
-            field_ref = (
-                _normalize_field_ref(item.get("field_ref"))
-                if cat == InsightCategory.FIELD
-                else None
-            )
+            raw_fr = item.get("field_ref")
+            if raw_fr is None:
+                raw_fr = item.get("fieldRef")
+            field_ref = _normalize_field_ref(raw_fr)
             msg = _sanitize_consultant_user_copy(str(item.get("message", ""))[:2000])
             reas = _sanitize_consultant_user_copy(str(item.get("reasoning", ""))[:4000])
             if _is_schema_meta_insight(msg) or _is_schema_meta_insight(reas):

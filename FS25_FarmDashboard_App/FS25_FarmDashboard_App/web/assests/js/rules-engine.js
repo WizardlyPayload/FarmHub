@@ -809,3 +809,61 @@ export function getLocalFieldSuggestion(field) {
     source: "rules",
   };
 }
+
+/**
+ * Urgency score for ranking parcels (matches former field-consultant tie-break intent).
+ * @param {object} field
+ * @returns {number}
+ */
+export function fieldRulesUrgencyScore(field) {
+  if (!field) return 0;
+  let s = 0;
+  if (fieldShowsWithered(field)) s += 100;
+  if (effectiveHarvestReady(field)) s += 80;
+  if (field.needsWork || field.needsRolling) s += 40;
+  const w = Number(field.weedLevel ?? 0);
+  if (w >= 0.5) s += 15;
+  if (field.needsPlowing || field.needsLime || field.needsCultivation) s += 10;
+  const bales = Number(field.baleCountOnField ?? field.baleCount ?? 0);
+  if (Number.isFinite(bales) && bales > 0) s += 25;
+  if (field.hasLooseForage === true) s += 20;
+  else if (field.hasWindrow === true || Number(field.windrowLiters ?? 0) > 0) s += 20;
+  if (
+    field.needsBaling === true ||
+    field.hasLooseForage === true ||
+    Number(field.baleableLooseLiters ?? 0) > 0
+  ) {
+    s += 12;
+  }
+  return s;
+}
+
+/**
+ * Best “do this first” from Layer‑1 rules only (no LLM / consultant).
+ * @param {object[]} fields
+ * @returns {{ field: object, action: string, reason: string } | null}
+ */
+export function pickDoThisFirstFieldRulesOnly(fields) {
+  if (!Array.isArray(fields) || fields.length === 0) return null;
+  const rows = [];
+  for (const field of fields) {
+    const sug = getLocalFieldSuggestion(field);
+    if (!sug || typeof sug.action !== "string" || !String(sug.action).trim()) continue;
+    if (sug.action === RULES_ENGINE_FALLBACK_ACTION) continue;
+    rows.push({ field, sug, score: fieldRulesUrgencyScore(field) });
+  }
+  if (rows.length === 0) return null;
+  rows.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    const ida = Number(a.field.farmlandId ?? a.field.id ?? 0);
+    const idb = Number(b.field.farmlandId ?? b.field.id ?? 0);
+    return ida - idb;
+  });
+  const top = rows[0];
+  return { field: top.field, action: top.sug.action, reason: top.sug.reason || "" };
+}
+
+if (typeof window !== "undefined") {
+  window.pickDoThisFirstFieldRulesOnly = pickDoThisFirstFieldRulesOnly;
+  window.fieldRulesUrgencyScore = fieldRulesUrgencyScore;
+}

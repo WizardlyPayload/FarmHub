@@ -71,11 +71,19 @@ function isAbortError(err) {
     );
 }
 
-const BASE_JSON_RULES = `You MUST respond with ONLY valid JSON (no markdown fences) in this exact shape:
-{"insights":[{"category":"Field|Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null}]}
+const BYOK_ACTIONABILITY_RULES = `
+Actionability:
+- **message** = one clear **next in-game action** (imperative: verb + what + where). Name **farmlandId** / crop / machine from JSON when you can. Avoid analyst filler: no "review usage", "could indicate", "may suggest", "consider monitoring" without a concrete job.
+- **reasoning** = one **fact from the JSON** that backs the message (growthLabel, fruitType, tank %, vehicle name). No hedge stacks.
+- **category** must be **exactly one** of: Field, Animal, Production, Finance — never "Field|Animal|..." or pipe-separated schema text.
+- **Sprayer / full tank:** do not claim "overuse" from a full tank; say which spray job or field is next using snapshot rows.
+`;
+
+const BASE_JSON_RULES = `You MUST respond with ONLY valid JSON (no markdown fences). Use **one literal category per row** (not alternatives joined with |):
+{"insights":[{"category":"Field","priority":"High","message":"...","reasoning":"...","field_ref":"27"},{"category":"Production","priority":"Medium","message":"...","reasoning":"...","field_ref":null}]}
 
 Rules:
-- category Field — only for parcel-specific tips; set field_ref to that parcel's farmlandId or id (number or string). Omit or null for general tips.
+- **category** = exactly Field, Animal, Production, or Finance. **field_ref** = that parcel's farmlandId or id only when category is Field; otherwise null.
 - priority must be exactly Low, Medium, or High (spell Medium in full).
 - **message** must be plain English: one short imperative sentence. No fictional character names, no roleplay, no "Name:/" or "Name: /" prefixes.
 - **Ground truth:** Every tip must follow the JSON snapshot for that parcel. If growthState / harvestReady / fruitType / nitrogenLevel vs targetNitrogen / pH or lime hints contradict an action, do not recommend that action.
@@ -87,7 +95,9 @@ Rules:
 - Late growth + weeds: herbicide/sprayer not mechanical weeder.
 - Use vehicles from JSON only for this farm (ownerFarmId matches activeFarmId); do not tell players to buy a machine when a suitable one is listed.
 - **Never** output tips about JSON, APIs, or data quality: do **not** say that **farmlandId**, **id**, **field_ref**, or **activeFarmId** are "missing" or "not set", and do not complain that farm data is unavailable — players cannot fix those. If a section of the snapshot is thin, give **general, cautious FS25 advice** (e.g. check contracts, review growth stages) instead.
-- Keep message and reasoning brief.`;
+- Keep message and reasoning useful (under ~280 characters each when possible so parcel ids and crop names fit).
+
+${BYOK_ACTIONABILITY_RULES}`;
 
 function viewInstruction(view, context) {
     const v = String(view || 'home').toLowerCase();
@@ -101,8 +111,8 @@ Hard rules: (1) If harvested / mulched / no standing crop, do not recommend spra
     }
 
     const map = {
-        home: `VIEW home: Return exactly 3 insights — the top priorities for this farm next (different angles if possible: field work, fleet/logistics, animals/money/production).`,
-        fields: `VIEW fields: Focus on crops, growth, soil, harvest readiness; prefer Field category with field_ref when one parcel is meant. Ground every tip in the JSON (growth, harvest state, N, pH). At most 4 insights.`,
+        home: `VIEW home: Return exactly 3 insights — the **most urgent next actions** for this farm (field + fleet + animals/production/money when JSON supports). Each **message** must be a concrete imperative (what to do next), not vague analysis. Each **reasoning** cites one JSON fact (parcel id, crop, fill %, machine name).`,
+        fields: `VIEW fields: Focus on crops, growth, soil, harvest readiness; prefer Field category with field_ref when one parcel is meant. Ground every tip in the JSON (growth, harvest state, N, pH). Say the **job** (spray, harvest, lime, spread N) and **which parcel** when data allows — not generic "levels are low". At most 4 insights.`,
         vehicles: `VIEW vehicles: Fleet only — maintenance, fuel, damage, hours. Use Production category. If fleet looks fine, one reassuring insight. At most 3 insights.`,
         pastures: `VIEW pastures: Grazing, pasture levels, manure, herd on pasture. At most 4 insights.`,
         livestock: `VIEW livestock: Barn animals, feed, water, health, production. At most 4 insights.`,
@@ -140,6 +150,27 @@ function isSchemaMetaInsight(text) {
     return false;
 }
 
+const _ALLOWED_INSIGHT_CATEGORIES = new Set(['Field', 'Animal', 'Production', 'Finance']);
+
+function normalizeInsightCategory(raw) {
+    const s0 = String(raw == null ? '' : raw).trim();
+    if (!s0) return 'Production';
+    if (_ALLOWED_INSIGHT_CATEGORIES.has(s0)) return s0;
+    if (s0.includes('|')) {
+        const parts = s0
+            .split('|')
+            .map((p) => p.trim())
+            .filter(Boolean);
+        for (const p of parts) {
+            const t = p.charAt(0).toUpperCase() + p.slice(1).toLowerCase();
+            if (_ALLOWED_INSIGHT_CATEGORIES.has(t)) return t;
+        }
+    }
+    const t = s0.charAt(0).toUpperCase() + s0.slice(1).toLowerCase();
+    if (_ALLOWED_INSIGHT_CATEGORIES.has(t)) return t;
+    return 'Production';
+}
+
 function sanitizeConsultantInsights(insights) {
     if (!Array.isArray(insights)) return [];
     return insights
@@ -151,6 +182,7 @@ function sanitizeConsultantInsights(insights) {
         })
         .map((ins) => {
             const next = { ...ins };
+            next.category = normalizeInsightCategory(next.category);
             if (typeof next.message === 'string') next.message = stripLeadingMentorPrefix(next.message);
             if (typeof next.reasoning === 'string') next.reasoning = stripLeadingMentorPrefix(next.reasoning);
             return next;
@@ -576,9 +608,11 @@ async function runByokConsultantLlm(opts) {
     };
 }
 
-const SHARD_JSON_RULES = `Reply with ONLY JSON: {"insights":[{"category":"Field|Animal|Production|Finance","priority":"Low|Medium|High","message":"...","reasoning":"...","field_ref":null}]}
+const SHARD_JSON_RULES = `Reply with ONLY JSON. One literal **category** per row (Field, Animal, Production, or Finance — never pipe-separated):
+{"insights":[{"category":"Field","priority":"High","message":"...","reasoning":"...","field_ref":"12"}]}
 category Field → set field_ref to farmlandId or id. Plain English messages; no "Name:/" prefixes.
-Never complain about missing JSON keys, farmlandId, field_ref, or activeFarmId in the message text — only gameplay advice.`;
+Never complain about missing JSON keys, farmlandId, field_ref, or activeFarmId in the message text — only gameplay advice.
+${BYOK_ACTIONABILITY_RULES}`;
 
 function ollamaShardViewBlurb(view, context) {
     const v = String(view || 'home').toLowerCase();

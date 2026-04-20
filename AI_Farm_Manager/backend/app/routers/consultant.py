@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from app.config import get_settings
 from app.deps.integration_auth import get_farmdash_connection_bucket
 from app.services.connection_registry import DEFAULT_BUCKET_ID, get_connection
-from app.schemas.insights import FarmInsightsResponse, InsightCategory
+from app.schemas.insights import FarmInsight, FarmInsightsResponse, InsightCategory
 from app.services.consultant import (
     CONSULTANT_SYSTEM_FIELDS_FOCUS,
     CONSULTANT_SYSTEM_SINGLE_FIELD,
@@ -168,18 +168,36 @@ async def _run_consultant_core(
     )
 
     if ctx == "fields" and not field_ref_q:
-        field_only = [i for i in insights if i.category == InsightCategory.FIELD]
-        dropped = len(insights) - len(field_only)
+        # LLMs often tag parcel-specific lines as Production/Animal/Finance; the dashboard only
+        # matches rows by field_ref. Coerce category to Field whenever a parcel id is present.
+        coerced: list[FarmInsight] = []
+        for i in insights:
+            fr = (str(i.field_ref).strip() if i.field_ref is not None else "")
+            if not fr:
+                continue
+            if i.category != InsightCategory.FIELD:
+                coerced.append(
+                    FarmInsight(
+                        category=InsightCategory.FIELD,
+                        priority=i.priority,
+                        message=i.message,
+                        reasoning=i.reasoning,
+                        field_ref=i.field_ref,
+                    )
+                )
+            else:
+                coerced.append(i)
+        dropped = len(insights) - len(coerced)
         if dropped > 0:
             logger.warning(
-                "consultant context=fields: dropped %s non-Field insight(s) (Animal/Production/Finance) — "
-                "field map UI only uses category=Field with field_ref",
+                "consultant context=fields: kept %s parcel-tied insight(s); dropped %s without field_ref",
+                len(coerced),
                 dropped,
             )
-        insights = field_only
+        insights = coerced
         if llm_used and not insights:
             logger.warning(
-                "consultant context=fields: LLM ran but no Field-tagged insights with field_ref — "
+                "consultant context=fields: LLM ran but no insights with a usable field_ref — "
                 "Farm Dashboard field rows will show local rules only",
             )
 

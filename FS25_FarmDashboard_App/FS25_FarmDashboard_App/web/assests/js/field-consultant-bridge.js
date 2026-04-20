@@ -84,7 +84,25 @@ function insightCategoryIsField(cat) {
   const raw =
     typeof cat === "object" && cat !== null && "value" in cat ? (cat).value : cat;
   const s = String(raw).trim().replace(/^["']|["']$/g, "");
-  return s.toLowerCase() === "field";
+  const t = s.toLowerCase();
+  return t === "field" || t === "fields" || t === "farmland";
+}
+
+/**
+ * Index into per-field map: need field_ref + message; category Field preferred but some LLMs omit or
+ * mislabel (Ollama) — accept null/empty category when field_ref is set.
+ */
+function insightRowUsableForFieldMap(ins) {
+  if (!ins || typeof ins !== "object") return false;
+  if (normalizeFieldRefKey(ins.field_ref) === "") return false;
+  if (typeof ins.message !== "string" || !String(ins.message).trim()) return false;
+  if (insightCategoryIsField(ins.category)) return true;
+  const raw =
+    typeof ins.category === "object" && ins.category !== null && "value" in ins.category
+      ? ins.category.value
+      : ins.category;
+  if (raw == null || String(raw).trim() === "") return true;
+  return false;
 }
 
 /** Legacy LLM prompts asked for "Ben:/" prefixes; strip for display (matches server localConsultantLlm.js). */
@@ -99,8 +117,7 @@ export function indexFieldConsultantInsights(insights) {
   const map = {};
   if (!Array.isArray(insights)) return map;
   for (const ins of insights) {
-    if (!ins || !insightCategoryIsField(ins.category)) continue;
-    if (normalizeFieldRefKey(ins.field_ref) === "") continue;
+    if (!ins || !insightRowUsableForFieldMap(ins)) continue;
     const cleaned =
       typeof ins.message === "string"
         ? { ...ins, message: stripMentorPrefixMessage(ins.message) }

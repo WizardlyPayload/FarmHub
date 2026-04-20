@@ -660,6 +660,19 @@ function isLocalDashboardClient(req) {
     return isRequestFromThisMachine(req);
 }
 
+/**
+ * Smart suggestions (BYOK / hosted proxy) normally run only for requests from this machine so API keys
+ * stay on the host. Set FARMDASH_ALLOW_LAN_CONSULTANT=1 when the dashboard is served on a NAS / Docker
+ * host and you open it from another PC on the LAN (same trust as exposing the dashboard on 0.0.0.0).
+ */
+function isFarmdashConsultantClientAllowed(req) {
+    if (isLocalDashboardClient(req)) return true;
+    const v = String(process.env.FARMDASH_ALLOW_LAN_CONSULTANT || '')
+        .trim()
+        .toLowerCase();
+    return v === '1' || v === 'true' || v === 'yes';
+}
+
 /** Allow POST /api/export-mod-store-images from LAN (default: localhost only). Power users: set env FARMDASH_ALLOW_LAN_EXPORT=1 */
 function allowLanModExportHttp() {
     return process.env.FARMDASH_ALLOW_LAN_EXPORT === '1';
@@ -797,7 +810,13 @@ function filterFieldsByExclusions(fields, serverId) {
 
 function cloneMergedDataWithFieldExclusions(mergedData, serverId) {
     if (!mergedData) return null;
-    const fields = filterFieldsByExclusions(mergedData.fields, serverId);
+    const raw =
+        Array.isArray(mergedData.fields) && mergedData.fields.length > 0
+            ? mergedData.fields
+            : Array.isArray(mergedData.allFields) && mergedData.allFields.length > 0
+              ? mergedData.allFields
+              : mergedData.fields;
+    const fields = filterFieldsByExclusions(Array.isArray(raw) ? raw : [], serverId);
     return { ...mergedData, fields };
 }
 
@@ -1141,7 +1160,7 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
         const mode = getAiSuggestionMode();
         const conn = getAiManagerConnectionForProxy();
         const cacheKey = consultantInsightsCacheKey(req.query || {});
-        const fromLocalDashboard = isLocalDashboardClient(req);
+        const consultantClientAllowed = isFarmdashConsultantClientAllowed(req);
 
         if (!mode) {
             return res.status(503).json({
@@ -1163,7 +1182,7 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
                     farmdash_ai_error: 'not_configured',
                 });
             }
-            if (!fromLocalDashboard) {
+            if (!consultantClientAllowed) {
                 const ent = consultantInsightsProxyCache.get(cacheKey);
                 if (ent && Date.now() - ent.ts < CONSULTANT_PROXY_CACHE_TTL_MS) {
                     res.status(ent.status);
@@ -1173,7 +1192,7 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
                 }
                 return res.status(503).json({
                     detail:
-                        'Smart suggestions run on the PC with Farm Dashboard. Open the dashboard on this machine via localhost first so results can be cached for tablets.',
+                        'Smart suggestions are locked to the machine running Farm Dashboard (or set environment variable FARMDASH_ALLOW_LAN_CONSULTANT=1 if you intentionally open the dashboard from another device on your LAN). Open via localhost on the host first, or enable LAN consultant mode.',
                     insights: [],
                     llm_used: false,
                     farmdash_ai_error: 'lan_cache_miss',
@@ -1190,13 +1209,35 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
                     farmdash_ai_error: 'no_snapshot',
                 });
             }
-            const view = String((req.query && req.query.view) || 'home');
-            const context = String((req.query && req.query.context) || '');
+            let view = String((req.query && req.query.view) || 'home');
+            let context = String((req.query && req.query.context) || '');
+            const fieldRefQ =
+                (req.query && (req.query.fieldRef || req.query.field_ref)) != null
+                    ? String(req.query.fieldRef || req.query.field_ref).trim()
+                    : '';
+            const fieldIdQ =
+                (req.query && (req.query.fieldId || req.query.field_id)) != null
+                    ? String(req.query.fieldId || req.query.field_id).trim()
+                    : '';
+            if (fieldRefQ || fieldIdQ) {
+                view = 'fields';
+                if (!context) context = 'fields';
+            }
             const sid = resolveServerIdForRequest(req);
             const farmId = Number(snap.activeFarmId) || 1;
-            const pruned = pruneMergedDataForView(snap, view, context, farmId);
+            const localCompatHeavyStrip =
+                mode === AI_SUGGESTION_MODE.OLLAMA || mode === AI_SUGGESTION_MODE.OPENAI_COMPAT;
+            const localMaxJsonChars = localCompatHeavyStrip
+                ? Number(process.env.FARMDASH_LOCAL_LLM_MAX_JSON_CHARS) || 7200
+                : undefined;
+            const pruned = pruneMergedDataForView(snap, view, context, farmId, {
+                fieldRef: fieldRefQ || undefined,
+                fieldId: fieldIdQ || undefined,
+                localCompatHeavyStrip,
+                maxJsonChars: localMaxJsonChars,
+            });
             const contentHash = hashPrunedSnapshot(pruned);
-            const laneKey = `${sid}|${farmId}|${view}|${context}`;
+            const laneKey = `${sid}|${farmId}|${view}|${context}|${fieldRefQ}|${fieldIdQ}`;
             const prevLane = byokInsightHashCache.get(laneKey);
             if (prevLane && prevLane.hash === contentHash) {
                 consultantInsightsProxyCache.set(cacheKey, {
@@ -1232,6 +1273,8 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
                     apiKey: cred.apiKey,
                     modelId: cred.modelId || undefined,
                     openaiBaseUrl: cred.openaiBaseUrl || undefined,
+                    localCompatHeavyStrip,
+                    localMaxJsonChars,
                 };
                 const out =
                     mode === AI_SUGGESTION_MODE.OLLAMA && prov === 'openai'
@@ -1261,11 +1304,15 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
                 return res.send(text);
             } catch (e) {
                 console.warn('[consultant BYOK local]', e && e.message ? e.message : e);
+                const code =
+                    e && typeof e.farmdash_ai_error === 'string' && e.farmdash_ai_error.trim()
+                        ? e.farmdash_ai_error.trim()
+                        : 'byok_llm_failed';
                 return res.status(503).json({
                     detail: String(e && e.message ? e.message : e),
                     insights: [],
                     llm_used: false,
-                    farmdash_ai_error: 'byok_llm_failed',
+                    farmdash_ai_error: code,
                 });
             }
         };
@@ -1296,7 +1343,7 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
             });
         }
 
-        if (!fromLocalDashboard) {
+        if (!consultantClientAllowed) {
             const ent = consultantInsightsProxyCache.get(cacheKey);
             if (ent && Date.now() - ent.ts < CONSULTANT_PROXY_CACHE_TTL_MS) {
                 res.status(ent.status);
@@ -1306,7 +1353,7 @@ expressApp.get('/api/farmdash-ai/consultant/insights', async (req, res) => {
             }
             return res.status(503).json({
                 detail:
-                    'AI insights are fetched on the PC running Farm Dashboard (localhost). This device shows cached results only.',
+                    'AI insights are fetched on the Farm Dashboard host (localhost by default). Use the dashboard on that machine first, or set FARMDASH_ALLOW_LAN_CONSULTANT=1 to allow this client on the LAN.',
                 insights: [],
                 llm_used: false,
                 farmdash_ai_error: 'lan_cache_miss',

@@ -28,20 +28,6 @@ def _norm_sid(server_id: str | None) -> str:
     return (server_id or "").strip()
 
 
-def _active_farm_id_from_raw(raw: str) -> int | None:
-    try:
-        data = json.loads(raw)
-        if not isinstance(data, dict):
-            return None
-        v = data.get("activeFarmId")
-        if v is None:
-            return None
-        n = int(v)
-        return n if n >= 1 else None
-    except (TypeError, ValueError, json.JSONDecodeError):
-        return None
-
-
 def _push_wait_err() -> str:
     return (
         "No snapshot received yet from Farm Dashboard. On the PC: Settings → AI Farm Manager → Hosted AI: "
@@ -52,67 +38,57 @@ def _push_wait_err() -> str:
     )
 
 
+# Returned when ?serverId= / env id does not match any key in this connection's push RAM (no silent fallback).
+_MISS_MATCH_SERVER_ID_MSG = (
+    "Mismatched serverId: no snapshot in the PC push buffer for this server id. "
+    "Use the same id as in Farm Dashboard’s server list (Settings → servers), and set DASHBOARD_SERVER_ID "
+    "or the connection’s dashboard_server_id to match."
+)
+
+# Multiple pushes stored but the request did not pin serverId (synthetic push:// URL has no query).
+_AMBIGUOUS_SERVER_ID_MSG = (
+    "Missing serverId: multiple Farm Dashboard snapshots are in the push buffer for this link key. "
+    "Set DASHBOARD_SERVER_ID (or dashboard_server_id on the client connection) to the correct server id, "
+    "or add ?serverId= to the dashboard URL used for fetch."
+)
+
+
 def _resolve_snapshot_map(
     snapshots_map: dict[str, tuple[str, float]],
     sid: str,
-    farm_id: int | None,
     err: str,
 ) -> tuple[str | None, str | None, str]:
-    def _newest_push() -> tuple[str, str]:
-        best_sid, (raw, _ts) = max(snapshots_map.items(), key=lambda kv: kv[1][1])
-        return best_sid, raw
-
-    if sid in snapshots_map:
-        return snapshots_map[sid][0], None, sid
-    if sid != "" and len(snapshots_map) > 0:
-        fid = int(farm_id) if farm_id is not None else None
-        if fid is not None and fid >= 1:
-            matched: list[tuple[str, str, float]] = []
-            for k, (raw, ts) in snapshots_map.items():
-                if _active_farm_id_from_raw(raw) == fid:
-                    matched.append((k, raw, ts))
-            if matched:
-                best_sid, raw, _ts = max(matched, key=lambda x: x[2])
-                log_pipeline(
-                    "push_resolve",
-                    "serverId not in RAM; using push whose activeFarmId matches farmId query",
-                    requested_server_id=sid,
-                    chosen_server_id=best_sid,
-                    farm_id_query=fid,
-                    candidates=len(snapshots_map),
-                )
-                return raw, None, best_sid
-            log_pipeline(
-                "push_resolve",
-                "serverId not in RAM; no push matched farmId — using newest PC push (fix DASHBOARD_SERVER_ID)",
-                requested_server_id=sid,
-                farm_id_query=fid,
-                candidates=len(snapshots_map),
-            )
-        else:
-            log_pipeline(
-                "push_resolve",
-                "serverId from env/URL not in push RAM; using newest PC push (fix DASHBOARD_SERVER_ID to match this farm)",
-                requested_server_id=sid,
-                candidates=len(snapshots_map),
-            )
-        best_sid, raw = _newest_push()
-        return raw, None, best_sid
-    if sid != "":
-        return None, err, ""
+    """
+    Strict resolution: no “newest push” or activeFarmId guessing — wrong id must fail loudly (503 upstream).
+    """
     if len(snapshots_map) == 0:
         return None, err, ""
+
+    norm = _norm_sid(sid)
+    if norm in snapshots_map:
+        return snapshots_map[norm][0], None, norm
+
+    if norm != "":
+        log_pipeline(
+            "push_resolve",
+            "serverId not in push buffer (strict; no fallback)",
+            requested_server_id=norm,
+            candidates=len(snapshots_map),
+            keys_preview=list(snapshots_map.keys())[:12],
+        )
+        return None, _MISS_MATCH_SERVER_ID_MSG, ""
+
     if len(snapshots_map) == 1:
         only_sid, (raw, _) = next(iter(snapshots_map.items()))
         return raw, None, only_sid
-    best_sid, raw = _newest_push()
+
     log_pipeline(
         "push_resolve",
-        "Multiple PC snapshots in RAM; using newest push (add ?serverId= to DASHBOARD_JSON_URL to pin one save)",
-        chosen_server_id=best_sid,
+        "missing serverId with multiple pushes (strict)",
         candidates=len(snapshots_map),
+        keys_preview=list(snapshots_map.keys())[:12],
     )
-    return raw, None, best_sid
+    return None, _AMBIGUOUS_SERVER_ID_MSG, ""
 
 
 def store_push(
@@ -158,10 +134,13 @@ def get_snapshot_json(
     farm_id: int | None = None,
 ) -> tuple[str | None, str | None, str]:
     """
-    When push mode is on: return stored JSON for this connection bucket + server_id (or resolve ambiguity).
+    When push mode is on: return stored JSON for this connection bucket + **exact** server_id key.
 
     ``connection_bucket_id`` is ``__default__`` for env FARMDASH key, or a UUID for a registered client connection.
+
+    ``farm_id`` is ignored (kept for call-site compatibility); resolution does not guess by farm.
     """
+    del farm_id  # strict serverId-only resolution — no activeFarmId fallback
     if not is_push_mode_enabled():
         return None, None, ""
     cid = (connection_bucket_id or DEFAULT_BUCKET_ID).strip() or DEFAULT_BUCKET_ID
@@ -169,7 +148,7 @@ def get_snapshot_json(
     err = _push_wait_err()
     with _lock:
         snapshots_map = dict(_snapshots_by_conn.get(cid) or {})
-    return _resolve_snapshot_map(snapshots_map, sid, farm_id, err)
+    return _resolve_snapshot_map(snapshots_map, sid, err)
 
 
 def get_servers_meta() -> list[dict[str, Any]] | None:

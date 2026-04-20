@@ -103,6 +103,13 @@ export function showFieldsSection() {
     fieldsSearchTerm = "";
     lastFieldsPayloadKey = null;
     ensureFieldConsultantListener();
+    try {
+      const m = typeof window !== "undefined" ? window.__fieldConsultantByRef : null;
+      const empty = !m || typeof m !== "object" || Object.keys(m).length === 0;
+      if (empty) scheduleFieldConsultantFetch({ force: true });
+    } catch (e) {
+      /* ignore */
+    }
 
     document.getElementById("section-content-dynamic").innerHTML = buildFieldsHTML();
     document.getElementById("section-content").classList.remove("d-none");

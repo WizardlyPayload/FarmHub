@@ -238,6 +238,8 @@ function mergeData(luaData, xmlData, options = {}) {
         saveDate     : xmlData.career?.saveDate     || '',
         mapId        : xmlData.career?.mapId        || '',
         settings     : xmlData.career?.settings     || {},
+        /** Alias for dashboard client (`apiStorage` / realtime); same object as `settings`. */
+        gameSettings : xmlData.career?.settings     || {},
         mods         : xmlData.career?.mods         || [],
 
         // Farms — XML has players/stats, Lua has live money; drop savegame-only farm slots with no owned land
@@ -473,6 +475,10 @@ function mergeFields(xmlFields, luaFields) {
                     ? luaField.pfStats
                     : xmlField.pfStats,
         };
+        if (luaField.nitrogenTargetDisplay != null && Number.isFinite(Number(luaField.nitrogenTargetDisplay))
+            && Number(luaField.nitrogenTargetDisplay) > 0) {
+            pfOverlay.nitrogenTargetDisplay = Number(luaField.nitrogenTargetDisplay);
+        }
 
         // Spatial data from Lua (g_fieldManager has actual map coords & hectares)
         const spatialData = {
@@ -575,6 +581,15 @@ function mergeFields(xmlFields, luaFields) {
             engineNumGrowthStates : Number.isFinite(Number(luaField.engineNumGrowthStates))
                 ? Number(luaField.engineNumGrowthStates)
                 : xmlField.engineNumGrowthStates,
+            grassRingStage:
+                luaField.grassRingStage != null && luaField.grassRingStage !== ''
+                    ? Number(luaField.grassRingStage)
+                    : null,
+            stoneLevel: Number(
+                luaField.stoneLevel != null && luaField.stoneLevel !== ''
+                    ? luaField.stoneLevel
+                    : (xmlField.stoneLevel ?? 0)
+            ),
         };
     });
 
@@ -663,7 +678,7 @@ function buildFromLuaOnly(lua) {
         lastUpdated: new Date().toISOString(),
         serverInfo: lua.serverInfo || {},
         mapTitle: lua.serverInfo?.mapName || 'Unknown Map',
-        savegameName: '', settings: {}, mods: [],
+        savegameName: '', settings: {}, gameSettings: {}, mods: [],
         gameTime: lua.gameTime || {},
         // Lua may serialise an empty table as {} — must be an array for the UI
         farmInfo: filterFarmsByFarmlandOwnership(toArr(lua.farmInfo), allowed),
@@ -690,6 +705,7 @@ function buildFromXmlOnly(xml) {
         savegameName: xml.career?.savegameName || '',
         saveDate: xml.career?.saveDate || '',
         settings: xml.career?.settings || {},
+        gameSettings: xml.career?.settings || {},
         mods: xml.career?.mods || [],
         gameTime: xml.environment ? {
             hour: xml.environment.hour, minute: xml.environment.minute,

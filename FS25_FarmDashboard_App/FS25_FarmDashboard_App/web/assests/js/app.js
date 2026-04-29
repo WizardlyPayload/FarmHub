@@ -39,6 +39,8 @@ class LivestockDashboard {
     this.luaAvailable       = false;
     this.money              = 0;
     this.gameSettings       = {};
+    this.fieldClusterPrefsByServer = {};
+    this.simHubView = { enabled: false };
 
     this.init();
   }
@@ -73,6 +75,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     const r = await fetch('/api/item-image-filenames');
     const data = await r.json();
+    window.__farmdashShopImageFilenames = [
+      ...(Array.isArray(data?.items) ? data.items : []),
+      ...(Array.isArray(data?.modExtract) ? data.modExtract : []),
+    ];
     vehicles.primeModExtractImageFilenames(data.modExtract || []);
   } catch (e) {
     console.warn('[item-image-filenames]', e);

@@ -2,8 +2,17 @@
 (function () {
   const MAX_LOG_LINES = 450;
 
-  function tr(key, fallback) {
-    return typeof window.t === "function" ? window.t(key) : fallback;
+  function tr(key, fallback, params) {
+    if (typeof window.t === "function") {
+      const out = window.t(key, params);
+      if (out && out !== key) return out;
+    }
+    if (!params) return fallback;
+    let out = fallback;
+    for (const pk of Object.keys(params)) {
+      out = out.split("{{" + pk + "}}").join(String(params[pk]));
+    }
+    return out;
   }
 
   function showModal() {
@@ -47,7 +56,7 @@
       bar.classList.remove("progress-bar-striped", "progress-bar-animated", "fd-indeterminate");
       bar.setAttribute("aria-valuenow", "0");
     }
-    if (label) label.textContent = "Starting PowerShell…";
+    if (label) label.textContent = tr("modExport.startingPs", "Starting PowerShell…");
     if (log) log.textContent = "";
   }
 
@@ -69,17 +78,14 @@
     const log = document.getElementById("modExportLog");
 
     if (data.type === "init" && label) {
-      const t = data.totalSteps || 0;
+      const totalSteps = data.totalSteps || 0;
       const f = data.folderCount ?? 0;
       const z = data.zipCount ?? 0;
-      label.textContent =
-        "Found " +
-        f +
-        " mod folder(s) and " +
-        z +
-        " zip archive(s) — " +
-        t +
-        " step(s) to process.";
+      label.textContent = tr(
+        "modExport.initSummary",
+        "Found " + f + " mod folder(s) and " + z + " zip archive(s) — " + totalSteps + " step(s) to process.",
+        { folders: f, zips: z, steps: totalSteps }
+      );
       if (bar) {
         if (t <= 0) {
           bar.style.width = "100%";
@@ -97,7 +103,9 @@
       bar.style.width = pct + "%";
       bar.setAttribute("aria-valuenow", String(pct));
       bar.classList.remove("progress-bar-striped", "progress-bar-animated", "fd-indeterminate");
-      const phase = data.phase === "zip" ? "Zip" : "Folder";
+      const phase = data.phase === "zip"
+        ? tr("modExport.phaseZip", "Zip")
+        : tr("modExport.phaseFolder", "Folder");
       const name = String(data.label || "").slice(0, 140);
       label.textContent = phase + " " + cur + " / " + tot + (name ? ": " + name : "");
     }

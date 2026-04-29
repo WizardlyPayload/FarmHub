@@ -11,7 +11,7 @@ function onChannel(channel, callback) {
 
 contextBridge.exposeInMainWorld('farmDashAPI', {
     getCurrentConfig: () => ipcRenderer.invoke('get-current-config'),
-    saveSettings: (config) => ipcRenderer.send('save-settings', config),
+    saveSettings: (config) => ipcRenderer.invoke('save-settings', config),
     scanLocalSaves: () => ipcRenderer.invoke('scan-local-saves'),
     openSetup: () => ipcRenderer.send('open-setup'),
     resetSettings: () => ipcRenderer.send('reset-settings'),
@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('farmDashAPI', {
     getModConfig: () => ipcRenderer.invoke('get-mod-config'),
     saveModConfig: (cfg) => ipcRenderer.invoke('save-mod-config', cfg),
     readLocalFarmdashDataJson: () => ipcRenderer.invoke('read-local-farmdash-data-json'),
+    setSimHubLiveContext: (payload) => ipcRenderer.invoke('set-simhub-live-context', payload),
     onAppUpdateStatus: (callback) => onChannel('app-update-status', callback),
     subscribeExportModStoreImagesProgress: (callback) =>
         onChannel('export-mod-store-images-progress', callback),

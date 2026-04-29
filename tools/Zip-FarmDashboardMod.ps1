@@ -6,17 +6,24 @@
   Reads from FS25_FarmDashboard_Mod\FS25_FarmDashboard_Mod\ only:
     modDesc.xml, icon.png (if present), src\
 
-  Uses -Path (not -LiteralPath) with an array — Windows PowerShell 5.1 is unreliable with
-  Compress-Archive -LiteralPath @(...) for multiple items.
+  IMPORTANT: Do not use Compress-Archive for FS mods. On Windows it writes zip entry names with
+  backslashes (src\collectors\Foo.lua). The GIANTS engine resolves extraSourceFiles using forward
+  slashes (src/collectors/Foo.lua), so "Can't load resource" appears and the mod never runs.
+
+  This script uses ZipArchive + CreateEntryFromFile with '/' entry names (POSIX paths inside the zip).
 
 .EXAMPLE
-  Set-Location "...\MAIN CODEBASE"
+  Set-Location "...\MAIN CODEBASE\FarmHub"
   .\tools\Zip-FarmDashboardMod.ps1
+
+.EXAMPLE
+  .\tools\Zip-FarmDashboardMod.ps1 -CopyTo "C:\Users\Graham\Documents\FS25_FarmDashboard.zip"
 #>
 [CmdletBinding()]
 param(
     [string] $RepoRoot = "",
-    [string] $OutZipName = "FS25_FarmDashboard.zip"
+    [string] $OutZipName = "FS25_FarmDashboard.zip",
+    [string] $CopyTo = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,16 +52,37 @@ if (Test-Path -LiteralPath $DestZip) {
     Remove-Item -LiteralPath $DestZip -Force
 }
 
-$toZip = [System.Collections.ArrayList]@()
-[void]$toZip.Add($ModDesc)
-if (Test-Path -LiteralPath $IconPng) {
-    [void]$toZip.Add($IconPng)
-} else {
-    Write-Warning "icon.png not in mod folder - zip will omit it. Add: $IconPng"
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+$rootNorm = $ModSource.TrimEnd('\', '/')
+$zip = [System.IO.Compression.ZipFile]::Open($DestZip, [System.IO.Compression.ZipArchiveMode]::Create)
+try {
+    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $ModDesc, "modDesc.xml") | Out-Null
+    if (Test-Path -LiteralPath $IconPng) {
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $IconPng, "icon.png") | Out-Null
+    } else {
+        Write-Warning "icon.png not in mod folder - zip will omit it. Add: $IconPng"
+    }
+    Get-ChildItem -LiteralPath $SrcTree -Recurse -File | ForEach-Object {
+        $full = $_.FullName
+        if (-not $full.StartsWith($rootNorm, [StringComparison]::OrdinalIgnoreCase)) {
+            throw "Unexpected path under src: $full"
+        }
+        $rel = $full.Substring($rootNorm.Length).TrimStart('\', '/').Replace('\', '/')
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $full, $rel) | Out-Null
+    }
+} finally {
+    $zip.Dispose()
 }
-[void]$toZip.Add($SrcTree)
 
-# -Path accepts multiple literal paths; -LiteralPath + array is broken on PS 5.1 for this cmdlet
-Compress-Archive -Path @($toZip.ToArray()) -DestinationPath $DestZip -CompressionLevel Optimal -Force
+Write-Host "Wrote: $DestZip (POSIX forward-slash paths inside zip; required for FS25 mod loading)"
 
-Write-Host "Wrote: $DestZip (root: modDesc.xml, icon.png if present, src folder)"
+if ($CopyTo) {
+    $destParent = Split-Path -Parent $CopyTo
+    if ($destParent -and -not (Test-Path -LiteralPath $destParent)) {
+        New-Item -ItemType Directory -Path $destParent -Force | Out-Null
+    }
+    Copy-Item -LiteralPath $DestZip -Destination $CopyTo -Force
+    Write-Host "Copied to: $CopyTo"
+}

@@ -1,8 +1,21 @@
--- FS25 FarmDashboard | FinanceDataCollector.lua | v2.0.0
+-- FS25 FarmDashboard | FinanceDataCollector.lua | v2.1.0
 
 FinanceDataCollector = {}
 
 function FinanceDataCollector:init()
+    FinanceDataCollector._incFin = false
+end
+
+function FinanceDataCollector:collectBegin()
+    FinanceDataCollector._incFin = true
+end
+
+function FinanceDataCollector:collectStep()
+    if FinanceDataCollector._incFin then
+        FinanceDataCollector._incFin = false
+        return true, self:collect()
+    end
+    return true, {}
 end
 
 function FinanceDataCollector:collect()

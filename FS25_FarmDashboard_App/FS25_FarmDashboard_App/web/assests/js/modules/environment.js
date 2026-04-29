@@ -209,7 +209,7 @@ export function showWeatherModal() {
             </div>`;
         });
       } else {
-        forecastContainer.innerHTML = '<div class="col-12 text-center text-muted">No forecast data available</div>';
+        forecastContainer.innerHTML = `<div class="col-12 text-center text-muted">${t("environment.noForecast")}</div>`;
       }
     }
   }

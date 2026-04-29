@@ -1,9 +1,22 @@
--- FS25 FarmDashboard | WeatherDataCollector.lua | v2.0.0
+-- FS25 FarmDashboard | WeatherDataCollector.lua | v2.1.0
 
 WeatherDataCollector = {}
 
 function WeatherDataCollector:init()
+    WeatherDataCollector._incWx = false
     print("[FarmDashboard] Weather data collector initialized")
+end
+
+function WeatherDataCollector:collectBegin()
+    WeatherDataCollector._incWx = true
+end
+
+function WeatherDataCollector:collectStep()
+    if WeatherDataCollector._incWx then
+        WeatherDataCollector._incWx = false
+        return true, self:collect()
+    end
+    return true, {}
 end
 
 function WeatherDataCollector:collect()

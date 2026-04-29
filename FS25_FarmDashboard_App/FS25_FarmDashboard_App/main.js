@@ -22,6 +22,8 @@ const LAN_ACCESS_DEFAULTS = {
     lanUsername:      'admin',
     lanPassword:      'farmhub',
     lanAllowedIPs:    '',
+    /** When true, GET/HEAD from non-loopback LAN clients skip HTTP Basic (closed networks only). */
+    lanAuthOptional:  false,
 };
 
 const {
@@ -412,6 +414,7 @@ function getLanSecurityFromStore() {
         lanUsername:      store.get('lanUsername', LAN_ACCESS_DEFAULTS.lanUsername),
         lanPassword:      store.get('lanPassword', LAN_ACCESS_DEFAULTS.lanPassword),
         lanAllowedIPs:    store.get('lanAllowedIPs', LAN_ACCESS_DEFAULTS.lanAllowedIPs),
+        lanAuthOptional:  !!store.get('lanAuthOptional', LAN_ACCESS_DEFAULTS.lanAuthOptional),
     };
 }
 
@@ -499,6 +502,12 @@ function checkLanAccessForRequest(req) {
         }
     }
 
+    const method = String(req.method || 'GET').toUpperCase();
+    const isWsUpgrade = String(req.headers?.upgrade || '').toLowerCase() === 'websocket';
+    if (cfg.lanAuthOptional && (method === 'GET' || method === 'HEAD') && !isWsUpgrade) {
+        return { ok: true };
+    }
+
     const auth = req.headers?.authorization || '';
     const m = /^Basic\s+(\S+)/i.exec(auth);
     if (!m) {
@@ -548,6 +557,9 @@ function allowLanModExportHttp() {
 expressApp.use(cors());
 expressApp.use(express.json());
 expressApp.use(lanAccessHttpMiddleware);
+expressApp.get('/simhub', (_req, res) => {
+    res.redirect(302, '/simhub.html');
+});
 expressApp.use(express.static(path.join(__dirname, 'web')));
 /** setup.html uses src="web/assests/..." — same paths work over http://host:8766/… and file:// */
 expressApp.use('/web', express.static(path.join(__dirname, 'web')));
@@ -649,6 +661,59 @@ function resolveServerIdForRequest(req) {
     return Object.keys(serverStates)[0];
 }
 
+/** SimHub read-only clients: follow the server + farm last selected in the desktop dashboard. */
+function normalizeSimHubLiveContext(raw) {
+    const keys = Object.keys(serverStates);
+    const firstSid = keys[0] || '';
+    let serverId = '';
+    let farmId = 1;
+    let updatedAt = null;
+    if (raw && typeof raw === 'object') {
+        if (raw.serverId != null && String(raw.serverId).trim() !== '') {
+            serverId = String(raw.serverId).trim();
+        }
+        const f = Number(raw.farmId);
+        if (Number.isFinite(f) && f > 0) farmId = Math.floor(f);
+        if (raw.updatedAt) updatedAt = raw.updatedAt;
+    }
+    if (serverId && serverStates[serverId] == null) {
+        serverId = firstSid;
+    }
+    if (!serverId) serverId = firstSid;
+    return { serverId, farmId, updatedAt };
+}
+
+function getSimHubLiveContext() {
+    try {
+        return normalizeSimHubLiveContext(store.get('simHubLiveContext'));
+    } catch (e) {
+        return normalizeSimHubLiveContext(null);
+    }
+}
+
+function applySimHubLiveContextPatch(payload) {
+    const cur = getSimHubLiveContext();
+    let serverId = cur.serverId;
+    let farmId = cur.farmId;
+    if (payload && typeof payload === 'object') {
+        if (payload.serverId != null && String(payload.serverId).trim() !== '') {
+            serverId = String(payload.serverId).trim();
+        }
+        const f = Number(payload.farmId);
+        if (Number.isFinite(f) && f > 0) farmId = Math.floor(f);
+    }
+    if (serverId && serverStates[serverId] == null) {
+        serverId = Object.keys(serverStates)[0] || '';
+    }
+    const next = {
+        serverId,
+        farmId,
+        updatedAt: new Date().toISOString(),
+    };
+    store.set('simHubLiveContext', next);
+    return next;
+}
+
 function normalizeExcludedFarmlandIdsMap(raw) {
     const out = {};
     if (!raw || typeof raw !== 'object') return out;
@@ -712,6 +777,34 @@ expressApp.get('/api/weather',    (req, res) => res.json(getDataForServer(req)?.
 expressApp.get('/api/economy',    (req, res) => res.json(getDataForServer(req)?.economy    || {}));
 expressApp.get('/api/farmlands',  (req, res) => res.json(getDataForServer(req)?.xmlFarmlands || []));
 expressApp.get('/api/status',     (req, res) => res.json({ status: 'online' }));
+
+expressApp.get('/api/simhub-view-config', (req, res) => {
+    try {
+        const u = store.get('uiPreferences') || {};
+        const sid = req.query && req.query.serverId != null && req.query.serverId !== ''
+            ? String(req.query.serverId)
+            : '';
+        const fcpAll = normalizeFieldClusterPrefs(u.fieldClusterPrefsByServer);
+        const fieldClusterPrefs = sid ? (fcpAll[sid] || { autoMerge: true, manualGroups: [] }) : { autoMerge: true, manualGroups: [] };
+        res.json({
+            simHubView: normalizeSimHubView(u.simHubView),
+            fieldClusterPrefs,
+        });
+    } catch (e) {
+        console.error('[api/simhub-view-config]', e);
+        res.status(500).json({ error: String(e.message || e) });
+    }
+});
+
+expressApp.get('/api/simhub-session', (_req, res) => {
+    try {
+        const ctx = getSimHubLiveContext();
+        res.json(ctx);
+    } catch (e) {
+        console.error('[api/simhub-session]', e);
+        res.status(500).json({ serverId: '', farmId: 1, error: String(e.message || e) });
+    }
+});
 
 /** For WebSocket clients that cannot send Basic auth on the upgrade request (browsers). */
 expressApp.get('/api/lan-ws-token', (req, res) => {
@@ -1410,16 +1503,29 @@ async function stopAllWatchers() {
     serverStates = {};
 }
 
-/** True if the main window is already showing this app’s dashboard origin (avoid full reload on Settings → Save). */
+/** True if we should navigate the main window to the dashboard HTTP root (skip only when already on `/`, not on `/setup.html`). */
 function shouldLoadDashboardUrl() {
     if (!mainWindow || mainWindow.isDestroyed()) return true;
     try {
-        const u = mainWindow.webContents.getURL();
-        if (!u) return true;
-        const portSeg = `:${PORT}`;
-        const isLocalDashboard =
-            (u.startsWith('http://127.0.0.1') || u.startsWith('http://localhost')) && u.includes(portSeg);
-        return !isLocalDashboard;
+        const raw = mainWindow.webContents.getURL();
+        if (!raw) return true;
+        let url;
+        try {
+            url = new URL(raw);
+        } catch {
+            return true;
+        }
+        if (url.protocol === 'file:') return true;
+        const host = url.hostname.toLowerCase();
+        const port = String(url.port || (url.protocol === 'https:' ? '443' : '80'));
+        const onLocalApp =
+            (host === '127.0.0.1' || host === 'localhost' || host === '::1') &&
+            port === String(PORT);
+        if (!onLocalApp) return true;
+        const pathNorm = (url.pathname || '/').replace(/\/+$/, '') || '/';
+        const onDashboardHome =
+            pathNorm === '/' || pathNorm.toLowerCase() === '/index.html';
+        return !onDashboardHome;
     } catch (_) {
         return true;
     }
@@ -1449,12 +1555,20 @@ async function bootServer(config) {
         };
     });
 
-    // Bring up HTTP + dashboard UI before disk cache hydration and watchers. Hydration can parse large
-    // JSON synchronously (30s+ on slow disks) and previously blocked listenFarmdashHttp → loadURL entirely.
+    // Restore last merged JSON from disk **before** HTTP accepts traffic so the first `/api/data` after
+    // reopen is not `{ error: 'Waiting for data...' }` (which cleared the renderer). Large saves may
+    // add a short delay before the port opens; that is preferable to an empty dashboard flash.
+    servers.forEach((srv) => {
+        try {
+            hydrateServerCacheFromDisk(srv.id);
+        } catch (e) {
+            console.error('[bootServer] hydrate', srv.id, e);
+        }
+    });
+
     const runDeferredBootWork = () => {
         try {
             servers.forEach((srv) => {
-                hydrateServerCacheFromDisk(srv.id);
                 if (srv.mode === 'local') startLocalWatching(srv);
             });
             startFtpPollingCoordinator(config, ftpServers);
@@ -1582,11 +1696,13 @@ app.on('window-all-closed', () => {
 
 // ── IPC ───────────────────────────────────────────────────────────────────────
 
-ipcMain.on('save-settings', async (event, newConfig) => {
+ipcMain.handle('save-settings', async (_event, newConfig) => {
     try {
         await applyFarmdashSetupConfig(newConfig);
+        return { ok: true };
     } catch (e) {
         console.error('[save-settings]', e);
+        return { ok: false, error: String(e && e.message ? e.message : e) };
     }
 });
 
@@ -1633,6 +1749,7 @@ ipcMain.handle('save-lan-access-settings', (_e, payload) => {
     store.set('lanUsername', String(payload?.lanUsername ?? LAN_ACCESS_DEFAULTS.lanUsername));
     store.set('lanPassword', String(payload?.lanPassword ?? LAN_ACCESS_DEFAULTS.lanPassword));
     store.set('lanAllowedIPs', String(payload?.lanAllowedIPs ?? '').trim());
+    store.set('lanAuthOptional', !!payload?.lanAuthOptional);
     return new Promise((resolve) => {
         restartHttpServer(() => {
             resolve({
@@ -1694,14 +1811,65 @@ const DEFAULT_UI_PREFS = {
         pastures: true,
         productions: true
     },
-    excludedFarmlandIdsByServer: {}
+    excludedFarmlandIdsByServer: {},
+    fieldClusterPrefsByServer: {},
+    simHubView: {
+        enabled: false,
+        view: 'fields',
+        fieldClusterIds: [],
+        pastureIds: [],
+        productionKeys: [],
+    },
 };
+
+function normalizeFieldClusterPrefs(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    for (const [sid, v] of Object.entries(raw)) {
+        if (!v || typeof v !== 'object') continue;
+        const autoMerge = v.autoMerge !== false;
+        const mg = Array.isArray(v.manualGroups) ? v.manualGroups : [];
+        const clean = mg
+            .map((g) =>
+                [...new Set((g || []).map((x) => parseInt(String(x).trim(), 10)).filter((n) => !Number.isNaN(n) && n > 0))]
+            )
+            .filter((g) => g.length >= 2);
+        out[String(sid)] = { autoMerge, manualGroups: clean };
+    }
+    return out;
+}
+
+function normalizeSimHubView(raw) {
+    const d = { ...DEFAULT_UI_PREFS.simHubView };
+    if (!raw || typeof raw !== 'object') return d;
+    const v = String(raw.view || '').toLowerCase();
+    const view = v === 'pastures' || v === 'production' ? v : 'fields';
+    const fc = Array.isArray(raw.fieldClusterIds)
+        ? raw.fieldClusterIds.map((x) => String(x).trim()).filter(Boolean)
+        : [];
+    const pa = Array.isArray(raw.pastureIds)
+        ? raw.pastureIds.map((x) => parseInt(String(x).trim(), 10)).filter((n) => !Number.isNaN(n) && n >= 0)
+        : [];
+    const pk = Array.isArray(raw.productionKeys)
+        ? raw.productionKeys.map((x) => String(x).trim()).filter(Boolean)
+        : [];
+    return {
+        ...d,
+        enabled: !!raw.enabled,
+        view,
+        fieldClusterIds: fc,
+        pastureIds: pa,
+        productionKeys: pk,
+    };
+}
 
 ipcMain.handle('get-ui-preferences', () => {
     const u = store.get('uiPreferences') || {};
     return {
         sections: { ...DEFAULT_UI_PREFS.sections, ...(u.sections || {}) },
-        excludedFarmlandIdsByServer: normalizeExcludedFarmlandIdsMap(u.excludedFarmlandIdsByServer)
+        excludedFarmlandIdsByServer: normalizeExcludedFarmlandIdsMap(u.excludedFarmlandIdsByServer),
+        fieldClusterPrefsByServer: normalizeFieldClusterPrefs(u.fieldClusterPrefsByServer),
+        simHubView: normalizeSimHubView(u.simHubView),
     };
 });
 
@@ -1711,12 +1879,30 @@ ipcMain.handle('save-ui-preferences', (_e, prefs) => {
     const prevEx = normalizeExcludedFarmlandIdsMap(prev.excludedFarmlandIdsByServer);
     const formEx = normalizeExcludedFarmlandIdsMap(prefs?.excludedFarmlandIdsByServer);
     const mergedEx = { ...prevEx, ...formEx };
+    const prevCl = normalizeFieldClusterPrefs(prev.fieldClusterPrefsByServer);
+    const formCl = normalizeFieldClusterPrefs(prefs?.fieldClusterPrefsByServer);
+    const mergedCl = { ...prevCl, ...formCl };
+    const prevSh = normalizeSimHubView(prev.simHubView);
+    const formSh = normalizeSimHubView(prefs?.simHubView);
+    const mergedSh = prefs?.simHubView !== undefined ? formSh : prevSh;
     const merged = {
         sections: { ...DEFAULT_UI_PREFS.sections, ...(prefs?.sections || {}) },
-        excludedFarmlandIdsByServer: mergedEx
+        excludedFarmlandIdsByServer: mergedEx,
+        fieldClusterPrefsByServer: mergedCl,
+        simHubView: mergedSh,
     };
     store.set('uiPreferences', merged);
     return { ok: true };
+});
+
+ipcMain.handle('set-simhub-live-context', (_e, payload) => {
+    try {
+        const context = applySimHubLiveContextPatch(payload || {});
+        return { ok: true, context };
+    } catch (e) {
+        console.error('[set-simhub-live-context]', e);
+        return { ok: false, error: String(e.message || e) };
+    }
 });
 
 /** For Dashboard Settings: list owned fields only (same farm as the dashboard farm selector). */

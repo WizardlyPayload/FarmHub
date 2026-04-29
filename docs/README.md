@@ -14,22 +14,14 @@ All project documentation lives under **`docs/`** (repository root: **FarmHub** 
 | [USER_GUIDE.md](./USER_GUIDE.md) | Short reference (fields, rules, windrows) |
 | [SECURITY.md](./SECURITY.md) | LAN access, Basic Auth, IP allowlist, Electron hardening |
 | [DESCRIPTION_AND_SCREENSHOTS.md](./DESCRIPTION_AND_SCREENSHOTS.md) | Product copy + screenshot checklist |
-| [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md) | Architecture, data flow, key files |
-| [**GEMINI_PROJECT_CONTEXT.md**](./GEMINI_PROJECT_CONTEXT.md) | Full project breakdown for external planning / audits |
+| [**DEVELOPER_HANDOVER.md**](./DEVELOPER_HANDOVER.md) | **v3.0 dev reference:** architecture, mod, Electron host, merge, rules, i18n, build, debugging |
+| [**AUDIT_v3.0.md**](./AUDIT_v3.0.md) | **v3.0 gap analysis:** code surface vs docs, tracked engineering follow-ups |
+| [**SCREENSHOT_MANIFEST.md**](./SCREENSHOT_MANIFEST.md) | Screenshot filenames, captions, [auto]/[manual] capture recipes |
+| [**I18N.md**](./I18N.md) | **Internationalisation:** 27 locales, `messages/*.json` pipeline, Google Translate refill |
+| [**PROJECT_CONTEXT.md**](./PROJECT_CONTEXT.md) | Full project overview for planning and audits |
 | [**CURSOR_SESSION_MEMORY.md**](./CURSOR_SESSION_MEMORY.md) | Cursor chat companion (session summaries) |
 | [SALES_HANDOVER.md](./SALES_HANDOVER.md) | Sales & partnerships positioning |
 | [AUTHORS.md](./AUTHORS.md) | **JoshWalki** & **WizardlyPayload** |
-
-### Stub redirects (legacy doc filenames)
-
-The following files are **one-line stubs** so old bookmarks do not 404. Current scope is documented in **USER_MANUAL.md** and **CHANGELOG.md** §3.0.0:
-
-- [SMART_SUGGESTIONS_TIERS.md](./SMART_SUGGESTIONS_TIERS.md)
-- [AI_FARM_MANAGER_BYOK.md](./AI_FARM_MANAGER_BYOK.md)
-- [AI_IN_GAME_CHAT.md](./AI_IN_GAME_CHAT.md)
-- [AI_SERVER_SECURITY.md](./AI_SERVER_SECURITY.md)
-- [LLM_GEMINI_ROUTING.md](./LLM_GEMINI_ROUTING.md)
-- [LLM_OPENAI_COMPATIBLE.md](./LLM_OPENAI_COMPATIBLE.md)
 
 **Authoritative versions:** `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` (app), `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` (mod).
 

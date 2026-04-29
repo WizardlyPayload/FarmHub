@@ -1,12 +1,64 @@
--- FS25 FarmDashboard | EconomyDataCollector.lua | v2.0.0
+-- FS25 FarmDashboard | EconomyDataCollector.lua | v2.1.0
 
 EconomyDataCollector = {}
 
 function EconomyDataCollector:init()
+    EconomyDataCollector._ecoCo = nil
     print("[FarmDashboard] Economy data collector initialized (Silent Mode)")
 end
 
+function EconomyDataCollector:_workYield()
+    local stride = EconomyDataCollector._yieldStride
+    if not stride or not coroutine.running() then return end
+    EconomyDataCollector._yieldTick = (EconomyDataCollector._yieldTick or 0) + 1
+    if EconomyDataCollector._yieldTick % stride ~= 0 then return end
+    coroutine.yield("progress", EconomyDataCollector._yieldPartialEcon or {})
+end
+
+function EconomyDataCollector:collectBegin()
+    EconomyDataCollector._ecoCo = coroutine.create(function(opts)
+        opts = opts or {}
+        EconomyDataCollector._yieldStride = math.max(10, tonumber(opts.economyYieldStride) or 55)
+        EconomyDataCollector._yieldTick = 0
+        EconomyDataCollector._yieldSnapshot = nil
+        local r = EconomyDataCollector._collectImpl(EconomyDataCollector)
+        EconomyDataCollector._yieldStride = nil
+        EconomyDataCollector._yieldSnapshot = nil
+        return r
+    end)
+end
+
+function EconomyDataCollector:collectStep(opts)
+    if not EconomyDataCollector._ecoCo then return true, {} end
+    local ok, a, b = coroutine.resume(EconomyDataCollector._ecoCo, opts or {})
+    if not ok then
+        Logging.warning("[FarmDash] EconomyDataCollector coroutine: " .. tostring(a))
+        EconomyDataCollector._ecoCo = nil
+        return true, {}
+    end
+    if a == "progress" then
+        return false, b or {}
+    end
+    local st = coroutine.status(EconomyDataCollector._ecoCo)
+    if st == "dead" then
+        EconomyDataCollector._ecoCo = nil
+        return true, a or {}
+    end
+    if st == "suspended" then
+        Logging.warning("[FarmDash] EconomyDataCollector: unexpected coroutine state; ending slice.")
+        EconomyDataCollector._ecoCo = nil
+        return true, EconomyDataCollector._yieldPartialEcon or (type(a) == "table" and a) or {}
+    end
+    return false, b or {}
+end
+
 function EconomyDataCollector:collect()
+    EconomyDataCollector._yieldStride = nil
+    EconomyDataCollector._yieldSnapshot = nil
+    return self:_collectImpl()
+end
+
+function EconomyDataCollector:_collectImpl()
     -- Safety check: Don't collect if game isn't ready or managers aren't available
     if not _G.g_currentMission then
         return {
@@ -27,6 +79,8 @@ function EconomyDataCollector:collect()
             allFillTypes = {}
         }
     }
+
+    EconomyDataCollector._yieldPartialEcon = economyData
     
     -- Collect all market prices for each sell point
     economyData.marketPrices = self:collectMarketPrices()
@@ -55,6 +109,9 @@ function EconomyDataCollector:collectMarketPrices()
     if not _G.g_currentMission then
         return marketData
     end
+
+    EconomyDataCollector._yieldSnapshot = marketData
+    EconomyDataCollector._yieldTick = 0
     
     -- Get all selling stations/points from multiple sources
     local sellingStations = {}
@@ -63,6 +120,7 @@ function EconomyDataCollector:collectMarketPrices()
     -- Method 1: Check economy manager selling stations (most important for base prices)
     if _G.g_currentMission.economyManager and _G.g_currentMission.economyManager.sellingStations then
         for _, station in pairs(_G.g_currentMission.economyManager.sellingStations) do
+            self:_workYield()
             if station and not foundStations[station] then
                 foundStations[station] = true
                 table.insert(sellingStations, station)
@@ -74,6 +132,7 @@ function EconomyDataCollector:collectMarketPrices()
     if _G.g_currentMission.storageSystem then
         if _G.g_currentMission.storageSystem.unloadingStations then
             for _, station in pairs(_G.g_currentMission.storageSystem.unloadingStations) do
+                self:_workYield()
                 if station and station.owningPlaceable and not foundStations[station.owningPlaceable] then
                     foundStations[station.owningPlaceable] = true
                     table.insert(sellingStations, station.owningPlaceable)
@@ -83,6 +142,7 @@ function EconomyDataCollector:collectMarketPrices()
         
         if _G.g_currentMission.storageSystem.storages then
             for _, storage in pairs(_G.g_currentMission.storageSystem.storages) do
+                self:_workYield()
                 if storage and storage.owningPlaceable and storage.isFarmOwned == false then
                     if not foundStations[storage.owningPlaceable] then
                         foundStations[storage.owningPlaceable] = true
@@ -96,6 +156,7 @@ function EconomyDataCollector:collectMarketPrices()
     -- Method 3: Check all placeables for selling capabilities
     if _G.g_currentMission.placeables then
         for _, placeable in pairs(_G.g_currentMission.placeables) do
+            self:_workYield()
             if placeable and not foundStations[placeable] then
                 if placeable.spec_sellingStation then
                     foundStations[placeable] = true
@@ -116,6 +177,7 @@ function EconomyDataCollector:collectMarketPrices()
     -- Method 4: Check mission placeables (map default sell points)
     if _G.g_currentMission.placeableSystem and _G.g_currentMission.placeableSystem.placeables then
         for _, placeable in pairs(_G.g_currentMission.placeableSystem.placeables) do
+            self:_workYield()
             if placeable and not foundStations[placeable] then
                 local stationName = "Unknown"
                 if placeable.getName then
@@ -150,6 +212,7 @@ function EconomyDataCollector:collectMarketPrices()
             table.insert(marketData.sellPoints, virtualStation)
             
             for cropName, priceInfo in pairs(virtualStation.prices) do
+                self:_workYield()
                 if not marketData.crops[cropName] then
                     marketData.crops[cropName] = {
                         name = cropName,
@@ -183,6 +246,7 @@ function EconomyDataCollector:collectMarketPrices()
     
     -- Process each selling station
     for _, station in pairs(sellingStations) do
+        self:_workYield()
         local stationData = self:getStationPrices(station)
         if stationData then
             table.insert(marketData.sellPoints, stationData)
@@ -193,6 +257,7 @@ function EconomyDataCollector:collectMarketPrices()
     local allFillTypes = {}
     if _G.g_fillTypeManager then
         for fillTypeIndex, fillType in pairs(_G.g_fillTypeManager.fillTypes) do
+            self:_workYield()
             if fillType and fillType.name then
                 allFillTypes[fillType.name] = fillTypeIndex
             end
@@ -202,6 +267,7 @@ function EconomyDataCollector:collectMarketPrices()
     -- Method 6a: Add production points as new selling stations if they're not already present
     if _G.g_currentMission.placeableSystem and _G.g_currentMission.placeableSystem.placeables then
         for _, placeable in pairs(_G.g_currentMission.placeableSystem.placeables) do
+            self:_workYield()
             if placeable and placeable.spec_productionPoint and placeable.spec_productionPoint.inputFillTypes then
                 local placeableName = "Unknown"
                 if placeable.getName then

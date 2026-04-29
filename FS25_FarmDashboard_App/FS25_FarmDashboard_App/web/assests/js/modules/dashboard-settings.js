@@ -37,16 +37,26 @@ export async function loadDashboardUiPreferences() {
     const api = getFarmDashApi();
     if (!api) {
       this.sectionVisibility = { ...DEFAULT_SECTION_VISIBILITY };
+      this.fieldClusterPrefsByServer = {};
+      this.simHubView = { enabled: false };
     } else {
       const prefs = await api.getUiPreferences();
       this.sectionVisibility = {
         ...DEFAULT_SECTION_VISIBILITY,
         ...(prefs?.sections || {}),
       };
+      this.fieldClusterPrefsByServer =
+        prefs?.fieldClusterPrefsByServer && typeof prefs.fieldClusterPrefsByServer === "object"
+          ? prefs.fieldClusterPrefsByServer
+          : {};
+      this.simHubView =
+        prefs?.simHubView && typeof prefs.simHubView === "object" ? prefs.simHubView : { enabled: false };
     }
   } catch (e) {
     console.warn("[dashboard-settings] load UI prefs", e);
     this.sectionVisibility = { ...DEFAULT_SECTION_VISIBILITY };
+    this.fieldClusterPrefsByServer = {};
+    this.simHubView = { enabled: false };
   }
   this.applyDashboardSectionVisibility();
 }
@@ -59,6 +69,55 @@ export function applyDashboardSectionVisibility() {
     const on = vis[sec] !== false;
     el.classList.toggle("d-none", !on);
   });
+}
+
+function collectSimHubViewFromForm() {
+  const enabled = !!document.getElementById("settings-simhub-enabled")?.checked;
+  const view = document.getElementById("settings-simhub-view")?.value || "fields";
+  const clusterLines = (document.getElementById("settings-simhub-cluster-ids")?.value || "")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const pastureRaw = document.getElementById("settings-simhub-pasture-ids")?.value || "";
+  const pastureIds = pastureRaw
+    .split(/[,;\s]+/)
+    .map((x) => parseInt(String(x).trim(), 10))
+    .filter((n) => !Number.isNaN(n) && n >= 0);
+  const productionKeys = (document.getElementById("settings-simhub-production-keys")?.value || "")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+  return {
+    enabled,
+    view,
+    fieldClusterIds: clusterLines,
+    pastureIds,
+    productionKeys,
+  };
+}
+
+function collectFieldClusterPrefsFromForm() {
+  const out = {};
+  document.querySelectorAll("[data-field-cluster-server]").forEach((wrap) => {
+    const sid = wrap.getAttribute("data-field-cluster-server");
+    if (!sid) return;
+    const safe = String(sid).replace(/[^a-zA-Z0-9_-]/g, "_");
+    const autoEl = document.getElementById(`settings-cluster-auto-${safe}`);
+    const ta = document.getElementById(`settings-cluster-groups-${safe}`);
+    const autoMerge = autoEl ? !!autoEl.checked : true;
+    const lines = (ta?.value || "")
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    const manualGroups = lines.map((line) =>
+      line
+        .split(/[,;\s]+/)
+        .map((x) => parseInt(String(x).trim(), 10))
+        .filter((n) => !Number.isNaN(n) && n > 0)
+    );
+    out[String(sid)] = { autoMerge, manualGroups };
+  });
+  return out;
 }
 
 function collectFieldExclusionsFromForm() {
@@ -132,8 +191,11 @@ function renderAppSettingsServerList() {
   servers.forEach((srv, idx) => {
     const info =
       srv.mode === "local"
-        ? "Local: " + (srv.localSubFolder || srv.name)
-        : "FTP: " + (srv.ftpHost || "") + (srv.httpFeedHost ? " + HTTP" : "");
+        ? t("setup.serverInfoLocal", { detail: srv.localSubFolder || srv.name })
+        : t("setup.serverInfoFtp", {
+            host: srv.ftpHost || "",
+            extra: srv.httpFeedHost ? t("setup.serverInfoHttpSuffix") : "",
+          });
     const row = document.createElement("div");
     row.className =
       "d-flex justify-content-between align-items-start border border-secondary rounded p-2 mb-2 bg-black bg-opacity-25 gap-2";
@@ -371,6 +433,18 @@ export function setupDashboardSettingsModal() {
   wireDesktopAppUpdaterOnce();
   wireAppSettingsServerControlsOnce(this);
 
+  document.getElementById("settings-lan-auth-optional")?.addEventListener("change", (ev) => {
+    const t = ev.target;
+    if (t && t.checked) {
+      const ok = window.confirm(
+        typeof window.t === "function"
+          ? window.t("settings.lanAuthOptionalWarn")
+          : "Optional LAN login disables HTTP Basic for read-only GET pages. Only use this on trusted closed networks; anyone on the LAN could read farm data without a password."
+      );
+      if (!ok) t.checked = false;
+    }
+  });
+
   modalEl.addEventListener("show.bs.modal", () => {
     this.populateDashboardSettingsForm();
   });
@@ -410,14 +484,6 @@ function escHtml(s) {
     .replace(/"/g, "&quot;");
 }
 
-async function refreshSettingsDashboardAiConnectionLine() {
-  const el = document.getElementById("settings-ai-connection-status");
-  if (!el) return;
-  el.className = "alert alert-secondary small py-2 mb-0";
-  el.innerHTML =
-    '<span class="badge bg-secondary me-1">Rules</span> Parcel tips use the <strong>offline rules engine</strong> only (Fields tab and field cards).';
-}
-
 export async function populateDashboardSettingsForm() {
   const api = getFarmDashApi();
 
@@ -432,11 +498,6 @@ export async function populateDashboardSettingsForm() {
   });
 
   if (!api) {
-    try {
-      await refreshSettingsDashboardAiConnectionLine();
-    } catch (e) {
-      console.warn("[dashboard-settings] field rules status line", e);
-    }
     return;
   }
 
@@ -495,6 +556,73 @@ export async function populateDashboardSettingsForm() {
     }
   }
 
+  const clContainer = document.getElementById("settings-field-clusters");
+  if (clContainer && api) {
+    try {
+      const fcp = this.fieldClusterPrefsByServer || {};
+      const farmId = Number(this.activeFarmId ?? 1);
+      const opt = await api.getFieldExclusionOptions({ activeFarmId: farmId });
+      const rows = opt?.rows || [];
+      if (rows.length === 0) {
+        clContainer.innerHTML = `<p class="text-muted small mb-0" data-i18n="settings.fieldClusterEmpty">${escHtml(
+          t("settings.fieldClusterEmpty")
+        )}</p>`;
+      } else {
+        const by = new Map();
+        for (const r of rows) {
+          if (!by.has(r.serverId)) by.set(r.serverId, { name: r.serverName, sid: r.serverId });
+        }
+        let html = `<p class="small text-muted mb-2" data-i18n="settings.fieldClusterHint">${escHtml(
+          t("settings.fieldClusterHint")
+        )}</p>`;
+        for (const { name, sid } of by.values()) {
+          const safeSid = String(sid).replace(/[^a-zA-Z0-9_-]/g, "_");
+          const pref = fcp[String(sid)] || { autoMerge: true, manualGroups: [] };
+          const lines = (pref.manualGroups || [])
+            .map((g) => (Array.isArray(g) ? g.join(", ") : ""))
+            .filter(Boolean)
+            .join("\n");
+          html += `<div class="mb-3 border border-secondary rounded p-2 bg-black bg-opacity-25" data-field-cluster-server="${escAttr(
+            sid
+          )}">`;
+          html += `<div class="fw-semibold text-light mb-1">${escHtml(name)} <span class="text-muted fw-normal small">(${escHtml(
+            String(sid)
+          )})</span></div>`;
+          html += `<div class="form-check mb-2">`;
+          html += `<input class="form-check-input" type="checkbox" id="settings-cluster-auto-${safeSid}" ${
+            pref.autoMerge !== false ? "checked" : ""
+          }/>`;
+          html += `<label class="form-check-label" for="settings-cluster-auto-${safeSid}" data-i18n="settings.fieldClusterAuto">${escHtml(
+            t("settings.fieldClusterAuto")
+          )}</label></div>`;
+          html += `<label class="form-label small mb-1" for="settings-cluster-groups-${safeSid}" data-i18n="settings.fieldClusterManualLabel">${escHtml(
+            t("settings.fieldClusterManualLabel")
+          )}</label>`;
+          html += `<textarea class="form-control form-control-sm bg-secondary text-light border-secondary font-monospace" id="settings-cluster-groups-${safeSid}" rows="3" spellcheck="false" placeholder="12,13,14">${escHtml(
+            lines
+          )}</textarea>`;
+          html += `</div>`;
+        }
+        clContainer.innerHTML = html;
+      }
+    } catch (e) {
+      console.warn("[dashboard-settings] field clusters", e);
+      clContainer.innerHTML = `<p class="text-muted small mb-0">${escHtml(t("settings.fieldClusterEmpty"))}</p>`;
+    }
+  }
+
+  const sh = this.simHubView || {};
+  const shEn = document.getElementById("settings-simhub-enabled");
+  if (shEn) shEn.checked = !!sh.enabled;
+  const shView = document.getElementById("settings-simhub-view");
+  if (shView) shView.value = ["fields", "pastures", "production"].includes(String(sh.view)) ? sh.view : "fields";
+  const shCl = document.getElementById("settings-simhub-cluster-ids");
+  if (shCl) shCl.value = (Array.isArray(sh.fieldClusterIds) ? sh.fieldClusterIds : []).join("\n");
+  const shPa = document.getElementById("settings-simhub-pasture-ids");
+  if (shPa) shPa.value = (Array.isArray(sh.pastureIds) ? sh.pastureIds : []).join(", ");
+  const shPr = document.getElementById("settings-simhub-production-keys");
+  if (shPr) shPr.value = (Array.isArray(sh.productionKeys) ? sh.productionKeys : []).join("\n");
+
   try {
     const mod = await api.getModConfig();
     const pathEl = document.getElementById("settings-mod-config-path");
@@ -538,15 +666,13 @@ export async function populateDashboardSettingsForm() {
     }
     const lanIps = document.getElementById("settings-lan-allowed-ips");
     if (lanIps) lanIps.value = lan.lanAllowedIPs || "";
+    const lanOpt = document.getElementById("settings-lan-auth-optional");
+    if (lanOpt) lanOpt.checked = !!lan.lanAuthOptional;
   } catch (e) {
     console.warn("[dashboard-settings] LAN access", e);
   }
 
-  try {
-    await refreshSettingsDashboardAiConnectionLine();
-  } catch (e) {
-    console.warn("[dashboard-settings] field rules status line", e);
-  }
+  if (dashPane) applyDom(dashPane);
 }
 
 export async function saveDashboardSettingsFromModal() {
@@ -563,11 +689,23 @@ export async function saveDashboardSettingsFromModal() {
   });
 
   const excludedFarmlandIdsByServer = collectFieldExclusionsFromForm();
+  const fieldClusterPrefsByServer = collectFieldClusterPrefsFromForm();
+  const simHubView = collectSimHubViewFromForm();
 
   try {
-    await api.saveUiPreferences({ sections, excludedFarmlandIdsByServer });
+    await api.saveUiPreferences({
+      sections,
+      excludedFarmlandIdsByServer,
+      fieldClusterPrefsByServer,
+      simHubView,
+    });
     this.sectionVisibility = { ...DEFAULT_SECTION_VISIBILITY, ...sections };
+    this.fieldClusterPrefsByServer = fieldClusterPrefsByServer;
+    this.simHubView = simHubView;
     this.applyDashboardSectionVisibility();
+    if (typeof this.invalidateFieldsClientCache === "function") {
+      this.invalidateFieldsClientCache();
+    }
   } catch (e) {
     this.showAlert?.(t("settings.saveFailed") + " (UI)", "error");
     return;
@@ -575,12 +713,15 @@ export async function saveDashboardSettingsFromModal() {
 
   try {
     const cfg = await api.getCurrentConfig();
-    api.saveSettings({
+    const saveRes = await api.saveSettings({
       ...cfg,
       isConfigured: true,
       servers: _appSettingsServersDraft !== null ? _appSettingsServersDraft : cfg?.servers || [],
       ftpPolling: { ...(cfg?.ftpPolling || {}), ...gatherFtpPollingFromForm() },
     });
+    if (saveRes && saveRes.ok === false) {
+      throw new Error(saveRes.error || "save-settings failed");
+    }
   } catch (e) {
     console.warn("[dashboard-settings] save-settings", e);
   }
@@ -631,6 +772,7 @@ export async function saveDashboardSettingsFromModal() {
           document.getElementById("settings-lan-username")?.value?.trim() || "admin",
         lanPassword: pwRaw !== "" ? pwRaw : prevLan.lanPassword,
         lanAllowedIPs: document.getElementById("settings-lan-allowed-ips")?.value?.trim() || "",
+        lanAuthOptional: !!document.getElementById("settings-lan-auth-optional")?.checked,
       });
       if (!lanRes?.ok) {
         this.showAlert?.(

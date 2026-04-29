@@ -42,8 +42,7 @@ Narrative: **[RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md)** · GitHub blurb: **[RELE
 
 ### Documentation
 
-- **USER_MANUAL**, **USER_GUIDE**, **RELEASE_NOTES**, **RELEASE_v3.0.0**, **DEVELOPER_HANDOVER**, **GEMINI_PROJECT_CONTEXT**, **SALES_HANDOVER**, **docs/README**, root **README**, app **README** — rewritten for **3.0.0** without optional cloud-stack assumptions.
-- **Stub pages** — Legacy filenames under `docs/` (see [docs/README.md](./README.md) “Retired placeholder docs”) return short redirects instead of long obsolete guides.
+- **USER_MANUAL**, **USER_GUIDE**, **RELEASE_NOTES**, **RELEASE_v3.0.0**, **DEVELOPER_HANDOVER**, **PROJECT_CONTEXT**, **SALES_HANDOVER**, **docs/README**, root **README**, app **README** — rewritten for **3.0.0** without optional cloud-stack assumptions.
 
 ### Historical note
 

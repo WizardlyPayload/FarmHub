@@ -38,11 +38,18 @@
   let catalog = null;
   let lang = 'en';
 
-  function t(key) {
+  function t(key, params) {
     const row = catalog && catalog.strings && catalog.strings[key];
     if (!row || typeof row !== 'object') return key;
-    const v = row[lang] || row.en;
-    return v != null && v !== '' ? v : key;
+    let v = row[lang];
+    if (v == null || v === '') v = row.en;
+    if (v == null || v === '') return key;
+    if (params && typeof params === 'object') {
+      for (const pk of Object.keys(params)) {
+        v = v.split('{{' + pk + '}}').join(String(params[pk]));
+      }
+    }
+    return v;
   }
 
   function apply() {
@@ -133,8 +140,8 @@
     }
     apply();
     document.documentElement.lang = lang;
-    window.setupT = function (key) {
-      return t(key);
+    window.setupT = function (key, params) {
+      return t(key, params);
     };
   }
 

@@ -1,6 +1,7 @@
--- FS25 FarmDashboard | FarmDashboardDataCollector.lua | v2.0.0
--- Collectors run one per time slice across collectionCycleMs (default 60s) so the game
--- is not hit with every module in one frame; data.json is rewritten after each slice.
+-- FS25 FarmDashboard | FarmDashboardDataCollector.lua | v2.1.1
+-- Inter-module staggering: one collector slot per collectionCycleMs / N (same as v2).
+-- Intra-module: collectors may expose collectBegin/collectStep (cooperative / batched).
+-- data.json is emitted progressively as each module slice completes.
 
 FarmDashboardDataCollector = {}
 FarmDashboardDataCollector.data = {}
@@ -35,6 +36,38 @@ function FarmDashboardDataCollector:resetStaggerState()
     self.slotAccumulator = 0
     self._lastSliceGTime = nil
     self._firstWriteLogged = nil
+    self._incActiveModule = nil
+    self._cycleFresh = {}
+    self._husbandryJob = nil
+    self._slicePendingFinish = nil
+    self._jsonWriteJob = nil
+    if rawget(_G, "VehicleDataCollector") then
+        VehicleDataCollector._inc = nil
+    end
+    if rawget(_G, "FieldDataCollector") then
+        FieldDataCollector._fdCo = nil
+        FieldDataCollector._yieldEvery = nil
+        FieldDataCollector._baleYieldStride = nil
+        FieldDataCollector._lastGameplayFlags = nil
+    end
+    if rawget(_G, "EconomyDataCollector") then
+        EconomyDataCollector._ecoCo = nil
+        EconomyDataCollector._yieldStride = nil
+        EconomyDataCollector._yieldPartialEcon = nil
+    end
+    if rawget(_G, "ProductionDataCollector") then
+        ProductionDataCollector._co = nil
+    end
+    if rawget(_G, "AnimalDataCollector") then
+        AnimalDataCollector._co = nil
+        AnimalDataCollector._yieldEvery = nil
+    end
+    if rawget(_G, "FinanceDataCollector") then
+        FinanceDataCollector._incFin = false
+    end
+    if rawget(_G, "WeatherDataCollector") then
+        WeatherDataCollector._incWx = false
+    end
 end
 
 function FarmDashboardDataCollector:loadConfig()
@@ -50,6 +83,16 @@ function FarmDashboardDataCollector:loadConfig()
         enableProduction    = true,
         --- When true, FieldDataCollector prints a throttled line to log.txt after bale scans (see FieldDataCollector.lua).
         debugBaleScan       = false,
+        --- Intra-module budgets (collectStep); see FieldDataCollector / VehicleDataCollector.
+        fieldsPerFrame      = 1,
+        baleEntitiesBudget  = 8,
+        vehiclesPerFrame    = 2,
+        animalsPerFrame      = 1,
+        husbandryPlaceablesPerFrame = 1,
+        jsonTopLevelKeysPerFrame    = 1,
+        economyYieldStride          = 20,
+        productionChainsPerYield    = 1,
+        productionPlaceablesPerYield = 4,
     }
 
     local configPath = getUserProfileAppPath() .. "modSettings/FS25_FarmDashboard/config.xml"
@@ -73,6 +116,18 @@ function FarmDashboardDataCollector:loadConfig()
             self.config.enableEconomy    = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#economy"),    true)
             self.config.enableProduction = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#production"), true)
             self.config.debugBaleScan = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#debugBaleScan"), false)
+            local fpf = getXMLInt(xmlFile, "farmDashboard.settings#fieldsPerFrame")
+            if fpf and fpf > 0 then self.config.fieldsPerFrame = fpf end
+            local beb = getXMLInt(xmlFile, "farmDashboard.settings#baleEntitiesBudget")
+            if beb and beb > 0 then self.config.baleEntitiesBudget = beb end
+            local vpf = getXMLInt(xmlFile, "farmDashboard.settings#vehiclesPerFrame")
+            if vpf and vpf > 0 then self.config.vehiclesPerFrame = vpf end
+            local hpp = getXMLInt(xmlFile, "farmDashboard.settings#husbandryPlaceablesPerFrame")
+            if hpp and hpp > 0 then self.config.husbandryPlaceablesPerFrame = hpp end
+            local jtk = getXMLInt(xmlFile, "farmDashboard.settings#jsonTopLevelKeysPerFrame")
+            if jtk and jtk > 0 then self.config.jsonTopLevelKeysPerFrame = jtk end
+            local eys = getXMLInt(xmlFile, "farmDashboard.settings#economyYieldStride")
+            if eys and eys > 0 then self.config.economyYieldStride = eys end
             delete(xmlFile)
         end
     else
@@ -88,11 +143,27 @@ function FarmDashboardDataCollector:loadConfig()
         setXMLBool(xmlFile, "farmDashboard.modules#finance",    true)
         setXMLBool(xmlFile, "farmDashboard.modules#economy",    true)
         setXMLBool(xmlFile, "farmDashboard.modules#production", true)
+        setXMLInt(xmlFile, "farmDashboard.settings#fieldsPerFrame", self.config.fieldsPerFrame)
+        setXMLInt(xmlFile, "farmDashboard.settings#baleEntitiesBudget", self.config.baleEntitiesBudget)
+        setXMLInt(xmlFile, "farmDashboard.settings#vehiclesPerFrame", self.config.vehiclesPerFrame)
+        setXMLInt(xmlFile, "farmDashboard.settings#husbandryPlaceablesPerFrame", self.config.husbandryPlaceablesPerFrame)
+        setXMLInt(xmlFile, "farmDashboard.settings#jsonTopLevelKeysPerFrame", self.config.jsonTopLevelKeysPerFrame)
+        setXMLInt(xmlFile, "farmDashboard.settings#economyYieldStride", self.config.economyYieldStride)
         saveXMLFile(xmlFile)
         delete(xmlFile)
     end
 
-    self.config.collectionCycleMs = math.max(5000, math.min(1800000, self.config.collectionCycleMs or 60000))
+    -- Keep staggered collection on a slow cadence by default: never faster than 60s per full pass.
+    self.config.collectionCycleMs = math.max(60000, math.min(1800000, self.config.collectionCycleMs or 60000))
+    self.config.fieldsPerFrame = math.max(1, math.min(12, self.config.fieldsPerFrame or 1))
+    self.config.baleEntitiesBudget = math.max(4, math.min(128, self.config.baleEntitiesBudget or 8))
+    self.config.vehiclesPerFrame = math.max(1, math.min(16, self.config.vehiclesPerFrame or 2))
+    self.config.animalsPerFrame = math.max(1, math.min(8, self.config.animalsPerFrame or 1))
+    self.config.husbandryPlaceablesPerFrame = math.max(1, math.min(8, self.config.husbandryPlaceablesPerFrame or 1))
+    self.config.jsonTopLevelKeysPerFrame = math.max(1, math.min(20, self.config.jsonTopLevelKeysPerFrame or 1))
+    self.config.economyYieldStride = math.max(8, math.min(120, self.config.economyYieldStride or 20))
+    self.config.productionChainsPerYield = math.max(1, math.min(8, self.config.productionChainsPerYield or 1))
+    self.config.productionPlaceablesPerYield = math.max(1, math.min(24, self.config.productionPlaceablesPerYield or 4))
     FarmDashboard.UPDATE_INTERVAL = self.config.collectionCycleMs
 end
 
@@ -135,6 +206,10 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
         economy    = mc.economy or {}
     }
 
+    if rawget(_G, "FieldDataCollector") and FieldDataCollector.getCachedGameplayFlags then
+        data.gameSettings = FieldDataCollector.getCachedGameplayFlags()
+    end
+
     if data.finance and data.finance.money then
         data.money = data.finance.money
     end
@@ -143,28 +218,144 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
     return data
 end
 
-function FarmDashboardDataCollector:runOneStaggeredSlice(order)
+--- @return boolean hasIncrementalCollector
+function FarmDashboardDataCollector:collectorSupportsIncremental(name)
+    local c = self.collectors[name]
+    return c ~= nil and type(c.collectBegin) == "function" and type(c.collectStep) == "function"
+end
+
+function FarmDashboardDataCollector:startModuleSlice(name, order)
+    if self:collectorSupportsIncremental(name) then
+        local c = self.collectors[name]
+        local ok = pcall(function() c:collectBegin() end)
+        if not ok then
+            Logging.warning("[FarmDash] collectBegin failed for " .. tostring(name))
+            self:runLegacyModuleSlice(name, order)
+            return
+        end
+    end
+    self._incActiveModule = name
+end
+
+--- After a module produces fresh data (partial or final), refresh in-memory payload without disk write.
+function FarmDashboardDataCollector:refreshAssembledInMemory()
+    local assembled = self:assembleDataFromModuleCache()
+    if assembled then
+        self.data = assembled
+    end
+end
+
+--- When a module slice completes (full collect or incremental done), advance schedule and maybe flush JSON.
+function FarmDashboardDataCollector:finishModuleSlice(name, order, usedIncremental)
+    self._incActiveModule = nil
+    local n = #order
+    if n > 0 then
+        self.nextSliceIdx = (self.nextSliceIdx or 1) % n + 1
+    end
+
+    self._cycleFresh[name] = true
+    self:refreshAssembledInMemory()
+    local assembled = self:assembleDataFromModuleCache()
+    if assembled then
+        self:beginDeferredJsonWrite(assembled)
+    end
+    self:tryFlushAfterFullCycle(order)
+end
+
+--- Track full-cycle completion while still allowing progressive per-slice writes.
+function FarmDashboardDataCollector:tryFlushAfterFullCycle(order)
+    for _, n in ipairs(order) do
+        if not self._cycleFresh[n] then return end
+    end
+    self._cycleFresh = {}
+end
+
+--- Run at most one incremental step for the active module (same frame as slot start is allowed).
+function FarmDashboardDataCollector:runIncrementalActiveStep(order)
+    local name = self._incActiveModule
+    if not name then return end
+    local c = self.collectors[name]
+    if not c or not c.collectStep then
+        self._incActiveModule = nil
+        return
+    end
+
+    local opts = {
+        batchSize = self.config.fieldsPerFrame or 8,
+        animalBatch = self.config.animalsPerFrame or 2,
+        baleBudget = self.config.baleEntitiesBudget or 48,
+        vehicleBatch = self.config.vehiclesPerFrame or 12,
+        economyYieldStride = self.config.economyYieldStride or 55,
+        productionChainsPerYield = self.config.productionChainsPerYield or 2,
+        productionPlaceablesPerYield = self.config.productionPlaceablesPerYield or 10,
+    }
+
+    local ok, done, payload = pcall(function() return c:collectStep(opts) end)
+    if not ok then
+        Logging.warning("[FarmDash] collectStep failed for " .. tostring(name))
+        self.moduleCache[name] = {}
+        self:finishModuleSlice(name, order, true)
+        return
+    end
+
+    if name == "production" and done then
+        local prod = payload or {}
+        self.moduleCache.production = prod
+        self:startHusbandryJobAfterProduction(order, true)
+        if self._husbandryJob then
+            self._incActiveModule = nil
+        else
+            self.moduleCache.production.husbandryTotals = {}
+            self:finishModuleSlice("production", order, true)
+        end
+    else
+        self.moduleCache[name] = payload or {}
+    end
+
+    self:refreshAssembledInMemory()
+
+    if done and name ~= "production" then
+        self:finishModuleSlice(name, order, true)
+    end
+end
+
+--- Legacy synchronous collect for one module name.
+function FarmDashboardDataCollector:runLegacyModuleSlice(name, order)
+    local result = self:safeCollect(name)
+    if name == "production" then
+        local prod = result or {}
+        self.moduleCache.production = prod
+        self:startHusbandryJobAfterProduction(order, false)
+        self:refreshAssembledInMemory()
+        if self._husbandryJob then
+            return
+        end
+        self.moduleCache.production.husbandryTotals = {}
+        self:finishModuleSlice(name, order, false)
+        return
+    end
+    self.moduleCache[name] = result or {}
+    self:finishModuleSlice(name, order, false)
+end
+
+--- Consume one inter-module slot: start or continue incremental work, or run a full legacy collect.
+function FarmDashboardDataCollector:consumeOneModuleSlot(order)
     local n = #order
     if n < 1 then return end
 
     local idx = self.nextSliceIdx or 1
     if idx > n then idx = 1 end
     local name = order[idx]
-    self.nextSliceIdx = (idx % n) + 1
 
-    local result = self:safeCollect(name)
-    if name == "production" then
-        local prod = result or {}
-        prod.husbandryTotals = self:collectHusbandryTotals()
-        self.moduleCache.production = prod
-    else
-        self.moduleCache[name] = result or {}
+    if self:collectorSupportsIncremental(name) then
+        self:startModuleSlice(name, order)
+        if self._incActiveModule == name then
+            self:runIncrementalActiveStep(order)
+        end
+        return
     end
 
-    local assembled = self:assembleDataFromModuleCache()
-    if assembled then
-        self:writeDataToFile(assembled)
-    end
+    self:runLegacyModuleSlice(name, order)
 end
 
 function FarmDashboardDataCollector:update(dt)
@@ -180,11 +371,28 @@ function FarmDashboardDataCollector:update(dt)
     if type(gt) == "number" then
         self._lastSliceGTime = gt
     end
-    if effDt <= 0 then return end
 
     local order = self:getEnabledCollectorOrder()
     local n = #order
     local cycleMs = self.config.collectionCycleMs
+
+    --- Drain incremental / husbandry / deferred JSON even when effDt<=0 (pause, menu, zero-dt ticks).
+    --- Otherwise mid-flight work never advances and data.json can stall permanently behind _jsonWriteJob.
+    if self._incActiveModule then
+        self:runIncrementalActiveStep(order)
+    end
+    if self._husbandryJob then
+        self:husbandryTotalsStep()
+    end
+    if self._jsonWriteJob then
+        self:jsonWriteStep()
+    end
+
+    if self._incActiveModule or self._husbandryJob or self._jsonWriteJob then
+        return
+    end
+
+    if effDt <= 0 then return end
 
     -- All modules disabled in config: still emit data.json on a heartbeat (otherwise file never appears).
     if n < 1 then
@@ -211,72 +419,238 @@ function FarmDashboardDataCollector:update(dt)
         self.staggerFirstRunDone = true
         self.nextSliceIdx = 1
         self.slotAccumulator = 0
-        self:runOneStaggeredSlice(order)
+        self:consumeOneModuleSlot(order)
         return
     end
 
     self.slotAccumulator = (self.slotAccumulator or 0) + effDt
-    while self.slotAccumulator >= slotMs do
+    --- At most one inter-module slot per engine tick to avoid multi-collector spikes in a single frame.
+    if self.slotAccumulator >= slotMs then
         self.slotAccumulator = self.slotAccumulator - slotMs
-        self:runOneStaggeredSlice(order)
+        self:consumeOneModuleSlot(order)
     end
 end
 
--- FIX: Aggregate milk/manure/slurry totals across all husbandry buildings.
--- This provides the farm-wide storage numbers that pastures.js needs.
-function FarmDashboardDataCollector:collectHusbandryTotals()
-    local totals = {}
+--- Merge one placeable's husbandry fill readings into `totals` (farm id 1 only).
+function FarmDashboardDataCollector:accumulateHusbandryTotalsForPlaceable(placeable, totals)
+    if not placeable or type(totals) ~= "table" then return end
+    local okFarm, isPlayer = pcall(function() return placeable:getOwnerFarmId() == 1 end)
+    if not okFarm or not isPlayer then return end
 
-    if not _G.g_currentMission or not _G.g_currentMission.husbandrySystem then
-        return totals
+    local function addFill(specObj)
+        if not specObj then return end
+        local fillLevel = specObj.fillLevel
+        local fillType  = specObj.fillType
+
+        if fillLevel and type(fillLevel) == "number" and fillLevel > 0 then
+            local typeName = "UNKNOWN"
+            if fillType and _G.g_fillTypeManager then
+                local ftData = _G.g_fillTypeManager:getFillTypeByIndex(fillType)
+                if ftData and ftData.name then
+                    typeName = ftData.name
+                end
+            end
+            totals[typeName] = (totals[typeName] or 0) + fillLevel
+        end
     end
 
-    local success, err = pcall(function()
-        for _, placeable in pairs(_G.g_currentMission.husbandrySystem.placeables or {}) do
-            if placeable and placeable:getOwnerFarmId() == 1 then
-                -- Check fillLevels via multiple spec paths
-                local function addFill(specObj)
-                    if not specObj then return end
-                    local fillLevel = specObj.fillLevel
-                    local fillType  = specObj.fillType
+    addFill(placeable.spec_husbandryMilk)
+    addFill(placeable.spec_husbandryLiquidManure)
+    addFill(placeable.spec_husbandryManure)
 
-                    if fillLevel and type(fillLevel) == "number" and fillLevel > 0 then
-                        local typeName = "UNKNOWN"
-                        if fillType and _G.g_fillTypeManager then
-                            local ftData = _G.g_fillTypeManager:getFillTypeByIndex(fillType)
-                            if ftData and ftData.name then
-                                typeName = ftData.name
-                            end
-                        end
-                        totals[typeName] = (totals[typeName] or 0) + fillLevel
-                    end
-                end
-
-                -- Specs that hold liquid/solid outputs
-                addFill(placeable.spec_husbandryMilk)
-                addFill(placeable.spec_husbandryLiquidManure)
-                addFill(placeable.spec_husbandryManure)
-
-                -- Generic fill unit fallback
-                if placeable.spec_fillUnit and placeable.spec_fillUnit.fillUnits then
-                    for _, unit in pairs(placeable.spec_fillUnit.fillUnits) do
-                        if unit.fillType and unit.fillLevel and type(unit.fillLevel) == "number" and unit.fillLevel > 0 then
-                            local ftData = _G.g_fillTypeManager and _G.g_fillTypeManager:getFillTypeByIndex(unit.fillType)
-                            local typeName = (ftData and ftData.name) or "UNKNOWN"
-                            if typeName ~= "UNKNOWN" then
-                                totals[typeName] = (totals[typeName] or 0) + unit.fillLevel
-                            end
-                        end
-                    end
+    if placeable.spec_fillUnit and placeable.spec_fillUnit.fillUnits then
+        for _, unit in pairs(placeable.spec_fillUnit.fillUnits) do
+            if unit.fillType and unit.fillLevel and type(unit.fillLevel) == "number" and unit.fillLevel > 0 then
+                local ftData = _G.g_fillTypeManager and _G.g_fillTypeManager:getFillTypeByIndex(unit.fillType)
+                local typeName = (ftData and ftData.name) or "UNKNOWN"
+                if typeName ~= "UNKNOWN" then
+                    totals[typeName] = (totals[typeName] or 0) + unit.fillLevel
                 end
             end
         end
-    end)
+    end
+end
 
-    if not success then
-        Logging.warning("[FarmDash] collectHusbandryTotals failed: " .. tostring(err))
+function FarmDashboardDataCollector:startHusbandryJobAfterProduction(order, incrementalFlag)
+    self._slicePendingFinish = nil
+    self._husbandryJob = nil
+    local list = {}
+    if _G.g_currentMission and _G.g_currentMission.husbandrySystem then
+        for _, placeable in pairs(_G.g_currentMission.husbandrySystem.placeables or {}) do
+            if placeable then
+                local ok, isOurs = pcall(function() return placeable:getOwnerFarmId() == 1 end)
+                if ok and isOurs then
+                    table.insert(list, placeable)
+                end
+            end
+        end
+    end
+    if #list < 1 then
+        return
+    end
+    self._husbandryJob = { list = list, idx = 1, totals = {} }
+    self._slicePendingFinish = { name = "production", order = order, incremental = incrementalFlag }
+end
+
+--- @return boolean true when job finished (or none)
+function FarmDashboardDataCollector:husbandryTotalsStep()
+    local job = self._husbandryJob
+    if not job then return true end
+    local per = self.config.husbandryPlaceablesPerFrame or 3
+    local n = #job.list
+    local hi = math.min(job.idx + per - 1, n)
+    for i = job.idx, hi do
+        local ok, err = pcall(function()
+            self:accumulateHusbandryTotalsForPlaceable(job.list[i], job.totals)
+        end)
+        if not ok then
+            Logging.warning("[FarmDash] husbandryTotalsStep placeable: " .. tostring(err))
+        end
+    end
+    job.idx = hi + 1
+    if job.idx > n then
+        if self.moduleCache.production then
+            self.moduleCache.production.husbandryTotals = job.totals
+        end
+        self._husbandryJob = nil
+        self:refreshAssembledInMemory()
+        local pending = self._slicePendingFinish
+        self._slicePendingFinish = nil
+        if pending then
+            self:finishModuleSlice(pending.name, pending.order, pending.incremental)
+        end
+        return true
+    end
+    self:refreshAssembledInMemory()
+    return false
+end
+
+--- Spread top-level JSON keys across frames, then write the file once.
+function FarmDashboardDataCollector:beginDeferredJsonWrite(data)
+    if not data or type(data) ~= "table" then return end
+    local savegameDir = self:getSavegameDirName()
+    local currentMapName = "Unknown Map"
+    if _G.g_currentMission and _G.g_currentMission.missionInfo then
+        local info = _G.g_currentMission.missionInfo
+        if info.mapTitle and info.mapTitle ~= "" then
+            currentMapName = info.mapTitle
+        end
+    end
+    data.serverInfo = { mapName = currentMapName, saveSlot = savegameDir }
+    self._jsonWriteJob = nil
+    local keys = {}
+    for k in pairs(data) do
+        table.insert(keys, tostring(k))
+    end
+    table.sort(keys, function(a, b) return a < b end)
+    self._jsonWriteJob = {
+        data = data,
+        keys = keys,
+        i = 1,
+        buf = "{" .. "\n",
+    }
+end
+
+function FarmDashboardDataCollector:jsonWriteStep()
+    local job = self._jsonWriteJob
+    if not job then return true end
+    local per = self.config.jsonTopLevelKeysPerFrame or 1
+    local nk = #job.keys
+    for _ = 1, per do
+        if job.i > nk then break end
+        local k = job.keys[job.i]
+        local v = job.data[k]
+        local escKey = tostring(k)
+            :gsub('[\x00-\x1f]', '')
+            :gsub('\\', '\\\\')
+            :gsub('"', '\\"')
+        local piece = '  "' .. escKey .. '": '
+        local okJson, frag = pcall(function() return self:toJSON(v, 0) end)
+        if not okJson then
+            Logging.error("[FarmDash] json chunk toJSON failed: %s", tostring(frag))
+            frag = "null"
+        end
+        job.buf = job.buf .. piece .. (frag or "null")
+        if job.i < nk then
+            job.buf = job.buf .. ","
+        end
+        job.buf = job.buf .. "\n"
+        job.i = job.i + 1
+    end
+    if job.i > nk then
+        job.buf = job.buf .. "}"
+        local savegameDir = self:getSavegameDirName()
+        self:_writeJsonStringToDisk(job.buf, savegameDir)
+        self._jsonWriteJob = nil
+        return true
+    end
+    return false
+end
+
+--- Write a fully built JSON string to data.json (I/O only).
+function FarmDashboardDataCollector:_writeJsonStringToDisk(jsonData, savegameDir)
+    if not jsonData or jsonData == "" then
+        Logging.warning("[FarmDash] skip write: empty JSON string")
+        return
+    end
+    savegameDir = savegameDir or self:getSavegameDirName()
+    local dataPath = self:getDataOutputDir()
+    local filePath = dataPath .. "data.json"
+    local normPath = string.gsub(filePath, "\\", "/")
+    local written = false
+
+    if type(io) == "table" and type(io.open) == "function" then
+        local file = io.open(normPath, "w") or io.open(filePath, "w")
+        if file then
+            file:write(jsonData)
+            file:close()
+            written = true
+        end
+    elseif not self._ioNilLogged then
+        self._ioNilLogged = true
+        Logging.error("[FarmDash] Lua io.open is not available; cannot write data.json.")
     end
 
+    if not written and type(_G.saveFile) == "function" then
+        local rel = "modSettings/FS25_FarmDashboard/" .. savegameDir .. "/data.json"
+        local okSf = pcall(function() _G.saveFile(rel, jsonData) end)
+        if okSf then
+            written = true
+        end
+    end
+
+    if written then
+        self._ioNilLogged = nil
+        if not self._firstWriteLogged then
+            self._firstWriteLogged = true
+            Logging.info("[FarmDash] data.json write OK: %s", tostring(normPath))
+        end
+        self._writeFailLogged = nil
+        self._writeFailCount = 0
+    else
+        self._writeFailCount = (self._writeFailCount or 0) + 1
+        if not self._writeFailLogged or self._writeFailCount % 40 == 0 then
+            self._writeFailLogged = true
+            Logging.error("[FarmDash] Could not write data.json (path: %s) [fail #%d]", tostring(normPath), self._writeFailCount)
+        end
+    end
+end
+
+--- FIX: Aggregate milk/manure/slurry totals across all husbandry buildings.
+-- This provides the farm-wide storage numbers that pastures.js needs.
+function FarmDashboardDataCollector:collectHusbandryTotals()
+    local totals = {}
+    if not _G.g_currentMission or not _G.g_currentMission.husbandrySystem then
+        return totals
+    end
+    local ok, err = pcall(function()
+        for _, placeable in pairs(_G.g_currentMission.husbandrySystem.placeables or {}) do
+            self:accumulateHusbandryTotalsForPlaceable(placeable, totals)
+        end
+    end)
+    if not ok then
+        Logging.warning("[FarmDash] collectHusbandryTotals failed: " .. tostring(err))
+    end
     return totals
 end
 
@@ -356,71 +730,22 @@ function FarmDashboardDataCollector:getDataOutputDir()
 end
 
 function FarmDashboardDataCollector:writeDataToFile(data)
-    local savegameDir    = self:getSavegameDirName()
+    local savegameDir = self:getSavegameDirName()
     local currentMapName = "Unknown Map"
-
     if _G.g_currentMission and _G.g_currentMission.missionInfo then
         local info = _G.g_currentMission.missionInfo
         if info.mapTitle and info.mapTitle ~= "" then
             currentMapName = info.mapTitle
         end
     end
-
     data.serverInfo = { mapName = currentMapName, saveSlot = savegameDir }
 
-    local dataPath = self:getDataOutputDir()
-
-    -- Pretty-print (indented) so data.json is human-readable and tools can open it
     local okJson, jsonData = pcall(function() return self:toJSON(data, 0) end)
     if not okJson then
         Logging.error("[FarmDash] toJSON failed: %s", tostring(jsonData))
         return
     end
-    if not jsonData or jsonData == "" then
-        Logging.warning("[FarmDash] toJSON returned empty; skip write")
-        return
-    end
-
-    local filePath = dataPath .. "data.json"
-    local normPath = string.gsub(filePath, "\\", "/")
-    local written = false
-
-    if type(io) == "table" and type(io.open) == "function" then
-        local file = io.open(normPath, "w") or io.open(filePath, "w")
-        if file then
-            file:write(jsonData)
-            file:close()
-            written = true
-        end
-    elseif not self._ioNilLogged then
-        self._ioNilLogged = true
-        Logging.error("[FarmDash] Lua io.open is not available; cannot write data.json.")
-    end
-
-    -- Some builds expose a profile-relative writer; try only if io failed.
-    if not written and type(_G.saveFile) == "function" then
-        local rel = "modSettings/FS25_FarmDashboard/" .. savegameDir .. "/data.json"
-        local okSf = pcall(function() _G.saveFile(rel, jsonData) end)
-        if okSf then
-            written = true
-        end
-    end
-
-    if written then
-        self._ioNilLogged = nil
-        if not self._firstWriteLogged then
-            self._firstWriteLogged = true
-            Logging.info("[FarmDash] data.json write OK: %s", tostring(normPath))
-        end
-        self._writeFailLogged = nil
-        self._writeFailCount = 0
-    else
-        self._writeFailCount = (self._writeFailCount or 0) + 1
-        if not self._writeFailLogged or self._writeFailCount % 40 == 0 then
-            self._writeFailLogged = true
-            Logging.error("[FarmDash] Could not write data.json (path: %s) [fail #%d]", tostring(normPath), self._writeFailCount)
-        end
-    end
+    self:_writeJsonStringToDisk(jsonData, savegameDir)
 end
 
 --- @param depth number|nil nil = compact (legacy); 0+ = pretty-print with 2-space indent
@@ -510,6 +835,23 @@ function FarmDashboardDataCollector:getCurrentData() return self.data end
 function FarmDashboardDataCollector:shutdown()
     for name, collector in pairs(self.collectors) do
         if collector.shutdown then collector:shutdown() end
+    end
+    if rawget(_G, "FieldDataCollector") then
+        FieldDataCollector._fdCo = nil
+        FieldDataCollector._yieldEvery = nil
+        FieldDataCollector._baleYieldStride = nil
+        FieldDataCollector._lastGameplayFlags = nil
+    end
+    if rawget(_G, "EconomyDataCollector") then
+        EconomyDataCollector._ecoCo = nil
+        EconomyDataCollector._yieldStride = nil
+    end
+    if rawget(_G, "ProductionDataCollector") then
+        ProductionDataCollector._co = nil
+    end
+    if rawget(_G, "AnimalDataCollector") then
+        AnimalDataCollector._co = nil
+        AnimalDataCollector._yieldEvery = nil
     end
     self:resetStaggerState()
 end

@@ -1,4 +1,4 @@
--- FS25 FarmDashboard | FieldDataCollector.lua | v2.0.0
+-- FS25 FarmDashboard | FieldDataCollector.lua | v2.1.0
 
 FieldDataCollector = {}
 
@@ -29,6 +29,82 @@ function FieldDataCollector:cacheWindrowFillTypeIndices()
     return c
 end
 
+--- Gameplay toggles from the **active save** (`careerSavegame.xml` → `settings.*`) — same file on dedi as on client.
+--- Install-dir XML is only defaults for new careers; runtime truth is this save + `g_gameSettings` when exposed.
+FieldDataCollector._lastGameplayFlags = nil
+
+local function farmDashJoinSavePath(dir, filename)
+    if type(dir) ~= "string" or dir == "" then return nil end
+    dir = string.gsub(dir, "\\", "/")
+    local last = string.sub(dir, -1)
+    if last ~= "/" then dir = dir .. "/" end
+    return dir .. filename
+end
+
+local function farmDashReadBoolFromCareerXml(fh, elemName, defaultTrue)
+    local key = "careerSavegame.settings." .. elemName
+    local s = getXMLString(fh, key)
+    if s == "true" then return true end
+    if s == "false" then return false end
+    if type(hasXMLProperty) == "function" then
+        local ok, exists = pcall(hasXMLProperty, fh, key)
+        if ok and exists then
+            local b = getXMLBool(fh, key, defaultTrue)
+            if type(b) == "boolean" then return b end
+        end
+    end
+    return defaultTrue
+end
+
+function FieldDataCollector.readCareerGameplayFlags()
+    local out = {
+        plowingRequired = true,
+        limeRequired    = true,
+        weedsEnabled    = true,
+        stonesEnabled   = true,
+    }
+
+    local m = rawget(_G, "g_currentMission")
+    local xmlPath = m and farmDashJoinSavePath(m.missionInfo and m.missionInfo.savegameDirectory, "careerSavegame.xml")
+    if xmlPath then
+        local okLoad, fh = pcall(loadXMLFile, "FarmDashCareerGameplay", xmlPath)
+        if okLoad and fh and fh ~= 0 then
+            out.plowingRequired = farmDashReadBoolFromCareerXml(fh, "plowingRequiredEnabled", true)
+            out.limeRequired    = farmDashReadBoolFromCareerXml(fh, "limeRequired", true)
+            out.weedsEnabled    = farmDashReadBoolFromCareerXml(fh, "weedsEnabled", true)
+            out.stonesEnabled   = farmDashReadBoolFromCareerXml(fh, "stonesEnabled", true)
+            pcall(delete, fh)
+        end
+    end
+
+    --- Prefer in-memory mission / game settings over disk (XML updates on save; menu toggles are immediate).
+    if m and m.plowingRequiredEnabled ~= nil then
+        out.plowingRequired = m.plowingRequiredEnabled == true
+    end
+
+    local ggs = rawget(_G, "g_gameSettings")
+    local GS = rawget(_G, "GameSettings")
+    if ggs and type(ggs.getValue) == "function" and GS and GS.SETTING then
+        for _, name in ipairs({ "PLOWING_REQUIRED", "PERIODIC_PLOWING", "PLOWING" }) do
+            local sid = GS.SETTING[name]
+            if sid ~= nil then
+                local ok, v = pcall(function() return ggs:getValue(sid) end)
+                if ok and type(v) == "boolean" then
+                    out.plowingRequired = v
+                    break
+                end
+            end
+        end
+    end
+
+    FieldDataCollector._lastGameplayFlags = out
+    return out
+end
+
+function FieldDataCollector.getCachedGameplayFlags()
+    return FieldDataCollector._lastGameplayFlags or FieldDataCollector.readCareerGameplayFlags()
+end
+
 --- Dominant tipped windrow class for JSON `windrowType` (Straw / Grass / Hay), or FD_JSON_NULL_STR → JSON null.
 local function classifyWindrowTypeForJson(strawL, grassL, hayL, totalL)
     local EPS = 0.01
@@ -54,14 +130,92 @@ end
 
 function FieldDataCollector:init()
     FieldDataCollector._windrowFillIdxCache = nil
+    FieldDataCollector._fdCo = nil
+    FieldDataCollector._lastGameplayFlags = nil
     print("[FarmDashboard] Field data collector initialized (Hybrid: NPC State + Physical HUD Probe)")
 end
 
+--- Cooperative micro-stagger: FarmDashboardDataCollector calls collectBegin once, then collectStep each frame.
+function FieldDataCollector:collectBegin()
+    FieldDataCollector._fdCo = coroutine.create(function(opts)
+        opts = opts or {}
+        FieldDataCollector._yieldEvery = math.max(1, tonumber(opts.batchSize) or 8)
+        FieldDataCollector._baleYieldStride = math.max(4, tonumber(opts.baleBudget) or 48)
+        FieldDataCollector._yieldBaleCounter = 0
+        return FieldDataCollector:_collectImpl()
+    end)
+end
+
+--- @return boolean done, table fieldArrayPartialOrFinal
+function FieldDataCollector:collectStep(opts)
+    opts = opts or {}
+    if not FieldDataCollector._fdCo then
+        return true, {}
+    end
+    local ok, a, b = coroutine.resume(FieldDataCollector._fdCo, opts)
+    if not ok then
+        Logging.warning("[FarmDash] FieldDataCollector coroutine: " .. tostring(a))
+        FieldDataCollector._fdCo = nil
+        FieldDataCollector._yieldEvery = nil
+        FieldDataCollector._baleYieldStride = nil
+        return true, {}
+    end
+    if a == "progress" then
+        return false, b or {}
+    end
+    local st = coroutine.status(FieldDataCollector._fdCo)
+    if st == "dead" then
+        FieldDataCollector._fdCo = nil
+        FieldDataCollector._yieldEvery = nil
+        FieldDataCollector._baleYieldStride = nil
+        return true, a or {}
+    end
+    if st == "suspended" then
+        Logging.warning("[FarmDash] FieldDataCollector: unexpected coroutine state; ending slice.")
+        FieldDataCollector._fdCo = nil
+        FieldDataCollector._yieldEvery = nil
+        FieldDataCollector._baleYieldStride = nil
+        return true, (type(a) == "table" and a) or b or {}
+    end
+    return false, b or {}
+end
+
 function FieldDataCollector:collect()
+    FieldDataCollector._yieldEvery = nil
+    FieldDataCollector._baleYieldStride = nil
+    return FieldDataCollector:_collectImpl()
+end
+
+function FieldDataCollector:_collectImpl()
     local fieldData = {}
+    local function coopProgress()
+        if FieldDataCollector._yieldEvery then
+            coroutine.yield("progress", fieldData)
+        end
+    end
+    local function baleCoopTick()
+        if not FieldDataCollector._yieldEvery then return end
+        local stride = FieldDataCollector._baleYieldStride or 48
+        FieldDataCollector._yieldBaleCounter = (FieldDataCollector._yieldBaleCounter or 0) + 1
+        if FieldDataCollector._yieldBaleCounter % stride == 0 then
+            coopProgress()
+        end
+    end
+    local function fieldCoopTick()
+        if not FieldDataCollector._yieldEvery then return end
+        FieldDataCollector._yieldFieldCounter = (FieldDataCollector._yieldFieldCounter or 0) + 1
+        if FieldDataCollector._yieldFieldCounter % FieldDataCollector._yieldEvery == 0 then
+            coopProgress()
+        end
+    end
+
+    FieldDataCollector._yieldFieldCounter = 0
     
     if not _G.g_currentMission then return fieldData end
     if not _G.g_fieldManager or not _G.g_fieldManager.fields then return fieldData end
+
+    local careerGameplayFlags = FieldDataCollector.readCareerGameplayFlags()
+    local periodicPlowingRequired = (careerGameplayFlags.plowingRequired ~= false)
 
     --- Shown on lime / fertiliser / nitrogen / weed-spray suggestions (limit crop trampling).
     local TYRE_NOTE_ON_CROP = " Use narrow tyres when working on the crop (lime, fertiliser, spray)."
@@ -124,6 +278,18 @@ function FieldDataCollector:collect()
         if raw > 1 and raw <= 255 then raw = raw / 255 end
         if raw > 1 then raw = 1 end
         return 1 - raw
+    end
+
+    --- `FieldState.stoneLevel` after `update` — same signal the game uses for stones on the field.
+    local function readStoneFromState(st)
+        if not st then return 0 end
+        local ok, v = pcall(function()
+            local s = st.stoneLevel
+            if s ~= nil and type(s) == "number" then return s end
+            return 0
+        end)
+        if ok and type(v) == "number" and v > 0 then return v end
+        return 0
     end
 
     --- Weed: integer 0–4 = FS stages; else 0–1 fraction; else 0–100 = percent. Normalize to 0–1.
@@ -232,38 +398,10 @@ function FieldDataCollector:collect()
                 end
                 return nil, nil
             end
-            --- Parcel id for bale tallies must match `field.farmland.id` / UI "Field N".
-            --- Some maps expose field id vs farmland parcel id separately; prefer **farmland** parcel id for bucket keys,
-            --- not Field:getId() first — those can differ on merged / complex maps and left counts in the wrong bucket.
-            local function fieldOrFarmlandKeyAtXZ(x, z)
-                local function keyFromFarmlandObject(fmo)
-                    if fmo == nil then return nil end
-                    if type(fmo) == "number" then
-                        local n = tonumber(fmo)
-                        return (n and n > 0) and n or nil
-                    end
-                    if type(fmo) ~= "table" then return nil end
-                    local parcel = tonumber(fmo.farmlandId or fmo.id)
-                    if parcel and parcel > 0 then return parcel end
-                    if type(fmo.getId) == "function" then
-                        local okI, ii = pcall(function() return fmo:getId() end)
-                        if okI and ii ~= nil then
-                            local n = tonumber(ii)
-                            if n and n > 0 then return n end
-                        end
-                    end
-                    if type(fmo.getField) == "function" then
-                        local okFld, fld = pcall(function() return fmo:getField() end)
-                        if okFld and fld and type(fld.getId) == "function" then
-                            local okId, fi = pcall(function() return fld:getId() end)
-                            if okId and fi ~= nil then
-                                local n = tonumber(fi)
-                                if n and n > 0 then return n end
-                            end
-                        end
-                    end
-                    return nil
-                end
+            --- Parcel id (farmland.id) at world XZ, with a small offset ring so bales resting a hair
+            --- off the parcel polygon still resolve to a parcel. Returns parcel id, or nil if the
+            --- engine reports no farmland here at all (e.g. truly off the map).
+            local function farmlandIdAtWithRing(x, z)
                 local function tryAt(px, pz)
                     if type(fm.getFarmlandIdAtWorldPosition) == "function" then
                         local ok, fid = pcall(function() return fm:getFarmlandIdAtWorldPosition(px, pz) end)
@@ -274,7 +412,20 @@ function FieldDataCollector:collect()
                     end
                     local okF, fmo = pcall(function() return fm:getFarmlandAtWorldPosition(px, pz) end)
                     if not okF or fmo == nil then return nil end
-                    return keyFromFarmlandObject(fmo)
+                    if type(fmo) == "number" then
+                        local n = tonumber(fmo); return (n and n > 0) and n or nil
+                    end
+                    if type(fmo) == "table" then
+                        local p = tonumber(fmo.farmlandId or fmo.id)
+                        if p and p > 0 then return p end
+                        if type(fmo.getId) == "function" then
+                            local okI, ii = pcall(function() return fmo:getId() end)
+                            if okI and ii ~= nil then
+                                local n = tonumber(ii); if n and n > 0 then return n end
+                            end
+                        end
+                    end
+                    return nil
                 end
                 --- Offsets when the bale origin sits on a parcel edge or slightly off the farmland nav mesh.
                 local offs = {
@@ -287,10 +438,60 @@ function FieldDataCollector:collect()
                 end
                 return nil
             end
+            --- A field's farmland parcel can also contain non-field areas — yards, driveways, lanes.
+            --- Counting *every* bale on the parcel attributes yard bales to the small grass field that
+            --- happens to share parcel id (e.g. on Witcombe, parcel 98 covers both the 1.16 ha grass
+            --- field and a yard area ~110 m away). We pre-compute each registered field's centre + an
+            --- effective radius, and only count a bale toward a parcel if there's a field on that
+            --- parcel whose centre is within range of the bale.
+            ---
+            --- effRadius = equiv-circle radius (sqrt(area/π)) + 50% shape slack (covers most non-circular
+            --- polygons — long rectangular fields included; a 4 ha 200×200 m square has corners ~141 m
+            --- from centre vs. equiv radius 113 m, well under 1.5×) + 2 m boundary tolerance the user
+            --- asked for. For fields with bogus posX/posZ, prefer `field:getCenterOfFieldWorldPosition()`.
+            local fieldGeometries = {}
+            if _G.g_fieldManager and _G.g_fieldManager.fields then
+                for _, fld in pairs(_G.g_fieldManager.fields) do
+                    local pid = (fld.farmland and fld.farmland.id) or nil
+                    local areaHa = tonumber(fld.areaHa) or 0
+                    if pid and pid > 0 and areaHa > 0 then
+                        local cx0 = tonumber(fld.posX) or 0
+                        local cz0 = tonumber(fld.posZ) or 0
+                        if type(fld.getCenterOfFieldWorldPosition) == "function" then
+                            local okC, gx, gz = pcall(function() return fld:getCenterOfFieldWorldPosition() end)
+                            if okC and tonumber(gx) and tonumber(gz) then cx0, cz0 = gx, gz end
+                        end
+                        local r = math.sqrt((areaHa * 10000) / math.pi)
+                        local effRadius = r + math.max(r * 0.5, 5) + 2
+                        table.insert(fieldGeometries, { farmlandId = pid, cx = cx0, cz = cz0, effRadius = effRadius })
+                    end
+                end
+            end
+            --- Returns the parcel id (= field.farmland.id, the bucket key) to credit a bale to, OR
+            --- nil to drop the bale (the bale is on a yard / driveway / lane portion of a parcel
+            --- whose registered field(s) sit too far from the bale to plausibly own it).
+            local function bestFieldKeyForBaleAtXZ(x, z)
+                local parcel = farmlandIdAtWithRing(x, z)
+                if parcel == nil or parcel <= 0 then return nil end
+                local bestKey, bestDistSq = nil, math.huge
+                for _, g in ipairs(fieldGeometries) do
+                    if g.farmlandId == parcel then
+                        local dx = x - g.cx
+                        local dz = z - g.cz
+                        local d2 = dx * dx + dz * dz
+                        local er = g.effRadius
+                        if d2 <= er * er and d2 < bestDistSq then
+                            bestDistSq = d2
+                            bestKey = parcel
+                        end
+                    end
+                end
+                return bestKey
+            end
             local function incrementFarmlandForBale(it)
                 local x, z = itemWorldXZ(it)
                 if x == nil or z == nil then return end
-                local key = fieldOrFarmlandKeyAtXZ(x, z)
+                local key = bestFieldKeyForBaleAtXZ(x, z)
                 if key ~= nil and key > 0 then
                     farmlandBaleCounts[key] = (farmlandBaleCounts[key] or 0) + 1
                 end
@@ -337,6 +538,7 @@ function FieldDataCollector:collect()
             if type(items) == "table" then
                 for _, it in pairs(items) do
                     tryCountBale(it)
+                    baleCoopTick()
                 end
             end
             --- Always merge bale manager list (round/round wrapped etc.), not only when items is missing.
@@ -356,6 +558,7 @@ function FieldDataCollector:collect()
             if type(list) == "table" then
                 for _, b in pairs(list) do
                     tryCountBale(b)
+                    baleCoopTick()
                 end
             end
             --- FS25: world bales also live in the mission slot system limited-object bucket (same source the game uses for bale limits).
@@ -365,6 +568,7 @@ function FieldDataCollector:collect()
                 if lim and type(lim.objects) == "table" then
                     for _, b in pairs(lim.objects) do
                         tryCountBale(b)
+                        baleCoopTick()
                     end
                 end
             end
@@ -375,12 +579,14 @@ function FieldDataCollector:collect()
                 if okBtc and type(bl) == "table" then
                     for _, b in pairs(bl) do
                         tryCountBale(b)
+                        baleCoopTick()
                     end
                 end
             end
             --- Fallback: scan mission.nodeToObject for Bale-class objects. Item / baleManager can miss bales on some MP or mod maps.
             if type(mission.nodeToObject) == "table" then
                 for _, obj in pairs(mission.nodeToObject) do
+                    baleCoopTick()
                     if type(obj) == "table" then
                         local likely = false
                         local cn = rawget(obj, "className")
@@ -449,6 +655,8 @@ function FieldDataCollector:collect()
             growthState           = 0,
             maxGrowthState        = 0,
             growthStatePercentage = 0,
+            --- Grass only: display ring 1–4 (perennial cycles map engine stage >4 back into the 4 map stages).
+            grassRingStage        = 0,
             --- Raw `numGrowthStates` from fruit desc (per crop); grass may report extra indices vs the 4 map stages — see §2.
             engineNumGrowthStates = 0,
             harvestReady          = false,
@@ -696,6 +904,30 @@ function FieldDataCollector:collect()
             fData.rollerLevel = rollerLevelAsRolledFraction(raw)
         end
 
+        -- 1e. Stones: worst `stoneLevel` across samples (FieldState — matches in-field map / work flags).
+        do
+            local maxStone = 0
+            local stoneOffsets = {
+                {0, 0}, {5, 5}, {-5, -5}, {5, -5}, {-5, 5},
+                {10, 0}, {-10, 0}, {0, 10}, {0, -10},
+            }
+            if probeState and type(probeState.update) == "function" then
+                for _, off in ipairs(stoneOffsets) do
+                    pcall(function() probeState:update(cx + off[1], cz + off[2]) end)
+                    local sl = readStoneFromState(probeState)
+                    if sl > maxStone then maxStone = sl end
+                end
+            end
+            if field.fieldState and type(field.fieldState.update) == "function" then
+                for _, off in ipairs(stoneOffsets) do
+                    pcall(function() field.fieldState:update(cx + off[1], cz + off[2]) end)
+                    local sl = readStoneFromState(field.fieldState)
+                    if sl > maxStone then maxStone = sl end
+                end
+            end
+            fData.stoneLevel = maxStone
+        end
+
         -- Engine GroundType cache: only adjust "visual dirt" when there is NO crop.
         -- If we clobber growthState with groundType while fruit is planted, rolling / stage-1 tasks
         -- disagree with the in-game field map (e.g. field still shows "needs rolling").
@@ -796,8 +1028,10 @@ function FieldDataCollector:collect()
                 end
 
                 -- Grass: only the last of the 4 map stages is "ready to cut" (not earlier engine-ready substates).
+                --- Do not overwrite mown / regrowth labels set from `growthStateToName` (cut / stubble / second growth).
                 if ftUpper == "GRASS" and (fData.maxGrowthState or 0) > 0 and (fData.growthState or 0) > 0
-                    and (fData.growthState or 0) < fData.maxGrowthState then
+                    and (fData.growthState or 0) < fData.maxGrowthState
+                    and fData.growthLabel ~= "mown_regrowth" then
                     fData.harvestReady = false
                     fData.growthLabel  = "growing"
                     fData.stateName    = "Growing"
@@ -805,15 +1039,23 @@ function FieldDataCollector:collect()
                         fData.growthStatePercentage = math.min(99, math.floor((fData.growthState / maxStateToShow) * 100))
                     end
                 end
-                -- Grass: growth index above the 4 map stages = mown / regrowth (not a 5th "growth" stage).
+                -- Grass: engine index above the 4 map stages = after cut / internal cycle — keep mown_regrowth for suggestions + UI.
                 if ftUpper == "GRASS" and (fData.growthState or 0) > (fData.maxGrowthState or GRASS_GROWTH_STAGES) then
                     fData.harvestReady = false
-                    fData.growthLabel  = "growing"
-                    fData.stateName    = "Growing"
+                    fData.growthLabel  = "mown_regrowth"
+                    fData.stateName    = "Mown / regrowing"
                     if maxStateToShow > 0 then
-                        local cap = fData.maxGrowthState or GRASS_GROWTH_STAGES
-                        local pctGs = math.min(fData.growthState or 0, cap)
-                        fData.growthStatePercentage = math.min(99, math.floor((pctGs / maxStateToShow) * 100))
+                        local gsMap = ((fData.growthState - 1) % GRASS_GROWTH_STAGES) + 1
+                        fData.growthStatePercentage = math.min(99, math.floor((gsMap / maxStateToShow) * 100))
+                    end
+                end
+
+                if ftUpper == "GRASS" and (fData.growthState or 0) > 0 then
+                    local gsv = fData.growthState or 0
+                    if fData.growthLabel == "mown_regrowth" or gsv > GRASS_GROWTH_STAGES then
+                        fData.grassRingStage = ((gsv - 1) % GRASS_GROWTH_STAGES) + 1
+                    else
+                        fData.grassRingStage = math.min(gsv, GRASS_GROWTH_STAGES)
                     end
                 end
             end
@@ -941,7 +1183,7 @@ function FieldDataCollector:collect()
         -- ====================================================================
         -- 4. STATUS FLAGS AND SUGGESTIONS
         -- ====================================================================
-        fData.needsPlowing = fData.plowLevel < 1
+        fData.needsPlowing = periodicPlowingRequired and (fData.plowLevel < 1)
         -- ~15%+ weeds (handles 0–1, 0–4 stages, or 0–100 percent-style reads)
         fData.needsWeeding = weedNorm01(fData.weedLevel) > 0.15
 
@@ -954,7 +1196,19 @@ function FieldDataCollector:collect()
                 fData.nitrogenText       = "Needs Scan"
                 fData.limeText           = "Needs Scan"
             else
-                fData.nitrogenText       = string.format("%.0f / %.0f kg/ha", nLevel, nTarget)
+                --- Grass: PF map can report very high kg/ha targets; keep raw `targetNitrogen` for logic, cap dashboard display only.
+                local nTextTarget = nTarget
+                local ftUpN = string.upper(tostring(fData.fruitType or ""))
+                local grassForN = (ftUpN == "GRASS")
+                if not grassForN and (fData.fruitTypeIndex or 0) > 0 and _G.g_fruitTypeManager then
+                    local ftdN = _G.g_fruitTypeManager:getFruitTypeByIndex(fData.fruitTypeIndex)
+                    if ftdN and string.upper(tostring(ftdN.name or "")) == "GRASS" then grassForN = true end
+                end
+                if grassForN and nTarget > 0 then
+                    nTextTarget = math.min(nTarget, math.max(nLevel * 1.15 + 30, 90))
+                    fData.nitrogenTargetDisplay = nTextTarget
+                end
+                fData.nitrogenText       = string.format("%.0f / %.0f kg/ha", nLevel, nTextTarget)
                 fData.limeText           = string.format("%.1f pH", phLevel)
                 fData.fertilizationLevel = nTarget > 0 and math.min(2, (nLevel / nTarget) * 2) or 0
                 -- Lime: use soil-map optimal pH for sampled soil types (targetPh); band ~0.2 below target.
@@ -1110,11 +1364,8 @@ function FieldDataCollector:collect()
             local deferEarlyN = isPF and isScanned and nTarget > 0 and gsGrow <= 2 and nLevel >= (nTarget * (1 - NUTRIENT_CLOSE_FRAC))
             local limeOkGrow = fData.needsLime and (isGrass or gsGrow <= 3)
 
-            --- Grass after mowing: only lime + any fertiliser (regrowth is not the same as first stage after seeding).
+            --- Grass after mowing: lime + fertiliser only (no tillage scan — PF scan is optional for pasture; use HUD / manual sampling).
             if grassMownRegrowth then
-                if isPF and not isScanned then
-                    table.insert(fData.suggestions, {priority = PR.grow_soil, type = "info", action = "Soil scan", reason = "Scan for pH and nitrogen on regrowth after mowing."})
-                end
                 if isPF and isScanned and limeOkGrow then
                     local tgt = phTarget > 0 and string.format("%.1f", phTarget) or "6.5"
                     local band = phTarget > 0 and string.format("%.1f", phTarget - 0.2) or "6.3"
@@ -1138,6 +1389,17 @@ function FieldDataCollector:collect()
                         priority = PR.grow_fert, type = "maintenance", action = "Apply fertiliser",
                         reason = "Grass regrowth after cut — top up with any fertiliser type as needed." .. TYRE_NOTE_ON_CROP
                     })
+                end
+                do
+                    local canAssess = (not isPF) or isScanned
+                    if canAssess and (not fData.needsLime) and (not fData.needsFertilizer) then
+                        table.insert(fData.suggestions, {
+                            priority = 208,
+                            type = "info",
+                            action = "Allow regrowth",
+                            reason = "Lime and fertiliser needs are met — grass will progress toward the next cut.",
+                        })
+                    end
                 end
             else
                 --- Growing crop: soil → lime → roll → mechanical weeds → organic → mineral → herbicide.
@@ -1539,6 +1801,16 @@ function FieldDataCollector:collect()
             fData.hasLooseForage = fData.hasLooseStraw or fData.hasLooseGrassWindrow or fData.hasLooseHayWindrow
             --- Align "needs baling / clear forage" step with straw+grass+hay presence (not cereal swath-only heaps).
             fData.needsBaling = fData.hasLooseForage
+            --- Below this combined bale-relevant volume (straw + grass + hay windrows, engine litres), skip forage / baling workflow — trace residue only.
+            local FORAGE_WORKFLOW_MIN_L = 100
+            local combinedForageL = aggS + aggG + aggH
+            if combinedForageL < FORAGE_WORKFLOW_MIN_L then
+                fData.hasLooseStraw = false
+                fData.hasLooseGrassWindrow = false
+                fData.hasLooseHayWindrow = false
+                fData.hasLooseForage = false
+                fData.needsBaling = false
+            end
             --- Single dominant class for dashboard (Straw / Grass / Hay); JSON null when empty (see FD_JSON_NULL_STR).
             fData.windrowType = classifyWindrowTypeForJson(aggS, aggG, aggH, fData.windrowLiters)
         else
@@ -1635,8 +1907,13 @@ function FieldDataCollector:collect()
         end
 
         table.insert(fieldData, fData)
+        fieldCoopTick()
     end
 
     table.sort(fieldData, function(a, b) return a.id < b.id end)
+    if FieldDataCollector._yieldEvery then
+        FieldDataCollector._yieldEvery = nil
+        FieldDataCollector._baleYieldStride = nil
+    end
     return fieldData
 end

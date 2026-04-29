@@ -24,7 +24,7 @@ function _hostnameImpliesLocalConfigHost() {
   }
 }
 
-/** Block Settings modal when opened programmatically (e.g. AI upsell) on remote viewers. */
+/** Block Settings modal when opened programmatically on remote viewers. */
 export function installFarmDashRemoteViewerGuards() {
   if (typeof document === "undefined") return;
   if (isFarmDashLocalConfigHost()) return;

@@ -18,7 +18,13 @@
     "dist": "node tools/run-electron-builder.mjs dist",
     "dist:in-repo": "electron-builder --win",
     "dist:fresh": "node tools/electron-builder-fresh-output.mjs dist",
-    "dist:alt": "electron-builder --win --config.directories.output=../electron-pack-out-alt"
+    "dist:alt": "electron-builder --win --config.directories.output=../electron-pack-out-alt",
+    "i18n:audit": "node web/locales/audit-keys.mjs",
+    "i18n:scan": "node web/locales/find-hardcoded-strings.mjs",
+    "i18n:build": "node web/locales/build-translations.mjs",
+    "i18n:fill": "node web/locales/mt-fill.mjs",
+    "i18n:fill:force": "node web/locales/mt-fill.mjs --force",
+    "i18n:verify": "node web/locales/verify-i18n.mjs"
   },
   "build": {
     "appId": "com.farmdashboard.app",

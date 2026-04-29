@@ -1,0 +1,197 @@
+<!--
+  FS25 Farm Dashboard — Itch.io page description (HTML)
+
+  Paste into: Dashboard → Edit game → Description (set format to HTML if available).
+
+  Image URL: hosted from the FarmHub GitHub repo (raw.githubusercontent.com). If you fork
+  the repo, update the USER/REPO/BRANCH portion of the URL below to match your fork.
+  Source file in repo:
+  FS25_FarmDashboard_App/FS25_FarmDashboard_App/web/assests/img/Dashboard PIctures/Background.png
+
+  Colours match web/assests/css/styles.css (glass hero, farm-primary, farm-accent).
+-->
+
+<div
+  style="
+    font-family: 'Segoe UI', system-ui, -apple-system, 'Plus Jakarta Sans', sans-serif;
+    color: #e8eef3;
+    margin: 0;
+    border-radius: 0;
+    overflow: hidden;
+  "
+>
+  <!-- Hero: full-bleed background + slate scrim (same feel as #splash-screen / #farm-dash-bg) -->
+  <div
+    style="
+      background-color: #0e1210;
+      background-image: linear-gradient(
+        165deg,
+        rgba(15, 23, 42, 0.92) 0%,
+        rgba(15, 23, 42, 0.58) 45%,
+        rgba(15, 23, 42, 0.85) 100%
+        ),
+        url('https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/FS25_FarmDashboard_App/FS25_FarmDashboard_App/web/assests/img/Dashboard%20PIctures/Background.png');
+      background-size: cover, cover;
+      background-position: center, center;
+      background-repeat: no-repeat;
+      padding: 1.75rem 1.1rem 2rem;
+      text-align: center;
+    "
+  >
+    <div
+      style="
+        max-width: 44rem;
+        margin: 0 auto;
+        padding: 1.6rem 1.4rem 1.75rem;
+        border-radius: 1.25rem;
+        background: rgba(15, 23, 42, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+      "
+    >
+      <p
+        style="
+          margin: 0 0 0.4rem 0;
+          font-size: 0.7rem;
+          font-weight: 600;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: #e8c547;
+        "
+      >
+        Farming Simulator 25 · live data
+      </p>
+      <h2
+        style="
+          margin: 0 0 0.75rem 0;
+          font-size: 1.65rem;
+          font-weight: 700;
+          letter-spacing: -0.03em;
+          line-height: 1.2;
+          color: #f8fafc;
+        "
+      >
+        <span style="color: #e8c547">⬡</span> Farm Management Dashboard
+      </h2>
+      <p
+        style="
+          margin: 0 auto 0.2rem;
+          max-width: 36rem;
+          font-size: 1.05rem;
+          line-height: 1.55;
+          color: rgba(226, 232, 240, 0.92);
+        "
+      >
+        Your field, your fleet, your money — in one browser, updating while you play. A
+        <strong style="color: #f1f5f9">lightweight in-game mod</strong> plus a
+        <strong style="color: #f1f5f9">Windows desktop app</strong> that serves the same glassy
+        home experience you get at <code style="color: #a5f3b5">http://localhost:8766</code>.
+      </p>
+      <p style="margin: 1rem 0 0; font-size: 0.9rem; color: #a8b3aa">
+        Livestock · Vehicles · Fields · Economy · Pastures · Productions — with optional
+        <strong style="color: #cde9d6">FTP</strong> for dedicated / hosted servers.
+      </p>
+    </div>
+  </div>
+
+  <div
+    style="
+      padding: 1.35rem 1.1rem 1.5rem;
+      background: linear-gradient(168deg, #0e1210 0%, #131a17 55%, #0f1412 100%);
+    "
+  >
+    <div
+      style="
+        max-width: 40rem;
+        margin: 0 auto 1rem;
+        text-align: center;
+        color: #98a39a;
+        font-size: 0.95rem;
+        line-height: 1.5;
+      "
+    >
+      Stop juggling spreadsheets. Open the dashboard on a second monitor or tablet and run your
+      operation with the same look and feel as the in-app UI.
+    </div>
+
+    <ul
+      style="
+        list-style: none;
+        margin: 0 auto 1.1rem;
+        padding: 0;
+        max-width: 38rem;
+        border-radius: 1rem;
+        background: rgba(20, 28, 24, 0.6);
+        border: 1px solid rgba(232, 197, 71, 0.2);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+        overflow: hidden;
+      "
+    >
+      <li
+        style="
+          padding: 0.7rem 1.1rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+          color: #e2e8f0;
+          font-size: 0.95rem;
+        "
+      >
+        <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.35rem">▸</span> Mod
+        exports live farm data to <code style="color: #a5f3b5">data.json</code> from your save or
+        server
+      </li>
+      <li
+        style="
+          padding: 0.7rem 1.1rem;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+          color: #e2e8f0;
+          font-size: 0.95rem;
+        "
+      >
+        <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.35rem">▸</span> App
+        merges Lua export with savegame context when XML is available — real dashboard, not a
+        static page
+      </li>
+      <li style="padding: 0.7rem 1.1rem; color: #e2e8f0; font-size: 0.95rem">
+        <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.35rem">▸</span> Built for
+        <strong>Windows</strong>; local disk paths or <strong>FTP</strong> for GPortal-style hosts
+      </li>
+    </ul>
+
+    <p
+      style="
+        text-align: center;
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #e8c547;
+        margin: 0 0 0.4rem 0;
+      "
+    >
+      Quick start
+    </p>
+    <ol
+      style="
+        max-width: 32rem;
+        margin: 0 auto 1rem;
+        padding-left: 1.2rem;
+        color: #b8c4bc;
+        font-size: 0.92rem;
+        line-height: 1.55;
+      "
+    >
+      <li>Install the mod, enable it, and load your save once.</li>
+      <li>Install the Farm Dashboard <strong style="color: #f0fdf4">.exe</strong> and run it.</li>
+      <li>Open the dashboard in your browser; adjust paths or FTP in Settings if needed.</li>
+    </ol>
+
+    <p style="text-align: center; margin: 0; font-size: 0.88rem; color: #7a877e">
+      Authors: <strong style="color: #9ca3af">JoshWalki</strong> &amp;
+      <strong style="color: #9ca3af">WizardlyPayload</strong> ·
+      <a
+        href="https://github.com/WizardlyPayload/FS25-Farm-Dashboard"
+        style="color: #e8c547; text-decoration: none; border-bottom: 1px solid rgba(232, 197, 71, 0.4)"
+        >docs &amp; releases on GitHub</a
+      >
+    </p>
+  </div>
+</div>

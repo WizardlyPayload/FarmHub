@@ -1,14 +1,16 @@
 // FS25 FarmDashboard | economy.js | v2.0.0
 
+import { t } from "../i18n/i18n.js";
+
 export function showEconomySection() {
   const economyHTML = `
           <div class="row mb-4">
               <div class="col-12 text-center">
                   <h2 class="text-farm-accent">
                       <i class="bi bi-graph-up me-2"></i>
-                      Economic Dashboard
+                      ${t("economy.title")}
                   </h2>
-                  <p class="lead text-muted">Monitor your finances, purchases, and market prices</p>
+                  <p class="lead text-muted">${t("economy.subtitle")}</p>
               </div>
           </div>
 
@@ -17,10 +19,10 @@ export function showEconomySection() {
                   <div class="card bg-farm-primary text-white border-0">
                       <div class="card-body text-center">
                           <h5 class="card-title">
-                              <i class="bi bi-cash-stack me-2"></i>Current Money
+                              <i class="bi bi-cash-stack me-2"></i>${t("economy.currentMoney")}
                           </h5>
                           <h2 class="display-4" id="current-money">$0</h2>
-                          <small class="text-light opacity-75">Available funds</small>
+                          <small class="text-light opacity-75">${t("economy.availableFunds")}</small>
                       </div>
                   </div>
               </div>
@@ -28,10 +30,10 @@ export function showEconomySection() {
                   <div class="card bg-success text-white border-0">
                       <div class="card-body text-center">
                           <h5 class="card-title">
-                              <i class="bi bi-cart me-2"></i>Total Purchases
+                              <i class="bi bi-cart me-2"></i>${t("economy.totalPurchases")}
                           </h5>
                           <h2 class="display-4" id="total-purchases">$0</h2>
-                          <small class="text-light opacity-75">Equipment value</small>
+                          <small class="text-light opacity-75">${t("economy.equipmentValue")}</small>
                       </div>
                   </div>
               </div>
@@ -39,10 +41,10 @@ export function showEconomySection() {
                   <div class="card bg-warning border-0">
                       <div class="card-body text-center">
                           <h5 class="card-title">
-                              <i class="bi bi-exclamation-triangle me-2"></i>Outstanding Loan
+                              <i class="bi bi-exclamation-triangle me-2"></i>${t("economy.outstandingLoan")}
                           </h5>
                           <h2 class="display-4" id="outstanding-loan">$0</h2>
-                          <small class="opacity-75">Current debt</small>
+                          <small class="opacity-75">${t("economy.currentDebt")}</small>
                       </div>
                   </div>
               </div>
@@ -50,10 +52,10 @@ export function showEconomySection() {
                   <div class="card bg-info text-white border-0">
                       <div class="card-body text-center">
                           <h5 class="card-title">
-                              <i class="bi bi-calculator me-2"></i>Net Worth
+                              <i class="bi bi-calculator me-2"></i>${t("economy.netWorth")}
                           </h5>
                           <h2 class="display-4" id="net-worth">$0</h2>
-                          <small class="text-light opacity-75">Assets - debt</small>
+                          <small class="text-light opacity-75">${t("economy.assetsMinusDebt")}</small>
                       </div>
                   </div>
               </div>
@@ -62,12 +64,12 @@ export function showEconomySection() {
           <ul class="nav nav-tabs mb-4" id="economyTabs" role="tablist">
               <li class="nav-item" role="presentation">
                   <button class="nav-link active" id="purchases-tab" data-bs-toggle="tab" data-bs-target="#purchases" type="button" role="tab">
-                      <i class="bi bi-cart-fill me-1"></i> Equipment Purchases
+                      <i class="bi bi-cart-fill me-1"></i> ${t("economy.tabPurchases")}
                   </button>
               </li>
               <li class="nav-item" role="presentation">
                   <button class="nav-link" id="market-tab" data-bs-toggle="tab" data-bs-target="#market" type="button" role="tab">
-                      <i class="bi bi-graph-up me-1"></i> Market Prices
+                      <i class="bi bi-graph-up me-1"></i> ${t("economy.tabMarket")}
                   </button>
               </li>
           </ul>
@@ -78,26 +80,26 @@ export function showEconomySection() {
                       <div class="col-md-6">
                           <div class="btn-group" role="group">
                               <button type="button" class="btn btn-outline-primary active" data-purchase-filter="all" onclick="dashboard.filterPurchases('all')">
-                                  <i class="bi bi-grid-3x3"></i> All Equipment
+                                  <i class="bi bi-grid-3x3"></i> ${t("economy.filterAllEquipment")}
                               </button>
                               <button type="button" class="btn btn-outline-success" data-purchase-filter="vehicles" onclick="dashboard.filterPurchases('vehicles')">
-                                  <i class="bi bi-truck"></i> Vehicles
+                                  <i class="bi bi-truck"></i> ${t("economy.filterVehicles")}
                               </button>
                               <button type="button" class="btn btn-outline-info" data-purchase-filter="implements" onclick="dashboard.filterPurchases('implements')">
-                                  <i class="bi bi-tools"></i> Implements
+                                  <i class="bi bi-tools"></i> ${t("economy.filterImplements")}
                               </button>
                           </div>
                       </div>
                       <div class="col-md-6 text-end">
                           <div class="btn-group" role="group">
                               <button class="btn btn-outline-secondary" onclick="dashboard.sortPurchases('price')">
-                                  <i class="bi bi-sort-numeric-down"></i> Price
+                                  <i class="bi bi-sort-numeric-down"></i> ${t("economy.sortPrice")}
                               </button>
                               <button class="btn btn-outline-secondary" onclick="dashboard.sortPurchases('age')">
-                                  <i class="bi bi-calendar"></i> Age
+                                  <i class="bi bi-calendar"></i> ${t("economy.sortAge")}
                               </button>
                               <button class="btn btn-outline-secondary" onclick="dashboard.sortPurchases('name')">
-                                  <i class="bi bi-sort-alpha-down"></i> Name
+                                  <i class="bi bi-sort-alpha-down"></i> ${t("economy.sortName")}
                               </button>
                           </div>
                       </div>
@@ -106,9 +108,9 @@ export function showEconomySection() {
                   <div class="row" id="purchases-list">
                       <div class="col-12 text-center p-5">
                           <div class="spinner-border text-primary" role="status">
-                              <span class="visually-hidden">Loading purchases...</span>
+                              <span class="visually-hidden">${t("economy.loadingPurchasesAria")}</span>
                           </div>
-                          <p class="mt-3 text-muted">Loading equipment data...</p>
+                          <p class="mt-3 text-muted">${t("economy.loadingEquipment")}</p>
                       </div>
                   </div>
               </div>
@@ -121,7 +123,7 @@ export function showEconomySection() {
                                   <i class="bi bi-search"></i>
                               </span>
                               <input type="text" class="form-control bg-secondary border-secondary text-white"
-                                     id="crop-search" placeholder="Search crops or locations..."
+                                     id="crop-search" placeholder="${t("economy.marketPlaceholder").replace(/"/g, "&quot;")}"
                                      onkeyup="dashboard.searchMarket(this.value)">
                           </div>
                       </div>
@@ -130,9 +132,9 @@ export function showEconomySection() {
                   <div id="market-prices">
                       <div class="text-center p-5">
                           <div class="spinner-border text-primary" role="status">
-                              <span class="visually-hidden">Loading market data...</span>
+                              <span class="visually-hidden">${t("economy.loadingMarketAria")}</span>
                           </div>
-                          <p class="mt-3 text-muted">Loading crop prices...</p>
+                          <p class="mt-3 text-muted">${t("economy.loadingCropPrices")}</p>
                       </div>
                   </div>
               </div>

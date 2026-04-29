@@ -1,4 +1,5 @@
 // FS25 FarmDashboard | changes.js | v2.0.0
+import { t } from "../i18n/i18n.js";
 
 export function storeDataForComparison() {
   // Store current data state for comparison after refresh - deep copy to prevent reference issues
@@ -342,12 +343,14 @@ export function displayNoChangesModal(changes) {
     </div>
   `;
 
-  // Show basic info in tabs
+  const emptyLivestockMsg = t("changes.emptyLivestock");
+  const emptyWarningsMsg = t("changes.emptyWarnings");
+  const emptyStatsMsg = t("changes.emptyStats");
   document.getElementById("livestockChangesContent").innerHTML =
-    '<div class="text-center text-muted py-4"><i class="bi bi-info-circle me-1"></i>No livestock changes detected.</div>';
+    `<div class="text-center text-muted py-4"><i class="bi bi-info-circle me-1"></i>${emptyLivestockMsg}</div>`;
 
   document.getElementById("warningsChangesContent").innerHTML =
-    '<div class="text-center text-muted py-4"><i class="bi bi-info-circle me-1"></i>No warning changes detected.</div>';
+    `<div class="text-center text-muted py-4"><i class="bi bi-info-circle me-1"></i>${emptyWarningsMsg}</div>`;
 
   // Show game time if it exists, or no changes message
   const container = document.getElementById("statisticsChangesContent");
@@ -366,7 +369,7 @@ export function displayNoChangesModal(changes) {
     `;
   } else {
     content =
-      '<div class="text-center text-muted py-4"><i class="bi bi-info-circle me-1"></i>No statistics changes detected.</div>';
+      `<div class="text-center text-muted py-4"><i class="bi bi-info-circle me-1"></i>${emptyStatsMsg}</div>`;
   }
 
   container.innerHTML = content;
@@ -610,21 +613,21 @@ export function populateStatisticsChanges(stats, gameTime) {
   const statChanges = [];
   if (stats.livestockCount.changed) {
     statChanges.push({
-      label: "Livestock Count",
+      label: t("changes.statLivestockCount"),
       old: stats.livestockCount.old,
       new: stats.livestockCount.new,
     });
   }
   if (stats.pastureCount.changed) {
     statChanges.push({
-      label: "Pasture Count",
+      label: t("changes.statPastureCount"),
       old: stats.pastureCount.old,
       new: stats.pastureCount.new,
     });
   }
   if (stats.farmsCount.changed) {
     statChanges.push({
-      label: "Farms Count",
+      label: t("changes.statFarmsCount"),
       old: stats.farmsCount.old,
       new: stats.farmsCount.new,
     });
@@ -655,7 +658,7 @@ export function populateStatisticsChanges(stats, gameTime) {
 
   if (content === "") {
     content =
-      '<div class="text-center text-muted"><i class="bi bi-info-circle me-1"></i>No statistics changes detected.</div>';
+      `<div class="text-center text-muted"><i class="bi bi-info-circle me-1"></i>${t("changes.emptyStats")}</div>`;
   }
 
   container.innerHTML = content;
@@ -679,25 +682,23 @@ export function showChangeToasts(changes) {
       .join(", ");
 
     const displayTextHtml =
-      count > 3 ? `${clickableIds} +${count - 3} more` : clickableIds;
+      count > 3 ? t("changes.suffixMoreHtml", { html: clickableIds, extra: count - 3 }) : clickableIds;
     const displayTextPlain =
-      count > 3 ? `${plainIds} +${count - 3} more` : plainIds;
+      count > 3 ? t("changes.suffixMoreText", { text: plainIds, extra: count - 3 }) : plainIds;
 
-    const messageHtml = `🐄 ${count} new animal${
-      count > 1 ? "s" : ""
-    } added: ${displayTextHtml}`;
+    const addedKey = count === 1 ? "changes.toastAnimalAddedOne" : "changes.toastAnimalAddedMany";
+    const messageHtml = t(addedKey, { count, ids: displayTextHtml });
     this.showAlert(messageHtml, "success");
 
-    // Add to notification history (use plain text for storage)
+    const titleKey = count === 1 ? "changes.historyAnimalAddedTitleOne" : "changes.historyAnimalAddedTitleMany";
     this.addNotificationToHistory({
       type: "added",
-      title: `${count} Animal${count > 1 ? "s" : ""} Added`,
+      title: t(titleKey, { count }),
       message: displayTextPlain,
-      messageHtml: displayTextHtml, // Store both versions
+      messageHtml: displayTextHtml,
     });
   }
 
-  // Animal removals
   if (changes.livestock.removed.length > 0) {
     const count = changes.livestock.removed.length;
     const clickableIds = this.createClickableAnimalIds(
@@ -709,21 +710,20 @@ export function showChangeToasts(changes) {
       .join(", ");
 
     const displayTextHtml =
-      count > 3 ? `${clickableIds} +${count - 3} more` : clickableIds;
+      count > 3 ? t("changes.suffixMoreHtml", { html: clickableIds, extra: count - 3 }) : clickableIds;
     const displayTextPlain =
-      count > 3 ? `${plainIds} +${count - 3} more` : plainIds;
+      count > 3 ? t("changes.suffixMoreText", { text: plainIds, extra: count - 3 }) : plainIds;
 
-    const messageHtml = `📦 ${count} animal${
-      count > 1 ? "s" : ""
-    } removed: ${displayTextHtml}`;
+    const removedKey = count === 1 ? "changes.toastAnimalRemovedOne" : "changes.toastAnimalRemovedMany";
+    const messageHtml = t(removedKey, { count, ids: displayTextHtml });
     this.showAlert(messageHtml, "warning");
 
-    // Add to notification history (use plain text for storage)
+    const titleKey = count === 1 ? "changes.historyAnimalRemovedTitleOne" : "changes.historyAnimalRemovedTitleMany";
     this.addNotificationToHistory({
       type: "removed",
-      title: `${count} Animal${count > 1 ? "s" : ""} Removed`,
+      title: t(titleKey, { count }),
       message: displayTextPlain,
-      messageHtml: displayTextHtml, // Store both versions
+      messageHtml: displayTextHtml,
     });
   }
 
@@ -738,22 +738,20 @@ export function showChangeToasts(changes) {
     const isStarting = update.changes.lactating.new;
 
     if (isStarting) {
-      this.showAlert(`🥛 ${clickableId} started lactating`, "info");
-      // Add to notification history
+      this.showAlert(t("changes.toastLactationStarted", { id: clickableId }), "info");
       this.addNotificationToHistory({
         type: "info",
-        title: "Lactation Started",
-        message: `${plainId} started lactating`,
-        messageHtml: `${clickableId} started lactating`,
+        title: t("changes.historyLactationStartedTitle"),
+        message: t("changes.historyLactationStartedBody", { id: plainId }),
+        messageHtml: t("changes.historyLactationStartedBody", { id: clickableId }),
       });
     } else {
-      this.showAlert(`⏸️ ${clickableId} stopped lactating`, "info");
-      // Add to notification history
+      this.showAlert(t("changes.toastLactationStopped", { id: clickableId }), "info");
       this.addNotificationToHistory({
         type: "info",
-        title: "Lactation Stopped",
-        message: `${plainId} stopped lactating`,
-        messageHtml: `${clickableId} stopped lactating`,
+        title: t("changes.historyLactationStoppedTitle"),
+        message: t("changes.historyLactationStoppedBody", { id: plainId }),
+        messageHtml: t("changes.historyLactationStoppedBody", { id: clickableId }),
       });
     }
   });
@@ -769,22 +767,20 @@ export function showChangeToasts(changes) {
     const isStarting = update.changes.pregnancy.new;
 
     if (isStarting) {
-      this.showAlert(`🤰 ${clickableId} is now pregnant`, "info");
-      // Add to notification history
+      this.showAlert(t("changes.toastPregnancyStarted", { id: clickableId }), "info");
       this.addNotificationToHistory({
         type: "info",
-        title: "Pregnancy Started",
-        message: `${plainId} is now pregnant`,
-        messageHtml: `${clickableId} is now pregnant`,
+        title: t("changes.historyPregnancyStartedTitle"),
+        message: t("changes.historyPregnancyStartedBody", { id: plainId }),
+        messageHtml: t("changes.historyPregnancyStartedBody", { id: clickableId }),
       });
     } else {
-      this.showAlert(`👶 ${clickableId} gave birth!`, "success");
-      // Add to notification history
+      this.showAlert(t("changes.toastBirth", { id: clickableId }), "success");
       this.addNotificationToHistory({
         type: "success",
-        title: "Birth",
-        message: `${plainId} gave birth!`,
-        messageHtml: `${clickableId} gave birth!`,
+        title: t("changes.historyBirthTitle"),
+        message: t("changes.historyBirthBody", { id: plainId }),
+        messageHtml: t("changes.historyBirthBody", { id: clickableId }),
       });
     }
   });
@@ -794,16 +790,18 @@ export function showChangeToasts(changes) {
     changes.foodLevels.forEach((foodChange) => {
       if (foodChange.type === "low_food_alert") {
         this.showAlert(
-          `🥣 ${
-            foodChange.pastureName
-          } food below 100L (${foodChange.newLevel.toFixed(1)}L)`,
+          t("changes.toastFoodLowAlert", {
+            pasture: foodChange.pastureName,
+            level: foodChange.newLevel.toFixed(1),
+          }),
           "warning"
         );
       } else if (foodChange.type === "food_drop") {
         this.showAlert(
-          `📉 ${
-            foodChange.pastureName
-          } food dropped by ${foodChange.amount.toFixed(1)}L`,
+          t("changes.toastFoodDrop", {
+            pasture: foodChange.pastureName,
+            amount: foodChange.amount.toFixed(1),
+          }),
           "info"
         );
       }
@@ -821,7 +819,10 @@ export function showChangeToasts(changes) {
         warning.message.includes("Low")
       ) {
         this.showAlert(
-          `⚠️ ${warning.pastureName}: ${warning.message}`,
+          t("changes.toastFoodWarning", {
+            pasture: warning.pastureName,
+            message: warning.message,
+          }),
           "warning"
         );
       }
@@ -837,6 +838,9 @@ export function showChangeToasts(changes) {
     const animalName = animal.name || `#${animal.id}`;
     const health = update.changes.health.new;
 
-    this.showAlert(`🚨 ${animalName} health critical: ${health}%`, "danger");
+    this.showAlert(
+      t("changes.toastHealthCritical", { name: animalName, health }),
+      "danger"
+    );
   });
 }

@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('farmDashAPI', {
     getModConfig: () => ipcRenderer.invoke('get-mod-config'),
     saveModConfig: (cfg) => ipcRenderer.invoke('save-mod-config', cfg),
     readLocalFarmdashDataJson: () => ipcRenderer.invoke('read-local-farmdash-data-json'),
+    readServerLiveCache: (serverId) => ipcRenderer.invoke('read-server-live-cache', serverId),
     setSimHubLiveContext: (payload) => ipcRenderer.invoke('set-simhub-live-context', payload),
     onAppUpdateStatus: (callback) => onChannel('app-update-status', callback),
     subscribeExportModStoreImagesProgress: (callback) =>

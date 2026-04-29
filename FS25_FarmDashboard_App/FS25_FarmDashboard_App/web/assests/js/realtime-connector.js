@@ -9,6 +9,31 @@ const VERBOSE_CHANGE_LOG = false;
  * Animal lists are filtered by selected farm. Switching farm/server/save replaces the list — not the same as animals leaving the map.
  * Skip add/remove toasts when the dashboard view context changed since the last payload.
  */
+function resolveServerIdForHttpPoll(dashboard) {
+  try {
+    if (
+      typeof window !== "undefined" &&
+      typeof window.__farmdashResolveServerIdForApi === "function"
+    ) {
+      const sid = window.__farmdashResolveServerIdForApi();
+      if (sid != null && String(sid).trim() !== "") return String(sid).trim();
+    }
+  } catch (_) {
+    /* ignore */
+  }
+  try {
+    if (typeof localStorage !== "undefined") {
+      const fromLs = localStorage.getItem("dashboard_active_server");
+      if (fromLs != null && String(fromLs).trim() !== "") return String(fromLs).trim();
+    }
+  } catch (_) {
+    /* ignore */
+  }
+  const fromDash = dashboard?.activeServerId;
+  if (fromDash != null && String(fromDash).trim() !== "") return String(fromDash).trim();
+  return "";
+}
+
 function shouldSkipLivestockChangeToasts(oldState, dashboard) {
   if (!oldState || !dashboard) return false;
   const hadCtx =
@@ -196,7 +221,9 @@ class RealtimeConnector {
 
     const self = this;
     this._httpPollData = function (bypassPayloadDedupe) {
-      fetch(`${self.httpEndpoint}/api/data`)
+      const sid = resolveServerIdForHttpPoll(self.dashboard);
+      const q = sid ? `?serverId=${encodeURIComponent(sid)}` : "";
+      fetch(`${self.httpEndpoint}/api/data${q}`)
         .then((response) => {
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -340,29 +367,163 @@ class RealtimeConnector {
     return raw;
   }
 
+  inferBestFarmIdFromPayload(data) {
+    const counts = new Map();
+    const bump = (v) => {
+      const id = Number(v);
+      if (!Number.isFinite(id) || id <= 0) return;
+      counts.set(id, (counts.get(id) || 0) + 1);
+    };
+
+    if (Array.isArray(data?.fields)) {
+      data.fields.forEach((f) => bump(f?.ownerFarmId ?? f?.farmId));
+    }
+    if (Array.isArray(data?.vehicles)) {
+      data.vehicles.forEach((v) => bump(v?.ownerFarmId ?? v?.farmId));
+    }
+    const husbandryInfer = this.normalizeHusbandryBuildingsArray(data?.animals);
+    husbandryInfer.forEach((h) => bump(h?.ownerFarmId ?? h?.farmId));
+
+    if (counts.size === 0) return null;
+    let best = null;
+    let bestN = -1;
+    for (const [id, n] of counts.entries()) {
+      if (n > bestN) {
+        bestN = n;
+        best = id;
+      }
+    }
+    return best;
+  }
+
+  /**
+   * Same shape handling as updateAnimalsData — Lua/export sometimes sends a keyed object, not an array.
+   */
+  normalizeHusbandryBuildingsArray(animalsData) {
+    if (!animalsData) return [];
+    let husbandryArray = animalsData;
+    if (!Array.isArray(animalsData)) {
+      if (animalsData.husbandries) husbandryArray = animalsData.husbandries;
+      else if (animalsData.animals) husbandryArray = animalsData.animals;
+      else if (animalsData.data) husbandryArray = animalsData.data;
+      else husbandryArray = Object.values(animalsData);
+    }
+    return Array.isArray(husbandryArray) ? husbandryArray : [];
+  }
+
+  ensureActiveFarmIdForPayload(data) {
+    if (!this.dashboard) return;
+    const current = Number(this.dashboard.activeFarmId ?? 1);
+    const husbandryOwns = this.normalizeHusbandryBuildingsArray(data?.animals);
+    const ownsCurrent =
+      (Array.isArray(data?.fields) &&
+        data.fields.some((f) => Number(f?.ownerFarmId ?? f?.farmId ?? 0) === current)) ||
+      (Array.isArray(data?.vehicles) &&
+        data.vehicles.some((v) => Number(v?.ownerFarmId ?? v?.farmId ?? 0) === current)) ||
+      husbandryOwns.some((h) => Number(h?.ownerFarmId ?? h?.farmId ?? 0) === current);
+    if (ownsCurrent) return;
+
+    const inferred = this.inferBestFarmIdFromPayload(data);
+    if (Number.isFinite(inferred) && inferred > 0 && inferred !== current) {
+      this.dashboard.activeFarmId = inferred;
+      try {
+        const sid = String(
+          this.dashboard.activeServerId ??
+            (typeof localStorage !== "undefined"
+              ? localStorage.getItem("dashboard_active_server") || ""
+              : "")
+        );
+        if (sid) localStorage.setItem(`dashboard_active_farm_${sid}`, String(inferred));
+      } catch (_) {
+        /* ignore */
+      }
+      return;
+    }
+
+    const farms = this.dashboard.farms;
+    if (Array.isArray(farms) && farms.length > 0) {
+      const ids = new Set(
+        farms
+          .map((f) => Number(f?.id))
+          .filter((n) => Number.isFinite(n) && n > 0)
+      );
+      if (ids.size > 0 && !ids.has(current)) {
+        const defaultFarm = farms.find((f) => Number(f?.id) > 0) || farms[0];
+        const nf = Number(defaultFarm?.id);
+        if (Number.isFinite(nf) && nf > 0) {
+          this.dashboard.activeFarmId = nf;
+          try {
+            const sid = String(
+              this.dashboard.activeServerId ??
+                (typeof localStorage !== "undefined"
+                  ? localStorage.getItem("dashboard_active_server") || ""
+                  : "")
+            );
+            if (sid) localStorage.setItem(`dashboard_active_farm_${sid}`, String(nf));
+          } catch (_) {
+            /* ignore */
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * In JavaScript, empty arrays are truthy. A transient `/api/data` row may include `animals: []`
+   * / `fields: []` while the host is still merging — that must not wipe a non-empty REST bootstrap.
+   */
+  applyMergedAnimalsSlice(rawAnimals) {
+    if (rawAnimals === undefined || rawAnimals === null) return;
+    const incoming = this.normalizeHusbandryBuildingsArray(rawAnimals);
+    const prior = this.normalizeHusbandryBuildingsArray(this.dashboard?.husbandryData);
+    if (incoming.length > 0) {
+      this.dashboard.husbandryData = rawAnimals;
+      this.updateAnimalsData(rawAnimals);
+      return;
+    }
+    if (prior.length === 0) {
+      this.dashboard.husbandryData = rawAnimals;
+      this.updateAnimalsData(rawAnimals);
+    }
+  }
+
+  applyMergedVehiclesSlice(rawVehicles) {
+    if (!Array.isArray(rawVehicles)) return;
+    const prior =
+      (Array.isArray(this.dashboard?._allVehiclesMerged) && this.dashboard._allVehiclesMerged.length) ||
+      (Array.isArray(this.dashboard?.vehicles) && this.dashboard.vehicles.length) ||
+      0;
+    if (rawVehicles.length > 0) {
+      this.updateVehiclesData(rawVehicles);
+      return;
+    }
+    if (prior === 0) this.updateVehiclesData(rawVehicles);
+  }
+
+  applyMergedFieldsSlice(rawFields) {
+    if (!Array.isArray(rawFields)) return;
+    const prior = Array.isArray(this.dashboard?.allFields) ? this.dashboard.allFields.length : 0;
+    if (rawFields.length > 0) {
+      this.updateFieldsData(rawFields);
+      return;
+    }
+    if (prior === 0) this.updateFieldsData(rawFields);
+  }
+
   handleRealtimeData(raw) {
     const data = this.normalizeRealtimePayload(raw);
     if (!data) return;
 
     if (data.error === "Waiting for data...") return;
+    this.ensureActiveFarmIdForPayload(data);
 
     // Store current dashboard state before updating (for change comparison)
     // Use the previously stored state, not the current state
     const oldState = this.previousData;
 
-    if (data.animals) {
-      // Store the raw husbandry data for pasture statistics
-      this.dashboard.husbandryData = data.animals;
-      this.updateAnimalsData(data.animals);
-    }
-
-    if (data.vehicles) {
-      this.updateVehiclesData(data.vehicles);
-    }
-
-    if (data.fields) {
-      this.updateFieldsData(data.fields);
-    }
+    this.applyMergedAnimalsSlice(data.animals);
+    this.applyMergedVehiclesSlice(data.vehicles);
+    this.applyMergedFieldsSlice(data.fields);
 
     if (data.production) {
       this.updateProductionData(data.production);
@@ -454,6 +615,14 @@ class RealtimeConnector {
 
     if (typeof window.farmDashScheduleMergedSnapshotPersist === "function") {
       window.farmDashScheduleMergedSnapshotPersist(this.dashboard, data);
+    }
+
+    // Refresh home counts on every merged payload so startup shows data immediately.
+    if (this.dashboard && typeof this.dashboard.updateLandingPageCounts === "function") {
+      this.dashboard.updateLandingPageCounts();
+    }
+    if (this.dashboard && typeof this.dashboard.updateNavbar === "function") {
+      this.dashboard.updateNavbar();
     }
 
     if (typeof window.farmDashNotifyDataReady === "function") {
@@ -744,20 +913,16 @@ class RealtimeConnector {
   }
 
   updateVehiclesData(vehiclesData) {
-    // Filter to only show player-owned vehicles (ownerFarmId: 1)
+    // Keep unfiltered list so farm changes can re-filter without waiting for a new API tick.
+    this.dashboard._allVehiclesMerged = Array.isArray(vehiclesData) ? vehiclesData : [];
+    // Filter to only show vehicles owned by the currently active farm.
     const activeFarmId = window.dashboard?.activeFarmId || 1;
-    const playerVehicles = vehiclesData
-      ? vehiclesData.filter((v) => v.ownerFarmId === activeFarmId)
+    const playerVehicles = this.dashboard._allVehiclesMerged
+      ? this.dashboard._allVehiclesMerged.filter((v) => v.ownerFarmId === activeFarmId)
       : [];
     this.dashboard.vehicles = playerVehicles;
 
-    // Update vehicle count on landing page
-    const vehicleCountElement = document.getElementById("vehicle-count");
-    if (vehicleCountElement) {
-      vehicleCountElement.textContent = t("realtime.vehicleCount", {
-        count: playerVehicles.length,
-      });
-    }
+    // Landing card counts are centralized in navigation.updateLandingPageCounts().
 
     // Update vehicles section if it's currently visible
     const sectionContent = document.getElementById("section-content");
@@ -829,14 +994,7 @@ class RealtimeConnector {
     if (this.dashboard.refreshProductionsIfVisible) {
       this.dashboard.refreshProductionsIfVisible();
     }
-    const prodBadge = document.getElementById("production-count");
-    if (
-      prodBadge &&
-      typeof this.dashboard.getOwnedProductionChainCount === "function"
-    ) {
-      const n = this.dashboard.getOwnedProductionChainCount();
-      prodBadge.textContent = `${n} ${n === 1 ? "Chain" : "Chains"}`;
-    }
+    // Landing card counts are centralized in navigation.updateLandingPageCounts().
   }
 
   updateFinanceData(financeData) {
@@ -899,8 +1057,47 @@ class RealtimeConnector {
         : [];
     this.dashboard.playerFarms = list;
     this.dashboard.farms = list;
-    // TODO: Implement farm selector when multi-farm support is ready
-    // this.dashboard.updateFarmSelector();
+    const active = Number(this.dashboard.activeFarmId ?? 1);
+    const hasActive = list.some((f) => Number(f?.id) === active && Number(f?.id) > 0);
+    if (!hasActive && list.length > 0) {
+      const next = list.find((f) => Number(f?.id) > 0) || list[0];
+      const nextId = Number(next?.id);
+      if (Number.isFinite(nextId) && nextId > 0) {
+        this.dashboard.activeFarmId = nextId;
+        try {
+          const sid = String(
+            this.dashboard.activeServerId ??
+              (typeof localStorage !== "undefined"
+                ? localStorage.getItem("dashboard_active_server") || ""
+                : "")
+          );
+          if (sid) localStorage.setItem(`dashboard_active_farm_${sid}`, String(nextId));
+        } catch (_) {
+          /* ignore */
+        }
+      }
+    }
+
+    // Re-filter existing datasets now that farm context is guaranteed valid.
+    if (Array.isArray(this.dashboard.allFields) && this.dashboard.allFields.length > 0) {
+      const fid = Number(this.dashboard.activeFarmId ?? 1);
+      this.dashboard.fields =
+        typeof window.filterFieldsForFarmView === "function"
+          ? window.filterFieldsForFarmView(this.dashboard.allFields, fid)
+          : this.dashboard.allFields;
+    }
+    if (this.dashboard.husbandryData) {
+      this.updateAnimalsData(this.dashboard.husbandryData);
+    }
+    if (Array.isArray(this.dashboard._allVehiclesMerged)) {
+      this.updateVehiclesData(this.dashboard._allVehiclesMerged);
+    }
+    if (typeof this.dashboard.renderFarmDropdown === "function") {
+      this.dashboard.renderFarmDropdown();
+    }
+    if (typeof this.dashboard.updateLandingPageCounts === "function") {
+      this.dashboard.updateLandingPageCounts();
+    }
   }
 
   scheduleReconnect() {

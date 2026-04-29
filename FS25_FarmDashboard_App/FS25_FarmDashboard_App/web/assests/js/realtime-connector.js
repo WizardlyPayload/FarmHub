@@ -1,5 +1,7 @@
 // FS25 FarmDashboard | realtime-connector.js | v2.0.0
 
+import { t } from "./i18n/i18n.js";
+
 /** Set true only when diagnosing livestock change notifications */
 const VERBOSE_CHANGE_LOG = false;
 
@@ -393,7 +395,9 @@ class RealtimeConnector {
     if (data.xmlAvailable !== undefined) this.dashboard.xmlAvailable = data.xmlAvailable;
     if (data.luaAvailable !== undefined) this.dashboard.luaAvailable = data.luaAvailable;
     if (data.money !== undefined) this.dashboard.money = data.money;
-    if (data.gameSettings) this.dashboard.gameSettings = data.gameSettings;
+    if (data.gameSettings || data.settings) {
+      this.dashboard.gameSettings = data.gameSettings || data.settings || {};
+    }
 
     this.dashboard.lastUpdate = new Date();
     this.updateLastUpdateTime();
@@ -447,6 +451,10 @@ class RealtimeConnector {
     }
 
     this.previousData = newState;
+
+    if (typeof window.farmDashScheduleMergedSnapshotPersist === "function") {
+      window.farmDashScheduleMergedSnapshotPersist(this.dashboard, data);
+    }
 
     if (typeof window.farmDashNotifyDataReady === "function") {
       if (!window.__farmDashRealtimeMergeNotified) {
@@ -746,7 +754,9 @@ class RealtimeConnector {
     // Update vehicle count on landing page
     const vehicleCountElement = document.getElementById("vehicle-count");
     if (vehicleCountElement) {
-      vehicleCountElement.textContent = `${playerVehicles.length} vehicles`;
+      vehicleCountElement.textContent = t("realtime.vehicleCount", {
+        count: playerVehicles.length,
+      });
     }
 
     // Update vehicles section if it's currently visible
@@ -1044,7 +1054,7 @@ class RealtimeConnector {
     if (header && !header.querySelector(".api-mode-badge")) {
       const badge = document.createElement("span");
       badge.className = "api-mode-badge";
-      badge.textContent = "LIVE API";
+      badge.textContent = t("realtime.liveApi");
       badge.style.cssText = `
                 background: #28a745;
                 color: white;
@@ -1065,11 +1075,17 @@ class RealtimeConnector {
       const diff = Math.floor((now - this.dashboard.lastUpdate) / 1000);
 
       if (diff < 60) {
-        lastUpdateElement.textContent = `${diff} seconds ago`;
+        lastUpdateElement.textContent = t("realtime.secondsAgo", {
+          seconds: diff,
+        });
       } else if (diff < 3600) {
-        lastUpdateElement.textContent = `${Math.floor(diff / 60)} minutes ago`;
+        lastUpdateElement.textContent = t("realtime.minutesAgo", {
+          minutes: Math.floor(diff / 60),
+        });
       } else {
-        lastUpdateElement.textContent = `${Math.floor(diff / 3600)} hours ago`;
+        lastUpdateElement.textContent = t("realtime.hoursAgo", {
+          hours: Math.floor(diff / 3600),
+        });
       }
     }
   }

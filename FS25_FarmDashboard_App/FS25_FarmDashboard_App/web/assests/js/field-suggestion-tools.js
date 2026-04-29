@@ -6,7 +6,70 @@
  * (Does not import `vehicles.js` — that module loads `apiStorage`, which imports `fields.js`.)
  */
 
-import { RULES_ENGINE_FALLBACK_ACTION } from "./rules-engine.js";
+import { RULES_ENGINE_FALLBACK_ACTION, RULES_ENGINE_FALLBACK_KIND } from "./rules-engine.js";
+import { t } from "./i18n/i18n.js";
+
+/**
+ * Stable map from rules-engine action keys to recommended tool roles.
+ * Avoids relying on substring matches against translated action text.
+ */
+const ACTION_KEY_TO_ROLES = {
+  "rules.action.cultivateReseed": ["cultivator", "seeder"],
+  "rules.action.combineHarvest": ["harvester", "tractor", "grain_trailer"],
+  "rules.action.mowGrass": ["mower", "forage_wagon", "baler", "wrapper"],
+  "rules.action.runSoilScan": ["soil_scanner"],
+  "rules.action.mulchStubble": ["mulcher"],
+  "rules.action.ploughBeforeNextCrop": ["plow", "cultivator", "seeder"],
+  "rules.action.ploughThenSeedbed": ["plow", "cultivator", "seeder"],
+  "rules.action.ploughDeepCultivate": ["plow"],
+  "rules.action.directDrill": ["seeder"],
+  "rules.action.cultivateMulchedDrill": ["cultivator", "seeder"],
+  "rules.action.cultivateStubbleDrill": ["cultivator", "seeder"],
+  "rules.action.spreadLimeBeforeSeed": ["lime_spreader"],
+  "rules.action.spreadLimeEmerged": ["lime_spreader"],
+  "rules.action.limePastureMap": ["lime_spreader"],
+  "rules.action.checkPasturePH": ["lime_spreader"],
+  "rules.action.cultivateMulch": ["cultivator"],
+  "rules.action.buildSoilN": ["fertilizer_spreader"],
+  "rules.action.fertilizeForDrilling": ["fertilizer_spreader"],
+  "rules.action.fertilizeStep": ["fertilizer_spreader"],
+  "rules.action.addNTarget": ["fertilizer_spreader"],
+  "rules.action.topUpNitrogen": ["fertilizer_spreader"],
+  "rules.action.sowPlant": ["seeder"],
+  "rules.action.sowSeedbed": ["seeder"],
+  "rules.action.rollFirstStage": ["roller"],
+  "rules.action.optionalOrganicFirst": ["fertilizer_spreader"],
+  "rules.action.weedMechanically": ["weeder"],
+  "rules.action.sprayHerbicide": ["sprayer"],
+  "rules.action.tedDryHay": ["tedder", "baler", "wrapper"],
+  "rules.action.finishGrass": ["tedder", "windrower", "baler", "wrapper"],
+  "rules.action.tedderOrBale": ["tedder", "baler", "wrapper"],
+  "rules.action.baleStrawForage": ["baler", "forage_wagon", "windrower"],
+  "rules.action.baleHay": ["baler", "forage_wagon", "windrower"],
+  "rules.action.baleStrawWagon": ["baler", "forage_wagon", "windrower"],
+  "rules.action.clearAllWindrows": ["baler", "forage_wagon", "windrower", "tedder"],
+  "rules.action.clearStrawGrassWindrows": ["baler", "forage_wagon", "windrower", "tedder"],
+  "rules.action.clearStrawHay": ["baler", "forage_wagon", "windrower", "tedder"],
+  "rules.action.clearGrassHay": ["baler", "forage_wagon", "windrower", "tedder"],
+  "rules.action.clearLooseForage": ["baler", "forage_wagon", "windrower", "tedder"],
+  "rules.action.clearStrawGrassOrHay": ["baler", "forage_wagon", "windrower", "tedder"],
+  "rules.action.pickupSwath": ["forage_wagon", "harvester", "baler"],
+  "rules.action.clearSwath": ["baler", "forage_wagon"],
+  "rules.action.moveOneBale": ["loader"],
+  "rules.action.moveBales": ["loader"],
+  "rules.action.pickStones": ["stone_picker", "roller"],
+  "rules.action.finishFlaggedSoilWork": [
+    "cultivator",
+    "lime_spreader",
+    "fertilizer_spreader",
+    "sprayer",
+    "plow",
+    "roller",
+  ],
+  "rules.action.prepareDrill": ["cultivator", "plow", "seeder"],
+  "rules.action.fallback": [],
+  "rules.monitorTowardHarvest": [],
+};
 
 function isStorageItemVehicle(v) {
   if (!v || !v.typeName) return false;
@@ -18,38 +81,33 @@ function isStorageItemVehicle(v) {
   );
 }
 
-/** @typedef {{ id: string, label: string, shopHint: string, patterns: RegExp[] }} ToolRole */
+/** @typedef {{ id: string, labelKey: string, patterns: RegExp[] }} ToolRole */
 
 /** @type {ToolRole[]} */
 const TOOL_ROLES = [
   {
     id: "cultivator",
-    label: "Cultivator / disc harrow",
-    shopHint: "a cultivator, disc harrow, or power harrow to work the seedbed",
+    labelKey: "tools.role.cultivator",
     patterns: [/cultivat/i, /\bdisc\b/i, /harrow/i, /stubble.?cult/i, /chisel/i, /field.?cult/i],
   },
   {
     id: "plow",
-    label: "Plow / deep tillage",
-    shopHint: "a plow, reversible plow, or deep cultivator for primary tillage",
+    labelKey: "tools.role.plow",
     patterns: [/plow/i, /reversible/i, /subsoil/i, /ripper/i, /mouldboard/i],
   },
   {
     id: "mulcher",
-    label: "Mulcher / stubble shredder",
-    shopHint: "a mulcher or stubble shredder for residue before tillage",
+    labelKey: "tools.role.mulcher",
     patterns: [/mulch/i, /shred/i, /stubble.?cutter/i],
   },
   {
     id: "lime_spreader",
-    label: "Lime spreader",
-    shopHint: "a lime spreader (mounted, trailed, or self-propelled spreader)",
+    labelKey: "tools.role.limeSpreader",
     patterns: [/lime/i, /spread.*lime/i, /bunning/i],
   },
   {
     id: "fertilizer_spreader",
-    label: "Fertilizer / manure / slurry",
-    shopHint: "a solid fertilizer spreader, slurry tanker, or manure spreader for N/build-up",
+    labelKey: "tools.role.fertilizerSpreader",
     patterns: [
       /fertil/i,
       /slurry/i,
@@ -62,86 +120,82 @@ const TOOL_ROLES = [
   },
   {
     id: "sprayer",
-    label: "Field sprayer",
-    shopHint: "a mounted or trailed sprayer for herbicide / liquid applications",
+    labelKey: "tools.role.sprayer",
     patterns: [/spray/i, /sprayer/i, /self.?propelled.*spray/i],
   },
   {
     id: "seeder",
-    label: "Seeder / planter / drill",
-    shopHint: "a seed drill, planter, or direct seeder",
+    labelKey: "tools.role.seeder",
     patterns: [/seed/i, /drill/i, /plant/i, /sow/i, /air.?seeder/i],
   },
   {
     id: "roller",
-    label: "Field roller",
-    shopHint: "a field roller for seedbed finish / stone knock-down",
+    labelKey: "tools.role.roller",
     patterns: [/roller/i, /roll\b/i],
   },
   {
     id: "mower",
-    label: "Mower / conditioner",
-    shopHint: "a mower or mower conditioner for grass / hay",
+    labelKey: "tools.role.mower",
     patterns: [/mower/i, /conditioner/i, /cutter.?bar/i],
   },
   {
     id: "tedder",
-    label: "Tedder",
-    shopHint: "a tedder to dry grass windrows for hay",
+    labelKey: "tools.role.tedder",
     patterns: [/tedder/i, /ted\b/i],
   },
   {
     id: "windrower",
-    label: "Rake / merger / windrower",
-    shopHint: "a rotary rake, merger, or windrower to tidy rows before baling",
+    labelKey: "tools.role.windrower",
     patterns: [/rake/i, /windrow/i, /merger/i, /row.?crop.*head/i],
   },
   {
     id: "baler",
-    label: "Baler",
-    shopHint: "a round or square baler with the right pickup for straw/grass/hay",
+    labelKey: "tools.role.baler",
     patterns: [/baler/i, /bale.?wrapper/i, /round.?baler/i, /square.?baler/i],
   },
   {
     id: "wrapper",
-    label: "Bale wrapper",
-    shopHint: "a bale wrapper for silage (if wrapping wet bales)",
+    labelKey: "tools.role.wrapper",
     patterns: [/wrapper/i, /wrap\b/i, /silage.?wrap/i],
   },
   {
     id: "forage_wagon",
-    label: "Forage wagon / pickup",
-    shopHint: "a forage wagon or pickup system to collect loose straw/grass",
+    labelKey: "tools.role.forageWagon",
     patterns: [/forage/i, /loading.?wagon/i, /pickup\b/i, /pick.?up/i, /pickup.?header/i],
   },
   {
     id: "harvester",
-    label: "Combine harvester",
-    shopHint: "a combine harvester with the correct header for this crop",
+    labelKey: "tools.role.harvester",
     patterns: [/combine/i, /harvest/i, /draper/i, /grain.?header/i, /corn.?head/i],
   },
   {
+    id: "tractor",
+    labelKey: "tools.role.tractor",
+    patterns: [/tractor/i, /\bmt\d/i],
+  },
+  {
+    id: "grain_trailer",
+    labelKey: "tools.role.grainTrailer",
+    patterns: [/trailer/i, /auger/i, /chaser/i, /cart\b/i, /tipper/i, /semi\b/i, /tandem/i],
+  },
+  {
     id: "stone_picker",
-    label: "Stone picker / collector",
-    shopHint: "a stone picker or collector (or use a heavy roller if that fits your setup)",
+    labelKey: "tools.role.stonePicker",
     patterns: [/stone/i, /rock.?picker/i, /collector/i],
   },
   {
     id: "weeder",
-    label: "Mechanical weeder / hoe",
-    shopHint: "a hoe weeder, tined weeder, or cultivator weeder for early-stage weeds",
+    labelKey: "tools.role.weeder",
     patterns: [/weed/i, /hoe\b/i, /inter.?row/i, /mechanical.?weed/i],
   },
   {
     id: "loader",
-    label: "Loader / handler / transport",
-    shopHint: "a telehandler, wheel loader, front loader, or bale trailer to move bales",
+    labelKey: "tools.role.loader",
     patterns: [/telehandler/i, /tele.?handler/i, /loader/i, /handler/i, /frontloader/i, /bale.?trail/i, /lowloader/i, /stacker/i],
   },
   {
     id: "soil_scanner",
-    label: "Soil scan (Precision Farming)",
-    shopHint: "the Precision Farming soil sampler / scanner from the in-game shop (DLC category)",
+    labelKey: "tools.role.soilScanner",
     patterns: [/soil.?scan/i, /sampler/i, /precision.?farm/i, /isaria/i, /nutrient.?sensor/i],
   },
 ];
@@ -163,9 +217,32 @@ function vehicleHaystack(v) {
     .toLowerCase();
 }
 
+function vehicleHasLimeFillUnit(v) {
+  const fl = v?.fillLevels;
+  if (!fl || typeof fl !== "object") return false;
+  return Object.keys(fl).some((k) => String(k).toUpperCase() === "LIME");
+}
+
+function isDedicatedCombine(v) {
+  const h = vehicleHaystack(v);
+  return /combine|draper|grain.?header|corn.?head|self.?propelled.?harvest/i.test(h);
+}
+
 function vehicleMatchesRole(v, role) {
   const h = vehicleHaystack(v);
   if (!h.trim()) return false;
+  if (role.id === "tractor") {
+    if (isDedicatedCombine(v)) return false;
+    if (/forage harvester|potato harvester|beet harvester|sugarbeet harvester/i.test(h)) return false;
+    return role.patterns.some((re) => re.test(h));
+  }
+  if (role.id === "grain_trailer") {
+    if (/forage.?wagon|loading.?wagon|baler|pickup\b|header.?cart/i.test(h)) return false;
+    return role.patterns.some((re) => re.test(h));
+  }
+  if (role.id === "lime_spreader") {
+    if (vehicleHasLimeFillUnit(v)) return true;
+  }
   return role.patterns.some((re) => re.test(h));
 }
 
@@ -176,10 +253,24 @@ function roleById(id) {
 /**
  * Infer which tool categories fit the current rule action (Layer 1 wording from rules-engine).
  * @param {object} field
- * @param {string} action
+ * @param {string} action — the (possibly localized) action text
+ * @param {string} [actionKey] — stable i18n key from the rules engine (preferred when present)
  * @returns {string[]} role ids (deduped, ordered)
  */
-export function inferToolRoleIds(field, action) {
+export function inferToolRoleIds(field, action, actionKey) {
+  if (actionKey && Object.prototype.hasOwnProperty.call(ACTION_KEY_TO_ROLES, actionKey)) {
+    const baseRoles = ACTION_KEY_TO_ROLES[actionKey].slice();
+    if (field?.needsRolling && !baseRoles.includes("roller")) baseRoles.push("roller");
+    if (
+      field?.needsWeeding &&
+      (field.growthState || 0) <= 2 &&
+      !baseRoles.includes("weeder")
+    ) {
+      baseRoles.push("weeder");
+    }
+    return baseRoles;
+  }
+
   const a = String(action || "").toLowerCase();
   const roles = [];
   const push = (id) => {
@@ -197,6 +288,8 @@ export function inferToolRoleIds(field, action) {
   }
   if (a.includes("combine-harvest") || (a.includes("combine") && a.includes("harvest"))) {
     push("harvester");
+    push("tractor");
+    push("grain_trailer");
     return roles;
   }
   if (a.includes("mow") || a.includes("grass is ready")) {
@@ -360,17 +453,91 @@ export function inferToolRoleIds(field, action) {
 }
 
 function displayNameForVehicle(v) {
+  const bo = v && typeof v.brand === "object" ? v.brand : null;
+  const brand = bo
+    ? `${String(bo.title || "").trim()} ${String(bo.name || "").trim()}`.trim()
+    : String(v?.brand || "").trim();
   const tn = (v.typeName || "").trim();
   const n = (v.name || "").trim();
-  if (tn && n && tn.toLowerCase() !== n.toLowerCase()) return `${tn} — ${n}`;
-  return tn || n || "Unnamed equipment";
+  const model =
+    tn && n && tn.toLowerCase() !== n.toLowerCase() ? `${tn} — ${n}` : tn || n || "Unnamed equipment";
+  if (brand) return `${brand} · ${model}`;
+  return model;
+}
+
+function pickPrimaryMatch(matches) {
+  const u = [...new Set(matches)].filter(Boolean).sort((x, y) => x.localeCompare(y));
+  return u[0] || "";
+}
+
+function estimateWorkingWidthMeters(haystack, modelName = "") {
+  const h = `${String(haystack || "")} ${String(modelName || "")}`.toLowerCase();
+  const m = h.match(/(\d+(?:\.\d+)?)\s?m\b/);
+  if (m) return Number(m[1]);
+  const mm = h.match(/\b(\d{4})\b/);
+  if (mm) {
+    const raw = Number(mm[1]);
+    if (raw >= 1200 && raw <= 18000) return raw / 1000;
+  }
+  return null;
+}
+
+function targetWidthByFieldSize(field) {
+  const ha = Number(field?.hectares ?? 0);
+  if (!Number.isFinite(ha) || ha <= 0) return 5;
+  if (ha < 2) return 2.5;
+  if (ha < 8) return 4.5;
+  if (ha < 20) return 6.5;
+  return 9;
+}
+
+function widthFitScore(width, target) {
+  if (!Number.isFinite(width)) return 0.35;
+  const diff = Math.abs(width - target);
+  return Math.max(0, 1 - diff / Math.max(2, target));
+}
+
+function scoreOwnedVehicleForRole(v, role, field) {
+  const hay = vehicleHaystack(v);
+  const width = estimateWorkingWidthMeters(hay, v?.typeName || v?.name || "");
+  const target = targetWidthByFieldSize(field);
+  let score = 1 + widthFitScore(width, target) * 4;
+  if (vehicleHasLimeFillUnit(v) && role.id === "lime_spreader") score += 2;
+  if (/self.?propelled/i.test(hay)) score += 0.5;
+  return { score, width };
+}
+
+function buildShopCatalog() {
+  if (typeof window === "undefined") return [];
+  const consumableRe =
+    /bigbag|big bag|pallet|tank\b|barrel|box|bottle|bale.?twine|bale.?net|seed(s)?\b|fertili[sz]er\b|lime\b|food\b|oil\b|clothes|cheese|milk|cake|flour|furniture|boards|cement|carton/i;
+  const implementHintRe =
+    /plow|plough|cultivat|disc|harrow|seeder|planter|drill|sprayer|spreader|roller|mower|tedder|rake|windrow|baler|wrapper|wagon|trailer|auger|cart|weeder|hoe|scanner|combine|harvester|loader|telehandler|tractor/i;
+  const files = Array.isArray(window.__farmdashShopImageFilenames)
+    ? window.__farmdashShopImageFilenames
+    : [];
+  return files
+    .map((f) => {
+      const base = String(f || "")
+        .replace(/\.png$/i, "")
+        .replace(/^.*__/, "")
+        .replace(/^vehicles?_?/, "")
+        .replace(/^store_?/, "")
+        .replace(/_/g, " ")
+        .trim();
+      if (!base) return null;
+      if (consumableRe.test(base)) return null;
+      if (!implementHintRe.test(base)) return null;
+      return { label: base, haystack: base.toLowerCase() };
+    })
+    .filter(Boolean);
 }
 
 /**
  * @param {object[]} vehicles
  * @param {number} farmId
  * @param {string[]} roleIds
- * @returns {{ owned: { roleId: string, matches: string[] }[], missing: { roleId: string, label: string, shopHint: string }[] }}
+ * @returns {{ owned: { roleId: string, matches: string[] }[], missing: { roleId: string, labelKey: string }[] }}
  */
 export function matchToolRolesToFleet(vehicles, farmId, roleIds) {
   const fid = Number(farmId) || 1;
@@ -385,6 +552,7 @@ export function matchToolRolesToFleet(vehicles, farmId, roleIds) {
 
   const owned = [];
   const missing = [];
+  const field = arguments[3] || null;
 
   for (const id of roleIds) {
     const meta = roleById(id);
@@ -396,9 +564,17 @@ export function matchToolRolesToFleet(vehicles, farmId, roleIds) {
       }
     }
     if (matches.length) {
-      owned.push({ roleId: id, matches: [...new Set(matches)].slice(0, 3) });
+      const best = farmVehicles
+        .filter((v) => vehicleMatchesRole(v, meta))
+        .map((v) => ({ v, ...scoreOwnedVehicleForRole(v, meta, field) }))
+        .sort((a, b) => b.score - a.score)[0];
+      if (best && best.v) {
+        owned.push({ roleId: id, matches: [displayNameForVehicle(best.v)] });
+      } else {
+        owned.push({ roleId: id, matches: [pickPrimaryMatch(matches)] });
+      }
     } else {
-      missing.push({ roleId: id, label: meta.label, shopHint: meta.shopHint });
+      missing.push({ roleId: id, labelKey: meta.labelKey });
     }
   }
 
@@ -406,39 +582,48 @@ export function matchToolRolesToFleet(vehicles, farmId, roleIds) {
 }
 
 /**
- * Plain-text lines for embedding in HTML (caller escapes).
+ * Plain-text lines for inlining into HTML (caller escapes).
  * @param {object[]} vehicles
  * @param {number} farmId
  * @param {string} action
  * @param {object} [field]
+ * @param {string} [actionKey] — stable i18n key for the action; preferred over text matching
  * @returns {string[]}
  */
-export function buildToolGuidanceLines(vehicles, farmId, action, field) {
-  const roleIds = inferToolRoleIds(field || {}, action);
+export function buildToolGuidanceLines(vehicles, farmId, action, field, actionKey) {
+  const roleIds = inferToolRoleIds(field || {}, action, actionKey);
   if (roleIds.length === 0) return [];
 
-  const { owned, missing } = matchToolRolesToFleet(vehicles, farmId, roleIds);
+  const { owned, missing } = matchToolRolesToFleet(vehicles, farmId, roleIds, field);
   const lines = [];
 
   if (owned.length) {
-    const typeLabels = owned
-      .map((o) => {
-        const meta = roleById(o.roleId);
-        return meta ? meta.label : o.roleId;
-      })
-      .filter(Boolean);
-    lines.push(`From your fleet: ${[...new Set(typeLabels)].join(", ")}`);
+    const first = owned[0];
+    const meta = roleById(first.roleId);
+    const label = meta ? t(meta.labelKey) : first.roleId;
+    const pick = first.matches && first.matches[0] ? first.matches[0] : "";
+    lines.push(`${t("tools.useFromYourFleet")}: ${label}${pick ? `: ${pick}` : ""}`);
   }
 
-  if (missing.length) {
-    const shopParts = missing.map((m) => `${m.label} — shop if you need this type for the job`);
-    lines.push(`Not in your fleet: ${shopParts.join(" · ")}`);
+  const shopRoleId = missing.length ? missing[0].roleId : roleIds[0];
+  if (shopRoleId) {
+    const meta = roleById(shopRoleId);
+    const roleLabel = meta ? t(meta.labelKey) : shopRoleId;
+    const target = targetWidthByFieldSize(field);
+    const shopBest = buildShopCatalog()
+      .filter((item) => (meta ? vehicleMatchesRole({ name: item.label, typeName: item.label }, meta) : true))
+      .map((item) => {
+        const w = estimateWorkingWidthMeters(item.haystack, item.label);
+        return { item, score: widthFitScore(w, target) };
+      })
+      .sort((a, b) => b.score - a.score)[0];
+    if (shopBest && shopBest.score >= 0.45) {
+      lines.push(`${t("tools.buyLeaseSuggestion")}: ${roleLabel}: ${shopBest.item.label}`);
+    }
   }
 
   if (!lines.length) {
-    lines.push(
-      "Typical tools: match the job to the right shop category (implements / harvesters / spreaders) for this field state."
-    );
+    lines.push(t("tools.typicalToolsFallback"));
   }
 
   return lines;

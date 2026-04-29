@@ -1,5 +1,7 @@
 // FS25 FarmDashboard | pastures.js | v2.0.0
 
+import { t } from "../i18n/i18n.js";
+
 /**
  * Resolve which farm a pasture belongs to: pasture row first, then any animal (REST often only had building id on parent).
  */
@@ -91,9 +93,9 @@ export function showPasturesSection() {
               <div class="col-12 text-center">
                   <h2 class="text-farm-accent">
                       <i class="bi bi-diagram-3 me-2"></i>
-                      Pasture Management
+                      ${t("pastures.title")}
                   </h2>
-                  <p class="lead text-muted">Monitor pastures, livestock, and grazing conditions</p>
+                  <p class="lead text-muted">${t("pastures.subtitle")}</p>
               </div>
           </div>
 
@@ -101,7 +103,7 @@ export function showPasturesSection() {
               <div class="col-md-3">
                   <div class="card bg-farm-primary text-white border-0">
                       <div class="card-body text-center">
-                          <h5 class="card-title">Total Pastures</h5>
+                          <h5 class="card-title">${t("pastures.totalPastures")}</h5>
                           <h2 class="display-4" id="total-pastures-count">0</h2>
                       </div>
                   </div>
@@ -109,7 +111,7 @@ export function showPasturesSection() {
               <div class="col-md-3">
                   <div class="card bg-farm-primary text-white border-0">
                       <div class="card-body text-center">
-                          <h5 class="card-title">Active Livestock</h5>
+                          <h5 class="card-title">${t("pastures.activeLivestock")}</h5>
                           <h2 class="display-4" id="pasture-livestock-count">0</h2>
                       </div>
                   </div>
@@ -117,16 +119,25 @@ export function showPasturesSection() {
               <div class="col-md-3">
                   <div class="card bg-farm-primary text-white border-0">
                       <div class="card-body text-center">
-                          <h5 class="card-title">Birth Warnings</h5>
+                          <h5 class="card-title">${t("pastures.birthWarnings")}</h5>
                           <h2 class="display-4" id="birth-warnings-count">0</h2>
                       </div>
                   </div>
               </div>
               <div class="col-md-3">
-                  <div class="card bg-farm-primary text-white border-0">
+                  <div
+                      class="card bg-farm-primary text-white border-0"
+                      id="pasture-low-health-summary-card"
+                      role="button"
+                      tabindex="0"
+                      onclick="dashboard.showLowHealthAnimalsDrilldown()"
+                      onkeypress="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); dashboard.showLowHealthAnimalsDrilldown(); }"
+                      title="${t("pastures.avgHealth")}"
+                  >
                       <div class="card-body text-center">
-                          <h5 class="card-title">Avg Health</h5>
+                          <h5 class="card-title">${t("pastures.avgHealth")}</h5>
                           <h2 class="display-4" id="pasture-avg-health">0%</h2>
+                          <small class="d-block text-light-emphasis" id="pasture-low-health-count">0 low-health</small>
                       </div>
                   </div>
               </div>
@@ -138,10 +149,10 @@ export function showPasturesSection() {
                       <div class="card-header d-flex justify-content-between align-items-center">
                           <h5 class="mb-0">
                               <i class="bi bi-list-ul me-2"></i>
-                              Pasture Overview
+                              ${t("pastures.overview")}
                           </h5>
                           <button class="btn btn-outline-success btn-sm" onclick="dashboard.showAllPastureLivestock()">
-                              <i class="bi bi-table me-1"></i>View All Livestock
+                              <i class="bi bi-table me-1"></i>${t("pastures.viewAllLivestock")}
                           </button>
                       </div>
                       <div class="card-body">
@@ -158,7 +169,7 @@ export function showPasturesSection() {
 
   // Update pasture data display
   this.updatePastureDisplay();
-  this.updateNavbar("Pastures");
+  this.updateNavbar(t("nav.section.pastures"));
 }
 
 export function parsePastureData() {
@@ -1123,25 +1134,22 @@ export function calculateAllPastureWarnings(pasture, animals, conditionReport, f
       warnings.push({
         type: "food",
         severity: "danger",
-        message: `Critical: No food data available for ${animalCount} animals - check feed levels immediately`,
+        message: t("pastures.warnNoFoodData", { count: animalCount }),
         icon: "bi-exclamation-triangle-fill",
         details: {
           animalCount: animalCount,
-          message:
-            "Animals require food and water. Game shows 0L - immediate attention needed.",
+          message: t("pastures.warnAnimalsRequireFood"),
         },
       });
 
-      // Add water warning as well since animals need both
       warnings.push({
         type: "water",
         severity: "danger",
-        message: `Critical: No water data available for ${animalCount} animals - check water supply immediately`,
+        message: t("pastures.warnNoWaterData", { count: animalCount }),
         icon: "bi-droplet-fill",
         details: {
           animalCount: animalCount,
-          message:
-            "Animals require fresh water. Ensure water systems are functioning.",
+          message: t("pastures.warnAnimalsRequireWater"),
         },
       });
     }
@@ -1154,7 +1162,10 @@ export function calculateAllPastureWarnings(pasture, animals, conditionReport, f
     warnings.push({
       type: "health",
       severity: criticalAnimals.length > 0 ? "danger" : "warning",
-      message: `${sickAnimals.length} with low health (${criticalAnimals.length} critical)`,
+      message: t("pastures.warnLowHealth", {
+        sick: sickAnimals.length,
+        critical: criticalAnimals.length,
+      }),
       icon: "bi-heart-pulse",
       affectedAnimals: sickAnimals,
       details: {
@@ -1174,7 +1185,10 @@ export function calculateAllPastureWarnings(pasture, animals, conditionReport, f
     warnings.push({
       type: "production",
       severity: "info",
-      message: `High milk production: ${conditionReport.milk}L/day from ${lactatingCows.length} cows`,
+      message: t("pastures.warnHighMilk", {
+        milk: conditionReport.milk,
+        cows: lactatingCows.length,
+      }),
       icon: "bi-droplet-fill",
       affectedAnimals: lactatingCows,
       details: {
@@ -1199,9 +1213,9 @@ export function calculateAllPastureWarnings(pasture, animals, conditionReport, f
     warnings.push({
       type: "maintenance",
       severity: "warning",
-      message: `High manure storage: ${totalManureStorage.toFixed(
-        1
-      )}L needs collection`,
+      message: t("pastures.warnManureStorage", {
+        storage: totalManureStorage.toFixed(1),
+      }),
       icon: "bi-recycle",
     });
   }
@@ -1219,9 +1233,7 @@ export function calculateAllPastureWarnings(pasture, animals, conditionReport, f
       warnings.push({
         type: "breeding",
         severity: "info",
-        message: `Breeding ratio: 1 male to ${ratio.toFixed(
-          0
-        )} females is expected`,
+        message: t("pastures.warnBreedingRatio", { ratio: ratio.toFixed(0) }),
         icon: "bi-gender-ambiguous",
       });
     }
@@ -1245,7 +1257,7 @@ export function calculateAllPastureWarnings(pasture, animals, conditionReport, f
     warnings.push({
       type: "age",
       severity: "warning",
-      message: `${oldAnimals.length} aging animals need replacement planning`,
+      message: t("pastures.warnAgingAnimals", { count: oldAnimals.length }),
       icon: "bi-clock-history",
       affectedAnimals: oldAnimals,
       details: {
@@ -1301,7 +1313,10 @@ export function calculateAllPastureWarnings(pasture, animals, conditionReport, f
       warnings.push({
         type: "dairy_optimization",
         severity: "info",
-        message: `${totalMothers} lactating mothers with ${totalOffspring} young animals - separate for optimal milk production`,
+        message: t("pastures.warnDairySeparate", {
+          mothers: totalMothers,
+          offspring: totalOffspring,
+        }),
         icon: "bi-droplet-half",
         affectedAnimals: [
           ...potentialOffspring.map((p) => p.mother),
@@ -1959,6 +1974,7 @@ export function updatePastureDisplay() {
           ) / totalLivestock
         ).toFixed(0)
       : 0;
+  const lowHealthAnimals = this.getLowHealthAnimalsForActiveFarm(pasturesView);
 
   const totalPasturesEl = document.getElementById("total-pastures-count");
   const pastureAnimalsEl = document.getElementById("pasture-livestock-count");
@@ -1982,9 +1998,13 @@ export function updatePastureDisplay() {
     ();
   const birthWarningsEl = document.getElementById("birth-warnings-count");
   const pastureHealthEl = document.getElementById("pasture-avg-health");
+  const lowHealthCountEl = document.getElementById("pasture-low-health-count");
 
   if (birthWarningsEl) birthWarningsEl.textContent = totalBirthWarnings;
   if (pastureHealthEl) pastureHealthEl.textContent = avgHealth + "%";
+  if (lowHealthCountEl) {
+    lowHealthCountEl.textContent = `${lowHealthAnimals.length} low-health`;
+  }
 
   // Update pastures list (only if pastures container exists)
   if (document.getElementById("pastures-list")) {
@@ -1994,7 +2014,11 @@ export function updatePastureDisplay() {
   // Update main dashboard count
   const pastureCountElement = document.getElementById("pasture-count");
   if (pastureCountElement) {
-    pastureCountElement.textContent = `${totalPastures} Pastures`;
+    const c = totalPastures;
+    pastureCountElement.textContent =
+      c === 1
+        ? t("card.badgePasturesOne", { count: c })
+        : t("card.badgePasturesMany", { count: c });
   }
 
   // Update warning badge on dashboard
@@ -2008,6 +2032,119 @@ export function updatePastureDisplay() {
       warningBadge.classList.add("d-none");
     }
   }
+}
+
+function formatLowHealthStatusBadges(animal) {
+  const statuses = [];
+  if (Number(animal?.health ?? 0) < 20) {
+    statuses.push('<span class="badge bg-danger">Critical</span>');
+  } else {
+    statuses.push('<span class="badge bg-warning text-dark">Poor</span>');
+  }
+  if (animal?.isPregnant) {
+    statuses.push('<span class="badge status-pregnant">Pregnant</span>');
+  }
+  if (animal?.isLactating) {
+    statuses.push('<span class="badge status-lactating">Lactating</span>');
+  }
+  return statuses.join(" ");
+}
+
+export function getLowHealthAnimalsForActiveFarm(pasturesList) {
+  const list =
+    Array.isArray(pasturesList) && pasturesList.length > 0
+      ? pasturesList
+      : this.getPasturesForActiveFarm();
+  const rows = [];
+  list.forEach((pasture) => {
+    const animals = Array.isArray(pasture?.animals) ? pasture.animals : [];
+    animals.forEach((animal) => {
+      const health = Number(animal?.health ?? 0);
+      if (Number.isFinite(health) && health < 70) {
+        rows.push({
+          ...animal,
+          health,
+          pastureName: pasture?.name || "Unknown",
+        });
+      }
+    });
+  });
+  rows.sort((a, b) => a.health - b.health);
+  return rows;
+}
+
+export function showLowHealthAnimalsDrilldown() {
+  const pasturesView = this.getPasturesForActiveFarm();
+  const affected = this.getLowHealthAnimalsForActiveFarm(pasturesView);
+  const modalEl = document.getElementById("warningModal");
+  const content = document.getElementById("warningDetailsContent");
+  const title = document.getElementById("warningModalLabel");
+  if (!modalEl || !content || !title) return;
+
+  title.innerHTML = `<i class="bi bi-heart-pulse me-2 text-warning"></i>Low Health Animals (${affected.length})`;
+
+  if (affected.length === 0) {
+    content.innerHTML = `
+      <div class="alert alert-success mb-0">
+        <i class="bi bi-check-circle me-2"></i>
+        No animals are currently in poor/critical health across active-farm pastures.
+      </div>
+    `;
+    new bootstrap.Modal(modalEl).show();
+    return;
+  }
+
+  const rows = affected
+    .map((animal) => {
+      const displayName =
+        animal.name && String(animal.name).trim() !== ""
+          ? animal.name
+          : `#${animal.id}`;
+      const healthClass = this.getHealthClass(animal.health);
+      return `
+        <tr>
+          <td>${animal.id}</td>
+          <td>${displayName}</td>
+          <td>${animal.subType || animal.type || "Unknown"}</td>
+          <td>${animal.pastureName}</td>
+          <td>
+            <div class="health-bar">
+              <div class="health-fill ${healthClass}" style="width: ${Math.max(
+                0,
+                Math.min(100, animal.health)
+              )}%"></div>
+            </div>
+            ${Math.round(animal.health)}%
+          </td>
+          <td>${formatLowHealthStatusBadges(animal)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  content.innerHTML = `
+    <div class="alert alert-warning mb-3">
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      <strong>${affected.length}</strong> animal(s) currently need attention.
+    </div>
+    <div class="table-responsive">
+      <table class="table table-dark table-striped">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Pasture</th>
+            <th>Health</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+
+  new bootstrap.Modal(modalEl).show();
 }
 
 export function renderPasturesList(pasturesList) {
@@ -2284,9 +2421,10 @@ export function showPastureDetails(pastureId) {
                   <div class="modal-content bg-dark text-light">
                       <div class="modal-header border-bottom border-secondary">
                           <h5 class="modal-title">
-                              <i class="bi bi-house-door me-2"></i>${
-                                pasture.name
-                              } - Details
+                              <i class="bi bi-house-door me-2"></i>${t(
+                                "pastures.details.title",
+                                { name: pasture.name }
+                              )}
                           </h5>
                           <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                       </div>
@@ -2296,59 +2434,87 @@ export function showPastureDetails(pastureId) {
                                   <div class="card bg-secondary">
                                       <div class="card-header">
                                           <h6 class="mb-0">
-                                              Condition Report
+                                              ${t("pastures.details.conditionReport")}
                                               ${
                                                 pasture.conditionReport
                                                   .hasRealData
-                                                  ? '<span class="badge bg-success ms-2 text-light">Live Data</span>'
-                                                  : '<span class="badge bg-warning ms-2 text-dark">Estimated</span>'
+                                                  ? `<span class="badge bg-success ms-2 text-light">${t(
+                                                      "pastures.details.badgeLiveData"
+                                                    )}</span>`
+                                                  : `<span class="badge bg-warning ms-2 text-dark">${t(
+                                                      "pastures.details.badgeEstimated"
+                                                    )}</span>`
                                               }
                                           </h6>
                                       </div>
                                       <div class="card-body">
                                           <table class="table table-sm table-borderless table-dark">
-                                              <tr><td>Total Animals:</td><td>${
-                                                pasture.animalCount
-                                              }</td></tr>
-                                              <tr><td>Males:</td><td>${
-                                                pasture.maleCount || 0
-                                              }</td></tr>
-                                              <tr><td>Females:</td><td>${
-                                                pasture.femaleCount || 0
-                                              }</td></tr>
-                                              <tr><td>Productivity:</td><td>${Math.round(
-                                                pasture.conditionReport
-                                                  .productivity
-                                              )}%</td></tr>
-                                              <tr><td>Avg Health:</td><td>${
-                                                pasture.avgHealth
-                                              }%</td></tr>
+                                              <tr><td>${t(
+                                                "pastures.details.totalAnimals"
+                                              )}:</td><td>${
+      pasture.animalCount
+    }</td></tr>
+                                              <tr><td>${t(
+                                                "pastures.details.males"
+                                              )}:</td><td>${
+      pasture.maleCount || 0
+    }</td></tr>
+                                              <tr><td>${t(
+                                                "pastures.details.females"
+                                              )}:</td><td>${
+      pasture.femaleCount || 0
+    }</td></tr>
+                                              <tr><td>${t(
+                                                "pastures.details.productivity"
+                                              )}:</td><td>${Math.round(
+      pasture.conditionReport.productivity
+    )}%</td></tr>
+                                              <tr><td>${t(
+                                                "pastures.details.avgHealth"
+                                              )}:</td><td>${
+      pasture.avgHealth
+    }%</td></tr>
                                               ${
                                                 pasture.foodReport &&
                                                 pasture.foodReport.SLURRY > 0
-                                                  ? `<tr><td>Slurry Storage:</td><td>${parseFloat(
-                                                      pasture.foodReport
-                                                        .SLURRY
+                                                  ? `<tr><td>${t(
+                                                      "pastures.details.slurryStorage"
+                                                    )}:</td><td>${parseFloat(
+                                                      pasture.foodReport.SLURRY
                                                     ).toFixed(0)}L</td></tr>`
                                                   : pasture.foodReport &&
                                                     pasture.foodReport
                                                       .LIQUIDMANURE > 0
-                                                  ? `<tr><td>Liquid Manure Storage:</td><td>${parseFloat(
+                                                  ? `<tr><td>${t(
+                                                      "pastures.details.liquidManureStorage"
+                                                    )}:</td><td>${parseFloat(
                                                       pasture.foodReport
                                                         .LIQUIDMANURE
                                                     ).toFixed(0)}L</td></tr>`
                                                   : ""
                                               }
                                               ${
-                                                pasture.conditionReport.eggs >
-                                                0
-                                                  ? `<tr><td>Egg Production:</td><td>${pasture.conditionReport.eggs}/day</td></tr>`
+                                                pasture.conditionReport.eggs > 0
+                                                  ? `<tr><td>${t(
+                                                      "pastures.details.eggProduction"
+                                                    )}:</td><td>${
+                                                      pasture.conditionReport
+                                                        .eggs
+                                                    }/${t(
+                                                      "pastures.details.perDay"
+                                                    )}</td></tr>`
                                                   : ""
                                               }
                                               ${
-                                                pasture.conditionReport.wool >
-                                                0
-                                                  ? `<tr><td>Wool Production:</td><td>${pasture.conditionReport.wool}/day</td></tr>`
+                                                pasture.conditionReport.wool > 0
+                                                  ? `<tr><td>${t(
+                                                      "pastures.details.woolProduction"
+                                                    )}:</td><td>${
+                                                      pasture.conditionReport
+                                                        .wool
+                                                    }/${t(
+                                                      "pastures.details.perDay"
+                                                    )}</td></tr>`
                                                   : ""
                                               }
                                           </table>
@@ -2359,96 +2525,118 @@ export function showPastureDetails(pastureId) {
                                   <div class="card bg-secondary">
                                       <div class="card-header">
                                           <h6 class="mb-0">
-                                              Storage & Production
+                                              ${t(
+                                                "pastures.details.storageAndProduction"
+                                              )}
                                               ${
                                                 pasture.foodReport.hasRealData
-                                                  ? '<span class="badge bg-success ms-2 text-light">Live Data</span>'
-                                                  : '<span class="badge bg-warning ms-2 text-dark">Not Monitored</span>'
+                                                  ? `<span class="badge bg-success ms-2 text-light">${t(
+                                                      "pastures.details.badgeLiveData"
+                                                    )}</span>`
+                                                  : `<span class="badge bg-warning ms-2 text-dark">${t(
+                                                      "pastures.details.badgeNotMonitored"
+                                                    )}</span>`
                                               }
                                           </h6>
                                       </div>
                                       <div class="card-body">
                                           <table class="table table-sm table-borderless table-dark">
-                                              <tr><td><strong>Feed Storage</strong></td><td></td></tr>
-                                              <tr><td>Total Capacity:</td><td>${
-                                                pasture.foodReport
-                                                  .totalCapacity
-                                              }L</td></tr>
-                                              <tr><td>Available Food:</td><td>${parseFloat(
-                                                pasture.foodReport
-                                                  .availableFood ||
-                                                  pasture.foodReport
-                                                    .totalMixedRation ||
-                                                  0
-                                              ).toFixed(0)}L</td></tr>
+                                              <tr><td><strong>${t(
+                                                "pastures.details.feedStorage"
+                                              )}</strong></td><td></td></tr>
+                                              <tr><td>${t(
+                                                "pastures.details.totalCapacity"
+                                              )}:</td><td>${
+      pasture.foodReport.totalCapacity
+    }L</td></tr>
+                                              <tr><td>${t(
+                                                "pastures.details.availableFood"
+                                              )}:</td><td>${parseFloat(
+      pasture.foodReport.availableFood ||
+        pasture.foodReport.totalMixedRation ||
+        0
+    ).toFixed(0)}L</td></tr>
                                               ${
                                                 pasture.foodReport.hay > 0
-                                                  ? `<tr><td>Hay:</td><td>${parseFloat(
+                                                  ? `<tr><td>${t(
+                                                      "pastures.details.hay"
+                                                    )}:</td><td>${parseFloat(
                                                       pasture.foodReport.hay
                                                     ).toFixed(0)}L</td></tr>`
                                                   : ""
                                               }
                                               ${
                                                 pasture.foodReport.silage > 0
-                                                  ? `<tr><td>Silage:</td><td>${parseFloat(
-                                                      pasture.foodReport
-                                                        .silage
+                                                  ? `<tr><td>${t(
+                                                      "pastures.details.silage"
+                                                    )}:</td><td>${parseFloat(
+                                                      pasture.foodReport.silage
                                                     ).toFixed(0)}L</td></tr>`
                                                   : ""
                                               }
                                               ${
                                                 pasture.foodReport.grass > 0
-                                                  ? `<tr><td>Grass:</td><td>${parseFloat(
+                                                  ? `<tr><td>${t(
+                                                      "pastures.details.grass"
+                                                    )}:</td><td>${parseFloat(
                                                       pasture.foodReport.grass
                                                     ).toFixed(0)}L</td></tr>`
                                                   : ""
                                               }
                                               ${
                                                 pasture.foodReport.straw > 0
-                                                  ? `<tr><td>Straw:</td><td>${parseFloat(
+                                                  ? `<tr><td>${t(
+                                                      "pastures.details.straw"
+                                                    )}:</td><td>${parseFloat(
                                                       pasture.foodReport.straw
                                                     ).toFixed(0)}L</td></tr>`
                                                   : ""
                                               }
                                               ${
                                                 pasture.foodReport.water > 0
-                                                  ? `<tr><td>Water:</td><td>${parseFloat(
+                                                  ? `<tr><td>${t(
+                                                      "pastures.details.water"
+                                                    )}:</td><td>${parseFloat(
                                                       pasture.foodReport.water
                                                     ).toFixed(0)}L</td></tr>`
                                                   : ""
                                               }
 
                                               ${
-                                                pasture.foodReport.MANURE >
-                                                  0 ||
-                                                pasture.foodReport.SLURRY >
-                                                  0 ||
+                                                pasture.foodReport.MANURE > 0 ||
+                                                pasture.foodReport.SLURRY > 0 ||
                                                 pasture.foodReport
                                                   .LIQUIDMANURE > 0 ||
                                                 pasture.foodReport.meadow > 0
-                                                  ? `<tr><td><strong>Production Storage</strong></td><td></td></tr>`
+                                                  ? `<tr><td><strong>${t(
+                                                      "pastures.details.productionStorage"
+                                                    )}</strong></td><td></td></tr>`
                                                   : ""
                                               }
                                               ${
                                                 pasture.foodReport.MANURE > 0
-                                                  ? `<tr><td>Manure:</td><td>${parseFloat(
-                                                      pasture.foodReport
-                                                        .MANURE
+                                                  ? `<tr><td>${t(
+                                                      "pastures.details.manure"
+                                                    )}:</td><td>${parseFloat(
+                                                      pasture.foodReport.MANURE
                                                     ).toFixed(0)}L</td></tr>`
                                                   : ""
                                               }
                                               ${
                                                 pasture.foodReport.SLURRY > 0
-                                                  ? `<tr><td>Slurry:</td><td>${parseFloat(
-                                                      pasture.foodReport
-                                                        .SLURRY
+                                                  ? `<tr><td>${t(
+                                                      "pastures.details.slurry"
+                                                    )}:</td><td>${parseFloat(
+                                                      pasture.foodReport.SLURRY
                                                     ).toFixed(0)}L</td></tr>`
                                                   : ""
                                               }
                                               ${
                                                 pasture.foodReport
                                                   .LIQUIDMANURE > 0
-                                                  ? `<tr><td>Liquid Manure:</td><td>${parseFloat(
+                                                  ? `<tr><td>${t(
+                                                      "pastures.details.liquidManure"
+                                                    )}:</td><td>${parseFloat(
                                                       pasture.foodReport
                                                         .LIQUIDMANURE
                                                     ).toFixed(0)}L</td></tr>`
@@ -2456,9 +2644,10 @@ export function showPastureDetails(pastureId) {
                                               }
                                               ${
                                                 pasture.foodReport.meadow > 0
-                                                  ? `<tr><td>Meadow:</td><td>${parseFloat(
-                                                      pasture.foodReport
-                                                        .meadow
+                                                  ? `<tr><td>${t(
+                                                      "pastures.details.meadow"
+                                                    )}:</td><td>${parseFloat(
+                                                      pasture.foodReport.meadow
                                                     ).toFixed(0)}L</td></tr>`
                                                   : ""
                                               }
@@ -2472,15 +2661,17 @@ export function showPastureDetails(pastureId) {
                               <div class="col-12">
                                   <div class="card bg-secondary">
                                       <div class="card-header">
-                                          <h6 class="mb-0">Livestock Summary</h6>
+                                          <h6 class="mb-0">${t(
+                                            "pastures.details.livestockSummary"
+                                          )}</h6>
                                       </div>
                                       <div class="card-body">
-                                          <p><strong>Total Animals:</strong> ${
-                                            pasture.animalCount
-                                          }</p>
-                                          <p><strong>Average Health:</strong> ${
-                                            pasture.avgHealth
-                                          }%</p>
+                                          <p><strong>${t(
+                                            "pastures.details.totalAnimals"
+                                          )}:</strong> ${pasture.animalCount}</p>
+                                          <p><strong>${t(
+                                            "pastures.details.averageHealth"
+                                          )}:</strong> ${pasture.avgHealth}%</p>
                                       </div>
                                   </div>
                               </div>
@@ -2494,18 +2685,29 @@ export function showPastureDetails(pastureId) {
                       <div class="row mt-4">
                           <div class="col-12">
                               <div class="alert alert-info">
-                                  <h6><i class="bi bi-info-circle me-2"></i>Production Data Not Available</h6>
+                                  <h6><i class="bi bi-info-circle me-2"></i>${t(
+                                    "pastures.details.prodDataUnavailable"
+                                  )}</h6>
                                   <p class="mb-0">
-                                      This pasture's production and food levels are not being monitored in real-time.
-                                      This can happen when:
+                                      ${t(
+                                        "pastures.details.prodDataUnavailableBody"
+                                      )}
                                   </p>
                                   <ul class="mt-2 mb-0">
-                                      <li>The RealisticLivestock mod is not monitoring this building</li>
-                                      <li>The building doesn't have detailed monitoring enabled</li>
-                                      <li>The building is new and hasn't generated data yet</li>
+                                      <li>${t(
+                                        "pastures.details.prodReasonRL"
+                                      )}</li>
+                                      <li>${t(
+                                        "pastures.details.prodReasonNoMonitoring"
+                                      )}</li>
+                                      <li>${t(
+                                        "pastures.details.prodReasonNew"
+                                      )}</li>
                                   </ul>
                                   <p class="mt-2 mb-0 text-muted">
-                                      <small>Values shown are estimates based on animal count and type.</small>
+                                      <small>${t(
+                                        "pastures.details.prodEstimatesNote"
+                                      )}</small>
                                   </p>
                               </div>
                           </div>
@@ -2515,9 +2717,11 @@ export function showPastureDetails(pastureId) {
                       }
 
                       <div class="modal-footer border-top border-secondary">
-                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">${t(
+                            "common.close"
+                          )}</button>
                           <button type="button" class="btn btn-primary" onclick="dashboard.showPastureLivestock('${pastureId}'); bootstrap.Modal.getInstance(document.getElementById('pasture-details-modal')).hide();">
-                              View Livestock Table
+                              ${t("pastures.details.viewLivestockTable")}
                           </button>
                       </div>
                   </div>
@@ -2551,7 +2755,7 @@ export function showPastureLivestock(pastureId) {
 
   this.renderPastureLivestockTable(
     pasture.animals,
-    `${pasture.name} Livestock`
+    t("pastures.livestockTableTitle", { name: pasture.name })
   );
 
   const modalElement = document.getElementById("pasturelivestock-modal");
@@ -2560,7 +2764,7 @@ export function showPastureLivestock(pastureId) {
     return;
   }
 
-  const modal = new bootstrap.Modal(modalElement);
+  const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
   modal.show();
 }
 
@@ -2572,12 +2776,24 @@ export function showAllPastureLivestock() {
     this.isFarmDropdownEnabled();
   this.renderPastureLivestockTable(
     allAnimals,
-    multiFarm ? "All Pasture Livestock (this farm)" : "All Pasture Livestock"
+    multiFarm
+      ? t("pastures.allLivestockThisFarm")
+      : t("pastures.allLivestock")
   );
-  const modal = new bootstrap.Modal(
-    document.getElementById("pasturelivestock-modal")
-  );
-  modal.show();
+  const plModalEl = document.getElementById("pasturelivestock-modal");
+  if (plModalEl) {
+    bootstrap.Modal.getOrCreateInstance(plModalEl).show();
+  }
+}
+
+function destroyPastureLivestockDataTable() {
+  if (typeof $ === "undefined" || !$.fn?.DataTable || !$.fn.dataTable?.isDataTable) {
+    return;
+  }
+  const $t = $("#pasture-livestock-table");
+  if ($t.length && $.fn.dataTable.isDataTable($t)) {
+    $t.DataTable().destroy(false);
+  }
 }
 
 export function renderPastureLivestockTable(animals, title) {
@@ -2590,32 +2806,35 @@ export function renderPastureLivestockTable(animals, title) {
     modalTitle.innerHTML = `<i class="bi bi-table me-2"></i>${title}`;
   }
 
+  if (!tableContainer) return;
+
+  destroyPastureLivestockDataTable();
+
   if (!animals || animals.length === 0) {
     tableContainer.innerHTML = `
               <div class="text-center text-muted py-4">
                   <i class="bi bi-info-circle display-1"></i>
-                  <h4>No Livestock Found</h4>
-                  <p>No animals found in the selected pasture(s).</p>
+                  <h4>${t("pastures.livestockTable.noLivestockTitle")}</h4>
+                  <p>${t("pastures.livestockTable.noLivestockBody")}</p>
               </div>
           `;
     return;
   }
 
-  // Create the same table structure as livestock management
   const tableHTML = `
           <div class="table-responsive">
               <table class="table table-dark table-striped" id="pasture-livestock-table">
                   <thead>
                       <tr>
-                          <th>ID</th>
-                          <th>Type</th>
-                          <th>Gender</th>
-                          <th>Age</th>
-                          <th>Health</th>
-                          <th>Weight</th>
-                          <th>Value</th>
-                          <th>Status</th>
-                          <th>Actions</th>
+                          <th>${t("pastures.livestockTable.colId")}</th>
+                          <th>${t("pastures.livestockTable.colType")}</th>
+                          <th>${t("pastures.livestockTable.colGender")}</th>
+                          <th>${t("pastures.livestockTable.colAge")}</th>
+                          <th>${t("pastures.livestockTable.colHealth")}</th>
+                          <th>${t("pastures.livestockTable.colWeight")}</th>
+                          <th>${t("pastures.livestockTable.colValue")}</th>
+                          <th>${t("pastures.livestockTable.colStatus")}</th>
+                          <th>${t("pastures.livestockTable.colActions")}</th>
                       </tr>
                   </thead>
                   <tbody>
@@ -2624,19 +2843,27 @@ export function renderPastureLivestockTable(animals, title) {
                           const statusBadges = [];
                           if (animal.health === 0)
                             statusBadges.push(
-                              '<span class="badge bg-danger">Error</span>'
+                              `<span class="badge bg-danger">${t(
+                                "pastures.livestockTable.badgeError"
+                              )}</span>`
                             );
                           if (animal.isPregnant)
                             statusBadges.push(
-                              '<span class="badge status-pregnant">Pregnant</span>'
+                              `<span class="badge status-pregnant">${t(
+                                "pastures.livestockTable.badgePregnant"
+                              )}</span>`
                             );
                           if (animal.isLactating)
                             statusBadges.push(
-                              '<span class="badge status-lactating">Lactating</span>'
+                              `<span class="badge status-lactating">${t(
+                                "pastures.livestockTable.badgeLactating"
+                              )}</span>`
                             );
                           if (animal.isParent)
                             statusBadges.push(
-                              '<span class="badge status-parent">Parent</span>'
+                              `<span class="badge status-parent">${t(
+                                "pastures.livestockTable.badgeParent"
+                              )}</span>`
                             );
 
                           const healthClass = this.getHealthClass(
@@ -2664,7 +2891,10 @@ export function renderPastureLivestockTable(animals, title) {
                                     animal.subType
                                   )}</td>
                                   <td>${this.capitalize(animal.gender)}</td>
-                                  <td>${animal.age} months</td>
+                                  <td>${t(
+                                    "pastures.livestockTable.ageMonths",
+                                    { age: animal.age }
+                                  )}</td>
                                   <td>${healthBar}</td>
                                   <td>${animal.weight.toFixed(1)} kg</td>
                                   <td>$${this.calculateAnimalValue(
@@ -2672,10 +2902,12 @@ export function renderPastureLivestockTable(animals, title) {
                                   ).value.toLocaleString()}</td>
                                   <td>${statusBadges.join(" ") || "-"}</td>
                                   <td>
-                                      <button class="btn btn-sm btn-outline-success" onclick="dashboard.showAnimalDetails('${
-                                        animal.id
-                                      }')">
-                                          <i class="bi bi-eye me-1"></i>Details
+                                      <button class="btn btn-sm btn-outline-success" onclick='dashboard.showAnimalDetails(${JSON.stringify(
+                                        String(animal.id)
+                                      )})'>
+                                          <i class="bi bi-eye me-1"></i>${t(
+                                            "pastures.livestockTable.details"
+                                          )}
                                       </button>
                                   </td>
                               </tr>
@@ -2696,10 +2928,10 @@ export function renderPastureLivestockTable(animals, title) {
       responsive: true,
       order: [[1, "asc"]], // Sort by name by default
       language: {
-        search: "Search animals:",
-        lengthMenu: "Show _MENU_ animals per page",
-        info: "Showing _START_ to _END_ of _TOTAL_ animals",
-        emptyTable: "No animals found",
+        search: t("pastures.livestockTable.dtSearch"),
+        lengthMenu: t("pastures.livestockTable.dtLengthMenu"),
+        info: t("pastures.livestockTable.dtInfo"),
+        emptyTable: t("pastures.livestockTable.dtEmptyTable"),
       },
     });
   }, 100);

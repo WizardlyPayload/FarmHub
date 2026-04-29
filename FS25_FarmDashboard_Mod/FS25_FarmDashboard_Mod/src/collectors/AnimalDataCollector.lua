@@ -1,12 +1,63 @@
--- FS25 FarmDashboard | AnimalDataCollector.lua | v2.0.0
+-- FS25 FarmDashboard | AnimalDataCollector.lua | v2.1.0
 
 AnimalDataCollector = {}
 
 function AnimalDataCollector:init()
-    -- print("[FarmDashboard] Animal data collector initialized (safe version)")
+    AnimalDataCollector._co = nil
+end
+
+local function animalCoopYield(partialAnimalData)
+    if AnimalDataCollector._yieldEvery and coroutine.running() then
+        coroutine.yield("progress", partialAnimalData or {})
+    end
+end
+
+function AnimalDataCollector:collectBegin()
+    AnimalDataCollector._co = coroutine.create(function(opts)
+        opts = opts or {}
+        AnimalDataCollector._yieldEvery = math.max(1, tonumber(opts.animalBatch or opts.batchSize) or 2)
+        AnimalDataCollector._animalTick = 0
+        local success, result = pcall(function()
+            return self:collectSafely()
+        end)
+        if not success or not result then
+            AnimalDataCollector._yieldEvery = nil
+            return {}
+        end
+        AnimalDataCollector._yieldEvery = nil
+        return result.animalData or {}
+    end)
+end
+
+function AnimalDataCollector:collectStep(opts)
+    if not AnimalDataCollector._co then return true, {} end
+    local ok, a, b = coroutine.resume(AnimalDataCollector._co, opts or {})
+    if not ok then
+        Logging.warning("[FarmDash] AnimalDataCollector coroutine: " .. tostring(a))
+        AnimalDataCollector._co = nil
+        AnimalDataCollector._yieldEvery = nil
+        return true, {}
+    end
+    if a == "progress" then
+        return false, b or {}
+    end
+    local st = coroutine.status(AnimalDataCollector._co)
+    if st == "dead" then
+        AnimalDataCollector._co = nil
+        AnimalDataCollector._yieldEvery = nil
+        return true, a or {}
+    end
+    if st == "suspended" then
+        Logging.warning("[FarmDash] AnimalDataCollector: unexpected coroutine state; ending slice.")
+        AnimalDataCollector._co = nil
+        AnimalDataCollector._yieldEvery = nil
+        return true, (type(a) == "table" and a) or b or {}
+    end
+    return false, b or {}
 end
 
 function AnimalDataCollector:collect()
+    AnimalDataCollector._yieldEvery = nil
     local animalData = {}
 
     -- Wrap entire function in pcall to prevent crashes
@@ -35,6 +86,10 @@ function AnimalDataCollector:collectSafely()
             local husbandryData = self:collectBasicHusbandryData(placeable)
             if husbandryData then
                 table.insert(animalData, husbandryData)
+            end
+            AnimalDataCollector._animalTick = (AnimalDataCollector._animalTick or 0) + 1
+            if AnimalDataCollector._yieldEvery and AnimalDataCollector._animalTick % AnimalDataCollector._yieldEvery == 0 then
+                animalCoopYield(animalData)
             end
         end
     end
@@ -128,6 +183,7 @@ function AnimalDataCollector:collectBasicHusbandryData(placeable)
             }
             
             for fillType, fillLevel in pairs(fillLevels) do
+                animalCoopYield()
                 if fillType and fillLevel and type(fillLevel) == "number" and fillLevel > 0 then
                     -- Get fill type name
                     local fillTypeName = fillType
@@ -201,6 +257,7 @@ function AnimalDataCollector:collectBasicHusbandryData(placeable)
         local success, clusters = pcall(function() return placeable:getClusters() end)
         if success and clusters then
             for clusterIndex, cluster in pairs(clusters) do
+                animalCoopYield()
                 if cluster then
                     -- Check if this is a RealisticLivestock individual animal (cluster.isIndividual == true)
                     if cluster.isIndividual == true then

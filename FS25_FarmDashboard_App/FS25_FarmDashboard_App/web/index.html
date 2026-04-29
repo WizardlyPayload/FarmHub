@@ -602,26 +602,6 @@
             </div>
           </div>
         </div>
-
-        <div class="modal fade" id="animalDetailsModal" tabindex="-1" aria-hidden="true">
-          <div class="modal-dialog modal-xl">
-            <div class="modal-content bg-dark text-light">
-              <div class="modal-header bg-farm-primary"><h5 class="modal-title" id="animalDetailsModalLabel"><i class="bi bi-clipboard-data me-2"></i><span data-i18n="animal.title">Animal Details</span></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-              <div class="modal-body"><div id="animalDetailsContent"></div></div>
-              <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.close">Close</button></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal fade" id="pasturelivestock-modal" tabindex="-1">
-        <div class="modal-dialog modal-xl">
-          <div class="modal-content bg-dark text-light">
-            <div class="modal-header border-bottom border-secondary"><h5 class="modal-title" id="pastureModal-title"><i class="bi bi-table me-2"></i><span data-i18n="pastureModal.title">Pasture Livestock</span></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body"><div id="pasture-livestock-table-container"></div></div>
-            <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.close">Close</button></div>
-          </div>
-        </div>
       </div>
 
       <div class="modal fade" id="dataChangesModal" tabindex="-1" aria-hidden="true">
@@ -692,6 +672,27 @@
       </script>
     </main>
 
+    <!-- Must be a direct child of body (not inside <main>): .farm-dash-main uses z-index:1 so modals inside main never stack above #main-navbar (1030). -->
+    <div class="modal fade" id="animalDetailsModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark text-light">
+          <div class="modal-header bg-farm-primary"><h5 class="modal-title" id="animalDetailsModalLabel"><i class="bi bi-clipboard-data me-2"></i><span data-i18n="animal.title">Animal Details</span></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body"><div id="animalDetailsContent"></div></div>
+          <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.close">Close</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="pasturelivestock-modal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-xl">
+        <div class="modal-content bg-dark text-light">
+          <div class="modal-header border-bottom border-secondary"><h5 class="modal-title" id="pastureModal-title"><i class="bi bi-table me-2"></i><span data-i18n="pastureModal.title">Pasture Livestock</span></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body"><div id="pasture-livestock-table-container"></div></div>
+          <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.close">Close</button></div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade farmdash-local-only" id="appSettingsModal" tabindex="-1" aria-hidden="true" aria-labelledby="appSettingsModalTitle">
       <div class="modal-dialog modal-xl modal-dialog-scrollable modal-fullscreen-md-down">
         <div class="modal-content bg-dark text-light">
@@ -745,32 +746,68 @@
                     <p class="small text-muted" data-i18n="settings.fieldExclusionHint">Only parcels your selected farm owns are listed.</p>
                     <div id="settings-field-exclusions" class="mb-0 small text-break">—</div>
                     <hr class="border-secondary my-3"/>
-                    <h6 class="text-farm-accent small text-uppercase mb-2">Field suggestions</h6>
-                    <div id="settings-ai-connection-status" class="alert alert-secondary small py-2 mb-0" role="status">
-                      <span class="text-muted">Parcel tips use the dashboard <strong>offline rules engine</strong> only.</span>
+                    <h6 class="text-farm-accent" data-i18n="settings.fieldClusterTitle">Fields — merged cards</h6>
+                    <div id="settings-field-clusters" class="mb-0 small text-break">—</div>
+                    <hr class="border-secondary my-3"/>
+                    <h6 class="text-farm-accent" data-i18n="settings.simHubTitle">SimHub read-only page</h6>
+                    <p class="small text-muted" data-i18n="settings.simHubHint">SimHub’s in-game web overlay cannot click the dashboard. Use this page to show only the block you need (same data as the main app). It tracks the server and farm you last picked in Farm Dashboard on this PC.</p>
+                    <div class="form-check mb-2">
+                      <input class="form-check-input" type="checkbox" id="settings-simhub-enabled"/>
+                      <label class="form-check-label" for="settings-simhub-enabled" data-i18n="settings.simHubEnable">Enable SimHub at /simhub.html or /simhub</label>
                     </div>
+                    <div class="mb-2">
+                      <label class="form-label small" for="settings-simhub-view" data-i18n="settings.simHubViewLabel">What to show</label>
+                      <select class="form-select form-select-sm bg-secondary text-light border-secondary" id="settings-simhub-view">
+                        <option value="fields" data-i18n="settings.simHubViewFields">Fields</option>
+                        <option value="pastures" data-i18n="settings.simHubViewPastures">Pastures</option>
+                        <option value="production" data-i18n="settings.simHubViewProduction">Production</option>
+                      </select>
+                    </div>
+                    <div class="mb-2">
+                      <label class="form-label small" for="settings-simhub-cluster-ids" data-i18n="settings.simHubClustersLabel">Field cluster ids (optional, one per line)</label>
+                      <textarea class="form-control form-control-sm bg-secondary text-light border-secondary font-monospace" id="settings-simhub-cluster-ids" rows="2" spellcheck="false" placeholder="a-12-13"></textarea>
+                      <div class="form-text text-muted small" data-i18n="settings.simHubClustersHelp">Leave empty to list every field card. Use the cluster id shown on each merged field card.</div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                      <div class="col-md-6">
+                        <label class="form-label small" for="settings-simhub-pasture-ids" data-i18n="settings.simHubPastureIds">Pasture indices (optional)</label>
+                        <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="settings-simhub-pasture-ids" placeholder="0,1" autocomplete="off"/>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label small" for="settings-simhub-production-keys" data-i18n="settings.simHubProductionKeys">Production keys (optional, one per line)</label>
+                        <textarea class="form-control form-control-sm bg-secondary text-light border-secondary" id="settings-simhub-production-keys" rows="2" spellcheck="false"></textarea>
+                      </div>
+                    </div>
+                    <p class="small text-muted mb-0" data-i18n="settings.simHubUrl">Open on this PC or a tablet: <code class="text-light">http://&lt;this-PC&gt;:8766/simhub.html</code> (or <code class="text-light">/simhub</code>). SimHub follows the server and farm you select in Farm Dashboard—no query string needed.</p>
                   </div>
 
                   <div class="tab-pane fade" id="app-settings-pane-servers" role="tabpanel" aria-labelledby="app-settings-tab-servers" tabindex="0">
-                    <h6 class="text-farm-accent">Remote / LAN access</h6>
-                    <p class="small text-muted mb-2">Allow tablets and other PCs on your network to open this dashboard at <code class="text-light">http://&lt;this-PC-LAN-IP&gt;:8766</code>. Local use from this app always stays on <strong>127.0.0.1</strong> and does not require a password. Changing these options restarts the built-in web server.</p>
+                    <h6 class="text-farm-accent" data-i18n="settings.lanTitle">Remote / LAN access</h6>
+                    <p class="small text-muted mb-2" data-i18n="settings.lanIntro" data-i18n-html="">Allow tablets and other PCs on your network to open this dashboard at <code class="text-light">http://&lt;this-PC-LAN-IP&gt;:8766</code>. Local use from this app always stays on <strong>127.0.0.1</strong> and does not require a password. Changing these options restarts the built-in web server.</p>
                     <div class="form-check mb-3">
                       <input class="form-check-input" type="checkbox" id="settings-lan-enabled"/>
-                      <label class="form-check-label" for="settings-lan-enabled">Enable LAN access (listen on all interfaces)</label>
+                      <label class="form-check-label" for="settings-lan-enabled" data-i18n="settings.lanEnableLabel">Enable LAN access (listen on all interfaces)</label>
                     </div>
                     <div class="row g-2 mb-3">
                       <div class="col-md-6">
-                        <label class="form-label small" for="settings-lan-username">LAN username</label>
+                        <label class="form-label small" for="settings-lan-username" data-i18n="settings.lanUserLabel">LAN username</label>
                         <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="settings-lan-username" autocomplete="username" value="admin"/>
                       </div>
                       <div class="col-md-6">
-                        <label class="form-label small" for="settings-lan-password">LAN password</label>
-                        <input type="password" class="form-control form-control-sm bg-secondary text-light border-secondary" id="settings-lan-password" autocomplete="new-password" placeholder="Required for remote browsers"/>
+                        <label class="form-label small" for="settings-lan-password" data-i18n="settings.lanPassLabel">LAN password</label>
+                        <input type="password" class="form-control form-control-sm bg-secondary text-light border-secondary" id="settings-lan-password" autocomplete="new-password" data-i18n-placeholder="settings.lanPassPlaceholder" placeholder="Required for remote browsers"/>
                       </div>
                       <div class="col-12">
-                        <label class="form-label small" for="settings-lan-allowed-ips">Allowed IP addresses (optional, comma-separated)</label>
-                        <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="settings-lan-allowed-ips" placeholder="e.g. 192.168.1.50, 192.168.1.51" autocomplete="off"/>
-                        <div class="form-text text-muted small">Leave empty to allow any LAN IP (still requires username and password). If set, only listed IPs may connect remotely.</div>
+                        <label class="form-label small" for="settings-lan-allowed-ips" data-i18n="settings.lanAllowedIpsLabel">Allowed IP addresses (optional, comma-separated)</label>
+                        <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="settings-lan-allowed-ips" data-i18n-placeholder="settings.lanAllowedIpsPlaceholder" placeholder="e.g. 192.168.1.50, 192.168.1.51" autocomplete="off"/>
+                        <div class="form-text text-muted small" data-i18n="settings.lanAllowedIpsHelp">Leave empty to allow any LAN IP (still requires username and password). If set, only listed IPs may connect remotely.</div>
+                      </div>
+                      <div class="col-12">
+                        <div class="form-check mt-2">
+                          <input class="form-check-input" type="checkbox" id="settings-lan-auth-optional"/>
+                          <label class="form-check-label" for="settings-lan-auth-optional" data-i18n="settings.lanAuthOptional">Allow LAN read-only pages without username/password (GET only)</label>
+                        </div>
+                        <div class="form-text text-muted small" data-i18n="settings.lanAuthOptionalHint">WebSocket live updates still require a token or login. Only enable on trusted home LANs.</div>
                       </div>
                     </div>
                     <hr class="border-secondary my-3"/>

@@ -1,4 +1,4 @@
--- FS25 FarmDashboard | ProductionDataCollector.lua | v2.0.0
+-- FS25 FarmDashboard | ProductionDataCollector.lua | v2.1.0
 -- 1) ProductionChainManager:getProductionPointsForFarmId / getFactoriesForFarmId
 -- 2) Placeable scan (REQUIRED on many builds): PlaceableProductionPoint.lua has
 --    addProductionPoint() commented out — points may never register on the manager.
@@ -9,9 +9,72 @@ ProductionDataCollector = {}
 function ProductionDataCollector:init()
     self.lastCollectTime = 0
     self.collectInterval = 1000
+    ProductionDataCollector._co = nil
+end
+
+function ProductionDataCollector:_prodYieldAfterChain(result)
+    local stride = ProductionDataCollector._yieldChains
+    if not stride or not coroutine.running() then return end
+    ProductionDataCollector._chainTick = (ProductionDataCollector._chainTick or 0) + 1
+    if ProductionDataCollector._chainTick % stride == 0 then
+        coroutine.yield("progress", result or { chains = {} })
+    end
+end
+
+function ProductionDataCollector:_prodYieldPlaceableScan()
+    local stride = ProductionDataCollector._yieldPlaceables
+    if not stride or not coroutine.running() then return end
+    ProductionDataCollector._placeableTick = (ProductionDataCollector._placeableTick or 0) + 1
+    if ProductionDataCollector._placeableTick % stride == 0 then
+        coroutine.yield("progress", ProductionDataCollector._lastResult or { chains = {} })
+    end
+end
+
+function ProductionDataCollector:collectBegin()
+    ProductionDataCollector._co = coroutine.create(function(opts)
+        opts = opts or {}
+        ProductionDataCollector._yieldChains = math.max(1, tonumber(opts.productionChainsPerYield) or 2)
+        ProductionDataCollector._yieldPlaceables = math.max(1, tonumber(opts.productionPlaceablesPerYield) or 10)
+        ProductionDataCollector._chainTick = 0
+        ProductionDataCollector._placeableTick = 0
+        ProductionDataCollector._lastResult = nil
+        local r = ProductionDataCollector._collectImpl(ProductionDataCollector)
+        ProductionDataCollector._yieldChains = nil
+        ProductionDataCollector._yieldPlaceables = nil
+        ProductionDataCollector._lastResult = nil
+        return r
+    end)
+end
+
+function ProductionDataCollector:collectStep(opts)
+    if not ProductionDataCollector._co then return true, { chains = {} } end
+    local ok, a, b = coroutine.resume(ProductionDataCollector._co, opts or {})
+    if not ok then
+        Logging.warning("[FarmDash] ProductionDataCollector coroutine: " .. tostring(a))
+        ProductionDataCollector._co = nil
+        return true, { chains = {} }
+    end
+    if a == "progress" then
+        return false, b or { chains = {} }
+    end
+    local st = coroutine.status(ProductionDataCollector._co)
+    if st == "dead" then
+        ProductionDataCollector._co = nil
+        return true, a or { chains = {} }
+    end
+    if st == "suspended" then
+        Logging.warning("[FarmDash] ProductionDataCollector: unexpected coroutine state; ending slice.")
+        ProductionDataCollector._co = nil
+        return true, ProductionDataCollector._lastResult or (type(a) == "table" and a) or b or { chains = {} }
+    end
+    return false, b or { chains = {} }
 end
 
 function ProductionDataCollector:collect()
+    return self:_collectImpl()
+end
+
+function ProductionDataCollector:_collectImpl()
     if not _G.g_currentMission then
         return { chains = {} }
     end
@@ -51,6 +114,7 @@ function ProductionDataCollector:collect()
                 if pData then
                     pData.source = "chainManager"
                     table.insert(result.chains, pData)
+                    self:_prodYieldAfterChain(result)
                 end
             end
 
@@ -61,6 +125,7 @@ function ProductionDataCollector:collect()
                 if pData then
                     pData.source = "chainManager"
                     table.insert(result.chains, pData)
+                    self:_prodYieldAfterChain(result)
                 end
             end
         end
@@ -81,6 +146,7 @@ function ProductionDataCollector:collect()
                         if pData then
                             pData.source = "chainManager"
                             table.insert(result.chains, pData)
+                            self:_prodYieldAfterChain(result)
                         end
                     end
                 end
@@ -94,6 +160,7 @@ function ProductionDataCollector:collect()
                         if pData then
                             pData.source = "chainManager"
                             table.insert(result.chains, pData)
+                            self:_prodYieldAfterChain(result)
                         end
                     end
                 end
@@ -102,6 +169,7 @@ function ProductionDataCollector:collect()
     end
 
     -- Always merge placeables: production points often exist only here (manager add commented in base game).
+    ProductionDataCollector._lastResult = result
     self:mergePlaceableProductions(result, seenPP, seenFactoryPlaceable, everyone)
 
     self.lastProductionData = result
@@ -116,6 +184,7 @@ function ProductionDataCollector:mergePlaceableProductions(result, seenPP, seenF
     end
 
     for _, placeable in ipairs(ps.placeables) do
+        self:_prodYieldPlaceableScan()
         if placeable and placeable.spec_productionPoint and placeable.spec_productionPoint.productionPoint then
             local pp = placeable.spec_productionPoint.productionPoint
             if not seenPP[pp] then
@@ -129,6 +198,7 @@ function ProductionDataCollector:mergePlaceableProductions(result, seenPP, seenF
                             pData.placeableStoreName = placeable.storeName
                         end
                         table.insert(result.chains, pData)
+                        self:_prodYieldAfterChain(result)
                     end
                 end
             end
@@ -140,6 +210,7 @@ function ProductionDataCollector:mergePlaceableProductions(result, seenPP, seenF
                 if pData then
                     pData.source = "placeable"
                     table.insert(result.chains, pData)
+                    self:_prodYieldAfterChain(result)
                 end
             end
         end

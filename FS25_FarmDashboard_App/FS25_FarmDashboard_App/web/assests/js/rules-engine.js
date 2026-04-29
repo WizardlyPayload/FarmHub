@@ -1,3 +1,5 @@
+import { t } from "./i18n/i18n.js";
+
 /**
  * FS25 FarmDashboard — Layer 1 local heuristic suggestions (offline-safe).
  * Parses field objects from merged /api/fields data (same shape as data.json fields).
@@ -13,13 +15,40 @@
  */
 
 /**
- * When Layer 1 cannot pick a sharper rule, `fields.js` may substitute XML/Lua `suggestions[]`
- * if present — compare against this exact action string.
+ * Sentinel value identifying the offline rules' generic fallback suggestion.
+ * Suggestion objects also carry `kind: "fallback"` for direct comparison without
+ * relying on the localized action text. Kept exported for backwards compatibility
+ * with callers that still string-match the English label.
  */
 export const RULES_ENGINE_FALLBACK_ACTION =
   "Use in-game field hints — saved data doesn’t show one clear job";
 
-/** Stable id for matching VPS consultant `field_ref` (farmlandId preferred). */
+/** Stable kind tag for the generic offline-rules fallback suggestion. */
+export const RULES_ENGINE_FALLBACK_KIND = "fallback";
+let fallbackSuggestionCounter = 0;
+
+export function getRulesFallbackCounter() {
+  return fallbackSuggestionCounter;
+}
+
+function localizedFruitLabel(ft) {
+  if (!ft) return null;
+  const slug = ft.toLowerCase();
+  const key = `rules.cropLabel.${slug}`;
+  const localized = t(key);
+  if (localized && localized !== key) return localized;
+  return null;
+}
+
+function humanizedFruitLabel(ft) {
+  return ft
+    .toLowerCase()
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+/** Stable id for matching external `field_ref` style keys (farmlandId preferred). */
 export function getFieldStableId(field) {
   if (field == null) return "";
   const id = field.farmlandId ?? field.id;
@@ -81,7 +110,7 @@ function isPostHarvestField(field) {
   const gs = field.growthState || 0;
   const gl = field.growthLabel;
   const gt = String(field.groundType || "").toUpperCase();
-  if (gl === "growing") return false;
+  if (gl === "growing" || gl === "mown_regrowth") return false;
   if (gs > 0 && !field.isHarvested && gl !== "harvested" && !gt.includes("HARVESTED")) {
     return false;
   }
@@ -106,6 +135,35 @@ function fruitUpper(field) {
 function isGrassCrop(field) {
   if (fruitUpper(field) === "GRASS") return true;
   return false;
+}
+
+/** Use PF map N for ratio/gap copy when PF is on (call sites also gate on scan + target). */
+function usePrecisionFarmingNitrogenTarget(field) {
+  return !!field;
+}
+
+/** Career savegame flags from `gameSettings` / `settings` (XML). Missing key → assume on (older payloads). */
+function careerBool(gs, key) {
+  if (!gs || typeof gs !== "object" || !(key in gs)) return true;
+  return !!gs[key];
+}
+
+/**
+ * @param {{ gameSettings?: object } | null | undefined} opts
+ * @returns {{ stones: boolean, weeds: boolean, plow: boolean, lime: boolean }}
+ */
+function rulesGameContext(opts) {
+  const gs =
+    opts && typeof opts === "object" && opts.gameSettings && typeof opts.gameSettings === "object"
+      ? opts.gameSettings
+      : {};
+  fallbackSuggestionCounter += 1;
+  return {
+    stones: careerBool(gs, "stonesEnabled"),
+    weeds: careerBool(gs, "weedsEnabled"),
+    plow: careerBool(gs, "plowingRequired"),
+    lime: careerBool(gs, "limeRequired"),
+  };
 }
 
 /** Legumes / N-fixing crops — do not suggest sidedress N from soil-map gaps (maps still show low mineral N). */
@@ -138,8 +196,98 @@ function hasNoCrop(field) {
   return true;
 }
 
+/** PF soil-map N kg/ha is often not meaningful vs game prep (mulched stubble, empty, grass). */
+function shouldCapPfNitrogenTargetForDisplay(field) {
+  if (isGrassCrop(field)) return true;
+  const ft = fruitUpper(field);
+  if (ft === "MULCHED_STUBBLE" || ft === "EMPTY") return true;
+  if (hasNoCrop(field)) return true;
+  return false;
+}
+
+/**
+ * PF map target for N bars and rule copy. Prefer mod `nitrogenTargetDisplay` when set.
+ * Caps huge map targets for grass and bare/mulch parcels (growthStage can be > 0 on cultivated soil).
+ */
+export function nitrogenTargetForDisplay(field) {
+  const cap = field?.nitrogenTargetDisplay;
+  const c = Number(cap);
+  if (Number.isFinite(c) && c > 0) return c;
+  const raw = Number(field?.targetNitrogen ?? 0);
+  const n = Number(field?.nitrogenLevel ?? 0);
+  if (
+    !field?.isPrecisionFarming ||
+    !field?.isScanned ||
+    raw <= 0 ||
+    !Number.isFinite(n) ||
+    !shouldCapPfNitrogenTargetForDisplay(field)
+  ) {
+    return raw;
+  }
+  if (isGrassCrop(field)) {
+    return Math.min(raw, Math.max(n * 1.15 + 30, 90));
+  }
+  return Math.min(raw, Math.max(n * 1.15 + 40, 120));
+}
+
 function mulchLevelNum(field) {
   return Number(field.mulchLevel ?? field.stubbleShredLevel ?? 0) || 0;
+}
+
+function optionalOrganicSkipKeyForField(field) {
+  const id = getFieldStableId(field);
+  if (!id) return "";
+  const cyc = [
+    String(field.fruitType || ""),
+    String(field.growthLabel || ""),
+    String(field.growthState ?? ""),
+    String(field.isHarvested ? 1 : 0),
+  ].join("|");
+  return `${id}::${cyc}`;
+}
+
+function isOptionalOrganicSkipped(field, opts) {
+  const m = opts && typeof opts === "object" ? opts.skippedOptionalOrganic : null;
+  if (!m || typeof m !== "object") return false;
+  const k = optionalOrganicSkipKeyForField(field);
+  if (k && m[k] === true) return true;
+  // Backward compatibility for previously server-prefixed keys.
+  if (k) {
+    for (const key of Object.keys(m)) {
+      if (typeof key === "string" && key.endsWith(`::${k}`) && m[key] === true) return true;
+    }
+  }
+  return false;
+}
+
+function shouldSuggestOptionalOrganicStep(field, opts = {}) {
+  if (!hasNoCrop(field)) return false;
+  if (isOptionalOrganicSkipped(field, opts)) return false;
+  if (isGrassCrop(field)) return false;
+  const nNeed =
+    typeof field.needsFertilizer === "boolean"
+      ? field.needsFertilizer
+      : Number(field.fertilizationLevel ?? 0) < 1;
+  if (!nNeed) return false;
+  return true;
+}
+
+/** Combined straw + grass + hay windrow litres from mod export; below this, skip forage workflow (matches Lua `FORAGE_WORKFLOW_MIN_L`). */
+export const MIN_FORAGE_WORKFLOW_LITERS = 100;
+
+function totalStrawGrassHayLiters(field) {
+  if (!field || typeof field !== "object") return null;
+  const ls = field.looseStrawLiters;
+  const lg = field.looseGrassWindrowLiters;
+  const lh = field.looseDryGrassWindrowLiters;
+  if (ls == null && lg == null && lh == null) return null;
+  return Number(ls ?? 0) + Number(lg ?? 0) + Number(lh ?? 0);
+}
+
+/** True when exported litre totals say residue is only trace amounts — suppress A2.5 even if stale flags exist. */
+function forageLitersNegligible(field) {
+  const t = totalStrawGrassHayLiters(field);
+  return t != null && Number.isFinite(t) && t >= 0 && t < MIN_FORAGE_WORKFLOW_LITERS;
 }
 
 /**
@@ -148,14 +296,16 @@ function mulchLevelNum(field) {
  */
 export function aggregateBaleableLoose(field) {
   if (!field || typeof field !== "object") return false;
-  if (field.hasLooseForage === true) return true;
-  if (field.needsBaling === true) return true;
   const v = Number(field.baleableLooseLiters ?? 0);
-  return Number.isFinite(v) && v > 0;
+  if (Number.isFinite(v) && v >= MIN_FORAGE_WORKFLOW_LITERS) return true;
+  if (field.hasLooseForage === true || field.needsBaling === true) {
+    return !forageLitersNegligible(field);
+  }
+  return false;
 }
 
 /** Ignore float noise / stale probes — only “clear swath” when material is non-trivial. */
-const MIN_WINDROW_LITERS = 120;
+const MIN_WINDROW_LITERS = 100;
 const MIN_WINDROW_AREA = 0.0005;
 const MIN_WINDROW_SAMPLE = 15;
 
@@ -165,7 +315,6 @@ const MIN_WINDROW_SAMPLE = 15;
  */
 export function aggregateWindrowDetected(field) {
   if (!field || typeof field !== "object") return false;
-  if (field.hasLooseForage === true) return true;
   if (aggregateBaleableLoose(field)) return true;
   if (field.hasWindrow === true || field.hasSwath === true) return true;
   const byName = field.windrowByFillName;
@@ -176,7 +325,7 @@ export function aggregateWindrowDetected(field) {
       sum += v;
       if (v >= MIN_WINDROW_LITERS) return true;
     }
-    if (sum >= MIN_WINDROW_LITERS * 2) return true;
+    if (sum >= MIN_FORAGE_WORKFLOW_LITERS) return true;
   }
   const liters = Number(field.windrowLiters ?? field.windrowVolume ?? field.swathLiters ?? 0);
   const area = Number(field.windrowArea ?? field.swathArea ?? 0);
@@ -293,11 +442,10 @@ function isCerealStrawContext(field) {
  * Fallow: safe to drill seed — plough + soil scan OK when maps apply, and **lime / starter N prep done**
  * (lime always before seed; never sow while `needsLime` or fallow nutrient prep is still true).
  */
-function canSowFallow(field) {
+function canSowFallow(field, limeMatter = true) {
   const plowOk = !field.needsPlowing || Number(field.plowLevel ?? 0) >= 1;
   const soilScanOk = !field.isPrecisionFarming || field.isScanned;
-  if (field.needsLime) return false;
-  if (needsFallowNutrientPrep(field)) return false;
+  if (limeMatter && field.needsLime) return false;
   return plowOk && soilScanOk;
 }
 
@@ -307,11 +455,49 @@ function fallowLimeBeforeSeedSuggestion(field) {
   const pht = Number(field.targetPh ?? 0);
   const detail =
     field.isPrecisionFarming && pht > 0
-      ? `pH is about ${ph.toFixed(1)} vs ~${pht.toFixed(1)} target — spread lime on prepared soil, then drill seed (not after seeding).`
-      : "pH is below target for the next crop — lime before you drill or plant seed, so pH is right from emergence.";
+      ? t("rules.reason.limeBeforeSeedPF", { ph: ph.toFixed(1), target: pht.toFixed(1) })
+      : t("rules.reason.limeBeforeSeedNoPF");
   return {
-    action: "Spread lime before drilling seed",
+    action: t("rules.action.spreadLimeBeforeSeed"),
+    actionKey: "rules.action.spreadLimeBeforeSeed",
     reason: detail,
+    source: "rules",
+  };
+}
+
+const GRASS_LIME_GAP_TOLERANCE = 0.15;
+const GRASS_N_GAP_TOLERANCE_PCT = 0.12;
+
+function grassPfLimeGap(field) {
+  const ph = Number(field?.phValue ?? 0);
+  const pht = Number(field?.targetPh ?? 0);
+  if (!field?.isPrecisionFarming || !field?.isScanned || !Number.isFinite(pht) || pht <= 0) return 0;
+  return Math.max(0, pht - ph);
+}
+
+function grassPfNitrogenGap(field) {
+  const n = Number(field?.nitrogenLevel ?? 0);
+  const target = nitrogenTargetForDisplay(field);
+  if (!field?.isPrecisionFarming || !field?.isScanned || !Number.isFinite(target) || target <= 0) {
+    return { gap: 0, pct: 0, target: 0, n: 0 };
+  }
+  const gap = Math.max(0, target - n);
+  const pct = target > 0 ? gap / target : 0;
+  return { gap, pct, target, n };
+}
+
+function grassGapActionable(field) {
+  const limeGap = grassPfLimeGap(field);
+  const nGap = grassPfNitrogenGap(field);
+  return limeGap > GRASS_LIME_GAP_TOLERANCE || nGap.pct > GRASS_N_GAP_TOLERANCE_PCT;
+}
+
+function monitorRegrowthSuggestion(field) {
+  const label = displayCropLabel(field);
+  return {
+    action: t("rules.monitorTowardHarvest", { label }),
+    actionKey: "rules.monitorTowardHarvest",
+    reason: t("rules.cropGrowingWatchHud"),
     source: "rules",
   };
 }
@@ -322,8 +508,14 @@ function needsGrowingFertilizer(field) {
   const gs = field.growthState || 0;
   if (gs <= 0) return false;
   if (typeof field.needsFertilizer === "boolean") return field.needsFertilizer;
-  if (field.isPrecisionFarming && field.isScanned && field.targetNitrogen > 0) {
-    return field.nitrogenLevel / field.targetNitrogen < 0.6;
+  if (
+    usePrecisionFarmingNitrogenTarget(field) &&
+    field.isPrecisionFarming &&
+    field.isScanned &&
+    field.targetNitrogen > 0
+  ) {
+    const t = nitrogenTargetForDisplay(field);
+    return t > 0 && field.nitrogenLevel / t < 0.6;
   }
   return (field.fertilizationLevel || 0) < 1;
 }
@@ -334,11 +526,12 @@ function needsGrowingFertilizer(field) {
  * @param {object} field
  * @returns {{ action: string, reason: string, source: 'rules' } | null}
  */
-function pickGrowingCropMaintenanceSuggestion(field) {
+function pickGrowingCropMaintenanceSuggestion(field, ctx) {
+  const game = ctx || rulesGameContext({});
   /** Lower `tie` wins on equal urgency. */
   const candidates = [];
 
-  if (field.needsRolling) {
+  if (field.needsRolling && String(field.growthLabel || "") !== "mown_regrowth") {
     const gs = field.growthState || 0;
     const urgency = gs <= 2 ? 0.95 : gs <= 4 ? 0.52 : 0.28;
     candidates.push({
@@ -346,16 +539,16 @@ function pickGrowingCropMaintenanceSuggestion(field) {
       tie: 4,
       apply() {
         return {
-          action: "Roll — first growth stage / seedbed finish",
-          reason:
-            "rollerLevel says rolling isn’t complete — roll once early for soil contact and stone knock-down.",
+          action: t("rules.action.rollFirstStage"),
+          actionKey: "rules.action.rollFirstStage",
+          reason: t("rules.reason.rollFirstStage"),
           source: "rules",
         };
       },
     });
   }
 
-  if (field.needsLime && !isGrassCrop(field)) {
+  if (game.lime && field.needsLime && !isGrassCrop(field)) {
     const ph = Number(field.phValue ?? 0);
     const pht = Number(field.targetPh ?? 0);
     let urgency = 0.42;
@@ -369,10 +562,11 @@ function pickGrowingCropMaintenanceSuggestion(field) {
       apply() {
         const detail =
           field.isPrecisionFarming && pht > 0
-            ? `${label}: pH ~${ph.toFixed(1)} vs target ~${pht.toFixed(1)} — this is the tightest gap to fix first on the scan.`
-            : `${label}: pH is low — lime is the priority fix before chasing other passes.`;
+            ? t("rules.reason.limeEmergedPF", { label, ph: ph.toFixed(1), target: pht.toFixed(1) })
+            : t("rules.reason.limeEmergedNoPF", { label });
         return {
-          action: "Spread lime (emerged crop — pre-drill is ideal next season)",
+          action: t("rules.action.spreadLimeEmerged"),
+          actionKey: "rules.action.spreadLimeEmerged",
           reason: detail,
           source: "rules",
         };
@@ -380,7 +574,7 @@ function pickGrowingCropMaintenanceSuggestion(field) {
     });
   }
 
-  if (field.needsWeeding) {
+  if (game.weeds && field.needsWeeding) {
     const w = Math.min(1, Math.max(0, Number(field.weedLevel ?? 0)));
     const urgency = Math.min(1.15, w + 0.08);
     const label = displayCropLabel(field);
@@ -391,14 +585,16 @@ function pickGrowingCropMaintenanceSuggestion(field) {
       apply() {
         if (gs <= 2) {
           return {
-            action: "Weed mechanically (hoe / weeder)",
-            reason: `Early growth (stage ${gs}) — weeds are the worst issue for ${label} right now; mechanical pass before herbicide.`,
+            action: t("rules.action.weedMechanically"),
+            actionKey: "rules.action.weedMechanically",
+            reason: t("rules.reason.weedsEarlyMechanical", { gs, label }),
             source: "rules",
           };
         }
         return {
-          action: "Spray herbicide — weeds past mechanical window",
-          reason: `Growth stage ${gs} — weed pressure on ${label} is the priority pass now.`,
+          action: t("rules.action.sprayHerbicide"),
+          actionKey: "rules.action.sprayHerbicide",
+          reason: t("rules.reason.weedsHerbicide", { gs, label }),
           source: "rules",
         };
       },
@@ -408,11 +604,21 @@ function pickGrowingCropMaintenanceSuggestion(field) {
   if (needsGrowingFertilizer(field)) {
     const label = displayCropLabel(field);
     let urgency = 0.5;
-    if (field.isPrecisionFarming && field.isScanned && field.targetNitrogen > 0) {
+    const pfN =
+      usePrecisionFarmingNitrogenTarget(field) &&
+      field.isPrecisionFarming &&
+      field.isScanned &&
+      field.targetNitrogen > 0;
+    if (pfN) {
       const n = Number(field.nitrogenLevel ?? 0);
-      const t = Number(field.targetNitrogen ?? 0);
+      const t = nitrogenTargetForDisplay(field);
       if (t > 0 && Number.isFinite(n)) {
-        urgency = Math.min(1.25, Math.max(0, 1 - n / t));
+        const deficitRatio = Math.max(0, 1 - n / t);
+        if (isGrassCrop(field) && deficitRatio <= GRASS_N_GAP_TOLERANCE_PCT) {
+          urgency = 0;
+        } else {
+          urgency = Math.min(1.25, deficitRatio);
+        }
       }
     } else {
       const fl = Number(field.fertilizationLevel ?? 0);
@@ -422,25 +628,37 @@ function pickGrowingCropMaintenanceSuggestion(field) {
       urgency,
       tie: 2,
       apply() {
-        if (field.isPrecisionFarming && field.isScanned && field.targetNitrogen > 0) {
+        if (pfN) {
           const n = Number(field.nitrogenLevel ?? 0);
-          const t = Number(field.targetNitrogen ?? 0);
-          const gap = Math.max(0, t - n);
+          const target = nitrogenTargetForDisplay(field);
+          const gap = Math.max(0, target - n);
+          const gapPct = target > 0 ? gap / target : 0;
+          if (isGrassCrop(field) && gapPct <= GRASS_N_GAP_TOLERANCE_PCT) {
+            return monitorRegrowthSuggestion(field);
+          }
           const pct =
-            t > 0 ? Math.round(Math.min(100, Math.max(0, (n / t) * 100))) : 0;
+            target > 0 ? Math.round(Math.min(100, Math.max(0, (n / target) * 100))) : 0;
           return {
             action:
               gap > 1
-                ? `Add ~${Math.round(gap)} kg N/ha to reach target`
-                : "Top up nitrogen for this growth stage",
-            reason: `Mapped N ${Math.round(n)} / ${Math.round(t)} kg N/ha (${pct}% of target) — ${label} is shortest on N versus the map; do this pass before other tweaks.`,
+                ? t("rules.action.addNTarget", { n: Math.round(gap) })
+                : t("rules.action.topUpNitrogen"),
+            actionKey:
+              gap > 1 ? "rules.action.addNTarget" : "rules.action.topUpNitrogen",
+            reason: t("rules.reason.fertilizerPFGap", {
+              n: Math.round(n),
+              target: Math.round(target),
+              pct,
+              label,
+            }),
             source: "rules",
           };
         }
         const fl = Number(field.fertilizationLevel ?? 0);
         return {
-          action: `Fertilize — spray / nutrient step ${fl}/2 (below full for this stage)`,
-          reason: `${label} is lowest on fertilization for this stage — one nutrient pass is the next job.`,
+          action: t("rules.action.fertilizeStep", { fl }),
+          actionKey: "rules.action.fertilizeStep",
+          reason: t("rules.reason.fertilizerSimple", { label }),
           source: "rules",
         };
       },
@@ -470,47 +688,191 @@ function needsFallowNutrientPrep(field) {
 /** Short crop name for sentences, e.g. WINTER_WHEAT → "winter wheat". */
 function displayCropLabel(field) {
   const ft = fruitUpper(field);
-  if (!ft || ft === "UNKNOWN" || ft === "EMPTY") return "this crop";
-  if (ft === "MULCHED_STUBBLE") return "mulched stubble";
-  return ft
-    .toLowerCase()
-    .split("_")
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(" ");
+  if (!ft || ft === "UNKNOWN" || ft === "EMPTY") return t("rules.cropLabel.thisCrop");
+  if (ft === "MULCHED_STUBBLE") return t("rules.cropLabel.mulchedStubble");
+  return localizedFruitLabel(ft) || humanizedFruitLabel(ft);
 }
 
-function suggestionForNeedsWork(field) {
+function suggestionForNeedsWork(field, ctx, opts = {}) {
+  const g = ctx || rulesGameContext({});
   const stones = Number(field.stoneLevel ?? 0);
-  if (Number.isFinite(stones) && stones > 0) {
+  if (g.stones && Number.isFinite(stones) && stones > 0) {
     return {
-      action: "Pick stones or roll to bury them",
-      reason: "Stone level is up — clear rocks so drills and harvesters don’t get blocked.",
+      action: t("rules.action.pickStones"),
+      actionKey: "rules.action.pickStones",
+      reason: t("rules.reason.pickStones"),
       source: "rules",
     };
   }
+  const noCrop = hasNoCrop(field);
+  const grass = isGrassCrop(field);
+  const mulch = mulchLevelNum(field);
+  const needsPlowRaw = field.needsPlowing === false ? false : Number(field.plowLevel ?? 0) < 1;
+  const needsPlow = g.plow && needsPlowRaw;
+
+  // Keep deterministic soil-order for empty fields.
+  if (noCrop) {
+    if (needsPlow && !grass && mulch < 1) {
+      return {
+        action: t("rules.action.mulchStubble"),
+        actionKey: "rules.action.mulchStubble",
+        reason: t("rules.reason.mulchBeforePlough"),
+        source: "rules",
+      };
+    }
+    if (needsPlow) {
+      return {
+        action: t("rules.action.ploughDeepCultivate"),
+        actionKey: "rules.action.ploughDeepCultivate",
+        reason: t("rules.reason.ploughDeep"),
+        source: "rules",
+      };
+    }
+    if (shouldSuggestOptionalOrganicStep(field, opts)) {
+      return {
+        action: t("rules.action.optionalOrganicFirst"),
+        actionKey: "rules.action.optionalOrganicFirst",
+        reason: t("rules.reason.optionalOrganicFirst"),
+        source: "rules",
+      };
+    }
+    if (g.lime && field.needsLime) return fallowLimeBeforeSeedSuggestion(field);
+  }
+
+  // Growing fallback: infer specific deficit even if `needs*` booleans were flattened/rounded away.
+  if (!noCrop) {
+    if (grass) {
+      if (g.weeds && field.needsWeeding) {
+        return pickGrowingCropMaintenanceSuggestion(field, g) || monitorRegrowthSuggestion(field);
+      }
+      if (field.needsRolling && String(field.growthLabel || "") !== "mown_regrowth") {
+        return pickGrowingCropMaintenanceSuggestion(field, g) || monitorRegrowthSuggestion(field);
+      }
+      const limeGap = grassPfLimeGap(field);
+      const nGap = grassPfNitrogenGap(field);
+      if (g.lime && limeGap > GRASS_LIME_GAP_TOLERANCE) {
+        const ph = Number(field.phValue ?? 0);
+        const pht = Number(field.targetPh ?? 0);
+        return {
+          action: t("rules.action.limePastureMap"),
+          actionKey: "rules.action.limePastureMap",
+          reason: t("rules.reason.limePastureMapPF", {
+            ph: ph.toFixed(1),
+            target: pht.toFixed(1),
+          }),
+          source: "rules",
+        };
+      }
+      if (nGap.pct > GRASS_N_GAP_TOLERANCE_PCT && nGap.gap > 1) {
+        const label = displayCropLabel(field);
+        const pct = nGap.target > 0 ? Math.round(Math.min(100, Math.max(0, (nGap.n / nGap.target) * 100))) : 0;
+        return {
+          action: t("rules.action.addNTarget", { n: Math.round(nGap.gap) }),
+          actionKey: "rules.action.addNTarget",
+          reason: t("rules.reason.fertilizerPFGap", {
+            n: Math.round(nGap.n),
+            target: Math.round(nGap.target),
+            pct,
+            label,
+          }),
+          source: "rules",
+        };
+      }
+      return monitorRegrowthSuggestion(field);
+    }
+
+    // 1) Native strict picker first (uses explicit needs flags).
+    const growingPick = pickGrowingCropMaintenanceSuggestion(field, g);
+    if (growingPick) return growingPick;
+
+    // 2) Inferred PF pH gap (exact-ish amount guidance in reason).
+    const ph = Number(field.phValue ?? 0);
+    const pht = Number(field.targetPh ?? 0);
+    const pfLimeGap = field.isPrecisionFarming && field.isScanned && pht > 0 ? (pht - ph) : 0;
+    if (g.lime && Number.isFinite(pfLimeGap) && pfLimeGap > 0.05) {
+      if (grass) {
+        return {
+          action: t("rules.action.limePastureMap"),
+          actionKey: "rules.action.limePastureMap",
+          reason: t("rules.reason.limePastureMapPF", {
+            ph: ph.toFixed(1),
+            target: pht.toFixed(1),
+          }),
+          source: "rules",
+        };
+      }
+      const label = displayCropLabel(field);
+      return {
+        action: t("rules.action.spreadLimeEmerged"),
+        actionKey: "rules.action.spreadLimeEmerged",
+        reason: t("rules.reason.limeEmergedPF", {
+          label,
+          ph: ph.toFixed(1),
+          target: pht.toFixed(1),
+        }),
+        source: "rules",
+      };
+    }
+
+    // 3) Inferred PF nitrogen gap (action carries kg N/ha).
+    if (
+      field.isPrecisionFarming &&
+      field.isScanned &&
+      Number(field.targetNitrogen ?? 0) > 0
+    ) {
+      const n = Number(field.nitrogenLevel ?? 0);
+      const target = nitrogenTargetForDisplay(field);
+      const gap = Math.max(0, target - n);
+      if (Number.isFinite(gap) && gap > 1) {
+        const label = displayCropLabel(field);
+        const pct = target > 0 ? Math.round(Math.min(100, Math.max(0, (n / target) * 100))) : 0;
+        return {
+          action:
+            gap > 1
+              ? t("rules.action.addNTarget", { n: Math.round(gap) })
+              : t("rules.action.topUpNitrogen"),
+          actionKey:
+            gap > 1 ? "rules.action.addNTarget" : "rules.action.topUpNitrogen",
+          reason: t("rules.reason.fertilizerPFGap", {
+            n: Math.round(n),
+            target: Math.round(target),
+            pct,
+            label,
+          }),
+          source: "rules",
+        };
+      }
+    }
+  }
+
   return {
-    action: "Finish flagged soil work (see field icons)",
-    reason:
-      "needsWork is set — match the in-field icons (stones, lime, N, weeds, plough, roll) to the right tool.",
+    action: t("rules.action.finishFlaggedSoilWork"),
+    actionKey: "rules.action.finishFlaggedSoilWork",
+    reason: t("rules.reason.finishFlaggedSoilWork"),
     source: "rules",
+    kind: RULES_ENGINE_FALLBACK_KIND,
   };
 }
 
 /**
+ * @param {object} field
+ * @param {{ gameSettings?: object }} [opts] — savegame flags (`weedsEnabled`, `stonesEnabled`, …)
  * @returns {{ action: string, reason: string, source: 'rules' } | null}
  */
-export function getLocalFieldSuggestion(field) {
+export function getLocalFieldSuggestion(field, opts = {}) {
   if (!field) return null;
+  const ctx = rulesGameContext(opts);
 
   // ── A1. Withered (reset before anything else) ─────────────────────────────
   if (fieldShowsWithered(field)) {
     const lost = displayCropLabel(field);
-    const reason =
-      lost === "this crop"
-        ? "The standing crop has withered — till the soil and plant something new."
-        : `Your ${lost} has withered — till the soil and plant something new.`;
+    const isGenericLabel = lost === t("rules.cropLabel.thisCrop");
+    const reason = isGenericLabel
+      ? t("rules.reason.witheredGeneric")
+      : t("rules.reason.witheredCrop", { label: lost });
     return {
-      action: "Start over: cultivate, then re-seed this parcel",
+      action: t("rules.action.cultivateReseed"),
+      actionKey: "rules.action.cultivateReseed",
       reason,
       source: "rules",
     };
@@ -521,109 +883,124 @@ export function getLocalFieldSuggestion(field) {
     const ft = fruitUpper(field);
     if (ft === "GRASS") {
       return {
-        action: "Mow or collect — grass is ready to cut",
-        reason: "Grass has reached cutting stage — bale silage/hay, wrap, or pick up before it gets rank.",
+        action: t("rules.action.mowGrass"),
+        actionKey: "rules.action.mowGrass",
+        reason: t("rules.reason.grassReadyMow"),
         source: "rules",
       };
     }
     const label = displayCropLabel(field);
     return {
-      action: `Combine-harvest — ${label} is ready`,
-      reason: `${label} is at harvest stage — get it off the field before rain, lodging, or withering costs yield.`,
+      action: t("rules.action.combineHarvest", { label }),
+      actionKey: "rules.action.combineHarvest",
+      reason: t("rules.reason.combineHarvest", { label }),
       source: "rules",
     };
   }
 
   // ── A2.5 Loose forage (presence: Lua hasLooseStraw / hasLooseGrassWindrow / hasLooseHayWindrow — next stage when all false)
-  const hs = field.hasLooseStraw === true;
-  const hg = field.hasLooseGrassWindrow === true;
-  const hh = field.hasLooseHayWindrow === true;
+  const flNeg = forageLitersNegligible(field);
+  const hs = field.hasLooseStraw === true && !flNeg;
+  const hg = field.hasLooseGrassWindrow === true && !flNeg;
+  const hh = field.hasLooseHayWindrow === true && !flNeg;
   if (hs || hg || hh) {
     if (hs && !hg && !hh) {
       return {
-        action: "Bale loose straw or pick up with a forage wagon",
-        reason: "Loose straw on the field — bale or collect before tillage or the next pass.",
+        action: t("rules.action.baleStrawForage"),
+        actionKey: "rules.action.baleStrawForage",
+        reason: t("rules.reason.looseStrawField"),
         source: "rules",
       };
     }
     if (hg && !hs && !hh) {
       return {
-        action: "Tedder to make hay, or bale wet and wrap for silage",
-        reason: "Fresh grass windrow on the field — tedder or bale before the next stage.",
+        action: t("rules.action.tedderOrBale"),
+        actionKey: "rules.action.tedderOrBale",
+        reason: t("rules.reason.freshGrassWindrow"),
         source: "rules",
       };
     }
     if (hh && !hs && !hg) {
       return {
-        action: "Bale hay windrow or collect dry forage",
-        reason: "Hay / dry grass windrow on the field — bale or load before the next stage.",
+        action: t("rules.action.baleHay"),
+        actionKey: "rules.action.baleHay",
+        reason: t("rules.reason.hayWindrowField"),
         source: "rules",
       };
     }
     if (hs && hg && hh) {
       return {
-        action: "Clear loose straw, grass, and hay windrows",
-        reason: "Straw, grass, and hay windrows on the ground — clear forage before continuing.",
+        action: t("rules.action.clearAllWindrows"),
+        actionKey: "rules.action.clearAllWindrows",
+        reason: t("rules.reason.allWindrowsField"),
         source: "rules",
       };
     }
     if (hs && hg) {
       return {
-        action: "Clear loose straw and grass windrows",
-        reason: "Straw and grass windrows on the field — bale or collect before continuing.",
+        action: t("rules.action.clearStrawGrassWindrows"),
+        actionKey: "rules.action.clearStrawGrassWindrows",
+        reason: t("rules.reason.strawGrassWindrows"),
         source: "rules",
       };
     }
     if (hs && hh) {
       return {
-        action: "Clear loose straw and hay",
-        reason: "Straw and hay on the field — bale or collect before continuing.",
+        action: t("rules.action.clearStrawHay"),
+        actionKey: "rules.action.clearStrawHay",
+        reason: t("rules.reason.strawHayField"),
         source: "rules",
       };
     }
     if (hg && hh) {
       return {
-        action: "Clear grass and hay windrows",
-        reason: "Grass and hay windrows on the field — finish before the next stage.",
+        action: t("rules.action.clearGrassHay"),
+        actionKey: "rules.action.clearGrassHay",
+        reason: t("rules.reason.grassHayWindrows"),
         source: "rules",
       };
     }
     return {
-      action: "Clear loose forage on the field",
-      reason: "Loose forage material detected — bale or collect before the next field stage.",
+      action: t("rules.action.clearLooseForage"),
+      actionKey: "rules.action.clearLooseForage",
+      reason: t("rules.reason.looseForageGeneric"),
       source: "rules",
     };
   }
-  // Legacy: older JSON without boolean flags (litre thresholds)
-  const MIN_LOOSE_CH = 25;
+  // Legacy: older JSON without boolean flags (litre thresholds — combined straw / grass / hay >= workflow minimum)
   const ls = Number(field.looseStrawLiters ?? 0);
   const lg = Number(field.looseGrassWindrowLiters ?? 0);
   const lh = Number(field.looseDryGrassWindrowLiters ?? 0);
-  if (Math.max(ls, lg, lh) >= MIN_LOOSE_CH) {
-    if (ls >= lg && ls >= lh && ls >= MIN_LOOSE_CH) {
+  const sumLooseCh = ls + lg + lh;
+  if (sumLooseCh >= MIN_FORAGE_WORKFLOW_LITERS) {
+    if (ls >= lg && ls >= lh && ls > 0) {
       return {
-        action: "Bale loose straw or pick up with a forage wagon",
-        reason: "Loose straw on the ground — bale or collect before tillage or the next pass.",
+        action: t("rules.action.baleStrawForage"),
+        actionKey: "rules.action.baleStrawForage",
+        reason: t("rules.reason.looseStrawGround"),
         source: "rules",
       };
     }
-    if (lg >= ls && lg >= lh && lg >= MIN_LOOSE_CH) {
+    if (lg >= ls && lg >= lh && lg > 0) {
       return {
-        action: "Tedder to make hay, or bale wet and wrap for silage",
-        reason: "Grass windrow on the field — tedder or bale before the next stage.",
+        action: t("rules.action.tedderOrBale"),
+        actionKey: "rules.action.tedderOrBale",
+        reason: t("rules.reason.grassWindrowField"),
         source: "rules",
       };
     }
-    if (lh >= ls && lh >= lg && lh >= MIN_LOOSE_CH) {
+    if (lh >= ls && lh >= lg && lh > 0) {
       return {
-        action: "Bale hay windrow or collect dry forage",
-        reason: "Hay windrow on the field — bale or load before the next stage.",
+        action: t("rules.action.baleHay"),
+        actionKey: "rules.action.baleHay",
+        reason: t("rules.reason.hayWindrowSimple"),
         source: "rules",
       };
     }
     return {
-      action: "Clear loose straw, grass, or hay windrows",
-      reason: "Multiple forage windrow types — clear before the next field stage.",
+      action: t("rules.action.clearStrawGrassOrHay"),
+      actionKey: "rules.action.clearStrawGrassOrHay",
+      reason: t("rules.reason.multipleWindrows"),
       source: "rules",
     };
   }
@@ -634,49 +1011,51 @@ export function getLocalFieldSuggestion(field) {
     const mat = classifyWindrowMaterial(field);
     if (mat === "straw" || (isCerealStrawContext(field) && mat !== "grass" && mat !== "hay")) {
       return {
-        action: "Bale straw or pick it up with a forage wagon",
+        action: t("rules.action.baleStrawWagon"),
+        actionKey: "rules.action.baleStrawWagon",
         reason:
           mat === "straw"
-            ? "Loose straw is on the field (density map) — bale or collect before tillage or the next crop."
-            : "Loose straw or cereal residue is on the field — clear it so cultivation and the next crop aren’t blocked.",
+            ? t("rules.reason.strawDensityMap")
+            : t("rules.reason.strawCerealResidue"),
         source: "rules",
       };
     }
     if (mat === "hay") {
       return {
-        action: "Ted dry hay or bale before weather hits",
-        reason:
-          "Dried grass (hay windrow) is on the ground — finish tedding if needed, then bale or store before rain.",
+        action: t("rules.action.tedDryHay"),
+        actionKey: "rules.action.tedDryHay",
+        reason: t("rules.reason.dryHayWindrow"),
         source: "rules",
       };
     }
     if (isGrassCrop(field) || mat === "grass") {
       return {
-        action: "Finish grass: tedder for hay, or merge and bale for silage",
-        reason:
-          "Fresh-cut grass is still on the ground — dry/ted for hay, or bale for silage (wrap wet bales) before you till.",
+        action: t("rules.action.finishGrass"),
+        actionKey: "rules.action.finishGrass",
+        reason: t("rules.reason.freshGrassCut"),
         source: "rules",
       };
     }
     if (mat === "crop_swath") {
       return {
-        action: "Pick up or bale the swathed crop",
-        reason:
-          "Crop windrows are on the field — combine pick-up, baler, or loader work before you work the soil.",
+        action: t("rules.action.pickupSwath"),
+        actionKey: "rules.action.pickupSwath",
+        reason: t("rules.reason.cropSwath"),
         source: "rules",
       };
     }
     if (isCerealStrawContext(field)) {
       return {
-        action: "Bale straw or pick it up with a forage wagon",
-        reason: "Loose straw is lying on the field — clear it so cultivation and the next crop aren’t blocked.",
+        action: t("rules.action.baleStrawWagon"),
+        actionKey: "rules.action.baleStrawWagon",
+        reason: t("rules.reason.strawCerealLying"),
         source: "rules",
       };
     }
     return {
-      action: "Clear the swath (baler or forage wagon)",
-      reason:
-        "Windrow or swath is covering the soil — remove it before you work ground for the next pass.",
+      action: t("rules.action.clearSwath"),
+      actionKey: "rules.action.clearSwath",
+      reason: t("rules.reason.swathCovering"),
       source: "rules",
     };
   }
@@ -686,14 +1065,17 @@ export function getLocalFieldSuggestion(field) {
   if (baleN > 0) {
     const action =
       baleN === 1
-        ? "Move 1 bale off this field first"
-        : `Move ${baleN} bales off this field first`;
+        ? t("rules.action.moveOneBale")
+        : t("rules.action.moveBales", { n: baleN });
+    const actionKey =
+      baleN === 1 ? "rules.action.moveOneBale" : "rules.action.moveBales";
     const reason =
       baleN === 1
-        ? "There is 1 bale still on this farmland — clear it so cultivators and planters aren’t blocked."
-        : `There are ${baleN} bales still on this farmland — load or stack them out of the way before tillage or drilling.`;
+        ? t("rules.reason.oneBale")
+        : t("rules.reason.manyBales", { n: baleN });
     return {
       action,
+      actionKey,
       reason,
       source: "rules",
     };
@@ -702,8 +1084,9 @@ export function getLocalFieldSuggestion(field) {
   // ── A5. Soil scan before lime / N / sow when variable-rate maps apply (Lua fallow_soil / grow_soil) ──
   if (field.isPrecisionFarming && !field.isScanned) {
     return {
-      action: "Run a soil scan on this field",
-      reason: "Scan data is needed before pH, nitrogen maps, and drilling advice match this parcel.",
+      action: t("rules.action.runSoilScan"),
+      actionKey: "rules.action.runSoilScan",
+      reason: t("rules.reason.runSoilScan"),
       source: "rules",
     };
   }
@@ -712,16 +1095,17 @@ export function getLocalFieldSuggestion(field) {
   const grass = isGrassCrop(field);
   const mulch = mulchLevelNum(field);
   /** Match Lua `needsPlowing = plowLevel < 1` when the flag isn’t explicitly false. */
-  const needsPlow = field.needsPlowing === false ? false : Number(field.plowLevel ?? 0) < 1;
+  const needsPlowRaw = field.needsPlowing === false ? false : Number(field.plowLevel ?? 0) < 1;
+  const needsPlow = ctx.plow && needsPlowRaw;
 
   // ── B. Fallow soil pipeline (matches Lua: mulch → plough → cultivate → lime → N → sow) ──
   if (noCrop) {
     // B1. Mulch stubble before plough (arable only, when plough still needed)
     if (needsPlow && !grass && mulch < 1) {
       return {
-        action: "Mulch stubble before you plough",
-        reason:
-          "Field data says this parcel still needs ploughing — shred harvest residue first (not for grass reseeding).",
+        action: t("rules.action.mulchStubble"),
+        actionKey: "rules.action.mulchStubble",
+        reason: t("rules.reason.mulchBeforePlough"),
         source: "rules",
       };
     }
@@ -729,61 +1113,55 @@ export function getLocalFieldSuggestion(field) {
     // B2. Primary tillage
     if (needsPlow) {
       return {
-        action: "Plough or deep-cultivate this field",
-        reason: "plowLevel / needsPlowing says primary tillage is still due before a clean seedbed.",
+        action: t("rules.action.ploughDeepCultivate"),
+        actionKey: "rules.action.ploughDeepCultivate",
+        reason: t("rules.reason.ploughDeep"),
         source: "rules",
       };
     }
 
-    // B3. Lime on prepared / fallow ground — before drilling seed (and typically before last cultivation passes).
-    if (field.needsLime) {
+    // B3. Optional organic route before cultivation (user may skip).
+    if (shouldSuggestOptionalOrganicStep(field, opts)) {
+      return {
+        action: t("rules.action.optionalOrganicFirst"),
+        actionKey: "rules.action.optionalOrganicFirst",
+        reason: t("rules.reason.optionalOrganicFirst"),
+        source: "rules",
+      };
+    }
+
+    // B4. Lime on prepared / fallow ground — before drilling seed (and typically before last cultivation passes).
+    if (ctx.lime && field.needsLime) {
       return fallowLimeBeforeSeedSuggestion(field);
     }
 
-    // B4. Work mulched stubble into the soil (Lua fallow_cult — after plough / lime when pH is OK).
+    // B5. Work mulched stubble into the soil (mulched + plough-required path: plough -> lime -> cultivate).
     if (mulch >= 1) {
       return {
-        action: "Cultivate to work in mulched stubble",
-        reason:
-          "Stubble is mulched — mix it in for an even seedbed. Lime (if needed) should already be planned before seed.",
+        action: t("rules.action.cultivateMulch"),
+        actionKey: "rules.action.cultivateMulch",
+        reason: t("rules.reason.cultivateMulch"),
         source: "rules",
       };
     }
 
-    // B5. Build nitrogen / starter fert before first crop (optional organic first in rotation)
-    if (needsFallowNutrientPrep(field)) {
-      if (field.isPrecisionFarming && field.targetNitrogen > 0) {
-        const n = Number(field.nitrogenLevel ?? 0);
-        const t = Number(field.targetNitrogen ?? 0);
-        return {
-          action: "Build soil N (manure/slurry or bag) before you drill",
-          reason: `Target ~${Math.round(t)} kg N/ha — you’re near ${Math.round(n)}; add organic first if you use it, then mineral.`,
-          source: "rules",
-        };
-      }
-      return {
-        action: "Fertilize — spray / nutrient level is low for drilling",
-        reason:
-          "Spray / nutrient step isn’t full — build N after lime, before you drill seed (or in an early pass right after drilling if that’s your routine).",
-        source: "rules",
-      };
-    }
-
-    // B6. Sow only when lime + starter N prep are satisfied (see canSowFallow).
-    if (canSowFallow(field)) {
+    // B6. Sow only when plough/scan/lime gates are satisfied.
+    if (canSowFallow(field, ctx.lime)) {
       if (field.isPrecisionFarming && field.isScanned) {
         return {
-          action: "Direct-drill your next crop (no-till)",
+          action: t("rules.action.directDrill"),
+          actionKey: "rules.action.directDrill",
           reason:
             mulch >= 1
-              ? "With Precision Farming on, this parcel is ready to plant — one pass with the drill through mulch/residue is the next job."
-              : "With Precision Farming on, this parcel is ready to plant — one pass with the drill is the next job; skip extra cultivation if your setup allows.",
+              ? t("rules.reason.directDrillMulched")
+              : t("rules.reason.directDrillBare"),
           source: "rules",
         };
       }
       return {
-        action: "Sow or plant your next crop",
-        reason: "Soil prep for this field is satisfied for drilling — the next job is putting seed in.",
+        action: t("rules.action.sowPlant"),
+        actionKey: "rules.action.sowPlant",
+        reason: t("rules.reason.sowPlant"),
         source: "rules",
       };
     }
@@ -793,31 +1171,31 @@ export function getLocalFieldSuggestion(field) {
   if (isMulchedEmptyField(field)) {
     if (field.isPrecisionFarming && field.isScanned) {
       return {
-        action: "Direct-drill your next crop (no-till)",
-        reason:
-          "Precision Farming is on and there’s no standing crop — the next job is planting with a direct drill; skip a full cultivation pass if your setup allows.",
+        action: t("rules.action.directDrill"),
+        actionKey: "rules.action.directDrill",
+        reason: t("rules.reason.directDrillNoCrop"),
         source: "rules",
       };
     }
     return {
-      action: "Cultivate mulched stubble, then drill or plant the next crop",
-      reason:
-        "Stubble is mulched and there’s no active crop — shallow cultivation before drilling is the usual path without Precision Farming maps guiding no-till.",
+      action: t("rules.action.cultivateMulchedDrill"),
+      actionKey: "rules.action.cultivateMulchedDrill",
+      reason: t("rules.reason.cultivateMulchedDrill"),
       source: "rules",
     };
   }
 
   // ── Post-harvest stubble (fruit type may still show on the card after combine) ───
   if (isPostHarvestField(field) || fieldIsAlreadyHarvested(field)) {
-    if (field.needsLime) {
+    if (ctx.lime && field.needsLime) {
       return fallowLimeBeforeSeedSuggestion(field);
     }
 
     if (needsPlow && !grass && mulch < 1) {
       return {
-        action: "Mulch stubble before you plough",
-        reason:
-          "Harvest residue is still standing and primary tillage is due — shred stubble so the plough or deep cultivator can work cleanly.",
+        action: t("rules.action.mulchStubble"),
+        actionKey: "rules.action.mulchStubble",
+        reason: t("rules.reason.mulchPostHarvest"),
         source: "rules",
       };
     }
@@ -825,33 +1203,33 @@ export function getLocalFieldSuggestion(field) {
     if (field.isPrecisionFarming && field.isScanned) {
       if (needsPlow) {
         return {
-          action: "Plough or deep-cultivate — primary tillage before the next crop",
-          reason:
-            "Precision Farming is enabled and this parcel still needs full inversion or deep tillage — maps and flags say ploughing isn’t satisfied yet.",
+          action: t("rules.action.ploughBeforeNextCrop"),
+          actionKey: "rules.action.ploughBeforeNextCrop",
+          reason: t("rules.reason.ploughBeforeNextCrop"),
           source: "rules",
         };
       }
       return {
-        action: "Direct-drill your next crop (no-till)",
-        reason:
-          "Precision Farming is on and ploughing isn’t flagged — harvest is done, so the next job is planting with a direct drill and keeping tillage minimal.",
+        action: t("rules.action.directDrill"),
+        actionKey: "rules.action.directDrill",
+        reason: t("rules.reason.directDrillPostHarvest"),
         source: "rules",
       };
     }
 
     if (needsPlow) {
       return {
-        action: "Plough or deep-cultivate, then finish the seedbed",
-        reason:
-          "Harvest is done and the save still flags primary tillage — work the soil deep, then cultivate and drill (or follow your rotation’s cultivation step).",
+        action: t("rules.action.ploughThenSeedbed"),
+        actionKey: "rules.action.ploughThenSeedbed",
+        reason: t("rules.reason.ploughThenSeedbed"),
         source: "rules",
       };
     }
 
     return {
-      action: "Cultivate stubble, then drill or plant the next crop",
-      reason:
-        "Harvest is done and ploughing isn’t flagged — shallow cultivation before the next seeding matches this field state (use in-game no-till if you prefer).",
+      action: t("rules.action.cultivateStubbleDrill"),
+      actionKey: "rules.action.cultivateStubbleDrill",
+      reason: t("rules.reason.cultivateStubbleDrill"),
       source: "rules",
     };
   }
@@ -859,25 +1237,25 @@ export function getLocalFieldSuggestion(field) {
   // ── C. Growing crop — one job: worst deficit vs scan/targets (lime first on tie) ──
   if (!noCrop) {
     // Permanent grass + lime: keep pasture-specific wording (not mixed into arable deficit ranks).
-    if (field.needsLime && isGrassCrop(field)) {
+    if (ctx.lime && field.needsLime && isGrassCrop(field)) {
       const ph = Number(field.phValue ?? 0);
       const pht = Number(field.targetPh ?? 0);
-      if (field.isPrecisionFarming && field.isScanned && pht > 0) {
+      const limeGap = grassPfLimeGap(field);
+      if (field.isPrecisionFarming && field.isScanned && pht > 0 && limeGap > GRASS_LIME_GAP_TOLERANCE) {
         return {
-          action: "Lime pasture only if the pH map shows a real gap",
-          reason: `Mapped pH ~${ph.toFixed(1)} vs target ~${pht.toFixed(1)} — grass tolerates a wider band than arable; lime after cuts only when the scan says pH is short, not as a drill-window task.`,
+          action: t("rules.action.limePastureMap"),
+          actionKey: "rules.action.limePastureMap",
+          reason: t("rules.reason.limePastureMapPF", {
+            ph: ph.toFixed(1),
+            target: pht.toFixed(1),
+          }),
           source: "rules",
         };
       }
-      return {
-        action: "Check pasture pH before liming mown grass",
-        reason:
-          "Low lime flags on permanent grass often follow mowing — correct pH gradually; avoid treating pasture like pre-drill arable land.",
-        source: "rules",
-      };
+      if (!grassGapActionable(field)) return monitorRegrowthSuggestion(field);
     }
 
-    const growingPick = pickGrowingCropMaintenanceSuggestion(field);
+    const growingPick = pickGrowingCropMaintenanceSuggestion(field, ctx);
     if (growingPick) {
       return growingPick;
     }
@@ -885,36 +1263,20 @@ export function getLocalFieldSuggestion(field) {
 
   // ── Empty seedbed without going through fallow branch (XML-only / edge) ───
   if (isSoilTilledField(field)) {
-    if (field.needsLime && hasNoCrop(field)) {
+    if (ctx.lime && field.needsLime && hasNoCrop(field)) {
       return fallowLimeBeforeSeedSuggestion(field);
     }
-    if (hasNoCrop(field) && needsFallowNutrientPrep(field)) {
-      if (field.isPrecisionFarming && field.targetNitrogen > 0) {
-        const n = Number(field.nitrogenLevel ?? 0);
-        const t = Number(field.targetNitrogen ?? 0);
-        return {
-          action: "Build soil N (manure/slurry or bag) before you drill",
-          reason: `Target ~${Math.round(t)} kg N/ha — you’re near ${Math.round(n)}; finish after lime, before seed.`,
-          source: "rules",
-        };
-      }
-      return {
-        action: "Fertilize — spray / nutrient level is low for drilling",
-        reason: "Bring spray/N up after lime and before drilling seed.",
-        source: "rules",
-      };
-    }
     return {
-      action: "Sow — seedbed is worked and empty",
-      reason:
-        "Ground reads cultivated/plowed with no crop — drill seed only after any required lime and starter N prep for this field.",
+      action: t("rules.action.sowSeedbed"),
+      actionKey: "rules.action.sowSeedbed",
+      reason: t("rules.reason.sowSeedbed"),
       source: "rules",
     };
   }
 
   // ── needsWork — stones or generic icon queue ──────────────────────────────
   if (field.needsWork) {
-    return suggestionForNeedsWork(field);
+    return suggestionForNeedsWork(field, ctx, opts);
   }
 
   // ── Growing — nothing flagged; remind to monitor ─────────────────────────
@@ -923,8 +1285,9 @@ export function getLocalFieldSuggestion(field) {
   const noCropLoose = !field.fruitType || fruit === "unknown" || fruit === "empty";
   if (noCropLoose && gs === 0) {
     return {
-      action: "Prepare soil, then drill or plant",
-      reason: "Field reads empty — plough/cultivate as needed, then put a crop in.",
+      action: t("rules.action.prepareDrill"),
+      actionKey: "rules.action.prepareDrill",
+      reason: t("rules.reason.prepareDrill"),
       source: "rules",
     };
   }
@@ -932,23 +1295,42 @@ export function getLocalFieldSuggestion(field) {
   if (gs > 0) {
     const label = displayCropLabel(field);
     return {
-      action: `Monitor ${label} toward harvest`,
-      reason:
-        `Crop is growing and no soil job is flagged here right now — watch the in-field HUD for the next pass and plan the harvest window.`,
+      action: t("rules.monitorTowardHarvest", { label }),
+      actionKey: "rules.monitorTowardHarvest",
+      reason: t("rules.cropGrowingWatchHud"),
       source: "rules",
     };
   }
 
   return {
-    action: RULES_ENGINE_FALLBACK_ACTION,
-    reason:
-      "The offline rules don’t match this odd state — use in-game field hints or the live suggestions list from your save.",
+    action: t("rules.action.fallback"),
+    actionKey: "rules.action.fallback",
+    reason: t("rules.reason.fallback"),
     source: "rules",
+    kind: RULES_ENGINE_FALLBACK_KIND,
   };
 }
 
+export const SUGGESTION_ORDER_CATALOG = Object.freeze([
+  "Withered reset",
+  "Harvest-ready",
+  "Loose forage / swath",
+  "Bales on field",
+  "PF soil scan",
+  "Optional slurry/manure (skippable)",
+  "Mulch/plough/lime/cultivate",
+  "Sow/plant",
+  "Rolling after seeding",
+  "Growing maintenance: lime/N/weeds",
+  "Monitor / fallback",
+]);
+
+export function getSuggestionOrderCatalog() {
+  return SUGGESTION_ORDER_CATALOG.slice();
+}
+
 /**
- * Urgency score for ranking parcels (matches former field-consultant tie-break intent).
+ * Urgency score for ranking parcels (tie-break when priorities match).
  * @param {object} field
  * @returns {number}
  */
@@ -963,30 +1345,34 @@ export function fieldRulesUrgencyScore(field) {
   if (field.needsPlowing || field.needsLime || field.needsCultivation) s += 10;
   const bales = Number(field.baleCountOnField ?? field.baleCount ?? 0);
   if (Number.isFinite(bales) && bales > 0) s += 25;
-  if (field.hasLooseForage === true) s += 20;
+  const forageUrgent =
+    (field.hasLooseForage === true || field.needsBaling === true) && !forageLitersNegligible(field);
+  if (forageUrgent) s += 20;
   else if (field.hasWindrow === true || Number(field.windrowLiters ?? 0) > 0) s += 20;
-  if (
-    field.needsBaling === true ||
-    field.hasLooseForage === true ||
-    Number(field.baleableLooseLiters ?? 0) > 0
-  ) {
+  if (forageUrgent || Number(field.baleableLooseLiters ?? 0) >= MIN_FORAGE_WORKFLOW_LITERS) {
     s += 12;
   }
   return s;
 }
 
 /**
- * Best “do this first” from Layer‑1 rules only (no LLM / consultant).
+ * Best “do this first” from offline rules only.
  * @param {object[]} fields
  * @returns {{ field: object, action: string, reason: string } | null}
  */
-export function pickDoThisFirstFieldRulesOnly(fields) {
+export function pickDoThisFirstFieldRulesOnly(fields, opts = {}) {
   if (!Array.isArray(fields) || fields.length === 0) return null;
+  const base = opts && typeof opts === "object" ? opts : {};
+  const gameSettings =
+    base.gameSettings != null
+      ? base.gameSettings
+      : (typeof window !== "undefined" && window.dashboard && window.dashboard.gameSettings) || {};
+  const mergedOpts = { ...base, gameSettings };
   const rows = [];
   for (const field of fields) {
-    const sug = getLocalFieldSuggestion(field);
+    const sug = getLocalFieldSuggestion(field, mergedOpts);
     if (!sug || typeof sug.action !== "string" || !String(sug.action).trim()) continue;
-    if (sug.action === RULES_ENGINE_FALLBACK_ACTION) continue;
+    if (sug.kind === RULES_ENGINE_FALLBACK_KIND) continue;
     rows.push({ field, sug, score: fieldRulesUrgencyScore(field) });
   }
   if (rows.length === 0) return null;
@@ -1000,7 +1386,27 @@ export function pickDoThisFirstFieldRulesOnly(fields) {
   return { field: top.field, action: top.sug.action, reason: top.sug.reason || "" };
 }
 
+export function runSuggestionRegressionMatrix() {
+  const base = {
+    gameSettings: { weedsEnabled: true, stonesEnabled: true, plowingRequired: true, limeRequired: true },
+    skippedOptionalOrganic: {},
+  };
+  const scenarios = [
+    { name: "arable-fallow-mulched-plow", field: { farmlandId: 1, fruitType: "EMPTY", growthState: 0, isMulched: true, plowLevel: 0, needsPlowing: true, needsLime: false } },
+    { name: "arable-fallow-lime", field: { farmlandId: 2, fruitType: "EMPTY", growthState: 0, plowLevel: 1, needsPlowing: false, needsLime: true, isPrecisionFarming: true, isScanned: true, phValue: 5.8, targetPh: 6.5 } },
+    { name: "arable-growing-weeds", field: { farmlandId: 3, fruitType: "WHEAT", growthState: 2, needsWeeding: true, weedLevel: 0.7 } },
+    { name: "grass-mown-regrowth-n", field: { farmlandId: 4, fruitType: "GRASS", growthState: 5, growthLabel: "mown_regrowth", isScanned: true, isPrecisionFarming: true, nitrogenLevel: 40, targetNitrogen: 90 } },
+    { name: "seeded-roll-first", field: { farmlandId: 5, fruitType: "BARLEY", growthState: 1, needsRolling: true } },
+  ];
+  return scenarios.map((s) => ({
+    name: s.name,
+    suggestion: getLocalFieldSuggestion(s.field, base),
+  }));
+}
+
 if (typeof window !== "undefined") {
   window.pickDoThisFirstFieldRulesOnly = pickDoThisFirstFieldRulesOnly;
   window.fieldRulesUrgencyScore = fieldRulesUrgencyScore;
+  window.getRulesFallbackCounter = getRulesFallbackCounter;
+  window.runSuggestionRegressionMatrix = runSuggestionRegressionMatrix;
 }

@@ -92,6 +92,16 @@ That `release/` directory is **gitignored** in the FarmHub repo: Git Desktop syn
 
 ---
 
+## Troubleshooting
+
+- **Launch Dashboard stuck on “Starting…” after opening Server Manager from the dashboard (Settings → Open full setup window):** The desktop app loads `setup.html` over `http://127.0.0.1:8766`. Saving config must navigate the main window back to `/`. If that step is skipped, the button text is never restored—use **Launch Dashboard** again after updating the app, or restart the app. (Fixed in source: dashboard home vs `/setup.html` detection in `main.js`.)
+- **Pastures → View all livestock / per-pasture livestock list breaks or Details stops working:** The pasture livestock table uses DataTables; reopening the modal without tearing down the previous instance causes re-init errors. (Fixed in source: destroy existing DataTable before rebuilding the table; reuse one Bootstrap modal instance.)
+- **Splash shows `splash.loading` instead of English text:** The key must exist in `web/locales/build-translations.mjs`; regenerate `translations.json` with `node web/locales/build-translations.mjs` (see **Languages** above).
+
+**Quick smoke check (desktop):** First load shows readable splash line (not a raw i18n key); **Settings → Open full setup window → Launch Dashboard** returns to the dashboard; **Pastures → View all livestock** (open twice) then **Details** on a row opens the animal modal; **Livestock → Details** still works. Watch the devtools console for DataTables “reinitialise” warnings.
+
+---
+
 ## Release notes — v3.0.0
 
 See **[../../docs/CHANGELOG.md](../../docs/CHANGELOG.md)** §**3.0.0**, **[../../docs/RELEASE_NOTES.md](../../docs/RELEASE_NOTES.md)**. Long-form narrative: **[../../docs/RELEASE_v3.0.0.md](../../docs/RELEASE_v3.0.0.md)**. Earlier packaged notes: **[../../docs/RELEASE_v2.0.0.md](../../docs/RELEASE_v2.0.0.md)**. Summary (v2 era):

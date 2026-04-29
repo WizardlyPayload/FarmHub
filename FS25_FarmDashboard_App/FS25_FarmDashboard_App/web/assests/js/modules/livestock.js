@@ -72,7 +72,7 @@ export function renderAnimalsTable() {
     } else {
       // If no DataTable, show empty message
       document.getElementById("animals-tbody").innerHTML =
-        '<tr><td colspan="10" class="text-center text-muted">No animals found</td></tr>';
+        `<tr><td colspan="10" class="text-center text-muted">${t("livestock.noAnimalsFound")}</td></tr>`;
     }
     return;
   }
@@ -83,17 +83,17 @@ export function renderAnimalsTable() {
       // Create status badges
       const statusBadges = [];
       if (animal.health === 0)
-        statusBadges.push('<span class="badge bg-danger">Error</span>');
+        statusBadges.push(`<span class="badge bg-danger">${t("livestock.badgeError")}</span>`);
       if (animal.isPregnant)
         statusBadges.push(
-          '<span class="badge status-pregnant">Pregnant</span>'
+          `<span class="badge status-pregnant">${t("livestock.badgePregnant")}</span>`
         );
       if (animal.isLactating)
         statusBadges.push(
-          '<span class="badge status-lactating">Lactating</span>'
+          `<span class="badge status-lactating">${t("livestock.badgeLactating")}</span>`
         );
       if (animal.isParent)
-        statusBadges.push('<span class="badge status-parent">Parent</span>');
+        statusBadges.push(`<span class="badge status-parent">${t("livestock.badgeParent")}</span>`);
 
       // Create health bar
       const healthClass = this.getHealthClass(animal.health || 100);
@@ -123,10 +123,10 @@ export function renderAnimalsTable() {
         `$${this.calculateAnimalValue(animal).value.toLocaleString()}`,
         statusBadges.join(" ") || "-",
         this.formatLocation(
-          animal.location || "Unknown",
-          animal.locationType || "unknown"
+          resolveAnimalLocationLabel(animal),
+          resolveAnimalLocationType(animal)
         ),
-        `<button class="btn btn-sm btn-outline-success" onclick="dashboard.showAnimalDetails('${animal.id}')" title="View full RealisticLivestock details">
+        `<button class="btn btn-sm btn-outline-success" onclick='dashboard.showAnimalDetails(${JSON.stringify(String(animal.id))})' title="View full RealisticLivestock details">
                     <i class="bi bi-eye me-1"></i>Details
                 </button>`,
       ];
@@ -300,6 +300,23 @@ export function capitalize(str) {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
+function resolveAnimalLocationLabel(animal) {
+  if (!animal || typeof animal !== "object") return "Unknown";
+  const direct = String(animal.location || "").trim();
+  if (direct && direct.toLowerCase() !== "unknown") return direct;
+  const husbandry = String(animal.husbandryName || "").trim();
+  if (husbandry && husbandry.toLowerCase() !== "unknown") return husbandry;
+  return "Unknown";
+}
+
+function resolveAnimalLocationType(animal) {
+  if (!animal || typeof animal !== "object") return "unknown";
+  const direct = String(animal.locationType || "").trim();
+  if (direct && direct.toLowerCase() !== "unknown") return direct;
+  const husbandry = String(animal.husbandryName || "").trim();
+  return husbandry ? "Livestock Building" : "unknown";
+}
+
 export function formatLocation(location, locationType) {
   if (!location || location === "Unknown") {
     return '<span class="badge bg-secondary">Unknown Location</span>';
@@ -331,9 +348,12 @@ export function formatLocation(location, locationType) {
 export function showAnimalDetails(animalId) {
   // Convert animalId to number if it's a string, to handle both string and number IDs
   const searchId =
-    typeof animalId === "string" ? parseInt(animalId) : animalId;
+    typeof animalId === "string" ? parseInt(animalId, 10) : animalId;
   const animal = this.animals.find(
-    (a) => a.id === searchId || a.id === animalId
+    (a) =>
+      a.id === searchId ||
+      a.id === animalId ||
+      String(a.id) === String(animalId)
   );
   if (!animal) {
     console.error(
@@ -424,8 +444,8 @@ export function showAnimalDetails(animalId) {
                                         animal.age || 0
                                       } months</td></tr>
                                       <tr><td><strong>Location:</strong></td><td>${
-                                        animal.location || "Unknown"
-                                      }
+                                        resolveAnimalLocationLabel(animal)
+                                      }</td></tr>
                                   </table>
                               </div>
                           </div>
@@ -656,11 +676,25 @@ export function showAnimalDetails(animalId) {
 
   modalContent.innerHTML = detailsHTML;
 
-  // Show the modal
-  const modal = new bootstrap.Modal(
-    document.getElementById("animalDetailsModal")
-  );
-  modal.show();
+  const pastureLivestockEl = document.getElementById("pasturelivestock-modal");
+  const animalModalEl = document.getElementById("animalDetailsModal");
+  if (!animalModalEl) return;
+
+  const showAnimalModal = () => {
+    bootstrap.Modal.getOrCreateInstance(animalModalEl).show();
+  };
+
+  if (pastureLivestockEl?.classList.contains("show")) {
+    const pl =
+      bootstrap.Modal.getInstance(pastureLivestockEl) ||
+      bootstrap.Modal.getOrCreateInstance(pastureLivestockEl);
+    pastureLivestockEl.addEventListener("hidden.bs.modal", showAnimalModal, {
+      once: true,
+    });
+    pl.hide();
+  } else {
+    showAnimalModal();
+  }
 }
 
 export function showExportModal() {
@@ -695,7 +729,7 @@ export function exportData(format) {
       ]
         .filter((s) => s)
         .join(", ") || "Normal",
-    Location: animal.location,
+    Location: resolveAnimalLocationLabel(animal),
     "Farm ID": animal.farmId,
     "Animal ID": animal.id,
     "Mother ID": animal.motherId !== "-1" ? animal.motherId : "",
@@ -763,17 +797,17 @@ export function filterAnimals(filterType, silentRefresh) {
       // Create status badges
       const statusBadges = [];
       if (animal.health === 0)
-        statusBadges.push('<span class="badge bg-danger">Error</span>');
+        statusBadges.push(`<span class="badge bg-danger">${t("livestock.badgeError")}</span>`);
       if (animal.isPregnant)
         statusBadges.push(
-          '<span class="badge status-pregnant">Pregnant</span>'
+          `<span class="badge status-pregnant">${t("livestock.badgePregnant")}</span>`
         );
       if (animal.isLactating)
         statusBadges.push(
-          '<span class="badge status-lactating">Lactating</span>'
+          `<span class="badge status-lactating">${t("livestock.badgeLactating")}</span>`
         );
       if (animal.isParent)
-        statusBadges.push('<span class="badge status-parent">Parent</span>');
+        statusBadges.push(`<span class="badge status-parent">${t("livestock.badgeParent")}</span>`);
 
       // Create health bar
       const healthClass = this.getHealthClass(animal.health);
@@ -797,8 +831,8 @@ export function filterAnimals(filterType, silentRefresh) {
         `${animal.weight.toFixed(1)} kg`,
         `$${this.calculateAnimalValue(animal).value.toLocaleString()}`,
         statusBadges.join(" ") || "-",
-        this.formatLocation(animal.location, animal.locationType),
-        `<button class="btn btn-sm btn-outline-success" onclick="dashboard.showAnimalDetails('${animal.id}')">
+        this.formatLocation(resolveAnimalLocationLabel(animal), resolveAnimalLocationType(animal)),
+        `<button class="btn btn-sm btn-outline-success" onclick='dashboard.showAnimalDetails(${JSON.stringify(String(animal.id))})'>
                       <i class="bi bi-eye me-1"></i>Details
                   </button>`,
       ];
@@ -815,16 +849,15 @@ export function filterAnimals(filterType, silentRefresh) {
 
   if (silentRefresh) return;
 
-  // Show status message
   const filterMessages = {
-    all: `Showing all ${filteredAnimals.length} animals`,
-    lactating: `Showing ${filteredAnimals.length} lactating animals`,
-    pregnant: `Showing ${filteredAnimals.length} pregnant animals`,
-    health: `Showing all animals sorted by health`,
+    all: t("livestock.filterStatusAll", { count: filteredAnimals.length }),
+    lactating: t("livestock.filterStatusLactating", { count: filteredAnimals.length }),
+    pregnant: t("livestock.filterStatusPregnant", { count: filteredAnimals.length }),
+    health: t("livestock.filterStatusHealth"),
   };
 
   this.showInfoMessage(
-    filterMessages[filterType] || `Filter applied: ${filterType}`
+    filterMessages[filterType] || t("livestock.filterStatusGeneric", { filter: filterType })
   );
 }
 
@@ -1228,17 +1261,17 @@ export function updateTableWithFilteredAnimals(filteredAnimals) {
     // Create status badges
     const statusBadges = [];
     if (animal.health === 0)
-      statusBadges.push('<span class="badge bg-danger">Error</span>');
+      statusBadges.push(`<span class="badge bg-danger">${t("livestock.badgeError")}</span>`);
     if (animal.isPregnant)
       statusBadges.push(
-        '<span class="badge status-pregnant">Pregnant</span>'
+        `<span class="badge status-pregnant">${t("livestock.badgePregnant")}</span>`
       );
     if (animal.isLactating)
       statusBadges.push(
-        '<span class="badge status-lactating">Lactating</span>'
+        `<span class="badge status-lactating">${t("livestock.badgeLactating")}</span>`
       );
     if (animal.isParent)
-      statusBadges.push('<span class="badge status-parent">Parent</span>');
+      statusBadges.push(`<span class="badge status-parent">${t("livestock.badgeParent")}</span>`);
 
     // Create health bar
     const healthClass = this.getHealthClass(animal.health);
@@ -1262,8 +1295,8 @@ export function updateTableWithFilteredAnimals(filteredAnimals) {
       `${animal.weight.toFixed(1)} kg`,
       `$${this.calculateAnimalValue(animal).value.toLocaleString()}`,
       statusBadges.join(" ") || "-",
-      this.formatLocation(animal.location, animal.locationType),
-      `<button class="btn btn-sm btn-outline-success" onclick="dashboard.showAnimalDetails('${animal.id}')">
+      this.formatLocation(resolveAnimalLocationLabel(animal), resolveAnimalLocationType(animal)),
+      `<button class="btn btn-sm btn-outline-success" onclick='dashboard.showAnimalDetails(${JSON.stringify(String(animal.id))})'>
                   <i class="bi bi-eye me-1"></i>Details
               </button>`,
     ];
@@ -1399,7 +1432,7 @@ export function openAnimalDetailsFromId(animalIdOrObject) {
     this.showAnimalDetails(animal.id); // Pass the ID, not the full object
   } else {
     console.warn("Animal not found for ID:", animalId);
-    this.showAlert(`Animal #${animalId} not found`, "warning");
+    this.showAlert(t("livestock.toastAnimalNotFound", { id: animalId }), "warning");
   }
 }
 

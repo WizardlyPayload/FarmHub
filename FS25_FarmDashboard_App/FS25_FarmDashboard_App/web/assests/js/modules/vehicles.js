@@ -1,6 +1,7 @@
 // FS25 FarmDashboard | vehicles.js | v2.0.0
 
 import { getAPIBaseURL } from "./apiStorage.js";
+import { t } from "../i18n/i18n.js";
 
 /** When local `_514_...SILOKING...1000+.png` is not shipped under items/, thumb onerror swaps to wiki. */
 const SILOKING_TRAILEDLINE_WIKI_THUMB =
@@ -455,9 +456,9 @@ export function showVehiclesSection() {
                 <div class="col-12 text-center">
                     <h2 class="text-farm-accent">
                         <i class="bi bi-truck me-2"></i>
-                        Vehicle Fleet Management
+                        ${t("vehicles.title")}
                     </h2>
-                    <p class="lead text-muted">Monitor your vehicle fleet, fuel levels, and maintenance status</p>
+                    <p class="lead text-muted">${t("vehicles.subtitle")}</p>
                 </div>
             </div>
 
@@ -470,10 +471,10 @@ export function showVehiclesSection() {
                          onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
                         <div class="card-body text-center">
                             <h5 class="card-title">
-                                <i class="bi bi-truck me-2"></i>Total Vehicles
+                                <i class="bi bi-truck me-2"></i>${t("vehicles.summaryTotal")}
                             </h5>
                             <h2 class="display-4" id="total-vehicles-count">0</h2>
-                            <small class="text-light opacity-75">Click to show all equipment</small>
+                            <small class="text-light opacity-75">${t("vehicles.summaryTotalHint")}</small>
                         </div>
                     </div>
                 </div>
@@ -485,10 +486,10 @@ export function showVehiclesSection() {
                          onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
                         <div class="card-body text-center">
                             <h5 class="card-title">
-                                <i class="bi bi-fuel-pump me-2"></i>Low Fuel
+                                <i class="bi bi-fuel-pump me-2"></i>${t("vehicles.summaryLowFuel")}
                             </h5>
                             <h2 class="display-4" id="low-fuel-count">0</h2>
-                            <small class="text-dark opacity-75">Click to show &lt; 25% fuel</small>
+                            <small class="text-dark opacity-75">${t("vehicles.summaryLowFuelHint")}</small>
                         </div>
                     </div>
                 </div>
@@ -500,11 +501,11 @@ export function showVehiclesSection() {
                          onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 2px 10px rgba(220,53,69,0.2)'">
                         <div class="card-body text-center text-white">
                             <h5 class="card-title">
-                                <i class="bi bi-exclamation-triangle-fill me-2"></i>High Damage
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>${t("vehicles.summaryHighDamage")}
                             </h5>
                             <h2 class="display-4" id="damaged-vehicles-count">0</h2>
                             <small class="text-light opacity-90">
-                                <i class="bi bi-shield-exclamation me-1"></i>Click to show &gt; 20% damage
+                                <i class="bi bi-shield-exclamation me-1"></i>${t("vehicles.summaryHighDamageHint")}
                             </small>
                         </div>
                     </div>
@@ -517,48 +518,48 @@ export function showVehiclesSection() {
                         <div class="card-header text-white">
                             <h6 class="card-title mb-0">
                                 <i class="bi bi-funnel me-2"></i>
-                                Vehicle Filters
+                                ${t("vehicles.filtersTitle")}
                                 <button class="btn btn-sm btn-outline-light ms-2" onclick="dashboard.toggleVehicleFilters()" id="vehicle-filter-toggle-btn">
-                                    <i class="bi bi-chevron-down"></i> Show Filters
+                                    <i class="bi bi-chevron-down"></i> ${t("vehicles.showFilters")}
                                 </button>
                             </h6>
                         </div>
                         <div class="card-body d-none" id="vehicle-filters-panel">
                             <div class="row g-3">
                                 <div class="col-md-3">
-                                    <label class="form-label text-farm-accent">Vehicle Type</label>
+                                    <label class="form-label text-farm-accent">${t("vehicles.labelVehicleType")}</label>
                                     <select class="form-select form-select-sm" id="vehicle-type-filter">
-                                        <option value="">All Types</option>
-                                        <option value="tractor">Tractors</option>
-                                        <option value="motorized">All Motorized</option>
-                                        <option value="trailer">Trailers</option>
-                                        <option value="implement">Implements</option>
-                                        <option value="cultivator">Cultivators</option>
-                                        <option value="unknown">Pallets & Others</option>
+                                        <option value="">${t("vehicles.optAllTypes")}</option>
+                                        <option value="tractor">${t("vehicles.optTractors")}</option>
+                                        <option value="motorized">${t("vehicles.optMotorized")}</option>
+                                        <option value="trailer">${t("vehicles.optTrailers")}</option>
+                                        <option value="implement">${t("vehicles.optImplements")}</option>
+                                        <option value="cultivator">${t("vehicles.optCultivators")}</option>
+                                        <option value="unknown">${t("vehicles.optPalletsOthers")}</option>
                                     </select>
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label text-farm-accent">Fuel Level</label>
+                                    <label class="form-label text-farm-accent">${t("vehicles.labelFuelLevel")}</label>
                                     <select class="form-select form-select-sm" id="vehicle-fuel-filter">
-                                        <option value="">All Levels</option>
-                                        <option value="empty">Empty (0%)</option>
-                                        <option value="low">Low (&lt; 25%)</option>
-                                        <option value="medium">Medium (25-75%)</option>
-                                        <option value="full">Full (&gt; 75%)</option>
+                                        <option value="">${t("vehicles.optFuelAll")}</option>
+                                        <option value="empty">${t("vehicles.optFuelEmpty")}</option>
+                                        <option value="low">${t("vehicles.optFuelLow")}</option>
+                                        <option value="medium">${t("vehicles.optFuelMedium")}</option>
+                                        <option value="full">${t("vehicles.optFuelFull")}</option>
                                     </select>
                                 </div>
                                 <div class="col-md-3">
-                                    <label class="form-label text-farm-accent">Status</label>
+                                    <label class="form-label text-farm-accent">${t("vehicles.labelStatus")}</label>
                                     <select class="form-select form-select-sm" id="vehicle-status-filter">
-                                        <option value="">All Status</option>
-                                        <option value="active">Engine Running</option>
-                                        <option value="inactive">Engine Off</option>
-                                        <option value="damaged">Damaged</option>
+                                        <option value="">${t("vehicles.optStatusAll")}</option>
+                                        <option value="active">${t("vehicles.optStatusEngineOn")}</option>
+                                        <option value="inactive">${t("vehicles.optStatusEngineOff")}</option>
+                                        <option value="damaged">${t("vehicles.optStatusDamaged")}</option>
                                     </select>
                                 </div>
                                 <div class="col-md-3 d-flex align-items-end">
                                     <button class="btn btn-farm-accent w-100" onclick="dashboard.applyVehicleFilters()">
-                                        <i class="bi bi-search me-1"></i> Apply Filters
+                                        <i class="bi bi-search me-1"></i> ${t("vehicles.applyFilters")}
                                     </button>
                                 </div>
                             </div>
@@ -695,6 +696,67 @@ export function getLocalVehicleImage(vehicleName, brandName, typeName) {
     "john deere tractor": "_28_FS25_John_Deere_6R_Series.png",
     "john deere": "_28_FS25_John_Deere_6R_Series.png",
 
+    // New Holland T7 family (shared store icon across HP variants)
+    "T7.260": "vehicles__store_t7.png",
+    "T7 260": "vehicles__store_t7.png",
+    t7260: "vehicles__store_t7.png",
+    "new holland t7.260": "vehicles__store_t7.png",
+    "new holland t7": "vehicles__store_t7.png",
+    t7: "vehicles__store_t7.png",
+    "t7 series": "vehicles__store_t7.png",
+
+    // Case IH Puma family (single shop icon, many HP/name variants)
+    "case ih puma 260cvxdrive": "vehicles__store_puma.png",
+    "case ih puma 260 cvxdrive": "vehicles__store_puma.png",
+    "case ih puma 260": "vehicles__store_puma.png",
+    "case ih puma": "vehicles__store_puma.png",
+    "puma 260cvxdrive": "vehicles__store_puma.png",
+    "puma 260": "vehicles__store_puma.png",
+    puma260cvxdrive: "vehicles__store_puma.png",
+    puma260: "vehicles__store_puma.png",
+    puma: "vehicles__store_puma.png",
+
+    // DEUTZ-FAHR 8-series family (same icon across 8 TTV variants)
+    "8280 ttv": "_38_FS25_DEUTZ-FAHR_Series_8_TTV.png",
+    "deutz-fahr 8280 ttv": "_38_FS25_DEUTZ-FAHR_Series_8_TTV.png",
+    "deutz fahr 8280 ttv": "_38_FS25_DEUTZ-FAHR_Series_8_TTV.png",
+    "deutz-fahr series 8 ttv": "_38_FS25_DEUTZ-FAHR_Series_8_TTV.png",
+    "deutz fahr series 8 ttv": "_38_FS25_DEUTZ-FAHR_Series_8_TTV.png",
+    deutzfahr8280ttv: "_38_FS25_DEUTZ-FAHR_Series_8_TTV.png",
+    deutzfahr8ttv: "_38_FS25_DEUTZ-FAHR_Series_8_TTV.png",
+    "series 8 ttv": "_38_FS25_DEUTZ-FAHR_Series_8_TTV.png",
+    "8 ttv": "_38_FS25_DEUTZ-FAHR_Series_8_TTV.png",
+
+    // Bailey Bale & Pallet trailer family (same icon across size variants)
+    "bailey bale and pallet trailer":
+      "FS25_Bailey_Bale__store_BALE16.png",
+    "bailey bale":
+      "FS25_Bailey_Bale__store_BALE16.png",
+    bailey: "FS25_Bailey_Bale__store_BALE16.png",
+    "bale and pallet": "FS25_Bailey_Bale__store_BALE16.png",
+    "bale and pallet trailer":
+      "FS25_Bailey_Bale__store_BALE16.png",
+    bale16: "FS25_Bailey_Bale__store_BALE16.png",
+    bale18: "FS25_Bailey_Bale__store_BALE16.png",
+    "bailey bale16": "FS25_Bailey_Bale__store_BALE16.png",
+    "bailey bale18": "FS25_Bailey_Bale__store_BALE16.png",
+
+    // Zetor Crystal HD family
+    "zetor crystal hd 170": "_26_FS25_Zetor_CRYSTAL_HD.png",
+    "zetor crystal hd": "_26_FS25_Zetor_CRYSTAL_HD.png",
+    "crystal hd 170": "_26_FS25_Zetor_CRYSTAL_HD.png",
+    "crystal hd": "_26_FS25_Zetor_CRYSTAL_HD.png",
+    zetorcrystalhd170: "_26_FS25_Zetor_CRYSTAL_HD.png",
+    zetorcrystalhd: "_26_FS25_Zetor_CRYSTAL_HD.png",
+
+    // ROPA Tiger 6 family (shared icon across XL/S variants)
+    "tiger 6 xl": "vehicles__store_tiger6S.png",
+    "ropa tiger 6 xl": "vehicles__store_tiger6S.png",
+    "ropa tiger 6": "vehicles__store_tiger6S.png",
+    tiger6xl: "vehicles__store_tiger6S.png",
+    tiger6: "vehicles__store_tiger6S.png",
+    tiger6s: "vehicles__store_tiger6S.png",
+
     // JCB
     "541-70 AGRI PRO": "_115_FS25_JCB_541-70_AGRI_PRO.png",
     "541-70": "_115_FS25_JCB_541-70_AGRI_PRO.png",
@@ -816,7 +878,12 @@ export function getLocalVehicleImage(vehicleName, brandName, typeName) {
     const termLower = term.toLowerCase().trim();
     if (vehicleModelMap[termLower]) {
       const filename = vehicleModelMap[termLower];
-      return `/assests/img/items/${normalizeItemImageFilename(filename)}`;
+      const normalized = normalizeItemImageFilename(filename);
+      const inModExtract =
+        Array.isArray(modExtractImageFilenames) &&
+        modExtractImageFilenames.some((f) => String(f).toLowerCase() === String(normalized).toLowerCase());
+      const dir = inModExtract ? "items_mod_extract" : "items";
+      return `/assests/img/${dir}/${normalized}`;
     }
   }
 
@@ -1528,10 +1595,19 @@ export function findVehicleImageDynamic(vehicleName, brandName, typeName) {
         .join(" ")
         .replace(/%2B/g, "+")
         .replace(/%25/g, "%");
-      // Giants exports: ModFolder__store_vario1067 — brand lives in folder name, not in "store_*"
+      // Giants exports: ModFolder__store_vario1067 — brand often lives in folder name, not in "store_*"
       if (parts[0] && /^(store|icon)$/i.test(parts[0])) {
         modelPart = parts.slice(1).join("_");
+        if (!brandPart || /^(store|icon)$/i.test(brandPart)) {
+          const fromPack = beforeSep.replace(/^vehicles?_?/i, "").replace(/^store_?/i, "");
+          brandPart = fromPack || brandPart;
+        }
       }
+      modelPart = String(modelPart)
+        .replace(/([a-z])(\d)/gi, "$1 $2")
+        .replace(/(\d)([a-z])/gi, "$1 $2")
+        .replace(/[_-]+/g, " ")
+        .trim();
       const packNorm = normalizeText(beforeSep.replace(/^FS\d+_?/i, ""));
       const fullNorm = normalizeText(
         (beforeSep && afterSep ? `${beforeSep}_${afterSep}` : base).replace(/\.png$/i, "")
@@ -1562,6 +1638,115 @@ export function findVehicleImageDynamic(vehicleName, brandName, typeName) {
   const MIN_SCORE_FUZZY_CURATED = 22;
   /** Mod items_mod_extract/ — fewer collisions per pack; slightly lower bar + fullNorm bonus in scoring. */
   const MIN_SCORE_FUZZY_MOD = 16;
+
+  // Direct compact-name pass for pack/store exports (e.g. vehicles__store_fenix3000)
+  const compactNeedle = normalizeCompactFold(vehicleName || "");
+  const compactBrandNeedle = normalizeCompactFold(`${brandName || ""}${vehicleName || ""}`);
+  const directNeedles = new Set([compactNeedle, compactBrandNeedle].filter(Boolean));
+  if (brandNameNorm && compactNeedle.startsWith(brandNameNorm) && compactNeedle.length > brandNameNorm.length + 4) {
+    directNeedles.add(compactNeedle.slice(brandNameNorm.length));
+  }
+  const slashTrim = normalizeCompactFold(String(vehicleName || "").replace(/\/\d+$/i, ""));
+  if (slashTrim) directNeedles.add(slashTrim);
+  // Shared-series icons: in-game titles include horsepower variant (e.g. "T7.260"),
+  // while store files may keep only the family token ("store_t7").
+  const seriesFromName = String(vehicleName || "")
+    .toLowerCase()
+    .match(/\b([a-z]+)\s?(\d{1,2})(?:[.,]\d{2,4})\b/);
+  if (seriesFromName) {
+    directNeedles.add(normalizeCompactFold(`${seriesFromName[1]}${seriesFromName[2]}`));
+  }
+  const familyText = String(`${brandName || ""} ${vehicleName || ""}`).toLowerCase();
+  if (familyText.includes("case") && familyText.includes("puma")) {
+    directNeedles.add("puma");
+    directNeedles.add("storepuma");
+  }
+  if (familyText.includes("deutz") && familyText.includes("ttv")) {
+    directNeedles.add("series8ttv");
+    directNeedles.add("8280ttv");
+    directNeedles.add("8ttv");
+  }
+  for (const n of [...directNeedles]) {
+    if (/^[a-z]+\d{4,6}$/.test(n)) {
+      directNeedles.add(n.replace(/(\d)\d$/, "$1"));
+    }
+    if (/^\d{4,6}$/.test(n)) {
+      directNeedles.add(n.slice(0, -1));
+    }
+    const seriesPrefix = n.match(/^([a-z]+\d{1,2})\d{2,4}$/);
+    if (seriesPrefix) {
+      directNeedles.add(seriesPrefix[1]);
+    }
+  }
+  const directCompactMatch = (img) => {
+    const f = normalizeCompactFold(String(img?.filename || "").replace(/\.png$/i, ""));
+    if (!f) return false;
+    for (const needle of directNeedles) {
+      if (needle && needle.length >= 5 && f.includes(needle)) return true;
+    }
+    return false;
+  };
+  const exactStoreTokenMatch = (img) => {
+    const raw = String(img?.filename || "").toLowerCase();
+    for (const needle of directNeedles) {
+      if (!needle || needle.length < 2) continue;
+      const re = new RegExp(`(?:^|__)store_${needle}(?:_|\\.|$)`, "i");
+      if (re.test(raw)) return true;
+    }
+    return false;
+  };
+  const curatedStoreExact = curatedAll.filter(exactStoreTokenMatch);
+  if (curatedStoreExact.length === 1) return curatedStoreExact[0].path;
+  if (curatedStoreExact.length > 1) {
+    const bestStoreCur = scoreVehicleImageCache(
+      curatedStoreExact,
+      vehicleNameNorm,
+      brandNameNorm,
+      typeNameNorm,
+      vehicleName,
+      6
+    );
+    if (bestStoreCur.bestMatch && bestStoreCur.bestScore >= 6) return bestStoreCur.bestMatch.path;
+  }
+  const modStoreExact = modAll.filter(exactStoreTokenMatch);
+  if (modStoreExact.length === 1) return modStoreExact[0].path;
+  if (modStoreExact.length > 1) {
+    const bestStoreMod = scoreVehicleImageCache(
+      modStoreExact,
+      vehicleNameNorm,
+      brandNameNorm,
+      typeNameNorm,
+      vehicleName,
+      6
+    );
+    if (bestStoreMod.bestMatch && bestStoreMod.bestScore >= 6) return bestStoreMod.bestMatch.path;
+  }
+  const curatedDirect = curatedAll.filter(directCompactMatch);
+  if (curatedDirect.length === 1) return curatedDirect[0].path;
+  if (curatedDirect.length > 1) {
+    const bestCur = scoreVehicleImageCache(
+      curatedDirect,
+      vehicleNameNorm,
+      brandNameNorm,
+      typeNameNorm,
+      vehicleName,
+      8
+    );
+    if (bestCur.bestMatch && bestCur.bestScore >= 8) return bestCur.bestMatch.path;
+  }
+  const modDirect = modAll.filter(directCompactMatch);
+  if (modDirect.length === 1) return modDirect[0].path;
+  if (modDirect.length > 1) {
+    const best = scoreVehicleImageCache(
+      modDirect,
+      vehicleNameNorm,
+      brandNameNorm,
+      typeNameNorm,
+      vehicleName,
+      9
+    );
+    if (best.bestMatch && best.bestScore >= 9) return best.bestMatch.path;
+  }
 
   const modJmXt = modAll.filter((img) =>
     modJmXtendedReachMatch(vehicleNameNorm, brandNameNorm, img)
@@ -2683,10 +2868,10 @@ export function toggleVehicleFilters() {
     const isHidden = panel.classList.contains("d-none");
     if (isHidden) {
       panel.classList.remove("d-none");
-      button.innerHTML = '<i class="bi bi-chevron-up"></i> Hide Filters';
+      button.innerHTML = `<i class="bi bi-chevron-up"></i> ${t("vehicles.hideFilters")}`;
     } else {
       panel.classList.add("d-none");
-      button.innerHTML = '<i class="bi bi-chevron-down"></i> Show Filters';
+      button.innerHTML = `<i class="bi bi-chevron-down"></i> ${t("vehicles.showFilters")}`;
     }
   }
 }

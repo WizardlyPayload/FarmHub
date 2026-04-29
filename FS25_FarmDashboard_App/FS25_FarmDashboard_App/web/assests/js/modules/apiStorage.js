@@ -9,6 +9,22 @@
 export const SERVER_LIVE_CACHE_SCHEMA_VERSION = '1.0';
 
 import { filterFieldsForFarmView, invalidateFieldsClientCache } from './fields.js';
+import { t } from '../i18n/i18n.js';
+
+/** Persist active server + farm for SimHub (`GET /api/simhub-session`) — desktop app only. */
+function pushSimHubLiveContext(dashboard) {
+  try {
+    if (typeof window === "undefined" || typeof window.farmDashAPI?.setSimHubLiveContext !== "function") {
+      return;
+    }
+    const serverId = dashboard?.activeServerId;
+    if (!serverId) return;
+    const farmId = Math.max(1, Number(dashboard?.activeFarmId ?? 1) || 1);
+    window.farmDashAPI.setSimHubLiveContext({ serverId: String(serverId), farmId });
+  } catch (_) {
+    /* ignore */
+  }
+}
 
 /** Clear per-farm / per-field UI caches so rapid farm or save switches cannot paint stale field cards. */
 function resetCrossFarmVisualizationCaches(dashboard) {
@@ -16,11 +32,10 @@ function resetCrossFarmVisualizationCaches(dashboard) {
     invalidateFieldsClientCache();
   } catch (_) {}
   if (typeof window !== 'undefined') {
-    window.__fieldConsultantByRef = {};
-    window.__fieldConsultantLlmUsed = false;
-    window.__fieldConsultantSuggestionTier = undefined;
-    window.__fieldConsultantAppliedKey = null;
-    window.__fieldConsultantAppliedHash = null;
+    window.__fieldRulesInsightByRef = {};
+    window.__fieldRulesSuggestionSource = undefined;
+    window.__fieldRulesCacheKey = null;
+    window.__fieldRulesCacheHash = null;
     window.__lastFieldStateHash = null;
   }
   if (dashboard && dashboard.realtimeConnector) {
@@ -165,7 +180,10 @@ export async function loadServersAndTabs() {
             } else {
                 this.activeServerId = undefined;
                 const container = document.getElementById("server-tabs-container");
-                if(container) container.innerHTML = '<span class="badge bg-danger">No Servers Found</span>';
+                if (container) {
+                    const label = t('apiStorage.noServersFound');
+                    container.innerHTML = `<span class="badge bg-danger">${label}</span>`;
+                }
             }
         }
     } catch (error) {
@@ -213,10 +231,7 @@ export async function switchServer(serverId) {
       else localStorage.removeItem("dashboard_active_server");
       this.renderServerTabs();
       if (this.showAlert) {
-        this.showAlert(
-          "Could not load data for this save. Check that the server has data or try again.",
-          "warning"
-        );
+        this.showAlert(t("apiStorage.toastCouldNotLoadData"), "warning");
       }
       return;
     }
@@ -232,29 +247,52 @@ export async function switchServer(serverId) {
     }
     if (this.updateNavbar) this.updateNavbar();
 
+    pushSimHubLiveContext(this);
+
   } finally {
     this._switchingServer = false;
+  }
+}
+
+function showDashboardOrFallback(dashboard) {
+  dashboard.isDataLoaded = true;
+  if (typeof dashboard.showDashboard === "function") {
+    dashboard.showDashboard();
+  } else {
+    document.getElementById("folder-selection").classList.add("d-none");
+    document.getElementById("landing-page").classList.remove("d-none");
+    document.getElementById("main-navbar").classList.remove("d-none");
+    if (dashboard.updateLandingPageCounts) dashboard.updateLandingPageCounts();
+    if (dashboard.updateNavbar) dashboard.updateNavbar();
+    if (window.location.hash) dashboard.handleHashChange();
   }
 }
 
 export async function checkAPIAvailability() {
   try {
     await this.loadServersAndTabs();
+    if (this.activeServerId) {
+      const snap = readBrowserMergedSnapshot(this.activeServerId);
+      if (snap?.payload && !snap.payload.error) {
+        applyApiMergedDataPayload(this, snap.payload);
+        if (hasRenderableDashboardData(this)) {
+          showDashboardOrFallback(this);
+        }
+      }
+    }
+
     const apiBaseURL = this.getAPIBaseURL();
     const response = await fetch(`${apiBaseURL}/api/status`);
     if (response.ok) {
       const loaded = await this.tryLoadApiData();
       if (loaded) {
-        this.isDataLoaded = true;
-        if (typeof this.showDashboard === "function") {
-          this.showDashboard();
-        } else {
-          document.getElementById("folder-selection").classList.add("d-none");
-          document.getElementById("landing-page").classList.remove("d-none");
-          document.getElementById("main-navbar").classList.remove("d-none");
-          if (this.updateLandingPageCounts) this.updateLandingPageCounts();
-          if (this.updateNavbar) this.updateNavbar();
-          if (window.location.hash) this.handleHashChange();
+        showDashboardOrFallback(this);
+        return;
+      }
+      if (hasRenderableDashboardData(this)) {
+        showDashboardOrFallback(this);
+        if (typeof window.farmDashNotifyDataReady === "function") {
+          window.farmDashNotifyDataReady();
         }
         return;
       }
@@ -287,6 +325,13 @@ export async function checkAPIAvailability() {
       }
     }
   } catch (error) {}
+  if (hasRenderableDashboardData(this)) {
+    showDashboardOrFallback(this);
+    if (typeof window.farmDashNotifyDataReady === "function") {
+      window.farmDashNotifyDataReady();
+    }
+    return;
+  }
   this.loadSavedFolder();
 }
 
@@ -329,6 +374,158 @@ export function resyncRealtimeAfterBootstrap() {
   this._pendingRealtimeBootstrapResync = true;
 }
 
+/** Last merged `/api/data` payload in localStorage so a reopened tab shows data before the host finishes hydrating. */
+const BROWSER_SNAPSHOT_PREFIX = "farmdash_merged_snapshot_v1_";
+const BROWSER_SNAPSHOT_MAX_CHARS = 4_000_000;
+let _browserSnapshotSaveTimer = null;
+
+function browserSnapshotKey(serverId) {
+  return `${BROWSER_SNAPSHOT_PREFIX}${String(serverId)}`;
+}
+
+export function hasRenderableDashboardData(dashboard) {
+  if (!dashboard) return false;
+  if (dashboard.luaAvailable || dashboard.xmlAvailable) return true;
+  if (Array.isArray(dashboard.allFields) && dashboard.allFields.length > 0) return true;
+  if (Array.isArray(dashboard.animals) && dashboard.animals.length > 0) return true;
+  if (Array.isArray(dashboard.vehicles) && dashboard.vehicles.length > 0) return true;
+  if (dashboard.mapTitle || dashboard.savegameName) return true;
+  return false;
+}
+
+export function readBrowserMergedSnapshot(serverId) {
+  if (serverId == null || typeof localStorage === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(browserSnapshotKey(serverId));
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (!o || typeof o !== "object" || !o.payload || typeof o.payload !== "object") return null;
+    return o;
+  } catch (_) {
+    return null;
+  }
+}
+
+export function persistBrowserMergedSnapshot(dashboard, data) {
+  if (!dashboard?.activeServerId || !data || typeof data !== "object" || data.error) return;
+  if (typeof localStorage === "undefined") return;
+  try {
+    const copy = JSON.parse(JSON.stringify(data));
+    delete copy.timestamp;
+    const wrapped = {
+      savedAt: new Date().toISOString(),
+      serverId: String(dashboard.activeServerId),
+      payload: copy,
+    };
+    const s = JSON.stringify(wrapped);
+    if (s.length > BROWSER_SNAPSHOT_MAX_CHARS) return;
+    localStorage.setItem(browserSnapshotKey(dashboard.activeServerId), s);
+  } catch (_) {
+    /* quota or private mode */
+  }
+}
+
+/** Debounced: realtime ticks often; avoid writing multi‑MB JSON every second. */
+export function scheduleBrowserMergedSnapshotPersist(dashboard, data) {
+  if (!dashboard?.activeServerId || !data || data.error) return;
+  clearTimeout(_browserSnapshotSaveTimer);
+  _browserSnapshotSaveTimer = setTimeout(() => {
+    _browserSnapshotSaveTimer = null;
+    persistBrowserMergedSnapshot(dashboard, data);
+  }, 2500);
+}
+
+/**
+ * Apply a merged dashboard payload (same shape as `GET /api/data`) onto the LivestockDashboard instance.
+ * Used by REST bootstrap and by browser snapshot restore on cold open.
+ */
+export function applyApiMergedDataPayload(dashboard, data) {
+  if (!dashboard || !data || data.error) return;
+
+  dashboard.vehicles = data.vehicles || [];
+  dashboard.economy = data.economy || {};
+  dashboard.finance = data.finance || {};
+  dashboard.weather = data.weather || {};
+  dashboard.production = data.production || {};
+  dashboard.pastures = data.pastures || [];
+  dashboard.mapTitle = data.mapTitle || null;
+  dashboard.savegameName = data.savegameName || null;
+  dashboard.dataSource = data.dataSource || "unknown";
+  dashboard.xmlAvailable = data.xmlAvailable || false;
+  dashboard.luaAvailable = data.luaAvailable || false;
+  dashboard.money = data.money || 0;
+  dashboard.gameSettings = data.gameSettings || data.settings || {};
+  dashboard.husbandryData = ensureHusbandryArray(data.animals);
+
+  dashboard.farms = ensureArray(data.farmInfo);
+  dashboard.playerFarms = dashboard.farms;
+  const mpFarmSwitch = dashboard.isFarmDropdownEnabled();
+  const farmKey = `dashboard_active_farm_${String(dashboard.activeServerId)}`;
+  let savedFarmId = mpFarmSwitch ? localStorage.getItem(farmKey) : null;
+  if (mpFarmSwitch && savedFarmId && dashboard.farms.find((f) => Number(f.id) === Number(savedFarmId))) {
+    dashboard.activeFarmId = Number(parseInt(savedFarmId, 10));
+  } else if (dashboard.farms.length > 0) {
+    const defaultFarm = dashboard.farms.find((f) => Number(f.id) > 0) || dashboard.farms[0];
+    dashboard.activeFarmId = Number(defaultFarm.id);
+  }
+  dashboard.renderFarmDropdown();
+
+  dashboard.allFields = data.fields || [];
+  dashboard.fields = filterFieldsForFarmView(dashboard.allFields, dashboard.activeFarmId ?? 1);
+  if (dashboard.fields.length === 0 && dashboard.allFields.length > 0) {
+    const inferred = inferFarmIdFromFieldOwnership(dashboard.allFields, dashboard.farms);
+    if (inferred != null && Number(inferred) !== Number(dashboard.activeFarmId)) {
+      dashboard.activeFarmId = Number(inferred);
+      try {
+        localStorage.setItem(farmKey, String(inferred));
+      } catch (_) {
+        /* ignore */
+      }
+      dashboard.fields = filterFieldsForFarmView(dashboard.allFields, dashboard.activeFarmId);
+      if (typeof dashboard.renderFarmDropdown === "function") dashboard.renderFarmDropdown();
+    }
+  }
+
+  const husbandryBuildings = ensureHusbandryArray(data.animals);
+  if (husbandryBuildings.length > 0) {
+    const allAnimals = [];
+    husbandryBuildings.forEach((building) => {
+      const inner = getAnimalListFromBuilding(building);
+      if (!inner.length) return;
+      const ownerFarmId = building.ownerFarmId ?? building.farmId;
+      const hid = building.id ?? building.buildingId;
+      const hname = building.name;
+      inner.forEach((animal) => {
+        allAnimals.push({
+          ...animal,
+          subType: animal.subType || animal.type || animal.animalType,
+          ownerFarmId: animal.ownerFarmId ?? ownerFarmId,
+          farmId: animal.farmId ?? ownerFarmId,
+          husbandryId: animal.husbandryId ?? hid,
+          husbandryName: animal.husbandryName ?? hname,
+        });
+      });
+    });
+    const uniqueAnimals = [];
+    const seenIds = new Set();
+    allAnimals.forEach((animal) => {
+      if (!seenIds.has(animal.id)) {
+        seenIds.add(animal.id);
+        uniqueAnimals.push(animal);
+      }
+    });
+    dashboard.animals = uniqueAnimals;
+  } else {
+    dashboard.animals = [];
+  }
+
+  dashboard.resyncRealtimeAfterBootstrap();
+  if (typeof window.farmDashNotifyDataReady === "function") {
+    window.farmDashNotifyDataReady();
+  }
+  pushSimHubLiveContext(dashboard);
+}
+
 export async function tryLoadApiData() {
   try {
     if (!this.activeServerId) return false;
@@ -341,7 +538,9 @@ export async function tryLoadApiData() {
         const waiting =
           errMsg === "Waiting for data..." || /waiting\s+for\s+data/i.test(errMsg);
         if (waiting) {
-          this.applyEmptyApiState();
+          if (!hasRenderableDashboardData(this)) {
+            this.applyEmptyApiState();
+          }
           if (typeof window.farmDashNotifyDataReady === "function") {
             window.farmDashNotifyDataReady();
           }
@@ -350,87 +549,8 @@ export async function tryLoadApiData() {
         return false;
       }
 
-      this.vehicles = data.vehicles || [];
-      this.economy = data.economy || {};
-      this.finance = data.finance || {};
-      this.weather = data.weather || {};
-      this.production = data.production || {};
-      this.pastures = data.pastures || [];
-      // Merged data top-level fields
-      this.mapTitle      = data.mapTitle      || null;
-      this.savegameName  = data.savegameName  || null;
-      this.dataSource    = data.dataSource    || 'unknown';
-      this.xmlAvailable  = data.xmlAvailable  || false;
-      this.luaAvailable  = data.luaAvailable  || false;
-      this.money         = data.money         || 0;
-      this.gameSettings  = data.gameSettings  || {};
-      this.husbandryData = ensureHusbandryArray(data.animals);
-
-      this.farms = ensureArray(data.farmInfo);
-      this.playerFarms = this.farms;
-      const mpFarmSwitch = this.isFarmDropdownEnabled();
-      const farmKey = `dashboard_active_farm_${String(this.activeServerId)}`;
-      let savedFarmId = mpFarmSwitch ? localStorage.getItem(farmKey) : null;
-      if (mpFarmSwitch && savedFarmId && this.farms.find(f => Number(f.id) === Number(savedFarmId))) {
-          this.activeFarmId = Number(parseInt(savedFarmId, 10));
-      } else if (this.farms.length > 0) {
-          const defaultFarm = this.farms.find(f => Number(f.id) > 0) || this.farms[0];
-          this.activeFarmId = Number(defaultFarm.id);
-      }
-      this.renderFarmDropdown();
-
-      this.allFields = data.fields || [];
-      this.fields = filterFieldsForFarmView(this.allFields, this.activeFarmId ?? 1);
-      if (this.fields.length === 0 && this.allFields.length > 0) {
-        const inferred = inferFarmIdFromFieldOwnership(this.allFields, this.farms);
-        if (inferred != null && Number(inferred) !== Number(this.activeFarmId)) {
-          this.activeFarmId = Number(inferred);
-          try {
-            localStorage.setItem(farmKey, String(inferred));
-          } catch (_) {
-            /* ignore */
-          }
-          this.fields = filterFieldsForFarmView(this.allFields, this.activeFarmId);
-          if (typeof this.renderFarmDropdown === 'function') this.renderFarmDropdown();
-        }
-      }
-
-      const husbandryBuildings = ensureHusbandryArray(data.animals);
-      if (husbandryBuildings.length > 0) {
-        const allAnimals = [];
-        husbandryBuildings.forEach((building) => {
-          const inner = getAnimalListFromBuilding(building);
-          if (!inner.length) return;
-          const ownerFarmId = building.ownerFarmId ?? building.farmId;
-          const hid = building.id ?? building.buildingId;
-          const hname = building.name;
-          inner.forEach((animal) => {
-            allAnimals.push({
-              ...animal,
-              subType: animal.subType || animal.type || animal.animalType,
-              ownerFarmId: animal.ownerFarmId ?? ownerFarmId,
-              farmId: animal.farmId ?? ownerFarmId,
-              husbandryId: animal.husbandryId ?? hid,
-              husbandryName: animal.husbandryName ?? hname,
-            });
-          });
-        });
-        const uniqueAnimals = [];
-        const seenIds = new Set();
-        allAnimals.forEach((animal) => {
-          if (!seenIds.has(animal.id)) {
-            seenIds.add(animal.id);
-            uniqueAnimals.push(animal);
-          }
-        });
-        this.animals = uniqueAnimals;
-      } else {
-        this.animals = [];
-      }
-      this.resyncRealtimeAfterBootstrap();
-      if (typeof window.farmDashNotifyDataReady === "function") {
-        window.farmDashNotifyDataReady();
-      }
+      applyApiMergedDataPayload(this, data);
+      persistBrowserMergedSnapshot(this, data);
       return true;
     }
     return false;
@@ -452,10 +572,10 @@ export function deleteStorage(key) {
 }
 
 export function clearSavedData() {
-  if (confirm("Are you sure you want to clear the saved folder data?")) {
+  if (confirm(t("apiStorage.confirmClearSavedFolder"))) {
     this.deleteStorage("livestockFolderData");
     const pathEl = document.getElementById("folder-path");
-    if (pathEl) pathEl.textContent = "No folder selected";
+    if (pathEl) pathEl.textContent = t("apiStorage.folderNoneSelected");
     const clearBtn = document.getElementById("clear-folder-btn");
     if (clearBtn) clearBtn.classList.add("d-none");
     document.getElementById("folder-selection").classList.remove("d-none");
@@ -468,10 +588,10 @@ export function clearSavedData() {
 }
 
 export function unloadData() {
-  if (confirm("Are you sure you want to unload all farm data?")) {
+  if (confirm(t("apiStorage.confirmUnloadAll"))) {
     this.deleteStorage("livestockFolderData");
     const pathEl = document.getElementById("folder-path");
-    if (pathEl) pathEl.textContent = "No folder selected";
+    if (pathEl) pathEl.textContent = t("apiStorage.folderNoneSelected");
     const clearBtn = document.getElementById("clear-folder-btn");
     if (clearBtn) clearBtn.classList.add("d-none");
     document.getElementById("main-navbar").classList.add("d-none");
@@ -542,7 +662,7 @@ export async function handleFolderSelection(event) {
   const placeablesFile = files.find((file) => file.name === "placeables.xml");
   const farmsFile = files.find((file) => file.name === "farms.xml");
   const environmentFile = files.find((file) => file.name === "environment.xml");
-  if (!animalSystemFile) { alert("animalSystem.xml not found."); return; }
+  if (!animalSystemFile) { alert(t("apiStorage.toastAnimalSystemXmlNotFound")); return; }
   const folderName = animalSystemFile.webkitRelativePath.split("/")[0];
   const pathEl = document.getElementById("folder-path");
   if (pathEl) pathEl.textContent = folderName;
@@ -642,14 +762,13 @@ export function switchFarm(farmId, event) {
     }
     if (this.updateNavbar) this.updateNavbar();
 
+    pushSimHubLiveContext(this);
+
 }
 export function openSetup() {
   if (!isFarmDashLocalConfigHost()) {
     if (this.showAlert) {
-      this.showAlert(
-        "Server and save setup is only available on the PC running Farm Dashboard.",
-        "info"
-      );
+      this.showAlert(t("apiStorage.toastServerSetupPcOnly"), "info");
     }
     return;
   }
@@ -658,4 +777,8 @@ export function openSetup() {
     return;
   }
   window.location.href = "/setup.html";
+}
+
+if (typeof window !== "undefined") {
+  window.farmDashScheduleMergedSnapshotPersist = scheduleBrowserMergedSnapshotPersist;
 }

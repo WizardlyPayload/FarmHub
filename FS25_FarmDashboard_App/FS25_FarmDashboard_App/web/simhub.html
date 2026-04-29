@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Farm Dashboard — SimHub</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.2/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.11.1/font/bootstrap-icons.min.css" />
+    <style>
+      body { min-height: 100vh; }
+      .simhub-card { border-left: 4px solid var(--bs-warning); }
+    </style>
+  </head>
+  <body class="bg-dark text-light" data-bs-theme="dark">
+    <div class="container-fluid py-3">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <h1 class="h4 mb-0"><i class="bi bi-display me-2 text-warning"></i>Farm Dashboard — SimHub</h1>
+        <span class="small text-muted" id="simhub-updated">—</span>
+      </div>
+      <div id="simhub-banner" class="alert alert-secondary py-2 d-none" role="status"></div>
+      <div id="simhub-root" class="row g-3"></div>
+    </div>
+    <script type="module" src="assests/js/simhub-page.js"></script>
+  </body>
+</html>

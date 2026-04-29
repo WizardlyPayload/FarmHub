@@ -200,9 +200,11 @@ function parseFarmlandXml(xml) {
  * groundType values: PLOWED, CULTIVATED, SOWN, DIRECT_SOWN, GRASS,
  *                    HARVEST_READY, HARVEST_READY_OTHER, HARVESTED
  */
-function parseFieldsXml(xml, farmlandOwnership, scannedFarmlands, farmlandStats) {
+function parseFieldsXml(xml, farmlandOwnership, scannedFarmlands, farmlandStats, careerSettings) {
     if (!xml) return [];
     const fields = [];
+    /** Same semantics as `rules-engine.js` `careerBool`: missing → treat periodic plough as required. */
+    const plowingRequired = !careerSettings || careerSettings.plowingRequired !== false;
     const re = /<field\s([^/>\r\n]*)\/?>/g;
     let m;
     while ((m = re.exec(xml)) !== null) {
@@ -236,7 +238,8 @@ function parseFieldsXml(xml, farmlandOwnership, scannedFarmlands, farmlandStats)
         const isWithered     = fruitType !== 'GRASS' && growthState > 0 &&
             (groundType === 'WITHERED' || (fruitType !== 'UNKNOWN' && growthState > 12));
         const isEmpty        = fruitType === 'UNKNOWN' || growthState === 0;
-        const needsWork      = weedState > 2 || limeLevel < 1 || sprayLevel < 1 || plowLevel < 1;
+        const needsPlowFlag  = plowingRequired && plowLevel < 1;
+        const needsWork      = weedState > 2 || limeLevel < 1 || sprayLevel < 1 || needsPlowFlag;
 
         // Approximate growth % (grass uses 4 stages in FS25; other crops often ~8)
         const maxGrowthEst   = fruitType === 'GRASS' ? 4 : 8;
@@ -253,7 +256,7 @@ function parseFieldsXml(xml, farmlandOwnership, scannedFarmlands, farmlandStats)
         else if (!isEmpty && weedState > 2) suggestions.push({ priority: 3, action: 'Spray or mechanical-weed — weeds are high',       type: 'maintenance' });
         if (limeLevel < 1)           suggestions.push({ priority: 4, action: 'Spread lime — pH is low',               type: 'maintenance' });
         if (sprayLevel < 1 && !isEmpty) suggestions.push({ priority: 4, action: 'Fertilize — nutrient level is low',             type: 'maintenance' });
-        if (plowLevel < 1 && isEmpty)   suggestions.push({ priority: 5, action: 'Plow or disc — primary tillage needed',            type: 'preparation' });
+        if (needsPlowFlag && isEmpty) suggestions.push({ priority: 5, action: 'Plow or disc — primary tillage needed', type: 'preparation' });
             suggestions.sort((a, b) => a.priority - b.priority);
 
         // Savegame precisionFarming.xml: soil samples / stats — drives PF UI when Lua is absent or stale.
@@ -606,7 +609,7 @@ async function collectXmlData(srv, saveSlot) {
     const career     = parseCareerSavegame(readXml(file('careerSavegame.xml')));
     const pfData     = parsePrecisionFarmingXml(readXml(file('precisionFarming.xml')));
     const farms      = parseFarmsXml(readXml(file('farms.xml')));
-    const fields     = parseFieldsXml(readXml(file('fields.xml')), farmlandOwnership, pfData.scannedFarmlands, pfData.farmlandStats);
+    const fields     = parseFieldsXml(readXml(file('fields.xml')), farmlandOwnership, pfData.scannedFarmlands, pfData.farmlandStats, career.settings);
     const environment= parseEnvironmentXml(readXml(file('environment.xml')));
     const missions   = parseMissionsXml(readXml(file('missions.xml')));
     const vehicles   = parseVehiclesXml(readXml(file('vehicles.xml')));

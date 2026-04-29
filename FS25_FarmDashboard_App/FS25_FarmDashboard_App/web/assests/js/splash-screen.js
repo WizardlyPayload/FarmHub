@@ -1,5 +1,5 @@
 /**
- * Splash: dismiss after first local /api/data merge. Does not wait for AI.
+ * Splash: dismiss after first local /api/data merge.
  * Minimum ~5s on screen (branding + progress); cap before fade from first notify.
  */
 (function () {

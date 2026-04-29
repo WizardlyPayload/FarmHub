@@ -79,13 +79,22 @@ export function getLocale() {
   return currentLocale;
 }
 
-export function t(key) {
+/**
+ * @param {string} key
+ * @param {Record<string, string | number>} [params] — replaces `{{name}}` in the resolved string
+ */
+export function t(key, params) {
   if (!catalog || !catalog.strings) return key;
   const row = catalog.strings[key];
   if (!row || typeof row !== 'object') return flatEn[key] ?? key;
-  const v = row[currentLocale] ?? row[FALLBACK];
-  if (v != null && v !== '') return v;
-  return flatEn[key] ?? key;
+  let v = row[currentLocale] ?? row[FALLBACK];
+  if (v == null || v === '') v = flatEn[key] ?? key;
+  if (params && typeof params === 'object' && typeof v === 'string') {
+    for (const [pk, pv] of Object.entries(params)) {
+      v = v.split(`{{${pk}}}`).join(String(pv));
+    }
+  }
+  return v;
 }
 
 export function applyDom(root = document) {

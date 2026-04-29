@@ -9,7 +9,7 @@
 | Doc | Use |
 |-----|-----|
 | [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md) | Architecture, data flow, key files |
-| [GEMINI_PROJECT_CONTEXT.md](./GEMINI_PROJECT_CONTEXT.md) | Full project overview for planning |
+| [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) | Full project overview for planning |
 | [USER_MANUAL.md](./USER_MANUAL.md) | Supported **3.0.0** end-user behaviour |
 
 **GitHub repo root:** `FarmHub` — [WizardlyPayload/FarmHub](https://github.com/WizardlyPayload/FarmHub). A parent folder named e.g. `MAIN CODEBASE` may **not** be the Git root; clone/work in **`FarmHub`**.

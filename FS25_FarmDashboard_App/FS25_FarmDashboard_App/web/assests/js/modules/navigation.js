@@ -15,6 +15,11 @@ function sectionHiddenMessage() {
   }
 }
 
+function fmtLandingBadge(n, oneKey, manyKey) {
+  const c = Number(n) || 0;
+  return c === 1 ? t(oneKey, { count: c }) : t(manyKey, { count: c });
+}
+
 export function setupEventListeners() {
   const folderInput = document.getElementById("folder-input");
   const clearFolderBtn = document.getElementById("clear-folder-btn");
@@ -345,9 +350,14 @@ export function showDashboard() {
 export function updateLandingPageCounts() {
   // Update livestock count
   const livestockCount = this.animals ? this.animals.length : 0;
-  document.getElementById(
-    "livestock-count"
-  ).textContent = `${livestockCount} Animals`;
+  const livestockEl = document.getElementById("livestock-count");
+  if (livestockEl) {
+    livestockEl.textContent = fmtLandingBadge(
+      livestockCount,
+      "card.badgeAnimalsOne",
+      "card.badgeAnimalsMany"
+    );
+  }
 
   // Update game time display
   const gameTimeElement = document.getElementById("game-time-display");
@@ -357,17 +367,23 @@ export function updateLandingPageCounts() {
 
   // Update vehicle count
   const vehicleCount = this.vehicles ? this.vehicles.length : 0;
-  document.getElementById(
-    "vehicle-count"
-  ).textContent = `${vehicleCount} Vehicles`;
+  const vehicleCountEl = document.getElementById("vehicle-count");
+  if (vehicleCountEl) {
+    vehicleCountEl.textContent = fmtLandingBadge(
+      vehicleCount,
+      "card.badgeVehiclesOne",
+      "card.badgeVehiclesMany"
+    );
+  }
 
   // Update field count
   const fieldCountElement = document.getElementById("field-count");
   if (fieldCountElement) {
     const fieldCount = this.fields ? this.fields.length : 0;
-    fieldCountElement.textContent = `${fieldCount} Field${
-      fieldCount !== 1 ? "s" : ""
-    }`;
+    fieldCountElement.textContent =
+      fieldCount === 1
+        ? t("fields.fieldCountOne", { count: fieldCount })
+        : t("fields.fieldCountMany", { count: fieldCount });
   }
 
   // Update pasture count (replaced property-count)
@@ -379,7 +395,12 @@ export function updateLandingPageCounts() {
       typeof this.getPasturesForActiveFarm === "function"
         ? this.getPasturesForActiveFarm()
         : this.pastures || [];
-    pastureCountElement.textContent = `${pasturesForFarm.length} Pastures`;
+    const pc = pasturesForFarm.length;
+    pastureCountElement.textContent = fmtLandingBadge(
+      pc,
+      "card.badgePasturesOne",
+      "card.badgePasturesMany"
+    );
 
     // Update warning badge on dashboard
     const totalAllWarnings = pasturesForFarm.reduce(
@@ -401,7 +422,11 @@ export function updateLandingPageCounts() {
   const productionCountEl = document.getElementById("production-count");
   if (productionCountEl && typeof this.getOwnedProductionChainCount === "function") {
     const n = this.getOwnedProductionChainCount();
-    productionCountEl.textContent = `${n} ${n === 1 ? "Chain" : "Chains"}`;
+    productionCountEl.textContent = fmtLandingBadge(
+      n,
+      "card.badgeProductionChainsOne",
+      "card.badgeProductionChainsMany"
+    );
   }
 }
 

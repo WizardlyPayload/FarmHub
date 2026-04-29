@@ -34,6 +34,7 @@
     rgba(18, 24, 20, 0.88) 100%
   );
   --vehicle-shop-thumb-fallback-bg: #121814;
+  --farm-navbar-height: 3.75rem;
 }
 
 /* --- DYNAMIC THEMING OVERRIDES --- */
@@ -67,6 +68,8 @@ body.bg-dark {
   min-height: 100vh;
   color: var(--farm-light) !important;
   letter-spacing: 0.01em;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 body.bg-dark::before {
@@ -84,13 +87,19 @@ body.bg-dark > #splash-screen {
 
 /* Navbar above main so dropdowns (e.g. farm picker) stack correctly */
 body.bg-dark > #main-navbar {
-  position: relative;
+  position: fixed;
+  inset: 0 0 auto 0;
   z-index: 1030;
 }
 
 body.bg-dark > main {
   position: relative;
   z-index: 0;
+}
+
+/* Offset scrollable content only while navbar is visible */
+body.bg-dark > #main-navbar:not(.d-none) ~ main {
+  padding-top: var(--farm-navbar-height);
 }
 
 /*
@@ -130,7 +139,7 @@ body.bg-dark > main {
 
 /* One consistent top bar on landing, livestock, and all section views */
 #main-navbar.farm-navbar-unified {
-  min-height: 3.25rem;
+  min-height: var(--farm-navbar-height);
   align-items: center;
   padding-top: 0.25rem;
   padding-bottom: 0.25rem;
@@ -1360,16 +1369,7 @@ th {
   left: 100%;
 }
 
-/* Modal z-index fixes */
-#animalDetailsModal {
-  z-index: 1080 !important; /* Higher than default Bootstrap modal z-index (1055) and pasture modal */
-}
-
-#pasturelivestock-modal {
-  z-index: 1060 !important; /* Standard modal z-index */
-}
-
-/* Unified Settings: sidebar + panes; wide dialog for AI + theme */
+/* Unified Settings: sidebar + panes; wide dialog */
 #appSettingsModal .modal-dialog.modal-xl {
   max-width: min(1140px, calc(100vw - 1rem));
   width: calc(100vw - 1rem);
@@ -1387,16 +1387,6 @@ th {
     font-size: 0.9rem;
     padding: 0.45rem 0.65rem;
   }
-}
-#aiFarmBotIntegrationKey {
-  min-width: 0;
-  flex: 1 1 auto;
-  font-size: 0.9rem;
-}
-
-/* Fields: Layer 1 rules vs Layer 2 AI consultant */
-.field-suggestion-card.field-suggestion-layer-ai {
-  box-shadow: 0 0 0 1px rgba(13, 202, 240, 0.25);
 }
 .field-suggestion-layer-rules .field-suggestion-layer-rules {
   opacity: 0.95;
@@ -1634,6 +1624,7 @@ body.farm-dash-ui.bg-dark::before {
   opacity: 1;
 }
 
+/* z-index keeps content under #main-navbar (1030); Bootstrap modals must live outside <main> or they cannot stack above the bar */
 .farm-dash-main {
   z-index: 1;
 }

@@ -3,6 +3,33 @@
 import { getAPIBaseURL } from "./apiStorage.js";
 import { t } from "../i18n/i18n.js";
 
+/** JSON may send farm ids as string or number — must match `applyApiMergedDataPayload` filtering. */
+export function vehicleMatchesActiveFarm(v, activeFarmId) {
+  const vf = Number(v?.ownerFarmId ?? v?.farmId ?? 0);
+  const af = Number(activeFarmId ?? 1);
+  return Number.isFinite(vf) && Number.isFinite(af) && vf === af;
+}
+
+/** Brand may be a string (Lua) or `{ title, name }` (XML / shop). */
+export function resolveVehicleBrandLabel(brand) {
+  if (brand == null || brand === "") return "";
+  if (typeof brand === "object") {
+    return String(
+      brand.title || brand.name || brand.label || brand.displayName || ""
+    ).trim();
+  }
+  return String(brand).trim();
+}
+
+export function resolveVehicleDisplayName(vehicle) {
+  if (!vehicle || typeof vehicle !== "object") return "—";
+  const n = String(vehicle.name ?? "").trim();
+  if (n) return n;
+  const tn = String(vehicle.typeName ?? "").trim();
+  if (tn) return tn;
+  return "—";
+}
+
 /** When local `_514_...SILOKING...1000+.png` is not shipped under items/, thumb onerror swaps to wiki. */
 const SILOKING_TRAILEDLINE_WIKI_THUMB =
   "https://farmingsimulator.wiki.gg/images/thumb/d/d6/Siloking_trailedline_4.0_system_1000%2B.png/300px-Siloking_trailedline_4.0_system_1000%2B.png";
@@ -2422,7 +2449,9 @@ export async function loadVehicles() {
       const allVehicles = await response.json();
       // Filter to only show player-owned vehicles (ownerFarmId: 1)
       this.vehicles = allVehicles
-        ? allVehicles.filter((v) => v.ownerFarmId === (window.dashboard?.activeFarmId || 1))
+        ? allVehicles.filter((v) =>
+            vehicleMatchesActiveFarm(v, window.dashboard?.activeFarmId || 1)
+          )
         : [];
       this.updateVehicleSummaryCards();
       // Re-apply dropdown/summary filters so refresh does not reset the view
@@ -2480,8 +2509,8 @@ export function renderVehicleCards(vehicles) {
     grid.innerHTML = `
       <div class="col-12 text-center py-5">
         <i class="bi bi-truck fs-1 text-muted mb-3"></i>
-        <h4 class="text-muted">No Vehicles Found</h4>
-        <p class="text-muted">No vehicles are currently available in your farm.</p>
+        <h4 class="text-muted">${t("vehicles.emptyNoneTitle")}</h4>
+        <p class="text-muted">${t("vehicles.emptyNoneBody")}</p>
       </div>
     `;
     return;
@@ -2496,8 +2525,8 @@ export function renderVehicleCards(vehicles) {
     grid.innerHTML = `
       <div class="col-12 text-center py-5">
         <i class="bi bi-truck fs-1 text-muted mb-3"></i>
-        <h4 class="text-muted">No Vehicles Found</h4>
-        <p class="text-muted">Only storage items (pallets/bigBags) are available. These are hidden from vehicle display.</p>
+        <h4 class="text-muted">${t("vehicles.emptyStorageTitle")}</h4>
+        <p class="text-muted">${t("vehicles.emptyStorageBody")}</p>
       </div>
     `;
     return;
@@ -2510,18 +2539,16 @@ export function renderVehicleCards(vehicles) {
 }
 
 export function createVehicleCard(vehicle) {
-  const brandName =
-    typeof vehicle.brand === "object"
-      ? vehicle.brand.title || vehicle.brand.name
-      : vehicle.brand;
+  const brandName = resolveVehicleBrandLabel(vehicle.brand);
   const brandImagePath =
     typeof vehicle.brand === "object" && vehicle.brand.image
       ? vehicle.brand.image
       : null;
 
   // Generate vehicle display data for CSS styling
+  const displayName = resolveVehicleDisplayName(vehicle);
   const vehicleDisplay = this.generateVehicleDisplay(
-    vehicle.name,
+    displayName,
     brandName,
     vehicle.typeName
   );
@@ -2569,10 +2596,10 @@ export function createVehicleCard(vehicle) {
               data.capacity > 0
                 ? Math.round((data.level / data.capacity) * 100)
                 : 0;
-            return `<small class="text-muted d-block">${type}: ${percentage}%</small>`;
+            return `<small class="text-muted d-block">${t("vehicles.cardCargoLine", { type, pct: percentage })}</small>`;
           })
           .join("")
-      : '<small class="text-muted">No cargo</small>';
+      : `<small class="text-muted">${t("vehicles.cardNoCargo")}</small>`;
 
   return `
     <div class="col-lg-4 col-md-6 mb-4">
@@ -2586,7 +2613,7 @@ export function createVehicleCard(vehicle) {
               ${
                 vehicleDisplay.isImage
                   ? `<div class="vehicle-display-container vehicle-shop-thumb"
-                        onclick="dashboard.showVehicleImage('${vehicleDisplay.imageUrl}', '${vehicleDisplay.displayText}', '${vehicle.brand}')">
+                        onclick="dashboard.showVehicleImage('${vehicleDisplay.imageUrl}', '${vehicleDisplay.displayText}', '${String(brandName).replace(/'/g, "\\'")}')">
                      <img class="vehicle-shop-thumb-img" src="${vehicleDisplay.imageUrl}" alt="${vehicleDisplay.displayText}"${
                        vehicleDisplay.wikiFallbackUrl
                          ? ` data-wiki-fallback="${vehicleDisplay.wikiFallbackUrl}"`
@@ -2612,12 +2639,13 @@ export function createVehicleCard(vehicle) {
               }
             </div>
             <div>
-              <h6 class="mb-0 text-truncate" style="max-width: 140px;" title="${
-                vehicle.name
-              }">
-                ${vehicle.name}
+              <h6 class="mb-0 text-truncate" style="max-width: 140px;" title="${displayName.replace(
+                /"/g,
+                "&quot;"
+              )}">
+                ${displayName}
               </h6>
-              <small class="text-muted">${brandName}</small>
+              <small class="text-muted">${brandName || "—"}</small>
             </div>
           </div>
           <i class="bi ${statusIcon} fs-5"></i>
@@ -2632,7 +2660,7 @@ export function createVehicleCard(vehicle) {
                 <div class="d-flex align-items-center">
                   <i class="bi bi-clock text-farm-accent me-2"></i>
                   <div>
-                    <small class="text-muted d-block">Operating Time</small>
+                    <small class="text-muted d-block">${t("vehicles.cardOperatingTime")}</small>
                     <strong>${this.formatOperatingTime(
                       vehicle.operatingTime || 0
                     )}</strong>
@@ -2650,7 +2678,7 @@ export function createVehicleCard(vehicle) {
             <div class="mb-3">
               <div class="d-flex justify-content-between align-items-center mb-1">
                 <small class="text-muted">
-                  <i class="bi bi-fuel-pump me-1"></i>Fuel
+                  <i class="bi bi-fuel-pump me-1"></i>${t("vehicles.cardFuel")}
                 </small>
                 <small class="text-muted">${fuelPercentage}%</small>
               </div>
@@ -2671,7 +2699,7 @@ export function createVehicleCard(vehicle) {
             <div class="mb-3">
               <div class="d-flex justify-content-between align-items-center mb-1">
                 <small class="text-muted">
-                  <i class="bi bi-wrench me-1"></i>Condition
+                  <i class="bi bi-wrench me-1"></i>${t("vehicles.cardCondition")}
                 </small>
                 <small class="text-muted">${100 - damagePercentage}%</small>
               </div>
@@ -2688,7 +2716,7 @@ export function createVehicleCard(vehicle) {
 
           <div class="mb-2">
             <small class="text-muted d-block mb-1">
-              <i class="bi bi-box me-1"></i>Cargo Status
+              <i class="bi bi-box me-1"></i>${t("vehicles.cardCargoStatus")}
             </small>
             ${fillSummary}
           </div>
@@ -2699,7 +2727,12 @@ export function createVehicleCard(vehicle) {
             <div class="mb-2">
               <small class="text-muted">
                 <i class="bi bi-link-45deg me-1"></i>
-                ${vehicle.attachedImplementsCount} implement(s) attached
+                ${t(
+                  vehicle.attachedImplementsCount === 1
+                    ? "vehicles.cardImplementsOne"
+                    : "vehicles.cardImplementsMany",
+                  { count: vehicle.attachedImplementsCount }
+                )}
               </small>
             </div>
           `
@@ -2886,7 +2919,9 @@ export function applyVehicleFilters() {
 
   // Start by filtering to only show player-owned vehicles (ownerFarmId: 1) and exclude storage items
   let filteredVehicles = [...(this.vehicles || [])].filter(
-    (v) => v.ownerFarmId === (this.activeFarmId || 1) && !this.isStorageItem(v)
+    (v) =>
+      vehicleMatchesActiveFarm(v, this.activeFarmId || 1) &&
+      !this.isStorageItem(v)
   );
 
   // Apply type filter with improved matching
@@ -2902,10 +2937,7 @@ export function applyVehicleFilters() {
       // Handle legacy/alternative mappings
       if (typeFilter === "tractor" && vehicleType === "motorized") {
         // Identify tractors within motorized vehicles
-        const brandName =
-          typeof v.brand === "object"
-            ? v.brand.title || v.brand.name
-            : v.brand;
+        const brandName = resolveVehicleBrandLabel(v.brand);
         const typeName = v.typeName || "";
         return (
           typeName.toLowerCase().includes("tractor") ||

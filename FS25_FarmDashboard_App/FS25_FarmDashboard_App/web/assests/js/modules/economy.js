@@ -1,6 +1,11 @@
 // FS25 FarmDashboard | economy.js | v2.0.0
 
 import { t } from "../i18n/i18n.js";
+import {
+  resolveVehicleBrandLabel,
+  resolveVehicleDisplayName,
+  vehicleMatchesActiveFarm,
+} from "./vehicles.js";
 
 export function showEconomySection() {
   const economyHTML = `
@@ -238,7 +243,7 @@ export function updateFinancialSummary(data) {
 
 export function calculateTotalPurchases(vehicles, targetFarmId = 1) {
   return vehicles
-    .filter((v) => v.ownerFarmId === targetFarmId) // Only count vehicles owned by the selected farm
+    .filter((v) => vehicleMatchesActiveFarm(v, targetFarmId))
     .reduce((total, vehicle) => total + (vehicle.price || 0), 0);
 }
 
@@ -248,13 +253,13 @@ export function updatePurchasesList(vehicles) {
 
   // Use the global activeFarmId instead of hardcoding 1
   const activeFarmId = window.dashboard.activeFarmId || 1;
-  const ownedVehicles = vehicles.filter((v) => v.ownerFarmId === activeFarmId);
+  const ownedVehicles = vehicles.filter((v) => vehicleMatchesActiveFarm(v, activeFarmId));
 
   if (ownedVehicles.length === 0) {
     purchasesContainer.innerHTML = `
       <div class="col-12 text-center p-5">
         <i class="bi bi-inbox text-muted" style="font-size: 3rem;"></i>
-        <p class="mt-3 text-muted">No equipment purchases found</p>
+        <p class="mt-3 text-muted">${t("economy.purchasesEmpty")}</p>
       </div>
     `;
     const preserved = this.economyPurchaseFilter || "all";
@@ -279,34 +284,34 @@ export function updatePurchasesList(vehicles) {
               <i class="bi ${this.getVehicleIcon(
                 vehicle.vehicleType
               )} text-primary"></i>
-              ${vehicle.name || "Unknown"}
+              ${resolveVehicleDisplayName(vehicle)}
             </h6>
             <span class="badge bg-primary">${
-              vehicle.brand?.title || "Unknown"
+              resolveVehicleBrandLabel(vehicle.brand) || "—"
             }</span>
           </div>
           <div class="card-body">
             <div class="row mb-2">
               <div class="col-6">
-                <small class="text-muted">Purchase Price:</small><br>
+                <small class="text-muted">${t("economy.purchasePrice")}</small><br>
                 <strong class="text-success">${this.formatCurrency(
                   vehicle.price || 0
                 )}</strong>
               </div>
               <div class="col-6">
-                <small class="text-muted">Type:</small><br>
+                <small class="text-muted">${t("economy.purchaseType")}</small><br>
                 <strong>${
-                  vehicle.typeName || vehicle.vehicleType || "Unknown"
+                  vehicle.typeName || vehicle.vehicleType || t("common.unknown")
                 }</strong>
               </div>
             </div>
             <div class="row mb-2">
               <div class="col-6">
-                <small class="text-muted">Age:</small><br>
-                <strong>${age} months</strong>
+                <small class="text-muted">${t("economy.purchaseAge")}</small><br>
+                <strong>${t("economy.purchaseAgeMonths", { months: age })}</strong>
               </div>
               <div class="col-6">
-                <small class="text-muted">Condition:</small><br>
+                <small class="text-muted">${t("economy.purchaseCondition")}</small><br>
                 <span class="badge ${condition.class}">${
       condition.text
     }</span>
@@ -316,10 +321,10 @@ export function updatePurchasesList(vehicles) {
               vehicle.operatingTime
                 ? `
               <div class="mt-2">
-                <small class="text-muted">Operating Hours:</small><br>
-                <strong>${Math.round(
-                  (vehicle.operatingTime || 0) / 3600000
-                )}h</strong>
+                <small class="text-muted">${t("economy.purchaseOperatingHours")}</small><br>
+                <strong>${t("economy.purchaseOperatingHoursVal", {
+                  hours: Math.round((vehicle.operatingTime || 0) / 3600000),
+                })}</strong>
               </div>
             `
                 : ""
@@ -1021,10 +1026,13 @@ export function createPriceCard(name, priceInfo) {
 
 export function calculateCondition(damage) {
   const condition = Math.max(0, 100 - damage * 100);
-  if (condition >= 80) return { text: "Excellent", class: "bg-success" };
-  if (condition >= 60) return { text: "Good", class: "bg-info" };
-  if (condition >= 40) return { text: "Fair", class: "bg-warning text-dark" };
-  return { text: "Poor", class: "bg-danger" };
+  if (condition >= 80)
+    return { text: t("economy.conditionExcellent"), class: "bg-success" };
+  if (condition >= 60)
+    return { text: t("economy.conditionGood"), class: "bg-info" };
+  if (condition >= 40)
+    return { text: t("economy.conditionFair"), class: "bg-warning text-dark" };
+  return { text: t("economy.conditionPoor"), class: "bg-danger" };
 }
 
 export function getVehicleIcon(type) {

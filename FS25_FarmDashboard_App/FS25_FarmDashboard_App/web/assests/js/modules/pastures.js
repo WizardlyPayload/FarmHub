@@ -1,6 +1,7 @@
 // FS25 FarmDashboard | pastures.js | v2.0.0
 
 import { t } from "../i18n/i18n.js";
+import { formatGenderLabel, fmtWeightKgStr } from "./livestock.js";
 
 /**
  * Resolve which farm a pasture belongs to: pasture row first, then any animal (REST often only had building id on parent).
@@ -2885,13 +2886,13 @@ export function renderPastureLivestockTable(animals, title) {
                                   <td>${this.formatAnimalType(
                                     animal.subType
                                   )}</td>
-                                  <td>${this.capitalize(animal.gender)}</td>
+                                  <td>${formatGenderLabel(animal.gender)}</td>
                                   <td>${t(
                                     "pastures.livestockTable.ageMonths",
                                     { age: animal.age }
                                   )}</td>
                                   <td>${healthBar}</td>
-                                  <td>${animal.weight.toFixed(1)} kg</td>
+                                  <td>${fmtWeightKgStr(animal.weight, 1)}</td>
                                   <td>$${this.calculateAnimalValue(
                                     animal
                                   ).value.toLocaleString()}</td>

@@ -2,6 +2,21 @@
 
 import { t } from "../i18n/i18n.js";
 
+export function formatGenderLabel(gender) {
+  const g = String(gender ?? "").trim().toLowerCase();
+  if (g === "male" || g === "m") return t("livestock.genderMale");
+  if (g === "female" || g === "f") return t("livestock.genderFemale");
+  return t("livestock.genderUnknown");
+}
+
+export function fmtAgeMonthsStr(m) {
+  return t("livestock.fmtAgeMonths", { months: m });
+}
+
+export function fmtWeightKgStr(w, decimals = 1) {
+  return t("livestock.fmtWeightKg", { kg: Number(w).toFixed(decimals) });
+}
+
 export function refreshAnimalData() {
   if (!this.savedFolderData || !this.savedFolderData.xmlData) {
     return;
@@ -111,38 +126,38 @@ export function renderAnimalsTable() {
       // Display RealisticLivestock ID prominently
       const animalIdDisplay = animal.id
         ? `<code class="text-info" title="RealisticLivestock ID: ${animal.id}">#${animal.id}</code>`
-        : '<code class="text-muted">N/A</code>';
+        : `<code class="text-muted">${t("common.notAvailable")}</code>`;
 
       return [
         animalIdDisplay,
-        this.formatAnimalType(animal.subType || "Unknown"),
-        `${animal.age || 0} months`,
-        this.capitalize(animal.gender || "unknown"),
+        this.formatAnimalType(animal.subType || t("common.unknown")),
+        fmtAgeMonthsStr(animal.age || 0),
+        formatGenderLabel(animal.gender),
         healthBar,
-        `${(animal.weight || 0).toFixed(1)} kg`,
+        fmtWeightKgStr(animal.weight || 0, 1),
         `$${this.calculateAnimalValue(animal).value.toLocaleString()}`,
         statusBadges.join(" ") || "-",
         this.formatLocation(
           resolveAnimalLocationLabel(animal),
           resolveAnimalLocationType(animal)
         ),
-        `<button class="btn btn-sm btn-outline-success" onclick='dashboard.showAnimalDetails(${JSON.stringify(String(animal.id))})' title="View full RealisticLivestock details">
-                    <i class="bi bi-eye me-1"></i>Details
+        `<button class="btn btn-sm btn-outline-success" onclick='dashboard.showAnimalDetails(${JSON.stringify(String(animal.id))})' title="${t("livestock.detailsBtnTitle")}">
+                    <i class="bi bi-eye me-1"></i>${t("livestock.btnDetails")}
                 </button>`,
       ];
     } catch (error) {
       // Return a safe fallback row
       return [
-        `<code class="text-muted">${animal.id || "Error"}</code>`,
-        "Unknown",
-        "0 months",
-        "Unknown",
+        `<code class="text-muted">${animal.id || t("livestock.badgeError")}</code>`,
+        t("common.unknown"),
+        fmtAgeMonthsStr(0),
+        t("common.unknown"),
         "0%",
-        "0 kg",
+        fmtWeightKgStr(0, 1),
         "$0",
-        "Error",
-        "Unknown",
-        "Error",
+        t("livestock.badgeError"),
+        t("common.unknown"),
+        t("livestock.badgeError"),
       ];
     }
   });
@@ -167,20 +182,20 @@ export function renderAnimalsTable() {
     this.dataTable = $("#animals-table").DataTable({
       data: tableData,
       columns: [
-        { title: "ID", data: 0 },
-        { title: "Type", data: 1 },
-        { title: "Age", data: 2 },
-        { title: "Gender", data: 3 },
-        { title: "Health", data: 4, orderable: false },
-        { title: "Weight", data: 5 },
-        { title: "Value", data: 6 },
-        { title: "Status", data: 7, orderable: false },
-        { title: "Location", data: 8 },
-        { title: "Actions", data: 9, orderable: false },
+        { title: t("livestock.colId"), data: 0 },
+        { title: t("livestock.colType"), data: 1 },
+        { title: t("livestock.colAge"), data: 2 },
+        { title: t("livestock.colGender"), data: 3 },
+        { title: t("livestock.colHealth"), data: 4, orderable: false },
+        { title: t("livestock.colWeight"), data: 5 },
+        { title: t("livestock.colValue"), data: 6 },
+        { title: t("livestock.colStatus"), data: 7, orderable: false },
+        { title: t("livestock.colLocation"), data: 8 },
+        { title: t("livestock.colActions"), data: 9, orderable: false },
       ],
       lengthMenu: [
         [10, 25, 50, 100, 200, 500, -1],
-        [10, 25, 50, 100, 200, 500, "All"]
+        [10, 25, 50, 100, 200, 500, t("livestock.dtAll")]
       ],
       pageLength: 25,
       responsive: true,
@@ -206,10 +221,10 @@ export function renderAnimalsTable() {
       dom: '<"d-none"B>lfrtip', 
       buttons: ["copy", "csv", "excel", "pdf", "print"],
       language: {
-        search: "Search animals:",
-        lengthMenu: "Show _MENU_ per page", // Cleaned up text so it fits the header
-        info: "Showing _START_ to _END_ of _TOTAL_ animals",
-        emptyTable: "No animals found",
+        search: t("livestock.dtSearch"),
+        lengthMenu: t("livestock.dtLengthMenu"),
+        info: t("livestock.dtInfo"),
+        emptyTable: t("livestock.dtEmpty"),
       },
       initComplete: function() {
         // --- THIS IS THE NEW TELEPORTATION LOGIC ---
@@ -319,7 +334,7 @@ function resolveAnimalLocationType(animal) {
 
 export function formatLocation(location, locationType) {
   if (!location || location === "Unknown") {
-    return '<span class="badge bg-secondary">Unknown Location</span>';
+    return `<span class="badge bg-secondary">${t("livestock.locationUnknownBadge")}</span>`;
   }
 
   // Determine badge color based on location type
@@ -378,7 +393,7 @@ export function showAnimalDetails(animalId) {
               <div class="col-md-4">
                   <div class="card bg-secondary mb-3">
                       <div class="card-header bg-info text-dark">
-                          <h6 class="mb-0"><i class="bi bi-tag-fill me-2"></i>Tag</h6>
+                          <h6 class="mb-0"><i class="bi bi-tag-fill me-2"></i>${t("livestock.modalTag")}</h6>
                       </div>
                       <div class="card-body text-center">
                           <div class="livestock-tag">
@@ -389,7 +404,7 @@ export function showAnimalDetails(animalId) {
 
                               ${
                                 animal.numAnimals
-                                  ? `<small class="text-muted d-block">Num Animals: ${animal.numAnimals}</small>`
+                                  ? `<small class="text-muted d-block">${t("livestock.labelNumAnimals")} ${animal.numAnimals}</small>`
                                   : ""
                               }
                           </div>
@@ -402,17 +417,17 @@ export function showAnimalDetails(animalId) {
                       ? `
                   <div class="card bg-secondary mb-3">
                       <div class="card-header">
-                          <h6 class="mb-0"><i class="bi bi-people-fill me-2"></i>Family</h6>
+                          <h6 class="mb-0"><i class="bi bi-people-fill me-2"></i>${t("livestock.modalFamily")}</h6>
                       </div>
                       <div class="card-body">
                           ${
                             animal.motherId && animal.motherId !== -1
-                              ? `<p class="mb-1"><strong>Mother ID:</strong> <code>#${animal.motherId}</code></p>`
+                              ? `<p class="mb-1"><strong>${t("livestock.labelMotherId")}</strong> <code>#${animal.motherId}</code></p>`
                               : ""
                           }
                           ${
                             animal.fatherId && animal.fatherId !== -1
-                              ? `<p class="mb-1"><strong>Father ID:</strong> <code>#${animal.fatherId}</code></p>`
+                              ? `<p class="mb-1"><strong>${t("livestock.labelFatherId")}</strong> <code>#${animal.fatherId}</code></p>`
                               : ""
                           }
                       </div>
@@ -427,23 +442,23 @@ export function showAnimalDetails(animalId) {
                       <div class="col-md-6">
                           <div class="card bg-secondary mb-3">
                               <div class="card-header">
-                                  <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>Basic Information</h6>
+                                  <h6 class="mb-0"><i class="bi bi-info-circle me-2"></i>${t("livestock.modalBasicInfo")}</h6>
                               </div>
                               <div class="card-body">
                                   <table class="table table-sm table-borderless table-dark text-light">
-                                      <tr><td><strong>Name:</strong></td><td>${
-                                        animal.name || `Animal #${animal.id}`
+                                      <tr><td><strong>${t("livestock.labelName")}</strong></td><td>${
+                                        animal.name || t("livestock.nameFallback", { id: animal.id })
                                       }</td></tr>
-                                      <tr><td><strong>Type:</strong></td><td>${this.formatAnimalType(
+                                      <tr><td><strong>${t("livestock.labelType")}</strong></td><td>${this.formatAnimalType(
                                         animal.subType
                                       )}</td></tr>
-                                      <tr><td><strong>Gender:</strong></td><td>${this.capitalize(
+                                      <tr><td><strong>${t("livestock.labelGender")}</strong></td><td>${formatGenderLabel(
                                         animal.gender
                                       )}</td></tr>
-                                      <tr><td><strong>Age:</strong></td><td>${
+                                      <tr><td><strong>${t("livestock.labelAge")}</strong></td><td>${fmtAgeMonthsStr(
                                         animal.age || 0
-                                      } months</td></tr>
-                                      <tr><td><strong>Location:</strong></td><td>${
+                                      )}</td></tr>
+                                      <tr><td><strong>${t("livestock.labelLocation")}</strong></td><td>${
                                         resolveAnimalLocationLabel(animal)
                                       }</td></tr>
                                   </table>
@@ -454,17 +469,18 @@ export function showAnimalDetails(animalId) {
                       <div class="col-md-6">
                           <div class="card bg-secondary mb-3">
                               <div class="card-header">
-                                  <h6 class="mb-0"><i class="bi bi-heart-pulse me-2"></i>Health & Physical</h6>
+                                  <h6 class="mb-0"><i class="bi bi-heart-pulse me-2"></i>${t("livestock.modalHealthPhysical")}</h6>
                               </div>
                               <div class="card-body">
                                   <table class="table table-sm table-borderless table-dark text-light">
-                                      <tr><td><strong>Health:</strong></td><td>${Math.round(
+                                      <tr><td><strong>${t("livestock.labelHealth")}</strong></td><td>${Math.round(
                                         animal.health || 0
                                       )}%</td></tr>
-                                      <tr><td><strong>Weight:</strong></td><td>${(
-                                        animal.weight || 0
-                                      ).toFixed(0)} kg</td></tr>
-                                      <tr><td><strong>Reproduction:</strong></td><td>${(animal.reproduction &&
+                                      <tr><td><strong>${t("livestock.labelWeight")}</strong></td><td>${fmtWeightKgStr(
+                                        animal.weight || 0,
+                                        0
+                                      )}</td></tr>
+                                      <tr><td><strong>${t("livestock.labelReproduction")}</strong></td><td>${(animal.reproduction &&
                                       !isNaN(animal.reproduction)
                                         ? animal.reproduction
                                         : animal.genetics &&
@@ -485,34 +501,34 @@ export function showAnimalDetails(animalId) {
               <div class="col-md-12">
                   <div class="card bg-secondary mb-3">
                       <div class="card-header bg-farm-accent">
-                          <h6 class="mb-0"><i class="bi bi-geo-alt me-2"></i>Reproduction Data</h6>
+                          <h6 class="mb-0"><i class="bi bi-geo-alt me-2"></i>${t("livestock.modalReproductionData")}</h6>
                       </div>
                       <div class="card-body">
                           <div class="row">
                               <div class="col-md-6">
                                   <table class="table table-sm table-borderless table-dark text-light">
-                                      <tr><td><strong>Is Parent:</strong></td><td>
+                                      <tr><td><strong>${t("livestock.labelIsParent")}</strong></td><td>
                                           ${
                                             animal.isParent
-                                              ? '<span class="badge bg-success">Yes</span>'
-                                              : '<span class="badge bg-secondary">No</span>'
+                                              ? `<span class="badge bg-success">${t("common.yes")}</span>`
+                                              : `<span class="badge bg-secondary">${t("common.no")}</span>`
                                           }
                                       </td></tr>
-                                      <tr><td><strong>Is Pregnant:</strong></td><td>
+                                      <tr><td><strong>${t("livestock.labelIsPregnant")}</strong></td><td>
                                           ${
                                             animal.isPregnant
-                                              ? '<span class="badge bg-warning text-dark">Yes</span>'
-                                              : '<span class="badge bg-secondary">No</span>'
+                                              ? `<span class="badge bg-warning text-dark">${t("common.yes")}</span>`
+                                              : `<span class="badge bg-secondary">${t("common.no")}</span>`
                                           }
                                       </td></tr>
-                                      <tr><td><strong>Is Lactating:</strong></td><td>
+                                      <tr><td><strong>${t("livestock.labelIsLactating")}</strong></td><td>
                                           ${
                                             animal.isLactating
-                                              ? '<span class="badge bg-info">Yes</span>'
-                                              : '<span class="badge bg-secondary">No</span>'
+                                              ? `<span class="badge bg-info">${t("common.yes")}</span>`
+                                              : `<span class="badge bg-secondary">${t("common.no")}</span>`
                                           }
                                       </td></tr>
-                                      <tr><td><strong>Reproduction Rate:</strong></td><td>
+                                      <tr><td><strong>${t("livestock.labelReproductionRate")}</strong></td><td>
                                           <div class="progress" style="height: 20px;">
                                               <div class="progress-bar bg-farm-success" role="progressbar"
                                                    style="width: ${
@@ -549,15 +565,15 @@ export function showAnimalDetails(animalId) {
                                               </div>
                                           </div>
                                       </td></tr>
-                                      <tr><td><strong>Months Since Birth:</strong></td><td>
+                                      <tr><td><strong>${t("livestock.labelMonthsSinceBirth")}</strong></td><td>
                                           ${
                                             animal.monthsSinceLastBirth !==
                                             undefined
-                                              ? animal.monthsSinceLastBirth
-                                              : "N/A"
-                                          } ${
-    animal.monthsSinceLastBirth !== undefined ? "months" : ""
-  }
+                                              ? fmtAgeMonthsStr(
+                                                  animal.monthsSinceLastBirth
+                                                )
+                                              : t("common.notAvailable")
+                                          }
                                       </td></tr>
                                   </table>
                               </div>
@@ -571,17 +587,17 @@ export function showAnimalDetails(animalId) {
                                       ${
                                         animal.impregnatedBy &&
                                         animal.impregnatedBy !== -1
-                                          ? `<tr><td><strong>Impregnated By:</strong></td><td><code class="text-warning">#${animal.impregnatedBy}</code></td></tr>`
+                                          ? `<tr><td><strong>${t("livestock.labelImpregnatedBy")}</strong></td><td><code class="text-warning">#${animal.impregnatedBy}</code></td></tr>`
                                           : ""
                                       }
                                       ${
                                         animal.pregnancyDuration
-                                          ? `<tr><td><strong>Pregnancy Duration:</strong></td><td>${animal.pregnancyDuration} days</td></tr>`
+                                          ? `<tr><td><strong>${t("livestock.labelPregnancyDuration")}</strong></td><td>${t("livestock.durationDays", { days: animal.pregnancyDuration })}</td></tr>`
                                           : ""
                                       }
                                       ${
                                         animal.offspring
-                                          ? `<tr><td><strong>Expected Offspring:</strong></td><td>${animal.offspring}</td></tr>`
+                                          ? `<tr><td><strong>${t("livestock.labelExpectedOffspring")}</strong></td><td>${animal.offspring}</td></tr>`
                                           : ""
                                       }
                                   </table>
@@ -592,10 +608,10 @@ export function showAnimalDetails(animalId) {
                               ? `
                           <div class="row mt-3">
                               <div class="col-12">
-                                  <h6 class="text-farm-accent"><i class="bi bi-dna me-1"></i>Genetics</h6>
+                                  <h6 class="text-farm-accent"><i class="bi bi-dna me-1"></i>${t("livestock.geneticsHeading")}</h6>
                                   <div class="row">
                                       <div class="col">
-                                          <small class="text-muted">Health</small>
+                                          <small class="text-muted">${t("livestock.geneticsShortHealth")}</small>
                                           <div class="mb-2" style="height: 15px;">
                                               <div class="text-info mb-3" style="width: ${
                                                 (animal.genetics.health ||
@@ -609,7 +625,7 @@ export function showAnimalDetails(animalId) {
                                           </div>
                                       </div>
                                       <div class="col">
-                                          <small class="text-muted">Fertility</small>
+                                          <small class="text-muted">${t("livestock.geneticsShortFertility")}</small>
                                           <div class="mb-2" style="height: 15px;">
                                               <div class="text-info mb-3" style="width: ${
                                                 (animal.genetics.fertility ||
@@ -623,7 +639,7 @@ export function showAnimalDetails(animalId) {
                                           </div>
                                       </div>
                                       <div class="col">
-                                          <small class="text-muted">Productivity</small>
+                                          <small class="text-muted">${t("livestock.geneticsShortProductivity")}</small>
                                           <div class="mb-2" style="height: 15px;">
                                               <div class="text-info mb-3" style="width: ${
                                                 (animal.genetics
@@ -637,7 +653,7 @@ export function showAnimalDetails(animalId) {
                                           </div>
                                       </div>
                                       <div class="col">
-                                          <small class="text-muted">Quality</small>
+                                          <small class="text-muted">${t("livestock.geneticsShortQuality")}</small>
                                           <div class="mb-2" style="height: 15px;">
                                               <div class="text-info mb-3" style="width: ${
                                                 (animal.genetics.quality ||
@@ -664,7 +680,7 @@ export function showAnimalDetails(animalId) {
               <div class="col-md-12">
                   <div class="card bg-secondary mb-3">
                       <div class="card-header">
-                          <h6 class="mb-0"><i class="bi bi-currency-dollar me-2"></i>Livestock Value</h6>
+                          <h6 class="mb-0"><i class="bi bi-currency-dollar me-2"></i>${t("livestock.modalLivestockValue")}</h6>
                       </div>
                       <div class="card-body">
                           ${this.generateAnimalValueDisplay(animal)}
@@ -713,22 +729,22 @@ export function exportData(format) {
 
   // Prepare data for export
   const exportData = this.animals.map((animal) => ({
-    Name: animal.name || `Animal #${animal.id}`,
+    Name: animal.name || t("livestock.nameFallback", { id: animal.id }),
     Type: this.formatAnimalType(animal.subType),
-    Age: `${animal.age} months`,
-    Gender: this.capitalize(animal.gender),
+    Age: fmtAgeMonthsStr(animal.age),
+    Gender: formatGenderLabel(animal.gender),
     Health: `${Math.round(animal.health)}%`,
-    Weight: `${animal.weight.toFixed(1)} kg`,
+    Weight: fmtWeightKgStr(animal.weight, 1),
     Value: `$${this.calculateAnimalValue(animal).value.toLocaleString()}`,
     Status:
       [
-        animal.health === 0 ? "Error" : "",
-        animal.isPregnant ? "Pregnant" : "",
-        animal.isLactating ? "Lactating" : "",
-        animal.isParent ? "Parent" : "",
+        animal.health === 0 ? t("livestock.badgeError") : "",
+        animal.isPregnant ? t("livestock.badgePregnant") : "",
+        animal.isLactating ? t("livestock.badgeLactating") : "",
+        animal.isParent ? t("livestock.badgeParent") : "",
       ]
         .filter((s) => s)
-        .join(", ") || "Normal",
+        .join(", ") || t("livestock.exportStatusNormal"),
     Location: resolveAnimalLocationLabel(animal),
     "Farm ID": animal.farmId,
     "Animal ID": animal.id,
@@ -755,7 +771,7 @@ export function exportData(format) {
   }
 
   this.showSuccessMessage(
-    `Export started in ${format.toUpperCase()} format!`
+    t("livestock.exportStarted", { format: format.toUpperCase() })
   );
 }
 
@@ -825,15 +841,15 @@ export function filterAnimals(filterType, silentRefresh) {
       return [
         `<code class="text-muted">${animal.id}</code>`,
         this.formatAnimalType(animal.subType),
-        `${animal.age} months`,
-        this.capitalize(animal.gender),
+        fmtAgeMonthsStr(animal.age),
+        formatGenderLabel(animal.gender),
         healthBar,
-        `${animal.weight.toFixed(1)} kg`,
+        fmtWeightKgStr(animal.weight, 1),
         `$${this.calculateAnimalValue(animal).value.toLocaleString()}`,
         statusBadges.join(" ") || "-",
         this.formatLocation(resolveAnimalLocationLabel(animal), resolveAnimalLocationType(animal)),
         `<button class="btn btn-sm btn-outline-success" onclick='dashboard.showAnimalDetails(${JSON.stringify(String(animal.id))})'>
-                      <i class="bi bi-eye me-1"></i>Details
+                      <i class="bi bi-eye me-1"></i>${t("livestock.btnDetails")}
                   </button>`,
       ];
     });
@@ -929,7 +945,7 @@ export function resetFilters() {
   // Apply filters (which will show all animals)
   this.applyFilters();
 
-  this.showSuccessMessage("All filters cleared");
+  this.showSuccessMessage(t("livestock.filtersCleared"));
 }
 
 export function applyFilters(isSliderChange = false) {
@@ -1234,20 +1250,19 @@ export function getPregnancyDetails(animal) {
     Math.round(gestationMonths * (1 - pregnancyProgress))
   );
 
-  let dueDateText = "Unknown";
+  let dueDateText = t("common.unknown");
   if (monthsRemaining === 0) {
-    dueDateText =
-      '<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>Due Soon</span>';
+    dueDateText = `<span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i>${t("livestock.pregnancyDueSoon")}</span>`;
   } else if (monthsRemaining === 1) {
-    dueDateText = `~${monthsRemaining} month`;
+    dueDateText = t("livestock.fmtApproxOneMonth", { n: monthsRemaining });
   } else {
-    dueDateText = `~${monthsRemaining} months`;
+    dueDateText = t("livestock.fmtApproxMonths", { n: monthsRemaining });
   }
 
   return `
-          <tr><td><strong>Est. Due Date:</strong></td><td>${dueDateText}</td></tr>
-          <tr><td><strong>Expected Count:</strong></td><td>${expectedCount}</td></tr>
-          <tr><td><strong>Pregnancy Progress:</strong></td><td>${(
+          <tr><td><strong>${t("livestock.labelEstDueDate")}</strong></td><td>${dueDateText}</td></tr>
+          <tr><td><strong>${t("livestock.labelExpectedCount")}</strong></td><td>${expectedCount}</td></tr>
+          <tr><td><strong>${t("livestock.labelPregnancyProgress")}</strong></td><td>${(
             pregnancyProgress * 100
           ).toFixed(0)}%</td></tr>
       `;
@@ -1289,15 +1304,15 @@ export function updateTableWithFilteredAnimals(filteredAnimals) {
     return [
       `<code class="text-muted">${animal.id}</code>`,
       this.formatAnimalType(animal.subType),
-      `${animal.age} months`,
-      this.capitalize(animal.gender),
+      fmtAgeMonthsStr(animal.age),
+      formatGenderLabel(animal.gender),
       healthBar,
-      `${animal.weight.toFixed(1)} kg`,
+      fmtWeightKgStr(animal.weight, 1),
       `$${this.calculateAnimalValue(animal).value.toLocaleString()}`,
       statusBadges.join(" ") || "-",
       this.formatLocation(resolveAnimalLocationLabel(animal), resolveAnimalLocationType(animal)),
       `<button class="btn btn-sm btn-outline-success" onclick='dashboard.showAnimalDetails(${JSON.stringify(String(animal.id))})'>
-                  <i class="bi bi-eye me-1"></i>Details
+                  <i class="bi bi-eye me-1"></i>${t("livestock.btnDetails")}
               </button>`,
     ];
   });
@@ -1319,16 +1334,23 @@ export function updateActiveFiltersDisplay() {
     this.activeFilters.ageMin !== null ||
     this.activeFilters.ageMax !== null
   ) {
-    let ageText = "Age: ";
+    let ageText = "";
     if (
       this.activeFilters.ageMin !== null &&
       this.activeFilters.ageMax !== null
     ) {
-      ageText += `${this.activeFilters.ageMin}-${this.activeFilters.ageMax} months`;
+      ageText = t("livestock.filterChipAgeBetween", {
+        min: this.activeFilters.ageMin,
+        max: this.activeFilters.ageMax,
+      });
     } else if (this.activeFilters.ageMin !== null) {
-      ageText += `≥${this.activeFilters.ageMin} months`;
+      ageText = t("livestock.filterChipAgeMin", {
+        min: this.activeFilters.ageMin,
+      });
     } else {
-      ageText += `≤${this.activeFilters.ageMax} months`;
+      ageText = t("livestock.filterChipAgeMax", {
+        max: this.activeFilters.ageMax,
+      });
     }
     filterDisplays.push(
       `<span class="badge bg-farm-primary me-1">${ageText}</span>`
@@ -1340,16 +1362,23 @@ export function updateActiveFiltersDisplay() {
     this.activeFilters.weightMin !== null ||
     this.activeFilters.weightMax !== null
   ) {
-    let weightText = "Weight: ";
+    let weightText = "";
     if (
       this.activeFilters.weightMin !== null &&
       this.activeFilters.weightMax !== null
     ) {
-      weightText += `${this.activeFilters.weightMin}-${this.activeFilters.weightMax} kg`;
+      weightText = t("livestock.filterChipWeightBetween", {
+        min: this.activeFilters.weightMin,
+        max: this.activeFilters.weightMax,
+      });
     } else if (this.activeFilters.weightMin !== null) {
-      weightText += `≥${this.activeFilters.weightMin} kg`;
+      weightText = t("livestock.filterChipWeightMin", {
+        min: this.activeFilters.weightMin,
+      });
     } else {
-      weightText += `≤${this.activeFilters.weightMax} kg`;
+      weightText = t("livestock.filterChipWeightMax", {
+        max: this.activeFilters.weightMax,
+      });
     }
     filterDisplays.push(
       `<span class="badge bg-farm-primary me-1">${weightText}</span>`
@@ -1358,19 +1387,13 @@ export function updateActiveFiltersDisplay() {
 
   // Animal type filter
   if (this.activeFilters.animalType !== null) {
-    const typeNames = {
-      COW: "Cows",
-      BULL: "Bulls",
-      SHEEP: "Sheep",
-      PIG: "Pigs",
-      CHICKEN: "Chickens",
-      HORSE: "Horses",
-    };
+    const typeKey = `livestock.animalType${this.activeFilters.animalType}`;
     const typeName =
-      typeNames[this.activeFilters.animalType] ||
-      this.activeFilters.animalType;
+      t(typeKey) !== typeKey
+        ? t(typeKey)
+        : this.activeFilters.animalType;
     filterDisplays.push(
-      `<span class="badge bg-farm-secondary me-1">Type: ${typeName}</span>`
+      `<span class="badge bg-farm-secondary me-1">${t("livestock.filterChipType", { type: typeName })}</span>`
     );
   }
 
@@ -1382,9 +1405,18 @@ export function updateActiveFiltersDisplay() {
     "quality",
     "productivity",
   ];
+  const geneticsLabelKey = {
+    health: "livestock.geneticsFilterHealth",
+    metabolism: "livestock.geneticsFilterMetabolism",
+    fertility: "livestock.geneticsFilterFertility",
+    quality: "livestock.geneticsFilterQuality",
+    productivity: "livestock.geneticsFilterProductivity",
+  };
   geneticsFilters.forEach((filter) => {
     if (this.activeFilters[filter]) {
-      const displayName = filter.charAt(0).toUpperCase() + filter.slice(1);
+      const displayName = t(
+        geneticsLabelKey[filter] || `livestock.geneticsFilter${filter}`
+      );
       const rating = this.activeFilters[filter]
         .replace("-", " ")
         .replace(/\b\w/g, (l) => l.toUpperCase());
@@ -1769,20 +1801,20 @@ export function generateAnimalValueDisplay(animal) {
               <div class="col-md-4">
                   <div class="text-center">
                       <h4 class="text-success mb-2">$${valueInfo.value.toLocaleString()}</h4>
-                      <small class="text-muted">Estimated Market Value<br>Value is not final</small>
+                      <small class="text-muted">${t("livestock.valueEstimatedTitle")}<br>${t("livestock.valueDisclaimer")}</small>
                   </div>
               </div>
               <div class="col-md-8">
-                  <h6 class="text-info mb-3">Value Calculation Breakdown:</h6>
+                  <h6 class="text-info mb-3">${t("livestock.valueBreakdownTitle")}</h6>
                   <table class="table table-sm table-borderless table-dark text-light">
                       <tr>
-                          <td><strong>Base Value (${
-                            breakdown.animalType
-                          }):</strong></td>
+                          <td><strong>${t("livestock.valueBaseValue", {
+                            type: breakdown.animalType,
+                          })}</strong></td>
                           <td class="text-end">$${breakdown.baseValue.toLocaleString()}</td>
                       </tr>
                       <tr>
-                          <td><strong>Age Factor:</strong></td>
+                          <td><strong>${t("livestock.valueAgeFactor")}</strong></td>
                           <td class="text-end">${(
                             breakdown.ageFactor * 100
                           ).toFixed(0)}% (${this.getAgeDescription(
@@ -1790,15 +1822,15 @@ export function generateAnimalValueDisplay(animal) {
   )})</td>
                       </tr>
                       <tr>
-                          <td><strong>Health Factor:</strong></td>
+                          <td><strong>${t("livestock.valueHealthFactor")}</strong></td>
                           <td class="text-end">${(
                             breakdown.healthFactor * 100
-                          ).toFixed(0)}% (${Math.round(
-    animal.health
-  )}% health)</td>
+                          ).toFixed(0)}% (${t("livestock.valueHealthPct", {
+    pct: Math.round(animal.health),
+  })})</td>
                       </tr>
                       <tr>
-                          <td><strong>Genetics Factor:</strong></td>
+                          <td><strong>${t("livestock.valueGeneticsFactor")}</strong></td>
                           <td class="text-end">${breakdown.geneticsFactor.toFixed(
                             2
                           )}x (${this.getGeneticsDescription(
@@ -1806,7 +1838,7 @@ export function generateAnimalValueDisplay(animal) {
   )})</td>
                       </tr>
                       <tr>
-                          <td><strong>Reproduction Factor:</strong></td>
+                          <td><strong>${t("livestock.valueReproductionFactor")}</strong></td>
                           <td class="text-end">${(
                             breakdown.reproductionFactor * 100
                           ).toFixed(0)}% (${this.getReproductionDescription(
@@ -1817,12 +1849,13 @@ export function generateAnimalValueDisplay(animal) {
                         breakdown.weightFactor !== 1.0
                           ? `
                       <tr>
-                          <td><strong>Weight Factor:</strong></td>
+                          <td><strong>${t("livestock.valueWeightFactor")}</strong></td>
                           <td class="text-end">${(
                             breakdown.weightFactor * 100
-                          ).toFixed(0)}% (${
-                              animal.weight?.toFixed(2) || 0
-                            } kg)</td>
+                          ).toFixed(0)}% (${fmtWeightKgStr(
+                              animal.weight || 0,
+                              2
+                            )})</td>
                       </tr>
                       `
                           : ""
@@ -1830,7 +1863,7 @@ export function generateAnimalValueDisplay(animal) {
                   </table>
                   <hr class="my-2">
                   <div class="d-flex justify-content-between">
-                      <strong>Estimated Final Value:</strong>
+                      <strong>${t("livestock.valueEstimatedFinal")}</strong>
                       <strong class="text-success">$${valueInfo.value.toLocaleString()}</strong>
                   </div>
               </div>
@@ -1839,14 +1872,14 @@ export function generateAnimalValueDisplay(animal) {
 }
 
 export function getAgeDescription(age) {
-  if (age < 6) return "Very Young";
-  if (age < 12) return "Young";
-  if (age < 120) return "Mature";
-  return "Old";
+  if (age < 6) return t("livestock.ageDescVeryYoung");
+  if (age < 12) return t("livestock.ageDescYoung");
+  if (age < 120) return t("livestock.ageDescMature");
+  return t("livestock.ageDescOld");
 }
 
 export function getGeneticsDescription(genetics) {
-  if (!genetics) return "Unknown";
+  if (!genetics) return t("livestock.geneticsDescUnknown");
   const avg =
     (genetics.health +
       genetics.metabolism +
@@ -1854,23 +1887,25 @@ export function getGeneticsDescription(genetics) {
       genetics.quality +
       genetics.productivity) /
     5;
-  if (avg > 1.8) return "Excellent";
-  if (avg > 1.6) return "Good";
-  if (avg > 1.4) return "Average";
-  if (avg > 1.2) return "Below Average";
-  return "Poor";
+  if (avg > 1.8) return t("livestock.geneticsDescExcellent");
+  if (avg > 1.6) return t("livestock.geneticsDescGood");
+  if (avg > 1.4) return t("livestock.geneticsDescAverage");
+  if (avg > 1.2) return t("livestock.geneticsDescBelowAverage");
+  return t("livestock.geneticsDescPoor");
 }
 
 export function getReproductionDescription(animal) {
   const descriptions = [];
   if (animal.isPregnant === "true" || animal.isPregnant === true) {
-    descriptions.push("Pregnant");
+    descriptions.push(t("livestock.reproDescPregnant"));
   }
   if (animal.isParent === "true" || animal.isParent === true) {
-    descriptions.push("Breeding Stock");
+    descriptions.push(t("livestock.reproDescBreedingStock"));
   }
   if (animal.isLactating === "true" || animal.isLactating === true) {
-    descriptions.push("Lactating");
+    descriptions.push(t("livestock.reproDescLactating"));
   }
-  return descriptions.length > 0 ? descriptions.join(", ") : "Standard";
+  return descriptions.length > 0
+    ? descriptions.join(", ")
+    : t("livestock.reproDescStandard");
 }

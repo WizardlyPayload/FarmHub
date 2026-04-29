@@ -103,30 +103,20 @@ function getAnimalListFromBuilding(building) {
   return [];
 }
 
-/**
- * Active server for `/api/*` calls.
- * Prefer localStorage first: `dashboard` exists immediately but `activeServerId` is set async in
- * loadServersAndTabs(), so early RealtimeConnector polls used no serverId → wrong merged snapshot,
- * especially visible on FTP/server saves (first server in backend order ≠ last selected tab).
- */
+/** Active server for `/api/*` calls (fetch shim + WS filter). */
 function resolveServerIdForApiFetch() {
   try {
+    const fromDash = window.dashboard?.activeServerId;
+    if (fromDash != null && String(fromDash).trim() !== "") return String(fromDash).trim();
     const fromLs =
       typeof localStorage !== "undefined"
         ? localStorage.getItem("dashboard_active_server")
         : null;
     if (fromLs != null && String(fromLs).trim() !== "") return String(fromLs).trim();
-    const fromDash = window.dashboard?.activeServerId;
-    if (fromDash != null && String(fromDash).trim() !== "") return String(fromDash).trim();
   } catch (_) {
     /* ignore */
   }
   return "";
-}
-
-/** RealtimeConnector HTTP polling appends ?serverId= explicitly; uses same resolver as fetch shim. */
-if (typeof window !== "undefined") {
-  window.__farmdashResolveServerIdForApi = resolveServerIdForApiFetch;
 }
 
 const originalFetch = window.fetch;
@@ -285,18 +275,6 @@ export async function switchServer(serverId) {
  * This aligns startup behavior with the manual "switch server/save" path that reliably populates Home cards.
  */
 export async function refreshActiveServerData() {
-  if (!this.activeServerId) {
-    try {
-      const ls =
-        typeof localStorage !== "undefined" ? localStorage.getItem("dashboard_active_server") : null;
-      if (ls != null && String(ls).trim() !== "") {
-        const m = (this.availableServers || []).find((s) => sameServerId(s.id, ls));
-        this.activeServerId = m ? m.id : ls;
-      }
-    } catch (_) {
-      /* ignore */
-    }
-  }
   if (!this.activeServerId) return false;
   const ok = await this.tryLoadApiData();
   if (!ok) return false;
@@ -392,7 +370,6 @@ export async function checkAPIAvailability() {
     const earlyLiveServer = await hydrateFromFirstServerWithData(this, preferredServerId);
     if (earlyLiveServer) {
       showDashboardOrFallback(this);
-      await this.refreshActiveServerData();
       if (typeof window.farmDashNotifyDataReady === "function") {
         window.farmDashNotifyDataReady();
       }
@@ -419,13 +396,11 @@ export async function checkAPIAvailability() {
       const loaded = await this.tryLoadApiData();
       if (loaded) {
         showDashboardOrFallback(this);
-        await this.refreshActiveServerData();
         return;
       }
       const switchedToLiveServer = await hydrateFromFirstServerWithData(this, preferredServerId);
       if (switchedToLiveServer) {
         showDashboardOrFallback(this);
-        await this.refreshActiveServerData();
         return;
       }
       if (hasRenderableDashboardData(this)) {
@@ -584,6 +559,7 @@ export function scheduleBrowserMergedSnapshotPersist(dashboard, data) {
 export function applyApiMergedDataPayload(dashboard, data) {
   if (!dashboard || !data || data.error) return;
 
+  dashboard.vehicles = data.vehicles || [];
   dashboard.economy = data.economy || {};
   dashboard.finance = data.finance || {};
   dashboard.weather = data.weather || {};
@@ -625,15 +601,6 @@ export function applyApiMergedDataPayload(dashboard, data) {
       dashboard.fields = filterFieldsForFarmView(dashboard.allFields, dashboard.activeFarmId);
       if (typeof dashboard.renderFarmDropdown === "function") dashboard.renderFarmDropdown();
     }
-  }
-
-  const vehicleList = ensureArray(data.vehicles);
-  dashboard._allVehiclesMerged = vehicleList;
-  {
-    const afv = Number(dashboard.activeFarmId ?? 1);
-    dashboard.vehicles = vehicleList.filter(
-      (v) => Number(v?.ownerFarmId ?? v?.farmId ?? 0) === afv
-    );
   }
 
   const husbandryBuildings = ensureHusbandryArray(data.animals);
@@ -678,18 +645,6 @@ export function applyApiMergedDataPayload(dashboard, data) {
 
 export async function tryLoadApiData() {
   try {
-    if (!this.activeServerId) {
-      try {
-        const ls =
-          typeof localStorage !== "undefined" ? localStorage.getItem("dashboard_active_server") : null;
-        if (ls != null && String(ls).trim() !== "") {
-          const m = (this.availableServers || []).find((s) => sameServerId(s.id, ls));
-          this.activeServerId = m ? m.id : ls;
-        }
-      } catch (_) {
-        /* ignore */
-      }
-    }
     if (!this.activeServerId) return false;
     const apiBaseURL = this.getAPIBaseURL();
     const response = await fetch(`${apiBaseURL}/api/data`);
@@ -953,10 +908,6 @@ export function switchFarm(farmId, event) {
 
     if (this.realtimeConnector?.updateAnimalsData && this.husbandryData) {
         this.realtimeConnector.updateAnimalsData(this.husbandryData);
-    }
-
-    if (this.realtimeConnector?.updateVehiclesData && Array.isArray(this._allVehiclesMerged)) {
-        this.realtimeConnector.updateVehiclesData(this._allVehiclesMerged);
     }
 
     if (this.allFields && this.allFields.length) {

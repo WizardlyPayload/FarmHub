@@ -9,31 +9,6 @@ const VERBOSE_CHANGE_LOG = false;
  * Animal lists are filtered by selected farm. Switching farm/server/save replaces the list — not the same as animals leaving the map.
  * Skip add/remove toasts when the dashboard view context changed since the last payload.
  */
-function resolveServerIdForHttpPoll(dashboard) {
-  try {
-    if (
-      typeof window !== "undefined" &&
-      typeof window.__farmdashResolveServerIdForApi === "function"
-    ) {
-      const sid = window.__farmdashResolveServerIdForApi();
-      if (sid != null && String(sid).trim() !== "") return String(sid).trim();
-    }
-  } catch (_) {
-    /* ignore */
-  }
-  try {
-    if (typeof localStorage !== "undefined") {
-      const fromLs = localStorage.getItem("dashboard_active_server");
-      if (fromLs != null && String(fromLs).trim() !== "") return String(fromLs).trim();
-    }
-  } catch (_) {
-    /* ignore */
-  }
-  const fromDash = dashboard?.activeServerId;
-  if (fromDash != null && String(fromDash).trim() !== "") return String(fromDash).trim();
-  return "";
-}
-
 function shouldSkipLivestockChangeToasts(oldState, dashboard) {
   if (!oldState || !dashboard) return false;
   const hadCtx =
@@ -221,9 +196,7 @@ class RealtimeConnector {
 
     const self = this;
     this._httpPollData = function (bypassPayloadDedupe) {
-      const sid = resolveServerIdForHttpPoll(self.dashboard);
-      const q = sid ? `?serverId=${encodeURIComponent(sid)}` : "";
-      fetch(`${self.httpEndpoint}/api/data${q}`)
+      fetch(`${self.httpEndpoint}/api/data`)
         .then((response) => {
           if (!response.ok) {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -381,8 +354,11 @@ class RealtimeConnector {
     if (Array.isArray(data?.vehicles)) {
       data.vehicles.forEach((v) => bump(v?.ownerFarmId ?? v?.farmId));
     }
-    const husbandryInfer = this.normalizeHusbandryBuildingsArray(data?.animals);
-    husbandryInfer.forEach((h) => bump(h?.ownerFarmId ?? h?.farmId));
+    if (Array.isArray(data?.animals)) {
+      data.animals.forEach((h) => {
+        bump(h?.ownerFarmId ?? h?.farmId);
+      });
+    }
 
     if (counts.size === 0) return null;
     let best = null;
@@ -396,118 +372,32 @@ class RealtimeConnector {
     return best;
   }
 
-  /**
-   * Same shape handling as updateAnimalsData — Lua/export sometimes sends a keyed object, not an array.
-   */
-  normalizeHusbandryBuildingsArray(animalsData) {
-    if (!animalsData) return [];
-    let husbandryArray = animalsData;
-    if (!Array.isArray(animalsData)) {
-      if (animalsData.husbandries) husbandryArray = animalsData.husbandries;
-      else if (animalsData.animals) husbandryArray = animalsData.animals;
-      else if (animalsData.data) husbandryArray = animalsData.data;
-      else husbandryArray = Object.values(animalsData);
-    }
-    return Array.isArray(husbandryArray) ? husbandryArray : [];
-  }
-
   ensureActiveFarmIdForPayload(data) {
     if (!this.dashboard) return;
     const current = Number(this.dashboard.activeFarmId ?? 1);
-    const husbandryOwns = this.normalizeHusbandryBuildingsArray(data?.animals);
     const ownsCurrent =
       (Array.isArray(data?.fields) &&
         data.fields.some((f) => Number(f?.ownerFarmId ?? f?.farmId ?? 0) === current)) ||
       (Array.isArray(data?.vehicles) &&
         data.vehicles.some((v) => Number(v?.ownerFarmId ?? v?.farmId ?? 0) === current)) ||
-      husbandryOwns.some((h) => Number(h?.ownerFarmId ?? h?.farmId ?? 0) === current);
+      (Array.isArray(data?.animals) &&
+        data.animals.some((h) => Number(h?.ownerFarmId ?? h?.farmId ?? 0) === current));
     if (ownsCurrent) return;
 
     const inferred = this.inferBestFarmIdFromPayload(data);
-    if (Number.isFinite(inferred) && inferred > 0 && inferred !== current) {
-      this.dashboard.activeFarmId = inferred;
-      try {
-        const sid = String(
-          this.dashboard.activeServerId ??
-            (typeof localStorage !== "undefined"
-              ? localStorage.getItem("dashboard_active_server") || ""
-              : "")
-        );
-        if (sid) localStorage.setItem(`dashboard_active_farm_${sid}`, String(inferred));
-      } catch (_) {
-        /* ignore */
-      }
-      return;
-    }
-
-    const farms = this.dashboard.farms;
-    if (Array.isArray(farms) && farms.length > 0) {
-      const ids = new Set(
-        farms
-          .map((f) => Number(f?.id))
-          .filter((n) => Number.isFinite(n) && n > 0)
+    if (!Number.isFinite(inferred) || inferred <= 0 || inferred === current) return;
+    this.dashboard.activeFarmId = inferred;
+    try {
+      const sid = String(
+        this.dashboard.activeServerId ??
+          (typeof localStorage !== "undefined"
+            ? localStorage.getItem("dashboard_active_server") || ""
+            : "")
       );
-      if (ids.size > 0 && !ids.has(current)) {
-        const defaultFarm = farms.find((f) => Number(f?.id) > 0) || farms[0];
-        const nf = Number(defaultFarm?.id);
-        if (Number.isFinite(nf) && nf > 0) {
-          this.dashboard.activeFarmId = nf;
-          try {
-            const sid = String(
-              this.dashboard.activeServerId ??
-                (typeof localStorage !== "undefined"
-                  ? localStorage.getItem("dashboard_active_server") || ""
-                  : "")
-            );
-            if (sid) localStorage.setItem(`dashboard_active_farm_${sid}`, String(nf));
-          } catch (_) {
-            /* ignore */
-          }
-        }
-      }
+      if (sid) localStorage.setItem(`dashboard_active_farm_${sid}`, String(inferred));
+    } catch (_) {
+      /* ignore */
     }
-  }
-
-  /**
-   * In JavaScript, empty arrays are truthy. A transient `/api/data` row may include `animals: []`
-   * / `fields: []` while the host is still merging — that must not wipe a non-empty REST bootstrap.
-   */
-  applyMergedAnimalsSlice(rawAnimals) {
-    if (rawAnimals === undefined || rawAnimals === null) return;
-    const incoming = this.normalizeHusbandryBuildingsArray(rawAnimals);
-    const prior = this.normalizeHusbandryBuildingsArray(this.dashboard?.husbandryData);
-    if (incoming.length > 0) {
-      this.dashboard.husbandryData = rawAnimals;
-      this.updateAnimalsData(rawAnimals);
-      return;
-    }
-    if (prior.length === 0) {
-      this.dashboard.husbandryData = rawAnimals;
-      this.updateAnimalsData(rawAnimals);
-    }
-  }
-
-  applyMergedVehiclesSlice(rawVehicles) {
-    if (!Array.isArray(rawVehicles)) return;
-    const prior =
-      (Array.isArray(this.dashboard?._allVehiclesMerged) && this.dashboard._allVehiclesMerged.length) ||
-      (Array.isArray(this.dashboard?.vehicles) && this.dashboard.vehicles.length) ||
-      0;
-    if (rawVehicles.length > 0) {
-      this.updateVehiclesData(rawVehicles);
-      return;
-    }
-    if (prior === 0) this.updateVehiclesData(rawVehicles);
-  }
-
-  applyMergedFieldsSlice(rawFields) {
-    if (!Array.isArray(rawFields)) return;
-    const prior = Array.isArray(this.dashboard?.allFields) ? this.dashboard.allFields.length : 0;
-    if (rawFields.length > 0) {
-      this.updateFieldsData(rawFields);
-      return;
-    }
-    if (prior === 0) this.updateFieldsData(rawFields);
   }
 
   handleRealtimeData(raw) {
@@ -521,9 +411,18 @@ class RealtimeConnector {
     // Use the previously stored state, not the current state
     const oldState = this.previousData;
 
-    this.applyMergedAnimalsSlice(data.animals);
-    this.applyMergedVehiclesSlice(data.vehicles);
-    this.applyMergedFieldsSlice(data.fields);
+    if (data.animals) {
+      this.dashboard.husbandryData = data.animals;
+      this.updateAnimalsData(data.animals);
+    }
+
+    if (data.vehicles) {
+      this.updateVehiclesData(data.vehicles);
+    }
+
+    if (data.fields) {
+      this.updateFieldsData(data.fields);
+    }
 
     if (data.production) {
       this.updateProductionData(data.production);
@@ -918,7 +817,10 @@ class RealtimeConnector {
     // Filter to only show vehicles owned by the currently active farm.
     const activeFarmId = window.dashboard?.activeFarmId || 1;
     const playerVehicles = this.dashboard._allVehiclesMerged
-      ? this.dashboard._allVehiclesMerged.filter((v) => v.ownerFarmId === activeFarmId)
+      ? this.dashboard._allVehiclesMerged.filter(
+          (v) =>
+            Number(v?.ownerFarmId ?? v?.farmId ?? 0) === Number(activeFarmId)
+        )
       : [];
     this.dashboard.vehicles = playerVehicles;
 

@@ -103,14 +103,40 @@ function getAnimalListFromBuilding(building) {
   return [];
 }
 
+/**
+ * Active server for `/api/*` calls.
+ * Prefer localStorage first: `dashboard` exists immediately but `activeServerId` is set async in
+ * loadServersAndTabs(), so early RealtimeConnector polls used no serverId → wrong merged snapshot,
+ * especially visible on FTP/server saves (first server in backend order ≠ last selected tab).
+ */
+function resolveServerIdForApiFetch() {
+  try {
+    const fromLs =
+      typeof localStorage !== "undefined"
+        ? localStorage.getItem("dashboard_active_server")
+        : null;
+    if (fromLs != null && String(fromLs).trim() !== "") return String(fromLs).trim();
+    const fromDash = window.dashboard?.activeServerId;
+    if (fromDash != null && String(fromDash).trim() !== "") return String(fromDash).trim();
+  } catch (_) {
+    /* ignore */
+  }
+  return "";
+}
+
+/** RealtimeConnector HTTP polling appends ?serverId= explicitly; uses same resolver as fetch shim. */
+if (typeof window !== "undefined") {
+  window.__farmdashResolveServerIdForApi = resolveServerIdForApiFetch;
+}
+
 const originalFetch = window.fetch;
 window.fetch = async function() {
     let [resource, config] = arguments;
     if (typeof resource === 'string' && resource.includes('/api/') && !resource.includes('serverId=')) {
-        let serverId = window.dashboard ? window.dashboard.activeServerId : localStorage.getItem('dashboard_active_server');
+        const serverId = resolveServerIdForApiFetch();
         if (serverId) {
             const separator = resource.includes('?') ? '&' : '?';
-            resource = `${resource}${separator}serverId=${serverId}`;
+            resource = `${resource}${separator}serverId=${encodeURIComponent(serverId)}`;
         }
     }
     return originalFetch(resource, config);
@@ -124,8 +150,8 @@ window.WebSocket = function(url, protocols) {
             this._onmessage = function(event) {
                 try {
                     const data = JSON.parse(event.data);
-                    let serverId = window.dashboard ? window.dashboard.activeServerId : localStorage.getItem('dashboard_active_server');
-                    if (data.serverId && serverId && data.serverId !== serverId) return; 
+                    const serverId = resolveServerIdForApiFetch();
+                    if (data.serverId && serverId && String(data.serverId) !== String(serverId)) return;
                 } catch(e) {}
                 if (func) func.call(this, event);
             };
@@ -254,6 +280,39 @@ export async function switchServer(serverId) {
   }
 }
 
+/**
+ * Run the same data/apply flow as a server switch, but for the already-active server.
+ * This aligns startup behavior with the manual "switch server/save" path that reliably populates Home cards.
+ */
+export async function refreshActiveServerData() {
+  if (!this.activeServerId) {
+    try {
+      const ls =
+        typeof localStorage !== "undefined" ? localStorage.getItem("dashboard_active_server") : null;
+      if (ls != null && String(ls).trim() !== "") {
+        const m = (this.availableServers || []).find((s) => sameServerId(s.id, ls));
+        this.activeServerId = m ? m.id : ls;
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }
+  if (!this.activeServerId) return false;
+  const ok = await this.tryLoadApiData();
+  if (!ok) return false;
+
+  resetCrossFarmVisualizationCaches(this);
+  const currentSection = this.getCurrentSection ? this.getCurrentSection() : null;
+  if (currentSection && currentSection !== "landing" && currentSection !== "dashboard") {
+    if (this.showSection) this.showSection(currentSection);
+  } else {
+    if (this.updateLandingPageCounts) this.updateLandingPageCounts();
+  }
+  if (this.updateNavbar) this.updateNavbar();
+  pushSimHubLiveContext(this);
+  return true;
+}
+
 function showDashboardOrFallback(dashboard) {
   dashboard.isDataLoaded = true;
   if (typeof dashboard.showDashboard === "function") {
@@ -268,14 +327,87 @@ function showDashboardOrFallback(dashboard) {
   }
 }
 
+async function tryHydrateFromDesktopServerCache(dashboard) {
+  try {
+    if (
+      !dashboard?.activeServerId ||
+      typeof window === "undefined" ||
+      typeof window.farmDashAPI?.readServerLiveCache !== "function"
+    ) {
+      return false;
+    }
+    const res = await window.farmDashAPI.readServerLiveCache(String(dashboard.activeServerId));
+    if (!res || !res.ok || !res.data || typeof res.data !== "object") return false;
+    applyApiMergedDataPayload(dashboard, res.data);
+    persistBrowserMergedSnapshot(dashboard, res.data);
+    return hasRenderableDashboardData(dashboard);
+  } catch (_) {
+    return false;
+  }
+}
+
+async function hydrateFromFirstServerWithData(dashboard, preferredServerId = "") {
+  try {
+    const servers = Array.isArray(dashboard?.availableServers) ? dashboard.availableServers : [];
+    if (!servers.length) return false;
+    const apiBaseURL = dashboard.getAPIBaseURL();
+    const preferred = String(preferredServerId || "").trim();
+    const ordered = preferred
+      ? [
+          ...servers.filter((s) => String(s?.id) === preferred),
+          ...servers.filter((s) => String(s?.id) !== preferred),
+        ]
+      : servers;
+    for (const s of ordered) {
+      const sid = String(s?.id ?? "");
+      if (!sid) continue;
+      const r = await originalFetch(`${apiBaseURL}/api/data?serverId=${encodeURIComponent(sid)}`);
+      if (!r.ok) continue;
+      const data = await r.json();
+      if (!data || data.error) continue;
+      dashboard.activeServerId = s.id;
+      try {
+        localStorage.setItem("dashboard_active_server", String(s.id));
+      } catch (_) {
+        /* ignore */
+      }
+      if (typeof dashboard.renderServerTabs === "function") {
+        dashboard.renderServerTabs();
+      }
+      applyApiMergedDataPayload(dashboard, data);
+      persistBrowserMergedSnapshot(dashboard, data);
+      return hasRenderableDashboardData(dashboard);
+    }
+    return false;
+  } catch (_) {
+    return false;
+  }
+}
+
 export async function checkAPIAvailability() {
   try {
     await this.loadServersAndTabs();
+    // Prefer the last server the user viewed; only fall back to others if it has no data.
+    const preferredServerId = this.activeServerId != null ? String(this.activeServerId) : "";
+    const earlyLiveServer = await hydrateFromFirstServerWithData(this, preferredServerId);
+    if (earlyLiveServer) {
+      showDashboardOrFallback(this);
+      await this.refreshActiveServerData();
+      if (typeof window.farmDashNotifyDataReady === "function") {
+        window.farmDashNotifyDataReady();
+      }
+      return;
+    }
     if (this.activeServerId) {
       const snap = readBrowserMergedSnapshot(this.activeServerId);
       if (snap?.payload && !snap.payload.error) {
         applyApiMergedDataPayload(this, snap.payload);
         if (hasRenderableDashboardData(this)) {
+          showDashboardOrFallback(this);
+        }
+      } else {
+        const diskHydrated = await tryHydrateFromDesktopServerCache(this);
+        if (diskHydrated) {
           showDashboardOrFallback(this);
         }
       }
@@ -287,6 +419,13 @@ export async function checkAPIAvailability() {
       const loaded = await this.tryLoadApiData();
       if (loaded) {
         showDashboardOrFallback(this);
+        await this.refreshActiveServerData();
+        return;
+      }
+      const switchedToLiveServer = await hydrateFromFirstServerWithData(this, preferredServerId);
+      if (switchedToLiveServer) {
+        showDashboardOrFallback(this);
+        await this.refreshActiveServerData();
         return;
       }
       if (hasRenderableDashboardData(this)) {
@@ -323,6 +462,7 @@ export async function checkAPIAvailability() {
         }
         return;
       }
+      this.scheduleStartupHydrationRetry();
     }
   } catch (error) {}
   if (hasRenderableDashboardData(this)) {
@@ -333,6 +473,7 @@ export async function checkAPIAvailability() {
     return;
   }
   this.loadSavedFolder();
+  this.scheduleStartupHydrationRetry();
 }
 
 export function applyEmptyApiState() {
@@ -378,6 +519,7 @@ export function resyncRealtimeAfterBootstrap() {
 const BROWSER_SNAPSHOT_PREFIX = "farmdash_merged_snapshot_v1_";
 const BROWSER_SNAPSHOT_MAX_CHARS = 4_000_000;
 let _browserSnapshotSaveTimer = null;
+let _startupHydrationRetryTimer = null;
 
 function browserSnapshotKey(serverId) {
   return `${BROWSER_SNAPSHOT_PREFIX}${String(serverId)}`;
@@ -442,7 +584,6 @@ export function scheduleBrowserMergedSnapshotPersist(dashboard, data) {
 export function applyApiMergedDataPayload(dashboard, data) {
   if (!dashboard || !data || data.error) return;
 
-  dashboard.vehicles = data.vehicles || [];
   dashboard.economy = data.economy || {};
   dashboard.finance = data.finance || {};
   dashboard.weather = data.weather || {};
@@ -484,6 +625,15 @@ export function applyApiMergedDataPayload(dashboard, data) {
       dashboard.fields = filterFieldsForFarmView(dashboard.allFields, dashboard.activeFarmId);
       if (typeof dashboard.renderFarmDropdown === "function") dashboard.renderFarmDropdown();
     }
+  }
+
+  const vehicleList = ensureArray(data.vehicles);
+  dashboard._allVehiclesMerged = vehicleList;
+  {
+    const afv = Number(dashboard.activeFarmId ?? 1);
+    dashboard.vehicles = vehicleList.filter(
+      (v) => Number(v?.ownerFarmId ?? v?.farmId ?? 0) === afv
+    );
   }
 
   const husbandryBuildings = ensureHusbandryArray(data.animals);
@@ -528,6 +678,18 @@ export function applyApiMergedDataPayload(dashboard, data) {
 
 export async function tryLoadApiData() {
   try {
+    if (!this.activeServerId) {
+      try {
+        const ls =
+          typeof localStorage !== "undefined" ? localStorage.getItem("dashboard_active_server") : null;
+        if (ls != null && String(ls).trim() !== "") {
+          const m = (this.availableServers || []).find((s) => sameServerId(s.id, ls));
+          this.activeServerId = m ? m.id : ls;
+        }
+      } catch (_) {
+        /* ignore */
+      }
+    }
     if (!this.activeServerId) return false;
     const apiBaseURL = this.getAPIBaseURL();
     const response = await fetch(`${apiBaseURL}/api/data`);
@@ -538,25 +700,68 @@ export async function tryLoadApiData() {
         const waiting =
           errMsg === "Waiting for data..." || /waiting\s+for\s+data/i.test(errMsg);
         if (waiting) {
+          const diskHydrated = await tryHydrateFromDesktopServerCache(this);
+          if (diskHydrated) {
+            return true;
+          }
           if (!hasRenderableDashboardData(this)) {
             this.applyEmptyApiState();
           }
           if (typeof window.farmDashNotifyDataReady === "function") {
             window.farmDashNotifyDataReady();
           }
-          return true;
+          return hasRenderableDashboardData(this);
         }
         return false;
       }
 
       applyApiMergedDataPayload(this, data);
       persistBrowserMergedSnapshot(this, data);
+      if (typeof this.updateLandingPageCounts === "function") {
+        this.updateLandingPageCounts();
+      }
       return true;
     }
     return false;
   } catch (error) {
     return false;
   }
+}
+
+/**
+ * Cold boot race guard:
+ * first `/api/data` may return "Waiting for data..." while main process finishes hydration.
+ * Retry briefly so Home cards populate without manual server/save switching.
+ */
+export function scheduleStartupHydrationRetry() {
+  if (_startupHydrationRetryTimer) return;
+  let attempts = 0;
+  const maxAttempts = 12;
+  const run = async () => {
+    attempts += 1;
+    try {
+      const loaded = await this.tryLoadApiData();
+      if (loaded || hasRenderableDashboardData(this)) {
+        if (_startupHydrationRetryTimer) {
+          clearTimeout(_startupHydrationRetryTimer);
+          _startupHydrationRetryTimer = null;
+        }
+        showDashboardOrFallback(this);
+        return;
+      }
+    } catch (_) {
+      /* ignore */
+    }
+    if (attempts >= maxAttempts) {
+      if (_startupHydrationRetryTimer) {
+        clearTimeout(_startupHydrationRetryTimer);
+        _startupHydrationRetryTimer = null;
+      }
+      return;
+    }
+    _startupHydrationRetryTimer = setTimeout(run, 1500);
+  };
+  _startupHydrationRetryTimer = setTimeout(run, 700);
 }
 
 export function setStorage(key, value) {
@@ -748,6 +953,10 @@ export function switchFarm(farmId, event) {
 
     if (this.realtimeConnector?.updateAnimalsData && this.husbandryData) {
         this.realtimeConnector.updateAnimalsData(this.husbandryData);
+    }
+
+    if (this.realtimeConnector?.updateVehiclesData && Array.isArray(this._allVehiclesMerged)) {
+        this.realtimeConnector.updateVehiclesData(this._allVehiclesMerged);
     }
 
     if (this.allFields && this.allFields.length) {

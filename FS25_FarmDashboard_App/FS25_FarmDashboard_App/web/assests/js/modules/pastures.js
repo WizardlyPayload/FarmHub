@@ -2011,14 +2011,9 @@ export function updatePastureDisplay() {
     this.renderPasturesList(pasturesView);
   }
 
-  // Update main dashboard count
-  const pastureCountElement = document.getElementById("pasture-count");
-  if (pastureCountElement) {
-    const c = totalPastures;
-    pastureCountElement.textContent =
-      c === 1
-        ? t("card.badgePasturesOne", { count: c })
-        : t("card.badgePasturesMany", { count: c });
+  // Landing card counts are centralized in navigation.updateLandingPageCounts().
+  if (window.dashboard && typeof window.dashboard.updateLandingPageCounts === "function") {
+    window.dashboard.updateLandingPageCounts();
   }
 
   // Update warning badge on dashboard

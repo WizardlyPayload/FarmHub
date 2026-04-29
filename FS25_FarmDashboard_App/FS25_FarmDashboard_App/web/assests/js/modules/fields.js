@@ -285,11 +285,10 @@ export function updateFieldsList() {
 }
 
 function updateLandingCount() {
-    const el = document.getElementById("field-count");
-    if (!el) return;
-    const n = currentFields.length;
-    el.textContent =
-        n === 1 ? t("fields.fieldCountOne", { count: n }) : t("fields.fieldCountMany", { count: n });
+    // Landing card counts are centralized in navigation.updateLandingPageCounts().
+    if (window.dashboard && typeof window.dashboard.updateLandingPageCounts === "function") {
+        window.dashboard.updateLandingPageCounts();
+    }
 }
 
 function setText(id, val) {

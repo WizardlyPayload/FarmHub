@@ -1042,6 +1042,41 @@ function hydrateServerCacheFromDisk(serverId) {
     console.log(`[Cache] [${serverId}] Restored last merged snapshot from disk (use until live Lua/XML return)`);
 }
 
+function getLocalLuaJsonPathForServer(srv) {
+    let basePath = srv.localPath;
+    if (!basePath) {
+        basePath = path.join(getFs25DocumentsRoot(), 'modSettings', 'FS25_FarmDashboard');
+    }
+    const folderName =
+        srv.localSubFolder ||
+        String(srv.name || '').replace(/[<>:"/\\|?*]/g, '').trim();
+    if (!folderName) return null;
+    return path.join(basePath, folderName, 'data.json');
+}
+
+/**
+ * Boot-time hydration from the latest already-written Lua JSON.
+ * This lets the dashboard show "last known server/save state" even while FS25 is not running.
+ */
+function hydrateLuaSnapshotFromDiskAtBoot(srv) {
+    try {
+        const state = serverStates[srv.id];
+        if (!state) return;
+        let luaJsonPath = null;
+        if (srv.mode === 'local') {
+            luaJsonPath = getLocalLuaJsonPathForServer(srv);
+        } else if (srv.mode === 'ftp') {
+            luaJsonPath = path.join(app.getPath('userData'), `data_${srv.id}.json`);
+        }
+        if (!luaJsonPath || !fs.existsSync(luaJsonPath)) return;
+        const raw = stripUtf8Bom(fs.readFileSync(luaJsonPath, 'utf8'));
+        processLuaData(srv.id, raw);
+        console.log(`[Boot] [${srv.id}] Hydrated Lua snapshot from disk: ${luaJsonPath}`);
+    } catch (e) {
+        console.warn(`[Boot] [${srv.id}] Lua snapshot hydrate failed:`, e.message);
+    }
+}
+
 function rebuildMerged(serverId) {
     const state = serverStates[serverId];
     if (!state) return;
@@ -1565,6 +1600,14 @@ async function bootServer(config) {
             console.error('[bootServer] hydrate', srv.id, e);
         }
     });
+    // Prefer the latest on-disk Lua export per configured server/save over older persisted merged cache.
+    servers.forEach((srv) => {
+        try {
+            hydrateLuaSnapshotFromDiskAtBoot(srv);
+        } catch (e) {
+            console.error('[bootServer] hydrate lua snapshot', srv.id, e);
+        }
+    });
 
     const runDeferredBootWork = () => {
         try {
@@ -1737,6 +1780,30 @@ ipcMain.handle('read-local-farmdash-data-json', () => {
             'data.json'
         );
         return { ok: false, path: fallback, error: 'not_found' };
+    } catch (e) {
+        return { ok: false, error: String(e && e.message ? e.message : e) };
+    }
+});
+
+/** Renderer fallback: load per-server merged snapshot persisted in userData/serverLiveCache. */
+ipcMain.handle('read-server-live-cache', (_event, serverId) => {
+    try {
+        if (serverId == null || serverId === '') {
+            return { ok: false, error: 'server_id_required' };
+        }
+        const sid = String(serverId);
+        const record = loadServerCache(app.getPath('userData'), sid);
+        if (!record || !record.mergedSnapshot || typeof record.mergedSnapshot !== 'object') {
+            return { ok: false, error: 'not_found', serverId: sid };
+        }
+        return {
+            ok: true,
+            serverId: sid,
+            savedAt: record.savedAt || null,
+            lastLuaAt: record.lastLuaAt || null,
+            lastXmlAt: record.lastXmlAt || null,
+            data: record.mergedSnapshot,
+        };
     } catch (e) {
         return { ok: false, error: String(e && e.message ? e.message : e) };
     }

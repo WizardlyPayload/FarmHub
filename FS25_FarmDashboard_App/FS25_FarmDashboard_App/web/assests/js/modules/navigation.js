@@ -509,7 +509,11 @@ export function showSection(sectionName) {
   }
 
   document.getElementById("landing-page").classList.add("d-none");
-  document.getElementById("section-content").classList.add("d-none");
+  const sectionShell = document.getElementById("section-content");
+  if (sectionShell) {
+    sectionShell.classList.add("d-none");
+    sectionShell.setAttribute("data-farmdash-route", sectionName);
+  }
 
   switch (sectionName) {
     case "dashboard":

@@ -80,6 +80,7 @@
   "fields.soilNitrogen": "Nítrigin",
   "fields.soilPhLime": "pH / Aol",
   "fields.needsScan": "Riachtanas scanadh",
+  "fields.scanned": "Scanned",
   "fields.fertilizationLevel": "Toirchiú {{cur}} /2 (lán = 2)",
   "fields.phNeeded": "Riachtanach",
   "fields.phDone": "Déanta",
@@ -860,5 +861,9 @@
   "rules.reason.fallback": "Ní oireann na rialacha as líne don staid aisteach seo — bain úsáid as leideanna réimse sa chluiche nó as an liosta moltaí beo ó do shábháil.",
   "simhub.noFieldRows": "Gan aon sraitheanna páirce don fheirm seo.",
   "simhub.noPastureData": "Gan aon sonraí féarach.",
-  "simhub.noProductionChains": "Gan aon slabhraí táirgthe."
+  "simhub.noProductionChains": "Gan aon slabhraí táirgthe.",
+  "settings.modOneDriveHint": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+  "weather.forecastTomorrow": "Tomorrow",
+  "weather.forecastDayAfter": "Day After",
+  "weather.forecastDayN": "Day {{n}}"
 }

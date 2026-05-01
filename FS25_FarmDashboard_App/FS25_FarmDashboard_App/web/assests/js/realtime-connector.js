@@ -798,16 +798,12 @@ class RealtimeConnector {
       }
     }
 
-    // Update pastures section if it's currently visible
-    const pasturesSection = document.getElementById("section-content");
+    // Update pastures section if it's currently visible (avoid locale-dependent title sniffing)
     if (
-      pasturesSection &&
-      !pasturesSection.classList.contains("d-none") &&
-      pasturesSection.innerHTML.includes("Pasture Management")
+      this.dashboard.currentSection === "pastures" &&
+      this.dashboard.updatePastureDisplay
     ) {
-      if (this.dashboard.updatePastureDisplay) {
-        this.dashboard.updatePastureDisplay();
-      }
+      this.dashboard.updatePastureDisplay();
     }
   }
 
@@ -826,14 +822,7 @@ class RealtimeConnector {
 
     // Landing card counts are centralized in navigation.updateLandingPageCounts().
 
-    // Update vehicles section if it's currently visible
-    const sectionContent = document.getElementById("section-content");
-    const isVehicleSectionVisible =
-      sectionContent &&
-      !sectionContent.classList.contains("d-none") &&
-      sectionContent.innerHTML.includes("Vehicle Fleet Management");
-
-    if (isVehicleSectionVisible) {
+    if (this.dashboard.currentSection === "vehicles") {
       this.dashboard.updateVehicleSummaryCards();
       if (typeof this.dashboard.applyVehicleFilters === "function") {
         this.dashboard.applyVehicleFilters();
@@ -881,16 +870,8 @@ class RealtimeConnector {
       this.dashboard.updateFarmStorageDisplay();
     }
 
-    // Update pasture display if visible since it uses storage data
-    const pasturesSection = document.getElementById("section-content");
-    if (
-      pasturesSection &&
-      !pasturesSection.classList.contains("d-none") &&
-      pasturesSection.innerHTML.includes("Pasture Management")
-    ) {
-      if (this.dashboard.updatePastureDisplay) {
-        this.dashboard.updatePastureDisplay();
-      }
+    if (this.dashboard.currentSection === "pastures" && this.dashboard.updatePastureDisplay) {
+      this.dashboard.updatePastureDisplay();
     }
 
     if (this.dashboard.refreshProductionsIfVisible) {

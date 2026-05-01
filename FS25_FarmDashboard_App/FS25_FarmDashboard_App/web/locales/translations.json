@@ -94,15 +94,15 @@
       "fr": "Chargement...",
       "es": "Cargando...",
       "it": "Caricamento...",
-      "pl": "Załadunek...",
+      "pl": "Ładowanie...",
       "nl": "Laden...",
       "pt": "Carregando...",
-      "sv": "Belastning...",
+      "sv": "Laddar...",
       "da": "Indlæser...",
       "fi": "Ladataan...",
       "cs": "Načítání...",
       "el": "Φόρτωση...",
-      "hu": "Terhelés...",
+      "hu": "Betöltés...",
       "ro": "Încărcare...",
       "bg": "Зареждане...",
       "hr": "Učitavanje...",
@@ -2349,6 +2349,35 @@
       "is": "Þarfnast skannunar",
       "nb": "Trenger skanning",
       "uk": "Потрібне сканування"
+    },
+    "fields.scanned": {
+      "en": "Scanned",
+      "de": "Scanned",
+      "fr": "Scanned",
+      "es": "Scanned",
+      "it": "Scanned",
+      "pl": "Scanned",
+      "nl": "Scanned",
+      "pt": "Scanned",
+      "sv": "Scanned",
+      "da": "Scanned",
+      "fi": "Scanned",
+      "cs": "Scanned",
+      "el": "Scanned",
+      "hu": "Scanned",
+      "ro": "Scanned",
+      "bg": "Scanned",
+      "hr": "Scanned",
+      "sk": "Scanned",
+      "sl": "Scanned",
+      "et": "Scanned",
+      "lv": "Scanned",
+      "lt": "Scanned",
+      "ga": "Scanned",
+      "mt": "Scanned",
+      "is": "Scanned",
+      "nb": "Scanned",
+      "uk": "Scanned"
     },
     "fields.fertilizationLevel": {
       "en": "Fertilization {{cur}}/2 (full = 2)",
@@ -8325,7 +8354,7 @@
       "uk": "Дозволити сторінки локальної мережі лише для читання без імені користувача/пароля (лише GET)"
     },
     "settings.lanAuthOptionalHint": {
-      "en": "Live WebSocket updates still need a token or login. Dangerous on public Wi‑Fi — use only on a trusted home LAN.",
+      "en": "Optional login skips Basic auth only for static pages and non-sensitive GET routes; live data, WebSocket tokens, and setup JSON still require credentials or loopback. Dangerous on public Wi‑Fi — use only on a trusted home LAN.",
       "de": "Live-WebSocket-Updates erfordern weiterhin ein Token oder eine Anmeldung. Gefährlich in öffentlichen WLAN-Netzen – nur in einem vertrauenswürdigen Heimnetzwerk verwenden.",
       "fr": "Les mises à jour WebSocket en direct nécessitent toujours un jeton ou une authentification. Dangereuses sur les réseaux Wi-Fi publics : à utiliser uniquement sur un réseau local domestique sécurisé.",
       "es": "Las actualizaciones en tiempo real mediante WebSocket aún requieren un token o inicio de sesión. Es peligroso en redes Wi-Fi públicas; úselo únicamente en una red LAN doméstica de confianza.",
@@ -8439,6 +8468,35 @@
       "is": "Þessir valkostir passa við stillingarskrá leiksins fyrir breytinguna. Endurræstu leikinn eða endurræstu vistunina til að breytingarnar taki gildi. Á við um sjálfgefna slóðina fyrir Documents breytinguna á þessari tölvu.",
       "nb": "Disse alternativene samsvarer med konfigurasjonsfilen til moden i spillet. Start spillet på nytt eller last inn lagrede filer på nytt for at endringene skal gjelde. Gjelder standardbanen for Dokumenter-moden på denne datamaskinen.",
       "uk": "Ці опції відповідають конфігураційному файлу ігрового мода. Перезавантажте гру або перезавантажте збереження, щоб зміни застосувалися. Застосовується до стандартного шляху модифікації «Документи» на цьому комп’ютері."
+    },
+    "settings.modOneDriveHint": {
+      "en": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "de": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "fr": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "es": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "it": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "pl": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "nl": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "pt": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "sv": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "da": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "fi": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "cs": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "el": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "hu": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "ro": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "bg": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "hr": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "sk": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "sl": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "et": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "lv": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "lt": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "ga": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "mt": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "is": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "nb": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+      "uk": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml."
     },
     "settings.modModules": {
       "en": "Data modules (in-game collectors)",
@@ -9635,15 +9693,15 @@
       "fr": "Chargement...",
       "es": "Cargando...",
       "it": "Caricamento...",
-      "pl": "Załadunek...",
+      "pl": "Ładowanie...",
       "nl": "Laden...",
       "pt": "Carregando...",
-      "sv": "Belastning...",
+      "sv": "Laddar...",
       "da": "Indlæser...",
       "fi": "Ladataan...",
       "cs": "Načítání...",
       "el": "Φόρτωση...",
-      "hu": "Terhelés...",
+      "hu": "Betöltés...",
       "ro": "Încărcare...",
       "bg": "Зареждане...",
       "hr": "Učitavanje...",
@@ -22245,7 +22303,7 @@
       "uk": "Ворошилка для заготівлі сіна або тюкування вологим способом для силосу"
     },
     "rules.action.baleHay": {
-      "en": "Bale hay windrow or collect dry forage",
+      "en": "Bale hay or collect dry forage",
       "de": "Heu zu Ballen pressen oder trockenes Futter sammeln",
       "fr": "Mettre le foin en andains ou ramasser le fourrage sec",
       "es": "Empacar heno en hileras o recolectar forraje seco.",
@@ -22274,7 +22332,7 @@
       "uk": "Збирати сіно у валки або збирати сухий корм"
     },
     "rules.action.clearAllWindrows": {
-      "en": "Clear loose straw, grass, and hay windrows",
+      "en": "Clear loose straw, grass, and hay",
       "de": "Lose Stroh-, Gras- und Heuhaufen entfernen",
       "fr": "Enlever les andains de paille, d'herbe et de foin détachés",
       "es": "Retire la paja suelta, la hierba y las hileras de heno.",
@@ -22303,7 +22361,7 @@
       "uk": "Очищення вільних валків соломи, трави та сіна"
     },
     "rules.action.clearStrawGrassWindrows": {
-      "en": "Clear loose straw and grass windrows",
+      "en": "Clear loose straw and grass",
       "de": "Lose Stroh- und Grasschwaden beseitigen",
       "fr": "Éliminer les andains de paille et d'herbe en vrac",
       "es": "Retire las hileras sueltas de paja y hierba.",
@@ -22361,7 +22419,7 @@
       "uk": "Очистити пухку солому та сіно"
     },
     "rules.action.clearGrassHay": {
-      "en": "Clear grass and hay windrows",
+      "en": "Clear grass and hay",
       "de": "Gras- und Heuschwaden entfernen",
       "fr": "Débroussailler l'herbe et les andains de foin",
       "es": "Limpie las hileras de hierba y heno.",
@@ -22419,7 +22477,7 @@
       "uk": "Очистіть пухкий корм на полі"
     },
     "rules.action.clearStrawGrassOrHay": {
-      "en": "Clear loose straw, grass, or hay windrows",
+      "en": "Clear loose straw, grass, or hay",
       "de": "Lose Stroh-, Gras- oder Heuhaufen entfernen",
       "fr": "Enlever les andains de paille, d'herbe ou de foin non stabilisés",
       "es": "Retire las hileras sueltas de paja, hierba o heno.",
@@ -23637,7 +23695,7 @@
       "uk": "Пухку солому на полі — тюкуйте або збирайте перед обробітком ґрунту чи наступним проходом."
     },
     "rules.reason.freshGrassWindrow": {
-      "en": "Fresh grass windrow on the field — tedder or bale before the next stage.",
+      "en": "Fresh-cut grass on the field — tedder or bale before the next stage.",
       "de": "Frischer Grasschwad auf dem Feld – vor dem nächsten Arbeitsschritt wenden oder zu Ballen pressen.",
       "fr": "Andain d'herbe fraîche dans le champ — faneuse ou balle avant l'étape suivante.",
       "es": "Hilera de hierba fresca en el campo: henificadora o paca antes de la siguiente etapa.",
@@ -23666,7 +23724,7 @@
       "uk": "Свіжий вал трави на полі — ворушилка або тюк перед наступним етапом."
     },
     "rules.reason.hayWindrowField": {
-      "en": "Hay / dry grass windrow on the field — bale or load before the next stage.",
+      "en": "Hay is on the field — bale or collect before the next stage.",
       "de": "Heu / trockenes Grasschwaden auf dem Feld – vor dem nächsten Arbeitsschritt zu Ballen pressen oder verladen.",
       "fr": "Andain de foin/d'herbe sèche sur le champ — mettre en balles ou charger avant l'étape suivante.",
       "es": "Montón de heno/hierba seca en el campo: empacar o cargar antes de la siguiente etapa.",
@@ -23695,7 +23753,7 @@
       "uk": "Сіно/суха трава у валку на полі — тюк або навантаження перед наступним етапом."
     },
     "rules.reason.allWindrowsField": {
-      "en": "Straw, grass, and hay windrows on the ground — clear forage before continuing.",
+      "en": "Loose straw, grass, and hay are on the ground — clear forage before continuing.",
       "de": "Stroh-, Gras- und Heuhaufen am Boden – Futter vor dem Weiterfahren entfernen.",
       "fr": "Andains de paille, d'herbe et de foin au sol — dégager le fourrage avant de continuer.",
       "es": "Hay hileras de paja, hierba y heno en el suelo; retire el forraje antes de continuar.",
@@ -23724,7 +23782,7 @@
       "uk": "Солома, трава та сіно, складені в валки на землі — очистіть корм, перш ніж продовжувати."
     },
     "rules.reason.strawGrassWindrows": {
-      "en": "Straw and grass windrows on the field — bale or collect before continuing.",
+      "en": "Loose straw and grass are on the field — bale or collect before continuing.",
       "de": "Stroh- und Grasschwaden auf dem Feld – vor der Weiterfahrt zu Ballen pressen oder einsammeln.",
       "fr": "Andains de paille et d'herbe dans le champ — les mettre en balles ou les ramasser avant de continuer.",
       "es": "Montones de paja y hierba en el campo: empáquelos o recójalos antes de continuar.",
@@ -23782,7 +23840,7 @@
       "uk": "Солома та сіно на полі — тюкуйте або збирайте, перш ніж продовжувати."
     },
     "rules.reason.grassHayWindrows": {
-      "en": "Grass and hay windrows on the field — finish before the next stage.",
+      "en": "Grass and hay are on the field — finish before the next stage.",
       "de": "Gras- und Heuhaufen auf dem Feld – vor dem nächsten Arbeitsschritt fertigstellen.",
       "fr": "Andains d'herbe et de foin dans le champ — à terminer avant la prochaine étape.",
       "es": "Montones de hierba y heno en el campo: hay que terminarlos antes de la siguiente etapa.",
@@ -23869,7 +23927,7 @@
       "uk": "Розсипчаста солома на землі — тюкуйте або збирайте перед обробітком ґрунту або наступним проходом."
     },
     "rules.reason.grassWindrowField": {
-      "en": "Grass windrow on the field — tedder or bale before the next stage.",
+      "en": "Grass is lying on the field — tedder or bale before the next stage.",
       "de": "Grasschwaden auf dem Feld – vor dem nächsten Arbeitsschritt wenden oder zu Ballen pressen.",
       "fr": "Andain d'herbe dans le champ — faneuse ou balle avant l'étape suivante.",
       "es": "Hilera de hierba en el campo: henificadora o paca antes de la siguiente etapa.",
@@ -23898,7 +23956,7 @@
       "uk": "Валок трави на полі — ворушилка або тюк перед наступним етапом."
     },
     "rules.reason.hayWindrowSimple": {
-      "en": "Hay windrow on the field — bale or load before the next stage.",
+      "en": "Hay is on the field — bale or collect before the next stage.",
       "de": "Heuschwaden auf dem Feld – vor dem nächsten Arbeitsschritt zu Ballen pressen oder verladen.",
       "fr": "Andain de foin dans le champ — presser ou charger avant l'étape suivante.",
       "es": "Montón de heno en el campo: empacar o cargar antes de la siguiente etapa.",
@@ -23927,7 +23985,7 @@
       "uk": "Валок сіна на полі — тюк або вантаж перед наступним етапом."
     },
     "rules.reason.multipleWindrows": {
-      "en": "Multiple forage windrow types — clear before the next field stage.",
+      "en": "Multiple forage types are lying on the field — clear them before the next stage.",
       "de": "Mehrere Arten von Futterschwaden – vor dem nächsten Feldbearbeitungsschritt entfernen.",
       "fr": "Plusieurs types d'andains de fourrage — à dégager avant la prochaine étape de culture.",
       "es": "Varios tipos de hileras de forraje: despejarlas antes de la siguiente etapa del campo.",
@@ -24014,7 +24072,7 @@
       "uk": "На полі є пухка солома або залишки зернових культур — очистіть їх, щоб не блокувати обробіток ґрунту та посів наступної культури."
     },
     "rules.reason.dryHayWindrow": {
-      "en": "Dried grass (hay windrow) is on the ground — finish tedding if needed, then bale or store before rain.",
+      "en": "Hay is on the ground — finish tedding if needed, then bale or store before rain.",
       "de": "Das getrocknete Gras (Heuschwaden) liegt auf dem Boden – falls nötig, noch einmal wenden und dann vor dem Regen zu Ballen pressen oder einlagern.",
       "fr": "L'herbe sèche (andain de foin) est au sol — terminez le fanage si nécessaire, puis mettez-la en balles ou stockez-la avant la pluie.",
       "es": "La hierba seca (hilera de heno) está en el suelo; si es necesario, termine de airearla y luego empacarla o almacenarla antes de que llueva.",
@@ -24998,6 +25056,93 @@
       "is": "Engar framleiðslukeðjur.",
       "nb": "Ingen produksjonskjeder.",
       "uk": "Немає виробничих ланцюжків."
+    },
+    "weather.forecastTomorrow": {
+      "en": "Tomorrow",
+      "de": "Tomorrow",
+      "fr": "Tomorrow",
+      "es": "Tomorrow",
+      "it": "Tomorrow",
+      "pl": "Tomorrow",
+      "nl": "Tomorrow",
+      "pt": "Tomorrow",
+      "sv": "Tomorrow",
+      "da": "Tomorrow",
+      "fi": "Tomorrow",
+      "cs": "Tomorrow",
+      "el": "Tomorrow",
+      "hu": "Tomorrow",
+      "ro": "Tomorrow",
+      "bg": "Tomorrow",
+      "hr": "Tomorrow",
+      "sk": "Tomorrow",
+      "sl": "Tomorrow",
+      "et": "Tomorrow",
+      "lv": "Tomorrow",
+      "lt": "Tomorrow",
+      "ga": "Tomorrow",
+      "mt": "Tomorrow",
+      "is": "Tomorrow",
+      "nb": "Tomorrow",
+      "uk": "Tomorrow"
+    },
+    "weather.forecastDayAfter": {
+      "en": "Day After",
+      "de": "Day After",
+      "fr": "Day After",
+      "es": "Day After",
+      "it": "Day After",
+      "pl": "Day After",
+      "nl": "Day After",
+      "pt": "Day After",
+      "sv": "Day After",
+      "da": "Day After",
+      "fi": "Day After",
+      "cs": "Day After",
+      "el": "Day After",
+      "hu": "Day After",
+      "ro": "Day After",
+      "bg": "Day After",
+      "hr": "Day After",
+      "sk": "Day After",
+      "sl": "Day After",
+      "et": "Day After",
+      "lv": "Day After",
+      "lt": "Day After",
+      "ga": "Day After",
+      "mt": "Day After",
+      "is": "Day After",
+      "nb": "Day After",
+      "uk": "Day After"
+    },
+    "weather.forecastDayN": {
+      "en": "Day {{n}}",
+      "de": "Day {{n}}",
+      "fr": "Day {{n}}",
+      "es": "Day {{n}}",
+      "it": "Day {{n}}",
+      "pl": "Day {{n}}",
+      "nl": "Day {{n}}",
+      "pt": "Day {{n}}",
+      "sv": "Day {{n}}",
+      "da": "Day {{n}}",
+      "fi": "Day {{n}}",
+      "cs": "Day {{n}}",
+      "el": "Day {{n}}",
+      "hu": "Day {{n}}",
+      "ro": "Day {{n}}",
+      "bg": "Day {{n}}",
+      "hr": "Day {{n}}",
+      "sk": "Day {{n}}",
+      "sl": "Day {{n}}",
+      "et": "Day {{n}}",
+      "lv": "Day {{n}}",
+      "lt": "Day {{n}}",
+      "ga": "Day {{n}}",
+      "mt": "Day {{n}}",
+      "is": "Day {{n}}",
+      "nb": "Day {{n}}",
+      "uk": "Day {{n}}"
     }
   }
 }

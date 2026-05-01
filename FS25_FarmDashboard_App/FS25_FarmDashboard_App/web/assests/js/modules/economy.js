@@ -68,19 +68,43 @@ export function showEconomySection() {
 
           <ul class="nav nav-tabs mb-4" id="economyTabs" role="tablist">
               <li class="nav-item" role="presentation">
-                  <button class="nav-link active" id="purchases-tab" data-bs-toggle="tab" data-bs-target="#purchases" type="button" role="tab">
-                      <i class="bi bi-cart-fill me-1"></i> ${t("economy.tabPurchases")}
+                  <button class="nav-link active" id="market-tab" data-bs-toggle="tab" data-bs-target="#market" type="button" role="tab">
+                      <i class="bi bi-graph-up me-1"></i> ${t("economy.tabMarket")}
                   </button>
               </li>
               <li class="nav-item" role="presentation">
-                  <button class="nav-link" id="market-tab" data-bs-toggle="tab" data-bs-target="#market" type="button" role="tab">
-                      <i class="bi bi-graph-up me-1"></i> ${t("economy.tabMarket")}
+                  <button class="nav-link" id="purchases-tab" data-bs-toggle="tab" data-bs-target="#purchases" type="button" role="tab">
+                      <i class="bi bi-cart-fill me-1"></i> ${t("economy.tabPurchases")}
                   </button>
               </li>
           </ul>
 
           <div class="tab-content" id="economyTabContent">
-              <div class="tab-pane fade show active" id="purchases" role="tabpanel">
+              <div class="tab-pane fade show active" id="market" role="tabpanel">
+                  <div class="row mb-3">
+                      <div class="col-12">
+                          <div class="input-group">
+                              <span class="input-group-text bg-secondary border-secondary">
+                                  <i class="bi bi-search"></i>
+                              </span>
+                              <input type="text" class="form-control bg-secondary border-secondary text-white"
+                                     id="crop-search" placeholder="${t("economy.marketPlaceholder").replace(/"/g, "&quot;")}"
+                                     onkeyup="dashboard.searchMarket(this.value)">
+                          </div>
+                      </div>
+                  </div>
+
+                  <div id="market-prices">
+                      <div class="text-center p-5">
+                          <div class="spinner-border text-primary" role="status">
+                              <span class="visually-hidden">${t("economy.loadingMarketAria")}</span>
+                          </div>
+                          <p class="mt-3 text-muted">${t("economy.loadingCropPrices")}</p>
+                      </div>
+                  </div>
+              </div>
+
+              <div class="tab-pane fade" id="purchases" role="tabpanel">
                   <div class="row mb-3">
                       <div class="col-md-6">
                           <div class="btn-group" role="group">
@@ -116,30 +140,6 @@ export function showEconomySection() {
                               <span class="visually-hidden">${t("economy.loadingPurchasesAria")}</span>
                           </div>
                           <p class="mt-3 text-muted">${t("economy.loadingEquipment")}</p>
-                      </div>
-                  </div>
-              </div>
-
-              <div class="tab-pane fade" id="market" role="tabpanel">
-                  <div class="row mb-3">
-                      <div class="col-12">
-                          <div class="input-group">
-                              <span class="input-group-text bg-secondary border-secondary">
-                                  <i class="bi bi-search"></i>
-                              </span>
-                              <input type="text" class="form-control bg-secondary border-secondary text-white"
-                                     id="crop-search" placeholder="${t("economy.marketPlaceholder").replace(/"/g, "&quot;")}"
-                                     onkeyup="dashboard.searchMarket(this.value)">
-                          </div>
-                      </div>
-                  </div>
-
-                  <div id="market-prices">
-                      <div class="text-center p-5">
-                          <div class="spinner-border text-primary" role="status">
-                              <span class="visually-hidden">${t("economy.loadingMarketAria")}</span>
-                          </div>
-                          <p class="mt-3 text-muted">${t("economy.loadingCropPrices")}</p>
                       </div>
                   </div>
               </div>

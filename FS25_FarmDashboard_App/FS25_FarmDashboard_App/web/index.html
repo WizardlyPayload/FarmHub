@@ -655,6 +655,10 @@
       <script src="assests/js/splash-screen.js"></script>
       <script src="assests/js/screen-wake-lock.js"></script>
       <script src="assests/js/pipeline-log.js"></script>
+      <script type="module">
+        import { installLanHttpBasicFetchPatch } from "./assests/js/lan-http-auth.js";
+        installLanHttpBasicFetchPatch();
+      </script>
       <script type="module" src="assests/js/realtime-connector.js"></script>
       <script src="assests/js/modExportProgress.js"></script>
       <script type="module" src="assests/js/app.js"></script>
@@ -914,6 +918,7 @@
                   <div class="tab-pane fade" id="app-settings-pane-mod" role="tabpanel" aria-labelledby="app-settings-tab-mod" tabindex="0">
                     <h6 class="text-farm-accent" data-i18n="settings.modTitle">FS25 mod — config.xml (this PC)</h6>
                     <p class="small text-muted" data-i18n="settings.modHint">These options match the in-game mod’s config file.</p>
+                    <p class="small text-muted" data-i18n="settings.modOneDriveHint">Documents, OneDrive, Microsoft Store / Xbox paths, and custom gameSettings paths are scanned automatically.</p>
                     <p class="small font-monospace text-break mb-2" id="settings-mod-config-path">—</p>
                     <div class="row g-3 mb-3">
                       <div class="col-md-6">
@@ -1041,6 +1046,20 @@
       </div>
     </div>
 
+    <div id="farmdash-lan-auth-overlay" class="farmdash-lan-auth-overlay d-none" aria-hidden="true">
+      <div class="farmdash-lan-auth-panel card bg-dark text-light border-secondary shadow-lg p-4 mx-3" style="max-width: 22rem">
+        <h2 class="h5 mb-2">LAN access</h2>
+        <p class="small text-muted mb-3">
+          Enter the LAN username and password from Farm Dashboard → Settings → LAN on the host PC (defaults are not secure — change them there).
+        </p>
+        <label class="form-label small" for="farmdash-lan-auth-user">Username</label>
+        <input type="text" id="farmdash-lan-auth-user" class="form-control form-control-sm mb-2" autocomplete="username" />
+        <label class="form-label small" for="farmdash-lan-auth-pass">Password</label>
+        <input type="password" id="farmdash-lan-auth-pass" class="form-control form-control-sm mb-3" autocomplete="current-password" />
+        <button type="button" id="farmdash-lan-auth-submit" class="btn btn-farm-accent w-100">Continue</button>
+      </div>
+    </div>
+
     <div class="modal fade" id="modExportProgressModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
       <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content bg-dark text-light border border-secondary">
@@ -1058,5 +1077,45 @@
         </div>
       </div>
     </div>
+    <style>
+      .farmdash-lan-auth-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483646;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(15, 23, 42, 0.94);
+      }
+    </style>
+    <script>
+      (function () {
+        document.addEventListener("DOMContentLoaded", function () {
+          try {
+            if (!window.__farmDashRemoteViewer) return;
+            var KEY = "farmdash_lan_http_basic_v1";
+            if (sessionStorage.getItem(KEY)) return;
+            var ov = document.getElementById("farmdash-lan-auth-overlay");
+            if (!ov) return;
+            ov.classList.remove("d-none");
+            ov.setAttribute("aria-hidden", "false");
+            var btn = document.getElementById("farmdash-lan-auth-submit");
+            var userEl = document.getElementById("farmdash-lan-auth-user");
+            var passEl = document.getElementById("farmdash-lan-auth-pass");
+            if (btn && userEl && passEl) {
+              btn.addEventListener("click", function () {
+                var u = userEl.value.trim();
+                var p = passEl.value;
+                if (!u || !p) return;
+                sessionStorage.setItem(KEY, btoa(u + ":" + p));
+                location.reload();
+              });
+            }
+          } catch (e) {
+            console.warn("[farmdash-lan-auth]", e);
+          }
+        });
+      })();
+    </script>
   </body>
 </html>

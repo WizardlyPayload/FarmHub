@@ -80,6 +80,7 @@
   "fields.soilNitrogen": "Azoto",
   "fields.soilPhLime": "pH / Calcare",
   "fields.needsScan": "Necessita di scansione",
+  "fields.scanned": "Scanned",
   "fields.fertilizationLevel": "Fertilizzazione {{cur}} /2 (completa = 2)",
   "fields.phNeeded": "Necessario",
   "fields.phDone": "Fatto",
@@ -860,5 +861,9 @@
   "rules.reason.fallback": "Le regole offline non corrispondono a questa situazione anomala: usa i suggerimenti sul campo di gioco o l'elenco dei suggerimenti in tempo reale dal tuo salvataggio.",
   "simhub.noFieldRows": "In questa fattoria non ci sono filari di campi.",
   "simhub.noPastureData": "Nessun dato sui pascoli.",
-  "simhub.noProductionChains": "Nessuna catena di produzione."
+  "simhub.noProductionChains": "Nessuna catena di produzione.",
+  "settings.modOneDriveHint": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+  "weather.forecastTomorrow": "Tomorrow",
+  "weather.forecastDayAfter": "Day After",
+  "weather.forecastDayN": "Day {{n}}"
 }

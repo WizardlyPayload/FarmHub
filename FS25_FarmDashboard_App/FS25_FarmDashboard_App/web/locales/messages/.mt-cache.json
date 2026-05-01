@@ -19695,5 +19695,9 @@
   "ef3c868b60af06d6324db75c3c4b8ad9b8a3f0ce|uk": "Метаболізм",
   "5397e0583f14f6c88de06b1ef28f460a1fb5b0ae|uk": "Так",
   "816c52fd2bdd94a63cd0944823a6c0aa9384c103|uk": "Ні",
-  "08d2e98e6754af941484848930ccbaddfefe13d6|uk": "Немає даних"
+  "08d2e98e6754af941484848930ccbaddfefe13d6|uk": "Немає даних",
+  "settings.modOneDriveHint": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+  "weather.forecastTomorrow": "Tomorrow",
+  "weather.forecastDayAfter": "Day After",
+  "weather.forecastDayN": "Day {{n}}"
 }

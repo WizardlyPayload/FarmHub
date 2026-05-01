@@ -10,6 +10,7 @@ export const SERVER_LIVE_CACHE_SCHEMA_VERSION = '1.0';
 
 import { filterFieldsForFarmView, invalidateFieldsClientCache } from './fields.js';
 import { t } from '../i18n/i18n.js';
+import { isFarmDashLocalConfigHost } from './viewer-mode.js';
 
 /** Persist active server + farm for SimHub (`GET /api/simhub-session`) — desktop app only. */
 function pushSimHubLiveContext(dashboard) {
@@ -46,7 +47,6 @@ function resetCrossFarmVisualizationCaches(dashboard) {
     }
   }
 }
-import { isFarmDashLocalConfigHost } from './viewer-mode.js';
 
 /** When the farm picker / saved id does not own any fields (multi-farm dedicated), pick the farm with the most field rows. */
 function inferFarmIdFromFieldOwnership(fields, farms) {

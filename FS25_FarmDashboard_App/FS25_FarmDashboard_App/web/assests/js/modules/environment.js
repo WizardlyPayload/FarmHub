@@ -191,7 +191,12 @@ export function showWeatherModal() {
       forecastContainer.innerHTML = '';
       if (this.weather.forecast && Array.isArray(this.weather.forecast) && this.weather.forecast.length > 0) {
         this.weather.forecast.slice(0, 3).forEach((day, index) => {
-          const dayLabel = index === 0 ? 'Tomorrow' : index === 1 ? 'Day After' : `Day ${index + 1}`;
+          const dayLabel =
+            index === 0
+              ? t("weather.forecastTomorrow")
+              : index === 1
+                ? t("weather.forecastDayAfter")
+                : t("weather.forecastDayN", { n: index + 1 });
           const weatherIcon = this.getWeatherIcon(day.weatherType);
           forecastContainer.innerHTML += `
             <div class="col-4">

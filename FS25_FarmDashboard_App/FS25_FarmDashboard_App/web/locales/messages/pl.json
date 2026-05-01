@@ -2,7 +2,7 @@
   "page.title": "Panel rolniczy",
   "splash.loading": "Ładowanie danych gospodarstwa…",
   "nav.brand": "Panel farmy",
-  "nav.loading": "Załadunek...",
+  "nav.loading": "Ładowanie...",
   "nav.dataSource": "Źródło danych",
   "nav.online": "W sieci",
   "nav.theme": "Ustawienia motywu",
@@ -80,6 +80,7 @@
   "fields.soilNitrogen": "Azot",
   "fields.soilPhLime": "pH / Wapno",
   "fields.needsScan": "Wymaga skanowania",
+  "fields.scanned": "Scanned",
   "fields.fertilizationLevel": "Zapłodnienie {{cur}} /2 (pełne = 2)",
   "fields.phNeeded": "Wymagany",
   "fields.phDone": "Zrobione",
@@ -331,7 +332,7 @@
   "card.productions": "Produkcja",
   "card.productionsDesc": "Łańcuchy produkcyjne, poziomy zapełnienia magazynów i aktywne sloty",
   "card.productionsBadge": "0 łańcuchów",
-  "card.loading": "Załadunek...",
+  "card.loading": "Ładowanie...",
   "card.badgeAnimalsOne": "{{count}} zwierzę",
   "card.badgeAnimalsMany": "{{count}} zwierząt",
   "card.badgeVehiclesOne": "{{count}} pojazd",
@@ -860,5 +861,9 @@
   "rules.reason.fallback": "Zasady trybu offline nie uwzględniają tego dziwnego stanu — skorzystaj ze wskazówek dostępnych w grze lub listy sugestii na żywo z zapisanej gry.",
   "simhub.noFieldRows": "W tym gospodarstwie nie ma rzędów pól.",
   "simhub.noPastureData": "Brak danych o pastwiskach.",
-  "simhub.noProductionChains": "Brak łańcuchów produkcyjnych."
+  "simhub.noProductionChains": "Brak łańcuchów produkcyjnych.",
+  "settings.modOneDriveHint": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+  "weather.forecastTomorrow": "Tomorrow",
+  "weather.forecastDayAfter": "Day After",
+  "weather.forecastDayN": "Day {{n}}"
 }

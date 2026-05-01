@@ -34,44 +34,32 @@ const {
 const { mergeData, buildFieldLiveFingerprints } = require('./dataMerger');
 const { loadServerCache, saveServerCache, appendFieldHistory } = require('./serverDataCache');
 const { initAppUpdater, checkForUpdatesNow } = require('./app-updater');
+const {
+    collectFs25DocumentRoots,
+    collectFarmDashboardModSettingsRoots,
+    selectPreferredFs25UserDataRoot,
+} = require('./fs25Paths');
+const { readFileUtf8WithRetry } = require('./fileReadRetry');
 
 const store = new Store({ defaults: { ...LAN_ACCESS_DEFAULTS } });
 
-/** .../Documents/My Games/FarmingSimulator2025 — Electron's documents path matches the game (incl. OneDrive redirects). */
-function getFs25DocumentsRoot() {
-    let docs;
+/** Same Documents folder as Explorer / FS25 (handles moved profiles); null if unavailable. */
+function getElectronDocumentsPath() {
     try {
-        docs = app.getPath('documents');
+        return app.getPath('documents');
     } catch {
-        docs = path.join(os.homedir(), 'Documents');
+        return null;
     }
-    return path.join(docs, 'My Games', 'FarmingSimulator2025');
 }
 
 /**
- * All plausible modSettings/FS25_FarmDashboard bases on Windows (game uses getUserProfileAppPath() —
- * often matches Explorer “Documents”, but OneDrive / USERPROFILE vs os.homedir() can diverge).
+ * FS25 user-data root (Documents / OneDrive / MS Store LocalCache / WpSystem / gameSettings override).
+ * Prefers a folder that already contains mod output or saves over an empty tree.
  */
-function collectFarmDashboardModSettingsRoots() {
-    const roots = new Set();
-    const add = (p) => {
-        if (!p || typeof p !== 'string') return;
-        try {
-            roots.add(path.normalize(p));
-        } catch (_) { /* ignore */ }
-    };
-    try {
-        add(path.join(getFs25DocumentsRoot(), 'modSettings', 'FS25_FarmDashboard'));
-    } catch (e) {
-        console.warn('[paths] getFs25DocumentsRoot:', e.message);
-    }
-    add(path.join(os.homedir(), 'Documents', 'My Games', 'FarmingSimulator2025', 'modSettings', 'FS25_FarmDashboard'));
-    const up = process.env.USERPROFILE;
-    if (up) {
-        add(path.join(up, 'Documents', 'My Games', 'FarmingSimulator2025', 'modSettings', 'FS25_FarmDashboard'));
-        add(path.join(up, 'OneDrive', 'Documents', 'My Games', 'FarmingSimulator2025', 'modSettings', 'FS25_FarmDashboard'));
-    }
-    return [...roots];
+function getFs25DocumentsRoot() {
+    const candidates = collectFs25DocumentRoots(getElectronDocumentsPath);
+    const fallback = path.join(os.homedir(), 'Documents', 'My Games', 'FarmingSimulator2025');
+    return selectPreferredFs25UserDataRoot(candidates, fallback) || fallback;
 }
 
 /** Random secret for POST /api/setup-config (browser cannot save config without this header). */
@@ -482,6 +470,86 @@ function normalizeIpForAllowlist(ip) {
 }
 
 /**
+ * When `lanAuthOptional` is true, GET/HEAD may skip Basic auth only for static/readme routes — never for live data,
+ * tokens, or server manager JSON. Paths are Express `req.path` (no query).
+ */
+function isLanSensitiveHttpPath(reqPath) {
+    const p = String(reqPath || '').split('?')[0] || '';
+    if (!p.startsWith('/api/')) return false;
+    const sensitive = new Set([
+        '/api/lan-ws-token',
+        '/api/setup-config',
+        '/api/data',
+        '/api/animals',
+        '/api/vehicles',
+        '/api/fields',
+        '/api/production',
+        '/api/finance',
+        '/api/weather',
+        '/api/economy',
+        '/api/farmlands',
+        '/api/simhub-view-config',
+        '/api/simhub-session',
+        '/api/servers',
+    ]);
+    if (sensitive.has(p)) return true;
+    return false;
+}
+
+function redactConfigForHttpGet(config) {
+    const c = config && typeof config === 'object' ? JSON.parse(JSON.stringify(config)) : {};
+    if (!Array.isArray(c.servers)) return c;
+    c.servers = c.servers.map((s) => {
+        if (!s || typeof s !== 'object') return s;
+        const copy = { ...s };
+        const hadPass = copy.ftpPass != null && String(copy.ftpPass).length > 0;
+        delete copy.ftpPass;
+        copy.ftpPassSet = hadPass;
+        if (copy.httpFeedCode != null && String(copy.httpFeedCode).length > 0) {
+            delete copy.httpFeedCode;
+            copy.httpFeedCodeSet = true;
+        } else {
+            copy.httpFeedCodeSet = false;
+        }
+        return copy;
+    });
+    return c;
+}
+
+/** Preserve FTP / feed secrets when LAN setup POST omits redacted fields (GET never returns cleartext). */
+function mergeServersPreserveSecrets(prevServers, incomingServers) {
+    if (!Array.isArray(incomingServers)) return [];
+    const prevById = new Map((prevServers || []).map((s) => [String(s.id), s]));
+    return incomingServers.map((inc) => {
+        if (!inc || typeof inc !== 'object') return inc;
+        const prev = prevById.get(String(inc.id));
+        const out = { ...inc };
+        delete out.ftpPassSet;
+        delete out.httpFeedCodeSet;
+        if (inc.mode === 'ftp' && prev) {
+            const emptyPass = inc.ftpPass == null || String(inc.ftpPass).trim() === '';
+            if (emptyPass && prev.ftpPass) out.ftpPass = prev.ftpPass;
+        }
+        const emptyCode = inc.httpFeedCode == null || String(inc.httpFeedCode).trim() === '';
+        if (emptyCode && prev && prev.httpFeedCode) out.httpFeedCode = prev.httpFeedCode;
+        return out;
+    });
+}
+
+function corsOriginAllowed(origin, callback) {
+    if (!origin) return callback(null, true);
+    try {
+        const u = new URL(origin);
+        if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') return callback(null, true);
+        const p = u.port || (u.protocol === 'https:' ? '443' : '80');
+        if (String(p) === '8766') return callback(null, true);
+    } catch (_) {
+        /* ignore */
+    }
+    return callback(null, false);
+}
+
+/**
  * LAN security for non-loopback clients: optional IP allowlist + HTTP Basic (same creds as Settings).
  * Loopback always allowed. Used by Express middleware and WebSocket `verifyClient`.
  */
@@ -504,7 +572,13 @@ function checkLanAccessForRequest(req) {
 
     const method = String(req.method || 'GET').toUpperCase();
     const isWsUpgrade = String(req.headers?.upgrade || '').toLowerCase() === 'websocket';
-    if (cfg.lanAuthOptional && (method === 'GET' || method === 'HEAD') && !isWsUpgrade) {
+    const pathOnly = req.path || (req.url && String(req.url).split('?')[0]) || '';
+    if (
+        cfg.lanAuthOptional &&
+        (method === 'GET' || method === 'HEAD') &&
+        !isWsUpgrade &&
+        !isLanSensitiveHttpPath(pathOnly)
+    ) {
         return { ok: true };
     }
 
@@ -554,7 +628,7 @@ function allowLanModExportHttp() {
     return process.env.FARMDASH_ALLOW_LAN_EXPORT === '1';
 }
 
-expressApp.use(cors());
+expressApp.use(cors({ origin: corsOriginAllowed }));
 expressApp.use(express.json());
 expressApp.use(lanAccessHttpMiddleware);
 expressApp.get('/simhub', (_req, res) => {
@@ -598,10 +672,10 @@ expressApp.get('/setup.html', (req, res) => {
     }
 });
 
-/** Full config for setup.html when opened in a normal browser (tablet on LAN — no Electron require). */
+/** Setup wizard JSON — FTP / feed secrets never included (use ftpPassSet / httpFeedCodeSet). Electron uses IPC for full config. */
 expressApp.get('/api/setup-config', (req, res) => {
     try {
-        res.json(store.get('config') || {});
+        res.json(redactConfigForHttpGet(store.get('config') || {}));
     } catch (e) {
         console.error('[api/setup-config GET]', e);
         res.status(500).json({ error: String(e.message || e) });
@@ -1069,8 +1143,9 @@ function hydrateLuaSnapshotFromDiskAtBoot(srv) {
             luaJsonPath = path.join(app.getPath('userData'), `data_${srv.id}.json`);
         }
         if (!luaJsonPath || !fs.existsSync(luaJsonPath)) return;
-        const raw = stripUtf8Bom(fs.readFileSync(luaJsonPath, 'utf8'));
-        processLuaData(srv.id, raw);
+        const raw = readFileUtf8WithRetry(luaJsonPath);
+        if (raw == null) return;
+        processLuaData(srv.id, stripUtf8Bom(raw));
         console.log(`[Boot] [${srv.id}] Hydrated Lua snapshot from disk: ${luaJsonPath}`);
     } catch (e) {
         console.warn(`[Boot] [${srv.id}] Lua snapshot hydrate failed:`, e.message);
@@ -1333,7 +1408,8 @@ function startLocalWatching(srv) {
     console.log(`[Local] Watching: ${luaJsonPath}`);
 
     const readFile = () => {
-        if (fs.existsSync(luaJsonPath)) processLuaData(srv.id, fs.readFileSync(luaJsonPath, 'utf8'));
+        const raw = readFileUtf8WithRetry(luaJsonPath);
+        if (raw != null) processLuaData(srv.id, stripUtf8Bom(raw));
     };
 
     // fs.watch + persistent:false — avoids chokidar polling handles that kept Windows folders "in use".
@@ -1439,7 +1515,8 @@ async function pollFtp(srv) {
 
 function getFtpPollingOptions(config) {
     const fp = config.ftpPolling || {};
-    const minutes = Math.min(25, Math.max(1, parseInt(fp.intervalMinutes, 10) || 5));
+    /** Default 1 min: aligns with mod default `collectionCycleMs=60000` (one full export pass / minute class). */
+    const minutes = Math.min(25, Math.max(1, parseInt(fp.intervalMinutes, 10) || 1));
     const delaySec = Math.min(600, Math.max(0, parseInt(fp.initialDelaySeconds, 10) || 0));
     const scheduleMode = fp.scheduleMode === 'staggered' ? 'staggered' : 'sync';
     return {
@@ -1475,7 +1552,8 @@ function startFtpPollingCoordinator(config, ftpServers) {
 
     console.log(
         `[FTP] Schedule: ${scheduleMode} | every ${opts.intervalMinutes} min | ` +
-        `delay ${initialDelaySeconds}s | ${N} server(s)`
+        `delay ${initialDelaySeconds}s | ${N} server(s) | ` +
+        'tip: set interval to a multiple of the mod `collectionCycleMs` (default 60s) for smooth updates'
     );
 
     const runLuaThenXml = (srv) =>
@@ -1639,10 +1717,11 @@ async function bootServer(config) {
 /** Same persistence + boot as ipcMain save-settings — used by POST /api/setup-config (tablet / browser on LAN). */
 async function applyFarmdashSetupConfig(newConfig) {
     const prev = store.get('config') || {};
+    const mergedServers = mergeServersPreserveSecrets(prev.servers, newConfig.servers);
     const merged = {
         ...prev,
         ...newConfig,
-        servers: newConfig.servers
+        servers: mergedServers,
     };
     if (newConfig.ftpPolling) {
         merged.ftpPolling = { ...(prev.ftpPolling || {}), ...newConfig.ftpPolling };
@@ -1664,7 +1743,7 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.js'),
-            webSecurity: false,
+            webSecurity: true,
         },
     });
 
@@ -1754,7 +1833,7 @@ ipcMain.handle('get-current-config', () => store.get('config'));
 /** Fallback when HTTP `/api/status` is unreachable — read default local `data.json` (same path logic as former `fs` in renderer). */
 ipcMain.handle('read-local-farmdash-data-json', () => {
     try {
-        const bases = collectFarmDashboardModSettingsRoots();
+        const bases = collectFarmDashboardModSettingsRoots(getElectronDocumentsPath);
         for (const base of bases) {
             if (!fs.existsSync(base)) continue;
             let folders;
@@ -1767,7 +1846,8 @@ ipcMain.handle('read-local-farmdash-data-json', () => {
                 if (!dirent.isDirectory()) continue;
                 const p = path.join(base, dirent.name, 'data.json');
                 if (!fs.existsSync(p)) continue;
-                const raw = fs.readFileSync(p, 'utf8');
+                const raw = readFileUtf8WithRetry(p);
+                if (raw == null) continue;
                 const data = JSON.parse(stripUtf8Bom(raw));
                 return { ok: true, path: p, data };
             }
@@ -2021,6 +2101,8 @@ function parseModConfigXml(text) {
     const base = {
         updateInterval: 10000,
         collectionCycleMs: 60000,
+        minWriteIntervalMs: 4000,
+        baleScanIntervalCycles: 1,
         modules: {
             animals: true,
             vehicles: true,
@@ -2036,6 +2118,10 @@ function parseModConfigXml(text) {
     const cc = text.match(/collectionCycleMs\s*=\s*"(\d+)"/i);
     if (ui) base.updateInterval = Math.max(1000, parseInt(ui[1], 10) || base.updateInterval);
     if (cc) base.collectionCycleMs = Math.max(5000, parseInt(cc[1], 10) || base.collectionCycleMs);
+    const mwi = text.match(/minWriteIntervalMs\s*=\s*"(\d+)"/i);
+    if (mwi) base.minWriteIntervalMs = Math.max(2000, Math.min(60000, parseInt(mwi[1], 10) || base.minWriteIntervalMs));
+    const bsc = text.match(/baleScanIntervalCycles\s*=\s*"(\d+)"/i);
+    if (bsc) base.baleScanIntervalCycles = Math.max(1, Math.min(20, parseInt(bsc[1], 10) || base.baleScanIntervalCycles));
     const modNames = ['animals', 'vehicles', 'weather', 'fields', 'finance', 'economy', 'production'];
     for (const m of modNames) {
         const re = new RegExp(`${m}\\s*=\\s*"(true|false)"`, 'i');
@@ -2048,11 +2134,13 @@ function parseModConfigXml(text) {
 function buildModConfigXml(cfg) {
     const u = Math.max(1000, Math.min(600000, Number(cfg.updateInterval) || 10000));
     const c = Math.max(5000, Math.min(1800000, Number(cfg.collectionCycleMs) || 60000));
+    const minW = Math.max(2000, Math.min(60000, Number(cfg.minWriteIntervalMs) || 4000));
+    const baleN = Math.max(1, Math.min(20, Number(cfg.baleScanIntervalCycles) || 1));
     const M = cfg.modules || {};
     const b = (k) => (M[k] === false ? 'false' : 'true');
     return `<?xml version="1.0" encoding="utf-8"?>
 <farmDashboard>
-    <settings updateInterval="${u}" collectionCycleMs="${c}"/>
+    <settings updateInterval="${u}" collectionCycleMs="${c}" minWriteIntervalMs="${minW}" baleScanIntervalCycles="${baleN}"/>
     <modules animals="${b('animals')}" vehicles="${b('vehicles')}" weather="${b('weather')}" fields="${b('fields')}" finance="${b('finance')}" economy="${b('economy')}" production="${b('production')}"/>
 </farmDashboard>
 `;
@@ -2064,7 +2152,10 @@ ipcMain.handle('get-mod-config', () => {
         if (!fs.existsSync(p)) {
             return { path: p, exists: false, ...parseModConfigXml('') };
         }
-        const text = fs.readFileSync(p, 'utf8');
+        const text = readFileUtf8WithRetry(p);
+        if (text == null) {
+            return { path: p, exists: false, error: 'unreadable', ...parseModConfigXml('') };
+        }
         return { path: p, exists: true, ...parseModConfigXml(text) };
     } catch (e) {
         return { path: p, exists: false, error: e.message, ...parseModConfigXml('') };
@@ -2087,7 +2178,7 @@ ipcMain.handle('scan-local-saves', async () => {
      * FS25 + mod write under .../modSettings/FS25_FarmDashboard/<slot>/data.json
      * Try every plausible Documents root (Electron, homedir, USERPROFILE, OneDrive).
      */
-    const roots = collectFarmDashboardModSettingsRoots();
+    const roots = collectFarmDashboardModSettingsRoots(getElectronDocumentsPath);
     const foundSaves = [];
     const seenJson = new Set();
     const searchedRoots = [];
@@ -2115,8 +2206,9 @@ ipcMain.handle('scan-local-saves', async () => {
             if (!fs.existsSync(jsonPath)) continue;
             seenJson.add(dedupeKey);
             try {
-                const raw = stripUtf8Bom(fs.readFileSync(jsonPath, 'utf8'));
-                const parsed = JSON.parse(raw);
+                const raw = readFileUtf8WithRetry(jsonPath);
+                if (raw == null) continue;
+                const parsed = JSON.parse(stripUtf8Bom(raw));
                 const mapName = parsed.serverInfo?.mapName || 'Unknown Map';
                 foundSaves.push({
                     id: 'srv_' + Date.now() + Math.floor(Math.random() * 1000),

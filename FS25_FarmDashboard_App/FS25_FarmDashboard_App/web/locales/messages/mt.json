@@ -80,6 +80,7 @@
   "fields.soilNitrogen": "Nitroġenu",
   "fields.soilPhLime": "pH / Ġir",
   "fields.needsScan": "Jeħtieġ skennjar",
+  "fields.scanned": "Scanned",
   "fields.fertilizationLevel": "Fertilizzazzjoni {{cur}} /2 (sħiħa = 2)",
   "fields.phNeeded": "Meħtieġ",
   "fields.phDone": "Magħmul",
@@ -860,5 +861,9 @@
   "rules.reason.fallback": "Ir-regoli offline ma jaqblux ma' dan l-istat stramb — uża l-ħjiel fil-logħba jew il-lista ta' suġġerimenti ħajjin mis-save tiegħek.",
   "simhub.noFieldRows": "L-ebda ringieli ta' għelieqi għal din ir-razzett.",
   "simhub.noPastureData": "L-ebda dejta dwar il-mergħat.",
-  "simhub.noProductionChains": "L-ebda katini ta' produzzjoni."
+  "simhub.noProductionChains": "L-ebda katini ta' produzzjoni.",
+  "settings.modOneDriveHint": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+  "weather.forecastTomorrow": "Tomorrow",
+  "weather.forecastDayAfter": "Day After",
+  "weather.forecastDayN": "Day {{n}}"
 }

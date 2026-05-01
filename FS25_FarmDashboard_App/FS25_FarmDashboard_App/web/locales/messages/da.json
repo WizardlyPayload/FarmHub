@@ -80,6 +80,7 @@
   "fields.soilNitrogen": "Kvælstof",
   "fields.soilPhLime": "pH / Kalk",
   "fields.needsScan": "Skal scannes",
+  "fields.scanned": "Scanned",
   "fields.fertilizationLevel": "Gødning {{cur}} /2 (fuld = 2)",
   "fields.phNeeded": "Nødvendig",
   "fields.phDone": "Færdig",
@@ -860,5 +861,9 @@
   "rules.reason.fallback": "Offline-reglerne matcher ikke denne mærkelige tilstand — brug felthints i spillet eller listen over liveforslag fra dit gemte game.",
   "simhub.noFieldRows": "Ingen markrækker for denne gård.",
   "simhub.noPastureData": "Ingen græsningsdata.",
-  "simhub.noProductionChains": "Ingen produktionskæder."
+  "simhub.noProductionChains": "Ingen produktionskæder.",
+  "settings.modOneDriveHint": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+  "weather.forecastTomorrow": "Tomorrow",
+  "weather.forecastDayAfter": "Day After",
+  "weather.forecastDayN": "Day {{n}}"
 }

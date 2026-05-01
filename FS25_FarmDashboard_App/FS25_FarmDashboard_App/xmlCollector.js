@@ -21,17 +21,26 @@
 const fs   = require('fs');
 const path = require('path');
 const os   = require('os');
+const { collectFs25DocumentRoots } = require('./fs25Paths');
+const { readFileUtf8WithRetry } = require('./fileReadRetry');
 
 // ─── tiny XML helpers (no external parser needed) ────────────────────────────
 
-function readXml(filePath) {
+function getElectronDocumentsPath() {
     try {
-        if (!fs.existsSync(filePath)) return null;
-        return fs.readFileSync(filePath, 'utf8');
-    } catch (e) {
-        console.warn(`[XML] Cannot read ${path.basename(filePath)}: ${e.message}`);
+        const { app } = require('electron');
+        return app.getPath('documents');
+    } catch {
         return null;
     }
+}
+
+function readXml(filePath) {
+    const text = readFileUtf8WithRetry(filePath);
+    if (text == null && fs.existsSync(filePath)) {
+        console.warn(`[XML] Cannot read ${path.basename(filePath)} after retries`);
+    }
+    return text;
 }
 
 function attr(str, name, fallback = null) {
@@ -120,10 +129,15 @@ function getSavegamePath(srv, saveSlot) {
         }
     }
 
-    // Standard default path
-    const fs25Root = path.join(os.homedir(), 'Documents', 'My Games', 'FarmingSimulator2025');
-    const direct   = path.join(fs25Root, slotLocal);
-    if (fs.existsSync(path.join(direct, 'careerSavegame.xml'))) return direct;
+    // Standard / OneDrive-shifted Documents paths (same order as main process)
+    const fs25Roots = collectFs25DocumentRoots(getElectronDocumentsPath);
+    for (const fs25Root of fs25Roots) {
+        const direct = path.join(fs25Root, slotLocal);
+        if (fs.existsSync(path.join(direct, 'careerSavegame.xml'))) return direct;
+    }
+    const fallbackRoot =
+        fs25Roots[0] || path.join(os.homedir(), 'Documents', 'My Games', 'FarmingSimulator2025');
+    const direct = path.join(fallbackRoot, slotLocal);
 
     // Try without slot (maybe localPath IS the savegame folder)
     if (srv.localPath && fs.existsSync(path.join(srv.localPath, 'careerSavegame.xml'))) {

@@ -17,14 +17,12 @@ function AnimalDataCollector:collectBegin()
         opts = opts or {}
         AnimalDataCollector._yieldEvery = math.max(1, tonumber(opts.animalBatch or opts.batchSize) or 2)
         AnimalDataCollector._animalTick = 0
-        local success, result = pcall(function()
-            return self:collectSafely()
-        end)
-        if not success or not result then
-            AnimalDataCollector._yieldEvery = nil
+        -- collectSafely may coroutine.yield; must not run under pcall (Lua 5.1 / engine — yields across C boundary hitch or error).
+        local result = self:collectSafely()
+        AnimalDataCollector._yieldEvery = nil
+        if not result then
             return {}
         end
-        AnimalDataCollector._yieldEvery = nil
         return result.animalData or {}
     end)
 end

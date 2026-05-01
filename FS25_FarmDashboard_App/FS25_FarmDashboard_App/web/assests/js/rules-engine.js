@@ -898,11 +898,41 @@ export function getLocalFieldSuggestion(field, opts = {}) {
     };
   }
 
-  // ── A2.5 Loose forage (presence: Lua hasLooseStraw / hasLooseGrassWindrow / hasLooseHayWindrow — next stage when all false)
+  // ── A2.5 Bales on field (Lua: baleCountOnField — physical bales on this farmland) ──
+  // Keep this before loose-forage flags so stale windrow flags don't hide the more
+  // actionable "move bales" instruction.
+  const baleN = getBaleCountStrict(field);
+  if (baleN > 0) {
+    const action =
+      baleN === 1
+        ? t("rules.action.moveOneBale")
+        : t("rules.action.moveBales", { n: baleN });
+    const actionKey =
+      baleN === 1 ? "rules.action.moveOneBale" : "rules.action.moveBales";
+    const reason =
+      baleN === 1
+        ? t("rules.reason.oneBale")
+        : t("rules.reason.manyBales", { n: baleN });
+    return {
+      action,
+      actionKey,
+      reason,
+      source: "rules",
+    };
+  }
+
+  // ── A2.6 Loose forage (presence: Lua hasLooseStraw / hasLooseGrassWindrow / hasLooseHayWindrow — next stage when all false)
+  // Only trust per-type booleans when we also have a meaningful loose-forage signal.
+  const looseLitersSignal =
+    Number(field.looseStrawLiters ?? 0) +
+    Number(field.looseGrassWindrowLiters ?? 0) +
+    Number(field.looseDryGrassWindrowLiters ?? 0);
+  const hasStrongLooseSignal =
+    looseLitersSignal >= MIN_FORAGE_WORKFLOW_LITERS || aggregateBaleableLoose(field);
   const flNeg = forageLitersNegligible(field);
-  const hs = field.hasLooseStraw === true && !flNeg;
-  const hg = field.hasLooseGrassWindrow === true && !flNeg;
-  const hh = field.hasLooseHayWindrow === true && !flNeg;
+  const hs = field.hasLooseStraw === true && !flNeg && hasStrongLooseSignal;
+  const hg = field.hasLooseGrassWindrow === true && !flNeg && hasStrongLooseSignal;
+  const hh = field.hasLooseHayWindrow === true && !flNeg && hasStrongLooseSignal;
   if (hs || hg || hh) {
     if (hs && !hg && !hh) {
       return {
@@ -1056,27 +1086,6 @@ export function getLocalFieldSuggestion(field, opts = {}) {
       action: t("rules.action.clearSwath"),
       actionKey: "rules.action.clearSwath",
       reason: t("rules.reason.swathCovering"),
-      source: "rules",
-    };
-  }
-
-  // ── A4. Bales on field (Lua: baleCountOnField — physical bales on this farmland) ──
-  const baleN = getBaleCountStrict(field);
-  if (baleN > 0) {
-    const action =
-      baleN === 1
-        ? t("rules.action.moveOneBale")
-        : t("rules.action.moveBales", { n: baleN });
-    const actionKey =
-      baleN === 1 ? "rules.action.moveOneBale" : "rules.action.moveBales";
-    const reason =
-      baleN === 1
-        ? t("rules.reason.oneBale")
-        : t("rules.reason.manyBales", { n: baleN });
-    return {
-      action,
-      actionKey,
-      reason,
       source: "rules",
     };
   }

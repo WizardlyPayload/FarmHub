@@ -80,6 +80,7 @@
   "fields.soilNitrogen": "Dusík",
   "fields.soilPhLime": "pH / Vápno",
   "fields.needsScan": "Vyžaduje skenování",
+  "fields.scanned": "Scanned",
   "fields.fertilizationLevel": "Hnojení {{cur}} /2 (full = 2)",
   "fields.phNeeded": "Potřebné",
   "fields.phDone": "Hotovo",
@@ -860,5 +861,9 @@
   "rules.reason.fallback": "Pravidla offline se tomuto zvláštnímu stavu nehodí – použijte nápovědy ve hře nebo seznam návrhů z uložené hry.",
   "simhub.noFieldRows": "Pro tuto farmu nejsou žádné řádky polí.",
   "simhub.noPastureData": "Žádné údaje o pastvinách.",
-  "simhub.noProductionChains": "Žádné výrobní řetězce."
+  "simhub.noProductionChains": "Žádné výrobní řetězce.",
+  "settings.modOneDriveHint": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+  "weather.forecastTomorrow": "Tomorrow",
+  "weather.forecastDayAfter": "Day After",
+  "weather.forecastDayN": "Day {{n}}"
 }

@@ -73,7 +73,10 @@ export function displayNotificationHistory() {
 
       const titleSafe = escapeNotificationHtml(notification.title);
       const bodyRaw = notification.messageHtml || notification.message;
-      const bodySafe = notification.messageHtml ? bodyRaw : escapeNotificationHtml(bodyRaw);
+      const bodySafe =
+        notification.messageHtml && notification.messageHtmlTrusted === true
+          ? bodyRaw
+          : escapeNotificationHtml(bodyRaw);
 
       return `
       <div class="notification-item border-bottom border-secondary pb-3 mb-3">

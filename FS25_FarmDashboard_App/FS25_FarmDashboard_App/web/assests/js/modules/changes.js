@@ -696,6 +696,7 @@ export function showChangeToasts(changes) {
       title: t(titleKey, { count }),
       message: displayTextPlain,
       messageHtml: displayTextHtml,
+      messageHtmlTrusted: true,
     });
   }
 
@@ -724,6 +725,7 @@ export function showChangeToasts(changes) {
       title: t(titleKey, { count }),
       message: displayTextPlain,
       messageHtml: displayTextHtml,
+      messageHtmlTrusted: true,
     });
   }
 
@@ -744,6 +746,7 @@ export function showChangeToasts(changes) {
         title: t("changes.historyLactationStartedTitle"),
         message: t("changes.historyLactationStartedBody", { id: plainId }),
         messageHtml: t("changes.historyLactationStartedBody", { id: clickableId }),
+        messageHtmlTrusted: true,
       });
     } else {
       this.showAlert(t("changes.toastLactationStopped", { id: clickableId }), "info");
@@ -752,6 +755,7 @@ export function showChangeToasts(changes) {
         title: t("changes.historyLactationStoppedTitle"),
         message: t("changes.historyLactationStoppedBody", { id: plainId }),
         messageHtml: t("changes.historyLactationStoppedBody", { id: clickableId }),
+        messageHtmlTrusted: true,
       });
     }
   });
@@ -773,6 +777,7 @@ export function showChangeToasts(changes) {
         title: t("changes.historyPregnancyStartedTitle"),
         message: t("changes.historyPregnancyStartedBody", { id: plainId }),
         messageHtml: t("changes.historyPregnancyStartedBody", { id: clickableId }),
+        messageHtmlTrusted: true,
       });
     } else {
       this.showAlert(t("changes.toastBirth", { id: clickableId }), "success");
@@ -781,6 +786,7 @@ export function showChangeToasts(changes) {
         title: t("changes.historyBirthTitle"),
         message: t("changes.historyBirthBody", { id: plainId }),
         messageHtml: t("changes.historyBirthBody", { id: clickableId }),
+        messageHtmlTrusted: true,
       });
     }
   });

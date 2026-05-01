@@ -80,6 +80,7 @@
   "fields.soilNitrogen": "Azotas",
   "fields.soilPhLime": "pH / Kalkės",
   "fields.needsScan": "Reikia nuskaityti",
+  "fields.scanned": "Scanned",
   "fields.fertilizationLevel": "Tręšimas {{cur}} /2 (pilnas = 2)",
   "fields.phNeeded": "Reikalingas",
   "fields.phDone": "Atlikta",
@@ -860,5 +861,9 @@
   "rules.reason.fallback": "Neprisijungus veikiančios taisyklės neatitinka šios keistos būsenos – naudokite žaidimo lauko užuominas arba tiesioginių pasiūlymų sąrašą iš savo išsaugojimo.",
   "simhub.noFieldRows": "Šiame ūkyje nėra lauko eilių.",
   "simhub.noPastureData": "Nėra ganyklų duomenų.",
-  "simhub.noProductionChains": "Nėra gamybos grandinių."
+  "simhub.noProductionChains": "Nėra gamybos grandinių.",
+  "settings.modOneDriveHint": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+  "weather.forecastTomorrow": "Tomorrow",
+  "weather.forecastDayAfter": "Day After",
+  "weather.forecastDayN": "Day {{n}}"
 }

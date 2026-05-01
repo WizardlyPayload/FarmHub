@@ -419,12 +419,7 @@ function buildFieldCard(field) {
     const progress   = buildProgressBar(field);
     const conditions = buildConditions(field);
     const suggestion = buildSuggestion(field);
-    const isPF       = field.isPrecisionFarming;
-    const pfBadge    = isPF
-        ? `<span class="badge bg-info text-dark ms-1" title="${escapeFieldHtml(t("fields.pfMappingTitle"))}">
-               <i class="bi bi-cpu me-1"></i>${escapeFieldHtml(t("fields.badgeSoil"))}
-           </span>`
-        : "";
+    const pfBadges   = buildPfBadges(field);
     const clusterNote =
         Array.isArray(field._clusterFields) && field._clusterFields.length > 1
             ? `<div class="small text-muted mb-2">${escapeFieldHtml(
@@ -444,7 +439,7 @@ function buildFieldCard(field) {
                     <h5 class="mb-0">
                         <i class="bi bi-geo-alt-fill text-primary me-1"></i>
                         ${field.name || t("fields.fieldNameFallback", { id: field.id })}
-                        ${pfBadge}
+                        ${pfBadges}
                     </h5>
                     ${badge}
                 </div>
@@ -468,6 +463,17 @@ function buildFieldCard(field) {
                 </div>
             </div>
         </div>`;
+}
+
+function buildPfBadges(field) {
+    if (!field?.isPrecisionFarming) return "";
+    const pfBadge = `<span class="badge bg-info text-dark ms-1" title="${escapeFieldHtml(t("fields.pfMappingTitle"))}">
+            <i class="bi bi-cpu me-1"></i>PF
+        </span>`;
+    const scanBadge = field.isScanned
+        ? `<span class="badge bg-success ms-1">${escapeFieldHtml(t("fields.scanned"))}</span>`
+        : `<span class="badge bg-danger ms-1">${escapeFieldHtml(t("fields.needsScan"))}</span>`;
+    return `${pfBadge}${scanBadge}`;
 }
 
 // ── Status badge ──────────────────────────────────────────────────────────────
@@ -679,11 +685,12 @@ function buildProgressBar(field) {
 function barHTML(pct, bg, label, textColour = "white") {
     return `
         <div class="mt-2">
-            <div class="progress" style="height:20px;background:#2c2c2c;">
-                <div class="progress-bar fw-bold"
-                     style="width:${pct}%;background:${bg};color:${textColour};">
+            <div class="progress field-progress-track" style="height:20px;background:#2c2c2c;">
+                <div class="progress-bar field-progress-fill"
+                     style="width:${pct}%;background:${bg};"></div>
+                <span class="field-progress-label fw-bold" style="color:${textColour};">
                     ${label}
-                </div>
+                </span>
             </div>
         </div>`;
 }
@@ -1255,19 +1262,6 @@ function buildFieldsHTML() {
                            placeholder="${escapeFieldHtml(t("fields.searchPlaceholder"))}"
                            oninput="dashboard.searchFields(this.value)">
                 </div>
-            </div>
-        </div>
-
-        <div class="row mb-3">
-            <div class="col-12">
-                <details class="bg-dark rounded border border-secondary p-2">
-                    <summary class="text-light small fw-semibold">${escapeFieldHtml(t("fields.suggestionOrderTitle"))}</summary>
-                    <div class="text-muted small mt-2">
-                        ${getSuggestionOrderCatalog()
-                            .map((step, idx) => `<div>${idx + 1}. ${escapeFieldHtml(step)}</div>`)
-                            .join("")}
-                    </div>
-                </details>
             </div>
         </div>
 

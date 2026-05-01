@@ -80,6 +80,7 @@
   "fields.soilNitrogen": "Αζωτο",
   "fields.soilPhLime": "pH / Ασβέστης",
   "fields.needsScan": "Χρειάζεται σάρωση",
+  "fields.scanned": "Scanned",
   "fields.fertilizationLevel": "Γονιμοποίηση {{cur}} /2 (πλήρης = 2)",
   "fields.phNeeded": "Απαιτείται",
   "fields.phDone": "Γινώμενος",
@@ -860,5 +861,9 @@
   "rules.reason.fallback": "Οι κανόνες εκτός σύνδεσης δεν ταιριάζουν με αυτήν την περίεργη κατάσταση — χρησιμοποιήστε υποδείξεις πεδίων εντός παιχνιδιού ή τη λίστα προτάσεων σε πραγματικό χρόνο από την αποθήκευσή σας.",
   "simhub.noFieldRows": "Δεν υπάρχουν σειρές χωραφιών για αυτό το αγρόκτημα.",
   "simhub.noPastureData": "Δεν υπάρχουν δεδομένα για τα βοσκοτόπια.",
-  "simhub.noProductionChains": "Χωρίς αλυσίδες παραγωγής."
+  "simhub.noProductionChains": "Χωρίς αλυσίδες παραγωγής.",
+  "settings.modOneDriveHint": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+  "weather.forecastTomorrow": "Tomorrow",
+  "weather.forecastDayAfter": "Day After",
+  "weather.forecastDayN": "Day {{n}}"
 }

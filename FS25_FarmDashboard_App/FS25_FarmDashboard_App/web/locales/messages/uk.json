@@ -80,6 +80,7 @@
   "fields.soilNitrogen": "Азот",
   "fields.soilPhLime": "pH / Вапно",
   "fields.needsScan": "Потрібне сканування",
+  "fields.scanned": "Scanned",
   "fields.fertilizationLevel": "Запліднення {{cur}} /2 (full = 2)",
   "fields.phNeeded": "Потрібно",
   "fields.phDone": "Готово",
@@ -860,5 +861,9 @@
   "rules.reason.fallback": "Правила офлайн-грав не відповідають цьому дивному стану — використовуйте підказки в грі або список пропозицій у режимі реального часу зі збереження.",
   "simhub.noFieldRows": "Для цієї ферми немає польових рядів.",
   "simhub.noPastureData": "Немає даних про пасовища.",
-  "simhub.noProductionChains": "Немає виробничих ланцюжків."
+  "simhub.noProductionChains": "Немає виробничих ланцюжків.",
+  "settings.modOneDriveHint": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+  "weather.forecastTomorrow": "Tomorrow",
+  "weather.forecastDayAfter": "Day After",
+  "weather.forecastDayN": "Day {{n}}"
 }

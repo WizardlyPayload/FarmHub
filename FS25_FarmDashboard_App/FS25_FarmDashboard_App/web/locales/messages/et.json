@@ -80,6 +80,7 @@
   "fields.soilNitrogen": "Lämmastik",
   "fields.soilPhLime": "pH / Lubi",
   "fields.needsScan": "Vajab skannimist",
+  "fields.scanned": "Scanned",
   "fields.fertilizationLevel": "Viljastumine {{cur}} /2 (täis = 2)",
   "fields.phNeeded": "Vajalik",
   "fields.phDone": "Valmis",
@@ -860,5 +861,9 @@
   "rules.reason.fallback": "Võrguühenduseta reeglid ei vasta sellele veidrale olekule – kasuta mängusiseseid väljavihjeid või salvestuse reaalajas soovituste loendit.",
   "simhub.noFieldRows": "Sellel talul pole põlluridu.",
   "simhub.noPastureData": "Karjamaa andmed puuduvad.",
-  "simhub.noProductionChains": "Tootmisahelaid pole."
+  "simhub.noProductionChains": "Tootmisahelaid pole.",
+  "settings.modOneDriveHint": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+  "weather.forecastTomorrow": "Tomorrow",
+  "weather.forecastDayAfter": "Day After",
+  "weather.forecastDayN": "Day {{n}}"
 }

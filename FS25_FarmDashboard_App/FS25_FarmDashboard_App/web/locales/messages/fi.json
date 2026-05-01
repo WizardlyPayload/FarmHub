@@ -80,6 +80,7 @@
   "fields.soilNitrogen": "Typpi",
   "fields.soilPhLime": "pH / Kalkki",
   "fields.needsScan": "Tarvitsee skannauksen",
+  "fields.scanned": "Scanned",
   "fields.fertilizationLevel": "Hedelmöitys {{cur}} /2 (täysi = 2)",
   "fields.phNeeded": "Tarvitaan",
   "fields.phDone": "Tehty",
@@ -860,5 +861,9 @@
   "rules.reason.fallback": "Offline-säännöt eivät vastaa tätä outoa tilaa – käytä pelin sisäisiä kenttävihjeitä tai tallennuksesi live-ehdotusluetteloa.",
   "simhub.noFieldRows": "Ei peltorivejä tälle tilalle.",
   "simhub.noPastureData": "Ei laiduntietoja.",
-  "simhub.noProductionChains": "Ei tuotantoketjuja."
+  "simhub.noProductionChains": "Ei tuotantoketjuja.",
+  "settings.modOneDriveHint": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
+  "weather.forecastTomorrow": "Tomorrow",
+  "weather.forecastDayAfter": "Day After",
+  "weather.forecastDayN": "Day {{n}}"
 }

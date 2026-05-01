@@ -255,9 +255,9 @@ function FarmDashboardDataCollector:finishModuleSlice(name, order, usedIncrement
 
     self._cycleFresh[name] = true
     self:refreshAssembledInMemory()
-    local assembled = self:assembleDataFromModuleCache()
-    if assembled then
-        self:beginDeferredJsonWrite(assembled)
+    --- refreshAssembledInMemory already ran assembleDataFromModuleCache; avoid a second full merge before JSON defer.
+    if self.data and type(self.data) == "table" then
+        self:beginDeferredJsonWrite(self.data)
     end
     self:tryFlushAfterFullCycle(order)
 end
@@ -312,7 +312,7 @@ function FarmDashboardDataCollector:runIncrementalActiveStep(order)
         self.moduleCache[name] = payload or {}
     end
 
-    self:refreshAssembledInMemory()
+    --- Partial incremental steps skip refreshAssembledInMemory (full assemble every frame hitched while driving).
 
     if done and name ~= "production" then
         self:finishModuleSlice(name, order, true)
@@ -349,9 +349,7 @@ function FarmDashboardDataCollector:consumeOneModuleSlot(order)
 
     if self:collectorSupportsIncremental(name) then
         self:startModuleSlice(name, order)
-        if self._incActiveModule == name then
-            self:runIncrementalActiveStep(order)
-        end
+        --- First collectStep runs next frame (update drain) so slot boundary does not stack collectBegin + collectStep in one frame.
         return
     end
 
@@ -413,6 +411,8 @@ function FarmDashboardDataCollector:update(dt)
         return
     end
 
+    --- Next inter-module slot after this many ms of mission time (same units as collectionCycleMs / dt).
+    --- Example: 60000 ms cycle, 5 modules enabled → ~12s between periodic export slot boundaries.
     local slotMs = cycleMs / n
 
     if not self.staggerFirstRunDone then
@@ -521,7 +521,6 @@ function FarmDashboardDataCollector:husbandryTotalsStep()
         end
         return true
     end
-    self:refreshAssembledInMemory()
     return false
 end
 

@@ -865,5 +865,10 @@
   "settings.modOneDriveHint": "This PC may store FS25 under Documents, under OneDrive, under the Microsoft Store / Xbox app package path (AppData\\Local\\Packages\\…\\LocalCache\\Local), or on another drive (WpSystem\\…\\Packages). The dashboard scans these locations and prefers a folder that already has mod data or saves. Custom mod paths from gameSettings.xml (modsDirectoryOverride) are followed when present. For stubborn sync issues, pause cloud sync while playing or relocate data via gameSettings.xml.",
   "weather.forecastTomorrow": "Tomorrow",
   "weather.forecastDayAfter": "Day After",
-  "weather.forecastDayN": "Day {{n}}"
+  "weather.forecastDayN": "Day {{n}}",
+  "updater.dialogTitle": "Update bereit",
+  "updater.dialogMessage": "Farm Dashboard {{version}} wurde heruntergeladen.",
+  "updater.dialogDetail": "Jetzt neu starten, um die Installation abzuschließen? Ihre Dashboard-Einstellungen und Farmdaten bleiben auf diesem PC.",
+  "updater.restartNow": "Neu starten und installieren",
+  "updater.later": "Später"
 }

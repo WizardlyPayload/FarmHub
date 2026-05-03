@@ -21,6 +21,8 @@ const APP_ROOT = path.resolve(__dirname, "..", "..");
 const WEB_ROOT = path.resolve(__dirname, "..");
 const SETUP_HTML = path.resolve(APP_ROOT, "setup.html");
 const TRANSLATIONS = path.resolve(__dirname, "translations.json");
+/** Main-process strings (app-updater.js) use tr('…'); scan so keys stay in catalog audit */
+const APP_UPDATER_JS = path.resolve(APP_ROOT, "app-updater.js");
 
 const SKIP_DIRS = new Set([
   "node_modules",
@@ -117,6 +119,7 @@ const AI_LEFTOVER_RE = /\b(?:ai|llm|gemini|openai|consultant|byok|field\s*consul
 function main() {
   const files = walk(WEB_ROOT);
   if (fs.existsSync(SETUP_HTML)) files.push(SETUP_HTML);
+  if (fs.existsSync(APP_UPDATER_JS)) files.push(APP_UPDATER_JS);
 
   const catalog = loadCatalog();
   const defined = new Set(Object.keys(catalog));

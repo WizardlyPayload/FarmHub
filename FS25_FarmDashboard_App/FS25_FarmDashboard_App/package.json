@@ -37,6 +37,8 @@
       "app-updater.js",
       "preload.js",
       "xmlCollector.js",
+      "fs25Paths.js",
+      "fileReadRetry.js",
       "dataMerger.js",
       "serverDataCache.js",
       "setup.html",

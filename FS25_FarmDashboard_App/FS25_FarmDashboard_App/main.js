@@ -1797,7 +1797,13 @@ process.on('unhandledRejection', (reason) => {
 app.whenReady().then(() => {
     consumeInstallLocaleFile();
     createWindow();
-    initAppUpdater(() => mainWindow);
+    initAppUpdater(
+        () => mainWindow,
+        () => {
+            const l = store.get('locale');
+            return l && typeof l === 'string' ? l : 'en';
+        }
+    );
     
 });
 app.on('window-all-closed', () => {

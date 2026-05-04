@@ -32,6 +32,7 @@ const {
     FTP_SAVEGAME_XML_DOWNLOAD_ORDER,
 } = require('./xmlCollector');
 const { mergeData, buildFieldLiveFingerprints } = require('./dataMerger');
+const { hydrateLuaDataAnimalsFromDetails } = require('./detailAnimalsHydrate');
 const { loadServerCache, saveServerCache, appendFieldHistory } = require('./serverDataCache');
 const { initAppUpdater, checkForUpdatesNow } = require('./app-updater');
 const {
@@ -40,6 +41,7 @@ const {
     selectPreferredFs25UserDataRoot,
 } = require('./fs25Paths');
 const { readFileUtf8WithRetry } = require('./fileReadRetry');
+const livestockDetailModule = require('./livestockDetail.js');
 
 const store = new Store({ defaults: { ...LAN_ACCESS_DEFAULTS } });
 
@@ -491,8 +493,10 @@ function isLanSensitiveHttpPath(reqPath) {
         '/api/simhub-view-config',
         '/api/simhub-session',
         '/api/servers',
+        '/api/livestock',
     ]);
     if (sensitive.has(p)) return true;
+    if (p.startsWith('/api/livestock/')) return true;
     return false;
 }
 
@@ -717,6 +721,8 @@ expressApp.get('/api/servers', (req, res) => {
         name: s.name,
         mode: s.mode || 'local',
         localSubFolder: s.localSubFolder || null,
+        // Plan v5 A5: surface a configuration warning so the UI can render a dismissible banner.
+        configWarning: (serverStates[s.id] && serverStates[s.id].configWarning) || null,
     })));
 });
 
@@ -838,6 +844,135 @@ expressApp.get('/api/data',       (req, res) => {
     }
 });
 expressApp.get('/api/animals',    (req, res) => res.json(getDataForServer(req)?.animals    || []));
+
+// Plan v5 A6: CSRF + rate-limit + integer-id validation for new write endpoints.
+// Loopback always passes. Non-loopback must:
+//   - send Origin or Referer matching http(s)://<host>:8766 (or localhost/127.0.0.1)
+//   - send X-FarmDash-Token / X-Setup-Token matching ensureSetupWriteToken() value
+//   - rate limit: 10 POST requests per 30s window per remote IP (token bucket)
+const lanWriteRateBuckets = new Map(); // ip -> { tokens, last }
+function takeRateLimitToken(ip, capacity = 10, refillSec = 30) {
+    const now = Date.now() / 1000;
+    let b = lanWriteRateBuckets.get(ip);
+    if (!b) { b = { tokens: capacity, last: now }; lanWriteRateBuckets.set(ip, b); }
+    const elapsed = Math.max(0, now - b.last);
+    b.tokens = Math.min(capacity, b.tokens + elapsed * (capacity / refillSec));
+    b.last = now;
+    if (b.tokens < 1) return false;
+    b.tokens -= 1;
+    return true;
+}
+function getRequestOrigin(req) {
+    const o = req.headers && (req.headers.origin || req.headers.referer || '');
+    if (!o) return '';
+    try {
+        return new URL(String(o)).origin;
+    } catch (_) { return ''; }
+}
+function isAllowedSameOrigin(originStr, req) {
+    if (!originStr) return false;
+    try {
+        const u = new URL(originStr);
+        if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') return true;
+        if (String(u.port || (u.protocol === 'https:' ? 443 : 80)) === '8766') return true;
+        // Same hostname as the request itself (LAN tablet hitting <hostIp>:8766 with same origin).
+        const hostHeader = String(req.headers && req.headers.host || '').split(':')[0];
+        if (hostHeader && u.hostname === hostHeader) return true;
+    } catch (_) { /* ignore */ }
+    return false;
+}
+function enforceWriteOriginAndToken(req, res) {
+    if (isLocalhostSocket(req)) return null; // loopback always passes
+    // Origin/Referer same-origin required from non-loopback
+    const origin = getRequestOrigin(req);
+    if (!isAllowedSameOrigin(origin, req)) {
+        return { code: 403, body: { ok: false, error: 'origin not allowed' } };
+    }
+    // When LAN access is enabled the API binds beyond localhost — require setup token for writes.
+    // With LAN off, only local processes reach the port; same-origin check above still applies for browsers.
+    const lanOn = !!store.get('lanAccessEnabled', false);
+    if (!lanOn) return null;
+    ensureSetupWriteToken();
+    const expected = String(store.get('farmdashSetupWriteToken') || '');
+    const got = String(
+        (req.headers && (req.headers['x-farmdash-token'] || req.headers['x-setup-token'])) || ''
+    ).trim();
+    if (!expected || got !== expected) {
+        return { code: 403, body: { ok: false, error: 'invalid token' } };
+    }
+    return null;
+}
+
+// Plan v5 A1+A6: per-pen LOD detail with id validation, rich response, and security gates.
+// Reads `details/animals_<id>.json` from the mod's output directory; FTP mode consults the
+// dirtyPens.json index (downloaded alongside data.json by pollFtp) to skip needless refetches.
+expressApp.get('/api/livestock/:id', async (req, res) => {
+    const pk = livestockDetailModule.parsePenKeyForRead(req.params.id);
+    if (!pk) {
+        return res.status(400).json({ error: 'invalid id' });
+    }
+    try {
+        const result = await getLivestockDetail(req);
+        if (!result || !result.detail) {
+            return res.status(404).json({ error: 'detail not available', id: pk.canonicalKey });
+        }
+        res.json(result);
+    } catch (e) {
+        if (e && e.code === 'INVALID_ID') {
+            return res.status(400).json({ error: 'invalid id' });
+        }
+        console.error('[api/livestock/:id]', e && e.stack ? e.stack : e);
+        res.status(500).json({ error: String(e.message || e) });
+    }
+});
+
+// Plan v5 A4+A6: write a hardened, bounded, schema-versioned requests.json with CSRF + rate limit.
+expressApp.post('/api/livestock/:id/request', express.json({ limit: '8kb' }), async (req, res) => {
+    const idCheck = livestockDetailModule.validatePenId(req.params.id);
+    if (idCheck == null) {
+        return res.status(400).json({ ok: false, error: 'invalid id' });
+    }
+    const gate = enforceWriteOriginAndToken(req, res);
+    if (gate) return res.status(gate.code).json(gate.body);
+    const ip = String(req.ip || requestRemoteAddress(req) || 'unknown');
+    if (!takeRateLimitToken(ip)) {
+        res.setHeader('Retry-After', '15');
+        return res.status(429).json({ ok: false, error: 'rate limit' });
+    }
+    try {
+        const ok = await requestLivestockDetail(req);
+        res.json({ ok: !!ok });
+    } catch (e) {
+        if (e && e.code === 'INVALID_ID') {
+            return res.status(400).json({ ok: false, error: 'invalid id' });
+        }
+        console.error('[api/livestock/:id/request]', e && e.stack ? e.stack : e);
+        res.status(500).json({ ok: false, error: String(e.message || e) });
+    }
+});
+
+function getServersFromStore() {
+    const config = store.get('config');
+    return Array.isArray(config?.servers) ? config.servers : [];
+}
+function getLivestockDetail(req) {
+    return livestockDetailModule.read({
+        req,
+        resolveServerIdForRequest,
+        servers: getServersFromStore(),
+        serverStates,
+        getFs25DocumentsRoot,
+    });
+}
+function requestLivestockDetail(req) {
+    return livestockDetailModule.request({
+        req,
+        resolveServerIdForRequest,
+        servers: getServersFromStore(),
+        serverStates,
+        getFs25DocumentsRoot,
+    });
+}
 expressApp.get('/api/vehicles',   (req, res) => res.json(getDataForServer(req)?.vehicles   || []));
 expressApp.get('/api/fields',     (req, res) => {
     const d = getDataForServer(req);
@@ -1155,13 +1290,38 @@ function hydrateLuaSnapshotFromDiskAtBoot(srv) {
 function rebuildMerged(serverId) {
     const state = serverStates[serverId];
     if (!state) return;
-    state.mergedData = mergeData(state.luaData, state.xmlData, {
+    let luaPayload = state.luaData;
+    const srv = getServersFromStore().find((s) => String(s.id) === String(serverId));
+    if (srv && state.luaData && (srv.mode === 'local' || srv.mode === 'ftp')) {
+        try {
+            luaPayload = hydrateLuaDataAnimalsFromDetails(
+                state.luaData,
+                srv,
+                getLocalLuaJsonPathForServer,
+                {
+                    userDataPath: app.getPath('userData'),
+                    serverState: state,
+                }
+            );
+        } catch (e) {
+            console.warn('[DetailHydrate]', serverId, e && e.message ? e.message : e);
+            luaPayload = state.luaData;
+        }
+    }
+    state.mergedData = mergeData(luaPayload, state.xmlData, {
         fieldLiveCache: state.fieldLiveCache || {},
         lastLuaAt: state.lastLuaReceivedAt || null,
         lastXmlAt: state.lastXmlReceivedAt || null,
     });
     if (state.mergedData && state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
         state.mergedData.fieldStatusHistory = state.fieldHistory;
+    }
+    if (state.mergedData) {
+        const si = { ...(state.mergedData.serverInfo || {}) };
+        const cw = state.configWarning;
+        if (cw) si.configWarning = cw;
+        else delete si.configWarning;
+        state.mergedData.serverInfo = si;
     }
     broadcast(serverId, state.mergedData);
     schedulePersistServerCache(serverId);
@@ -1432,6 +1592,40 @@ function startLocalWatching(srv) {
     state.watcher = fw;
     readFile();
 
+    const dirtyPensPath = path.join(path.dirname(luaJsonPath), 'dirtyPens.json');
+    try {
+        const bustDirty = () => {
+            try {
+                livestockDetailModule.bustDirtyIndexCache(srv.id);
+            } catch (_) { /* ignore */ }
+        };
+        let fwDirty = null;
+        if (fs.existsSync(dirtyPensPath)) {
+            fwDirty = fs.watch(dirtyPensPath, { persistent: false }, bustDirty);
+            fwDirty.on('error', (err) => {
+                console.warn(`[Local] dirtyPens watch error [${srv.id}]:`, err && err.message ? err.message : err);
+                try { fwDirty.close(); } catch (_) { /* ignore */ }
+                state.dirtyPensWatcher = null;
+            });
+        } else {
+            const dirOfDirty = path.dirname(dirtyPensPath);
+            const baseName = path.basename(dirtyPensPath);
+            if (fs.existsSync(dirOfDirty)) {
+                fwDirty = fs.watch(dirOfDirty, { persistent: false }, (_evt, fname) => {
+                    if (fname === baseName) bustDirty();
+                });
+                fwDirty.on('error', (err) => {
+                    console.warn(`[Local] slot-dir watch error [${srv.id}]:`, err && err.message ? err.message : err);
+                    try { fwDirty.close(); } catch (_) { /* ignore */ }
+                    state.dirtyPensWatcher = null;
+                });
+            }
+        }
+        state.dirtyPensWatcher = fwDirty;
+    } catch (e) {
+        console.warn(`[Local] dirtyPens watch setup failed [${srv.id}]:`, e.message);
+    }
+
     // XML poll immediately then every 60s (XML changes on save, not every 10s)
     triggerXmlPoll(srv.id);
     const xmlInterval = setInterval(() => triggerXmlPoll(srv.id), 60000);
@@ -1476,6 +1670,66 @@ async function safeDownload(client, remotePath, localTmp, localFinal, options = 
     return false;
 }
 
+/** FTP FileInfo.type — Directory (skip when syncing files). */
+const FTP_FILE_TYPE_DIRECTORY = 2;
+
+/**
+ * Mirror host `details/animals_*.json` into userData so livestock hydration matches local mode.
+ * Only re-downloads when remote size differs from cached file (large herds = multi‑MiB files).
+ */
+/** @returns {Promise<number>} number of detail files newly downloaded or updated */
+async function syncFtpDetailsCache(client, srv, slotRemote, userDataPath) {
+    const remoteDir = `${slotRemote}/details`.replace(/\\/g, '/');
+    const localRoot = path.join(userDataPath, 'ftpDetailsCache', String(srv.id));
+    const st = serverStates[srv.id];
+    const folderName =
+        (st && st.lastSaveSlot) ||
+        srv.localSubFolder ||
+        'savegame1';
+    const localDir = path.join(localRoot, folderName, 'details');
+    try {
+        fs.mkdirSync(localDir, { recursive: true });
+    } catch (_) {
+        return 0;
+    }
+    let list;
+    try {
+        list = await client.list(remoteDir);
+    } catch (_) {
+        return 0;
+    }
+    let pulled = 0;
+    const dlOpts = { maxAttempts: 2, retryDelayMs: 400 };
+    for (const ent of list) {
+        if (!ent || !ent.name || ent.type === FTP_FILE_TYPE_DIRECTORY) continue;
+        const name = ent.name;
+        if (!name.startsWith('animals_') || !name.endsWith('.json')) continue;
+        const remotePath = `${remoteDir}/${name}`;
+        const localFinal = path.join(localDir, name);
+        const tmpPath = `${localFinal}.tmp`;
+        let need = true;
+        if (fs.existsSync(localFinal)) {
+            try {
+                const localSize = fs.statSync(localFinal).size;
+                const remSize = Number(ent.size);
+                if (Number.isFinite(remSize) && remSize > 0 && localSize === remSize) {
+                    need = false;
+                }
+            } catch (_) {
+                /* re-fetch */
+            }
+        }
+        if (!need) continue;
+        if (await safeDownload(client, remotePath, tmpPath, localFinal, dlOpts)) {
+            pulled += 1;
+        }
+    }
+    if (pulled > 0) {
+        console.log(`[FTP] [${srv.id}] Synced ${pulled} pen detail file(s) → ${localDir}`);
+    }
+    return pulled;
+}
+
 async function pollFtp(srv) {
     const client = new ftp.Client(120000);
     client.ftp.verbose = false;
@@ -1492,7 +1746,8 @@ async function pollFtp(srv) {
             (st && st.lastSaveSlot) ||
             srv.localSubFolder ||
             'savegame1';
-        const remotePath = `${basePath}/modSettings/FS25_FarmDashboard/${folderName}/data.json`;
+        let slotRemote = `${basePath}/modSettings/FS25_FarmDashboard/${folderName}`;
+        const remotePath = `${slotRemote}/data.json`;
 
         const tmpPath   = path.join(userDataPath, `data_${srv.id}.json.tmp`);
         const finalPath = path.join(userDataPath, `data_${srv.id}.json`);
@@ -1505,6 +1760,40 @@ async function pollFtp(srv) {
                 '  Fix: game running on host, FS25_FarmDashboard mod enabled, and this server\'s ' +
                 '"Local folder" in app settings matches modSettings/FS25_FarmDashboard/<that folder>/data.json on FTP.'
             );
+        }
+
+        const stAfter = serverStates[srv.id];
+        const folderAfter =
+            (stAfter && stAfter.lastSaveSlot) ||
+            srv.localSubFolder ||
+            'savegame1';
+        slotRemote = `${basePath}/modSettings/FS25_FarmDashboard/${folderAfter}`;
+
+        // Plan v5 A1: piggy-back the small dirtyPens.json index download on the same FTP session.
+        // No extra connect; failures are non-fatal so data.json polling is never disrupted.
+        try {
+            const dirtyRemote = `${slotRemote}/dirtyPens.json`;
+            const dirtyTmp = path.join(userDataPath, `livestock_dirtyPens_${srv.id}.json.tmp`);
+            const dirtyFinal = path.join(userDataPath, `livestock_dirtyPens_${srv.id}.json`);
+            const ok = await safeDownload(client, dirtyRemote, dirtyTmp, dirtyFinal, { maxAttempts: 1 });
+            if (!ok && srv && srv.id != null) {
+                // Don't spam: dirtyPens.json may not exist yet on a fresh save.
+                if (!serverStates[srv.id] || !serverStates[srv.id]._dirtyMissingLogged) {
+                    if (serverStates[srv.id]) serverStates[srv.id]._dirtyMissingLogged = true;
+                    console.log(`[FTP] [${srv.id}] dirtyPens.json not yet available on host; live detail fetches will refetch on each click until index exists.`);
+                }
+            }
+        } catch (e) {
+            console.warn(`[FTP] [${srv.id}] dirtyPens piggy-back failed: ${e && e.message}`);
+        }
+
+        try {
+            const detailPulls = await syncFtpDetailsCache(client, srv, slotRemote, userDataPath);
+            if (detailPulls > 0) {
+                rebuildMerged(srv.id);
+            }
+        } catch (e) {
+            console.warn(`[FTP] [${srv.id}] details folder sync: ${e && e.message}`);
         }
     } catch (err) {
         console.warn(`[FTP] [${srv.id}] ${srv.name}: ${err.message}`);
@@ -1608,6 +1897,12 @@ async function stopAllWatchers() {
             } catch (_) { /* ignore */ }
             state.watcher = null;
         }
+        if (state.dirtyPensWatcher) {
+            try {
+                state.dirtyPensWatcher.close();
+            } catch (_) { /* ignore */ }
+            state.dirtyPensWatcher = null;
+        }
         for (const t of (state.intervals || [])) {
             clearTimeout(t);
             clearInterval(t);
@@ -1659,13 +1954,51 @@ async function bootServer(config) {
             xmlData: null,
             mergedData: null,
             watcher: null,
+            dirtyPensWatcher: null,
             intervals: [],
             lastSaveSlot: null,
             lastLuaReceivedAt: null,
             lastXmlReceivedAt: null,
             fieldLiveCache: {},
             fieldHistory: {},
+            configWarning: null,
         };
+    });
+
+    // Plan v5 A5: surface localSubFolder mismatches as a one-time WARN + serverInfo.configWarning.
+    // Only meaningful for local mode (FTP folder name is resolved later from save-slot probing).
+    servers.forEach((srv) => {
+        if (!srv || srv.mode !== 'local') return;
+        try {
+            let basePath = srv.localPath;
+            if (!basePath) {
+                basePath = path.join(getFs25DocumentsRoot(), 'modSettings', 'FS25_FarmDashboard');
+            }
+            const folderName = srv.localSubFolder ||
+                String(srv.name || '').replace(/[<>:"/\\|?*]/g, '').trim();
+            if (!folderName) {
+                serverStates[srv.id].configWarning = {
+                    code: 'localSubFolderMissing',
+                    expected: basePath,
+                    at: new Date().toISOString(),
+                    message: 'Server has no localSubFolder configured. Set it to your savegame folder (e.g. savegame1).',
+                };
+                console.warn(`[livestock] folder mismatch serverId=${srv.id} expected: a folder under ${basePath}`);
+                return;
+            }
+            const slotPath = path.join(basePath, folderName);
+            if (!fs.existsSync(slotPath)) {
+                serverStates[srv.id].configWarning = {
+                    code: 'localSubFolderMissing',
+                    expected: slotPath,
+                    at: new Date().toISOString(),
+                    message: `Configured local folder does not exist: ${slotPath}. Open the game once with the FarmDashboard mod to create it, or update the server's "Local folder" in settings.`,
+                };
+                console.warn(`[livestock] folder mismatch serverId=${srv.id} expected=${slotPath}`);
+            }
+        } catch (e) {
+            console.warn('[livestock] configWarning probe failed', srv && srv.id, e && e.message);
+        }
     });
 
     // Restore last merged JSON from disk **before** HTTP accepts traffic so the first `/api/data` after

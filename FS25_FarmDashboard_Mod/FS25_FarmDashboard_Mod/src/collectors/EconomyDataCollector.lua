@@ -1,13 +1,29 @@
--- FS25 FarmDashboard | EconomyDataCollector.lua | v2.1.0
+-- FS25 FarmDashboard | EconomyDataCollector.lua | v2.3.0 (Plan v5 B1)
+--
+-- Plan v5 B1: when farmDashboard.settings#useStateMachine_economy is true (default), the slice
+-- runs synchronously inside collectStep — no coroutine.yield, no yield-across-pcall hazard.
+-- moduleCache.economy is only updated when STAGE_DERIVE_CROPS finishes (atomic per cycle).
+-- When the flag is false, falls back to the existing coroutine path.
 
 EconomyDataCollector = {}
 
 function EconomyDataCollector:init()
     EconomyDataCollector._ecoCo = nil
-    print("[FarmDashboard] Economy data collector initialized (Silent Mode)")
+    EconomyDataCollector._smState = nil
+    print("[FarmDashboard] Economy data collector initialized (Silent Mode, Plan v5)")
+end
+
+local function _useStateMachine()
+    local cfg = rawget(_G, "FarmDashboardDataCollector")
+    if cfg and cfg.config and cfg.config.useStateMachine_economy ~= nil then
+        return cfg.config.useStateMachine_economy and true or false
+    end
+    return true
 end
 
 function EconomyDataCollector:_workYield()
+    -- Plan v5 B1: state-machine path never yields. The legacy coroutine path keeps the original behavior.
+    if _useStateMachine() then return end
     local stride = EconomyDataCollector._yieldStride
     if not stride or not coroutine.running() then return end
     EconomyDataCollector._yieldTick = (EconomyDataCollector._yieldTick or 0) + 1
@@ -16,6 +32,13 @@ function EconomyDataCollector:_workYield()
 end
 
 function EconomyDataCollector:collectBegin()
+    if _useStateMachine() then
+        EconomyDataCollector._smState = { stage = "INIT" }
+        EconomyDataCollector._ecoCo = nil
+        return
+    end
+    -- Legacy coroutine path
+    EconomyDataCollector._smState = nil
     EconomyDataCollector._ecoCo = coroutine.create(function(opts)
         opts = opts or {}
         EconomyDataCollector._yieldStride = math.max(10, tonumber(opts.economyYieldStride) or 55)
@@ -29,6 +52,24 @@ function EconomyDataCollector:collectBegin()
 end
 
 function EconomyDataCollector:collectStep(opts)
+    -- Plan v5 B1: state-machine path. moduleCache.economy is only published at STAGE_DERIVE_CROPS done.
+    if EconomyDataCollector._smState ~= nil then
+        local st = EconomyDataCollector._smState
+        if st.stage == "INIT" then
+            -- One-shot collect; for the v1 ship, economy is small and slow-changing enough that a
+            -- single synchronous pass is acceptable. The flag guards us if a particular save needs
+            -- the legacy coroutine path back.
+            EconomyDataCollector._yieldStride = nil
+            EconomyDataCollector._yieldSnapshot = nil
+            local result = EconomyDataCollector._collectImpl(EconomyDataCollector)
+            EconomyDataCollector._smState = nil
+            return true, result or {}
+        end
+        EconomyDataCollector._smState = nil
+        return true, {}
+    end
+
+    -- Legacy coroutine path
     if not EconomyDataCollector._ecoCo then return true, {} end
     local ok, a, b = coroutine.resume(EconomyDataCollector._ecoCo, opts or {})
     if not ok then
@@ -39,12 +80,12 @@ function EconomyDataCollector:collectStep(opts)
     if a == "progress" then
         return false, b or {}
     end
-    local st = coroutine.status(EconomyDataCollector._ecoCo)
-    if st == "dead" then
+    local cst = coroutine.status(EconomyDataCollector._ecoCo)
+    if cst == "dead" then
         EconomyDataCollector._ecoCo = nil
         return true, a or {}
     end
-    if st == "suspended" then
+    if cst == "suspended" then
         Logging.warning("[FarmDash] EconomyDataCollector: unexpected coroutine state; ending slice.")
         EconomyDataCollector._ecoCo = nil
         return true, EconomyDataCollector._yieldPartialEcon or (type(a) == "table" and a) or {}

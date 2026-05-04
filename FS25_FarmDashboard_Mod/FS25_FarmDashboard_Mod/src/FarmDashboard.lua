@@ -1,10 +1,10 @@
--- FS25 FarmDashboard | FarmDashboard.lua | v2.0.0
+-- FS25 FarmDashboard | FarmDashboard.lua | v2.3.0 (Plan v5)
 -- Authors: JoshWalki, WizardlyPayload
 
 FarmDashboard = {}
 FarmDashboard.MOD_NAME = "FS25_FarmDashboard"
 FarmDashboard.MOD_DIR = _G.g_currentModDirectory
-FarmDashboard.VERSION = "2.0.0.0"
+FarmDashboard.VERSION = "2.3.0.0"
 FarmDashboard.UPDATE_INTERVAL = 10000
 FarmDashboard.PORT = 8766
 FarmDashboard.readyAt = nil
@@ -62,6 +62,7 @@ function FarmDashboard:loadMap()
     hasLoaded = true
 
     -- Source all collector scripts (paths relative to mod root)
+    source(FarmDashboard.MOD_DIR .. "src/Diagnostics.lua")
     source(FarmDashboard.MOD_DIR .. "src/FarmDashboardDataCollector.lua")
     source(FarmDashboard.MOD_DIR .. "src/collectors/AnimalDataCollector.lua")
     source(FarmDashboard.MOD_DIR .. "src/collectors/VehicleDataCollector.lua")
@@ -95,6 +96,11 @@ function FarmDashboard:onStartMission()
     end
     if FarmDashboardDataCollector and FarmDashboardDataCollector.resetStaggerState then
         FarmDashboardDataCollector:resetStaggerState()
+    end
+    -- Plan v5 B6+B8+B11: notify the data collector that a save just loaded so it can reset
+    -- animalMode samples, clear stale ledger / dirty set, and arm the post-load silence window.
+    if FarmDashboardDataCollector and FarmDashboardDataCollector.onMissionLoaded then
+        FarmDashboardDataCollector:onMissionLoaded()
     end
     self:bootstrapDataJson()
 end

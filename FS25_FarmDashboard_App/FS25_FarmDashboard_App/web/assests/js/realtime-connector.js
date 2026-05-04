@@ -532,6 +532,193 @@ class RealtimeConnector {
     }
   }
 
+  /**
+   * Plan v5 A3: read the user-configured global synthetic cap; defaults to 8000 with
+   * sensible bounds. Settings panel can expose this via window.farmDashSettings.lod.maxSynthAnimals.
+   */
+  _getMaxSynthAnimals() {
+    let v = 8000;
+    try {
+      const root = (typeof window !== 'undefined') ? window : null;
+      const u = root && root.farmDashSettings && root.farmDashSettings.lod && root.farmDashSettings.lod.maxSynthAnimals;
+      if (Number.isFinite(u)) v = Math.floor(u);
+      else {
+        // Fallback to localStorage so the cap survives reloads when the settings UI persists it there.
+        const ls = root && root.localStorage && root.localStorage.getItem('farmdash.lod.maxSynthAnimals');
+        const n = ls != null ? Number(ls) : NaN;
+        if (Number.isFinite(n)) v = Math.floor(n);
+      }
+    } catch (_) { /* ignore */ }
+    if (v < 1000) v = 1000;
+    if (v > 50000) v = 50000;
+    return v;
+  }
+
+  /** True if nested object contains any numeric value > 0 (fill levels, storage, etc.). */
+  _objectHasPositiveNumbers(obj, depth = 0) {
+    if (!obj || typeof obj !== "object" || depth > 8) return false;
+    for (const v of Object.values(obj)) {
+      if (typeof v === "number" && Number.isFinite(v) && v > 0) return true;
+      if (v && typeof v === "object" && this._objectHasPositiveNumbers(v, depth + 1)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Show a dashboard row for pens with no animals when they still matter: feed/water in fills,
+   * storage, or configured capacity (empty pasture / barn slot).
+   */
+  _shouldShowEmptyPenRow(husbandry) {
+    if (!husbandry || typeof husbandry !== "object") return false;
+    if (this._objectHasPositiveNumbers(husbandry.fillLevels)) return true;
+    if (this._objectHasPositiveNumbers(husbandry.storageData)) return true;
+    const cap = Number(husbandry.maxAnimals ?? husbandry.capacity ?? 0);
+    return Number.isFinite(cap) && cap > 0;
+  }
+
+  _buildFillSummaryForPen(husbandry) {
+    const parts = [];
+    const fl = husbandry.fillLevels;
+    if (fl && typeof fl === "object") {
+      for (const [k, v] of Object.entries(fl)) {
+        const n = typeof v === "number" ? v : Number(v);
+        if (!Number.isFinite(n) || n <= 0) continue;
+        const label = String(k).replace(/^\d+\s*/, "").trim().slice(0, 36);
+        parts.push(`${label || k}: ${n % 1 === 0 ? n : n.toFixed(1)}`);
+      }
+    }
+    const st = husbandry.storageData;
+    if (st && typeof st === "object") {
+      for (const [k, v] of Object.entries(st)) {
+        const n = typeof v === "number" ? v : Number(v);
+        if (!Number.isFinite(n) || n <= 0) continue;
+        parts.push(`${String(k).slice(0, 28)}: ${n % 1 === 0 ? n : n.toFixed(1)}`);
+      }
+    }
+    return parts.slice(0, 6).join(" · ");
+  }
+
+  _makeEmptyPastureRow(husbandry, hfarm) {
+    const hid = husbandry.id ?? husbandry.buildingId;
+    const fillSummary = this._buildFillSummaryForPen(husbandry);
+    const penLabel = husbandry.name || husbandry.buildingName || "Pen";
+    return {
+      id: `pen-empty-${hid}`,
+      name: `${penLabel} (${t("livestock.emptyPenShort") || "empty"})`,
+      __emptyPen: true,
+      husbandryName: penLabel,
+      husbandryId: hid,
+      ownerFarmId: husbandry.ownerFarmId ?? husbandry.farmId,
+      farmId: hfarm,
+      age: 0,
+      health: typeof husbandry.health === "number" ? husbandry.health : 100,
+      weight: 0,
+      gender: "—",
+      subType: "EMPTY_PEN",
+      location: penLabel,
+      locationType: "pasture",
+      isLactating: false,
+      isPregnant: false,
+      isParent: false,
+      genetics: null,
+      productivity: husbandry.productivity,
+      fillLevels: husbandry.fillLevels,
+      storageData: husbandry.storageData,
+      fillSummary,
+      maxAnimals: husbandry.maxAnimals,
+      animalCount: 0,
+    };
+  }
+
+  /**
+   * Phase 4 LOD + Plan v5 A3: convert a husbandry's `clusters[]` (aggregates from the mod's
+   * data.json) into **one dashboard row per cluster** — same averages as before, but no longer
+   * one synthetic row per head (which duplicated the same stats and looked like “duplicate cows”).
+   * True per-animal rows live in `details/animals_<id>.json`; open Pen detail for those.
+   *
+   * `globalCounter.emitted` counts **cluster-rows** (cheap); `trimmed` counts **animal heads**
+   * skipped when row/cluster budgets are exceeded.
+   */
+  _fanOutClusters(husbandry, clusters, farmId, globalCounter) {
+    const out = [];
+    const PEN_CLUSTER_ROW_CAP = 4096;
+    const GLOBAL_ROW_CAP = (globalCounter && Number.isFinite(globalCounter.cap))
+      ? globalCounter.cap
+      : this._getMaxSynthAnimals();
+    const huName = husbandry.name || husbandry.buildingName;
+    const huId = husbandry.id || husbandry.buildingId;
+
+    let clusterRowsThisPen = 0;
+    let trimmedHeads = 0;
+
+    for (let ci = 0; ci < clusters.length; ci++) {
+      const c = clusters[ci];
+      if (!c || !c.count || c.count <= 0) continue;
+
+      if (clusterRowsThisPen >= PEN_CLUSTER_ROW_CAP) {
+        trimmedHeads += c.count;
+        continue;
+      }
+      if (globalCounter && (globalCounter.emitted || 0) >= GLOBAL_ROW_CAP) {
+        trimmedHeads += c.count;
+        continue;
+      }
+
+      const subType = c.subType || c.animalType || 'Unknown';
+      const ageMonths = (typeof c.avgAgeMonths === 'number')
+          ? c.avgAgeMonths
+          : (typeof c.ageMonths === 'number' ? c.ageMonths : (c.ageDecile || 0) * 12);
+      const avgHealth = (typeof c.avgHealth === 'number') ? c.avgHealth : 100;
+      const avgWeight = (typeof c.avgWeight === 'number') ? c.avgWeight : 0;
+      const n = c.count;
+
+      const id = `${huId || 'pen'}-cluster-${ci}`;
+      out.push({
+        id,
+        name: `${subType} (${n}×)`,
+        clusterCount: n,
+        husbandryName: huName,
+        husbandryId: huId,
+        ownerFarmId: husbandry.ownerFarmId || husbandry.farmId,
+        farmId,
+        age: ageMonths,
+        health: avgHealth,
+        weight: avgWeight,
+        gender: c.gender || 'female',
+        subType,
+        location: huName,
+        locationType: 'pasture',
+        isLactating: !!c.isLactating,
+        isPregnant: !!c.isPregnant,
+        isParent: false,
+        genetics: (typeof c.avgGenFert === 'number') ? {
+          fertility: c.avgGenFert,
+          productivity: c.avgGenProd,
+          health: c.avgGenHealth,
+          metabolism: c.avgGenMetabolism,
+          quality: c.avgGenQuality,
+        } : null,
+        productivity: c.avgGenProd ?? null,
+        __lodSynth: true,
+        __lodSynthEstimate: true,
+        __lodClusterAggregate: true,
+      });
+      clusterRowsThisPen += 1;
+      if (globalCounter) {
+        globalCounter.emitted = (globalCounter.emitted || 0) + 1;
+      }
+    }
+
+    if (trimmedHeads > 0) {
+      husbandry.__lodTrimmed = trimmedHeads;
+      if (globalCounter) globalCounter.trimmed = (globalCounter.trimmed || 0) + trimmedHeads;
+    }
+    if (globalCounter && (globalCounter.emitted || 0) >= GLOBAL_ROW_CAP) {
+      globalCounter.capHit = true;
+    }
+    return out;
+  }
+
   updateAnimalsData(animalsData) {
     // Handle API data format — husbandry buildings with animal details.
     // Only include animals owned by the selected farm (same idea as vehicles/fields).
@@ -539,6 +726,15 @@ class RealtimeConnector {
     const formattedAnimals = [];
     const activeFarmId = Number(this.dashboard?.activeFarmId ?? 1);
     let rawHusbandryCount = 0;
+
+    // Plan v5 A3: shared counter across all husbandries. Caller (this.dashboard) can read
+    // `dashboard.lodGlobalState` after this call to render the "estimated cap" banner.
+    const globalCounter = {
+      emitted: 0,
+      trimmed: 0,
+      capHit: false,
+      cap: this._getMaxSynthAnimals(),
+    };
 
     // Handle different data formats (vanilla vs RealisticLivestock)
     if (animalsData) {
@@ -573,6 +769,24 @@ class RealtimeConnector {
       husbandryArray.forEach((husbandry, index) => {
         const hfarm = Number(husbandry.ownerFarmId ?? husbandry.farmId ?? 0);
         if (hfarm !== activeFarmId) return;
+
+        const rowCountBefore = formattedAnimals.length;
+
+        // Phase 4 LOD + Plan v5 A3: when the mod ships aggregate clusters and an empty animals[],
+        // fan out one synthetic animal per cluster.count using the bucket's average values.
+        // The global counter limits total synthetic rows across pens to prevent UI memory explosions.
+        const lodClusters = Array.isArray(husbandry.clusters) ? husbandry.clusters : null;
+        const animalsEmptyOrSparse = !husbandry.animals
+            || !Array.isArray(husbandry.animals)
+            || husbandry.animals.length === 0;
+        if (lodClusters && lodClusters.length > 0 && animalsEmptyOrSparse) {
+          const synth = this._fanOutClusters(husbandry, lodClusters, hfarm, globalCounter);
+          for (let s = 0; s < synth.length; s++) formattedAnimals.push(synth[s]);
+          if (synth.length > 0) {
+            return; // cluster rows cover this pen
+          }
+          // No cluster rows emitted (e.g. capped): fall through for empty-pen / legacy paths
+        }
 
         // Check different possible animal data structures
         let animalsList = null;
@@ -635,6 +849,15 @@ class RealtimeConnector {
                 genetics: animalGroup.genetics || null,
                 productivity: animalGroup.productivity || null,
                 sellPrice: animalGroup.sellPrice || null,
+                uniqueId: animalGroup.uniqueId ?? null,
+                breed: animalGroup.breed ?? null,
+                motherId: animalGroup.motherId ?? null,
+                fatherId: animalGroup.fatherId ?? null,
+                isCastrated: !!animalGroup.isCastrated,
+                birthday: animalGroup.birthday ?? null,
+                dirt: animalGroup.dirt,
+                fitness: animalGroup.fitness,
+                diseaseCount: animalGroup.diseaseCount,
               });
             } else {
               // Handle grouped animals (vanilla format)
@@ -742,6 +965,13 @@ class RealtimeConnector {
             });
           }
         }
+
+        if (
+          formattedAnimals.length === rowCountBefore &&
+          this._shouldShowEmptyPenRow(husbandry)
+        ) {
+          formattedAnimals.push(this._makeEmptyPastureRow(husbandry, hfarm));
+        }
       });
     }
 
@@ -759,6 +989,16 @@ class RealtimeConnector {
 
     this.dashboard.animals = formattedAnimals;
     this.dashboard.filteredAnimals = formattedAnimals;
+
+    // Plan v5 A3: surface global LOD synthetic-cap state for the livestock UI banner.
+    this.dashboard.lodGlobalState = {
+      emitted: globalCounter.emitted || 0,
+      trimmed: globalCounter.trimmed || 0,
+      capHit: !!globalCounter.capHit,
+      cap: Number.isFinite(globalCounter.cap) ? globalCounter.cap : this._getMaxSynthAnimals(),
+    };
+    this.dashboard.__lodTotalSynthCap = !!globalCounter.capHit;
+    this.dashboard.__lodTotalTrimmed = globalCounter.trimmed || 0;
 
     const landingEl = typeof document !== "undefined" ? document.getElementById("landing-page") : null;
     const landingVisible = landingEl && !landingEl.classList.contains("d-none");

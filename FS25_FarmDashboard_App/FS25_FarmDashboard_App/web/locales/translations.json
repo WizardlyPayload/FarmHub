@@ -6729,6 +6729,12 @@
       "nb": "Ingen dyr funnet",
       "uk": "Тварин не знайдено"
     },
+    "livestock.emptyPenShort": {
+      "en": "empty pen"
+    },
+    "livestock.emptyPenBadge": {
+      "en": "No animals — pen has feed / storage or capacity"
+    },
     "livestock.badgeError": {
       "en": "Error",
       "de": "Fehler",

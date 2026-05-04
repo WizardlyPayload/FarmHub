@@ -1,6 +1,22 @@
-// FS25 FarmDashboard | livestock.js | v2.0.0
+// FS25 FarmDashboard | livestock.js | v2.3.0 (Plan v5 A2)
 
 import { t } from "../i18n/i18n.js";
+import {
+  loadPenDetail,
+  requestPenRefresh,
+  openPenDetailModal,
+  resolveSyntheticAnimal,
+} from "./livestock.penDetail.js";
+
+/** Plan v5 A2: dashboard entrypoint — open the real-detail modal for a husbandry pen. */
+export function openPenDetail(penId) {
+  return openPenDetailModal(penId);
+}
+
+/** Plan v5 A2: dashboard entrypoint — explicitly request a refresh for a pen (mod will pull). */
+export function requestPenDetailRefresh(penId) {
+  return requestPenRefresh(penId);
+}
 
 export function formatGenderLabel(gender) {
   const g = String(gender ?? "").trim().toLowerCase();
@@ -38,7 +54,7 @@ export function generateAnimalsDataHash() {
   const dataString = this.animals
     .map(
       (animal) =>
-        `${animal.id}-${animal.health}-${animal.age}-${animal.isLactating}-${animal.isPregnant}-${animal.weight}`
+        `${animal.id}-${animal.health}-${animal.age}-${animal.isLactating}-${animal.isPregnant}-${animal.weight}-${animal.clusterCount ?? ""}-${animal.__lodClusterAggregate ? 1 : 0}-${animal.__emptyPen ? 1 : 0}-${animal.fillSummary || ""}`
     )
     .sort()
     .join("|");
@@ -53,14 +69,43 @@ export function generateAnimalsDataHash() {
   return hash.toString();
 }
 
+function countAnimalHeadsForSummary(animals) {
+  if (!Array.isArray(animals)) return 0;
+  let n = 0;
+  for (const a of animals) {
+    if (!a) continue;
+    if (a.__emptyPen) continue;
+    const c = Number(a.clusterCount);
+    if (a.__lodClusterAggregate && Number.isFinite(c) && c > 0) n += c;
+    else n += 1;
+  }
+  return n;
+}
+
 export function updateSummaryCards() {
-  const totalCount = this.animals.length;
-  const lactatingCount = this.animals.filter((a) => a.isLactating).length;
-  const pregnantCount = this.animals.filter((a) => a.isPregnant).length;
+  const totalCount = countAnimalHeadsForSummary(this.animals);
+  const lactatingCount = this.animals.reduce((s, a) => {
+    if (a.__emptyPen || !a.isLactating) return s;
+    const c = a.__lodClusterAggregate ? Math.max(1, Number(a.clusterCount) || 1) : 1;
+    return s + c;
+  }, 0);
+  const pregnantCount = this.animals.reduce((s, a) => {
+    if (a.__emptyPen || !a.isPregnant) return s;
+    const c = a.__lodClusterAggregate ? Math.max(1, Number(a.clusterCount) || 1) : 1;
+    return s + c;
+  }, 0);
   const avgHealth =
     totalCount > 0
       ? (
-          this.animals.reduce((sum, a) => sum + a.health, 0) / totalCount
+          this.animals.reduce((sum, a) => {
+            if (a.__emptyPen) return sum;
+            const h = Number(a.health) || 0;
+            const w =
+              a.__lodClusterAggregate && Number(a.clusterCount) > 0
+                ? Number(a.clusterCount)
+                : 1;
+            return sum + h * w;
+          }, 0) / totalCount
         ).toFixed(0)
       : 0;
 
@@ -95,6 +140,37 @@ export function renderAnimalsTable() {
   // Prepare data for DataTables
   const tableData = this.animals.map((animal) => {
     try {
+      if (animal.__emptyPen) {
+        const esc = (s) =>
+          String(s)
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/"/g, "&quot;");
+        const hid = animal.husbandryId != null ? String(animal.husbandryId) : "";
+        const fillBlock = animal.fillSummary
+          ? `<div class="small text-muted" style="max-width:22rem">${esc(animal.fillSummary)}</div>`
+          : `<span class="badge bg-secondary">${esc(t("livestock.emptyPenBadge"))}</span>`;
+        return [
+          `<code class="text-warning" title="${esc(t("livestock.emptyPenShort"))}">#${esc(hid)}</code> <span class="badge border border-secondary text-muted">${esc(t("livestock.emptyPenShort"))}</span>`,
+          fillBlock,
+          "—",
+          "—",
+          `<span class="text-muted">—</span>`,
+          "—",
+          "$0",
+          `<span class="badge bg-light text-dark">${esc(t("livestock.emptyPenShort"))}</span>`,
+          this.formatLocation(
+            resolveAnimalLocationLabel(animal),
+            resolveAnimalLocationType(animal)
+          ),
+          `<div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn btn-outline-info" onclick='dashboard.openPenDetail(${JSON.stringify(hid)})' title="${esc(t("livestock.openPenDetailTitle") || "Pen detail")}">
+              <i class="bi bi-clipboard2-pulse me-1"></i>${esc(t("livestock.openPenDetailTitle") || "Pen")}
+            </button>
+          </div>`,
+        ];
+      }
+
       // Create status badges
       const statusBadges = [];
       if (animal.health === 0)
@@ -123,10 +199,16 @@ export function renderAnimalsTable() {
                 </div>
             `;
 
-      // Display RealisticLivestock ID prominently
+      // Display RealisticLivestock ID prominently; LOD cluster rows are one row per cluster (aggregates).
+      const clusterAggBadge =
+        animal.__lodClusterAggregate && Number(animal.clusterCount) > 0
+          ? ` <span class="badge bg-secondary" title="${t("livestock.clusterAggBadgeTitle") || "Cluster average — open Pen detail for each animal"}">×${Number(
+              animal.clusterCount
+            )}</span>`
+          : "";
       const animalIdDisplay = animal.id
-        ? `<code class="text-info" title="RealisticLivestock ID: ${animal.id}">#${animal.id}</code>`
-        : `<code class="text-muted">${t("common.notAvailable")}</code>`;
+        ? `<code class="text-info" title="RealisticLivestock ID: ${animal.id}">#${animal.id}</code>${clusterAggBadge}`
+        : `<code class="text-muted">${t("common.notAvailable")}</code>${clusterAggBadge}`;
 
       return [
         animalIdDisplay,
@@ -141,9 +223,20 @@ export function renderAnimalsTable() {
           resolveAnimalLocationLabel(animal),
           resolveAnimalLocationType(animal)
         ),
-        `<button class="btn btn-sm btn-outline-success" onclick='dashboard.showAnimalDetails(${JSON.stringify(String(animal.id))})' title="${t("livestock.detailsBtnTitle")}">
-                    <i class="bi bi-eye me-1"></i>${t("livestock.btnDetails")}
-                </button>`,
+        // Plan v5 A2: animal "Details" + "Pen" drilldown. The pen button opens the real-detail modal,
+        // sourced from the mod's per-pen `details/animals_<id>.json` file when available.
+        `<div class="btn-group btn-group-sm" role="group" aria-label="${t("livestock.detailsBtnTitle")}">
+          <button class="btn btn-outline-success" onclick='dashboard.showAnimalDetails(${JSON.stringify(String(animal.id))})' title="${t("livestock.detailsBtnTitle")}">
+            <i class="bi bi-eye me-1"></i>${t("livestock.btnDetails")}
+          </button>
+          ${
+            animal.husbandryId != null
+              ? `<button class="btn btn-outline-info" onclick='dashboard.openPenDetail(${JSON.stringify(String(animal.husbandryId))})' title="${t("livestock.openPenDetailTitle") || "Open pen detail"}" aria-label="${t("livestock.openPenDetailTitle") || "Open pen detail"}">
+                  <i class="bi bi-clipboard2-pulse"></i>
+                </button>`
+              : ""
+          }
+        </div>`,
       ];
     } catch (error) {
       // Return a safe fallback row
@@ -378,6 +471,29 @@ export function showAnimalDetails(animalId) {
       this.animals.map((a) => a.id)
     );
     return;
+  }
+
+  if (animal.__emptyPen) {
+    const penId = animal.husbandryId;
+    if (penId != null) {
+      openPenDetailModal(String(penId)).catch(() => {});
+    }
+    return;
+  }
+
+  // Plan v5 A2: when the animal is synthetic (LOD fan-out), open the pen-detail modal so the
+  // user sees REAL animals from the mod's per-pen file rather than averaged placeholder data.
+  // The original modal is still rendered (so existing UI keeps working), but a hint is added
+  // to the title indicating the data is estimated and the pen drilldown is now available.
+  // Synthetic LOD rows (per-cluster aggregate or legacy per-head synth): pen-detail has real individuals.
+  if (animal.__lodSynth || animal.__lodClusterAggregate) {
+    try {
+      const penId = animal.husbandryId || animal.huId;
+      if (penId != null) {
+        // Don't await; let the modal open in parallel with the legacy estimated view.
+        openPenDetailModal(String(penId)).catch(() => { /* swallow */ });
+      }
+    } catch (_) { /* ignore */ }
   }
 
   const modalTitle = document.getElementById("animalDetailsModalLabel");
@@ -1469,6 +1585,23 @@ export function openAnimalDetailsFromId(animalIdOrObject) {
 }
 
 export function calculateAnimalValue(animal) {
+  if (animal && animal.__emptyPen) {
+    return {
+      value: 0,
+      breakdown: {
+        baseValue: 0,
+        ageFactor: 0,
+        healthFactor: 0,
+        geneticsFactor: 0,
+        reproductionFactor: 0,
+        weightFactor: 0,
+        animalType: "EMPTY_PEN",
+        heads: 0,
+        perHead: 0,
+      },
+    };
+  }
+
   // Debug logging for specific animals
 
   // RealisticLivestock mod accurate base values by breed
@@ -1755,8 +1888,14 @@ export function calculateAnimalValue(animal) {
     );
   }
 
+  const perHead = Math.round(Math.max(finalValue, baseValue * 0.05));
+  const heads =
+    animal.__lodClusterAggregate && Number(animal.clusterCount) > 0
+      ? Math.max(1, Math.floor(Number(animal.clusterCount)))
+      : 1;
+
   return {
-    value: Math.round(Math.max(finalValue, baseValue * 0.05)),
+    value: perHead * heads,
     breakdown: {
       baseValue,
       ageFactor,
@@ -1765,30 +1904,38 @@ export function calculateAnimalValue(animal) {
       reproductionFactor,
       weightFactor,
       animalType: subType,
+      heads,
+      perHead,
     },
   };
 }
 
 export function calculateTotalPastureValue(animals) {
   let totalValue = 0;
+  let totalHeads = 0;
   const breakdown = {};
 
   animals.forEach((animal) => {
     const animalValue = this.calculateAnimalValue(animal);
     totalValue += animalValue.value;
+    const heads =
+      animal.__lodClusterAggregate && Number(animal.clusterCount) > 0
+        ? Math.max(1, Math.floor(Number(animal.clusterCount)))
+        : 1;
+    totalHeads += heads;
 
     const type = animalValue.breakdown.animalType;
     if (!breakdown[type]) {
       breakdown[type] = { count: 0, totalValue: 0 };
     }
-    breakdown[type].count++;
+    breakdown[type].count += heads;
     breakdown[type].totalValue += animalValue.value;
   });
 
   return {
     total: totalValue,
     breakdown,
-    average: animals.length > 0 ? Math.round(totalValue / animals.length) : 0,
+    average: totalHeads > 0 ? Math.round(totalValue / totalHeads) : 0,
   };
 }
 

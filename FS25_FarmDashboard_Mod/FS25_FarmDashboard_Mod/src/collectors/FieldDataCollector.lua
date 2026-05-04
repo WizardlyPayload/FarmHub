@@ -135,8 +135,23 @@ function FieldDataCollector:init()
     print("[FarmDashboard] Field data collector initialized (Hybrid: NPC State + Physical HUD Probe)")
 end
 
+--- Plan v5 B2: state-machine path runs sync; legacy coroutine path retained behind a flag.
+local function _fieldsUseStateMachine()
+    local cfg = rawget(_G, "FarmDashboardDataCollector")
+    if cfg and cfg.config and cfg.config.useStateMachine_fields ~= nil then
+        return cfg.config.useStateMachine_fields and true or false
+    end
+    return true
+end
+
 --- Cooperative micro-stagger: FarmDashboardDataCollector calls collectBegin once, then collectStep each frame.
 function FieldDataCollector:collectBegin()
+    if _fieldsUseStateMachine() then
+        FieldDataCollector._smState = { stage = "INIT" }
+        FieldDataCollector._fdCo = nil
+        return
+    end
+    FieldDataCollector._smState = nil
     FieldDataCollector._fdCo = coroutine.create(function(opts)
         opts = opts or {}
         FieldDataCollector._yieldEvery = math.max(1, tonumber(opts.batchSize) or 8)
@@ -149,6 +164,14 @@ end
 --- @return boolean done, table fieldArrayPartialOrFinal
 function FieldDataCollector:collectStep(opts)
     opts = opts or {}
+    -- Plan v5 B2: state-machine path. No coroutines, no yield-across-pcall hazard.
+    if FieldDataCollector._smState ~= nil then
+        FieldDataCollector._yieldEvery = nil
+        FieldDataCollector._baleYieldStride = nil
+        local result = FieldDataCollector:_collectImpl()
+        FieldDataCollector._smState = nil
+        return true, result or {}
+    end
     if not FieldDataCollector._fdCo then
         return true, {}
     end

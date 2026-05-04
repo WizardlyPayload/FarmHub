@@ -30,7 +30,22 @@ function ProductionDataCollector:_prodYieldPlaceableScan()
     end
 end
 
+--- Plan v5 B3: state-machine path runs sync; legacy coroutine path retained behind a flag.
+local function _productionUseStateMachine()
+    local cfg = rawget(_G, "FarmDashboardDataCollector")
+    if cfg and cfg.config and cfg.config.useStateMachine_production ~= nil then
+        return cfg.config.useStateMachine_production and true or false
+    end
+    return true
+end
+
 function ProductionDataCollector:collectBegin()
+    if _productionUseStateMachine() then
+        ProductionDataCollector._smState = { stage = "INIT" }
+        ProductionDataCollector._co = nil
+        return
+    end
+    ProductionDataCollector._smState = nil
     ProductionDataCollector._co = coroutine.create(function(opts)
         opts = opts or {}
         ProductionDataCollector._yieldChains = math.max(1, tonumber(opts.productionChainsPerYield) or 2)
@@ -47,6 +62,14 @@ function ProductionDataCollector:collectBegin()
 end
 
 function ProductionDataCollector:collectStep(opts)
+    if ProductionDataCollector._smState ~= nil then
+        -- Plan v5 B3: state-machine path. Yields gated by _yieldChains/_yieldPlaceables (nil = no-op).
+        ProductionDataCollector._yieldChains = nil
+        ProductionDataCollector._yieldPlaceables = nil
+        local result = ProductionDataCollector._collectImpl(ProductionDataCollector)
+        ProductionDataCollector._smState = nil
+        return true, result or { chains = {} }
+    end
     if not ProductionDataCollector._co then return true, { chains = {} } end
     local ok, a, b = coroutine.resume(ProductionDataCollector._co, opts or {})
     if not ok then

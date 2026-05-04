@@ -1,0 +1,245 @@
+<modDesc descVersion="107">
+    <author>Ritter</author>
+    <version>1.2.2.0</version>
+    <title>
+        <en>Realistic Livestock - Ritter version</en>
+        <it>Allevamento Realistico - Versione Ritter</it>
+    </title>
+    <description>
+        <en>
+            <![CDATA[Replaces FS25's simple animal clusters with individually tracked animals - each with unique genetics, breeding, diseases, and production traits. A maintained version of Arrow-kb's Realistic Livestock mod.
+
+Every animal is tracked separately with its own identity, genetic makeup, health status, and production output. Genetics are inherited through breeding, diseases can spread and require treatment, and production is driven by each animal's individual traits.
+
+This is a maintained version of the original Realistic Livestock mod by Arrow-kb, who has discontinued development. The goal is to keep the mod working, fix bugs, and make improvements where needed.
+
+Notes:
+- Based on Arrow-kb's Realistic Livestock mod (v1.2.0.5), released under GPL-3 license
+- Savegame data from Arrow-kb's original version is automatically migrated on first load
+- Font Library mod is no longer required
+- Incompatible with FS25_EnhancedLivestock, FS25_MoreVisualAnimals, and FS25_EnhancedAnimalSystem
+
+Documentation: https://rittermod.github.io/FS25_RealisticLivestockRM
+Source code and issue tracker: https://github.com/rittermod/FS25_RealisticLivestockRM
+
+Changelog
+
+1.2.2.0:
+- Added Witcombe map support: new UK breeds (Jersey, Gloucestershire Old Spot, Texel, Suffolk, Blue Faced Leicester) with full breeding, genetics, and reproduction; rabbits get viable weights, litter sizes, and consumption rates; automatic version-aware compatibility
+- Hereford on Witcombe now uses a heritage breed profile: 9-month gestation, premium pricing (300/3000), and an 18-month sell-price peak
+- Info tab genetics now show a 0-99 score next to each label (e.g. "97 - Extremely high") so animals within the same bucket can be compared at a glance
+- Fixed singleplayer: RL Messages tab now shows "Bought/Sold N animal(s) for €X" entries after buying or selling (previously these entries only appeared in multiplayer)
+- Fixed potential multiplayer crash when changing monitor, name, or disease treatment on an animal while the husbandry is being sold or demolished
+- Fixed multiplayer: insemination result notification to clients no longer reports success when the insemination actually failed
+
+RL Menu (preview - work in progress):
+- Added Buy tab: browse dealer animals, see per-row prices and a running cart total, then buy one or many at a time via a destination-picker flow
+- Added Artificial Insemination tab: browse dealer bulls by species, pick a straw quantity with live price preview, favourite bulls, and buy straws without leaving the menu
+- Fixed multiplayer: Sell and Info tabs now refresh the farm balance display immediately instead of showing a stale value until the next action
+
+1.2.1.0:
+- Added multiplayer support for "Reset Animal Dealer" and "Reset AI Animals" buttons (admin-only in MP, syncs to all players)
+- Fixed multiplayer: straw pickup from dewar now syncs to server (dewar no longer "refills" on reconnect)
+- Fixed multiplayer: empty straw hand tool now deleted from client inventory after insemination or return
+- Fixed animal mark/unmark: 3D visual marker now updates immediately when unmarking (previously required relog)
+- Fixed potential multiplayer crash when receiving unknown mark keys from newer mod versions
+- Fixed straw hand tool crash when no player is carrying it
+- Fixed crash when selling an animal from a livestock trailer at the animal dealer
+- Fixed crash when opening the animal trailer screen near a rideable horse created by third-party mods (e.g. AdditionalContracts animal missions)
+- Fixed prop horses from third-party mods being incorrectly converted to real animals when loaded onto trailers or into pens
+- Fixed animals marked as non-sellable being sellable after loading onto a trailer
+
+RL Menu (preview - work in progress):
+- Added Sell tab with shopping cart summary (selected count, price, fee, total); animals marked as non-sellable are filtered out
+- Husbandry selector now sorted alphabetically by name
+- RL Menu now remembers selected husbandry and animal when switching between Manage, Move, and Sell tabs
+- Single sell/move no longer clears other checkbox selections
+- Renamed "Info" tab to "Manage" to better reflect its actions (mark, inseminate, monitor, etc.)
+- Reordered tabs: Sell, Move, Manage, Messages
+- Fixed status icons jumping position when switching between tabs
+- Fixed animal age not showing in the RL Menu stats area
+
+1.2.0.1:
+- Fixed deprecated fillUnit warning in game log for semen dewar
+
+v1.2.0.0:
+- Rewrote semen dewar as a vehicle/pallet - fixes game freeze when looking at dewar, multiplayer pickup failures, and invisible dewars after mid-game purchase
+- Dewar state (straws, bull genetics) now persists through save/load and object storage cycles
+- Fixed crash in third-party mods that inspect stored pallets (e.g. Time Saving Stock Check) when a semen dewar is placed in object storage
+- Fixed multiplayer desync: mark, castrate, monitor toggle, rename, and disease treatment changes from a client now sync to all other connected players
+- Fixed all pre-existing animals getting the same identity (e.g. "UK 1 1") when installing RL on an existing save for the first time - also self-heals saves already affected
+- Added Czech translation update (community contribution by Kynuska)
+- Added Hungarian translation (community contribution by Toamsz93)
+- Added missing translation keys across all 16 languages
+- Fixed fillType errors in log when third-party selling station mods reference the ANIMAL category
+
+New RL Menu (preview - work in progress):
+- Added new RL Menu (assign key in Settings -> Controls): a standalone tabbed menu. The legacy animal screen (R key) still works unchanged
+- Messages tab: chronological message feed with single and bulk delete
+- Info tab: husbandry selector, animal list with detail pane (pedigree, genetics, diseases, inputs/outputs), and action buttons (Mark, Monitor, Rename, Diseases, Inseminate, Castrate)
+- Move tab: move animals between husbandries or to butchers with single-move and bulk-move using checkbox multi-select
+- Status icons on animal list cards showing pregnancy, recovering, infertile/castrated, lactating, producing wool, and laying eggs at a glance
+
+
+]]>
+        </en>
+        <it>
+            <![CDATA[Sostituisce i semplici cluster di animali di FS25 con animali individualmente tracciati, ciascuno con genetica unica, allevamento, malattie e tratti produttivi. Una versione mantenuta del mod Realistic Livestock di Arrow-kb.
+
+Ogni animale viene monitorato separatamente con la propria identità, composizione genetica, stato di salute e produzione. La genetica si trasmette tramite riproduzione, le malattie possono diffondersi richiedendo trattamenti, e la produzione dipende dai tratti individuali di ciascun animale.
+
+Questa è una versione mantenuta del mod originale Realistic Livestock di Arrow-kb, che ha interrotto lo sviluppo. L'obiettivo è mantenere il mod funzionante, correggere bug e apportare miglioramenti dove necessario.
+
+Note:
+- Basato sul mod Realistic Livestock di Arrow-kb (v1.2.0.5), rilasciato sotto licenza GPL-3
+- I dati di salvataggio della versione originale di Arrow-kb vengono migrati automaticamente al primo caricamento
+- Il mod Font Library non è più richiesto
+- Incompatibile con FS25_EnhancedLivestock, FS25_MoreVisualAnimals e FS25_EnhancedAnimalSystem
+
+Documentazione: https://rittermod.github.io/FS25_RealisticLivestockRM
+Codice sorgente e tracciamento issue: https://github.com/rittermod/FS25_RealisticLivestockRM
+
+]]>
+        </it>
+    </description>
+    <iconFilename>icon_RealisticLivestock.dds</iconFilename>
+    <multiplayer supported="true"/>
+    <extraSourceFiles>
+        <sourceFile filename="scripts/main.lua"/>
+    </extraSourceFiles>
+    <l10n filenamePrefix="translations/translation"/>
+    <inputBinding>
+        <actionBinding action="VisualAnimalsDialog">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_lshift KEY_t"/>
+        </actionBinding>
+        <actionBinding action="RL_OPEN_ANIMAL_SCREEN">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_r" index="1"/>
+        </actionBinding>
+        <actionBinding action="RL_MARK">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_x" index="1"/>
+        </actionBinding>
+        <actionBinding action="RL_MONITOR">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_m" index="1"/>
+        </actionBinding>
+        <actionBinding action="RL_AI">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_i" index="1"/>
+        </actionBinding>
+        <actionBinding action="RL_CASTRATE">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_c" index="1"/>
+        </actionBinding>
+        <actionBinding action="RL_DISEASES">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_d" index="1"/>
+        </actionBinding>
+        <actionBinding action="RL_RENAME">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_n" index="1"/>
+        </actionBinding>
+        <actionBinding action="RL_SELECT">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_a" index="1"/>
+        </actionBinding>
+        <actionBinding action="RL_MENU"/>
+    </inputBinding>
+    <actions>
+        <action name="VisualAnimalsDialog"/>
+        <action name="RL_OPEN_ANIMAL_SCREEN"/>
+        <action name="RL_MARK"/>
+        <action name="RL_MONITOR"/>
+        <action name="RL_AI"/>
+        <action name="RL_CASTRATE"/>
+        <action name="RL_DISEASES"/>
+        <action name="RL_RENAME"/>
+        <action name="RL_SELECT"/>
+        <action name="RL_MENU"/>
+    </actions>
+    <helpLines>
+
+        <category title="$l10n_rl_settings">
+
+            <page title="$l10n_rl_help_monitors_title" iconSliceId="rlHelpIcons.monitor">
+
+                <paragraph>
+                    <text text="$l10n_rl_help_monitors_1"/>
+                </paragraph>
+                <paragraph>
+                    <text text="$l10n_rl_help_monitors_2"/>
+                </paragraph>
+                <paragraph>
+                    <text text="$l10n_rl_help_monitors_3"/>
+                </paragraph>
+
+            </page>
+
+            <page title="$l10n_rl_help_pregnancy_title" iconSliceId="rlHelpIcons.pregnancy">
+
+                <paragraph>
+                    <text text="$l10n_rl_help_pregnancy_1"/>
+                </paragraph>
+                <paragraph>
+                    <text text="$l10n_rl_help_pregnancy_2"/>
+                </paragraph>
+                <paragraph>
+                    <text text="$l10n_rl_help_pregnancy_3"/>
+                </paragraph>
+                <paragraph>
+                    <text text="$l10n_rl_help_pregnancy_4"/>
+                </paragraph>
+                <paragraph>
+                    <text text="$l10n_rl_help_pregnancy_5"/>
+                </paragraph>
+
+            </page>
+
+            <page title="$l10n_rl_help_production_title" iconSliceId="rlHelpIcons.production">
+
+                <paragraph>
+                    <text text="$l10n_rl_help_production_1"/>
+                </paragraph>
+                <paragraph>
+                    <text text="$l10n_rl_help_production_2"/>
+                </paragraph>
+                <paragraph>
+                    <text text="$l10n_rl_help_production_3"/>
+                </paragraph>
+
+            </page>
+
+            <page title="$l10n_rl_help_weight_title" iconSliceId="gui.storeAttribute_maxLoadCapacity">
+
+                <paragraph>
+                    <text text="$l10n_rl_help_weight_1"/>
+                </paragraph>
+                <paragraph>
+                    <text text="$l10n_rl_help_weight_2"/>
+                </paragraph>
+
+            </page>
+
+            <page title="$l10n_rl_help_genetics_title" iconSliceId="rlHelpIcons.genetics">
+
+                <paragraph>
+                    <text text="$l10n_rl_help_genetics_1"/>
+                </paragraph>
+                <paragraph>
+                    <text text="$l10n_rl_help_genetics_2"/>
+                </paragraph>
+                <paragraph>
+                    <text text="$l10n_rl_help_genetics_3"/>
+                </paragraph>
+                <paragraph>
+                    <text text="$l10n_rl_help_genetics_4"/>
+                </paragraph>
+                <paragraph>
+                    <text text="$l10n_rl_help_genetics_5"/>
+                </paragraph>
+                <paragraph>
+                    <text text="$l10n_rl_help_genetics_6"/>
+                </paragraph>
+
+            </page>
+
+        </category>
+
+    </helpLines>
+    <storeItems>
+        <storeItem xmlFilename="objects/dewar/dewar.xml" />
+    </storeItems>
+</modDesc>

@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- FS25 FarmDashboard | modDesc.xml | v2.0.0 -->
+<!-- FS25 FarmDashboard | modDesc.xml | v2.2.0 -->
 <modDesc descVersion="99">
     <author>JoshWalki / Wizardlypayload &amp; WizardlyPayload</author>
-    <version>2.0.0.0</version>
+    <version>2.2.0.0</version>
     
     <title>
         <en>Farm Dashboard</en>
@@ -20,6 +20,7 @@
     
     <extraSourceFiles>
         <sourceFile filename="src/FarmDashboard.lua"/>
+        <sourceFile filename="src/Diagnostics.lua"/>
         <sourceFile filename="src/FarmDashboardDataCollector.lua"/>
         <sourceFile filename="src/collectors/AnimalDataCollector.lua"/>
         <sourceFile filename="src/collectors/EconomyDataCollector.lua"/>

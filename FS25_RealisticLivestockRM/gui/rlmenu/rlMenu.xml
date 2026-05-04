@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!--
+    rlMenu.xml
+    Root GUI for the RL Tabbed Menu - standalone full-screen TabbedMenu.
+    Tabs are added by registering additional <FrameReference> entries
+    inside <Paging> and calling registerPage/addPageTab in
+    RLMenu:setupMenuPages.
+-->
+<GUI onOpen="onOpen" onClose="onClose" onCreate="onCreate">
+
+    <!-- Fullscreen background -->
+    <Bitmap profile="fs25_fullScreenBackground" id="background"/>
+
+    <!-- Page container: one FrameReference per tab -->
+    <Paging profile="uiInGameMenuPaging"
+            onPageChange="onPageChange"
+            onPageUpdate="onPageUpdate"
+            id="pagingElement">
+        <FrameReference ref="RLMenuBuyFrame" name="buyFrame" id="buyFrame"/>
+        <FrameReference ref="RLMenuSellFrame" name="sellFrame" id="sellFrame"/>
+        <FrameReference ref="RLMenuMoveFrame" name="moveFrame" id="moveFrame"/>
+        <FrameReference ref="RLMenuInfoFrame" name="infoFrame" id="infoFrame"/>
+        <FrameReference ref="RLMenuAIFrame" name="aiFrame" id="aiFrame"/>
+        <FrameReference ref="RLMenuMessagesFrame" name="messagesFrame" id="messagesFrame"/>
+    </Paging>
+
+    <!-- Tab header bar -->
+    <Bitmap profile="fs25_tabListContainer" id="header">
+        <MultiTextOption profile="uiInGameMenuHeaderSelector"
+                         onClick="onClickPageSelection"
+                         id="pageSelector"
+                         soundDisabled="true"/>
+        <SmoothList profile="fs25_tabList"
+                    id="pagingTabList"
+                    onSelectionChanged="onTabMenuSelectionChanged"
+                    onScroll="onTabMenuScroll">
+            <ListItem profile="fs25_tabListItem">
+                <Button profile="fs25_tabListItemButton" name="tabButton" soundDisabled="true"/>
+                <Bitmap profile="fs25_tabListItemSeparator"/>
+                <Bitmap profile="fs25_tabListItemSeparatorBottom"/>
+            </ListItem>
+        </SmoothList>
+    </Bitmap>
+
+    <!-- Bottom button bar - 9 slots for dynamic menu buttons (Back + Filter + up to 6 mutations + headroom) -->
+    <BoxLayout profile="fs25_buttonBox" id="buttonsPanel">
+        <Button profile="buttonBack" onClick="onClickBack" id="menuButton[1]">
+            <Bitmap profile="fs25_buttonBoxSeparator" name="separator"/>
+        </Button>
+        <Button profile="buttonBack" onClick="onClickBack" id="menuButton[2]">
+            <Bitmap profile="fs25_buttonBoxSeparator" name="separator"/>
+        </Button>
+        <Button profile="buttonBack" onClick="onClickBack" id="menuButton[3]">
+            <Bitmap profile="fs25_buttonBoxSeparator" name="separator"/>
+        </Button>
+        <Button profile="buttonBack" onClick="onClickBack" id="menuButton[4]">
+            <Bitmap profile="fs25_buttonBoxSeparator" name="separator"/>
+        </Button>
+        <Button profile="buttonBack" onClick="onClickBack" id="menuButton[5]">
+            <Bitmap profile="fs25_buttonBoxSeparator" name="separator"/>
+        </Button>
+        <Button profile="buttonBack" onClick="onClickBack" id="menuButton[6]">
+            <Bitmap profile="fs25_buttonBoxSeparator" name="separator"/>
+        </Button>
+        <Button profile="buttonBack" onClick="onClickBack" id="menuButton[7]">
+            <Bitmap profile="fs25_buttonBoxSeparator" name="separator"/>
+        </Button>
+        <Button profile="buttonBack" onClick="onClickBack" id="menuButton[8]">
+            <Bitmap profile="fs25_buttonBoxSeparator" name="separator"/>
+        </Button>
+        <Button profile="buttonBack" onClick="onClickBack" id="menuButton[9]">
+            <Bitmap profile="fs25_buttonBoxSeparator" name="separator"/>
+        </Button>
+    </BoxLayout>
+
+</GUI>

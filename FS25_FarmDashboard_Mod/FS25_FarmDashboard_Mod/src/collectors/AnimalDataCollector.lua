@@ -1,397 +1,656 @@
--- FS25 FarmDashboard | AnimalDataCollector.lua | v2.1.0
+-- FS25 FarmDashboard | AnimalDataCollector.lua | v2.2.0
+-- Pure state-machine collector. NO coroutines. NO yields.
+-- Phase 1: single-pass cluster walk; Phase 2: row-count caps + opportunistic wall-clock budget;
+-- Phase 4: hard LOD with dual-mode (base sums numAnimals, RL buckets individual Animal instances).
+-- The legacy fabricated-individuals fallback is removed: data.animals[i].animals is intentionally empty
+-- in the LOD export. Per-pen detail rows live in details/animals_<id>.json (see Phase 7).
 
 AnimalDataCollector = {}
 
+local STAGE_INIT       = 0
+local STAGE_PLACEABLES = 1
+local STAGE_DONE       = 2
+
 function AnimalDataCollector:init()
-    AnimalDataCollector._co = nil
+    self._iter = nil
 end
 
-local function animalCoopYield(partialAnimalData)
-    if AnimalDataCollector._yieldEvery and coroutine.running() then
-        coroutine.yield("progress", partialAnimalData or {})
-    end
+local function diagToken(name)
+    local D = rawget(_G, "FarmDashDiagnostics")
+    if D and D:isEnabled() then return D, D:start(name) end
+    return nil, nil
 end
+
+local function diagStop(D, tok)
+    if D and tok then D:stop(tok) end
+end
+
+-- After `local function` (load order). Used only from `_walkRL` which is defined below.
+local function _anyMarkActive(marks)
+    if type(marks) ~= "table" then return false end
+    for _, mark in pairs(marks) do
+        if mark and (mark.active == true or mark == true) then return true end
+    end
+    return false
+end
+
+--- Public hooks -------------------------------------------------------------
 
 function AnimalDataCollector:collectBegin()
-    AnimalDataCollector._co = coroutine.create(function(opts)
-        opts = opts or {}
-        AnimalDataCollector._yieldEvery = math.max(1, tonumber(opts.animalBatch or opts.batchSize) or 2)
-        AnimalDataCollector._animalTick = 0
-        -- collectSafely may coroutine.yield; must not run under pcall (Lua 5.1 / engine — yields across C boundary hitch or error).
-        local result = self:collectSafely()
-        AnimalDataCollector._yieldEvery = nil
-        if not result then
-            return {}
-        end
-        return result.animalData or {}
-    end)
+    self._iter = {
+        stage = STAGE_INIT,
+        list = {},
+        idx = 1,
+        out = {},
+        penState = nil,
+        rowsThisSlice = 0,
+        sliceDeadline = nil,
+        startedAt = nil,
+    }
 end
 
+--- Returns done(boolean), payload(table-or-nil partial array of pen rows so far).
+--- collectStep is called repeatedly by the orchestrator until done==true.
+--- IMPORTANT: This function never yields. State lives in self._iter.
 function AnimalDataCollector:collectStep(opts)
-    if not AnimalDataCollector._co then return true, {} end
-    local ok, a, b = coroutine.resume(AnimalDataCollector._co, opts or {})
-    if not ok then
-        Logging.warning("[FarmDash] AnimalDataCollector coroutine: " .. tostring(a))
-        AnimalDataCollector._co = nil
-        AnimalDataCollector._yieldEvery = nil
-        return true, {}
+    if not self._iter then return true, {} end
+
+    opts = opts or {}
+    local maxRows = math.max(32, tonumber(opts.animalRowsPerSlice) or 256)
+    local budgetMs = math.max(0, tonumber(opts.sliceBudgetMs) or 0)
+
+    local D = rawget(_G, "FarmDashDiagnostics")
+    -- Plan v5 B10: animals_collectStep is an always-on bucket; D:start handles the gate.
+    local stepTok = D and D:start("animals_collectStep") or nil
+
+    local it = self._iter
+    it.rowsThisSlice = 0
+    if budgetMs > 0 and D and D.nowSec then
+        local t = D.nowSec()
+        if t then it.sliceDeadline = t + (budgetMs / 1000) end
+    else
+        it.sliceDeadline = nil
     end
-    if a == "progress" then
-        return false, b or {}
+
+    if it.stage == STAGE_INIT then
+        self:_buildPlaceableList(it)
+        it.stage = STAGE_PLACEABLES
     end
-    local st = coroutine.status(AnimalDataCollector._co)
-    if st == "dead" then
-        AnimalDataCollector._co = nil
-        AnimalDataCollector._yieldEvery = nil
-        return true, a or {}
+
+    if it.stage == STAGE_PLACEABLES then
+        self:_walkPlaceables(it, maxRows)
     end
-    if st == "suspended" then
-        Logging.warning("[FarmDash] AnimalDataCollector: unexpected coroutine state; ending slice.")
-        AnimalDataCollector._co = nil
-        AnimalDataCollector._yieldEvery = nil
-        return true, (type(a) == "table" and a) or b or {}
+
+    diagStop(D, stepTok)
+
+    if it.stage == STAGE_DONE then
+        local result = it.out
+        self._iter = nil
+        return true, result
     end
-    return false, b or {}
+    return false, it.out
 end
 
 function AnimalDataCollector:collect()
-    AnimalDataCollector._yieldEvery = nil
-    local animalData = {}
+    -- Synchronous fallback for legacy callers. Same single-pass walker, no caps.
+    self:collectBegin()
+    local guard = 0
+    while self._iter and guard < 100000 do
+        local done, _ = self:collectStep({ animalRowsPerSlice = 8192, sliceBudgetMs = 0 })
+        guard = guard + 1
+        if done then break end
+    end
+    return (self._iter == nil and self._lastSyncResult) or {}
+end
 
-    -- Wrap entire function in pcall to prevent crashes
-    local success, result = pcall(function()
-        return self:collectSafely()
-    end)
-    
-    if success and result then
-        return result.animalData or {}
-    else
-        -- print("[FarmDash] AnimalDataCollector failed, using fallback")
-        return animalData
+function AnimalDataCollector:shutdown()
+    self._iter = nil
+end
+
+--- Internals --------------------------------------------------------------
+
+function AnimalDataCollector:_buildPlaceableList(it)
+    if not _G.g_currentMission or not _G.g_currentMission.husbandrySystem then return end
+    local placeables = _G.g_currentMission.husbandrySystem.placeables
+    if not placeables then return end
+    for _, placeable in pairs(placeables) do
+        if placeable then
+            it.list[#it.list + 1] = placeable
+        end
     end
 end
 
-function AnimalDataCollector:collectSafely()
-    local animalData = {}
+function AnimalDataCollector:_isOutOfBudget(it)
+    if not it.sliceDeadline then return false end
+    local D = rawget(_G, "FarmDashDiagnostics")
+    if not D or not D.nowSec then return false end
+    local t = D.nowSec()
+    if not t then return false end
+    return t >= it.sliceDeadline
+end
 
-    if not _G.g_currentMission then
-        return {animalData = animalData}
-    end
+function AnimalDataCollector:_walkPlaceables(it, maxRows)
+    while it.idx <= #it.list do
+        if it.rowsThisSlice >= maxRows then return end
+        if self:_isOutOfBudget(it) then return end
 
-    -- Simple collection - only get basic husbandry data without any arithmetic
-    if _G.g_currentMission.husbandrySystem then
-        for _, placeable in pairs(_G.g_currentMission.husbandrySystem.placeables or {}) do
-            local husbandryData = self:collectBasicHusbandryData(placeable)
-            if husbandryData then
-                table.insert(animalData, husbandryData)
+        local placeable = it.list[it.idx]
+
+        if it.penState == nil then
+            it.penState = self:_beginPen(placeable)
+        end
+
+        if it.penState then
+            local penDone = self:_continuePen(placeable, it.penState, maxRows - it.rowsThisSlice)
+            it.rowsThisSlice = it.rowsThisSlice + (it.penState.rowsConsumedThisStep or 0)
+            it.penState.rowsConsumedThisStep = 0
+            if penDone then
+                local row = self:_finalizePen(placeable, it.penState)
+                if row then it.out[#it.out + 1] = row end
+                it.penState = nil
+                it.idx = it.idx + 1
             end
-            AnimalDataCollector._animalTick = (AnimalDataCollector._animalTick or 0) + 1
-            if AnimalDataCollector._yieldEvery and AnimalDataCollector._animalTick % AnimalDataCollector._yieldEvery == 0 then
-                animalCoopYield(animalData)
-            end
+        else
+            it.idx = it.idx + 1
         end
     end
 
-    -- print("[FarmDashboard] AnimalDataCollector: collected animalData, count:", #animalData)
-    return {animalData = animalData}
+    it.stage = STAGE_DONE
+    self._lastSyncResult = it.out
 end
 
-function AnimalDataCollector:collectBasicHusbandryData(placeable)
+--- Pen processing ---------------------------------------------------------
+
+function AnimalDataCollector:_beginPen(placeable)
     if not placeable then return nil end
 
-    local data = {
+    local row = {
         id = placeable.id or 0,
-        name = placeable:getName() or "Unknown",
-        position = self:getPosition(placeable),
-        ownerFarmId = placeable:getOwnerFarmId() or 0,
+        name = "Unknown",
+        position = self:_getPosition(placeable),
+        ownerFarmId = 0,
         animalType = placeable.animalTypeIndex or 0,
-        animals = {},
+        animals = {},          -- intentionally empty: LOD aggregates only; details live elsewhere
+        clusters = {},
         fillLevels = {},
+        storageData = {},
         productivity = 0,
         health = 0,
         capacity = 0,
         animalCount = 0,
-        productionData = {},
-        consumptionData = {},
-        storageData = {}
+        lod = "agg",
     }
 
-    -- Try to get animal type name from animalTypeIndex
-    if placeable.animalTypeIndex and _G.g_animalManager then
-        local animalTypeData = _G.g_animalManager.nameToType[placeable.animalTypeIndex]
-        if animalTypeData then
-            data.animalTypeName = animalTypeData.name or "Unknown"
+    local nameOk, nameVal = pcall(function() return placeable:getName() end)
+    if nameOk and type(nameVal) == "string" and nameVal ~= "" then
+        row.name = nameVal
+    end
+
+    local farmOk, farmId = pcall(function() return placeable:getOwnerFarmId() end)
+    if farmOk and type(farmId) == "number" then
+        row.ownerFarmId = farmId
+    end
+
+    if placeable.animalTypeIndex and _G.g_animalManager and _G.g_animalManager.nameToType then
+        local at = _G.g_animalManager.nameToType[placeable.animalTypeIndex]
+        if at and at.name then
+            row.animalTypeName = at.name
         end
     end
 
-    -- Get basic animal count if available
-    if placeable.getClusters then
-        local clusters = placeable:getClusters()
-        if clusters then
-            for _, cluster in pairs(clusters) do
-                if cluster.numAnimals and type(cluster.numAnimals) == "number" and type(data.animalCount) == "number" then
-                    data.animalCount = data.animalCount + cluster.numAnimals
-                end
-            end
-        end
+    -- Fill levels (one consolidated read per pen)
+    self:_collectFillLevels(placeable, row)
+
+    -- Capacity / productivity / health (cheap getters; if any blow up, fall back to defaults)
+    local capOk, cap = pcall(function() return placeable:getCapacity() end)
+    if capOk and type(cap) == "number" then row.capacity = cap end
+
+    local prodOk, prod = pcall(function() return placeable:getGlobalProductionFactor() end)
+    if prodOk and type(prod) == "number" then row.productivity = prod end
+
+    local condOk, cond = pcall(function() return placeable:getConditionInfos() end)
+    if condOk and type(cond) == "table" and cond.health then
+        local hv = cond.health.value or 0
+        if hv <= 2 then hv = hv * 100 end
+        row.health = hv
     end
-    
-    -- Get fill levels from multiple possible sources
+
+    return {
+        row = row,
+        clusters = nil,
+        clusterIdx = 1,
+        animalIdx = 1,
+        buckets = {},
+        bucketKeys = {},
+        animalsInPen = nil,
+        mode = nil,
+        rowsConsumedThisStep = 0,
+    }
+end
+
+function AnimalDataCollector:_collectFillLevels(placeable, row)
     local fillLevels = {}
-    
-    -- Try generic getFillLevels method first
+
     if placeable.getFillLevels then
-        local success, levels = pcall(function() return placeable:getFillLevels() end)
-        if success and levels then
-            for k, v in pairs(levels) do
-                fillLevels[k] = v
-            end
+        local ok, levels = pcall(function() return placeable:getFillLevels() end)
+        if ok and type(levels) == "table" then
+            for k, v in pairs(levels) do fillLevels[k] = v end
         end
     end
-    
-    -- Try spec_husbandryFood for food items
     if placeable.spec_husbandryFood and placeable.spec_husbandryFood.fillLevels then
         for fillType, level in pairs(placeable.spec_husbandryFood.fillLevels) do
             fillLevels[fillType] = level
         end
     end
-    
-    -- Try spec_husbandryWater for water
     if placeable.spec_husbandryWater and placeable.spec_husbandryWater.fillLevel then
         fillLevels["WATER"] = placeable.spec_husbandryWater.fillLevel
     end
-    
-    -- Try spec_husbandryStraw for straw/bedding
     if placeable.spec_husbandryStraw and placeable.spec_husbandryStraw.fillLevel then
         fillLevels["STRAW"] = placeable.spec_husbandryStraw.fillLevel
     end
-    
-    -- Process fill levels if we found any
-    if fillLevels and next(fillLevels) ~= nil then
-        local availableFood = 0
-        local edibleFoods = {
-                -- Grains and crops
-                "WHEAT", "BARLEY", "OAT", "CANOLA", "SORGHUM", "MAIZE", "CORN",
-                "SUNFLOWER", "SOYBEAN", "POTATO", "SUGARBEET", "SUGARBEET_CUT",
-                -- Processed feeds
-                "DRYGRASS_WINDROW", "GRASS_WINDROW", "SILAGE", "HAY", "STRAW",
-                "FORAGE", "CHAFF", "WOODCHIPS", 
-                -- Mixed feeds
-                "PIGFOOD", "MINERAL_FEED", "TOTAL_MIXED_RATION", "FORAGE_MIXING"
+
+    if next(fillLevels) == nil then return end
+
+    local availableFood = 0
+    local edibleFoods = {
+        WHEAT=1, BARLEY=1, OAT=1, CANOLA=1, SORGHUM=1, MAIZE=1, CORN=1,
+        SUNFLOWER=1, SOYBEAN=1, POTATO=1, SUGARBEET=1, SUGARBEET_CUT=1,
+        DRYGRASS_WINDROW=1, GRASS_WINDROW=1, SILAGE=1, HAY=1, STRAW=1,
+        FORAGE=1, CHAFF=1, WOODCHIPS=1,
+        PIGFOOD=1, MINERAL_FEED=1, TOTAL_MIXED_RATION=1, FORAGE_MIXING=1,
+    }
+
+    for fillType, fillLevel in pairs(fillLevels) do
+        if fillType and fillLevel and type(fillLevel) == "number" and fillLevel > 0 then
+            local fillTypeName = fillType
+            if type(fillType) == "number" and _G.g_fillTypeManager then
+                local ft = _G.g_fillTypeManager:getFillTypeByIndex(fillType)
+                if ft and ft.name then fillTypeName = ft.name end
+            end
+            row.fillLevels[fillTypeName] = fillLevel
+            row.storageData[fillTypeName] = fillLevel
+            if edibleFoods[string.upper(tostring(fillTypeName))] then
+                availableFood = availableFood + fillLevel
+            end
+        end
+    end
+
+    if availableFood > 0 then
+        row.fillLevels["Available Food"] = availableFood
+        row.storageData["Available Food"] = availableFood
+        row.storageData["availableFood"] = availableFood
+    end
+end
+
+--- Continue cluster walk for one pen across multiple slices.
+--- @return boolean done (true when all clusters in this pen are processed)
+function AnimalDataCollector:_continuePen(placeable, st, remainingRows)
+    if not st.clusters then
+        local ok, clusters = pcall(function() return placeable:getClusters() end)
+        st.clusters = (ok and type(clusters) == "table") and clusters or {}
+    end
+
+    local clusters = st.clusters
+
+    if st.mode == nil then
+        for _, c in pairs(clusters) do
+            if c then
+                st.mode = (c.isIndividual == true) and "rl" or "base"
+                break
+            end
+        end
+        if st.mode == nil then return true end
+    end
+
+    local rowsLeft = remainingRows
+    if rowsLeft <= 0 then return false end
+
+    if st.mode == "base" then
+        return self:_walkBase(clusters, st, rowsLeft)
+    else
+        return self:_walkRL(clusters, st, rowsLeft)
+    end
+end
+
+--- Base game: each cluster has numAnimals; aggregate per (subType, age, gender) bucket.
+function AnimalDataCollector:_walkBase(clusters, st, rowsLeft)
+    -- pairs() order is non-deterministic; use sequential keys collected once.
+    if not st.clusterKeys then
+        st.clusterKeys = {}
+        for k in pairs(clusters) do
+            st.clusterKeys[#st.clusterKeys + 1] = k
+        end
+        st.clusterIdx = 1
+    end
+
+    local keys = st.clusterKeys
+    local n = #keys
+    local processed = 0
+
+    while st.clusterIdx <= n and processed < rowsLeft do
+        local c = clusters[keys[st.clusterIdx]]
+        if c and type(c.numAnimals) == "number" and c.numAnimals > 0 then
+            local subType = tostring(c.subType or c.fillType or "UNKNOWN")
+            local subTypeIndex = c.subTypeIndex or 0
+            local ageMonths = math.floor(c.age or 0)
+            local ageDecile = math.floor(ageMonths / 12)
+            local gender = (c.gender == "male") and "male" or "female"
+            local key = subType .. "|" .. tostring(ageDecile) .. "|" .. gender
+            local b = st.buckets[key]
+            if not b then
+                b = {
+                    subType = subType,
+                    subTypeIndex = subTypeIndex,
+                    ageDecile = ageDecile,
+                    ageMonths = ageMonths,
+                    gender = gender,
+                    isPregnant = c.isPregnant == true,
+                    isLactating = c.isLactating == true,
+                    count = 0,
+                    sumWeight = 0,
+                    sumHealth = 0,
+                }
+                st.buckets[key] = b
+                st.bucketKeys[#st.bucketKeys + 1] = key
+            end
+            local n2 = c.numAnimals
+            b.count = b.count + n2
+            b.sumWeight = b.sumWeight + (c.weight or 0) * n2
+            local h = c.health
+            if type(h) == "number" then
+                if h <= 2 then h = h * 100 end
+                b.sumHealth = b.sumHealth + h * n2
+            end
+        end
+        st.clusterIdx = st.clusterIdx + 1
+        processed = processed + 1
+    end
+
+    st.rowsConsumedThisStep = (st.rowsConsumedThisStep or 0) + processed
+    return st.clusterIdx > n
+end
+
+--- RealisticLivestock: each cluster IS an individual animal; bucket by (subType, ageDecile, gender, pregnant, lactating).
+--- isCastrated and hasDisease are tracked as counts inside each bucket, never in the key.
+function AnimalDataCollector:_walkRL(animals, st, rowsLeft)
+    if not st.clusterKeys then
+        st.clusterKeys = {}
+        for k in pairs(animals) do
+            st.clusterKeys[#st.clusterKeys + 1] = k
+        end
+        st.clusterIdx = 1
+    end
+
+    local D = rawget(_G, "FarmDashDiagnostics")
+    local innerTok = (D and D:isEnabled()) and D:start("animals_rlInner_perBatch") or nil
+
+    local keys = st.clusterKeys
+    local n = #keys
+    local processed = 0
+
+    while st.clusterIdx <= n and processed < rowsLeft do
+        local a = animals[keys[st.clusterIdx]]
+        if a and a.subType then
+            local ageMonths = math.floor(a.age or 0)
+            local ageDecile = math.floor(ageMonths / 12)
+            local gender = (a.gender == "male") and "male" or "female"
+            local key = tostring(a.subType) .. "|" .. tostring(ageDecile)
+                .. "|" .. gender
+                .. "|" .. (a.isPregnant and "P" or "p")
+                .. "|" .. (a.isLactating and "L" or "l")
+
+            local b = st.buckets[key]
+            if not b then
+                b = {
+                    subType = tostring(a.subType),
+                    subTypeIndex = a.subTypeIndex or 0,
+                    ageDecile = ageDecile,
+                    ageMonths = ageMonths,
+                    gender = gender,
+                    isPregnant = a.isPregnant == true,
+                    isLactating = a.isLactating == true,
+                    count = 0,
+                    sumWeight = 0,
+                    sumHealth = 0,
+                    sumGenFert = 0,
+                    sumGenProd = 0,
+                    sumGenHealth = 0,
+                    sumGenMetabolism = 0,
+                    sumGenQuality = 0,
+                    castratedCount = 0,
+                    diseasedCount = 0,
+                    markedCount = 0,
+                    sumAgeMonths = 0,
+                    minAgeMonths = ageMonths,
+                    maxAgeMonths = ageMonths,
+                }
+                st.buckets[key] = b
+                st.bucketKeys[#st.bucketKeys + 1] = key
+            end
+            b.count = b.count + 1
+            b.sumWeight = b.sumWeight + (a.weight or 0)
+            local h = a.health
+            if type(h) == "number" then
+                if h <= 2 then h = h * 100 end
+                b.sumHealth = b.sumHealth + h
+            end
+            b.sumAgeMonths = b.sumAgeMonths + ageMonths
+            if ageMonths < b.minAgeMonths then b.minAgeMonths = ageMonths end
+            if ageMonths > b.maxAgeMonths then b.maxAgeMonths = ageMonths end
+            local g = a.genetics
+            if type(g) == "table" then
+                b.sumGenFert       = b.sumGenFert       + (g.fertility       or 0)
+                b.sumGenProd       = b.sumGenProd       + (g.productivity    or 0)
+                b.sumGenHealth     = b.sumGenHealth     + (g.health          or 0)
+                b.sumGenMetabolism = b.sumGenMetabolism + (g.metabolism      or 0)
+                b.sumGenQuality    = b.sumGenQuality    + (g.quality         or 0)
+            end
+            if a.isCastrated then b.castratedCount = b.castratedCount + 1 end
+            if type(a.diseases) == "table" and #a.diseases > 0 then
+                b.diseasedCount = b.diseasedCount + 1
+            end
+            if type(a.marks) == "table" and _anyMarkActive(a.marks) then
+                b.markedCount = b.markedCount + 1
+            end
+        end
+        st.clusterIdx = st.clusterIdx + 1
+        processed = processed + 1
+    end
+
+    diagStop(D, innerTok)
+    st.rowsConsumedThisStep = (st.rowsConsumedThisStep or 0) + processed
+    return st.clusterIdx > n
+end
+
+--- Build the final per-pen JSON row from accumulated buckets.
+function AnimalDataCollector:_finalizePen(placeable, st)
+    local row = st.row
+    if not row then return nil end
+
+    local clustersOut = {}
+    local totalCount = 0
+    local subTypeCounts = {}
+
+    for _, key in ipairs(st.bucketKeys) do
+        local b = st.buckets[key]
+        if b and b.count > 0 then
+            local entry = {
+                subType       = b.subType,
+                subTypeIndex  = b.subTypeIndex,
+                ageDecile     = b.ageDecile,
+                ageMonths     = b.ageMonths,
+                gender        = b.gender,
+                isPregnant    = b.isPregnant,
+                isLactating   = b.isLactating,
+                count         = b.count,
+                avgWeight     = (b.count > 0) and (b.sumWeight / b.count) or 0,
+                avgHealth     = (b.count > 0) and (b.sumHealth / b.count) or 0,
             }
-            
-            for fillType, fillLevel in pairs(fillLevels) do
-                animalCoopYield()
-                if fillType and fillLevel and type(fillLevel) == "number" and fillLevel > 0 then
-                    -- Get fill type name
-                    local fillTypeName = fillType
-                    if type(fillType) == "number" and _G.g_fillTypeManager then
-                        local fillTypeData = _G.g_fillTypeManager:getFillTypeByIndex(fillType)
-                        if fillTypeData and fillTypeData.name then
-                            fillTypeName = fillTypeData.name
-                        end
-                    end
-                    
-                    -- Store all fill types in both fillLevels and storageData
-                    data.fillLevels[fillTypeName] = fillLevel
-                    data.storageData[fillTypeName] = fillLevel
-                    
-                    -- Check if this is an edible food item
-                    local isEdible = false
-                    for _, food in ipairs(edibleFoods) do
-                        if string.upper(tostring(fillTypeName)) == food then
-                            isEdible = true
-                            break
-                        end
-                    end
-                    
-                    if isEdible then
-                        availableFood = availableFood + fillLevel
-                    end
-                end
+            if b.sumGenFert ~= nil then
+                entry.avgGenFert       = (b.count > 0) and (b.sumGenFert       / b.count) or 0
+                entry.avgGenProd       = (b.count > 0) and (b.sumGenProd       / b.count) or 0
+                entry.avgGenHealth     = (b.count > 0) and (b.sumGenHealth     / b.count) or 0
+                entry.avgGenMetabolism = (b.count > 0) and (b.sumGenMetabolism / b.count) or 0
+                entry.avgGenQuality    = (b.count > 0) and (b.sumGenQuality    / b.count) or 0
+                entry.castratedCount   = b.castratedCount or 0
+                entry.diseasedCount    = b.diseasedCount or 0
+                entry.markedCount      = b.markedCount or 0
+                entry.minAgeMonths     = b.minAgeMonths or 0
+                entry.maxAgeMonths     = b.maxAgeMonths or 0
+                entry.avgAgeMonths     = (b.count > 0) and (b.sumAgeMonths / b.count) or 0
             end
-            
-        -- Add the aggregated available food to both fillLevels and storageData
-        if availableFood > 0 then
-            data.fillLevels["Available Food"] = availableFood
-            -- Also add to storageData for compatibility with web interface
-            data.storageData["Available Food"] = availableFood
-            -- Add as camelCase for web interface compatibility
-            data.storageData["availableFood"] = availableFood
+            clustersOut[#clustersOut + 1] = entry
+            totalCount = totalCount + b.count
+            subTypeCounts[b.subType] = (subTypeCounts[b.subType] or 0) + b.count
         end
     end
 
-    -- Get capacity information safely
-    if placeable.getCapacity then
-        local success, capacity = pcall(function() return placeable:getCapacity() end)
-        if success and capacity then
-            data.capacity = capacity
-        end
+    table.sort(clustersOut, function(a, c)
+        if a.subType ~= c.subType then return a.subType < c.subType end
+        if a.ageDecile ~= c.ageDecile then return a.ageDecile < c.ageDecile end
+        return a.gender < c.gender
+    end)
+
+    row.clusters = clustersOut
+    row.subTypeCounts = subTypeCounts
+    row.animalCount = totalCount
+    row.lod = "agg"
+
+    -- Try max capacity (separate from getCapacity which can return per-fill values).
+    local mxOk, maxN = pcall(function()
+        if placeable.getMaxNumOfAnimals then return placeable:getMaxNumOfAnimals(nil) end
+        return nil
+    end)
+    if mxOk and type(maxN) == "number" then
+        row.maxAnimals = maxN
     end
 
-    -- Get productivity safely
-    if placeable.getGlobalProductionFactor then
-        local success, productivity = pcall(function() return placeable:getGlobalProductionFactor() end)
-        if success and productivity then
-            data.productivity = productivity
-        end
+    -- Try base getNumOfAnimals as a sanity cross-check (may differ from sum on RL during sync).
+    local nOk, numA = pcall(function()
+        if placeable.getNumOfAnimals then return placeable:getNumOfAnimals() end
+        return nil
+    end)
+    if nOk and type(numA) == "number" then
+        row.numOfAnimalsReported = numA
     end
 
-    -- Get health information safely
-    if placeable.getConditionInfos then
-        local success, conditions = pcall(function() return placeable:getConditionInfos() end)
-        if success and conditions and conditions.health then
-            local healthValue = conditions.health.value or 0
-            -- Check if health is in 0-1 range or 0-100 range
-            if healthValue <= 2 then
-                healthValue = healthValue * 100
-            end
-            data.health = healthValue
-        end
-    end
-
-    -- Try to get individual animal data from clusters (RealisticLivestock compatibility)
-    if placeable.getClusters then
-        local success, clusters = pcall(function() return placeable:getClusters() end)
-        if success and clusters then
-            for clusterIndex, cluster in pairs(clusters) do
-                animalCoopYield()
-                if cluster then
-                    -- Check if this is a RealisticLivestock individual animal (cluster.isIndividual == true)
-                    if cluster.isIndividual == true then
-                        -- This cluster IS an individual RealisticLivestock animal
-                        local finalId = nil
-                        if cluster.uniqueId then
-                            if type(cluster.uniqueId) == "string" and tonumber(cluster.uniqueId) then
-                                finalId = tonumber(cluster.uniqueId)
-                            elseif type(cluster.uniqueId) == "number" then
-                                finalId = cluster.uniqueId
-                            end
-                        end
-                        
-                        if not finalId then
-                            -- Fallback if RealisticLivestock animal missing unique ID
-                            finalId = 999999 + #data.animals + 1
-                        end
-                        
-                        -- Handle health value - RealisticLivestock uses genetics.health as 0-1 decimal
-                        local healthValue = cluster.health or 1
-                        -- Check if health is in 0-1 range (RealisticLivestock) or 0-100 range (vanilla)
-                        if healthValue <= 2 then
-                            -- Likely in 0-1 range, convert to percentage
-                            healthValue = healthValue * 100
-                        end
-                        
-                        local animalData = {
-                            id = finalId,
-                            name = cluster.subType or "Unknown",
-                            age = cluster.age or 0,
-                            productivity = cluster.reproduction and (cluster.reproduction / 100) or 0,
-                            health = healthValue,  -- Now properly converted to 0-100 range
-                            gender = cluster.gender or "Unknown",
-                            weight = cluster.weight or 0,
-                            type = cluster.subType or "Unknown",
-                            isPregnant = cluster.isPregnant or false,
-                            isLactating = cluster.isLactating or false,
-                            isDirty = cluster.isDirty or false,
-                            fitness = cluster.fitness or 0,
-                            dirt = cluster.dirt or 0,
-                            variation = cluster.variation or 1
-                        }
-                        table.insert(data.animals, animalData)
-                    else
-                        -- This is a regular cluster (non-RealisticLivestock or grouped animals)
-                        -- Try different possible property names for RealisticLivestock
-                        local individualAnimals = cluster.animals or cluster.individualAnimals or cluster.livestock or cluster.animalList
-                        local animalType = cluster.subType or cluster.animalType or cluster.type or cluster.animalSubType or cluster.fillType or data.animalTypeName
-                    
-                        if individualAnimals and type(individualAnimals) == "table" then
-                            -- Legacy handling for nested individual animals (shouldn't happen with RealisticLivestock)
-                            for animalIndex, animal in pairs(individualAnimals) do
-                                if animal and type(animal) == "table" then
-                                    -- Handle health value conversion
-                                    local healthValue = animal.health or data.health or 1
-                                    if healthValue <= 2 then
-                                        healthValue = healthValue * 100
-                                    end
-                                    
-                                    local animalData = {
-                                        id = (data.id or 0) * 1000 + #data.animals + 1,
-                                        name = ((animalType or "Animal") .. " " .. (#data.animals + 1)),
-                                        age = animal.age or 30,
-                                        productivity = animal.productivity or data.productivity or 0.8,
-                                        health = healthValue,
-                                        gender = animal.gender or "Unknown",
-                                        weight = animal.weight or 0,
-                                        type = animalType or "Unknown"
-                                    }
-                                    table.insert(data.animals, animalData)
-                                end
-                            end
-                        elseif cluster.numAnimals and type(cluster.numAnimals) == "number" and cluster.numAnimals > 0 then
-                            -- Basic cluster without individual animals - create generic entries
-                            for i = 1, cluster.numAnimals do
-                                -- Handle health value conversion
-                                local healthValue = data.health or 1
-                                if healthValue <= 2 then
-                                    healthValue = healthValue * 100
-                                end
-                                
-                                local animalData = {
-                                    id = (data.id or 0) * 1000 + #data.animals + 1,
-                                    name = (animalType or "Animal") .. " " .. (#data.animals + 1),
-                                    age = 30 + (i * 5),
-                                    productivity = data.productivity or 0.8,
-                                    health = healthValue,
-                                    gender = "Unknown",
-                                    weight = 0,
-                                    type = animalType or "Unknown"
-                                }
-                                table.insert(data.animals, animalData)
-                            end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    
-    -- Fallback: If no animals found through clusters, use animalCount
-    if #data.animals == 0 and data.animalCount and type(data.animalCount) == "number" and data.animalCount > 0 then
-        for i = 1, data.animalCount do
-            -- Handle health value conversion
-            local healthValue = data.health or 1
-            if healthValue <= 2 then
-                healthValue = healthValue * 100
-            end
-            
-            table.insert(data.animals, {
-                id = (data.id or 0) * 1000 + i,
-                name = (data.animalTypeName or data.name or "Unknown") .. " " .. i,
-                age = 30 + (i * 5),
-                productivity = data.productivity or 0.8,
-                health = healthValue,
-                gender = "Unknown",
-                weight = 0,
-                type = data.animalTypeName or "Unknown"
-            })
-        end
-    end
-
-    return data
+    return row
 end
 
-function AnimalDataCollector:getPosition(placeable)
+function AnimalDataCollector:_getPosition(placeable)
     if placeable and placeable.rootNode then
-        -- Wrap in pcall to prevent crashes from invalid nodes
-        local success, x, y, z = pcall(getWorldTranslation, placeable.rootNode)
-        if success and x and y and z then
-            return {x = x, y = y, z = z}
+        local ok, x, y, z = pcall(getWorldTranslation, placeable.rootNode)
+        if ok and x and y and z then
+            return { x = x, y = y, z = z }
         end
     end
-    return {x = 0, y = 0, z = 0}
+    return { x = 0, y = 0, z = 0 }
 end
 
-function AnimalDataCollector:shutdown()
-    -- Nothing to clean up
+--- Detail collection (Phase 7) -------------------------------------------
+--- Builds full per-animal row list for one pen, used by per-pen detail file.
+--- Caller is expected to handle file writing and rotation.
+
+function AnimalDataCollector:collectPenDetail(placeable)
+    if not placeable then return nil end
+
+    local out = {
+        id = placeable.id or 0,
+        animals = {},
+    }
+
+    local nameOk, nameVal = pcall(function() return placeable:getName() end)
+    if nameOk and type(nameVal) == "string" then out.name = nameVal end
+
+    local farmOk, farmId = pcall(function() return placeable:getOwnerFarmId() end)
+    if farmOk and type(farmId) == "number" then out.ownerFarmId = farmId end
+
+    local clOk, clusters = pcall(function() return placeable:getClusters() end)
+    if not clOk or type(clusters) ~= "table" then return out end
+
+    local nextId = 1
+    for _, c in pairs(clusters) do
+        if c then
+            if c.isIndividual == true then
+                local finalId
+                if c.uniqueId then
+                    if type(c.uniqueId) == "string" and tonumber(c.uniqueId) then
+                        finalId = tonumber(c.uniqueId)
+                    elseif type(c.uniqueId) == "number" then
+                        finalId = c.uniqueId
+                    else
+                        finalId = tostring(c.uniqueId)
+                    end
+                end
+                if finalId == nil then
+                    finalId = (out.id or 0) * 1000000 + nextId
+                    nextId = nextId + 1
+                end
+
+                local healthValue = c.health or 1
+                if type(healthValue) == "number" and healthValue <= 2 then
+                    healthValue = healthValue * 100
+                end
+
+                local entry = {
+                    id          = finalId,
+                    uniqueId    = c.uniqueId,
+                    name        = c.subType or "Unknown",
+                    subType     = c.subType,
+                    subTypeIndex = c.subTypeIndex,
+                    age         = c.age or 0,
+                    productivity = (c.reproduction and (c.reproduction / 100)) or 0,
+                    health      = healthValue,
+                    gender      = c.gender or "Unknown",
+                    weight      = c.weight or 0,
+                    type        = c.subType or "Unknown",
+                    isPregnant  = c.isPregnant or false,
+                    isLactating = c.isLactating or false,
+                    isDirty     = c.isDirty or false,
+                    fitness     = c.fitness or 0,
+                    dirt        = c.dirt or 0,
+                    variation   = c.variation or 1,
+                    isCastrated = c.isCastrated or false,
+                    motherId    = c.motherId,
+                    fatherId    = c.fatherId,
+                    birthday    = c.birthday,
+                    breed       = c.breed,
+                }
+                local g = c.genetics
+                if type(g) == "table" then
+                    entry.genetics = {
+                        fertility    = g.fertility,
+                        productivity = g.productivity,
+                        health       = g.health,
+                        metabolism   = g.metabolism,
+                        quality      = g.quality,
+                    }
+                end
+                if type(c.diseases) == "table" then
+                    entry.diseaseCount = #c.diseases
+                end
+                out.animals[#out.animals + 1] = entry
+            else
+                local n = (type(c.numAnimals) == "number") and c.numAnimals or 0
+                if n > 0 then
+                    out.animals[#out.animals + 1] = {
+                        id          = (out.id or 0) * 1000 + nextId,
+                        name        = tostring(c.subType or c.fillType or "Cluster"),
+                        subType     = c.subType,
+                        subTypeIndex = c.subTypeIndex,
+                        age         = c.age or 0,
+                        weight      = c.weight or 0,
+                        gender      = c.gender or "Unknown",
+                        type        = "cluster",
+                        count       = n,
+                        isPregnant  = c.isPregnant or false,
+                        isLactating = c.isLactating or false,
+                    }
+                    nextId = nextId + 1
+                end
+            end
+        end
+    end
+
+    return out
 end

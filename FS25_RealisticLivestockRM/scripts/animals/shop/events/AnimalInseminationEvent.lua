@@ -1,0 +1,96 @@
+AnimalInseminationEvent = {}
+
+local AnimalInseminationEvent_mt = Class(AnimalInseminationEvent, Event)
+InitEventClass(AnimalInseminationEvent, "AnimalInseminationEvent")
+
+
+function AnimalInseminationEvent.emptyNew()
+
+    local self = Event.new(AnimalInseminationEvent_mt)
+    return self
+
+end
+
+
+function AnimalInseminationEvent.new(object, animal, semen)
+
+	local event = AnimalInseminationEvent.emptyNew()
+
+	event.object = object
+	event.animal = animal
+	event.semen = semen
+
+	return event
+
+end
+
+
+function AnimalInseminationEvent:readStream(streamId, connection)
+
+	self.object = NetworkUtil.readNodeObject(streamId)
+	self.animal = RLAnimalUtil.readStreamIdentifiers(streamId, connection)
+	
+	self.semen = { ["genetics"] = {} }
+
+	self.semen.country = streamReadUInt8(streamId)
+	self.semen.farmId = streamReadString(streamId)
+	self.semen.uniqueId = streamReadString(streamId)
+	self.semen.name = streamReadString(streamId)
+	self.semen.typeIndex = streamReadUInt8(streamId)
+	self.semen.subTypeIndex = streamReadUInt8(streamId)
+	self.semen.success = streamReadFloat32(streamId)
+
+	self.semen.genetics.metabolism = streamReadFloat32(streamId)
+	self.semen.genetics.fertility = streamReadFloat32(streamId)
+	self.semen.genetics.health = streamReadFloat32(streamId)
+	self.semen.genetics.quality = streamReadFloat32(streamId)
+	self.semen.genetics.productivity = streamReadFloat32(streamId)
+
+	if self.semen.genetics.productivity < 0 then self.semen.genetics.productivity = nil end
+
+	Log:trace("InseminationEvent:readStream semen.country=%s", tostring(self.semen.country))
+
+	self:run(connection)
+
+end
+
+
+function AnimalInseminationEvent:writeStream(streamId, connection)
+
+	NetworkUtil.writeNodeObject(streamId, self.object)
+	RLAnimalUtil.writeStreamIdentifiers(self.animal, streamId, connection)
+
+	local semen = self.semen
+
+	streamWriteUInt8(streamId, semen.country)
+	streamWriteString(streamId, semen.farmId)
+	streamWriteString(streamId, semen.uniqueId)
+	streamWriteString(streamId, semen.name or "")
+	streamWriteUInt8(streamId, semen.typeIndex)
+	streamWriteUInt8(streamId, semen.subTypeIndex)
+	streamWriteFloat32(streamId, semen.success)
+
+	streamWriteFloat32(streamId, semen.genetics.metabolism)
+	streamWriteFloat32(streamId, semen.genetics.fertility)
+	streamWriteFloat32(streamId, semen.genetics.health)
+	streamWriteFloat32(streamId, semen.genetics.quality)
+	streamWriteFloat32(streamId, semen.genetics.productivity or -1)
+
+end
+
+
+function AnimalInseminationEvent:run(connection)
+
+	local clusterSystem = self.object:getClusterSystem()
+	local identifiers = self.animal
+
+	local animal = RLAnimalUtil.find(clusterSystem.animals, identifiers.farmId, identifiers.uniqueId, identifiers.country or identifiers.birthday.country)
+
+	if animal ~= nil then
+		animal:setInsemination(self.semen)
+		Log:trace("InseminationEvent:run applied to %s", tostring(identifiers.uniqueId))
+	else
+		Log:trace("InseminationEvent:run animal not found uniqueId=%s", tostring(identifiers.uniqueId))
+	end
+
+end

@@ -8,7 +8,7 @@ const fs   = require('fs');
 const os   = require('os');
 const url  = require('url');
 const crypto = require('crypto');
-const { spawn } = require('child_process');
+const { spawn, exec } = require('child_process');
 
 const express   = require('express');
 const http      = require('http');
@@ -500,6 +500,66 @@ function isLanSensitiveHttpPath(reqPath) {
     return false;
 }
 
+/** Logs actionable LAN hints when HTTP starts (visible in the Electron main-process console / debug). */
+function logLanStartupHints(bindHost) {
+    const cfg = getLanSecurityFromStore();
+    if (bindHost === '127.0.0.1') {
+        console.log('');
+        console.log('[LAN] Remote devices cannot open http://<this-PC-IP>:' + PORT + ' — HTTP is bound to localhost only.');
+        console.log('[LAN] Enable: Farm Dashboard on this PC → Settings → Servers & saves → check "LAN access (listen on all interfaces)", then save.');
+        console.log('[LAN] After enabling, if tablets still fail: allow inbound TCP ' + PORT + ' in Windows Firewall.');
+        console.log('');
+        return;
+    }
+    const ipv4 = [];
+    try {
+        const ifs = os.networkInterfaces();
+        for (const k of Object.keys(ifs)) {
+            for (const a of ifs[k] || []) {
+                if (a.internal) continue;
+                if (a.family === 'IPv4' || a.family === 4) ipv4.push(a.address);
+            }
+        }
+    } catch (_) {
+        /* ignore */
+    }
+    console.log('[LAN] Listening for other devices on port ' + PORT + '. Try:');
+    if (ipv4.length === 0) {
+        console.log('[LAN]   (no non-loopback IPv4 found — check Wi‑Fi/Ethernet on this PC)');
+    } else {
+        for (const ip of ipv4) {
+            console.log('[LAN]   http://' + ip + ':' + PORT + '/');
+        }
+    }
+    const allow = (cfg.lanAllowedIPs || '').trim();
+    if (allow) {
+        console.log('[LAN] IP allowlist is active; client IP must match: ' + allow);
+    }
+    console.log(
+        '[LAN] If this PC can open its own LAN IP but other devices time out: use the same Wi‑Fi (not guest), disable router AP/client isolation, same subnet. Not usually this app.'
+    );
+    console.log('[LAN] If a device still cannot connect, add an inbound Windows Firewall rule for TCP ' + PORT + '.');
+}
+
+/** After listen, print Windows netstat lines for this port (confirms 0.0.0.0 vs 127.0.0.1). */
+function logWindowsSocketsForFarmdashPort() {
+    if (process.platform !== 'win32') return;
+    exec(
+        'cmd /c netstat -an | findstr ":8766"',
+        { windowsHide: true, timeout: 8000 },
+        (_err, stdout) => {
+            const out = stdout && String(stdout).trim();
+            if (out) {
+                console.log('[LAN] netstat (expect LISTENING on 0.0.0.0:' + PORT + ' when LAN access is on):');
+                for (const line of out.split(/\r?\n/)) {
+                    const s = line.trim();
+                    if (s) console.log('[LAN]   ' + s);
+                }
+            }
+        }
+    );
+}
+
 function redactConfigForHttpGet(config) {
     const c = config && typeof config === 'object' ? JSON.parse(JSON.stringify(config)) : {};
     if (!Array.isArray(c.servers)) return c;
@@ -577,6 +637,18 @@ function checkLanAccessForRequest(req) {
     const method = String(req.method || 'GET').toUpperCase();
     const isWsUpgrade = String(req.headers?.upgrade || '').toLowerCase() === 'websocket';
     const pathOnly = req.path || (req.url && String(req.url).split('?')[0]) || '';
+    /**
+     * Remote tablets need the HTML/JS/CSS shell and a health check without the browser's HTTP Basic
+     * dialog. Farm data stays on /api/* (sensitive list + other /api routes still require auth below).
+     * WebSocket upgrades are never allowed here (token or Basic on the upgrade request).
+     */
+    if (
+        (method === 'GET' || method === 'HEAD') &&
+        !isWsUpgrade &&
+        (!pathOnly.startsWith('/api/') || pathOnly === '/api/status')
+    ) {
+        return { ok: true };
+    }
     if (
         cfg.lanAuthOptional &&
         (method === 'GET' || method === 'HEAD') &&
@@ -1121,6 +1193,8 @@ function listenFarmdashHttp(bindHost, onListening) {
                         });
                         server.listen(PORT, bindHost, () => {
                             console.log(`[HTTP/WS] listening on http://${bindHost === '0.0.0.0' ? '0.0.0.0 (all interfaces)' : bindHost}:${PORT}`);
+                            logLanStartupHints(bindHost);
+                            logWindowsSocketsForFarmdashPort();
                             if (typeof onListening === 'function') onListening();
                             finish();
                         });

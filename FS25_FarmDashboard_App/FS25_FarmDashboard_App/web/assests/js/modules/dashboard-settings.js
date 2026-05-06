@@ -722,8 +722,20 @@ export async function saveDashboardSettingsFromModal() {
     if (saveRes && saveRes.ok === false) {
       throw new Error(saveRes.error || "save-settings failed");
     }
+    // Settings save can reconfigure servers without reloading this renderer.
+    // Refresh tabs + active data immediately so newly added servers appear now.
+    if (typeof this.loadServersAndTabs === "function") {
+      await this.loadServersAndTabs();
+    }
+    if (this.activeServerId && typeof this.refreshActiveServerData === "function") {
+      await this.refreshActiveServerData();
+    }
+    if (typeof this.updateNavbar === "function") {
+      this.updateNavbar();
+    }
   } catch (e) {
     console.warn("[dashboard-settings] save-settings", e);
+    this.showAlert?.("Server settings were saved, but the live server list refresh failed.", "warning");
   }
 
   const ui = parseInt(

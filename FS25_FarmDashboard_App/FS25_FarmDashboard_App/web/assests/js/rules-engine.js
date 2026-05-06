@@ -343,6 +343,34 @@ export function aggregateWindrowDetected(field) {
 }
 
 /**
+ * True when the field card would show forage / windrow badges from `buildForageDetectionBadges`
+ * (excluding the physical bales-on-field badge). Keeps Layer‑1 rule suggestions aligned with badges:
+ * no ted/bale/finish‑grass hints when those badges are hidden.
+ */
+export function fieldShowsNonBaleForageBadges(field) {
+  if (!field || typeof field !== "object") return false;
+  const hasForage = field.hasLooseForage === true;
+  const wind = aggregateWindrowDetected(field);
+  const baleLoose = aggregateBaleableLoose(field);
+  const ls = Number(field.looseStrawLiters ?? 0);
+  const lg = Number(field.looseGrassWindrowLiters ?? 0);
+  const lh = Number(field.looseDryGrassWindrowLiters ?? 0);
+  const combinedLooseLiters = ls + lg + lh;
+  const hasMeaningfulLooseForage = combinedLooseLiters >= MIN_FORAGE_WORKFLOW_LITERS;
+  const windrowLiters = Number(field.windrowLiters ?? 0);
+  const hasMeaningfulWindrowLiters =
+    Number.isFinite(windrowLiters) && windrowLiters >= MIN_FORAGE_WORKFLOW_LITERS;
+  const showWindrowBadge = wind && (hasMeaningfulWindrowLiters || hasMeaningfulLooseForage);
+
+  if (field.hasLooseStraw === true && ls >= MIN_FORAGE_WORKFLOW_LITERS) return true;
+  if (field.hasLooseGrassWindrow === true && lg >= MIN_FORAGE_WORKFLOW_LITERS) return true;
+  if (field.hasLooseHayWindrow === true && lh >= MIN_FORAGE_WORKFLOW_LITERS) return true;
+  if (!hasForage && baleLoose) return true;
+  if (!hasForage && showWindrowBadge) return true;
+  return false;
+}
+
+/**
  * Best-effort classification from `windrowByFillName` (straw / mown grass / hay / crop swaths).
  * @returns {'straw'|'grass'|'hay'|'crop_swath'|'mixed'|null}
  */
@@ -921,19 +949,17 @@ export function getLocalFieldSuggestion(field, opts = {}) {
     };
   }
 
-  // ── A2.6 Loose forage (presence: Lua hasLooseStraw / hasLooseGrassWindrow / hasLooseHayWindrow — next stage when all false)
-  // Only trust per-type booleans when we also have a meaningful loose-forage signal.
-  const looseLitersSignal =
-    Number(field.looseStrawLiters ?? 0) +
-    Number(field.looseGrassWindrowLiters ?? 0) +
-    Number(field.looseDryGrassWindrowLiters ?? 0);
-  const hasStrongLooseSignal =
-    looseLitersSignal >= MIN_FORAGE_WORKFLOW_LITERS || aggregateBaleableLoose(field);
+  // ── A2.6 Loose forage — same liter thresholds as field-card badges (`fields.js` buildForageDetectionBadges).
+  // ── A3 Windrow / swath — only when `fieldShowsNonBaleForageBadges` (matches badge visibility).
+  const ls = Number(field.looseStrawLiters ?? 0);
+  const lg = Number(field.looseGrassWindrowLiters ?? 0);
+  const lh = Number(field.looseDryGrassWindrowLiters ?? 0);
   const flNeg = forageLitersNegligible(field);
-  const hs = field.hasLooseStraw === true && !flNeg && hasStrongLooseSignal;
-  const hg = field.hasLooseGrassWindrow === true && !flNeg && hasStrongLooseSignal;
-  const hh = field.hasLooseHayWindrow === true && !flNeg && hasStrongLooseSignal;
-  if (hs || hg || hh) {
+  const hs = field.hasLooseStraw === true && ls >= MIN_FORAGE_WORKFLOW_LITERS && !flNeg;
+  const hg = field.hasLooseGrassWindrow === true && lg >= MIN_FORAGE_WORKFLOW_LITERS && !flNeg;
+  const hh = field.hasLooseHayWindrow === true && lh >= MIN_FORAGE_WORKFLOW_LITERS && !flNeg;
+
+  if (fieldShowsNonBaleForageBadges(field) && (hs || hg || hh)) {
     if (hs && !hg && !hh) {
       return {
         action: t("rules.action.baleStrawForage"),
@@ -998,11 +1024,8 @@ export function getLocalFieldSuggestion(field, opts = {}) {
     };
   }
   // Legacy: older JSON without boolean flags (litre thresholds — combined straw / grass / hay >= workflow minimum)
-  const ls = Number(field.looseStrawLiters ?? 0);
-  const lg = Number(field.looseGrassWindrowLiters ?? 0);
-  const lh = Number(field.looseDryGrassWindrowLiters ?? 0);
   const sumLooseCh = ls + lg + lh;
-  if (sumLooseCh >= MIN_FORAGE_WORKFLOW_LITERS) {
+  if (fieldShowsNonBaleForageBadges(field) && sumLooseCh >= MIN_FORAGE_WORKFLOW_LITERS) {
     if (ls >= lg && ls >= lh && ls > 0) {
       return {
         action: t("rules.action.baleStrawForage"),
@@ -1037,7 +1060,7 @@ export function getLocalFieldSuggestion(field, opts = {}) {
 
   // ── A3. Loose swath / windrow / baler-relevant surface material (blocks tillage) — density probes + needsBaling ──
   const swath = aggregateWindrowDetected(field);
-  if (swath) {
+  if (fieldShowsNonBaleForageBadges(field) && swath) {
     const mat = classifyWindrowMaterial(field);
     if (mat === "straw" || (isCerealStrawContext(field) && mat !== "grass" && mat !== "hay")) {
       return {

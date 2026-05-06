@@ -8,6 +8,7 @@ import {
     aggregateWindrowDetected,
     aggregateBaleableLoose,
     classifyWindrowMaterial,
+    fieldShowsNonBaleForageBadges,
     MIN_FORAGE_WORKFLOW_LITERS,
     nitrogenTargetForDisplay,
 } from "../rules-engine.js";
@@ -892,8 +893,8 @@ function buildForageDetectionBadges(field) {
     const windrowLiters = Number(field?.windrowLiters ?? 0);
     const hasMeaningfulWindrowLiters =
         Number.isFinite(windrowLiters) && windrowLiters >= MIN_FORAGE_WORKFLOW_LITERS;
+    if (baleN <= 0 && !hasForage && !fieldShowsNonBaleForageBadges(field)) return "";
     const showWindrowBadge = wind && (hasMeaningfulWindrowLiters || hasMeaningfulLooseForage);
-    if (baleN <= 0 && !showWindrowBadge && !baleLoose && !hasForage) return "";
 
     const parts = [];
     if (baleN > 0) {
@@ -1047,6 +1048,13 @@ function buildSuggestion(field) {
     const buyPrefix = `${t("tools.buyLeaseSuggestion")}:`;
     const fleetLines = toolLines.filter((line) => String(line).startsWith(fleetPrefix));
     const buyLeaseLines = toolLines.filter((line) => String(line).startsWith(buyPrefix));
+    /** e.g. `tools.typicalToolsFallback` — no fleet/shop prefix; must still render or “lost” suggestions */
+    const otherToolLines = toolLines.filter(
+        (line) =>
+            String(line).trim().length > 0 &&
+            !String(line).startsWith(fleetPrefix) &&
+            !String(line).startsWith(buyPrefix)
+    );
     const rulesReason = rules && typeof rules.reason === "string" ? rules.reason.trim() : "";
     const showOrganicSkip = rules?.actionKey === "rules.action.optionalOrganicFirst";
     const organicSkipKey = showOrganicSkip ? optionalOrganicSkipKeyForField(field) : "";
@@ -1085,7 +1093,7 @@ function buildSuggestion(field) {
                     : ""
             }
             ${
-                fleetLines.length || buyLeaseLines.length
+                fleetLines.length || buyLeaseLines.length || otherToolLines.length
                     ? `<div class="mt-2 pt-2 border-top border-secondary">
                     ${
                         fleetLines.length
@@ -1112,6 +1120,21 @@ function buildSuggestion(field) {
                                 (line) =>
                                     `<div class="small text-light opacity-90 lh-sm mb-1"><i class="bi bi-wrench-adjustable me-1 text-warning"></i>${escapeFieldHtml(
                                         line.replace(buyPrefix, "").trim()
+                                    )}</div>`
+                            )
+                            .join("")}`
+                            : ""
+                    }
+                    ${
+                        otherToolLines.length
+                            ? `<small class="text-secondary text-uppercase d-block mb-1 ${fleetLines.length || buyLeaseLines.length ? "mt-2" : ""}" style="letter-spacing:0.04em;">${escapeFieldHtml(
+                                  t("tools.generalEquipmentHint")
+                              )}</small>
+                        ${otherToolLines
+                            .map(
+                                (line) =>
+                                    `<div class="small text-light opacity-90 lh-sm mb-1"><i class="bi bi-info-circle me-1 text-info"></i>${escapeFieldHtml(
+                                        String(line).trim()
                                     )}</div>`
                             )
                             .join("")}`

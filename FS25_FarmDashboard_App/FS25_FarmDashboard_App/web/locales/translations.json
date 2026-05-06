@@ -3510,6 +3510,9 @@
       "nb": "Typiske verktøy: match jobben med riktig verkstedkategori (redskaper / hogstmaskiner / spredere) for denne felttilstanden.",
       "uk": "Типові інструменти: підберіть для роботи правильну категорію майстерні (знаряддя / комбайни / розкидачі) для цього стану поля."
     },
+    "tools.generalEquipmentHint": {
+      "en": "Typical equipment"
+    },
     "vehicles.title": {
       "en": "Vehicle Fleet Management",
       "de": "Fahrzeuge, Kraftstoff, Wartung",
@@ -8244,7 +8247,7 @@
       "uk": "Віддалений / локальний доступ"
     },
     "settings.lanIntro": {
-      "en": "Allow tablets and other PCs on your network to open this dashboard at <code class=\"text-light\">http://&lt;this-PC-LAN-IP&gt;:8766</code>. Local use from this app always stays on <strong>127.0.0.1</strong> and does not require a password. Changing these options restarts the built-in web server.",
+      "en": "Turn on <strong>LAN access</strong> below — until then, phones and tablets cannot use <code class=\"text-light\">http://&lt;this-PC-LAN-IP&gt;:8766</code> (the server listens on this PC only). After enabling, open that URL from your tablet on the same Wi‑Fi. This app still uses <strong>127.0.0.1</strong> locally without a password. You may need an inbound Windows Firewall rule for TCP 8766. Changing these options restarts the built-in web server.",
       "de": "Tablets und andere PCs im Netzwerk können das Dashboard unter <code class=\"text-light\">http://&lt;LAN-IP-dieses-PCs&gt;:8766</code> öffnen. Lokale Nutzung in dieser App bleibt auf <strong>127.0.0.1</strong> ohne Passwort. Änderungen starten den eingebauten Webserver neu.",
       "fr": "Autorisez les tablettes et autres ordinateurs de votre réseau à ouvrir ce tableau de bord à l' <code class=\"text-light\">http://<this-PC-LAN-IP>:8766</code> . L'utilisation locale de cette application se fait toujours sur <strong>127.0.0.1</strong> et ne nécessite pas de mot de passe. Modifier ces options entraîne le redémarrage du serveur web intégré.",
       "es": "Permita que las tabletas y otros ordenadores de su red accedan a este panel de control en <code class=\"text-light\">http://<this-PC-LAN-IP>:8766</code> . El uso local de esta aplicación siempre se mantiene en <strong>127.0.0.1</strong> y no requiere contraseña. Modificar estas opciones reinicia el servidor web integrado.",
@@ -8561,6 +8564,9 @@
       "is": "Valfrjáls innskráning á LAN slekkur á HTTP Basic fyrir venjulegar GET síður (ekki WebSockets). Allir á LAN þínu geta lesið gögn um mælaborðsbú án lykilorðs. Virkja aðeins á lokuðu traustu neti. Halda áfram?",
       "nb": "Valgfri LAN-pålogging slår av HTTP Basic for vanlige GET-sider (ikke WebSockets). Alle på LAN-et ditt kan lese dashbordfarmdata uten passord. Aktiver bare på et lukket, klarert nettverk. Fortsette?",
       "uk": "Додатковий вхід до локальної мережі вимикає HTTP Basic для звичайних сторінок GET (не WebSockets). Будь-хто у вашій локальній мережі може читати дані ферми панелі інструментів без пароля. Увімкнути лише в закритій довіреній мережі. Продовжити?"
+    },
+    "settings.lanTimeoutTroubleshoot": {
+      "en": "<strong>Other devices time out?</strong> If this PC can open its own LAN IP but phones or tablets never load the page, that is almost always the Wi‑Fi/router: use the <strong>same</strong> network (not guest/IoT), turn off <strong>AP / client isolation</strong> if your router has it, and check both devices use the <strong>same subnet</strong> (e.g. 192.168.1.x). Some VPN or security suites block device-to-device traffic even when Windows Firewall is off."
     },
     "settings.modTitle": {
       "en": "FS25 mod — config.xml (this PC)",

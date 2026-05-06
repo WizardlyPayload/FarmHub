@@ -6,8 +6,25 @@
  * (Does not import `vehicles.js` — that module loads `apiStorage`, which imports `fields.js`.)
  */
 
-import { RULES_ENGINE_FALLBACK_ACTION, RULES_ENGINE_FALLBACK_KIND } from "./rules-engine.js";
+import { RULES_ENGINE_FALLBACK_ACTION } from "./rules-engine.js";
+import { getBaseGameLabelsForRole } from "./base-game-tool-catalog.js";
 import { t } from "./i18n/i18n.js";
+
+/** Stable hash → [0, modulo) for varied picks without RNG flicker per field. */
+function hashPickIndex(seedStr, modulo) {
+  if (modulo <= 0) return 0;
+  let h = 5381;
+  const s = String(seedStr || "");
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h) ^ s.charCodeAt(i);
+  }
+  return Math.abs(h) % modulo;
+}
+
+function suggestionVarietySeed(field, roleId, actionKey, suffix = "") {
+  const fid = field?.farmlandId ?? field?.id ?? "";
+  return `${fid}|${roleId}|${actionKey || ""}|${suffix}`;
+}
 
 /**
  * Stable map from rules-engine action keys to recommended tool roles.
@@ -470,6 +487,23 @@ function pickPrimaryMatch(matches) {
   return u[0] || "";
 }
 
+/**
+ * Among similarly good fleet matches, pick one deterministically so different fields
+ * don’t all show the same tractor/implement name.
+ */
+function pickVariedOwnedVehicle(candidates, field, roleId, actionKey) {
+  if (!candidates.length) return null;
+  if (candidates.length === 1) return candidates[0];
+  candidates.sort((a, b) => b.score - a.score);
+  const best = candidates[0].score;
+  let pool = candidates.filter((c) => c.score >= best - 0.55);
+  if (pool.length < 2) {
+    pool = candidates.slice(0, Math.min(6, candidates.length));
+  }
+  const idx = hashPickIndex(suggestionVarietySeed(field, roleId, actionKey, "fleet"), pool.length);
+  return pool[idx];
+}
+
 function estimateWorkingWidthMeters(haystack, modelName = "") {
   const h = `${String(haystack || "")} ${String(modelName || "")}`.toLowerCase();
   const m = h.match(/(\d+(?:\.\d+)?)\s?m\b/);
@@ -534,12 +568,64 @@ function buildShopCatalog() {
 }
 
 /**
+ * Merge scanned shop PNG names with the base-game label table; dedupe; score by working width;
+ * pick one row with deterministic variety so the same lime spreader isn’t always chosen.
+ */
+function pickShopExampleForRole(meta, roleId, field, actionKey) {
+  if (!meta) return null;
+  const target = targetWidthByFieldSize(field);
+  const fromFiles = buildShopCatalog()
+    .filter((item) => vehicleMatchesRole({ name: item.label, typeName: item.label }, meta))
+    .map((item) => {
+      const w = estimateWorkingWidthMeters(item.haystack, item.label);
+      return {
+        label: item.label,
+        haystack: item.haystack,
+        score: widthFitScore(w, target),
+        source: "scan",
+      };
+    });
+
+  const baseLabels = getBaseGameLabelsForRole(roleId);
+  const fromBase = baseLabels.map((label) => ({
+    label,
+    haystack: label.toLowerCase(),
+    score: 0.42 + widthFitScore(estimateWorkingWidthMeters(label.toLowerCase(), label), target) * 0.25,
+    source: "catalog",
+  }));
+
+  const seen = new Set();
+  const merged = [];
+  for (const row of [...fromFiles, ...fromBase]) {
+    const key = String(row.label || "")
+      .toLowerCase()
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    merged.push(row);
+  }
+
+  if (!merged.length) return null;
+  merged.sort((a, b) => b.score - a.score);
+  const best = merged[0].score;
+  let pool = merged.filter((r) => r.score >= best - 0.35);
+  if (pool.length < 2) {
+    pool = merged.slice(0, Math.min(12, merged.length));
+  }
+  const idx = hashPickIndex(suggestionVarietySeed(field, roleId, actionKey, "shop"), pool.length);
+  return pool[idx];
+}
+
+/**
  * @param {object[]} vehicles
  * @param {number} farmId
  * @param {string[]} roleIds
+ * @param {object} [field]
+ * @param {string} [actionKey]
  * @returns {{ owned: { roleId: string, matches: string[] }[], missing: { roleId: string, labelKey: string }[] }}
  */
-export function matchToolRolesToFleet(vehicles, farmId, roleIds) {
+export function matchToolRolesToFleet(vehicles, farmId, roleIds, field, actionKey) {
   const fid = Number(farmId) || 1;
   const list = Array.isArray(vehicles) ? vehicles : [];
   const farmVehicles = list.filter(
@@ -552,7 +638,6 @@ export function matchToolRolesToFleet(vehicles, farmId, roleIds) {
 
   const owned = [];
   const missing = [];
-  const field = arguments[3] || null;
 
   for (const id of roleIds) {
     const meta = roleById(id);
@@ -564,12 +649,12 @@ export function matchToolRolesToFleet(vehicles, farmId, roleIds) {
       }
     }
     if (matches.length) {
-      const best = farmVehicles
+      const scored = farmVehicles
         .filter((v) => vehicleMatchesRole(v, meta))
-        .map((v) => ({ v, ...scoreOwnedVehicleForRole(v, meta, field) }))
-        .sort((a, b) => b.score - a.score)[0];
-      if (best && best.v) {
-        owned.push({ roleId: id, matches: [displayNameForVehicle(best.v)] });
+        .map((v) => ({ v, ...scoreOwnedVehicleForRole(v, meta, field) }));
+      const picked = pickVariedOwnedVehicle(scored, field, id, actionKey);
+      if (picked && picked.v) {
+        owned.push({ roleId: id, matches: [displayNameForVehicle(picked.v)] });
       } else {
         owned.push({ roleId: id, matches: [pickPrimaryMatch(matches)] });
       }
@@ -594,7 +679,7 @@ export function buildToolGuidanceLines(vehicles, farmId, action, field, actionKe
   const roleIds = inferToolRoleIds(field || {}, action, actionKey);
   if (roleIds.length === 0) return [];
 
-  const { owned, missing } = matchToolRolesToFleet(vehicles, farmId, roleIds, field);
+  const { owned, missing } = matchToolRolesToFleet(vehicles, farmId, roleIds, field, actionKey);
   const lines = [];
 
   if (owned.length) {
@@ -605,20 +690,15 @@ export function buildToolGuidanceLines(vehicles, farmId, action, field, actionKe
     lines.push(`${t("tools.useFromYourFleet")}: ${label}${pick ? `: ${pick}` : ""}`);
   }
 
-  const shopRoleId = missing.length ? missing[0].roleId : roleIds[0];
+  /** Shop hint only when a role is missing from the fleet, or when nothing matched (same as before, avoids duplicating fleet + shop for the same role). */
+  const shopRoleId =
+    missing.length > 0 ? missing[0].roleId : owned.length === 0 ? roleIds[0] : null;
   if (shopRoleId) {
     const meta = roleById(shopRoleId);
     const roleLabel = meta ? t(meta.labelKey) : shopRoleId;
-    const target = targetWidthByFieldSize(field);
-    const shopBest = buildShopCatalog()
-      .filter((item) => (meta ? vehicleMatchesRole({ name: item.label, typeName: item.label }, meta) : true))
-      .map((item) => {
-        const w = estimateWorkingWidthMeters(item.haystack, item.label);
-        return { item, score: widthFitScore(w, target) };
-      })
-      .sort((a, b) => b.score - a.score)[0];
-    if (shopBest && shopBest.score >= 0.45) {
-      lines.push(`${t("tools.buyLeaseSuggestion")}: ${roleLabel}: ${shopBest.item.label}`);
+    const shopPick = pickShopExampleForRole(meta, shopRoleId, field, actionKey);
+    if (shopPick && shopPick.label) {
+      lines.push(`${t("tools.buyLeaseSuggestion")}: ${roleLabel}: ${shopPick.label}`);
     }
   }
 

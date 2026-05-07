@@ -15,6 +15,7 @@ import * as theming       from './modules/theming.js';
 import * as productions   from './modules/productions.js';
 import * as dashboardSettings from './modules/dashboard-settings.js';
 import { installFarmDashRemoteViewerGuards } from './modules/viewer-mode.js';
+import { farmdashWaitForLanHttpBasicIfNeeded } from './lan-http-auth.js';
 import { initI18n, t }    from './i18n/i18n.js';
 
 class LivestockDashboard {
@@ -66,6 +67,11 @@ Object.assign(
 let dashboard;
 document.addEventListener('DOMContentLoaded', async () => {
   installFarmDashRemoteViewerGuards();
+  try {
+    await farmdashWaitForLanHttpBasicIfNeeded();
+  } catch (e) {
+    console.warn('[lan-auth-wait]', e);
+  }
   try {
     await initI18n();
     window.t = t;

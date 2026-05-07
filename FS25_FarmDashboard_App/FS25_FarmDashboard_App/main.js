@@ -623,6 +623,10 @@ function checkLanAccessForRequest(req) {
     if (isLoopbackIp(expressIp) || isLoopbackIp(rawIp)) {
         return { ok: true };
     }
+    // Same PC often opens http://THIS-PC-LAN-IP:8766 — trust like loopback without Basic churn.
+    if (isRequestFromThisMachine(req)) {
+        return { ok: true };
+    }
 
     const cfg = getLanSecurityFromStore();
     const allowRaw = (cfg.lanAllowedIPs || '').trim();
@@ -682,7 +686,13 @@ function lanAccessHttpMiddleware(req, res, next) {
     if (req.method === 'OPTIONS') return next();
     const r = checkLanAccessForRequest(req);
     if (r.ok) return next();
-    if (r.wwwAuthenticate) {
+    const pathOnly = req.path || (req.url && String(req.url).split('?')[0]) || '';
+    /**
+     * Never send WWW-Authenticate on /api/* — browsers (especially Safari on iPhone) may show the
+     * system HTTP Basic sheet on every 401 before our SPA can attach Authorization, causing a login loop.
+     * In-app LAN gate (lan-http-auth.js) sends Basic explicitly on fetch.
+     */
+    if (r.wwwAuthenticate && !pathOnly.startsWith('/api/')) {
         res.setHeader('WWW-Authenticate', 'Basic realm="Farm Dashboard"');
     }
     return res.status(r.code || 403).send(r.message || 'Forbidden');
@@ -1134,6 +1144,7 @@ function checkWebSocketLanAccess(info) {
     const rawIp = requestRemoteAddress(req);
     const expressIp = req.ip ? String(req.ip) : '';
     if (isLoopbackIp(expressIp) || isLoopbackIp(rawIp)) return true;
+    if (isRequestFromThisMachine(req)) return true;
 
     const cfg = getLanSecurityFromStore();
     const allowRaw = (cfg.lanAllowedIPs || '').trim();

@@ -2582,10 +2582,7 @@ export function createVehicleCard(vehicle) {
     vehicle.typeName
   );
 
-  // Check if this is a storage item (pallet, bigBag)
-  const isStorageItem = ["bigbag", "pallet"].includes(
-    vehicle.typeName?.toLowerCase()
-  );
+  const storageItem = isStorageItem(vehicle);
 
   // Fill levels summary
   const fillSummary =
@@ -2653,7 +2650,7 @@ export function createVehicleCard(vehicle) {
 
         <div class="card-body">
           ${
-            !isStorageItem
+            !storageItem
               ? `
             <div class="row g-2 mb-3">
               <div class="col-12">
@@ -2694,7 +2691,7 @@ export function createVehicleCard(vehicle) {
           }
 
           ${
-            !isStorageItem
+            !storageItem
               ? `
             <div class="mb-3">
               <div class="d-flex justify-content-between align-items-center mb-1">
@@ -2794,6 +2791,12 @@ export function getVehicleIcon(vehicleType, typeName = "") {
   ) {
     return "bi-droplet";
   } else if (
+    typeNameLower.includes("ibc") ||
+    typeNameLower.includes("liquidtank") ||
+    typeNameLower.includes("liquid tank")
+  ) {
+    return "bi-droplet-fill";
+  } else if (
     typeNameLower.includes("pallet") ||
     typeNameLower.includes("bigbag")
   ) {
@@ -2830,21 +2833,64 @@ export function getDamageBarColor(damagePercentage) {
   return "bg-success";
 }
 
-// Helper function to check if a vehicle is a storage item (pallet/bigBag)
+/**
+ * Pallets, big bags, and liquid bulk containers (IBCs) — tracked as vehicles/placeables in game data.
+ * Match typeName, display name, and filename so items are not missed when typeName is "unknown".
+ */
 export function isStorageItem(vehicle) {
-  if (!vehicle || !vehicle.typeName) return false;
-  const typeName = vehicle.typeName.toLowerCase();
-  const isStorage = (
-    typeName.includes("pallet") ||
-    typeName.includes("bigbag") ||
-    typeName.includes("big bag")
-  );
-  
-  if (isStorage) {
-    console.log(`[Vehicle Filter] Hiding storage item: ${vehicle.name} (${vehicle.typeName})`);
+  if (!vehicle || typeof vehicle !== "object") return false;
+  const brandLabel =
+    vehicle.brand &&
+    (typeof vehicle.brand === "string"
+      ? vehicle.brand
+      : vehicle.brand.name || "");
+  const blob = [
+    vehicle.typeName,
+    vehicle.name,
+    vehicle.filename,
+    vehicle.vehicleType,
+    brandLabel,
+  ]
+    .filter(Boolean)
+    .map((s) => String(s).toLowerCase())
+    .join(" ");
+  if (!blob.trim()) return false;
+
+  // Real vehicles/tools — not loose consumables on the ground
+  if (
+    /pallet\s*fork|palletfork/i.test(blob) ||
+    /pallet\s*trailer/i.test(blob) ||
+    /bale\s+and\s+pallet/i.test(blob)
+  ) {
+    return false;
   }
-  
-  return isStorage;
+
+  if (
+    blob.includes("bigbag") ||
+    blob.includes("big_bag") ||
+    /\bbig\s+bag\b/.test(blob)
+  ) {
+    return true;
+  }
+
+  if (
+    /\bibc\b/.test(blob) ||
+    blob.includes("liquidtank") ||
+    blob.includes("liquid_tank") ||
+    blob.includes("bulkliquid")
+  ) {
+    return true;
+  }
+
+  if (
+    blob.includes("pallet") ||
+    blob.includes("palette") ||
+    blob.includes("pallete")
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 export function getVehicleTypeBadge(vehicleType, typeName = "") {
@@ -2868,6 +2914,12 @@ export function getVehicleTypeBadge(vehicleType, typeName = "") {
     typeNameLower.includes("pickup")
   ) {
     return "bg-info";
+  } else if (
+    typeNameLower.includes("ibc") ||
+    typeNameLower.includes("liquidtank") ||
+    typeNameLower.includes("liquid tank")
+  ) {
+    return "bg-info text-dark";
   } else if (
     typeNameLower.includes("pallet") ||
     typeNameLower.includes("bigbag")

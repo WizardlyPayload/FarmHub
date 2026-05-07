@@ -293,6 +293,9 @@ function mergeData(luaData, xmlData, options = {}) {
         // Production — Lua only
         production   : luaData.production || { chains: [], husbandryTotals: {} },
 
+        // Physical bales by fill category — on cropland vs yards/sheds (Lua mod scan)
+        baleInventory: luaData.baleInventory || { farmId: null, onField: {}, offField: {} },
+
         // Placeables — XML
         placeables   : toArr(xmlData.placeables),
 
@@ -691,6 +694,7 @@ function buildFromLuaOnly(lua) {
         vehicles: lua.vehicles || [],
         economy: lua.economy   || {},
         production: lua.production || {},
+        baleInventory: lua.baleInventory || { farmId: null, onField: {}, offField: {} },
         placeables: [],
     };
 }

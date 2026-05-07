@@ -5108,6 +5108,84 @@
       "nb": "Markedspriser",
       "uk": "Ринкові ціни"
     },
+    "economy.tabConsumables": {
+      "en": "Consumables"
+    },
+    "economy.consumablesHelp": {
+      "en": "Pallets, big bags, and IBCs (bulk liquid containers) on the map. They are hidden from the Vehicles page and listed here."
+    },
+    "economy.consumablesEmpty": {
+      "en": "No pallets, big bags, or IBCs found for this farm."
+    },
+    "economy.consumablesContents": {
+      "en": "Fill levels"
+    },
+    "economy.consumablesNoFill": {
+      "en": "No fill data"
+    },
+    "economy.consumablesFillLine": {
+      "en": "{{type}} · {{pct}}%"
+    },
+    "economy.loadingConsumables": {
+      "en": "Loading consumables…"
+    },
+    "economy.loadingConsumablesAria": {
+      "en": "Loading consumables"
+    },
+    "economy.consumablesBaleSummaryTitle": {
+      "en": "Bale stock (physical)"
+    },
+    "economy.consumablesBaleSummarySubtitle": {
+      "en": "Ground bales counted per farmland (same as the Fields tab), totaled for the selected farm."
+    },
+    "economy.consumablesBaleInventorySubtitle": {
+      "en": "Counts by fill type for your farm: loose on cropland vs yards, sheds, and roads on your farmland."
+    },
+    "economy.balesLooseOnFields": {
+      "en": "Loose on cropland"
+    },
+    "economy.balesLooseOnFieldsHint": {
+      "en": "On the ground inside registered field boundaries (same logic as the Fields tab per-field count)."
+    },
+    "economy.balesInYardsSheds": {
+      "en": "Yards, sheds & roads"
+    },
+    "economy.balesInYardsShedsHint": {
+      "en": "Not credited to a field polygon — barn storage, yards, and farm lanes on your parcels."
+    },
+    "economy.baleInventoryEmptyAll": {
+      "en": "No physical bales detected for your farm in this scan."
+    },
+    "economy.baleInventoryLegacyHint": {
+      "en": "Update the FarmDashboard mod for per-type counts. Until then: {{total}} bale(s) on {{fields}} field(s) from field totals only."
+    },
+    "economy.baleInventoryCategoryNone": {
+      "en": "None"
+    },
+    "economy.baleCatStraw": {
+      "en": "Straw"
+    },
+    "economy.baleCatGrass": {
+      "en": "Grass"
+    },
+    "economy.baleCatHay": {
+      "en": "Hay"
+    },
+    "economy.baleCatSilage": {
+      "en": "Silage"
+    },
+    "economy.baleCatOther": {
+      "en": "Other"
+    },
+    "economy.consumablesBaleSummaryZero": {
+      "en": "No bales counted on owned fields."
+    },
+    "economy.consumablesBaleSummaryFieldsOne": {
+      "en": "On 1 owned field with bales"
+    },
+    "economy.consumablesBaleSummaryFieldsMany": {
+      "en": "Across {{fields}} owned fields with bales"
+    },
     "economy.filterAllEquipment": {
       "en": "All Equipment",
       "de": "Fahrzeuge",

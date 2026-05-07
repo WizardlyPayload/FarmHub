@@ -5,7 +5,76 @@ import {
   resolveVehicleBrandLabel,
   resolveVehicleDisplayName,
   vehicleMatchesActiveFarm,
+  isStorageItem,
 } from "./vehicles.js";
+import { filterFieldsForFarmView } from "./fields.js";
+
+/** Sum `baleCountOnField` for the active farm — fallback when Lua does not export `baleInventory`. */
+function sumBalesOnFarmFields(data, farmId) {
+  if (!data || typeof data !== "object") {
+    return { total: 0, fieldsWithBales: 0 };
+  }
+  const fromPlayer = filterFieldsForFarmView(data.fields || [], farmId);
+  const list =
+    fromPlayer.length > 0
+      ? fromPlayer
+      : filterFieldsForFarmView(data.allFields || [], farmId);
+  let total = 0;
+  let fieldsWithBales = 0;
+  for (const f of list) {
+    const n = Number(f?.baleCountOnField ?? 0);
+    if (!Number.isFinite(n) || n <= 0) continue;
+    total += n;
+    fieldsWithBales += 1;
+  }
+  return { total, fieldsWithBales };
+}
+
+const BALE_CATEGORY_KEYS = ["straw", "grass", "hay", "silage", "other"];
+
+const BALE_BADGE_CLASS = {
+  straw: "bg-warning text-dark",
+  grass: "bg-success",
+  hay: "bg-primary",
+  silage: "bg-secondary",
+  other: "bg-light text-dark",
+};
+
+function sumBaleBucket(bucket) {
+  if (!bucket || typeof bucket !== "object") return 0;
+  return BALE_CATEGORY_KEYS.reduce(
+    (s, k) => s + (Number(bucket[k]) || 0),
+    0
+  );
+}
+
+function baleCategoryLabel(key) {
+  const map = {
+    straw: "economy.baleCatStraw",
+    grass: "economy.baleCatGrass",
+    hay: "economy.baleCatHay",
+    silage: "economy.baleCatSilage",
+    other: "economy.baleCatOther",
+  };
+  return t(map[key] || "economy.baleCatOther");
+}
+
+/** HTML: badges per fill type with non-zero counts */
+function baleInventoryBadgesHtml(bucket) {
+  const parts = [];
+  for (const key of BALE_CATEGORY_KEYS) {
+    const n = Number(bucket?.[key]) || 0;
+    if (n <= 0) continue;
+    const cls = BALE_BADGE_CLASS[key] || "bg-secondary";
+    parts.push(
+      `<span class="badge ${cls} me-1 mb-1">${baleCategoryLabel(key)}: <strong>${n}</strong></span>`
+    );
+  }
+  if (parts.length === 0) {
+    return `<span class="text-muted small">${t("economy.baleInventoryCategoryNone")}</span>`;
+  }
+  return `<div class="d-flex flex-wrap align-items-center">${parts.join("")}</div>`;
+}
 
 export function showEconomySection() {
   const economyHTML = `
@@ -77,6 +146,11 @@ export function showEconomySection() {
                       <i class="bi bi-cart-fill me-1"></i> ${t("economy.tabPurchases")}
                   </button>
               </li>
+              <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="consumables-tab" data-bs-toggle="tab" data-bs-target="#consumables" type="button" role="tab">
+                      <i class="bi bi-box-seam me-1"></i> ${t("economy.tabConsumables")}
+                  </button>
+              </li>
           </ul>
 
           <div class="tab-content" id="economyTabContent">
@@ -143,6 +217,19 @@ export function showEconomySection() {
                       </div>
                   </div>
               </div>
+
+              <div class="tab-pane fade" id="consumables" role="tabpanel">
+                  <div id="consumables-bale-summary" class="mb-4" aria-live="polite"></div>
+                  <p class="text-muted small mb-3">${t("economy.consumablesHelp")}</p>
+                  <div class="row" id="consumables-list">
+                      <div class="col-12 text-center p-5">
+                          <div class="spinner-border text-primary" role="status">
+                              <span class="visually-hidden">${t("economy.loadingConsumablesAria")}</span>
+                          </div>
+                          <p class="mt-3 text-muted">${t("economy.loadingConsumables")}</p>
+                      </div>
+                  </div>
+              </div>
           </div>
       `;
 
@@ -162,8 +249,13 @@ export async function loadEconomyData() {
 
     if (dataResponse.ok) {
       const data = await dataResponse.json();
-      this.updateFinancialSummary(data);
-      this.updatePurchasesList(data.vehicles || []);
+      const raw = data.vehicles || [];
+      const equipment = raw.filter((v) => !isStorageItem(v));
+      const consumables = raw.filter((v) => isStorageItem(v));
+      this.updateFinancialSummary({ ...data, vehicles: equipment });
+      this.updatePurchasesList(equipment);
+      this.updateConsumablesList(consumables);
+      this.updateConsumablesBaleSummaryCard(data);
     }
 
     // Try to load economy data, but don't fail if it's not available
@@ -222,7 +314,7 @@ export function updateFinancialSummary(data) {
       loan = data.loan || 0;
   }
 
-  // Calculate Equipment Value explicitly for this Farm
+  // Equipment value: exclude pallets / big bags / IBCs (shown under Consumables tab)
   totalPurchases = this.calculateTotalPurchases(data.vehicles || [], activeFarmId);
   
   // Note: If you add buildings/animals to the advanced finance module later, 
@@ -340,6 +432,168 @@ export function updatePurchasesList(vehicles) {
   if (typeof this.filterPurchases === "function") {
     this.filterPurchases(preserved);
   }
+}
+
+export function updateConsumablesBaleSummaryCard(data) {
+  const mount = document.getElementById("consumables-bale-summary");
+  if (!mount) return;
+
+  if (!data || data.error) {
+    mount.innerHTML = "";
+    return;
+  }
+
+  const farmId = window.dashboard?.activeFarmId ?? 1;
+  const inv = data.baleInventory || {};
+  const onField = inv.onField || {};
+  const offField = inv.offField || {};
+  const onSum = sumBaleBucket(onField);
+  const offSum = sumBaleBucket(offField);
+
+  const title = t("economy.consumablesBaleSummaryTitle");
+  const subtitle = t("economy.consumablesBaleInventorySubtitle");
+
+  let legacyFooter = "";
+  if (onSum === 0 && offSum === 0) {
+    const { total, fieldsWithBales } = sumBalesOnFarmFields(data, farmId);
+    if (total > 0) {
+      legacyFooter = `
+        <p class="text-muted small mt-3 mb-0">
+          ${t("economy.baleInventoryLegacyHint", { total, fields: fieldsWithBales })}
+        </p>`;
+    }
+  }
+
+  mount.innerHTML = `
+    <div class="card shadow-lg border-warning border-opacity-50">
+      <div class="card-body py-4 px-4">
+        <div class="row mb-3">
+          <div class="col-12">
+            <h4 class="text-farm-accent mb-2">
+              <i class="bi bi-stack me-2"></i>${title}
+            </h4>
+            <p class="text-muted mb-0 small">${subtitle}</p>
+          </div>
+        </div>
+        <div class="row g-4">
+          <div class="col-lg-6">
+            <div class="border border-secondary border-opacity-50 rounded p-3 h-100 bg-dark bg-opacity-25">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <h6 class="mb-0 text-info">
+                  <i class="bi bi-geo-alt me-1"></i>${t("economy.balesLooseOnFields")}
+                </h6>
+                <span class="display-6 fw-bold text-info lh-1">${onSum}</span>
+              </div>
+              <p class="small text-muted mb-2">${t("economy.balesLooseOnFieldsHint")}</p>
+              ${baleInventoryBadgesHtml(onField)}
+            </div>
+          </div>
+          <div class="col-lg-6">
+            <div class="border border-secondary border-opacity-50 rounded p-3 h-100 bg-dark bg-opacity-25">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <h6 class="mb-0 text-warning">
+                  <i class="bi bi-building me-1"></i>${t("economy.balesInYardsSheds")}
+                </h6>
+                <span class="display-6 fw-bold text-warning lh-1">${offSum}</span>
+              </div>
+              <p class="small text-muted mb-2">${t("economy.balesInYardsShedsHint")}</p>
+              ${baleInventoryBadgesHtml(offField)}
+            </div>
+          </div>
+        </div>
+        ${
+          onSum === 0 && offSum === 0 && !legacyFooter
+            ? `<p class="text-muted small mt-3 mb-0">${t("economy.baleInventoryEmptyAll")}</p>`
+            : ""
+        }
+        ${legacyFooter}
+      </div>
+    </div>
+  `;
+}
+
+function consumableFillSummaryHtml(vehicle) {
+  const levels = vehicle.fillLevels || {};
+  const keys = Object.keys(levels);
+  if (keys.length === 0) {
+    return `<small class="text-muted">${t("economy.consumablesNoFill")}</small>`;
+  }
+  return keys
+    .map((type) => {
+      const data = levels[type];
+      const pct =
+        data && data.capacity > 0
+          ? Math.round((data.level / data.capacity) * 100)
+          : 0;
+      return `<small class="text-muted d-block">${t("economy.consumablesFillLine", { type, pct })}</small>`;
+    })
+    .join("");
+}
+
+export function updateConsumablesList(vehicles) {
+  const el = document.getElementById("consumables-list");
+  if (!el) return;
+
+  const activeFarmId = window.dashboard.activeFarmId || 1;
+  const rows = (vehicles || []).filter((v) =>
+    vehicleMatchesActiveFarm(v, activeFarmId)
+  );
+
+  if (rows.length === 0) {
+    el.innerHTML = `
+      <div class="col-12 text-center p-5">
+        <i class="bi bi-box-seam text-muted" style="font-size: 3rem;"></i>
+        <p class="mt-3 text-muted">${t("economy.consumablesEmpty")}</p>
+      </div>
+    `;
+    return;
+  }
+
+  let html = "";
+  rows.forEach((vehicle) => {
+    const condition = this.calculateCondition(vehicle.damage || 0);
+    const age = vehicle.age || 0;
+    const icon = this.getVehicleIcon(vehicle.vehicleType, vehicle.typeName || "");
+    html += `
+      <div class="col-md-6 col-lg-4 mb-4 consumable-card" data-type="${
+        vehicle.vehicleType || "unknown"
+      }" data-price="${vehicle.price || 0}" data-age="${age}">
+        <div class="card bg-secondary h-100 border border-info border-opacity-25">
+          <div class="card-header d-flex justify-content-between align-items-center">
+            <h6 class="mb-0 text-truncate" style="max-width:70%">
+              <i class="bi ${icon} text-info"></i>
+              ${resolveVehicleDisplayName(vehicle)}
+            </h6>
+            <span class="badge bg-info text-dark text-truncate" style="max-width:45%" title="${String(vehicle.typeName || "").replace(/"/g, "&quot;")}">
+              ${vehicle.typeName || vehicle.vehicleType || "—"}
+            </span>
+          </div>
+          <div class="card-body">
+            <div class="row mb-2">
+              <div class="col-6">
+                <small class="text-muted">${t("economy.purchasePrice")}</small><br>
+                <strong class="text-success">${this.formatCurrency(vehicle.price || 0)}</strong>
+              </div>
+              <div class="col-6">
+                <small class="text-muted">${t("economy.purchaseCondition")}</small><br>
+                <span class="badge ${condition.class}">${condition.text}</span>
+              </div>
+            </div>
+            <div class="mb-2">
+              <small class="text-muted d-block mb-1">${t("economy.consumablesContents")}</small>
+              ${consumableFillSummaryHtml(vehicle)}
+            </div>
+            <div class="small text-muted">
+              <i class="bi bi-geo-alt me-1"></i>
+              ${Math.round(vehicle.position?.x || 0)}, ${Math.round(vehicle.position?.z || 0)}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  el.innerHTML = html;
 }
 
 export function updateMarketPrices(economyData) {

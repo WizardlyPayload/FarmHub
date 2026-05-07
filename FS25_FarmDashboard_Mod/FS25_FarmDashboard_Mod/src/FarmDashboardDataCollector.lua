@@ -849,6 +849,10 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
     local nowS = (D and D.nowSec and D.nowSec()) or 0
 
     local mc = self.moduleCache
+    local baleInv = nil
+    if FieldDataCollector and FieldDataCollector.getLastBaleInventory then
+        baleInv = FieldDataCollector.getLastBaleInventory()
+    end
     local data = {
         -- Plan v5 Phase 0: schemaVersion + serverTimeSec on every emission.
         schemaVersion = DATA_SCHEMA_VERSION,
@@ -863,7 +867,9 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
         production = mc.production or {},
         finance    = mc.finance or {},
         weather    = mc.weather or {},
-        economy    = mc.economy or {}
+        economy    = mc.economy or {},
+        --- Physical bales by fill + placement (FieldDataCollector last collect).
+        baleInventory = baleInv or { farmId = nil, onField = {}, offField = {} }
     }
 
     if rawget(_G, "FieldDataCollector") and FieldDataCollector.getCachedGameplayFlags then

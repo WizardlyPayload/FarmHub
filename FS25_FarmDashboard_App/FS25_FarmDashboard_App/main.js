@@ -1261,6 +1261,7 @@ function restartHttpServer(done) {
 }
 
 function broadcast(serverId, data) {
+    if (data == null) return;
     const payload = cloneMergedDataWithFieldExclusions(data, serverId) || data;
     const msg = JSON.stringify({ type: 'data', serverId, data: payload, timestamp: new Date().toISOString() });
     clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(msg); });
@@ -1321,6 +1322,7 @@ function hydrateServerCacheFromDisk(serverId) {
     if (state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
         state.mergedData.fieldStatusHistory = state.fieldHistory;
     }
+    updateLuaLiveBackup(state, state.mergedData);
     broadcast(serverId, state.mergedData);
     console.log(`[Cache] [${serverId}] Restored last merged snapshot from disk (use until live Lua/XML return)`);
 }
@@ -1335,6 +1337,78 @@ function getLocalLuaJsonPathForServer(srv) {
         String(srv.name || '').replace(/[<>:"/\\|?*]/g, '').trim();
     if (!folderName) return null;
     return path.join(basePath, folderName, 'data.json');
+}
+
+function productionLooksEmpty(p) {
+    if (!p || typeof p !== 'object') return true;
+    const chains = p.chains;
+    if (Array.isArray(chains) && chains.length > 0) return false;
+    const ht = p.husbandryTotals;
+    if (ht && typeof ht === 'object' && Object.keys(ht).length > 0) return false;
+    return true;
+}
+
+/**
+ * True when data.json looks like a full in-game export (vs `{}` / minimal writes on FS exit).
+ * Used to avoid restoring stale animals/production when the live export is intentionally empty.
+ */
+function isRichLuaExport(lua) {
+    if (!lua || typeof lua !== 'object') return false;
+    const keys = Object.keys(lua).length;
+    if (keys >= 10) return true;
+    if (Array.isArray(lua.fields) && lua.fields.length > 0) return true;
+    if (Array.isArray(lua.vehicles) && lua.vehicles.length > 0) return true;
+    if (lua.finance && typeof lua.finance === 'object' && Object.keys(lua.finance).length > 0) return true;
+    if (lua.gameTime && typeof lua.gameTime === 'object' && Object.keys(lua.gameTime).length > 0) return true;
+    if (lua.weather && typeof lua.weather === 'object') return true;
+    return false;
+}
+
+/** Last non-empty Lua-only sections so shutdown/truncated data.json does not zero the UI. */
+function updateLuaLiveBackup(state, merged) {
+    if (!merged) return;
+    const hasAnim = Array.isArray(merged.animals) && merged.animals.length > 0;
+    const hasProd = !productionLooksEmpty(merged.production);
+    if (!hasAnim && !hasProd) return;
+    const prev = state.luaLiveBackup || {};
+    state.luaLiveBackup = {
+        animals: hasAnim
+            ? JSON.parse(JSON.stringify(merged.animals))
+            : (prev.animals ? JSON.parse(JSON.stringify(prev.animals)) : undefined),
+        production: hasProd
+            ? JSON.parse(JSON.stringify(merged.production))
+            : (prev.production ? JSON.parse(JSON.stringify(prev.production)) : undefined),
+    };
+}
+
+function applyLuaLiveBackupIfStaleExport(merged, luaPayload, state) {
+    if (!merged || !state.luaLiveBackup) return merged;
+    const backup = state.luaLiveBackup;
+    const mergedAnimEmpty = !Array.isArray(merged.animals) || merged.animals.length === 0;
+    const mergedProdEmpty = productionLooksEmpty(merged.production);
+    const backupAnim = Array.isArray(backup.animals) && backup.animals.length > 0;
+    const backupProd = backup.production && !productionLooksEmpty(backup.production);
+    const needAnimRestore = mergedAnimEmpty && backupAnim;
+    const needProdRestore = mergedProdEmpty && backupProd;
+    if (!needAnimRestore && !needProdRestore) return merged;
+    if (isRichLuaExport(luaPayload)) return merged;
+
+    const ts = {
+        ...(merged.dataTimestamps || {}),
+        luaLiveSectionsHeldStaleAt: new Date().toISOString(),
+    };
+    const out = { ...merged, dataTimestamps: ts };
+    if (needAnimRestore) {
+        out.animals = JSON.parse(JSON.stringify(backup.animals));
+    }
+    if (needProdRestore) {
+        out.production = JSON.parse(JSON.stringify(backup.production));
+    }
+    console.warn(
+        '[rebuildMerged] Restored animals/production from last good Lua export ' +
+            '(current data.json looks like a shutdown or minimal snapshot)'
+    );
+    return out;
 }
 
 /**
@@ -1382,11 +1456,50 @@ function rebuildMerged(serverId) {
             luaPayload = state.luaData;
         }
     }
-    state.mergedData = mergeData(luaPayload, state.xmlData, {
-        fieldLiveCache: state.fieldLiveCache || {},
-        lastLuaAt: state.lastLuaReceivedAt || null,
-        lastXmlAt: state.lastXmlReceivedAt || null,
-    });
+    let merged;
+    try {
+        merged = mergeData(luaPayload, state.xmlData, {
+            fieldLiveCache: state.fieldLiveCache || {},
+            lastLuaAt: state.lastLuaReceivedAt || null,
+            lastXmlAt: state.lastXmlReceivedAt || null,
+        });
+    } catch (e) {
+        console.warn('[rebuildMerged] merge threw', serverId, e && e.message ? e.message : e);
+        merged = null;
+    }
+    if (!merged) {
+        if (state.mergedData) {
+            state.mergedData = {
+                ...state.mergedData,
+                dataTimestamps: {
+                    ...(state.mergedData.dataTimestamps || {}),
+                    mergeHeldStaleAt: new Date().toISOString(),
+                },
+            };
+            if (state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
+                state.mergedData.fieldStatusHistory = state.fieldHistory;
+            }
+            const si = { ...(state.mergedData.serverInfo || {}) };
+            const cw = state.configWarning;
+            if (cw) si.configWarning = cw;
+            else delete si.configWarning;
+            state.mergedData.serverInfo = si;
+            broadcast(serverId, state.mergedData);
+            schedulePersistServerCache(serverId);
+            console.warn(
+                `[rebuildMerged] [${serverId}] merge unavailable; keeping last merged snapshot (live export may have stopped)`
+            );
+            return;
+        }
+        try {
+            hydrateServerCacheFromDisk(serverId);
+        } catch (e) {
+            console.warn('[rebuildMerged] hydrate fallback failed', serverId, e.message);
+        }
+        return;
+    }
+    merged = applyLuaLiveBackupIfStaleExport(merged, luaPayload, state);
+    state.mergedData = merged;
     if (state.mergedData && state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
         state.mergedData.fieldStatusHistory = state.fieldHistory;
     }
@@ -1397,6 +1510,7 @@ function rebuildMerged(serverId) {
         else delete si.configWarning;
         state.mergedData.serverInfo = si;
     }
+    updateLuaLiveBackup(state, state.mergedData);
     broadcast(serverId, state.mergedData);
     schedulePersistServerCache(serverId);
 }
@@ -1406,6 +1520,14 @@ function processLuaData(serverId, raw) {
         const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
         const state = serverStates[serverId];
         if (!state) return;
+
+        // FS exit / partial writes can yield JSON `null` or non-objects — do not wipe live state.
+        if (data == null || typeof data !== 'object' || Array.isArray(data)) {
+            console.warn(
+                `[processLuaData] [${serverId}] ignored invalid Lua JSON (expected object); keeping previous export`
+            );
+            return;
+        }
 
         state.luaData = data;
 
@@ -2035,6 +2157,7 @@ async function bootServer(config) {
             lastXmlReceivedAt: null,
             fieldLiveCache: {},
             fieldHistory: {},
+            luaLiveBackup: null,
             configWarning: null,
         };
     });

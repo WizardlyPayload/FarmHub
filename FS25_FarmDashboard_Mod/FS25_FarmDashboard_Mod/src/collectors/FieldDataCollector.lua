@@ -132,7 +132,12 @@ function FieldDataCollector:init()
     FieldDataCollector._windrowFillIdxCache = nil
     FieldDataCollector._fdCo = nil
     FieldDataCollector._lastGameplayFlags = nil
+    FieldDataCollector._lastBaleInventory = nil
     print("[FarmDashboard] Field data collector initialized (Hybrid: NPC State + Physical HUD Probe)")
+end
+
+function FieldDataCollector.getLastBaleInventory()
+    return FieldDataCollector._lastBaleInventory
 end
 
 --- Plan v5 B2: state-machine path runs sync; legacy coroutine path retained behind a flag.
@@ -341,6 +346,9 @@ function FieldDataCollector:_collectImpl()
     --- Bale counts per farmland: scan **all** known bale sources (item list + bale manager), dedupe by stable key.
     --- FS25: `itemSystem.items` may exist but be empty — we must still call `g_baleManager` (previous code skipped it).
     local farmlandBaleCounts = {}
+    --- Player farm only: physical bales by fill category — on cropland vs yards/sheds (off registered field geometry).
+    local baleInvOnField = { straw = 0, grass = 0, hay = 0, silage = 0, other = 0 }
+    local baleInvOffField = { straw = 0, grass = 0, hay = 0, silage = 0, other = 0 }
     do
         local mission = _G.g_currentMission
         local fm = _G.g_farmlandManager
@@ -519,6 +527,73 @@ function FieldDataCollector:_collectImpl()
                     farmlandBaleCounts[key] = (farmlandBaleCounts[key] or 0) + 1
                 end
             end
+
+            local function classifyBaleFillCategory(it)
+                local ftm = rawget(_G, "g_fillTypeManager")
+                local name = ""
+                local idx = tonumber(rawget(it, "fillTypeIndex") or rawget(it, "fillIndex"))
+                if idx and ftm and type(ftm.getFillTypeNameByIndex) == "function" then
+                    local ok, nm = pcall(function() return ftm:getFillTypeNameByIndex(idx) end)
+                    if ok and nm then name = string.upper(tostring(nm)) end
+                end
+                if name == "" and rawget(it, "fillType") ~= nil then
+                    name = string.upper(tostring(rawget(it, "fillType")))
+                end
+                if string.find(name, "STRAW", 1, true) then return "straw" end
+                if string.find(name, "SILAGE", 1, true) then return "silage" end
+                if string.find(name, "FERMENT", 1, true) then return "silage" end
+                if string.find(name, "HAY", 1, true) then return "hay" end
+                if string.find(name, "DRYGRASS", 1, true) then return "hay" end
+                if string.find(name, "GRASS_WINDROW", 1, true) then return "grass" end
+                if string.find(name, "GRASS", 1, true) then return "grass" end
+                return "other"
+            end
+
+            local function getFarmIdForParcel(parcelId)
+                if not parcelId or parcelId <= 0 then return nil end
+                if fm and type(fm.getFarmlandById) == "function" then
+                    local ok, land = pcall(function() return fm:getFarmlandById(parcelId) end)
+                    if ok and land then
+                        local fid = tonumber(land.farmId)
+                        if fid and fid > 0 then return fid end
+                    end
+                end
+                return nil
+            end
+
+            local function playerOwnsFieldOnParcel(parcelId)
+                if not parcelId or parcelId <= 0 then return false end
+                if not _G.g_fieldManager or not _G.g_fieldManager.fields then return false end
+                for _, fld in pairs(_G.g_fieldManager.fields) do
+                    local pid = fld.farmland and fld.farmland.id
+                    if pid == parcelId then
+                        local of = tonumber(fld.farmland and fld.farmland.farmId) or 0
+                        if of == currentFarmId then return true end
+                    end
+                end
+                return false
+            end
+
+            local function tallyBaleForInventory(it)
+                local x, z = itemWorldXZ(it)
+                if x == nil or z == nil then return end
+                local cat = classifyBaleFillCategory(it)
+                local fk = bestFieldKeyForBaleAtXZ(x, z)
+                if fk ~= nil and fk > 0 then
+                    if playerOwnsFieldOnParcel(fk) then
+                        baleInvOnField[cat] = (baleInvOnField[cat] or 0) + 1
+                    end
+                    return
+                end
+                local parcel = farmlandIdAtWithRing(x, z)
+                if parcel ~= nil and parcel > 0 then
+                    local farmHere = getFarmIdForParcel(parcel)
+                    if farmHere ~= nil and farmHere == currentFarmId then
+                        baleInvOffField[cat] = (baleInvOffField[cat] or 0) + 1
+                    end
+                end
+            end
+
             local baleSeen = {}
             local function baleDedupKey(it)
                 if not it then return nil end
@@ -546,6 +621,7 @@ function FieldDataCollector:_collectImpl()
                 local dk = baleDedupKey(it)
                 if dk and baleSeen[dk] then return end
                 if dk then baleSeen[dk] = true end
+                tallyBaleForInventory(it)
                 incrementFarmlandForBale(it)
             end
             --- Module 1 (Engine Interaction doc): master list is itemSystem:getItems(); .items is a legacy/shape fallback.
@@ -652,6 +728,24 @@ function FieldDataCollector:_collectImpl()
             end
         end
     end
+
+    FieldDataCollector._lastBaleInventory = {
+        farmId = currentFarmId,
+        onField = {
+            straw = baleInvOnField.straw or 0,
+            grass = baleInvOnField.grass or 0,
+            hay = baleInvOnField.hay or 0,
+            silage = baleInvOnField.silage or 0,
+            other = baleInvOnField.other or 0,
+        },
+        offField = {
+            straw = baleInvOffField.straw or 0,
+            grass = baleInvOffField.grass or 0,
+            hay = baleInvOffField.hay or 0,
+            silage = baleInvOffField.silage or 0,
+            other = baleInvOffField.other or 0,
+        },
+    }
 
     for fieldId, field in pairs(_G.g_fieldManager.fields) do
         

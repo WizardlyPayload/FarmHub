@@ -1,7 +1,7 @@
 // FS25 FarmDashboard | pastures.js | v2.0.0
 
 import { t } from "../i18n/i18n.js";
-import { formatGenderLabel, fmtWeightKgStr } from "./livestock.js";
+import { formatGenderLabel, fmtWeightKgStr, countLivestockHeads } from "./livestock.js";
 
 /**
  * Resolve which farm a pasture belongs to: pasture row first, then any animal (REST often only had building id on parent).
@@ -181,11 +181,11 @@ export function parsePastureData() {
 
   this.pastures = [];
 
-  // Use the new API data format - check for animals data from realtime connector
+  // Use the new API data format — any row with husbandryId (do not rely on animals[0]; order varies).
   if (
     this.animals &&
     this.animals.length > 0 &&
-    this.animals[0].husbandryId
+    this.animals.some((a) => a && a.husbandryId != null && String(a.husbandryId) !== "")
   ) {
     // Group animals by their husbandry location (new API format)
     const animalsByHusbandry = {};
@@ -209,6 +209,7 @@ export function parsePastureData() {
     // Convert to pastures format
     Object.values(animalsByHusbandry).forEach((husbandryData) => {
       const pastureAnimals = husbandryData.animals;
+      const stockingAnimals = pastureAnimals.filter((a) => a && !a.__emptyPen);
 
       // Try to find the original husbandry data from the API for real statistics
       let originalHusbandry = null;
@@ -218,18 +219,26 @@ export function parsePastureData() {
         );
       }
 
-      // Calculate pasture statistics
-      const avgHealth =
-        pastureAnimals.length > 0
-          ? (
-              pastureAnimals.reduce((sum, animal) => sum + animal.health, 0) /
-              pastureAnimals.length
-            ).toFixed(0)
-          : 0;
+      // Calculate pasture statistics (weighted by head count for LOD cluster rows)
+      let avgHealth = 0;
+      if (stockingAnimals.length > 0) {
+        let hw = 0;
+        let tw = 0;
+        for (const animal of stockingAnimals) {
+          const w =
+            animal.__lodClusterAggregate && Number(animal.clusterCount) > 0
+              ? Number(animal.clusterCount)
+              : 1;
+          const h = Number(animal.health) || 0;
+          hw += h * w;
+          tw += w;
+        }
+        avgHealth = tw > 0 ? Number((hw / tw).toFixed(0)) : 0;
+      }
 
       // Check for condition reports
       const conditionReport = this.calculateConditionReport(
-        pastureAnimals,
+        stockingAnimals,
         originalHusbandry
       );
 
@@ -245,7 +254,7 @@ export function parsePastureData() {
       // Calculate milk production based on actual cow data
       const milkProductionData = this.calculateMilkProduction(
         { name: husbandryData.name },
-        pastureAnimals
+        stockingAnimals
       );
 
       const foodReportInput = originalHusbandry || husbandryData;
@@ -280,24 +289,29 @@ export function parsePastureData() {
 
       const allWarnings = this.calculateAllPastureWarnings(
         husbandryData,
-        pastureAnimals,
+        stockingAnimals,
         conditionReport,
         foodReport
       );
 
-      // Calculate gender counts for this pasture
-      const maleCount = pastureAnimals.filter(
-        (a) => a.gender?.toLowerCase() === "male"
-      ).length;
-      const femaleCount = pastureAnimals.filter(
-        (a) => a.gender?.toLowerCase() === "female"
-      ).length;
+      // Gender counts — weight LOD cluster rows by head count
+      let maleCount = 0;
+      let femaleCount = 0;
+      for (const a of stockingAnimals) {
+        const heads =
+          a.__lodClusterAggregate && Number(a.clusterCount) > 0
+            ? Number(a.clusterCount)
+            : 1;
+        const g = String(a.gender ?? "").toLowerCase();
+        if (g === "male") maleCount += heads;
+        else if (g === "female") femaleCount += heads;
+      }
 
       const pastureData = {
         id: husbandryData.id,
         name: husbandryData.name,
         animals: pastureAnimals,
-        animalCount: pastureAnimals.length,
+        animalCount: countLivestockHeads(stockingAnimals),
         maleCount: maleCount,
         femaleCount: femaleCount,
         avgHealth: parseFloat(avgHealth),

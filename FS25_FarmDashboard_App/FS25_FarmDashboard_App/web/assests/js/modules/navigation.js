@@ -6,6 +6,7 @@ import {
   setFarmDashboardBackground,
 } from "./farm-dashboard-bg.js";
 import { stopFieldsRefresh } from "./fields.js";
+import { countLivestockHeads } from "./livestock.js";
 
 function sectionHiddenMessage() {
   try {
@@ -350,7 +351,9 @@ export function showDashboard() {
 export function updateLandingPageCounts() {
   // Landing cards should never look empty just because farm-specific filters haven't settled yet.
   // Prefer active-farm counts, then fall back to server-wide merged totals.
-  const livestockCountFiltered = Array.isArray(this.animals) ? this.animals.length : 0;
+  // Use **animal heads** (cluster LOD expands one row to many head); row count ≠ herd size.
+  const headsFromAnimals = Array.isArray(this.animals) ? countLivestockHeads(this.animals) : 0;
+  const livestockCountFiltered = headsFromAnimals;
   const livestockCountAll = Array.isArray(this.husbandryData) ? this.husbandryData.length : 0;
   const livestockCount =
     livestockCountFiltered > 0

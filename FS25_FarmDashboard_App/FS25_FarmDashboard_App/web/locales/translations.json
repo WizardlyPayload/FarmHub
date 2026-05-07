@@ -10879,6 +10879,9 @@
       "nb": "Se alle dyredetaljer",
       "uk": "Переглянути повну інформацію про тварину"
     },
+    "livestock.openPenDetailTitle": {
+      "en": "Pen detail — animals from save"
+    },
     "livestock.fmtAgeMonths": {
       "en": "{{months}} months",
       "de": "{{months}} Monate",

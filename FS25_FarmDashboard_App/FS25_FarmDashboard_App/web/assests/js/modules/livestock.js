@@ -26,7 +26,11 @@ export function formatGenderLabel(gender) {
 }
 
 export function fmtAgeMonthsStr(m) {
-  return t("livestock.fmtAgeMonths", { months: m });
+  const n = Number(m);
+  if (!Number.isFinite(n)) return t("livestock.fmtAgeMonths", { months: 0 });
+  const rounded =
+    Math.abs(n - Math.round(n)) < 0.001 ? Math.round(n) : Math.round(n * 10) / 10;
+  return t("livestock.fmtAgeMonths", { months: rounded });
 }
 
 export function fmtWeightKgStr(w, decimals = 1) {
@@ -69,7 +73,8 @@ export function generateAnimalsDataHash() {
   return hash.toString();
 }
 
-function countAnimalHeadsForSummary(animals) {
+/** Heads on farm: cluster rows count as `clusterCount`; excludes synthetic empty-pen stubs. */
+export function countLivestockHeads(animals) {
   if (!Array.isArray(animals)) return 0;
   let n = 0;
   for (const a of animals) {
@@ -83,7 +88,7 @@ function countAnimalHeadsForSummary(animals) {
 }
 
 export function updateSummaryCards() {
-  const totalCount = countAnimalHeadsForSummary(this.animals);
+  const totalCount = countLivestockHeads(this.animals);
   const lactatingCount = this.animals.reduce((s, a) => {
     if (a.__emptyPen || !a.isLactating) return s;
     const c = a.__lodClusterAggregate ? Math.max(1, Number(a.clusterCount) || 1) : 1;
@@ -137,8 +142,16 @@ export function renderAnimalsTable() {
     return;
   }
 
+  // Empty-pen stubs last so the default view shows real/cluster rows first (IDs alone often sort stubs first).
+  const sortedAnimals = [...this.animals].sort((a, b) => {
+    const ea = a.__emptyPen ? 1 : 0;
+    const eb = b.__emptyPen ? 1 : 0;
+    if (ea !== eb) return ea - eb;
+    return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+  });
+
   // Prepare data for DataTables
-  const tableData = this.animals.map((animal) => {
+  const tableData = sortedAnimals.map((animal) => {
     try {
       if (animal.__emptyPen) {
         const esc = (s) =>

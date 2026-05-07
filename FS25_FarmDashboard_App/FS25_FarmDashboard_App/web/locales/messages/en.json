@@ -399,6 +399,7 @@
   "livestock.colActions": "Actions",
   "livestock.btnDetails": "Details",
   "livestock.detailsBtnTitle": "View full animal details",
+  "livestock.openPenDetailTitle": "Pen detail — animals from save",
   "livestock.fmtAgeMonths": "{{months}} months",
   "livestock.fmtWeightKg": "{{kg}} kg",
   "livestock.nameFallback": "Animal #{{id}}",

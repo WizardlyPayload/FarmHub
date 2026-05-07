@@ -776,10 +776,11 @@ class RealtimeConnector {
         // fan out one synthetic animal per cluster.count using the bucket's average values.
         // The global counter limits total synthetic rows across pens to prevent UI memory explosions.
         const lodClusters = Array.isArray(husbandry.clusters) ? husbandry.clusters : null;
-        const animalsEmptyOrSparse = !husbandry.animals
-            || !Array.isArray(husbandry.animals)
-            || husbandry.animals.length === 0;
-        if (lodClusters && lodClusters.length > 0 && animalsEmptyOrSparse) {
+        /** Prefer mod aggregate clusters whenever present — even if `animals[]` is non-empty (stale placeholders skip LOD and produced only empty-pen rows). */
+        const hasClusterBuckets =
+          lodClusters &&
+          lodClusters.some((c) => c && Number(c.count) > 0);
+        if (hasClusterBuckets) {
           const synth = this._fanOutClusters(husbandry, lodClusters, hfarm, globalCounter);
           for (let s = 0; s < synth.length; s++) formattedAnimals.push(synth[s]);
           if (synth.length > 0) {

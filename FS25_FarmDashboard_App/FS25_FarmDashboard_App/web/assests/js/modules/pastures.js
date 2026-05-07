@@ -21,6 +21,55 @@ function inferPastureFarmId(p) {
 }
 
 /**
+ * True when husbandry metadata indicates zero animals (used to list empty pens without synthetic animal rows).
+ */
+function husbandryReportsZeroAnimals(h) {
+  if (!h || typeof h !== "object") return false;
+
+  if (
+    h.__detailHydrated === true &&
+    Array.isArray(h.animals) &&
+    h.animals.length > 0
+  ) {
+    return false;
+  }
+
+  const clusters = Array.isArray(h.clusters) ? h.clusters : [];
+  if (clusters.some((c) => c && Number(c.count) > 0)) return false;
+
+  const ac = Number(h.animalCount);
+  const na = Number(h.numAnimals);
+  if (Number.isFinite(ac) && ac > 0) return false;
+  if (Number.isFinite(na) && na > 0) return false;
+
+  const lists = [h.animals, h.livestock, h.animalList].filter(Array.isArray);
+  let groupedHeads = 0;
+  for (const list of lists) {
+    for (const g of list) {
+      if (!g || typeof g !== "object") continue;
+      const num = Number(g.numAnimals ?? g.count);
+      if (Number.isFinite(num) && num > 0) {
+        groupedHeads += num;
+        continue;
+      }
+      if (
+        g.id &&
+        (g.numAnimals === undefined || Number(g.numAnimals) <= 1) &&
+        (g.uniqueId != null ||
+          g.age !== undefined ||
+          g.weight !== undefined)
+      ) {
+        return false;
+      }
+      if (g.id != null && !Number.isFinite(num)) return false;
+    }
+  }
+  if (groupedHeads > 0) return false;
+
+  return true;
+}
+
+/**
  * Pastures for the active farm (multi-farm / FTP). Matches farm id on pasture or on animals.
  * If still unknown and not multi-farm, include (local saves). If unknown and multi-farm, exclude unless fallback.
  */
@@ -501,9 +550,70 @@ export function parsePastureData() {
     });
   }
 
+  this.addEmptyPasturesFromHusbandryData();
+
   // Update milk values if price is available
   if (this.milkPrice && this.milkPrice > 0) {
     this.updateMilkValues();
+  }
+}
+
+/** Adds pasture cards for husbandries with no animals (does not add dashboard.animals rows). */
+export function addEmptyPasturesFromHusbandryData() {
+  if (!Array.isArray(this.husbandryData) || this.husbandryData.length === 0) {
+    return;
+  }
+  const existing = new Set(
+    (this.pastures || []).map((p) =>
+      p && p.id != null && p.id !== "" ? String(p.id) : ""
+    )
+  );
+  for (const h of this.husbandryData) {
+    const hid = h.id ?? h.buildingId;
+    if (hid == null || hid === "") continue;
+    const hidStr = String(hid);
+    if (existing.has(hidStr)) continue;
+    if (!husbandryReportsZeroAnimals(h)) continue;
+
+    const penName = h.name || h.buildingName || "Pen";
+    const milkProductionData = this.calculateMilkProduction(
+      { name: penName },
+      []
+    );
+    const foodReportInput = {
+      ...h,
+      calculatedMilkProduction: milkProductionData.estimatedStorage,
+    };
+    const foodReport = this.calculateFoodReport(foodReportInput);
+    const conditionReport = this.calculateConditionReport([], h);
+    const allWarnings = this.calculateAllPastureWarnings(
+      h,
+      [],
+      conditionReport,
+      foodReport
+    );
+
+    this.pastures.push({
+      id: hid,
+      name: penName,
+      animals: [],
+      animalCount: 0,
+      maleCount: 0,
+      femaleCount: 0,
+      avgHealth: 0,
+      conditionReport,
+      foodReport,
+      milkProductionData,
+      allWarnings,
+      farmId: h.ownerFarmId ?? h.farmId ?? "Unknown",
+      capacity:
+        h.capacity ??
+        h.maxAnimals ??
+        this.estimatePastureCapacity(penName),
+      husbandryData: h,
+      isEmptyPasture: true,
+    });
+    existing.add(hidStr);
   }
 }
 
@@ -630,8 +740,10 @@ export function calculateConditionReport(animals, husbandryData) {
     // console.log("[DEBUG] Final hasProductionData result:", hasProductionData);
 
     if (hasProductionData) {
+      const p0 = Number(husbandryData.productivity);
+      const productivityPct = Number.isFinite(p0) ? p0 * 100 : 0;
       return {
-        productivity: husbandryData.productivity * 100 || 0, // Convert to percentage
+        productivity: productivityPct, // Convert to percentage
         milk: productionData.milkPerDay || productionData.milk || 0,
         straw: consumptionData.strawPerDay || consumptionData.straw || 0,
         manure: productionData.manurePerDay || productionData.manure || 0,
@@ -1098,6 +1210,14 @@ export function estimatePastureCapacity(filename) {
 
 export function calculateAllPastureWarnings(pasture, animals, conditionReport, foodReport) {
   const warnings = [];
+
+  const stocked = Array.isArray(animals)
+    ? animals.filter((a) => a && !a.__emptyPen)
+    : [];
+  const heads = countLivestockHeads(stocked);
+  if (heads === 0 || pasture?.isEmptyPasture) {
+    return warnings;
+  }
 
   // 1. Capacity Warning (>90% full) ** Legacy
   /* LEGACY as mentioned above
@@ -2167,23 +2287,6 @@ export function renderPasturesList(pasturesList) {
   // console.log("[DEBUG] this.pastures:", this.pastures);
   // console.log("[DEBUG] this.pastures.length:", this.pastures.length);
 
-  if (list && list.length > 0) {
-    list.forEach((pasture, index) => {
-      // console.log(
-      //   `[DEBUG] Pasture ${index} (${pasture.name}) foodReport:`,
-      //   pasture.foodReport
-      // );
-      // console.log(
-      //   `[DEBUG] Pasture ${index} foodReport.forage:`,
-      //   pasture.foodReport.forage
-      // );
-      // console.log(
-      //   `[DEBUG] Pasture ${index} foodReport.forage > 0:`,
-      //   pasture.foodReport.forage > 0
-      // );
-    });
-  }
-
   const pasturesContainer = document.getElementById("pastures-list");
   if (!pasturesContainer) return;
 
@@ -2191,16 +2294,43 @@ export function renderPasturesList(pasturesList) {
     pasturesContainer.innerHTML = `
               <div class="text-center text-muted py-4">
                   <i class="bi bi-info-circle display-1"></i>
-                  <h4>No Pastures Found</h4>
-                  <p>No livestock buildings with animals were found for this farm.</p>
+                  <h4>${t("pastures.emptyStateTitle")}</h4>
+                  <p>${t("pastures.emptyStateHint")}</p>
               </div>
           `;
     return;
   }
 
   const pasturesHTML = list
-    .map(
-      (pasture) => `
+    .map((pasture) => {
+      const warnings = pasture.allWarnings || [];
+      const prod = Math.round(
+        Number(pasture.conditionReport?.productivity) || 0
+      );
+      if (pasture.isEmptyPasture) {
+        return `
+          <div class="card bg-dark mb-3">
+              <div class="card-header d-flex justify-content-between align-items-center">
+                  <h6 class="mb-0 d-flex align-items-center">
+                      <i class="bi bi-house-door me-2"></i>
+                      ${pasture.name}
+                  </h6>
+                  <div class="d-flex gap-2">
+                      <button class="btn btn-outline-info btn-sm" onclick="dashboard.showPastureDetails('${
+                        pasture.id
+                      }')">
+                          <i class="bi bi-eye me-1"></i>Details
+                      </button>
+                  </div>
+              </div>
+              <div class="card-body">
+                  <p class="text-muted mb-0"><i class="bi bi-inbox me-2"></i>${t(
+                    "pastures.emptyPenHint"
+                  )}</p>
+              </div>
+          </div>`;
+      }
+      return `
           <div class="card bg-dark mb-3">
               <div class="card-header d-flex justify-content-between align-items-center">
                   <h6 class="mb-0 d-flex align-items-center">
@@ -2253,9 +2383,7 @@ export function renderPasturesList(pasturesList) {
                       <div class="col-md-3">
                           <div class="d-flex align-items-center mb-2">
                               <i class="bi bi-speedometer2 me-2 text-farm-info"></i>
-                              <span><strong>Productivity:</strong> ${Math.round(
-                                pasture.conditionReport.productivity
-                              )}%</span>
+                              <span><strong>Productivity:</strong> ${prod}%</span>
                           </div>
                           ${(() => {
                             const hasMilkData =
@@ -2263,7 +2391,7 @@ export function renderPasturesList(pasturesList) {
                               pasture.milkProductionData.lactatingCows > 0;
                             const isDairyPasture =
                               hasMilkData &&
-                              pasture.animals.some((animal) => {
+                              (pasture.animals || []).some((animal) => {
                                 const subTypeUpper = (
                                   animal.subType || ""
                                 ).toUpperCase();
@@ -2280,9 +2408,8 @@ export function renderPasturesList(pasturesList) {
                               <i class="bi bi-droplet-fill me-2 text-farm-info"></i>
                               <span><strong>Lactating:</strong> ${pasture.milkProductionData.lactatingCows} animals</small></span>
                           </div>`;
-                            } else {
-                              return "";
                             }
+                            return "";
                           })()}
                       </div>
                       <div class="col-md-3">
@@ -2317,11 +2444,10 @@ export function renderPasturesList(pasturesList) {
                               : ""
                           }
                           ${(() => {
-                            // Debug logging for milk display conditions
                             const hasMilkData = pasture.milkProductionData;
                             const isDairyPasture =
                               hasMilkData &&
-                              pasture.animals.some((animal) => {
+                              (pasture.animals || []).some((animal) => {
                                 const subTypeUpper = (
                                   animal.subType || ""
                                 ).toUpperCase();
@@ -2332,22 +2458,6 @@ export function renderPasturesList(pasturesList) {
                                 );
                               });
 
-                            console.log(
-                              `[renderPasturesList] ${pasture.name} milk display check:`,
-                              {
-                                hasMilkData,
-                                isDairyPasture,
-                                lactatingCows: hasMilkData
-                                  ? pasture.milkProductionData.lactatingCows
-                                  : "N/A",
-                                estimatedStorage: hasMilkData
-                                  ? pasture.milkProductionData
-                                      .estimatedStorage
-                                  : "N/A",
-                                willShow: hasMilkData && isDairyPasture,
-                              }
-                            );
-
                             if (hasMilkData && isDairyPasture) {
                               return `
                           <div class="d-flex align-items-center mb-2">
@@ -2357,15 +2467,14 @@ export function renderPasturesList(pasturesList) {
                               )}L/h</small></span>
                           </div>
 `;
-                            } else {
-                              return "";
                             }
+                            return "";
                           })()}
                       </div>
                   </div>
 
                   ${
-                    pasture.allWarnings.length > 0
+                    warnings.length > 0
                       ? `
                       <div class="mt-3">
                           <h6 class="text-warning">
@@ -2373,7 +2482,7 @@ export function renderPasturesList(pasturesList) {
                               Active Warnings
                           </h6>
                           <div class="row">
-                              ${pasture.allWarnings
+                              ${warnings
                                 .map(
                                   (warning, index) => `
                                   <div class="col-md-6 mb-2">
@@ -2405,8 +2514,8 @@ export function renderPasturesList(pasturesList) {
                   }
               </div>
           </div>
-      `
-    )
+      `;
+    })
     .join("");
 
   pasturesContainer.innerHTML = pasturesHTML;
@@ -2477,7 +2586,7 @@ export function showPastureDetails(pastureId) {
                                               <tr><td>${t(
                                                 "pastures.details.productivity"
                                               )}:</td><td>${Math.round(
-      pasture.conditionReport.productivity
+      Number(pasture.conditionReport?.productivity) || 0
     )}%</td></tr>
                                               <tr><td>${t(
                                                 "pastures.details.avgHealth"

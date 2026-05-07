@@ -554,158 +554,93 @@ class RealtimeConnector {
     return v;
   }
 
-  /** True if nested object contains any numeric value > 0 (fill levels, storage, etc.). */
-  _objectHasPositiveNumbers(obj, depth = 0) {
-    if (!obj || typeof obj !== "object" || depth > 8) return false;
-    for (const v of Object.values(obj)) {
-      if (typeof v === "number" && Number.isFinite(v) && v > 0) return true;
-      if (v && typeof v === "object" && this._objectHasPositiveNumbers(v, depth + 1)) return true;
-    }
-    return false;
-  }
-
   /**
-   * Show a dashboard row for pens with no animals when they still matter: feed/water in fills,
-   * storage, or configured capacity (empty pasture / barn slot).
-   */
-  _shouldShowEmptyPenRow(husbandry) {
-    if (!husbandry || typeof husbandry !== "object") return false;
-    if (this._objectHasPositiveNumbers(husbandry.fillLevels)) return true;
-    if (this._objectHasPositiveNumbers(husbandry.storageData)) return true;
-    const cap = Number(husbandry.maxAnimals ?? husbandry.capacity ?? 0);
-    return Number.isFinite(cap) && cap > 0;
-  }
-
-  _buildFillSummaryForPen(husbandry) {
-    const parts = [];
-    const fl = husbandry.fillLevels;
-    if (fl && typeof fl === "object") {
-      for (const [k, v] of Object.entries(fl)) {
-        const n = typeof v === "number" ? v : Number(v);
-        if (!Number.isFinite(n) || n <= 0) continue;
-        const label = String(k).replace(/^\d+\s*/, "").trim().slice(0, 36);
-        parts.push(`${label || k}: ${n % 1 === 0 ? n : n.toFixed(1)}`);
-      }
-    }
-    const st = husbandry.storageData;
-    if (st && typeof st === "object") {
-      for (const [k, v] of Object.entries(st)) {
-        const n = typeof v === "number" ? v : Number(v);
-        if (!Number.isFinite(n) || n <= 0) continue;
-        parts.push(`${String(k).slice(0, 28)}: ${n % 1 === 0 ? n : n.toFixed(1)}`);
-      }
-    }
-    return parts.slice(0, 6).join(" · ");
-  }
-
-  _makeEmptyPastureRow(husbandry, hfarm) {
-    const hid = husbandry.id ?? husbandry.buildingId;
-    const fillSummary = this._buildFillSummaryForPen(husbandry);
-    const penLabel = husbandry.name || husbandry.buildingName || "Pen";
-    return {
-      id: `pen-empty-${hid}`,
-      name: `${penLabel} (${t("livestock.emptyPenShort") || "empty"})`,
-      __emptyPen: true,
-      husbandryName: penLabel,
-      husbandryId: hid,
-      ownerFarmId: husbandry.ownerFarmId ?? husbandry.farmId,
-      farmId: hfarm,
-      age: 0,
-      health: typeof husbandry.health === "number" ? husbandry.health : 100,
-      weight: 0,
-      gender: "—",
-      subType: "EMPTY_PEN",
-      location: penLabel,
-      locationType: "pasture",
-      isLactating: false,
-      isPregnant: false,
-      isParent: false,
-      genetics: null,
-      productivity: husbandry.productivity,
-      fillLevels: husbandry.fillLevels,
-      storageData: husbandry.storageData,
-      fillSummary,
-      maxAnimals: husbandry.maxAnimals,
-      animalCount: 0,
-    };
-  }
-
-  /**
-   * Phase 4 LOD + Plan v5 A3: convert a husbandry's `clusters[]` (aggregates from the mod's
-   * data.json) into **one dashboard row per cluster** — same averages as before, but no longer
-   * one synthetic row per head (which duplicated the same stats and looked like “duplicate cows”).
-   * True per-animal rows live in `details/animals_<id>.json`; open Pen detail for those.
+   * Expand mod LOD `clusters[]` into **one dashboard row per animal head** (no ×N aggregate rows).
+   * Stats repeat the cluster bucket averages when per-head detail is not inlined — real RL IDs come
+   * from `details/animals_<id>.json` hydration (`__detailHydrated` / `lod: full`), which skips this path.
    *
-   * `globalCounter.emitted` counts **cluster-rows** (cheap); `trimmed` counts **animal heads**
-   * skipped when row/cluster budgets are exceeded.
+   * `globalCounter.emitted` counts emitted rows (heads); `trimmed` counts heads skipped by caps.
    */
-  _fanOutClusters(husbandry, clusters, farmId, globalCounter) {
+  _fanOutClustersIndividualRows(husbandry, clusters, farmId, globalCounter) {
     const out = [];
-    const PEN_CLUSTER_ROW_CAP = 4096;
+    const PEN_HEAD_ROW_CAP = 4096;
     const GLOBAL_ROW_CAP = (globalCounter && Number.isFinite(globalCounter.cap))
       ? globalCounter.cap
       : this._getMaxSynthAnimals();
     const huName = husbandry.name || husbandry.buildingName;
     const huId = husbandry.id || husbandry.buildingId;
 
-    let clusterRowsThisPen = 0;
+    let headsThisPen = 0;
     let trimmedHeads = 0;
 
-    for (let ci = 0; ci < clusters.length; ci++) {
+    outer: for (let ci = 0; ci < clusters.length; ci++) {
       const c = clusters[ci];
       if (!c || !c.count || c.count <= 0) continue;
 
-      if (clusterRowsThisPen >= PEN_CLUSTER_ROW_CAP) {
-        trimmedHeads += c.count;
-        continue;
-      }
-      if (globalCounter && (globalCounter.emitted || 0) >= GLOBAL_ROW_CAP) {
-        trimmedHeads += c.count;
-        continue;
-      }
-
       const subType = c.subType || c.animalType || 'Unknown';
       const ageMonths = (typeof c.avgAgeMonths === 'number')
-          ? c.avgAgeMonths
-          : (typeof c.ageMonths === 'number' ? c.ageMonths : (c.ageDecile || 0) * 12);
+        ? c.avgAgeMonths
+        : (typeof c.ageMonths === 'number' ? c.ageMonths : (c.ageDecile || 0) * 12);
       const avgHealth = (typeof c.avgHealth === 'number') ? c.avgHealth : 100;
       const avgWeight = (typeof c.avgWeight === 'number') ? c.avgWeight : 0;
-      const n = c.count;
+      const nTotal = Math.floor(Number(c.count)) || 0;
 
-      const id = `${huId || 'pen'}-cluster-${ci}`;
-      out.push({
-        id,
-        name: `${subType} (${n}×)`,
-        clusterCount: n,
-        husbandryName: huName,
-        husbandryId: huId,
-        ownerFarmId: husbandry.ownerFarmId || husbandry.farmId,
-        farmId,
-        age: ageMonths,
-        health: avgHealth,
-        weight: avgWeight,
-        gender: c.gender || 'female',
-        subType,
-        location: huName,
-        locationType: 'pasture',
-        isLactating: !!c.isLactating,
-        isPregnant: !!c.isPregnant,
-        isParent: false,
-        genetics: (typeof c.avgGenFert === 'number') ? {
-          fertility: c.avgGenFert,
-          productivity: c.avgGenProd,
-          health: c.avgGenHealth,
-          metabolism: c.avgGenMetabolism,
-          quality: c.avgGenQuality,
-        } : null,
-        productivity: c.avgGenProd ?? null,
-        __lodSynth: true,
-        __lodSynthEstimate: true,
-        __lodClusterAggregate: true,
-      });
-      clusterRowsThisPen += 1;
-      if (globalCounter) {
-        globalCounter.emitted = (globalCounter.emitted || 0) + 1;
+      const genetics =
+        typeof c.avgGenFert === 'number'
+          ? {
+              fertility: c.avgGenFert,
+              productivity: c.avgGenProd,
+              health: c.avgGenHealth,
+              metabolism: c.avgGenMetabolism,
+              quality: c.avgGenQuality,
+            }
+          : null;
+
+      for (let hi = 0; hi < nTotal; hi++) {
+        if (headsThisPen >= PEN_HEAD_ROW_CAP) {
+          trimmedHeads += nTotal - hi;
+          for (let cj = ci + 1; cj < clusters.length; cj++) {
+            const cc = clusters[cj];
+            if (cc && cc.count > 0) trimmedHeads += Math.floor(Number(cc.count)) || 0;
+          }
+          break outer;
+        }
+        if (globalCounter && (globalCounter.emitted || 0) >= GLOBAL_ROW_CAP) {
+          trimmedHeads += nTotal - hi;
+          for (let cj = ci + 1; cj < clusters.length; cj++) {
+            const cc = clusters[cj];
+            if (cc && cc.count > 0) trimmedHeads += Math.floor(Number(cc.count)) || 0;
+          }
+          break outer;
+        }
+
+        const id = `${huId || 'pen'}-c${ci}-h${hi}`;
+        out.push({
+          id,
+          name: `${subType}`,
+          husbandryName: huName,
+          husbandryId: huId,
+          ownerFarmId: husbandry.ownerFarmId || husbandry.farmId,
+          farmId,
+          age: ageMonths,
+          health: avgHealth,
+          weight: avgWeight,
+          gender: c.gender || 'female',
+          subType,
+          location: huName,
+          locationType: 'pasture',
+          isLactating: !!c.isLactating,
+          isPregnant: !!c.isPregnant,
+          isParent: false,
+          genetics,
+          productivity: c.avgGenProd ?? null,
+          __lodSynth: true,
+          __lodSynthEstimate: true,
+        });
+        headsThisPen += 1;
+        if (globalCounter) {
+          globalCounter.emitted = (globalCounter.emitted || 0) + 1;
+        }
       }
     }
 
@@ -772,21 +707,24 @@ class RealtimeConnector {
 
         const rowCountBefore = formattedAnimals.length;
 
-        // Phase 4 LOD + Plan v5 A3: when the mod ships aggregate clusters and an empty animals[],
-        // fan out one synthetic animal per cluster.count using the bucket's average values.
-        // The global counter limits total synthetic rows across pens to prevent UI memory explosions.
+        /** Per-pen files merged in main process (`detailAnimalsHydrate.js`) — real RL individuals; never overlay clusters. */
+        const detailReady =
+          (husbandry.__detailHydrated === true || husbandry.lod === 'full') &&
+          Array.isArray(husbandry.animals) &&
+          husbandry.animals.length > 0;
+
         const lodClusters = Array.isArray(husbandry.clusters) ? husbandry.clusters : null;
-        /** Prefer mod aggregate clusters whenever present — even if `animals[]` is non-empty (stale placeholders skip LOD and produced only empty-pen rows). */
         const hasClusterBuckets =
           lodClusters &&
           lodClusters.some((c) => c && Number(c.count) > 0);
-        if (hasClusterBuckets) {
-          const synth = this._fanOutClusters(husbandry, lodClusters, hfarm, globalCounter);
+
+        // LOD clusters → one table row per head (no ×N aggregates). Skipped when detail JSON hydrated `animals[]`.
+        if (!detailReady && hasClusterBuckets) {
+          const synth = this._fanOutClustersIndividualRows(husbandry, lodClusters, hfarm, globalCounter);
           for (let s = 0; s < synth.length; s++) formattedAnimals.push(synth[s]);
           if (synth.length > 0) {
-            return; // cluster rows cover this pen
+            return;
           }
-          // No cluster rows emitted (e.g. capped): fall through for empty-pen / legacy paths
         }
 
         // Check different possible animal data structures
@@ -965,13 +903,6 @@ class RealtimeConnector {
               isParent: false, // Don't fabricate parent status
             });
           }
-        }
-
-        if (
-          formattedAnimals.length === rowCountBefore &&
-          this._shouldShowEmptyPenRow(husbandry)
-        ) {
-          formattedAnimals.push(this._makeEmptyPastureRow(husbandry, hfarm));
         }
       });
     }

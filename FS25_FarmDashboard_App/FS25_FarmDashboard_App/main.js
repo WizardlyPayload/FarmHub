@@ -88,14 +88,21 @@ function ensureSetupWriteToken() {
 const VALID_LOCALE_RE = /^[a-z]{2}$/;
 
 /** Written by the NSIS installer (first page); consumed on first app launch. */
-function consumeInstallLocaleFile() {
+async function consumeInstallLocaleFile() {
+    const p = path.join(app.getPath('userData'), 'install-locale.txt');
+    let raw;
     try {
-        const p = path.join(app.getPath('userData'), 'install-locale.txt');
-        if (!fs.existsSync(p)) return;
-        const raw = stripUtf8Bom(fs.readFileSync(p, 'utf8')).trim();
+        raw = await fs.promises.readFile(p, 'utf8');
+    } catch (e) {
+        if (e && e.code === 'ENOENT') return;
+        console.warn('[install-locale]', e.message);
+        return;
+    }
+    try {
+        raw = stripUtf8Bom(raw).trim();
         const code = (raw.split(/\r?\n/)[0] || '').substring(0, 2).toLowerCase();
         if (VALID_LOCALE_RE.test(code)) store.set('locale', code);
-        fs.unlinkSync(p);
+        await fs.promises.unlink(p);
     } catch (e) {
         console.warn('[install-locale]', e.message);
     }
@@ -2336,8 +2343,8 @@ process.on('unhandledRejection', (reason) => {
     console.error('[unhandledRejection]', reason);
 });
 
-app.whenReady().then(() => {
-    consumeInstallLocaleFile();
+app.whenReady().then(async () => {
+    await consumeInstallLocaleFile();
     createWindow();
     initAppUpdater(
         () => mainWindow,

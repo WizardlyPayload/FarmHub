@@ -655,6 +655,10 @@
       <script src="assests/js/splash-screen.js"></script>
       <script src="assests/js/screen-wake-lock.js"></script>
       <script src="assests/js/pipeline-log.js"></script>
+      <script src="assests/js/utils/escape.js"></script>
+      <script src="assests/js/realtime-fanout.js"></script>
+      <script src="assests/js/realtime-dedupe.js"></script>
+      <script src="assests/js/pastures-warnings.js"></script>
       <script type="module">
         import {
           installLanHttpBasicFetchPatch,
@@ -817,6 +821,7 @@
                           <label class="form-check-label" for="settings-lan-auth-optional" data-i18n="settings.lanAuthOptional">Allow LAN read-only pages without username/password (GET only)</label>
                         </div>
                         <div class="form-text text-muted small" data-i18n="settings.lanAuthOptionalHint">WebSocket live updates still require a token or login. Only enable on trusted home LANs.</div>
+                        <div id="settings-lan-auth-optional-banner" class="alert alert-warning py-2 px-3 mt-2 mb-0 small d-none" role="status" data-i18n="settings.lanAuthOptionalBanner">Optional LAN login is enabled: read-only GET pages may be reachable without a password on your LAN.</div>
                       </div>
                     </div>
                     <hr class="border-secondary my-3"/>

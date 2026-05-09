@@ -42,6 +42,7 @@ const {
 } = require('./fs25Paths');
 const { readFileUtf8WithRetry } = require('./fileReadRetry');
 const livestockDetailModule = require('./livestockDetail.js');
+const { validateLanCredentials } = require('./lanCredentialPolicy.js');
 
 const store = new Store({ defaults: { ...LAN_ACCESS_DEFAULTS } });
 
@@ -2439,6 +2440,18 @@ ipcMain.handle('read-server-live-cache', (_event, serverId) => {
 ipcMain.handle('get-lan-access-settings', () => getLanSecurityFromStore());
 
 ipcMain.handle('save-lan-access-settings', (_e, payload) => {
+    // v3.9 hardening: when LAN access is being enabled, refuse weak/default
+    // credentials before persisting them. This prevents an inadvertent
+    // "admin/farmhub" listener on `0.0.0.0:8766` and gives the renderer a
+    // localised error key so the LAN panel can surface field-level feedback.
+    const validation = validateLanCredentials(payload);
+    if (!validation.ok) {
+        return Promise.resolve({
+            ok: false,
+            error: validation.error,
+            field: validation.field,
+        });
+    }
     store.set('lanAccessEnabled', !!payload?.lanAccessEnabled);
     store.set('lanUsername', String(payload?.lanUsername ?? LAN_ACCESS_DEFAULTS.lanUsername));
     store.set('lanPassword', String(payload?.lanPassword ?? LAN_ACCESS_DEFAULTS.lanPassword));

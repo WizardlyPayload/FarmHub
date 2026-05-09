@@ -909,15 +909,20 @@ function buildForageDetectionBadges(field) {
             `<span class="badge bg-info text-dark" title="${escapeFieldHtml(t("fields.looseStrawTitle"))}"><i class="bi bi-circle-square me-1"></i>${escapeFieldHtml(t("fields.looseStraw"))}</span>`
         );
     }
-    if (field.hasLooseGrassWindrow === true && lg >= MIN_FORAGE_WORKFLOW_LITERS) {
-        parts.push(
-            `<span class="badge bg-info text-dark" title="${escapeFieldHtml(t("fields.grassWindrowTitle"))}"><i class="bi bi-circle-square me-1"></i>${escapeFieldHtml(t("fields.grassWindrow"))}</span>`
-        );
-    }
-    if (field.hasLooseHayWindrow === true && lh >= MIN_FORAGE_WORKFLOW_LITERS) {
-        parts.push(
-            `<span class="badge bg-info text-dark" title="${escapeFieldHtml(t("fields.hayWindrowTitle"))}"><i class="bi bi-circle-square me-1"></i>${escapeFieldHtml(t("fields.hayWindrow"))}</span>`
-        );
+    const hasGrassWindrow = field.hasLooseGrassWindrow === true && lg >= MIN_FORAGE_WORKFLOW_LITERS;
+    const hasHayWindrow = field.hasLooseHayWindrow === true && lh >= MIN_FORAGE_WORKFLOW_LITERS;
+    // Never show both on the same field: prefer whichever loose windrow amount is larger.
+    if (hasGrassWindrow || hasHayWindrow) {
+        const showGrass = hasGrassWindrow && (!hasHayWindrow || lg >= lh);
+        if (showGrass) {
+            parts.push(
+                `<span class="badge bg-info text-dark" title="${escapeFieldHtml(t("fields.grassWindrowTitle"))}"><i class="bi bi-circle-square me-1"></i>${escapeFieldHtml(t("fields.grassWindrow"))}</span>`
+            );
+        } else {
+            parts.push(
+                `<span class="badge bg-info text-dark" title="${escapeFieldHtml(t("fields.hayWindrowTitle"))}"><i class="bi bi-circle-square me-1"></i>${escapeFieldHtml(t("fields.hayWindrow"))}</span>`
+            );
+        }
     }
     if (!hasForage && baleLoose) {
         const bl = Number(field.baleableLooseLiters ?? 0);

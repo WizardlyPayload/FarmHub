@@ -1,6 +1,6 @@
 {
   "name": "fs25-farm-dashboard",
-  "version": "3.0.0",
+  "version": "3.9.0",
   "description": "Real-time Farm Management Dashboard for FS25",
   "author": "JoshWalki / Wizardlypayload & WizardlyPayload",
   "main": "main.js",
@@ -36,6 +36,7 @@
     },
     "files": [
       "main.js",
+      "lanCredentialPolicy.js",
       "app-updater.js",
       "preload.js",
       "xmlCollector.js",

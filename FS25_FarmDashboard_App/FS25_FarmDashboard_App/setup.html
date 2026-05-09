@@ -246,6 +246,37 @@
 
     #ftp-fields { display: none; }
 
+    /* v3.9: per-field validation feedback */
+    input.is-invalid {
+      border-color: #f38ba8 !important;
+      box-shadow: 0 0 0 2px rgba(243, 139, 168, 0.18) !important;
+    }
+    input.is-valid {
+      border-color: #a6e3a1 !important;
+    }
+    .invalid-feedback {
+      display: none;
+      color: #f38ba8;
+      font-size: 12px;
+      margin-top: 4px;
+      line-height: 1.4;
+    }
+    .form-group.has-error .invalid-feedback {
+      display: block;
+    }
+    .setup-success-card {
+      display: none;
+      margin: 16px 0;
+      padding: 12px 14px;
+      background: rgba(166, 227, 161, 0.12);
+      border: 1px solid #a6e3a1;
+      border-radius: 8px;
+      color: #a6e3a1;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .setup-success-card.show { display: block; }
+
     .optional-badge {
       display: inline-block;
       background: #45475a;
@@ -389,6 +420,7 @@ Use Auto-Detect or add one manually →</div>
     <button class="btn-launch" id="launchBtn" onclick="saveAndLaunch()">
       🚀 <span data-setup-i18n="setup.launch">Launch Dashboard</span>
     </button>
+    <div class="setup-success-card" id="setupSuccessCard" role="status" aria-live="polite" data-setup-i18n="setup.successSaved">✅ Configuration saved. Opening dashboard…</div>
   </div>
 
   <!-- RIGHT: add server form -->
@@ -408,9 +440,10 @@ Use Auto-Detect or add one manually →</div>
 
     <h3 class="section-heading" data-setup-i18n="setup.addManual">Add Server Manually</h3>
 
-    <div class="form-group">
+    <div class="form-group" data-field="serverName">
       <label for="serverName" data-setup-i18n="setup.displayName">Display Name</label>
       <input type="text" id="serverName" placeholder="e.g., My Elmcreek Save" autocomplete="off"/>
+      <div class="invalid-feedback" id="serverName-error" data-setup-i18n="setup.errDisplayNameRequired">Please enter a display name.</div>
     </div>
 
     <div class="radio-group">
@@ -437,9 +470,10 @@ Use Auto-Detect or add one manually →</div>
     <!-- FTP / Dedicated -->
     <div id="ftp-fields">
       <div class="row-flex">
-        <div class="form-group wide">
+        <div class="form-group wide" data-field="ftpHost">
           <label for="ftpHost" data-setup-i18n="setup.ftpHost">FTP Host / IP</label>
           <input type="text" id="ftpHost" placeholder="e.g., ftp.gportal.com" autocomplete="off"/>
+          <div class="invalid-feedback" id="ftpHost-error" data-setup-i18n="setup.errFtpHostRequired">FTP Host is required.</div>
         </div>
         <div class="form-group narrow">
           <label for="ftpPort" data-setup-i18n="setup.ftpPort">Port</label>
@@ -447,13 +481,15 @@ Use Auto-Detect or add one manually →</div>
         </div>
       </div>
       <div class="row-flex">
-        <div class="form-group">
+        <div class="form-group" data-field="ftpUser">
           <label for="ftpUser" data-setup-i18n="setup.ftpUser">Username</label>
           <input type="text" id="ftpUser" autocomplete="off"/>
+          <div class="invalid-feedback" id="ftpUser-error" data-setup-i18n="setup.errFtpUserRequired">FTP username is required.</div>
         </div>
-        <div class="form-group">
+        <div class="form-group" data-field="ftpPass">
           <label for="ftpPass" data-setup-i18n="setup.ftpPass">Password</label>
           <input type="password" id="ftpPass" autocomplete="new-password"/>
+          <div class="invalid-feedback" id="ftpPass-error" data-setup-i18n="setup.errFtpPassRequired">FTP password is required.</div>
         </div>
       </div>
       <div class="form-group">
@@ -506,6 +542,7 @@ Use Auto-Detect or add one manually →</div>
 </div>
 
 <script src="web/assests/js/setup-i18n.js"></script>
+<script src="web/assests/js/setup-validation.js"></script>
 <script src="web/assests/js/modExportProgress.js"></script>
 <script>
 (function () {
@@ -697,11 +734,62 @@ function scanModImagesForDashboard() {
 }
 window.scanModImagesForDashboard = scanModImagesForDashboard;
 
+// ── per-field validation helpers (v3.9) ─────────────────────────────────
+function clearFieldError(id) {
+  var input = document.getElementById(id);
+  if (input) {
+    input.classList.remove('is-invalid');
+    var group = input.closest('.form-group');
+    if (group) group.classList.remove('has-error');
+  }
+}
+function clearAllFieldErrors() {
+  ['serverName','ftpHost','ftpUser','ftpPass'].forEach(clearFieldError);
+}
+function markFieldInvalid(id) {
+  var input = document.getElementById(id);
+  if (!input) return;
+  input.classList.add('is-invalid');
+  var group = input.closest('.form-group');
+  if (group) group.classList.add('has-error');
+  if (typeof input.focus === 'function') {
+    try { input.focus(); } catch (_) {}
+  }
+}
+['serverName','ftpHost','ftpUser','ftpPass'].forEach(function (id) {
+  var input = document.getElementById(id);
+  if (input && typeof input.addEventListener === 'function') {
+    input.addEventListener('input', function () { clearFieldError(id); });
+  }
+});
+
+// Map low-level save/launch errors to actionable user-facing copy.
+// Implementation lives in setup-validation.js so Jest can exercise the
+// same regex set that ships to users; this thin wrapper passes the i18n
+// translator into the helper.
+function mapSaveError(rawMsg) {
+  var ns = (typeof window !== 'undefined' && window.farmDashSetupValidation) || null;
+  if (ns && typeof ns.mapSaveError === 'function') {
+    return ns.mapSaveError(rawMsg, st);
+  }
+  return st('setup.toastCouldNotSave', { msg: rawMsg }, 'Could not save: ' + rawMsg);
+}
+
+function showSuccessCard() {
+  var card = document.getElementById('setupSuccessCard');
+  if (card) card.classList.add('show');
+}
+
 // ── add server ───────────────────────────────────────────────────────────
 function addServer() {
+  clearAllFieldErrors();
   var name = document.getElementById('serverName').value.trim();
   var mode = document.querySelector('input[name="mode"]:checked').value;
-  if (!name) { toast(st('setup.toastPleaseEnterName', null, 'Please enter a display name.'), 'error'); return; }
+  if (!name) {
+    markFieldInvalid('serverName');
+    toast(st('setup.toastPleaseEnterName', null, 'Please enter a display name.'), 'error');
+    return;
+  }
 
   var srv = { id: 'srv_' + Date.now(), name: name, mode: mode };
 
@@ -716,7 +804,12 @@ function addServer() {
     srv.ftpBasePath    = document.getElementById('ftpBasePath').value.trim() || 'profile';
     srv.localSubFolder = document.getElementById('ftpSubFolder').value.trim() || 'savegame1';
 
-    if (!srv.ftpHost || !srv.ftpUser || !srv.ftpPass) {
+    var missing = [];
+    if (!srv.ftpHost) missing.push('ftpHost');
+    if (!srv.ftpUser) missing.push('ftpUser');
+    if (!srv.ftpPass) missing.push('ftpPass');
+    if (missing.length > 0) {
+      missing.forEach(markFieldInvalid);
       toast(st('setup.toastFtpRequired', null, 'FTP Host, Username and Password are all required.'), 'error');
       return;
     }
@@ -767,10 +860,11 @@ function saveAndLaunch() {
     Promise.resolve(fdApi.saveSettings(payload))
       .then(function (res) {
         if (res && res.ok === false) throw new Error(res.error || 'Save failed');
+        showSuccessCard();
       })
       .catch(function (e) {
         var msg = String(e && e.message ? e.message : e);
-        toast(st('setup.toastCouldNotSave', { msg: msg }, 'Could not save: ' + msg), 'error');
+        toast(mapSaveError(msg), 'error');
         if (launchBtn) launchBtn.innerHTML = launchHtml;
       });
     return;
@@ -791,15 +885,24 @@ function saveAndLaunch() {
       });
     })
     .then(function () {
-      window.location.href = '/';
+      showSuccessCard();
+      // Brief pause so users see the confirmation before the dashboard takes over.
+      setTimeout(function () { window.location.href = '/'; }, 1500);
     })
     .catch(function (e) {
       var msg = String(e && e.message ? e.message : e);
-      toast(st('setup.toastCouldNotSave', { msg: msg }, 'Could not save: ' + msg), 'error');
+      toast(mapSaveError(msg), 'error');
       if (launchBtn) launchBtn.innerHTML = launchHtml;
     });
 }
 window.saveAndLaunch = saveAndLaunch;
+window.__farmdashSetupValidation = {
+  clearFieldError: clearFieldError,
+  clearAllFieldErrors: clearAllFieldErrors,
+  markFieldInvalid: markFieldInvalid,
+  mapSaveError: mapSaveError,
+  showSuccessCard: showSuccessCard
+};
 
 // ── load existing config on page ready ───────────────────────────────────
 function loadFtpPollingFromConfig(cfg) {

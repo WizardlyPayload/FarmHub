@@ -8,9 +8,45 @@ All notable changes to this project are recorded here. For GitHub release blurbs
 
 | Artifact | Where it lives | Format |
 |----------|----------------|--------|
-| **Desktop app** | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | Semver (e.g. `3.0.0`) |
-| **FS25 mod** | `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `2.0.0.0`) |
+| **Desktop app** | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | Semver (e.g. `3.9.0`) |
+| **FS25 mod** | `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `2.3.0.0`) |
 | **Source headers** | First line of many `.js` / `.lua` files | Often `v2.0.0` historically; bump only when you intentionally resync headers |
+
+---
+
+## 3.9.0 — Pre-final hardening (security, i18n, tests, docs)
+
+**App:** `3.9.0` (`package.json`) · **Mod:** `2.3.0.0` (`modDesc.xml` + Lua, now in lockstep).
+
+Narrative: **[RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md)** · Audit: **[AUDIT_v3.9_PREFINAL.md](./AUDIT_v3.9_PREFINAL.md)**.
+
+### Security blockers closed
+
+- **LAN credential policy** — `lanCredentialPolicy.js` now rejects the historic default `admin / farmhub` pair, passwords below 10 characters, and a known-weak password list when LAN access is enabled. The settings UI surfaces field-level error keys (`settings.lanErrDefaultCreds`, `settings.lanErrPasswordTooShort`, `settings.lanErrWeakPassword`).
+- **DOM XSS sweep** — Added shared `web/assests/js/utils/escape.js` (`farmDashEscape.escapeHtml`). Pasture warning modals, low-health drilldown, dairy mother-offspring detail, and pasture card headers now route every game-sourced string (`pasture.name`, `animal.name`, `subType`, `husbandryName`, etc.) through the helper. Notifications already escaped title and body — verified by `tests/xss.smoke.test.js`.
+
+### Testing — production parity, no more drift
+
+- **Realtime fan-out** — Extracted `web/assests/js/realtime-fanout.js` (UMD: `farmDashFanOut.fanOutClustersIndividualRows`). `realtime-connector.js` delegates to it; tests exercise the same source. Added `tests/realtime-connector.fanOut.test.js` and `tests/realtime-connector.updateAnimals.test.js` covering per-pen + global caps and multi-pen aggregation.
+- **Dedupe key** — Extracted `realtime-dedupe.js` (UMD: `computePayloadDedupeKey`). `tests/contextSwitch.test.js` verifies that farm-switch and server-switch invalidate the cache while volatile heartbeat fields don't.
+- **Pasture warnings** — Extracted `pastures-warnings.js` (UMD: `buildFoodWaterDecisions`, `countLivestockHeads`). v3.9 separates **telemetry-absent** (info severity, `data_unavailable` type, new keys `pastures.warnNoFoodTelemetry` / `pastures.warnFoodTelemetryHint`) from **critical low-stock** (warning/danger). Counts inside `calculateAllPastureWarnings` are now head-aware via `countLivestockHeads`. `tests/pastures.warnings.test.js` covers the boundary.
+- **Setup hardening** — Extracted `setup-validation.js` (UMD: `mapSaveError`, `findMissingFtpFields`). `setup.html` now renders per-field `is-invalid` styling, an `invalid-feedback` element next to each required input, and a green success card before redirecting (1.5 s). Network / auth / path / token errors are mapped to actionable copy. `tests/setup.validation.test.js` locks the structure and the regex set.
+
+### i18n sweep
+
+- New keys for pasture cards (`pastures.card.*`), warnings heading, status badges, table headers, drilldown details, and notification time-ago variants live in `web/locales/messages/en.json`. `npm run i18n:build` regenerates `translations.json` (982+ keys × 27 locales).
+- `tests/i18n.coverage.test.js` guards against backsliding by failing on previously-localized literals (`<strong>Total Animals:</strong>`, `<small>Lactating Cows</small>`, `Just now`, etc.).
+
+### Version unification
+
+- `modDesc.xml` bumped to **`2.3.0.0`** to match the `FarmDashboard.VERSION` Lua constant.
+- `package.json` and `package-lock.json` bumped to **`3.9.0`**.
+- `INSTALL.md` malformed markdown fixed (`**data.json` → `data.json`, `**FS25_FarmDashboard` → `FS25_FarmDashboard`); release URL pointed at the canonical `WizardlyPayload/FarmHub` GitHub repo.
+- `USER_MANUAL.md`, `DEVELOPER_HANDOVER.md` rename `lanUser` → `lanUsername` to match `main.js` `LAN_ACCESS_DEFAULTS` keys.
+
+### Acceptance
+
+`npm test` reports green across **11** suites (**210** tests) on the reference machine — re-run before tagging. The remaining release gate is the updater smoke test (3.9.0 → 4.0.0 channel) per [`UPDATER_QA.md`](./UPDATER_QA.md).
 
 ---
 
@@ -54,6 +90,7 @@ Git history or older branches may contain experiments and code paths not describ
 
 | Version | Focus |
 |---------|--------|
+| **3.9.0** | Pre-final hardening: LAN credential policy, DOM XSS sweep, telemetry-vs-critical pasture warnings, setup UX, i18n sweep, test parity, version unification — see §3.9.0 above and [RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md). |
 | **3.0.0** | Rules-first field UX, windrow export/merge/UI, unified Settings, LAN security, default build output outside repo, NSIS upgrade/uninstall hardening — see §3.0.0 above and [RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md). |
 | **1.0.0** | First public release: mod + Electron app, local/FTP, XML + Lua merge, full dashboard sections. |
 | **1.1.2** | Mod shop image export pipeline, vehicle thumbnails from extracted PNGs, installer resources. |

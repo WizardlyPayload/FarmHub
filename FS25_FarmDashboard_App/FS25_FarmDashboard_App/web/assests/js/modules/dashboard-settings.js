@@ -426,6 +426,14 @@ function wireAppSettingsServerControlsOnce(dashboard) {
   });
 }
 
+function syncLanOptionalBanner() {
+  const banner = document.getElementById("settings-lan-auth-optional-banner");
+  const chk = document.getElementById("settings-lan-auth-optional");
+  if (banner && chk) {
+    banner.classList.toggle("d-none", !chk.checked);
+  }
+}
+
 export function setupDashboardSettingsModal() {
   const modalEl = document.getElementById("appSettingsModal");
   if (!modalEl) return;
@@ -434,15 +442,16 @@ export function setupDashboardSettingsModal() {
   wireAppSettingsServerControlsOnce(this);
 
   document.getElementById("settings-lan-auth-optional")?.addEventListener("change", (ev) => {
-    const t = ev.target;
-    if (t && t.checked) {
+    const tgt = ev.target;
+    if (tgt && tgt.checked) {
       const ok = window.confirm(
         typeof window.t === "function"
           ? window.t("settings.lanAuthOptionalWarn")
           : "Optional LAN login disables HTTP Basic for read-only GET pages. Only use this on trusted closed networks; anyone on the LAN could read farm data without a password."
       );
-      if (!ok) t.checked = false;
+      if (!ok) tgt.checked = false;
     }
+    syncLanOptionalBanner();
   });
 
   modalEl.addEventListener("show.bs.modal", () => {
@@ -668,6 +677,7 @@ export async function populateDashboardSettingsForm() {
     if (lanIps) lanIps.value = lan.lanAllowedIPs || "";
     const lanOpt = document.getElementById("settings-lan-auth-optional");
     if (lanOpt) lanOpt.checked = !!lan.lanAuthOptional;
+    syncLanOptionalBanner();
   } catch (e) {
     console.warn("[dashboard-settings] LAN access", e);
   }
@@ -787,10 +797,25 @@ export async function saveDashboardSettingsFromModal() {
         lanAuthOptional: !!document.getElementById("settings-lan-auth-optional")?.checked,
       });
       if (!lanRes?.ok) {
-        this.showAlert?.(
-          lanRes?.error || "LAN access could not be applied (HTTP server restart failed).",
-          "warning"
-        );
+        const code = lanRes?.error || "";
+        const localised = (() => {
+          switch (code) {
+            case "default_credentials_rejected":
+              return t("settings.lanErrDefaultCreds");
+            case "password_too_short":
+              return t("settings.lanErrPasswordTooShort");
+            case "weak_password":
+              return t("settings.lanErrWeakPassword");
+            case "username_required":
+              return t("settings.lanErrUsernameRequired");
+            default:
+              return (
+                code ||
+                "LAN access could not be applied (HTTP server restart failed)."
+              );
+          }
+        })();
+        this.showAlert?.(localised, "warning");
       }
     } catch (le) {
       console.warn("[dashboard-settings] save LAN", le);

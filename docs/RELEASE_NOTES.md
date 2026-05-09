@@ -4,33 +4,38 @@ Use this file for **short copy-paste text** on GitHub Releases. The **full histo
 
 ---
 
-## Current shipping line: **3.0.0** (app) / **2.0.0.0** (mod — bump `modDesc.xml` when you ship a mod change)
+## Current shipping line: **3.9.0** (app) / **2.3.0.0** (mod — `modDesc.xml` matches Lua)
 
 ### GitHub release title (example)
 
-`FS25 Farm Dashboard 3.0.0`
+`FS25 Farm Dashboard 3.9.0`
 
 ### Description (copy-paste)
 
-**FS25 Farm Dashboard 3.0.0** is the **rules-first** dashboard line for **Farming Simulator 25**:
+**FS25 Farm Dashboard 3.9.0** is the **pre-final hardening** release for **Farming Simulator 25** — security, tests tied to production code, pasture telemetry semantics, setup validation, and docs/version alignment ahead of the **v4** updater promotion.
 
-- **Offline field rules** — concise **suggested next steps** on **field cards** from merged Lua + XML (bales, windrows, growth, Precision Farming hints where the save exports them).
-- **Windrows** — Mod exports **`windrowLiters`** / **`windrowType`**; merger + UI show a **volume badge** on field cards when data exists.
-- **Unified Settings** — **Servers & saves**, LAN, theme, notifications from the **gear** menu (see [USER_MANUAL.md](./USER_MANUAL.md)).
-- **Windows reliability** — Default **`npm run dist`** writes outside the repo (`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out`); NSIS upgrade path uses **`taskkill`** for stuck child processes; optional **full user-data wipe** on uninstall.
-- **LAN tablets** — Optional bind on your network with **HTTP Basic Auth** + **IP allowlist**; localhost stays convenient — [SECURITY.md](./SECURITY.md).
+- **LAN security** — Rejects **default `admin` / `farmhub`**, **short passwords**, and **known-weak** passwords when **LAN access** is turned on. See [SECURITY.md](./SECURITY.md).
+- **DOM safety** — Shared **`escapeHtml`** helper; pasture modals and tables escape game-sourced names.
+- **Tests** — Realtime fan-out, dedupe keys, pasture warnings, setup `mapSaveError`, LAN policy, XSS smoke — all green under `npm test`.
+- **Pastures** — **Telemetry missing** vs **critical low stock** are distinct severities; counts are **head-aware** for LOD clusters.
+- **Setup** — Per-field validation, success state before redirect (browser setup path).
 
-1. **FS25 mod** (**2.0.0.0** in `modDesc.xml` unless you release a new mod build) — install into FS25 `mods`, enable on your save or server, and **run the game at least once** before relying on the desktop app.
-2. **Windows desktop app** (**3.0.0**) — NSIS installer; dashboard at **http://localhost:8766**.
+**Still the same great dashboard:** rules-first fields, windrows, unified Settings, FTP, LAN tablets (with strong creds). Full narrative: **[RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md)** · History: **[CHANGELOG.md](./CHANGELOG.md)** §**3.9.0**.
+
+1. **FS25 mod** (**2.3.0.0**) — copy into FS25 `mods`, enable on your save or server, **load the save once** with the mod active.
+2. **Windows desktop app** (**3.9.0**) — NSIS installer; dashboard at **http://localhost:8766**.
 
 **Install order:** mod → enable & load save → then install/run the desktop app. See [README.md](../README.md) and [INSTALL.md](./INSTALL.md).
+
+**Next step for maintainers:** updater QA (**3.9.0 → 4.0.0**) per **[UPDATER_QA.md](./UPDATER_QA.md)**.
 
 ### Where this release is documented
 
 | Topic | Document |
 | ----- | -------- |
-| **3.0.0** narrative | [RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md), [CHANGELOG.md](./CHANGELOG.md) §3.0.0 |
-| **2.0.0** mod/app foundations | [CHANGELOG.md](./CHANGELOG.md) §2.0.0 |
+| **3.9.0** narrative | [RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md), [CHANGELOG.md](./CHANGELOG.md) §3.9.0 |
+| **3.0.0** prior line | [RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md), [CHANGELOG.md](./CHANGELOG.md) §3.0.0 |
+| **Audit bundle** | [AUDIT_v3.9_PREFINAL.md](./AUDIT_v3.9_PREFINAL.md) |
 | **LAN** | [SECURITY.md](./SECURITY.md) |
 | **Product copy + screenshots** | [DESCRIPTION_AND_SCREENSHOTS.md](./DESCRIPTION_AND_SCREENSHOTS.md) |
 | **Developers** | [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md) |

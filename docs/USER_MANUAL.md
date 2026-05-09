@@ -1,6 +1,6 @@
 # FS25 Farm Dashboard — User manual (v3.0)
 
-**Farm Dashboard** is the Windows desktop app that reads live farm data from **Farming Simulator 25** (via the in-game **FS25 Farm Dashboard** mod) and renders it in your browser at **[http://localhost:8766](http://localhost:8766)**. **App version 3.0.0**, **mod version 2.0.0.0**.
+**Farm Dashboard** is the Windows desktop app that reads live farm data from **Farming Simulator 25** (via the in-game **FS25 Farm Dashboard** mod) and renders it in your browser at **[http://localhost:8766](http://localhost:8766)**. **App version 3.9.0**, **mod version 2.3.0.0**.
 
 This manual walks every setting, every section, and every modal, and points to a labelled screenshot for each. The screenshot manifest with filenames, captions, and capture recipes is in [`SCREENSHOT_MANIFEST.md`](./SCREENSHOT_MANIFEST.md).
 
@@ -32,7 +32,7 @@ This manual walks every setting, every section, and every modal, and points to a
 | ---- | ------- |
 | **Farming Simulator 25** | Game must run with the mod for live data to exist |
 | **FS25 Farm Dashboard mod** | Folder `FS25_FarmDashboard_Mod` copied into your FS25 `mods` folder |
-| **FS25 Farm Dashboard app (Windows)** | Installer `FS25 Farm Dashboard Setup 3.0.0.exe` |
+| **FS25 Farm Dashboard app (Windows)** | Installer `FS25 Farm Dashboard Setup 3.9.0.exe` |
 | **Browser** | Edge, Chrome, Firefox — opens [http://localhost:8766](http://localhost:8766) |
 | **(Optional) FTP credentials** | If FS25 runs on a dedicated / rented server you do not own locally |
 | **(Optional) LAN network** | If you want the dashboard on a tablet or second screen |
@@ -74,7 +74,7 @@ After a minute, look in:
 
 ### Stage D — Install the Windows app
 
-1. Run **`FS25 Farm Dashboard Setup 3.0.0.exe`**.
+1. Run **`FS25 Farm Dashboard Setup 3.9.0.exe`**.
 2. Pick installer language on the welcome page; complete the installer.
 3. Launch **Farm Dashboard** from the Start menu.
 
@@ -210,7 +210,7 @@ Open with the gear icon. The modal has a left-hand sidebar with four tabs, plus 
 | Control | What it does | Persisted as |
 | ------- | ------------ | ------------ |
 | **Section toggles (6)** | Show / hide Livestock, Vehicles, Fields, Economy, Pastures, Productions cards on the landing page | `uiPreferences.sections` |
-| **Desktop version** | Read-only build version (e.g. `3.0.0`) | — |
+| **Desktop version** | Read-only build version (e.g. `3.9.0`) | — |
 | **Check for updates** | Triggers `electron-updater` against GitHub Releases | — |
 | **Update status** | Live status line during checks | — |
 | **Field exclusions** | Per-server, per-farmland checkboxes; un-tick to hide that parcel from the Fields page | `uiPreferences.excludedFarmlandIdsByServer` |
@@ -227,7 +227,7 @@ Open with the gear icon. The modal has a left-hand sidebar with four tabs, plus 
 | Control | What it does | Persisted as |
 | ------- | ------------ | ------------ |
 | **Enable LAN access** | Switches the HTTP/WS bind from `127.0.0.1` to `0.0.0.0` so other devices can connect | `lanAccessEnabled` |
-| **LAN user** / **LAN password** | HTTP Basic credentials applied to non-loopback requests | `lanUser`, `lanPassword` |
+| **LAN user** / **LAN password** | HTTP Basic credentials applied to non-loopback requests. v3.9: weak/default passwords are rejected when LAN access is enabled. | `lanUsername`, `lanPassword` |
 | **IP allowlist** | Comma-separated CIDRs / IPs that may connect; empty = any LAN IP | `lanAllowlist` |
 | **Require auth even from loopback** | Optional, for shared desktops | `lanRequireAuthForLoopback` |
 | **Open full setup** | Opens `setup.html` in a separate window for power users | — |
@@ -559,4 +559,4 @@ The mod has **no in-game console command** and **no Giants settings menu entry**
 
 The full list of filenames, captions, and capture recipes (auto vs manual) lives in [`SCREENSHOT_MANIFEST.md`](./SCREENSHOT_MANIFEST.md). All images sit under [`docs/screenshots/`](./screenshots/).
 
-**Document version:** aligned with app **3.0.0** and mod **2.0.0.0**. **Authors:** [`AUTHORS.md`](./AUTHORS.md).
+**Document version:** aligned with app **3.9.0** and mod **2.3.0.0**. **Authors:** [`AUTHORS.md`](./AUTHORS.md).

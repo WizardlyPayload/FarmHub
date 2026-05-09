@@ -3,7 +3,7 @@
 **Purpose:** Single document to feed into an external planner so it can propose roadmaps, refactors, or debugging steps **without** prior chat history.
 
 **Repository:** `FarmHub` — FS25 Farm Dashboard (Electron + web + Lua mod).  
-**Current versions:** App **3.0.0** (`package.json`), mod **2.0.0.0** (`modDesc.xml`).
+**Current versions:** App **3.9.0** (`package.json`), mod **2.3.0.0** (`modDesc.xml`).
 
 **Technical handover:** [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md) · **Doc index:** [README.md](./README.md)
 
@@ -13,7 +13,7 @@
 
 - **Farm Dashboard:** Real-time browser UI for **Farming Simulator 25**: livestock, vehicles, fields, economy, weather, productions, pastures, notifications.
 - **Data sources:** Lua mod writes **`data.json`**; the app **merges** with **savegame XML** (local disk or **FTP** for dedicated servers).
-- **Field guidance:** **Offline rules** on field cards + optional Lua **`suggestions`** list from the mod — no remote model or subscription service in this tree’s **3.0.0** baseline.
+- **Field guidance:** **Offline rules** on field cards + optional Lua **`suggestions`** list from the mod — no remote model or subscription service in this tree’s **3.9.0** baseline.
 
 ---
 

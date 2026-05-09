@@ -8,6 +8,21 @@ import {
   resolveSyntheticAnimal,
 } from "./livestock.penDetail.js";
 
+function _safe(value) {
+  const ns =
+    (typeof globalThis !== "undefined" && globalThis.farmDashEscape) ||
+    (typeof window !== "undefined" && window.farmDashEscape) ||
+    null;
+  if (ns && typeof ns.escapeHtml === "function") return ns.escapeHtml(value);
+  if (value == null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /** Plan v5 A2: dashboard entrypoint — open the real-detail modal for a husbandry pen. */
 export function openPenDetail(penId) {
   return openPenDetailModal(penId);
@@ -512,9 +527,10 @@ export function showAnimalDetails(animalId) {
   const modalTitle = document.getElementById("animalDetailsModalLabel");
   const modalContent = document.getElementById("animalDetailsContent");
 
-  modalTitle.innerHTML = `<i class="bi bi-clipboard-data me-2"></i>${
-    animal.name || `Animal #${animal.id}`
-  } <span class="badge bg-info ms-2">${animal.id}</span>`;
+  const titleName = _safe(animal.name || `Animal #${animal.id}`);
+  modalTitle.innerHTML = `<i class="bi bi-clipboard-data me-2"></i>${titleName} <span class="badge bg-info ms-2">${_safe(
+    animal.id
+  )}</span>`;
 
   // Create comprehensive animal details with RealisticLivestock data
   const detailsHTML = `

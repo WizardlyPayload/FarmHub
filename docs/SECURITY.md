@@ -2,7 +2,7 @@
 
 **Authors:** **JoshWalki** (Josh) / Wizardlypayload and **WizardlyPayload** — see [AUTHORS.md](./AUTHORS.md).
 
-This document describes how the **desktop app** exposes data, what is **optional** vs **default-locked**, and how that fits a **home / LAN** setup. It is written for **3.0.0**; review again after major upgrades.
+This document describes how the **desktop app** exposes data, what is **optional** vs **default-locked**, and how that fits a **home / LAN** setup. It is written for **3.9.0**; review again after major upgrades.
 
 ---
 
@@ -25,7 +25,9 @@ The embedded HTTP server listens on **port `8766`**. **Binding and access contro
 
 **Loopback bypass:** requests from **`127.0.0.1`**, **`::1`**, and **`::ffff:127.0.0.1`** skip LAN auth middleware so the desktop app and local browser are not blocked.
 
-**CORS** is enabled for the API routes so a normal browser can load the dashboard from that origin.
+**CORS** is restricted in **v3.9+**: the Express server allows requests whose `Origin` header is **localhost/127.0.0.1**, or **any host on port 8766** (so phone/tablet browsers on the same LAN using `http://<PC-LAN-IP>:8766` still work). Other cross-origin callers receive **no CORS allowance**. This tightens the surface versus a blanket “allow everything” policy.
+
+**LAN credentials (v3.9+):** when **LAN access is enabled**, the app **rejects** the historic default pair **`admin` / `farmhub`**, passwords **shorter than 10 characters**, and a small list of **known-weak passwords** (`lanCredentialPolicy.js`). Choose a strong password before exposing the bind on `0.0.0.0`. Stored credentials remain **local** (Electron Store) and **HTTP Basic** is still **cleartext on the wire** — use only on a **trusted home LAN**, or put a **reverse proxy with TLS** in front for remote access.
 
 **Implications**
 
@@ -73,4 +75,4 @@ The FS25 mod only writes **`data.json`** under the user profile. It does not ope
 
 ## Reporting security concerns
 
-For **public** security issues (e.g. unintended remote code execution via the app), contact the maintainers via the GitHub repository’s channels (**JoshWalki** & **WizardlyPayload** — [AUTHORS.md](./AUTHORS.md)). Include app version **3.0.0** and platform **Windows**.
+For **public** security issues (e.g. unintended remote code execution via the app), contact the maintainers via the GitHub repository’s channels (**JoshWalki** & **WizardlyPayload** — [AUTHORS.md](./AUTHORS.md)). Include app version **3.9.0** and platform **Windows**.

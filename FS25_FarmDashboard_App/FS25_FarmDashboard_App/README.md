@@ -1,6 +1,6 @@
 # FS25 Farm Dashboard
 
-**Version 3.0.0** — Real-time farm management dashboard for *Farming Simulator 25*, with local save folders and dedicated (FTP) servers.
+**Version 3.9.0** — Real-time farm management dashboard for *Farming Simulator 25*, with local save folders and dedicated (FTP) servers.
 
 **Authors:** JoshWalki, WizardlyPayload  
 
@@ -18,7 +18,7 @@
 
 ### 1. Run the installer
 
-1. Run **`FS25 Farm Dashboard Setup 3.0.0.exe`** (or the current release build from `npm run dist`).
+1. Run **`FS25 Farm Dashboard Setup 3.9.0.exe`** (or the current release build from `npm run dist`).
 2. **The first screen is language selection** — choose the language used for the rest of the installer, the **first-run Server Manager** setup, and the default **Dashboard** language (you can change language again inside the app under **Theme & Color Settings**).
 3. The installer installs the app and **automatically runs an ImageMagick helper** so DDS→PNG conversion works without manual downloads when possible (bundled/offline installer, **winget**, **Chocolatey**, or a **download** fallback — see `build/install-imagemagick.ps1`).
 
@@ -65,12 +65,20 @@ npm start
 npm run dist
 ```
 
-Output (folder is **next to** `package.json` in this app):  
-`FS25_FarmDashboard_App/FS25_FarmDashboard_App/release/` — e.g. `FS25 Farm Dashboard Setup 3.0.0.exe`, `latest.yml`, and `win-unpacked/` (version follows `package.json`).
+Default output (**`tools/run-electron-builder.mjs`**):  
+`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\` — e.g. `FS25 Farm Dashboard Setup 3.9.0.exe`, `latest.yml`, and `win-unpacked/` (version follows `package.json`).
 
-That `release/` directory is **gitignored** in the FarmHub repo: Git Desktop syncs **source** only; the installer files are produced locally when you run `npm run dist` and are **not** pushed as normal commits.
+**In-repo build** (writes under this app folder — can lock `app.asar` in some setups):
 
-**Auto-update (desktop app):** Packaged builds use `electron-updater` against **GitHub Releases** (`package.json` → `build.publish`, repo `WizardlyPayload/FarmHub`). After each `npm run dist`, create or edit a **GitHub Release** (browser or `gh release`) and attach **`latest.yml`** and the **`.exe`** from your local `release/` folder so tags match `package.json` `version`. The in-game **FS25 Farm Dashboard mod** is updated separately via Giants Mod Hub / the in-game mod browser, not this mechanism.
+```bash
+npm run dist:in-repo
+```
+
+→ `electron-pack-out/` next to this `package.json` (see `package.json` → `build.directories.output`).
+
+Build output folders are **gitignored**; installers are produced locally and **not** pushed as normal commits.
+
+**Auto-update (desktop app):** Packaged builds use `electron-updater` against **GitHub Releases** (`package.json` → `build.publish`, repo `WizardlyPayload/FarmHub`). After each `npm run dist`, create or edit a **GitHub Release** (browser or `gh release`) and attach **`latest.yml`** and the **`.exe`** from your output folder so tags match `package.json` `version`. The in-game **FS25 Farm Dashboard mod** is updated separately via Giants Mod Hub / the in-game mod browser, not this mechanism.
 
 **NSIS include:** `build/installer.nsh` (language welcome page + ImageMagick `customInstall`). `package.json` → `build.nsis.include`.
 
@@ -102,9 +110,9 @@ That `release/` directory is **gitignored** in the FarmHub repo: Git Desktop syn
 
 ---
 
-## Release notes — v3.0.0
+## Release notes — v3.9.0
 
-See **[../../docs/CHANGELOG.md](../../docs/CHANGELOG.md)** §**3.0.0**, **[../../docs/RELEASE_NOTES.md](../../docs/RELEASE_NOTES.md)**. Long-form narrative: **[../../docs/RELEASE_v3.0.0.md](../../docs/RELEASE_v3.0.0.md)**. Earlier packaged notes: **[../../docs/RELEASE_v2.0.0.md](../../docs/RELEASE_v2.0.0.md)**. Summary (v2 era):
+See **[../../docs/CHANGELOG.md](../../docs/CHANGELOG.md)** §**3.9.0**, **[../../docs/RELEASE_NOTES.md](../../docs/RELEASE_NOTES.md)**. Long-form narrative: **[../../docs/RELEASE_v3.9.0.md](../../docs/RELEASE_v3.9.0.md)**. Prior line: **[../../docs/RELEASE_v3.0.0.md](../../docs/RELEASE_v3.0.0.md)**. Earlier packaged notes: **[../../docs/RELEASE_v2.0.0.md](../../docs/RELEASE_v2.0.0.md)**. Summary (v2 era):
 
 - **Language first:** NSIS installer welcome page + Server Manager language bar; shared `locale` store and `translations.json` pipeline.
 - **Dashboard i18n:** EU/EEA-oriented locales with English fallback per string.

@@ -4,23 +4,23 @@ Read these steps **in order**. Do **not** install the Windows dashboard app unti
 
 ### Why the mod has to come before the dashboard
 
-The **Windows app is not inside the game**. It cannot read your farm directly from FS25. It only reads a file called `**data.json`** that the **mod** creates and updates while you play (or while a dedicated server runs).
+The **Windows app is not inside the game**. It cannot read your farm directly from FS25. It only reads a file called `data.json` that the **mod** creates and updates while you play (or while a dedicated server runs).
 
 Until you have **loaded a save with the mod enabled** at least once:
 
 - The game has not created the mod’s output folders under your profile.
-- `**data.json` does not exist yet** (or is not being updated) for that save.
+- `data.json` does not exist yet (or is not being updated) for that save.
 - The dashboard would have **nothing to show**, even if the app is installed.
 
 So: **mod first** (so FS25 can create the data), **dashboard app second** (so something can open that data in the browser). The order avoids a blank or “waiting for data” setup when you first open the app.
 
-On a **dedicated / hosted server**, the same idea applies: the mod must be **active on the server** and the save must have run so `**data.json`** exists in the server profile (where your FTP or host points)—not only on your own PC.
+On a **dedicated / hosted server**, the same idea applies: the mod must be **active on the server** and the save must have run so `data.json` exists in the server profile (where your FTP or host points)—not only on your own PC.
 
 ---
 
 ## 1. Install the mod in Farming Simulator 25
 
-1. Copy the `**FS25_FarmDashboard`** mod folder into your FS25 mods folder.
+1. Copy the `FS25_FarmDashboard` mod folder into your FS25 mods folder.
   **Typical Windows path:**  
    `Documents\My Games\FarmingSimulator2025\mods\`
 2. Start **Farming Simulator 25**.
@@ -35,13 +35,13 @@ On a **dedicated / hosted server**, the same idea applies: the mod must be **act
 2. **Load that save** (play until you are in the game world, not only the menu).
 3. Repeat for **every other save** that should use the dashboard (different slots, multiplayer farms, dedicated server saves, etc.).
 
-The mod creates its folders and starts writing `**data.json`** only **after** the save has been loaded with the mod active. If you skip this for a save, that save will have no data for the app later.
+The mod creates its folders and starts writing `data.json` only **after** the save has been loaded with the mod active. If you skip this for a save, that save will have no data for the app later.
 
 ---
 
 ## 3. Install the Windows dashboard app (only after step 2)
 
-1. Run the **FS25 Farm Dashboard** installer (`.exe` from [Releases](https://github.com/WizardlyPayload/FS25-Farm-Dashboard/releases) or your own build).
+1. Run the **FS25 Farm Dashboard** installer (`.exe` from [Releases](https://github.com/WizardlyPayload/FarmHub/releases) or your own build).
 2. Start **Farm Dashboard** from the Start menu or desktop shortcut.
 3. The first time it opens, complete **Setup** (local folder to your FS25 profile, or **FTP** if you use a hosted/dedicated server). Later, you can change servers and polling from **Settings (gear icon) → Servers & saves** in the dashboard — you no longer need a separate shortcut for that.
 4. Open your browser to **[http://localhost:8766](http://localhost:8766)** (or the address the app shows).

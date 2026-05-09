@@ -4,8 +4,8 @@ This is the maintainer reference for **FarmHub**: the **FS25 Farm Dashboard** El
 
 | Artifact | Where | Current value |
 | -------- | ----- | ------------- |
-| Desktop app | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | **`3.0.0`** |
-| Lua mod | `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` | **`2.0.0.0`** |
+| Desktop app | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | **`3.9.0`** |
+| Lua mod | `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` | **`2.3.0.0`** |
 | HTTP / WebSocket port | `main.js` `PORT` | **`8766`** |
 | Companion docs | [`USER_MANUAL.md`](./USER_MANUAL.md) · [`AUDIT_v3.0.md`](./AUDIT_v3.0.md) · [`SECURITY.md`](./SECURITY.md) · [`CHANGELOG.md`](./CHANGELOG.md) · [`I18N.md`](./I18N.md) | — |
 
@@ -71,7 +71,7 @@ FarmHub/
       xmlCollector.js                    # savegame XML reader
       serverDataCache.js                 # serverLiveCache helpers
       app-updater.js                     # electron-updater integration
-      package.json                       # 3.0.0
+      package.json                       # 3.9.0
       setup.html                         # first-run setup page (sibling of web/)
       build/installer.nsh                # NSIS hooks
       tools/                             # build helpers (PS1 + mjs)
@@ -108,7 +108,7 @@ FarmHub/
           find-hardcoded-strings.mjs, verify-i18n.mjs
   FS25_FarmDashboard_Mod/
     FS25_FarmDashboard_Mod/
-      modDesc.xml                        # 2.0.0.0
+      modDesc.xml                        # 2.3.0.0
       FarmDashboard.lua                  # mission hook + authority
       src/
         FarmDashboardDataCollector.lua   # staggered orchestration + writer
@@ -235,7 +235,7 @@ The mod has **no `addConsoleCommand` integration and no in-game settings menu en
 | `config` | Servers, paths, FTP settings, polling options |
 | `uiPreferences` | Section toggles, field exclusions, field clusters, SimHub view |
 | `locale` | Persisted `farmdash_locale` (mirrored to `localStorage`) |
-| `lanAccessEnabled`, `lanUser`, `lanPassword`, `lanAllowlist`, `lanRequireAuthForLoopback` | LAN settings |
+| `lanAccessEnabled`, `lanUsername`, `lanPassword`, `lanAllowedIPs`, `lanAuthOptional` | LAN settings (v3.9: weak/default credentials rejected when enabling LAN access) |
 | `farmdashSetupWriteToken` | LAN setup writer token |
 | `lanWsSecret` | WebSocket auth secret for LAN |
 | `simHubLiveContext` | Last-known SimHub context for the overlay page |
@@ -535,7 +535,7 @@ There is **no rotating log file**. Console output goes to stdout / DevTools. If 
 | Fields stuck on "waiting for field data" | `dataTimestamps.lastLuaReceivedAt` should advance; if not, the mod is not authority (MP client) or the watcher has not fired (re-arms every 5 s) |
 | Wrong farm | `activeFarmId`, `ownerFarmId`, `filterFieldsForFarmView` (`fields.js`, `apiStorage.js`); confirm farm dropdown |
 | Merge oddities | `dataMerger.js` precedence table (§6); `dataTimestamps.liveNewerThanXml` should be `true` when the live tick is fresh |
-| LAN 401 / 403 | `lanUser`, `lanPassword`, `lanAllowlist`; check IPv4-mapped IPv6 (`::ffff:` prefix is normalised) |
+| LAN 401 / 403 | `lanUsername`, `lanPassword`, `lanAllowedIPs`; check IPv4-mapped IPv6 (`::ffff:` prefix is normalised) |
 | FTP not ticking | `getFtpPollingOptions` clamps; check `intervalMinutes` is between 1 and 25 |
 | Notifications empty after upgrade | `localStorage` `farmdashboard_notifications`; cap is 10; `notif.none` is overridden by hard-coded English (audit gap #4) |
 | `app.asar` locked during install | `npm run unlock-install`, then `npm run dist` |

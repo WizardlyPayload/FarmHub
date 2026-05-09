@@ -85,8 +85,10 @@ end
 
 -- =====================================================================================
 -- FS25 Engine I/O compatibility (Foundation Lua surface differs by build):
---   * getFiles(dir) → error "1 instead of 3": use getFiles(dir, recursive, pattern).
---   * io.open may return a table without :read — try readAll / read(f, n) fallbacks.
+--   * getFiles requires 3 args: getFiles(directory, patternString, recursiveBool).
+--     (Passing bool as arg2 yields "Expected: String. Actual: Bool".)
+--   * io.open is often sandboxed to mode "w" only — avoid "r"/"rb" (use readFile if present).
+--   * copyFile requires 3 args on FS25 — try bool then numeric overloads best-effort.
 --   * `os` may be nil — os.rename unavailable; use copy/delete or direct write.
 -- =====================================================================================
 
@@ -108,10 +110,10 @@ local function _tryGetFilesList(dir)
     if type(dir) ~= "string" then return nil end
     if type(getFiles) == "function" then
         local attempts = {
-            function() return getFiles(dir, false, "*") end,
-            function() return getFiles(dir, false, "*.*") end,
-            function() return getFiles(dir, true, "*") end,
-            function() return getFiles(dir) end,
+            function() return getFiles(dir, "*", false) end,
+            function() return getFiles(dir, "*.*", false) end,
+            function() return getFiles(dir, "*", true) end,
+            function() return getFiles(dir, "*.*", true) end,
         }
         for _, fn in ipairs(attempts) do
             local ok, res = pcall(fn)
@@ -160,16 +162,19 @@ local function _ioReadBytes(f, maxBytes)
     return nil
 end
 
---- Read at most `maxBytes` from a path. Closes the handle when done.
+--- Read at most `maxBytes` from a path. Avoids io.open(..., "r") on FS25 (often disallowed).
 local function _readPathLimited(path, maxBytes)
-    if type(path) ~= "string" or type(io) ~= "table" or type(io.open) ~= "function" then
-        return nil
+    if type(path) ~= "string" then return nil end
+    if type(readFile) == "function" then
+        local ok, data = pcall(function() return readFile(path) end)
+        if ok and type(data) == "string" then
+            if maxBytes and #data > maxBytes then
+                return string.sub(data, 1, maxBytes)
+            end
+            return data
+        end
     end
-    local f = io.open(path, "r") or io.open(path, "rb")
-    if not f then return nil end
-    local data = _ioReadBytes(f, maxBytes)
-    pcall(function() if f.close then f:close() end end)
-    return data
+    return nil
 end
 
 local function _pathExists(p)
@@ -181,6 +186,23 @@ local function _pathExists(p)
     return false
 end
 
+local function _copyFileFs25BestEffort(src, dst)
+    if type(copyFile) ~= "function" or type(src) ~= "string" or type(dst) ~= "string" then
+        return false
+    end
+    local trials = {
+        function() copyFile(src, dst, true) end,
+        function() copyFile(src, dst, false) end,
+        function() copyFile(src, dst, 1) end,
+        function() copyFile(src, dst, 0) end,
+    }
+    for _, fn in ipairs(trials) do
+        local ok = pcall(fn)
+        if ok and _pathExists(dst) then return true end
+    end
+    return false
+end
+
 --- Replace `src` with `dst` (move). Works when `os` is nil. Returns true on success.
 local function _movePathBestEffort(src, dst)
     if type(src) ~= "string" or type(dst) ~= "string" then return false end
@@ -188,12 +210,9 @@ local function _movePathBestEffort(src, dst)
         pcall(function() os.rename(src, dst) end)
         if _pathExists(dst) then return true end
     end
-    if type(copyFile) == "function" and type(deleteFile) == "function" then
-        local ok = pcall(function() copyFile(src, dst) end)
-        if ok and _pathExists(dst) then
-            pcall(function() deleteFile(src) end)
-            return true
-        end
+    if type(deleteFile) == "function" and _copyFileFs25BestEffort(src, dst) then
+        pcall(function() deleteFile(src) end)
+        return true
     end
     local body = _readPathLimited(src, 8 * 1024 * 1024)
     if body and type(io) == "table" and type(io.open) == "function" then

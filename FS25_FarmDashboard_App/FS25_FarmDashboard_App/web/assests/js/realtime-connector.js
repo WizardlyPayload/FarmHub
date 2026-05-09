@@ -220,10 +220,6 @@ class RealtimeConnector {
           if (bypassPayloadDedupe) {
             self.lastRealtimePayloadKey = null;
           }
-          const rest = { ...data };
-          delete rest.timestamp;
-          delete rest.dataTimestamps;
-          delete rest.fieldStatusHistory;
           const farmId = Number(self.dashboard?.activeFarmId ?? 1);
           const srv = String(
             self.dashboard?.activeServerId ??
@@ -231,8 +227,21 @@ class RealtimeConnector {
                 ? localStorage.getItem("dashboard_active_server") || ""
                 : "")
           );
+          const dedupeNs =
+            (typeof globalThis !== "undefined" &&
+              globalThis.farmDashRealtimeDedupe) ||
+            (typeof window !== "undefined" && window.farmDashRealtimeDedupe) ||
+            null;
           const payloadKey =
-            JSON.stringify(rest) + "|" + farmId + "|" + srv;
+            dedupeNs && typeof dedupeNs.computePayloadDedupeKey === "function"
+              ? dedupeNs.computePayloadDedupeKey(data, farmId, srv)
+              : (() => {
+                  const rest = { ...data };
+                  delete rest.timestamp;
+                  delete rest.dataTimestamps;
+                  delete rest.fieldStatusHistory;
+                  return JSON.stringify(rest) + "|" + farmId + "|" + srv;
+                })();
           if (self.lastRealtimePayloadKey === payloadKey) {
             self.isConnected = true;
             self.updateConnectionStatus(true);
@@ -559,99 +568,30 @@ class RealtimeConnector {
    * Stats repeat the cluster bucket averages when per-head detail is not inlined — real RL IDs come
    * from `details/animals_<id>.json` hydration (`__detailHydrated` / `lod: full`), which skips this path.
    *
-   * `globalCounter.emitted` counts emitted rows (heads); `trimmed` counts heads skipped by caps.
+   * Delegates to the shared `realtime-fanout.js` helper so production code and Jest tests
+   * exercise the same implementation. `globalCounter.cap` is honoured; if missing,
+   * `_getMaxSynthAnimals()` provides the per-tab fallback before the helper is invoked.
    */
   _fanOutClustersIndividualRows(husbandry, clusters, farmId, globalCounter) {
-    const out = [];
-    const PEN_HEAD_ROW_CAP = 4096;
-    const GLOBAL_ROW_CAP = (globalCounter && Number.isFinite(globalCounter.cap))
-      ? globalCounter.cap
-      : this._getMaxSynthAnimals();
-    const huName = husbandry.name || husbandry.buildingName;
-    const huId = husbandry.id || husbandry.buildingId;
-
-    let headsThisPen = 0;
-    let trimmedHeads = 0;
-
-    outer: for (let ci = 0; ci < clusters.length; ci++) {
-      const c = clusters[ci];
-      if (!c || !c.count || c.count <= 0) continue;
-
-      const subType = c.subType || c.animalType || 'Unknown';
-      const ageMonths = (typeof c.avgAgeMonths === 'number')
-        ? c.avgAgeMonths
-        : (typeof c.ageMonths === 'number' ? c.ageMonths : (c.ageDecile || 0) * 12);
-      const avgHealth = (typeof c.avgHealth === 'number') ? c.avgHealth : 100;
-      const avgWeight = (typeof c.avgWeight === 'number') ? c.avgWeight : 0;
-      const nTotal = Math.floor(Number(c.count)) || 0;
-
-      const genetics =
-        typeof c.avgGenFert === 'number'
-          ? {
-              fertility: c.avgGenFert,
-              productivity: c.avgGenProd,
-              health: c.avgGenHealth,
-              metabolism: c.avgGenMetabolism,
-              quality: c.avgGenQuality,
-            }
-          : null;
-
-      for (let hi = 0; hi < nTotal; hi++) {
-        if (headsThisPen >= PEN_HEAD_ROW_CAP) {
-          trimmedHeads += nTotal - hi;
-          for (let cj = ci + 1; cj < clusters.length; cj++) {
-            const cc = clusters[cj];
-            if (cc && cc.count > 0) trimmedHeads += Math.floor(Number(cc.count)) || 0;
-          }
-          break outer;
-        }
-        if (globalCounter && (globalCounter.emitted || 0) >= GLOBAL_ROW_CAP) {
-          trimmedHeads += nTotal - hi;
-          for (let cj = ci + 1; cj < clusters.length; cj++) {
-            const cc = clusters[cj];
-            if (cc && cc.count > 0) trimmedHeads += Math.floor(Number(cc.count)) || 0;
-          }
-          break outer;
-        }
-
-        const id = `${huId || 'pen'}-c${ci}-h${hi}`;
-        out.push({
-          id,
-          name: `${subType}`,
-          husbandryName: huName,
-          husbandryId: huId,
-          ownerFarmId: husbandry.ownerFarmId || husbandry.farmId,
-          farmId,
-          age: ageMonths,
-          health: avgHealth,
-          weight: avgWeight,
-          gender: c.gender || 'female',
-          subType,
-          location: huName,
-          locationType: 'pasture',
-          isLactating: !!c.isLactating,
-          isPregnant: !!c.isPregnant,
-          isParent: false,
-          genetics,
-          productivity: c.avgGenProd ?? null,
-          __lodSynth: true,
-          __lodSynthEstimate: true,
-        });
-        headsThisPen += 1;
-        if (globalCounter) {
-          globalCounter.emitted = (globalCounter.emitted || 0) + 1;
-        }
-      }
+    if (globalCounter && !Number.isFinite(globalCounter.cap)) {
+      globalCounter.cap = this._getMaxSynthAnimals();
     }
-
-    if (trimmedHeads > 0) {
-      husbandry.__lodTrimmed = trimmedHeads;
-      if (globalCounter) globalCounter.trimmed = (globalCounter.trimmed || 0) + trimmedHeads;
+    const ns =
+      (typeof globalThis !== "undefined" && globalThis.farmDashFanOut) ||
+      (typeof window !== "undefined" && window.farmDashFanOut) ||
+      null;
+    if (!ns || typeof ns.fanOutClustersIndividualRows !== "function") {
+      console.error(
+        "[RealtimeConnector] realtime-fanout.js not loaded; cluster rows will be skipped."
+      );
+      return [];
     }
-    if (globalCounter && (globalCounter.emitted || 0) >= GLOBAL_ROW_CAP) {
-      globalCounter.capHit = true;
-    }
-    return out;
+    return ns.fanOutClustersIndividualRows(
+      husbandry,
+      clusters,
+      farmId,
+      globalCounter
+    );
   }
 
   updateAnimalsData(animalsData) {

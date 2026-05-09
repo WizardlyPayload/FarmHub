@@ -1,5 +1,7 @@
 // FS25 FarmDashboard | notifications.js | v2.0.0
 
+import { t } from "../i18n/i18n.js";
+
 function escapeNotificationHtml(s) {
   if (s == null) return "";
   return String(s)
@@ -58,7 +60,7 @@ export function displayNotificationHistory() {
     content.innerHTML = `
       <div class="text-center text-muted py-4">
         <i class="bi bi-bell-slash fs-1 mb-3"></i>
-        <p>No notifications yet</p>
+        <p>${escapeNotificationHtml(t("notifications.empty"))}</p>
       </div>
     `;
     return;
@@ -150,13 +152,19 @@ export function getTimeAgo(date) {
   const diffDays = Math.floor(diffHours / 24);
 
   if (diffSeconds < 60) {
-    return "Just now";
+    return t("notifications.justNow");
   } else if (diffMinutes < 60) {
-    return `${diffMinutes} minute${diffMinutes > 1 ? "s" : ""} ago`;
+    return diffMinutes === 1
+      ? t("notifications.minutesAgoOne")
+      : t("notifications.minutesAgoMany", { count: diffMinutes });
   } else if (diffHours < 24) {
-    return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`;
+    return diffHours === 1
+      ? t("notifications.hoursAgoOne")
+      : t("notifications.hoursAgoMany", { count: diffHours });
   } else {
-    return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`;
+    return diffDays === 1
+      ? t("notifications.daysAgoOne")
+      : t("notifications.daysAgoMany", { count: diffDays });
   }
 }
 

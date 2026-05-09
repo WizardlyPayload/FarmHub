@@ -4,6 +4,28 @@ import { t } from "../i18n/i18n.js";
 import { formatGenderLabel, fmtWeightKgStr, countLivestockHeads } from "./livestock.js";
 
 /**
+ * Escape a value before embedding it in HTML. Sources can come from the game
+ * (animal names, pasture names, husbandry types) or from the user, so this
+ * runs unconditionally on every interpolation that lands in `innerHTML`.
+ * Delegates to the shared `web/assests/js/utils/escape.js` UMD helper when
+ * loaded; otherwise a local fallback prevents accidental XSS.
+ */
+function _safe(value) {
+  const ns =
+    (typeof globalThis !== "undefined" && globalThis.farmDashEscape) ||
+    (typeof window !== "undefined" && window.farmDashEscape) ||
+    null;
+  if (ns && typeof ns.escapeHtml === "function") return ns.escapeHtml(value);
+  if (value == null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
  * Resolve which farm a pasture belongs to: pasture row first, then any animal (REST often only had building id on parent).
  */
 function inferPastureFarmId(p) {
@@ -1244,91 +1266,96 @@ export function calculateAllPastureWarnings(pasture, animals, conditionReport, f
     });
   }
   */
-  // 2. Food and Water Warnings
-  if (foodReport.hasRealData) {
-    // If we have real data, check for low levels. Removed checks for "hay", "silage", "grass"
-    const foodTypes = ["totalMixedRation"];
-    foodTypes.forEach((foodType) => {
-      const amount = foodReport[foodType];
-      const capacity = foodReport.totalCapacity;
-      const percent = (amount / capacity) * 100;
-      if (percent < 20) {
-        warnings.push({
-          type: "food",
-          severity: percent < 10 ? "danger" : "warning",
-          message: `Low ${foodType}: ${percent.toFixed(0)}% remaining`,
-          icon: "bi-basket",
-        });
-      }
-    });
-  } else {
-    // If no real data available, assume animals need food and water
-    // This represents the critical situation where food levels are unknown/0
-    const animalCount = animals.length;
-    if (animalCount > 0) {
+  // 2. Food and Water Warnings — telemetry-absent (info) vs critical (warning/danger)
+  // are decided in the shared `pastures-warnings.js` helper so tests and
+  // production share the same source of truth. Localized messages are layered
+  // on here because the i18n runtime only exists in the browser.
+  const pwNs =
+    (typeof globalThis !== "undefined" && globalThis.farmDashPastureWarnings) ||
+    (typeof window !== "undefined" && window.farmDashPastureWarnings) ||
+    null;
+  const foodWaterDecisions =
+    pwNs && typeof pwNs.buildFoodWaterDecisions === "function"
+      ? pwNs.buildFoodWaterDecisions(heads, foodReport)
+      : [];
+  for (let i = 0; i < foodWaterDecisions.length; i++) {
+    const d = foodWaterDecisions[i];
+    if (d.type === "data_unavailable" && d.subtype === "food") {
       warnings.push({
-        type: "food",
-        severity: "danger",
-        message: t("pastures.warnNoFoodData", { count: animalCount }),
-        icon: "bi-exclamation-triangle-fill",
+        type: "data_unavailable",
+        subtype: "food",
+        severity: "info",
+        message: t("pastures.warnNoFoodTelemetry", { count: d.count }),
+        icon: "bi-question-circle",
         details: {
-          animalCount: animalCount,
-          message: t("pastures.warnAnimalsRequireFood"),
+          animalCount: d.count,
+          message: t("pastures.warnFoodTelemetryHint"),
         },
       });
-
+    } else if (d.type === "data_unavailable" && d.subtype === "water") {
       warnings.push({
-        type: "water",
-        severity: "danger",
-        message: t("pastures.warnNoWaterData", { count: animalCount }),
-        icon: "bi-droplet-fill",
+        type: "data_unavailable",
+        subtype: "water",
+        severity: "info",
+        message: t("pastures.warnNoWaterTelemetry", { count: d.count }),
+        icon: "bi-question-circle",
         details: {
-          animalCount: animalCount,
-          message: t("pastures.warnAnimalsRequireWater"),
+          animalCount: d.count,
+          message: t("pastures.warnWaterTelemetryHint"),
         },
+      });
+    } else if (d.type === "food") {
+      warnings.push({
+        type: "food",
+        severity: d.severity,
+        message: `Low totalMixedRation: ${d.percent.toFixed(0)}% remaining`,
+        icon: "bi-basket",
       });
     }
   }
 
   // 3. Health Warnings (animals with health < 70%)
-  const sickAnimals = animals.filter((a) => a.health < 70);
-  if (sickAnimals.length > 0) {
+  const sickAnimals = stocked.filter((a) => a.health < 70);
+  const sickHeads = countLivestockHeads(sickAnimals);
+  if (sickHeads > 0) {
     const criticalAnimals = sickAnimals.filter((a) => a.health < 20);
+    const criticalHeads = countLivestockHeads(criticalAnimals);
     warnings.push({
       type: "health",
-      severity: criticalAnimals.length > 0 ? "danger" : "warning",
+      severity: criticalHeads > 0 ? "danger" : "warning",
       message: t("pastures.warnLowHealth", {
-        sick: sickAnimals.length,
-        critical: criticalAnimals.length,
+        sick: sickHeads,
+        critical: criticalHeads,
       }),
       icon: "bi-heart-pulse",
       affectedAnimals: sickAnimals,
       details: {
-        total: sickAnimals.length,
-        critical: criticalAnimals.length,
-        warning: sickAnimals.length - criticalAnimals.length,
+        total: sickHeads,
+        critical: criticalHeads,
+        warning: sickHeads - criticalHeads,
       },
     });
   }
 
   // 4. Production Warnings
   // High milk production warning (lactating cows need attention)
-  const lactatingCows = animals.filter(
+  const lactatingCows = stocked.filter(
     (a) => a.isLactating && a.subType?.includes("COW")
   );
-  if (lactatingCows.length > 5) {
+  const lactatingHeads = countLivestockHeads(lactatingCows);
+  if (lactatingHeads > 5) {
     warnings.push({
       type: "production",
       severity: "info",
       message: t("pastures.warnHighMilk", {
         milk: conditionReport.milk,
-        cows: lactatingCows.length,
+        cows: lactatingHeads,
       }),
       icon: "bi-droplet-fill",
       affectedAnimals: lactatingCows,
       details: {
         totalProduction: conditionReport.milk,
-        cowCount: lactatingCows.length,
+        cowCount: lactatingHeads,
       },
     });
   }
@@ -1356,14 +1383,16 @@ export function calculateAllPastureWarnings(pasture, animals, conditionReport, f
   }
 
   // 6. Breeding Management Warning
-  const maleAnimals = animals.filter(
+  const maleAnimals = stocked.filter(
     (a) => a.gender?.toLowerCase() === "male"
   );
-  const femaleAnimals = animals.filter(
+  const femaleAnimals = stocked.filter(
     (a) => a.gender?.toLowerCase() === "female"
   );
-  if (maleAnimals.length > 0 && femaleAnimals.length > 10) {
-    const ratio = femaleAnimals.length / maleAnimals.length;
+  const maleHeads = countLivestockHeads(maleAnimals);
+  const femaleHeads = countLivestockHeads(femaleAnimals);
+  if (maleHeads > 0 && femaleHeads > 10) {
+    const ratio = femaleHeads / maleHeads;
     if (ratio > 20) {
       warnings.push({
         type: "breeding",
@@ -1375,7 +1404,7 @@ export function calculateAllPastureWarnings(pasture, animals, conditionReport, f
   }
 
   // 7. Age Warning (too many old animals)
-  const oldAnimals = animals.filter((a) => {
+  const oldAnimals = stocked.filter((a) => {
     const lifeExpectancy = {
       COW: 240,
       PIG: 180,
@@ -1388,16 +1417,17 @@ export function calculateAllPastureWarnings(pasture, animals, conditionReport, f
     const maxAge = lifeExpectancy[type] || 200;
     return a.age > maxAge * 0.8;
   });
-  if (oldAnimals.length > animals.length * 0.3) {
+  const oldHeads = countLivestockHeads(oldAnimals);
+  if (heads > 0 && oldHeads > heads * 0.3) {
     warnings.push({
       type: "age",
       severity: "warning",
-      message: t("pastures.warnAgingAnimals", { count: oldAnimals.length }),
+      message: t("pastures.warnAgingAnimals", { count: oldHeads }),
       icon: "bi-clock-history",
       affectedAnimals: oldAnimals,
       details: {
-        total: oldAnimals.length,
-        percentage: Math.round((oldAnimals.length / animals.length) * 100),
+        total: oldHeads,
+        percentage: Math.round((oldHeads / heads) * 100),
       },
     });
   }
@@ -1556,7 +1586,7 @@ export function showWarningDetails(pastureId, warningIndex) {
           <i class="bi bi-${warning.icon} me-2 text-${
     warning.severity === "danger" ? "danger" : warning.severity
   }"></i>
-          ${this.getWarningTypeTitle(warning.type)} - ${pasture.name}
+          ${_safe(this.getWarningTypeTitle(warning.type))} - ${_safe(pasture.name)}
       `;
 
   let detailsHTML = `
@@ -1568,7 +1598,7 @@ export function showWarningDetails(pastureId, warningIndex) {
               : "info"
           } mb-4">
               <i class="bi bi-${warning.icon} me-2"></i>
-              <strong>${warning.message}</strong>
+              <strong>${_safe(warning.message)}</strong>
           </div>
       `;
 
@@ -1584,11 +1614,11 @@ export function showWarningDetails(pastureId, warningIndex) {
                       <thead>
                           <tr>
                               <th>ID</th>
-                              <th>Name</th>
-                              <th>Type</th>
-                              <th>Health</th>
-                              <th>Age</th>
-                              <th>Status</th>
+                              <th>${t("pastures.tableName")}</th>
+                              <th>${t("pastures.tableType")}</th>
+                              <th>${t("pastures.tableHealth")}</th>
+                              <th>${t("pastures.tableAge")}</th>
+                              <th>${t("pastures.tableStatus")}</th>
                           </tr>
                       </thead>
                       <tbody>
@@ -1603,23 +1633,27 @@ export function showWarningDetails(pastureId, warningIndex) {
       const statusBadges = [];
 
       if (animal.health < 20)
-        statusBadges.push('<span class="badge bg-danger">Critical</span>');
+        statusBadges.push(
+          `<span class="badge bg-danger">${t("pastures.statusCritical")}</span>`
+        );
       else if (animal.health < 50)
-        statusBadges.push('<span class="badge bg-warning">Poor</span>');
+        statusBadges.push(
+          `<span class="badge bg-warning">${t("pastures.statusPoor")}</span>`
+        );
       if (animal.isPregnant)
         statusBadges.push(
-          '<span class="badge status-pregnant">Pregnant</span>'
+          `<span class="badge status-pregnant">${t("pastures.statusPregnant")}</span>`
         );
       if (animal.isLactating)
         statusBadges.push(
-          '<span class="badge status-lactating">Lactating</span>'
+          `<span class="badge status-lactating">${t("pastures.statusLactating")}</span>`
         );
 
       detailsHTML += `
                   <tr>
-                      <td>${animal.id}</td>
-                      <td>${displayName}</td>
-                      <td>${animal.subType || animal.type || "Unknown"}</td>
+                      <td>${_safe(animal.id)}</td>
+                      <td>${_safe(displayName)}</td>
+                      <td>${_safe(animal.subType || animal.type || "Unknown")}</td>
                       <td>
                           <div class="health-bar">
                               <div class="health-fill ${healthClass}" style="width: ${
@@ -1631,7 +1665,9 @@ export function showWarningDetails(pastureId, warningIndex) {
                       <td>${animal.age || 0} months</td>
                       <td>${
                         statusBadges.join(" ") ||
-                        '<span class="badge bg-success">Normal</span>'
+                        `<span class="badge bg-success">${t(
+                          "pastures.statusNormal"
+                        )}</span>`
                       }</td>
                   </tr>
               `;
@@ -1661,7 +1697,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                           <div class="card bg-secondary">
                               <div class="card-body text-center">
                                   <h5 class="text-danger">${warning.details.critical}</h5>
-                                  <small>Critical (<20% health)</small>
+                                  <small>${t("pastures.detail.criticalUnder20")}</small>
                               </div>
                           </div>
                       </div>
@@ -1669,7 +1705,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                           <div class="card bg-secondary">
                               <div class="card-body text-center">
                                   <h5 class="text-warning">${warning.details.warning}</h5>
-                                  <small>Poor (20-70% health)</small>
+                                  <small>${t("pastures.detail.poor20to70")}</small>
                               </div>
                           </div>
                       </div>
@@ -1677,7 +1713,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                           <div class="card bg-secondary">
                               <div class="card-body text-center">
                                   <h5 class="text-info">${warning.details.total}</h5>
-                                  <small>Total Affected</small>
+                                  <small>${t("pastures.detail.totalAffected")}</small>
                               </div>
                           </div>
                       </div>
@@ -1689,7 +1725,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                           <div class="card bg-secondary">
                               <div class="card-body text-center">
                                   <h5 class="text-info">${warning.details.totalProduction}L</h5>
-                                  <small>Daily Milk Production</small>
+                                  <small>${t("pastures.detail.dailyMilkProduction")}</small>
                               </div>
                           </div>
                       </div>
@@ -1697,7 +1733,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                           <div class="card bg-secondary">
                               <div class="card-body text-center">
                                   <h5 class="text-success">${warning.details.cowCount}</h5>
-                                  <small>Lactating Cows</small>
+                                  <small>${t("pastures.detail.lactatingCows")}</small>
                               </div>
                           </div>
                       </div>
@@ -1709,7 +1745,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                           <div class="card bg-secondary">
                               <div class="card-body text-center">
                                   <h5 class="text-warning">${warning.details.total}</h5>
-                                  <small>Aging Animals</small>
+                                  <small>${t("pastures.detail.agingAnimals")}</small>
                               </div>
                           </div>
                       </div>
@@ -1717,7 +1753,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                           <div class="card bg-secondary">
                               <div class="card-body text-center">
                                   <h5 class="text-warning">${warning.details.percentage}%</h5>
-                                  <small>Of Total Herd</small>
+                                  <small>${t("pastures.detail.ofTotalHerd")}</small>
                               </div>
                           </div>
                       </div>
@@ -1729,7 +1765,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                           <div class="card bg-secondary">
                               <div class="card-body text-center">
                                   <h5 class="text-warning pulse-warning">${warning.details.dueCount}</h5>
-                                  <small>Animals Due Soon</small>
+                                  <small>${t("pastures.detail.animalsDueSoon")}</small>
                               </div>
                           </div>
                       </div>
@@ -1737,7 +1773,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                           <div class="card bg-secondary">
                               <div class="card-body text-center">
                                   <h5 class="text-info">${warning.details.dueNames}</h5>
-                                  <small>Names</small>
+                                  <small>${t("pastures.detail.names")}</small>
                               </div>
                           </div>
                       </div>
@@ -1751,7 +1787,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                                   <h5 class="text-danger">${
                                     warning.details.currentAnimals
                                   }</h5>
-                                  <small>Current Animals</small>
+                                  <small>${t("pastures.detail.currentAnimals")}</small>
                               </div>
                           </div>
                       </div>
@@ -1761,7 +1797,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                                   <h5 class="text-info">${
                                     warning.details.maxCapacity
                                   }</h5>
-                                  <small>Max Capacity</small>
+                                  <small>${t("pastures.detail.maxCapacity")}</small>
                               </div>
                           </div>
                       </div>
@@ -1771,7 +1807,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                                   <h5 class="text-warning">${warning.details.utilizationPercent.toFixed(
                                     1
                                   )}%</h5>
-                                  <small>Utilization</small>
+                                  <small>${t("pastures.detail.utilization")}</small>
                               </div>
                           </div>
                       </div>
@@ -1783,7 +1819,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                                       ? "success"
                                       : "danger"
                                   }">${warning.details.availableSpace}</h5>
-                                  <small>Available Space</small>
+                                  <small>${t("pastures.detail.availableSpace")}</small>
                               </div>
                           </div>
                       </div>
@@ -1795,23 +1831,23 @@ export function showWarningDetails(pastureId, warningIndex) {
                       <div class="alert alert-info mt-4">
                           <h6 class="text-info mb-3">
                               <i class="bi bi-calculator me-2"></i>
-                              Capacity Calculation Details
+                              ${t("pastures.detail.capCalcHeading")}
                           </h6>
                           <div class="row">
                               <div class="col-md-6">
-                                  <p><strong>Source:</strong> ${
+                                  <p><strong>${t("pastures.detail.source")}</strong> ${
                                     warning.details.capacitySource
                                   }</p>
-                                  <p><strong>Method:</strong> ${
+                                  <p><strong>${t("pastures.detail.method")}</strong> ${
                                     warning.details.calculationMethod
                                       .description
                                   }</p>
                               </div>
                               <div class="col-md-6">
-                                  <p><strong>Formula:</strong> <code>${
+                                  <p><strong>${t("pastures.detail.formula")}</strong> <code>${
                                     warning.details.calculationMethod.formula
                                   }</code></p>
-                                  <p><strong>Details:</strong> ${
+                                  <p><strong>${t("pastures.detail.details")}</strong> ${
                                     warning.details.calculationMethod.details
                                   }</p>
                               </div>
@@ -1820,19 +1856,19 @@ export function showWarningDetails(pastureId, warningIndex) {
                       <div class="alert alert-success mt-3">
                           <h6 class="text-success mb-3">
                               <i class="bi bi-currency-dollar me-2"></i>
-                              Pasture Livestock Value
+                              ${t("pastures.detail.livestockValueHeading")}
                           </h6>
                           <div class="row">
                               <div class="col-md-4">
                                   <div class="text-center">
                                       <h5 class="text-success">$${warning.details.pastureValue.total.toLocaleString()}</h5>
-                                      <small>Total Value</small>
+                                      <small>${t("pastures.detail.totalValue")}</small>
                                   </div>
                               </div>
                               <div class="col-md-4">
                                   <div class="text-center">
                                       <h5 class="text-info">$${warning.details.pastureValue.average.toLocaleString()}</h5>
-                                      <small>Average per Animal</small>
+                                      <small>${t("pastures.detail.avgPerAnimal")}</small>
                                   </div>
                               </div>
                               <div class="col-md-4">
@@ -1843,7 +1879,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                                             .breakdown
                                         ).length
                                       }</h5>
-                                      <small>Animal Types</small>
+                                      <small>${t("pastures.detail.animalTypes")}</small>
                                   </div>
                               </div>
                           </div>
@@ -1853,7 +1889,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                             ).length > 0
                               ? `
                           <hr class="my-3">
-                          <h6 class="mb-2">Value Breakdown by Type:</h6>
+                          <h6 class="mb-2">${t("pastures.detail.valueBreakdownHeading")}</h6>
                           <div class="row">
                               ${Object.entries(
                                 warning.details.pastureValue.breakdown
@@ -1882,7 +1918,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                           <div class="card bg-secondary">
                               <div class="card-body text-center">
                                   <h5 class="text-info">${warning.details.totalMothers}</h5>
-                                  <small>Lactating Mothers</small>
+                                  <small>${t("pastures.detail.lactatingMothers")}</small>
                               </div>
                           </div>
                       </div>
@@ -1890,7 +1926,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                           <div class="card bg-secondary">
                               <div class="card-body text-center">
                                   <h5 class="text-warning">${warning.details.totalOffspring}</h5>
-                                  <small>Young Animals</small>
+                                  <small>${t("pastures.detail.youngAnimals")}</small>
                               </div>
                           </div>
                       </div>
@@ -1898,7 +1934,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                           <div class="card bg-secondary">
                               <div class="card-body text-center">
                                   <h5 class="text-success">+${warning.details.potentialMilkGain}L</h5>
-                                  <small>Potential Daily Gain</small>
+                                  <small>${t("pastures.detail.potentialDailyGain")}</small>
                               </div>
                           </div>
                       </div>
@@ -1910,7 +1946,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                           </div>
                           <h6 class="text-farm-accent mb-3 mt-4">
                               <i class="bi bi-arrow-left-right me-2"></i>
-                              Mother-Offspring Pairs
+                              ${t("pastures.detail.motherOffspringHeading")}
                           </h6>
                           <div class="row">
                       `;
@@ -1926,9 +1962,9 @@ export function showWarningDetails(pastureId, warningIndex) {
                                       <div class="card-header">
                                           <h6 class="mb-0 text-info">
                                               <i class="bi bi-droplet-fill me-2"></i>
-                                              Mother: ${motherName} (${
+                                              Mother: ${_safe(motherName)} (${_safe(
               pair.type
-            })
+            )})
                                           </h6>
                                       </div>
                                       <div class="card-body">
@@ -1952,7 +1988,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                                                       ""
                                                       ? offspring.name
                                                       : `#${offspring.id}`;
-                                                  return `<li><small>${offspringName} - ${
+                                                  return `<li><small>${_safe(offspringName)} - ${
                                                     offspring.age || 0
                                                   } months old</small></li>`;
                                                 })
@@ -1968,8 +2004,10 @@ export function showWarningDetails(pastureId, warningIndex) {
                           </div>
                           <div class="alert alert-info mt-3">
                               <i class="bi bi-lightbulb me-2"></i>
-                              <strong>Recommendation:</strong> Move the young animals to a separate pasture to allow mothers to produce milk at optimal capacity.
-                              This can increase daily milk production by an estimated ${warning.details.potentialMilkGain} liters.
+                              <strong>${t("pastures.detail.recommendationLabel")}</strong> ${t(
+                                "pastures.detail.recommendationCopy",
+                                { liters: warning.details.potentialMilkGain }
+                              )}
                           </div>
                           <div class="row">
                       `;
@@ -2167,15 +2205,29 @@ export function updatePastureDisplay() {
 function formatLowHealthStatusBadges(animal) {
   const statuses = [];
   if (Number(animal?.health ?? 0) < 20) {
-    statuses.push('<span class="badge bg-danger">Critical</span>');
+    statuses.push(
+      `<span class="badge bg-danger">${t("pastures.statusCritical")}</span>`
+    );
   } else {
-    statuses.push('<span class="badge bg-warning text-dark">Poor</span>');
+    statuses.push(
+      `<span class="badge bg-warning text-dark">${t(
+        "pastures.statusPoor"
+      )}</span>`
+    );
   }
   if (animal?.isPregnant) {
-    statuses.push('<span class="badge status-pregnant">Pregnant</span>');
+    statuses.push(
+      `<span class="badge status-pregnant">${t(
+        "pastures.statusPregnant"
+      )}</span>`
+    );
   }
   if (animal?.isLactating) {
-    statuses.push('<span class="badge status-lactating">Lactating</span>');
+    statuses.push(
+      `<span class="badge status-lactating">${t(
+        "pastures.statusLactating"
+      )}</span>`
+    );
   }
   return statuses.join(" ");
 }
@@ -2211,13 +2263,16 @@ export function showLowHealthAnimalsDrilldown() {
   const title = document.getElementById("warningModalLabel");
   if (!modalEl || !content || !title) return;
 
-  title.innerHTML = `<i class="bi bi-heart-pulse me-2 text-warning"></i>Low Health Animals (${affected.length})`;
+  title.innerHTML = `<i class="bi bi-heart-pulse me-2 text-warning"></i>${t(
+    "pastures.lowHealthDrilldownTitle",
+    { count: affected.length }
+  )}`;
 
   if (affected.length === 0) {
     content.innerHTML = `
       <div class="alert alert-success mb-0">
         <i class="bi bi-check-circle me-2"></i>
-        No animals are currently in poor/critical health across active-farm pastures.
+        ${t("pastures.lowHealthAllGood")}
       </div>
     `;
     new bootstrap.Modal(modalEl).show();
@@ -2233,10 +2288,10 @@ export function showLowHealthAnimalsDrilldown() {
       const healthClass = this.getHealthClass(animal.health);
       return `
         <tr>
-          <td>${animal.id}</td>
-          <td>${displayName}</td>
-          <td>${animal.subType || animal.type || "Unknown"}</td>
-          <td>${animal.pastureName}</td>
+          <td>${_safe(animal.id)}</td>
+          <td>${_safe(displayName)}</td>
+          <td>${_safe(animal.subType || animal.type || "Unknown")}</td>
+          <td>${_safe(animal.pastureName)}</td>
           <td>
             <div class="health-bar">
               <div class="health-fill ${healthClass}" style="width: ${Math.max(
@@ -2255,18 +2310,18 @@ export function showLowHealthAnimalsDrilldown() {
   content.innerHTML = `
     <div class="alert alert-warning mb-3">
       <i class="bi bi-exclamation-triangle me-2"></i>
-      <strong>${affected.length}</strong> animal(s) currently need attention.
+      <strong>${affected.length}</strong> ${t("pastures.lowHealthNeedAttention")}
     </div>
     <div class="table-responsive">
       <table class="table table-dark table-striped">
         <thead>
           <tr>
             <th>ID</th>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Pasture</th>
-            <th>Health</th>
-            <th>Status</th>
+            <th>${t("pastures.tableName")}</th>
+            <th>${t("pastures.tableType")}</th>
+            <th>${t("pastures.tablePasture")}</th>
+            <th>${t("pastures.tableHealth")}</th>
+            <th>${t("pastures.tableStatus")}</th>
           </tr>
         </thead>
         <tbody>${rows}</tbody>
@@ -2313,13 +2368,13 @@ export function renderPasturesList(pasturesList) {
               <div class="card-header d-flex justify-content-between align-items-center">
                   <h6 class="mb-0 d-flex align-items-center">
                       <i class="bi bi-house-door me-2"></i>
-                      ${pasture.name}
+                      ${_safe(pasture.name)}
                   </h6>
                   <div class="d-flex gap-2">
                       <button class="btn btn-outline-info btn-sm" onclick="dashboard.showPastureDetails('${
                         pasture.id
                       }')">
-                          <i class="bi bi-eye me-1"></i>Details
+                          <i class="bi bi-eye me-1"></i>${t("pastures.btnDetails")}
                       </button>
                   </div>
               </div>
@@ -2335,18 +2390,18 @@ export function renderPasturesList(pasturesList) {
               <div class="card-header d-flex justify-content-between align-items-center">
                   <h6 class="mb-0 d-flex align-items-center">
                       <i class="bi bi-house-door me-2"></i>
-                      ${pasture.name}
+                      ${_safe(pasture.name)}
                   </h6>
                   <div class="d-flex gap-2">
                       <button class="btn btn-outline-info btn-sm" onclick="dashboard.showPastureDetails('${
                         pasture.id
                       }')">
-                          <i class="bi bi-eye me-1"></i>Details
+                          <i class="bi bi-eye me-1"></i>${t("pastures.btnDetails")}
                       </button>
                       <button class="btn btn-outline-success btn-sm" onclick="dashboard.showPastureLivestock('${
                         pasture.id
                       }')">
-                          <i class="bi bi-table me-1"></i>Livestock
+                          <i class="bi bi-table me-1"></i>${t("pastures.btnLivestock")}
                       </button>
                   </div>
               </div>
@@ -2355,13 +2410,13 @@ export function renderPasturesList(pasturesList) {
                       <div class="col-md-3">
                           <div class="d-flex align-items-center mb-2">
                               <i class="bi bi-list-ol me-2 text-farm-accent"></i>
-                              <span><strong>Total Animals:</strong> ${
+                              <span><strong>${t("pastures.card.totalAnimals")}:</strong> ${
                                 pasture.animalCount
                               }</span>
                           </div>
                           <div class="d-flex align-items-center mb-2">
                               <i class="bi bi-heart-pulse me-2 text-farm-success"></i>
-                              <span><strong>Avg Health:</strong> ${
+                              <span><strong>${t("pastures.card.avgHealth")}:</strong> ${
                                 pasture.avgHealth
                               }%</span>
                           </div>
@@ -2369,13 +2424,13 @@ export function renderPasturesList(pasturesList) {
                       <div class="col-md-3">
                           <div class="d-flex align-items-center mb-2">
                               <i class="bi bi-gender-male me-2 text-info"></i>
-                              <span><strong>Males:</strong> ${
+                              <span><strong>${t("pastures.card.males")}:</strong> ${
                                 pasture.maleCount || 0
                               }</span>
                           </div>
                           <div class="d-flex align-items-center mb-2">
                               <i class="bi bi-gender-female me-2 text-danger"></i>
-                              <span><strong>Females:</strong> ${
+                              <span><strong>${t("pastures.card.females")}:</strong> ${
                                 pasture.femaleCount || 0
                               }</span>
                           </div>
@@ -2383,7 +2438,7 @@ export function renderPasturesList(pasturesList) {
                       <div class="col-md-3">
                           <div class="d-flex align-items-center mb-2">
                               <i class="bi bi-speedometer2 me-2 text-farm-info"></i>
-                              <span><strong>Productivity:</strong> ${prod}%</span>
+                              <span><strong>${t("pastures.card.productivity")}:</strong> ${prod}%</span>
                           </div>
                           ${(() => {
                             const hasMilkData =
@@ -2406,7 +2461,13 @@ export function renderPasturesList(pasturesList) {
                               return `
                           <div class="d-flex align-items-center mb-2">
                               <i class="bi bi-droplet-fill me-2 text-farm-info"></i>
-                              <span><strong>Lactating:</strong> ${pasture.milkProductionData.lactatingCows} animals</small></span>
+                              <span><strong>${t("pastures.card.lactating")}:</strong> ${t(
+                                "pastures.card.lactatingAnimals",
+                                {
+                                  count:
+                                    pasture.milkProductionData.lactatingCows,
+                                }
+                              )}</span>
                           </div>`;
                             }
                             return "";
@@ -2415,7 +2476,7 @@ export function renderPasturesList(pasturesList) {
                       <div class="col-md-3">
                           <div class="d-flex align-items-center mb-2">
                               <i class="bi bi-basket me-2 text-success"></i>
-                              <span><strong>Available Food:</strong> ${parseFloat(
+                              <span><strong>${t("pastures.card.availableFood")}:</strong> ${parseFloat(
                                 pasture.foodReport.availableFood ||
                                   pasture.foodReport.totalMixedRation ||
                                   0
@@ -2426,7 +2487,7 @@ export function renderPasturesList(pasturesList) {
                               ? `
                           <div class="d-flex align-items-center mb-2">
                               <i class="bi bi-droplet me-2 text-info"></i>
-                              <span><strong>Water:</strong> ${parseFloat(
+                              <span><strong>${t("pastures.card.water")}:</strong> ${parseFloat(
                                 pasture.foodReport.water
                               ).toFixed(0)}L</span>
                           </div>`
@@ -2437,7 +2498,7 @@ export function renderPasturesList(pasturesList) {
                               ? `
                           <div class="d-flex align-items-center mb-2">
                               <i class="bi bi-grid me-2 text-warning"></i>
-                              <span><strong>Straw:</strong> ${parseFloat(
+                              <span><strong>${t("pastures.card.straw")}:</strong> ${parseFloat(
                                 pasture.foodReport.straw
                               ).toFixed(0)}L</span>
                           </div>`
@@ -2462,9 +2523,9 @@ export function renderPasturesList(pasturesList) {
                               return `
                           <div class="d-flex align-items-center mb-2">
                               <i class="bi bi-graph-up me-2 text-success"></i>
-                              <span><strong>Production: </strong>${pasture.milkProductionData.hourlyProduction.toFixed(
+                              <span><strong>${t("pastures.card.production")}:</strong> ${pasture.milkProductionData.hourlyProduction.toFixed(
                                 1
-                              )}L/h</small></span>
+                              )}L/h</span>
                           </div>
 `;
                             }
@@ -2479,7 +2540,7 @@ export function renderPasturesList(pasturesList) {
                       <div class="mt-3">
                           <h6 class="text-warning">
                               <i class="bi bi-exclamation-triangle me-2"></i>
-                              Active Warnings
+                              ${t("pastures.warningsHeading")}
                           </h6>
                           <div class="row">
                               ${warnings

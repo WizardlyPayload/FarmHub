@@ -2,9 +2,9 @@
 
 Desktop companion for **Farming Simulator 25**: a Windows app plus an in-game mod that exports live farm data to a browser dashboard (local disk or FTP). **Repository root on GitHub:** **FarmHub**.
 
-**Releases:** [github.com/WizardlyPayload/FS25-Farm-Dashboard/releases](https://github.com/WizardlyPayload/FS25-Farm-Dashboard/releases)
+**Releases:** [github.com/WizardlyPayload/FarmHub/releases](https://github.com/WizardlyPayload/FarmHub/releases)
 
-**Current line:** App **3.0.0** · Mod **2.0.0.0** (bump `modDesc.xml` only if you ship a new mod build).
+**Current line:** App **3.9.0** · Mod **2.3.0.0** (`modDesc.xml` and Lua aligned).
 
 ---
 
@@ -51,7 +51,7 @@ npm install
 npm run dist
 ```
 
-Default **`npm run dist`** (via `tools/run-electron-builder.mjs`) writes the installer under **`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out`** to avoid file locks on `app.asar` inside the repo. See **[docs/CHANGELOG.md](docs/CHANGELOG.md)** §**3.0.0**.
+Default **`npm run dist`** (via `tools/run-electron-builder.mjs`) writes the installer under **`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out`** to avoid file locks on `app.asar` inside the repo. In-repo output: **`npm run dist:in-repo`** → `FS25_FarmDashboard_App/electron-pack-out`. See **[docs/CHANGELOG.md](docs/CHANGELOG.md)** §**3.9.0** and §**3.0.0**.
 
 ```bash
 npm start

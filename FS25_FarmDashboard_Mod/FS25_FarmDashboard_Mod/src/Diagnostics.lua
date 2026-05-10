@@ -16,6 +16,8 @@ D.enabled = false
 D.buckets = {}
 D.lastDumpClockSec = 0
 D.dumpIntervalSec = 60
+--- Last mission-frame dt in ms (written by FarmDashboardDataCollector:update when dt > 0).
+D.lastUpdateDtMs = nil
 
 -- Plan v5 B10: even with diagnostics disabled (verbose logging off), the autotuner needs a
 -- minimal histogram for `animals_collectStep`. Buckets in this set are always collected.
@@ -130,6 +132,19 @@ function D:bucketStats(name)
         p99 = p99,
         max = b.maxMs,
         avg = avg,
+    }
+end
+
+--- Plain snapshot for orchestrator stress heuristics (no engine cpuLoad in FS25 Lua).
+--- sliceBudgetMs is optional; matches farmDashboard.settings#sliceBudgetMs when passed.
+function D:getLoadInfo(sliceBudgetMs)
+    local ac = self:bucketStats("animals_collectStep")
+    return {
+        cpuLoad = nil,
+        animalsCollectMedianMs = ac and ac.median or nil,
+        animalsCollectP99Ms = ac and ac.p99 or nil,
+        sliceBudgetMs = sliceBudgetMs,
+        lastUpdateDtMs = self.lastUpdateDtMs,
     }
 end
 

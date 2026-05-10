@@ -57,10 +57,10 @@ Transport (**cleartext HTTP Basic**) is unchanged — still **home-LAN only** un
 
 ## Upgrade / next step (v4)
 
-1. Build and sign **`3.9.0`** NSIS installer.  
+1. Follow **[RELEASE_READINESS_v3.9.md](./RELEASE_READINESS_v3.9.md)** — build and publish **`3.9.0`** with **`latest.yml`** + installer on GitHub Releases.  
 2. Follow **[UPDATER_QA.md](./UPDATER_QA.md)** — publish **4.0.0** on the GitHub repo configured in **`FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json`** → **`build.publish`** (**`owner`: `WizardlyPayload`**, **`repo`: `FarmHub`**, **`releaseType`: `release`**).  
 3. **`app-updater.js`** is only active when **`app.isPackaged`** is true — dev (`npm start`) skips the updater (`initAppUpdater` returns immediately in development).  
-4. When QA passes, promote **v4** as the advertised stable line.
+4. When QA passes, promote **v4** as the advertised stable line. Full-project findings: **[PROJECT_DEEP_AUDIT_FARMHUB.md](./PROJECT_DEEP_AUDIT_FARMHUB.md)**.
 
 ---
 

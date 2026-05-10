@@ -203,6 +203,9 @@ local function _copyFileFs25BestEffort(src, dst)
     return false
 end
 
+--- Cap for read/write fallback when rename/copy fail (atomic write recovery only). Bounds hitch vs huge tmp→final copies.
+local MOVE_FALLBACK_READ_MAX = 2 * 1024 * 1024
+
 --- Replace `src` with `dst` (move). Works when `os` is nil. Returns true on success.
 local function _movePathBestEffort(src, dst)
     if type(src) ~= "string" or type(dst) ~= "string" then return false end
@@ -214,7 +217,7 @@ local function _movePathBestEffort(src, dst)
         pcall(function() deleteFile(src) end)
         return true
     end
-    local body = _readPathLimited(src, 8 * 1024 * 1024)
+    local body = _readPathLimited(src, MOVE_FALLBACK_READ_MAX)
     if body and type(io) == "table" and type(io.open) == "function" then
         local o, e = io.open(dst, "w")
         if o then
@@ -1093,6 +1096,26 @@ function FarmDashboardDataCollector:runIncrementalActiveStep(order)
         return
     end
 
+    local sliceMs = self.config.sliceBudgetMs or 4
+    local arps = self.config.animalRowsPerSlice or 256
+    local D = rawget(_G, "FarmDashDiagnostics")
+    if D and type(D.getLoadInfo) == "function" then
+        local info = D:getLoadInfo(sliceMs)
+        local stress = false
+        if info.animalsCollectMedianMs and sliceMs > 0 and info.animalsCollectMedianMs > sliceMs * 0.5 then
+            stress = true
+        end
+        if info.animalsCollectP99Ms and sliceMs > 0 and info.animalsCollectP99Ms > sliceMs then
+            stress = true
+        end
+        if info.lastUpdateDtMs and info.lastUpdateDtMs > 25 then
+            stress = true
+        end
+        if stress then
+            arps = math.min(arps, 64)
+        end
+    end
+
     local opts = {
         batchSize = self.config.fieldsPerFrame or 8,
         animalBatch = self.config.animalsPerFrame or 2,
@@ -1102,8 +1125,8 @@ function FarmDashboardDataCollector:runIncrementalActiveStep(order)
         productionChainsPerYield = self.config.productionChainsPerYield or 2,
         productionPlaceablesPerYield = self.config.productionPlaceablesPerYield or 10,
         --- Phase 2: row-count caps as primary safety net + opportunistic wall-clock budget.
-        animalRowsPerSlice = self.config.animalRowsPerSlice or 256,
-        sliceBudgetMs = self.config.sliceBudgetMs or 4,
+        animalRowsPerSlice = arps,
+        sliceBudgetMs = sliceMs,
     }
 
     local results = { xpcall(function() return c:collectStep(opts) end, function(e)
@@ -1178,6 +1201,10 @@ end
 
 function FarmDashboardDataCollector:update(dt)
     if type(dt) ~= "number" then return end
+    local diagEarly = rawget(_G, "FarmDashDiagnostics")
+    if diagEarly and dt > 0 then
+        diagEarly.lastUpdateDtMs = dt * 1000
+    end
     if not _G.g_currentMission then return end
 
     local diag = rawget(_G, "FarmDashDiagnostics")

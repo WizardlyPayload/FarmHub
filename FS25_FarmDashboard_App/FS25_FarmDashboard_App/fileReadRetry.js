@@ -1,4 +1,4 @@
-// Small sync read retries for Windows + OneDrive / AV locks on XML and JSON.
+// Small read retries for Windows + OneDrive / AV locks on XML and JSON.
 
 const fs = require('fs');
 
@@ -12,6 +12,11 @@ function sleepSync(ms) {
         const end = Date.now() + n;
         while (Date.now() < end) { /* sync fallback */ }
     }
+}
+
+function delay(ms) {
+    const n = Math.max(0, Math.min(Number(ms) || 0, 5000));
+    return new Promise((resolve) => setTimeout(resolve, n));
 }
 
 function shouldRetryRead(err) {
@@ -47,6 +52,47 @@ function readFileUtf8WithRetry(filePath, opts = {}) {
     return null;
 }
 
+/**
+ * Async UTF-8 read with the same retry semantics as {@link readFileUtf8WithRetry}.
+ * @param {string} filePath
+ * @param {{ maxAttempts?: number, baseDelayMs?: number }} [opts]
+ * @returns {Promise<string|null>}
+ */
+async function readFileUtf8WithRetryAsync(filePath, opts = {}) {
+    const maxAttempts = Math.max(1, Math.min(parseInt(opts.maxAttempts, 10) || 5, 12));
+    const baseDelayMs = Math.max(10, Math.min(parseInt(opts.baseDelayMs, 10) || 60, 500));
+    let lastErr = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await fs.promises.access(filePath, fs.constants.F_OK);
+        } catch (e) {
+            if (e && e.code === 'ENOENT') return null;
+            lastErr = e;
+            if (!shouldRetryRead(e) || attempt >= maxAttempts) {
+                if (e && e.message) console.warn(`[readFileUtf8WithRetryAsync] ${filePath}: ${e.message}`);
+                return null;
+            }
+            await delay(baseDelayMs * attempt);
+            continue;
+        }
+        try {
+            return await fs.promises.readFile(filePath, 'utf8');
+        } catch (e) {
+            lastErr = e;
+            const code = e && e.code;
+            if (code === 'ENOENT') return null;
+            if (!shouldRetryRead(e) || attempt >= maxAttempts) break;
+            await delay(baseDelayMs * attempt);
+        }
+    }
+    if (lastErr && lastErr.message) {
+        console.warn(`[readFileUtf8WithRetryAsync] ${filePath}: ${lastErr.message}`);
+    }
+    return null;
+}
+
 module.exports = {
     readFileUtf8WithRetry,
+    readFileUtf8WithRetryAsync,
+    delay,
 };

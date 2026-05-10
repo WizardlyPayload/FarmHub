@@ -1,4 +1,4 @@
--- FS25 FarmDashboard | AnimalDataCollector.lua | v2.2.0
+-- FS25 FarmDashboard | AnimalDataCollector.lua | v2.3.0
 -- Pure state-machine collector. NO coroutines. NO yields.
 -- Phase 1: single-pass cluster walk; Phase 2: row-count caps + opportunistic wall-clock budget;
 -- Phase 4: hard LOD with dual-mode (base sums numAnimals, RL buckets individual Animal instances).
@@ -10,6 +10,109 @@ AnimalDataCollector = {}
 local STAGE_INIT       = 0
 local STAGE_PLACEABLES = 1
 local STAGE_DONE       = 2
+
+--- RL LOD: beyond this individual count per pen, walk a systematic subsample and scale aggregates.
+local RL_SAMPLE_THRESHOLD = 50
+local RL_SAMPLE_RATE      = 0.1
+
+local function _subtypeMix(str)
+    if type(str) ~= "string" or str == "" then return 0 end
+    local h = 0
+    for i = 1, math.min(#str, 48) do
+        h = (h * 33 + string.byte(str, i)) % 4096
+    end
+    return h
+end
+
+--- Numeric bucket key for RL individuals (avoids per-animal string concat GC).
+local function _packRlAnimalKey(a)
+    local sti = math.floor(tonumber(a.subTypeIndex) or 0)
+    if sti < 0 then sti = 0 end
+    if sti > 65535 then sti = 65535 end
+    local ageMonths = math.floor(a.age or 0)
+    local ageDecile = math.floor(ageMonths / 12)
+    if ageDecile > 255 then ageDecile = 255 end
+    local male = (a.gender == "male") and 1 or 0
+    local preg = a.isPregnant and 1 or 0
+    local lac = a.isLactating and 1 or 0
+    local mix = 0
+    if sti == 0 then
+        mix = _subtypeMix(tostring(a.subType or ""))
+    end
+    return sti * 1073741824 + ageDecile * 4194304 + male * 2097152 + preg * 1048576 + lac * 524288 + mix
+end
+
+--- Numeric bucket key for base-game cluster rows.
+local function _packBaseClusterKey(c)
+    local sti = math.floor(tonumber(c.subTypeIndex) or 0)
+    if sti < 0 then sti = 0 end
+    if sti > 65535 then sti = 65535 end
+    local ageMonths = math.floor(c.age or 0)
+    local ageDecile = math.floor(ageMonths / 12)
+    if ageDecile > 255 then ageDecile = 255 end
+    local male = (c.gender == "male") and 1 or 0
+    local mix = 0
+    if sti == 0 then
+        mix = _subtypeMix(tostring(c.subType or c.fillType or ""))
+    end
+    return sti * 1073741824 + ageDecile * 4194304 + male * 2097152 + mix
+end
+
+local function _scaleRlSampledBuckets(st)
+    local sc = st.rlScale or 1
+    if sc <= 1 then return end
+    local function ri(x)
+        x = tonumber(x) or 0
+        return math.floor(x * sc + 0.5)
+    end
+    for _, key in ipairs(st.bucketKeys) do
+        local b = st.buckets[key]
+        if b then
+            b.count = ri(b.count)
+            b.sumWeight = (b.sumWeight or 0) * sc
+            b.sumHealth = (b.sumHealth or 0) * sc
+            b.sumAgeMonths = (b.sumAgeMonths or 0) * sc
+            b.sumGenFert = (b.sumGenFert or 0) * sc
+            b.sumGenProd = (b.sumGenProd or 0) * sc
+            b.sumGenHealth = (b.sumGenHealth or 0) * sc
+            b.sumGenMetabolism = (b.sumGenMetabolism or 0) * sc
+            b.sumGenQuality = (b.sumGenQuality or 0) * sc
+            b.castratedCount = ri(b.castratedCount or 0)
+            b.diseasedCount = ri(b.diseasedCount or 0)
+            b.markedCount = ri(b.markedCount or 0)
+        end
+    end
+end
+
+--- Full pass over RL individuals (age only) to fix min/max after sampling distorted within-bucket extrema.
+local function _patchRlAgeMinMaxFromFullScan(st)
+    local sc = st.rlScale or 1
+    if sc <= 1 then return end
+    if not st.rlAnimals or not st.clusterKeys then return end
+    local mmByKey = {}
+    for _, kk in ipairs(st.clusterKeys) do
+        local a = st.rlAnimals[kk]
+        if a and a.subType then
+            local kn = _packRlAnimalKey(a)
+            local am = math.floor(a.age or 0)
+            local e = mmByKey[kn]
+            if not e then
+                mmByKey[kn] = { min = am, max = am }
+            else
+                if am < e.min then e.min = am end
+                if am > e.max then e.max = am end
+            end
+        end
+    end
+    for _, key in ipairs(st.bucketKeys) do
+        local b = st.buckets[key]
+        local mm = mmByKey[key]
+        if b and mm then
+            b.minAgeMonths = mm.min
+            b.maxAgeMonths = mm.max
+        end
+    end
+end
 
 function AnimalDataCollector:init()
     self._iter = nil
@@ -34,9 +137,27 @@ local function _anyMarkActive(marks)
     return false
 end
 
+--- Cached per collectBegin(); keyed by uniqueId when present.
+local function _anyMarkActiveCached(a)
+    local marks = a and a.marks
+    if type(marks) ~= "table" then return false end
+    local uid = rawget(a, "uniqueId")
+    local cache = AnimalDataCollector._markCache
+    if uid ~= nil and cache then
+        local hit = cache[uid]
+        if hit ~= nil then return hit end
+    end
+    local v = _anyMarkActive(marks)
+    if uid ~= nil and cache then
+        cache[uid] = v
+    end
+    return v
+end
+
 --- Public hooks -------------------------------------------------------------
 
 function AnimalDataCollector:collectBegin()
+    AnimalDataCollector._markCache = {}
     self._iter = {
         stage = STAGE_INIT,
         list = {},
@@ -335,7 +456,7 @@ function AnimalDataCollector:_walkBase(clusters, st, rowsLeft)
             local ageMonths = math.floor(c.age or 0)
             local ageDecile = math.floor(ageMonths / 12)
             local gender = (c.gender == "male") and "male" or "female"
-            local key = subType .. "|" .. tostring(ageDecile) .. "|" .. gender
+            local key = _packBaseClusterKey(c)
             local b = st.buckets[key]
             if not b then
                 b = {
@@ -372,6 +493,7 @@ end
 
 --- RealisticLivestock: each cluster IS an individual animal; bucket by (subType, ageDecile, gender, pregnant, lactating).
 --- isCastrated and hasDisease are tracked as counts inside each bucket, never in the key.
+--- Large herds: systematic sampling + scale (see RL_SAMPLE_*); marks cached by uniqueId per slice.
 function AnimalDataCollector:_walkRL(animals, st, rowsLeft)
     if not st.clusterKeys then
         st.clusterKeys = {}
@@ -379,6 +501,14 @@ function AnimalDataCollector:_walkRL(animals, st, rowsLeft)
             st.clusterKeys[#st.clusterKeys + 1] = k
         end
         st.clusterIdx = 1
+        st.rlAnimals = animals
+        local nTotal = #st.clusterKeys
+        st.rlStride = 1
+        st.rlScale = 1
+        if nTotal >= RL_SAMPLE_THRESHOLD then
+            st.rlStride = math.max(2, math.ceil(1.0 / RL_SAMPLE_RATE))
+            st.rlScale = st.rlStride
+        end
     end
 
     local D = rawget(_G, "FarmDashDiagnostics")
@@ -386,18 +516,21 @@ function AnimalDataCollector:_walkRL(animals, st, rowsLeft)
 
     local keys = st.clusterKeys
     local n = #keys
-    local processed = 0
+    local stride = st.rlStride or 1
+    local heavyProcessed = 0
 
-    while st.clusterIdx <= n and processed < rowsLeft do
-        local a = animals[keys[st.clusterIdx]]
-        if a and a.subType then
+    while st.clusterIdx <= n do
+        if heavyProcessed >= rowsLeft then break end
+
+        local idx = st.clusterIdx
+        local a = animals[keys[idx]]
+        local doHeavy = (stride <= 1) or (((idx - 1) % stride) == 0)
+
+        if a and a.subType and doHeavy then
             local ageMonths = math.floor(a.age or 0)
             local ageDecile = math.floor(ageMonths / 12)
             local gender = (a.gender == "male") and "male" or "female"
-            local key = tostring(a.subType) .. "|" .. tostring(ageDecile)
-                .. "|" .. gender
-                .. "|" .. (a.isPregnant and "P" or "p")
-                .. "|" .. (a.isLactating and "L" or "l")
+            local key = _packRlAnimalKey(a)
 
             local b = st.buckets[key]
             if not b then
@@ -449,16 +582,16 @@ function AnimalDataCollector:_walkRL(animals, st, rowsLeft)
             if type(a.diseases) == "table" and #a.diseases > 0 then
                 b.diseasedCount = b.diseasedCount + 1
             end
-            if type(a.marks) == "table" and _anyMarkActive(a.marks) then
+            if type(a.marks) == "table" and _anyMarkActiveCached(a) then
                 b.markedCount = b.markedCount + 1
             end
+            heavyProcessed = heavyProcessed + 1
         end
-        st.clusterIdx = st.clusterIdx + 1
-        processed = processed + 1
+        st.clusterIdx = idx + 1
     end
 
     diagStop(D, innerTok)
-    st.rowsConsumedThisStep = (st.rowsConsumedThisStep or 0) + processed
+    st.rowsConsumedThisStep = (st.rowsConsumedThisStep or 0) + heavyProcessed
     return st.clusterIdx > n
 end
 
@@ -466,6 +599,11 @@ end
 function AnimalDataCollector:_finalizePen(placeable, st)
     local row = st.row
     if not row then return nil end
+
+    if (st.rlScale or 1) > 1 then
+        _scaleRlSampledBuckets(st)
+        _patchRlAgeMinMaxFromFullScan(st)
+    end
 
     local clustersOut = {}
     local totalCount = 0

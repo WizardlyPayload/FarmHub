@@ -16,3 +16,16 @@ The Windows packaged app uses `electron-updater` ([`app-updater.js`](../FS25_Far
 ## Notes
 
 - `autoDownload` and `autoInstallOnAppQuit` are enabled in code; user still confirms immediate restart from the dialog when a download completes.
+
+---
+
+## Rehearsing the path to **v4.0.0** (recommended)
+
+Use this once **3.9.0** is published with **`latest.yml`** + installer attached.
+
+1. Install **3.9.0** from the GitHub Release (packaged build — not `npm start`).
+2. Launch, wait ~10s, confirm updater logs look sane ([What to verify](#what-to-verify)).
+3. Build **4.0.0** locally (`package.json` **4.0.0** → `npm run dist`), publish a **draft or pre-release** on GitHub with the new **`latest.yml`** and **`Setup 4.0.0.exe`**.
+4. Restart the **3.9.0** install — expect **update available** → **downloading** → dialog when ready → **Restart** installs **4.0.0**.
+
+Operator checklist: [RELEASE_READINESS_v3.9.md](./RELEASE_READINESS_v3.9.md).

@@ -40,11 +40,41 @@ const {
     collectFarmDashboardModSettingsRoots,
     selectPreferredFs25UserDataRoot,
 } = require('./fs25Paths');
-const { readFileUtf8WithRetry } = require('./fileReadRetry');
+const { readFileUtf8WithRetryAsync } = require('./fileReadRetry');
 const livestockDetailModule = require('./livestockDetail.js');
 const { validateLanCredentials } = require('./lanCredentialPolicy.js');
 
 const store = new Store({ defaults: { ...LAN_ACCESS_DEFAULTS } });
+
+/** In-memory LAN prefs snapshot — refreshed at startup and whenever LAN settings are saved (avoid hot-path store.get churn). */
+let lanSecurityCache = {
+    lanAccessEnabled: LAN_ACCESS_DEFAULTS.lanAccessEnabled,
+    lanUsername: LAN_ACCESS_DEFAULTS.lanUsername,
+    lanPassword: LAN_ACCESS_DEFAULTS.lanPassword,
+    lanAllowedIPs: LAN_ACCESS_DEFAULTS.lanAllowedIPs,
+    lanAuthOptional: LAN_ACCESS_DEFAULTS.lanAuthOptional,
+};
+
+function refreshLanSecurityCache() {
+    lanSecurityCache.lanAccessEnabled = store.get('lanAccessEnabled', LAN_ACCESS_DEFAULTS.lanAccessEnabled);
+    lanSecurityCache.lanUsername = store.get('lanUsername', LAN_ACCESS_DEFAULTS.lanUsername);
+    lanSecurityCache.lanPassword = store.get('lanPassword', LAN_ACCESS_DEFAULTS.lanPassword);
+    lanSecurityCache.lanAllowedIPs = store.get('lanAllowedIPs', LAN_ACCESS_DEFAULTS.lanAllowedIPs);
+    lanSecurityCache.lanAuthOptional = !!store.get('lanAuthOptional', LAN_ACCESS_DEFAULTS.lanAuthOptional);
+}
+
+refreshLanSecurityCache();
+
+/** @returns {Promise<boolean>} true if path exists and is accessible */
+async function pathExists(filePath) {
+    try {
+        await fs.promises.access(filePath, fs.constants.F_OK);
+        return true;
+    } catch (e) {
+        if (e && e.code === 'ENOENT') return false;
+        throw e;
+    }
+}
 
 /** Same Documents folder as Explorer / FS25 (handles moved profiles); null if unavailable. */
 function getElectronDocumentsPath() {
@@ -141,22 +171,33 @@ const serverCacheSaveTimers = {};
 
 
 /** PowerShell script: repo tools/ or packaged resources/tools/ */
-function getModExportScriptPath() {
+async function resolveModExportScriptPath() {
     if (app.isPackaged) {
         const p = path.join(process.resourcesPath, 'tools', 'Export-ModStoreImages.ps1');
-        if (fs.existsSync(p)) return p;
+        try {
+            await fs.promises.access(p, fs.constants.F_OK);
+            return p;
+        } catch {
+            /* fall through to dev repo path */
+        }
     }
     return path.join(__dirname, '..', '..', 'tools', 'Export-ModStoreImages.ps1');
 }
 
 /** Optional bundled DirectXTex texconv (place at resources/texconv/texconv.exe). */
-function getBundledTexconvPath() {
+async function resolveBundledTexconvPath() {
     const candidates = [
         path.join(__dirname, 'resources', 'texconv', 'texconv.exe'),
-        path.join(process.resourcesPath || '', 'texconv', 'texconv.exe')
+        path.join(process.resourcesPath || '', 'texconv', 'texconv.exe'),
     ];
     for (const p of candidates) {
-        if (p && fs.existsSync(p)) return p;
+        if (!p) continue;
+        try {
+            await fs.promises.access(p, fs.constants.F_OK);
+            return p;
+        } catch {
+            /* try next */
+        }
     }
     return null;
 }
@@ -198,8 +239,10 @@ async function runExportModStoreImages(progressSender) {
         return { ok: false, error: msg };
     }
 
-    const scriptPath = getModExportScriptPath();
-    if (!fs.existsSync(scriptPath)) {
+    const scriptPath = await resolveModExportScriptPath();
+    try {
+        await fs.promises.access(scriptPath, fs.constants.F_OK);
+    } catch {
         const err = `Export script not found:\n${scriptPath}`;
         if (mainWindow) {
             await dialog.showMessageBox(mainWindow, { type: 'error', title: 'Mod shop images', message: err, buttons: ['OK'] });
@@ -211,10 +254,14 @@ async function runExportModStoreImages(progressSender) {
     const outputDir = path.join(__dirname, 'web', 'assests', 'img', 'items_mod_extract');
     const summaryJson = path.join(app.getPath('temp'), 'farmdash-mod-export-summary.json');
     try {
-        if (fs.existsSync(summaryJson)) fs.unlinkSync(summaryJson);
-    } catch (e) { /* ignore */ }
+        await fs.promises.unlink(summaryJson);
+    } catch (e) {
+        if (e && e.code !== 'ENOENT') {
+            console.warn('[export-mod-store-images] unlink old summary:', e.message);
+        }
+    }
 
-    const texconv = getBundledTexconvPath();
+    const texconv = await resolveBundledTexconvPath();
     const args = [
         '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath,
         '-ModsRoot', modsRoot,
@@ -306,12 +353,14 @@ async function runExportModStoreImages(progressSender) {
 
     let summary = null;
     try {
-        if (fs.existsSync(summaryJson)) {
-            const raw = stripUtf8Bom(fs.readFileSync(summaryJson, 'utf8'));
-            summary = JSON.parse(raw);
-        }
+        const raw = stripUtf8Bom(await fs.promises.readFile(summaryJson, 'utf8'));
+        summary = JSON.parse(raw);
     } catch (e) {
-        console.warn('[export-mod-store-images] summary parse:', e.message);
+        if (e && e.code === 'ENOENT') {
+            /* PowerShell did not write summary */
+        } else {
+            console.warn('[export-mod-store-images] summary parse:', e && e.message ? e.message : e);
+        }
     }
 
     if (!summary) {
@@ -406,14 +455,9 @@ let server = null;
 /** @type {import('ws').WebSocketServer | null} */
 let wss = null;
 
+/** @returns {typeof lanSecurityCache} Read-only contract — do not mutate (shared snapshot). */
 function getLanSecurityFromStore() {
-    return {
-        lanAccessEnabled: store.get('lanAccessEnabled', LAN_ACCESS_DEFAULTS.lanAccessEnabled),
-        lanUsername:      store.get('lanUsername', LAN_ACCESS_DEFAULTS.lanUsername),
-        lanPassword:      store.get('lanPassword', LAN_ACCESS_DEFAULTS.lanPassword),
-        lanAllowedIPs:    store.get('lanAllowedIPs', LAN_ACCESS_DEFAULTS.lanAllowedIPs),
-        lanAuthOptional:  !!store.get('lanAuthOptional', LAN_ACCESS_DEFAULTS.lanAuthOptional),
-    };
+    return lanSecurityCache;
 }
 
 /** `0.0.0.0` when LAN access is enabled; else localhost only. */
@@ -732,26 +776,31 @@ expressApp.use(express.static(path.join(__dirname, 'web')));
 /** setup.html uses src="web/assests/..." — same paths work over http://host:8766/… and file:// */
 expressApp.use('/web', express.static(path.join(__dirname, 'web')));
 /** Same icon as the Windows desktop app (electron-builder `icon.ico`) — splash screen in web/index.html */
-expressApp.get('/app-brand-icon.ico', (req, res) => {
+expressApp.get('/app-brand-icon.ico', async (req, res) => {
     const icoPath = path.join(__dirname, 'icon.ico');
-    if (fs.existsSync(icoPath)) {
+    try {
+        await fs.promises.access(icoPath, fs.constants.F_OK);
         res.type('image/x-icon');
         return res.sendFile(icoPath);
+    } catch (_) {
+        /* fall through */
     }
     const pngFallback = path.join(__dirname, 'web', 'assests', 'img', 'app-icon.png');
-    if (fs.existsSync(pngFallback)) {
+    try {
+        await fs.promises.access(pngFallback, fs.constants.F_OK);
         res.type('image/png');
         return res.sendFile(pngFallback);
+    } catch (_) {
+        res.status(404).end();
     }
-    res.status(404).end();
 });
 expressApp.get('/', (req, res) => res.sendFile(path.join(__dirname, 'web', 'index.html')));
-expressApp.get('/setup.html', (req, res) => {
+expressApp.get('/setup.html', async (req, res) => {
     try {
         ensureSetupWriteToken();
         const token = String(store.get('farmdashSetupWriteToken') || '');
         const p = path.join(__dirname, 'setup.html');
-        let html = fs.readFileSync(p, 'utf8');
+        let html = await fs.promises.readFile(p, 'utf8');
         const inj = `<script>window.__FARMDASH_SETUP_TOKEN=${JSON.stringify(token)};</script>`;
         const i = html.indexOf('</head>');
         if (i === -1) {
@@ -980,7 +1029,7 @@ function enforceWriteOriginAndToken(req, res) {
     }
     // When LAN access is enabled the API binds beyond localhost — require setup token for writes.
     // With LAN off, only local processes reach the port; same-origin check above still applies for browsers.
-    const lanOn = !!store.get('lanAccessEnabled', false);
+    const lanOn = !!getLanSecurityFromStore().lanAccessEnabled;
     if (!lanOn) return null;
     ensureSetupWriteToken();
     const expected = String(store.get('farmdashSetupWriteToken') || '');
@@ -1112,17 +1161,24 @@ expressApp.get('/api/lan-ws-token', (req, res) => {
 
 
 /** Curated PNGs under items/ + exported mod shop PNGs under items_mod_extract/ (for vehicle image matching). */
-expressApp.get('/api/item-image-filenames', (req, res) => {
+expressApp.get('/api/item-image-filenames', async (req, res) => {
     const itemsDir = path.join(__dirname, 'web', 'assests', 'img', 'items');
     const modDir = path.join(__dirname, 'web', 'assests', 'img', 'items_mod_extract');
-    const listPng = (dir) => {
+    const listPng = async (dir) => {
         try {
-            return fs.readdirSync(dir).filter((f) => /\.png$/i.test(f));
+            const names = await fs.promises.readdir(dir);
+            return names.filter((f) => /\.png$/i.test(f));
         } catch (e) {
             return [];
         }
     };
-    res.json({ items: listPng(itemsDir), modExtract: listPng(modDir) });
+    try {
+        const [items, modExtract] = await Promise.all([listPng(itemsDir), listPng(modDir)]);
+        res.json({ items, modExtract });
+    } catch (e) {
+        console.error('[api/item-image-filenames]', e);
+        res.status(500).json({ items: [], modExtract: [], error: String(e.message || e) });
+    }
 });
 
 /**
@@ -1434,7 +1490,7 @@ function applyLuaLiveBackupIfStaleExport(merged, luaPayload, state) {
  * Boot-time hydration from the latest already-written Lua JSON.
  * This lets the dashboard show "last known server/save state" even while FS25 is not running.
  */
-function hydrateLuaSnapshotFromDiskAtBoot(srv) {
+async function hydrateLuaSnapshotFromDiskAtBoot(srv) {
     try {
         const state = serverStates[srv.id];
         if (!state) return;
@@ -1444,8 +1500,8 @@ function hydrateLuaSnapshotFromDiskAtBoot(srv) {
         } else if (srv.mode === 'ftp') {
             luaJsonPath = path.join(app.getPath('userData'), `data_${srv.id}.json`);
         }
-        if (!luaJsonPath || !fs.existsSync(luaJsonPath)) return;
-        const raw = readFileUtf8WithRetry(luaJsonPath);
+        if (!luaJsonPath || !(await pathExists(luaJsonPath))) return;
+        const raw = await readFileUtf8WithRetryAsync(luaJsonPath);
         if (raw == null) return;
         processLuaData(srv.id, stripUtf8Bom(raw));
         console.log(`[Boot] [${srv.id}] Hydrated Lua snapshot from disk: ${luaJsonPath}`);
@@ -1579,7 +1635,7 @@ function processLuaData(serverId, raw) {
 async function downloadFtpSavegameXml(srv, saveSlot) {
     const slot = saveSlot || srv.localSubFolder || 'savegame1';
     const localDir = path.join(app.getPath('userData'), 'ftpXmlCache', srv.id, slot);
-    fs.mkdirSync(localDir, { recursive: true });
+    await fs.promises.mkdir(localDir, { recursive: true });
 
     const remoteDir = srv.ftpSavegameRemoteDir
         ? String(srv.ftpSavegameRemoteDir).replace(/\\/g, '/').replace(/\/$/, '')
@@ -1761,7 +1817,7 @@ async function triggerXmlPoll(serverId) {
 
 // ── Local file watcher ────────────────────────────────────────────────────────
 
-function startLocalWatching(srv) {
+async function startLocalWatching(srv) {
     const state = serverStates[srv.id];
 
     let basePath = srv.localPath;
@@ -1773,9 +1829,13 @@ function startLocalWatching(srv) {
                        srv.name.replace(/[<>:"/\\|?*]/g, '').trim();
     const luaJsonPath = path.join(basePath, folderName, 'data.json');
 
-    if (!fs.existsSync(luaJsonPath)) {
+    if (!(await pathExists(luaJsonPath))) {
         console.log(`[Local] Waiting for: ${luaJsonPath}`);
-        const t = setTimeout(() => startLocalWatching(srv), 5000);
+        const t = setTimeout(() => {
+            startLocalWatching(srv).catch((err) => {
+                console.error(`[Local] startLocalWatching retry failed [${srv.id}]:`, err && err.message ? err.message : err);
+            });
+        }, 5000);
         state.intervals.push(t);
         return;
     }
@@ -1783,8 +1843,13 @@ function startLocalWatching(srv) {
     console.log(`[Local] Watching: ${luaJsonPath}`);
 
     const readFile = () => {
-        const raw = readFileUtf8WithRetry(luaJsonPath);
-        if (raw != null) processLuaData(srv.id, stripUtf8Bom(raw));
+        readFileUtf8WithRetryAsync(luaJsonPath)
+            .then((raw) => {
+                if (raw != null) processLuaData(srv.id, stripUtf8Bom(raw));
+            })
+            .catch((e) => {
+                console.warn(`[Local] read data.json [${srv.id}]:`, e && e.message ? e.message : e);
+            });
     };
 
     // fs.watch + persistent:false — avoids chokidar polling handles that kept Windows folders "in use".
@@ -1797,11 +1862,19 @@ function startLocalWatching(srv) {
                 fw.close();
             } catch (_) { /* ignore */ }
             state.watcher = null;
-            state.intervals.push(setTimeout(() => startLocalWatching(srv), 5000));
+            state.intervals.push(setTimeout(() => {
+                startLocalWatching(srv).catch((err) => {
+                    console.error(`[Local] watch restart failed [${srv.id}]:`, err && err.message ? err.message : err);
+                });
+            }, 5000));
         });
     } catch (e) {
         console.warn(`[Local] fs.watch failed [${srv.id}]:`, e.message);
-        state.intervals.push(setTimeout(() => startLocalWatching(srv), 5000));
+        state.intervals.push(setTimeout(() => {
+            startLocalWatching(srv).catch((err) => {
+                console.error(`[Local] fs.watch restart failed [${srv.id}]:`, err && err.message ? err.message : err);
+            });
+        }, 5000));
         return;
     }
     state.watcher = fw;
@@ -1815,7 +1888,7 @@ function startLocalWatching(srv) {
             } catch (_) { /* ignore */ }
         };
         let fwDirty = null;
-        if (fs.existsSync(dirtyPensPath)) {
+        if (await pathExists(dirtyPensPath)) {
             fwDirty = fs.watch(dirtyPensPath, { persistent: false }, bustDirty);
             fwDirty.on('error', (err) => {
                 console.warn(`[Local] dirtyPens watch error [${srv.id}]:`, err && err.message ? err.message : err);
@@ -1825,7 +1898,7 @@ function startLocalWatching(srv) {
         } else {
             const dirOfDirty = path.dirname(dirtyPensPath);
             const baseName = path.basename(dirtyPensPath);
-            if (fs.existsSync(dirOfDirty)) {
+            if (await pathExists(dirOfDirty)) {
                 fwDirty = fs.watch(dirOfDirty, { persistent: false }, (_evt, fname) => {
                     if (fname === baseName) bustDirty();
                 });
@@ -1861,14 +1934,32 @@ async function safeDownload(client, remotePath, localTmp, localFinal, options = 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
             try {
-                if (fs.existsSync(localTmp)) fs.unlinkSync(localTmp);
-            } catch (_) {
-                /* ignore */
+                await fs.promises.unlink(localTmp);
+            } catch (e) {
+                if (e && e.code !== 'ENOENT') {
+                    /* ignore transient unlink issues like old behavior */
+                }
             }
             await client.downloadTo(localTmp, remotePath);
-            if (fs.existsSync(localTmp) && fs.statSync(localTmp).size > 0) {
-                if (fs.existsSync(localFinal)) fs.unlinkSync(localFinal);
-                fs.renameSync(localTmp, localFinal);
+            let size = 0;
+            try {
+                size = (await fs.promises.stat(localTmp)).size;
+            } catch (e) {
+                lastErr = e && e.message ? String(e.message) : String(e);
+                if (attempt < maxAttempts) {
+                    await new Promise((r) => setTimeout(r, retryDelayMs * attempt));
+                }
+                continue;
+            }
+            if (size > 0) {
+                try {
+                    await fs.promises.unlink(localFinal);
+                } catch (e) {
+                    if (e && e.code !== 'ENOENT') {
+                        /* ignore */
+                    }
+                }
+                await fs.promises.rename(localTmp, localFinal);
                 return true;
             }
             lastErr = 'empty or zero-byte after download';
@@ -1903,7 +1994,7 @@ async function syncFtpDetailsCache(client, srv, slotRemote, userDataPath) {
         'savegame1';
     const localDir = path.join(localRoot, folderName, 'details');
     try {
-        fs.mkdirSync(localDir, { recursive: true });
+        await fs.promises.mkdir(localDir, { recursive: true });
     } catch (_) {
         return 0;
     }
@@ -1923,9 +2014,9 @@ async function syncFtpDetailsCache(client, srv, slotRemote, userDataPath) {
         const localFinal = path.join(localDir, name);
         const tmpPath = `${localFinal}.tmp`;
         let need = true;
-        if (fs.existsSync(localFinal)) {
+        if (await pathExists(localFinal)) {
             try {
-                const localSize = fs.statSync(localFinal).size;
+                const localSize = (await fs.promises.stat(localFinal)).size;
                 const remSize = Number(ent.size);
                 if (Number.isFinite(remSize) && remSize > 0 && localSize === remSize) {
                     need = false;
@@ -1968,7 +2059,10 @@ async function pollFtp(srv) {
         const finalPath = path.join(userDataPath, `data_${srv.id}.json`);
 
         if (await safeDownload(client, remotePath, tmpPath, finalPath, { maxAttempts: 4, retryDelayMs: 350 })) {
-            processLuaData(srv.id, fs.readFileSync(finalPath, 'utf8'));
+            const luaRaw = await readFileUtf8WithRetryAsync(finalPath, { maxAttempts: 3 });
+            if (luaRaw != null) {
+                processLuaData(srv.id, stripUtf8Bom(luaRaw));
+            }
         } else {
             console.warn(
                 `[FTP] [${srv.id}] Could not download live Lua data.json from:\n  ${remotePath}\n` +
@@ -2183,8 +2277,8 @@ async function bootServer(config) {
 
     // Plan v5 A5: surface localSubFolder mismatches as a one-time WARN + serverInfo.configWarning.
     // Only meaningful for local mode (FTP folder name is resolved later from save-slot probing).
-    servers.forEach((srv) => {
-        if (!srv || srv.mode !== 'local') return;
+    for (const srv of servers) {
+        if (!srv || srv.mode !== 'local') continue;
         try {
             let basePath = srv.localPath;
             if (!basePath) {
@@ -2200,10 +2294,10 @@ async function bootServer(config) {
                     message: 'Server has no localSubFolder configured. Set it to your savegame folder (e.g. savegame1).',
                 };
                 console.warn(`[livestock] folder mismatch serverId=${srv.id} expected: a folder under ${basePath}`);
-                return;
+                continue;
             }
             const slotPath = path.join(basePath, folderName);
-            if (!fs.existsSync(slotPath)) {
+            if (!(await pathExists(slotPath))) {
                 serverStates[srv.id].configWarning = {
                     code: 'localSubFolderMissing',
                     expected: slotPath,
@@ -2215,7 +2309,7 @@ async function bootServer(config) {
         } catch (e) {
             console.warn('[livestock] configWarning probe failed', srv && srv.id, e && e.message);
         }
-    });
+    }
 
     // Restore last merged JSON from disk **before** HTTP accepts traffic so the first `/api/data` after
     // reopen is not `{ error: 'Waiting for data...' }` (which cleared the renderer). Large saves may
@@ -2228,18 +2322,22 @@ async function bootServer(config) {
         }
     });
     // Prefer the latest on-disk Lua export per configured server/save over older persisted merged cache.
-    servers.forEach((srv) => {
+    for (const srv of servers) {
         try {
-            hydrateLuaSnapshotFromDiskAtBoot(srv);
+            await hydrateLuaSnapshotFromDiskAtBoot(srv);
         } catch (e) {
             console.error('[bootServer] hydrate lua snapshot', srv.id, e);
         }
-    });
+    }
 
     const runDeferredBootWork = () => {
         try {
             servers.forEach((srv) => {
-                if (srv.mode === 'local') startLocalWatching(srv);
+                if (srv.mode === 'local') {
+                    startLocalWatching(srv).catch((err) => {
+                        console.error('[bootServer] startLocalWatching', srv.id, err && err.message ? err.message : err);
+                    });
+                }
             });
             startFtpPollingCoordinator(config, ftpServers);
         } catch (e) {
@@ -2386,22 +2484,30 @@ ipcMain.handle('save-settings', async (_event, newConfig) => {
 ipcMain.handle('get-current-config', () => store.get('config'));
 
 /** Fallback when HTTP `/api/status` is unreachable — read default local `data.json` (same path logic as former `fs` in renderer). */
-ipcMain.handle('read-local-farmdash-data-json', () => {
+ipcMain.handle('read-local-farmdash-data-json', async () => {
     try {
         const bases = collectFarmDashboardModSettingsRoots(getElectronDocumentsPath);
         for (const base of bases) {
-            if (!fs.existsSync(base)) continue;
+            try {
+                await fs.promises.access(base);
+            } catch {
+                continue;
+            }
             let folders;
             try {
-                folders = fs.readdirSync(base, { withFileTypes: true });
+                folders = await fs.promises.readdir(base, { withFileTypes: true });
             } catch {
                 continue;
             }
             for (const dirent of folders) {
                 if (!dirent.isDirectory()) continue;
                 const p = path.join(base, dirent.name, 'data.json');
-                if (!fs.existsSync(p)) continue;
-                const raw = readFileUtf8WithRetry(p);
+                try {
+                    await fs.promises.access(p);
+                } catch {
+                    continue;
+                }
+                const raw = await readFileUtf8WithRetryAsync(p);
                 if (raw == null) continue;
                 const data = JSON.parse(stripUtf8Bom(raw));
                 return { ok: true, path: p, data };
@@ -2444,7 +2550,7 @@ ipcMain.handle('read-server-live-cache', (_event, serverId) => {
     }
 });
 
-ipcMain.handle('get-lan-access-settings', () => getLanSecurityFromStore());
+ipcMain.handle('get-lan-access-settings', () => ({ ...getLanSecurityFromStore() }));
 
 ipcMain.handle('save-lan-access-settings', (_e, payload) => {
     // v3.9 hardening: when LAN access is being enabled, refuse weak/default
@@ -2464,6 +2570,7 @@ ipcMain.handle('save-lan-access-settings', (_e, payload) => {
     store.set('lanPassword', String(payload?.lanPassword ?? LAN_ACCESS_DEFAULTS.lanPassword));
     store.set('lanAllowedIPs', String(payload?.lanAllowedIPs ?? '').trim());
     store.set('lanAuthOptional', !!payload?.lanAuthOptional);
+    refreshLanSecurityCache();
     return new Promise((resolve) => {
         restartHttpServer(() => {
             resolve({
@@ -2484,17 +2591,18 @@ ipcMain.handle('get-stored-locale', () => {
     return l && typeof l === 'string' ? l : 'en';
 });
 
-ipcMain.handle('get-translations-json', () => {
+ipcMain.handle('get-translations-json', async () => {
     const p = path.join(__dirname, 'web', 'locales', 'translations.json');
     try {
-        if (!fs.existsSync(p)) {
-            console.error('[get-translations-json] missing file:', p);
-            return { strings: {} };
-        }
-        const raw = fs.readFileSync(p, 'utf8');
+        await fs.promises.access(p);
+        const raw = await fs.promises.readFile(p, 'utf8');
         return JSON.parse(stripUtf8Bom(raw));
     } catch (e) {
-        console.error('[get-translations-json]', e.message);
+        if (e && e.code === 'ENOENT') {
+            console.error('[get-translations-json] missing file:', p);
+        } else {
+            console.error('[get-translations-json]', e.message);
+        }
         return { strings: {} };
     }
 });
@@ -2713,13 +2821,13 @@ function buildModConfigXml(cfg) {
 `;
 }
 
-ipcMain.handle('get-mod-config', () => {
+ipcMain.handle('get-mod-config', async () => {
     const p = getModConfigPath();
     try {
-        if (!fs.existsSync(p)) {
+        if (!(await pathExists(p))) {
             return { path: p, exists: false, ...parseModConfigXml('') };
         }
-        const text = readFileUtf8WithRetry(p);
+        const text = await readFileUtf8WithRetryAsync(p);
         if (text == null) {
             return { path: p, exists: false, error: 'unreadable', ...parseModConfigXml('') };
         }
@@ -2729,11 +2837,11 @@ ipcMain.handle('get-mod-config', () => {
     }
 });
 
-ipcMain.handle('save-mod-config', (_e, cfg) => {
+ipcMain.handle('save-mod-config', async (_e, cfg) => {
     const p = getModConfigPath();
     try {
-        fs.mkdirSync(getModConfigDir(), { recursive: true });
-        fs.writeFileSync(p, buildModConfigXml(cfg || {}), 'utf8');
+        await fs.promises.mkdir(getModConfigDir(), { recursive: true });
+        await fs.promises.writeFile(p, buildModConfigXml(cfg || {}), 'utf8');
         return { ok: true, path: p };
     } catch (e) {
         return { ok: false, error: e.message };
@@ -2753,14 +2861,14 @@ ipcMain.handle('scan-local-saves', async () => {
 
     for (const basePath of roots) {
         searchedRoots.push(basePath);
-        if (!fs.existsSync(basePath)) {
+        if (!(await pathExists(basePath))) {
             missingRoots.push(basePath);
             console.log('[scan-local-saves] (skip missing)', basePath);
             continue;
         }
         let folders;
         try {
-            folders = fs.readdirSync(basePath, { withFileTypes: true });
+            folders = await fs.promises.readdir(basePath, { withFileTypes: true });
         } catch (e) {
             console.warn('[scan-local-saves] readdir', basePath, e.message);
             continue;
@@ -2770,10 +2878,10 @@ ipcMain.handle('scan-local-saves', async () => {
             const jsonPath = path.join(basePath, dirent.name, 'data.json');
             const dedupeKey = path.normalize(jsonPath).toLowerCase();
             if (seenJson.has(dedupeKey)) continue;
-            if (!fs.existsSync(jsonPath)) continue;
+            if (!(await pathExists(jsonPath))) continue;
             seenJson.add(dedupeKey);
             try {
-                const raw = readFileUtf8WithRetry(jsonPath);
+                const raw = await readFileUtf8WithRetryAsync(jsonPath);
                 if (raw == null) continue;
                 const parsed = JSON.parse(stripUtf8Bom(raw));
                 const mapName = parsed.serverInfo?.mapName || 'Unknown Map';

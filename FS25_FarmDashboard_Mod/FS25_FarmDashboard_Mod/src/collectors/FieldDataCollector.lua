@@ -5,6 +5,18 @@ FieldDataCollector = {}
 --- Serialized as JSON `null` (see `FarmDashboardDataCollector:toJSON` string handling).
 local FD_JSON_NULL_STR = "__FD_JSON_NULL__"
 
+--- Module-local keyed pools (integer/string keys only). Cleared at reuse — reduces GC churn on large saves.
+local _pool_farmlandBaleCounts = {}
+local _pool_baleSeen = {}
+local _pool_fillIdxSeen = {}
+local _pool_windByIdx = {}
+
+local function _clearKeyedPool(t)
+    for k in pairs(t) do
+        t[k] = nil
+    end
+end
+
 --- Cached `g_fillTypeManager:getFillTypeIndexByName` for STRAW / GRASS_WINDROW / DRYGRASS_WINDROW (refreshed in collect when mission is up).
 FieldDataCollector._windrowFillIdxCache = nil
 
@@ -345,7 +357,8 @@ function FieldDataCollector:_collectImpl()
 
     --- Bale counts per farmland: scan **all** known bale sources (item list + bale manager), dedupe by stable key.
     --- FS25: `itemSystem.items` may exist but be empty — we must still call `g_baleManager` (previous code skipped it).
-    local farmlandBaleCounts = {}
+    _clearKeyedPool(_pool_farmlandBaleCounts)
+    local farmlandBaleCounts = _pool_farmlandBaleCounts
     --- Player farm only: physical bales by fill category — on cropland vs yards/sheds (off registered field geometry).
     local baleInvOnField = { straw = 0, grass = 0, hay = 0, silage = 0, other = 0 }
     local baleInvOffField = { straw = 0, grass = 0, hay = 0, silage = 0, other = 0 }
@@ -594,7 +607,8 @@ function FieldDataCollector:_collectImpl()
                 end
             end
 
-            local baleSeen = {}
+            _clearKeyedPool(_pool_baleSeen)
+            local baleSeen = _pool_baleSeen
             local function baleDedupKey(it)
                 if not it then return nil end
                 --- uniqueId is stable across saves; id is network id — prefer both for dedup.
@@ -1732,7 +1746,8 @@ function FieldDataCollector:_collectImpl()
             end
             local function buildBaleableEntries()
                 local list = {}
-                local seen = {}
+                _clearKeyedPool(_pool_fillIdxSeen)
+                local seen = _pool_fillIdxSeen
                 local function addIndex(idx)
                     if not idx or type(idx) ~= "number" or idx <= 0 or seen[idx] then return end
                     seen[idx] = true
@@ -1791,7 +1806,8 @@ function FieldDataCollector:_collectImpl()
             end
             local balePart = buildBaleableEntries()
             local swathPart = buildSwathOnlyEntries()
-            local byIdx = {}
+            _clearKeyedPool(_pool_windByIdx)
+            local byIdx = _pool_windByIdx
             for _, ent in ipairs(balePart) do
                 byIdx[ent.index] = { name = ent.name, index = ent.index, baleable = true }
             end

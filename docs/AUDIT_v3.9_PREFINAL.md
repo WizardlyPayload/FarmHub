@@ -89,30 +89,22 @@ Risks:
 - Documentation drift has outpaced implementation versioning.
 - Security-sensitive UI rendering still includes unsafe patterns.
 
-## Security review summary
+## Security review summary (post-remediation)
 
-Current status: **Not release-ready** until blockers are resolved.
+Status for **v3.9.0 pre-final:** blockers **#1–#3** in this document are **resolved** in tree — LAN policy + pastures XSS path + doc alignment. Residual risks match **[SECURITY.md](./SECURITY.md)** (cleartext Basic on LAN) and **follow-up XSS coverage** on modules beyond pastures (see §Major non-blocking findings).
 
 Positive controls already present:
 - Electron hardening baseline (`nodeIntegration: false`, `contextIsolation: true`).
-- CSRF/token/rate-limit controls present on sensitive routes.
-- Path/id validation and defensive file I/O patterns exist.
+- CSRF/token/rate-limit controls on sensitive routes.
+- Path/id validation and defensive file I/O patterns.
 
-Primary remediation focus:
-1. LAN credential hardening and safer defaults.
-2. DOM XSS sink elimination.
-3. Clear trust-boundary documentation for LAN/HTTP transport.
-
-## Usability review summary
+## Usability review summary (post-remediation)
 
 Strengths:
 - Feature-rich setup and farm/server flow.
 - Good live data presentation depth across modules.
 
-Needed before final sign-off:
-- Tighten first-run validation messaging.
-- Improve consistency of localized and actionable error text.
-- Ensure warning semantics are user-intuitive in missing-data scenarios.
+Non-blocking polish for **v4+:** first-run copy, i18n completeness on edge strings, and warning taxonomy (telemetry vs critical) — tracked in §Major non-blocking findings above.
 
 ## v3.9 prefinal release gate checklist
 

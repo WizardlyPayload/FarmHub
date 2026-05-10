@@ -20,6 +20,9 @@ All project documentation lives under **`docs/`** (repository root: **FarmHub** 
 | [**SCREENSHOT_MANIFEST.md**](./SCREENSHOT_MANIFEST.md) | Screenshot filenames, captions, [auto]/[manual] capture recipes |
 | [**I18N.md**](./I18N.md) | **Internationalisation:** 27 locales, `messages/*.json` pipeline, Google Translate refill |
 | [**PROJECT_CONTEXT.md**](./PROJECT_CONTEXT.md) | Full project overview for planning and audits |
+| [**RELEASE_READINESS_v3.9.md**](./RELEASE_READINESS_v3.9.md) | **Operator checklist:** build 3.9.0, GitHub assets, updater rehearsal before v4 |
+| [**PROJECT_DEEP_AUDIT_FARMHUB.md**](./PROJECT_DEEP_AUDIT_FARMHUB.md) | **Full-repo audit:** findings, risks, prioritized fixes |
+| [**UPDATER_QA.md**](./UPDATER_QA.md) | Auto-update (`electron-updater`) verification matrix |
 | [**CURSOR_SESSION_MEMORY.md**](./CURSOR_SESSION_MEMORY.md) | Cursor chat companion (session summaries) |
 | [SALES_HANDOVER.md](./SALES_HANDOVER.md) | Sales & partnerships positioning |
 | [AUTHORS.md](./AUTHORS.md) | **JoshWalki** & **WizardlyPayload** |

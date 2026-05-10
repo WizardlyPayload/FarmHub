@@ -42,11 +42,19 @@ Narrative: **[RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md)** · Audit: **[AUDIT_v3.9_
 - `modDesc.xml` bumped to **`2.3.0.0`** to match the `FarmDashboard.VERSION` Lua constant.
 - `package.json` and `package-lock.json` bumped to **`3.9.0`**.
 - `INSTALL.md` malformed markdown fixed (`**data.json` → `data.json`, `**FS25_FarmDashboard` → `FS25_FarmDashboard`); release URL pointed at the canonical `WizardlyPayload/FarmHub` GitHub repo.
+- **Mod packaging / docs** — **`Zip-FarmDashboardMod.ps1`** packs **only** **`modDesc.xml`**, **`icon.png`**, and **`src/`** at the zip root (Giants `sourceFile` paths). Install docs name the player-facing mod **`FS25_FarmDashboard`** in **`mods\`**, not the repo folder **`FS25_FarmDashboard_Mod`**. Screenshot manifest: **1920 × 1080** desktop, **1080 × 1920** tablet LAN rows only.
+- **Supply chain & CI** — **`fast-xml-parser`** raised to **^5.7.3** (moderate advisory); **`npm audit --omit=dev`** clean on the app tree. GitHub Actions **`.github/workflows/ci.yml`** runs **`npm ci`**, **`npm test`**, **`npm run i18n:verify`**, **`npm audit --omit=dev`** on Windows for **`main` / `master` / `develop`**. Root **`LICENSE`** added (all rights reserved). **XSS:** **`livestock.js`** (`formatLocation`, breed column), **`navigation.js`** (farm picker, unknown section), **`vehicles.js`** (card title / brand / thumb labels), **`economy.js`** / **`changes.js`** / **`fields.js`** (market rows, data-change modal, field card titles) — escape via **`_safe`** / **`escapeFieldHtml`**. Extended **`tests/xss.smoke.test.js`** (**223** tests).
+- **i18n** — Ran **`sync-keys-from-en.mjs`**: all **26** non-English locales now include every key from **`en.json`** (**987** keys each); **`npm run i18n:verify`** passes (no missing keys / placeholder drift). **`translations.json`** regenerated. **`npm run i18n:sync`** added to **`package.json`**; **[docs/I18N.md](./I18N.md)** documents the workflow.
 - `USER_MANUAL.md`, `DEVELOPER_HANDOVER.md` rename `lanUser` → `lanUsername` to match `main.js` `LAN_ACCESS_DEFAULTS` keys.
+
+### Repository layout
+
+- **Electron build scripts** moved to **`tools/app/`** (repo root). `package.json` npm scripts use **`../../tools/app/...`** from `FS25_FarmDashboard_App/FS25_FarmDashboard_App/`.
+- **Validation runbook** consolidated as **[VALIDATION-RUNBOOK.md](./VALIDATION-RUNBOOK.md)** (formerly under the mod tree). Index: **[tools/README.md](../tools/README.md)**.
 
 ### Acceptance
 
-`npm test` reports green across **11** suites (**210** tests) on the reference machine — re-run before tagging. The remaining release gate is the updater smoke test (3.9.0 → 4.0.0 channel) per [`UPDATER_QA.md`](./UPDATER_QA.md).
+`npm test` reports green across **12** suites (**223** tests) on the reference machine — re-run before tagging. The remaining release gate is the updater smoke test (3.9.0 → 4.0.0 channel) per [`UPDATER_QA.md`](./UPDATER_QA.md). Operator checklist: **[RELEASE_READINESS_v3.9.md](./RELEASE_READINESS_v3.9.md)**.
 
 ---
 
@@ -71,7 +79,7 @@ Narrative: **[RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md)** · GitHub blurb: **[RELE
 
 ### Windows build, installer, uninstall
 
-- **Default `npm run dist` / `pack`** — `tools/run-electron-builder.mjs` writes under **`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out`** to avoid IDE/Windows Search locks on `app.asar` inside the repo.
+- **Default `npm run dist` / `pack`** — `tools/app/run-electron-builder.mjs` writes under **`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out`** to avoid IDE/Windows Search locks on `app.asar` inside the repo.
 - **NSIS** — `customCheckAppRunning` uses **`taskkill /F /T`** so child processes release file locks during upgrade.
 - **Uninstall** — Optional **wipe all user profile data** (settings/caches) vs keep data (`build/installer.nsh`, `FarmDashWipeUserData`).
 - **Supporting scripts** — `clean:build-out`, `unlock-install`, `remove-build-output-folders.ps1`, `stop-farmdash-install-lock.ps1` for repeatable builds.

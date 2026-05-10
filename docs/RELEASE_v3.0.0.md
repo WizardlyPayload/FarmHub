@@ -30,7 +30,7 @@ Earlier branches may contain experiments not described in the **3.0.0** manuals;
 
 ### Windows build and installer
 
-- **`tools/run-electron-builder.mjs`** — default **`npm run dist` / `pack`** targets **`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out`** so IDEs and Windows Search are less likely to lock `app.asar` inside the clone.
+- **`tools/app/run-electron-builder.mjs`** — default **`npm run dist` / `pack`** targets **`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out`** so IDEs and Windows Search are less likely to lock `app.asar` inside the clone.
 - **NSIS** — aggressive shutdown of child processes during upgrade; **language-first** installer; optional **ImageMagick** helper for mod image pipeline.
 - **Uninstall** — optional **wipe all user profile data** vs keep data (`FarmDashWipeUserData` in installer scripts).
 

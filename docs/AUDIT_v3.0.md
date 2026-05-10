@@ -145,7 +145,7 @@ The dev handover documents both flows, the order to run them in, and lists the s
 
 | Item | Where | Previously documented? | After rewrite |
 | ---- | ----- | ---------------------- | ------------- |
-| `npm run dist` default output | `tools/run-electron-builder.mjs` → `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out` | Yes | Documented |
+| `npm run dist` default output | `tools/app/run-electron-builder.mjs` → `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out` | Yes | Documented |
 | `npm run pack` / `:fresh` / `:alt` / `:in-repo` | `package.json` scripts | Partial | Full script inventory |
 | Auto-update | `electron-updater` against `WizardlyPayload/FarmHub` GitHub releases (`build.publish`) | Mentioned | Documented |
 | NSIS hooks | `build/installer.nsh`: `customCheckAppRunning` (`taskkill /F /T`), `customWelcomePage` (language), `customInstall` (ImageMagick PS1), `customUnInit`, `customUnInstall` | Partial | Full hook list |

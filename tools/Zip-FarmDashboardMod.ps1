@@ -1,10 +1,15 @@
 <#
 .SYNOPSIS
-  Builds FS25_FarmDashboard.zip with modDesc.xml, icon.png, and src at the archive root (no wrapper folder).
+  Builds FS25_FarmDashboard.zip containing only modDesc.xml, icon.png (if present), and the src\ tree - nothing else.
 
 .DESCRIPTION
   Reads from FS25_FarmDashboard_Mod\FS25_FarmDashboard_Mod\ only:
-    modDesc.xml, icon.png (if present), src\
+    modDesc.xml, icon.png (optional), src\
+
+  Zip layout is **flat at archive root** (Giants resolves `sourceFile` paths like `src/FarmDashboard.lua` from there):
+    modDesc.xml, icon.png, src/...
+
+  Do not add other repo files (e.g. stray zips, README, l10n) - only those three roots.
 
   IMPORTANT: Do not use Compress-Archive for FS mods. On Windows it writes zip entry names with
   backslashes (src\collectors\Foo.lua). The GIANTS engine resolves extraSourceFiles using forward
@@ -76,7 +81,7 @@ try {
     $zip.Dispose()
 }
 
-Write-Host "Wrote: $DestZip (POSIX forward-slash paths inside zip; required for FS25 mod loading)"
+Write-Host "Wrote: $DestZip (only modDesc.xml, icon.png, src/ - POSIX paths inside zip)"
 
 if ($CopyTo) {
     $destParent = Split-Path -Parent $CopyTo

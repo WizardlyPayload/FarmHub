@@ -1,11 +1,13 @@
-# Screenshot manifest (v3.0)
+# Screenshot manifest (v3.9)
 
 This is the canonical list of every screenshot referenced from [`USER_MANUAL.md`](./USER_MANUAL.md) and [`DEVELOPER_HANDOVER.md`](./DEVELOPER_HANDOVER.md). All images live under [`docs/screenshots/`](./screenshots/).
 
 ## Conventions
 
 - **Filename:** `fd-<area>-<3-digit-order>-<kebab-slug>.png`. The 3-digit order keeps lexical order = doc order.
-- **Format:** PNG, **1920 x 1080** for desktop UI shots, **1280 x 800** acceptable for tablet shots.
+- **Format:** PNG.
+  - **Desktop browser / app UI (`[auto]` and most `[manual]` shots):** **1920 × 1080** — landscape Full HD so the full dashboard fits without letterboxing.
+  - **Tablet LAN only (`fd-lan-020-tablet-prompt.png`, `fd-lan-030-tablet-dashboard.png`):** **1080 × 1920** — portrait (typical tablet in hand). Do **not** use portrait size for desktop captures.
 - **Privacy:** blur or redact server hostnames, IPs, FTP credentials, save names if sensitive.
 - **Tag:**
   - **[auto]** — captured by Cursor against the running Farm Dashboard at `http://localhost:8766` via the browser MCP.
@@ -18,7 +20,7 @@ For **[auto]** capture in one go:
 1. Run FS25 with the mod for at least one save, so `data.json` is current.
 2. Launch the desktop app (`npm start` or the installed shortcut) and complete first-run Setup with at least **one Local server**, ideally with two farms so the farm dropdown is visible.
 3. Generate at least one notification (e.g. start the app while a field is in `Needs work`) so the bell modal has content.
-4. Open `http://localhost:8766` in a 1920 x 1080 browser window. Stop other browser tabs that might steal focus.
+4. Open `http://localhost:8766` in a browser viewport sized **1920 × 1080** (landscape). Stop other browser tabs that might steal focus.
 5. Tell me you are ready; I will drive the captures via the `cursor-ide-browser` MCP.
 
 For **[manual]** captures, follow the recipe in each row below and drop the PNG into [`docs/screenshots/`](./screenshots/) using the exact filename.
@@ -29,7 +31,7 @@ For **[manual]** captures, follow the recipe in each row below and drop the PNG 
 
 | # | Filename | Section in manual | Tag | Capture recipe |
 | - | -------- | ----------------- | --- | -------------- |
-| 1 | `fd-install-010-mod-folder.png` | §2 Stage A | manual | File Explorer at `Documents\My Games\FarmingSimulator2025\mods\` showing the `FS25_FarmDashboard_Mod` folder |
+| 1 | `fd-install-010-mod-folder.png` | §2 Stage A | manual | File Explorer at `Documents\My Games\FarmingSimulator2025\mods\` showing **`FS25_FarmDashboard`** (folder or `.zip`) |
 | 2 | `fd-install-020-fs25-mod-enabled.png` | §2 Stage B | manual | FS25 in-game savegame's mod list with **FS25 Farm Dashboard** ticked |
 | 3 | `fd-install-030-datajson-explorer.png` | §2 Stage C | manual | File Explorer at `…\modSettings\FS25_FarmDashboard\<savegame>\` showing `data.json` with a recent timestamp |
 | 4 | `fd-install-040-installer-welcome.png` | §2 Stage D | manual | NSIS welcome page (language pick) |
@@ -103,7 +105,9 @@ For **[manual]** captures, follow the recipe in each row below and drop the PNG 
 
 ## Capture status (last run)
 
-The first auto-capture pass landed the following 16 PNGs into [`docs/screenshots/`](./screenshots/):
+**Resolution refresh:** replace older PNGs with **1920 × 1080** desktop shots (and **1080 × 1920** for the two tablet rows above). Older MCP passes produced ~**800px**-wide images — **redo** for release-quality docs.
+
+The first auto-capture pass landed the following 16 PNGs into [`docs/screenshots/`](./screenshots/) (many still need re-capture at full resolution):
 
 | File | Slot |
 | ---- | ---- |
@@ -126,7 +130,7 @@ The first auto-capture pass landed the following 16 PNGs into [`docs/screenshots
 
 Notes:
 
-- Because the MCP-driven browser is mounted in the IDE, the actual image width is roughly **800 px**, not 1920. Content is sharp and readable but a re-shoot in a 1920 px standalone browser is recommended for a polished release.
+- **Redo policy:** full-width dashboard shots must be **1920 × 1080**; tablet LAN shots **1080 × 1920**. Legacy MCP captures were ~**800px** wide — treat as placeholders until replaced.
 - The screenshots were captured against a real save (`Carpathian Countryside / savegame1`) with live data: 38 animals, 57 vehicles, 10 fields, 4 pastures, 1 production chain.
 - Screenshots **not yet captured** (still listed `[auto]` above, awaiting a re-run): `fd-shell-010-navbar.png`, `fd-shell-030-game-time-weather.png`, `fd-shell-050-import-mod-images.png`, `fd-settings-015/016/017-*.png` (Dashboard exclusions / clusters / SimHub blocks), `fd-settings-021/022/023-servers-*.png` (LAN / FTP polling / Add server zoom-ins), `fd-settings-040-appearance-language.png` (language picker zoom-in), `fd-section-livestock-020-filters.png`, `fd-section-livestock-030-table.png`, `fd-section-vehicles-020-filters.png`, `fd-section-vehicles-030-grid.png`, `fd-section-fields-020-filter-bar.png`, `fd-section-fields-040-card-windrow.png`, `fd-section-fields-050-card-soil.png`, `fd-section-fields-060-tools-shop.png`, `fd-section-fields-070-waiting.png`, `fd-section-economy-020/030-*.png`, `fd-section-pastures-020-cards.png`, `fd-section-productions-020-empty.png`, all `fd-modal-*` entries, `fd-lan-010-toggle-on.png`, `fd-section-000-landing.png`. These either need additional click steps in the walk-through or are easier to re-capture once the docs are reviewed.
 

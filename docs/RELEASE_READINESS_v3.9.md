@@ -18,7 +18,9 @@ Long-form narrative: [RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md).
 
 ---
 
-## 2. Automated gates (run locally before `dist`)
+## 2. Automated gates (CI + run locally before `dist`)
+
+**GitHub:** pushes/PRs to **`main`**, **`master`**, or **`develop`** run [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — **`npm ci`**, **`npm test`**, **`npm run i18n:verify`**, **`npm audit --omit=dev`** on Windows (Node 20).
 
 From `FS25_FarmDashboard_App/FS25_FarmDashboard_App/`:
 
@@ -34,7 +36,7 @@ npm audit --omit=dev
 
 ## 3. Build the Windows installer
 
-From the same app directory (see app `README.md` for full detail):
+From the same app directory (see app `README.md` for full detail). npm invokes **`../../tools/app/run-electron-builder.mjs`** — index: [**`tools/README.md`**](../tools/README.md).
 
 ```bash
 npm run dist
@@ -51,7 +53,7 @@ Confirm output under the configured directory (default sibling **`electron-pack-
 
 1. Tag **`v3.9.0`** (or consistent tag naming your pipeline expects — **must** match what electron-builder / updater use).
 2. Create a **GitHub Release** on **`WizardlyPayload/FarmHub`** (see `build.publish`).
-3. Attach **`latest.yml`** and the **`.exe`** from the build output.
+3. Attach **`latest.yml`** and the **`.exe`** from the build output, plus **`FS25_FarmDashboard.zip`** for the FS25 mod (see **`tools\Zip-FarmDashboardMod.ps1`** and [RELEASE_NOTES.md](./RELEASE_NOTES.md) “Attach to this release”).
 
 Without **`latest.yml`**, installed clients will not see updates correctly.
 

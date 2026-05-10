@@ -1,6 +1,21 @@
 // FS25 FarmDashboard | changes.js | v2.0.0
 import { t } from "../i18n/i18n.js";
 
+function _safe(value) {
+  const ns =
+    (typeof globalThis !== "undefined" && globalThis.farmDashEscape) ||
+    (typeof window !== "undefined" && window.farmDashEscape) ||
+    null;
+  if (ns && typeof ns.escapeHtml === "function") return ns.escapeHtml(value);
+  if (value == null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export function storeDataForComparison() {
   // Store current data state for comparison after refresh - deep copy to prevent reference issues
   this.preRefreshData = {
@@ -362,7 +377,7 @@ export function displayNoChangesModal(changes) {
         <div class="card bg-farm-info bg-opacity-10 border-farm-info">
           <div class="card-body">
             <h6 class="text-farm-info"><i class="bi bi-clock me-1"></i>Current Game Time</h6>
-            <strong>${changes.gameTime.new}</strong>
+            <strong>${_safe(changes.gameTime.new)}</strong>
           </div>
         </div>
       </div>
@@ -437,7 +452,7 @@ export function populateLivestockChanges(livestockChanges) {
         <li class="list-group-item bg-farm-success bg-opacity-10 border-farm-success">
           <div class="d-flex justify-content-between align-items-start">
             <div>
-              <strong>${animal.name || "Unnamed"}</strong> - ${displayName}
+              <strong>${_safe(animal.name || "Unnamed")}</strong> - ${_safe(displayName)}
               <br><small class="text-muted">Age: ${
                 animal.age
               } months, Health: ${Math.round(animal.health)}%</small>
@@ -473,7 +488,7 @@ export function populateLivestockChanges(livestockChanges) {
         <li class="list-group-item bg-farm-danger bg-opacity-10 border-farm-danger">
           <div class="d-flex justify-content-between align-items-start">
             <div>
-              <strong>${animal.name || "Unnamed"}</strong> - ${displayName}
+              <strong>${_safe(animal.name || "Unnamed")}</strong> - ${_safe(displayName)}
               <br><small class="text-muted">Age: ${
                 animal.age
               } months, Health: ${Math.round(animal.health)}%</small>
@@ -505,14 +520,16 @@ export function populateLivestockChanges(livestockChanges) {
         if (key === "pregnancy") label = "Pregnancy";
         if (key === "lactating") label = "Lactating";
 
-        changesList.push(`${label}: ${change.old} → ${change.new}`);
+        changesList.push(
+          `${_safe(label)}: ${_safe(change.old)} → ${_safe(change.new)}`
+        );
       });
 
       content += `
         <li class="list-group-item bg-farm-warning bg-opacity-10 border-farm-warning">
           <div class="d-flex justify-content-between align-items-start">
             <div>
-              <strong>${animal.name || "Unnamed"}</strong> - ${displayName}
+              <strong>${_safe(animal.name || "Unnamed")}</strong> - ${_safe(displayName)}
               <br><small class="text-muted">${changesList.join(", ")}</small>
             </div>
             <span class="badge bg-warning text-dark">UPDATED</span>
@@ -548,11 +565,13 @@ export function populateWarningsChanges(warningsChanges) {
         ? pasture.name
         : `Pasture ${warning.pastureId}`;
 
+      const warnMsg =
+        typeof warning === "string"
+          ? warning
+          : warning?.message || warning?.text || "";
       content += `
         <div class="alert alert-warning mb-2">
-          <strong>${pastureName}:</strong> ${
-        warning.message || warning.text || warning
-      }
+          <strong>${_safe(pastureName)}:</strong> ${_safe(warnMsg)}
         </div>
       `;
     });
@@ -572,11 +591,13 @@ export function populateWarningsChanges(warningsChanges) {
         ? pasture.name
         : `Pasture ${warning.pastureId}`;
 
+      const warnMsgR =
+        typeof warning === "string"
+          ? warning
+          : warning?.message || warning?.text || "";
       content += `
         <div class="alert alert-success mb-2">
-          <strong>${pastureName}:</strong> ${
-        warning.message || warning.text || warning
-      }
+          <strong>${_safe(pastureName)}:</strong> ${_safe(warnMsgR)}
         </div>
       `;
     });
@@ -602,7 +623,7 @@ export function populateStatisticsChanges(stats, gameTime) {
         <h6 class="text-farm-info"><i class="bi bi-clock me-1"></i>Game Time Update</h6>
         <div class="card bg-farm-info bg-opacity-10 border-farm-info">
           <div class="card-body">
-            <strong>Time:</strong> ${gameTime.old} → <strong>${gameTime.new}</strong>
+            <strong>Time:</strong> ${_safe(gameTime.old)} → <strong>${_safe(gameTime.new)}</strong>
           </div>
         </div>
       </div>

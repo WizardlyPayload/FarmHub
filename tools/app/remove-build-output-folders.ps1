@@ -11,9 +11,10 @@ param(
 )
 
 $ErrorActionPreference = 'Continue'
-# Script lives in .../FS25_FarmDashboard_App/FS25_FarmDashboard_App/tools
-$toolsDir = $PSScriptRoot
-$appRoot = Split-Path -Parent $toolsDir
+# Script lives in FarmHub/tools/app — resolve inner Electron app root for in-repo output folders
+$toolsAppDir = $PSScriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $toolsAppDir)
+$appRoot = Join-Path $repoRoot 'FS25_FarmDashboard_App\FS25_FarmDashboard_App'
 # package.json build.output is ../electron-pack-out → sibling of inner app folder
 $packParent = Split-Path -Parent $appRoot
 
@@ -176,5 +177,5 @@ if ($StopWindowsSearch) {
 
 Write-Host '[FarmDash] Finished. You can run npm run pack / npm run dist again.'
 Write-Host '[FarmDash] If app.asar stayed locked: close Cursor/VS Code, close Explorer on those folders, or run:'
-Write-Host '  powershell -ExecutionPolicy Bypass -File tools/remove-build-output-folders.ps1 -StopWindowsSearch'
+Write-Host '  powershell -ExecutionPolicy Bypass -File <FarmHub>/tools/app/remove-build-output-folders.ps1 -StopWindowsSearch'
 Write-Host '  (as Administrator). Or use: npm run dist:fresh'

@@ -8,6 +8,21 @@ import {
 import { stopFieldsRefresh } from "./fields.js";
 import { countLivestockHeads } from "./livestock.js";
 
+function _safe(value) {
+  const ns =
+    (typeof globalThis !== "undefined" && globalThis.farmDashEscape) ||
+    (typeof window !== "undefined" && window.farmDashEscape) ||
+    null;
+  if (ns && typeof ns.escapeHtml === "function") return ns.escapeHtml(value);
+  if (value == null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function sectionHiddenMessage() {
   try {
     return t("settings.sectionHidden");
@@ -551,7 +566,7 @@ export function showSection(sectionName) {
         dyn.innerHTML = `
                   <div class="text-center">
                       <h3 class="text-warning">Section Under Development</h3>
-                      <p class="text-muted">The ${sectionName} section is coming soon!</p>
+                      <p class="text-muted">The ${_safe(sectionName)} section is coming soon!</p>
                   </div>
               `;
       }
@@ -575,8 +590,8 @@ export function showFarmSelectionModal() {
     farmOption.className = `list-group-item list-group-item-action bg-secondary text-light d-flex justify-content-between align-items-center`;
     farmOption.innerHTML = `
               <div>
-                  <h6 class="mb-1">${farm.name}</h6>
-                  <small class="text-muted">Farm ID: ${farm.id} (Internal: ${farm.internalId})</small>
+                  <h6 class="mb-1">${_safe(farm.name)}</h6>
+                  <small class="text-muted">Farm ID: ${_safe(farm.id)} (Internal: ${_safe(farm.internalId)})</small>
               </div>
               <i class="bi bi-arrow-right"></i>
           `;

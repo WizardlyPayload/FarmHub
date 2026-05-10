@@ -1,6 +1,6 @@
-# FarmHub — Developer handover (v3.0)
+# FarmHub — Developer handover (v3.9)
 
-This is the maintainer reference for **FarmHub**: the **FS25 Farm Dashboard** Electron + web app and the **FS25 Farm Dashboard** Lua mod. It targets a new contributor who needs to ship a fix or a feature in v3.0 without breaking anything.
+This is the maintainer reference for **FarmHub**: the **FS25 Farm Dashboard** Electron + web app and the **FS25 Farm Dashboard** Lua mod. It targets a new contributor shipping fixes or features on the **3.9.x** line without breaking LAN, merge, or mod export contracts.
 
 | Artifact | Where | Current value |
 | -------- | ----- | ------------- |
@@ -74,7 +74,6 @@ FarmHub/
       package.json                       # 3.9.0
       setup.html                         # first-run setup page (sibling of web/)
       build/installer.nsh                # NSIS hooks
-      tools/                             # build helpers (PS1 + mjs)
       web/
         index.html                       # main dashboard shell
         simhub.html                      # SimHub overlay page (separate)
@@ -120,8 +119,10 @@ FarmHub/
           FinanceDataCollector.lua
           EconomyDataCollector.lua
           ProductionDataCollector.lua
-  tools/                                 # repo-level PS1 helpers
+  tools/                                 # all scripts: app/ (Electron npm helpers), *.ps1 zips + mod export
 ```
+
+**Release mod zip:** run **`.\tools\Zip-FarmDashboardMod.ps1`** from the repo root → **`FS25_FarmDashboard_Mod\FS25_FarmDashboard.zip`**. The archive contains **only** **`modDesc.xml`**, **`icon.png`** (if present), and **`src/`** at the **zip root** — matching **`modDesc.xml`** `sourceFile` paths. Ship/rename as **`FS25_FarmDashboard.zip`** for players; they drop it in **`mods\`** or extract into **`mods\FS25_FarmDashboard\`**. That is **not** the **`FS25_FarmDashboard_Mod\`** dev tree name.
 
 ---
 
@@ -471,16 +472,18 @@ Today only `de.txt` is populated (198 lines). `fr`, `es`, `it`, `pl`, `nl`, `pt`
 | Script | What it does |
 | ------ | ------------ |
 | `npm start` | `electron .` — dev launch |
-| `npm run pack` | `node tools/run-electron-builder.mjs pack` — `--dir` build into `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out` |
+| `npm run pack` | `node ../../tools/app/run-electron-builder.mjs pack` — `--dir` build into `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out` |
 | `npm run pack:in-repo` | `electron-builder --dir` — output under `../electron-pack-out` |
 | `npm run pack:fresh` | Fresh tmp folder, used when normal output is locked |
 | `npm run pack:alt` | `../electron-pack-out-alt` |
-| `npm run dist` | `node tools/run-electron-builder.mjs dist` — full NSIS installer at `%LOCALAPPDATA%` |
+| `npm run dist` | `node ../../tools/app/run-electron-builder.mjs dist` — full NSIS installer at `%LOCALAPPDATA%` |
 | `npm run dist:in-repo` / `:fresh` / `:alt` | NSIS variants matching `pack:*` |
-| `npm run clean:build-out[:search]` | `tools/remove-build-output-folders.ps1`; `:search` also stops Windows Search |
-| `npm run unlock-install[:delete]` | `tools/stop-farmdash-install-lock.ps1` to release locked installer files |
+| `npm run clean:build-out[:search]` | `../../tools/app/remove-build-output-folders.ps1`; `:search` also stops Windows Search |
+| `npm run unlock-install[:delete]` | `../../tools/app/stop-farmdash-install-lock.ps1` to release locked installer files |
 | `npm run i18n:*` | See §9 |
-| `npm run export-fields-csv` | `tools/export-fields-to-csv.mjs` (engineer-only diagnostic) |
+| `npm run export-fields-csv` | `../../tools/app/export-fields-to-csv.mjs` (engineer-only diagnostic) |
+
+**CI:** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — on push/PR to **`main`**, **`master`**, or **`develop`**, runs **`npm ci`**, **`npm test`**, **`npm run i18n:verify`**, **`npm audit --omit=dev`** (Windows, Node 20) in the app folder.
 
 ### 10.2 NSIS (`build/installer.nsh`)
 
@@ -519,7 +522,7 @@ The `--delete-app-data` CLI on the uninstaller forces wipe without prompting.
 | `%APPDATA%\fs25-farm-dashboard\serverLiveCache\<id>.json` | `serverDataCache.js` | Last seen merged payload per server (debounced 600 ms) |
 | `%APPDATA%\fs25-farm-dashboard\ftpXmlCache\<server>\<slot>\` | FTP coordinator | Cached XML downloads |
 | `%APPDATA%\fs25-farm-dashboard\<temp>` | FTP coordinator | `data_<id>.json` and `.tmp` while downloading |
-| `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\` | `tools/run-electron-builder.mjs` | Build output (default) |
+| `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\` | `tools/app/run-electron-builder.mjs` | Build output (default) |
 | `%TEMP%\farmdash-mod-export-summary.json` | Mod-image pipeline | Last run result |
 | `$TEMP\farmdash-install-locale.txt` | NSIS | Captured installer language |
 
@@ -562,6 +565,6 @@ There is **no rotating log file**. Console output goes to stdout / DevTools. If 
 - New translations go through `messages/<code>.json` for full keys and `line-packs/<lang>.txt` for segment keys; never hand-edit `translations.json`.
 - New IPC channels: add in `main.js`, expose in `preload.js`, document in §5.
 - Store keys: prefer `electron-store` keys over ad-hoc `localStorage` for anything the desktop should be authoritative on (e.g. server config, LAN, mod config).
-- Tests: there is no test harness in v3.0. PRs must include manual verification notes against a real save (or note that the change is text/markdown only).
+- Tests: run **`npm test`** under `FS25_FarmDashboard_App/FS25_FarmDashboard_App/` for JS changes; Lua/game behaviour still needs **manual** verification on a real save when collectors or merge semantics change (markdown-only PRs: tests optional).
 
 **Credits:** [`AUTHORS.md`](./AUTHORS.md).

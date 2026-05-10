@@ -11,7 +11,8 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectDir = path.join(__dirname, '..');
+/** Inner Electron app root (`.../FS25_FarmDashboard_App/FS25_FarmDashboard_App`). Script lives in `tools/app/`. */
+const projectDir = path.join(__dirname, '..', '..', 'FS25_FarmDashboard_App', 'FS25_FarmDashboard_App');
 
 const mode = process.argv[2] === 'dist' ? 'dist' : 'pack';
 const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');

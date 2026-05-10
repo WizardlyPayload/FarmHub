@@ -12,9 +12,9 @@
 //   - serverInfo.idScheme     (Plan v5 B5)
 //   - serverInfo.animalMode   (Phase 5 — already shipped)
 //
-// Usage:
-//   node tools/parity.js <candidate.json> [baseline.json]
-//   node tools/parity.js --help
+// Usage (from FS25_FarmDashboard_App/FS25_FarmDashboard_App): npm run parity --
+//   node ../../tools/app/parity.js <candidate.json> [baseline.json]
+//   node ../../tools/app/parity.js --help
 //
 // Exit codes:
 //   0  — parity OK (differences only in volatile fields like timestamp / serverTimeSec)
@@ -40,7 +40,7 @@ const NEW_FIELDS_WHITELIST = new Set([
 ]);
 
 function usage() {
-  console.log(`Usage: node tools/parity.js <candidate.json> [baseline.json]
+    console.log(`Usage: node ../../tools/app/parity.js <candidate.json> [baseline.json]
 
 Compares a candidate Farm Dashboard data.json against a known-good baseline using a stable,
 key-sorted, recursive deep-equal. Volatile fields (timestamps) are ignored.

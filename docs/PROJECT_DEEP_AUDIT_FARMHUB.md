@@ -15,12 +15,12 @@ FarmHub is a **mature, modular** baseline: clear separation between **Lua export
 **Strengths**
 
 - Documented trust boundaries ([SECURITY.md](./SECURITY.md), [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md)).
-- Automated tests (**210** tests across **11** Jest files as of this audit) covering wire formats, LAN policy, XSS smoke, i18n guards, setup validation, realtime fan-out/dedupe, pastures warnings, and more.
+- Automated tests (**218** tests across **12** Jest files; run **`npm test`** after pull) covering wire formats, LAN policy, XSS smoke, i18n guards, setup validation, realtime fan-out/dedupe, pastures warnings, and more.
 - Update pipeline wired (`electron-updater` + GitHub Releases in `package.json`).
 
 **Top risks / gaps**
 
-1. **Transitive dependency advisory** (`fast-uri`, via `electron-store` → `ajv`) — see §6.3.
+1. **DevDependency / Electron advisory noise** — `npm audit` without `--omit=dev` still reports builder/Electron chains; **`npm audit --omit=dev`** is the production gate (CI uses it).
 2. **DOM XSS surface** not uniformly escaped across every module — pastures path hardened; other modules may still need the same discipline ([AUDIT_v3.9_PREFINAL.md](./AUDIT_v3.9_PREFINAL.md) follow-up).
 3. **No automated end-to-end** (Electron + browser) tests — regression risk for full startup and LAN flows.
 4. **Lua single-thread** — any heavy or frequent disk fallback (e.g. move/copy paths) can hitch the sim; mitigations are architectural (aggregate-first, stagger, `pcall`), not “async I/O”.
@@ -105,15 +105,11 @@ FarmHub is a **mature, modular** baseline: clear separation between **Lua export
 
 `electron`, `electron-builder`, `jest` — track Electron security releases for the embedded Chromium.
 
-### 6.3 npm audit (representative)
+### 6.3 npm audit (production)
 
-Command: `npm audit --omit=dev` (from app folder).
+Command: `npm audit --omit=dev` from **`FS25_FarmDashboard_App/FS25_FarmDashboard_App/`**.
 
-**Finding:** **high** severity in **`fast-uri`** (transitive: **`electron-store` → `conf` → `ajv` → `fast-uri@3.1.0`**).
-
-**Impact:** Primarily schema validation URI handling inside **AJV**, not necessarily Farm Dashboard’s HTTP routing — still worth **tracking** and resolving via upstream bumps (`npm audit fix`, or `electron-store` / `ajv` upgrades when compatible).
-
-**Action:** Before **v4.0.0** stable, re-run audit and record resolution in [CHANGELOG.md](./CHANGELOG.md).
+**Baseline:** **`fast-xml-parser@^5.7.3`** addresses the moderate XML-builder advisory; re-run after dependency bumps. Full-tree `npm audit` (including devDependencies) may still list **electron-builder** / **Electron** chains — track separately when upgrading **electron** / **electron-builder**.
 
 ---
 
@@ -132,12 +128,12 @@ Command: `npm audit --omit=dev` (from app folder).
 | Wire formats | `wireFormats.test.js` |
 | Livestock detail hydrate | `livestockDetail.test.js`, `detailAnimalsHydrate.test.js` |
 
-**Result at audit time:** `npm test` — **11** suites, **210** tests, **all passed**.
+**Result at audit time:** `npm test` — **12** suites, **218** tests, **all passed**; `npm audit --omit=dev` — **0** production vulnerabilities (re-verify locally).
 
 ### 7.2 Gaps
 
 - **No Playwright/Spectron-style E2E** for packaged app or LAN browser.
-- **No CI file observed in audit pass** — if GitHub Actions exist elsewhere, document in README; if not, consider minimal **CI** (lint + `npm test` on PR).
+- **CI:** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on **`main` / `master` / `develop`** (Windows, Node 20).
 - **Lua mod:** no automated Lua test harness in-repo — rely on SP/MP host manual QA.
 
 ---
@@ -164,10 +160,10 @@ Use **[RELEASE_READINESS_v3.9.md](./RELEASE_READINESS_v3.9.md)** as the operator
 | -------- | ---- | --------- | --------------- |
 | **P0** | Confirm **GitHub Release** assets (**`latest.yml` + `.exe`**) for **3.9.0** | Updater breaks silently without YAML | Follow release readiness doc |
 | **P0** | Run **updater rehearsal** (3.9 → 4.0 beta) | Final gate before marketing **v4** stable | Draft release + installed 3.9 client |
-| **P1** | Resolve or document **`fast-uri` / ajv** transitive advisory | Supply-chain hygiene | `npm audit fix`, bump `electron-store` when safe |
+| **P1** | Keep **`npm audit --omit=dev`** clean when touching deps | Supply-chain hygiene | CI fails on prod vulns; bump majors deliberately |
 | **P1** | XSS audit **remaining** SPA modules | Defense in depth | Mirror pastures `_safe()` pattern + tests |
 | **P2** | Reduce **`readFileSync`** in **`main.js`** hot paths | Startup / responsiveness | Incremental `fs.promises` migration |
-| **P2** | Optional **minimal CI** | Prevent regressions | GitHub Action: checkout, `npm ci`, `npm test` |
+| **P2** | ~~Optional **minimal CI**~~ | Done | See `.github/workflows/ci.yml` |
 | **P3** | Frame-budget **Lua** work if profiling shows hitches | SP sim smoothness | Smaller chunks / rarer fallback paths |
 | **P3** | Clarify **Realistic Livestock** vs Farm Dashboard in root **README** | Contributor confusion | Short section “Other mods in this repo” |
 

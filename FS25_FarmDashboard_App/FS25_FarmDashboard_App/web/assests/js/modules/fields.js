@@ -439,7 +439,7 @@ function buildFieldCard(field) {
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">
                         <i class="bi bi-geo-alt-fill text-primary me-1"></i>
-                        ${field.name || t("fields.fieldNameFallback", { id: field.id })}
+                        ${escapeFieldHtml(field.name ? String(field.name) : t("fields.fieldNameFallback", { id: field.id }))}
                         ${pfBadges}
                     </h5>
                     ${badge}
@@ -453,7 +453,7 @@ function buildFieldCard(field) {
                         </div>
                         <div class="col-6">
                             <small class="text-muted d-block">${escapeFieldHtml(t("fields.cardCrop"))}</small>
-                            <strong>${formatCropName(field.fruitType)}</strong>
+                            <strong>${escapeFieldHtml(formatCropName(field.fruitType))}</strong>
                         </div>
                     </div>
                     ${buildForageDetectionBadges(field)}

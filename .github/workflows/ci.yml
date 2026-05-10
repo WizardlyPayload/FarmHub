@@ -1,0 +1,30 @@
+# FarmHub — run Jest on push/PR (FS25 Farm Dashboard app)
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: FS25_FarmDashboard_App/FS25_FarmDashboard_App
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: FS25_FarmDashboard_App/FS25_FarmDashboard_App/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run tests
+        run: npm test
+      - name: i18n verify (all locales match en + placeholders)
+        run: npm run i18n:verify
+      - name: Production dependency audit
+        run: npm audit --omit=dev

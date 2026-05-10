@@ -65,8 +65,8 @@ npm start
 npm run dist
 ```
 
-Default output (**`tools/run-electron-builder.mjs`**):  
-`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\` — e.g. `FS25 Farm Dashboard Setup 3.9.0.exe`, `latest.yml`, and `win-unpacked/` (version follows `package.json`).
+Default output (**[`tools/app/run-electron-builder.mjs`](../../../tools/app/run-electron-builder.mjs)** relative to repo root):  
+`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\` — e.g. `FS25 Farm Dashboard Setup 3.9.0.exe`, `latest.yml`, and `win-unpacked/` (version follows `package.json`). See **[`tools/README.md`](../../../tools/README.md)**.
 
 **In-repo build** (writes under this app folder — can lock `app.asar` in some setups):
 

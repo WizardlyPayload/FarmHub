@@ -42,7 +42,7 @@ Historical note: this audit originally recorded **Conditional NO-GO** before the
 ### 3) XSS risk from untrusted data rendered with HTML templates — **MITIGATED (pastures path + tests)**
 
 - **`web/assests/js/utils/escape.js`** + **`pastures.js`** `_safe()` on names, messages, and table cells; **`tests/xss.smoke.test.js`** guards regressions.
-- **Follow-up for v4:** extend the same `_safe` / delegated-event pattern to **livestock.js**, **vehicles.js**, **navigation.js** if any raw interpolations remain (see original audit scope).
+- **Update (post-audit):** high-risk interpolations in **livestock.js** (`formatLocation`, breed column), **vehicles.js** (card titles / brands / thumb labels), and **navigation.js** (farm picker) now route through **`_safe`**; **`tests/xss.smoke.test.js`** guards patterns. Residual review: **economy.js**, **changes.js**, **fields.js** innerHTML paths if game strings appear unescaped.
 
 ## Major non-blocking findings (fix in v3.9.x or v4)
 
@@ -58,13 +58,10 @@ Action:
 
 ### 5) Setup and installation docs have clarity gaps
 
-Severity: **Medium**
+Severity: **Medium** (partially addressed)
 
-- `INSTALL.md` has malformed markdown tokens around `data.json` and mod folder naming.
-- Build output and release location wording is inconsistent between root/app docs.
-
-Action:
-- Normalize installation wording, release URLs, and build output notes to one canonical path.
+- Historical: `INSTALL.md` token issues and mod folder naming were corrected for **`FS25_FarmDashboard`** / zip layout.
+- **Residual:** keep root **`README.md`**, **`INSTALL.md`**, and **`RELEASE_NOTES.md`** aligned whenever build output paths or GitHub URLs change.
 
 ### 6) Usability/i18n consistency gaps
 

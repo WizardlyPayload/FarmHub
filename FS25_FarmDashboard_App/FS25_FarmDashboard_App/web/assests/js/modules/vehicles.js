@@ -3,6 +3,21 @@
 import { getAPIBaseURL } from "./apiStorage.js";
 import { t } from "../i18n/i18n.js";
 
+function _safe(value) {
+  const ns =
+    (typeof globalThis !== "undefined" && globalThis.farmDashEscape) ||
+    (typeof window !== "undefined" && window.farmDashEscape) ||
+    null;
+  if (ns && typeof ns.escapeHtml === "function") return ns.escapeHtml(value);
+  if (value == null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /** JSON may send farm ids as string or number — must match `applyApiMergedDataPayload` filtering. */
 export function vehicleMatchesActiveFarm(v, activeFarmId) {
   const vf = Number(v?.ownerFarmId ?? v?.farmId ?? 0);
@@ -2611,7 +2626,7 @@ export function createVehicleCard(vehicle) {
                 vehicleDisplay.isImage
                   ? `<div class="vehicle-display-container vehicle-shop-thumb"
                         onclick="dashboard.showVehicleImage('${vehicleDisplay.imageUrl}', '${vehicleDisplay.displayText}', '${String(brandName).replace(/'/g, "\\'")}')">
-                     <img class="vehicle-shop-thumb-img" src="${vehicleDisplay.imageUrl}" alt="${vehicleDisplay.displayText}"${
+                     <img class="vehicle-shop-thumb-img" src="${vehicleDisplay.imageUrl}" alt="${_safe(vehicleDisplay.displayText)}"${
                        vehicleDisplay.wikiFallbackUrl
                          ? ` data-wiki-fallback="${vehicleDisplay.wikiFallbackUrl}"`
                          : ""
@@ -2620,7 +2635,7 @@ export function createVehicleCard(vehicle) {
                           onmouseover="this.style.transform='scale(1.05)'"
                           onmouseout="this.style.transform='scale(1)'" />
                      <div class="vehicle-shop-thumb-fallback">
-                       ${vehicleDisplay.displayText}
+                       ${_safe(vehicleDisplay.displayText)}
                      </div>
                      <div class="vehicle-shop-thumb-zoom">
                        <i class="bi bi-zoom-in"></i>
@@ -2628,7 +2643,7 @@ export function createVehicleCard(vehicle) {
                    </div>`
                   : `<div class="vehicle-display-container" style="width: 80px; height: 60px; border-radius: 8px; background: ${vehicleDisplay.background}; display: flex; align-items: center; justify-content: center; border: 1px solid rgba(255,255,255,0.3); box-shadow: 0 2px 6px rgba(0,0,0,0.15); position: relative; overflow: hidden;">
                      <div style="color: ${vehicleDisplay.textColor}; font-size: 10px; font-weight: bold; text-align: center; padding: 2px; line-height: 1.1; word-wrap: break-word; max-width: 76px;">
-                       ${vehicleDisplay.displayText}
+                       ${_safe(vehicleDisplay.displayText)}
                      </div>
                      <div style="position: absolute; top: 2px; right: 2px; width: 12px; height: 12px; border-radius: 50%; background: rgba(255,255,255,0.2);"></div>
                      <div style="position: absolute; bottom: 2px; left: 2px; width: 16px; height: 2px; background: rgba(255,255,255,0.3); border-radius: 1px;"></div>
@@ -2636,13 +2651,10 @@ export function createVehicleCard(vehicle) {
               }
             </div>
             <div>
-              <h6 class="mb-0 text-truncate" style="max-width: 140px;" title="${displayName.replace(
-                /"/g,
-                "&quot;"
-              )}">
-                ${displayName}
+              <h6 class="mb-0 text-truncate" style="max-width: 140px;" title="${_safe(displayName)}">
+                ${_safe(displayName)}
               </h6>
-              <small class="text-muted">${brandName || "—"}</small>
+              <small class="text-muted">${_safe(brandName || "—")}</small>
             </div>
           </div>
           <i class="bi ${statusIcon} fs-5"></i>

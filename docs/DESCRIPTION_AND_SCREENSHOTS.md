@@ -4,7 +4,9 @@ This document describes the **in-game mod** and **desktop application**, lists e
 
 **Version history:** [CHANGELOG.md](./CHANGELOG.md) · **Short release blurbs:** [RELEASE_NOTES.md](./RELEASE_NOTES.md) · **Security / LAN:** [SECURITY.md](./SECURITY.md) · **Authors:** [AUTHORS.md](./AUTHORS.md) (JoshWalki & WizardlyPayload)
 
-> **Note:** Screenshots must be captured on **your PC** while FS25 and the dashboard app are running with real data. Place image files under `docs/screenshots/` (create the folder) using the filenames below. Then uncomment or add the Markdown image lines in your README.
+> **Two filename schemes:** This page uses short names (`mod-01`, `app-01`, `ui-01`) for **quick GitHub/README** bundles. The **illustrated user manual** uses the canonical **`fd-*`** filenames — full list, capture recipes, and status in **[SCREENSHOT_MANIFEST.md](./SCREENSHOT_MANIFEST.md)**.
+
+> **Note:** Screenshots must be captured on **your PC** while FS25 and the dashboard app are running with real data. Place PNGs under **`docs/screenshots/`**. Then add Markdown image lines in README or release pages as needed.
 
 ---
 
@@ -69,9 +71,9 @@ A **Windows desktop program** that:
 
 First-time **Server Manager** screen: **`setup.html`** (local paths, FTP, multi-server).
 
-### Timing: mod vs app (2.0.0)
+### Timing: mod vs app (3.9 baseline)
 
-Two different “schedules” are involved (see [CHANGELOG.md §2.0.0 — **G** and **H**](./CHANGELOG.md)):
+Two different “schedules” are involved (historical detail in [CHANGELOG.md](./CHANGELOG.md) §**3.0.0** / §**2.0.0**):
 
 | Layer | What it controls |
 |--------|------------------|
@@ -144,7 +146,9 @@ Open **`http://localhost:8766`** after the app is running and data is flowing.
 
 ## Quick capture checklist
 
-Use **Win + Shift + S** (Snipping Tool) or fullscreen capture.
+**Sizes:** dashboard / Setup — **1920 × 1080** PNG (landscape). Tablet LAN photos (`§8`) — **1080 × 1920** PNG (portrait). If you meant standard PC fullscreen without cropping, that size is **1920 × 1080**, not **1080 × 1920**.
+
+Use **Win + Shift + S** (Snipping Tool) or fullscreen capture at the target resolution (resize the browser window or use your GPU’s capture preset where available).
 
 - [ ] `mod-01-mods-list.png`
 - [ ] `app-01-setup.png`
@@ -166,4 +170,4 @@ Commit the `docs/screenshots/*.png` files to git, or attach them to **GitHub Rel
 
 ---
 
-*Document revision: 2.0 — aligned with app **2.0.0** / mod **2.0.0.0** (see [CHANGELOG.md](./CHANGELOG.md)). Authors: **JoshWalki** & **WizardlyPayload** ([AUTHORS.md](./AUTHORS.md)).*
+*Document revision: 3.9 — aligned with app **3.9.0** / mod **2.3.0.0** (see [CHANGELOG.md](./CHANGELOG.md)). Authors: **JoshWalki** & **WizardlyPayload** ([AUTHORS.md](./AUTHORS.md)). For storefront blurbs, see also [RELEASE_NOTES.md](./RELEASE_NOTES.md).*

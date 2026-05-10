@@ -23,10 +23,15 @@ All project documentation lives under **`docs/`** (repository root: **FarmHub** 
 | [**RELEASE_READINESS_v3.9.md**](./RELEASE_READINESS_v3.9.md) | **Operator checklist:** build 3.9.0, GitHub assets, updater rehearsal before v4 |
 | [**PROJECT_DEEP_AUDIT_FARMHUB.md**](./PROJECT_DEEP_AUDIT_FARMHUB.md) | **Full-repo audit:** findings, risks, prioritized fixes |
 | [**UPDATER_QA.md**](./UPDATER_QA.md) | Auto-update (`electron-updater`) verification matrix |
+| [**VALIDATION-RUNBOOK.md**](./VALIDATION-RUNBOOK.md) | Plan v5 diagnostics soak profiles (`[FarmDash][diag]` thresholds) |
 | [**CURSOR_SESSION_MEMORY.md**](./CURSOR_SESSION_MEMORY.md) | Cursor chat companion (session summaries) |
 | [SALES_HANDOVER.md](./SALES_HANDOVER.md) | Sales & partnerships positioning |
 | [AUTHORS.md](./AUTHORS.md) | **JoshWalki** & **WizardlyPayload** |
 
 **Authoritative versions:** `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` (app), `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` (mod).
+
+**Scripts (build / CI):** [**`tools/README.md`**](../tools/README.md) at repo root — Electron helpers live in **`tools/app/`**.
+
+**Screenshots:** [`SCREENSHOT_MANIFEST.md`](./SCREENSHOT_MANIFEST.md) lists optional **`fd-*`** PNGs for [`USER_MANUAL.md`](./USER_MANUAL.md). The manual is complete without images; add PNGs under **`screenshots/`** when you want illustrations.
 
 **Internal engine notes (maintainers):** `FS25 Engine Interaction Modules.txt`, `Dynamic Ground Material Moisture & Transfor.txt`, `FS25 Chat System & Server Integration.txt` in this folder — referenced from Lua comments where applicable.

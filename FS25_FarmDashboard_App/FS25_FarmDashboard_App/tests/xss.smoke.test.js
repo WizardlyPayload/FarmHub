@@ -110,3 +110,78 @@ describe("livestock.js: animal details modal title is escaped", () => {
     expect(/\$\{_safe\(\s*animal\.id\s*\)/.test(text)).toBe(true);
   });
 });
+
+describe("livestock.js: table cells escape game-sourced labels", () => {
+  const text = readFile("web/assests/js/modules/livestock.js");
+  test("formatAnimalType column wrapped with _safe in main row builder", () => {
+    expect(text).toMatch(
+      /_safe\(this\.formatAnimalType\(animal\.subType \|\| t\("common\.unknown"\)\)\)/
+    );
+  });
+  test("formatLocation escapes location text and type for badge/title", () => {
+    expect(text).toMatch(/const safeType = _safe\(locationType/);
+    expect(text).toMatch(/const safeLoc = _safe\(location\)/);
+  });
+});
+
+describe("fields.js: field card escapes engine-provided names", () => {
+  const text = readFile("web/assests/js/modules/fields.js");
+  test("field title and crop use escapeFieldHtml", () => {
+    expect(text).toMatch(
+      /\$\{escapeFieldHtml\(field\.name \? String\(field\.name\) : t\("fields\.fieldNameFallback"/
+    );
+    expect(text).toMatch(
+      /\$\{escapeFieldHtml\(formatCropName\(field\.fruitType\)\)\}/
+    );
+  });
+});
+
+describe("economy.js: vehicle and price strings escaped", () => {
+  const text = readFile("web/assests/js/modules/economy.js");
+  test("defines _safe", () => {
+    expect(text).toMatch(/function _safe\(value\)/);
+  });
+  test("purchase and consumable headers use _safe on names", () => {
+    expect(text).toMatch(/\$\{_safe\(resolveVehicleDisplayName\(vehicle\)\)\}/);
+    expect(text).toMatch(/_safe\(resolveVehicleBrandLabel\(vehicle\.brand\) \|\| "—"\)/);
+  });
+  test("price card title escaped", () => {
+    expect(text).toMatch(/\$\{_safe\(priceInfo\.title \|\| name\)\}/);
+  });
+});
+
+describe("changes.js: diff modal escapes game strings", () => {
+  const text = readFile("web/assests/js/modules/changes.js");
+  test("defines _safe and uses on livestock / warnings", () => {
+    expect(text).toMatch(/function _safe\(value\)/);
+    expect(text).toMatch(/\$\{_safe\(animal\.name \|\| "Unnamed"\)\}/);
+    expect(text).toMatch(/\$\{_safe\(warnMsg\)\}/);
+  });
+});
+
+describe("vehicles.js: card header escapes display names", () => {
+  const text = readFile("web/assests/js/modules/vehicles.js");
+  test("defines _safe near top", () => {
+    expect(text).toMatch(/function _safe\(value\)/);
+  });
+  test("card title and brand use _safe", () => {
+    expect(text).toMatch(/title="\$\{_safe\(displayName\)\}"/);
+    expect(text).toMatch(/\$\{_safe\(displayName\)\}/);
+    expect(text).toMatch(/\$\{_safe\(brandName \|\| "—"\)\}/);
+  });
+});
+
+describe("navigation.js: farm selection list escapes farm fields", () => {
+  const text = readFile("web/assests/js/modules/navigation.js");
+  test("farm name and ids use _safe in list items", () => {
+    expect(text).toMatch(/\$\{_safe\(farm\.name\)\}/);
+    expect(text).toMatch(/\$\{_safe\(farm\.id\)\}/);
+    expect(text).toMatch(/\$\{_safe\(farm\.internalId\)\}/);
+  });
+  test("unknown section placeholder escapes sectionName", () => {
+    expect(text).toMatch(/\$\{_safe\(sectionName\)\}/);
+  });
+  test("defines local _safe helper", () => {
+    expect(text).toMatch(/function _safe\(value\)/);
+  });
+});

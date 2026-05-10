@@ -10,7 +10,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectDir = path.join(__dirname, '..');
+const projectDir = path.join(__dirname, '..', '..', 'FS25_FarmDashboard_App', 'FS25_FarmDashboard_App');
 
 const mode = process.argv[2] === 'pack' ? 'pack' : 'dist';
 const outDir = path.join(os.tmpdir(), `farmdash-electron-out-${Date.now()}`);

@@ -240,7 +240,7 @@ export function renderAnimalsTable() {
 
       return [
         animalIdDisplay,
-        this.formatAnimalType(animal.subType || t("common.unknown")),
+        _safe(this.formatAnimalType(animal.subType || t("common.unknown"))),
         fmtAgeMonthsStr(animal.age || 0),
         formatGenderLabel(animal.gender),
         healthBar,
@@ -476,8 +476,10 @@ export function formatLocation(location, locationType) {
     icon = "bi-tree";
   }
 
-  return `<span class="badge ${badgeClass}" title="${locationType}">
-                  <i class="${icon} me-1"></i>${location}
+  const safeType = _safe(locationType || "");
+  const safeLoc = _safe(location);
+  return `<span class="badge ${badgeClass}" title="${safeType}">
+                  <i class="${icon} me-1"></i>${safeLoc}
               </span>`;
 }
 
@@ -985,7 +987,7 @@ export function filterAnimals(filterType, silentRefresh) {
 
       return [
         `<code class="text-muted">${animal.id}</code>`,
-        this.formatAnimalType(animal.subType),
+        _safe(this.formatAnimalType(animal.subType)),
         fmtAgeMonthsStr(animal.age),
         formatGenderLabel(animal.gender),
         healthBar,
@@ -1448,7 +1450,7 @@ export function updateTableWithFilteredAnimals(filteredAnimals) {
 
     return [
       `<code class="text-muted">${animal.id}</code>`,
-      this.formatAnimalType(animal.subType),
+      _safe(this.formatAnimalType(animal.subType)),
       fmtAgeMonthsStr(animal.age),
       formatGenderLabel(animal.gender),
       healthBar,

@@ -20,8 +20,13 @@ On a **dedicated / hosted server**, the same idea applies: the mod must be **act
 
 ## 1. Install the mod in Farming Simulator 25
 
-1. Copy the `FS25_FarmDashboard` mod folder into your FS25 mods folder.
-  **Typical Windows path:**  
+1. Install the mod into your FS25 **`mods`** folder using **either** approach:
+   - **Recommended:** copy **`FS25_FarmDashboard.zip`** from the GitHub release into **`mods`** (the game loads `.zip` mods directly), **or**
+   - Extract/copy so you have a folder **`FS25_FarmDashboard`** next to your other mods, with **`modDesc.xml`**, **`icon.png`**, and **`src`** directly inside **`mods\FS25_FarmDashboard\`** (same flat layout as the zip from **`tools\Zip-FarmDashboardMod.ps1`** — nothing else).
+   
+   **Developers:** sources live under **`FS25_FarmDashboard_Mod\FS25_FarmDashboard_Mod\`** in the repo; that name is **not** what players put in **`mods`** — the shipped folder / zip root is **`FS25_FarmDashboard`**.
+   
+   **Typical Windows path:**  
    `Documents\My Games\FarmingSimulator2025\mods\`
 2. Start **Farming Simulator 25**.
 

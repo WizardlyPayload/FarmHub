@@ -42,8 +42,8 @@ Use this file for **short copy-paste text** on GitHub Releases. The **full histo
 
 ### Attach to this release (recommended)
 
-- `FS25 Farm Dashboard Setup 3.0.0.exe` — default build output: `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\` (see [CHANGELOG.md](./CHANGELOG.md) §3.0.0); or your in-repo `electron-pack-out` if you build that way.
-- `FS25_FarmDashboard_Mod.zip` — zip the **`FS25_FarmDashboard_Mod`** folder for `Documents\My Games\FarmingSimulator2025\mods\`
+- `FS25 Farm Dashboard Setup 3.9.0.exe` — default build output: `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\` (see [CHANGELOG.md](./CHANGELOG.md) §3.9.0); or your in-repo `electron-pack-out` if you build `npm run dist:in-repo`.
+- **`FS25_FarmDashboard.zip`** — FS25 mod for `Documents\My Games\FarmingSimulator2025\mods\` (built with **`tools\Zip-FarmDashboardMod.ps1`**; archive root is **`modDesc.xml`**, **`icon.png`**, **`src/`** only)
 
 ### Reporting issues
 

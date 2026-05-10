@@ -1,4 +1,4 @@
-# FS25 Farm Dashboard — User manual (v3.0)
+# FS25 Farm Dashboard — User manual (v3.9)
 
 **Farm Dashboard** is the Windows desktop app that reads live farm data from **Farming Simulator 25** (via the in-game **FS25 Farm Dashboard** mod) and renders it in your browser at **[http://localhost:8766](http://localhost:8766)**. **App version 3.9.0**, **mod version 2.3.0.0**.
 
@@ -31,7 +31,7 @@ This manual walks every setting, every section, and every modal, and points to a
 | Item | Purpose |
 | ---- | ------- |
 | **Farming Simulator 25** | Game must run with the mod for live data to exist |
-| **FS25 Farm Dashboard mod** | Folder `FS25_FarmDashboard_Mod` copied into your FS25 `mods` folder |
+| **FS25 Farm Dashboard mod** | **`FS25_FarmDashboard.zip`** or folder **`FS25_FarmDashboard`** in your FS25 `mods` folder |
 | **FS25 Farm Dashboard app (Windows)** | Installer `FS25 Farm Dashboard Setup 3.9.0.exe` |
 | **Browser** | Edge, Chrome, Firefox — opens [http://localhost:8766](http://localhost:8766) |
 | **(Optional) FTP credentials** | If FS25 runs on a dedicated / rented server you do not own locally |
@@ -45,11 +45,10 @@ Do these **in order**. Skipping a stage is the most common reason the dashboard 
 
 ### Stage A — Install the mod
 
-1. Copy `FS25_FarmDashboard_Mod\FS25_FarmDashboard_Mod` into:
-   `Documents\My Games\FarmingSimulator2025\mods\`
+1. Copy **`FS25_FarmDashboard.zip`** into **`Documents\My Games\FarmingSimulator2025\mods\`** (recommended), **or** copy/extract so you have **`mods\FS25_FarmDashboard\`** with **`modDesc.xml`** at that folder root (same layout as the release zip from **`tools\Zip-FarmDashboardMod.ps1`**).
 2. Start FS25 once so it sees the mod.
 
-> Screenshot: `fd-install-010-mod-folder.png` — Mod folder visible under FS25 `mods\`. **[manual]**
+> Screenshot: `fd-install-010-mod-folder.png` — **`FS25_FarmDashboard`** visible under FS25 **`mods\`** (folder **or** `.zip`). **[manual]**
 
 ### Stage B — Enable per save
 

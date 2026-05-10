@@ -21,9 +21,10 @@
 
 | Path | Technology | Role |
 | ---- | ----------- | ---- |
-| `FS25_FarmDashboard_Mod/.../` | Lua | Collectors; writes `data.json` |
+| `FS25_FarmDashboard_Mod/.../` | Lua | Collectors; writes `data.json`. **Shipped to players:** **`FS25_FarmDashboard.zip`** = only **`modDesc.xml`**, **`icon.png`**, **`src/`** at archive root ([`tools/Zip-FarmDashboardMod.ps1`](../tools/Zip-FarmDashboardMod.ps1)); use as **`mods\FS25_FarmDashboard.zip`** or extract to **`mods\FS25_FarmDashboard\`**. |
 | `FS25_FarmDashboard_App/.../` | Electron, Express, vanilla JS | Local HTTP API (~**8766**), merge, FTP, IPC |
 | `docs/` | Markdown | Manuals, security, changelog |
+| `tools/` | Scripts | Build helpers — **[tools/README.md](../tools/README.md)** (`tools/app/` for Electron npm scripts) |
 
 **Note:** Web assets folder is spelled **`web/assests/`** (historic typo).
 

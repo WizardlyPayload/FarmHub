@@ -9,6 +9,21 @@ import {
 } from "./vehicles.js";
 import { filterFieldsForFarmView } from "./fields.js";
 
+function _safe(value) {
+  const ns =
+    (typeof globalThis !== "undefined" && globalThis.farmDashEscape) ||
+    (typeof window !== "undefined" && window.farmDashEscape) ||
+    null;
+  if (ns && typeof ns.escapeHtml === "function") return ns.escapeHtml(value);
+  if (value == null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 /** Sum `baleCountOnField` for the active farm — fallback when Lua does not export `baleInventory`. */
 function sumBalesOnFarmFields(data, farmId) {
   if (!data || typeof data !== "object") {
@@ -376,10 +391,10 @@ export function updatePurchasesList(vehicles) {
               <i class="bi ${this.getVehicleIcon(
                 vehicle.vehicleType
               )} text-primary"></i>
-              ${resolveVehicleDisplayName(vehicle)}
+              ${_safe(resolveVehicleDisplayName(vehicle))}
             </h6>
             <span class="badge bg-primary">${
-              resolveVehicleBrandLabel(vehicle.brand) || "—"
+              _safe(resolveVehicleBrandLabel(vehicle.brand) || "—")
             }</span>
           </div>
           <div class="card-body">
@@ -393,7 +408,7 @@ export function updatePurchasesList(vehicles) {
               <div class="col-6">
                 <small class="text-muted">${t("economy.purchaseType")}</small><br>
                 <strong>${
-                  vehicle.typeName || vehicle.vehicleType || t("common.unknown")
+                  _safe(vehicle.typeName || vehicle.vehicleType || t("common.unknown"))
                 }</strong>
               </div>
             </div>
@@ -525,7 +540,7 @@ function consumableFillSummaryHtml(vehicle) {
         data && data.capacity > 0
           ? Math.round((data.level / data.capacity) * 100)
           : 0;
-      return `<small class="text-muted d-block">${t("economy.consumablesFillLine", { type, pct })}</small>`;
+      return `<small class="text-muted d-block">${t("economy.consumablesFillLine", { type: _safe(type), pct })}</small>`;
     })
     .join("");
 }
@@ -562,10 +577,10 @@ export function updateConsumablesList(vehicles) {
           <div class="card-header d-flex justify-content-between align-items-center">
             <h6 class="mb-0 text-truncate" style="max-width:70%">
               <i class="bi ${icon} text-info"></i>
-              ${resolveVehicleDisplayName(vehicle)}
+              ${_safe(resolveVehicleDisplayName(vehicle))}
             </h6>
-            <span class="badge bg-info text-dark text-truncate" style="max-width:45%" title="${String(vehicle.typeName || "").replace(/"/g, "&quot;")}">
-              ${vehicle.typeName || vehicle.vehicleType || "—"}
+            <span class="badge bg-info text-dark text-truncate" style="max-width:45%" title="${_safe(String(vehicle.typeName || ""))}">
+              ${_safe(vehicle.typeName || vehicle.vehicleType || "—")}
             </span>
           </div>
           <div class="card-body">
@@ -877,11 +892,11 @@ export function displayMarketPrices(marketData) {
         const isBadTimeToSell = bestLocation && bestLocation.name === 'Market Base Prices' && sortedLocations.length > 1;
         
         html += `
-          <div class="col-md-6 col-lg-4 mb-3 market-crop-card" data-crop-name="${cropName.toLowerCase()}" data-search-text="${formattedName.toLowerCase()}">
+          <div class="col-md-6 col-lg-4 mb-3 market-crop-card" data-crop-name="${_safe(cropName.toLowerCase())}" data-search-text="${_safe(formattedName.toLowerCase())}">
             <div class="card ${isBadTimeToSell ? 'bg-danger bg-opacity-25 border-danger' : 'bg-secondary'} h-100">
               <div class="card-body">
                 <h6 class="card-title text-farm-accent mb-2">
-                  <i class="bi ${category.icon}"></i> ${formattedName}
+                  <i class="bi ${category.icon}"></i> ${_safe(formattedName)}
                 </h6>
                 ${isBadTimeToSell ? `
                 <div class="alert alert-warning py-2 px-2 mb-3" style="font-size: 0.75rem;">
@@ -898,9 +913,9 @@ export function displayMarketPrices(marketData) {
                         <i class="bi ${index === 0 ? 'bi-geo-alt-fill' : 'bi-geo-alt'}"></i> 
                         ${location.name === 'Market Base Prices' ? 
                           `<span style="cursor: pointer;" onclick="dashboard.showMarketBasePricesModal()" title="Click for explanation">
-                            ${location.name} <i class="bi bi-info-circle ms-1"></i>
+                            ${_safe(location.name)} <i class="bi bi-info-circle ms-1"></i>
                           </span>` : 
-                          location.name}
+                          _safe(location.name)}
                       </small>
                       <small class="${index === 0 ? 'text-success fw-bold' : 'text-warning'}">
                         $${location.price.toFixed(0)}
@@ -966,10 +981,10 @@ export function displayMarketPrices(marketData) {
         .join(' ');
       
       html += `
-        <div class="accordion-item market-location-item" data-location-name="${sellPoint.name.toLowerCase()}" data-search-text="${sellPoint.name.toLowerCase()} ${locationCrops.toLowerCase()}">
+        <div class="accordion-item market-location-item" data-location-name="${_safe(sellPoint.name.toLowerCase())}" data-search-text="${_safe(`${sellPoint.name.toLowerCase()} ${locationCrops.toLowerCase()}`)}">
           <h2 class="accordion-header">
             <button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#sellPoint${index}">
-              <i class="bi bi-shop me-2"></i> ${sellPoint.name}
+              <i class="bi bi-shop me-2"></i> ${_safe(sellPoint.name)}
               <span class="badge bg-info ms-2">${totalCrops} crops</span>
               ${sellPoint.isSpecialEvent ? '<span class="badge bg-warning ms-2"><i class="bi bi-star-fill"></i> Special Event</span>' : ''}
             </button>
@@ -1016,7 +1031,7 @@ export function displayMarketPrices(marketData) {
           
           html += `
             <tr>
-              <td>${formattedCropName}</td>
+              <td>${_safe(formattedCropName)}</td>
               <td class="text-end"><strong>$${priceInfo.price.toFixed(0)}</strong></td>
               <td class="text-end">
                 <span class="badge ${priceInfo.multiplier > 1.1 ? 'bg-success' : priceInfo.multiplier < 0.9 ? 'bg-danger' : 'bg-secondary'}">
@@ -1222,7 +1237,7 @@ export function updateSearchResults(searchTerm, cropCards, locationItems) {
         <div class="col-12 text-center p-5 market-no-results">
           <i class="bi bi-search text-muted" style="font-size: 3rem;"></i>
           <h5 class="text-muted mt-3">No Results Found</h5>
-          <p class="text-muted">No ${isCropTab ? 'crops' : 'locations'} match "${searchTerm}"</p>
+          <p class="text-muted">No ${isCropTab ? 'crops' : 'locations'} match "${_safe(searchTerm)}"</p>
         </div>
       `;
       container.insertAdjacentHTML('beforeend', noResultsHTML);
@@ -1250,11 +1265,11 @@ export function createPriceCard(name, priceInfo) {
       : "bi-dash";
 
   return `
-    <div class="col-md-6 col-lg-4 mb-3 crop-card" data-name="${name.toLowerCase()}">
+    <div class="col-md-6 col-lg-4 mb-3 crop-card" data-name="${String(name).toLowerCase()}">
       <div class="card bg-secondary">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center mb-2">
-            <h6 class="card-title mb-0">${priceInfo.title || name}</h6>
+            <h6 class="card-title mb-0">${_safe(priceInfo.title || name)}</h6>
             <span class="${trendClass}">
               <i class="bi ${trendIcon}"></i>
               ${Math.abs(percentChange).toFixed(1)}%

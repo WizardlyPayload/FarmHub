@@ -27,15 +27,25 @@ Desktop companion for **Farming Simulator 25**: a Windows app plus an in-game mo
 
 | Path | Role |
 |------|------|
-| `FS25_FarmDashboard_Mod/` | FS25 mod (Lua) → game `mods` folder |
+| `FS25_FarmDashboard_Mod/` | FS25 mod **sources** (Lua). **Release zip** (`tools\Zip-FarmDashboardMod.ps1`): only `modDesc.xml`, `icon.png`, `src/` at archive root. **In `mods\`:** use **`FS25_FarmDashboard.zip`** or a folder **`FS25_FarmDashboard`** with the same three at folder root. |
 | `FS25_FarmDashboard_App/` | Electron app + web UI + merger + FTP |
-| `tools/` | Build helpers (e.g. mod shop image export) — see below |
+| `tools/` | **All** build helpers — [`tools/README.md`](tools/README.md) · Electron npm scripts use [`tools/app/`](tools/app/) |
+
+### Other mods in this repo
+
+**`FS25_RealisticLivestockRM/`** is a separate Farming Simulator 25 mod (not required for Farm Dashboard). It has its own lifecycle, releases, and issues — only bundle or ship it when you intend to maintain that product too.
+
+---
+
+## Continuous integration
+
+On push/PR to **`main`**, **`master`**, or **`develop`**, GitHub Actions runs **`npm ci`**, **`npm test`**, **`npm run i18n:verify`**, and **`npm audit --omit=dev`** in **`FS25_FarmDashboard_App/FS25_FarmDashboard_App/`**. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---
 
 ## Install order (short)
 
-1. Install the **mod** into FS25 `mods`, enable it, **load the save** once.  
+1. Install the **mod** into FS25 `mods` (zip **`FS25_FarmDashboard.zip`** or folder **`FS25_FarmDashboard`**), enable it, **load the save** once.  
 2. Install the **Farm Dashboard** `.exe` from Releases (or your build).  
 3. Open **Settings → Servers & saves** if paths or FTP need adjustment.
 
@@ -51,7 +61,7 @@ npm install
 npm run dist
 ```
 
-Default **`npm run dist`** (via `tools/run-electron-builder.mjs`) writes the installer under **`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out`** to avoid file locks on `app.asar` inside the repo. In-repo output: **`npm run dist:in-repo`** → `FS25_FarmDashboard_App/electron-pack-out`. See **[docs/CHANGELOG.md](docs/CHANGELOG.md)** §**3.9.0** and §**3.0.0**.
+Default **`npm run dist`** (via [`tools/app/run-electron-builder.mjs`](tools/app/run-electron-builder.mjs)) writes the installer under **`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out`** to avoid file locks on `app.asar` inside the repo. In-repo output: **`npm run dist:in-repo`** → `FS25_FarmDashboard_App/electron-pack-out`. See **[docs/CHANGELOG.md](docs/CHANGELOG.md)** §**3.9.0** and §**3.0.0**. Script index: **[tools/README.md](tools/README.md)**.
 
 ```bash
 npm start
@@ -65,7 +75,7 @@ Run unpacked dev build without packaging.
 
 Use **Git** or **GitHub Desktop** in your clone of **FarmHub**. Commit from your machine; do not rely on custom sync scripts—mirror trees manually if you keep a second working copy.
 
-Publishing a release: attach the **NSIS `.exe`** and a **zip of `FS25_FarmDashboard_Mod`**. Blurb text: **[docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)**.
+Publishing a release: attach the **NSIS `.exe`** and **`FS25_FarmDashboard.zip`** (built with [`tools/Zip-FarmDashboardMod.ps1`](tools/Zip-FarmDashboardMod.ps1) — **only** `modDesc.xml`, `icon.png`, `src/` at zip root). Blurb text: **[docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)**.
 
 ---
 
@@ -82,4 +92,4 @@ Publishing a release: attach the **NSIS `.exe`** and a **zip of `FS25_FarmDashbo
 ## Credits & licence
 
 **JoshWalki** & **WizardlyPayload** — **[docs/AUTHORS.md](docs/AUTHORS.md)**.  
-Add a **`LICENSE`** file if you want explicit terms; otherwise all rights reserved unless stated.
+Terms: **[LICENSE](LICENSE)** (all rights reserved unless you negotiate otherwise).

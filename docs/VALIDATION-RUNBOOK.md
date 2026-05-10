@@ -1,5 +1,7 @@
 # FarmDashboard Plan v5 — Validation runbook
 
+**Repository path:** `docs/VALIDATION-RUNBOOK.md` (FarmHub **docs** folder — consolidated from the mod tree).
+
 This document defines the **five numbered validation profiles** required before shipping the
 Plan v5 hardening pass. Each profile lists the fixture, soak duration, and pass thresholds.
 

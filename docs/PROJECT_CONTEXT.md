@@ -61,8 +61,9 @@ Optional **`0.0.0.0`** bind with **HTTP Basic** + **IP allowlist**; loopback req
 
 ### 4.2 Web UI (`web/assests/js/`)
 
-- SPA-style modules per section.
-- **Fields** — `fields.js` + `rules-engine.js`; windrow badge builder; filters (`Needs work`, etc.).
+- Entry **`app.js`** composes **`window.dashboard`** (class `LivestockDashboard`) from **`modules/*`**, **`apiStorage`**, **`navigation`**, etc.
+- **`realtime-connector.js`** (ES module) — WebSocket live path; works with **`realtime-fanout.js`** / **`realtime-dedupe.js`**.
+- **Fields** — `modules/fields.js` + `rules-engine.js`; windrow badge builder; filters (`Needs work`, etc.).
 
 ### 4.3 Merge (`dataMerger.js`)
 
@@ -117,6 +118,8 @@ Optional **`0.0.0.0`** bind with **HTTP Basic** + **IP allowlist**; loopback req
 | ---- | -------------- |
 | `main.js` | Express, FTP, merge, LAN |
 | `dataMerger.js` | Merge |
+| `web/assests/js/app.js` | Dashboard shell (`window.dashboard`) |
+| `web/assests/js/realtime-connector.js` | WebSocket live updates |
 | `web/assests/js/modules/fields.js` | Field UI |
 | `web/assests/js/rules-engine.js` | Offline parcel tips |
 | `FieldDataCollector.lua` | Field metrics export |

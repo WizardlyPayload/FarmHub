@@ -1,5 +1,7 @@
 # FarmHub v3.0 audit
 
+**Reader note:** This is a **frozen** gap analysis from **April 2026** (app **3.0.0**, mod **2.0.0.0** at audit time). **Current** versions and release posture: **`package.json` / `modDesc.xml`** and **[AUDIT_v3.9_PREFINAL.md](./AUDIT_v3.9_PREFINAL.md)**. Finding **#6** (dual i18n “segment / line-pack” pipeline) described implementation that **no longer exists** in the tree — shipping i18n is **`messages/*.json` + `build-translations.mjs`** only (**[I18N.md](./I18N.md)**).
+
 **App version:** `3.0.0` (`FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json`)
 **Mod version:** `2.0.0.0` (`FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml`)
 **Audit cut:** April 2026
@@ -109,7 +111,7 @@ Findings are grouped by **surface** and tagged:
 
 | File | Role | Previously listed? | After rewrite |
 | ---- | ---- | ------------------ | ------------- |
-| `dashboard.js` | Top-level controller, server/farm switching, section show | Mentioned | Documented |
+| `app.js` | Top-level controller, server/farm switching, section show (`window.dashboard`) | Mentioned | Documented |
 | `navigation.js` | Sidebar, landing badges, alerts, splash | Partial | Full landing badge keys (`fmtLandingBadge`, `card.badge*One/Many`, `fields.fieldCountOne/Many`) |
 | `apiStorage.js` | Server tabs, farm dropdown, auto-detect → setup config | Mentioned | Documented |
 | `modules/livestock.js` | Livestock section + filters + table + export | Mentioned | Full controls + CODE GAP #1 |
@@ -120,7 +122,7 @@ Findings are grouped by **surface** and tagged:
 | `modules/productions.js` | Productions chains | Mentioned | Full controls |
 | `notifications.js` | Bell, history modal, `localStorage` `farmdashboard_notifications` | Mentioned | Documented + CODE GAP #11 |
 | `theming.js` | 4-color theme editor, `localStorage` `dashboard_themes` | Mentioned | Documented |
-| `i18n.js` | `t()`, `applyDom`, `setLocale` (reload), `farmdash_locale` | Mentioned | Documented |
+| `i18n/i18n.js` | `t()`, `applyDom`, `setLocale` (reload), `farmdash_locale` | Mentioned | Documented |
 | `rules-engine.js` | Field rules thresholds | Mentioned | All thresholds enumerated |
 | `field-rules-cache.js` | In-memory rule results per field | Not listed | Documented |
 | `field-suggestion-tools.js` | Tool labels for Tools & shop block | Not listed | Documented |
@@ -137,7 +139,7 @@ The repo has two parallel pipelines that both feed `web/locales/translations.jso
 | **Messages flow** (long-standing) | `web/locales/messages/<code>.json` (per-locale overrides) | `web/locales/build-translations.mjs` | `translations.json` | All shipped languages have `messages/<code>.json` files |
 | **Segment flow** (added for badge fix) | `web/locales/segment-key-list.json` (198 keys), `web/locales/en-segment-strings.json`, `web/locales/line-packs/<lang>.txt` | `web/locales/emit-locale-packs.mjs` then `build-translations.mjs` | `web/locales/locale-packs/<lang>.json` then folded into `translations.json` | Only **`de`** is fully populated; `fr`, `es`, `it`, `pl`, `nl`, `pt`, `uk` are skipped at emit time and fall back to English for the 198 segment keys |
 
-The dev handover documents both flows, the order to run them in, and lists the seven outstanding language line-packs as a tracked follow-up. The user manual sticks to the user-visible **language picker** behaviour and does not mention the build pipeline.
+The dev handover documents both flows, the order to run them in, and lists the seven outstanding language line-packs as a tracked follow-up. The user manual sticks to the user-visible **language picker** behaviour and does not mention the build pipeline. **(Historical:** current **[DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md)** / **[I18N.md](./I18N.md)** describe **`messages/*.json` only** — segment artifacts were removed from the repo.)
 
 ---
 
@@ -167,7 +169,7 @@ The audit deliberately keeps these as code follow-ups so that the v3.0 docs can 
 | 2 | Electron `parseModConfigXml` ignores `debugBaleScan` | Extend regex / writer in `main.js` so the Settings → FS25 mod tab can flip the flag |
 | 3 | Fields error strip has no retry button | Add a small "Retry now" link that re-arms the watcher / forces a fetch, matching the manual copy |
 | 4 | Notification history empty state hard-codes English | Use the existing `notif.none` translation key in `notifications.js` `displayNotificationHistory` |
-| 5 | Seven `line-packs/<lang>.txt` files outstanding | Author the 198-line files for `fr`, `es`, `it`, `pl`, `nl`, `pt`, `uk`, then re-run `emit-locale-packs.mjs` + `build-translations.mjs` |
+| 5 | Seven `line-packs/<lang>.txt` files outstanding | **Obsolete** — segment pipeline removed; use **`messages/*.json`** + **`npm run i18n:sync`** per **[I18N.md](./I18N.md)** |
 
 ---
 

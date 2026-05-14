@@ -24,6 +24,8 @@ jobs:
         run: npm ci
       - name: Run tests
         run: npm test
+      - name: Electron pack files (main require closure vs build.files)
+        run: npm run verify:electron-pack
       - name: i18n verify (all locales match en + placeholders)
         run: npm run i18n:verify
       - name: Production dependency audit

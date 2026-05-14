@@ -5,11 +5,13 @@
 **In-game mod:** `2.0.0.0` (`modDesc.xml`) — bump only when you ship a new mod build  
 **Documentation cut-off:** April 2026  
 
+**Historical document:** This file describes the **v3.0.0** release line. For **current** app and mod versions, see **[RELEASE_NOTES.md](./RELEASE_NOTES.md)** and **[CHANGELOG.md](./CHANGELOG.md)** §**3.9.0**.
+
 ---
 
 ## Executive summary
 
-**3.0.0** is the **shipping line** that presents the dashboard as a **self-contained Windows app**: live JSON from FS25, **XML + Lua merge**, full sections (livestock, vehicles, fields, economy, pastures, productions), **FTP** for dedicated hosts, **LAN** access with auth for tablets, and **offline field rules** (plus mod **`suggestions`**) — **without** documenting or depending on a separate cloud stack in this repository.
+**3.0.0** was the **shipping line** (April 2026) that presented the dashboard as a **self-contained Windows app**: live JSON from FS25, **XML + Lua merge**, full sections (livestock, vehicles, fields, economy, pastures, productions), **FTP** for dedicated hosts, **LAN** access with auth for tablets, and **offline field rules** (plus mod **`suggestions`**) — **without** documenting or depending on a separate cloud stack in this repository.
 
 Earlier branches may contain experiments not described in the **3.0.0** manuals; use **git history** if you need to recover obsolete work.
 

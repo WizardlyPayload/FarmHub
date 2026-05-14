@@ -7,7 +7,7 @@ This is the maintainer reference for **FarmHub**: the **FS25 Farm Dashboard** El
 | Desktop app | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | **`3.9.0`** |
 | Lua mod | `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` | **`2.3.0.0`** |
 | HTTP / WebSocket port | `main.js` `PORT` | **`8766`** |
-| Companion docs | [`USER_MANUAL.md`](./USER_MANUAL.md) · [`AUDIT_v3.0.md`](./AUDIT_v3.0.md) · [`SECURITY.md`](./SECURITY.md) · [`CHANGELOG.md`](./CHANGELOG.md) · [`I18N.md`](./I18N.md) | — |
+| Companion docs | [`USER_MANUAL.md`](./USER_MANUAL.md) · [`AUDIT_v3.9_PREFINAL.md`](./AUDIT_v3.9_PREFINAL.md) · [`AUDIT_v3.0.md`](./AUDIT_v3.0.md) (historical) · [`SECURITY.md`](./SECURITY.md) · [`CHANGELOG.md`](./CHANGELOG.md) · [`I18N.md`](./I18N.md) | — |
 
 ## Table of contents
 
@@ -67,10 +67,9 @@ FarmHub/
     FS25_FarmDashboard_App/
       main.js                            # Electron main + Express + FTP coordinator
       preload.js                         # IPC surface
-      dataMerger.js                      # Lua + XML merge
-      xmlCollector.js                    # savegame XML reader
-      serverDataCache.js                 # serverLiveCache helpers
-      app-updater.js                     # electron-updater integration
+      dataMerger.js, xmlCollector.js, serverDataCache.js
+      detailAnimalsHydrate.js, livestockDetail.js, fileReadRetry.js, fs25Paths.js
+      lanCredentialPolicy.js, app-updater.js
       package.json                       # 3.9.0
       setup.html                         # first-run setup page (sibling of web/)
       build/installer.nsh                # NSIS hooks
@@ -80,36 +79,36 @@ FarmHub/
         assests/                         # historic spelling
           css/styles.css
           js/
-            dashboard.js                 # top-level controller
-            navigation.js                # landing badges, alerts
-            apiStorage.js                # server tabs, farm dropdown, /api glue
-            i18n.js, setup-i18n.js
-            theming.js, splash-screen.js, viewer-mode.js
-            notifications.js
-            rules-engine.js              # field rules
-            field-rules-cache.js
-            field-suggestion-tools.js
+            app.js                         # `LivestockDashboard` + `window.dashboard`; composes modules below
+            realtime-connector.js         # WebSocket / live merge fan-out (ES module)
+            lan-http-auth.js, pipeline-log.js, modExportProgress.js
+            splash-screen.js, screen-wake-lock.js
+            pastures-warnings.js, realtime-fanout.js, realtime-dedupe.js
+            rules-engine.js                 # offline field heuristics (imported by fields / tools / cache)
+            field-rules-cache.js, field-suggestion-tools.js, field-clusters.js
+            base-game-tool-catalog.js
+            i18n/i18n.js, setup-i18n.js
+            utils/escape.js
             modules/
-              livestock.js, vehicles.js, fields.js,
-              economy.js, pastures.js, productions.js,
-              environment.js
+              apiStorage.js, navigation.js, notifications.js, parsers.js, changes.js
+              theming.js, dashboard-settings.js, viewer-mode.js
+              livestock.js, livestock.penDetail.js, vehicles.js, fields.js
+              economy.js, pastures.js, productions.js, environment.js
             simhub-page.js
         locales/
-          messages/<code>.json           # per-locale overrides
+          messages/<code>.json           # en.json = source of truth; other locales = overrides / copies from en
           translations.json              # built bundle served at /locales/translations.json
-          build-translations.mjs         # main builder
-          segment-key-list.json          # 198-key segment scope
-          en-segment-strings.json
-          line-packs/<lang>.txt          # per-line segment strings
-          locale-packs/<lang>.json       # emitted segment bundle
-          emit-locale-packs.mjs          # line-packs -> locale-packs
+          build-translations.mjs         # npm run i18n:build
+          sync-keys-from-en.mjs          # npm run i18n:sync (copy new keys from en into every locale)
           mt-fill.mjs, audit-keys.mjs,
           find-hardcoded-strings.mjs, verify-i18n.mjs
   FS25_FarmDashboard_Mod/
     FS25_FarmDashboard_Mod/
       modDesc.xml                        # 2.3.0.0
-      FarmDashboard.lua                  # mission hook + authority
+      icon.png                           # mod icon (also in release zip)
       src/
+        FarmDashboard.lua                # mission hook + authority
+        Diagnostics.lua                  # optional diagnostics (modDesc `sourceFile`)
         FarmDashboardDataCollector.lua   # staggered orchestration + writer
         collectors/
           AnimalDataCollector.lua
@@ -256,7 +255,11 @@ There is no global `DEBUG=1` flag; logging is `console.log` / `console.warn`.
 
 Every channel handled in `main.js` corresponds to a function in `preload.js` (next section). The map is intentionally one-to-one — do not introduce new channels without adding the matching `farmDashAPI` method.
 
----
+**`ipcMain.handle` channels (invoke):** `save-settings`, `get-current-config`, `read-local-farmdash-data-json`, `read-server-live-cache`, `get-lan-access-settings`, `save-lan-access-settings`, `get-desktop-app-version`, `check-desktop-app-updates`, `get-stored-locale`, `get-translations-json`, `get-ui-preferences`, `save-ui-preferences`, `set-simhub-live-context`, `get-field-exclusion-options`, `get-mod-config`, `save-mod-config`, `scan-local-saves`, `export-mod-store-images`.
+
+**`ipcMain.on` channels (send):** `set-stored-locale`, `reset-settings`, `open-setup`.
+
+**Main → renderer `webContents.send`:** `app-update-status`, `export-mod-store-images-progress` (subscribed in `preload.js`; not on `farmDashAPI` as invoke).
 
 ## 5. Renderer bridge (`preload.js`)
 
@@ -275,10 +278,10 @@ Every channel handled in `main.js` corresponds to a function in `preload.js` (ne
 | `getLanAccessSettings()` / `saveLanAccessSettings(s)` | LAN tab values |
 | `getDesktopAppVersion()` | App version for Settings → Dashboard |
 | `checkDesktopAppUpdates()` | Trigger `electron-updater` check |
-| `exportModStoreImages(opts)` | Run mod-image PowerShell |
-| `getFieldExclusionOptions()` | List farmlands per server for the exclusions UI |
+| `exportModStoreImages()` | Run mod-image PowerShell pipeline |
+| `getFieldExclusionOptions(payload)` | List farmlands per server for the exclusions UI |
 | `getModConfig()` / `saveModConfig(cfg)` | Read/write the mod `config.xml` (parser ignores `debugBaleScan` — audit gap #2) |
-| `readLocalFarmdashDataJson(path)` | Helper for the local fallback path picker |
+| `readLocalFarmdashDataJson()` | Fallback when `/api` is down — scans `modSettings/FS25_FarmDashboard/*/data.json`, returns `{ ok, path, data }` |
 | `setSimHubLiveContext(ctx)` | Push live context to `simhub.html` |
 | `onAppUpdateStatus(cb)` | Subscribe to channel `app-update-status` |
 | `subscribeExportModStoreImagesProgress(cb)` | Subscribe to `export-mod-store-images-progress` |
@@ -369,20 +372,28 @@ The mod also exports its own `suggestions[]` per field. `fields.js` prefers the 
 
 ### 8.1 Module map
 
+Entry **`app.js`** defines `LivestockDashboard`, mixes in **`apiStorage`**, **`navigation`**, section modules, etc., and assigns **`window.dashboard`**. **`realtime-connector.js`** (ES module) attaches WebSocket live updates. **`index.html`** also loads shared helpers (`escape.js`, fan-out/dedupe, pastures warnings) before **`app.js`**.
+
 | File | Role |
 | ---- | ---- |
-| `dashboard.js` | Top-level controller; server / farm switching, `showSection(name)`, polling cadence |
+| `app.js` | Top-level controller; server / farm switching, `showSection(name)`, polling cadence (`window.dashboard`) |
 | `navigation.js` | Sidebar, landing badges (`fmtLandingBadge`, `card.badge*One/Many`), alerts, splash |
 | `apiStorage.js` | Server tabs (`renderServerTabs`), farm dropdown (`renderFarmDropdown`), `localStorage` keys `dashboard_active_server` / `dashboard_active_farm_<server>`, `/api/*` glue |
-| `i18n.js` | `t(key, params)`, `applyDom(root)`, `setLocale(code, reload)`, persists to `farmdash_locale` |
+| `i18n/i18n.js` | `t(key, params)`, `applyDom(root)`, `setLocale(code, reload)`, persists to `farmdash_locale` |
 | `setup-i18n.js` | Same surface for `setup.html` (`data-setup-i18n` attributes) |
 | `theming.js` | 4-color theme editor; persists `dashboard_themes` in `localStorage` |
 | `notifications.js` | Bell, modal, `farmdashboard_notifications` (max 10 items) |
 | `splash-screen.js` | First-load splash overlay |
 | `viewer-mode.js` | Marks the body when running as `?viewer=1` (read-only LAN tablet); hides Settings gear |
-| `field-rules-cache.js` | In-memory cache of rule output keyed by field id; invalidation events on data refresh |
+| `dashboard-settings.js` | Unified Settings modal (servers, LAN, dashboard, mod export, etc.) |
+| `parsers.js` | Shared parse helpers for merged payloads |
+| `changes.js` | Data-change / diff style UI |
+| `field-rules-cache.js` | In-memory cache of rule output keyed by field id; invalidation on data refresh |
 | `field-suggestion-tools.js` | Mapping of action → tool labels for the **Tools & shop** block on field cards |
+| `rules-engine.js` | Offline field heuristics (imported by `fields.js` and helpers) |
+| `realtime-connector.js` | WebSocket client, coordinates with `realtime-fanout.js` / `realtime-dedupe.js` |
 | `modules/livestock.js` | Livestock section, filters, table, animal-details modal |
+| `modules/livestock.penDetail.js` | Pen / detail drilldown helpers |
 | `modules/vehicles.js` | Vehicles section, filters, image modal |
 | `modules/fields.js` | Fields section, badges, rules badge, windrow badge, soil mini-bars, error / waiting states |
 | `modules/economy.js` | Economy section, Purchases / Market tabs |
@@ -395,7 +406,7 @@ The mod also exports its own `suggestions[]` per field. `fields.js` prefers the 
 
 | Key | Owner | Purpose |
 | --- | ----- | ------- |
-| `farmdash_locale` | `i18n.js` | Selected language; mirrored into `electron-store` `locale` |
+| `farmdash_locale` | `i18n/i18n.js` | Selected language; mirrored into `electron-store` `locale` |
 | `dashboard_active_server` | `apiStorage.js` | Currently selected server tab |
 | `dashboard_active_farm_<serverId>` | `apiStorage.js` | Active farm per server |
 | `dashboard_themes` | `theming.js` | Per-tab colour set |
@@ -407,61 +418,34 @@ The mod also exports its own `suggestions[]` per field. `fields.js` prefers the 
 1. User clicks a landing card or sidebar entry.
 2. `dashboard.showSection(name)` calls `modules/<name>.js` `show*Section()`.
 3. The module fetches `/api/data` (already merged), renders into `#dashboard-content`, registers its filter handlers.
-4. Polling continues at `dashboard.js` cadence; modules expose a `refresh*()` so polling does not rebuild the DOM unnecessarily.
+4. Polling continues at the **`dashboard` instance** (`app.js` + mixed-in modules) cadence; modules expose a `refresh*()` so polling does not rebuild the DOM unnecessarily.
 
 ---
 
 ## 9. i18n pipeline
 
-Two parallel flows feed `web/locales/translations.json`. The output is served via IPC `getTranslationsJson` and consumed by `i18n.js`.
+All user-visible strings ship through **`web/locales/messages/<code>.json`** → **`build-translations.mjs`** → **`translations.json`**. There is **no** second “segment / line-pack” pipeline in this tree anymore (that experiment was removed; everything lives in `messages/*.json`).
 
-### 9.1 Messages flow (long-standing)
+Full workflow (sync, MT fill, verify, placeholders): **[I18N.md](./I18N.md)**.
 
-Inputs: `web/locales/messages/<code>.json` (per-locale overrides keyed by translation key).
-
-```
-node web/locales/build-translations.mjs   # merges en + per-locale into translations.json
-```
-
-`audit-keys.mjs` and `find-hardcoded-strings.mjs` scan the codebase; `verify-i18n.mjs` checks placeholder parity; `mt-fill.mjs` machine-fills missing values. NPM aliases live in `package.json`:
+`audit-keys.mjs` and `find-hardcoded-strings.mjs` scan the codebase; `verify-i18n.mjs` checks 100% locale coverage vs `en.json`. NPM aliases in `package.json`:
 
 ```
 npm run i18n:audit     # key audit
 npm run i18n:scan      # hardcoded strings
 npm run i18n:build     # build translations.json
+npm run i18n:sync      # copy missing keys from en.json into every locale
 npm run i18n:fill      # mt fill (non-destructive)
 npm run i18n:fill:force
 npm run i18n:verify
 ```
 
-### 9.2 Segment flow (new)
-
-For the v3.0 landing-badge fix and a controlled "section translation" pass, a parallel segment-only flow exists. The scope is a fixed list of 198 keys ("nav", "fields", "vehicles", "economy", "pastures", "productions", "tools", "card.badge*").
-
-| File | Role |
-| ---- | ---- |
-| `web/locales/segment-key-list.json` | Exact 198 keys, in canonical order |
-| `web/locales/en-segment-strings.json` | English source for those keys |
-| `web/locales/line-packs/<lang>.txt` | One translation per line, same order as `segment-key-list.json`. **198 lines exactly** |
-| `web/locales/locale-packs/<lang>.json` | Emitted JSON object keyed by translation key |
-| `web/locales/emit-locale-packs.mjs` | Reads each `line-packs/<lang>.txt` (or `.arr.json`) and writes `locale-packs/<lang>.json` |
-
-Build order:
-
-```
-node web/locales/emit-locale-packs.mjs    # line-packs -> locale-packs
-node web/locales/build-translations.mjs   # locale-packs + messages -> translations.json
-```
-
-Today only `de.txt` is populated (198 lines). `fr`, `es`, `it`, `pl`, `nl`, `pt`, `uk` are skipped at emit time and fall back to English for the 198 segment keys.
-
-### 9.3 Adding a new key
+### 9.1 Adding a new key
 
 1. Add the key to `messages/en.json` (source of truth).
 2. Run `npm run i18n:audit` to confirm no orphan or duplicate.
-3. Add the key to `messages/<other-codes>.json` or rely on the English fallback.
-4. If the key is in the segment scope, also append a line to every `line-packs/<lang>.txt` and bump `segment-key-list.json` + `en-segment-strings.json`.
-5. `npm run i18n:build`.
+3. Run **`npm run i18n:sync`** so every `messages/<lang>.json` receives the new key (English placeholder until translated).
+4. Hand-edit non-English files as needed, then **`npm run i18n:build`** and **`npm run i18n:verify`** before merge.
 
 ---
 
@@ -481,9 +465,10 @@ Today only `de.txt` is populated (198 lines). `fr`, `es`, `it`, `pl`, `nl`, `pt`
 | `npm run clean:build-out[:search]` | `../../tools/app/remove-build-output-folders.ps1`; `:search` also stops Windows Search |
 | `npm run unlock-install[:delete]` | `../../tools/app/stop-farmdash-install-lock.ps1` to release locked installer files |
 | `npm run i18n:*` | See §9 |
+| `npm run verify:electron-pack` | `../../tools/app/verify-electron-pack-files.mjs` — CI gate: main `require('./…')` closure vs **`build.files`** |
 | `npm run export-fields-csv` | `../../tools/app/export-fields-to-csv.mjs` (engineer-only diagnostic) |
 
-**CI:** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — on push/PR to **`main`**, **`master`**, or **`develop`**, runs **`npm ci`**, **`npm test`**, **`npm run i18n:verify`**, **`npm audit --omit=dev`** (Windows, Node 20) in the app folder.
+**CI:** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — on push/PR to **`main`**, **`master`**, or **`develop`**, runs **`npm ci`**, **`npm test`**, **`npm run verify:electron-pack`**, **`npm run i18n:verify`**, **`npm audit --omit=dev`** (Windows, Node 20) in the app folder.
 
 ### 10.2 NSIS (`build/installer.nsh`)
 
@@ -542,19 +527,21 @@ There is **no rotating log file**. Console output goes to stdout / DevTools. If 
 | FTP not ticking | `getFtpPollingOptions` clamps; check `intervalMinutes` is between 1 and 25 |
 | Notifications empty after upgrade | `localStorage` `farmdashboard_notifications`; cap is 10; `notif.none` is overridden by hard-coded English (audit gap #4) |
 | `app.asar` locked during install | `npm run unlock-install`, then `npm run dist` |
+| **Cannot find module './…'** in installed Electron app | Root **`*.js`** missing from **`package.json` → `build` → `files`** — add it, run **`npm run verify:electron-pack`**, rebuild |
 | `debugBaleScan` flag flipped in UI but no extra logs | Audit gap #2: hand-edit `config.xml`, the Electron writer ignores the flag |
 
 ---
 
-## 13. Known gaps from the audit
+## 13. Known gaps from the audits
 
-[`AUDIT_v3.0.md`](./AUDIT_v3.0.md) tracks five engineering follow-ups that v3.0 docs intentionally describe honestly:
+**Current release posture:** [`AUDIT_v3.9_PREFINAL.md`](./AUDIT_v3.9_PREFINAL.md) (v3.9.0 pre-final — updater QA gate, residual risks).
+
+**Historical v3.0 gap analysis:** [`AUDIT_v3.0.md`](./AUDIT_v3.0.md) listed code-vs-docs items; several UX/engineering follow-ups below were captured there and may still apply until closed in code:
 
 1. Livestock Statistics / Genetics tab buttons not wired (`index.html`, `livestock.js`).
 2. Electron `parseModConfigXml` ignores `debugBaleScan` (`main.js`).
 3. Fields error strip has no retry button (`modules/fields.js` `showFieldsApiError`).
 4. Notification empty state hard-codes English (`notifications.js` `displayNotificationHistory`).
-5. Seven outstanding `line-packs/<lang>.txt` files (i18n segment flow).
 
 ---
 
@@ -562,8 +549,8 @@ There is **no rotating log file**. Console output goes to stdout / DevTools. If 
 
 - Match existing **naming**, **IPC channel lists**, and **merge** semantics when extending the payload. Prefer **additive** JSON fields and **aggregate-first** Lua tables.
 - Do not reintroduce **per-vertex coordinate dumps** in `data.json`; keep the file rewrite-friendly from the game thread.
-- New translations go through `messages/<code>.json` for full keys and `line-packs/<lang>.txt` for segment keys; never hand-edit `translations.json`.
-- New IPC channels: add in `main.js`, expose in `preload.js`, document in §5.
+- New translations go through `messages/<code>.json` for full keys; never hand-edit `translations.json`.
+- New IPC channels: add in `main.js`, expose in `preload.js`, document in §**4.7** and §**5**.
 - Store keys: prefer `electron-store` keys over ad-hoc `localStorage` for anything the desktop should be authoritative on (e.g. server config, LAN, mod config).
 - Tests: run **`npm test`** under `FS25_FarmDashboard_App/FS25_FarmDashboard_App/` for JS changes; Lua/game behaviour still needs **manual** verification on a real save when collectors or merge semantics change (markdown-only PRs: tests optional).
 

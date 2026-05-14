@@ -16,7 +16,8 @@ All project documentation lives under **`docs/`** (repository root: **FarmHub** 
 | [SECURITY.md](./SECURITY.md) | LAN access, Basic Auth, IP allowlist, Electron hardening |
 | [DESCRIPTION_AND_SCREENSHOTS.md](./DESCRIPTION_AND_SCREENSHOTS.md) | Product copy + screenshot checklist |
 | [**DEVELOPER_HANDOVER.md**](./DEVELOPER_HANDOVER.md) | **v3.9 dev reference:** architecture, mod, Electron host, merge, rules, i18n, build, debugging |
-| [**AUDIT_v3.0.md**](./AUDIT_v3.0.md) | **v3.0 gap analysis:** code surface vs docs, tracked engineering follow-ups |
+| [**AUDIT_v3.9_PREFINAL.md**](./AUDIT_v3.9_PREFINAL.md) | **v3.9 pre-final audit:** release gate, security/i18n posture (current) |
+| [**AUDIT_v3.0.md**](./AUDIT_v3.0.md) | **v3.0 gap analysis** (frozen April 2026; i18n “segment” pipeline noted there was removed — see **I18N.md**) |
 | [**SCREENSHOT_MANIFEST.md**](./SCREENSHOT_MANIFEST.md) | Screenshot filenames, captions, [auto]/[manual] capture recipes |
 | [**I18N.md**](./I18N.md) | **Internationalisation:** 27 locales, `messages/*.json` pipeline, Google Translate refill |
 | [**PROJECT_CONTEXT.md**](./PROJECT_CONTEXT.md) | Full project overview for planning and audits |

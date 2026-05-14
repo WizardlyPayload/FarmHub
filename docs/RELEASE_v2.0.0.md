@@ -63,7 +63,7 @@ Custom logic lives in **`build/installer.nsh`**. `package.json` may set `build.n
 
 ### Dashboard
 
-- Theme & Color Settings include a language selector; dashboard uses `data-i18n` and syncs with stored locale / `farmdash_locale` as implemented in `main.js` and `i18n.js`.
+- Theme & Color Settings include a language selector; dashboard uses `data-i18n` and syncs with stored locale / `farmdash_locale` as implemented in `main.js` and `i18n/i18n.js`.
 
 ### Documentation shipped with the repo
 

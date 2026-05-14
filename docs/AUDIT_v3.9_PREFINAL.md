@@ -18,6 +18,7 @@ Historical note: this audit originally recorded **Conditional NO-GO** before the
 - Automated checks:
   - `npm test` (Jest suite)
   - `npm audit --omit=dev --json`
+  - **Post-audit CI:** `npm run verify:electron-pack`, `npm run i18n:verify` (see `.github/workflows/ci.yml`)
 
 ## Verification evidence
 
@@ -42,7 +43,7 @@ Historical note: this audit originally recorded **Conditional NO-GO** before the
 ### 3) XSS risk from untrusted data rendered with HTML templates — **MITIGATED (pastures path + tests)**
 
 - **`web/assests/js/utils/escape.js`** + **`pastures.js`** `_safe()` on names, messages, and table cells; **`tests/xss.smoke.test.js`** guards regressions.
-- **Update (post-audit):** high-risk interpolations in **livestock.js** (`formatLocation`, breed column), **vehicles.js** (card titles / brands / thumb labels), and **navigation.js** (farm picker) now route through **`_safe`**; **`tests/xss.smoke.test.js`** guards patterns. Residual review: **economy.js**, **changes.js**, **fields.js** innerHTML paths if game strings appear unescaped.
+- **Update (3.9.0):** **`economy.js`**, **`changes.js`**, and **`fields.js`** innerHTML paths that render game-sourced strings were hardened (see **[CHANGELOG.md](./CHANGELOG.md)** §3.9.0). Residual risk: **new** `innerHTML` sites or third-party DOM should be reviewed the same way.
 
 ## Major non-blocking findings (fix in v3.9.x or v4)
 
@@ -83,12 +84,12 @@ Strengths:
 
 Risks:
 - Incomplete end-to-end tests for cross-context state transitions.
-- Documentation drift has outpaced implementation versioning.
-- Security-sensitive UI rendering still includes unsafe patterns.
+- **Packaging / docs drift** — mitigated by **`npm run verify:electron-pack`** in CI; still re-read release docs when paths or **`build.files`** change.
+- **Security-sensitive UI** — high-traffic modules hardened in 3.9.0; treat **new** `innerHTML` as high review priority (see §Major non-blocking findings and **CHANGELOG** §3.9.0).
 
 ## Security review summary (post-remediation)
 
-Status for **v3.9.0 pre-final:** blockers **#1–#3** in this document are **resolved** in tree — LAN policy + pastures XSS path + doc alignment. Residual risks match **[SECURITY.md](./SECURITY.md)** (cleartext Basic on LAN) and **follow-up XSS coverage** on modules beyond pastures (see §Major non-blocking findings).
+Status for **v3.9.0 pre-final:** blockers **#1–#3** in this document are **resolved** in tree — LAN policy + pastures XSS path + doc alignment. Residual risks match **[SECURITY.md](./SECURITY.md)** (cleartext Basic on LAN) and **ongoing** review of any **new** game-string → HTML paths (major modules addressed per **CHANGELOG** §3.9.0).
 
 Positive controls already present:
 - Electron hardening baseline (`nodeIntegration: false`, `contextIsolation: true`).

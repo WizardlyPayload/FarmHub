@@ -39,7 +39,7 @@ Desktop companion for **Farming Simulator 25**: a Windows app plus an in-game mo
 
 ## Continuous integration
 
-On push/PR to **`main`**, **`master`**, or **`develop`**, GitHub Actions runs **`npm ci`**, **`npm test`**, **`npm run i18n:verify`**, and **`npm audit --omit=dev`** in **`FS25_FarmDashboard_App/FS25_FarmDashboard_App/`**. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+On push/PR to **`main`**, **`master`**, or **`develop`**, GitHub Actions runs **`npm ci`**, **`npm test`**, **`npm run verify:electron-pack`**, **`npm run i18n:verify`**, and **`npm audit --omit=dev`** in **`FS25_FarmDashboard_App/FS25_FarmDashboard_App/`**. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---
 

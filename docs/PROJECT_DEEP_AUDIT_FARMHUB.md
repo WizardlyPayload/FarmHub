@@ -128,12 +128,12 @@ Command: `npm audit --omit=dev` from **`FS25_FarmDashboard_App/FS25_FarmDashboar
 | Wire formats | `wireFormats.test.js` |
 | Livestock detail hydrate | `livestockDetail.test.js`, `detailAnimalsHydrate.test.js` |
 
-**Result at audit time:** `npm test` — **12** suites, **218** tests, **all passed**; `npm audit --omit=dev` — **0** production vulnerabilities (re-verify locally).
+**Result at audit time:** `npm test` — **12** suites, **218** tests, **all passed**; `npm audit --omit=dev` — **0** production vulnerabilities (re-verify locally). **Current tree:** expect **223** tests; CI also runs **`npm run verify:electron-pack`** and **`npm run i18n:verify`** (see [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)).
 
 ### 7.2 Gaps
 
 - **No Playwright/Spectron-style E2E** for packaged app or LAN browser.
-- **CI:** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) runs on **`main` / `master` / `develop`** (Windows, Node 20).
+- **CI:** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) on **`main` / `master` / `develop`** (Windows, Node 20): **`npm ci`**, **`npm test`**, **`npm run verify:electron-pack`**, **`npm run i18n:verify`**, **`npm audit --omit=dev`**.
 - **Lua mod:** no automated Lua test harness in-repo — rely on SP/MP host manual QA.
 
 ---
@@ -161,7 +161,7 @@ Use **[RELEASE_READINESS_v3.9.md](./RELEASE_READINESS_v3.9.md)** as the operator
 | **P0** | Confirm **GitHub Release** assets (**`latest.yml` + `.exe`**) for **3.9.0** | Updater breaks silently without YAML | Follow release readiness doc |
 | **P0** | Run **updater rehearsal** (3.9 → 4.0 beta) | Final gate before marketing **v4** stable | Draft release + installed 3.9 client |
 | **P1** | Keep **`npm audit --omit=dev`** clean when touching deps | Supply-chain hygiene | CI fails on prod vulns; bump majors deliberately |
-| **P1** | XSS audit **remaining** SPA modules | Defense in depth | Mirror pastures `_safe()` pattern + tests |
+| **P1** | XSS audit **remaining** SPA modules | Defense in depth | **economy / changes / fields** hardened in 3.9.0; keep mirroring **`_safe` / `escapeFieldHtml`** for new `innerHTML` + extend **`tests/xss.smoke.test.js`** |
 | **P2** | Reduce **`readFileSync`** in **`main.js`** hot paths | Startup / responsiveness | Incremental `fs.promises` migration |
 | **P2** | ~~Optional **minimal CI**~~ | Done | See `.github/workflows/ci.yml` |
 | **P3** | Frame-budget **Lua** work if profiling shows hitches | SP sim smoothness | Smaller chunks / rarer fallback paths |

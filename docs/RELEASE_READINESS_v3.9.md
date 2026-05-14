@@ -20,7 +20,7 @@ Long-form narrative: [RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md).
 
 ## 2. Automated gates (CI + run locally before `dist`)
 
-**GitHub:** pushes/PRs to **`main`**, **`master`**, or **`develop`** run [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — **`npm ci`**, **`npm test`**, **`npm run i18n:verify`**, **`npm audit --omit=dev`** on Windows (Node 20).
+**GitHub:** pushes/PRs to **`main`**, **`master`**, or **`develop`** run [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — **`npm ci`**, **`npm test`**, **`npm run verify:electron-pack`**, **`npm run i18n:verify`**, **`npm audit --omit=dev`** on Windows (Node 20).
 
 From `FS25_FarmDashboard_App/FS25_FarmDashboard_App/`:
 

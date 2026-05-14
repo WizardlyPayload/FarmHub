@@ -10,7 +10,7 @@
 |-----|-----|
 | [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md) | Architecture, data flow, key files |
 | [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) | Full project overview for planning |
-| [USER_MANUAL.md](./USER_MANUAL.md) | Supported **3.0.0** end-user behaviour |
+| [USER_MANUAL.md](./USER_MANUAL.md) | Supported end-user behaviour (**app 3.9.0** / **mod 2.3.0.0** line) |
 
 **GitHub repo root:** `FarmHub` — [WizardlyPayload/FarmHub](https://github.com/WizardlyPayload/FarmHub). A parent folder named e.g. `MAIN CODEBASE` may **not** be the Git root; clone/work in **`FarmHub`**.
 
@@ -18,7 +18,7 @@
 
 ## Ground rules for assistants (read before editing)
 
-1. **Shipping line:** Farm Dashboard **3.0.0** — field guidance is **offline rules** + mod **`suggestions`**; see [CHANGELOG.md](./CHANGELOG.md) §3.0.0.
+1. **Shipping line:** Desktop app **3.9.0**, FS25 mod **2.3.0.0** — field guidance is **offline rules** + mod **`suggestions`**; see [CHANGELOG.md](./CHANGELOG.md) §**3.9.0** (§3.0.0 is historical).
 2. **Prefer small diffs** tied to a reported symptom; do not “fix” unrelated subsystems.
 3. **Web assets path** is `web/assests/` (historic typo—match existing imports).
 

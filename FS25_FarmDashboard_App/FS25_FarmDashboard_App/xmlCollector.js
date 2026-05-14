@@ -26,7 +26,7 @@ const { XMLParser } = require('fast-xml-parser');
 const { collectFs25DocumentRoots } = require('./fs25Paths');
 const { readFileUtf8WithRetryAsync } = require('./fileReadRetry');
 
-// Whole-file read + parse only: fast-xml-parser v4 here exposes parse(string), not a supported streaming API for arbitrary savegame XML.
+// Whole-file read + parse only: fast-xml-parser exposes parse(string), not a supported streaming API for arbitrary savegame XML.
 
 // ─── XML parser (fast-xml-parser) ────────────────────────────────────────────
 

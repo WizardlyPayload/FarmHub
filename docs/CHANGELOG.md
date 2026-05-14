@@ -34,7 +34,7 @@ Narrative: **[RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md)** · Audit: **[AUDIT_v3.9_
 
 ### i18n sweep
 
-- New keys for pasture cards (`pastures.card.*`), warnings heading, status badges, table headers, drilldown details, and notification time-ago variants live in `web/locales/messages/en.json`. `npm run i18n:build` regenerates `translations.json` (982+ keys × 27 locales).
+- New keys for pasture cards (`pastures.card.*`), warnings heading, status badges, table headers, drilldown details, and notification time-ago variants live in `web/locales/messages/en.json`. `npm run i18n:build` regenerates `translations.json` (~**987** keys × 27 locales as of 3.9.0; run `npm run i18n:verify` for the live count).
 - `tests/i18n.coverage.test.js` guards against backsliding by failing on previously-localized literals (`<strong>Total Animals:</strong>`, `<small>Lactating Cows</small>`, `Just now`, etc.).
 
 ### Version unification
@@ -43,7 +43,7 @@ Narrative: **[RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md)** · Audit: **[AUDIT_v3.9_
 - `package.json` and `package-lock.json` bumped to **`3.9.0`**.
 - `INSTALL.md` malformed markdown fixed (`**data.json` → `data.json`, `**FS25_FarmDashboard` → `FS25_FarmDashboard`); release URL pointed at the canonical `WizardlyPayload/FarmHub` GitHub repo.
 - **Mod packaging / docs** — **`Zip-FarmDashboardMod.ps1`** packs **only** **`modDesc.xml`**, **`icon.png`**, and **`src/`** at the zip root (Giants `sourceFile` paths). Install docs name the player-facing mod **`FS25_FarmDashboard`** in **`mods\`**, not the repo folder **`FS25_FarmDashboard_Mod`**. Screenshot manifest: **1920 × 1080** desktop, **1080 × 1920** tablet LAN rows only.
-- **Supply chain & CI** — **`fast-xml-parser`** raised to **^5.7.3** (moderate advisory); **`npm audit --omit=dev`** clean on the app tree. GitHub Actions **`.github/workflows/ci.yml`** runs **`npm ci`**, **`npm test`**, **`npm run i18n:verify`**, **`npm audit --omit=dev`** on Windows for **`main` / `master` / `develop`**. Root **`LICENSE`** added (all rights reserved). **XSS:** **`livestock.js`** (`formatLocation`, breed column), **`navigation.js`** (farm picker, unknown section), **`vehicles.js`** (card title / brand / thumb labels), **`economy.js`** / **`changes.js`** / **`fields.js`** (market rows, data-change modal, field card titles) — escape via **`_safe`** / **`escapeFieldHtml`**. Extended **`tests/xss.smoke.test.js`** (**223** tests).
+- **Supply chain & CI** — **`fast-xml-parser`** raised to **^5.7.3** (moderate advisory); **`npm audit --omit=dev`** clean on the app tree. GitHub Actions **`.github/workflows/ci.yml`** runs **`npm ci`**, **`npm test`**, **`npm run verify:electron-pack`** (main-process `require('./…')` closure vs **`build.files`**), **`npm run i18n:verify`**, **`npm audit --omit=dev`** on Windows for **`main` / `master` / `develop`**. Root **`LICENSE`** added (all rights reserved). **Packaging:** **`build.files`** includes **`detailAnimalsHydrate.js`**, **`livestockDetail.js`**, **`icon.ico`** so packaged installs do not throw **Cannot find module** at startup. **XSS:** **`livestock.js`** (`formatLocation`, breed column), **`navigation.js`** (farm picker, unknown section), **`vehicles.js`** (card title / brand / thumb labels), **`economy.js`** / **`changes.js`** / **`fields.js`** (market rows, data-change modal, field card titles) — escape via **`_safe`** / **`escapeFieldHtml`**. Extended **`tests/xss.smoke.test.js`** (**223** tests).
 - **i18n** — Ran **`sync-keys-from-en.mjs`**: all **26** non-English locales now include every key from **`en.json`** (**987** keys each); **`npm run i18n:verify`** passes (no missing keys / placeholder drift). **`translations.json`** regenerated. **`npm run i18n:sync`** added to **`package.json`**; **[docs/I18N.md](./I18N.md)** documents the workflow.
 - `USER_MANUAL.md`, `DEVELOPER_HANDOVER.md` rename `lanUser` → `lanUsername` to match `main.js` `LAN_ACCESS_DEFAULTS` keys.
 
@@ -54,7 +54,7 @@ Narrative: **[RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md)** · Audit: **[AUDIT_v3.9_
 
 ### Acceptance
 
-`npm test` reports green across **12** suites (**223** tests) on the reference machine — re-run before tagging. The remaining release gate is the updater smoke test (3.9.0 → 4.0.0 channel) per [`UPDATER_QA.md`](./UPDATER_QA.md). Operator checklist: **[RELEASE_READINESS_v3.9.md](./RELEASE_READINESS_v3.9.md)**.
+`npm test` reports green across **12** suites (**223** tests) on the reference machine — re-run **`npm test`** and **`npm run verify:electron-pack`** before tagging. The remaining release gate is the updater smoke test (3.9.0 → 4.0.0 channel) per [`UPDATER_QA.md`](./UPDATER_QA.md). Operator checklist: **[RELEASE_READINESS_v3.9.md](./RELEASE_READINESS_v3.9.md)**.
 
 ---
 

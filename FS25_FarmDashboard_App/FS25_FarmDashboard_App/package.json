@@ -27,7 +27,8 @@
     "i18n:fill": "node web/locales/mt-fill.mjs",
     "i18n:fill:force": "node web/locales/mt-fill.mjs --force",
     "i18n:verify": "node web/locales/verify-i18n.mjs",
-    "i18n:sync": "node web/locales/sync-keys-from-en.mjs"
+    "i18n:sync": "node web/locales/sync-keys-from-en.mjs",
+    "verify:electron-pack": "node ../../tools/app/verify-electron-pack-files.mjs"
   },
   "build": {
     "appId": "com.farmdashboard.app",
@@ -44,8 +45,11 @@
       "fs25Paths.js",
       "fileReadRetry.js",
       "dataMerger.js",
+      "detailAnimalsHydrate.js",
+      "livestockDetail.js",
       "serverDataCache.js",
       "setup.html",
+      "icon.ico",
       "web/**/*",
       "node_modules/**/*"
     ],

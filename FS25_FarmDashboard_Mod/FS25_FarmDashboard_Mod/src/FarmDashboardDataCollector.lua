@@ -710,9 +710,9 @@ function FarmDashboardDataCollector:loadConfig()
         --- Phase 5: opportunistic wall-clock budget per slice (ms). Best-effort; row caps are the actual safety net.
         sliceBudgetMs               = 4,
         --- Plan v5 B1/B2/B3: per-collector kill switches for the state-machine port.
-        --- Default true (use the new state-machine path); set false to fall back to the existing coroutine path.
+        --- Fields defaults to false because bale-heavy saves require cooperative frame slicing.
         useStateMachine_economy     = true,
-        useStateMachine_fields      = true,
+        useStateMachine_fields      = false,
         useStateMachine_production  = true,
         --- Plan v5 B1: row cap for economy state-machine slice.
         economyRowsPerSlice         = 64,
@@ -762,7 +762,7 @@ function FarmDashboardDataCollector:loadConfig()
             if eys and eys > 0 then self.config.economyYieldStride = eys end
             -- Plan v5 B1/B2/B3: collector kill switches.
             self.config.useStateMachine_economy    = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_economy"),    true)
-            self.config.useStateMachine_fields     = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_fields"),     true)
+            self.config.useStateMachine_fields     = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_fields"),     false)
             self.config.useStateMachine_production = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_production"), true)
             local erp = getXMLInt(xmlFile, "farmDashboard.settings#economyRowsPerSlice")
             if erp and erp > 0 then self.config.economyRowsPerSlice = erp end
@@ -794,7 +794,7 @@ function FarmDashboardDataCollector:loadConfig()
         setXMLInt(xmlFile, "farmDashboard.settings#economyYieldStride", self.config.economyYieldStride)
         -- Plan v5 B1/B2/B3 + B10:
         setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_economy",    true)
-        setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_fields",     true)
+        setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_fields",     false)
         setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_production", true)
         setXMLInt(xmlFile, "farmDashboard.settings#economyRowsPerSlice", self.config.economyRowsPerSlice)
         saveXMLFile(xmlFile)

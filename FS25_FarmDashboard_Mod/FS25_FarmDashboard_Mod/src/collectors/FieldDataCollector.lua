@@ -145,6 +145,7 @@ function FieldDataCollector:init()
     FieldDataCollector._fdCo = nil
     FieldDataCollector._lastGameplayFlags = nil
     FieldDataCollector._lastBaleInventory = nil
+    FieldDataCollector._stateMachineDisabledLogged = nil
     print("[FarmDashboard] Field data collector initialized (Hybrid: NPC State + Physical HUD Probe)")
 end
 
@@ -152,22 +153,25 @@ function FieldDataCollector.getLastBaleInventory()
     return FieldDataCollector._lastBaleInventory
 end
 
---- Plan v5 B2: state-machine path runs sync; legacy coroutine path retained behind a flag.
+--- Plan v5 hotfix: force cooperative collector mode for fields.
+--- The current field state-machine executes synchronously and can still spike on large bale populations.
+--- Keep the compatibility flag in config.xml, but ignore it here until a truly incremental state-machine lands.
 local function _fieldsUseStateMachine()
     local cfg = rawget(_G, "FarmDashboardDataCollector")
+    local wantsStateMachine = false
     if cfg and cfg.config and cfg.config.useStateMachine_fields ~= nil then
-        return cfg.config.useStateMachine_fields and true or false
+        wantsStateMachine = cfg.config.useStateMachine_fields and true or false
     end
-    return true
+    if wantsStateMachine and not FieldDataCollector._stateMachineDisabledLogged then
+        FieldDataCollector._stateMachineDisabledLogged = true
+        Logging.info("[FarmDash] fields state-machine forced off; using cooperative per-frame collector for bale-heavy maps")
+    end
+    return false
 end
 
 --- Cooperative micro-stagger: FarmDashboardDataCollector calls collectBegin once, then collectStep each frame.
 function FieldDataCollector:collectBegin()
-    if _fieldsUseStateMachine() then
-        FieldDataCollector._smState = { stage = "INIT" }
-        FieldDataCollector._fdCo = nil
-        return
-    end
+    _fieldsUseStateMachine()
     FieldDataCollector._smState = nil
     FieldDataCollector._fdCo = coroutine.create(function(opts)
         opts = opts or {}
@@ -181,14 +185,6 @@ end
 --- @return boolean done, table fieldArrayPartialOrFinal
 function FieldDataCollector:collectStep(opts)
     opts = opts or {}
-    -- Plan v5 B2: state-machine path. No coroutines, no yield-across-pcall hazard.
-    if FieldDataCollector._smState ~= nil then
-        FieldDataCollector._yieldEvery = nil
-        FieldDataCollector._baleYieldStride = nil
-        local result = FieldDataCollector:_collectImpl()
-        FieldDataCollector._smState = nil
-        return true, result or {}
-    end
     if not FieldDataCollector._fdCo then
         return true, {}
     end

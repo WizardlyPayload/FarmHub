@@ -152,7 +152,8 @@ function FieldDataCollector.getLastBaleInventory()
     return FieldDataCollector._lastBaleInventory
 end
 
---- Plan v5 B2: state-machine path runs sync; legacy coroutine path retained behind a flag.
+--- Plan v5 B2: the default path now uses the same cooperative worker as the legacy path.
+--- Large bale saves must never scan every bale in one update() frame.
 local function _fieldsUseStateMachine()
     local cfg = rawget(_G, "FarmDashboardDataCollector")
     if cfg and cfg.config and cfg.config.useStateMachine_fields ~= nil then
@@ -163,12 +164,6 @@ end
 
 --- Cooperative micro-stagger: FarmDashboardDataCollector calls collectBegin once, then collectStep each frame.
 function FieldDataCollector:collectBegin()
-    if _fieldsUseStateMachine() then
-        FieldDataCollector._smState = { stage = "INIT" }
-        FieldDataCollector._fdCo = nil
-        return
-    end
-    FieldDataCollector._smState = nil
     FieldDataCollector._fdCo = coroutine.create(function(opts)
         opts = opts or {}
         FieldDataCollector._yieldEvery = math.max(1, tonumber(opts.batchSize) or 8)
@@ -176,26 +171,25 @@ function FieldDataCollector:collectBegin()
         FieldDataCollector._yieldBaleCounter = 0
         return FieldDataCollector:_collectImpl()
     end)
+    if _fieldsUseStateMachine() then
+        FieldDataCollector._smState = { stage = "COOPERATIVE" }
+        return
+    end
+    FieldDataCollector._smState = nil
 end
 
 --- @return boolean done, table fieldArrayPartialOrFinal
 function FieldDataCollector:collectStep(opts)
     opts = opts or {}
-    -- Plan v5 B2: state-machine path. No coroutines, no yield-across-pcall hazard.
-    if FieldDataCollector._smState ~= nil then
-        FieldDataCollector._yieldEvery = nil
-        FieldDataCollector._baleYieldStride = nil
-        local result = FieldDataCollector:_collectImpl()
-        FieldDataCollector._smState = nil
-        return true, result or {}
-    end
     if not FieldDataCollector._fdCo then
+        FieldDataCollector._smState = nil
         return true, {}
     end
     local ok, a, b = coroutine.resume(FieldDataCollector._fdCo, opts)
     if not ok then
         Logging.warning("[FarmDash] FieldDataCollector coroutine: " .. tostring(a))
         FieldDataCollector._fdCo = nil
+        FieldDataCollector._smState = nil
         FieldDataCollector._yieldEvery = nil
         FieldDataCollector._baleYieldStride = nil
         return true, {}
@@ -206,6 +200,7 @@ function FieldDataCollector:collectStep(opts)
     local st = coroutine.status(FieldDataCollector._fdCo)
     if st == "dead" then
         FieldDataCollector._fdCo = nil
+        FieldDataCollector._smState = nil
         FieldDataCollector._yieldEvery = nil
         FieldDataCollector._baleYieldStride = nil
         return true, a or {}
@@ -213,6 +208,7 @@ function FieldDataCollector:collectStep(opts)
     if st == "suspended" then
         Logging.warning("[FarmDash] FieldDataCollector: unexpected coroutine state; ending slice.")
         FieldDataCollector._fdCo = nil
+        FieldDataCollector._smState = nil
         FieldDataCollector._yieldEvery = nil
         FieldDataCollector._baleYieldStride = nil
         return true, (type(a) == "table" and a) or b or {}
@@ -493,7 +489,8 @@ function FieldDataCollector:_collectImpl()
             --- polygons — long rectangular fields included; a 4 ha 200×200 m square has corners ~141 m
             --- from centre vs. equiv radius 113 m, well under 1.5×) + 2 m boundary tolerance the user
             --- asked for. For fields with bogus posX/posZ, prefer `field:getCenterOfFieldWorldPosition()`.
-            local fieldGeometries = {}
+            local fieldGeometriesByParcel = {}
+            local ownedFieldParcels = {}
             if _G.g_fieldManager and _G.g_fieldManager.fields then
                 for _, fld in pairs(_G.g_fieldManager.fields) do
                     local pid = (fld.farmland and fld.farmland.id) or nil
@@ -507,7 +504,11 @@ function FieldDataCollector:_collectImpl()
                         end
                         local r = math.sqrt((areaHa * 10000) / math.pi)
                         local effRadius = r + math.max(r * 0.5, 5) + 2
-                        table.insert(fieldGeometries, { farmlandId = pid, cx = cx0, cz = cz0, effRadius = effRadius })
+                        local geom = { farmlandId = pid, cx = cx0, cz = cz0, effRadius = effRadius }
+                        if fieldGeometriesByParcel[pid] == nil then fieldGeometriesByParcel[pid] = {} end
+                        table.insert(fieldGeometriesByParcel[pid], geom)
+                        local of = tonumber(fld.farmland and fld.farmland.farmId) or 0
+                        if of == currentFarmId then ownedFieldParcels[pid] = true end
                     end
                 end
             end
@@ -518,24 +519,21 @@ function FieldDataCollector:_collectImpl()
                 local parcel = farmlandIdAtWithRing(x, z)
                 if parcel == nil or parcel <= 0 then return nil end
                 local bestKey, bestDistSq = nil, math.huge
-                for _, g in ipairs(fieldGeometries) do
-                    if g.farmlandId == parcel then
-                        local dx = x - g.cx
-                        local dz = z - g.cz
-                        local d2 = dx * dx + dz * dz
-                        local er = g.effRadius
-                        if d2 <= er * er and d2 < bestDistSq then
-                            bestDistSq = d2
-                            bestKey = parcel
-                        end
+                local parcelFields = fieldGeometriesByParcel[parcel]
+                if parcelFields == nil then return nil end
+                for _, g in ipairs(parcelFields) do
+                    local dx = x - g.cx
+                    local dz = z - g.cz
+                    local d2 = dx * dx + dz * dz
+                    local er = g.effRadius
+                    if d2 <= er * er and d2 < bestDistSq then
+                        bestDistSq = d2
+                        bestKey = parcel
                     end
                 end
                 return bestKey
             end
-            local function incrementFarmlandForBale(it)
-                local x, z = itemWorldXZ(it)
-                if x == nil or z == nil then return end
-                local key = bestFieldKeyForBaleAtXZ(x, z)
+            local function incrementFarmlandForBaleAtKey(key)
                 if key ~= nil and key > 0 then
                     farmlandBaleCounts[key] = (farmlandBaleCounts[key] or 0) + 1
                 end
@@ -576,22 +574,11 @@ function FieldDataCollector:_collectImpl()
 
             local function playerOwnsFieldOnParcel(parcelId)
                 if not parcelId or parcelId <= 0 then return false end
-                if not _G.g_fieldManager or not _G.g_fieldManager.fields then return false end
-                for _, fld in pairs(_G.g_fieldManager.fields) do
-                    local pid = fld.farmland and fld.farmland.id
-                    if pid == parcelId then
-                        local of = tonumber(fld.farmland and fld.farmland.farmId) or 0
-                        if of == currentFarmId then return true end
-                    end
-                end
-                return false
+                return ownedFieldParcels[parcelId] == true
             end
 
-            local function tallyBaleForInventory(it)
-                local x, z = itemWorldXZ(it)
-                if x == nil or z == nil then return end
+            local function tallyBaleForInventoryAt(it, x, z, fk)
                 local cat = classifyBaleFillCategory(it)
-                local fk = bestFieldKeyForBaleAtXZ(x, z)
                 if fk ~= nil and fk > 0 then
                     if playerOwnsFieldOnParcel(fk) then
                         baleInvOnField[cat] = (baleInvOnField[cat] or 0) + 1
@@ -609,7 +596,7 @@ function FieldDataCollector:_collectImpl()
 
             _clearKeyedPool(_pool_baleSeen)
             local baleSeen = _pool_baleSeen
-            local function baleDedupKey(it)
+            local function baleDedupKey(it, x, z)
                 if not it then return nil end
                 --- uniqueId is stable across saves; id is network id — prefer both for dedup.
                 local uid = rawget(it, "uniqueId")
@@ -618,7 +605,6 @@ function FieldDataCollector:_collectImpl()
                 if oid ~= nil then return "id:" .. tostring(oid) end
                 local k = it.nodeId or it.rootNode
                 if k ~= nil then return "o:" .. tostring(k) end
-                local x, z = itemWorldXZ(it)
                 if x and z then return string.format("xz:%.1f:%.1f", x, z) end
                 return "t:" .. tostring(it)
             end
@@ -632,11 +618,14 @@ function FieldDataCollector:_collectImpl()
             local function tryCountBale(it)
                 if not isHeuristicBale(it) then return end
                 if not baleIsOnGround(it) then return end
-                local dk = baleDedupKey(it)
+                local x, z = itemWorldXZ(it)
+                if x == nil or z == nil then return end
+                local dk = baleDedupKey(it, x, z)
                 if dk and baleSeen[dk] then return end
                 if dk then baleSeen[dk] = true end
-                tallyBaleForInventory(it)
-                incrementFarmlandForBale(it)
+                local fk = bestFieldKeyForBaleAtXZ(x, z)
+                tallyBaleForInventoryAt(it, x, z, fk)
+                incrementFarmlandForBaleAtKey(fk)
             end
             --- Module 1 (Engine Interaction doc): master list is itemSystem:getItems(); .items is a legacy/shape fallback.
             local itemSys = mission.itemSystem

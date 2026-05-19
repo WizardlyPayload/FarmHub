@@ -142,6 +142,7 @@ end
 
 function FieldDataCollector:init()
     FieldDataCollector._windrowFillIdxCache = nil
+    FieldDataCollector._smState = nil
     FieldDataCollector._fdCo = nil
     FieldDataCollector._lastGameplayFlags = nil
     FieldDataCollector._lastBaleInventory = nil
@@ -152,7 +153,9 @@ function FieldDataCollector.getLastBaleInventory()
     return FieldDataCollector._lastBaleInventory
 end
 
---- Plan v5 B2: state-machine path runs sync; legacy coroutine path retained behind a flag.
+--- Plan v5 B2: the default field path now uses the same budgeted coroutine driver as
+--- the fallback path. `_collectImpl` only yields between engine calls (never inside a pcall),
+--- which keeps large bale/source scans split across frames without crossing protected calls.
 local function _fieldsUseStateMachine()
     local cfg = rawget(_G, "FarmDashboardDataCollector")
     if cfg and cfg.config and cfg.config.useStateMachine_fields ~= nil then
@@ -164,15 +167,21 @@ end
 --- Cooperative micro-stagger: FarmDashboardDataCollector calls collectBegin once, then collectStep each frame.
 function FieldDataCollector:collectBegin()
     if _fieldsUseStateMachine() then
-        FieldDataCollector._smState = { stage = "INIT" }
+        FieldDataCollector._smState = {
+            co = coroutine.create(function()
+                return FieldDataCollector:_collectImpl()
+            end)
+        }
         FieldDataCollector._fdCo = nil
+        FieldDataCollector._yieldBaleCounter = 0
+        FieldDataCollector._yieldFieldCounter = 0
         return
     end
     FieldDataCollector._smState = nil
     FieldDataCollector._fdCo = coroutine.create(function(opts)
         opts = opts or {}
         FieldDataCollector._yieldEvery = math.max(1, tonumber(opts.batchSize) or 8)
-        FieldDataCollector._baleYieldStride = math.max(4, tonumber(opts.baleBudget) or 48)
+        FieldDataCollector._baleYieldStride = math.max(4, tonumber(opts.baleBudget) or 32)
         FieldDataCollector._yieldBaleCounter = 0
         return FieldDataCollector:_collectImpl()
     end)
@@ -181,13 +190,46 @@ end
 --- @return boolean done, table fieldArrayPartialOrFinal
 function FieldDataCollector:collectStep(opts)
     opts = opts or {}
-    -- Plan v5 B2: state-machine path. No coroutines, no yield-across-pcall hazard.
+    -- Plan v5 B2: default budgeted path. No yield-across-pcall hazard: `_collectImpl`
+    -- calls `coopProgress()` only after pcall-wrapped engine probes have returned.
     if FieldDataCollector._smState ~= nil then
+        local st = FieldDataCollector._smState
+        local co = st and st.co
+        if not co then
+            FieldDataCollector._smState = nil
+            FieldDataCollector._yieldEvery = nil
+            FieldDataCollector._baleYieldStride = nil
+            return true, {}
+        end
+
+        FieldDataCollector._yieldEvery = math.max(1, tonumber(opts.batchSize) or 8)
+        FieldDataCollector._baleYieldStride = math.max(4, tonumber(opts.baleBudget) or 32)
+
+        local ok, a, b = coroutine.resume(co)
+        if not ok then
+            Logging.warning("[FarmDash] FieldDataCollector state step: " .. tostring(a))
+            FieldDataCollector._smState = nil
+            FieldDataCollector._yieldEvery = nil
+            FieldDataCollector._baleYieldStride = nil
+            return true, {}
+        end
+        if a == "progress" then
+            return false, b or {}
+        end
+        local status = coroutine.status(co)
+        if status == "dead" then
+            FieldDataCollector._smState = nil
+            FieldDataCollector._yieldEvery = nil
+            FieldDataCollector._baleYieldStride = nil
+            return true, a or {}
+        end
+        if status == "suspended" then
+            return false, (type(a) == "table" and a) or b or {}
+        end
+        FieldDataCollector._smState = nil
         FieldDataCollector._yieldEvery = nil
         FieldDataCollector._baleYieldStride = nil
-        local result = FieldDataCollector:_collectImpl()
-        FieldDataCollector._smState = nil
-        return true, result or {}
+        return true, (type(a) == "table" and a) or b or {}
     end
     if not FieldDataCollector._fdCo then
         return true, {}

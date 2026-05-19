@@ -649,9 +649,12 @@ function FarmDashboardDataCollector:resetStaggerState()
         VehicleDataCollector._inc = nil
     end
     if rawget(_G, "FieldDataCollector") then
+        FieldDataCollector._smState = nil
         FieldDataCollector._fdCo = nil
         FieldDataCollector._yieldEvery = nil
         FieldDataCollector._baleYieldStride = nil
+        FieldDataCollector._yieldBaleCounter = nil
+        FieldDataCollector._yieldFieldCounter = nil
         FieldDataCollector._lastGameplayFlags = nil
     end
     if rawget(_G, "EconomyDataCollector") then
@@ -692,7 +695,7 @@ function FarmDashboardDataCollector:loadConfig()
         diagnostics         = false,
         --- Intra-module budgets (collectStep); see FieldDataCollector / VehicleDataCollector.
         fieldsPerFrame      = 1,
-        baleEntitiesBudget  = 8,
+        baleEntitiesBudget  = 32,
         vehiclesPerFrame    = 2,
         animalsPerFrame      = 1,
         husbandryPlaceablesPerFrame = 1,
@@ -709,8 +712,8 @@ function FarmDashboardDataCollector:loadConfig()
         detailFileCapBase           = 512,
         --- Phase 5: opportunistic wall-clock budget per slice (ms). Best-effort; row caps are the actual safety net.
         sliceBudgetMs               = 4,
-        --- Plan v5 B1/B2/B3: per-collector kill switches for the state-machine port.
-        --- Default true (use the new state-machine path); set false to fall back to the existing coroutine path.
+        --- Plan v5 B1/B2/B3: per-collector kill switches for incremental collection ports.
+        --- Default true (use the budgeted collector path); set false for legacy fallback behavior.
         useStateMachine_economy     = true,
         useStateMachine_fields      = true,
         useStateMachine_production  = true,
@@ -804,7 +807,7 @@ function FarmDashboardDataCollector:loadConfig()
     -- Keep staggered collection on a slow cadence by default: never faster than 60s per full pass.
     self.config.collectionCycleMs = math.max(60000, math.min(1800000, self.config.collectionCycleMs or 60000))
     self.config.fieldsPerFrame = math.max(1, math.min(12, self.config.fieldsPerFrame or 1))
-    self.config.baleEntitiesBudget = math.max(4, math.min(128, self.config.baleEntitiesBudget or 8))
+    self.config.baleEntitiesBudget = math.max(4, math.min(128, self.config.baleEntitiesBudget or 32))
     self.config.vehiclesPerFrame = math.max(1, math.min(16, self.config.vehiclesPerFrame or 2))
     self.config.animalsPerFrame = math.max(1, math.min(8, self.config.animalsPerFrame or 1))
     self.config.husbandryPlaceablesPerFrame = math.max(1, math.min(8, self.config.husbandryPlaceablesPerFrame or 1))
@@ -1119,7 +1122,7 @@ function FarmDashboardDataCollector:runIncrementalActiveStep(order)
     local opts = {
         batchSize = self.config.fieldsPerFrame or 8,
         animalBatch = self.config.animalsPerFrame or 2,
-        baleBudget = self.config.baleEntitiesBudget or 48,
+        baleBudget = self.config.baleEntitiesBudget or 32,
         vehicleBatch = self.config.vehiclesPerFrame or 12,
         economyYieldStride = self.config.economyYieldStride or 55,
         productionChainsPerYield = self.config.productionChainsPerYield or 2,
@@ -2204,9 +2207,12 @@ function FarmDashboardDataCollector:shutdown()
         if collector.shutdown then collector:shutdown() end
     end
     if rawget(_G, "FieldDataCollector") then
+        FieldDataCollector._smState = nil
         FieldDataCollector._fdCo = nil
         FieldDataCollector._yieldEvery = nil
         FieldDataCollector._baleYieldStride = nil
+        FieldDataCollector._yieldBaleCounter = nil
+        FieldDataCollector._yieldFieldCounter = nil
         FieldDataCollector._lastGameplayFlags = nil
     end
     if rawget(_G, "EconomyDataCollector") then

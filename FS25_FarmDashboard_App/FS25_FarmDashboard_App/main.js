@@ -1367,6 +1367,28 @@ function schedulePersistServerCache(serverId) {
     }, 600);
 }
 
+function persistAllServerCaches(reason) {
+    const userData = app.getPath('userData');
+    const states = Object.entries(serverStates || {});
+    for (const [serverId, state] of states) {
+        if (!state || !state.mergedData) continue;
+        try {
+            saveServerCache(userData, serverId, {
+                mergedSnapshot: state.mergedData,
+                lastKnownSaveSlot: state.lastSaveSlot || null,
+                fieldLiveByFarmlandId: state.fieldLiveCache || {},
+                fieldHistory: state.fieldHistory || {},
+                lastLuaAt: state.lastLuaReceivedAt || null,
+                lastXmlAt: state.lastXmlReceivedAt || null,
+                savedAt: new Date().toISOString(),
+                savedReason: reason || 'flush',
+            });
+        } catch (e) {
+            console.warn('[Cache] persist flush failed', serverId, e.message);
+        }
+    }
+}
+
 function hydrateServerCacheFromDisk(serverId) {
     let disk;
     try {
@@ -1842,10 +1864,21 @@ async function startLocalWatching(srv) {
 
     console.log(`[Local] Watching: ${luaJsonPath}`);
 
-    const readFile = () => {
+    let lastMtimeMs = 0;
+    const updateMtime = (mtimeMs) => {
+        if (Number.isFinite(mtimeMs) && mtimeMs > 0) lastMtimeMs = mtimeMs;
+    };
+    const readFile = (knownMtimeMs) => {
         readFileUtf8WithRetryAsync(luaJsonPath)
             .then((raw) => {
                 if (raw != null) processLuaData(srv.id, stripUtf8Bom(raw));
+                if (Number.isFinite(knownMtimeMs)) {
+                    updateMtime(knownMtimeMs);
+                } else {
+                    fs.promises.stat(luaJsonPath)
+                        .then((stat) => updateMtime(Number(stat.mtimeMs) || 0))
+                        .catch(() => {});
+                }
             })
             .catch((e) => {
                 console.warn(`[Local] read data.json [${srv.id}]:`, e && e.message ? e.message : e);
@@ -1879,6 +1912,21 @@ async function startLocalWatching(srv) {
     }
     state.watcher = fw;
     readFile();
+
+    // Poll mtime as a fallback for missed fs.watch events (Windows can drop change signals).
+    const pollIntervalMs = 10000;
+    const pollTimer = setInterval(async () => {
+        try {
+            const stat = await fs.promises.stat(luaJsonPath);
+            const mtimeMs = Number(stat.mtimeMs) || 0;
+            if (mtimeMs > lastMtimeMs + 1) {
+                readFile(mtimeMs);
+            }
+        } catch (_) {
+            /* ignore */
+        }
+    }, pollIntervalMs);
+    state.intervals.push(pollTimer);
 
     const dirtyPensPath = path.join(path.dirname(luaJsonPath), 'dirtyPens.json');
     try {
@@ -2193,6 +2241,7 @@ function startFtpPollingCoordinator(config, ftpServers) {
 
 /** Stops local file watchers, FTP timers, and cache debouncers. Chokidar.close() was async; quit now awaits this. */
 async function stopAllWatchers() {
+    persistAllServerCaches('shutdown');
     clearFtpPollingTimers();
     Object.keys(serverCacheSaveTimers).forEach((k) => {
         clearTimeout(serverCacheSaveTimers[k]);
@@ -2315,6 +2364,7 @@ async function bootServer(config) {
     // reopen is not `{ error: 'Waiting for data...' }` (which cleared the renderer). Large saves may
     // add a short delay before the port opens; that is preferable to an empty dashboard flash.
     servers.forEach((srv) => {
+        if (srv && srv.mode === 'ftp') return;
         try {
             hydrateServerCacheFromDisk(srv.id);
         } catch (e) {
@@ -2533,6 +2583,10 @@ ipcMain.handle('read-server-live-cache', (_event, serverId) => {
             return { ok: false, error: 'server_id_required' };
         }
         const sid = String(serverId);
+        const srv = getServersFromStore().find((s) => String(s.id) === sid);
+        if (srv && srv.mode === 'ftp') {
+            return { ok: false, error: 'ftp_requires_fresh', serverId: sid };
+        }
         const record = loadServerCache(app.getPath('userData'), sid);
         if (!record || !record.mergedSnapshot || typeof record.mergedSnapshot !== 'object') {
             return { ok: false, error: 'not_found', serverId: sid };

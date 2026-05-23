@@ -4,9 +4,11 @@ All project documentation lives under **`docs/`** (repository root: **FarmHub** 
 
 | Document | Description |
 | -------- | ----------- |
+| [**wiki/**](../wiki/Home.md) | **GitHub Wiki source** — Home, install, user manual, dev, security, troubleshooting |
 | [README.md](../README.md) | Repository landing — install summary, build, layout |
 | [**USER_MANUAL.md**](./USER_MANUAL.md) | **Illustrated how-to:** installation, UI map, field rules, windrows, screenshot checklist |
 | [INSTALL.md](./INSTALL.md) | **Quick install:** mod first, then Windows app (every save) |
+| [**UPGRADE_FROM_FS25-Farm-Dashboard.md**](./UPGRADE_FROM_FS25-Farm-Dashboard.md) | **Differences since the public 2.0.0 repo** (WizardlyPayload/FS25-Farm-Dashboard) |
 | [CHANGELOG.md](./CHANGELOG.md) | Full version history |
 | [RELEASE_NOTES.md](./RELEASE_NOTES.md) | Short copy for **GitHub Releases** |
 | [RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md) | Long-form **3.9.0** pre-final narrative |

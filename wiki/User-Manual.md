@@ -1,5 +1,6 @@
 # User Manual
 
+<<<<<<< Updated upstream
 This is the comprehensive guide to using the **FS25 Farm Dashboard**. It covers every screen, setting, and feature.
 
 ## Quick Navigation
@@ -194,19 +195,220 @@ The app now binds to all network interfaces (`0.0.0.0:8766`).
 ### Read-Only Viewer Mode
 
 For tablets, you can hide the Settings gear and lock the interface read-only by appending `?viewer=1` to the URL:
+=======
+Complete guide to the **FS25 Farm Dashboard** UI. For illustrated screenshots see [USER_MANUAL.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/USER_MANUAL.md) in `docs/`.
+
+**Versions:** app **3.9.0**, mod **2.3.0.0**
+
+---
+
+## Table of contents
+
+1. [What you need](#what-you-need)
+2. [Dashboard layout](#dashboard-layout)
+3. [Settings](#settings)
+4. [Sections](#sections)
+5. [LAN & tablets](#lan--tablets)
+6. [Mod config (`config.xml`)](#mod-config-configxml)
+7. [Tips](#tips)
+
+---
+
+## What you need
+
+- **Farming Simulator 25** with mod installed ([Installation Guide](Installation-Guide))
+- **Farm Dashboard** Windows app
+- **Browser** (Edge, Chrome, Firefox)
+- **(Optional)** FTP for dedicated servers
+- **(Optional)** Home LAN for tablets
+
+---
+
+## Dashboard layout
+
+### Top bar
+
+| Element | Purpose |
+|---------|---------|
+| **Server tabs** | Switch configured servers (local / FTP) |
+| **Farm dropdown** | Multi-farm saves |
+| **Game time** | Day/hour from mod |
+| **Data-source badge** | Live / XML / API health |
+| **Weather** | Opens forecast modal |
+| **Notifications (bell)** | Recent alerts |
+| **Settings (gear)** | Settings modal |
+| **Home** | Landing page |
+| **Refresh** | Force data reload |
+
+### Landing page
+
+Up to six cards (can hide in Settings):
+
+| Card | Opens |
+|------|--------|
+| Livestock | Animals |
+| Vehicles | Fleet |
+| Fields | Parcels + suggestions |
+| Economy | Money & purchases |
+| Pastures | Grazing areas |
+| Productions | Factories / chains |
+
+### Section backgrounds
+
+The dashboard uses **full-screen background images** that **crossfade** when you change section. Default art: `web/assests/img/Dashboard PIctures/Background.png`. Optional per-section PNGs (e.g. `fields.png`) can be added with the same naming pattern — see `farm-dashboard-bg.js` in the repo.
+
+---
+
+## Settings
+
+Open via **gear icon**. Four tabs:
+
+### Dashboard tab
+
+| Control | Purpose |
+|---------|---------|
+| **Section toggles** | Show/hide landing cards |
+| **Field exclusions** | Hide farmland IDs per server |
+| **Field clusters** | Auto-merge adjacent same-crop fields, or manual groups |
+| **SimHub view** | Cluster IDs, pasture IDs, production keys for `simhub.html` |
+| **Desktop version** | Installed app version (read-only) |
+| **Check for updates** | Query GitHub Releases |
+
+### Servers & saves tab
+
+| Control | Purpose |
+|---------|---------|
+| **Enable LAN access** | Bind `0.0.0.0:8766` for tablets (see [Security](Security-and-Network)) |
+| **LAN user / password** | HTTP Basic (≥10 chars; weak defaults rejected in 3.9+) |
+| **IP allowlist** | Optional comma-separated IPs/CIDRs |
+| **Require auth from loopback** | Force password even on same PC |
+| **Auto-detect saves** | Scan `modSettings\FS25_FarmDashboard\` |
+| **FTP polling** | Interval 1–25 min; initial delay; sync vs staggered |
+| **Server list** | Add/remove local or FTP servers |
+| **Scan FS25 mods for images** | Export mod-shop PNGs for vehicle thumbnails |
+
+### FS25 Mod tab
+
+Writes **`config.xml`** (game restart required after save):
+
+| Setting | Range | Purpose |
+|---------|-------|---------|
+| **Collection cycle (ms)** | 5,000 – 1,800,000 | Full collector cycle length |
+| **Module toggles** | On/off | Animals, Vehicles, Fields, Weather, Finance, Economy, Production |
+
+> **`debugBaleScan`:** enable by hand-editing `config.xml` (Settings toggle may not persist — see [Troubleshooting](Troubleshooting#debugbalescan-not-working)).
+
+### Theme tab
+
+| Control | Purpose |
+|---------|---------|
+| **Language** | UI language (page reloads) |
+| **Per-area colors** | Background, surface, text, accent |
+| **Copy to all / Reset** | Theme presets |
+
+---
+
+## Sections
+
+### Livestock
+
+- Summary cards (totals, lactating, pregnant, health)
+- Filters: type, health, weight, age
+- Sortable table with pagination
+- **View** → animal detail modal (on-demand detail files from app)
+- **Export** CSV/JSON
+
+> **Note:** Statistics / Genetics tab buttons exist but are not fully wired (audit gap).
+
+### Vehicles
+
+- Summary: fleet size, low fuel, damage
+- Filters by type, fuel, status
+- Cards with fuel %, damage %, location
+- **Thumbnails** from base game + **mod shop export** pipeline
+- Image modal on click
+
+### Fields
+
+Most detailed section.
+
+**Summary:** field count, area, harvest ready, needs work.
+
+**Filters:** All · Harvest ready · Needs work · Growing · Empty
+
+**Each field card shows:**
+
+- Crop, growth bar, status badge (Harvest ready, Needs work, Growing, Empty, Withered, etc.)
+- **Precision Farming:** N and pH vs targets when exported
+- **Forage / bale badges** (when above **2000 L** workflow floor):
+  - Bales on field (count)
+  - Loose straw, grass windrow, or hay windrow
+  - Baleable loose / windrow material with liter hints
+- **Windrow volume** badge when `windrowLiters` present
+- **Suggested next step** — local rules engine (not cloud AI)
+- **Tools & shop** — fleet vs shop equipment for suggested action
+
+**Field clusters:** grouped cards when enabled in Settings.
+
+**Rules examples:** harvest, lime (with pH gap), nitrogen, weeds, roll; post-harvest baling/tedding; **mulched ground → cultivate before seed** (no direct-drill into mulch).
+
+### Economy
+
+- Money, purchases, loan, net worth summaries
+- **Purchases** tab — owned equipment, sort/filter
+- **Market** tab — prices when available in merged data
+
+### Pastures
+
+- Pasture cards with animal counts
+- **Telemetry missing** (info) vs **critical low stock** (warning) — separate severities in 3.9+
+- Click pasture → animals in that pasture
+
+### Productions
+
+- Production point cards
+- Input/output fill levels, slot status (read-only)
+
+### SimHub (separate page)
+
+Open **`/simhub.html`** (or link from Settings). Read-only overlay for streaming; follows desktop server/farm selection. Configure visible clusters in **Settings → Dashboard → SimHub view**.
+
+---
+
+## LAN & tablets
+
+1. **Settings → Servers & saves → Enable LAN access**
+2. Set **LAN user** and **password** (≥10 characters; not `admin`/`farmhub`)
+3. **Save**
+4. On PC: `ipconfig` → IPv4 (e.g. `192.168.1.50`)
+5. On tablet browser: `http://192.168.1.50:8766` → enter credentials
+
+**Read-only viewer** (hides Settings):
+>>>>>>> Stashed changes
 
 ```
 http://192.168.1.50:8766?viewer=1
 ```
 
+<<<<<<< Updated upstream
 ## Mod Settings (`config.xml`)
 
 The in-game mod reads a config file here:
+=======
+Details: [Security & Network](Security-and-Network)
+
+---
+
+## Mod config (`config.xml`)
+
+Path:
+>>>>>>> Stashed changes
 
 ```
 %USERPROFILE%\Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\config.xml
 ```
 
+<<<<<<< Updated upstream
 You can edit this manually or use **Settings → FS25 Mod** in the app.
 
 | Setting | What it does |
@@ -230,3 +432,32 @@ You can edit this manually or use **Settings → FS25 Mod** in the app.
 ---
 
 Next: [Security & Network](Security-and-Network) for LAN and network details.
+=======
+Example:
+
+```xml
+<farmDashboard>
+  <settings collectionCycleMs="60000" debugBaleScan="false" />
+  <modules animals="true" vehicles="true" fields="true" weather="true"
+          finance="true" economy="true" production="true" />
+</farmDashboard>
+```
+
+Changes require **restarting FS25** after saving from the app or editing by hand.
+
+---
+
+## Tips
+
+- Bookmark `http://localhost:8766`
+- **FTP servers** do not use offline desktop cache — wait for next poll after restart
+- **Local servers** restore last merged view on app restart (3.9+)
+- Use **field exclusions** to hide unused parcels
+- Increase **collection cycle** in mod settings if field scans cause in-game stutter
+
+---
+
+**Problems?** [Troubleshooting](Troubleshooting) · **Setup:** [Installation Guide](Installation-Guide)
+
+*Aligned with app **3.9.0**, mod **2.3.0.0***
+>>>>>>> Stashed changes

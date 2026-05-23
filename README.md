@@ -14,11 +14,13 @@ Desktop companion for **Farming Simulator 25**: a Windows app plus an in-game mo
 
 | Quick link | |
 |------------|--|
+| **GitHub Wiki** | [wiki/](wiki/Home.md) (source for [project wiki](https://github.com/WizardlyPayload/FarmHub/wiki)) |
 | **Install (mod first)** | [docs/INSTALL.md](docs/INSTALL.md) |
 | **Doc index** | [docs/README.md](docs/README.md) |
 | **Complete how-to + screenshots** | [docs/USER_MANUAL.md](docs/USER_MANUAL.md) |
 | **Changelog** | [docs/CHANGELOG.md](docs/CHANGELOG.md) |
 | **GitHub release blurbs** | [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) |
+| **Upgrade from old public repo** | [docs/UPGRADE_FROM_FS25-Farm-Dashboard.md](docs/UPGRADE_FROM_FS25-Farm-Dashboard.md) |
 | **Authors** | [docs/AUTHORS.md](docs/AUTHORS.md) |
 
 ---

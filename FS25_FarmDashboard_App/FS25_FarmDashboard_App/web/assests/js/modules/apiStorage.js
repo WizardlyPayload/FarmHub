@@ -314,7 +314,12 @@ async function tryHydrateFromDesktopServerCache(dashboard) {
     ) {
       return false;
     }
-    const res = await window.farmDashAPI.readServerLiveCache(String(dashboard.activeServerId));
+    const sid = String(dashboard.activeServerId);
+    const serverMeta = Array.isArray(dashboard.availableServers)
+      ? dashboard.availableServers.find((s) => String(s?.id) === sid)
+      : null;
+    if (serverMeta && serverMeta.mode === "ftp") return false;
+    const res = await window.farmDashAPI.readServerLiveCache(sid);
     if (!res || !res.ok || !res.data || typeof res.data !== "object") return false;
     applyApiMergedDataPayload(dashboard, res.data);
     persistBrowserMergedSnapshot(dashboard, res.data);

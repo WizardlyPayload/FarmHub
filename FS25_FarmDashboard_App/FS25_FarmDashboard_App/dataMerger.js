@@ -120,8 +120,19 @@ function buildFieldLiveFingerprints(luaFields, receivedAt) {
 
 function fieldAdvanceScore(f) {
     if (!f) return -1;
-    if (f.harvestReady || f.isHarvested) return 10000 + Number(f.growthState || 0);
     const gl = String(f.growthLabel || '').toLowerCase();
+    const gt = String(f.groundType || '').toLowerCase();
+    const postHarvest =
+        f.isHarvested ||
+        gl.includes('harvested') ||
+        gl.includes('mulched') ||
+        gl.includes('mown') ||
+        gl.includes('regrowth') ||
+        gt.includes('harvested') ||
+        gt.includes('grass_cut') ||
+        gt.includes('cut');
+    if (postHarvest) return 11000 + Number(f.growthState || 0);
+    if (f.harvestReady) return 10000 + Number(f.growthState || 0);
     if (gl.includes('harvest')) return 9000 + Number(f.growthState || 0);
     return Number(f.growthState || 0);
 }

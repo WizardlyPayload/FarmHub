@@ -273,7 +273,7 @@ function shouldSuggestOptionalOrganicStep(field, opts = {}) {
 }
 
 /** Combined straw + grass + hay windrow litres from mod export; below this, skip forage workflow (matches Lua `FORAGE_WORKFLOW_MIN_L`). */
-export const MIN_FORAGE_WORKFLOW_LITERS = 100;
+export const MIN_FORAGE_WORKFLOW_LITERS = 2000;
 
 function totalStrawGrassHayLiters(field) {
   if (!field || typeof field !== "object") return null;
@@ -481,9 +481,14 @@ function canSowFallow(field, limeMatter = true) {
 function fallowLimeBeforeSeedSuggestion(field) {
   const ph = Number(field.phValue ?? 0);
   const pht = Number(field.targetPh ?? 0);
+  const gap = pht > 0 ? Math.max(0, pht - ph) : 0;
   const detail =
     field.isPrecisionFarming && pht > 0
-      ? t("rules.reason.limeBeforeSeedPF", { ph: ph.toFixed(1), target: pht.toFixed(1) })
+      ? t("rules.reason.limeBeforeSeedPF", {
+          ph: ph.toFixed(1),
+          target: pht.toFixed(1),
+          gap: gap.toFixed(1),
+        })
       : t("rules.reason.limeBeforeSeedNoPF");
   return {
     action: t("rules.action.spreadLimeBeforeSeed"),
@@ -590,7 +595,12 @@ function pickGrowingCropMaintenanceSuggestion(field, ctx) {
       apply() {
         const detail =
           field.isPrecisionFarming && pht > 0
-            ? t("rules.reason.limeEmergedPF", { label, ph: ph.toFixed(1), target: pht.toFixed(1) })
+            ? t("rules.reason.limeEmergedPF", {
+                label,
+                ph: ph.toFixed(1),
+                target: pht.toFixed(1),
+                gap: Math.max(0, pht - ph).toFixed(1),
+              })
             : t("rules.reason.limeEmergedNoPF", { label });
         return {
           action: t("rules.action.spreadLimeEmerged"),
@@ -787,6 +797,7 @@ function suggestionForNeedsWork(field, ctx, opts = {}) {
           reason: t("rules.reason.limePastureMapPF", {
             ph: ph.toFixed(1),
             target: pht.toFixed(1),
+            gap: Math.max(0, pht - ph).toFixed(1),
           }),
           source: "rules",
         };
@@ -825,6 +836,7 @@ function suggestionForNeedsWork(field, ctx, opts = {}) {
           reason: t("rules.reason.limePastureMapPF", {
             ph: ph.toFixed(1),
             target: pht.toFixed(1),
+            gap: Math.max(0, pht - ph).toFixed(1),
           }),
           source: "rules",
         };
@@ -837,6 +849,7 @@ function suggestionForNeedsWork(field, ctx, opts = {}) {
           label,
           ph: ph.toFixed(1),
           target: pht.toFixed(1),
+          gap: Math.max(0, pht - ph).toFixed(1),
         }),
         source: "rules",
       };
@@ -1201,14 +1214,6 @@ export function getLocalFieldSuggestion(field, opts = {}) {
 
   // ── Mulched empty without full fallow detection (legacy shape) ───────────
   if (isMulchedEmptyField(field)) {
-    if (field.isPrecisionFarming && field.isScanned) {
-      return {
-        action: t("rules.action.directDrill"),
-        actionKey: "rules.action.directDrill",
-        reason: t("rules.reason.directDrillNoCrop"),
-        source: "rules",
-      };
-    }
     return {
       action: t("rules.action.cultivateMulchedDrill"),
       actionKey: "rules.action.cultivateMulchedDrill",
@@ -1280,6 +1285,7 @@ export function getLocalFieldSuggestion(field, opts = {}) {
           reason: t("rules.reason.limePastureMapPF", {
             ph: ph.toFixed(1),
             target: pht.toFixed(1),
+            gap: Math.max(0, pht - ph).toFixed(1),
           }),
           source: "rules",
         };

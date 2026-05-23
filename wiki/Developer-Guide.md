@@ -1,321 +1,269 @@
 # Developer Guide
 
-This guide is for contributors and maintainers of **FarmHub**. It covers the architecture, codebase structure, and how to work on the project.
+For contributors and maintainers of **FarmHub**. Deep reference: [DEVELOPER_HANDOVER.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/DEVELOPER_HANDOVER.md).
 
-## Quick Start for Developers
+**Versions:** app **3.9.0**, mod **2.3.0.0**
 
-### Current Versions
-- **App:** 3.9.0 (`FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json`)
-- **Mod:** 2.3.0.0 (`FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml`)
-
-### Build the Windows App
-
-```bash
-cd FS25_FarmDashboard_App/FS25_FarmDashboard_App
-npm install
-npm run dist
-```
-
-The installer goes to `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\`
-
-### Run Dev Build
-
-```bash
-cd FS25_FarmDashboard_App/FS25_FarmDashboard_App
-npm install
-npm start
-```
-
-Opens the Electron app in dev mode.
+---
 
 ## Architecture
 
 ```
-Game (FS25)
-    ↓
-Mod writes data.json
-    ↓
-Electron (main.js) watches data.json
-    ↓
-Express server :8766
-    ↓
-Web client (browser) polls /api/*
+FS25 (Lua mod, authority only)
+    │ writes data.json (+ optional config.xml)
+    ▼
+Electron main (Node.js)
+    ├── fs.watch (local) / FTP poll (remote)
+    ├── xmlCollector + dataMerger.mergeData()
+    ├── Express HTTP + WebSocket :8766
+    └── electron-store, auto-updater
+    ▼
+Chromium renderer (web/)
+    ├── app.js + modules/
+    ├── rules-engine.js (client-side field heuristics)
+    └── realtime-connector.js (WebSocket)
 ```
 
-### Key Components
-
-| Component | File | Role |
-|-----------|------|------|
-| **Lua Mod** | `FS25_FarmDashboard_Mod/src/FarmDashboard.lua` | Runs in game; writes `data.json` every cycle |
-| **Electron Main** | `FS25_FarmDashboard_App/main.js` | Watches files, manages server, IPC bridge |
-| **Express Server** | `FS25_FarmDashboard_App/main.js` | HTTP/WebSocket on port 8766 |
-| **Data Merger** | `FS25_FarmDashboard_App/dataMerger.js` | Combines Lua data + XML savegame data |
-| **Rules Engine** | `FS25_FarmDashboard_App/web/assests/js/rules-engine.js` | AI field suggestions (browser-side) |
-| **Web Client** | `FS25_FarmDashboard_App/web/assests/js/app.js` | Main dashboard UI |
-
-## Repository Layout
-
-```
-FarmHub/
-├── FS25_FarmDashboard_App/
-│   └── FS25_FarmDashboard_App/
-│       ├── main.js                    # Electron + Express
-│       ├── preload.js                 # IPC bridge
-│       ├── dataMerger.js              # Merge Lua + XML
-│       ├── package.json               # v3.9.0
-│       ├── web/
-│       │   ├── index.html
-│       │   ├── setup.html
-│       │   ├── assests/
-│       │   │   ├── css/styles.css
-│       │   │   └── js/
-│       │   │       ├── app.js
-│       │   │       ├── rules-engine.js
-│       │   │       ├── modules/       # Sections
-│       │   │       └── i18n/          # Translations
-│       │   └── locales/
-│       │       ├── messages/          # Source translations
-│       │       └── translations.json
-│       └── build/
-│           └── installer.nsh          # NSIS hooks
-├── FS25_FarmDashboard_Mod/
-│   └── FS25_FarmDashboard_Mod/
-│       ├── modDesc.xml                # v2.3.0.0
-│       ├── icon.png
-│       └── src/
-│           ├── FarmDashboard.lua      # Entry point
-│           ├── FarmDashboardDataCollector.lua
-│           ├── Diagnostics.lua
-│           └── collectors/            # Per-data-type
-├── tools/
-│   ├── app/                           # Electron npm helpers
-│   ├── Zip-FarmDashboardMod.ps1       # Package mod zip
-│   └── Export-ModStoreImages.ps1      # Image extraction
-└── docs/                              # Full documentation
-```
-
-## The Lua Mod
-
-### Mission Hook
-
-`FarmDashboard.lua` registers with `addModEventListener`. On `loadMap`, if `isAuthority()` is true (host/single-player), it adds itself to updateables.
-
-### Staggered Orchestration
-
-`FarmDashboardDataCollector:update(dt)` divides each `collectionCycleMs` into slots — one per enabled module. This prevents lag spikes.
-
-### Collectors
-
-| Collector | Produces |
-|-----------|----------|
-| `AnimalDataCollector.lua` | Animals, health, type |
-| `VehicleDataCollector.lua` | Vehicles, fuel, damage, position |
-| `FieldDataCollector.lua` | Crops, growth, PF nitrogen/pH, windrows, bales, suggestions |
-| `WeatherDataCollector.lua` | Temperature, conditions |
-| `FinanceDataCollector.lua` | Money, loan, asset values |
-| `EconomyDataCollector.lua` | Market prices, selling stations |
-| `ProductionDataCollector.lua` | Production chains, fill levels |
-
-### Output
-
-The mod writes `data.json` to:
-
-```
-%USERPROFILE%\Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\<savename>\data.json
-```
-
-This file is updated every `collectionCycleMs` (default 60 seconds).
-
-## The Electron App
-
-### HTTP Server
-
-- Runs on port **8766** (both HTTP and WebSocket)
-- Binds to `127.0.0.1` by default (localhost only)
-- If LAN enabled, binds to `0.0.0.0` and enforces HTTP Basic Auth
-
-### File Watching
-
-`startLocalWatching()` watches `data.json` on local servers. If the file changes, Electron:
-1. Reads the new `data.json`
-2. Also re-reads the savegame XML
-3. Merges both with `dataMerger.mergeData()`
-4. Broadcasts to all connected browsers via WebSocket
-
-### FTP Polling
-
-`startFtpPollingCoordinator()` handles remote (FTP) servers. Configurable:
-- **Interval**: 1–25 minutes
-- **Schedule**: Sync (all at once) or Staggered (spread out)
-
-### IPC Bridge
-
-`preload.js` exposes methods to the web UI via `window.farmDashAPI`. Every method is intentionally listed — no ad-hoc access to Node APIs.
-
-**Key methods:**
-- `saveSettings(cfg)` — Persist server config
-- `saveUiPreferences(prefs)` — Save theme, field clusters, etc.
-- `checkDesktopAppUpdates()` — Trigger `electron-updater`
-- `exportModStoreImages()` — Run mod-image PowerShell pipeline
-
-## Data Merge (`dataMerger.js`)
-
-Combines Lua live data with savegame XML static data.
-
-### Precedence
-
-| Domain | Lua | XML | Both |
-|--------|-----|-----|------|
-| Animals | live counts, fill | — | — |
-| Fields | live agronomy, growth, suggestions | base field rows | merged |
-| Vehicles | live state, fuel | base list, ownership | merged |
-| Economy | live prices | history | merged |
-
-### Anti-Regress
-
-If live data is missing (game just restarted), the merger caches the last known value so the UI doesn't flicker.
-
-### Timestamps
-
-The merged payload includes:
-```json
-{
-  "dataTimestamps": {
-    "lastLuaReceivedAt": <epoch_ms>,
-    "lastXmlReceivedAt": <epoch_ms>,
-    "mergeComputedAt": <epoch_ms>,
-    "liveNewerThanXml": <bool>
-  }
-}
-```
-
-Used for the top-bar data-source badge.
-
-## Rules Engine (`rules-engine.js`)
-
-Runs in the browser; no network calls. Provides AI-powered field work suggestions.
-
-### Entry Point
-
-`getLocalFieldSuggestion(field, opts)` — called by `fields.js` for each field.
-
-### Thresholds
-
-| Constant | Value | Meaning |
-|----------|-------|---------|
-| `MIN_WINDROW_LITERS` | 120 | Ignore windrow signal below this |
-| `MIN_WINDROW_AREA` | 0.0005 | Min area fraction to count windrow |
-| PF nitrogen band | < 0.6 × target | "Needs nitrogen" |
-
-### Suggestion Priority
-
-When multiple maintenance actions apply:
-1. **Lime** (highest priority)
-2. **Nitrogen**
-3. **Weeds**
-4. **Rolling** (lowest priority)
-
-## Web Client
-
-### Entry Point
-
-`web/assests/js/app.js` defines `LivestockDashboard` and mixes in modules. Assigned to `window.dashboard`.
-
-### Module Map
-
-| Module | Handles |
-|--------|---------|
-| `navigation.js` | Sidebar, landing page |
-| `apiStorage.js` | Server tabs, `/api/*` calls |
-| `livestock.js` | Livestock section |
-| `vehicles.js` | Vehicles section |
-| `fields.js` | Fields section |
-| `economy.js` | Economy section |
-| `pastures.js` | Pastures section |
-| `productions.js` | Production chains |
-| `theming.js` | Color picker |
-| `i18n/i18n.js` | Translations |
-
-### Polling
-
-`app.js` has a `dashboard.pollInterval` (default 1s). On each tick:
-1. Fetch `/api/data`
-2. Merge with local state
-3. Call `refresh*()` on each module (incremental DOM update)
-
-## Internationalization (i18n)
-
-### Adding a String
-
-1. Add the key to `web/locales/messages/en.json` (source of truth)
-2. Run `npm run i18n:sync` — copies the key to every language
-3. Translate non-English files
-4. Run `npm run i18n:build` — creates `translations.json`
-5. Run `npm run i18n:verify` — confirms full coverage
-
-### Build & Verify
-
-```bash
-npm run i18n:build      # Create translations.json
-npm run i18n:verify     # Check coverage
-npm run i18n:audit      # Find orphans/duplicates
-```
-
-## Build & Packaging
-
-### npm Scripts
-
-| Script | What |
-|--------|------|
-| `npm start` | Dev launch (`electron .`) |
-| `npm run dist` | Full NSIS installer |
-| `npm run pack` | Unpacked app (for testing) |
-| `npm test` | Run tests |
-| `npm run verify:electron-pack` | CI gate: verify all required files in `package.json` `build.files` |
-
-### CI/CD
-
-GitHub Actions runs on push/PR to `main`, `master`, or `develop`:
-- `npm ci` — clean install
-- `npm test` — unit tests
-- `npm run verify:electron-pack` — file verification
-- `npm run i18n:verify` — translation coverage
-
-### Release Checklist
-
-1. Build mod zip: `.\tools\Zip-FarmDashboardMod.ps1`
-2. Build Windows app: `npm run dist`
-3. Attach `.exe` and mod `.zip` to GitHub Release
-4. Verify auto-update works: Settings → Check for updates
-
-## Debugging Checklist
-
-| Issue | Check |
-|-------|-------|
-| Empty dashboard | Mod enabled + save loaded; `data.json` exists; Settings path correct |
-| "Waiting for field data" | `dataTimestamps.lastLuaReceivedAt` advancing? Watcher fired? |
-| Wrong farm shown | `activeFarmId` in merged payload; check farm dropdown |
-| Merge oddities | `dataMerger.js` precedence table; `liveNewerThanXml` should be `true` when fresh |
-| LAN 401/403 | Check `lanUsername`, `lanPassword`, IP allowlist |
-| FTP not polling | `intervalMinutes` must be 1–25 |
-| `app.asar` locked | `npm run unlock-install`, then `npm run dist` |
-
-## Known Gaps from the Audits
-
-1. **Livestock Statistics / Genetics tabs** — UI buttons not wired (`index.html`, `livestock.js`)
-2. **Electron `parseModConfigXml`** — ignores `debugBaleScan` flag (`main.js`)
-3. **Fields error strip** — no retry button; auto-retries every 5s
-4. **Notification history** — hard-codes English empty state
-
-## Conventions
-
-- Match existing naming, IPC channels, and merge semantics
-- Prefer additive JSON fields; don't reintroduce coordinate dumps
-- New translations → `messages/<code>.json` only; never hand-edit `translations.json`
-- New IPC channels: add in `main.js`, expose in `preload.js`, document in this file
-- Store keys: prefer `electron-store` over `localStorage` for desktop-level config
-- Tests: `npm test` for JS changes; Lua/game behaviour needs manual testing
+**Rules:**
+
+- Mod runs only when `isAuthority()` (SP / host / dedicated).
+- Export **aggregate** JSON — no huge coordinate dumps.
+- Collectors use **`pcall`** on density / PF APIs (mod conflicts).
 
 ---
 
-**Questions?** Check the [full documentation](../docs/README.md) or open a GitHub issue.
+## Repository layout
+
+```
+FarmHub/
+├── docs/                         # Manuals, CHANGELOG, SECURITY
+├── wiki/                         # GitHub wiki source
+├── FS25_FarmDashboard_App/
+│   └── FS25_FarmDashboard_App/
+│       ├── main.js               # Electron + Express + FTP + IPC
+│       ├── preload.js            # farmDashAPI bridge
+│       ├── dataMerger.js         # Lua + XML merge
+│       ├── livestockDetail.js    # Pen detail files
+│       ├── serverDataCache.js    # Offline snapshot (local servers)
+│       ├── lanCredentialPolicy.js
+│       ├── package.json
+│       ├── build/installer.nsh
+│       └── web/
+│           ├── index.html, setup.html, simhub.html
+│           └── assests/js/       # note: typo "assests"
+│               ├── app.js
+│               ├── rules-engine.js
+│               ├── field-rules-cache.js
+│               ├── field-clusters.js
+│               ├── realtime-connector.js
+│               └── modules/
+├── FS25_FarmDashboard_Mod/
+│   └── FS25_FarmDashboard_Mod/
+│       ├── modDesc.xml
+│       └── src/
+│           ├── FarmDashboard.lua
+│           ├── FarmDashboardDataCollector.lua
+│           └── collectors/
+└── tools/
+    ├── Zip-FarmDashboardMod.ps1
+    └── Export-ModStoreImages.ps1
+```
+
+---
+
+## Quick start
+
+```bash
+cd FS25_FarmDashboard_App/FS25_FarmDashboard_App
+npm install
+npm start          # dev
+npm test           # Jest
+npm run dist       # NSIS → %LOCALAPPDATA%\fs25-farm-dashboard-electron-out\
+```
+
+Mod release zip:
+
+```powershell
+.\tools\Zip-FarmDashboardMod.ps1
+```
+
+---
+
+## Lua mod
+
+| File | Role |
+|------|------|
+| `FarmDashboard.lua` | `addModEventListener`, authority gate, `addUpdateable` |
+| `FarmDashboardDataCollector.lua` | Staggered slots over `collectionCycleMs` |
+| `collectors/*.lua` | One data domain per collector |
+
+| Collector | Exports (examples) |
+|-----------|-------------------|
+| `AnimalDataCollector` | Herds, fills, detail hooks |
+| `VehicleDataCollector` | Fleet, fuel, damage |
+| `FieldDataCollector` | Growth, PF N/pH, windrows, bales, `baleCountOnField`, suggestions |
+| `WeatherDataCollector` | Conditions |
+| `FinanceDataCollector` | Money, loan |
+| `EconomyDataCollector` | Prices, stations |
+| `ProductionDataCollector` | Chains, slots |
+
+**Output path:**
+
+```
+Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\<save>\data.json
+```
+
+**JSON:** custom `toJSON` — only acyclic plain tables (no userdata/functions).
+
+---
+
+## Electron main (`main.js`)
+
+- HTTP + WebSocket on **8766**
+- `getLanBindAddress()` → `127.0.0.1` vs `0.0.0.0`
+- LAN middleware: Basic auth, allowlist, `lanCredentialPolicy`
+- `startLocalWatching()` / FTP coordinator
+- `mergeAndBroadcast()` → `dataMerger.mergeData()`
+- `schedulePersistServerCache()` — local servers only; FTP skips hydrate
+- IPC handlers for settings, mod config, image export, updater
+
+---
+
+## Data merge (`dataMerger.js`)
+
+| Domain | Precedence |
+|--------|------------|
+| Animals | Lua live |
+| Fields | Lua agronomy, `harvestReady`, suggestions; XML base rows |
+| Vehicles | Union; Lua state wins |
+| Economy | Merge live + history |
+
+Merged payload includes `dataTimestamps` (`lastLuaReceivedAt`, `liveNewerThanXml`, etc.).
+
+**Field merge highlights:**
+
+- Lua wins `harvestReady`, `needsWork`, suggestions when both exist
+- Anti-regress: cache last good values when live slice missing
+
+---
+
+## Web client
+
+**Entry:** `app.js` → `window.dashboard` (`LivestockDashboard` + modules).
+
+| Module | Role |
+|--------|------|
+| `apiStorage.js` | Servers, farms, `/api/*`, cache hydrate |
+| `fields.js` | Cards, forage badges, PF, rules display |
+| `rules-engine.js` | `getLocalFieldSuggestion()` |
+| `field-rules-cache.js` | Cached rule output per field |
+| `realtime-connector.js` | WebSocket; **serverId** guard (3.9) |
+| `farm-dashboard-bg.js` | Section background crossfade |
+
+**Polling:** default ~1s `GET /api/data`; WebSocket for push updates.
+
+---
+
+## Rules engine
+
+**File:** `web/assests/js/rules-engine.js`  
+**Runs in browser** — no external API.
+
+```javascript
+import { getLocalFieldSuggestion, fieldShowsNonBaleForageBadges } from './rules-engine.js';
+```
+
+Notable constants:
+
+| Constant | Value | Use |
+|----------|-------|-----|
+| `MIN_FORAGE_WORKFLOW_LITERS` | 2000 | Forage badges + baling workflow |
+| `MIN_WINDROW_LITERS` | 120 | Small windrow noise |
+| PF N (growing) | &lt; 60% target | Needs nitrogen |
+| PF N (fallow) | &lt; 95% target | Prep nitrogen |
+
+Priority tie-break (maintenance): lime → N → weeds → roll.
+
+---
+
+## i18n
+
+| Step | Command |
+|------|---------|
+| Add key | `web/locales/messages/en.json` |
+| Sync locales | `npm run i18n:sync` |
+| Build bundle | `npm run i18n:build` |
+| Verify | `npm run i18n:verify` |
+
+**Never** hand-edit `translations.json`.
+
+---
+
+## Build & CI
+
+| Script | Purpose |
+|--------|---------|
+| `npm run dist` | NSIS installer (output outside repo) |
+| `npm run pack` | Unpacked test build |
+| `npm run verify:electron-pack` | CI file list gate |
+| `npm run unlock-install` | Release installer file locks |
+
+**GitHub Actions:** `npm ci`, `npm test`, `verify:electron-pack`, `i18n:verify`, `npm audit`.
+
+**Release:**
+
+1. Bump `package.json` + `modDesc.xml`
+2. `npm run dist` + `Zip-FarmDashboardMod.ps1`
+3. GitHub Release: `.exe` + `FS25_FarmDashboard.zip` + notes from `docs/GITHUB_RELEASE_v3.9.0.md`
+
+---
+
+## Debugging
+
+| Symptom | Check |
+|---------|--------|
+| Empty fields | `data.json` timestamp; `dataTimestamps.lastLuaReceivedAt` |
+| Wrong server data | `activeServerId` in realtime payload |
+| FTP stale | FTP skips disk cache by design |
+| LAN 401 | Credentials + `lanCredentialPolicy` |
+| Merge wrong | `liveNewerThanXml`; `dataMerger` field branch |
+
+**Paths:**
+
+```
+modSettings\FS25_FarmDashboard\<save>\data.json
+%APPDATA%\fs25-farm-dashboard\
+```
+
+DevTools: **Ctrl+Shift+I** in Electron window.
+
+---
+
+## Known gaps (v3.9 audit)
+
+| # | Issue |
+|---|--------|
+| 1 | Livestock Statistics / Genetics tabs not wired |
+| 2 | `debugBaleScan` UI may not persist — edit `config.xml` |
+| 3 | Fields API error strip auto-retries only (no manual button) |
+| 4 | Notification empty state English-only |
+| 5 | Mod version mismatch banner not implemented |
+
+Full list: [AUDIT_v3.9_PREFINAL.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/AUDIT_v3.9_PREFINAL.md)
+
+---
+
+## Contributing conventions
+
+- Match existing IPC names and merge semantics
+- **Additive** JSON fields only from collectors
+- New IPC: `main.js` + `preload.js` + docs
+- New strings: `messages/en.json` → `i18n:sync`
+- Run `npm test` before PR
+- Lua/game behaviour: test **SP first**, then MP host
+
+---
+
+**Related:** [Releases & Upgrades](Releases-and-Upgrades) · [Security](Security-and-Network)
+
+*App **3.9.0**, mod **2.3.0.0***

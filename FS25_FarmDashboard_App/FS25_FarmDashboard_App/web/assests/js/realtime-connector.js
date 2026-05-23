@@ -410,6 +410,15 @@ class RealtimeConnector {
   }
 
   handleRealtimeData(raw) {
+    if (
+      raw &&
+      raw.type === "data" &&
+      raw.serverId != null &&
+      this.dashboard?.activeServerId != null &&
+      String(raw.serverId) !== String(this.dashboard.activeServerId)
+    ) {
+      return;
+    }
     const data = this.normalizeRealtimePayload(raw);
     if (!data) return;
 

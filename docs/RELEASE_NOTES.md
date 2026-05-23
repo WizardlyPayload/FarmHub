@@ -12,22 +12,38 @@ Use this file for **short copy-paste text** on GitHub Releases. The **full histo
 
 ### Description (copy-paste)
 
-**FS25 Farm Dashboard 3.9.0** is the **pre-final hardening** release for **Farming Simulator 25** — security, tests tied to production code, pasture telemetry semantics, setup validation, and docs/version alignment ahead of the **v4** updater promotion.
+**Full GitHub body (every feature since public 2.0.0):** **[GITHUB_RELEASE_v3.9.0.md](./GITHUB_RELEASE_v3.9.0.md)** — use that file for the release page. Short summary below.
 
-- **LAN security** — Rejects **default `admin` / `farmhub`**, **short passwords**, and **known-weak** passwords when **LAN access** is turned on. See [SECURITY.md](./SECURITY.md).
-- **DOM safety** — Shared **`escapeHtml`** helper; pasture modals and tables escape game-sourced names.
-- **Tests** — Realtime fan-out, dedupe keys, pasture warnings, setup `mapSaveError`, LAN policy, XSS smoke — all green under `npm test`.
-- **Pastures** — **Telemetry missing** vs **critical low stock** are distinct severities; counts are **head-aware** for LOD clusters.
-- **Setup** — Per-field validation, success state before redirect (browser setup path).
+---
 
-**Still the same great dashboard:** rules-first fields, windrows, unified Settings, FTP, LAN tablets (with strong creds). Full narrative: **[RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md)** · History: **[CHANGELOG.md](./CHANGELOG.md)** §**3.9.0**.
+**FS25 Farm Dashboard 3.9.0** — App **3.9.0** · Mod **2.3.0.0** · Canonical repo: **FarmHub** (replaces public [FS25-Farm-Dashboard](https://github.com/WizardlyPayload/FS25-Farm-Dashboard) **2.0.0**).
 
-1. **FS25 mod** (**2.3.0.0**) — copy into FS25 `mods`, enable on your save or server, **load the save once** with the mod active.
-2. **Windows desktop app** (**3.9.0**) — NSIS installer; dashboard at **http://localhost:8766**.
+#### Install first (mod → app)
 
-**Install order:** mod → enable & load save → then install/run the desktop app. See [README.md](../README.md) and [INSTALL.md](./INSTALL.md).
+1. **Mod** — Install `FS25_FarmDashboard.zip` into FS25 `mods`, enable on your save/server, **load the save once** so `data.json` exists.
+2. **App** — Install `FS25 Farm Dashboard Setup 3.9.0.exe`, open **http://localhost:8766** (or your PC LAN IP on a tablet).
+3. **Order:** mod → load save → desktop app. Guide: [INSTALL.md](./INSTALL.md).
 
-**Next step for maintainers:** updater QA (**3.9.0 → 4.0.0**) per **[UPDATER_QA.md](./UPDATER_QA.md)**.
+#### What’s new since public 2.0.0 (highlights)
+
+| Area | Highlights |
+|------|------------|
+| **Look & feel** | Section **background pictures** (crossfade per tab), **Theme** settings, **27 languages** |
+| **Fields** | **Rules engine** + cache; **field clusters** & exclusions; PF bars; **mulch → cultivate before seed**; **lime pH gap** |
+| **Forage & bales** | Windrow liters/type, loose straw/grass/hay probes, **bale count on field**, card badges, **2000 L** noise floor, rules aligned with badges |
+| **Livestock** | Detail API, LOD fan-out, escaped names |
+| **Pastures** | Telemetry vs critical stock severities |
+| **Vehicles** | Mod shop PNG export + **thumbnails** on cards |
+| **Data** | Lua+XML merge, staggered collectors, FTP sync/stagger, multi-farm, **offline cache** (local only), **serverId-safe realtime** |
+| **Settings** | Unified gear menu, SimHub page, section toggles |
+| **Security (3.9)** | LAN weak/default password block, DOM XSS sweep |
+| **Build** | NSIS, updater 3.9→4.0 ready, CI tests + i18n verify |
+
+**3.9-specific:** LAN credential policy, offline snapshot on close (FTP excluded), harvest/mulch/realtime fixes above.
+
+**Upgrade from 2.0.0:** [UPGRADE_FROM_FS25-Farm-Dashboard.md](./UPGRADE_FROM_FS25-Farm-Dashboard.md) · **Full list:** [GITHUB_RELEASE_v3.9.0.md](./GITHUB_RELEASE_v3.9.0.md) · **History:** [CHANGELOG.md](./CHANGELOG.md)
+
+**Maintainers:** updater QA **3.9 → 4.0** — [UPDATER_QA.md](./UPDATER_QA.md) · Narrative: [RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md)
 
 ### Where this release is documented
 

@@ -1089,6 +1089,7 @@ function FieldDataCollector:_collectImpl()
                 end
                 local gs             = fData.growthState
                 local gsName         = ftDesc.growthStateToName and ftDesc.growthStateToName[gs]
+                local gsNameLower    = gsName and string.lower(tostring(gsName)) or nil
                 
                 local minHarvest = ftDesc.minHarvestingGrowthState or fData.maxGrowthState
                 local maxHarvest = ftDesc.maxHarvestingGrowthState or fData.maxGrowthState
@@ -1101,6 +1102,16 @@ function FieldDataCollector:_collectImpl()
                 -- Withered: trust the engine name only. `gs > maxHarvestingGrowthState` matches post-harvest /
                 -- stubble / extra engine stages (e.g. maize gs 10 vs max harvest 7) and must NOT imply withered.
                 local isWitheredState = (gsName == "withered")
+                local isPostHarvestState = false
+                if ftUpper ~= "GRASS" and gsNameLower then
+                    if gsNameLower == "harvested"
+                        or gsNameLower == "cut"
+                        or gsNameLower == "mown"
+                        or gsNameLower == "mowed"
+                        or gsNameLower:find("stubble", 1, true) then
+                        isPostHarvestState = true
+                    end
+                end
 
                 --- Arable: the Giants *window* minHarvest..maxHarvest can span several indices. Treating any index
                 --- in that band as "ready" made barley show harvest at 7/8 while the bar is still growing. Align with
@@ -1116,8 +1127,9 @@ function FieldDataCollector:_collectImpl()
                         inHarvestWindow = true
                     end
                 end
-                if gsName == "harvested" then
+                if isPostHarvestState then
                     fData.isHarvested  = true
+                    fData.harvestReady = false
                     fData.growthLabel  = "harvested"
                     fData.stateName    = "Harvested"
                 elseif ftUpper ~= "GRASS" and isWitheredState then
@@ -1935,7 +1947,7 @@ function FieldDataCollector:_collectImpl()
             --- Align "needs baling / clear forage" step with straw+grass+hay presence (not cereal swath-only heaps).
             fData.needsBaling = fData.hasLooseForage
             --- Below this combined bale-relevant volume (straw + grass + hay windrows, engine litres), skip forage / baling workflow — trace residue only.
-            local FORAGE_WORKFLOW_MIN_L = 100
+            local FORAGE_WORKFLOW_MIN_L = 2000
             local combinedForageL = aggS + aggG + aggH
             if combinedForageL < FORAGE_WORKFLOW_MIN_L then
                 fData.hasLooseStraw = false

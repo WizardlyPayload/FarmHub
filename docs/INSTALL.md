@@ -2,6 +2,8 @@
 
 Read these steps **in order**. Do **not** install the Windows dashboard app until the mod has been used in **every** save where you want the dashboard.
 
+**Upgrading from the old public repo?** See [UPGRADE_FROM_FS25-Farm-Dashboard.md](./UPGRADE_FROM_FS25-Farm-Dashboard.md) for what changed since app **2.0.0** / mod **2.0.0.0**.
+
 ### Why the mod has to come before the dashboard
 
 The **Windows app is not inside the game**. It cannot read your farm directly from FS25. It only reads a file called `data.json` that the **mod** creates and updates while you play (or while a dedicated server runs).

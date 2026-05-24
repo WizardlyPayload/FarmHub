@@ -198,7 +198,7 @@ For tablets, you can hide the Settings gear and lock the interface read-only by 
 =======
 Complete guide to the **FS25 Farm Dashboard** UI. For illustrated screenshots see [USER_MANUAL.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/USER_MANUAL.md) in `docs/`.
 
-**Versions:** app **3.9.0**, mod **2.3.0.0**
+**Versions:** app **4.0.0**, mod **2.3.0.0**
 
 ---
 
@@ -459,5 +459,5 @@ Changes require **restarting FS25** after saving from the app or editing by hand
 
 **Problems?** [Troubleshooting](Troubleshooting) · **Setup:** [Installation Guide](Installation-Guide)
 
-*Aligned with app **3.9.0**, mod **2.3.0.0***
+*Aligned with app **4.0.0**, mod **2.3.0.0***
 >>>>>>> Stashed changes

@@ -250,7 +250,7 @@ If you find a **security vulnerability**:
 
 How **FarmHub** exposes the dashboard on your network and how to use it safely. Canonical detail: [SECURITY.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/SECURITY.md).
 
-**App version:** 3.9.0
+**App version:** 4.0.0
 
 ---
 
@@ -410,7 +410,7 @@ The Lua mod:
 
 **Do not** open public issues for exploitable vulnerabilities.
 
-Contact **JoshWalki** or **WizardlyPayload** privately via GitHub with version **3.9.0** and platform **Windows**.
+Contact **JoshWalki** or **WizardlyPayload** privately via GitHub with version **4.0.0** and platform **Windows**.
 
 ---
 

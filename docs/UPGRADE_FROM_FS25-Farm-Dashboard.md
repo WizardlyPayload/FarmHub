@@ -9,7 +9,7 @@ Use this document to understand **what changed** and **what was added** since th
 ## 1) Repository + release channels
 
 - **Repo name changed**: public repo → **FarmHub** (this repo).
-- **Release line**: app **3.9.0** / mod **2.3.0.0** (current) vs public **2.0.0**.
+- **Release line**: app **4.0.0** / mod **2.3.0.0** (current) vs public **2.0.0**.
 - **Docs consolidated**: everything lives under `docs/` with a master index in `docs/README.md`.
 
 ---
@@ -65,7 +65,7 @@ The public repo docs were expanded and split for maintainers:
 
 1. Install the **new mod** (`FS25_FarmDashboard.zip`, version **2.3.0.0**).
 2. Load each save once with the mod enabled.
-3. Install the **new app** (**3.9.0**), open **http://localhost:8766**.
+3. Install the **new app** (**4.0.0**), open **http://localhost:8766**.
 4. For FTP servers, re‑enter credentials and save slots in **Settings → Servers & saves**.
 
 ---

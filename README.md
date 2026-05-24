@@ -4,7 +4,7 @@ Desktop companion for **Farming Simulator 25**: a Windows app plus an in-game mo
 
 **Releases:** [github.com/WizardlyPayload/FarmHub/releases](https://github.com/WizardlyPayload/FarmHub/releases)
 
-**Current line:** App **3.9.0** · Mod **2.3.0.0** (`modDesc.xml` and Lua aligned).
+**Current line:** App **4.0.0** · Mod **2.3.0.0** (`modDesc.xml` and Lua aligned).
 
 ---
 

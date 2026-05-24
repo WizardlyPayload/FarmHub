@@ -43,7 +43,7 @@ FarmHub is a **mature, modular** baseline: clear separation between **Lua export
 
 | Component | Version | File / symbol |
 | --------- | ------- | --------------- |
-| Desktop app | **3.9.0** | `FS25_FarmDashboard_App/…/package.json` |
+| Desktop app | **4.0.0** | `FS25_FarmDashboard_App/…/package.json` |
 | FS25 Farm Dashboard mod | **2.3.0.0** | `modDesc.xml`, `FarmDashboard.VERSION` in `FarmDashboard.lua` |
 
 **Recommendation for every release:** bump **app** version in `package.json` for the Windows installer line; bump **mod** version when the Lua wire format or shipped behaviour changes — keep [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md) and [USER_MANUAL.md](./USER_MANUAL.md) in sync.

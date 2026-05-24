@@ -1,10 +1,10 @@
--- FS25 FarmDashboard | FarmDashboard.lua | v2.3.0 (Plan v5)
+-- FS25 FarmDashboard | FarmDashboard.lua | v3.0.0 (Plan v5)
 -- Authors: JoshWalki, WizardlyPayload
 
 FarmDashboard = {}
 FarmDashboard.MOD_NAME = "FS25_FarmDashboard"
 FarmDashboard.MOD_DIR = _G.g_currentModDirectory
-FarmDashboard.VERSION = "2.3.0.0"
+FarmDashboard.VERSION = "3.0.0.0"
 FarmDashboard.UPDATE_INTERVAL = 10000
 FarmDashboard.PORT = 8766
 FarmDashboard.readyAt = nil

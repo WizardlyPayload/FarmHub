@@ -16,7 +16,7 @@ All notable changes to this project are recorded here. For GitHub release blurbs
 
 ## 4.0.0 — Stable line: auto-update + mod version awareness
 
-**App:** `4.0.0` (`package.json`) · **Mod:** `2.3.0.0` (unchanged; optional zip refresh for `serverInfo.modVersion` export).
+**App:** `4.0.0` (`package.json`) · **Mod:** `3.0.0.0` (`modDesc.xml` + Lua; app requires **3.0.0.0+** via `modVersionPolicy.js`).
 
 Narrative: **[RELEASE_v4.0.0.md](./RELEASE_v4.0.0.md)** · GitHub body: **[GITHUB_RELEASE_v4.0.0.md](./GITHUB_RELEASE_v4.0.0.md)**.
 
@@ -29,7 +29,7 @@ Narrative: **[RELEASE_v4.0.0.md](./RELEASE_v4.0.0.md)** · GitHub body: **[GITHU
 ### Mod version badge
 
 - Lua: `serverInfo.modVersion` from `FarmDashboard.VERSION` on each `data.json` write.
-- Node: **`modVersionPolicy.js`** (`MIN_MOD_VERSION` **2.3.0.0**) attached to merged API payloads as **`modVersionCheck`**.
+- Node: **`modVersionPolicy.js`** (`MIN_MOD_VERSION` **3.0.0.0**) attached to merged API payloads as **`modVersionCheck`**.
 - UI: unobtrusive navbar badge when mod is **outdated** or **unknown** (legacy mod without version export).
 
 ### Tests & docs

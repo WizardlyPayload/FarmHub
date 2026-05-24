@@ -31,15 +31,15 @@ describe('assessModVersion', () => {
     });
 
     test('newer mod is ok', () => {
-        const res = assessModVersion('2.4.0.0');
+        const res = assessModVersion('3.0.0.1');
         expect(res.status).toBe('ok');
-        expect(res.actual).toBe('2.4.0.0');
+        expect(res.actual).toBe('3.0.0.1');
     });
 
     test('older mod is outdated', () => {
-        const res = assessModVersion('2.2.0.0');
+        const res = assessModVersion('2.3.0.0');
         expect(res.status).toBe('outdated');
-        expect(res.actual).toBe('2.2.0.0');
+        expect(res.actual).toBe('2.3.0.0');
         expect(res.expectedMin).toBe(MIN_MOD_VERSION);
     });
 

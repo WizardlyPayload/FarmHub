@@ -4,7 +4,7 @@
 // the minimum version this desktop app release supports.
 
 /** Minimum FS25 Farm Dashboard mod version for full compatibility with this app line. */
-const MIN_MOD_VERSION = '2.3.0.0';
+const MIN_MOD_VERSION = '3.0.0.0';
 
 /**
  * @param {string|null|undefined} version

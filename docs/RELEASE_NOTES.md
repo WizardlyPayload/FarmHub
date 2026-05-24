@@ -4,7 +4,7 @@ Use this file for **short copy-paste text** on GitHub Releases. The **full histo
 
 ---
 
-## Current shipping line: **4.0.0** (app) / **2.3.0.0** (mod — `modDesc.xml` matches Lua)
+## Current shipping line: **4.0.0** (app) / **3.0.0.0** (mod — `modDesc.xml` matches Lua)
 
 ### GitHub release title (example)
 
@@ -16,7 +16,7 @@ Use this file for **short copy-paste text** on GitHub Releases. The **full histo
 
 ---
 
-**FS25 Farm Dashboard 4.0.0** — App **4.0.0** · Mod **2.3.0.0** · Canonical repo: **FarmHub**.
+**FS25 Farm Dashboard 4.0.0** — App **4.0.0** · Mod **3.0.0.0** · Canonical repo: **FarmHub**.
 
 #### Updating from 3.9.0
 

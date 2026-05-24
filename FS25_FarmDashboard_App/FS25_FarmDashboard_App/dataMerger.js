@@ -1,4 +1,4 @@
-// FS25 FarmDashboard | dataMerger.js | v2.0.0
+// FS25 FarmDashboard | dataMerger.js | v4.0.0
 
 /**
  * dataMerger.js  —  Merge Lua live data + XML savegame data
@@ -16,6 +16,8 @@
  *  come from Lua only (live game). XML suggestions are used only when there is no Lua
  *  match (savegame-only / HTTP path). Never merge two suggestion lists.
  */
+
+const { assessModVersion } = require('./modVersionPolicy.js');
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -187,6 +189,16 @@ function applyFieldLiveCacheAntiRegress(xmlFields, fieldLiveCache, lastLuaAt, la
     });
 }
 
+function attachModVersionCheck(obj) {
+    if (!obj || obj.luaAvailable !== true) {
+        return obj;
+    }
+    const actual = obj.serverInfo && obj.serverInfo.modVersion != null
+        ? obj.serverInfo.modVersion
+        : null;
+    return { ...obj, modVersionCheck: assessModVersion(actual) };
+}
+
 function attachDataTimestamps(obj, options) {
     const lastLuaAt = options.lastLuaAt || null;
     const lastXmlAt = options.lastXmlAt || null;
@@ -197,7 +209,7 @@ function attachDataTimestamps(obj, options) {
         const b = Date.parse(lastXmlAt);
         if (!Number.isNaN(a) && !Number.isNaN(b)) liveNewerThanXml = a > b;
     }
-    return {
+    const withTimestamps = {
         ...obj,
         dataTimestamps: {
             lastLuaReceivedAt: lastLuaAt,
@@ -206,6 +218,7 @@ function attachDataTimestamps(obj, options) {
             liveNewerThanXml,
         },
     };
+    return attachModVersionCheck(withTimestamps);
 }
 
 function mergeData(luaData, xmlData, options = {}) {

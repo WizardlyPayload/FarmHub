@@ -575,6 +575,7 @@ export function applyApiMergedDataPayload(dashboard, data) {
   dashboard.dataSource = data.dataSource || "unknown";
   dashboard.xmlAvailable = data.xmlAvailable || false;
   dashboard.luaAvailable = data.luaAvailable || false;
+  dashboard.modVersionCheck = data.modVersionCheck || null;
   dashboard.money = data.money || 0;
   dashboard.gameSettings = data.gameSettings || data.settings || {};
   dashboard.husbandryData = ensureHusbandryArray(data.animals);

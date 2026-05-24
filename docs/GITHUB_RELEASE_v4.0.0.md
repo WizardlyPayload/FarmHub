@@ -6,7 +6,7 @@ Use the markdown **below the line** as the **Release description** on GitHub for
 
 | File | Required |
 |------|----------|
-| `FS25 Farm Dashboard Setup 4.0.0.exe` | Yes |
+| `FS25-Farm-Dashboard-Setup-4.0.0.exe` | Yes — **exact name** must match `latest.yml` |
 | `latest.yml` | **Yes** — auto-update will not work without it |
 | `FS25_FarmDashboard.zip` | Yes (mod **3.0.0.0**) |
 

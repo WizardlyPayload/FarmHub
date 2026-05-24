@@ -12,6 +12,15 @@ The Windows packaged app uses `electron-updater` ([`app-updater.js`](../FS25_Far
 
 - Console: `[updater] electron-updater load failed` — dependency or signing issue.
 - `update-error` / GitHub API errors — network, wrong `publish` URL, or private repo without token (not used in this project by default).
+- **`404` on download** — the **`.exe` filename on the GitHub Release must exactly match** the `path:` (and `files[].url`) in **`latest.yml`**. Do not rename the installer when uploading (no spaces → dots, no manual renames). After `npm run dist`, upload **`FS25-Farm-Dashboard-Setup-4.0.0.exe`** and **`latest.yml`** from the **same** build output folder without editing either file.
+
+## Publish checklist (avoid 404)
+
+From `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\` after `npm run dist`:
+
+1. Open **`latest.yml`** — note the `path:` value (e.g. `FS25-Farm-Dashboard-Setup-4.0.0.exe`).
+2. Upload that **exact** `.exe` file (same name, same folder build) plus **`latest.yml`** to the GitHub Release.
+3. Do **not** upload `FS25 Farm Dashboard Setup 4.0.0.exe` (spaces) or `FS25.Farm.Dashboard.Setup.4.0.0.exe` (dots) unless you regenerate `latest.yml` to match.
 
 ## Notes
 

@@ -80,7 +80,8 @@
     ],
     "win": {
       "target": "nsis",
-      "icon": "icon.ico"
+      "icon": "icon.ico",
+      "artifactName": "FS25-Farm-Dashboard-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,

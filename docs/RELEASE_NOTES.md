@@ -12,7 +12,7 @@ Use this file for **short copy-paste text** on GitHub Releases. The **full histo
 
 ### Description (copy-paste)
 
-**Full GitHub body:** **[GITHUB_RELEASE_v4.0.0.md](./GITHUB_RELEASE_v4.0.0.md)** — use that file for the release page. Short summary below.
+**Full GitHub body (copy-paste for v4.0.0 release page):** **[GITHUB_RELEASE_v4.0.0.md](./GITHUB_RELEASE_v4.0.0.md)**
 
 ---
 

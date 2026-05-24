@@ -1,61 +1,87 @@
 # FS25 Farm Dashboard
 
-Desktop companion for **Farming Simulator 25**: a Windows app plus an in-game mod that exports live farm data to a browser dashboard (local disk or FTP). **Repository root on GitHub:** **FarmHub**.
-
-**Releases:** [github.com/WizardlyPayload/FarmHub/releases](https://github.com/WizardlyPayload/FarmHub/releases)
-
-**Current line:** App **4.0.0** · Mod **3.0.0.0** (`modDesc.xml` and Lua aligned).
+Real-time farm management dashboard for **Farming Simulator 25** — a Windows desktop app plus an in-game mod that streams live fields, livestock, vehicles, economy, and more to your browser.
 
 ---
 
-## Documentation (single folder)
+## Download (start here)
 
-**Everything is under [`docs/`](docs/README.md):** install order, changelog, security, release notes, authors.
+### ➡️ [**Get the latest release — app + mod**](https://github.com/WizardlyPayload/FarmHub/releases)
 
-| Quick link | |
-|------------|--|
-| **GitHub Wiki** | [wiki/](wiki/Home.md) (source for [project wiki](https://github.com/WizardlyPayload/FarmHub/wiki)) |
-| **Install (mod first)** | [docs/INSTALL.md](docs/INSTALL.md) |
-| **Doc index** | [docs/README.md](docs/README.md) |
-| **Complete how-to + screenshots** | [docs/USER_MANUAL.md](docs/USER_MANUAL.md) |
-| **Changelog** | [docs/CHANGELOG.md](docs/CHANGELOG.md) |
-| **GitHub release blurbs** | [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md) |
-| **Upgrade from old public repo** | [docs/UPGRADE_FROM_FS25-Farm-Dashboard.md](docs/UPGRADE_FROM_FS25-Farm-Dashboard.md) |
-| **Authors** | [docs/AUTHORS.md](docs/AUTHORS.md) |
+| Download from Releases | Version |
+|------------------------|---------|
+| **`FS25 Farm Dashboard Setup 4.0.0.exe`** | Windows app |
+| **`FS25_FarmDashboard.zip`** | FS25 mod |
+
+**Current stable line:** App **4.0.0** · Mod **3.0.0.0**
+
+Install **mod first**, load your save once, then install the app. Step-by-step instructions are on the **[Releases page](https://github.com/WizardlyPayload/FarmHub/releases)** and in **[docs/INSTALL.md](docs/INSTALL.md)**.
+
+Open the dashboard at **[http://localhost:8766](http://localhost:8766)** after setup.
 
 ---
 
-## What’s in the repo
+## Quick install
+
+1. **Mod** — Put **`FS25_FarmDashboard.zip`** in `Documents\My Games\FarmingSimulator2025\mods\`, enable on your save, **load the save once**.
+2. **App** — Run **`FS25 Farm Dashboard Setup 4.0.0.exe`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
+3. **Configure** — **Settings → Servers & saves** (local path or FTP for dedicated servers).
+
+**Full guide:** [docs/USER_MANUAL.md](docs/USER_MANUAL.md) · [GitHub Wiki](https://github.com/WizardlyPayload/FarmHub/wiki)
+
+---
+
+## About this project (fork & lineage)
+
+This repository (**[FarmHub](https://github.com/WizardlyPayload/FarmHub)**) is **continued development** of Josh Walki’s Farm Dashboard — not a separate product.
+
+| Project | What it is |
+|---------|------------|
+| **[JoshWalki / FarmDashboard](https://github.com/JoshWalki/FarmDashboard)** | Original FS25 mod + web dashboard (**Josh Walki**) |
+| **[WizardlyPayload / FS25-Farm-Dashboard](https://github.com/WizardlyPayload/FS25-Farm-Dashboard/releases)** | Public **2.0.0** release — Electron desktop fork of Josh’s work |
+| **[WizardlyPayload / FarmHub](https://github.com/WizardlyPayload/FarmHub/releases)** *(this repo)* | **4.0.0** stable line — security, FTP/multi-server, field rules, auto-update, mod version checks |
+
+**Coming from 2.0.0 or Josh’s repo?** See **[docs/UPGRADE_FROM_FS25-Farm-Dashboard.md](docs/UPGRADE_FROM_FS25-Farm-Dashboard.md)** for what changed.
+
+**Authors:** **[JoshWalki](https://github.com/JoshWalki)** (Josh) — original concept & FS25 mod · **WizardlyPayload** — Electron app, maintenance, releases · [docs/AUTHORS.md](docs/AUTHORS.md)
+
+---
+
+## What you get in 4.0.0
+
+- **Live dashboard** — livestock, pastures, vehicles, fields, economy, productions, weather (port **8766**).
+- **Local + FTP** — single-player / LAN host on disk, or dedicated server over FTP.
+- **Offline field rules** — suggested next steps from merged game data (no cloud service).
+- **Windrows, bales, forage badges** — field workflow hints aligned with in-game state.
+- **27 languages**, themes, section backgrounds, unified Settings.
+- **Auto-update** (Windows app) and **mod version badge** when the in-game mod is behind.
+
+**Release notes (full public copy):** [docs/GITHUB_RELEASE_v4.0.0.md](docs/GITHUB_RELEASE_v4.0.0.md) · **History:** [docs/CHANGELOG.md](docs/CHANGELOG.md)
+
+---
+
+## Documentation
+
+| Link | |
+|------|--|
+| **[Releases / downloads](https://github.com/WizardlyPayload/FarmHub/releases)** | App installer + mod zip |
+| **[Wiki](https://github.com/WizardlyPayload/FarmHub/wiki)** | Install, user manual, troubleshooting |
+| [docs/INSTALL.md](docs/INSTALL.md) | Short install order |
+| [docs/USER_MANUAL.md](docs/USER_MANUAL.md) | Complete how-to |
+| [docs/SECURITY.md](docs/SECURITY.md) | LAN access & passwords |
+| [docs/README.md](docs/README.md) | Full doc index |
+
+---
+
+## Repository layout (developers)
 
 | Path | Role |
 |------|------|
-| `FS25_FarmDashboard_Mod/` | FS25 mod **sources** (Lua). **Release zip** (`tools\Zip-FarmDashboardMod.ps1`): only `modDesc.xml`, `icon.png`, `src/` at archive root. **In `mods\`:** use **`FS25_FarmDashboard.zip`** or a folder **`FS25_FarmDashboard`** with the same three at folder root. |
-| `FS25_FarmDashboard_App/` | Electron app + web UI + merger + FTP |
-| `tools/` | **All** build helpers — [`tools/README.md`](tools/README.md) · Electron npm scripts use [`tools/app/`](tools/app/) |
+| `FS25_FarmDashboard_Mod/` | FS25 mod (Lua) — release as **`FS25_FarmDashboard.zip`** |
+| `FS25_FarmDashboard_App/` | Electron app + web UI + merge/FTP layer |
+| `tools/` | Build scripts — [tools/README.md](tools/README.md) |
 
-### Other mods in this repo
-
-**`FS25_RealisticLivestockRM/`** is a separate Farming Simulator 25 mod (not required for Farm Dashboard). It has its own lifecycle, releases, and issues — only bundle or ship it when you intend to maintain that product too.
-
----
-
-## Continuous integration
-
-On push/PR to **`main`**, **`master`**, or **`develop`**, GitHub Actions runs **`npm ci`**, **`npm test`**, **`npm run verify:electron-pack`**, **`npm run i18n:verify`**, and **`npm audit --omit=dev`** in **`FS25_FarmDashboard_App/FS25_FarmDashboard_App/`**. See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
-
----
-
-## Install order (short)
-
-1. Install the **mod** into FS25 `mods` (zip **`FS25_FarmDashboard.zip`** or folder **`FS25_FarmDashboard`**), enable it, **load the save** once.  
-2. Install the **Farm Dashboard** `.exe` from Releases (or your build).  
-3. Open **Settings → Servers & saves** if paths or FTP need adjustment.
-
-Details: **[docs/INSTALL.md](docs/INSTALL.md)**.
-
----
-
-## Build the Windows app (developers)
+**Build the Windows installer:**
 
 ```bash
 cd FS25_FarmDashboard_App/FS25_FarmDashboard_App
@@ -63,21 +89,9 @@ npm install
 npm run dist
 ```
 
-Default **`npm run dist`** (via [`tools/app/run-electron-builder.mjs`](tools/app/run-electron-builder.mjs)) writes the installer under **`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out`** to avoid file locks on `app.asar` inside the repo. In-repo output: **`npm run dist:in-repo`** → `FS25_FarmDashboard_App/electron-pack-out`. See **[docs/CHANGELOG.md](docs/CHANGELOG.md)** §**3.9.0** and §**3.0.0**. Script index: **[tools/README.md](tools/README.md)**.
+Default output: `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\`
 
-```bash
-npm start
-```
-
-Run unpacked dev build without packaging.
-
----
-
-## Git workflow
-
-Use **Git** or **GitHub Desktop** in your clone of **FarmHub**. Commit from your machine; do not rely on custom sync scripts—mirror trees manually if you keep a second working copy.
-
-Publishing a release: attach the **NSIS `.exe`** and **`FS25_FarmDashboard.zip`** (built with [`tools/Zip-FarmDashboardMod.ps1`](tools/Zip-FarmDashboardMod.ps1) — **only** `modDesc.xml`, `icon.png`, `src/` at zip root). Blurb text: **[docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)**.
+CI on `main` runs tests, electron-pack verify, and i18n verify — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---
 
@@ -85,13 +99,13 @@ Publishing a release: attach the **NSIS `.exe`** and **`FS25_FarmDashboard.zip`*
 
 | Issue | Try |
 |--------|-----|
-| “Waiting for data” | FS25 ran with mod enabled; check paths/FTP in Settings |
-| Port **8766** in use | Close other apps using the port; restart the dashboard app |
-| LAN tablet | Enable LAN in Settings; set Basic Auth + allowlist — **[docs/SECURITY.md](docs/SECURITY.md)** |
+| “Waiting for data” | Mod enabled; save loaded once; check path in Settings |
+| Port **8766** in use | Close other apps on that port; restart Farm Dashboard |
+| LAN tablet | Enable LAN in Settings; strong password — [docs/SECURITY.md](docs/SECURITY.md) |
+| Mod version badge | Update **`FS25_FarmDashboard.zip`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases) |
 
 ---
 
-## Credits & licence
+## Licence & credits
 
-**JoshWalki** & **WizardlyPayload** — **[docs/AUTHORS.md](docs/AUTHORS.md)**.  
-Terms: **[LICENSE](LICENSE)** (all rights reserved unless you negotiate otherwise).
+**JoshWalki** & **WizardlyPayload** — [docs/AUTHORS.md](docs/AUTHORS.md) · [LICENSE](LICENSE)

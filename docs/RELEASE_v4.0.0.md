@@ -1,7 +1,7 @@
 # FS25 Farm Dashboard — Release **v4.0.0** (stable line)
 
 **Desktop app:** `4.0.0` (`FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json`)  
-**FS25 mod:** `2.3.0.0` (`modDesc.xml` + `FarmDashboard.VERSION` in Lua — unchanged from 3.9; optional zip refresh if you ship the mod-version export)
+**FS25 mod:** `3.0.0.0` (`modDesc.xml` + `FarmDashboard.VERSION` in Lua — app requires **3.0.0.0+**)
 
 **Prior line:** [RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md) (pre-final hardening + updater baseline).
 
@@ -43,8 +43,8 @@ Copy-paste release body: **[GITHUB_RELEASE_v4.0.0.md](./GITHUB_RELEASE_v4.0.0.md
 | Artifact | Value |
 | -------- | ----- |
 | `package.json` / `package-lock.json` | **4.0.0** |
-| `modDesc.xml` / `FarmDashboard.VERSION` | **2.3.0.0** (unchanged) |
-| `modVersionPolicy.js` → `MIN_MOD_VERSION` | **2.3.0.0** |
+| `modDesc.xml` / `FarmDashboard.VERSION` | **3.0.0.0** |
+| `modVersionPolicy.js` → `MIN_MOD_VERSION` | **3.0.0.0** |
 | Installer filename | `FS25 Farm Dashboard Setup 4.0.0.exe` |
 
 ---

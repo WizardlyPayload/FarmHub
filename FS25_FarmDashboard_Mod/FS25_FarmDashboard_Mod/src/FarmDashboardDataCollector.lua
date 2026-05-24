@@ -1448,6 +1448,9 @@ function FarmDashboardDataCollector:beginDeferredJsonWrite(data)
         data.serverInfo.animalMode = self._animalMode
     end
     data.serverInfo.idScheme = self._idScheme
+    if _G.FarmDashboard and _G.FarmDashboard.VERSION then
+        data.serverInfo.modVersion = _G.FarmDashboard.VERSION
+    end
     -- Plan v5 Phase 0: schemaVersion + serverTimeSec.
     data.schemaVersion = DATA_SCHEMA_VERSION
     if data.serverTimeSec == nil then

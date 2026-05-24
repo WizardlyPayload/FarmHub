@@ -39,6 +39,7 @@
     "files": [
       "main.js",
       "lanCredentialPolicy.js",
+      "modVersionPolicy.js",
       "app-updater.js",
       "preload.js",
       "xmlCollector.js",

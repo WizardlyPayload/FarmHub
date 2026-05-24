@@ -472,6 +472,7 @@ class RealtimeConnector {
     if (data.dataSource)   this.dashboard.dataSource   = data.dataSource;
     if (data.xmlAvailable !== undefined) this.dashboard.xmlAvailable = data.xmlAvailable;
     if (data.luaAvailable !== undefined) this.dashboard.luaAvailable = data.luaAvailable;
+    if (data.modVersionCheck) this.dashboard.modVersionCheck = data.modVersionCheck;
     if (data.money !== undefined) this.dashboard.money = data.money;
     if (data.gameSettings || data.settings) {
       this.dashboard.gameSettings = data.gameSettings || data.settings || {};

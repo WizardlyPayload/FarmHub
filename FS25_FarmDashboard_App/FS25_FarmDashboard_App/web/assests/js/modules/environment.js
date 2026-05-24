@@ -77,6 +77,8 @@ export function updateNavbarConnectionStrip() {
 
   dsBadge.classList.remove("d-none");
 
+  this.updateNavbarModVersionBadge();
+
   if (src === "xml_only") {
     dsBadge.title =
       "Live data missing: enable mod FS25_FarmDashboard for this save (SP / host / dedicated). " +
@@ -86,6 +88,49 @@ export function updateNavbarConnectionStrip() {
       ? "Savegame XML, live mod data stream, and dashboard API are connected."
       : "Data source status for this save (dashboard API not connected yet).";
   }
+}
+
+/**
+ * Unobtrusive navbar badge when the in-game mod is older than this app expects.
+ */
+export function updateNavbarModVersionBadge() {
+  const badge = document.getElementById("navbar-mod-version");
+  const textEl = document.getElementById("navbar-mod-version-text");
+  if (!badge || !textEl) return;
+
+  const check = this.modVersionCheck;
+  if (!check || !this.luaAvailable) {
+    badge.classList.add("d-none");
+    return;
+  }
+
+  const status = check.status;
+  if (status === "ok") {
+    badge.classList.add("d-none");
+    return;
+  }
+
+  badge.classList.remove("d-none");
+  badge.className = "badge text-light";
+
+  if (status === "outdated") {
+    badge.classList.add("bg-warning", "text-dark");
+    textEl.textContent = t("nav.modVersionOutdatedShort", {
+      actual: check.actual || "?",
+      expected: check.expectedMin || "",
+    });
+    badge.title = t("nav.modVersionOutdatedTitle", {
+      actual: check.actual || "?",
+      expected: check.expectedMin || "",
+    });
+    return;
+  }
+
+  badge.classList.add("bg-secondary");
+  textEl.textContent = t("nav.modVersionUnknownShort");
+  badge.title = t("nav.modVersionUnknownTitle", {
+    expected: check.expectedMin || "",
+  });
 }
 
 export function updateGameTimeDisplay() {

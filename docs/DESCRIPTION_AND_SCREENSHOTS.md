@@ -170,4 +170,4 @@ Commit the `docs/screenshots/*.png` files to git, or attach them to **GitHub Rel
 
 ---
 
-*Document revision: 3.9 — aligned with app **3.9.0** / mod **2.3.0.0** (see [CHANGELOG.md](./CHANGELOG.md)). Authors: **JoshWalki** & **WizardlyPayload** ([AUTHORS.md](./AUTHORS.md)). For storefront blurbs, see also [RELEASE_NOTES.md](./RELEASE_NOTES.md).*
+*Document revision: 4.0 — aligned with app **4.0.0** / mod **2.3.0.0** (see [CHANGELOG.md](./CHANGELOG.md)). Authors: **JoshWalki** & **WizardlyPayload** ([AUTHORS.md](./AUTHORS.md)). For storefront blurbs, see also [RELEASE_NOTES.md](./RELEASE_NOTES.md).*

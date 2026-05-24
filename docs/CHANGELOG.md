@@ -8,9 +8,35 @@ All notable changes to this project are recorded here. For GitHub release blurbs
 
 | Artifact | Where it lives | Format |
 |----------|----------------|--------|
-| **Desktop app** | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | Semver (e.g. `3.9.0`) |
+| **Desktop app** | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | Semver (e.g. `4.0.0`) |
 | **FS25 mod** | `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `2.3.0.0`) |
 | **Source headers** | First line of many `.js` / `.lua` files | Often `v2.0.0` historically; bump only when you intentionally resync headers |
+
+---
+
+## 4.0.0 — Stable line: auto-update + mod version awareness
+
+**App:** `4.0.0` (`package.json`) · **Mod:** `2.3.0.0` (unchanged; optional zip refresh for `serverInfo.modVersion` export).
+
+Narrative: **[RELEASE_v4.0.0.md](./RELEASE_v4.0.0.md)** · GitHub body: **[GITHUB_RELEASE_v4.0.0.md](./GITHUB_RELEASE_v4.0.0.md)**.
+
+### Auto-update (3.9 → 4.0)
+
+- Packaged **3.9.0** clients use **`electron-updater`** against **GitHub Releases** (`package.json` → `build.publish`, repo **`WizardlyPayload/FarmHub`**).
+- Publish **4.0.0** as a **non-draft** release with **`latest.yml`** + **`FS25 Farm Dashboard Setup 4.0.0.exe`** — drafts are not visible to the updater.
+- User flow: startup check (~10s) or **Settings → Check for updates** → download → **Restart and install** dialog (`app-updater.js`).
+
+### Mod version badge
+
+- Lua: `serverInfo.modVersion` from `FarmDashboard.VERSION` on each `data.json` write.
+- Node: **`modVersionPolicy.js`** (`MIN_MOD_VERSION` **2.3.0.0**) attached to merged API payloads as **`modVersionCheck`**.
+- UI: unobtrusive navbar badge when mod is **outdated** or **unknown** (legacy mod without version export).
+
+### Tests & docs
+
+- **`tests/modVersionPolicy.test.js`** — version compare + assess paths.
+- **`npm test`**: **13** suites, **230** tests.
+- App version **4.0.0** across README, manuals, wiki, **`RELEASE_NOTES.md`**.
 
 ---
 
@@ -98,6 +124,7 @@ Git history or older branches may contain experiments and code paths not describ
 
 | Version | Focus |
 |---------|--------|
+| **4.0.0** | Stable promotion: validated in-app updater (3.9→4.0), mod version navbar badge, docs at 4.0 — see §4.0.0 and [RELEASE_v4.0.0.md](./RELEASE_v4.0.0.md). |
 | **3.9.0** | Pre-final hardening: LAN credential policy, DOM XSS sweep, telemetry-vs-critical pasture warnings, setup UX, i18n sweep, test parity, version unification — see §3.9.0 above and [RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md). |
 | **3.0.0** | Rules-first field UX, windrow export/merge/UI, unified Settings, LAN security, default build output outside repo, NSIS upgrade/uninstall hardening — see §3.0.0 above and [RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md). |
 | **1.0.0** | First public release: mod + Electron app, local/FTP, XML + Lua merge, full dashboard sections. |

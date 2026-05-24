@@ -4,7 +4,7 @@ This is the maintainer reference for **FarmHub**: the **FS25 Farm Dashboard** El
 
 | Artifact | Where | Current value |
 | -------- | ----- | ------------- |
-| Desktop app | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | **`3.9.0`** |
+| Desktop app | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | **`4.0.0`** |
 | Lua mod | `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` | **`2.3.0.0`** |
 | HTTP / WebSocket port | `main.js` `PORT` | **`8766`** |
 | Companion docs | [`USER_MANUAL.md`](./USER_MANUAL.md) · [`AUDIT_v3.9_PREFINAL.md`](./AUDIT_v3.9_PREFINAL.md) · [`AUDIT_v3.0.md`](./AUDIT_v3.0.md) (historical) · [`SECURITY.md`](./SECURITY.md) · [`CHANGELOG.md`](./CHANGELOG.md) · [`I18N.md`](./I18N.md) | — |
@@ -70,7 +70,7 @@ FarmHub/
       dataMerger.js, xmlCollector.js, serverDataCache.js
       detailAnimalsHydrate.js, livestockDetail.js, fileReadRetry.js, fs25Paths.js
       lanCredentialPolicy.js, app-updater.js
-      package.json                       # 3.9.0
+      package.json                       # 4.0.0
       setup.html                         # first-run setup page (sibling of web/)
       build/installer.nsh                # NSIS hooks
       web/
@@ -534,7 +534,7 @@ There is **no rotating log file**. Console output goes to stdout / DevTools. If 
 
 ## 13. Known gaps from the audits
 
-**Current release posture:** [`AUDIT_v3.9_PREFINAL.md`](./AUDIT_v3.9_PREFINAL.md) (v3.9.0 pre-final — updater QA gate, residual risks).
+**Current release posture:** [`RELEASE_v4.0.0.md`](./RELEASE_v4.0.0.md) (stable **4.0.0** line). Prior audit: [`AUDIT_v3.9_PREFINAL.md`](./AUDIT_v3.9_PREFINAL.md).
 
 **Historical v3.0 gap analysis:** [`AUDIT_v3.0.md`](./AUDIT_v3.0.md) listed code-vs-docs items; several UX/engineering follow-ups below were captured there and may still apply until closed in code:
 

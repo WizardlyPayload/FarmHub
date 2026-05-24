@@ -201,7 +201,7 @@ Uninstall app separately if needed.
 Open a [GitHub Issue](https://github.com/WizardlyPayload/FarmHub/issues) with:
 
 - FS25 version, SP vs dedicated
-- App **3.9.0**, mod **2.3.0.0**
+- App **4.0.0**, mod **2.3.0.0**
 - Local vs FTP
 - Steps + screenshots
 

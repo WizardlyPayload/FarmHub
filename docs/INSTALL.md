@@ -100,7 +100,7 @@ On first launch the app opens **Server Manager** (`setup.html`) if no servers ar
 | Mod images | Optional **Scan FS25 mods for dashboard images** | `fd-setup-070-mod-images.png` **[manual]** |
 | Launch | At least one server in the list → **Launch Dashboard** | `fd-setup-080-launch-button.png` **[manual]** |
 
-<img src="./screenshots/fd-setup-080-launch-button.png" alt="fd-setup-080-launch-button.png" width="920" />
+![fd-setup-080-launch-button.png](screenshots/fd-setup-080-launch-button.png)
 
 *Figure: fd-setup-080-launch-button.png.**Figure: Server Manager with **Launch Dashboard**. **[manual]** capture.*
 
@@ -129,7 +129,7 @@ After launch, open **[http://localhost:8766](http://localhost:8766)** in the app
 3. Optional **HTTP feed** (Giants dedicated XML): server IP, port **8080**, access code — improves vehicle age, prices, and market history when available.
 4. Set **Poll every** (1–25 minutes). **Local saves** use file watching; FTP uses this schedule.
 
-<img src="./screenshots/fd-settings-020-servers-list.png" alt="fd-settings-020-servers-list.png" width="920" />
+![fd-settings-020-servers-list.png](screenshots/fd-settings-020-servers-list.png)
 
 *Figure: fd-settings-020-servers-list.png.**Figure: Settings → Servers — polling and configured servers. **[auto]** capture.*
 

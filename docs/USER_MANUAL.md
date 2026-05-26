@@ -129,7 +129,7 @@ For a dedicated / rented FS25 server you do **not** play on locally.
 | Save slot | Slot number / folder name when needed |
 | (Optional) HTTP feed | Only when your host documents one |
 
-<img src="./screenshots/fd-setup-050-add-ftp.png" alt="Add-server form filled in for FTP (blur secrets)" width="920" />
+![Add-server form filled in for FTP (blur secrets)](screenshots/fd-setup-050-add-ftp.png)
 
 *Figure: Add-server form filled in for FTP (blur secrets).*
 
@@ -153,7 +153,7 @@ Right-side button. Runs a background PowerShell helper to extract vehicle thumbn
 
 Saves the config and reloads to the dashboard home.
 
-<img src="./screenshots/fd-setup-080-launch-button.png" alt="Setup ready to launch with one server" width="920" />
+![Setup ready to launch with one server](screenshots/fd-setup-080-launch-button.png)
 
 *Figure: Setup ready to launch with one server.*
 
@@ -174,7 +174,7 @@ After Setup, the dashboard shell loads at [http://localhost:8766](http://localho
 | **Settings (gear)** | Opens the unified Settings modal (§5). Hidden in viewer mode. |
 | **Home** | Returns to the landing page. |
 
-<img src="./screenshots/fd-shell-020-landing.png" alt="Farm Management Dashboard home — top bar, six section cards, and count badges" width="920" />
+![Farm Management Dashboard home — top bar, six section cards, and count badges](screenshots/fd-shell-020-landing.png)
 
 *Figure: **Home (landing page)** — server tabs, farm dropdown, game time, data-source and weather pills, notification bell, and settings. The six cards (Livestock, Vehicles, Fields, Economy, Pastures, Productions) show live counts. This one capture also covers `fd-shell-010-navbar`, `fd-shell-040-landing-badges`, and `fd-section-000-landing` in the manifest.*
 
@@ -184,7 +184,7 @@ The **landing page** shows up to six cards: Livestock, Vehicles, Fields, Economy
 
 There is also an **Import mod images** action on the landing page when running locally with API access.
 
-<img src="./screenshots/fd-shell-050-import-mod-images.png" alt="Import button on landing" width="920" />
+![Import button on landing](screenshots/fd-shell-050-import-mod-images.png)
 
 *Figure: Import button on landing.*
 
@@ -197,7 +197,7 @@ Open with the gear icon. The modal has a left-hand sidebar with four tabs, plus 
 - **Save** — saves the current tab's controls.
 - **Save theme** — only on Appearance; saves theme colours.
 
-<img src="./screenshots/fd-settings-010-dashboard-toggles.png" alt="Settings modal open on the first tab" width="920" />
+![Settings modal open on the first tab](screenshots/fd-settings-010-dashboard-toggles.png)
 
 *Figure: Settings modal open on the first tab.*
 
@@ -215,21 +215,21 @@ Open with the gear icon. The modal has a left-hand sidebar with four tabs, plus 
 | **Field clusters** | Group several parcels into one **field card** — Auto (heuristic) or Manual (paste comma-separated ids) | `uiPreferences.fieldClusterPrefsByServer` |
 | **SimHub view** | Cluster ids, pasture ids, production keys, plus a help text — feeds the optional `simhub.html` overlay page | `uiPreferences.simHubView` |
 
-<img src="./screenshots/fd-settings-010-dashboard-toggles.png" alt="Section toggles + version" width="920" />
+![Section toggles + version](screenshots/fd-settings-010-dashboard-toggles.png)
 
 *Figure: Section toggles + version.*
 
-<img src="./screenshots/fd-settings-010-dashboard-toggles.png" alt="Field exclusions list" width="920" />
+![Field exclusions list](screenshots/fd-settings-010-dashboard-toggles.png)
 
 *Figure: Field exclusions list.*
 
 *(Same UI as `fd-settings-015-dashboard-exclusions.png` — shown using `fd-settings-010-dashboard-toggles.png`.)*
 
-<img src="./screenshots/fd-settings-016-dashboard-clusters.png" alt="Field clusters block" width="920" />
+![Field clusters block](screenshots/fd-settings-016-dashboard-clusters.png)
 
 *Figure: Field clusters block.*
 
-<img src="./screenshots/fd-settings-017-dashboard-simhub.png" alt="SimHub view block" width="920" />
+![SimHub view block](screenshots/fd-settings-017-dashboard-simhub.png)
 
 *Figure: SimHub view block.*
 
@@ -248,23 +248,23 @@ Open with the gear icon. The modal has a left-hand sidebar with four tabs, plus 
 | **Server list** | Current servers; **Remove** per row | `config.servers` |
 | **Add server form** | Same fields as Setup §3.4 / §3.5 | `config.servers` |
 
-<img src="./screenshots/fd-settings-020-servers-list.png" alt="Servers tab top-half (LAN + servers list)" width="920" />
+![Servers tab top-half (LAN + servers list)](screenshots/fd-settings-020-servers-list.png)
 
 *Figure: Servers tab top-half (LAN + servers list).*
 
-<img src="./screenshots/fd-lan-010-toggle-on.png" alt="LAN block close-up" width="920" />
+![LAN block close-up](screenshots/fd-lan-010-toggle-on.png)
 
 *Figure: LAN block close-up.*
 
 *(Same UI as `fd-settings-021-servers-lan.png` — shown using `fd-lan-010-toggle-on.png`.)*
 
-<img src="./screenshots/fd-settings-020-servers-list.png" alt="FTP polling block" width="920" />
+![FTP polling block](screenshots/fd-settings-020-servers-list.png)
 
 *Figure: FTP polling block.*
 
 *(Same UI as `fd-settings-022-servers-ftp-polling.png` — shown using `fd-settings-020-servers-list.png`.)*
 
-<img src="./screenshots/fd-settings-023-servers-add-server.png" alt="Add-server form expanded" width="920" />
+![Add-server form expanded](screenshots/fd-settings-023-servers-add-server.png)
 
 *Figure: Add-server form expanded.*
 
@@ -279,7 +279,7 @@ Settings written here become `config.xml` on disk (see §9 for the file path).
 | **Collection cycle (ms)** | Master cycle. Clamped 5 000 – 1 800 000 by the mod | XML attr `collectionCycleMs` |
 | **Module checkboxes (7)** | Animals, Vehicles, Fields, Weather, Finance, Economy, Production | XML attrs `farmDashboard.modules#…` |
 
-<img src="./screenshots/fd-settings-030-mod-tab.png" alt="FS25 mod tab with all controls" width="920" />
+![FS25 mod tab with all controls](screenshots/fd-settings-030-mod-tab.png)
 
 *Figure: FS25 mod tab with all controls.*
 
@@ -299,13 +299,13 @@ Settings written here become `config.xml` on disk (see §9 for the file path).
 | **Reset** | Reset the current tab to defaults | same |
 | **Save theme** (footer) | Persists colour set | same |
 
-<img src="./screenshots/fd-settings-041-appearance-theme.png" alt="Language picker" width="920" />
+![Language picker](screenshots/fd-settings-041-appearance-theme.png)
 
 *Figure: Language picker.*
 
 *(Same UI as `fd-settings-040-appearance-language.png` — shown using `fd-settings-041-appearance-theme.png`.)*
 
-<img src="./screenshots/fd-settings-041-appearance-theme.png" alt="Theme editor with colour pickers" width="920" />
+![Theme editor with colour pickers](screenshots/fd-settings-041-appearance-theme.png)
 
 *Figure: Theme editor with colour pickers.*
 
@@ -321,7 +321,7 @@ Every section section header has a back-to-home button. Sections live under `web
 
 Already covered in §4. The six cards are populated by `navigation.js` `updateLandingPageCounts()`. Card visibility follows the toggles in Settings → Dashboard.
 
-<img src="./screenshots/fd-shell-020-landing.png" alt="Full landing with all six cards" width="920" />
+![Full landing with all six cards](screenshots/fd-shell-020-landing.png)
 
 *Figure: Full landing with all six cards.*
 
@@ -346,15 +346,15 @@ Already covered in §4. The six cards are populated by `navigation.js` `updateLa
 | **Export** | Opens the export modal (§7.2) |
 | **Row "View" button** | Opens **Animal details** modal (§7.6) |
 
-<img src="./screenshots/fd-section-livestock-010-summary.png" alt="Summary cards row" width="920" />
+![Summary cards row](screenshots/fd-section-livestock-010-summary.png)
 
 *Figure: Summary cards row.*
 
-<img src="./screenshots/fd-section-livestock-020-filters.png" alt="Filter panel expanded" width="920" />
+![Filter panel expanded](screenshots/fd-section-livestock-020-filters.png)
 
 *Figure: Filter panel expanded.*
 
-<img src="./screenshots/fd-section-livestock-030-table.png" alt="Animals table" width="920" />
+![Animals table](screenshots/fd-section-livestock-030-table.png)
 
 *Figure: Animals table.*
 
@@ -375,12 +375,12 @@ Already covered in §4. The six cards are populated by `navigation.js` `updateLa
 | **Vehicle grid** | Card per vehicle with image, name, fuel, damage, location |
 | **Vehicle image click** | Opens **Vehicle image** modal (§7.8) |
 
-<img src="./screenshots/fd-section-vehicles-010-summary.png" alt="Summary cards" width="920" />
+![Summary cards](screenshots/fd-section-vehicles-010-summary.png)
 
 *Figure: Summary cards.*
 
 *Screenshot not yet added:* `fd-section-vehicles-020-filters.png` — Filters panel. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
-<img src="./screenshots/fd-section-vehicles-030-grid.png" alt="Vehicle grid" width="920" />
+![Vehicle grid](screenshots/fd-section-vehicles-030-grid.png)
 
 *Figure: Vehicle grid.*
 
@@ -409,29 +409,29 @@ The most feature-rich section.
 | **Waiting state** | Rendered when no merge data has arrived yet |
 | **API error strip** | Rendered when the fetch fails. Background polling auto-retries every 5 seconds (no explicit retry button) |
 
-<img src="./screenshots/fd-section-fields-010-summary.png" alt="Summary row" width="920" />
+![Summary row](screenshots/fd-section-fields-010-summary.png)
 
 *Figure: Summary row.*
 
-<img src="./screenshots/fd-section-fields-010-summary.png" alt="Filter buttons + search" width="920" />
+![Filter buttons + search](screenshots/fd-section-fields-010-summary.png)
 
 *Figure: Filter buttons + search.*
 
 *(Same UI as `fd-section-fields-020-filter-bar.png` — shown using `fd-section-fields-010-summary.png`.)*
 
-<img src="./screenshots/fd-section-fields-030-card-rules.png" alt="One field card with the rules suggestion" width="920" />
+![One field card with the rules suggestion](screenshots/fd-section-fields-030-card-rules.png)
 
 *Figure: One field card with the rules suggestion.*
 
-<img src="./screenshots/fd-section-fields-040-card-windrow.png" alt="Field card with windrow volume badge" width="920" />
+![Field card with windrow volume badge](screenshots/fd-section-fields-040-card-windrow.png)
 
 *Figure: Field card with windrow volume badge.*
 
-<img src="./screenshots/fd-section-fields-050-card-soil.png" alt="Field card with N + pH mini-bars" width="920" />
+![Field card with N + pH mini-bars](screenshots/fd-section-fields-050-card-soil.png)
 
 *Figure: Field card with N + pH mini-bars.*
 
-<img src="./screenshots/fd-section-fields-060-tools-shop.png" alt="Tools & shop block" width="920" />
+![Tools & shop block](screenshots/fd-section-fields-060-tools-shop.png)
 
 *Figure: Tools & shop block.*
 
@@ -453,15 +453,15 @@ The most feature-rich section.
 | **Sort — Price / Age / Name** | Sort buttons |
 | **Market search** | Filter by crop or location |
 
-<img src="./screenshots/fd-section-economy-010-summary.png" alt="Summary row" width="920" />
+![Summary row](screenshots/fd-section-economy-010-summary.png)
 
 *Figure: Summary row.*
 
-<img src="./screenshots/fd-section-economy-020-purchases.png" alt="Purchases tab with filters and sort" width="920" />
+![Purchases tab with filters and sort](screenshots/fd-section-economy-020-purchases.png)
 
 *Figure: Purchases tab with filters and sort.*
 
-<img src="./screenshots/fd-section-economy-030-market.png" alt="Market tab (or placeholder)" width="920" />
+![Market tab (or placeholder)](screenshots/fd-section-economy-030-market.png)
 
 *Figure: Market tab (or placeholder).*
 
@@ -477,11 +477,11 @@ The most feature-rich section.
 | **Pasture cards** | Click to open per-pasture details modal (§7.7) |
 | **Warning badges** | Click to open warning details modal (§7.5) |
 
-<img src="./screenshots/fd-section-pastures-010-summary.png" alt="Summary row" width="920" />
+![Summary row](screenshots/fd-section-pastures-010-summary.png)
 
 *Figure: Summary row.*
 
-<img src="./screenshots/fd-section-pastures-020-cards.png" alt="Pasture cards grid" width="920" />
+![Pasture cards grid](screenshots/fd-section-pastures-020-cards.png)
 
 *Figure: Pasture cards grid.*
 
@@ -495,7 +495,7 @@ The most feature-rich section.
 
 Productions has no user filters; it is read-only.
 
-<img src="./screenshots/fd-section-productions-010-list.png" alt="Chains list" width="920" />
+![Chains list](screenshots/fd-section-productions-010-list.png)
 
 *Figure: Chains list.*
 
@@ -513,7 +513,7 @@ Bell → opens the modal. Lists up to 10 most recent notifications with a **Clea
 
 Livestock section → **Export**. Format options + download.
 
-<img src="./screenshots/fd-section-livestock-020-filters.png" alt="Export modal" width="920" />
+![Export modal](screenshots/fd-section-livestock-020-filters.png)
 
 *Figure: Export modal.*
 
@@ -558,7 +558,7 @@ Opened by clicking the navbar weather pill.
 
 Shown while the mod-image scan is running.
 
-<img src="./screenshots/fd-modal-100-mod-export.png" alt="Mod export progress modal" width="920" />
+![Mod export progress modal](screenshots/fd-modal-100-mod-export.png)
 
 *Figure: Mod export progress modal.*
 
@@ -581,7 +581,7 @@ The dashboard can serve a tablet on your LAN. Always set both **a username and a
 6. On the tablet, open `http://<PC-LAN-IP>:8766`. The browser prompts for the credentials you set.
 7. (Optional) append `?viewer=1` for read-only viewer mode on the tablet (hides the gear and any destructive buttons).
 
-<img src="./screenshots/fd-lan-010-toggle-on.png" alt="LAN access toggle on with credentials" width="920" />
+![LAN access toggle on with credentials](screenshots/fd-lan-010-toggle-on.png)
 
 *Figure: LAN access toggle on with credentials.*
 

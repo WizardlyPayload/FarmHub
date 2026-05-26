@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replace screenshot blockquotes in docs with visible <img> tags."""
+"""Replace screenshot blockquotes in docs with Markdown images (![]())."""
 import re
 from pathlib import Path
 
@@ -37,10 +37,7 @@ def resolve(name: str) -> str | None:
 
 def image_block(file: str, caption: str) -> str:
     cap = re.sub(r"\s+", " ", caption.strip().rstrip("."))
-    return (
-        f'<img src="./screenshots/{file}" alt="{cap}" width="920" />\n\n'
-        f"*Figure: {cap}.*"
-    )
+    return f"![{cap}](screenshots/{file})\n\n*Figure: {cap}.*\n"
 
 
 def missing_block(name: str, caption: str) -> str:

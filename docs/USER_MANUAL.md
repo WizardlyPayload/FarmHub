@@ -4,7 +4,9 @@
 
 This manual walks every setting, every section, and every modal, with **inline screenshots** (below each section). Where we already have a similar capture, one image is reused instead of asking twice. The screenshot manifest with filenames, captions, and capture recipes is in [`SCREENSHOT_MANIFEST.md`](./SCREENSHOT_MANIFEST.md) · [`SCREENSHOTS_TO_CAPTURE.md`](./SCREENSHOTS_TO_CAPTURE.md).
 
-**Companion docs:** [`INSTALL.md`](./INSTALL.md) · [`SECURITY.md`](./SECURITY.md) · [`CHANGELOG.md`](./CHANGELOG.md) · [`SCREENSHOT_MANIFEST.md`](./SCREENSHOT_MANIFEST.md)
+**Companion docs:** [`INSTALL.md`](./INSTALL.md) · [`SECURITY.md`](./SECURITY.md) · [`CHANGELOG.md`](./CHANGELOG.md) · [`SCREENSHOT_MANIFEST.md`](./SCREENSHOT_MANIFEST.md) · [`SCREENSHOTS_TO_CAPTURE.md`](./SCREENSHOTS_TO_CAPTURE.md)
+
+> **Screenshots not visible?** Open **Markdown Preview** (`Ctrl+Shift+V`) while this file is focused — the editor tab alone shows text, not pictures. Images are in [`screenshots/`](./screenshots/) beside this file. On GitHub they appear only after PNGs are **committed and pushed**.
 
 ---
 

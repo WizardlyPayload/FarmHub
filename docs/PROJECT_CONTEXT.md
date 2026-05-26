@@ -1,9 +1,11 @@
 # FarmHub — Full project context for planning
 
+> **Internal / maintainer only** — not required for end-user install or play. For public docs see [README.md](./README.md) (index), [INSTALL.md](./INSTALL.md), and [USER_MANUAL.md](./USER_MANUAL.md). For code maintenance start at [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md).
+
 **Purpose:** Single document to feed into an external planner so it can propose roadmaps, refactors, or debugging steps **without** prior chat history.
 
 **Repository:** `FarmHub` — FS25 Farm Dashboard (Electron + web + Lua mod).  
-**Current versions:** App **4.0.0** (`package.json`), mod **2.3.0.0** (`modDesc.xml`).
+**Current versions:** App **4.0.0** (`package.json`), mod **3.0.0.0** (`modDesc.xml`).
 
 **Technical handover:** [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md) · **Doc index:** [README.md](./README.md)
 

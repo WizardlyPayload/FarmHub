@@ -1,11 +1,13 @@
-# FarmHub — Developer handover (v3.9)
+# FarmHub — Developer handover (v4.0)
 
-This is the maintainer reference for **FarmHub**: the **FS25 Farm Dashboard** Electron + web app and the **FS25 Farm Dashboard** Lua mod. It targets a new contributor shipping fixes or features on the **3.9.x** line without breaking LAN, merge, or mod export contracts.
+This is the **single maintainer reference** for **FarmHub**: the **FS25 Farm Dashboard** Electron + web app and the **FS25 Farm Dashboard** Lua mod. It targets a new contributor shipping fixes or features on the **4.0.x** line without breaking LAN, merge, or mod export contracts.
+
+**Documentation map:** Public users → [README.md](../README.md), [INSTALL.md](./INSTALL.md), [USER_MANUAL.md](./USER_MANUAL.md). Internal planning → [PROJECT_CONTEXT.md](./PROJECT_CONTEXT.md), audits → [PROJECT_DEEP_AUDIT_FARMHUB.md](./PROJECT_DEEP_AUDIT_FARMHUB.md), [AUDIT_v3.9_PREFINAL.md](./AUDIT_v3.9_PREFINAL.md). Screenshots → [SCREENSHOT_MANIFEST.md](./SCREENSHOT_MANIFEST.md), [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
 
 | Artifact | Where | Current value |
 | -------- | ----- | ------------- |
 | Desktop app | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | **`4.0.0`** |
-| Lua mod | `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` | **`2.3.0.0`** |
+| Lua mod | `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` | **`3.0.0.0`** |
 | HTTP / WebSocket port | `main.js` `PORT` | **`8766`** |
 | Companion docs | [`USER_MANUAL.md`](./USER_MANUAL.md) · [`AUDIT_v3.9_PREFINAL.md`](./AUDIT_v3.9_PREFINAL.md) · [`AUDIT_v3.0.md`](./AUDIT_v3.0.md) (historical) · [`SECURITY.md`](./SECURITY.md) · [`CHANGELOG.md`](./CHANGELOG.md) · [`I18N.md`](./I18N.md) | — |
 

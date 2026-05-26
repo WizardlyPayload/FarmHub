@@ -105,34 +105,46 @@ For **[manual]** captures, follow the recipe in each row below and drop the PNG 
 
 ## Capture status (last run)
 
-**Resolution refresh:** replace older PNGs with **1920 × 1080** desktop shots (and **1080 × 1920** for the two tablet rows above). Older MCP passes produced ~**800px**-wide images — **redo** for release-quality docs.
+**Batch rename (2026-05-22 screen grabs):** 32 PNGs in [`docs/screenshots/`](./screenshots/) were renamed from `Screenshot …` timestamps to manifest-style `fd-*` names (see table below). Most captures use **Ballam Road Dairy Farming (savegame11)** with live data (1054 animals, 102 vehicles, 48 fields, 15 pastures, 1 production chain). `reference-home-network-topology.png` is unrelated to the dashboard UI.
 
-The first auto-capture pass landed the following 16 PNGs into [`docs/screenshots/`](./screenshots/) (many still need re-capture at full resolution):
+| File | Shows |
+| ---- | ----- |
+| `fd-shell-020-landing.png` | Landing page — six section cards, counts, Import mod shop images |
+| `fd-shell-050-import-mod-images.png` | Import mod shop images modal (early zip progress) |
+| `fd-section-fields-010-summary.png` | Fields — summary row + Growing filter + field cards |
+| `fd-section-fields-030-card-rules.png` | Fields — cards with suggested next step / fleet / buy-lease |
+| `fd-section-fields-040-card-windrow.png` | Fields — windrows, bales on field, tedder/baler hints |
+| `fd-section-fields-050-card-soil.png` | Fields — N / pH targets, lime, cultivate suggestions |
+| `fd-section-fields-060-tools-shop.png` | Fields — Carpathian save; needs-scan + PF sensor suggestions |
+| `fd-section-vehicles-010-summary.png` | Vehicles — summary cards (total / low fuel / damage) |
+| `fd-section-vehicles-030-grid.png` | Vehicles — equipment grid |
+| `fd-section-livestock-010-summary.png` | Livestock — summary cards + animals table header |
+| `fd-section-livestock-020-filters.png` | Livestock — table pagination + Export Data |
+| `fd-section-livestock-030-table.png` | Livestock — animals list rows |
+| `fd-section-economy-010-summary.png` | Economy — financial summary + Consumables tab |
+| `fd-section-economy-020-purchases.png` | Economy — All Equipment purchase cards |
+| `fd-section-economy-021-consumables-inventory.png` | Economy — bale stock + lime big bags *(extra; add to manifest row if desired)* |
+| `fd-section-economy-030-market.png` | Economy — market prices by crop |
+| `fd-section-pastures-010-summary.png` | Pastures — summary row + first pasture cards |
+| `fd-section-pastures-020-cards.png` | Pastures — additional shed cards + warnings |
+| `fd-section-productions-010-list.png` | Productions — input/output storage + inactive slots |
+| `fd-modal-100-mod-export.png` | Import mod images — skip-heavy conversion log |
+| `fd-modal-101-mod-import-progress.png` | Import mod images — mid-batch progress *(extra)* |
+| `fd-settings-010-dashboard-toggles.png` | Settings → Dashboard — sections, updates, hide parcels |
+| `fd-settings-016-dashboard-clusters.png` | Settings → Dashboard — merged field cards |
+| `fd-settings-017-dashboard-simhub.png` | Settings → Dashboard — SimHub block |
+| `fd-settings-020-servers-list.png` | Settings → Servers — FTP polling + server list |
+| `fd-settings-023-servers-add-server.png` | Settings → Servers — Add dedicated FTP server form |
+| `fd-settings-030-mod-tab.png` | Settings → FS25 mod — config.xml intervals + modules |
+| `fd-settings-041-appearance-theme.png` | Settings → Appearance — language + theme colours |
+| `fd-lan-010-toggle-on.png` | Settings → Servers — LAN access enabled + credentials |
+| `fd-setup-080-launch-button.png` | Setup / Server Manager — servers list + Launch Dashboard |
+| `fd-setup-050-add-ftp.png` | Setup — Add dedicated server (FTP + HTTP feed) |
+| `reference-home-network-topology.png` | Home network diagram (pfSense / switches / APs) |
 
-| File | Slot |
-| ---- | ---- |
-| `fd-install-050-app-first-launch.png` | §2 Stage E |
-| `fd-shell-020-landing.png` | §4 |
-| `fd-shell-040-landing-badges.png` | §4 |
-| `fd-settings-000-modal-overview.png` | §5 |
-| `fd-settings-010-dashboard-toggles.png` | §5.1 |
-| `fd-settings-020-servers-list.png` | §5.2 |
-| `fd-settings-030-mod-tab.png` | §5.3 |
-| `fd-settings-041-appearance-theme.png` | §5.4 |
-| `fd-section-livestock-010-summary.png` | §6.2 |
-| `fd-section-vehicles-010-summary.png` | §6.3 |
-| `fd-section-fields-010-summary.png` | §6.4 |
-| `fd-section-fields-030-card-rules.png` | §6.4 |
-| `fd-section-fields-080-api-error.png` | §6.4 (API error / first launch state) |
-| `fd-section-economy-010-summary.png` | §6.5 |
-| `fd-section-pastures-010-summary.png` | §6.6 |
-| `fd-section-productions-010-list.png` | §6.7 |
+**Still missing** from the manifest table above (capture when ready): all `fd-install-*`, most `fd-setup-*` (except 050/080), `fd-shell-010/030/040`, `fd-settings-000/015/021/022/040`, `fd-section-fields-020/070/080`, `fd-section-vehicles-020`, `fd-section-productions-020-empty`, most `fd-modal-*` (notifications, weather, animal details, etc.), `fd-lan-020/030` tablet shots, `fd-mod-*` config.xml explorer/editor.
 
-Notes:
-
-- **Redo policy:** full-width dashboard shots must be **1920 × 1080**; tablet LAN shots **1080 × 1920**. Legacy MCP captures were ~**800px** wide — treat as placeholders until replaced.
-- The screenshots were captured against a real save (`Carpathian Countryside / savegame1`) with live data: 38 animals, 57 vehicles, 10 fields, 4 pastures, 1 production chain.
-- Screenshots **not yet captured** (still listed `[auto]` above, awaiting a re-run): `fd-shell-010-navbar.png`, `fd-shell-030-game-time-weather.png`, `fd-shell-050-import-mod-images.png`, `fd-settings-015/016/017-*.png` (Dashboard exclusions / clusters / SimHub blocks), `fd-settings-021/022/023-servers-*.png` (LAN / FTP polling / Add server zoom-ins), `fd-settings-040-appearance-language.png` (language picker zoom-in), `fd-section-livestock-020-filters.png`, `fd-section-livestock-030-table.png`, `fd-section-vehicles-020-filters.png`, `fd-section-vehicles-030-grid.png`, `fd-section-fields-020-filter-bar.png`, `fd-section-fields-040-card-windrow.png`, `fd-section-fields-050-card-soil.png`, `fd-section-fields-060-tools-shop.png`, `fd-section-fields-070-waiting.png`, `fd-section-economy-020/030-*.png`, `fd-section-pastures-020-cards.png`, `fd-section-productions-020-empty.png`, all `fd-modal-*` entries, `fd-lan-010-toggle-on.png`, `fd-section-000-landing.png`. These either need additional click steps in the walk-through or are easier to re-capture once the docs are reviewed.
+**Resolution:** confirm desktop shots are **1920 × 1080** before release; re-capture any that are not.
 
 ## How auto capture runs
 

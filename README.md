@@ -15,9 +15,22 @@ Real-time farm management dashboard for **Farming Simulator 25** — a Windows d
 
 **Current stable line:** App **4.0.0** · Mod **3.0.0.0**
 
-Install **mod first**, load your save once, then install the app. Step-by-step instructions are on the **[Releases page](https://github.com/WizardlyPayload/FarmHub/releases)** and in **[docs/INSTALL.md](docs/INSTALL.md)**.
+Install **mod first**, load your save once, then install the app. See **[docs/INSTALL.md](docs/INSTALL.md)** (detailed) or the quick steps below.
 
 Open the dashboard at **[http://localhost:8766](http://localhost:8766)** after setup.
+
+---
+
+## Screenshots
+
+| | |
+| --- | --- |
+| **Home** | **Fields** |
+| ![Farm Management Dashboard landing](docs/screenshots/fd-shell-020-landing.png) | ![Fields section with summary and cards](docs/screenshots/fd-section-fields-010-summary.png) |
+| **Livestock** | **Productions** |
+| ![Livestock summary and animals table](docs/screenshots/fd-section-livestock-010-summary.png) | ![Productions storage and chains](docs/screenshots/fd-section-productions-010-list.png) |
+
+More UI shots and install screenshots: **[docs/USER_MANUAL.md](docs/USER_MANUAL.md)** · capture checklist: **[docs/SCREENSHOTS_TO_CAPTURE.md](docs/SCREENSHOTS_TO_CAPTURE.md)**
 
 ---
 
@@ -27,7 +40,7 @@ Open the dashboard at **[http://localhost:8766](http://localhost:8766)** after s
 2. **App** — Run **`FS25 Farm Dashboard Setup 4.0.0.exe`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
 3. **Configure** — **Settings → Servers & saves** (local path or FTP for dedicated servers).
 
-**Full guide:** [docs/USER_MANUAL.md](docs/USER_MANUAL.md) · [GitHub Wiki](https://github.com/WizardlyPayload/FarmHub/wiki)
+**Full guide:** [docs/USER_MANUAL.md](docs/USER_MANUAL.md) · **Install (detailed):** [docs/INSTALL.md](docs/INSTALL.md) · [GitHub Wiki](https://github.com/WizardlyPayload/FarmHub/wiki)
 
 ---
 
@@ -62,14 +75,15 @@ This repository (**[FarmHub](https://github.com/WizardlyPayload/FarmHub)**) is *
 
 ## Documentation
 
-| Link | |
-|------|--|
+| Document | Audience |
+| -------- | -------- |
 | **[Releases / downloads](https://github.com/WizardlyPayload/FarmHub/releases)** | App installer + mod zip |
-| **[Wiki](https://github.com/WizardlyPayload/FarmHub/wiki)** | Install, user manual, troubleshooting |
-| [docs/INSTALL.md](docs/INSTALL.md) | Short install order |
-| [docs/USER_MANUAL.md](docs/USER_MANUAL.md) | Complete how-to |
-| [docs/SECURITY.md](docs/SECURITY.md) | LAN access & passwords |
-| [docs/README.md](docs/README.md) | Full doc index |
+| [docs/INSTALL.md](docs/INSTALL.md) | **Installation** (mod → app → setup, with screenshots) |
+| [docs/USER_MANUAL.md](docs/USER_MANUAL.md) | **User manual** — every feature |
+| [docs/DEVELOPER_HANDOVER.md](docs/DEVELOPER_HANDOVER.md) | **Developers** — architecture & code map |
+| [docs/SECURITY.md](docs/SECURITY.md) | LAN access & hardening |
+| [docs/README.md](docs/README.md) | Full index (public vs internal) |
+| **[Wiki](https://github.com/WizardlyPayload/FarmHub/wiki)** | Mirror of key guides |
 
 ---
 

@@ -54,10 +54,10 @@ Use this document to understand **what changed** and **what was added** since th
 
 The public repo docs were expanded and split for maintainers:
 - `docs/CHANGELOG.md` — full change history.
-- `docs/RELEASE_NOTES.md` — GitHub release blurbs.
+- `docs/GITHUB_RELEASE_v4.0.0.md` — GitHub release blurbs.
 - `docs/USER_MANUAL.md` — end‑user walkthrough and screenshots.
 - `docs/DEVELOPER_HANDOVER.md` — architecture and build notes.
-- `docs/UPDATER_QA.md` — update verification checklist.
+- `docs/_internal/UPDATER_QA.md` — update verification checklist.
 
 ---
 
@@ -74,4 +74,4 @@ The public repo docs were expanded and split for maintainers:
 
 - **Full version history**: `docs/CHANGELOG.md`
 - **3.9 narrative**: `docs/RELEASE_v3.9.0.md`
-- **Release copy**: `docs/RELEASE_NOTES.md`
+- **Release copy**: `docs/GITHUB_RELEASE_v4.0.0.md`

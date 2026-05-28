@@ -64,7 +64,7 @@ Packaged installs use **electron-updater** (GitHub Releases on **FarmHub**).
 - **Settings → Check for updates**
 - Download runs in background; **Restart and install** dialog when ready
 - Publish releases as **Published** (not **Draft**) with **`latest.yml`**
-- Maintainer QA: [UPDATER_QA.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/UPDATER_QA.md)
+- Maintainer QA: [UPDATER_QA.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/_internal/UPDATER_QA.md)
 
 ---
 

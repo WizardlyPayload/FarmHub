@@ -1075,6 +1075,34 @@
       </div>
     </div>
 
+    <div class="modal fade" id="farmdash-mod-required-modal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="farmdash-mod-required-title">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-light border border-warning">
+          <div class="modal-header border-secondary">
+            <h5 class="modal-title" id="farmdash-mod-required-title">
+              <i class="bi bi-exclamation-triangle-fill text-warning me-2" aria-hidden="true"></i>
+              <span data-i18n="modRequired.title">Farm Dashboard mod not active</span>
+            </h5>
+          </div>
+          <div class="modal-body">
+            <div data-mod-required-local>
+              <p class="mb-3" data-i18n="modRequired.lead">This save is only showing data from the save file. Live fields, animals, and updates need the FS25 Farm Dashboard mod enabled in-game.</p>
+              <ol class="small text-muted mb-0 ps-3">
+                <li class="mb-2" data-i18n="modRequired.step1">Install <strong>FS25_FarmDashboard.zip</strong> in your FS25 mods folder.</li>
+                <li class="mb-2" data-i18n="modRequired.step2">Enable the mod for this save in the game&apos;s mod selection screen.</li>
+                <li class="mb-2" data-i18n="modRequired.step3">Load the save once in single-player or as the multiplayer host (not as a joining client).</li>
+                <li data-i18n="modRequired.step4">In Settings → Servers &amp; saves, confirm the save folder matches <code class="text-light">modSettings/FS25_FarmDashboard/&lt;your save&gt;</code>.</li>
+              </ol>
+            </div>
+            <p class="mb-0 d-none" data-mod-required-remote data-i18n="modRequired.remoteLead">Live farm data is not available on this device. On the PC running Farm Dashboard, enable FS25_FarmDashboard for this save and load the game.</p>
+          </div>
+          <div class="modal-footer border-secondary">
+            <button type="button" class="btn btn-farm-accent" data-bs-dismiss="modal" onclick="dashboard.dismissModRequiredModal()" data-i18n="modRequired.ok">OK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade" id="modExportProgressModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
       <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content bg-dark text-light border border-secondary">

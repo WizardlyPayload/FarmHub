@@ -1,11 +1,19 @@
 #Requires -Version 5.1
 # Runs during Farm Dashboard setup: ensures ImageMagick (magick) is available for DDS→PNG in the mod scanner.
-# Order: bundled installer → already installed → winget → Chocolatey → download official Windows installer.
+# Order (default): bundled installer → already installed → winget → Chocolatey → download official Windows installer.
+# With -NoPackageManagers (NSIS installer): bundled → already installed → silent download only (no winget/choco windows).
 # Exits 0 always so the main app install completes even if every path fails (user can install IM manually).
+
+param(
+    [switch] $NoPackageManagers
+)
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+# Inno Setup silent switches (no wizard, no console from the IM setup.exe itself).
+$script:InnoSilentArgs = @('/VERYSILENT', '/SILENT', '/SP-', '/SUPPRESSMSGBOXES', '/NORESTART')
 
 $log = Join-Path $env:TEMP 'FarmDashImageMagickInstall.log'
 
@@ -20,11 +28,69 @@ function Write-Log([string] $m) {
     Add-Content -LiteralPath $log -Value $line -Encoding utf8 -ErrorAction SilentlyContinue
 }
 
+function Start-HiddenProcess {
+    param(
+        [Parameter(Mandatory)][string] $FilePath,
+        [string[]] $ArgumentList = @(),
+        [switch] $Wait
+    )
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $FilePath
+    if ($ArgumentList.Count -gt 0) {
+        $psi.Arguments = [string]::Join(' ', $ArgumentList)
+    }
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow = $true
+    $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+    $p = [System.Diagnostics.Process]::Start($psi)
+    if ($Wait -and $p) {
+        $p.WaitForExit()
+        return $p
+    }
+    return $p
+}
+
 function Update-SessionPathFromRegistry {
     $machine = [System.Environment]::GetEnvironmentVariable('Path', 'Machine')
     $user = [System.Environment]::GetEnvironmentVariable('Path', 'User')
     if (-not [string]::IsNullOrWhiteSpace($machine) -or -not [string]::IsNullOrWhiteSpace($user)) {
         $env:Path = "$machine;$user;$env:Path"
+    }
+}
+
+$FarmDashRegistryKey = 'HKCU:\Software\fs25-farm-dashboard'
+
+function Find-ImageMagickUninstaller {
+    foreach ($root in @(
+            [Environment]::GetEnvironmentVariable('ProgramFiles'),
+            [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
+        )) {
+        if ([string]::IsNullOrWhiteSpace($root)) { continue }
+        $dirs = @(Get-ChildItem -Path $root -Directory -Filter 'ImageMagick*' -ErrorAction SilentlyContinue)
+        foreach ($d in $dirs) {
+            foreach ($name in @('unins000.exe', 'uninstall.exe')) {
+                $u = Join-Path $d.FullName $name
+                if (Test-Path -LiteralPath $u) { return $u }
+            }
+        }
+    }
+    return $null
+}
+
+function Register-FarmDashImageMagickInstall {
+    param([string]$Method)
+    if (-not (Test-MagickOnPath)) { return }
+    try {
+        New-Item -Path $FarmDashRegistryKey -Force | Out-Null
+        Set-ItemProperty -LiteralPath $FarmDashRegistryKey -Name 'ImageMagickInstalledByFarmDash' -Value '1'
+        Set-ItemProperty -LiteralPath $FarmDashRegistryKey -Name 'ImageMagickInstallMethod' -Value $Method
+        $unins = Find-ImageMagickUninstaller
+        if ($unins) {
+            Set-ItemProperty -LiteralPath $FarmDashRegistryKey -Name 'ImageMagickUninstallExe' -Value $unins
+        }
+        Write-Log "Recorded Farm Dashboard ImageMagick install (method=$Method)."
+    } catch {
+        Write-Log "Could not record ImageMagick install marker: $($_.Exception.Message)"
     }
 }
 
@@ -62,9 +128,8 @@ function Install-FromBundledExe {
     $setup = $candidates | Select-Object -First 1
     if (-not $setup) { return $false }
     Write-Log "Bundled installer found: $($setup.FullName)"
-    $args = @('/SILENT', '/SP-', '/SUPPRESSMSGBOXES', '/NORESTART')
     try {
-        $p = Start-Process -FilePath $setup.FullName -ArgumentList $args -Wait -PassThru
+        $p = Start-HiddenProcess -FilePath $setup.FullName -ArgumentList $script:InnoSilentArgs -Wait
         Write-Log "Bundled setup exit: $($p.ExitCode)"
     } catch {
         Write-Log "Bundled setup error: $($_.Exception.Message)"
@@ -85,8 +150,7 @@ function Install-FromOfficialDownload {
                 Remove-Item -LiteralPath $dest -Force -ErrorAction SilentlyContinue
                 continue
             }
-            $args = @('/SILENT', '/SP-', '/SUPPRESSMSGBOXES', '/NORESTART')
-            $p = Start-Process -FilePath $dest -ArgumentList $args -Wait -PassThru
+            $p = Start-HiddenProcess -FilePath $dest -ArgumentList $script:InnoSilentArgs -Wait
             Write-Log "Downloaded installer exit: $($p.ExitCode)"
             Remove-Item -LiteralPath $dest -Force -ErrorAction SilentlyContinue
             Update-SessionPathFromRegistry
@@ -106,11 +170,23 @@ try {
 
     if (Install-FromBundledExe -ResourcesRoot $resourcesRoot) {
         Write-Log 'Bundled ImageMagick install succeeded.'
+        Register-FarmDashImageMagickInstall -Method 'bundled'
         exit 0
     }
 
     if (Test-MagickOnPath) {
-        Write-Log 'Already available; done.'
+        Write-Log 'Already available before setup; not recorded for uninstall.'
+        exit 0
+    }
+
+    if ($NoPackageManagers) {
+        Write-Log 'NoPackageManagers: skipping winget/Chocolatey (no visible console during NSIS install).'
+        if (Install-FromOfficialDownload) {
+            Write-Log 'Official download install succeeded.'
+            Register-FarmDashImageMagickInstall -Method 'download'
+            exit 0
+        }
+        Write-Log 'ImageMagick not installed (quiet path). DDS thumbnails may need texconv or manual ImageMagick.'
         exit 0
     }
 
@@ -122,7 +198,7 @@ try {
         )
         Write-Log 'Trying winget (user context) ...'
         try {
-            $p = Start-Process -FilePath $winget.Source -ArgumentList $args -Wait -PassThru -NoNewWindow
+            $p = Start-HiddenProcess -FilePath $winget.Source -ArgumentList $args -Wait
             Write-Log "winget exit: $($p.ExitCode)"
         } catch {
             Write-Log "winget start error: $($_.Exception.Message)"
@@ -130,43 +206,33 @@ try {
         Update-SessionPathFromRegistry
         if (Test-MagickOnPath) {
             Write-Log 'winget succeeded.'
+            Register-FarmDashImageMagickInstall -Method 'winget'
             exit 0
         }
 
-        Write-Log 'Trying winget elevated (UAC may prompt) ...'
-        try {
-            $psi = New-Object System.Diagnostics.ProcessStartInfo
-            $psi.FileName = $winget.Source
-            $psi.Arguments = ($args -join ' ')
-            $psi.UseShellExecute = $true
-            $psi.Verb = 'runas'
-            $elev = [System.Diagnostics.Process]::Start($psi)
-            $elev.WaitForExit()
-            Write-Log "winget elevated exit: $($elev.ExitCode)"
-        } catch {
-            Write-Log "winget elevated: $($_.Exception.Message)"
-        }
-        Update-SessionPathFromRegistry
-        if (Test-MagickOnPath) { exit 0 }
     } else {
         Write-Log 'winget not on PATH.'
     }
 
     $choco = Get-Command choco.exe -ErrorAction SilentlyContinue
     if ($choco) {
-        Write-Log 'Trying Chocolatey (may prompt UAC) ...'
+        Write-Log 'Trying Chocolatey ...'
         try {
-            $c = Start-Process -FilePath $choco.Source -ArgumentList @('install', 'imagemagick', '-y') -Wait -PassThru -Verb RunAs -ErrorAction SilentlyContinue
+            $c = Start-HiddenProcess -FilePath $choco.Source -ArgumentList @('install', 'imagemagick', '-y') -Wait
             if ($c) { Write-Log "choco exit: $($c.ExitCode)" }
         } catch {
             Write-Log "choco: $($_.Exception.Message)"
         }
         Update-SessionPathFromRegistry
-        if (Test-MagickOnPath) { exit 0 }
+        if (Test-MagickOnPath) {
+            Register-FarmDashImageMagickInstall -Method 'choco'
+            exit 0
+        }
     }
 
     if (Install-FromOfficialDownload) {
         Write-Log 'Official download install succeeded.'
+        Register-FarmDashImageMagickInstall -Method 'download'
         exit 0
     }
 

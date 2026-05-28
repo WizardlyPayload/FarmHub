@@ -37,7 +37,9 @@ On a **hosted / FTP server**, the mod must be active on that server and the save
 
 3. Start **Farming Simulator 25** once so the game registers the mod.
 
-*Screenshot not yet added:* `fd-install-010-mod-folder.png` — File Explorer showing **`FS25_FarmDashboard`** (`.zip` or folder) under **`mods\`**. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+![File Explorer showing **`FS25_FarmDashboard`** (`.zip` or folder) under **`mods\`**](screenshots/fd-install-010-mod-folder.png)
+
+*Figure: File Explorer showing **`FS25_FarmDashboard`** (`.zip` or folder) under **`mods\`**.*
 
 ---
 
@@ -49,8 +51,7 @@ Repeat for **each savegame** (and each dedicated-server save) that should use th
 2. Enable **Farm Dashboard** / **FS25 Farm Dashboard**.
 3. **Load the save and enter the world** (main menu alone is not enough).
 
-*Screenshot not yet added:* `fd-install-020-fs25-mod-enabled.png` — Mod ticked in the save’s mod list. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
-
+*Screenshot not yet added:* `fd-install-020-fs25-mod-enabled.png` — Mod ticked in the save’s mod list. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 ---
 
 ## Stage C — Confirm `data.json` is updating
@@ -63,8 +64,7 @@ After about one minute in-game, check:
 
 The file should exist and its **Modified** time should advance while you play.
 
-*Screenshot not yet added:* `fd-install-030-datajson-explorer.png` — File Explorer on that folder with a recent `data.json` timestamp. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
-
+*Screenshot not yet added:* `fd-install-030-datajson-explorer.png` — File Explorer on that folder with a recent `data.json` timestamp. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 **Dedicated / FTP server:** confirm the same path exists on the server profile you will point the app at (via FTP), not only on your gaming PC.
 
 ---
@@ -75,9 +75,13 @@ The file should exist and its **Modified** time should advance while you play.
 2. Run the installer. Choose language on the welcome page.
 3. Finish setup and launch **Farm Dashboard** from the Start menu.
 
-*Screenshot not yet added:* `fd-install-040-installer-welcome.png` — NSIS welcome / language page. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+![NSIS welcome / language page](screenshots/fd-install-040-installer-welcome.png)
 
-*Screenshot not yet added:* `fd-install-045-installer-finished.png` — Installer **Finished** page. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Figure: NSIS welcome / language page.*
+
+![Installer **Finished** page](screenshots/fd-install-045-installer-finished.png)
+
+*Figure: Installer **Finished** page.*
 
 ---
 
@@ -85,7 +89,9 @@ The file should exist and its **Modified** time should advance while you play.
 
 On first launch the app opens **Server Manager** (`setup.html`) if no servers are configured.
 
-*Screenshot not yet added:* `fd-install-050-app-first-launch.png` — App window before you complete Setup (or empty server list). See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+![App window before you complete Setup (or empty server list)](screenshots/fd-install-050-app-first-launch.png)
+
+*Figure: App window before you complete Setup (or empty server list).*
 
 ### Setup walk-through
 
@@ -150,6 +156,6 @@ More detail: [`USER_MANUAL.md` §10](./USER_MANUAL.md#10-troubleshooting) · [`S
 
 ## Screenshots for this guide
 
-Place PNGs in [`docs/screenshots/`](./screenshots/) using the exact names above. Full capture recipes: [`SCREENSHOTS_TO_CAPTURE.md`](./SCREENSHOTS_TO_CAPTURE.md) · master list: [`SCREENSHOT_MANIFEST.md`](./SCREENSHOT_MANIFEST.md).
+Place PNGs in [`docs/screenshots/`](./screenshots/) using the exact names above. Full manifest and capture checklist: [`SCREENSHOTS.md`](./SCREENSHOTS.md).
 
 **Authors:** [`AUTHORS.md`](./AUTHORS.md)

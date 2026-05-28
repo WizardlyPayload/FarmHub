@@ -2,9 +2,9 @@
 
 **Farm Dashboard** is the Windows desktop app that reads live farm data from **Farming Simulator 25** (via the in-game **FS25 Farm Dashboard** mod) and renders it in your browser at **[http://localhost:8766](http://localhost:8766)**. **App version 4.0.0**, **mod version 3.0.0.0**.
 
-This manual walks every setting, every section, and every modal, with **inline screenshots** (below each section). Where we already have a similar capture, one image is reused instead of asking twice. The screenshot manifest with filenames, captions, and capture recipes is in [`SCREENSHOT_MANIFEST.md`](./SCREENSHOT_MANIFEST.md) · [`SCREENSHOTS_TO_CAPTURE.md`](./SCREENSHOTS_TO_CAPTURE.md).
+This manual walks every setting, every section, and every modal, with **inline screenshots** (below each section). Where we already have a similar capture, one image is reused instead of asking twice. Screenshot filenames, capture recipes, and the “still to capture” checklist are in [`SCREENSHOTS.md`](./SCREENSHOTS.md).
 
-**Companion docs:** [`INSTALL.md`](./INSTALL.md) · [`SECURITY.md`](./SECURITY.md) · [`CHANGELOG.md`](./CHANGELOG.md) · [`SCREENSHOT_MANIFEST.md`](./SCREENSHOT_MANIFEST.md) · [`SCREENSHOTS_TO_CAPTURE.md`](./SCREENSHOTS_TO_CAPTURE.md)
+**Companion docs:** [`INSTALL.md`](./INSTALL.md) · [`SECURITY.md`](./SECURITY.md) · [`CHANGELOG.md`](./CHANGELOG.md) · [`SCREENSHOTS.md`](./SCREENSHOTS.md)
 
 > **Screenshots not visible?** Open **Markdown Preview** (`Ctrl+Shift+V`) while this file is focused — the editor tab alone shows text, not pictures. Images are in [`screenshots/`](./screenshots/) beside this file. On GitHub they appear only after PNGs are **committed and pushed**.
 
@@ -50,7 +50,10 @@ Do these **in order**. Skipping a stage is the most common reason the dashboard 
 1. Copy **`FS25_FarmDashboard.zip`** into **`Documents\My Games\FarmingSimulator2025\mods\`** (recommended), **or** copy/extract so you have **`mods\FS25_FarmDashboard\`** with **`modDesc.xml`** at that folder root (same layout as the release zip from **`tools\Zip-FarmDashboardMod.ps1`**).
 2. Start FS25 once so it sees the mod.
 
-*Screenshot not yet added:* `fd-install-010-mod-folder.png` — **`FS25_FarmDashboard`** visible under FS25 **`mods\`** (folder **or** `.zip`). See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+![**`FS25_FarmDashboard`** visible under FS25 **`mods\`** (folder **or** `.zip`)](screenshots/fd-install-010-mod-folder.png)
+
+*Figure: **`FS25_FarmDashboard`** visible under FS25 **`mods\`** (folder **or** `.zip`).*
+
 ### Stage B — Enable per save
 
 For **every** savegame where you want the dashboard:
@@ -58,7 +61,7 @@ For **every** savegame where you want the dashboard:
 1. Enable **FS25 Farm Dashboard** in the save's mod list.
 2. Load the save and enter the world (the main menu alone does not start collectors).
 
-*Screenshot not yet added:* `fd-install-020-fs25-mod-enabled.png` — Mod ticked in the save's mod list. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-install-020-fs25-mod-enabled.png` — Mod ticked in the save's mod list. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 ### Stage C — Confirm the mod is writing data
 
 After a minute, look in:
@@ -69,20 +72,29 @@ After a minute, look in:
 
 `data.json` should be present and have a recent **modified** timestamp.
 
-*Screenshot not yet added:* `fd-install-030-datajson-explorer.png` — `data.json` shown in File Explorer with a fresh timestamp. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-install-030-datajson-explorer.png` — `data.json` shown in File Explorer with a fresh timestamp. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 ### Stage D — Install the Windows app
 
 1. Run **`FS25 Farm Dashboard Setup 4.0.0.exe`**.
 2. Pick installer language on the welcome page; complete the installer.
 3. Launch **Farm Dashboard** from the Start menu.
 
-*Screenshot not yet added:* `fd-install-040-installer-welcome.png` — NSIS welcome page (language pick). See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
-*Screenshot not yet added:* `fd-install-045-installer-finished.png` — Installer "Finished" page. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+![NSIS welcome page (language pick)](screenshots/fd-install-040-installer-welcome.png)
+
+*Figure: NSIS welcome page (language pick).*
+
+![Installer "Finished" page](screenshots/fd-install-045-installer-finished.png)
+
+*Figure: Installer "Finished" page.*
+
 ### Stage E — First launch
 
 The app starts the Express server on `127.0.0.1:8766`, opens its window, and walks you through Setup if no servers are configured (see §3). After Setup completes you land on the **dashboard home** (§4).
 
-*Screenshot not yet added:* `fd-install-050-app-first-launch.png` — App window on first launch, before Setup. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+![App window on first launch, before Setup](screenshots/fd-install-050-app-first-launch.png)
+
+*Figure: App window on first launch, before Setup.*
+
 ---
 
 ## 3. First-run Setup
@@ -96,17 +108,26 @@ The Setup page (`setup.html`) is a **left/right split**:
 
 Top-right of the Setup page. Picking a language switches the page (and persists `farmdash_locale` for the main app too).
 
-*Screenshot not yet added:* `fd-setup-010-language-corner.png` — Language dropdown highlighted. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+![Language dropdown highlighted](screenshots/fd-setup-010-language-corner.png)
+
+*Figure: Language dropdown highlighted.*
+
 ### 3.2 Server list
 
 Each row shows the server name, source type, and a **Remove** button. The list is empty on first run.
 
-*Screenshot not yet added:* `fd-setup-020-empty-server-list.png` — Empty list, ready for first add. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+![Empty list, ready for first add](screenshots/fd-setup-020-empty-server-list.png)
+
+*Figure: Empty list, ready for first add.*
+
 ### 3.3 Auto-detect saves
 
 Right-side button. Scans `Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\` and proposes one **Local** server per save it finds. Accept to add them to the list.
 
-*Screenshot not yet added:* `fd-setup-030-auto-detect.png` — Auto-detect result with two saves found. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+![Auto-detect result with two saves found](screenshots/fd-setup-030-auto-detect.png)
+
+*Figure: Auto-detect result with two saves found.*
+
 ### 3.4 Add server (Local)
 
 | Field | What to enter |
@@ -116,7 +137,7 @@ Right-side button. Scans `Documents\My Games\FarmingSimulator2025\modSettings\FS
 | Local path | Full path to the folder containing `data.json`, e.g. `…\modSettings\FS25_FarmDashboard\savegame1` |
 | (Optional) HTTP feed | Only when your host documents an extra XML/HTTP source |
 
-*Screenshot not yet added:* `fd-setup-040-add-local.png` — Add-server form filled in for Local. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-setup-040-add-local.png` — Add-server form filled in for Local. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 ### 3.5 Add server (FTP)
 
 For a dedicated / rented FS25 server you do **not** play on locally.
@@ -145,12 +166,18 @@ Polling settings apply to **all FTP servers** at once.
 | Interval (minutes) | 1 – 25 | 5 | Time between polls per server |
 | Schedule | **Sync** / **Staggered** | Sync | Sync = all servers fire on the boundary; Staggered = offset each server by `interval / number of servers` |
 
-*Screenshot not yet added:* `fd-setup-060-ftp-polling.png` — FTP polling block. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+![FTP polling block](screenshots/fd-setup-060-ftp-polling.png)
+
+*Figure: FTP polling block.*
+
 ### 3.7 Mod images scan
 
 Right-side button. Runs a background PowerShell helper to extract vehicle thumbnails from your installed mods. Has a progress overlay and can take a long time (capped at 90 minutes).
 
-*Screenshot not yet added:* `fd-setup-070-mod-images.png` — Mod images progress overlay. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+![Mod images progress overlay](screenshots/fd-setup-070-mod-images.png)
+
+*Figure: Mod images progress overlay.*
+
 ### 3.8 Launch
 
 Saves the config and reloads to the dashboard home.
@@ -180,8 +207,7 @@ After Setup, the dashboard shell loads at [http://localhost:8766](http://localho
 
 *Figure: **Home (landing page)** — server tabs, farm dropdown, game time, data-source and weather pills, notification bell, and settings. The six cards (Livestock, Vehicles, Fields, Economy, Pastures, Productions) show live counts. This one capture also covers `fd-shell-010-navbar`, `fd-shell-040-landing-badges`, and `fd-section-000-landing` in the manifest.*
 
-*Screenshot not yet added:* `fd-shell-030-game-time-weather.png` — Close-up crop of only the game time and weather pills. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
-
+*Screenshot not yet added:* `fd-shell-030-game-time-weather.png` — Close-up crop of only the game time and weather pills. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 The **landing page** shows up to six cards: Livestock, Vehicles, Fields, Economy, Pastures, Productions. Each card has a count badge using the localised pluralised string (`{{count}} animal/animals`, etc.).
 
 There is also an **Import mod images** action on the landing page when running locally with API access.
@@ -381,7 +407,7 @@ Already covered in §4. The six cards are populated by `navigation.js` `updateLa
 
 *Figure: Summary cards.*
 
-*Screenshot not yet added:* `fd-section-vehicles-020-filters.png` — Filters panel. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-section-vehicles-020-filters.png` — Filters panel. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 ![Vehicle grid](screenshots/fd-section-vehicles-030-grid.png)
 
 *Figure: Vehicle grid.*
@@ -437,8 +463,8 @@ The most feature-rich section.
 
 *Figure: Tools & shop block.*
 
-*Screenshot not yet added:* `fd-section-fields-070-waiting.png` — Waiting state. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
-*Screenshot not yet added:* `fd-section-fields-080-api-error.png` — API error strip. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-section-fields-070-waiting.png` — Waiting state. See [SCREENSHOTS.md](./SCREENSHOTS.md).
+*Screenshot not yet added:* `fd-section-fields-080-api-error.png` — API error strip. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 ### 6.5 Economy
 
 | Control | What it does |
@@ -501,7 +527,7 @@ Productions has no user filters; it is read-only.
 
 *Figure: Chains list.*
 
-*Screenshot not yet added:* `fd-section-productions-020-empty.png` — Empty state. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-section-productions-020-empty.png` — Empty state. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 ---
 
 ## 7. Modals
@@ -510,7 +536,7 @@ Productions has no user filters; it is read-only.
 
 Bell → opens the modal. Lists up to 10 most recent notifications with a **Clear all** button.
 
-*Screenshot not yet added:* `fd-modal-010-notifications.png` — Notification history modal. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-modal-010-notifications.png` — Notification history modal. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 ### 7.2 Export livestock
 
 Livestock section → **Export**. Format options + download.
@@ -525,37 +551,43 @@ Livestock section → **Export**. Format options + download.
 
 Optional confirmation when forcing a refresh from the navbar.
 
-*Screenshot not yet added:* `fd-modal-030-refresh-data.png` — Refresh modal. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-modal-030-refresh-data.png` — Refresh modal. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 ### 7.4 Data changes
 
 Lists recent change deltas in three sub-tabs (added / removed / updated).
 
-*Screenshot not yet added:* `fd-modal-040-data-changes.png` — Data changes modal. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-modal-040-data-changes.png` — Data changes modal. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 ### 7.5 Warning details
 
 Opened from a warning badge (e.g. on a pasture).
 
-*Screenshot not yet added:* `fd-modal-050-warning-details.png` — Warning modal. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-modal-050-warning-details.png` — Warning modal. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 ### 7.6 Animal details
 
 Opened from a row on the Livestock table.
 
-*Screenshot not yet added:* `fd-modal-060-animal-details.png` — Animal details modal. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+![Animal details modal](screenshots/fd-modal-060-animal-details.png)
+
+*Figure: Animal details modal.*
+
 ### 7.7 Pasture livestock / details
 
 Opened from pasture cards or **View all livestock**.
 
-*Screenshot not yet added:* `fd-modal-070-pasture-livestock.png` — Pasture livestock modal. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+![Pasture livestock modal](screenshots/fd-modal-070-pasture-livestock.png)
+
+*Figure: Pasture livestock modal.*
+
 ### 7.8 Vehicle image
 
 Opened by clicking a vehicle image.
 
-*Screenshot not yet added:* `fd-modal-080-vehicle-image.png` — Vehicle image modal. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-modal-080-vehicle-image.png` — Vehicle image modal. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 ### 7.9 Weather forecast
 
 Opened by clicking the navbar weather pill.
 
-*Screenshot not yet added:* `fd-modal-090-weather.png` — Weather forecast modal. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-modal-090-weather.png` — Weather forecast modal. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 ### 7.10 Mod export progress
 
 Shown while the mod-image scan is running.
@@ -568,7 +600,7 @@ Shown while the mod-image scan is running.
 
 Shown when more than one farm is found and the dashboard wants you to pick one explicitly.
 
-*Screenshot not yet added:* `fd-modal-110-farm-selection.png` — Farm selection modal. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-modal-110-farm-selection.png` — Farm selection modal. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 ---
 
 ## 8. LAN access and tablets
@@ -587,8 +619,8 @@ The dashboard can serve a tablet on your LAN. Always set both **a username and a
 
 *Figure: LAN access toggle on with credentials.*
 
-*Screenshot not yet added:* `fd-lan-020-tablet-prompt.png` — Tablet showing the Basic auth prompt. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
-*Screenshot not yet added:* `fd-lan-030-tablet-dashboard.png` — Tablet showing the dashboard home. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-lan-020-tablet-prompt.png` — Tablet showing the Basic auth prompt. See [SCREENSHOTS.md](./SCREENSHOTS.md).
+*Screenshot not yet added:* `fd-lan-030-tablet-dashboard.png` — Tablet showing the dashboard home. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 See [`SECURITY.md`](./SECURITY.md) for the trust assumptions and what LAN exposure does and does not protect.
 
 ---
@@ -618,8 +650,8 @@ Settings → **FS25 mod** edits this file directly (see §5.3). The file looks l
 | `debugBaleScan` | `true` / `false` | Throttled bale-scan logging into FS25's `log.txt`. **Hand-edit only** — see audit gap #2 |
 | `modules.animals` … `modules.production` | bool | Per-collector enable; disabling one shortens the slot for the others |
 
-*Screenshot not yet added:* `fd-mod-010-config-xml-explorer.png` — `config.xml` in File Explorer. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
-*Screenshot not yet added:* `fd-mod-020-config-xml-editor.png` — `config.xml` open in a text editor. See [SCREENSHOTS_TO_CAPTURE.md](./SCREENSHOTS_TO_CAPTURE.md).
+*Screenshot not yet added:* `fd-mod-010-config-xml-explorer.png` — `config.xml` in File Explorer. See [SCREENSHOTS.md](./SCREENSHOTS.md).
+*Screenshot not yet added:* `fd-mod-020-config-xml-editor.png` — `config.xml` open in a text editor. See [SCREENSHOTS.md](./SCREENSHOTS.md).
 The mod has **no in-game console command** and **no Giants settings menu entry**; the file above is the only configuration surface.
 
 ---
@@ -643,6 +675,6 @@ The mod has **no in-game console command** and **no Giants settings menu entry**
 
 ## 11. Screenshot index
 
-The full list of filenames, captions, and capture recipes (auto vs manual) lives in [`SCREENSHOT_MANIFEST.md`](./SCREENSHOT_MANIFEST.md). All images sit under [`docs/screenshots/`](./screenshots/).
+The full list of filenames, captions, and capture recipes (auto vs manual) lives in [`SCREENSHOTS.md`](./SCREENSHOTS.md). All images sit under [`docs/screenshots/`](./screenshots/).
 
 **Document version:** aligned with app **4.0.0** and mod **3.0.0.0**. **Authors:** [`AUTHORS.md`](./AUTHORS.md).

@@ -64,6 +64,14 @@
         "to": "install-imagemagick.ps1"
       },
       {
+        "from": "build/uninstall-user-data.ps1",
+        "to": "uninstall-user-data.ps1"
+      },
+      {
+        "from": "build/uninstall-dependencies.ps1",
+        "to": "uninstall-dependencies.ps1"
+      },
+      {
         "from": "resources/imagemagick",
         "to": "imagemagick",
         "filter": [

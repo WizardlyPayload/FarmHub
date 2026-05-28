@@ -1,6 +1,6 @@
 # Farm Dashboard — Changelog
 
-All notable changes to this project are recorded here. For GitHub release blurbs, see [RELEASE_NOTES.md](./RELEASE_NOTES.md). For **network exposure and trust assumptions**, see [SECURITY.md](./SECURITY.md).
+All notable changes to this project are recorded here. For GitHub release blurbs, see [GITHUB_RELEASE_v4.0.0.md](./GITHUB_RELEASE_v4.0.0.md). For **network exposure and trust assumptions**, see [SECURITY.md](./SECURITY.md).
 
 ---
 
@@ -44,7 +44,7 @@ Narrative: **[RELEASE_v4.0.0.md](./RELEASE_v4.0.0.md)** · GitHub body: **[GITHU
 
 **App:** `3.9.0` (`package.json`) · **Mod:** `2.3.0.0` (`modDesc.xml` + Lua, now in lockstep).
 
-Narrative: **[RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md)** · Audit: **[AUDIT_v3.9_PREFINAL.md](./AUDIT_v3.9_PREFINAL.md)**.
+Narrative: **[_internal/archive-releases/RELEASE_v3.9.0.md](./_internal/archive-releases/RELEASE_v3.9.0.md)** · Audit: **[_internal/AUDIT_v3.9_PREFINAL.md](./_internal/AUDIT_v3.9_PREFINAL.md)**.
 
 ### Security blockers closed
 
@@ -70,7 +70,7 @@ Narrative: **[RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md)** · Audit: **[AUDIT_v3.9_
 - `INSTALL.md` malformed markdown fixed (`**data.json` → `data.json`, `**FS25_FarmDashboard` → `FS25_FarmDashboard`); release URL pointed at the canonical `WizardlyPayload/FarmHub` GitHub repo.
 - **Mod packaging / docs** — **`Zip-FarmDashboardMod.ps1`** packs **only** **`modDesc.xml`**, **`icon.png`**, and **`src/`** at the zip root (Giants `sourceFile` paths). Install docs name the player-facing mod **`FS25_FarmDashboard`** in **`mods\`**, not the repo folder **`FS25_FarmDashboard_Mod`**. Screenshot manifest: **1920 × 1080** desktop, **1080 × 1920** tablet LAN rows only.
 - **Supply chain & CI** — **`fast-xml-parser`** raised to **^5.7.3** (moderate advisory); **`npm audit --omit=dev`** clean on the app tree. GitHub Actions **`.github/workflows/ci.yml`** runs **`npm ci`**, **`npm test`**, **`npm run verify:electron-pack`** (main-process `require('./…')` closure vs **`build.files`**), **`npm run i18n:verify`**, **`npm audit --omit=dev`** on Windows for **`main` / `master` / `develop`**. Root **`LICENSE`** added (all rights reserved). **Packaging:** **`build.files`** includes **`detailAnimalsHydrate.js`**, **`livestockDetail.js`**, **`icon.ico`** so packaged installs do not throw **Cannot find module** at startup. **XSS:** **`livestock.js`** (`formatLocation`, breed column), **`navigation.js`** (farm picker, unknown section), **`vehicles.js`** (card title / brand / thumb labels), **`economy.js`** / **`changes.js`** / **`fields.js`** (market rows, data-change modal, field card titles) — escape via **`_safe`** / **`escapeFieldHtml`**. Extended **`tests/xss.smoke.test.js`** (**223** tests).
-- **i18n** — Ran **`sync-keys-from-en.mjs`**: all **26** non-English locales now include every key from **`en.json`** (**987** keys each); **`npm run i18n:verify`** passes (no missing keys / placeholder drift). **`translations.json`** regenerated. **`npm run i18n:sync`** added to **`package.json`**; **[docs/I18N.md](./I18N.md)** documents the workflow.
+- **i18n** — Ran **`sync-keys-from-en.mjs`**: all **26** non-English locales now include every key from **`en.json`** (**987** keys each); **`npm run i18n:verify`** passes (no missing keys / placeholder drift). **`translations.json`** regenerated. **`npm run i18n:sync`** added to **`package.json`**; **[docs/_internal/I18N.md](./I18N.md)** documents the workflow.
 - `USER_MANUAL.md`, `DEVELOPER_HANDOVER.md` rename `lanUser` → `lanUsername` to match `main.js` `LAN_ACCESS_DEFAULTS` keys.
 
 ### Repository layout
@@ -80,7 +80,7 @@ Narrative: **[RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md)** · Audit: **[AUDIT_v3.9_
 
 ### Acceptance
 
-`npm test` reports green across **12** suites (**223** tests) on the reference machine — re-run **`npm test`** and **`npm run verify:electron-pack`** before tagging. The remaining release gate is the updater smoke test (3.9.0 → 4.0.0 channel) per [`UPDATER_QA.md`](./UPDATER_QA.md). Operator checklist: **[RELEASE_READINESS_v3.9.md](./RELEASE_READINESS_v3.9.md)**.
+`npm test` reports green across **12** suites (**223** tests) on the reference machine — re-run **`npm test`** and **`npm run verify:electron-pack`** before tagging. The remaining release gate is the updater smoke test (3.9.0 → 4.0.0 channel) per [`UPDATER_QA.md`](./UPDATER_QA.md). Operator checklist: **[_internal/RELEASE_READINESS_v3.9.md](./_internal/RELEASE_READINESS_v3.9.md)**.
 
 ---
 
@@ -88,7 +88,7 @@ Narrative: **[RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md)** · Audit: **[AUDIT_v3.9_
 
 **App:** `3.0.0` (`package.json`) · **Mod:** `2.0.0.0` unless you ship a new mod build.
 
-Narrative: **[RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md)** · GitHub blurb: **[RELEASE_NOTES.md](./RELEASE_NOTES.md)**.
+Narrative: **[_internal/archive-releases/RELEASE_v3.0.0.md](./_internal/archive-releases/RELEASE_v3.0.0.md)** · GitHub blurb: **[GITHUB_RELEASE_v4.0.0.md](./GITHUB_RELEASE_v4.0.0.md)**.
 
 ### Product scope (documentation + supported surface)
 
@@ -125,8 +125,8 @@ Git history or older branches may contain experiments and code paths not describ
 | Version | Focus |
 |---------|--------|
 | **4.0.0** | Stable promotion: validated in-app updater (3.9→4.0), mod version navbar badge, docs at 4.0 — see §4.0.0 and [RELEASE_v4.0.0.md](./RELEASE_v4.0.0.md). |
-| **3.9.0** | Pre-final hardening: LAN credential policy, DOM XSS sweep, telemetry-vs-critical pasture warnings, setup UX, i18n sweep, test parity, version unification — see §3.9.0 above and [RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md). |
-| **3.0.0** | Rules-first field UX, windrow export/merge/UI, unified Settings, LAN security, default build output outside repo, NSIS upgrade/uninstall hardening — see §3.0.0 above and [RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md). |
+| **3.9.0** | Pre-final hardening: LAN credential policy, DOM XSS sweep, telemetry-vs-critical pasture warnings, setup UX, i18n sweep, test parity, version unification — see §3.9.0 above and [_internal/archive-releases/RELEASE_v3.9.0.md](./_internal/archive-releases/RELEASE_v3.9.0.md). |
+| **3.0.0** | Rules-first field UX, windrow export/merge/UI, unified Settings, LAN security, default build output outside repo, NSIS upgrade/uninstall hardening — see §3.0.0 above and [_internal/archive-releases/RELEASE_v3.0.0.md](./_internal/archive-releases/RELEASE_v3.0.0.md). |
 | **1.0.0** | First public release: mod + Electron app, local/FTP, XML + Lua merge, full dashboard sections. |
 | **1.1.2** | Mod shop image export pipeline, vehicle thumbnails from extracted PNGs, installer resources. |
 | **2.0.0** | Field accuracy and merge rules, single-player authority, multi-farm UI, data pipeline robustness, packaging, docs, repo hygiene, security/network documentation. |
@@ -137,7 +137,7 @@ Git history or older branches may contain experiments and code paths not describ
 
 **App:** `1.0.0` · **Mod:** `1.0.0.0`
 
-Initial shipping version documented in [RELEASE_NOTES.md](./RELEASE_NOTES.md).
+Initial shipping version documented in [GITHUB_RELEASE_v4.0.0.md](./GITHUB_RELEASE_v4.0.0.md).
 
 ### Product
 
@@ -270,9 +270,9 @@ After pulling, run **`npm install`** under `FS25_FarmDashboard_App/FS25_FarmDash
 |------|------|
 | [README.md](../README.md) | Install, build, LAN browser access, troubleshooting, GitHub workflow |
 | [INSTALL.md](./INSTALL.md) | Basic install order: mod in every target save **before** the desktop app |
-| [RELEASE_NOTES.md](./RELEASE_NOTES.md) | Short copy-paste text for GitHub Releases |
-| [RELEASE_v3.0.0.md](./RELEASE_v3.0.0.md) | Long-form **3.0.0** release narrative |
-| [DESCRIPTION_AND_SCREENSHOTS.md](./DESCRIPTION_AND_SCREENSHOTS.md) | Long-form product description + screenshot checklist |
+| [GITHUB_RELEASE_v4.0.0.md](./GITHUB_RELEASE_v4.0.0.md) | Short copy-paste text for GitHub Releases |
+| [_internal/archive-releases/RELEASE_v3.0.0.md](./_internal/archive-releases/RELEASE_v3.0.0.md) | Long-form **3.0.0** release narrative |
+| [SCREENSHOTS.md](./SCREENSHOTS.md) | Long-form product description + screenshot checklist |
 | [SECURITY.md](./SECURITY.md) | Network exposure, LAN browser use, trust model |
 | [DEVELOPER_HANDOVER.md](./DEVELOPER_HANDOVER.md) | FarmHub: dashboard + mod architecture and file map |
 | [AUTHORS.md](./AUTHORS.md) | JoshWalki & WizardlyPayload |

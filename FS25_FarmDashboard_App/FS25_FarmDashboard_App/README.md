@@ -112,7 +112,7 @@ Build output folders are **gitignored**; installers are produced locally and **n
 
 ## Release notes — v4.0.0
 
-See **[../../docs/CHANGELOG.md](../../docs/CHANGELOG.md)** §**4.0.0**, **[../../docs/RELEASE_NOTES.md](../../docs/RELEASE_NOTES.md)**. Long-form narrative: **[../../docs/RELEASE_v4.0.0.md](../../docs/RELEASE_v4.0.0.md)**. Prior line: **[../../docs/RELEASE_v3.9.0.md](../../docs/RELEASE_v3.9.0.md)**, **[../../docs/RELEASE_v3.0.0.md](../../docs/RELEASE_v3.0.0.md)**. Earlier packaged notes: **[../../docs/RELEASE_v2.0.0.md](../../docs/RELEASE_v2.0.0.md)**. Summary (v2 era):
+See **[../../docs/CHANGELOG.md](../../docs/CHANGELOG.md)** §**4.0.0**, **[../../docs/GITHUB_RELEASE_v4.0.0.md](../../docs/GITHUB_RELEASE_v4.0.0.md)**. Long-form narrative: **[../../docs/RELEASE_v4.0.0.md](../../docs/RELEASE_v4.0.0.md)**. Prior line: **[../../docs/RELEASE_v3.9.0.md](../../docs/RELEASE_v3.9.0.md)**, **[../../docs/RELEASE_v3.0.0.md](../../docs/RELEASE_v3.0.0.md)**. Earlier packaged notes: **[../../docs/RELEASE_v2.0.0.md](../../docs/RELEASE_v2.0.0.md)**. Summary (v2 era):
 
 - **Language first:** NSIS installer welcome page + Server Manager language bar; shared `locale` store and `translations.json` pipeline.
 - **Dashboard i18n:** EU/EEA-oriented locales with English fallback per string.

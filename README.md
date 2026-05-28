@@ -30,7 +30,7 @@ Open the dashboard at **[http://localhost:8766](http://localhost:8766)** after s
 | **Livestock** | **Productions** |
 | ![Livestock summary and animals table](docs/screenshots/fd-section-livestock-010-summary.png) | ![Productions storage and chains](docs/screenshots/fd-section-productions-010-list.png) |
 
-More UI shots and install screenshots: **[docs/USER_MANUAL.md](docs/USER_MANUAL.md)** · capture checklist: **[docs/SCREENSHOTS_TO_CAPTURE.md](docs/SCREENSHOTS_TO_CAPTURE.md)**
+More UI shots and install screenshots: **[docs/USER_MANUAL.md](docs/USER_MANUAL.md)** · capture checklist: **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)**
 
 ---
 

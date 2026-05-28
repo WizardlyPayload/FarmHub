@@ -3,7 +3,7 @@
 **Desktop app:** `4.0.0` (`FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json`)  
 **FS25 mod:** `3.0.0.0` (`modDesc.xml` + `FarmDashboard.VERSION` in Lua — app requires **3.0.0.0+**)
 
-**Prior line:** [RELEASE_v3.9.0.md](./RELEASE_v3.9.0.md) (pre-final hardening + updater baseline).
+**Prior line:** [RELEASE_v3.9.0.md](./_internal/archive-releases/RELEASE_v3.9.0.md) (pre-final hardening + updater baseline).
 
 ---
 
@@ -17,7 +17,7 @@ v4.0.0 is the **first stable promotion** after the 3.9 pre-final line. It valida
 
 | Area | Change |
 |------|--------|
-| **Auto-update** | Confirmed production path: packaged **3.9.0** → published **4.0.0** release with **`latest.yml`** + installer. See [UPDATER_QA.md](./UPDATER_QA.md). |
+| **Auto-update** | Confirmed production path: packaged **3.9.0** → published **4.0.0** release with **`latest.yml`** + installer. See [_internal/UPDATER_QA.md](./_internal/UPDATER_QA.md). |
 | **Mod version badge** | Lua exports `serverInfo.modVersion`; app compares against `MIN_MOD_VERSION` in `modVersionPolicy.js`; unobtrusive navbar badge when the in-game mod is older or version cannot be read. |
 | **Tests** | `modVersionPolicy.test.js` (+7 tests); **230** total under `npm test`. |
 | **Docs / versions** | App **`4.0.0`** across `package.json`, manuals, wiki, and release notes. |

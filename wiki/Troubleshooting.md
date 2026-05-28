@@ -170,7 +170,7 @@ Restart game.
 ## Updates
 
 - **Check for updates:** Settings → Dashboard (needs packaged build + GitHub Releases)
-- **3.9 → 4.0:** see [UPDATER_QA.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/UPDATER_QA.md)
+- **3.9 → 4.0:** see [UPDATER_QA.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/_internal/UPDATER_QA.md)
 - Manual: download latest `.exe` from Releases
 
 ---
@@ -193,6 +193,50 @@ Delete app data (re-run Setup):
 ```
 
 Uninstall app separately if needed.
+
+---
+
+## Installer — progress bar then nothing (first try)
+
+**What you see:** Windows shows a short **“preparing” / extracting** progress bar, then **no installer window**. Running the `.exe` again often works.
+
+**What is happening:** The setup file is a **self-extracting NSIS package**. The small bar is it unpacking to `%TEMP%`. The **real** wizard (language page first) should open after that. If it does not on the first attempt, something blocked or hid the inner installer.
+
+**Try this order:**
+
+1. **Wait 30–60 seconds** after the bar closes (Defender may still be scanning the temp `.exe`).
+2. **Check the taskbar** and **Alt+Tab** — the wizard may be behind FS25, a browser, or on another monitor.
+3. **UAC** — look for a dimmed **“Do you want to allow this app…”** prompt (especially if you chose install for all users / Run as administrator).
+4. **SmartScreen** — right-click the installer → **Properties** → if you see **Unblock**, tick it → OK. Or open **Windows Security → App & browser control → Protection history** for a blocked run.
+5. **Close Farm Dashboard** completely (tray too), then run the installer again.
+6. **Task Manager** — end any stuck `FS25 Farm Dashboard Setup` or `*_setup.exe` under Details, then run again.
+7. **Unlock script** (from repo, if you build locally):
+   ```powershell
+   cd FS25_FarmDashboard_App\FS25_FarmDashboard_App
+   npm run unlock-install
+   ```
+8. **Log the next run** (send log if you open an issue):
+   ```bat
+   "FS25 Farm Dashboard Setup 3.9.0.exe" /LOG="%USERPROFILE%\Desktop\farmdash-install.log"
+   ```
+
+**Why the second try often works:** The first run may have finished extracting to `%TEMP%` while the GUI was blocked; the second run reuses or replaces that cache and starts faster.
+
+**After install:** If upgrade fails with “file in use”, close the app and run `npm run unlock-install` from the app folder, or reboot once.
+
+---
+
+## Mod shop images — "Cannot create app.asar"
+
+**Symptom:** `Export did not produce a summary file` and PowerShell mentions `Cannot create "…\resources\app.asar"`.
+
+**Cause:** The installed app tried to write PNGs inside the read-only **`app.asar`** file. Newer app builds write to:
+
+```
+%APPDATA%\fs25-farm-dashboard\items_mod_extract\
+```
+
+**Fix:** Update to a build that includes the `resolveModStoreImagesOutputDir()` fix, or run **`npm start`** from the repo for export.
 
 ---
 

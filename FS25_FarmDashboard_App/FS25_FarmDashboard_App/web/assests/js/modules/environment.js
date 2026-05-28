@@ -1,6 +1,18 @@
 // FS25 FarmDashboard | environment.js | v2.0.0
 
-import { t } from "../i18n/i18n.js";
+import { t, applyDom } from "../i18n/i18n.js";
+
+const MOD_REQUIRED_DISMISS_PREFIX = "farmdash_mod_required_ok_";
+
+function modRequiredDismissKey(serverId) {
+  return MOD_REQUIRED_DISMISS_PREFIX + String(serverId || "");
+}
+
+function removeLegacyModRequiredBanner() {
+  ["farmdash-live-mod-banner", "farmdash-mod-required-banner"].forEach((id) => {
+    document.getElementById(id)?.remove();
+  });
+}
 
 export function formatGameTime(dayTimeMinutes) {
   const hours = Math.floor(dayTimeMinutes / 60);
@@ -87,6 +99,80 @@ export function updateNavbarConnectionStrip() {
     dsBadge.title = apiOn
       ? "Savegame XML, live mod data stream, and dashboard API are connected."
       : "Data source status for this save (dashboard API not connected yet).";
+  }
+
+  this.maybeShowModRequiredModal();
+}
+
+/** True when the save has XML but the in-game mod is not exporting live data. */
+export function needsModActivationNotice() {
+  if (!this.activeServerId) return false;
+  if (this.luaAvailable) return false;
+  const src = this.dataSource || "unknown";
+  if (src === "lua_only" || src === "merged") return false;
+  if (src === "xml_only") return true;
+  return !!this.xmlAvailable;
+}
+
+export function clearModRequiredDismissal(serverId) {
+  try {
+    sessionStorage.removeItem(modRequiredDismissKey(serverId));
+  } catch (_) {
+    /* private mode */
+  }
+}
+
+/**
+ * One-time modal (per server, per browser session) when FS25_FarmDashboard is not active on this save.
+ * Replaces any legacy full-width top banner.
+ */
+export function maybeShowModRequiredModal() {
+  removeLegacyModRequiredBanner();
+
+  if (!this.needsModActivationNotice()) {
+    if (this.activeServerId && this.luaAvailable) {
+      this.clearModRequiredDismissal(this.activeServerId);
+    }
+    return;
+  }
+
+  const sid = String(this.activeServerId);
+  try {
+    if (sessionStorage.getItem(modRequiredDismissKey(sid)) === "1") return;
+  } catch (_) {
+    /* ignore */
+  }
+
+  const lanOverlay = document.getElementById("farmdash-lan-auth-overlay");
+  if (lanOverlay && !lanOverlay.classList.contains("d-none")) return;
+  if (document.body.classList.contains("has-farmdash-splash")) return;
+
+  const el = document.getElementById("farmdash-mod-required-modal");
+  if (!el || typeof bootstrap === "undefined" || !bootstrap.Modal) return;
+  if (el.classList.contains("show")) return;
+
+  const remote = !!(typeof window !== "undefined" && window.__farmDashRemoteViewer);
+  const remoteBlock = el.querySelector("[data-mod-required-remote]");
+  const localBlock = el.querySelector("[data-mod-required-local]");
+  if (remoteBlock) remoteBlock.classList.toggle("d-none", !remote);
+  if (localBlock) localBlock.classList.toggle("d-none", remote);
+
+  applyDom(el);
+  bootstrap.Modal.getOrCreateInstance(el, { backdrop: "static", keyboard: false }).show();
+}
+
+export function dismissModRequiredModal() {
+  const sid = String(this.activeServerId || "");
+  try {
+    if (sid) sessionStorage.setItem(modRequiredDismissKey(sid), "1");
+  } catch (_) {
+    /* ignore */
+  }
+  removeLegacyModRequiredBanner();
+  const el = document.getElementById("farmdash-mod-required-modal");
+  if (el && typeof bootstrap !== "undefined" && bootstrap.Modal) {
+    const inst = bootstrap.Modal.getInstance(el);
+    if (inst) inst.hide();
   }
 }
 

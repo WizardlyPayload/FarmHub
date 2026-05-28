@@ -18,7 +18,7 @@
 
 Var FarmDashLangCombo
 Var FarmDashSavedLang
-; 0 = keep profile data (settings, server caches, etc.); 1 = remove all user-level data (set in uninstaller customUnInit).
+; 0 = keep config.json + serverLiveCache only; 1 = remove all user-level data (set in customUnInit).
 Var FarmDashWipeUserData
 
 !macro customWelcomePage
@@ -201,7 +201,7 @@ FunctionEnd
   FarmDash_RunMagick:
     DetailPrint "Installing ImageMagick (mod folder DDS to PNG thumbnails)..."
     ; -WindowStyle Hidden avoids a visible blue PowerShell console during install
-    ExecWait 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\install-imagemagick.ps1"'
+    ExecWait 'powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$INSTDIR\resources\install-imagemagick.ps1" -NoPackageManagers'
   FarmDash_MagickDone:
 !macroend
 
@@ -212,7 +212,7 @@ FunctionEnd
     Goto FarmDashUnInitDone
   ${EndIf}
   MessageBox MB_YESNOCANCEL|MB_ICONQUESTION \
-    "Farm Dashboard stores your preferences, server connections, downloaded XML/caches, and other data under your Windows user profile (separate from the program files).$\r$\n$\r$\nDo you want to KEEP this data if you reinstall later?$\r$\n$\r$\nYes — Uninstall the app only (keep my data)$\r$\nNo — Remove ALL Farm Dashboard data from this user account$\r$\nCancel — Do not uninstall" \
+    "Farm Dashboard stores data under your Windows user profile (not in Program Files).$\r$\n$\r$\nYes — Keep for reinstall:$\r$\n  • Settings (servers, FTP/LAN, theme, preferences)$\r$\n  • Offline farm snapshots (last merged view per server)$\r$\n  Removes caches, FTP/XML copies, and other temporary files.$\r$\n  Keeps ImageMagick if the installer added it.$\r$\n$\r$\nNo — Remove everything:$\r$\n  • All settings, snapshots, caches, and registry entries$\r$\n  • ImageMagick if Farm Dashboard installed it (not if you had it already)$\r$\n$\r$\nCancel — Do not uninstall" \
     IDYES FarmDashUnKeep \
     IDNO FarmDashUnWipe
   Quit
@@ -224,8 +224,14 @@ FunctionEnd
   FarmDashUnInitDone:
 !macroend
 
-; After built-in uninstall steps: optionally remove Roaming + Local profile folders and our HKCU key.
+; After built-in uninstall steps: optionally remove user profile data, or keep only settings + offline snapshots.
 !macro customUnInstall
+  DetailPrint "Stopping ${PRODUCT_NAME} if still running..."
+  ClearErrors
+  nsExec::ExecToLog `cmd.exe /c taskkill /F /T /IM "${APP_EXECUTABLE_FILENAME}" 2>nul`
+  Pop $R0
+  Sleep 1500
+
   StrCpy $R6 "0"
   ${If} $FarmDashWipeUserData == "1"
     StrCpy $R6 "1"
@@ -236,37 +242,65 @@ FunctionEnd
   ${IfNot} ${Errors}
     StrCpy $R6 "1"
   ${EndIf}
-  ${If} $R6 != "1"
-    Goto FarmDashUninstallUserDone
-  ${EndIf}
-  DetailPrint "Removing Farm Dashboard user profile data (AppData Roaming/Local, registry)..."
+
   ${if} $installMode == "all"
     SetShellVarContext current
   ${endif}
-  RMDir /r "$APPDATA\fs25-farm-dashboard"
-  !ifdef APP_FILENAME
-    RMDir /r "$APPDATA\${APP_FILENAME}"
-  !endif
-  !ifdef APP_PACKAGE_NAME
-    RMDir /r "$APPDATA\${APP_PACKAGE_NAME}"
-  !endif
-  !ifdef APP_PRODUCT_FILENAME
-    RMDir /r "$APPDATA\${APP_PRODUCT_FILENAME}"
-  !endif
-  RMDir /r "$LOCALAPPDATA\fs25-farm-dashboard"
-  !ifdef APP_PACKAGE_NAME
-    RMDir /r "$LOCALAPPDATA\${APP_PACKAGE_NAME}"
-  !endif
-  !ifdef APP_FILENAME
-    RMDir /r "$LOCALAPPDATA\${APP_FILENAME}"
-  !endif
-  !ifdef APP_PRODUCT_FILENAME
-    RMDir /r "$LOCALAPPDATA\${APP_PRODUCT_FILENAME}"
-  !endif
-  DeleteRegKey HKCU "Software\fs25-farm-dashboard"
-  Delete "$TEMP\farmdash-install-locale.txt"
+
+  ${If} $R6 == "1"
+    DetailPrint "Removing all Farm Dashboard user data..."
+    IfFileExists "$INSTDIR\resources\uninstall-user-data.ps1" FarmDash_UnFullScript FarmDash_UnFullLegacy
+    FarmDash_UnFullScript:
+      ExecWait 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\uninstall-user-data.ps1" -Mode Full' $R0
+      Goto FarmDash_UnFullDone
+    FarmDash_UnFullLegacy:
+      RMDir /r "$APPDATA\fs25-farm-dashboard"
+      !ifdef APP_FILENAME
+        RMDir /r "$APPDATA\${APP_FILENAME}"
+      !endif
+      !ifdef APP_PACKAGE_NAME
+        RMDir /r "$APPDATA\${APP_PACKAGE_NAME}"
+      !endif
+      !ifdef APP_PRODUCT_FILENAME
+        RMDir /r "$APPDATA\${APP_PRODUCT_FILENAME}"
+      !endif
+      RMDir /r "$LOCALAPPDATA\fs25-farm-dashboard"
+      RMDir /r "$LOCALAPPDATA\fs25-farm-dashboard-updater"
+      !ifdef APP_PACKAGE_NAME
+        RMDir /r "$LOCALAPPDATA\${APP_PACKAGE_NAME}"
+        RMDir /r "$LOCALAPPDATA\${APP_PACKAGE_NAME}-updater"
+      !endif
+      !ifdef APP_FILENAME
+        RMDir /r "$LOCALAPPDATA\${APP_FILENAME}"
+      !endif
+      !ifdef APP_PRODUCT_FILENAME
+        RMDir /r "$LOCALAPPDATA\${APP_PRODUCT_FILENAME}"
+      !endif
+      Delete "$TEMP\farmdash-install-locale.txt"
+    FarmDash_UnFullDone:
+    DetailPrint "Removing optional dependencies installed by setup (ImageMagick)..."
+    IfFileExists "$INSTDIR\resources\uninstall-dependencies.ps1" FarmDash_UnDeps FarmDash_UnDepsDone
+    FarmDash_UnDeps:
+      ExecWait 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\uninstall-dependencies.ps1"' $R0
+    FarmDash_UnDepsDone:
+    DeleteRegKey HKCU "Software\fs25-farm-dashboard"
+  ${Else}
+    DetailPrint "Keeping settings and offline snapshots; removing caches and temporary data..."
+    IfFileExists "$INSTDIR\resources\uninstall-user-data.ps1" FarmDash_UnKeepScript FarmDash_UnKeepLegacy
+    FarmDash_UnKeepScript:
+      ExecWait 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\uninstall-user-data.ps1" -Mode Keep' $R0
+      Goto FarmDash_UnKeepDone
+    FarmDash_UnKeepLegacy:
+      RMDir /r "$LOCALAPPDATA\fs25-farm-dashboard"
+      RMDir /r "$LOCALAPPDATA\fs25-farm-dashboard-updater"
+      !ifdef APP_PACKAGE_NAME
+        RMDir /r "$LOCALAPPDATA\${APP_PACKAGE_NAME}"
+        RMDir /r "$LOCALAPPDATA\${APP_PACKAGE_NAME}-updater"
+      !endif
+    FarmDash_UnKeepDone:
+  ${EndIf}
+
   ${if} $installMode == "all"
     SetShellVarContext all
   ${endif}
-FarmDashUninstallUserDone:
 !macroend

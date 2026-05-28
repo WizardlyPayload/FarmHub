@@ -647,6 +647,9 @@ export function applyApiMergedDataPayload(dashboard, data) {
     window.farmDashNotifyDataReady();
   }
   pushSimHubLiveContext(dashboard);
+  if (typeof dashboard.maybeShowModRequiredModal === "function") {
+    dashboard.maybeShowModRequiredModal();
+  }
 }
 
 export async function tryLoadApiData() {

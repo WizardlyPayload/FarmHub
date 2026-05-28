@@ -249,7 +249,7 @@ DevTools: **Ctrl+Shift+I** in Electron window.
 | 4 | Notification empty state English-only |
 | 5 | Mod version mismatch banner not implemented |
 
-Full list: [AUDIT_v3.9_PREFINAL.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/AUDIT_v3.9_PREFINAL.md)
+Full list: [AUDIT_v3.9_PREFINAL.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/_internal/AUDIT_v3.9_PREFINAL.md)
 
 ---
 

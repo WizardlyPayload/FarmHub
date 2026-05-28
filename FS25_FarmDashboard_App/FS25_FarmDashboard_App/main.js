@@ -184,6 +184,18 @@ async function resolveModExportScriptPath() {
     return path.join(__dirname, '..', '..', 'tools', 'Export-ModStoreImages.ps1');
 }
 
+/**
+ * Where Export-ModStoreImages.ps1 writes PNGs.
+ * Packaged Electron: __dirname is …/resources/app.asar (a file) — cannot mkdir under it.
+ * Use userData (writable). Dev: keep images inside web/assests for the repo.
+ */
+function resolveModStoreImagesOutputDir() {
+    if (app.isPackaged) {
+        return path.join(app.getPath('userData'), 'items_mod_extract');
+    }
+    return path.join(__dirname, 'web', 'assests', 'img', 'items_mod_extract');
+}
+
 /** Optional bundled DirectXTex texconv (place at resources/texconv/texconv.exe). */
 async function resolveBundledTexconvPath() {
     const candidates = [
@@ -251,7 +263,22 @@ async function runExportModStoreImages(progressSender) {
     }
 
     const modsRoot = path.join(getFs25DocumentsRoot(), 'mods');
-    const outputDir = path.join(__dirname, 'web', 'assests', 'img', 'items_mod_extract');
+    const outputDir = resolveModStoreImagesOutputDir();
+    try {
+        await fs.promises.mkdir(outputDir, { recursive: true });
+    } catch (e) {
+        const err = e && e.message ? e.message : String(e);
+        if (mainWindow) {
+            await dialog.showMessageBox(mainWindow, {
+                type: 'error',
+                title: 'Mod shop images',
+                message: 'Could not create output folder for exported images.',
+                detail: `${outputDir}\n\n${err}`,
+                buttons: ['OK']
+            });
+        }
+        return { ok: false, error: err };
+    }
     const summaryJson = path.join(app.getPath('temp'), 'farmdash-mod-export-summary.json');
     try {
         await fs.promises.unlink(summaryJson);
@@ -772,6 +799,8 @@ expressApp.use(lanAccessHttpMiddleware);
 expressApp.get('/simhub', (_req, res) => {
     res.redirect(302, '/simhub.html');
 });
+/** Mod shop PNG export target (writable when packaged; mounted before web/ so it wins over asar). */
+expressApp.use('/assests/img/items_mod_extract', express.static(resolveModStoreImagesOutputDir()));
 expressApp.use(express.static(path.join(__dirname, 'web')));
 /** setup.html uses src="web/assests/..." — same paths work over http://host:8766/… and file:// */
 expressApp.use('/web', express.static(path.join(__dirname, 'web')));
@@ -1163,7 +1192,7 @@ expressApp.get('/api/lan-ws-token', (req, res) => {
 /** Curated PNGs under items/ + exported mod shop PNGs under items_mod_extract/ (for vehicle image matching). */
 expressApp.get('/api/item-image-filenames', async (req, res) => {
     const itemsDir = path.join(__dirname, 'web', 'assests', 'img', 'items');
-    const modDir = path.join(__dirname, 'web', 'assests', 'img', 'items_mod_extract');
+    const modDir = resolveModStoreImagesOutputDir();
     const listPng = async (dir) => {
         try {
             const names = await fs.promises.readdir(dir);

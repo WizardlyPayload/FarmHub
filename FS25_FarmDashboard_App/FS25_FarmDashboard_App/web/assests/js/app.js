@@ -91,4 +91,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   dashboard = new LivestockDashboard();
   window.dashboard = dashboard;
+
+  document.addEventListener("farmdash-first-data-ready", () => {
+    if (typeof dashboard.maybeShowModRequiredModal === "function") {
+      dashboard.maybeShowModRequiredModal();
+    }
+  });
 });

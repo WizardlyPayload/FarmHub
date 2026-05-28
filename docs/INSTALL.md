@@ -51,7 +51,10 @@ Repeat for **each savegame** (and each dedicated-server save) that should use th
 2. Enable **Farm Dashboard** / **FS25 Farm Dashboard**.
 3. **Load the save and enter the world** (main menu alone is not enough).
 
-*Screenshot not yet added:* `fd-install-020-fs25-mod-enabled.png` — Mod ticked in the save’s mod list. See [SCREENSHOTS.md](./SCREENSHOTS.md).
+![Mod ticked in the save’s mod list](screenshots/fd-install-020-fs25-mod-enabled.png)
+
+*Figure: Mod ticked in the save’s mod list.*
+
 ---
 
 ## Stage C — Confirm `data.json` is updating
@@ -64,7 +67,10 @@ After about one minute in-game, check:
 
 The file should exist and its **Modified** time should advance while you play.
 
-*Screenshot not yet added:* `fd-install-030-datajson-explorer.png` — File Explorer on that folder with a recent `data.json` timestamp. See [SCREENSHOTS.md](./SCREENSHOTS.md).
+![File Explorer on that folder with a recent `data.json` timestamp](screenshots/fd-install-030-datajson-explorer.png)
+
+*Figure: File Explorer on that folder with a recent `data.json` timestamp.*
+
 **Dedicated / FTP server:** confirm the same path exists on the server profile you will point the app at (via FTP), not only on your gaming PC.
 
 ---

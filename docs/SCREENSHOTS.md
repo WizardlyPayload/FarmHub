@@ -79,31 +79,27 @@ For **[manual]** captures, follow the recipe in each row below and drop the PNG 
 | 42 | `fd-section-fields-040-card-windrow.png` | §6.4 | auto | Field card showing windrow volume badge |
 | 43 | `fd-section-fields-050-card-soil.png` | §6.4 | auto | Field card with N + pH mini-bars |
 | 44 | `fd-section-fields-060-tools-shop.png` | §6.4 | auto | Tools & shop block on a field card |
-| 45 | `fd-section-fields-070-waiting.png` | §6.4 | auto | Fields waiting state (drop the data source briefly) |
-| 46 | `fd-section-fields-080-api-error.png` | §6.4 | auto | Fields API error strip (kill the data source) |
-| 47 | `fd-section-economy-010-summary.png` | §6.5 | auto | Economy summary row |
-| 48 | `fd-section-economy-020-purchases.png` | §6.5 | auto | Economy purchases tab with filters / sort |
-| 49 | `fd-section-economy-030-market.png` | §6.5 | auto | Economy market tab (or placeholder) |
-| 50 | `fd-section-pastures-010-summary.png` | §6.6 | auto | Pastures summary row |
-| 51 | `fd-section-pastures-020-cards.png` | §6.6 | auto | Pastures grid |
-| 52 | `fd-section-productions-010-list.png` | §6.7 | auto | Productions chains list |
-| 53 | `fd-section-productions-020-empty.png` | §6.7 | auto | Productions empty state (use a save with no chains, or temporarily stop the production module) |
-| 54 | `fd-modal-010-notifications.png` | §7.1 | auto | Notification history modal |
-| 55 | `fd-modal-020-export-livestock.png` | §7.2 | auto | Export livestock modal |
-| 56 | `fd-modal-030-refresh-data.png` | §7.3 | auto | Refresh data modal |
-| 57 | `fd-modal-040-data-changes.png` | §7.4 | auto | Data changes modal (any sub-tab) |
-| 58 | `fd-modal-050-warning-details.png` | §7.5 | auto | Warning details modal |
-| 59 | `fd-modal-060-animal-details.png` | §7.6 | auto | Animal details modal |
-| 60 | `fd-modal-070-pasture-livestock.png` | §7.7 | auto | Pasture livestock modal |
-| 61 | `fd-modal-080-vehicle-image.png` | §7.8 | auto | Vehicle image modal |
-| 62 | `fd-modal-090-weather.png` | §7.9 | auto | Weather forecast modal |
-| 63 | `fd-modal-100-mod-export.png` | §7.10 | auto | Mod export progress modal |
-| 64 | `fd-modal-110-farm-selection.png` | §7.11 | auto | Farm selection modal |
-| 65 | `fd-lan-010-toggle-on.png` | §8 | auto | LAN access on with credentials filled |
-| 66 | `fd-lan-020-tablet-prompt.png` | §8 | manual | Tablet showing Basic auth prompt at `http://<PC-LAN-IP>:8766` |
-| 67 | `fd-lan-030-tablet-dashboard.png` | §8 | manual | Tablet showing dashboard home over LAN |
-| 68 | `fd-mod-010-config-xml-explorer.png` | §9 | manual | File Explorer showing `config.xml` |
-| 69 | `fd-mod-020-config-xml-editor.png` | §9 | manual | `config.xml` open in a text editor |
+| 45 | `fd-section-economy-010-summary.png` | §6.5 | auto | Economy summary row |
+| 46 | `fd-section-economy-020-purchases.png` | §6.5 | auto | Economy purchases tab with filters / sort |
+| 47 | `fd-section-economy-030-market.png` | §6.5 | auto | Economy market tab (or placeholder) |
+| 48 | `fd-section-pastures-010-summary.png` | §6.6 | auto | Pastures summary row |
+| 49 | `fd-section-pastures-020-cards.png` | §6.6 | auto | Pastures grid |
+| 50 | `fd-section-productions-010-list.png` | §6.7 | auto | Productions chains list |
+| 51 | `fd-modal-010-notifications.png` | §7.1 | auto | Notification history modal |
+| 52 | `fd-modal-020-export-livestock.png` | §7.2 | auto | Export livestock modal |
+| 53 | `fd-modal-060-animal-details.png` | §7.6 | auto | Animal details modal |
+| 54 | `fd-modal-070-pasture-livestock.png` | §7.7 | auto | Pasture livestock modal |
+| 55 | `fd-modal-080-vehicle-image.png` | §7.8 | auto | Vehicle image modal |
+| 56 | `fd-modal-090-weather.png` | §7.9 | auto | Weather forecast modal |
+| 57 | `fd-modal-100-mod-export.png` | §7.10 | auto | Mod export progress modal |
+| 58 | `fd-modal-110-farm-selection.png` | §7.11 | auto | Farm selection modal |
+| 59 | `fd-lan-010-toggle-on.png` | §8 | auto | LAN access on with credentials filled |
+| 60 | `fd-lan-020-tablet-prompt.png` | LAN guide (planned) | manual | Tablet Basic auth prompt — **separate LAN doc**, not USER_MANUAL |
+| 61 | `fd-lan-030-tablet-dashboard.png` | LAN guide (planned) | manual | Tablet dashboard home — **separate LAN doc**, not USER_MANUAL |
+| 62 | `fd-mod-010-config-xml-explorer.png` | §9 | manual | File Explorer showing `config.xml` |
+| 63 | `fd-mod-020-config-xml-editor.png` | §9 | manual | `config.xml` open in a text editor |
+
+**Not in the user manual** (edge / empty / failure UI — users should not see these if setup is correct): `fd-section-fields-070-waiting`, `fd-section-fields-080-api-error`, `fd-section-productions-020-empty`, `fd-modal-030-refresh-data`, `fd-modal-040-data-changes`, `fd-modal-050-warning-details`.
 
 ---
 
@@ -146,9 +142,13 @@ For **[manual]** captures, follow the recipe in each row below and drop the PNG 
 | `fd-setup-050-add-ftp.png` | Setup — Add dedicated server (FTP + HTTP feed) |
 | `reference-home-network-topology.png` | Home network diagram (pfSense / switches / APs) |
 
-**Added (2026-05-28):** `fd-install-010`, `040`, `045`, `050`; `fd-setup-010`, `020`, `030`, `060`, `070`; `fd-modal-060`, `070`.
+**On disk (2026-05-28 audit):** **56** manifest `fd-*` PNGs + **13** extra `Screenshot …` files (installer steps, errors, spare field cards — not wired into the manual) + `reference-home-network-topology.png`.
 
-**Still missing** (placeholders remain in the manual): `fd-install-020`, `030`; `fd-setup-040`; `fd-shell-030`; `fd-section-vehicles-020`, `fields-070/080`, `productions-020-empty`; `fd-modal-010`, `030`, `040`, `050`, `080`, `090`, `110`; `fd-lan-020/030`; `fd-mod-010/020`. Extra unmapped `Screenshot …` files in the folder are field-card close-ups and installer steps not used in the manual.
+**Embedded in [`USER_MANUAL.md`](./USER_MANUAL.md) / [`INSTALL.md`](./INSTALL.md):** **58** inline images, **0** placeholders (2026-05-28).
+
+**Not in this manual:** edge/failure UI (waiting, API error, empty productions, refresh/data-changes/warning modals); **farm selection** modal (multi-farm edge case); **tablet LAN** shots (`fd-lan-020`, `fd-lan-030`) — planned for a separate **LAN & tablet** guide; see [`SECURITY.md`](./SECURITY.md) until then.
+
+Workflow: drop PNGs with exact names → `python tools/map-all-screenshots.py` (if still named `Screenshot …`) → `python tools/embed-manual-screenshots.py`.
 
 **Resolution:** confirm desktop shots are **1920 × 1080** before release; re-capture any that are not.
 
@@ -159,9 +159,8 @@ When you tell me you are ready, I drive the `cursor-ide-browser` MCP through the
 1. **Navbar / landing** — `browser_navigate http://localhost:8766` → snapshot → screenshots `fd-shell-*` and `fd-section-000-landing.png` / `fd-shell-040-landing-badges.png`.
 2. **Settings tabs** — click gear → screenshots for each pane (`fd-settings-*`).
 3. **Sections** — for each section, click the matching landing card, screenshot the summary, expand filters, screenshot again, drill into a card / open a modal.
-4. **Fields edge cases** — `fd-section-fields-070-waiting.png` and `-080-api-error.png` need the data source temporarily disabled (rename the local server's `data.json` for ~10 seconds, capture, restore).
-5. **Modals** — open each one in turn, screenshot, close.
-6. **LAN toggle** — Settings → Servers & saves → LAN → `fd-lan-010-toggle-on.png`. Do **not** save unless you really intend to enable LAN.
+4. **Modals** — open each illustrated modal in turn, screenshot, close.
+5. **LAN toggle** — Settings → Servers & saves → LAN → `fd-lan-010-toggle-on.png`. Do **not** save unless you really intend to enable LAN.
 
 If the app is not running when capture starts, the MCP step fails fast and I leave placeholder rows untouched so you can fill them later.
 
@@ -326,18 +325,6 @@ Many section shots exist. Still needed:
 - **Steps:** Fields section.
 - **Show:** **All / Harvest ready / Needs work / Growing / Empty** buttons + **Search fields…** box (one filter selected is fine).
 
-### `fd-section-fields-070-waiting.png`
-- **Steps:** Temporarily break data — rename `data.json` to `data.json.bak` for ~10s, open Fields, capture **waiting** state, restore file.
-- **Show:** “Waiting for field data” (or equivalent) on Fields.
-
-### `fd-section-fields-080-api-error.png`
-- **Steps:** Stop app data source (wrong FTP path or rename `data.json` longer) until red **API error** strip appears.
-- **Show:** Error strip on Fields (“retrying every 5 s”).
-
-### `fd-section-productions-020-empty.png`
-- **Steps:** Use a save with **no** production chains, or disable production module in mod `config.xml` briefly.
-- **Show:** Productions empty state message.
-
 ---
 
 ## 6. Modals (auto — open each from UI, screenshot, close)
@@ -348,9 +335,6 @@ None of the standard modals are captured yet except mod import (`fd-modal-100`).
 | -------- | ------------- |
 | `fd-modal-010-notifications.png` | Click **bell** → notification history |
 | `fd-modal-020-export-livestock.png` | Livestock → **Export Data** (or export flow) |
-| `fd-modal-030-refresh-data.png` | Trigger **Refresh data** if exposed in UI |
-| `fd-modal-040-data-changes.png` | Open **Data changes** modal (any sub-tab) |
-| `fd-modal-050-warning-details.png` | Pastures/fields **warning** → Details |
 | `fd-modal-060-animal-details.png` | Livestock row → **Details** |
 | `fd-modal-070-pasture-livestock.png` | Pastures card → **Livestock** |
 | `fd-modal-080-vehicle-image.png` | Vehicles → open vehicle image / enlarge |

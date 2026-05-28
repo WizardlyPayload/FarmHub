@@ -531,43 +531,6 @@
           </div>
         </div>
 
-        <div class="modal fade" id="exportDataModal" tabindex="-1" aria-hidden="true">
-          <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content bg-dark text-light">
-              <div class="modal-header bg-farm-primary">
-                <h5 class="modal-title"><i class="bi bi-download me-2"></i><span data-i18n="export.title">Export Livestock Data</span></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-              </div>
-              <div class="modal-body">
-                <p class="text-muted mb-4"><i class="bi bi-info-circle me-2"></i><span data-i18n="export.intro">Choose your preferred export format for the livestock data:</span></p>
-                <div class="row g-3">
-                  <div class="col-12">
-                    <button class="btn btn-outline-farm-accent w-100 py-3" onclick="dashboard.exportData('csv')">
-                      <div class="d-flex align-items-center justify-content-between"><div class="d-flex align-items-center"><i class="bi bi-file-earmark-spreadsheet fs-4 me-3"></i><div class="text-start"><div class="fw-bold" data-i18n="export.csv">CSV (Comma-Separated Values)</div><small class="text-muted" data-i18n="export.csvSub">Compatible with Excel, Google Sheets</small></div></div><i class="bi bi-arrow-right"></i></div>
-                    </button>
-                  </div>
-                  <div class="col-12">
-                    <button class="btn btn-outline-farm-accent w-100 py-3" onclick="dashboard.exportData('excel')">
-                      <div class="d-flex align-items-center justify-content-between"><div class="d-flex align-items-center"><i class="bi bi-file-earmark-excel fs-4 me-3"></i><div class="text-start"><div class="fw-bold" data-i18n="export.xlsx">Excel (.xlsx)</div><small class="text-muted" data-i18n="export.xlsxSub">Microsoft Excel format with formatting</small></div></div><i class="bi bi-arrow-right"></i></div>
-                    </button>
-                  </div>
-                  <div class="col-12">
-                    <button class="btn btn-outline-farm-accent w-100 py-3" onclick="dashboard.exportData('pdf')">
-                      <div class="d-flex align-items-center justify-content-between"><div class="d-flex align-items-center"><i class="bi bi-file-earmark-pdf fs-4 me-3"></i><div class="text-start"><div class="fw-bold" data-i18n="export.pdf">PDF Document</div><small class="text-muted" data-i18n="export.pdfSub">Printable report format</small></div></div><i class="bi bi-arrow-right"></i></div>
-                    </button>
-                  </div>
-                  <div class="col-12">
-                    <button class="btn btn-outline-farm-accent w-100 py-3" onclick="dashboard.exportData('print')">
-                      <div class="d-flex align-items-center justify-content-between"><div class="d-flex align-items-center"><i class="bi bi-printer fs-4 me-3"></i><div class="text-start"><div class="fw-bold" data-i18n="export.print">Print Preview</div><small class="text-muted" data-i18n="export.printSub">Print directly from browser</small></div></div><i class="bi bi-arrow-right"></i></div>
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button></div>
-            </div>
-          </div>
-        </div>
-
         <div class="modal fade" id="refreshDataModal" tabindex="-1" aria-hidden="true">
           <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content bg-dark text-light">
@@ -695,6 +658,43 @@
           <div class="modal-header bg-farm-primary"><h5 class="modal-title" id="animalDetailsModalLabel"><i class="bi bi-clipboard-data me-2"></i><span data-i18n="animal.title">Animal Details</span></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
           <div class="modal-body"><div id="animalDetailsContent"></div></div>
           <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.close">Close</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal fade" id="exportDataModal" tabindex="-1" aria-hidden="true" aria-labelledby="exportDataModalTitle">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content bg-dark text-light">
+          <div class="modal-header bg-farm-primary">
+            <h5 class="modal-title" id="exportDataModalTitle"><i class="bi bi-download me-2"></i><span data-i18n="export.title">Export Livestock Data</span></h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted mb-4"><i class="bi bi-info-circle me-2"></i><span data-i18n="export.intro">Choose your preferred export format for the livestock data:</span></p>
+            <div class="row g-3">
+              <div class="col-12">
+                <button type="button" class="btn btn-outline-farm-accent w-100 py-3" onclick="dashboard.exportData('csv')">
+                  <div class="d-flex align-items-center justify-content-between"><div class="d-flex align-items-center"><i class="bi bi-file-earmark-spreadsheet fs-4 me-3"></i><div class="text-start"><div class="fw-bold" data-i18n="export.csv">CSV (Comma-Separated Values)</div><small class="text-muted" data-i18n="export.csvSub">Compatible with Excel, Google Sheets</small></div></div><i class="bi bi-arrow-right"></i></div>
+                </button>
+              </div>
+              <div class="col-12">
+                <button type="button" class="btn btn-outline-farm-accent w-100 py-3" onclick="dashboard.exportData('excel')">
+                  <div class="d-flex align-items-center justify-content-between"><div class="d-flex align-items-center"><i class="bi bi-file-earmark-excel fs-4 me-3"></i><div class="text-start"><div class="fw-bold" data-i18n="export.xlsx">Excel (.xlsx)</div><small class="text-muted" data-i18n="export.xlsxSub">Microsoft Excel format with formatting</small></div></div><i class="bi bi-arrow-right"></i></div>
+                </button>
+              </div>
+              <div class="col-12">
+                <button type="button" class="btn btn-outline-farm-accent w-100 py-3" onclick="dashboard.exportData('pdf')">
+                  <div class="d-flex align-items-center justify-content-between"><div class="d-flex align-items-center"><i class="bi bi-file-earmark-pdf fs-4 me-3"></i><div class="text-start"><div class="fw-bold" data-i18n="export.pdf">PDF Document</div><small class="text-muted" data-i18n="export.pdfSub">Printable report format</small></div></div><i class="bi bi-arrow-right"></i></div>
+                </button>
+              </div>
+              <div class="col-12">
+                <button type="button" class="btn btn-outline-farm-accent w-100 py-3" onclick="dashboard.exportData('print')">
+                  <div class="d-flex align-items-center justify-content-between"><div class="d-flex align-items-center"><i class="bi bi-printer fs-4 me-3"></i><div class="text-start"><div class="fw-bold" data-i18n="export.print">Print Preview</div><small class="text-muted" data-i18n="export.printSub">Print directly from browser</small></div></div><i class="bi bi-arrow-right"></i></div>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button></div>
         </div>
       </div>
     </div>

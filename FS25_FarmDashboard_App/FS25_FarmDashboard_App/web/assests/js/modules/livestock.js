@@ -860,66 +860,84 @@ export function showAnimalDetails(animalId) {
   }
 }
 
+/** Remove orphan Bootstrap backdrops when no modal is open (prevents dimmed frozen UI). */
+function releaseStuckModalUi() {
+  if (document.querySelector(".modal.show")) return;
+  document.querySelectorAll(".modal-backdrop").forEach((node) => node.remove());
+  document.body.classList.remove("modal-open");
+  document.body.style.removeProperty("overflow");
+  document.body.style.removeProperty("padding-right");
+}
+
+function getExportDataModalEl() {
+  const el = document.getElementById("exportDataModal");
+  if (el && el.parentElement !== document.body) {
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+const EXPORT_BUTTON_SELECTORS = {
+  csv: ".buttons-csv",
+  excel: ".buttons-excel",
+  pdf: ".buttons-pdf",
+  print: ".buttons-print",
+};
+
 export function showExportModal() {
-  const modal = new bootstrap.Modal(
-    document.getElementById("exportDataModal")
-  );
+  const el = getExportDataModalEl();
+  if (!el || typeof bootstrap === "undefined" || !bootstrap.Modal) return;
+  releaseStuckModalUi();
+  const modal = bootstrap.Modal.getOrCreateInstance(el);
+  el.addEventListener("hidden.bs.modal", releaseStuckModalUi, { once: true });
   modal.show();
 }
 
 export function exportData(format) {
-  // Hide the export modal
-  const modal = bootstrap.Modal.getInstance(
-    document.getElementById("exportDataModal")
-  );
-  modal.hide();
-
-  // Prepare data for export
-  const exportData = this.animals.map((animal) => ({
-    Name: animal.name || t("livestock.nameFallback", { id: animal.id }),
-    Type: this.formatAnimalType(animal.subType),
-    Age: fmtAgeMonthsStr(animal.age),
-    Gender: formatGenderLabel(animal.gender),
-    Health: `${Math.round(animal.health)}%`,
-    Weight: fmtWeightKgStr(animal.weight, 1),
-    Value: `$${this.calculateAnimalValue(animal).value.toLocaleString()}`,
-    Status:
-      [
-        animal.health === 0 ? t("livestock.badgeError") : "",
-        animal.isPregnant ? t("livestock.badgePregnant") : "",
-        animal.isLactating ? t("livestock.badgeLactating") : "",
-        animal.isParent ? t("livestock.badgeParent") : "",
-      ]
-        .filter((s) => s)
-        .join(", ") || t("livestock.exportStatusNormal"),
-    Location: resolveAnimalLocationLabel(animal),
-    "Farm ID": animal.farmId,
-    "Animal ID": animal.id,
-    "Mother ID": animal.motherId !== "-1" ? animal.motherId : "",
-    "Father ID": animal.fatherId !== "-1" ? animal.fatherId : "",
-  }));
-
-  // Use DataTables built-in export functionality
-  switch (format) {
-    case "csv":
-      this.dataTable.button(".buttons-csv").trigger();
-      break;
-    case "excel":
-      this.dataTable.button(".buttons-excel").trigger();
-      break;
-    case "pdf":
-      this.dataTable.button(".buttons-pdf").trigger();
-      break;
-    case "print":
-      this.dataTable.button(".buttons-print").trigger();
-      break;
-    default:
-      console.error("Unknown export format:", format);
+  const el = getExportDataModalEl();
+  if (el && typeof bootstrap !== "undefined" && bootstrap.Modal) {
+    const modal =
+      bootstrap.Modal.getInstance(el) ||
+      bootstrap.Modal.getOrCreateInstance(el);
+    el.addEventListener("hidden.bs.modal", releaseStuckModalUi, { once: true });
+    modal.hide();
   }
 
-  this.showSuccessMessage(
-    t("livestock.exportStarted", { format: format.toUpperCase() })
-  );
+  const buttonSelector = EXPORT_BUTTON_SELECTORS[format];
+  if (!buttonSelector) {
+    console.error("Unknown export format:", format);
+    releaseStuckModalUi();
+    return;
+  }
+
+  if (!this.dataTable || typeof this.dataTable.button !== "function") {
+    const msg = t("livestock.dtEmpty");
+    if (typeof this.showAlert === "function") {
+      this.showAlert(msg, "warning");
+    } else {
+      console.warn("[livestock] export:", msg);
+    }
+    releaseStuckModalUi();
+    return;
+  }
+
+  try {
+    this.dataTable.button(buttonSelector).trigger();
+    if (typeof this.showSuccessMessage === "function") {
+      this.showSuccessMessage(
+        t("livestock.exportStarted", { format: format.toUpperCase() })
+      );
+    }
+  } catch (err) {
+    console.error("[livestock] export failed:", err);
+    if (typeof this.showAlert === "function") {
+      this.showAlert(
+        "Could not export livestock data. Wait for the animals table to finish loading, then try again.",
+        "error"
+      );
+    }
+    releaseStuckModalUi();
+  }
 }
 
 export function filterAnimals(filterType, silentRefresh) {

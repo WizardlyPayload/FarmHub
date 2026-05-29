@@ -17,7 +17,9 @@ Real-time farm management dashboard for **Farming Simulator 25** — a Windows d
 
 Install **mod first**, load your save once, then install the app. See **[docs/INSTALL.md](docs/INSTALL.md)** (detailed) or the quick steps below.
 
-Open the dashboard at **[http://localhost:8766](http://localhost:8766)** after setup.
+Open the dashboard at **[http://localhost:8766](http://localhost:8766)** after setup (same PC only — `localhost` does not work from a phone or tablet).
+
+**Tablet / LAN on your home Wi‑Fi:** enable **Settings → Remote / LAN access**, open `http://<this-PCs-LAN-IP>:8766`, and use a strong password — see [docs/SECURITY.md](docs/SECURITY.md). You usually **do not** need router port forwarding for devices on the **same** network. If the page never loads, check **Windows Defender Firewall** (or another **host** firewall / antivirus suite) and allow **inbound TCP port 8766** for Farm Dashboard on your **Private** network profile.
 
 ---
 
@@ -95,15 +97,16 @@ This repository (**[FarmHub](https://github.com/WizardlyPayload/FarmHub)**) is *
 | `FS25_FarmDashboard_App/` | Electron app + web UI + merge/FTP layer |
 | `tools/` | Build scripts — [tools/README.md](tools/README.md) |
 
-**Build the Windows installer:**
+**Build the Windows installer** (from repo root — recommended):
 
 ```bash
-cd FS25_FarmDashboard_App/FS25_FarmDashboard_App
-npm install
-npm run dist
+npm run install:app    # once, or after pulling dependency changes
+npm run build:app      # NSIS installer → %LOCALAPPDATA%\fs25-farm-dashboard-electron-out\
+npm run package:mod    # FS25_FarmDashboard.zip → FS25_FarmDashboard_Mod/
+npm run build:all      # mod zip + installer
 ```
 
-Default output: `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\`
+Equivalent from the app folder: `cd FS25_FarmDashboard_App && npm install && npm run dist`. See root **`package.json`** for all delegated scripts (`npm run start`, `npm test`, `npm run verify`, i18n, clean, etc.).
 
 CI on `main` runs tests, electron-pack verify, and i18n verify — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
@@ -115,7 +118,7 @@ CI on `main` runs tests, electron-pack verify, and i18n verify — see [`.github
 |--------|-----|
 | “Waiting for data” | Mod enabled; save loaded once; check path in Settings |
 | Port **8766** in use | Close other apps on that port; restart Farm Dashboard |
-| LAN tablet | Enable LAN in Settings; strong password — [docs/SECURITY.md](docs/SECURITY.md) |
+| LAN tablet will not load | Enable LAN in Settings; use the PC’s **LAN IP** (not `localhost`); allow **inbound TCP 8766** in **Windows Defender Firewall** (Private profile) or your host antivirus firewall; strong password — [docs/SECURITY.md](docs/SECURITY.md) |
 | Mod version badge | Update **`FS25_FarmDashboard.zip`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases) |
 
 ---

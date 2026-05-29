@@ -6,21 +6,21 @@
   "main": "main.js",
   "scripts": {
     "test": "jest",
-    "parity": "node ../../tools/app/parity.js",
-    "export-fields-csv": "node ../../tools/app/export-fields-to-csv.mjs",
-    "unlock-install": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../../tools/app/stop-farmdash-install-lock.ps1",
-    "unlock-install:delete": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../../tools/app/stop-farmdash-install-lock.ps1 -DeleteInstallFolder",
-    "clean:build-out": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../../tools/app/remove-build-output-folders.ps1",
-    "clean:build-out:search": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../../tools/app/remove-build-output-folders.ps1 -StopWindowsSearch",
+    "parity": "node ../tools/app/parity.js",
+    "export-fields-csv": "node ../tools/app/export-fields-to-csv.mjs",
+    "unlock-install": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../tools/app/stop-farmdash-install-lock.ps1",
+    "unlock-install:delete": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../tools/app/stop-farmdash-install-lock.ps1 -DeleteInstallFolder",
+    "clean:build-out": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../tools/app/remove-build-output-folders.ps1",
+    "clean:build-out:search": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../tools/app/remove-build-output-folders.ps1 -StopWindowsSearch",
     "start": "electron .",
-    "pack": "node ../../tools/app/run-electron-builder.mjs pack",
+    "pack": "node ../tools/app/run-electron-builder.mjs pack",
     "pack:in-repo": "electron-builder --dir",
-    "pack:fresh": "node ../../tools/app/electron-builder-fresh-output.mjs pack",
-    "pack:alt": "electron-builder --dir --config.directories.output=../electron-pack-out-alt",
-    "dist": "node ../../tools/app/run-electron-builder.mjs dist",
+    "pack:fresh": "node ../tools/app/electron-builder-fresh-output.mjs pack",
+    "pack:alt": "electron-builder --dir --config.directories.output=electron-pack-out-alt",
+    "dist": "node ../tools/app/run-electron-builder.mjs dist",
     "dist:in-repo": "electron-builder --win",
-    "dist:fresh": "node ../../tools/app/electron-builder-fresh-output.mjs dist",
-    "dist:alt": "electron-builder --win --config.directories.output=../electron-pack-out-alt",
+    "dist:fresh": "node ../tools/app/electron-builder-fresh-output.mjs dist",
+    "dist:alt": "electron-builder --win --config.directories.output=electron-pack-out-alt",
     "i18n:audit": "node web/locales/audit-keys.mjs",
     "i18n:scan": "node web/locales/find-hardcoded-strings.mjs",
     "i18n:build": "node web/locales/build-translations.mjs",
@@ -28,13 +28,13 @@
     "i18n:fill:force": "node web/locales/mt-fill.mjs --force",
     "i18n:verify": "node web/locales/verify-i18n.mjs",
     "i18n:sync": "node web/locales/sync-keys-from-en.mjs",
-    "verify:electron-pack": "node ../../tools/app/verify-electron-pack-files.mjs"
+    "verify:electron-pack": "node ../tools/app/verify-electron-pack-files.mjs"
   },
   "build": {
     "appId": "com.farmdashboard.app",
     "productName": "FS25 Farm Dashboard",
     "directories": {
-      "output": "../electron-pack-out"
+      "output": "electron-pack-out"
     },
     "files": [
       "main.js",
@@ -56,7 +56,7 @@
     ],
     "extraResources": [
       {
-        "from": "../../tools/Export-ModStoreImages.ps1",
+        "from": "../tools/Export-ModStoreImages.ps1",
         "to": "tools/Export-ModStoreImages.ps1"
       },
       {

@@ -8,8 +8,8 @@ All notable changes to this project are recorded here. For GitHub release blurbs
 
 | Artifact | Where it lives | Format |
 |----------|----------------|--------|
-| **Desktop app** | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | Semver (e.g. `4.0.0`) |
-| **FS25 mod** | `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `2.3.0.0`) |
+| **Desktop app** | `FS25_FarmDashboard_App/package.json` | Semver (e.g. `4.0.0`) |
+| **FS25 mod** | `FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `2.3.0.0`) |
 | **Source headers** | First line of many `.js` / `.lua` files | Often `v2.0.0` historically; bump only when you intentionally resync headers |
 
 ---
@@ -75,7 +75,7 @@ Narrative: **[_internal/archive-releases/RELEASE_v3.9.0.md](./_internal/archive-
 
 ### Repository layout
 
-- **Electron build scripts** moved to **`tools/app/`** (repo root). `package.json` npm scripts use **`../../tools/app/...`** from `FS25_FarmDashboard_App/FS25_FarmDashboard_App/`.
+- **Electron build scripts** moved to **`tools/app/`** (repo root). `package.json` npm scripts use **`../tools/app/...`** from `FS25_FarmDashboard_App/`.
 - **Validation runbook** consolidated as **[VALIDATION-RUNBOOK.md](./VALIDATION-RUNBOOK.md)** (formerly under the mod tree). Index: **[tools/README.md](../tools/README.md)**.
 
 ### Acceptance
@@ -260,7 +260,7 @@ This is **independent** of the **desktop app’s FTP polling** settings below.
 
 ### Maintainer note
 
-After pulling, run **`npm install`** under `FS25_FarmDashboard_App/FS25_FarmDashboard_App` before **`npm run dist`** so `package-lock.json` matches `package.json`.
+After pulling, run **`npm install`** under `FS25_FarmDashboard_App` before **`npm run dist`** so `package-lock.json` matches `package.json`.
 
 ---
 

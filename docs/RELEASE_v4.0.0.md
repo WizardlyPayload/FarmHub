@@ -1,6 +1,6 @@
 # FS25 Farm Dashboard — Release **v4.0.0** (stable line)
 
-**Desktop app:** `4.0.0` (`FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json`)  
+**Desktop app:** `4.0.0` (`FS25_FarmDashboard_App/package.json`)  
 **FS25 mod:** `3.0.0.0` (`modDesc.xml` + `FarmDashboard.VERSION` in Lua — app requires **3.0.0.0+**)
 
 **Prior line:** [RELEASE_v3.9.0.md](./_internal/archive-releases/RELEASE_v3.9.0.md) (pre-final hardening + updater baseline).
@@ -27,7 +27,7 @@ v4.0.0 is the **first stable promotion** after the 3.9 pre-final line. It valida
 ## Operator checklist (publish so updater works)
 
 1. **Merge / tag** `v4.0.0` on `main` with app version **4.0.0** in `package.json`.
-2. From `FS25_FarmDashboard_App/FS25_FarmDashboard_App/`: `npm test` then `npm run dist`.
+2. From `FS25_FarmDashboard_App/`: `npm test` then `npm run dist`.
 3. Create a **published** GitHub Release on **`WizardlyPayload/FarmHub`** (tag **`v4.0.0`**).  
    **Do not use Draft** — `electron-updater` will not see draft assets.
 4. Attach **`latest.yml`** and **`FS25 Farm Dashboard Setup 4.0.0.exe`** from the build output folder.

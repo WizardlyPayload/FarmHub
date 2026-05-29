@@ -8,9 +8,9 @@ This checklist ties together **`package.json`**, **`modDesc.xml`**, GitHub Relea
 
 | Artifact | Location | Expected for this line |
 | -------- | -------- | ---------------------- |
-| Desktop app | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | **3.9.0** |
+| Desktop app | `FS25_FarmDashboard_App/package.json` | **3.9.0** |
 | Lockfile | same folder `package-lock.json` | same **`version`** field after `npm install` |
-| FS25 mod | `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` | **2.3.0.0** |
+| FS25 mod | `FS25_FarmDashboard_Mod/modDesc.xml` | **2.3.0.0** |
 | Lua constant | `src/FarmDashboard.lua` → `FarmDashboard.VERSION` | **2.3.0.0** |
 | Publish target | `package.json` → `build.publish` | `WizardlyPayload` / `FarmHub`, **`releaseType`: `release`** |
 
@@ -22,7 +22,7 @@ Long-form narrative: [_internal/archive-releases/RELEASE_v3.9.0.md](./_internal/
 
 **GitHub:** pushes/PRs to **`main`**, **`master`**, or **`develop`** run [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — **`npm ci`**, **`npm test`**, **`npm run verify:electron-pack`**, **`npm run i18n:verify`**, **`npm audit --omit=dev`** on Windows (Node 20).
 
-From `FS25_FarmDashboard_App/FS25_FarmDashboard_App/`:
+From `FS25_FarmDashboard_App/`:
 
 ```bash
 npm test
@@ -36,7 +36,7 @@ npm audit --omit=dev
 
 ## 3. Build the Windows installer
 
-From the same app directory (see app `README.md` for full detail). npm invokes **`../../tools/app/run-electron-builder.mjs`** — index: [**`tools/README.md`**](../tools/README.md).
+From the same app directory (see app `README.md` for full detail). npm invokes **`../tools/app/run-electron-builder.mjs`** — index: [**`tools/README.md`**](../tools/README.md).
 
 ```bash
 npm run dist

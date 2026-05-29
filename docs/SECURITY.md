@@ -36,6 +36,7 @@ The embedded HTTP server listens on **port `8766`**. **Binding and access contro
 
 **Recommendations**
 
+- **Same Wi‑Fi, tablet or phone will not connect:** LAN access must be **on**, the URL must use the PC’s **LAN IP** (e.g. `http://192.168.1.50:8766`), not `localhost`. Then allow **inbound TCP 8766** on the **Private** network profile — **Windows Defender Firewall with Advanced Security** → **Inbound Rules** → allow the Farm Dashboard app or a rule for port **8766**. Third-party antivirus suites often ship a separate host firewall; allow the same port there. Consumer routers rarely need changes for devices on the **same** subnet (no VLANs / port forwarding required for typical home Wi‑Fi).
 - Use **Windows Firewall** (or your OS firewall) to block **inbound** TCP **8766** from untrusted networks if the PC joins public Wi‑Fi.
 - For **remote** access from outside the home, prefer a **VPN** into your network rather than port-forwarding 8766 to the world.
 - **FTP passwords** for dedicated servers are stored in **electron-store** (local user profile). Treat the PC account as trusted; use a **strong Windows password** and disk encryption if the machine is portable.

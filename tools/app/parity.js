@@ -12,7 +12,7 @@
 //   - serverInfo.idScheme     (Plan v5 B5)
 //   - serverInfo.animalMode   (Phase 5 — already shipped)
 //
-// Usage (from FS25_FarmDashboard_App/FS25_FarmDashboard_App): npm run parity --
+// Usage (from FS25_FarmDashboard_App): npm run parity --
 //   node ../../tools/app/parity.js <candidate.json> [baseline.json]
 //   node ../../tools/app/parity.js --help
 //

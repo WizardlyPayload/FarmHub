@@ -6,8 +6,8 @@ This is the **single maintainer reference** for **FarmHub**: the **FS25 Farm Das
 
 | Artifact | Where | Current value |
 | -------- | ----- | ------------- |
-| Desktop app | `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` | **`4.0.0`** |
-| Lua mod | `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` | **`3.0.0.0`** |
+| Desktop app | `FS25_FarmDashboard_App/package.json` | **`4.0.0`** |
+| Lua mod | `FS25_FarmDashboard_Mod/modDesc.xml` | **`3.0.0.0`** |
 | HTTP / WebSocket port | `main.js` `PORT` | **`8766`** |
 | Companion docs | [`USER_MANUAL.md`](./USER_MANUAL.md) · [`SECURITY.md`](./SECURITY.md) · [`CHANGELOG.md`](./CHANGELOG.md) · [`_internal/I18N.md`](./_internal/I18N.md) · [`_internal/AUDIT_v3.9_PREFINAL.md`](./_internal/AUDIT_v3.9_PREFINAL.md) | — |
 
@@ -453,22 +453,41 @@ npm run i18n:verify
 
 ## 10. Build, packaging, installer
 
-### 10.1 NPM scripts
+### 10.0 Repo root (recommended DX)
+
+From **`FarmHub/`** (repository root), use the root **`package.json`** — no need to `cd` into `FS25_FarmDashboard_App/` for daily work:
+
+| Root command | Delegates to |
+| ------------ | ------------ |
+| `npm run install:app` | `npm install` in the app folder |
+| `npm run start` | `electron .` |
+| `npm run test` | Jest |
+| `npm run build:app` | `npm run dist` (NSIS installer) |
+| `npm run pack:app` | `npm run pack` (unpacked `--dir`) |
+| `npm run package:mod` | `tools/Zip-FarmDashboardMod.ps1` |
+| `npm run build:all` | mod zip, then installer |
+| `npm run verify` | `verify:electron-pack` + `i18n:verify` |
+
+First-time setup: **`npm run install:app`** (or `npm run setup`). Mod packaging requires **PowerShell** (Windows).
+
+### 10.1 NPM scripts (app folder)
+
+These live in **`FS25_FarmDashboard_App/package.json`**. Run from that directory, or via root aliases above / `npm run <script> --prefix FS25_FarmDashboard_App`.
 
 | Script | What it does |
 | ------ | ------------ |
 | `npm start` | `electron .` — dev launch |
-| `npm run pack` | `node ../../tools/app/run-electron-builder.mjs pack` — `--dir` build into `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out` |
+| `npm run pack` | `node ../tools/app/run-electron-builder.mjs pack` — `--dir` build into `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out` |
 | `npm run pack:in-repo` | `electron-builder --dir` — output under `../electron-pack-out` |
 | `npm run pack:fresh` | Fresh tmp folder, used when normal output is locked |
 | `npm run pack:alt` | `../electron-pack-out-alt` |
-| `npm run dist` | `node ../../tools/app/run-electron-builder.mjs dist` — full NSIS installer at `%LOCALAPPDATA%` |
+| `npm run dist` | `node ../tools/app/run-electron-builder.mjs dist` — full NSIS installer at `%LOCALAPPDATA%` |
 | `npm run dist:in-repo` / `:fresh` / `:alt` | NSIS variants matching `pack:*` |
-| `npm run clean:build-out[:search]` | `../../tools/app/remove-build-output-folders.ps1`; `:search` also stops Windows Search |
-| `npm run unlock-install[:delete]` | `../../tools/app/stop-farmdash-install-lock.ps1` to release locked installer files |
+| `npm run clean:build-out[:search]` | `../tools/app/remove-build-output-folders.ps1`; `:search` also stops Windows Search |
+| `npm run unlock-install[:delete]` | `../tools/app/stop-farmdash-install-lock.ps1` to release locked installer files |
 | `npm run i18n:*` | See §9 |
-| `npm run verify:electron-pack` | `../../tools/app/verify-electron-pack-files.mjs` — CI gate: main `require('./…')` closure vs **`build.files`** |
-| `npm run export-fields-csv` | `../../tools/app/export-fields-to-csv.mjs` (engineer-only diagnostic) |
+| `npm run verify:electron-pack` | `../tools/app/verify-electron-pack-files.mjs` — CI gate: main `require('./…')` closure vs **`build.files`** |
+| `npm run export-fields-csv` | `../tools/app/export-fields-to-csv.mjs` (engineer-only diagnostic) |
 
 **CI:** [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — on push/PR to **`main`**, **`master`**, or **`develop`**, runs **`npm ci`**, **`npm test`**, **`npm run verify:electron-pack`**, **`npm run i18n:verify`**, **`npm audit --omit=dev`** (Windows, Node 20) in the app folder.
 
@@ -554,6 +573,6 @@ There is **no rotating log file**. Console output goes to stdout / DevTools. If 
 - New translations go through `messages/<code>.json` for full keys; never hand-edit `translations.json`.
 - New IPC channels: add in `main.js`, expose in `preload.js`, document in §**4.7** and §**5**.
 - Store keys: prefer `electron-store` keys over ad-hoc `localStorage` for anything the desktop should be authoritative on (e.g. server config, LAN, mod config).
-- Tests: run **`npm test`** under `FS25_FarmDashboard_App/FS25_FarmDashboard_App/` for JS changes; Lua/game behaviour still needs **manual** verification on a real save when collectors or merge semantics change (markdown-only PRs: tests optional).
+- Tests: run **`npm test`** under `FS25_FarmDashboard_App/` for JS changes; Lua/game behaviour still needs **manual** verification on a real save when collectors or merge semantics change (markdown-only PRs: tests optional).
 
 **Credits:** [`AUTHORS.md`](./AUTHORS.md).

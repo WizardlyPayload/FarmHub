@@ -3,7 +3,7 @@
   Builds FS25_FarmDashboard.zip containing only modDesc.xml, icon.png (if present), and the src\ tree - nothing else.
 
 .DESCRIPTION
-  Reads from FS25_FarmDashboard_Mod\FS25_FarmDashboard_Mod\ only:
+  Reads from FS25_FarmDashboard_Mod\ only:
     modDesc.xml, icon.png (optional), src\
 
   Zip layout is **flat at archive root** (Giants resolves `sourceFile` paths like `src/FarmDashboard.lua` from there):
@@ -37,7 +37,7 @@ if (-not $RepoRoot) {
     $RepoRoot = Split-Path -Parent $PSScriptRoot
 }
 
-$ModSource = Join-Path $RepoRoot "FS25_FarmDashboard_Mod\FS25_FarmDashboard_Mod"
+$ModSource = Join-Path $RepoRoot "FS25_FarmDashboard_Mod"
 $DestZip = Join-Path $RepoRoot "FS25_FarmDashboard_Mod\$OutZipName"
 $SrcTree = Join-Path $ModSource "src"
 $ModDesc = Join-Path $ModSource "modDesc.xml"

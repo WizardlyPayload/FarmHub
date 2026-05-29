@@ -14,9 +14,9 @@ $ErrorActionPreference = 'Continue'
 # Script lives in FarmHub/tools/app — resolve inner Electron app root for in-repo output folders
 $toolsAppDir = $PSScriptRoot
 $repoRoot = Split-Path -Parent (Split-Path -Parent $toolsAppDir)
-$appRoot = Join-Path $repoRoot 'FS25_FarmDashboard_App\FS25_FarmDashboard_App'
-# package.json build.output is ../electron-pack-out → sibling of inner app folder
-$packParent = Split-Path -Parent $appRoot
+$appRoot = Join-Path $repoRoot 'FS25_FarmDashboard_App'
+# package.json build.output is electron-pack-out (inside app folder)
+$packParent = $appRoot
 
 $targets = [System.Collections.Generic.List[string]]::new()
 # Default npm run dist/pack output — outside repo (see tools/run-electron-builder.mjs)

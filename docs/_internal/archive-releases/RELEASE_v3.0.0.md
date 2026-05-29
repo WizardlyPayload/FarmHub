@@ -50,7 +50,7 @@ Everything in [CHANGELOG §2.0.0](./CHANGELOG.md) remains the foundation: mod **
 
 ## Maintainer notes
 
-- **Build:** `cd FS25_FarmDashboard_App/FS25_FarmDashboard_App && npm install && npm run dist`
+- **Build:** `cd FS25_FarmDashboard_App && npm install && npm run dist`
 - **Support bundle:** always ask for **app `package.json` version**, **`modDesc.xml` version**, and whether the issue is **local** vs **FTP**.
 - **Git history:** Some commits may mention removed features; **3.0.0 docs** describe the supported surface only.
 

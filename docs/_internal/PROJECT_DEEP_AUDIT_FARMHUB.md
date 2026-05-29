@@ -32,8 +32,8 @@ FarmHub is a **mature, modular** baseline: clear separation between **Lua export
 
 | Path | Role | Notes |
 | ---- | ---- | ----- |
-| `FS25_FarmDashboard_App/FS25_FarmDashboard_App/` | Electron **main** (`main.js`), **preload**, **Express**, **merge**, **FTP**, **tests** | Primary engineering surface |
-| `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/` | FS25 **Lua** mod, collectors | Writes `data.json`; authority-only export |
+| `FS25_FarmDashboard_App/` | Electron **main** (`main.js`), **preload**, **Express**, **merge**, **FTP**, **tests** | Primary engineering surface |
+| `FS25_FarmDashboard_Mod/` | FS25 **Lua** mod, collectors | Writes `data.json`; authority-only export |
 | `docs/` | Manuals, security, release notes | Canonical user + maintainer docs |
 | `FS25_RealisticLivestockRM/` | Large **separate** FS25 mod | Not required for Farm Dashboard operation; increases clone size and cognitive load |
 
@@ -107,7 +107,7 @@ FarmHub is a **mature, modular** baseline: clear separation between **Lua export
 
 ### 6.3 npm audit (production)
 
-Command: `npm audit --omit=dev` from **`FS25_FarmDashboard_App/FS25_FarmDashboard_App/`**.
+Command: `npm audit --omit=dev` from **`FS25_FarmDashboard_App/`**.
 
 **Baseline:** **`fast-xml-parser@^5.7.3`** addresses the moderate XML-builder advisory; re-run after dependency bumps. Full-tree `npm audit` (including devDependencies) may still list **electron-builder** / **Electron** chains — track separately when upgrading **electron** / **electron-builder**.
 

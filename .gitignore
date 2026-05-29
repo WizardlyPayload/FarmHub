@@ -34,8 +34,8 @@ dataS_py_extracted/
 dataS_py_extract/
 
 # Mod shop images exported from FS25 mods folder (local only; not for git)
-FS25_FarmDashboard_App/FS25_FarmDashboard_App/web/assests/img/items_mod_extract/*
-!FS25_FarmDashboard_App/FS25_FarmDashboard_App/web/assests/img/items_mod_extract/.gitkeep
+FS25_FarmDashboard_App/web/assests/img/items_mod_extract/*
+!FS25_FarmDashboard_App/web/assests/img/items_mod_extract/.gitkeep
 
 # Optional: keep built installers only in GitHub Releases, not in git
 # (uncomment if you prefer never to commit installers)

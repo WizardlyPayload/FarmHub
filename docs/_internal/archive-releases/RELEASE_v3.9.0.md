@@ -1,6 +1,6 @@
 # FS25 Farm Dashboard — Release **v3.9.0** (pre-final hardening line)
 
-**Desktop app:** `3.9.0` (`FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json`)  
+**Desktop app:** `3.9.0` (`FS25_FarmDashboard_App/package.json`)  
 **FS25 mod:** `2.3.0.0` (`modDesc.xml` + `FarmDashboard.VERSION` in Lua — aligned in this release)
 
 **Plan + audit context:** this release implements the **v3.9 Prefinal Release Plan** (see repo planning docs / team checklist) and closes the findings in **[_internal/AUDIT_v3.9_PREFINAL.md](./_internal/AUDIT_v3.9_PREFINAL.md)**. The **only** remaining manual gate before promoting **v4.0.0** as “stable” is **updater QA** — install **3.9.0**, publish **4.0.0**, verify download + install-on-quit per **[_internal/UPDATER_QA.md](./_internal/UPDATER_QA.md)**.
@@ -58,7 +58,7 @@ Transport (**cleartext HTTP Basic**) is unchanged — still **home-LAN only** un
 ## Upgrade / next step (v4)
 
 1. Follow **[_internal/RELEASE_READINESS_v3.9.md](./_internal/RELEASE_READINESS_v3.9.md)** — build and publish **`3.9.0`** with **`latest.yml`** + installer on GitHub Releases.  
-2. Follow **[_internal/UPDATER_QA.md](./_internal/UPDATER_QA.md)** — publish **4.0.0** on the GitHub repo configured in **`FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json`** → **`build.publish`** (**`owner`: `WizardlyPayload`**, **`repo`: `FarmHub`**, **`releaseType`: `release`**).  
+2. Follow **[_internal/UPDATER_QA.md](./_internal/UPDATER_QA.md)** — publish **4.0.0** on the GitHub repo configured in **`FS25_FarmDashboard_App/package.json`** → **`build.publish`** (**`owner`: `WizardlyPayload`**, **`repo`: `FarmHub`**, **`releaseType`: `release`**).  
 3. **`app-updater.js`** is only active when **`app.isPackaged`** is true — dev (`npm start`) skips the updater (`initAppUpdater` returns immediately in development).  
 4. When QA passes, promote **v4** as the advertised stable line. Full-project findings: **[PROJECT_DEEP_AUDIT_FARMHUB.md](./PROJECT_DEEP_AUDIT_FARMHUB.md)**.
 

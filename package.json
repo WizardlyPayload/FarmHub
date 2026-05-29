@@ -1,0 +1,29 @@
+{
+  "name": "farmhub",
+  "version": "4.0.0",
+  "private": true,
+  "description": "FarmHub — FS25 Farm Dashboard (Lua mod + Electron app). Run builds from the repo root.",
+  "scripts": {
+    "install:app": "npm install --prefix FS25_FarmDashboard_App",
+    "ci:app": "npm ci --prefix FS25_FarmDashboard_App",
+    "setup": "npm run install:app",
+    "start": "npm run start --prefix FS25_FarmDashboard_App",
+    "test": "npm test --prefix FS25_FarmDashboard_App",
+    "build:app": "npm run dist --prefix FS25_FarmDashboard_App",
+    "pack:app": "npm run pack --prefix FS25_FarmDashboard_App",
+    "build:app:in-repo": "npm run dist:in-repo --prefix FS25_FarmDashboard_App",
+    "pack:app:in-repo": "npm run pack:in-repo --prefix FS25_FarmDashboard_App",
+    "build:app:fresh": "npm run dist:fresh --prefix FS25_FarmDashboard_App",
+    "package:mod": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/Zip-FarmDashboardMod.ps1",
+    "build:all": "npm run package:mod && npm run build:app",
+    "clean:build-out": "npm run clean:build-out --prefix FS25_FarmDashboard_App",
+    "clean:build-out:search": "npm run clean:build-out:search --prefix FS25_FarmDashboard_App",
+    "unlock-install": "npm run unlock-install --prefix FS25_FarmDashboard_App",
+    "verify": "npm run verify:electron-pack --prefix FS25_FarmDashboard_App && npm run i18n:verify --prefix FS25_FarmDashboard_App",
+    "verify:electron-pack": "npm run verify:electron-pack --prefix FS25_FarmDashboard_App",
+    "i18n:audit": "npm run i18n:audit --prefix FS25_FarmDashboard_App",
+    "i18n:build": "npm run i18n:build --prefix FS25_FarmDashboard_App",
+    "i18n:sync": "npm run i18n:sync --prefix FS25_FarmDashboard_App",
+    "i18n:verify": "npm run i18n:verify --prefix FS25_FarmDashboard_App"
+  }
+}

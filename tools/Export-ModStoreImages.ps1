@@ -76,7 +76,7 @@ $ErrorActionPreference = "Stop"
 
 # Default output: MAIN CODEBASE layout, or public GitHub clone (`FS25_Dashboard APP`).
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
-    $_main = Join-Path $PSScriptRoot "..\FS25_FarmDashboard_App\FS25_FarmDashboard_App\web\assests\img\items_mod_extract"
+    $_main = Join-Path $PSScriptRoot "..\FS25_FarmDashboard_App\web\assests\img\items_mod_extract"
     $_git  = Join-Path $PSScriptRoot "..\FS25_Dashboard APP\web\assests\img\items_mod_extract"
     if (Test-Path -LiteralPath (Split-Path -Parent $_main)) {
         $OutputDir = $_main

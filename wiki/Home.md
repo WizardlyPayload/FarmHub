@@ -130,7 +130,7 @@ Download both from **[GitHub Releases](https://github.com/WizardlyPayload/FarmHu
 
 1. Read **[Developer Guide](Developer-Guide)** — data flow, repo layout, `npm run dist`
 2. See **[DEVELOPER_HANDOVER.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/DEVELOPER_HANDOVER.md)** for IPC, merge rules, and file map
-3. Run tests: `cd FS25_FarmDashboard_App/FS25_FarmDashboard_App && npm test`
+3. Run tests: `cd FS25_FarmDashboard_App && npm test`
 
 ## Main features
 

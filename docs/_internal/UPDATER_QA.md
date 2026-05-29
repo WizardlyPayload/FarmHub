@@ -1,6 +1,6 @@
 # Farm Dashboard — auto-update QA
 
-The Windows packaged app uses `electron-updater` ([`app-updater.js`](../FS25_FarmDashboard_App/FS25_FarmDashboard_App/app-updater.js)) against GitHub Releases configured in `package.json` (`build.publish`).
+The Windows packaged app uses `electron-updater` ([`app-updater.js`](../FS25_FarmDashboard_App/app-updater.js)) against GitHub Releases configured in `package.json` (`build.publish`).
 
 ## What to verify
 

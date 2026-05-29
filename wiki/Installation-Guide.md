@@ -91,7 +91,7 @@ After loading a save with the mod enabled, check for the `data.json` file:
 
 3. Start **Farming Simulator 25** once so the game registers the mod.
 
-> **Developers:** sources live under `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/` in the repo; players install **`FS25_FarmDashboard`** (zip root layout from `tools\Zip-FarmDashboardMod.ps1`).
+> **Developers:** sources live under `FS25_FarmDashboard_Mod/` in the repo; players install **`FS25_FarmDashboard`** (zip root layout from `tools\Zip-FarmDashboardMod.ps1`).
 
 ---
 

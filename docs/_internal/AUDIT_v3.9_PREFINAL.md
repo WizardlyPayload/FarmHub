@@ -13,8 +13,8 @@ Historical note: this audit originally recorded **Conditional NO-GO** before the
 ## What was audited
 
 - Documentation and setup manuals in `docs/`, root `README.md`, and app `README.md`.
-- App runtime and UI code in `FS25_FarmDashboard_App/FS25_FarmDashboard_App`.
-- Mod runtime code in `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod`.
+- App runtime and UI code in `FS25_FarmDashboard_App`.
+- Mod runtime code in `FS25_FarmDashboard_Mod`.
 - Automated checks:
   - `npm test` (Jest suite)
   - `npm audit --omit=dev --json`
@@ -22,8 +22,8 @@ Historical note: this audit originally recorded **Conditional NO-GO** before the
 
 ## Verification evidence
 
-- App version: **`3.9.0`** in `FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json` (+ matching `package-lock.json`).
-- Mod version: **`2.3.0.0`** in both `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` (Lua).
+- App version: **`3.9.0`** in `FS25_FarmDashboard_App/package.json` (+ matching `package-lock.json`).
+- Mod version: **`2.3.0.0`** in both `FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` (Lua).
 - Tests: run **`npm test`** — expanded Jest coverage (fan-out, dedupe, pastures, setup, LAN policy, XSS smoke, i18n guard, etc.); re-run after pull before tagging.
 - Production dependency audit: **`npm audit --omit=dev`** — expect **0** production vulnerabilities before tag (re-verify on your machine).
 

@@ -1,7 +1,7 @@
 /**
  * Reads FarmDashboard data.json and writes one CSV row per field (Excel-friendly).
  * Usage (from inner app dir): npm run export-fields-csv -- …
- *   node ../../tools/app/export-fields-to-csv.mjs [path-to-data.json] [output.csv]
+ *   node ../tools/app/export-fields-to-csv.mjs [path-to-data.json] [output.csv]
  * If omitted, reads: Documents/My Games/FarmingSimulator2025/modSettings/FS25_FarmDashboard/savegame1/data.json
  */
 

@@ -39,7 +39,7 @@ Use this document to understand **what changed** and **what was added** since th
 
 - **Mod zip** is now **strictly**: `modDesc.xml`, `icon.png`, `src/` at the **zip root**.
 - **Mod folder name** remains **`FS25_FarmDashboard`** in your FS25 `mods` directory.
-- **App installer** is an NSIS `.exe` built from `FS25_FarmDashboard_App/FS25_FarmDashboard_App`.
+- **App installer** is an NSIS `.exe` built from `FS25_FarmDashboard_App`.
 
 ---
 

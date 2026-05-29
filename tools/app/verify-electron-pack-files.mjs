@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const projectDir = path.join(__dirname, '..', '..', 'FS25_FarmDashboard_App', 'FS25_FarmDashboard_App');
+const projectDir = path.join(__dirname, '..', '..', 'FS25_FarmDashboard_App');
 
 const REQ_RE = /require\s*\(\s*['"]\.\/([^'"]+)['"]\s*\)/g;
 

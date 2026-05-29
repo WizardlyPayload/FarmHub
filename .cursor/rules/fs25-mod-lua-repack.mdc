@@ -5,7 +5,7 @@ globs: FarmHub/FS25_FarmDashboard_Mod/**/*.lua
 
 # FS25 Farm Dashboard mod — repack after Lua changes
 
-The game loads **`FS25_FarmDashboard.zip`** (or an extracted folder) under **`mods/`**. Edits under `FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/src/` are **not** picked up until you rebuild the archive (or copy files to the server’s mod tree).
+The game loads **`FS25_FarmDashboard.zip`** (or an extracted folder) under **`mods/`**. Edits under `FS25_FarmDashboard_Mod/src/` are **not** picked up until you rebuild the archive (or copy files to the server’s mod tree).
 
 From repo root **`FarmHub`** (parent of `FS25_FarmDashboard_Mod` and `tools`):
 

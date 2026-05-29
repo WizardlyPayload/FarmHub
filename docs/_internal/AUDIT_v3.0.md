@@ -2,8 +2,8 @@
 
 **Reader note:** This is a **frozen** gap analysis from **April 2026** (app **3.0.0**, mod **2.0.0.0** at audit time). **Current** versions and release posture: **`package.json` / `modDesc.xml`** and **[_internal/AUDIT_v3.9_PREFINAL.md](./_internal/AUDIT_v3.9_PREFINAL.md)**. Finding **#6** (dual i18n “segment / line-pack” pipeline) described implementation that **no longer exists** in the tree — shipping i18n is **`messages/*.json` + `build-translations.mjs`** only (**[_internal/I18N.md](./_internal/I18N.md)**).
 
-**App version:** `3.0.0` (`FS25_FarmDashboard_App/FS25_FarmDashboard_App/package.json`)
-**Mod version:** `2.0.0.0` (`FS25_FarmDashboard_Mod/FS25_FarmDashboard_Mod/modDesc.xml`)
+**App version:** `3.0.0` (`FS25_FarmDashboard_App/package.json`)
+**Mod version:** `2.0.0.0` (`FS25_FarmDashboard_Mod/modDesc.xml`)
 **Audit cut:** April 2026
 **Companions:** [`DEVELOPER_HANDOVER.md`](./DEVELOPER_HANDOVER.md) · [`USER_MANUAL.md`](./USER_MANUAL.md) · [`SCREENSHOTS.md`](./SCREENSHOTS.md)
 

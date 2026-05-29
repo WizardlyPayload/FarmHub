@@ -212,7 +212,7 @@ Uninstall app separately if needed.
 6. **Task Manager** — end any stuck `FS25 Farm Dashboard Setup` or `*_setup.exe` under Details, then run again.
 7. **Unlock script** (from repo, if you build locally):
    ```powershell
-   cd FS25_FarmDashboard_App\FS25_FarmDashboard_App
+   cd FS25_FarmDashboard_App
    npm run unlock-install
    ```
 8. **Log the next run** (send log if you open an issue):

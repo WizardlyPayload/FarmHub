@@ -74,7 +74,7 @@ FarmHub/
 ## Quick start
 
 ```bash
-cd FS25_FarmDashboard_App/FS25_FarmDashboard_App
+cd FS25_FarmDashboard_App
 npm install
 npm start          # dev
 npm test           # Jest

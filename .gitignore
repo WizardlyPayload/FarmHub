@@ -43,3 +43,6 @@ FS25_FarmDashboard_App/FS25_FarmDashboard_App/web/assests/img/items_mod_extract/
 
 # Marketing site (local / VPS — not pushed to GitHub)
 Website/
+
+# Realistic Livestock mod (local reference only — third-party; do not push to GitHub)
+FS25_RealisticLivestockRM/

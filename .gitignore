@@ -40,3 +40,6 @@ FS25_FarmDashboard_App/FS25_FarmDashboard_App/web/assests/img/items_mod_extract/
 # Optional: keep built installers only in GitHub Releases, not in git
 # (uncomment if you prefer never to commit installers)
 # *.exe
+
+# Marketing site (local / VPS — not pushed to GitHub)
+Website/

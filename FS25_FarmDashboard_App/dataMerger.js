@@ -18,6 +18,7 @@
  */
 
 const { assessModVersion } = require('./modVersionPolicy.js');
+const { pruneMergedDataToPlayerFarms } = require('./farmScope.cjs');
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -115,8 +116,63 @@ function buildFieldLiveFingerprints(luaFields, receivedAt) {
             harvestReady: !!f.harvestReady,
             isHarvested: !!f.isHarvested,
             needsWork: !!f.needsWork,
+            // Live-only signals XML never carries — held so UI keeps area/PF when Lua stops.
+            hectares: Number(f.hectares ?? f.areaHa) || 0,
+            posX: Number(f.posX ?? f.position?.x) || 0,
+            posZ: Number(f.posZ ?? f.position?.z) || 0,
+            isPrecisionFarming: !!f.isPrecisionFarming,
+            isScanned: !!f.isScanned,
+            nitrogenLevel: Number(f.nitrogenLevel) || 0,
+            targetNitrogen: Number(f.targetNitrogen) || 0,
+            nitrogenTargetDisplay: Number(f.nitrogenTargetDisplay) || 0,
+            phValue: Number(f.phValue) || 0,
+            targetPh: Number(f.targetPh) || 0,
+            phLimeBarMin: Number(f.phLimeBarMin) || 0,
+            phLimeBarMax: Number(f.phLimeBarMax) || 0,
+            rollerLevel: Number(f.rollerLevel) || 0,
+            weedLevel: Number(f.weedLevel) || 0,
         };
     }
+    return out;
+}
+
+/**
+ * Overlay cached live-only values (area, position, PF soil data) onto an XML row that lacks them.
+ * Geometry never regresses; PF values are better stale than blank when the live export drops out.
+ */
+function enrichFieldFromLiveCache(base, cache) {
+    if (!cache) return base;
+    const out = { ...base };
+    let enriched = false;
+    if (!(Number(out.hectares) > 0) && Number(cache.hectares) > 0) {
+        out.hectares = cache.hectares;
+        enriched = true;
+    }
+    if (!(Number(out.posX) || Number(out.posZ)) && (Number(cache.posX) || Number(cache.posZ))) {
+        out.posX = cache.posX;
+        out.posZ = cache.posZ;
+        enriched = true;
+    }
+    if (cache.isPrecisionFarming && !out.isPrecisionFarming) {
+        out.isPrecisionFarming = true;
+        enriched = true;
+    }
+    const hasPfValues = Number(out.targetNitrogen) > 0 || Number(out.phValue) > 0;
+    const cacheHasPf = Number(cache.targetNitrogen) > 0 || Number(cache.phValue) > 0;
+    if (!hasPfValues && cacheHasPf) {
+        out.isScanned = out.isScanned || cache.isScanned;
+        out.nitrogenLevel = cache.nitrogenLevel;
+        out.targetNitrogen = cache.targetNitrogen;
+        if (Number(cache.nitrogenTargetDisplay) > 0) {
+            out.nitrogenTargetDisplay = cache.nitrogenTargetDisplay;
+        }
+        out.phValue = cache.phValue;
+        out.targetPh = cache.targetPh;
+        out.phLimeBarMin = cache.phLimeBarMin;
+        out.phLimeBarMax = cache.phLimeBarMax;
+        enriched = true;
+    }
+    if (enriched) out._fieldLiveEnrichedFromCache = true;
     return out;
 }
 
@@ -165,27 +221,34 @@ function applyFieldLiveCacheAntiRegress(xmlFields, fieldLiveCache, lastLuaAt, la
         const xmlCrop = String(xmlField.fruitType || '').toUpperCase();
         const cacheCrop = String(cache.fruitType || '').toUpperCase();
         if (xmlCrop && cacheCrop && xmlCrop !== 'UNKNOWN' && cacheCrop !== 'UNKNOWN' && xmlCrop !== cacheCrop) {
-            return { ...base, _fieldDataSource: 'savegame_xml', _fieldCropRotated: true };
+            // Crop rotated since last live tick: keep XML crop, but area/position/PF soil are still valid.
+            return enrichFieldFromLiveCache(
+                { ...base, _fieldDataSource: 'savegame_xml', _fieldCropRotated: true },
+                cache
+            );
         }
         const xc = fieldAdvanceScore(xmlField);
         const lc = fieldAdvanceScore(cache);
         if (lc > xc + 0.5 || (luaNewer && lc >= xc)) {
-            return {
-                ...base,
-                growthLabel: cache.growthLabel || xmlField.growthLabel,
-                growthState: Number.isFinite(Number(cache.growthState)) ? cache.growthState : xmlField.growthState,
-                maxGrowthState: Number.isFinite(Number(cache.maxGrowthState)) ? cache.maxGrowthState : xmlField.maxGrowthState,
-                fruitType: cache.fruitType || xmlField.fruitType,
-                harvestReady:
-                    typeof cache.harvestReady === 'boolean' ? cache.harvestReady : xmlField.harvestReady,
-                isHarvested: cache.isHarvested ?? xmlField.isHarvested,
-                needsWork: cache.needsWork ?? xmlField.needsWork,
-                _fieldDataSource: 'last_live_cache',
-                _fieldDataNote:
-                    'Showing last live field state; savegame XML looks older (empty/paused server). Resume play or reconnect to refresh.',
-            };
+            return enrichFieldFromLiveCache(
+                {
+                    ...base,
+                    growthLabel: cache.growthLabel || xmlField.growthLabel,
+                    growthState: Number.isFinite(Number(cache.growthState)) ? cache.growthState : xmlField.growthState,
+                    maxGrowthState: Number.isFinite(Number(cache.maxGrowthState)) ? cache.maxGrowthState : xmlField.maxGrowthState,
+                    fruitType: cache.fruitType || xmlField.fruitType,
+                    harvestReady:
+                        typeof cache.harvestReady === 'boolean' ? cache.harvestReady : xmlField.harvestReady,
+                    isHarvested: cache.isHarvested ?? xmlField.isHarvested,
+                    needsWork: cache.needsWork ?? xmlField.needsWork,
+                    _fieldDataSource: 'last_live_cache',
+                    _fieldDataNote:
+                        'Showing last live field state; savegame XML looks older (empty/paused server). Resume play or reconnect to refresh.',
+                },
+                cache
+            );
         }
-        return { ...base, _fieldDataSource: 'savegame_xml' };
+        return enrichFieldFromLiveCache({ ...base, _fieldDataSource: 'savegame_xml' }, cache);
     });
 }
 
@@ -235,11 +298,15 @@ function mergeData(luaData, xmlData, options = {}) {
             lastLuaAt,
             lastXmlAt
         );
-        return attachDataTimestamps({ ...base, fields }, { lastLuaAt, lastXmlAt });
+        return pruneMergedDataToPlayerFarms(
+            attachDataTimestamps({ ...base, fields }, { lastLuaAt, lastXmlAt })
+        );
     }
     if (!xmlData) {
         const base = buildFromLuaOnly(luaData);
-        return attachDataTimestamps(base, { lastLuaAt, lastXmlAt });
+        return pruneMergedDataToPlayerFarms(
+            attachDataTimestamps(base, { lastLuaAt, lastXmlAt })
+        );
     }
 
     let allowedFarmIds = farmIdsOwningFarmland(toArr(xmlData.farmlandsArray));
@@ -260,7 +327,7 @@ function mergeData(luaData, xmlData, options = {}) {
         mapTitle     : xmlData.career?.mapTitle     || luaData.serverInfo?.mapName || 'Unknown Map',
         savegameName : xmlData.career?.savegameName || '',
         saveDate     : xmlData.career?.saveDate     || '',
-        mapId        : xmlData.career?.mapId        || '',
+        mapId        : luaData.serverInfo?.mapId || xmlData.career?.mapId || '',
         settings     : xmlData.career?.settings     || {},
         /** Alias for dashboard client (`apiStorage` / realtime); same object as `settings`. */
         gameSettings : xmlData.career?.settings     || {},
@@ -328,7 +395,9 @@ function mergeData(luaData, xmlData, options = {}) {
         xmlEconomy   : xmlData.economy        || {},
     };
 
-    return attachDataTimestamps(mergedCore, { lastLuaAt, lastXmlAt });
+    return pruneMergedDataToPlayerFarms(
+        attachDataTimestamps(mergedCore, { lastLuaAt, lastXmlAt })
+    );
 }
 
 // ─── farms ────────────────────────────────────────────────────────────────────

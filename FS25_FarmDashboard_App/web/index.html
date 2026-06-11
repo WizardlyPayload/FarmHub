@@ -164,7 +164,7 @@
       <div class="container-fluid py-4 farm-dash-shell">
         <div class="row mb-4">
           <div class="col-12">
-            <div id="folder-selection" class="card shadow-sm border-farm-accent">
+            <div id="folder-selection" class="card shadow-sm border-farm-accent d-none">
               <div class="card-header bg-farm-primary text-white">
                 <h5 class="card-title text-warning mb-0"><i class="bi bi-exclamation-triangle me-2"></i><span data-i18n="folder.title">Oops — something went wrong</span></h5>
               </div>
@@ -204,11 +204,21 @@
               <div class="farm-landing-hero-glass text-center">
                 <h2 class="farm-landing-hero-title mb-2"><i class="bi bi-speedometer2 me-2 text-farm-accent"></i><span data-i18n="landing.title">Farm Management Dashboard</span></h2>
                 <p class="farm-landing-hero-lead mb-3" data-i18n="landing.lead">Select a section below to manage your farm data</p>
-                <div class="d-flex flex-wrap justify-content-center align-items-center gap-3">
-                  <div class="badge farm-landing-time-badge fs-6" id="game-time-display"><i class="bi bi-clock me-1"></i><span data-i18n="landing.gameLoading">Loading game time...</span></div>
-                  <button type="button" class="btn btn-sm farm-btn-accent-outline farmdash-local-only" id="landing-import-mod-images" title="Scan local FS25 mods folder">
-                    <i class="bi bi-images me-1"></i><span data-i18n="landing.importMods">Import mod shop images</span>
-                  </button>
+                <div class="farm-landing-hero-toolbar" role="group" aria-label="Quick actions">
+                  <div class="farm-landing-hero-toolbar__slot farm-landing-hero-toolbar__slot--start">
+                    <button type="button" class="btn btn-sm farm-btn-accent-outline farmdash-local-only" id="landing-import-mod-images" title="Scan local FS25 mods folder">
+                      <i class="bi bi-images me-1"></i><span data-i18n="landing.importMods">Import mod shop images</span>
+                    </button>
+                  </div>
+                  <div class="farm-landing-hero-toolbar__slot farm-landing-hero-toolbar__slot--center">
+                    <div class="badge farm-landing-time-badge fs-6" id="game-time-display"><i class="bi bi-clock me-1"></i><span data-i18n="landing.gameLoading">Loading game time...</span></div>
+                  </div>
+                  <div class="farm-landing-hero-toolbar__slot farm-landing-hero-toolbar__slot--end">
+                    <button type="button" class="btn btn-sm farm-btn-accent-outline" id="landing-fleet-map-btn" onclick="dashboard.showSection('map')" aria-label="Fleet map">
+                      <i class="bi bi-map me-1"></i><span data-i18n="landing.fleetMap">Fleet map</span>
+                      <span class="badge bg-dark border border-secondary text-farm-accent ms-1" id="map-vehicle-count">0</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -734,6 +744,9 @@
                   <button class="nav-link text-start rounded py-2 px-3" id="app-settings-tab-theme" data-bs-toggle="tab" data-bs-target="#app-settings-pane-theme" type="button" role="tab" aria-controls="app-settings-pane-theme" aria-selected="false">
                     <i class="bi bi-palette me-2 text-farm-accent"></i><span data-i18n="settings.sidebarAppearance">Appearance</span>
                   </button>
+                  <button class="nav-link text-start rounded py-2 px-3" id="app-settings-tab-about" data-bs-toggle="tab" data-bs-target="#app-settings-pane-about" type="button" role="tab" aria-controls="app-settings-pane-about" aria-selected="false">
+                    <i class="bi bi-info-circle me-2 text-secondary"></i><span data-i18n="settings.sidebarAbout">About</span>
+                  </button>
                 </nav>
               </div>
               <div class="col-12 col-md-8 col-lg-9 p-3 p-md-4 app-settings-pane-scroll">
@@ -749,14 +762,6 @@
                       <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-pastures" checked/><label class="form-check-label" for="settings-section-pastures" data-i18n="card.pastures">Pastures</label></div></div>
                       <div class="col-md-6"><div class="form-check"><input class="form-check-input" type="checkbox" id="settings-section-productions" checked/><label class="form-check-label" for="settings-section-productions" data-i18n="card.productions">Productions</label></div></div>
                     </div>
-                    <hr class="border-secondary my-3"/>
-                    <h6 class="text-farm-accent" data-i18n="settings.desktopAppTitle">Desktop app — updates</h6>
-                    <p class="small text-muted mb-2" data-i18n="settings.desktopAppHint">The Farm Dashboard installer checks GitHub Releases for new versions. FS25 mod updates use Giants Mod Hub or in-game mods.</p>
-                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                      <span class="small text-muted"><span data-i18n="settings.appVersionLabel">Version</span> <strong id="settings-desktop-app-version" class="text-light">—</strong></span>
-                      <button type="button" class="btn btn-sm btn-outline-farm-accent" id="settings-desktop-check-updates-btn" data-i18n="settings.checkForUpdates">Check for updates</button>
-                    </div>
-                    <div id="settings-desktop-update-status" class="small text-muted mb-0" role="status"></div>
                     <hr class="border-secondary my-3"/>
                     <h6 class="text-farm-accent" data-i18n="settings.fieldExclusionTitle">Fields — hide parcels</h6>
                     <p class="small text-muted" data-i18n="settings.fieldExclusionHint">Only parcels your selected farm owns are listed.</p>
@@ -998,6 +1003,51 @@
                       <button type="button" class="btn btn-outline-danger btn-sm" onclick="dashboard.resetThemeToDefaults()">
                         <i class="bi bi-arrow-counterclockwise me-1"></i> <span data-i18n="theme.reset">Reset Defaults</span>
                       </button>
+                    </div>
+                  </div>
+
+                  <div class="tab-pane fade" id="app-settings-pane-about" role="tabpanel" aria-labelledby="app-settings-tab-about" tabindex="0">
+                    <div class="farmdash-about-hero mb-4">
+                      <img src="assests/img/icon.png" alt="" width="72" height="72" class="farmdash-about-logo flex-shrink-0"/>
+                      <div>
+                        <h5 class="mb-1 text-light">FS25 Farm Dashboard</h5>
+                        <p class="small text-muted mb-0" data-i18n="settings.aboutTagline">Built on Josh Walki&apos;s original Farm Dashboard — extended as a Windows companion for Farming Simulator 25.</p>
+                      </div>
+                    </div>
+
+                    <h6 class="text-farm-accent" data-i18n="settings.aboutVersionsTitle">Versions</h6>
+                    <dl class="row small mb-3 farmdash-about-dl">
+                      <dt class="col-sm-5 text-muted" data-i18n="settings.aboutAppVersionLabel">Desktop app</dt>
+                      <dd class="col-sm-7 mb-1"><strong id="settings-about-app-version" class="text-light">—</strong></dd>
+                      <dt class="col-sm-5 text-muted" data-i18n="settings.aboutModVersionLabel">In-game mod</dt>
+                      <dd class="col-sm-7 mb-1"><span id="settings-about-mod-version" class="text-light">—</span></dd>
+                      <dt class="col-sm-5 text-muted" data-i18n="settings.aboutModExpectedLabel">Minimum mod for this app</dt>
+                      <dd class="col-sm-7 mb-1"><span id="settings-about-mod-expected" class="text-light">—</span></dd>
+                    </dl>
+
+                    <h6 class="text-farm-accent" data-i18n="settings.desktopAppTitle">Desktop app — updates</h6>
+                    <p class="small text-muted mb-2" data-i18n="settings.desktopAppHint">The Farm Dashboard installer checks GitHub Releases for new versions. FS25 mod updates use Giants Mod Hub or in-game mods.</p>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                      <button type="button" class="btn btn-sm btn-outline-farm-accent" id="settings-desktop-check-updates-btn" data-i18n="settings.checkForUpdates">Check for updates</button>
+                    </div>
+                    <div id="settings-desktop-update-status" class="small text-muted mb-3" role="status"></div>
+
+                    <h6 class="text-farm-accent" data-i18n="settings.aboutAuthorsTitle">Authors</h6>
+                    <ul class="small text-muted mb-3 ps-3">
+                      <li class="mb-1" data-i18n="settings.aboutAuthorJosh">JoshWalki (Josh) — original Farm Dashboard idea, core FS25 mod, and the first live browser dashboard</li>
+                      <li data-i18n="settings.aboutAuthorWizardly">WizardlyPayload — Windows desktop app and FarmHub continuation: hosted and multiplayer farms, deeper field and farm workflows, security, translations, and ongoing releases</li>
+                    </ul>
+
+                    <h6 class="text-farm-accent" data-i18n="settings.aboutLicenseTitle">Licence</h6>
+                    <p class="small text-muted mb-2" data-i18n="settings.aboutLicenseBody">Copyright © JoshWalki and WizardlyPayload. All rights reserved. This software is proprietary; no licence is granted to copy, modify, or distribute without written permission.</p>
+                    <p class="small text-muted mb-3" data-i18n="settings.aboutGiantsNote">Farming Simulator 25 and related game content are trademarks of GIANTS Software. Not affiliated with GIANTS.</p>
+
+                    <h6 class="text-farm-accent" data-i18n="settings.aboutLinksTitle">Links</h6>
+                    <div class="farmdash-about-links">
+                      <a href="https://github.com/WizardlyPayload/FarmHub" target="_blank" rel="noopener noreferrer" class="farmdash-about-link"><i class="bi bi-github me-1" aria-hidden="true"></i><span data-i18n="settings.aboutLinkGithub">GitHub</span></a>
+                      <a href="https://github.com/WizardlyPayload/FarmHub/releases" target="_blank" rel="noopener noreferrer" class="farmdash-about-link"><i class="bi bi-download me-1" aria-hidden="true"></i><span data-i18n="settings.aboutLinkReleases">Releases</span></a>
+                      <a href="https://farmdashboard.co.uk" target="_blank" rel="noopener noreferrer" class="farmdash-about-link"><i class="bi bi-globe2 me-1" aria-hidden="true"></i><span data-i18n="settings.aboutLinkWebsite">Website</span></a>
+                      <a href="https://ko-fi.com/wizarlypayload" target="_blank" rel="noopener noreferrer" class="farmdash-about-link"><i class="bi bi-cup-hot me-1" aria-hidden="true"></i>Ko-fi</a>
                     </div>
                   </div>
                 </div>

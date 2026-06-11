@@ -499,7 +499,22 @@ function fallowLimeBeforeSeedSuggestion(field) {
 }
 
 const GRASS_LIME_GAP_TOLERANCE = 0.15;
-const GRASS_N_GAP_TOLERANCE_PCT = 0.12;
+/** PF mapped N: within this fraction of target → treat as close enough (matches mod `NUTRIENT_CLOSE_FRAC`). */
+export const PF_NUTRIENT_CLOSE_FRAC = 0.10;
+const GRASS_N_GAP_TOLERANCE_PCT = PF_NUTRIENT_CLOSE_FRAC;
+
+/** True when scanned PF nitrogen is within {@link PF_NUTRIENT_CLOSE_FRAC} of the display target. */
+export function pfNitrogenWithinTolerance(field, targetOverride) {
+  if (!field?.isPrecisionFarming || !field?.isScanned) return false;
+  const target =
+    Number.isFinite(Number(targetOverride)) && Number(targetOverride) > 0
+      ? Number(targetOverride)
+      : nitrogenTargetForDisplay(field);
+  if (!Number.isFinite(target) || target <= 0) return false;
+  const n = Number(field.nitrogenLevel ?? 0);
+  if (!Number.isFinite(n)) return false;
+  return n >= target * (1 - PF_NUTRIENT_CLOSE_FRAC);
+}
 
 function grassPfLimeGap(field) {
   const ph = Number(field?.phValue ?? 0);
@@ -540,6 +555,7 @@ function needsGrowingFertilizer(field) {
   if (isLegumeSkipGrowingNFertilizer(field)) return false;
   const gs = field.growthState || 0;
   if (gs <= 0) return false;
+  if (pfNitrogenWithinTolerance(field)) return false;
   if (typeof field.needsFertilizer === "boolean") return field.needsFertilizer;
   if (
     usePrecisionFarmingNitrogenTarget(field) &&
@@ -555,7 +571,8 @@ function needsGrowingFertilizer(field) {
 
 /**
  * One growing-crop maintenance suggestion: pick the job with the largest deficit vs targets.
- * Tie order (when urgencies match): lime → nitrogen → weeds → roll.
+ * Tie order (when urgencies match): lime → nitrogen → roll → weeds.
+ * Roll blocks weed suggestions at growth stage ≤2 while `needsRolling` (matches mod + in-game order).
  * @param {object} field
  * @returns {{ action: string, reason: string, source: 'rules' } | null}
  */
@@ -566,10 +583,10 @@ function pickGrowingCropMaintenanceSuggestion(field, ctx) {
 
   if (field.needsRolling && String(field.growthLabel || "") !== "mown_regrowth") {
     const gs = field.growthState || 0;
-    const urgency = gs <= 2 ? 0.95 : gs <= 4 ? 0.52 : 0.28;
+    const urgency = gs <= 2 ? 1.05 : gs <= 4 ? 0.52 : 0.28;
     candidates.push({
       urgency,
-      tie: 4,
+      tie: 2,
       apply() {
         return {
           action: t("rules.action.rollFirstStage"),
@@ -613,13 +630,18 @@ function pickGrowingCropMaintenanceSuggestion(field, ctx) {
   }
 
   if (game.weeds && field.needsWeeding) {
+    const gs = field.growthState || 0;
+    const rollFirst =
+      field.needsRolling &&
+      String(field.growthLabel || "") !== "mown_regrowth" &&
+      gs <= 2;
+    if (!rollFirst) {
     const w = Math.min(1, Math.max(0, Number(field.weedLevel ?? 0)));
     const urgency = Math.min(1.15, w + 0.08);
     const label = displayCropLabel(field);
-    const gs = field.growthState || 0;
     candidates.push({
       urgency,
-      tie: 3,
+      tie: 4,
       apply() {
         if (gs <= 2) {
           return {
@@ -637,6 +659,7 @@ function pickGrowingCropMaintenanceSuggestion(field, ctx) {
         };
       },
     });
+    }
   }
 
   if (needsGrowingFertilizer(field)) {
@@ -652,7 +675,7 @@ function pickGrowingCropMaintenanceSuggestion(field, ctx) {
       const t = nitrogenTargetForDisplay(field);
       if (t > 0 && Number.isFinite(n)) {
         const deficitRatio = Math.max(0, 1 - n / t);
-        if (isGrassCrop(field) && deficitRatio <= GRASS_N_GAP_TOLERANCE_PCT) {
+        if (deficitRatio <= PF_NUTRIENT_CLOSE_FRAC) {
           urgency = 0;
         } else {
           urgency = Math.min(1.25, deficitRatio);
@@ -671,7 +694,7 @@ function pickGrowingCropMaintenanceSuggestion(field, ctx) {
           const target = nitrogenTargetForDisplay(field);
           const gap = Math.max(0, target - n);
           const gapPct = target > 0 ? gap / target : 0;
-          if (isGrassCrop(field) && gapPct <= GRASS_N_GAP_TOLERANCE_PCT) {
+          if (gapPct <= PF_NUTRIENT_CLOSE_FRAC) {
             return monitorRegrowthSuggestion(field);
           }
           const pct =
@@ -714,10 +737,11 @@ function pickGrowingCropMaintenanceSuggestion(field, ctx) {
 /** Bare field before first crop: mirror base spray steps + mapped N target when soil data is scanned. */
 function needsFallowNutrientPrep(field) {
   if (!hasNoCrop(field)) return false;
+  if (pfNitrogenWithinTolerance(field)) return false;
   if (typeof field.needsFertilizer === "boolean") return field.needsFertilizer;
   if (field.isPrecisionFarming) {
     if (!field.isScanned || !field.targetNitrogen) return false;
-    return field.nitrogenLevel < field.targetNitrogen * 0.95;
+    return !pfNitrogenWithinTolerance(field);
   }
   // Match growing-crop threshold (< 1 “step”) — 1.9 was almost always true and nagged “fertilize” on fallow.
   return (field.fertilizationLevel || 0) < 1;
@@ -864,7 +888,8 @@ function suggestionForNeedsWork(field, ctx, opts = {}) {
       const n = Number(field.nitrogenLevel ?? 0);
       const target = nitrogenTargetForDisplay(field);
       const gap = Math.max(0, target - n);
-      if (Number.isFinite(gap) && gap > 1) {
+      const gapPct = target > 0 ? gap / target : 0;
+      if (Number.isFinite(gap) && gap > 1 && gapPct > PF_NUTRIENT_CLOSE_FRAC) {
         const label = displayCropLabel(field);
         const pct = target > 0 ? Math.round(Math.min(100, Math.max(0, (n / target) * 100))) : 0;
         return {
@@ -1435,6 +1460,17 @@ export function runSuggestionRegressionMatrix() {
     { name: "arable-growing-weeds", field: { farmlandId: 3, fruitType: "WHEAT", growthState: 2, needsWeeding: true, weedLevel: 0.7 } },
     { name: "grass-mown-regrowth-n", field: { farmlandId: 4, fruitType: "GRASS", growthState: 5, growthLabel: "mown_regrowth", isScanned: true, isPrecisionFarming: true, nitrogenLevel: 40, targetNitrogen: 90 } },
     { name: "seeded-roll-first", field: { farmlandId: 5, fruitType: "BARLEY", growthState: 1, needsRolling: true } },
+    {
+      name: "roll-before-weed-early",
+      field: {
+        farmlandId: 28,
+        fruitType: "WHEAT",
+        growthState: 1,
+        needsRolling: true,
+        needsWeeding: true,
+        weedLevel: 0.85,
+      },
+    },
   ];
   return scenarios.map((s) => ({
     name: s.name,

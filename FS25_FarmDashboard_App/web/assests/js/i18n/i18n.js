@@ -84,7 +84,7 @@ export function getLocale() {
  * @param {Record<string, string | number>} [params] — replaces `{{name}}` in the resolved string
  */
 export function t(key, params) {
-  if (!catalog || !catalog.strings) return key;
+  if (!catalog || !catalog.strings) return flatEn[key] ?? key;
   const row = catalog.strings[key];
   if (!row || typeof row !== 'object') return flatEn[key] ?? key;
   let v = row[currentLocale] ?? row[FALLBACK];
@@ -94,6 +94,13 @@ export function t(key, params) {
       v = v.split(`{{${pk}}}`).join(String(pv));
     }
   }
+  return v;
+}
+
+/** Like t() but returns `fallback` when the key is missing (t would return the raw key). */
+export function tOr(key, fallback, params) {
+  const v = t(key, params);
+  if (v === key || v == null || v === '') return fallback != null ? fallback : key;
   return v;
 }
 
@@ -174,5 +181,5 @@ export async function initI18n() {
     if (sel) sel.value = currentLocale;
     document.title = t('page.title');
   }
-  return { t, getLocale, setLocale, applyDom };
+  return { t, tOr, getLocale, setLocale, applyDom };
 }

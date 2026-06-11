@@ -18,15 +18,35 @@ function _hostnameImpliesLocalConfigHost() {
       ? window.location.hostname
       : "").toLowerCase();
     if (!h) return true;
+    if (h === "demo.farmdashboard.co.uk") return false;
     return h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]";
   } catch (e) {
     return true;
   }
 }
 
+function maybeInstallPublicDemoBanner() {
+  try {
+    const h = String(window.location?.hostname || "").toLowerCase();
+    if (h !== "demo.farmdashboard.co.uk") return;
+    if (document.getElementById("farmdash-public-demo-banner")) return;
+    const bar = document.createElement("div");
+    bar.id = "farmdash-public-demo-banner";
+    bar.className = "farmdash-public-demo-banner";
+    bar.setAttribute("role", "status");
+    bar.innerHTML =
+      '<span><strong>Live demo</strong> — read-only view of a real multiplayer farm. Data updates while we play.</span>' +
+      '<a href="https://www.farmdashboard.co.uk/demo.html" target="_blank" rel="noopener">About this demo</a>';
+    document.body.prepend(bar);
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 /** Block Settings modal when opened programmatically on remote viewers. */
 export function installFarmDashRemoteViewerGuards() {
   if (typeof document === "undefined") return;
+  maybeInstallPublicDemoBanner();
   if (isFarmDashLocalConfigHost()) return;
   const modalEl = document.getElementById("appSettingsModal");
   if (!modalEl) return;

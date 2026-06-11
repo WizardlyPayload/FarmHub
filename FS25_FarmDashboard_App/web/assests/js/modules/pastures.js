@@ -2,6 +2,7 @@
 
 import { t } from "../i18n/i18n.js";
 import { formatGenderLabel, fmtWeightKgStr, countLivestockHeads } from "./livestock.js";
+import { entityOwnerFarmId } from "./farmScope.js";
 
 /**
  * Escape a value before embedding it in HTML. Sources can come from the game
@@ -115,8 +116,8 @@ export function filterPasturesForFarmView(pastures, farmId, dashboard) {
     return !multiFarm;
   });
 
-  // FTP + no owner on animals/pasture (older payloads) — empty list helps nobody; show unscoped pastures once
-  if (multiFarm && filtered.length === 0 && pastures.length > 0) {
+  // Single-farm local saves: if nothing has farm ids yet, show all (legacy payloads).
+  if (!multiFarm && filtered.length === 0 && pastures.length > 0) {
     const anyResolved = pastures.some((p) => {
       const pid = inferPastureFarmId(p);
       return Number.isFinite(pid) && pid > 0;
@@ -242,6 +243,65 @@ export function showPasturesSection() {
   // Update pasture data display
   this.updatePastureDisplay();
   this.updateNavbar(t("nav.section.pastures"));
+}
+
+function husbandryRowHasStock(h) {
+  if (!h || typeof h !== "object") return false;
+  if (Number(h.animalCount) > 0 || Number(h.numAnimals) > 0) return true;
+  const clusters = h.clusters;
+  if (Array.isArray(clusters) && clusters.some((c) => c && Number(c.count) > 0)) return true;
+  if (Array.isArray(h.animals) && h.animals.length > 0) return true;
+  return false;
+}
+
+function stockCountFromHusbandry(h) {
+  if (!h) return 0;
+  const direct = Number(h.animalCount ?? h.numAnimals ?? 0);
+  if (direct > 0) return direct;
+  const clusters = h.clusters;
+  if (!Array.isArray(clusters)) return 0;
+  return clusters.reduce(
+    (sum, c) => sum + (c && Number(c.count) > 0 ? Number(c.count) : 0),
+    0
+  );
+}
+
+function buildPastureFromHusbandryRow(husbandryData, dashboard) {
+  const stockingCount = stockCountFromHusbandry(husbandryData);
+  const conditionReport = dashboard.calculateConditionReport([], husbandryData);
+  const milkProductionData = dashboard.calculateMilkProduction(
+    { name: husbandryData.name },
+    []
+  );
+  const foodReportInput = {
+    ...husbandryData,
+    calculatedMilkProduction: milkProductionData.estimatedStorage,
+  };
+  const foodReport = dashboard.calculateFoodReport(foodReportInput);
+  const allWarnings = dashboard.calculateAllPastureWarnings(
+    husbandryData,
+    [],
+    conditionReport,
+    foodReport
+  );
+  return {
+    id: husbandryData.id,
+    name: husbandryData.name || husbandryData.buildingName || `Pen ${husbandryData.id}`,
+    animals: [],
+    animalCount: stockingCount,
+    maleCount: 0,
+    femaleCount: 0,
+    avgHealth: Number(husbandryData.health) || 0,
+    conditionReport,
+    foodReport,
+    milkProductionData,
+    allWarnings,
+    farmId: husbandryData.ownerFarmId ?? husbandryData.farmId ?? "Unknown",
+    capacity:
+      husbandryData.capacity ||
+      dashboard.estimatePastureCapacity(husbandryData.name),
+    husbandryData,
+  };
 }
 
 export function parsePastureData() {
@@ -407,6 +467,19 @@ export function parsePastureData() {
       // );
 
       this.pastures.push(pastureData);
+    });
+  }
+  // LOD export: husbandry pens with clusters / animalCount but no flattened rows yet.
+  else if (
+    Array.isArray(this.husbandryData) &&
+    this.husbandryData.some(husbandryRowHasStock)
+  ) {
+    const activeFarmId = Number(this.activeFarmId ?? 1);
+    this.husbandryData.forEach((h) => {
+      const hf = entityOwnerFarmId(h);
+      if (hf > 0 && hf !== activeFarmId) return;
+      if (!husbandryRowHasStock(h)) return;
+      this.pastures.push(buildPastureFromHusbandryRow(h, this));
     });
   }
   // Fallback: try to use placeables data if available (for file-based mode)

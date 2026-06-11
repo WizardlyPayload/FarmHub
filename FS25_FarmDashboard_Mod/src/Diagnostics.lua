@@ -213,10 +213,8 @@ function D:maybeDump(ctx)
     end
 
     local line = table.concat(parts, " ")
-    if type(Logging) == "table" and type(Logging.info) == "function" then
-        Logging.info(line)
-    else
-        print(line)
+    if FarmDashLog and FarmDashLog.dev then
+        FarmDashLog.dev("%s", line)
     end
 
     self:resetIntervalCounters()

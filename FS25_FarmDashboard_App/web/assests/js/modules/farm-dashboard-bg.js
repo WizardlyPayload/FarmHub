@@ -16,6 +16,7 @@ export const FARM_DASHBOARD_BG_KEYS = {
   economy: `${IMG_BASE}/Background.png`,
   pastures: `${IMG_BASE}/Background.png`,
   productions: `${IMG_BASE}/Background.png`,
+  map: `${IMG_BASE}/vehicles.png`,
 };
 
 let _inited = false;
@@ -44,7 +45,7 @@ export function initFarmDashboardBackground() {
 }
 
 /**
- * @param {'home'|'livestock'|'vehicles'|'fields'|'economy'|'pastures'|'productions'} key
+ * @param {'home'|'livestock'|'vehicles'|'fields'|'economy'|'pastures'|'productions'|'map'} key
  */
 export function setFarmDashboardBackground(key) {
   initFarmDashboardBackground();

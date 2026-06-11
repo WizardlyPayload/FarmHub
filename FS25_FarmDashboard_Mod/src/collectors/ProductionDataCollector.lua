@@ -6,6 +6,29 @@
 
 ProductionDataCollector = {}
 
+local function productionFarmHasHumanPlayers(farm)
+    if not farm or not farm.farmId or farm.farmId <= 0 then return false end
+    if farm.players then
+        for _ in pairs(farm.players) do
+            return true
+        end
+    end
+    local name = farm.name and tostring(farm.name):match("^%s*(.-)%s*$") or ""
+    return name ~= ""
+end
+
+local function productionIsPlayerFarmId(farmId, everyone)
+    if not farmId or farmId <= 0 or farmId == everyone then return false end
+    if _G.g_farmManager and _G.g_farmManager.farms then
+        for _, farm in pairs(_G.g_farmManager.farms) do
+            if farm and farm.farmId == farmId then
+                return productionFarmHasHumanPlayers(farm)
+            end
+        end
+    end
+    return false
+end
+
 function ProductionDataCollector:init()
     self.lastCollectTime = 0
     self.collectInterval = 1000
@@ -73,7 +96,7 @@ function ProductionDataCollector:collectStep(opts)
     if not ProductionDataCollector._co then return true, { chains = {} } end
     local ok, a, b = coroutine.resume(ProductionDataCollector._co, opts or {})
     if not ok then
-        Logging.warning("[FarmDash] ProductionDataCollector coroutine: " .. tostring(a))
+        FarmDashLog.devWarn("ProductionDataCollector coroutine: %s", tostring(a))
         ProductionDataCollector._co = nil
         return true, { chains = {} }
     end
@@ -86,7 +109,7 @@ function ProductionDataCollector:collectStep(opts)
         return true, a or { chains = {} }
     end
     if st == "suspended" then
-        Logging.warning("[FarmDash] ProductionDataCollector: unexpected coroutine state; ending slice.")
+        FarmDashLog.devWarn("ProductionDataCollector: unexpected coroutine state; ending slice.")
         ProductionDataCollector._co = nil
         return true, ProductionDataCollector._lastResult or (type(a) == "table" and a) or b or { chains = {} }
     end
@@ -128,7 +151,7 @@ function ProductionDataCollector:_collectImpl()
 
     if pcm then
         local function addFarmProductions(farmId)
-            if not farmId or farmId == everyone then return end
+            if not farmId or farmId == everyone or not productionIsPlayerFarmId(farmId, everyone) then return end
 
             local points = pcm.getProductionPointsForFarmId and pcm:getProductionPointsForFarmId(farmId) or {}
             for _, pp in ipairs(points) do
@@ -155,7 +178,7 @@ function ProductionDataCollector:_collectImpl()
 
         if _G.g_farmManager and _G.g_farmManager.farms then
             for _, farm in pairs(_G.g_farmManager.farms) do
-                if farm and farm.farmId then
+                if farm and farm.farmId and productionFarmHasHumanPlayers(farm) then
                     addFarmProductions(farm.farmId)
                 end
             end
@@ -163,7 +186,7 @@ function ProductionDataCollector:_collectImpl()
             if pcm.productionPoints then
                 for _, pp in ipairs(pcm.productionPoints) do
                     local ok, fid = pcall(function() return pp:getOwnerFarmId() end)
-                    if ok and fid and fid ~= everyone then
+                    if ok and fid and productionIsPlayerFarmId(fid, everyone) then
                         notePP(pp)
                         local pData = self:collectProductionPointData(pp, fid)
                         if pData then
@@ -177,7 +200,7 @@ function ProductionDataCollector:_collectImpl()
             if pcm.factories then
                 for _, placeable in ipairs(pcm.factories) do
                     local ok, fid = pcall(function() return placeable:getOwnerFarmId() end)
-                    if ok and fid and fid ~= everyone then
+                    if ok and fid and productionIsPlayerFarmId(fid, everyone) then
                         noteFactory(placeable)
                         local pData = self:collectFactoryPlaceable(placeable, fid)
                         if pData then
@@ -212,7 +235,7 @@ function ProductionDataCollector:mergePlaceableProductions(result, seenPP, seenF
             local pp = placeable.spec_productionPoint.productionPoint
             if not seenPP[pp] then
                 local ok, fid = pcall(function() return placeable:getOwnerFarmId() end)
-                if ok and fid and fid ~= everyone then
+                if ok and fid and productionIsPlayerFarmId(fid, everyone) then
                     seenPP[pp] = true
                     local pData = self:collectProductionPointData(pp, fid)
                     if pData then
@@ -227,7 +250,7 @@ function ProductionDataCollector:mergePlaceableProductions(result, seenPP, seenF
             end
         elseif placeable and placeable.spec_factory and not seenFactoryPlaceable[placeable] then
             local ok, fid = pcall(function() return placeable:getOwnerFarmId() end)
-            if ok and fid and fid ~= everyone then
+            if ok and fid and productionIsPlayerFarmId(fid, everyone) then
                 seenFactoryPlaceable[placeable] = true
                 local pData = self:collectFactoryPlaceable(placeable, fid)
                 if pData then

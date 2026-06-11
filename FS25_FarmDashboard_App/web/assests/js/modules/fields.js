@@ -11,6 +11,7 @@ import {
     fieldShowsNonBaleForageBadges,
     MIN_FORAGE_WORKFLOW_LITERS,
     nitrogenTargetForDisplay,
+    PF_NUTRIENT_CLOSE_FRAC,
 } from "../rules-engine.js";
 import {
     refreshFieldRulesCache,
@@ -270,8 +271,11 @@ export function updateFieldStats() {
     const needsWork     = currentFields.filter(f => f.needsWork || f.needsRolling || fieldShowsWithered(f)).length;
     const harvestReady  = currentFields.filter(f => effectiveHarvestReady(f)).length;
 
+    // Same rule as formatFieldHectares: live Lua hectares missing → show "—", not a fake 0.0.
+    const haKnown = currentFields.some(f => Number(f.hectares) > 0.001);
+
     setText("total-fields-count", currentFields.length);
-    setText("total-area",         totalArea.toFixed(1));
+    setText("total-area",         haKnown ? totalArea.toFixed(1) : "—");
     setText("fields-need-work",   needsWork);
     setText("fields-harvest-ready", harvestReady);
 }
@@ -723,8 +727,9 @@ function buildConditions(field) {
             const nl = Number(field.nitrogenLevel ?? 0);
             if (tn > 0) {
                 const gap = Math.max(0, tn - nl);
+                const gapPct = gap / tn;
                 nLabel =
-                    gap > 1
+                    gap > 1 && gapPct > PF_NUTRIENT_CLOSE_FRAC
                         ? t("fields.pfNitrogenLevelsNeedGap", {
                               current: Math.round(nl),
                               target: Math.round(tn),

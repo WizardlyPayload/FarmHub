@@ -163,6 +163,41 @@ describe('local-mode read returns rich envelope', () => {
     expect(result.penKey).toBe('foo.xml:12');
     expect(result.detail.animals[0].subType).toBe('PIG');
   });
+
+  test('integer UI id resolves composite detail file via dirtyPens + placeableId scan', async () => {
+    const slot = mktmp();
+    fs.mkdirSync(path.join(slot, 'details'), { recursive: true });
+    const fname = livestockDetail.penKeyToFilenameSegment('sheepPasture.xml:518');
+    fs.writeFileSync(path.join(slot, 'details', `animals_${fname}.json`), JSON.stringify({
+      schemaVersion: 1,
+      idScheme: 'composite-v1',
+      penId: 'sheepPasture.xml:518',
+      placeableId: 518,
+      generatedAt: 3000,
+      mode: 'base',
+      lod: 'full',
+      animals: [{ uniqueId: 'S1', subType: 'SHEEP' }],
+    }));
+    fs.writeFileSync(path.join(slot, 'dirtyPens.json'), JSON.stringify({
+      schemaVersion: 1,
+      idScheme: 'composite-v1',
+      updatedAt: 3000,
+      animalMode: 'base',
+      pens: [{ id: 'sheepPasture.xml:518', ts: 3000, animalCount: 1 }],
+    }));
+    const srv = { id: 'srv', mode: 'local', localPath: path.dirname(slot), localSubFolder: path.basename(slot) };
+    const req = { params: { id: '518' }, query: {} };
+    const result = await livestockDetail.read({
+      req,
+      resolveServerIdForRequest: () => 'srv',
+      servers: [srv],
+      serverStates: { srv: {} },
+      getFs25DocumentsRoot: () => slot,
+    });
+    expect(result).not.toBeNull();
+    expect(result.penKey).toBe('sheepPasture.xml:518');
+    expect(result.detail.animals[0].subType).toBe('SHEEP');
+  });
 });
 
 describe('request() bounds requests.json', () => {

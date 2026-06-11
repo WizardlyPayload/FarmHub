@@ -242,6 +242,29 @@ body.bg-dark > #main-navbar:not(.d-none) ~ main {
   width: max-content;
 }
 
+.farm-server-tabs-wrap.is-dropdown-mode {
+  overflow: visible;
+  flex: 0 1 auto;
+}
+
+.farm-server-select-dropdown {
+  position: relative;
+  z-index: 1060;
+}
+
+.farm-server-select-dropdown .dropdown-toggle {
+  max-width: min(42vw, 15rem);
+}
+
+.farm-server-select-dropdown .dropdown-toggle .server-select-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  display: inline-block;
+  max-width: min(36vw, 12rem);
+}
+
 .farm-navbar-badges {
   max-width: 100%;
   min-width: 0;
@@ -1388,6 +1411,38 @@ th {
     padding: 0.45rem 0.65rem;
   }
 }
+.farmdash-about-hero {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.farmdash-about-logo {
+  border-radius: 0.75rem;
+  object-fit: contain;
+  background: rgba(0, 0, 0, 0.25);
+}
+.farmdash-about-dl dt {
+  font-weight: 500;
+}
+.farmdash-about-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.35rem;
+  align-items: center;
+}
+.farmdash-about-link {
+  display: inline-flex;
+  align-items: center;
+  color: var(--farm-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+.farmdash-about-link:hover,
+.farmdash-about-link:focus-visible {
+  color: #f5d96a;
+}
 .field-suggestion-layer-rules .field-suggestion-layer-rules {
   opacity: 0.95;
 }
@@ -1634,6 +1689,11 @@ body.farm-dash-ui.bg-dark::before {
   z-index: 1;
 }
 
+/* Hide the error-card row until folder-selection is shown (avoids empty gap on home) */
+.farm-dash-shell > .row:has(#folder-selection.d-none) {
+  display: none;
+}
+
 /* Glass panels: lighter so background photography reads through */
 .farm-glass-page {
   padding: 1.25rem 1.35rem 1.75rem;
@@ -1652,6 +1712,41 @@ body.farm-dash-ui.bg-dark::before {
 
 .farm-glass-page .table {
   --bs-table-bg: transparent;
+}
+
+/* Vehicles: lighter glass (backdrop-filter on a long scroll list is costly in Electron). */
+.farm-glass-page.farm-glass-page--vehicles {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
+.farm-glass-page.farm-glass-page--vehicles.farm-glass-page--scrolling {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+#vehicles-grid .vehicle-card-col {
+  content-visibility: auto;
+  contain-intrinsic-size: 320px 420px;
+}
+
+.vehicle-card {
+  contain: layout style paint;
+}
+
+.vehicle-card--ads-warn {
+  border: 1px solid rgba(220, 53, 69, 0.55) !important;
+  box-shadow: 0 0 0 1px rgba(220, 53, 69, 0.15);
+}
+
+.ads-vehicle-panel--warn {
+  border-color: rgba(255, 193, 7, 0.45) !important;
+  background: rgba(220, 53, 69, 0.06);
+}
+
+.ads-breakdown-table th,
+.ads-breakdown-table td {
+  padding: 0.15rem 0.35rem;
 }
 
 .farm-glass-panel {
@@ -1694,6 +1789,44 @@ body.farm-dash-ui.bg-dark::before {
   color: #f8fafc !important;
   font-weight: 600;
   border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Hero row: mod images (left) · time (center) · fleet map (right) */
+.farm-landing-hero-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem 1rem;
+  width: 100%;
+  max-width: 52rem;
+  margin: 0 auto;
+}
+.farm-landing-hero-toolbar__slot {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.farm-landing-hero-toolbar__slot--start {
+  justify-content: flex-start;
+}
+.farm-landing-hero-toolbar__slot--center {
+  justify-content: center;
+}
+.farm-landing-hero-toolbar__slot--end {
+  justify-content: flex-end;
+}
+@media (max-width: 768px) {
+  .farm-landing-hero-toolbar {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+  .farm-landing-hero-toolbar__slot--start,
+  .farm-landing-hero-toolbar__slot--center,
+  .farm-landing-hero-toolbar__slot--end {
+    justify-content: center;
+    width: 100%;
+  }
 }
 
 .farm-btn-accent-outline {
@@ -1876,6 +2009,186 @@ body.farm-dash-ui.bg-dark::before {
   .farm-landing-card-body {
     min-height: 200px;
   }
+}
+
+.farm-fleet-map-link:hover,
+.farm-fleet-map-link:focus-visible {
+  color: #f5d96a;
+}
+
+/* Fleet map page */
+.farm-fleet-map-shell {
+  border-radius: var(--farm-radius);
+  border: 1px solid color-mix(in srgb, var(--farm-accent) 22%, transparent);
+  background: color-mix(in srgb, var(--farm-darker) 92%, #0a120e 8%);
+  padding: 0.75rem;
+}
+.farm-fleet-map-stage {
+  position: relative;
+  width: min(100%, min(72vh, 820px));
+  aspect-ratio: 1 / 1;
+  max-height: min(72vh, 820px);
+  margin-inline: auto;
+  border-radius: calc(var(--farm-radius-sm) + 2px);
+  overflow: hidden;
+  background: #0c100e;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.farm-fleet-map-viewport {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+.farm-fleet-map-viewport--dragging {
+  cursor: grabbing;
+}
+.farm-fleet-map-transform {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.farm-fleet-map-canvas {
+  position: relative;
+  display: block;
+}
+.farm-fleet-map-overview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+.farm-fleet-map-stage--has-overview .farm-fleet-map-grid {
+  opacity: 0;
+}
+.farm-fleet-map-markers {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.farm-fleet-map-markers .farm-fleet-map-pin {
+  pointer-events: auto;
+}
+.farm-fleet-map-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 8.333% 8.333%;
+  pointer-events: none;
+}
+.farm-fleet-map-compass {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  z-index: 6;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+}
+.farm-fleet-map-toolbar {
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.farm-fleet-map-stage--has-overview {
+  background: #1a1f1c;
+}
+.farm-fleet-map-stage--has-overview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, 0.35);
+}
+.farm-fleet-map-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 1.65rem;
+  height: 1.65rem;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: var(--fleet-pin-color, var(--farm-accent));
+  color: #111;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 0.75rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.farm-fleet-map-pin:hover,
+.farm-fleet-map-pin:focus-visible {
+  transform: translate(-50%, -50%) scale(1.15);
+  z-index: 5;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.55);
+}
+.farm-fleet-map-tooltip {
+  position: absolute;
+  z-index: 6;
+  transform: translate(-50%, calc(-100% - 12px));
+  max-width: min(240px, 80vw);
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.45rem;
+  background: rgba(15, 20, 18, 0.94);
+  border: 1px solid rgba(232, 197, 71, 0.35);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  pointer-events: none;
+  text-align: center;
+}
+.farm-fleet-map-legend-swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+.farm-fleet-map-legend-item {
+  font-size: 0.85rem;
+  color: var(--farm-muted);
+}
+#landing-fleet-map-btn .badge {
+  font-size: 0.7rem;
+  vertical-align: middle;
+}
+
+.farmdash-public-demo-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem 1.25rem;
+  padding: 0.45rem 1rem;
+  font-size: 0.85rem;
+  color: #e8f5ec;
+  background: linear-gradient(90deg, rgba(47, 111, 78, 0.92), rgba(30, 70, 50, 0.92));
+  border-bottom: 1px solid rgba(232, 197, 71, 0.35);
+  z-index: 2000;
+}
+
+.farmdash-public-demo-banner a {
+  color: var(--farm-accent);
+  font-weight: 600;
+}
+
+.farmdash-public-demo-banner a:hover {
+  color: #f5d96a;
 }
 
 /* Remote viewers (LAN IP / tablet): hide server manager, settings, local-only tools */

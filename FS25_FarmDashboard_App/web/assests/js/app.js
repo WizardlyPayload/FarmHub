@@ -13,6 +13,7 @@ import * as fields        from './modules/fields.js';
 import * as environment   from './modules/environment.js';
 import * as theming       from './modules/theming.js';
 import * as productions   from './modules/productions.js';
+import * as fleetMap      from './modules/fleet-map.js';
 import * as dashboardSettings from './modules/dashboard-settings.js';
 import { installFarmDashRemoteViewerGuards } from './modules/viewer-mode.js';
 import { farmdashWaitForLanHttpBasicIfNeeded } from './lan-http-auth.js';
@@ -34,6 +35,8 @@ class LivestockDashboard {
     this._pendingRealtimeBootstrapResync = false;
     // Merged data fields
     this.mapTitle           = null;
+    this.mapId              = null;
+    this.mapBounds         = null;
     this.savegameName       = null;
     this.dataSource         = 'unknown';
     this.xmlAvailable       = false;
@@ -61,7 +64,7 @@ Object.assign(
   LivestockDashboard.prototype,
   apiStorage, parsers, navigation, notifications,
   changes, livestock, pastures, vehicles, economy,
-  fields, environment, theming, productions, dashboardSettings
+  fields, environment, theming, productions, fleetMap, dashboardSettings
 );
 
 let dashboard;
@@ -78,19 +81,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch (e) {
     console.warn('[i18n]', e);
   }
+  let shopImageLists = null;
   try {
     const r = await fetch('/api/item-image-filenames');
     const data = await r.json();
+    shopImageLists = {
+      items: data.items || [],
+      modExtract: data.modExtract || [],
+    };
     window.__farmdashShopImageFilenames = [
-      ...(Array.isArray(data?.items) ? data.items : []),
-      ...(Array.isArray(data?.modExtract) ? data.modExtract : []),
+      ...shopImageLists.items,
+      ...shopImageLists.modExtract,
     ];
-    vehicles.primeModExtractImageFilenames(data.modExtract || []);
+    vehicles.primeShopImageFilenames(shopImageLists);
   } catch (e) {
     console.warn('[item-image-filenames]', e);
   }
   dashboard = new LivestockDashboard();
   window.dashboard = dashboard;
+  if (shopImageLists) {
+    dashboard.setShopImageFilenames(shopImageLists);
+  }
 
   document.addEventListener("farmdash-first-data-ready", () => {
     if (typeof dashboard.maybeShowModRequiredModal === "function") {

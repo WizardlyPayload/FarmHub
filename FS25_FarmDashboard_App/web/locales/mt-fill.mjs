@@ -7,6 +7,9 @@
  *   GOOGLE_TRANSLATE_API_KEY=AIza...                               (v3 with API key)
  *   GOOGLE_PROJECT_ID=<gcp-project-id>                             (required when using API key)
  *
+ * Optional local file (gitignored): web/locales/.mt-env.local
+ *   GOOGLE_TRANSLATE_API_KEY=AIza...
+ *
  * CLI:
  *   node web/locales/mt-fill.mjs                  fill missing strings for every locale
  *   node web/locales/mt-fill.mjs --langs de,fr    only those locales
@@ -36,6 +39,28 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MESSAGES_DIR = path.join(__dirname, 'messages');
 const CACHE_PATH = path.join(MESSAGES_DIR, '.mt-cache.json');
 
+/** Load GOOGLE_* vars from web/locales/.mt-env.local when not already in process.env. */
+function loadOptionalEnvFile() {
+  for (const name of ['.mt-env.local', '.mt-env']) {
+    const fp = path.join(__dirname, name);
+    if (!fs.existsSync(fp)) continue;
+    const lines = fs.readFileSync(fp, 'utf8').split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eq = trimmed.indexOf('=');
+      if (eq <= 0) continue;
+      const key = trimmed.slice(0, eq).trim();
+      let val = trimmed.slice(eq + 1).trim();
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1);
+      }
+      if (process.env[key] == null || process.env[key] === '') process.env[key] = val;
+    }
+  }
+}
+loadOptionalEnvFile();
+
 const ALL_LANGS = [
   'de', 'fr', 'es', 'it', 'pl', 'nl', 'pt', 'sv', 'da', 'fi', 'cs',
   'el', 'hu', 'ro', 'bg', 'hr', 'sk', 'sl', 'et', 'lv', 'lt', 'ga', 'mt',
@@ -47,7 +72,7 @@ const BATCH_SIZE = 96;
 const MAX_RETRIES = 5;
 
 function parseArgs(argv) {
-  const args = { langs: null, force: false, limit: null, dryRun: false };
+  const args = { langs: null, force: false, limit: null, dryRun: false, keys: null };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--force') args.force = true;
@@ -56,12 +81,16 @@ function parseArgs(argv) {
       args.langs = (argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean);
     } else if (a === '--limit') {
       args.limit = Number(argv[++i]) || null;
+    } else if (a === '--keys' || a === '-k') {
+      args.keys = new Set((argv[++i] || '').split(',').map((s) => s.trim()).filter(Boolean));
     } else if (a.startsWith('--langs=')) {
       args.langs = a.slice('--langs='.length).split(',').map((s) => s.trim()).filter(Boolean);
     } else if (a.startsWith('--limit=')) {
       args.limit = Number(a.slice('--limit='.length)) || null;
+    } else if (a.startsWith('--keys=')) {
+      args.keys = new Set(a.slice('--keys='.length).split(',').map((s) => s.trim()).filter(Boolean));
     } else if (a === '--help' || a === '-h') {
-      console.log('Usage: node web/locales/mt-fill.mjs [--langs de,fr] [--force] [--limit N] [--dry-run]');
+      console.log('Usage: node web/locales/mt-fill.mjs [--langs de,fr] [--keys nav.home,common.refresh] [--force] [--limit N] [--dry-run]');
       process.exit(0);
     }
   }
@@ -257,9 +286,10 @@ async function callTranslateBatch(auth, sourceLang, targetLang, htmlInputs) {
   }
 }
 
-function gapKeys(enObj, locObj, force) {
+function gapKeys(enObj, locObj, force, onlyKeys) {
   const out = [];
   for (const [k, en] of Object.entries(enObj)) {
+    if (onlyKeys && !onlyKeys.has(k)) continue;
     if (typeof en !== 'string' || en.trim() === '') continue;
     const v = locObj[k];
     if (force) { out.push(k); continue; }
@@ -273,7 +303,7 @@ function gapKeys(enObj, locObj, force) {
 async function fillLocale(args, auth, enObj, lang, cache) {
   const locPath = path.join(MESSAGES_DIR, `${lang}.json`);
   const locObj = readJson(locPath, {});
-  const keys = gapKeys(enObj, locObj, args.force);
+  const keys = gapKeys(enObj, locObj, args.force, args.keys);
   if (keys.length === 0) {
     console.log(`[${lang}] up to date`);
     return { translated: 0, cached: 0, skipped: 0 };

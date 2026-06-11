@@ -24,6 +24,23 @@ function writeJson(p, obj) {
   fs.writeFileSync(p, JSON.stringify(obj, null, 2) + '\n', 'utf8');
 }
 
+const PLACEHOLDER_RE = /\{\{\s*([A-Za-z_][\w]*)\s*\}\}/g;
+
+function placeholderMultiset(str) {
+  const map = new Map();
+  if (typeof str !== 'string') return map;
+  PLACEHOLDER_RE.lastIndex = 0;
+  let m;
+  while ((m = PLACEHOLDER_RE.exec(str))) map.set(m[1], (map.get(m[1]) || 0) + 1);
+  return map;
+}
+
+function placeholderEqual(a, b) {
+  if (a.size !== b.size) return false;
+  for (const [k, v] of a) if (b.get(k) !== v) return false;
+  return true;
+}
+
 const enPath = path.join(MESSAGES_DIR, 'en.json');
 const en = readJson(enPath);
 let added = 0;
@@ -37,6 +54,14 @@ for (const lang of LANGS) {
       loc[k] = en[k];
       added++;
       changed = true;
+    } else if (typeof en[k] === 'string' && typeof loc[k] === 'string') {
+      const enPh = placeholderMultiset(en[k]);
+      const locPh = placeholderMultiset(loc[k]);
+      if (enPh.size > 0 && !placeholderEqual(enPh, locPh)) {
+        loc[k] = en[k];
+        added++;
+        changed = true;
+      }
     }
   }
   if (changed) {

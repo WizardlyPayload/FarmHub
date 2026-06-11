@@ -1,13 +1,15 @@
 <#
 .SYNOPSIS
-  Builds FS25_FarmDashboard.zip containing only modDesc.xml, icon.png (if present), and the src\ tree - nothing else.
+  Builds FS25_FarmDashboard.zip containing only modDesc.xml, icon_FarmDashboard.dds (if present), and the src\ tree - nothing else.
 
 .DESCRIPTION
   Reads from FS25_FarmDashboard_Mod\ only:
-    modDesc.xml, icon.png (optional), src\
+    modDesc.xml, icon_FarmDashboard.dds (optional), src\
 
   Zip layout is **flat at archive root** (Giants resolves `sourceFile` paths like `src/FarmDashboard.lua` from there):
-    modDesc.xml, icon.png, src/...
+    modDesc.xml, icon_FarmDashboard.dds, src/...
+
+  Run tools\Convert-ModIconToDds.mjs after editing icon.png (composites onto tools\modIcon_BG512.png; 512×512 DXT1, icon_modName.dds).
 
   Do not add other repo files (e.g. stray zips, README, l10n) - only those three roots.
 
@@ -41,7 +43,7 @@ $ModSource = Join-Path $RepoRoot "FS25_FarmDashboard_Mod"
 $DestZip = Join-Path $RepoRoot "FS25_FarmDashboard_Mod\$OutZipName"
 $SrcTree = Join-Path $ModSource "src"
 $ModDesc = Join-Path $ModSource "modDesc.xml"
-$IconPng = Join-Path $ModSource "icon.png"
+$IconDds = Join-Path $ModSource "icon_FarmDashboard.dds"
 
 if (-not (Test-Path -LiteralPath $ModSource -PathType Container)) {
     throw "Mod folder not found: $ModSource"
@@ -64,10 +66,10 @@ $rootNorm = $ModSource.TrimEnd('\', '/')
 $zip = [System.IO.Compression.ZipFile]::Open($DestZip, [System.IO.Compression.ZipArchiveMode]::Create)
 try {
     [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $ModDesc, "modDesc.xml") | Out-Null
-    if (Test-Path -LiteralPath $IconPng) {
-        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $IconPng, "icon.png") | Out-Null
+    if (Test-Path -LiteralPath $IconDds) {
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $IconDds, "icon_FarmDashboard.dds") | Out-Null
     } else {
-        Write-Warning "icon.png not in mod folder - zip will omit it. Add: $IconPng"
+        Write-Warning "icon_FarmDashboard.dds not in mod folder - zip will omit it. Run tools\Convert-ModIconToDds.mjs (needs icon.png source in mod folder)."
     }
     Get-ChildItem -LiteralPath $SrcTree -Recurse -File | ForEach-Object {
         $full = $_.FullName
@@ -81,7 +83,7 @@ try {
     $zip.Dispose()
 }
 
-Write-Host "Wrote: $DestZip (only modDesc.xml, icon.png, src/ - POSIX paths inside zip)"
+Write-Host "Wrote: $DestZip (only modDesc.xml, icon_FarmDashboard.dds, src/ - POSIX paths inside zip)"
 
 if ($CopyTo) {
     $destParent = Split-Path -Parent $CopyTo

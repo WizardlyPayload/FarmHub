@@ -145,6 +145,66 @@ function resolveDirtyTs(dirtyIndex, canonicalKey) {
     return 0;
 }
 
+/** Map UI placeable id (518) → mod pen key (e.g. foo.xml:518) using dirtyPens index. */
+function resolvePenKeyForRead(canonicalKey, dirtyIndex) {
+    if (!dirtyIndex || !dirtyIndex.pens) return String(canonicalKey);
+    const k = String(canonicalKey);
+    if (dirtyIndex.pens.has(k)) return k;
+    const n = validatePenId(canonicalKey);
+    if (n != null) {
+        for (const idKey of dirtyIndex.pens.keys()) {
+            if (idKey === String(n) || idKey.endsWith(`:${n}`)) return idKey;
+        }
+    }
+    return k;
+}
+
+function getFtpDetailsCacheDir(userDataPath, srv, serverStates) {
+    if (!srv || !userDataPath) return null;
+    const st = serverStates && serverStates[srv.id];
+    const folderName =
+        (st && st.lastSaveSlot) ||
+        (srv && srv.localSubFolder) ||
+        String((srv && srv.name) || '').replace(/[<>:"/\\|?*]/g, '').trim() ||
+        'savegame1';
+    return path.join(userDataPath, 'ftpDetailsCache', String(srv.id), folderName, 'details');
+}
+
+/**
+ * Locate `details/animals_*.json` on disk. Handles composite-v1 filenames when the UI only
+ * knows the placeable integer id (518 → animals_foo.xml_518.json).
+ */
+function findDetailInDirectory(detailsDir, canonicalKey, resolvedPenKey) {
+    if (!detailsDir || !fs.existsSync(detailsDir)) return null;
+    const fileSegment = penKeyToFilenameSegment(resolvedPenKey);
+    const direct = path.join(detailsDir, `animals_${fileSegment}.json`);
+    if (fs.existsSync(direct)) {
+        return { path: direct, penKey: resolvedPenKey, fileSegment };
+    }
+    const asInt = validatePenId(canonicalKey);
+    if (asInt == null) return null;
+    try {
+        for (const name of fs.readdirSync(detailsDir)) {
+            if (!name.startsWith('animals_') || !name.endsWith('.json')) continue;
+            const fp = path.join(detailsDir, name);
+            const doc = readJsonSafe(fp);
+            if (!doc || typeof doc !== 'object') continue;
+            const placeableId = Number(doc.placeableId);
+            const penIdStr = doc.penId != null ? String(doc.penId) : '';
+            if (placeableId === asInt || penIdStr === String(canonicalKey) || penIdStr.endsWith(`:${asInt}`)) {
+                return {
+                    path: fp,
+                    penKey: penIdStr || resolvedPenKey,
+                    fileSegment: name.slice(8, -5),
+                };
+            }
+        }
+    } catch (e) {
+        console.warn('[livestockDetail] findDetailInDirectory', detailsDir, e.message);
+    }
+    return null;
+}
+
 const DETAIL_ROOT_KEYS = new Set([
     'schemaVersion', 'idScheme', 'penId', 'placeableId', 'generatedAt', 'serverTimeSec',
     'mode', 'lod', 'animalMode', 'animals',
@@ -462,7 +522,7 @@ async function read(opts) {
         err.code = 'INVALID_ID';
         throw err;
     }
-    const { canonicalKey, fileSegment } = parsed;
+    const { canonicalKey } = parsed;
 
     const serverId = (typeof resolveServerIdForRequest === 'function') ? resolveServerIdForRequest(req) : null;
     const srv = getServerById(servers, serverId);
@@ -472,7 +532,9 @@ async function read(opts) {
         require('electron').app.getPath('userData');
 
     const dirtyIndex = await readDirtyIndex(srv, { userDataPath, getFs25DocumentsRoot });
-    const dirtyAt = resolveDirtyTs(dirtyIndex, canonicalKey);
+    const resolvedPenKey = resolvePenKeyForRead(canonicalKey, dirtyIndex);
+    const fileSegment = penKeyToFilenameSegment(resolvedPenKey);
+    const dirtyAt = resolveDirtyTs(dirtyIndex, resolvedPenKey);
     const idScheme = (dirtyIndex && dirtyIndex.idScheme) || 'integer-v1';
     const animalMode = (dirtyIndex && dirtyIndex.animalMode) || 'unknown';
 
@@ -481,7 +543,10 @@ async function read(opts) {
     let fromCache = false;
 
     if (srv.mode === 'local') {
-        const p = getDetailPathLocal(srv, fileSegment, getFs25DocumentsRoot);
+        const slotDir = getLocalSlotPath(srv, getFs25DocumentsRoot);
+        const detailsDir = slotDir ? path.join(slotDir, 'details') : null;
+        const located = findDetailInDirectory(detailsDir, canonicalKey, resolvedPenKey);
+        const p = located ? located.path : getDetailPathLocal(srv, fileSegment, getFs25DocumentsRoot);
         if (!p || !fs.existsSync(p)) return null;
         try { cachedAtMs = fs.statSync(p).mtimeMs || 0; } catch (_) { /* ignore */ }
         detail = readJsonSafe(p);
@@ -490,6 +555,7 @@ async function read(opts) {
         const localCache = getFtpDetailCachePath(userDataPath, srv, idScheme, fileSegment);
         const slotRemote = ftpRemoteSlotPath(srv, serverStates);
         const remote = `${slotRemote}/details/animals_${fileSegment}.json`;
+        const bulkDetailsDir = getFtpDetailsCacheDir(userDataPath, srv, serverStates);
 
         let localTs = 0;
         if (fs.existsSync(localCache)) {
@@ -501,13 +567,27 @@ async function read(opts) {
 
         if (needsFetch) {
             const ok = await ftpDownloadOne(srv, remote, localCache);
-            if (!ok && !fs.existsSync(localCache)) return null;
-            fromCache = !ok;
+            if (!ok && !fs.existsSync(localCache)) {
+                const located = findDetailInDirectory(bulkDetailsDir, canonicalKey, resolvedPenKey);
+                if (!located) return null;
+                try { cachedAtMs = fs.statSync(located.path).mtimeMs || 0; } catch (_) { /* ignore */ }
+                detail = readJsonSafe(located.path);
+                fromCache = true;
+            } else {
+                fromCache = !ok;
+            }
         } else {
             fromCache = true;
         }
-        try { cachedAtMs = fs.statSync(localCache).mtimeMs || 0; } catch (_) { /* ignore */ }
-        detail = readJsonSafe(localCache);
+
+        if (!detail) {
+            const readPath = fs.existsSync(localCache)
+                ? localCache
+                : (findDetailInDirectory(bulkDetailsDir, canonicalKey, resolvedPenKey) || {}).path;
+            if (!readPath || !fs.existsSync(readPath)) return null;
+            try { cachedAtMs = fs.statSync(readPath).mtimeMs || 0; } catch (_) { /* ignore */ }
+            detail = readJsonSafe(readPath);
+        }
     }
 
     if (!detail) return null;
@@ -526,7 +606,7 @@ async function read(opts) {
         dirtyAt,
         cachedAt: Math.floor(cachedAtMs / 1000),
         fromCache,
-        penKey: canonicalKey,
+        penKey: resolvedPenKey,
         detail: sanitizeDetailDoc(detail),
     };
 }
@@ -609,6 +689,8 @@ module.exports = {
     validatePenId,
     parsePenKeyForRead,
     penKeyToFilenameSegment,
+    resolvePenKeyForRead,
+    findDetailInDirectory,
     bustDirtyIndexCache,
     // exported for tests / parity tooling
     REQUESTS_SCHEMA_VERSION,

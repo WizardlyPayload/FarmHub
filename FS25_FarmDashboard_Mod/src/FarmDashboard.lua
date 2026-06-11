@@ -53,7 +53,9 @@ function FarmDashboard:bootstrapDataJson()
         end
     end)
     if not ok then
-        Logging.error("[FarmDash] bootstrapDataJson failed: %s", tostring(err))
+        if FarmDashLog and FarmDashLog.devWarn then
+            FarmDashLog.devWarn("bootstrapDataJson failed: %s", tostring(err))
+        end
     end
 end
 
@@ -61,17 +63,7 @@ function FarmDashboard:loadMap()
     if hasLoaded then return end
     hasLoaded = true
 
-    -- Source all collector scripts (paths relative to mod root)
-    source(FarmDashboard.MOD_DIR .. "src/Diagnostics.lua")
-    source(FarmDashboard.MOD_DIR .. "src/FarmDashboardDataCollector.lua")
-    source(FarmDashboard.MOD_DIR .. "src/collectors/AnimalDataCollector.lua")
-    source(FarmDashboard.MOD_DIR .. "src/collectors/VehicleDataCollector.lua")
-    source(FarmDashboard.MOD_DIR .. "src/collectors/FieldDataCollector.lua")
-    source(FarmDashboard.MOD_DIR .. "src/collectors/ProductionDataCollector.lua")
-    source(FarmDashboard.MOD_DIR .. "src/collectors/FinanceDataCollector.lua")
-    source(FarmDashboard.MOD_DIR .. "src/collectors/WeatherDataCollector.lua")
-    source(FarmDashboard.MOD_DIR .. "src/collectors/EconomyDataCollector.lua")
-
+    -- Scripts are loaded via modDesc extraSourceFiles; init once when the map loads.
     FarmDashboardDataCollector:init()
 
     if self:isAuthority() then
@@ -110,7 +102,6 @@ function FarmDashboard:deleteMap()
         _G.g_currentMission:removeUpdateable(FarmDashboard)
         self.isRegistered = false
     end
-    FarmDashboard._skippedAuthLog = nil
     if FarmDashboardDataCollector then
         FarmDashboardDataCollector:shutdown()
     end
@@ -119,15 +110,6 @@ end
 function FarmDashboard:update(dt)
     if not _G.g_currentMission then return end
     if not self:isAuthority() then
-        if not FarmDashboard._skippedAuthLog then
-            FarmDashboard._skippedAuthLog = true
-            local md = _G.g_currentMission.missionDynamicInfo
-            Logging.warning(
-                "[FarmDash] Not authority — data.json will not write. missionDynamicInfo mp=%s client=%s",
-                tostring(md and md.isMultiplayer),
-                tostring(md and md.isClient)
-            )
-        end
         return
     end
     if not FarmDashboard.readyAt or not _G.g_time then return end
@@ -141,7 +123,9 @@ function FarmDashboard:update(dt)
     end)
 
     if not success and err then
-        Logging.error("[FarmDash] Update error: %s", tostring(err))
+        if FarmDashLog and FarmDashLog.devWarn then
+            FarmDashLog.devWarn("Update error: %s", tostring(err))
+        end
     end
 end
 

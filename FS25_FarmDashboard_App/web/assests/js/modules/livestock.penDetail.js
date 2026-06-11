@@ -7,7 +7,7 @@
 //   - Modal is role="dialog" aria-modal=true with focus trap, Esc close, ARIA live region.
 //   - Loading skeleton, error toast w/ retry, "Stale" pill when cachedAt > 60s ago.
 
-import { t } from "../i18n/i18n.js";
+import { t, tOr } from "../i18n/i18n.js";
 
 const LRU_MAX = 32;
 const REQUEST_DEBOUNCE_SEC = 5;
@@ -135,6 +135,19 @@ function escapeHtml(s) {
     .replace(/'/g, "&#39;");
 }
 
+function bindPenDetailModalStrings(penIdStr) {
+  const titleEl = document.getElementById("penDetailTitleText");
+  if (titleEl) {
+    titleEl.textContent = `${tOr("livestock.penDetailTitle", "Pen detail")} — #${penIdStr}`;
+  }
+  const refreshBtn = document.getElementById("penDetailRefreshBtn");
+  if (refreshBtn) {
+    refreshBtn.innerHTML = `<i class="bi bi-arrow-clockwise me-1"></i>${escapeHtml(tOr("common.refresh", "Refresh"))}`;
+  }
+  const closeBtn = document.querySelector("#penDetailModal .modal-footer [data-bs-dismiss='modal']");
+  if (closeBtn) closeBtn.textContent = tOr("common.close", "Close");
+}
+
 function ensurePenDetailModal() {
   let modal = document.getElementById("penDetailModal");
   if (modal) return modal;
@@ -164,9 +177,9 @@ function ensurePenDetailModal() {
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" id="penDetailRefreshBtn">
-            <i class="bi bi-arrow-clockwise me-1"></i>${escapeHtml(t("common.refresh") || "Refresh")}
+            <i class="bi bi-arrow-clockwise me-1"></i>Refresh
           </button>
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">${escapeHtml(t("common.close") || "Close")}</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
         </div>
       </div>
     </div>
@@ -182,7 +195,7 @@ function announceLive(msg) {
 
 function renderAnimalsTable(animals, mode) {
   if (!Array.isArray(animals) || animals.length === 0) {
-    return `<div class="alert alert-secondary mb-0">${escapeHtml(t("livestock.noAnimals") || "No animals in this pen.")}</div>`;
+    return `<div class="alert alert-secondary mb-0">${escapeHtml(tOr("livestock.noAnimals", "No animals in this pen."))}</div>`;
   }
   const PER_PAGE = 50;
   const rows = animals.slice(0, PER_PAGE).map((a, i) => {
@@ -200,25 +213,25 @@ function renderAnimalsTable(animals, mode) {
     return `<tr><td><code>${id}</code></td><td>${subType}</td><td>${gender}</td><td class="text-end">${age}</td><td class="text-end">${weight}</td><td class="text-end">${health}</td><td>${flags}</td></tr>`;
   }).join("");
   const more = animals.length > PER_PAGE
-    ? `<tfoot><tr><td colspan="7" class="text-muted text-center small">${escapeHtml(t("livestock.morePagedHint") || `+${animals.length - PER_PAGE} more (paging coming soon)`)}</td></tr></tfoot>`
+    ? `<tfoot><tr><td colspan="7" class="text-muted text-center small">${escapeHtml(tOr("livestock.morePagedHint", `+${animals.length - PER_PAGE} more (paging coming soon)`, { count: animals.length - PER_PAGE }))}</td></tr></tfoot>`
     : "";
   return `
     <table class="table table-sm table-dark table-striped table-hover mb-0">
       <thead>
         <tr>
-          <th>${escapeHtml(t("livestock.colId") || "ID")}</th>
-          <th>${escapeHtml(t("livestock.colType") || "Type")}</th>
-          <th>${escapeHtml(t("livestock.colGender") || "Gender")}</th>
-          <th class="text-end">${escapeHtml(t("livestock.colAge") || "Age")}</th>
-          <th class="text-end">${escapeHtml(t("livestock.colWeight") || "Weight")}</th>
-          <th class="text-end">${escapeHtml(t("livestock.colHealth") || "Health")}</th>
-          <th>${escapeHtml(t("livestock.colFlags") || "Flags")}</th>
+          <th>${escapeHtml(tOr("livestock.colId", "ID"))}</th>
+          <th>${escapeHtml(tOr("livestock.colType", "Type"))}</th>
+          <th>${escapeHtml(tOr("livestock.colGender", "Gender"))}</th>
+          <th class="text-end">${escapeHtml(tOr("livestock.colAge", "Age"))}</th>
+          <th class="text-end">${escapeHtml(tOr("livestock.colWeight", "Weight"))}</th>
+          <th class="text-end">${escapeHtml(tOr("livestock.colHealth", "Health"))}</th>
+          <th>${escapeHtml(tOr("livestock.colFlags", "Flags"))}</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
       ${more}
     </table>
-    <div class="small text-muted mt-2">${escapeHtml((t("livestock.modeLabel") || "Mode") + ": " + (mode || "?"))}</div>
+    <div class="small text-muted mt-2">${escapeHtml(tOr("livestock.modeLabel", "Mode") + ": " + (mode || "?"))}</div>
   `;
 }
 
@@ -241,26 +254,26 @@ function renderModalState(envelope) {
   if (!envelope || !envelope.detail) {
     if (meta) meta.textContent = "";
     if (content) {
-      content.innerHTML = `<div class="alert alert-warning">${escapeHtml(t("livestock.detailUnavailable") || "Detail not available — the mod has not generated a per-pen file for this pen yet.")}</div>`;
+      content.innerHTML = `<div class="alert alert-warning">${escapeHtml(tOr("livestock.detailUnavailable", "Detail not available yet. Click Refresh, then wait for the next mod export cycle (about one minute)."))}</div>`;
     }
     setStalePill(envelope);
-    announceLive(t("livestock.detailUnavailable") || "Detail not available.");
+    announceLive(tOr("livestock.detailUnavailable", "Detail not available."));
     return;
   }
   const d = envelope.detail;
   if (meta) {
     meta.innerHTML = `
-      <span title="${escapeHtml(t("livestock.serverTimeTitle") || "Server clock at generation")}">${escapeHtml(t("livestock.serverTime") || "Server time")}: ${escapeHtml(formatTime(envelope.serverTimeSec))}</span>
-      <span class="ms-3">${escapeHtml(t("livestock.cachedAt") || "Cached at")}: ${escapeHtml(formatTime(envelope.cachedAt))}</span>
-      <span class="ms-3">${escapeHtml(t("livestock.modeLabel") || "Mode")}: ${escapeHtml(envelope.animalMode)}</span>
-      <span class="ms-3">${escapeHtml(t("livestock.idSchemeLabel") || "ID scheme")}: ${escapeHtml(envelope.idScheme || "integer-v1")}</span>
+      <span title="${escapeHtml(tOr("livestock.serverTimeTitle", "Server clock at generation"))}">${escapeHtml(tOr("livestock.serverTime", "Server time"))}: ${escapeHtml(formatTime(envelope.serverTimeSec))}</span>
+      <span class="ms-3">${escapeHtml(tOr("livestock.cachedAt", "Cached at"))}: ${escapeHtml(formatTime(envelope.cachedAt))}</span>
+      <span class="ms-3">${escapeHtml(tOr("livestock.modeLabel", "Mode"))}: ${escapeHtml(envelope.animalMode)}</span>
+      <span class="ms-3">${escapeHtml(tOr("livestock.idSchemeLabel", "ID scheme"))}: ${escapeHtml(envelope.idScheme || "integer-v1")}</span>
     `;
   }
   if (content) {
     content.innerHTML = renderAnimalsTable(d.animals, d.mode || envelope.animalMode);
   }
   setStalePill(envelope);
-  announceLive((t("livestock.detailLoaded") || "Loaded animals from pen detail.") + " " + (Array.isArray(d.animals) ? d.animals.length : 0));
+  announceLive(tOr("livestock.detailLoaded", "Loaded animals from pen detail.") + " " + (Array.isArray(d.animals) ? d.animals.length : 0));
 }
 
 let lastFocusedTrigger = null;
@@ -271,15 +284,14 @@ let lastFocusedTrigger = null;
 export async function openPenDetailModal(penId, opts = {}) {
   const modal = ensurePenDetailModal();
   const idStr = String(penId);
-  const titleEl = document.getElementById("penDetailTitleText");
+  bindPenDetailModalStrings(idStr);
   const refreshBtn = document.getElementById("penDetailRefreshBtn");
-  if (titleEl) titleEl.textContent = `${t("livestock.penDetailTitle") || "Pen detail"} — #${idStr}`;
   // Reset content to skeleton.
   const content = document.getElementById("penDetailContent");
   if (content) {
     content.innerHTML = `<div class="placeholder-glow">${Array(10).fill('<div class="placeholder col-12 mb-2" style="height:1.5em"></div>').join("")}</div>`;
   }
-  announceLive(t("livestock.detailLoading") || "Loading pen detail.");
+  announceLive(tOr("livestock.detailLoading", "Loading pen detail."));
 
   lastFocusedTrigger = document.activeElement;
   if (typeof bootstrap !== "undefined" && bootstrap.Modal) {
@@ -304,7 +316,7 @@ export async function openPenDetailModal(penId, opts = {}) {
       if (content) {
         content.innerHTML = `<div class="placeholder-glow">${Array(10).fill('<div class="placeholder col-12 mb-2" style="height:1.5em"></div>').join("")}</div>`;
       }
-      announceLive(t("livestock.detailRefreshing") || "Refreshing pen detail.");
+      announceLive(tOr("livestock.detailRefreshing", "Refreshing pen detail."));
       await requestPenRefresh(idStr).catch(() => { /* swallow */ });
       // Bust the cache for this pen (but keep idScheme/dirtyAt — server side will tell us anew).
       for (const k of Array.from(lruCache.keys())) {

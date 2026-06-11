@@ -1,0 +1,655 @@
+// FS25 FarmDashboard | mapOverviewResolver.js
+// Locates the in-game PDA overview texture (overview.dds / overview.png) and caches a web PNG.
+
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const os = require('os');
+const { spawn } = require('child_process');
+
+const OVERVIEW_NAMES = new Set(['overview.dds', 'overview.png']);
+const OVERVIEW_ENTRY_RE = /(?:^|\/)textures\/ui\/overview\.(dds|png)$/i;
+const OVERVIEW_ENTRY_FALLBACK_RE = /(?:^|\/)overview\.(dds|png)$/i;
+
+function normalizeMapSlug(mapId, mapTitle) {
+  const raw = String(mapId || mapTitle || '').trim();
+  if (!raw) return '';
+  const cleaned = raw.replace(/\.[^.\\/]+$/, '').replace(/[\s'"]+/g, '');
+  if (/^map[a-z0-9]+$/i.test(cleaned)) return cleaned.toLowerCase();
+  if (/^[a-z]{2,3}$/i.test(cleaned) && mapTitle) {
+    const t = String(mapTitle).toLowerCase();
+    if (t.includes('us') || t.includes('america')) return 'mapus';
+    if (t.includes('eu') || t.includes('europe')) return 'mapeu';
+  }
+  return cleaned.toLowerCase();
+}
+
+/** Distinct tokens from a display title — used to rank mod zips (e.g. Witcombe Valley → witcombe). */
+function titleTokensFromMapTitle(mapTitle) {
+  if (!mapTitle) return [];
+  const seen = new Set();
+  const out = [];
+  for (const tok of String(mapTitle).toLowerCase().split(/[^a-z0-9]+/)) {
+    if (tok.length < 4 || seen.has(tok)) continue;
+    seen.add(tok);
+    out.push(tok);
+  }
+  return out;
+}
+
+const GENERIC_MAP_TITLE_TOKENS = new Set([
+  'valley', 'farming', 'farm', 'road', 'roads', 'dairy', 'map', 'simulator',
+  'fs25', 'fs22', 'mod', 'the', 'and', 'for', 'edition', 'main', 'hills',
+]);
+
+function distinctiveTitleTokens(mapTitle) {
+  return titleTokensFromMapTitle(mapTitle).filter((t) => !GENERIC_MAP_TITLE_TOKENS.has(t));
+}
+
+function pathMatchesMapIdentity(filePath, mapSlug, mapTitle) {
+  const lower = String(filePath || '').toLowerCase().replace(/\\/g, '/');
+  const distinctive = distinctiveTitleTokens(mapTitle);
+  if (distinctive.length > 0) {
+    return distinctive.some((tok) => lower.includes(tok));
+  }
+  if (mapSlug && lower.includes(mapSlug)) return true;
+  return !mapTitle && !mapSlug;
+}
+
+function archiveMatchesMapIdentity(zipPath, mapSlug, mapTitle) {
+  return pathMatchesMapIdentity(path.basename(zipPath), mapSlug, mapTitle);
+}
+
+function scoreZipArchiveName(zipPath, mapSlug, titleTokens) {
+  const base = path.basename(zipPath).toLowerCase();
+  let score = 0;
+  if (mapSlug && base.includes(mapSlug)) score += 60;
+  for (const tok of titleTokens || []) {
+    if (base.includes(tok)) score += 40;
+  }
+  return score;
+}
+
+function getMapOverviewCacheDir() {
+  try {
+    const { app } = require('electron');
+    if (app && typeof app.getPath === 'function') {
+      return path.join(app.getPath('userData'), 'map_overviews');
+    }
+  } catch (_) {
+    /* not in Electron main process */
+  }
+  return path.join(
+    process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'),
+    'fs25-farm-dashboard',
+    'map_overviews'
+  );
+}
+
+function getFs25GameDataRoots() {
+  const roots = [];
+  const push = (p) => {
+    if (!p || typeof p !== 'string') return;
+    const data = path.join(p, 'data');
+    const maps = path.join(data, 'maps');
+    if (fs.existsSync(maps)) roots.push(data);
+  };
+  const env = process.env.FS25_GAME_PATH || process.env.FARMING_SIMULATOR_2025_PATH;
+  if (env) push(env);
+  const steam = path.join(
+    process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)',
+    'Steam',
+    'steamapps',
+    'common',
+    'Farming Simulator 2025'
+  );
+  push(steam);
+  const pf = process.env.ProgramFiles || 'C:\\Program Files';
+  push(path.join(pf, 'Farming Simulator 2025'));
+  push(path.join(pf, 'Epic Games', 'FarmingSimulator2025'));
+  push(path.join(pf, 'XboxGames', 'Farming Simulator 25', 'Content'));
+  push(path.join(pf, 'XboxGames', 'Farming Simulator 2025', 'Content'));
+  return [...new Set(roots)];
+}
+
+function vanillaOverviewCandidates(gameDataRoot, mapSlug) {
+  if (!gameDataRoot || !mapSlug) return [];
+  const base = path.join(gameDataRoot, 'maps', mapSlug);
+  return [
+    path.join(base, 'textures', 'ui', 'overview.dds'),
+    path.join(base, 'textures', 'ui', 'overview.png'),
+    path.join(base, 'overview.dds'),
+    path.join(base, 'overview.png'),
+  ];
+}
+
+function scoreOverviewPath(filePath, mapSlug, titleTokens) {
+  const lower = filePath.toLowerCase().replace(/\\/g, '/');
+  let score = 0;
+  if (lower.endsWith('/textures/ui/overview.dds') || lower.endsWith('/textures/ui/overview.png')) {
+    score += 40;
+  } else if (lower.endsWith('/overview.dds') || lower.endsWith('/overview.png')) {
+    score += 25;
+  }
+  if (mapSlug && lower.includes(`/maps/${mapSlug}/`)) score += 80;
+  if (mapSlug && lower.includes(`/${mapSlug}/`)) score += 35;
+  if (mapSlug && lower.includes(mapSlug)) score += 15;
+  for (const tok of titleTokens || []) {
+    if (lower.includes(tok)) score += 25;
+  }
+  return score;
+}
+
+async function pathExists(p) {
+  try {
+    await fs.promises.access(p, fs.constants.R_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function findFirstExisting(paths) {
+  for (const p of paths) {
+    if (await pathExists(p)) return p;
+  }
+  return null;
+}
+
+async function walkForOverview(rootDir, mapSlug, mapTitle, titleTokens, maxDepth = 9, maxFiles = 12000) {
+  let best = null;
+  let bestScore = -1;
+  let seen = 0;
+  const stack = [{ dir: rootDir, depth: 0 }];
+
+  while (stack.length > 0 && seen < maxFiles) {
+    const { dir, depth } = stack.pop();
+    if (depth > maxDepth) continue;
+    let entries;
+    try {
+      entries = await fs.promises.readdir(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const ent of entries) {
+      seen += 1;
+      if (seen >= maxFiles) break;
+      const full = path.join(dir, ent.name);
+      if (ent.isDirectory()) {
+        const skip = /^\.|node_modules$/i.test(ent.name);
+        if (!skip) stack.push({ dir: full, depth: depth + 1 });
+        continue;
+      }
+      if (!ent.isFile()) continue;
+      const low = ent.name.toLowerCase();
+      if (!OVERVIEW_NAMES.has(low)) continue;
+      if (!pathMatchesMapIdentity(full, mapSlug, mapTitle)) continue;
+      const sc = scoreOverviewPath(full, mapSlug, titleTokens);
+      if (sc > bestScore) {
+        bestScore = sc;
+        best = full;
+      }
+    }
+  }
+  return best;
+}
+
+function loadYauzl() {
+  try {
+    return require('yauzl');
+  } catch {
+    return null;
+  }
+}
+
+function openZip(yauzl, zipPath) {
+  return new Promise((resolve, reject) => {
+    yauzl.open(zipPath, { lazyEntries: true }, (err, zipfile) => {
+      if (err) reject(err);
+      else resolve(zipfile);
+    });
+  });
+}
+
+function readZipEntryStream(yauzl, zipfile, entry) {
+  return new Promise((resolve, reject) => {
+    zipfile.openReadStream(entry, (err, stream) => {
+      if (err) reject(err);
+      else resolve(stream);
+    });
+  });
+}
+
+async function findOverviewInZip(yauzl, zipPath, mapSlug, titleTokens) {
+  const zipfile = await openZip(yauzl, zipPath);
+  return new Promise((resolve, reject) => {
+    let best = null;
+    let bestScore = -1;
+    zipfile.on('entry', (entry) => {
+      const name = entry.fileName.replace(/\\/g, '/');
+      const low = name.toLowerCase();
+      const isOverview =
+        OVERVIEW_ENTRY_RE.test(low) ||
+        OVERVIEW_ENTRY_FALLBACK_RE.test(low) ||
+        /(?:^|\/)map\/textures\/ui\/overview\.(dds|png)$/i.test(low) ||
+        OVERVIEW_NAMES.has(path.basename(low));
+      if (!isOverview) {
+        zipfile.readEntry();
+        return;
+      }
+      const sc =
+        scoreOverviewPath(name, mapSlug, titleTokens) +
+        scoreZipArchiveName(zipPath, mapSlug, titleTokens);
+      if (sc > bestScore) {
+        bestScore = sc;
+        best = { zipPath, entryName: entry.fileName, entrySize: entry.uncompressedSize };
+      }
+      zipfile.readEntry();
+    });
+    zipfile.on('end', () => resolve(best));
+    zipfile.on('error', reject);
+    zipfile.readEntry();
+  });
+}
+
+async function listZipArchives(modsRoot, maxZips = 400) {
+  let entries;
+  try {
+    entries = await fs.promises.readdir(modsRoot, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const zips = entries
+    .filter((e) => e.isFile() && /\.zip$/i.test(e.name))
+    .map((e) => path.join(modsRoot, e.name));
+  return zips.slice(0, maxZips);
+}
+
+async function listMatchingMapZipPaths(modsRoot, mapSlug, mapTitle) {
+  let entries;
+  try {
+    entries = await fs.promises.readdir(modsRoot, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const hints = new Set();
+  for (const tok of distinctiveTitleTokens(mapTitle)) hints.add(tok);
+  if (mapSlug) {
+    hints.add(mapSlug);
+    const stripped = mapSlug.replace(/^map/, '');
+    if (stripped) hints.add(stripped);
+  }
+  const out = [];
+  for (const ent of entries) {
+    if (!ent.isFile() || !/\.zip$/i.test(ent.name)) continue;
+    const low = ent.name.toLowerCase();
+    for (const hint of hints) {
+      if (hint && low.includes(String(hint).toLowerCase())) {
+        out.push(path.join(modsRoot, ent.name));
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+async function findOverviewInZipArchives(modsRoots, mapSlug, mapTitle, titleTokens) {
+  const yauzl = loadYauzl();
+  if (!yauzl) return null;
+
+  const archives = [];
+  const priority = [];
+  for (const root of modsRoots || []) {
+    if (!(await pathExists(root))) continue;
+    for (const z of await listMatchingMapZipPaths(root, mapSlug, mapTitle)) {
+      priority.push(z);
+    }
+    const zips = await listZipArchives(root);
+    for (const z of zips) archives.push(z);
+  }
+  if (archives.length === 0 && priority.length === 0) return null;
+
+  const distinctive = distinctiveTitleTokens(mapTitle);
+  let candidates = [...new Set([...priority, ...archives])];
+  if (distinctive.length > 0) {
+    const matched = candidates.filter((z) => archiveMatchesMapIdentity(z, mapSlug, mapTitle));
+    if (matched.length > 0) candidates = matched;
+  }
+
+  candidates.sort(
+    (a, b) =>
+      scoreZipArchiveName(b, mapSlug, titleTokens) -
+      scoreZipArchiveName(a, mapSlug, titleTokens)
+  );
+
+  let best = null;
+  let bestScore = -1;
+  const limit = Math.min(candidates.length, 80);
+  for (let i = 0; i < limit; i += 1) {
+    const zipPath = candidates[i];
+    let hit;
+    try {
+      hit = await findOverviewInZip(yauzl, zipPath, mapSlug, titleTokens);
+    } catch {
+      continue;
+    }
+    if (!hit) continue;
+    const sc =
+      scoreOverviewPath(hit.entryName, mapSlug, titleTokens) +
+      scoreZipArchiveName(zipPath, mapSlug, titleTokens);
+    if (sc > bestScore) {
+      bestScore = sc;
+      best = hit;
+    }
+    if (bestScore >= 120) break;
+  }
+  const minScore = distinctive.length > 0 ? 55 : mapSlug ? 40 : 30;
+  if (!best || bestScore < minScore) return null;
+  return best;
+}
+
+async function extractZipOverviewToTemp(zipHit) {
+  const yauzl = loadYauzl();
+  if (!yauzl) throw new Error('yauzl unavailable');
+
+  const zipStat = await fs.promises.stat(zipHit.zipPath);
+  const key = crypto
+    .createHash('sha1')
+    .update(`${zipHit.zipPath}|${zipHit.entryName}|${zipStat.mtimeMs}|${zipStat.size}`)
+    .digest('hex')
+    .slice(0, 16);
+  const tempDir = path.join(os.tmpdir(), 'farmdash_map_overviews');
+  await fs.promises.mkdir(tempDir, { recursive: true });
+  const ext = path.extname(zipHit.entryName) || '.dds';
+  const dest = path.join(tempDir, `${key}${ext.toLowerCase()}`);
+  if (await pathExists(dest)) return dest;
+
+  const zipfile = await openZip(yauzl, zipHit.zipPath);
+  await new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (fn) => {
+      if (settled) return;
+      settled = true;
+      fn();
+    };
+    zipfile.on('entry', (entry) => {
+      if (entry.fileName !== zipHit.entryName) {
+        zipfile.readEntry();
+        return;
+      }
+      readZipEntryStream(yauzl, zipfile, entry)
+        .then(async (stream) => {
+          await fs.promises.mkdir(path.dirname(dest), { recursive: true });
+          const out = fs.createWriteStream(dest);
+          stream.pipe(out);
+          out.on('close', () => finish(resolve));
+          out.on('error', (e) => finish(() => reject(e)));
+          stream.on('error', (e) => finish(() => reject(e)));
+        })
+        .catch((e) => finish(() => reject(e)));
+    });
+    zipfile.on('end', () => finish(() => reject(new Error('zip entry not found'))));
+    zipfile.on('error', (e) => finish(() => reject(e)));
+    zipfile.readEntry();
+  });
+  return dest;
+}
+
+function normalizeModsRoots(modsRoot, modsRoots) {
+  const out = [];
+  const seen = new Set();
+  const add = (p) => {
+    if (!p || typeof p !== 'string') return;
+    const k = p.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push(p);
+  };
+  if (Array.isArray(modsRoots)) modsRoots.forEach(add);
+  if (modsRoot) add(modsRoot);
+  return out;
+}
+
+async function findOverviewSourceFile({ mapId, mapTitle, modsRoot, modsRoots }) {
+  const mapSlug = normalizeMapSlug(mapId, mapTitle);
+  const titleTokens = titleTokensFromMapTitle(mapTitle);
+  const roots = normalizeModsRoots(modsRoot, modsRoots);
+  const candidates = [];
+
+  for (const dataRoot of getFs25GameDataRoots()) {
+    if (mapSlug) {
+      for (const p of vanillaOverviewCandidates(dataRoot, mapSlug)) {
+        candidates.push(p);
+      }
+    }
+  }
+  const direct = await findFirstExisting(candidates);
+  if (direct) return { sourcePath: direct, mapSlug, sourceKind: 'file' };
+
+  for (const modsDir of roots) {
+    if (!mapSlug) continue;
+    const modDirect = path.join(modsDir, 'maps', mapSlug, 'textures', 'ui', 'overview.dds');
+    const modDirectPng = path.join(modsDir, 'maps', mapSlug, 'textures', 'ui', 'overview.png');
+    const modHit = await findFirstExisting([modDirect, modDirectPng]);
+    if (modHit) return { sourcePath: modHit, mapSlug, sourceKind: 'file' };
+  }
+
+  const zipHit = await findOverviewInZipArchives(roots, mapSlug, mapTitle, titleTokens);
+  if (zipHit) {
+    return {
+      sourcePath: `${zipHit.zipPath}::${zipHit.entryName}`,
+      mapSlug,
+      sourceKind: 'zip',
+      zipHit,
+    };
+  }
+
+  for (const modsDir of roots) {
+    if (!(await pathExists(modsDir))) continue;
+    const walked = await walkForOverview(modsDir, mapSlug, mapTitle, titleTokens);
+    if (walked) return { sourcePath: walked, mapSlug, sourceKind: 'file' };
+  }
+
+  return { sourcePath: null, mapSlug };
+}
+
+async function resolveMagickExe() {
+  const names = ['magick.exe', 'magick'];
+  for (const name of names) {
+    try {
+      const { execFileSync } = require('child_process');
+      const out = execFileSync('where.exe', [name], { encoding: 'utf8', windowsHide: true });
+      const line = out.split(/\r?\n/).map((s) => s.trim()).find(Boolean);
+      if (line && (await pathExists(line))) return line;
+    } catch {
+      /* next */
+    }
+  }
+  const bundledDirs = [
+    path.join(__dirname, 'resources', 'imagemagick'),
+    path.join(process.resourcesPath || '', 'imagemagick'),
+  ];
+  for (const dir of bundledDirs) {
+    const exe = path.join(dir, 'magick.exe');
+    if (await pathExists(exe)) return exe;
+  }
+  return null;
+}
+
+async function resolveTexconvExe() {
+  const candidates = [
+    path.join(__dirname, 'resources', 'texconv', 'texconv.exe'),
+    path.join(process.resourcesPath || '', 'texconv', 'texconv.exe'),
+  ];
+  for (const p of candidates) {
+    if (await pathExists(p)) return p;
+  }
+  try {
+    const { execFileSync } = require('child_process');
+    const out = execFileSync('where.exe', ['texconv'], { encoding: 'utf8', windowsHide: true });
+    const line = out.split(/\r?\n/).map((s) => s.trim()).find(Boolean);
+    if (line && (await pathExists(line))) return line;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function spawnAsync(file, args, opts = {}) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(file, args, { windowsHide: true, ...opts });
+    let err = '';
+    child.stderr?.on('data', (d) => { err += d.toString(); });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(err || `${path.basename(file)} exited ${code}`));
+    });
+  });
+}
+
+async function convertDdsToPng(sourcePath, destPng) {
+  const magick = await resolveMagickExe();
+  if (magick) {
+    await spawnAsync(magick, [sourcePath, destPng]);
+    if (await pathExists(destPng)) return;
+    throw new Error('ImageMagick did not produce PNG output');
+  }
+  const texconv = await resolveTexconvExe();
+  if (!texconv) {
+    throw new Error('No DDS converter (install ImageMagick or add texconv.exe to resources/texconv)');
+  }
+  const tempOut = path.join(os.tmpdir(), `fd_map_texconv_${crypto.randomBytes(6).toString('hex')}`);
+  await fs.promises.mkdir(tempOut, { recursive: true });
+  try {
+    await spawnAsync(texconv, ['-nologo', '-y', '-ft', 'png', '-o', tempOut, sourcePath]);
+    const base = path.basename(sourcePath, path.extname(sourcePath));
+    let candidate = path.join(tempOut, `${base}.png`);
+    if (!(await pathExists(candidate))) {
+      const files = await fs.promises.readdir(tempOut);
+      const png = files.find((f) => f.toLowerCase().endsWith('.png'));
+      if (png) candidate = path.join(tempOut, png);
+    }
+    if (!(await pathExists(candidate))) {
+      throw new Error('texconv did not produce PNG output');
+    }
+    await fs.promises.copyFile(candidate, destPng);
+  } finally {
+    await fs.promises.rm(tempOut, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+function cacheKeyForMap(mapSlug, mapId, mapTitle) {
+  const identity = `${mapSlug || ''}|${mapId || ''}|${mapTitle || ''}`.toLowerCase();
+  const h = crypto.createHash('sha1').update(identity).digest('hex').slice(0, 12);
+  const slug = (mapSlug || mapTitle || mapId || 'map').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 40);
+  return `${slug}_${h}`;
+}
+
+async function ensureCachedPng(sourceDescriptor, mapSlug, mapId, mapTitle) {
+  let sourcePath = sourceDescriptor;
+  let stat;
+  if (typeof sourceDescriptor === 'object' && sourceDescriptor?.sourceKind === 'zip') {
+    sourcePath = await extractZipOverviewToTemp(sourceDescriptor.zipHit);
+    stat = await fs.promises.stat(sourcePath);
+  } else {
+    stat = await fs.promises.stat(sourcePath);
+  }
+
+  const cacheDir = getMapOverviewCacheDir();
+  await fs.promises.mkdir(cacheDir, { recursive: true });
+  const cacheSourceKey =
+    typeof sourceDescriptor === 'object' && sourceDescriptor?.sourcePath
+      ? sourceDescriptor.sourcePath
+      : sourcePath;
+  const key = cacheKeyForMap(mapSlug, mapId, mapTitle);
+  const metaPath = path.join(cacheDir, `${key}.json`);
+  const pngPath = path.join(cacheDir, `${key}.png`);
+
+  try {
+    const metaRaw = await fs.promises.readFile(metaPath, 'utf8');
+    const meta = JSON.parse(metaRaw);
+    if (
+      meta.sourcePath === cacheSourceKey &&
+      meta.mtimeMs === stat.mtimeMs &&
+      meta.size === stat.size &&
+      (await pathExists(pngPath))
+    ) {
+      return { pngPath, key, mapTitle: meta.mapTitle || mapTitle || null };
+    }
+  } catch {
+    /* rebuild */
+  }
+
+  const ext = path.extname(sourcePath).toLowerCase();
+  if (ext === '.png') {
+    await fs.promises.copyFile(sourcePath, pngPath);
+  } else if (ext === '.dds') {
+    await convertDdsToPng(sourcePath, pngPath);
+  } else {
+    throw new Error(`Unsupported overview format: ${ext}`);
+  }
+
+  await fs.promises.writeFile(
+    metaPath,
+    JSON.stringify({
+      sourcePath: cacheSourceKey,
+      mtimeMs: stat.mtimeMs,
+      size: stat.size,
+      mapSlug,
+      mapId: mapId || null,
+      mapTitle: mapTitle || null,
+      cachedAt: new Date().toISOString(),
+    }),
+    'utf8'
+  );
+  return { pngPath, key, mapTitle: mapTitle || null };
+}
+
+/**
+ * @returns {Promise<{ ok: boolean, url?: string, sourcePath?: string, mapSlug?: string, mapTitle?: string, error?: string }>}
+ */
+async function resolveMapOverviewImage({ mapId, mapTitle, modsRoot, modsRoots }) {
+  try {
+    const found = await findOverviewSourceFile({ mapId, mapTitle, modsRoot, modsRoots });
+    const { sourcePath, mapSlug, sourceKind, zipHit } = found;
+    if (!sourcePath) {
+      return {
+        ok: false,
+        error: 'overview_not_found',
+        mapTitle: mapTitle || null,
+        mapId: mapId || null,
+        mapSlug: found.mapSlug || null,
+      };
+    }
+    const descriptor =
+      sourceKind === 'zip'
+        ? { sourceKind: 'zip', zipHit, sourcePath }
+        : sourcePath;
+    const cached = await ensureCachedPng(descriptor, mapSlug, mapId, mapTitle);
+    return {
+      ok: true,
+      url: `/map-overview-cache/${cached.key}.png`,
+      sourcePath,
+      mapSlug,
+      mapTitle: mapTitle || null,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      error: e && e.message ? e.message : String(e),
+    };
+  }
+}
+
+module.exports = {
+  normalizeMapSlug,
+  titleTokensFromMapTitle,
+  distinctiveTitleTokens,
+  pathMatchesMapIdentity,
+  scoreZipArchiveName,
+  getMapOverviewCacheDir,
+  findOverviewSourceFile,
+  resolveMapOverviewImage,
+  scoreOverviewPath,
+};

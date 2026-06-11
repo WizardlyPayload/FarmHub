@@ -134,3 +134,5 @@ This app lives under the **FarmHub** workspace. For **security / LAN** and the *
 ## Licence / credits
 
 Bundled third-party components (Electron, Chromium, ImageMagick when installed, etc.) are subject to their respective licences. Game content and mod data remain property of Giants Software and respective mod authors.
+
+Project authors: [docs/AUTHORS.md](../../docs/AUTHORS.md). Optional maintenance tips: [Ko-fi](https://ko-fi.com/wizarlypayload).

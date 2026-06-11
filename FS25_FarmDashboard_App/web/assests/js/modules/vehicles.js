@@ -2,6 +2,29 @@
 
 import { getAPIBaseURL } from "./apiStorage.js";
 import { t } from "../i18n/i18n.js";
+import {
+  getVehicleConditionFraction,
+  getVehicleDamageFraction,
+  isVehicleHighWear,
+  isVehicleInAdsService,
+  isVehicleAdsOverdue,
+  countActiveAdsBreakdowns,
+  summarizeAdsFleet,
+  buildAdsVehiclePanelHtml,
+  vehicleNeedsAdsWarning,
+  isVehicleInNeedOfRepair,
+  getWorstAdsInspectionSeverity,
+  hasVisibleAdsBreakdowns,
+} from "./vehicleAds.js";
+import {
+  vehicleHasYears,
+  getVehicleModelYear,
+  getVehicleDecadeLabel,
+  isVehicleYearUnknown,
+  getVehicleReliability,
+  getVehicleMaintainability,
+  formatReliabilityPercent,
+} from "./vehicleYears.js";
 
 function _safe(value) {
   const ns =
@@ -49,17 +72,124 @@ export function resolveVehicleDisplayName(vehicle) {
 const SILOKING_TRAILEDLINE_WIKI_THUMB =
   "https://farmingsimulator.wiki.gg/images/thumb/d/d6/Siloking_trailedline_4.0_system_1000%2B.png/300px-Siloking_trailedline_4.0_system_1000%2B.png";
 
+/** Filenames in assests/img/items/ from GET /api/item-image-filenames (primed in app.js before dashboard init). */
+let itemsImageFilenames = [];
 /** Filenames in assests/img/items_mod_extract/ from GET /api/item-image-filenames (primed in app.js before dashboard init). */
 let modExtractImageFilenames = [];
 
+/** Resolved local PNG paths / null — findVehicleImageDynamic is O(images) per vehicle. */
+const vehicleImageMatchCache = new Map();
+/** Full generateVehicleDisplay() results keyed by name|brand|type. */
+const vehicleDisplayCache = new Map();
+
+function buildVehicleImageCacheKey(vehicleName, brandName, typeName) {
+  return `${String(vehicleName ?? "")}\0${String(brandName ?? "")}\0${String(typeName ?? "")}`;
+}
+
+function vehicleCardFingerprint(vehicle) {
+  const skipFuelTypes = ["highPressureWasher", "High Pressure Washer"];
+  let fuelPct = -1;
+  if (vehicle.isMotorized && !skipFuelTypes.includes(vehicle.typeName)) {
+    if (vehicle.fuelCapacity > 0 && vehicle.fuelLevel >= 0) {
+      fuelPct = Math.round((vehicle.fuelLevel / vehicle.fuelCapacity) * 100);
+    } else if (vehicle.fillLevels?.DIESEL) {
+      const diesel = vehicle.fillLevels.DIESEL;
+      fuelPct =
+        diesel.capacity > 0
+          ? Math.round((diesel.level / diesel.capacity) * 100)
+          : 0;
+    } else {
+      fuelPct = 0;
+    }
+  }
+  return [
+    vehicle.id,
+    vehicle.engineOn ? 1 : 0,
+    fuelPct,
+    Math.round(getVehicleDamageFraction(vehicle) * 100),
+    Math.round(getVehicleConditionFraction(vehicle) * 100),
+    getVehicleModelYear(vehicle) ?? "",
+    countActiveAdsBreakdowns(vehicle),
+    isVehicleInAdsService(vehicle) ? 1 : 0,
+    isVehicleAdsOverdue(vehicle) ? 1 : 0,
+    getWorstAdsInspectionSeverity(vehicle),
+    hasVisibleAdsBreakdowns(vehicle) ? 1 : 0,
+  ].join(":");
+}
+
+function vehicleListUiFingerprint(vehicles) {
+  if (!Array.isArray(vehicles) || vehicles.length === 0) return "";
+  return vehicles.map(vehicleCardFingerprint).join("|");
+}
+
+export function primeItemImageFilenames(list) {
+  itemsImageFilenames = Array.isArray(list) ? list : [];
+}
+
 export function primeModExtractImageFilenames(list) {
   modExtractImageFilenames = Array.isArray(list) ? list : [];
+}
+
+/** Prime both shop image lists (call before dashboard init or after mod image rescan). */
+export function primeShopImageFilenames({ items, modExtract } = {}) {
+  if (items !== undefined) primeItemImageFilenames(items);
+  if (modExtract !== undefined) primeModExtractImageFilenames(modExtract);
+}
+
+function clearVehicleImageMatchCaches(instance) {
+  vehicleImageMatchCache.clear();
+  vehicleDisplayCache.clear();
+  if (instance) {
+    instance.vehicleImageCacheCurated = null;
+    instance.vehicleImageCacheCuratedBuilt = false;
+    instance.vehicleImageCacheMod = null;
+    instance.vehicleImageCacheModBuilt = false;
+    instance._lastVehicleCardsFingerprint = "";
+  }
 }
 
 export function setModExtractImageFilenames(list) {
   primeModExtractImageFilenames(list);
   this.vehicleImageCacheMod = null;
   this.vehicleImageCacheModBuilt = false;
+  clearVehicleImageMatchCaches(this);
+}
+
+/** Refresh curated + mod filename lists from the server and invalidate match caches. */
+export function setShopImageFilenames({ items, modExtract } = {}) {
+  primeShopImageFilenames({ items, modExtract });
+  clearVehicleImageMatchCaches(this);
+}
+
+/** Re-fetch /api/item-image-filenames after mod export; re-render vehicle cards when possible. */
+export async function refreshShopImageFilenamesFromApi(dashboardInstance) {
+  try {
+    const r = await fetch("/api/item-image-filenames");
+    const data = await r.json();
+    window.__farmdashShopImageFilenames = [
+      ...(Array.isArray(data?.items) ? data.items : []),
+      ...(Array.isArray(data?.modExtract) ? data.modExtract : []),
+    ];
+    if (dashboardInstance && typeof dashboardInstance.setShopImageFilenames === "function") {
+      dashboardInstance.setShopImageFilenames({
+        items: data.items || [],
+        modExtract: data.modExtract || [],
+      });
+      if (typeof dashboardInstance.renderVehicleCards === "function") {
+        dashboardInstance.renderVehicleCards(dashboardInstance.vehicles || []);
+      }
+    } else {
+      primeShopImageFilenames({
+        items: data.items || [],
+        modExtract: data.modExtract || [],
+      });
+      clearVehicleImageMatchCaches(null);
+    }
+    return data;
+  } catch (e) {
+    console.warn("[refreshShopImageFilenamesFromApi]", e);
+    return null;
+  }
 }
 
 /** Lowercase letters+digits only — same logical string for "Axial-Flow 9250" and "AxialFlow9250". */
@@ -160,6 +290,86 @@ function normalizeItemImageFilename(name) {
   s = s.replace(/%2B/gi, "+").replace(/%2b/gi, "+");
   s = s.replace(/%26/g, "&");
   return s;
+}
+
+/**
+ * Build one searchable cache row for a shop PNG under items/ or items_mod_extract/.
+ * Handles Giants pack__store_* exports and legacy _NN_FS25_Brand_Model wiki-style names.
+ */
+function buildShopImageCacheEntry(filenameRaw, folderPath, normalizeText) {
+  const filename = normalizeItemImageFilename(filenameRaw);
+  if (!filename || !/\.png$/i.test(filename)) return null;
+
+  const base = filename.replace(/\.png$/i, "");
+  const sep = base.indexOf("__");
+  let brandPart = "";
+  let modelPart = "";
+  let beforeSep = "";
+  let afterSep = base;
+  let packNorm = "";
+  let fullNorm = "";
+
+  if (sep >= 0) {
+    beforeSep = base.slice(0, sep);
+    afterSep = base.slice(sep + 2);
+    const parts = afterSep.split("_");
+    brandPart = parts[0] || "";
+    modelPart = parts
+      .slice(1)
+      .join(" ")
+      .replace(/%2B/g, "+")
+      .replace(/%25/g, "%");
+    if (parts[0] && /^(store|icon)$/i.test(parts[0])) {
+      modelPart = parts.slice(1).join("_");
+      const fromPack = beforeSep
+        .replace(/^vehicles?_?/i, "")
+        .replace(/^store_?/i, "");
+      brandPart = fromPack || brandPart;
+    }
+    modelPart = String(modelPart)
+      .replace(/([a-z])(\d)/gi, "$1 $2")
+      .replace(/(\d)([a-z])/gi, "$1 $2")
+      .replace(/[_-]+/g, " ")
+      .trim();
+    packNorm = normalizeText(beforeSep.replace(/^FS\d+_?/i, ""));
+    fullNorm = normalizeText(
+      (beforeSep && afterSep ? `${beforeSep}_${afterSep}` : base).replace(
+        /\.png$/i,
+        ""
+      )
+    );
+  } else {
+    const parts = base.split("_");
+    let brandStart = 2;
+    if (parts[0] === "" && /^\d+$/.test(parts[1] || "")) brandStart = 2;
+    else if (parts[0] === "" && /^\d+px/i.test(parts[1] || "")) brandStart = 2;
+    const fsIdx = parts.findIndex((p) => /^FS25/i.test(p) || /^200px-FS25/i.test(p));
+    if (fsIdx >= 0) brandStart = fsIdx + 1;
+    brandPart = parts[brandStart] || "";
+    modelPart = parts
+      .slice(brandStart + 1)
+      .join(" ")
+      .replace(/%2B/g, "+")
+      .replace(/%25/g, "%");
+    fullNorm = normalizeText(
+      base
+        .replace(/^_\d+_/, "")
+        .replace(/^200px-/i, "")
+        .replace(/^FS25_/i, "")
+    );
+    packNorm = "";
+  }
+
+  return {
+    filename,
+    path: `${folderPath}${filename}`,
+    brandNorm: normalizeText(brandPart),
+    modelNorm: normalizeText(modelPart),
+    fullNorm,
+    packNorm,
+    originalBrand: brandPart,
+    originalModel: modelPart,
+  };
 }
 
 /**
@@ -492,6 +702,40 @@ function scoreVehicleImageCache(
   return { bestMatch, bestScore };
 }
 
+function buildVehicleYearsPanelHtml(vehicle) {
+  if (!vehicleHasYears(vehicle)) return "";
+
+  const modelYear = getVehicleModelYear(vehicle);
+  const decadeLabel = getVehicleDecadeLabel(vehicle);
+  const reliability = getVehicleReliability(vehicle);
+  const maintainability = getVehicleMaintainability(vehicle);
+
+  const yearLine =
+    modelYear != null
+      ? `<div class="d-flex justify-content-between mb-1">
+          <small class="text-muted">${_safe(t("vehicles.vyModelYear"))}</small>
+          <strong>${modelYear}${decadeLabel ? ` <span class="text-muted fw-normal">(${_safe(decadeLabel)})</span>` : ""}</strong>
+        </div>`
+      : `<div class="mb-1"><small class="text-muted">${_safe(t("vehicles.yearUnknown"))}</small></div>`;
+
+  const relLine =
+    reliability != null || maintainability != null
+      ? `<div class="d-flex justify-content-between gap-2 mt-1">
+          ${reliability != null ? `<small class="text-muted">${_safe(t("vehicles.vyReliability", { pct: formatReliabilityPercent(reliability) }))}</small>` : ""}
+          ${maintainability != null ? `<small class="text-muted">${_safe(t("vehicles.vyMaintainability", { pct: formatReliabilityPercent(maintainability) }))}</small>` : ""}
+        </div>`
+      : "";
+
+  return `
+    <div class="mb-3 border border-secondary rounded p-2 vy-vehicle-panel">
+      <small class="text-farm-accent fw-semibold d-block mb-2">
+        <i class="bi bi-calendar3 me-1"></i>${t("vehicles.vyPanelTitle")}
+      </small>
+      ${yearLine}
+      ${relLine}
+    </div>`;
+}
+
 export function showVehiclesSection() {
   const vehiclesHTML = `
             <div class="row mb-4">
@@ -501,6 +745,42 @@ export function showVehiclesSection() {
                         ${t("vehicles.title")}
                     </h2>
                     <p class="lead text-muted">${t("vehicles.subtitle")}</p>
+                </div>
+            </div>
+
+            <div class="row mb-4 d-none" id="ads-fleet-summary-row">
+                <div class="col-md-4">
+                    <div class="card border-0 vehicle-summary-card text-white"
+                         style="background: linear-gradient(135deg, #6f42c1, #5a32a3);">
+                        <div class="card-body text-center">
+                            <h5 class="card-title"><i class="bi bi-tools me-2"></i>${t("vehicles.adsInService")}</h5>
+                            <h2 class="display-4" id="ads-in-service-count">0</h2>
+                            <small class="text-light opacity-90">${t("vehicles.adsInServiceHint")}</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 vehicle-summary-card text-white"
+                         style="cursor: pointer; transition: all 0.3s ease; background: linear-gradient(135deg, #fd7e14, #e8590c);"
+                         onclick="dashboard.filterVehiclesBySummaryCard('needs-repair')"
+                         onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 4px 15px rgba(0,0,0,0.2)'"
+                         onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                        <div class="card-body text-center">
+                            <h5 class="card-title"><i class="bi bi-wrench-adjustable me-2"></i>${t("vehicles.adsNeedsRepair")}</h5>
+                            <h2 class="display-4" id="ads-needs-repair-count">0</h2>
+                            <small class="text-light opacity-90">${t("vehicles.adsNeedsRepairHint")}</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card border-0 vehicle-summary-card text-white"
+                         style="background: linear-gradient(135deg, #20c997, #0ca678);">
+                        <div class="card-body text-center">
+                            <h5 class="card-title"><i class="bi bi-calendar-x me-2"></i>${t("vehicles.adsOverdue")}</h5>
+                            <h2 class="display-4" id="ads-overdue-count">0</h2>
+                            <small class="text-light opacity-90">${t("vehicles.adsOverdueHint")}</small>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -597,6 +877,7 @@ export function showVehiclesSection() {
                                         <option value="active">${t("vehicles.optStatusEngineOn")}</option>
                                         <option value="inactive">${t("vehicles.optStatusEngineOff")}</option>
                                         <option value="damaged">${t("vehicles.optStatusDamaged")}</option>
+                                        <option value="needs-repair">${t("vehicles.optStatusNeedsRepair")}</option>
                                     </select>
                                 </div>
                                 <div class="col-md-3 d-flex align-items-end">
@@ -615,19 +896,101 @@ export function showVehiclesSection() {
         `;
 
   document.getElementById("section-content-dynamic").innerHTML = vehiclesHTML;
-  document.getElementById("section-content").classList.remove("d-none");
+  const sectionShell = document.getElementById("section-content");
+  if (sectionShell) {
+    sectionShell.classList.add("farm-glass-page--vehicles");
+    sectionShell.classList.remove("d-none");
+  }
+
+  this.bindVehiclesScrollPerf();
 
   // Load and display vehicles
   this.loadVehicles();
 }
 
+/** Pause heavy vehicle re-renders while the main pane is scrolling (Electron backdrop-filter jank). */
+export function bindVehiclesScrollPerf() {
+  if (this._vehiclesScrollBound) return;
+  this._vehiclesScrollBound = true;
+  this._vehiclesUiScrollPaused = false;
+  this._vehiclesUiRefreshPending = false;
+
+  const scrollRoot = window;
+  let scrollEndTimer = null;
+
+  scrollRoot.addEventListener(
+    "scroll",
+    () => {
+      if (this.currentSection !== "vehicles") return;
+      this._vehiclesUiScrollPaused = true;
+      document
+        .getElementById("section-content")
+        ?.classList.add("farm-glass-page--scrolling");
+      clearTimeout(scrollEndTimer);
+      scrollEndTimer = setTimeout(() => {
+        this._vehiclesUiScrollPaused = false;
+        document
+          .getElementById("section-content")
+          ?.classList.remove("farm-glass-page--scrolling");
+        if (this._vehiclesUiRefreshPending) {
+          this._vehiclesUiRefreshPending = false;
+          this.flushVehiclesUiRefresh();
+        }
+      }, 180);
+    },
+    { passive: true, capture: true }
+  );
+}
+
+/** Debounced refresh for realtime ticks — avoids full card rebuild during active scroll. */
+export function scheduleVehiclesUiRefresh(options = {}) {
+  if (options.immediate) {
+    clearTimeout(this._vehiclesUiRefreshTimer);
+    this._vehiclesUiRefreshPending = false;
+    return this.flushVehiclesUiRefresh();
+  }
+  clearTimeout(this._vehiclesUiRefreshTimer);
+  this._vehiclesUiRefreshTimer = setTimeout(() => {
+    this._vehiclesUiRefreshTimer = null;
+    if (this._vehiclesUiScrollPaused) {
+      this._vehiclesUiRefreshPending = true;
+      return;
+    }
+    this.flushVehiclesUiRefresh();
+  }, 450);
+}
+
+export function flushVehiclesUiRefresh() {
+  if (this._vehiclesUiRefreshRaf) {
+    cancelAnimationFrame(this._vehiclesUiRefreshRaf);
+  }
+  this._vehiclesUiRefreshRaf = requestAnimationFrame(() => {
+    this._vehiclesUiRefreshRaf = 0;
+    this.updateVehicleSummaryCards();
+    if (typeof this.applyVehicleFilters === "function") {
+      this.applyVehicleFilters();
+    } else {
+      this.renderVehicleCards(this.vehicles || []);
+    }
+  });
+}
+
 // Generate vehicle display using local images
-export function generateVehicleDisplay(vehicleName, brandName, typeName) {
+export function generateVehicleDisplay(vehicleName, brandName, typeName, hints) {
+  const cacheKey = buildVehicleImageCacheKey(
+    vehicleName,
+    brandName,
+    typeName
+  );
+  const cachedDisplay = vehicleDisplayCache.get(cacheKey);
+  if (cachedDisplay) return cachedDisplay;
+
   // Try to find a local image first
   const localImage = this.getLocalVehicleImage(
     vehicleName,
     brandName,
-    typeName
+    typeName,
+    hints
   );
 
   if (localImage) {
@@ -639,6 +1002,7 @@ export function generateVehicleDisplay(vehicleName, brandName, typeName) {
     if (localImage.includes("_514_FS25_SILOKING")) {
       out.wikiFallbackUrl = SILOKING_TRAILEDLINE_WIKI_THUMB;
     }
+    vehicleDisplayCache.set(cacheKey, out);
     return out;
   }
 
@@ -690,16 +1054,18 @@ export function generateVehicleDisplay(vehicleName, brandName, typeName) {
     }
   }
 
-  return {
+  const fallbackDisplay = {
     background: colors.bg,
     textColor: colors.text,
     displayText: displayText,
     isImage: false,
   };
+  vehicleDisplayCache.set(cacheKey, fallbackDisplay);
+  return fallbackDisplay;
 }
 
 // Match vehicles to local images
-export function getLocalVehicleImage(vehicleName, brandName, typeName) {
+export function getLocalVehicleImage(vehicleName, brandName, typeName, hints) {
   // Skip image matching for bigBags, pallets, and other storage items
   const skipImageTypes = ["bigbag", "pallet"];
   if (skipImageTypes.includes(typeName?.toLowerCase())) {
@@ -709,13 +1075,30 @@ export function getLocalVehicleImage(vehicleName, brandName, typeName) {
     return null;
   }
 
-  // First try to find image through dynamic matching
-  const dynamicMatch = this.findVehicleImageDynamic(
+  const cacheKey = buildVehicleImageCacheKey(
     vehicleName,
     brandName,
     typeName
   );
+  if (vehicleImageMatchCache.has(cacheKey)) {
+    return vehicleImageMatchCache.get(cacheKey);
+  }
+
+  const tryDynamic = (name) => {
+    if (!name || name === "Unknown" || name === "—") return null;
+    return this.findVehicleImageDynamic(name, brandName, typeName);
+  };
+
+  // First try to find image through dynamic matching
+  let dynamicMatch = tryDynamic(vehicleName);
+  if (!dynamicMatch && hints?.storeName) {
+    const storeLabel = String(hints.storeName).trim();
+    if (storeLabel && storeLabel !== String(vehicleName || "").trim()) {
+      dynamicMatch = tryDynamic(storeLabel);
+    }
+  }
   if (dynamicMatch) {
+    vehicleImageMatchCache.set(cacheKey, dynamicMatch);
     return dynamicMatch;
   }
 
@@ -925,10 +1308,13 @@ export function getLocalVehicleImage(vehicleName, brandName, typeName) {
         Array.isArray(modExtractImageFilenames) &&
         modExtractImageFilenames.some((f) => String(f).toLowerCase() === String(normalized).toLowerCase());
       const dir = inModExtract ? "items_mod_extract" : "items";
-      return `/assests/img/${dir}/${normalized}`;
+      const resolved = `/assests/img/${dir}/${normalized}`;
+      vehicleImageMatchCache.set(cacheKey, resolved);
+      return resolved;
     }
   }
 
+  vehicleImageMatchCache.set(cacheKey, null);
   return null;
 }
 
@@ -969,705 +1355,30 @@ export function findVehicleImageDynamic(vehicleName, brandName, typeName) {
     );
   }
 
-  // Cache for image files (populate once): curated items/ first; items_mod_extract/ filled from API list
-  if (!this.vehicleImageCacheCurated) {
+  // Cache for image files (populate once): full items/ + items_mod_extract/ lists from API
+  if (!this.vehicleImageCacheCuratedBuilt) {
     this.vehicleImageCacheCurated = [];
-    
-    // User-provided extensive image files list
-    const imageFiles = [
-      "_10_FS25_Massey_Ferguson_MF_5700_S.png",
-      "_100_FS25_Albutt_Bale_Spike.png",
-      "_101_FS25_Albutt_Bale_King.png",
-      "_102_200px-FS25_Albutt_F155A_Bale_Fork.png",
-      "_103_FS25_Albutt_Manure_Fork.png",
-      "_104_FS25_Albutt_Fork_with_Grapple.png",
-      "_105_FS25_Albutt_Roundbale_Fork.png",
-      "_106_FS25_Albutt_Bale_Handler.png",
-      "_107_FS25_Albutt_Log_Fork.png",
-      "_108_FS25_Albutt_Silage_Cutter.png",
-      "_109_FS25_GÖWEIL_Bale_Handler_RBG_FL.png",
-      "_11_FS25_Antonio_Carraro_Tony_10900_TTR.png",
-      "_110_FS25_GÖWEIL_Bale_Handler_BTGQU_FL.png",
-      "_111_FS25_Quicke_BIG_BAG_LIFTER_-_SINGLE.png",
-      "_112_FS25_Quicke_BIG_BAG_LIFTER_-_DUAL.png",
-      "_113_FS25_Fliegl_Ruby_2000.png",
-      "_114_FS25_Manitou_MLT_841-145_PS%2B.png",
-      "_115_FS25_JCB_541-70_AGRI_PRO.png",
-      "_116_FS25_Sennebogen_340G_icon.png",
-      "_117_FS25_Fendt_Cargo_T740.png",
-      "_118_FS25_Merlo_MF44.9CS-170-CVTRONIC.png",
-      "_119_FS25_Schäffer_9660_T-2.png",
-      "_12_FS25_Antonio_Carraro_Mach_4R.png",
-      "_120_FS25_MAGSI_Universal_Bucket.png",
-      "_121_FS25_MAGSI_Pallet_Fork.png",
-      "_122_FS25_MAGSI_Bale_Fork.png",
-      "_123_FS25_MAGSI_Wrapped_Bale_Handler.png",
-      "_124_FS25_MAGSI_Manure_Fork.png",
-      "_125_FS25_MAGSI_Log_Fork.png",
-      "_126_FS25_GÖWEIL_Bale_Handler_RBG_TL.png",
-      "_127_FS25_GÖWEIL_Bale_Handler_BTGQU_TL.png",
-      "_128_200px-FS25_Albutt_F155A_TL.png",
-      "_129_FS25_JCB_435S_icon.png",
-      "_13_FS25_Fendt_300_Vario.png",
-      "_130_FS25_Volvo_L120H.png",
-      "_131_FS25_Volvo_L120H_Electric_Conversion.png",
-      "_132_FS25_Volvo_L180H.png",
-      "_133_FS25_McCormack_High-Dump_Bucket.png",
-      "_134_FS25_MAGSI_Pallet_Fork_WL.png",
-      "_135_FS25_MAGSI_Log_Fork_WL.png",
-      "_136_FS25_McCormack_Bale_Fork.png",
-      "_137_200px-FS25_Albutt_F155A_WL.png",
-      "_138_FS25_Albutt_SitePro.png",
-      "_139_FS25_Albutt_Silage_Fork.png",
-      "_14_FS25_John_Deere_3650.png",
-      "_140_FS25_Volvo_Pallet_Fork.png",
-      "_141_FS25_Volvo_Big_Bag_Lifter.png",
-      "_142_FS25_Volvo_Rock_Bucket_-_Spade_Nose.png",
-      "_143_FS25_Volvo_General_Purpose_Bucket_-_Heavy_Duty.png",
-      "_144_FS25_Volvo_High_Tip_Bucket.png",
-      "_145_FS25_Volvo_Pallet_Fork_L180H.png",
-      "_146_FS25_Volvo_Big_Bag_Lifter_L180H.png",
-      "_147_FS25_Volvo_Unloading_Grapple_L180H.png",
-      "_148_FS25_Volvo_Rock_Bucket_-_Spade_Nose_L180H.png",
-      "_149_FS25_Volvo_General_Purpose_Bucket_-_Heavy_Duty_L180H.png",
-      "_15_FS25_Zetor_FORTERRA_HSX.png",
-      "_150_FS25_Volvo_High_Tip_Bucket_L180H.png",
-      "_151_FS25_New_Holland_L318.png",
-      "_152_FS25_Kubota_SVL_97-2.png",
-      "_153_FS25_Paladin_High-Dump_Bucket.png",
-      "_154_FS25_Paladin_Pallet_Fork.png",
-      "_155_FS25_Paladin_Bale_Spear.png",
-      "_156_FS25_Paladin_Wrapped_Bale_Handler.png",
-      "_157_FS25_Paladin_Manure_Fork.png",
-      "_158_FS25_Paladin_Brush_%26_Log_Fork.png",
-      "_159_FS25_Paladin_Stump_Grinder.png",
-      "_16_FS25_Iseki_TJW.png",
-      "_160_FS25_Paladin_SFB_750.png",
-      "_161_FS25_Jungheinrich_EFG_S50.png",
-      "_162_FS25_Manitou_M50-4.png",
-      "_163_FS25_Salek_ANS-1900.png",
-      "_164_FS25_Farmtech_EDK_650.png",
-      "_165_FS25_Krampe_HALFPIPE_HP_20.png",
-      "_166_FS25_Farmtech_DDK_2400.png",
-      "_167_FS25_Rudolph_DK_280_RP.png",
-      "_168_FS25_Rudolph_TDK_301_RP.png",
-      "_169_FS25_Rudolph_TDK_301_RA.png",
-      "_17_FS25_Fendt_500_Vario.png",
-      "_170_FS25_Brantner_Z_18051-2_XXL_Power_Flex.png",
-      "_171_FS25_Krampe_Big_Body_750_S.png",
-      "_172_FS25_Brantner_DD_24073-2_XXL.png",
-      "_173_FS25_Fliegl_ASW_271.png",
-      "_174_FS25_Brantner_TR_34090-2_PT%2B.png",
-      "_175_FS25_Krampe_RamBody_AS_750%2B.png",
-      "_176_FS25_Kaweco_Radium_255.png",
-      "_177_FS25_KRONE_GX_520.png",
-      "_178_FS25_BERGMANN_HTW_65.png",
-      "_179_FS25_Fliegl_Büffel.png",
-      "_18_FS25_Lindner_Lintrac_130.png",
-      "_180_FS25_Hawe_KUW_2000.png",
-      "_181_FS25_Demco_850_Single_Auger_Grain_Cart.png",
-      "_182_FS25_BERGMANN_GTW_330.png",
-      "_183_FS25_J%26M_X-Tended_Reach_1112.png",
-      "_184_FS25_Convey-All_CST_1550.png",
-      "_185_FS25_Elmer's_Manufacturing_HaulMaster.png",
-      "_186_FS25_Hawe_SUW_5000.png",
-      "_187_FS25_BERGMANN_RRW_500.png",
-      "_188_FS25_AMITYTECH_Crop_Chaser_1000.png",
-      "_189_FS25_Walkabout_WMB_4000.png",
-      "_19_FS25_Same_Virtus_135_RVShift.png",
-      "_190_FS25_Brandt_2500_DXT.png",
-      "_191_FS25_ANNABURGER_HTS_22B.79.png",
-      "_192_FS25_ANNABURGER_AW_22.17.png",
-      "_193_FS25_ANNABURGER_AW_22.07.png",
-      "_194_FS25_ANNABURGER_AW_22.16.png",
-      "_195_FS25_ANNABURGER_AW_22.27.png",
-      "_196_FS25_Farmtech_DPW_1800.png",
-      "_197_FS25_Kröger_PWO_24.png",
-      "_198_FS25_KRONE_Trailer_Profi_Liner.png",
-      "_199_FS25_Fliegl_DTS_5.9.png",
-      "_20_FS25_DEUTZ-FAHR_6C_RVShift.png",
-      "_200_FS25_Demco_Steel_Drop_Deck.png",
-      "_201_FS25_LODE_KING_Renown_Drop_Deck.png",
-      "_202_FS25_Schwarzmüller_Low_Loader_4A.png",
-      "_203_FS25_Brandt_H550_Beavertail.png",
-      "_204_FS25_LODE_KING_Distinction_Triple_Hopper.png",
-      "_205_FS25_Krampe_SKS_30-1050.png",
-      "_206_FS25_LODE_KING_Prestige_Super-B.png",
-      "_207_FS25_PITTS_Trailers_LT40-8L.png",
-      "_208_FS25_Trout_River_Live_Bottom_Rear_Lift.png",
-      "_209_FS25_PÖTTINGER_SERVO_25.png",
-      "_21_200px-FS25_CLAAS_ARION_550-530.png",
-      "_210_FS25_AGROMASZ_POV_5_XL.png",
-      "_211_FS25_PÖTTINGER_SERVO_T_6000_P.png",
-      "_212_FS25_LEMKEN_Titan_18.png",
-      "_213_FS25_Kverneland_PW_100_-_12.png",
-      "_214_FS25_Knoche_ECO-CULTIVATOR_300.png",
-      "_215_FS25_John_Deere_980.png",
-      "_216_FS25_AMAZONE_Cenio_4000_Super.png",
-      "_217_FS25_AGROMASZ_GRIZZLY_X4.png",
-      "_218_FS25_LEMKEN_Smaragd_9-500K.png",
-      "_219_FS25_Treffler_TGA_560.png",
-      "_22_FS25_Massey_Ferguson_MF_7S.png",
-      "_220_200px-FS25_HORSCH_Finer_6_SL.png",
-      "_221_FS25_PÖTTINGER_TERRIA_6040.png",
-      "_222_200px-FS25_Väderstad_TopDown_600.png",
-      "_223_FS25_KUHN_PROLANDER_7500.png",
-      "_224_FS25_HORSCH_Tiger_8_MT.png",
-      "_225_FS25_LEMKEN_Koralin_9-840.png",
-      "_226_FS25_Einböck_TAIFUN_900_RP58.png",
-      "_227_FS25_Väderstad_NZ_Extreme_1425.png",
-      "_228_FS25_Summers_Superchisel_CP2050.png",
-      "_229_FS25_Salek_TB-100.png",
-      "_23_200px-FS25_Fiat_160-90_DT.png",
-      "_230_FS25_Knoche_CROSSMAX_300.png",
-      "_231_FS25_Unia_ARES_XL.png",
-      "_232_FS25_Väderstad_Carrier_XL_625.png",
-      "_233_FS25_Dalbo_Powerchain_800.png",
-      "_234_FS25_PÖTTINGER_Terradisc_10001T.png",
-      "_235_FS25_Farmet_Softer_11_PS.png",
-      "_236_FS25_KINZE_Mach_Till_412.png",
-      "_237_FS25_Bednar_SWIFTERDISC_XE_18400_MEGA.png",
-      "_238_FS25_Salford_Independent_Series_1260.png",
-      "_239_FS25_HORSCH_Kredo_3.png",
-      "_24_FS25_Challenger_MT600_Series.png",
-      "_240_FS25_KUHN_HR_6040_RCS.png",
-      "_241_FS25_Bednar_KATOR_KN_8000Q_PROFI.png",
-      "_242_FS25_Salek_AKP-122.png",
-      "_243_FS25_AGRISEM_Disc-O-Vigne_V.png",
-      "_244_FS25_ALPEGO_K-DYNO_5-200.png",
-      "_245_FS25_ALPEGO_K-FORCE_400.png",
-      "_246_FS25_AGRISEM_Combiplow_Gold.png",
-      "_247_FS25_ALPEGO_K-EXTREME_11-500.png",
-      "_248_FS25_Salek_MUL-1000.png",
-      "_249_FS25_TMC_Cancela_TPN_140.png",
-      "_25_FS25_AGCO_White_8010_Series.png",
-      "_250_FS25_TMC_Cancela_TDE-220.png",
-      "_251_FS25_Knoche_SPEEDMAX_300.png",
-      "_252_FS25_TMC_Cancela_TMS2-300D.png",
-      "_253_FS25_Knoche_SPEEDMAX_560.png",
-      "_254_FS25_Bednar_MULCHER_MM_7000.png",
-      "_255_FS25_HORSCH_Cultro_12_TC.png",
-      "_256_FS25_Farmax_Rapide_450_Trailed.png",
-      "_257_FS25_ELHO_Scorpio_550.png",
-      "_258_FS25_HORSCH_Versa_3_KR.png",
-      "_259_FS25_Unia_FENIX_3000-4.png",
-      "_26_FS25_Zetor_CRYSTAL_HD.png",
-      "_260_FS25_Great_Plains_SOLID_STAND_1500.png",
-      "_261_FS25_AGROMASZ_AQUILA_DRIVE_400.png",
-      "_262_200px-FS25_PÖTTINGER_AEROSEM_VT_5000_DD.png",
-      "_263_FS25_KUHN_HR_6040_RCS_%2B_BTFR_6030.png",
-      "_264_FS25_Bednar_Omega_OO_6000_FL.png",
-      "_265_FS25_KUHN_ESPRO_6000_RC.png",
-      "_266_FS25_Köckerling_Ultima_800.png",
-      "_267_FS25_Novag_T-ForcePlus_950.png",
-      "_268_FS25_LEMKEN_Solitair_12.png",
-      "_269_FS25_AMAZONE_Citan_15001-C.png",
-      "_27_FS25_Kubota_M8_SERIES.png",
-      "_270_FS25_Väderstad_Seed_Hawk_84.png",
-      "_271_FS25_MZURI_PRO-TIL_4T_Xzact.png",
-      "_272_FS25_AMAZONE_Precea_4500-2C_Super.png",
-      "_273_FS25_KUHN_MAXIMA_3_TI_L.png",
-      "_274_FS25_HORSCH_Maestro_9.75_RX.png",
-      "_275_FS25_Grimme_MATRIX_1800.png",
-      "_276_FS25_Kverneland_Optima_RS.png",
-      "_277_FS25_HORSCH_Maestro_24.50_SV.png",
-      "_278_FS25_KINZE_4905_Blue_Drive.png",
-      "_279_FS25_Väderstad_Tempo_K24.png",
-      "_28_FS25_John_Deere_6R_Series.png",
-      "_280_FS25_KUHN_TF_1512.png",
-      "_281_FS25_HORSCH_Partner_1600_FT.png",
-      "_282_FS25_Väderstad_PD_1000.png",
-      "_283_FS25_Hardi_MEGA_1200L.png",
-      "_284_FS25_Hardi_MEGA_1200L_Tank.png",
-      "_285_FS25_Hardi_AEON_5200_DELTA_FORCE.png",
-      "_286_FS25_AMAZONE_UX_5201_Super.png",
-      "_287_FS25_Agrio_DINO_II.png",
-      "_288_FS25_Agrifac_Condor_Endurance_II.png",
-      "_289_FS25_Fendt_Rogator_900.png",
-      "_29_FS25_Fendt_700_Vario.png",
-      "_290_FS25_Farmtech_Variofex_750.png",
-      "_291_FS25_Brantner_TA_12050_Power_Spread_%2B.png",
-      "_292_FS25_Hawe_DST_16.png",
-      "_293_FS25_BERGMANN_TSW_6240_W.png",
-      "_294_FS25_Samson_Agro_US_235_Dynamic.png",
-      "_295_FS25_Salek_RZK_300H.png",
-      "_296_FS25_AMAZONE_ZA-TS_3200.png",
-      "_297_FS25_BREDAL_K105.png",
-      "_298_FS25_AMAZONE_ZG-TS_10001.png",
-      "_299_FS25_Salford_9620_Air_Boom_Applicator.png",
-      "_3_FS25_Landini_REX_4_GT.png",
-      "_30_FS25_Valtra_T_Series.png",
-      "_300_FS25_Farmtech_Supercis_800.png",
-      "_301_FS25_Fliegl_PFW_18000_MaxxLine_Plus.png",
-      "_302_FS25_Kaweco_Profi_II.png",
-      "_303_FS25_Samson_Agro_PG_II_28_Genesis.png",
-      "_304_FS25_Kotte_PQ_32.000.png",
-      "_305_FS25_OXBO_AT5105.png",
-      "_306_FS25_GEA_EL48-6D-4800.png",
-      "_307_FS25_GEA_EL48-8D-7900.png",
-      "_308_FS25_Zunhammer_Vibro.png",
-      "_309_FS25_Samson_Agro_SD_700.png",
-      "_31_FS25_Case_IH_Puma_AFS_Connect.png",
-      "_310_FS25_Bomech_Trac-Pack.png",
-      "_311_FS25_Bomech_Multi_Profi_21-15.png",
-      "_312_FS25_Bomech_Multi_4XL.png",
-      "_313_FS25_Samson_Agro_SBH4_36.png",
-      "_314_FS25_Zunhammer_ULT_18.png",
-      "_315_FS25_Zunhammer_ULT_24.png",
-      "_316_FS25_Kotte_TSA_30000.png",
-      "_317_FS25_Kotte_FRC_65.png",
-      "_318_FS25_GEA_STR-447.png",
-      "_319_FS25_Gorenc_Puler_600.png",
-      "_32_FS25_New_Holland_T7_LWB_PLMI.png",
-      "_320_FS25_PÖTTINGER_ROTOCARE_V_12400.png",
-      "_321_FS25_Einböck_PNEUMATICSTAR-PRO_1200.png",
-      "_322_FS25_Elmer's_Manufacturing_Super_7.png",
-      "_323_FS25_Einböck_AEROSTAR-CLASSIC_XXL_2400.png",
-      "_324_FS25_Väderstad_Rexius_1230.png",
-      "_325_FS25_Brandt_LandRoller_591A.png",
-      "_326_FS25_Massey_Ferguson_MF_8570.png",
-      "_327_FS25_CLAAS_EVION_450.png",
-      "_328_FS25_Massey_Ferguson_Beta_7360_AL4.png",
-      "_329_FS25_Fendt_5275_C_SL.png",
-      "_33_FS25_STEYR_Absolut_CVT.png",
-      "_330_200px-FS25_New_Holland_CH7.70.png",
-      "_331_FS25_Case_IH_Axial-Flow_7150.png",
-      "_332_FS25_John_Deere_S7.png",
-      "_333_FS25_CLAAS_LEXION_6900.png",
-      "_334_FS25_John_Deere_X9_1100.png",
-      "_335_FS25_CLAAS_LEXION_8000.png",
-      "_336_FS25_New_Holland_CR11.png",
-      "_337_FS25_New_Holland_CR11_Gold_Edition.png",
-      "_338_FS25_Case_IH_AF11.png",
-      "_339_FS25_Massey_Ferguson_MF_8570_Header.png",
-      "_34_FS25_DEUTZ-FAHR_AgroStar_8.31.png",
-      "_340_FS25_CLAAS_VARIO_620.png",
-      "_341_FS25_Massey_Ferguson_FreeFlow_25FT.png",
-      "_342_FS25_Fendt_FreeFlow_25FT.png",
-      "_343_200px-FS25_New_Holland_SuperFlex_25FT.png",
-      "_344_FS25_Case_IH_3020_TerraFlex_25FT.png",
-      "_345_200px-FS25_New_Holland_Varifeed_28FT.png",
-      "_346_FS25_Case_IH_3050_TerraFlex_28FT.png",
-      "_347_FS25_John_Deere_RDF35.png",
-      "_348_FS25_CLAAS_CONVIO_FLEX_1080.png",
-      "_349_FS25_John_Deere_HD45X.png",
-      "_35_FS25_DEUTZ-FAHR_Series_7_TTV_HD.png",
-      "_350_FS25_CLAAS_CONVIO_FLEX_1380.png",
-      "_351_FS25_John_Deere_HD50F.png",
-      "_352_FS25_MacDon_FD250_FlexDraper®.png",
-      "_353_FS25_Case_IH_FD250_FlexDraper®.png",
-      "_354_FS25_New_Holland_FD250_FlexDraper®.png",
-      "_355_FS25_New_Holland_FD250_FlexDraper®_Gold_Edition.png",
-      "_356_FS25_MacDon_FD140_FlexDraper®.png",
-      "_357_200px-FS25_New_Holland_980CR_8-30.png",
-      "_358_FS25_Case_IH_4408.png",
-      "_359_FS25_Capello_Diamant_8.png",
-      "_36_FS25_McCormick_X8_VT-Drive.png",
-      "_360_FS25_GERINGHOFF_NorthStar_1230_FB.png",
-      "_361_FS25_Case_IH_4418_N.png",
-      "_362_FS25_New_Holland_980CR_18-30.png",
-      "_363_FS25_John_Deere_C16F.png",
-      "_364_FS25_GERINGHOFF_NorthStar_1830.png",
-      "_365_FS25_GERINGHOFF_SunLite_40.png",
-      "_366_FS25_GERINGHOFF_MiloStar_1630.png",
-      "_367_FS25_MacDon_PW8.png",
-      "_368_FS25_Massey_Ferguson_MF_8570_Trailer.png",
-      "_369_FS25_Nardi_N20T.png",
-      "_37_200px-FS25_John_Deere_6R_Series_230-250.png",
-      "_370_FS25_Nardi_N40BX.png",
-      "_371_FS25_Nardi_N70-30.png",
-      "_372_FS25_Nardi_N60-35.png",
-      "_373_FS25_Nardi_N70-40.png",
-      "_374_FS25_Nardi_N60-45.png",
-      "_375_FS25_Demco_HDHT_52.png",
-      "_376_FS25_MacDon_M1240_icon_v2.png",
-      "_377_FS25_MacDon_D140XL.png",
-      "_378_FS25_MacDon_R216_SP.png",
-      "_379_FS25_Lacotec_LH_II.png",
-      "_38_FS25_DEUTZ-FAHR_Series_8_TTV.png",
-      "_380_FS25_Fendt_Katana.png",
-      "_381_FS25_John_Deere_9000_Series.png",
-      "_382_FS25_New_Holland_FR_780.png",
-      "_383_FS25_CLAAS_JAGUAR_990_TERRA_TRAC.png",
-      "_384_FS25_KRONE_BiG_X_1180.png",
-      "_385_FS25_CLAAS_PICK_UP_300.png",
-      "_386_FS25_KEMPER_3003.png",
-      "_387_FS25_John_Deere_639_Premium.png",
-      "_388_FS25_KRONE_EasyFlow_300_S.png",
-      "_389_FS25_CLAAS_DIRECT_DISC_500.png",
-      "_39_FS25_Versatile_Nemesis.png",
-      "_390_FS25_KRONE_XDisc_620.png",
-      "_391_FS25_New_Holland_130FB.png",
-      "_392_FS25_KEMPER_345_Plus.png",
-      "_393_FS25_John_Deere_345_Plus.png",
-      "_394_FS25_New_Holland_450_SFI.png",
-      "_395_FS25_KEMPER_360_Plus.png",
-      "_396_FS25_John_Deere_360_Plus.png",
-      "_397_FS25_New_Holland_600_SFI.png",
-      "_398_FS25_KEMPER_375_Plus.png",
-      "_399_FS25_John_Deere_375_Plus.png",
-      "_4_FS25_New_Holland_TK4.80_Methane_Power.png",
-      "_40_FS25_Valtra_S_Series.png",
-      "_400_FS25_New_Holland_750_SFI.png",
-      "_401_FS25_KEMPER_390_Plus.png",
-      "_402_FS25_John_Deere_390_Plus.png",
-      "_403_FS25_CLAAS_ORBIS_900.png",
-      "_404_FS25_KRONE_X-Collect_900-3.png",
-      "_405_FS25_CLAAS_DIRECT_DISC_500_TRAILER.png",
-      "_406_FS25_KEMPER_Comfort_Support_Wheel.png",
-      "_407_FS25_KRONE_XDisc_620_Trailer.png",
-      "_408_FS25_Holaras_MES_400.png",
-      "_409_FS25_Holaras_Stego_485_Pro.png",
-      "_41_FS25_Massey_Ferguson_MF_9S.png",
-      "_410_FS25_KUHN_GMD_3123_F.png",
-      "_411_FS25_Samasz_KDF_341_S.png",
-      "_412_FS25_Samasz_XT_390.png",
-      "_413_FS25_Vermeer_TM_1410.png",
-      "_414_FS25_ELHO_Duett_7300.png",
-      "_415_FS25_KUHN_GMD_8730-FF.png",
-      "_416_FS25_Samasz_KDD_941_STH.png",
-      "_417_FS25_KRONE_BiG_M_450.png",
-      "_418_FS25_PÖTTINGER_ALPINHIT_4.4_H.png",
-      "_419_FS25_KRONE_Vendro_820_Highland.png",
-      "_42_FS25_Fendt_900_Vario.png",
-      "_420_FS25_Samasz_P8_-_890.png",
-      "_421_FS25_PÖTTINGER_HIT_16.18_T.png",
-      "_422_FS25_SIP_Favorit_254.png",
-      "_423_FS25_SIP_Air_300_F_Alp.png",
-      "_424_FS25_KUHN_GA_4731.png",
-      "_425_FS25_Reiter_Respiro_R7_RD.png",
-      "_426_FS25_Samasz_Z2-840_H.png",
-      "_427_FS25_KRONE_Swadro_TS_970.png",
-      "_428_FS25_Anderson_Group_MERGEPRO_915.png",
-      "_429_FS25_PÖTTINGER_TOP_1403_C.png",
-      "_43_FS25_John_Deere_7R_Series.png",
-      "_430_FS25_PÖTTINGER_BOSS_ALPIN_251.png",
-      "_431_FS25_PÖTTINGER_FARO_4010_D.png",
-      "_432_FS25_Schuitemaker_Rapide_580V.png",
-      "_433_FS25_Fendt_Tigo_75_VR_D.png",
-      "_434_FS25_PÖTTINGER_JUMBO_8450_DB.png",
-      "_435_FS25_BERGMANN_SHUTTLE_490_S.png",
-      "_436_FS25_Dalbo_MaxiRoll_630_Greenline.png",
-      "_437_FS25_Massey_Ferguson_MF_1840.png",
-      "_438_FS25_KUHN_SB_1290_iD.png",
-      "_439_FS25_CLAAS_QUADRANT_5300_FC.png",
-      "_44_FS25_John_Deere_8R_Series.png",
-      "_440_FS25_Massey_Ferguson_MF_2370_Ultra_HD.png",
-      "_441_FS25_Fendt_Squadra_1290_N_UD.png",
-      "_442_FS25_KRONE_BiG_Pack_1290_HDP_VC.png",
-      "_443_FS25_GÖWEIL_G-1_F125.png",
-      "_444_200px-FS25_GÖWEIL_G-1_F125_Kombi.png",
-      "_445_FS25_New_Holland_Pro-Belt_165.png",
-      "_446_FS25_Case_IH_RB_456_HD_Pro.png",
-      "_447_FS25_KUHN_VB_3190.png",
-      "_448_FS25_KRONE_VariPack_V_190_XC_Plus.png",
-      "_449_FS25_John_Deere_C441R.png",
-      "_45_FS25_New_Holland_T8_GENESIS_Series.png",
-      "_450_FS25_Massey_Ferguson_MF_RB_4160V_Protec.png",
-      "_451_FS25_Fendt_Rotana_160_V_Combi.png",
-      "_452_FS25_GÖWEIL_VARIO-Master_V140.png",
-      "_453_FS25_Anderson_Group_BioBaler_WB-55.png",
-      "_454_FS25_Vermeer_ZR5-1200.png",
-      "_455_FS25_Fliegl_Schmetterling.png",
-      "_456_FS25_Anderson_Group_RBM2000.png",
-      "_457_FS25_Arcusin_Multipack_D14.png",
-      "_458_FS25_Arcusin_FSX_63.72.png",
-      "_459_FS25_GÖWEIL_G1015.png",
-      "_46_FS25_John_Deere_8RT_Series.png",
-      "_460_FS25_GÖWEIL_G5020.png",
-      "_461_FS25_Anderson_Group_HYBRID_X_XTRACTOR.png",
-      "_462_FS25_KUHN_SW_4014.png",
-      "_463_200px-FS25_GÖWEIL_G4010_Q_Profi.png",
-      "_464_FS25_Anderson_Group_Bumper.png",
-      "_465_FS25_AMITYTECH_3750_Defoliator.png",
-      "_466_FS25_AMITYTECH_2720_Harvester_Scrub.png",
-      "_467_FS25_AGRIFAC_LightTraxx.png",
-      "_468_FS25_HOLMER_Terra_Dos_5-40_icon.png",
-      "_469_FS25_Ropa_Tiger_6S.png",
-      "_47_FS25_John_Deere_8RX_Series.png",
-      "_470_FS25_HOLMER_HR_6.png",
-      "_471_FS25_Ropa_RR-XL_9x45.png",
-      "_472_FS25_Ropa_RR-XL_9x45_Trailer.png",
-      "_473_FS25_Ropa_Maus_5.png",
-      "_474_FS25_Grimme_GL_420.png",
-      "_475_FS25_Grimme_Prios_440.png",
-      "_476_FS25_Grimme_GL_860_Compacta.png",
-      "_477_FS25_Ropa_Keiler_2_RK22.png",
-      "_478_FS25_Grimme_Evo_290.png",
-      "_479_FS25_Grimme_Ventor_4150.png",
-      "_48_FS25_Case_IH_Magnum_AFS_Connect_Series.png",
-      "_480_FS25_Grimme_GF_400.png",
-      "_481_FS25_Grimme_GF_800.png",
-      "_482_FS25_Kverneland_Miniair_Nova_Rigid.png",
-      "_483_FS25_Kverneland_Miniair_Nova_Fold.png",
-      "_484_FS25_Dewulf_P3CL_Profi.png",
-      "_485_FS25_Dewulf_P3K_Profi.png",
-      "_486_FS25_Dewulf_GBC.png",
-      "_487_FS25_Dewulf_ZKIVSE.png",
-      "_488_FS25_Oxbo_MKB-4TR_icon.png",
-      "_489_FS25_OXBO_BP2140e.png",
-      "_49_FS25_Fendt_1000_Vario.png",
-      "_490_FS25_OXBO_EPD540e.png",
-      "_491_FS25_Iseki_PRJ8D.png",
-      "_492_FS25_Iseki_HJ6130.png",
-      "_493_FS25_Gessner_Industries_Single_Row_Billet_Planter.png",
-      "_494_FS25_Gessner_Industries_Two_Row_Billet_Planter.png",
-      "_495_FS25_Case_IH_Austoft_8800_Multi-Row.png",
-      "_496_FS25_TT_Colossus_10.000.png",
-      "_497_FS25_Massey_Ferguson_MF_3012.png",
-      "_498_FS25_Case_IH_Module_Express_635.png",
-      "_499_FS25_John_Deere_CP690.png",
-      "_5_FS25_Rigitrac_SKH_60.png",
-      "_50_FS25_John_Deere_9R_Series.png",
-      "_500_FS25_McCormack_Cotton_Wheelie_Grab.png",
-      "_501_FS25_Lizard_Module_4.png",
-      "_502_FS25_McCormack_Cotton_Tag_Trailer.png",
-      "_503_FS25_Lizard_Module_X_Semi.png",
-      "_504_FS25_Grégoire_GL.png",
-      "_505_FS25_New_Holland_Braud_9090X_Olive.png",
-      "_506_FS25_ERO_Grapeliner_Series_7000.png",
-      "_507_FS25_New_Holland_Braud_9070L.png",
-      "_508_FS25_Fuhrmann_MRWK_6000.png",
-      "_509_FS25_Fuhrmann_LWS_12000.png",
-      "_51_FS25_Fendt_1100_Vario_MT.png",
-      "_510_FS25_Provitis_MP_122_OCEA.png",
-      "_511_FS25_Hardi_MERCURY_4000L.png",
-      "_512_FS25_KUHN_RA_142.png",
-      "_513_FS25_FARESIN_PF_2.24_Plus.png",
-      "_514_FS25_SILOKING_TrailedLine_4.0_System_1000+.png",
-      "_515_FS25_KUHN_SPW_INTENSE_25.2_CL.png",
-      "_516_FS25_FARESIN_Leader_PF_2.26_Plus_Ecomode.png",
-      "_517_FS25_Abi_550.png",
-      "_518_FS25_Abi_1600.png",
-      "_519_FS25_Lizard_MKS_8.png",
-      "_52_FS25_John_Deere_9RX_Series.png",
-      "_520_FS25_Lizard_MKS_32.png",
-      "_521_FS25_Kingston_Trailers_Belvedere.png",
-      "_522_FS25_Fliegl_Noah_TTW_140.png",
-      "_523_FS25_Wilson_Trailer_Silverstar.png",
-      "_524_FS25_KUHN_PRIMOR_15070_M.png",
-      "_525_FS25_Elmer's_Manufacturing_Ravage.png",
-      "_526_FS25_John_Deere_843L-II.png",
-      "_527_200px-FS25_John_Deere_1270G.png",
-      "_528_FS25_Komatsu_951.png",
-      "_529_FS25_IMPEX_Hannibal_T50.png",
-      "_53_FS25_CLAAS_XERION_12.png",
-      "_530_FS25_Pfanzelt_Felix.png",
-      "_531_FS25_John_Deere_848L-II.png",
-      "_532_FS25_PONSSE_Bison_Active_Frame.png",
-      "_533_FS25_Rottne_F20D.png",
-      "_534_FS25_Volvo_EC250DL.png",
-      "_535_FS25_Volvo_EC380DL.png",
-      "_536_FS25_WesttecH_WOODCRACKER®_G1650.png",
-      "_537_FS25_TMC_Cancela_THX-180.png",
-      "_538_FS25_WesttecH_WOODCRACKER®_C550.png",
-      "_539_FS25_Risutec_SKB-240.png",
-      "_54_FS25_Case_IH_Steiger_715_Quadtrac.png",
-      "_540_FS25_Kesla_144ND.png",
-      "_541_FS25_Pfanzelt_P13_4272.png",
-      "_542_FS25_Riedler_Fahrzeugbau_RUH327.png",
-      "_543_FS25_Heizomat_HM_10-500_KF.png",
-      "_544_FS25_JENZ_HEM_922_DQ_Cobra_hybrid.png",
-      "_545_FS25_TMC_Cancela_TFR_250.png",
-      "_546_FS25_Tajfun_EGV_65_AHK_SG.png",
-      "_547_200px-FS25_Pfanzelt_DW_P_186.png",
-      "_548_FS25_Koller_Forsttechnik_K_300-T_%2B_SKA_1-Z.png",
-      "_549_FS25_Koller_Forsttechnik_K_307c-H_%2B_ECKO_FLEX.png",
-      "_55_FS25_Versatile_MFWD.png",
-      "_550_FS25_Damcon_PL-75.png",
-      "_551_FS25_Prinoth_SF900.png",
-      "_552_FS25_Pfanzelt_Pm_Trac_III.png",
-      "_553_FS25_Volvo_L200H_High_Lift.png",
-      "_554_FS25_Sennebogen_835_G_Hybrid.png",
-      "_555_FS25_Tenwinkel_Top_450.png",
-      "_556_FS25_CLAAS_W_600.png",
-      "_557_FS25_Tenwinkel_FGB_600.png",
-      "_558_FS25_AGCO_650.png",
-      "_559_FS25_Tenwinkel_PAC-750.png",
-      "_56_FS25_Ford_976_Versatile.png",
-      "_560_FS25_CLAAS_W_900.png",
-      "_561_FS25_John_Deere_PickUp_900.png",
-      "_562_FS25_Tenwinkel_PAC-1000.png",
-      "_563_FS25_Case_IH_1000.png",
-      "_564_FS25_New_Holland_1000.png",
-      "_565_FS25_STEYR_1000.png",
-      "_566_FS25_AGCO_1100.png",
-      "_567_FS25_John_Deere_PickUp_1150.png",
-      "_568_FS25_Tenwinkel_GUSSCOM_1250.png",
-      "_569_FS25_AGCO_1500.png",
-      "_57_FS25_Versatile_976.png",
-      "_570_FS25_Tenwinkel_PAC-1500.png",
-      "_571_FS25_CLAAS_W_1800.png",
-      "_572_FS25_John_Deere_PickUp_1800.png",
-      "_573_FS25_AGCO_2300.png",
-      "_574_FS25_Tenwinkel_B2500.png",
-      "_575_FS25_Fendt_3300.png",
-      "_576_FS25_John_Deere_Laforge_EZ_1700.png",
-      "_577_200px-FS25_Lizard_S-710.png",
-      "_578_FS25_Grimme_TC_816.png",
-      "_579_FS25_Grimme_SL_80-22_Quantum.png",
-      "_58_FS25_Ford_1156_Versatile.png",
-      "_580_FS25_Grimme_RH_24-60.png",
-      "_581_FS25_MERIDIAN_TL_12-39.png",
-      "_582_FS25_Convey-All_1690.png",
-      "_583_FS25_Samasz_JUMP_320.png",
-      "_584_FS25_BREDAL_SG2000.png",
-      "_585_FS25_Samasz_Tornado_252.png",
-      "_586_FS25_NEXAT_Wide-Span.png",
-      "_587_FS25_Wienhoff_Slurry_Module.png",
-      "_588_FS25_Evers_Agro_Toric_NX_1400.png",
-      "_589_FS25_NEXAT_Seedhopper.png",
-      "_59_FS25_Versatile_1156.png",
-      "_590_FS25_Väderstad_Carrier_NX.png",
-      "_591_FS25_Väderstad_Inspire_NX.png",
-      "_592_FS25_Väderstad_Tempo_NX27.png",
-      "_593_FS25_Einböck_CHOPSTAR-MAX.png",
-      "_594_FS25_Dammann_SFP22056_-_PROFI-CLASS.png",
-      "_595_FS25_NEXAT_Nexco.png",
-      "_596_FS25_GERINGHOFF_XtremeFlex_Razor_50FT.png",
-      "_597_FS25_GERINGHOFF_Patriot_RotaDisc_2030“B.png",
-      "_598_FS25_STEMA_TRIUS.png",
-      "_599_FS25_WIFO_HMZ_340-3000.png",
-      "_6_FS25_Zetor_PROXIMA_HS.png",
-      "_60_FS25_Versatile_1080_Big_Roy.png",
-      "_600_FS25_Krampe_Dolly_10L.png",
-      "_601_FS25_Thunder_Creek_Equipment_FST_990.png",
-      "_602_FS25_Husqvarna_550_XP.png",
-      "_603_FS25_STIHL_MS_261.png",
-      "_604_FS25_Jonsered_CS_2252.png",
-      "_605_FS25_McCulloch_CS_410.png",
-      "_606_FS25_STIHL_Markingspray_Blue.png",
-      "_607_FS25_STIHL_Markingspray_Green.png",
-      "_608_FS25_STIHL_Markingspray_Orange.png",
-      "_609_FS25_STIHL_Markingspray_Red.png",
-      "_61_FS25_Versatile_DeltaTrack.png",
-      "_610_FS25_STIHL_Markingspray_Pink.png",
-      "_611_FS25_STIHL_Markingspray_White.png",
-      "_612_FS25_STIHL_Markingspray_Yellow.png",
-      "_613_FS25_Kärcher_HDS_9-18-4M.png",
-      "_614_FS25_Brielmaier_29_EFI.png",
-      "_62_FS25_Lizard_Dragon.png",
-      "_63_FS25_INTERNATIONAL_CV_Series.png",
-      "_64_FS25_INTERNATIONAL_Transtar_II_Eagle.png",
-      "_65_FS25_Mack_Trucks_Anthem_6x4.png",
-      "_66_FS25_Mack_Trucks_Black_Anthem_6x4.png",
-      "_67_FS25_Volvo_FH_Electric.png",
-      "_68_FS25_Mack_Trucks_Super-Liner_6x4.png",
-      "_69_FS25_Volvo_VNX_300.png",
-      "_7_FS25_Fendt_200_V_Vario.png",
-      "_70_FS25_Volvo_FH16.png",
-      "_71_FS25_Riedler_Fahrzeugbau_FH16_RUL-HKR.png",
-      "_72_FS25_International_LT_Series.png",
-      "_73_FS25_Aprilia_RX_125.png",
-      "_74_FS25_APE_50.png",
-      "_75_FS25_Kubota_RTV-XG850_SIDEKICK.png",
-      "_76_FS25_Antonio_Carraro_Tigrecar_3200_GST.png",
-      "_77_FS25_Kubota_RTV-X1180W-H.png",
-      "_78_FS25_INTERNATIONAL_Series_200.png",
-      "_79_FS25_Skoda_Kodiaq.png",
-      "_8_200px-FS25_Case_IH_Farmall_C_Series.png",
-      "_80_200px-FS25_Skoda_Enyaq_Coupe_RS_iV.png",
-      "_81_FS25_Lizard_Pickup_2017.png",
-      "_82_FS25_Prinoth_Leitwolf_Agripower.png",
-      "_83_FS25_Ropa_NawaRo-Maus.png",
-      "_84_FS25_Schäffer_23E.png",
-      "_85_FS25_Kubota_R640.png",
-      "_86_FS25_Quicke_Q4M.png",
-      "_87_FS25_Hauer_XB_150.png",
-      "_88_FS25_Quicke_Q6M.png",
-      "_89_FS25_Hauer_XB_190.png",
-      "_9_FS25_CLAAS_ARION_470-410.png",
-      "_90_200px-FS25_Case_IH_L630.png",
-      "_91_FS25_John_Deere_663R.png",
-      "_92_200px-FS25_John_Deere_683R.png",
-      "_93_FS25_Quicke_Q7M.png",
-      "_94_200px-FS25_CLAAS_FL_140.png",
-      "_95_FS25_Kubota_M77.png",
-      "_96_FS25_John_Deere_700M.png",
-      "_97_FS25_Versatile_V7.png",
-      "_98_FS25_Albutt_Universal_Bucket.png",
-      "_99_FS25_Albutt_Pallet_Fork.png"
-    ];
-
-    // Parse and cache image metadata
-    imageFiles.forEach((filenameRaw) => {
-      const filename = normalizeItemImageFilename(filenameRaw);
-      const parts = filename.replace(".png", "").split("_");
-      const brandPart = parts[2] || "";
-      const modelPart = parts
-        .slice(3)
-        .join(" ")
-        .replace(/%2B/g, "+")
-        .replace(/%25/g, "%");
-
-      const cacheEntry = {
-        filename: filename,
-        path: `/assests/img/items/${filename}`,
-        brandNorm: normalizeText(brandPart),
-        modelNorm: normalizeText(modelPart),
-        fullNorm: normalizeText(brandPart + " " + modelPart),
-        originalBrand: brandPart,
-        originalModel: modelPart,
-      };
-
-      this.vehicleImageCacheCurated.push(cacheEntry);
-
-      // Debug log cache entries for specific images
-      if (filename.includes("8570")) {
-        console.log(
-          `[LocalImage] Cached: ${filename} -> brand:"${cacheEntry.brandNorm}" model:"${cacheEntry.modelNorm}"`
-        );
-      }
-    });
+    for (const filenameRaw of itemsImageFilenames) {
+      const entry = buildShopImageCacheEntry(
+        filenameRaw,
+        "/assests/img/items/",
+        normalizeText
+      );
+      if (entry) this.vehicleImageCacheCurated.push(entry);
+    }
+    this.vehicleImageCacheCuratedBuilt = true;
   }
 
-  if (this.vehicleImageCacheModBuilt !== true) {
+  if (!this.vehicleImageCacheModBuilt) {
     this.vehicleImageCacheMod = [];
-    modExtractImageFilenames.forEach((filenameRaw) => {
-      const filename = normalizeItemImageFilename(filenameRaw);
-      if (!filename || !/\.png$/i.test(filename)) return;
-      const base = filename.replace(/\.png$/i, "");
-      const sep = base.indexOf("__");
-      const beforeSep = sep >= 0 ? base.slice(0, sep) : "";
-      const afterSep = sep >= 0 ? base.slice(sep + 2) : base;
-      const parts = afterSep.split("_");
-      let brandPart = parts[0] || "";
-      let modelPart = parts
-        .slice(1)
-        .join(" ")
-        .replace(/%2B/g, "+")
-        .replace(/%25/g, "%");
-      // Giants exports: ModFolder__store_vario1067 — brand often lives in folder name, not in "store_*"
-      if (parts[0] && /^(store|icon)$/i.test(parts[0])) {
-        modelPart = parts.slice(1).join("_");
-        if (!brandPart || /^(store|icon)$/i.test(brandPart)) {
-          const fromPack = beforeSep.replace(/^vehicles?_?/i, "").replace(/^store_?/i, "");
-          brandPart = fromPack || brandPart;
-        }
-      }
-      modelPart = String(modelPart)
-        .replace(/([a-z])(\d)/gi, "$1 $2")
-        .replace(/(\d)([a-z])/gi, "$1 $2")
-        .replace(/[_-]+/g, " ")
-        .trim();
-      const packNorm = normalizeText(beforeSep.replace(/^FS\d+_?/i, ""));
-      const fullNorm = normalizeText(
-        (beforeSep && afterSep ? `${beforeSep}_${afterSep}` : base).replace(/\.png$/i, "")
+    for (const filenameRaw of modExtractImageFilenames) {
+      const entry = buildShopImageCacheEntry(
+        filenameRaw,
+        "/assests/img/items_mod_extract/",
+        normalizeText
       );
-
-      const cacheEntry = {
-        filename: filename,
-        path: `/assests/img/items_mod_extract/${filename}`,
-        brandNorm: normalizeText(brandPart),
-        modelNorm: normalizeText(modelPart),
-        fullNorm: fullNorm,
-        packNorm: packNorm,
-        originalBrand: brandPart,
-        originalModel: modelPart,
-      };
-
-      this.vehicleImageCacheMod.push(cacheEntry);
-    });
+      if (entry) this.vehicleImageCacheMod.push(entry);
+    }
     this.vehicleImageCacheModBuilt = true;
   }
 
@@ -2509,11 +2220,20 @@ export function updateVehicleSummaryCards() {
     return fuelPercentage < 25;
   }).length;
 
-  const damagedCount = displayVehicles.filter((v) => v.damage > 0.2).length;
+  const damagedCount = displayVehicles.filter((v) => isVehicleHighWear(v)).length;
 
   this.setElementText("total-vehicles-count", totalCount);
   this.setElementText("low-fuel-count", lowFuelCount);
   this.setElementText("damaged-vehicles-count", damagedCount);
+
+  const adsFleet = summarizeAdsFleet(displayVehicles);
+  const adsRow = document.getElementById("ads-fleet-summary-row");
+  if (adsRow) {
+    adsRow.classList.toggle("d-none", !adsFleet.enabled);
+    this.setElementText("ads-in-service-count", adsFleet.inServiceCount);
+    this.setElementText("ads-needs-repair-count", adsFleet.needsRepairCount);
+    this.setElementText("ads-overdue-count", adsFleet.overdueMaintenanceCount);
+  }
 }
 
 export function renderVehicleCards(vehicles) {
@@ -2544,8 +2264,18 @@ export function renderVehicleCards(vehicles) {
         <p class="text-muted">${t("vehicles.emptyStorageBody")}</p>
       </div>
     `;
+    this._lastVehicleCardsFingerprint = "";
     return;
   }
+
+  const fingerprint = vehicleListUiFingerprint(displayVehicles);
+  if (
+    fingerprint === this._lastVehicleCardsFingerprint &&
+    grid.querySelector(".vehicle-card")
+  ) {
+    return;
+  }
+  this._lastVehicleCardsFingerprint = fingerprint;
 
   const cards = displayVehicles
     .map((vehicle) => this.createVehicleCard(vehicle))
@@ -2565,7 +2295,13 @@ export function createVehicleCard(vehicle) {
   const vehicleDisplay = this.generateVehicleDisplay(
     displayName,
     brandName,
-    vehicle.typeName
+    vehicle.typeName,
+    {
+      storeName:
+        vehicle.storeName ||
+        vehicle.vehicleYears?.storeName ||
+        null,
+    }
   );
 
   // Calculate fuel percentage - check multiple possible fuel sources
@@ -2588,7 +2324,24 @@ export function createVehicleCard(vehicle) {
           : 0;
     }
   }
-  const damagePercentage = Math.round(vehicle.damage * 100);
+  const damagePercentage = Math.round(getVehicleDamageFraction(vehicle) * 100);
+  const conditionPercentage = Math.round(getVehicleConditionFraction(vehicle) * 100);
+  const adsPanel = buildAdsVehiclePanelHtml(vehicle);
+  const vyPanel = buildVehicleYearsPanelHtml(vehicle);
+  const adsWarnClass = vehicleNeedsAdsWarning(vehicle)
+    ? " vehicle-card--ads-warn"
+    : "";
+  const adsHeaderWarn =
+    vehicleNeedsAdsWarning(vehicle)
+      ? `<span class="badge bg-danger ms-1" title="${_safe(t("vehicles.adsCardWarnTitle"))}"><i class="bi bi-exclamation-triangle-fill"></i></span>`
+      : "";
+  const modelYear = getVehicleModelYear(vehicle);
+  const yearBadge =
+    modelYear != null
+      ? `<span class="badge bg-info text-dark ms-1" title="${_safe(t("vehicles.vyModelYear"))}">${modelYear}</span>`
+      : isVehicleYearUnknown(vehicle)
+        ? `<span class="badge bg-secondary ms-1">${_safe(t("vehicles.yearUnknownShort"))}</span>`
+        : "";
   const statusIcon = vehicle.engineOn
     ? "bi-play-circle-fill text-success"
     : "bi-pause-circle text-muted";
@@ -2614,8 +2367,8 @@ export function createVehicleCard(vehicle) {
       : `<small class="text-muted">${t("vehicles.cardNoCargo")}</small>`;
 
   return `
-    <div class="col-lg-4 col-md-6 mb-4">
-      <div class="card bg-secondary h-100 vehicle-card" data-vehicle-id="${
+    <div class="col-lg-4 col-md-6 mb-4 vehicle-card-col">
+      <div class="card bg-secondary h-100 vehicle-card${adsWarnClass}" data-vehicle-id="${
         vehicle.id
       }">
         <div class="card-header d-flex justify-content-between align-items-center">
@@ -2652,7 +2405,7 @@ export function createVehicleCard(vehicle) {
             </div>
             <div>
               <h6 class="mb-0 text-truncate" style="max-width: 140px;" title="${_safe(displayName)}">
-                ${_safe(displayName)}
+                ${_safe(displayName)}${yearBadge}${adsHeaderWarn}
               </h6>
               <small class="text-muted">${_safe(brandName || "—")}</small>
             </div>
@@ -2710,15 +2463,17 @@ export function createVehicleCard(vehicle) {
                 <small class="text-muted">
                   <i class="bi bi-wrench me-1"></i>${t("vehicles.cardCondition")}
                 </small>
-                <small class="text-muted">${100 - damagePercentage}%</small>
+                <small class="text-muted">${conditionPercentage}%</small>
               </div>
               <div class="progress" style="height: 6px;">
                 <div class="progress-bar ${this.getDamageBarColor(
                   damagePercentage
                 )}"
-                     style="width: ${100 - damagePercentage}%"></div>
+                     style="width: ${conditionPercentage}%"></div>
               </div>
             </div>
+            ${adsPanel}
+            ${vyPanel && !vehicle?.ads?.enabled ? vyPanel : ""}
           `
               : ""
           }
@@ -3055,7 +2810,9 @@ export function applyVehicleFilters() {
         case "inactive":
           return !v.engineOn && v.speed === 0;
         case "damaged":
-          return v.damage > 0.1;
+          return isVehicleHighWear(v);
+        case "needs-repair":
+          return isVehicleInNeedOfRepair(v);
         default:
           return true;
       }
@@ -3106,10 +2863,15 @@ export function filterVehiclesBySummaryCard(filterType) {
       break;
 
     case "damaged":
-      filteredVehicles = filteredVehicles.filter((v) => v.damage > 0.2);
-
-      // Update the status filter dropdown to show what's selected
+      filteredVehicles = filteredVehicles.filter((v) => isVehicleHighWear(v));
       document.getElementById("vehicle-status-filter").value = "damaged";
+      break;
+
+    case "needs-repair":
+      filteredVehicles = filteredVehicles.filter((v) =>
+        isVehicleInNeedOfRepair(v)
+      );
+      document.getElementById("vehicle-status-filter").value = "needs-repair";
       break;
   }
 

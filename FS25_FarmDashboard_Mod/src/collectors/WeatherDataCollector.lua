@@ -4,7 +4,6 @@ WeatherDataCollector = {}
 
 function WeatherDataCollector:init()
     WeatherDataCollector._incWx = false
-    print("[FarmDashboard] Weather data collector initialized")
 end
 
 function WeatherDataCollector:collectBegin()

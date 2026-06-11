@@ -15,11 +15,12 @@
       background: #1e1e2e;
       color: #cdd6f4;
       display: flex;
-      justify-content: center;
-      align-items: flex-start;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
       min-height: 100vh;
       margin: 0;
-      padding: clamp(12px, 2.5vw, 30px) clamp(10px, 2vw, 24px);
+      padding: clamp(48px, 7vw, 56px) clamp(10px, 2vw, 24px) clamp(12px, 2.5vw, 30px);
       overflow-x: hidden;
       /* Fix: allow pointer events everywhere */
       pointer-events: auto;
@@ -365,6 +366,19 @@
       white-space: pre-wrap;
       font-family: ui-monospace, Consolas, monospace;
     }
+
+    .setup-site-footer {
+      text-align: center;
+      font-size: 11px;
+      color: #7f849c;
+      margin: 14px auto 0;
+      max-width: min(920px, 100%);
+    }
+    .setup-site-footer a {
+      color: #89b4fa;
+      text-decoration: none;
+    }
+    .setup-site-footer a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -530,6 +544,8 @@ Use Auto-Detect or add one manually →</div>
 
   </div><!-- /right-panel -->
 </div><!-- /container -->
+
+<p class="setup-site-footer">JoshWalki · WizardlyPayload · <a href="https://ko-fi.com/wizarlypayload" target="_blank" rel="noopener noreferrer">Ko-fi</a></p>
 
 <div id="modExportProgressModal" class="fd-modexp-overlay" style="display: none" aria-hidden="true">
   <div class="fd-modexp-panel">

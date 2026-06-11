@@ -129,17 +129,28 @@ function hydrateLuaDataAnimalsFromDetails(luaData, srv, getLocalLuaJsonPath, opt
         if (!block) return h;
 
         const hf = Number(h.ownerFarmId ?? h.farmId ?? 0);
+        const resolvedFarm =
+            hf > 0 ? hf : (block.ownerFarmId > 0 ? block.ownerFarmId : hf);
         if (block.ownerFarmId && hf && block.ownerFarmId !== hf) return h;
 
         hydratedPens += 1;
         totalHeads += block.animals.length;
 
+        const ownerFarmId = resolvedFarm > 0 ? resolvedFarm : block.ownerFarmId || hf;
+        const animals = block.animals.map((a) => ({
+            ...a,
+            ownerFarmId: a.ownerFarmId ?? a.farmId ?? ownerFarmId,
+            farmId: a.farmId ?? a.ownerFarmId ?? ownerFarmId,
+        }));
+
         return {
             ...h,
-            animals: block.animals,
+            ownerFarmId,
+            farmId: ownerFarmId,
+            animals,
             lod: 'full',
-            animalCount: block.animals.length,
-            numOfAnimalsReported: block.animals.length,
+            animalCount: animals.length,
+            numOfAnimalsReported: animals.length,
             __detailHydrated: true,
         };
     });

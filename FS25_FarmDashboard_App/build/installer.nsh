@@ -8,7 +8,7 @@
 !macro customCheckAppRunning
   DetailPrint "Stopping ${PRODUCT_NAME} if running (/F /T so child processes release file locks)..."
   ClearErrors
-  nsExec::ExecToLog `cmd.exe /c taskkill /F /T /IM "${APP_EXECUTABLE_FILENAME}" 2>nul`
+  nsExec::ExecToLog `"$SYSDIR\taskkill.exe" /F /T /IM "${APP_EXECUTABLE_FILENAME}"`
   Pop $R0
   Sleep 1500
   ClearErrors
@@ -200,8 +200,9 @@ FunctionEnd
   IfFileExists "$INSTDIR\resources\install-imagemagick.ps1" FarmDash_RunMagick FarmDash_MagickDone
   FarmDash_RunMagick:
     DetailPrint "Installing ImageMagick (mod folder DDS to PNG thumbnails)..."
-    ; -WindowStyle Hidden avoids a visible blue PowerShell console during install
-    ExecWait 'powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$INSTDIR\resources\install-imagemagick.ps1" -NoPackageManagers'
+    ; nsExec::ExecToLog runs hidden — avoids cmd.exe / PowerShell console flash during install
+    nsExec::ExecToLog 'powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$INSTDIR\resources\install-imagemagick.ps1" -NoPackageManagers'
+    Pop $R0
   FarmDash_MagickDone:
 !macroend
 
@@ -228,7 +229,7 @@ FunctionEnd
 !macro customUnInstall
   DetailPrint "Stopping ${PRODUCT_NAME} if still running..."
   ClearErrors
-  nsExec::ExecToLog `cmd.exe /c taskkill /F /T /IM "${APP_EXECUTABLE_FILENAME}" 2>nul`
+  nsExec::ExecToLog `"$SYSDIR\taskkill.exe" /F /T /IM "${APP_EXECUTABLE_FILENAME}"`
   Pop $R0
   Sleep 1500
 
@@ -251,7 +252,8 @@ FunctionEnd
     DetailPrint "Removing all Farm Dashboard user data..."
     IfFileExists "$INSTDIR\resources\uninstall-user-data.ps1" FarmDash_UnFullScript FarmDash_UnFullLegacy
     FarmDash_UnFullScript:
-      ExecWait 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\uninstall-user-data.ps1" -Mode Full' $R0
+      nsExec::ExecToLog 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\uninstall-user-data.ps1" -Mode Full'
+      Pop $R0
       Goto FarmDash_UnFullDone
     FarmDash_UnFullLegacy:
       RMDir /r "$APPDATA\fs25-farm-dashboard"
@@ -281,14 +283,16 @@ FunctionEnd
     DetailPrint "Removing optional dependencies installed by setup (ImageMagick)..."
     IfFileExists "$INSTDIR\resources\uninstall-dependencies.ps1" FarmDash_UnDeps FarmDash_UnDepsDone
     FarmDash_UnDeps:
-      ExecWait 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\uninstall-dependencies.ps1"' $R0
+      nsExec::ExecToLog 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\uninstall-dependencies.ps1"'
+      Pop $R0
     FarmDash_UnDepsDone:
     DeleteRegKey HKCU "Software\fs25-farm-dashboard"
   ${Else}
     DetailPrint "Keeping settings and offline snapshots; removing caches and temporary data..."
     IfFileExists "$INSTDIR\resources\uninstall-user-data.ps1" FarmDash_UnKeepScript FarmDash_UnKeepLegacy
     FarmDash_UnKeepScript:
-      ExecWait 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\uninstall-user-data.ps1" -Mode Keep' $R0
+      nsExec::ExecToLog 'powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\uninstall-user-data.ps1" -Mode Keep'
+      Pop $R0
       Goto FarmDash_UnKeepDone
     FarmDash_UnKeepLegacy:
       RMDir /r "$LOCALAPPDATA\fs25-farm-dashboard"

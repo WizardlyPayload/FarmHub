@@ -1,6 +1,12 @@
 // FS25 FarmDashboard | realtime-connector.js | v2.0.0
 
 import { t } from "./i18n/i18n.js";
+import {
+  getPlayerFarmIdSet,
+  getPlayerFarmRecords,
+  entityOwnerFarmId,
+  pruneMergedDataToPlayerFarms,
+} from "./modules/farmScope.js";
 
 /** Set true only when diagnosing livestock change notifications */
 const VERBOSE_CHANGE_LOG = false;
@@ -350,10 +356,12 @@ class RealtimeConnector {
   }
 
   inferBestFarmIdFromPayload(data) {
+    const playerIds = getPlayerFarmIdSet(data?.farmInfo);
     const counts = new Map();
     const bump = (v) => {
       const id = Number(v);
       if (!Number.isFinite(id) || id <= 0) return;
+      if (playerIds.size > 0 && !playerIds.has(id)) return;
       counts.set(id, (counts.get(id) || 0) + 1);
     };
 
@@ -365,7 +373,7 @@ class RealtimeConnector {
     }
     if (Array.isArray(data?.animals)) {
       data.animals.forEach((h) => {
-        bump(h?.ownerFarmId ?? h?.farmId);
+        bump(entityOwnerFarmId(h));
       });
     }
 
@@ -390,7 +398,7 @@ class RealtimeConnector {
       (Array.isArray(data?.vehicles) &&
         data.vehicles.some((v) => Number(v?.ownerFarmId ?? v?.farmId ?? 0) === current)) ||
       (Array.isArray(data?.animals) &&
-        data.animals.some((h) => Number(h?.ownerFarmId ?? h?.farmId ?? 0) === current));
+        data.animals.some((h) => entityOwnerFarmId(h) === current));
     if (ownsCurrent) return;
 
     const inferred = this.inferBestFarmIdFromPayload(data);
@@ -419,17 +427,18 @@ class RealtimeConnector {
     ) {
       return;
     }
-    const data = this.normalizeRealtimePayload(raw);
+    let data = this.normalizeRealtimePayload(raw);
     if (!data) return;
 
     if (data.error === "Waiting for data...") return;
+    data = pruneMergedDataToPlayerFarms(data);
     this.ensureActiveFarmIdForPayload(data);
 
     // Store current dashboard state before updating (for change comparison)
     // Use the previously stored state, not the current state
     const oldState = this.previousData;
 
-    if (data.animals) {
+    if (Array.isArray(data.animals)) {
       this.dashboard.husbandryData = data.animals;
       this.updateAnimalsData(data.animals);
     }
@@ -467,11 +476,24 @@ class RealtimeConnector {
     }
 
     // Handle merged data top-level fields from dataMerger
-    if (data.mapTitle)     this.dashboard.mapTitle     = data.mapTitle;
+    if (data.serverInfo?.mapName && !data.mapTitle) {
+      this.dashboard.mapTitle = data.serverInfo.mapName;
+    }
+    if (data.mapTitle) this.dashboard.mapTitle = data.mapTitle;
+    if (data.mapId || data.serverInfo?.mapId) {
+      this.dashboard.mapId = data.mapId || data.serverInfo.mapId;
+    }
+    if (data.serverInfo?.mapBounds) {
+      this.dashboard.mapBounds = data.serverInfo.mapBounds;
+    }
+    if (typeof this.dashboard.syncFleetMapOverviewIdentity === "function") {
+      this.dashboard.syncFleetMapOverviewIdentity(this.dashboard);
+    }
     if (data.savegameName) this.dashboard.savegameName = data.savegameName;
     if (data.dataSource)   this.dashboard.dataSource   = data.dataSource;
     if (data.xmlAvailable !== undefined) this.dashboard.xmlAvailable = data.xmlAvailable;
     if (data.luaAvailable !== undefined) this.dashboard.luaAvailable = data.luaAvailable;
+    if (data.dataTimestamps) this.dashboard.dataTimestamps = data.dataTimestamps;
     if (data.modVersionCheck) this.dashboard.modVersionCheck = data.modVersionCheck;
     if (data.money !== undefined) this.dashboard.money = data.money;
     if (data.gameSettings || data.settings) {
@@ -652,8 +674,8 @@ class RealtimeConnector {
       rawHusbandryCount = husbandryArray.length;
 
       husbandryArray.forEach((husbandry, index) => {
-        const hfarm = Number(husbandry.ownerFarmId ?? husbandry.farmId ?? 0);
-        if (hfarm !== activeFarmId) return;
+        const hfarm = entityOwnerFarmId(husbandry);
+        if (hfarm > 0 && hfarm !== activeFarmId) return;
 
         const rowCountBefore = formattedAnimals.length;
 
@@ -945,12 +967,22 @@ class RealtimeConnector {
     // Landing card counts are centralized in navigation.updateLandingPageCounts().
 
     if (this.dashboard.currentSection === "vehicles") {
-      this.dashboard.updateVehicleSummaryCards();
-      if (typeof this.dashboard.applyVehicleFilters === "function") {
-        this.dashboard.applyVehicleFilters();
+      if (typeof this.dashboard.scheduleVehiclesUiRefresh === "function") {
+        this.dashboard.scheduleVehiclesUiRefresh();
       } else {
-        this.dashboard.renderVehicleCards(playerVehicles);
+        this.dashboard.updateVehicleSummaryCards();
+        if (typeof this.dashboard.applyVehicleFilters === "function") {
+          this.dashboard.applyVehicleFilters();
+        } else {
+          this.dashboard.renderVehicleCards(playerVehicles);
+        }
       }
+    }
+    if (typeof this.dashboard.refreshFleetMapIfVisible === "function") {
+      this.dashboard.refreshFleetMapIfVisible();
+    }
+    if (typeof this.dashboard.updateLandingPageCounts === "function") {
+      this.dashboard.updateLandingPageCounts();
     }
   }
 
@@ -1055,11 +1087,7 @@ class RealtimeConnector {
   }
 
   updateFarmInfo(farmInfo) {
-    const list = Array.isArray(farmInfo)
-      ? farmInfo
-      : farmInfo && typeof farmInfo === "object"
-        ? Object.values(farmInfo)
-        : [];
+    const list = getPlayerFarmRecords(farmInfo);
     this.dashboard.playerFarms = list;
     this.dashboard.farms = list;
     const active = Number(this.dashboard.activeFarmId ?? 1);

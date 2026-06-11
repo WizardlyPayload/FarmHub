@@ -36,6 +36,18 @@ function fmtLandingBadge(n, oneKey, manyKey) {
   return c === 1 ? t(oneKey, { count: c }) : t(manyKey, { count: c });
 }
 
+/** Multi-farm saves: zero on the active farm is valid — do not fall back to server-wide totals. */
+function pickLandingFarmCount(filtered, all, dashboard) {
+  const farmFiltered = Number(filtered) || 0;
+  const farmAll = Number(all) || 0;
+  const multiFarm =
+    dashboard &&
+    typeof dashboard.isFarmDropdownEnabled === "function" &&
+    dashboard.isFarmDropdownEnabled();
+  if (multiFarm) return farmFiltered;
+  return farmFiltered > 0 ? farmFiltered : farmAll;
+}
+
 export function setupEventListeners() {
   const folderInput = document.getElementById("folder-input");
   const clearFolderBtn = document.getElementById("clear-folder-btn");
@@ -66,6 +78,10 @@ export function setupEventListeners() {
             cleanupProgress = window.attachModExportProgress(api);
           }
           await api.exportModStoreImages();
+          const { refreshShopImageFilenamesFromApi } = await import(
+            "./vehicles.js"
+          );
+          await refreshShopImageFilenamesFromApi(this);
         }
       } catch (e) {
         console.error("[landing-import-mod-images]", e);
@@ -149,6 +165,10 @@ export function handleHashChange() {
   }
 
   if (hash) {
+    if (hash === "map") {
+      this.showSection("map");
+      return;
+    }
     // Navigate to specific section
     const validSections = [
       "livestock",
@@ -229,6 +249,10 @@ export function updateNavbar() {
       break;
     case "productions":
       sectionTitleElement.textContent = t("nav.section.productions");
+      homeButton.classList.remove("d-none");
+      break;
+    case "map":
+      sectionTitleElement.textContent = t("nav.section.map");
       homeButton.classList.remove("d-none");
       break;
     default:
@@ -364,18 +388,18 @@ export function showDashboard() {
 }
 
 export function updateLandingPageCounts() {
-  // Landing cards should never look empty just because farm-specific filters haven't settled yet.
-  // Prefer active-farm counts, then fall back to server-wide merged totals.
+  // Prefer active-farm counts. On multi-farm saves, never substitute server-wide totals when the farm has none.
   // Use **animal heads** (cluster LOD expands one row to many head); row count ≠ herd size.
   const headsFromAnimals = Array.isArray(this.animals) ? countLivestockHeads(this.animals) : 0;
   const livestockCountFiltered = headsFromAnimals;
-  const livestockCountAll = Array.isArray(this.husbandryData) ? this.husbandryData.length : 0;
-  const livestockCount =
-    livestockCountFiltered > 0
-      ? livestockCountFiltered
-      : livestockCountAll > 0
-        ? livestockCountAll
-        : 0;
+  const livestockCountAll = Array.isArray(this.husbandryData)
+    ? countLivestockHeads(this.husbandryData)
+    : 0;
+  const livestockCount = pickLandingFarmCount(
+    livestockCountFiltered,
+    livestockCountAll,
+    this
+  );
   const livestockEl = document.getElementById("livestock-count");
   if (livestockEl) {
     livestockEl.textContent = fmtLandingBadge(
@@ -396,12 +420,11 @@ export function updateLandingPageCounts() {
   const vehicleCountAll = Array.isArray(this._allVehiclesMerged)
     ? this._allVehiclesMerged.length
     : vehicleCountFiltered;
-  const vehicleCount =
-    vehicleCountFiltered > 0
-      ? vehicleCountFiltered
-      : vehicleCountAll > 0
-        ? vehicleCountAll
-        : 0;
+  const vehicleCount = pickLandingFarmCount(
+    vehicleCountFiltered,
+    vehicleCountAll,
+    this
+  );
   const vehicleCountEl = document.getElementById("vehicle-count");
   if (vehicleCountEl) {
     vehicleCountEl.textContent = fmtLandingBadge(
@@ -411,17 +434,32 @@ export function updateLandingPageCounts() {
     );
   }
 
+  const mapCountEl = document.getElementById("map-vehicle-count");
+  if (mapCountEl) {
+    const mapSrc = Array.isArray(this._allVehiclesMerged)
+      ? this._allVehiclesMerged
+      : Array.isArray(this.vehicles)
+        ? this.vehicles
+        : [];
+    const mapCount = mapSrc.filter((v) => {
+      if (!v || typeof v !== "object") return false;
+      const x = Number(v.position?.x);
+      const z = Number(v.position?.z);
+      return Number.isFinite(x) && Number.isFinite(z) && (Math.abs(x) > 0.5 || Math.abs(z) > 0.5);
+    }).length;
+    mapCountEl.textContent = String(mapCount);
+  }
+
   // Update field count
   const fieldCountElement = document.getElementById("field-count");
   if (fieldCountElement) {
     const fieldCountFiltered = Array.isArray(this.fields) ? this.fields.length : 0;
     const fieldCountAll = Array.isArray(this.allFields) ? this.allFields.length : 0;
-    const fieldCount =
-      fieldCountFiltered > 0
-        ? fieldCountFiltered
-        : fieldCountAll > 0
-          ? fieldCountAll
-          : 0;
+    const fieldCount = pickLandingFarmCount(
+      fieldCountFiltered,
+      fieldCountAll,
+      this
+    );
     fieldCountElement.textContent =
       fieldCount === 1
         ? t("fields.fieldCountOne", { count: fieldCount })
@@ -439,7 +477,7 @@ export function updateLandingPageCounts() {
         : this.pastures || [];
     const pcFiltered = pasturesForFarm.length;
     const pcAll = Array.isArray(this.pastures) ? this.pastures.length : 0;
-    const pc = pcFiltered > 0 ? pcFiltered : pcAll;
+    const pc = pickLandingFarmCount(pcFiltered, pcAll, this);
     pastureCountElement.textContent = fmtLandingBadge(
       pc,
       "card.badgePasturesOne",
@@ -466,8 +504,10 @@ export function updateLandingPageCounts() {
   const productionCountEl = document.getElementById("production-count");
   if (productionCountEl && typeof this.getOwnedProductionChainCount === "function") {
     const filtered = Number(this.getOwnedProductionChainCount()) || 0;
-    const all = Array.isArray(this.production?.chains) ? this.production.chains.length : 0;
-    const n = filtered > 0 ? filtered : all;
+    const all = Array.isArray(this.production?.chains)
+      ? this.production.chains.length
+      : 0;
+    const n = pickLandingFarmCount(filtered, all, this);
     productionCountEl.textContent = fmtLandingBadge(
       n,
       "card.badgeProductionChainsOne",
@@ -517,6 +557,17 @@ export function showSection(sectionName) {
     } catch (_) {}
   }
 
+  if (prevSection === "vehicles" && sectionName !== "vehicles") {
+    const sectionShell = document.getElementById("section-content");
+    sectionShell?.classList.remove(
+      "farm-glass-page--vehicles",
+      "farm-glass-page--scrolling"
+    );
+  }
+  if (prevSection === "map" && sectionName !== "map") {
+    document.getElementById("section-content")?.classList.remove("farm-glass-page--map");
+  }
+
   if (sectionName !== "landing" && sectionName !== "dashboard") {
     setFarmDashboardBackground(sectionName);
   }
@@ -559,6 +610,9 @@ export function showSection(sectionName) {
       break;
     case "productions":
       this.showProductionsSection();
+      break;
+    case "map":
+      this.showMapSection();
       break;
     default: {
       const dyn = document.getElementById("section-content-dynamic");

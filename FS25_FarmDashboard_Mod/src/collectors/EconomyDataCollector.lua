@@ -10,7 +10,6 @@ EconomyDataCollector = {}
 function EconomyDataCollector:init()
     EconomyDataCollector._ecoCo = nil
     EconomyDataCollector._smState = nil
-    print("[FarmDashboard] Economy data collector initialized (Silent Mode, Plan v5)")
 end
 
 local function _useStateMachine()
@@ -73,7 +72,7 @@ function EconomyDataCollector:collectStep(opts)
     if not EconomyDataCollector._ecoCo then return true, {} end
     local ok, a, b = coroutine.resume(EconomyDataCollector._ecoCo, opts or {})
     if not ok then
-        Logging.warning("[FarmDash] EconomyDataCollector coroutine: " .. tostring(a))
+        FarmDashLog.devWarn("EconomyDataCollector coroutine: %s", tostring(a))
         EconomyDataCollector._ecoCo = nil
         return true, {}
     end
@@ -86,7 +85,7 @@ function EconomyDataCollector:collectStep(opts)
         return true, a or {}
     end
     if cst == "suspended" then
-        Logging.warning("[FarmDash] EconomyDataCollector: unexpected coroutine state; ending slice.")
+        FarmDashLog.devWarn("EconomyDataCollector: unexpected coroutine state; ending slice.")
         EconomyDataCollector._ecoCo = nil
         return true, EconomyDataCollector._yieldPartialEcon or (type(a) == "table" and a) or {}
     end

@@ -126,3 +126,5 @@ CI on `main` runs tests, electron-pack verify, and i18n verify — see [`.github
 ## Licence & credits
 
 **JoshWalki** & **WizardlyPayload** — [docs/AUTHORS.md](docs/AUTHORS.md) · [LICENSE](LICENSE)
+
+Optional maintenance tips for the desktop app: [Ko-fi](https://ko-fi.com/wizarlypayload) (not required — Farm Dashboard stays free).

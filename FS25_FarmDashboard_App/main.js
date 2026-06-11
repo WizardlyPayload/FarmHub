@@ -1,14 +1,14 @@
 // FS25 FarmDashboard | main.js | v2.0.0
 // Authors: JoshWalki, WizardlyPayload
-// Electron main: Express + WS on 8766, local fs.watch + FTP → mergeData → renderer.
+// Electron main: Express + WS (default 8766; dev 8767 via FARMDASH_DEV), local fs.watch + FTP → mergeData → renderer.
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs   = require('fs');
 const os   = require('os');
 const url  = require('url');
 const crypto = require('crypto');
-const { spawn, exec } = require('child_process');
+const { spawn, exec, execFile } = require('child_process');
 
 const express   = require('express');
 const http      = require('http');
@@ -16,6 +16,28 @@ const WebSocket = require('ws');
 const cors      = require('cors');
 const ftp       = require('basic-ftp');
 const Store     = require('electron-store');
+
+/** Second instance on another port (npm run start:dev) while installed demo keeps 8766. */
+const FARMDASH_DEV =
+    process.env.FARMDASH_DEV === '1' ||
+    process.env.FARMDASH_DEV === 'true' ||
+    process.env.FARMDASH_DEV === 'yes';
+
+function resolveFarmdashPort() {
+    const raw = process.env.FARMDASH_PORT;
+    if (raw != null && String(raw).trim() !== '') {
+        const n = parseInt(String(raw).trim(), 10);
+        if (Number.isFinite(n) && n >= 1024 && n <= 65535) return n;
+        console.warn('[FarmDash] Invalid FARMDASH_PORT — using default for this mode');
+    }
+    return FARMDASH_DEV ? 8767 : 8766;
+}
+
+const FARMDASH_PORT = resolveFarmdashPort();
+const {
+    getMapOverviewCacheDir,
+    resolveMapOverviewImage,
+} = require('./mapOverviewResolver');
 
 const LAN_ACCESS_DEFAULTS = {
     lanAccessEnabled: false,
@@ -41,6 +63,14 @@ const {
     selectPreferredFs25UserDataRoot,
 } = require('./fs25Paths');
 const { readFileUtf8WithRetryAsync } = require('./fileReadRetry');
+const {
+    shouldIgnoreMinimalLuaExport,
+    applyMergedSnapshotIfStaleExport,
+    applyLiveSectionHold,
+    updateLiveSectionBackup,
+    updateLastGoodMergedSnapshot,
+    buildHeldPayloadFromState,
+} = require('./mergedSnapshotHold');
 const livestockDetailModule = require('./livestockDetail.js');
 const { validateLanCredentials } = require('./lanCredentialPolicy.js');
 
@@ -475,7 +505,7 @@ ipcMain.handle('export-mod-store-images', (event) => runExportModStoreImages(eve
 // ── Express / WebSocket ───────────────────────────────────────────────────────
 const expressApp = express();
 expressApp.set('trust proxy', false);
-const PORT       = 8766;
+const PORT       = FARMDASH_PORT;
 const clients    = new Set();
 /** @type {import('http').Server | null} */
 let server = null;
@@ -623,17 +653,20 @@ function logLanStartupHints(bindHost) {
 /** After listen, print Windows netstat lines for this port (confirms 0.0.0.0 vs 127.0.0.1). */
 function logWindowsSocketsForFarmdashPort() {
     if (process.platform !== 'win32') return;
-    exec(
-        'cmd /c netstat -an | findstr ":8766"',
+    execFile(
+        path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'netstat.exe'),
+        ['-an'],
         { windowsHide: true, timeout: 8000 },
-        (_err, stdout) => {
+        (err, stdout) => {
+            if (err) return;
             const out = stdout && String(stdout).trim();
-            if (out) {
-                console.log('[LAN] netstat (expect LISTENING on 0.0.0.0:' + PORT + ' when LAN access is on):');
-                for (const line of out.split(/\r?\n/)) {
-                    const s = line.trim();
-                    if (s) console.log('[LAN]   ' + s);
-                }
+            if (!out) return;
+            const lines = out.split(/\r?\n/).filter((line) => new RegExp(`:${PORT}\\b`).test(line));
+            if (lines.length === 0) return;
+            console.log('[LAN] netstat (expect LISTENING on 0.0.0.0:' + PORT + ' when LAN access is on):');
+            for (const line of lines) {
+                const s = line.trim();
+                if (s) console.log('[LAN]   ' + s);
             }
         }
     );
@@ -679,13 +712,21 @@ function mergeServersPreserveSecrets(prevServers, incomingServers) {
     });
 }
 
+const MARKETING_SITE_HOSTS = new Set([
+    'www.farmdashboard.co.uk',
+    'farmdashboard.co.uk',
+    'demo.farmdashboard.co.uk',
+]);
+
 function corsOriginAllowed(origin, callback) {
     if (!origin) return callback(null, true);
     try {
         const u = new URL(origin);
+        const host = String(u.hostname || '').toLowerCase();
         if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') return callback(null, true);
+        if (MARKETING_SITE_HOSTS.has(host)) return callback(null, true);
         const p = u.port || (u.protocol === 'https:' ? '443' : '80');
-        if (String(p) === '8766') return callback(null, true);
+        if (String(p) === String(PORT)) return callback(null, true);
     } catch (_) {
         /* ignore */
     }
@@ -801,6 +842,47 @@ expressApp.get('/simhub', (_req, res) => {
 });
 /** Mod shop PNG export target (writable when packaged; mounted before web/ so it wins over asar). */
 expressApp.use('/assests/img/items_mod_extract', express.static(resolveModStoreImagesOutputDir()));
+/** Cached in-game PDA overview textures (overview.dds → PNG). Lazy-init so Electron is ready. */
+let mapOverviewCacheStatic = null;
+expressApp.use('/map-overview-cache', (req, res, next) => {
+    try {
+        if (!mapOverviewCacheStatic) {
+            mapOverviewCacheStatic = express.static(getMapOverviewCacheDir());
+        }
+        return mapOverviewCacheStatic(req, res, next);
+    } catch (e) {
+        console.warn('[map-overview-cache]', e && e.message ? e.message : e);
+        return res.status(503).end();
+    }
+});
+expressApp.get('/api/map-overview-image', async (req, res) => {
+    const mapId = String(req.query.mapId || '').trim();
+    const mapTitle = String(req.query.mapTitle || '').trim();
+    if (!mapId && !mapTitle) {
+        return res.status(400).json({ ok: false, error: 'missing_map_id' });
+    }
+    try {
+        const modsRoots = collectFs25DocumentRoots(getElectronDocumentsPath)
+            .map((root) => path.join(root, 'mods'))
+            .filter((p) => {
+                try {
+                    return fs.existsSync(p);
+                } catch (_) {
+                    return false;
+                }
+            });
+        const modsRoot = modsRoots[0] || path.join(getFs25DocumentsRoot(), 'mods');
+        const result = await resolveMapOverviewImage({ mapId, mapTitle, modsRoot, modsRoots });
+        if (!result.ok) {
+            result.modsFoldersChecked = modsRoots;
+        }
+        return res.json(result);
+    } catch (e) {
+        const msg = e && e.message ? e.message : String(e);
+        console.warn('[map-overview]', msg);
+        return res.status(500).json({ ok: false, error: msg });
+    }
+});
 expressApp.use(express.static(path.join(__dirname, 'web')));
 /** setup.html uses src="web/assests/..." — same paths work over http://host:8766/… and file:// */
 expressApp.use('/web', express.static(path.join(__dirname, 'web')));
@@ -1042,7 +1124,7 @@ function isAllowedSameOrigin(originStr, req) {
     try {
         const u = new URL(originStr);
         if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') return true;
-        if (String(u.port || (u.protocol === 'https:' ? 443 : 80)) === '8766') return true;
+        if (String(u.port || (u.protocol === 'https:' ? 443 : 80)) === String(PORT)) return true;
         // Same hostname as the request itself (LAN tablet hitting <hostIp>:8766 with same origin).
         const hostHeader = String(req.headers && req.headers.host || '').split(':')[0];
         if (hostHeader && u.hostname === hostHeader) return true;
@@ -1153,7 +1235,38 @@ expressApp.get('/api/finance',    (req, res) => res.json(getDataForServer(req)?.
 expressApp.get('/api/weather',    (req, res) => res.json(getDataForServer(req)?.weather    || {}));
 expressApp.get('/api/economy',    (req, res) => res.json(getDataForServer(req)?.economy    || {}));
 expressApp.get('/api/farmlands',  (req, res) => res.json(getDataForServer(req)?.xmlFarmlands || []));
-expressApp.get('/api/status',     (req, res) => res.json({ status: 'online' }));
+function getActiveMergedDataForStatus() {
+    const ctx = store.get('simHubLiveContext');
+    if (ctx && ctx.serverId != null && String(ctx.serverId).trim() !== '') {
+        const sid = String(ctx.serverId).trim();
+        if (serverStates[sid]?.mergedData) return serverStates[sid].mergedData;
+    }
+    const keys = Object.keys(serverStates);
+    if (!keys.length) return null;
+    return serverStates[keys[0]]?.mergedData || null;
+}
+
+function buildPublicStatusPayload() {
+    const m = getActiveMergedDataForStatus();
+    const payload = {
+        status: 'online',
+        service: 'fs25-farm-dashboard',
+        appVersion: app.getVersion(),
+    };
+    if (!m) return payload;
+    const fields = Array.isArray(m.fields) ? m.fields : (Array.isArray(m.allFields) ? m.allFields : []);
+    const vehicles = Array.isArray(m.vehicles) ? m.vehicles : [];
+    payload.mapTitle = m.mapTitle || m.serverInfo?.mapName || null;
+    payload.mapId = m.mapId || m.serverInfo?.mapId || null;
+    payload.savegameName = m.savegameName || null;
+    payload.lastUpdated = m.lastUpdated || null;
+    payload.fieldCount = fields.length;
+    payload.vehicleCount = vehicles.length;
+    payload.hasData = fields.length > 0 || vehicles.length > 0 || !!m.luaAvailable || !!m.xmlAvailable;
+    return payload;
+}
+
+expressApp.get('/api/status', (req, res) => res.json(buildPublicStatusPayload()));
 
 expressApp.get('/api/simhub-view-config', (req, res) => {
     try {
@@ -1271,6 +1384,24 @@ function attachWebSocketServer(httpSrv) {
 
 /** Serializes bind so concurrent ``bootServer`` / ``restartHttpServer`` cannot orphan a listener (EADDRINUSE). */
 let httpListenChain = Promise.resolve();
+let httpPortInUseDialogShown = false;
+
+function showHttpPortInUseDialog() {
+    if (httpPortInUseDialogShown) return;
+    httpPortInUseDialogShown = true;
+    const msg =
+        `Port ${PORT} is already in use — the dashboard API cannot start.\n\n` +
+        'Close any other Farm Dashboard window, end leftover "Electron" or "FS25 Farm Dashboard" tasks in Task Manager, then restart the app.';
+    try {
+        if (app && app.isReady && app.isReady()) {
+            dialog.showErrorBox('Farm Dashboard — port in use', msg);
+        } else if (app && typeof app.once === 'function') {
+            app.once('ready', () => dialog.showErrorBox('Farm Dashboard — port in use', msg));
+        }
+    } catch (_) {
+        console.error('[HTTP/WS]', msg);
+    }
+}
 
 /**
  * Starts HTTP + WebSocket on ``bindHost`` (``127.0.0.1`` or ``0.0.0.0``).
@@ -1293,7 +1424,12 @@ function listenFarmdashHttp(bindHost, onListening) {
                         };
                         server.once('error', (err) => {
                             console.error('[HTTP/WS] server error:', err && err.code ? err.code : err.message || err);
-                            finish();
+                            if (settled) return;
+                            settled = true;
+                            if (err && err.code === 'EADDRINUSE') {
+                                showHttpPortInUseDialog();
+                            }
+                            reject(err);
                         });
                         server.listen(PORT, bindHost, () => {
                             console.log(`[HTTP/WS] listening on http://${bindHost === '0.0.0.0' ? '0.0.0.0 (all interfaces)' : bindHost}:${PORT}`);
@@ -1448,7 +1584,8 @@ function hydrateServerCacheFromDisk(serverId) {
     if (state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
         state.mergedData.fieldStatusHistory = state.fieldHistory;
     }
-    updateLuaLiveBackup(state, state.mergedData);
+    updateLiveSectionBackup(state, state.mergedData, null);
+    updateLastGoodMergedSnapshot(state, state.mergedData, null);
     broadcast(serverId, state.mergedData);
     console.log(`[Cache] [${serverId}] Restored last merged snapshot from disk (use until live Lua/XML return)`);
 }
@@ -1463,78 +1600,6 @@ function getLocalLuaJsonPathForServer(srv) {
         String(srv.name || '').replace(/[<>:"/\\|?*]/g, '').trim();
     if (!folderName) return null;
     return path.join(basePath, folderName, 'data.json');
-}
-
-function productionLooksEmpty(p) {
-    if (!p || typeof p !== 'object') return true;
-    const chains = p.chains;
-    if (Array.isArray(chains) && chains.length > 0) return false;
-    const ht = p.husbandryTotals;
-    if (ht && typeof ht === 'object' && Object.keys(ht).length > 0) return false;
-    return true;
-}
-
-/**
- * True when data.json looks like a full in-game export (vs `{}` / minimal writes on FS exit).
- * Used to avoid restoring stale animals/production when the live export is intentionally empty.
- */
-function isRichLuaExport(lua) {
-    if (!lua || typeof lua !== 'object') return false;
-    const keys = Object.keys(lua).length;
-    if (keys >= 10) return true;
-    if (Array.isArray(lua.fields) && lua.fields.length > 0) return true;
-    if (Array.isArray(lua.vehicles) && lua.vehicles.length > 0) return true;
-    if (lua.finance && typeof lua.finance === 'object' && Object.keys(lua.finance).length > 0) return true;
-    if (lua.gameTime && typeof lua.gameTime === 'object' && Object.keys(lua.gameTime).length > 0) return true;
-    if (lua.weather && typeof lua.weather === 'object') return true;
-    return false;
-}
-
-/** Last non-empty Lua-only sections so shutdown/truncated data.json does not zero the UI. */
-function updateLuaLiveBackup(state, merged) {
-    if (!merged) return;
-    const hasAnim = Array.isArray(merged.animals) && merged.animals.length > 0;
-    const hasProd = !productionLooksEmpty(merged.production);
-    if (!hasAnim && !hasProd) return;
-    const prev = state.luaLiveBackup || {};
-    state.luaLiveBackup = {
-        animals: hasAnim
-            ? JSON.parse(JSON.stringify(merged.animals))
-            : (prev.animals ? JSON.parse(JSON.stringify(prev.animals)) : undefined),
-        production: hasProd
-            ? JSON.parse(JSON.stringify(merged.production))
-            : (prev.production ? JSON.parse(JSON.stringify(prev.production)) : undefined),
-    };
-}
-
-function applyLuaLiveBackupIfStaleExport(merged, luaPayload, state) {
-    if (!merged || !state.luaLiveBackup) return merged;
-    const backup = state.luaLiveBackup;
-    const mergedAnimEmpty = !Array.isArray(merged.animals) || merged.animals.length === 0;
-    const mergedProdEmpty = productionLooksEmpty(merged.production);
-    const backupAnim = Array.isArray(backup.animals) && backup.animals.length > 0;
-    const backupProd = backup.production && !productionLooksEmpty(backup.production);
-    const needAnimRestore = mergedAnimEmpty && backupAnim;
-    const needProdRestore = mergedProdEmpty && backupProd;
-    if (!needAnimRestore && !needProdRestore) return merged;
-    if (isRichLuaExport(luaPayload)) return merged;
-
-    const ts = {
-        ...(merged.dataTimestamps || {}),
-        luaLiveSectionsHeldStaleAt: new Date().toISOString(),
-    };
-    const out = { ...merged, dataTimestamps: ts };
-    if (needAnimRestore) {
-        out.animals = JSON.parse(JSON.stringify(backup.animals));
-    }
-    if (needProdRestore) {
-        out.production = JSON.parse(JSON.stringify(backup.production));
-    }
-    console.warn(
-        '[rebuildMerged] Restored animals/production from last good Lua export ' +
-            '(current data.json looks like a shutdown or minimal snapshot)'
-    );
-    return out;
 }
 
 /**
@@ -1554,6 +1619,18 @@ async function hydrateLuaSnapshotFromDiskAtBoot(srv) {
         if (!luaJsonPath || !(await pathExists(luaJsonPath))) return;
         const raw = await readFileUtf8WithRetryAsync(luaJsonPath);
         if (raw == null) return;
+        let parsed;
+        try {
+            parsed = JSON.parse(stripUtf8Bom(raw));
+        } catch (_) {
+            return;
+        }
+        if (shouldIgnoreMinimalLuaExport(parsed, state)) {
+            console.log(
+                `[Boot] [${srv.id}] Skipped minimal/shutdown Lua snapshot on disk; using cached merged snapshot`
+            );
+            return;
+        }
         processLuaData(srv.id, stripUtf8Bom(raw));
         console.log(`[Boot] [${srv.id}] Hydrated Lua snapshot from disk: ${luaJsonPath}`);
     } catch (e) {
@@ -1624,7 +1701,14 @@ function rebuildMerged(serverId) {
         }
         return;
     }
-    merged = applyLuaLiveBackupIfStaleExport(merged, luaPayload, state);
+    const preHeldAt = merged && merged.dataTimestamps && merged.dataTimestamps.heldFromSnapshotAt;
+    merged = applyLiveSectionHold(merged, state, state.luaData, luaPayload);
+    merged = applyMergedSnapshotIfStaleExport(merged, luaPayload, state);
+    if (!preHeldAt && merged && merged.dataTimestamps && merged.dataTimestamps.heldFromSnapshotAt) {
+        console.warn(
+            `[rebuildMerged] [${serverId}] Serving last good merged snapshot (live export looks minimal or shutdown)`
+        );
+    }
     state.mergedData = merged;
     if (state.mergedData && state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
         state.mergedData.fieldStatusHistory = state.fieldHistory;
@@ -1636,7 +1720,8 @@ function rebuildMerged(serverId) {
         else delete si.configWarning;
         state.mergedData.serverInfo = si;
     }
-    updateLuaLiveBackup(state, state.mergedData);
+    updateLiveSectionBackup(state, state.mergedData, luaPayload);
+    updateLastGoodMergedSnapshot(state, state.mergedData, luaPayload);
     broadcast(serverId, state.mergedData);
     schedulePersistServerCache(serverId);
 }
@@ -1652,6 +1737,27 @@ function processLuaData(serverId, raw) {
             console.warn(
                 `[processLuaData] [${serverId}] ignored invalid Lua JSON (expected object); keeping previous export`
             );
+            return;
+        }
+
+        if (shouldIgnoreMinimalLuaExport(data, state)) {
+            console.warn(
+                `[processLuaData] [${serverId}] ignored minimal/shutdown Lua export; keeping last good snapshot`
+            );
+            const held = buildHeldPayloadFromState(state);
+            if (held) {
+                state.mergedData = held;
+                const si = { ...(state.mergedData.serverInfo || {}) };
+                const cw = state.configWarning;
+                if (cw) si.configWarning = cw;
+                else delete si.configWarning;
+                state.mergedData.serverInfo = si;
+                if (state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
+                    state.mergedData.fieldStatusHistory = state.fieldHistory;
+                }
+                broadcast(serverId, state.mergedData);
+                schedulePersistServerCache(serverId);
+            }
             return;
         }
 
@@ -2348,7 +2454,8 @@ async function bootServer(config) {
             lastXmlReceivedAt: null,
             fieldLiveCache: {},
             fieldHistory: {},
-            luaLiveBackup: null,
+            lastGoodMergedSnapshot: null,
+            liveSectionBackup: null,
             configWarning: null,
         };
     });
@@ -2458,11 +2565,56 @@ async function applyFarmdashSetupConfig(newConfig) {
 
 // ── Electron window ───────────────────────────────────────────────────────────
 
+/** Hidden Edit menu enables Ctrl+C/V/X/A; context menu adds right-click paste on inputs. */
+let editApplicationMenuInstalled = false;
+
+function ensureEditApplicationMenu() {
+    if (editApplicationMenuInstalled) return;
+    editApplicationMenuInstalled = true;
+    const editSubmenu = [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'selectAll' },
+    ];
+    const template = process.platform === 'darwin'
+        ? [{ role: 'editMenu' }]
+        : [{ label: 'Edit', submenu: editSubmenu }];
+    Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+function attachEditContextMenu(webContents) {
+    if (!webContents || webContents.isDestroyed()) return;
+    webContents.on('context-menu', (_event, params) => {
+        const win = BrowserWindow.fromWebContents(webContents);
+        const template = [];
+        if (params.isEditable) {
+            template.push(
+                { role: 'cut', enabled: params.editFlags.canCut },
+                { role: 'copy', enabled: params.editFlags.canCopy },
+                { role: 'paste', enabled: params.editFlags.canPaste },
+                { type: 'separator' },
+                { role: 'selectAll', enabled: params.editFlags.canSelectAll }
+            );
+        } else if (params.selectionText) {
+            template.push({ role: 'copy', enabled: params.editFlags.canCopy });
+        }
+        if (template.length === 0) return;
+        Menu.buildFromTemplate(template).popup({ window: win });
+    });
+}
+
 function createWindow() {
     ensureSetupWriteToken();
+    const winTitle = FARMDASH_DEV
+        ? `FS25 Farm Dashboard (dev :${PORT})`
+        : 'FS25 Farm Dashboard';
     mainWindow = new BrowserWindow({
         width: 1400, height: 900,
-        title: 'FS25 Farm Dashboard',
+        title: winTitle,
         backgroundColor: '#0f172a',
         autoHideMenuBar: true,
         webPreferences: {
@@ -2472,6 +2624,8 @@ function createWindow() {
             webSecurity: true,
         },
     });
+
+    attachEditContextMenu(mainWindow.webContents);
 
     mainWindow.webContents.on('render-process-gone', (_event, details) => {
         console.error('[render-process-gone]', details.reason, details.exitCode);
@@ -2520,18 +2674,42 @@ process.on('unhandledRejection', (reason) => {
     console.error('[unhandledRejection]', reason);
 });
 
-app.whenReady().then(async () => {
-    await consumeInstallLocaleFile();
-    createWindow();
-    initAppUpdater(
-        () => mainWindow,
-        () => {
-            const l = store.get('locale');
-            return l && typeof l === 'string' ? l : 'en';
+let gotSingleInstanceLock = true;
+if (FARMDASH_DEV) {
+    console.log('[dev] FARMDASH_DEV=1 — running alongside installed app (port ' + PORT + ')');
+} else {
+    gotSingleInstanceLock = app.requestSingleInstanceLock();
+    if (!gotSingleInstanceLock) {
+        app.quit();
+    } else {
+        app.on('second-instance', () => {
+            if (mainWindow) {
+                if (mainWindow.isMinimized()) mainWindow.restore();
+                mainWindow.focus();
+            }
+        });
+    }
+}
+
+if (gotSingleInstanceLock) {
+    app.whenReady().then(async () => {
+        if (FARMDASH_DEV) {
+            console.log('[dev] userData:', app.getPath('userData'));
+            console.log('[dev] Open http://127.0.0.1:' + PORT + '/ (installed demo can stay on 8766)');
         }
-    );
-    
-});
+        await consumeInstallLocaleFile();
+        ensureEditApplicationMenu();
+        createWindow();
+        initAppUpdater(
+            () => mainWindow,
+            () => {
+                const l = store.get('locale');
+                return l && typeof l === 'string' ? l : 'en';
+            }
+        );
+        
+    });
+}
 app.on('window-all-closed', () => {
     stopAllWatchers()
         .then(() => {

@@ -402,7 +402,7 @@ function FarmDashboardDataCollector:_subscribeToRLEvents()
             for i = 1, math.min(#args, 6) do
                 types[#types + 1] = type(args[i])
             end
-            Logging.info("[FarmDash] AnimalClusterUpdateEvent first-hit signature types=[%s]", table.concat(types, ","))
+            FarmDashLog.dev("AnimalClusterUpdateEvent first-hit signature types=[%s]", table.concat(types, ","))
         end
 
         local ok, err = xpcall(function()
@@ -428,7 +428,7 @@ function FarmDashboardDataCollector:_subscribeToRLEvents()
             local nowS = (D and D.nowSec and D.nowSec()) or 0
             if (nowS - (self_ref._rlEventErrLogAt or 0)) >= 60 then
                 self_ref._rlEventErrLogAt = nowS
-                Logging.warning("[FarmDash] AnimalClusterUpdateEvent handler error: %s", tostring(err))
+                FarmDashLog.devWarn("AnimalClusterUpdateEvent handler error: %s", tostring(err))
             end
         end
     end
@@ -441,9 +441,9 @@ function FarmDashboardDataCollector:_subscribeToRLEvents()
     end)
     if subscribeOk then
         self._rlSubscribed = true
-        Logging.info("[FarmDash] subscribed to AnimalClusterUpdateEvent")
+        FarmDashLog.dev("subscribed to AnimalClusterUpdateEvent")
     else
-        Logging.warning("[FarmDash] could not subscribe to AnimalClusterUpdateEvent: %s", tostring(subscribeErr))
+        FarmDashLog.devWarn("could not subscribe to AnimalClusterUpdateEvent: %s", tostring(subscribeErr))
     end
 end
 
@@ -480,7 +480,7 @@ function FarmDashboardDataCollector:_addDirtyPen(placeable)
             self._dirtyPensCount = self._dirtyPensCount - 1
             if (nowS - (self._dirtyPensDropLogAt or 0)) >= 30 then
                 self._dirtyPensDropLogAt = nowS
-                Logging.info("[FarmDash] _dirtyPens at cap %d; dropped oldest %s", DIRTY_PENS_HARD_CAP, tostring(oldestKey))
+                FarmDashLog.dev("_dirtyPens at cap %d; dropped oldest %s", DIRTY_PENS_HARD_CAP, tostring(oldestKey))
             end
         end
     end
@@ -572,7 +572,7 @@ function FarmDashboardDataCollector:runAdaptiveProbeOnce()
     if prev ~= cycleMs then
         self.config.collectionCycleMs = cycleMs
         FarmDashboard.UPDATE_INTERVAL = cycleMs
-        Logging.info("[FarmDash] adaptive cadence: animals=%d pens=%d vehicles=%d cycleMs=%d",
+        FarmDashLog.dev("adaptive cadence: animals=%d pens=%d vehicles=%d cycleMs=%d",
             totalAnimals, totalPens, totalVehicles, cycleMs)
     end
 end
@@ -624,10 +624,10 @@ function FarmDashboardDataCollector:calibrateRowCapsAtBoot()
     local cur = self.config.animalRowsPerSlice or 256
     if cap >= cur * 1.25 or cap <= cur * 0.75 then
         self.config.animalRowsPerSlice = cap
-        Logging.info("[FarmDash] calibrated animalRowsPerSlice=%d (synthetic %d rows in %.2fms, target %.2fms)",
+        FarmDashLog.dev("calibrated animalRowsPerSlice=%d (synthetic %d rows in %.2fms, target %.2fms)",
             cap, SAMPLES, elapsedMs, targetMs)
     else
-        Logging.info("[FarmDash] calibration kept animalRowsPerSlice=%d (synthetic %d rows in %.2fms)",
+        FarmDashLog.dev("calibration kept animalRowsPerSlice=%d (synthetic %d rows in %.2fms)",
             cur, SAMPLES, elapsedMs)
     end
 end
@@ -891,7 +891,7 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
         weather    = mc.weather or {},
         economy    = mc.economy or {},
         --- Physical bales by fill + placement (FieldDataCollector last collect).
-        baleInventory = baleInv or { farmId = nil, onField = {}, offField = {} }
+        baleInventory = baleInv or { farmId = nil, byFarm = {}, onField = {}, offField = {} }
     }
 
     if rawget(_G, "FieldDataCollector") and FieldDataCollector.getCachedGameplayFlags then
@@ -902,8 +902,112 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
         data.money = data.finance.money
     end
 
+    data.adsSummary = self:buildAdsSummary(mc.vehicles)
+    data.vehicleYearsSummary = self:buildVehicleYearsSummary(mc.vehicles, data.gameTime)
+
     self.data = data
     return data
+end
+
+--- Fleet aggregates when FS25_AdvancedDamageSystem vehicles are present in moduleCache.
+function FarmDashboardDataCollector:buildAdsSummary(vehicles)
+    if type(vehicles) ~= "table" then return nil end
+    local summary = {
+        enabled = false,
+        vehicleCount = 0,
+        inServiceCount = 0,
+        breakdownVehicleCount = 0,
+        overdueMaintenanceCount = 0,
+    }
+    for _, v in ipairs(vehicles) do
+        local ads = v and v.ads
+        if ads and ads.enabled then
+            summary.enabled = true
+            summary.vehicleCount = summary.vehicleCount + 1
+            if ads.inService then
+                summary.inServiceCount = summary.inServiceCount + 1
+            end
+            if (ads.breakdownCount or 0) > 0 then
+                summary.breakdownVehicleCount = summary.breakdownVehicleCount + 1
+            end
+            if ads.intervalRatio ~= nil and ads.intervalRatio > 1 then
+                summary.overdueMaintenanceCount = summary.overdueMaintenanceCount + 1
+            end
+        end
+    end
+    if not summary.enabled then return nil end
+    return summary
+end
+
+function FarmDashboardDataCollector:isAdvancedDamageSystemLoaded()
+    if _G.g_modIsLoaded and _G.g_modIsLoaded["FS25_AdvancedDamageSystem"] then
+        return true
+    end
+    if _G.g_modManager and _G.g_modManager.getActiveModByName then
+        local ok, mod = pcall(function()
+            return _G.g_modManager:getActiveModByName("FS25_AdvancedDamageSystem")
+        end)
+        if ok and mod ~= nil then return true end
+    end
+    return false
+end
+
+function FarmDashboardDataCollector:isVehicleYearsLoaded()
+    if _G.VehicleYears and _G.VehicleYears.modActivated then
+        return true
+    end
+    if _G.g_modIsLoaded and _G.g_modIsLoaded["FS25_Vehicle_Years"] then
+        return true
+    end
+    if _G.g_modManager and _G.g_modManager.getActiveModByName then
+        local ok, mod = pcall(function()
+            return _G.g_modManager:getActiveModByName("FS25_Vehicle_Years")
+        end)
+        if ok and mod ~= nil then return true end
+    end
+    return false
+end
+
+--- Fleet aggregates when FS25_Vehicle_Years data is present on exported vehicles.
+function FarmDashboardDataCollector:buildVehicleYearsSummary(vehicles, gameTime)
+    if type(vehicles) ~= "table" then return nil end
+
+    local summary = {
+        enabled = false,
+        knownCount = 0,
+        missingCount = 0,
+        averageModelYear = nil,
+        pre2000Count = 0,
+        byDecade = {},
+    }
+
+    local yearSum = 0
+    for _, v in ipairs(vehicles) do
+        local vy = v and v.vehicleYears
+        if vy and vy.enabled then
+            summary.enabled = true
+            if vy.yearKnown and vy.modelYear then
+                summary.knownCount = summary.knownCount + 1
+                yearSum = yearSum + vy.modelYear
+                if vy.modelYear < 2000 then
+                    summary.pre2000Count = summary.pre2000Count + 1
+                end
+                local decadeId = vy.decadeId or "unknown"
+                summary.byDecade[decadeId] = (summary.byDecade[decadeId] or 0) + 1
+            else
+                summary.missingCount = summary.missingCount + 1
+            end
+        end
+    end
+
+    if not summary.enabled then return nil end
+    if summary.knownCount > 0 then
+        summary.averageModelYear = math.floor(yearSum / summary.knownCount + 0.5)
+    end
+    if gameTime and gameTime.year and summary.averageModelYear then
+        summary.averageModelAge = math.max(0, tonumber(gameTime.year) - summary.averageModelYear)
+    end
+    return summary
 end
 
 --- @return boolean hasIncrementalCollector
@@ -919,7 +1023,7 @@ function FarmDashboardDataCollector:startModuleSlice(name, order)
             return tostring(e) .. "\n" .. debug.traceback("", 2)
         end)
         if not ok then
-            Logging.warning("[FarmDash] collectBegin failed for %s: %s", tostring(name), tostring(err))
+            FarmDashLog.devWarn("collectBegin failed for %s: %s", tostring(name), tostring(err))
             self:runLegacyModuleSlice(name, order)
             return
         end
@@ -1010,7 +1114,7 @@ function FarmDashboardDataCollector:_bootstrapDetailLedgerFromDisk()
         end
     end
     if seeded > 0 then
-        Logging.info("[FarmDash] bootstrapped %d detail ledger entries from disk", seeded)
+        FarmDashLog.dev("bootstrapped %d detail ledger entries from disk", seeded)
     end
 end
 
@@ -1032,7 +1136,7 @@ function FarmDashboardDataCollector:_primeDirtyPensFromOwnedHusbandries()
         end
     end
     if primed > 0 then
-        Logging.info("[FarmDash] primed _dirtyPens with %d owned husbandries (idScheme=%s)", primed, tostring(self._idScheme))
+        FarmDashLog.dev("primed _dirtyPens with %d owned husbandries (idScheme=%s)", primed, tostring(self._idScheme))
     end
 end
 
@@ -1062,7 +1166,7 @@ function FarmDashboardDataCollector:_runAutoTunerOnce()
         self._lastAutoTuneSec = now
         self.config.animalRowsPerSlice = nextVal
         if D:isEnabled() then
-            Logging.info("[FarmDash][autotune] animalRowsPerSlice %d -> %d (median=%.2fms p99=%.2fms slice=%dms)",
+            FarmDashLog.dev("[autotune] animalRowsPerSlice %d -> %d (median=%.2fms p99=%.2fms slice=%dms)",
                 cur, nextVal, stats.median, stats.p99 or 0, slice)
         end
     end
@@ -1134,7 +1238,7 @@ function FarmDashboardDataCollector:runIncrementalActiveStep(order)
     end) }
     local ok = results[1]
     if not ok then
-        Logging.warning("[FarmDash] collectStep failed for %s: %s", tostring(name), tostring(results[2]))
+        FarmDashLog.devWarn("collectStep failed for %s: %s", tostring(name), tostring(results[2]))
         self.moduleCache[name] = {}
         self:finishModuleSlice(name, order, true)
         return
@@ -1401,7 +1505,7 @@ function FarmDashboardDataCollector:husbandryTotalsStep()
             self:accumulateHusbandryTotalsForPlaceable(job.list[i], job.totalsByFarm)
         end)
         if not ok then
-            Logging.warning("[FarmDash] husbandryTotalsStep placeable: " .. tostring(err))
+            FarmDashLog.devWarn("husbandryTotalsStep placeable: %s", tostring(err))
         end
     end
     job.idx = hi + 1
@@ -1450,6 +1554,20 @@ function FarmDashboardDataCollector:beginDeferredJsonWrite(data)
     data.serverInfo.idScheme = self._idScheme
     if _G.FarmDashboard and _G.FarmDashboard.VERSION then
         data.serverInfo.modVersion = _G.FarmDashboard.VERSION
+    end
+    if self:isAdvancedDamageSystemLoaded() or (data.adsSummary and data.adsSummary.enabled) then
+        data.serverInfo.adsEnabled = true
+    end
+    if self:isVehicleYearsLoaded() or (data.vehicleYearsSummary and data.vehicleYearsSummary.enabled) then
+        data.serverInfo.vehicleYearsEnabled = true
+    end
+    data.serverInfo.mapBounds = self:getMapBounds()
+    data.serverInfo.mapBounds = self:refineMapBoundsFromWorldActivity(data, data.serverInfo.mapBounds)
+    if _G.g_currentMission and _G.g_currentMission.missionInfo then
+        local info = _G.g_currentMission.missionInfo
+        if info.mapId and info.mapId ~= "" then
+            data.serverInfo.mapId = tostring(info.mapId)
+        end
     end
     -- Plan v5 Phase 0: schemaVersion + serverTimeSec.
     data.schemaVersion = DATA_SCHEMA_VERSION
@@ -1512,7 +1630,7 @@ function FarmDashboardDataCollector:jsonWriteStep()
             return tostring(e) .. "\n" .. debug.traceback("", 2)
         end)
         if not okJson then
-            Logging.error("[FarmDash] json chunk toJSON failed for key '%s': %s", tostring(k), tostring(err))
+            FarmDashLog.devWarn("json chunk toJSON failed for key '%s': %s", tostring(k), tostring(err))
             parts[#parts + 1] = "null"
         end
 
@@ -1548,7 +1666,7 @@ end
 --- Write a fully built JSON string to data.json (I/O only).
 function FarmDashboardDataCollector:_writeJsonStringToDisk(jsonData, savegameDir)
     if not jsonData or jsonData == "" then
-        Logging.warning("[FarmDash] skip write: empty JSON string")
+        FarmDashLog.devWarn("skip write: empty JSON string")
         return
     end
     savegameDir = savegameDir or self:getSavegameDirName()
@@ -1566,7 +1684,7 @@ function FarmDashboardDataCollector:_writeJsonStringToDisk(jsonData, savegameDir
         end
     elseif not self._ioNilLogged then
         self._ioNilLogged = true
-        Logging.error("[FarmDash] Lua io.open is not available; cannot write data.json.")
+        FarmDashLog.devWarn("Lua io.open is not available; cannot write data.json.")
     end
 
     if not written and type(_G.saveFile) == "function" then
@@ -1581,7 +1699,7 @@ function FarmDashboardDataCollector:_writeJsonStringToDisk(jsonData, savegameDir
         self._ioNilLogged = nil
         if not self._firstWriteLogged then
             self._firstWriteLogged = true
-            Logging.info("[FarmDash] data.json write OK: %s", tostring(normPath))
+            FarmDashLog.dev("data.json write OK: %s", tostring(normPath))
         end
         self._writeFailLogged = nil
         self._writeFailCount = 0
@@ -1589,7 +1707,7 @@ function FarmDashboardDataCollector:_writeJsonStringToDisk(jsonData, savegameDir
         self._writeFailCount = (self._writeFailCount or 0) + 1
         if not self._writeFailLogged or self._writeFailCount % 40 == 0 then
             self._writeFailLogged = true
-            Logging.error("[FarmDash] Could not write data.json (path: %s) [fail #%d]", tostring(normPath), self._writeFailCount)
+            FarmDashLog.devWarn("Could not write data.json (path: %s) [fail #%d]", tostring(normPath), self._writeFailCount)
         end
     end
 end
@@ -1608,7 +1726,7 @@ function FarmDashboardDataCollector:collectHusbandryTotals()
         end
     end)
     if not ok then
-        Logging.warning("[FarmDash] collectHusbandryTotals failed: " .. tostring(err))
+        FarmDashLog.devWarn("collectHusbandryTotals failed: %s", tostring(err))
     end
     local activeFarmId = self:getActiveFarmId()
     return byFarm[activeFarmId] or {}, byFarm
@@ -1622,7 +1740,7 @@ function FarmDashboardDataCollector:safeCollect(collectorName)
     if success then
         return result or {}
     else
-        Logging.warning("[FarmDash] Failed to collect " .. tostring(collectorName))
+        FarmDashLog.devWarn("Failed to collect %s", tostring(collectorName))
         return {}
     end
 end
@@ -1642,6 +1760,67 @@ function FarmDashboardDataCollector:getGameTime()
     }
 end
 
+--- World bounds for dashboard fleet map (terrain half-extent in metres).
+function FarmDashboardDataCollector:refineMapBoundsFromWorldActivity(data, bounds)
+    if not bounds or type(bounds) ~= "table" then
+        return bounds
+    end
+    local half = tonumber(bounds.halfSize) or 1024
+    local maxAbs = 0
+    local function consider(x, z)
+        x = tonumber(x)
+        z = tonumber(z)
+        if x and z and (math.abs(x) > 0.5 or math.abs(z) > 0.5) then
+            maxAbs = math.max(maxAbs, math.abs(x), math.abs(z))
+        end
+    end
+    if data and data.vehicles then
+        for _, v in pairs(data.vehicles) do
+            if v and v.position then
+                consider(v.position.x, v.position.z)
+            end
+        end
+    end
+    if maxAbs <= half * 0.98 then
+        return bounds
+    end
+    local newHalf = 1024
+    while newHalf < maxAbs and newHalf < 8192 do
+        newHalf = newHalf * 2
+    end
+    if newHalf <= half then
+        return bounds
+    end
+    bounds.halfSize = newHalf
+    bounds.terrainSize = newHalf * 2
+    bounds.minX = -newHalf
+    bounds.maxX = newHalf
+    bounds.minZ = -newHalf
+    bounds.maxZ = newHalf
+    return bounds
+end
+
+function FarmDashboardDataCollector:getMapBounds()
+    local half = 1024
+    local ok, ts = pcall(function()
+        if _G.g_currentMission and _G.g_currentMission.terrainSize then
+            return tonumber(_G.g_currentMission.terrainSize) * 0.5
+        end
+        return nil
+    end)
+    if ok and ts and ts > 0 then
+        half = ts
+    end
+    return {
+        minX = -half,
+        maxX = half,
+        minZ = -half,
+        maxZ = half,
+        halfSize = half,
+        terrainSize = half * 2
+    }
+end
+
 function FarmDashboardDataCollector:getFarmInfo()
     local farms = {}
     if _G.g_farmManager then
@@ -1655,13 +1834,19 @@ function FarmDashboardDataCollector:getFarmInfo()
                 money   = farm.money  or 0,
                 players = {}
             }
+            farmData.isPlayer = false
             if farm.players then
                 for _, player in pairs(farm.players) do
+                    farmData.isPlayer = true
                     table.insert(farmData.players, {
                         name   = player.nickname or "Unknown",
                         id     = player.userId
                     })
                 end
+            end
+            local farmName = farm.name and tostring(farm.name):match("^%s*(.-)%s*$") or ""
+            if not farmData.isPlayer and farmName ~= "" then
+                farmData.isPlayer = true
             end
             table.insert(farms, farmData)
         end
@@ -1698,11 +1883,21 @@ function FarmDashboardDataCollector:writeDataToFile(data)
             currentMapName = info.mapTitle
         end
     end
-    data.serverInfo = { mapName = currentMapName, saveSlot = savegameDir }
+    data.serverInfo = {
+        mapName = currentMapName,
+        saveSlot = savegameDir,
+        mapBounds = self:refineMapBoundsFromWorldActivity(data, self:getMapBounds()),
+    }
+    if _G.g_currentMission and _G.g_currentMission.missionInfo then
+        local info = _G.g_currentMission.missionInfo
+        if info.mapId and info.mapId ~= "" then
+            data.serverInfo.mapId = tostring(info.mapId)
+        end
+    end
 
     local okJson, jsonData = pcall(function() return self:toJSON(data, 0) end)
     if not okJson then
-        Logging.error("[FarmDash] toJSON failed: %s", tostring(jsonData))
+        FarmDashLog.devWarn("toJSON failed: %s", tostring(jsonData))
         return
     end
     self:_writeJsonStringToDisk(jsonData, savegameDir)
@@ -1920,7 +2115,7 @@ function FarmDashboardDataCollector:_logWriteFail(msg)
     local nowS = (D and D.nowSec and D.nowSec()) or 0
     if (nowS - (self._writeFailLogAtSec or 0)) >= 30 then
         self._writeFailLogAtSec = nowS
-        Logging.warning("[FarmDash] write failure: %s", tostring(msg))
+        FarmDashLog.devWarn("write failure: %s", tostring(msg))
     end
 end
 
@@ -1962,13 +2157,13 @@ function FarmDashboardDataCollector:_ensureDetailsWritable()
     local probe = self:_detailDirPath() .. ".writetest"
     if type(io) ~= "table" or type(io.open) ~= "function" then
         self._detailsDisabled = true
-        Logging.warning("[FarmDash] io.open unavailable; detail writes disabled this session")
+        FarmDashLog.devWarn("io.open unavailable; detail writes disabled this session")
         return false
     end
     local f, err = io.open(probe, "w")
     if not f then
         self._detailsDisabled = true
-        Logging.warning("[FarmDash] details/ not writable (%s); detail writes disabled this session: %s",
+        FarmDashLog.devWarn("details/ not writable (%s); detail writes disabled this session: %s",
             tostring(probe), tostring(err))
         return false
     end
@@ -1995,7 +2190,7 @@ function FarmDashboardDataCollector:_writePenDetail(penKey)
         return tostring(e) .. "\n" .. debug.traceback("", 2)
     end)
     if not ok or not detail then
-        Logging.warning("[FarmDash] pen detail collection failed for key=%s: %s", tostring(penKey), tostring(err))
+        FarmDashLog.devWarn("pen detail collection failed for key=%s: %s", tostring(penKey), tostring(err))
         return false
     end
 
@@ -2143,7 +2338,7 @@ function FarmDashboardDataCollector:_pollRequestsFile()
         local nowS = (D and D.nowSec and D.nowSec()) or 0
         if (nowS - (self._requestsParseLogAtSec or 0)) >= 60 then
             self._requestsParseLogAtSec = nowS
-            Logging.warning("[FarmDash] requests.json rejected (%s); quarantining", tostring(perr))
+            FarmDashLog.devWarn("requests.json rejected (%s); quarantining", tostring(perr))
         end
         local broken = base .. "requests.broken." .. tostring(math.floor(nowS or 0)) .. ".json"
         _movePathBestEffort(path, broken)

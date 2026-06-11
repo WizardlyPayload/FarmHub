@@ -61,9 +61,12 @@ export function updateNavbarConnectionStrip() {
 
   const src = this.dataSource || "unknown";
   const apiOn = !!(this.realtimeConnector && this.realtimeConnector.isConnected);
+  const heldSnapshot = !!(this.dataTimestamps && this.dataTimestamps.liveExportStaleAt);
 
   let label = "";
-  if (src === "merged") {
+  if (heldSnapshot) {
+    label = apiOn ? "Snapshot + API" : "Snapshot (game offline)";
+  } else if (src === "merged") {
     label = apiOn ? "XML + Live + API" : "XML + Live";
   } else if (src === "xml_only") {
     label = apiOn ? "XML only + API" : "XML only";
@@ -75,7 +78,9 @@ export function updateNavbarConnectionStrip() {
 
   dsText.textContent = label;
   dsBadge.className = "badge text-light ms-2";
-  if (src === "merged" && apiOn) {
+  if (heldSnapshot) {
+    dsBadge.classList.add("bg-info");
+  } else if (src === "merged" && apiOn) {
     dsBadge.classList.add("bg-success");
   } else if (src === "merged" && !apiOn) {
     dsBadge.classList.add("bg-secondary");
@@ -91,7 +96,11 @@ export function updateNavbarConnectionStrip() {
 
   this.updateNavbarModVersionBadge();
 
-  if (src === "xml_only") {
+  if (heldSnapshot) {
+    dsBadge.title =
+      "Showing the last good farm snapshot. FS25 is not exporting live data (game closed or minimal export). " +
+      "Data will refresh when the game writes a full export again.";
+  } else if (src === "xml_only") {
     dsBadge.title =
       "Live data missing: enable mod FS25_FarmDashboard for this save (SP / host / dedicated). " +
       "Joining players do not write data.json. Ensure dashboard Savegame Folder matches modSettings/FS25_FarmDashboard/<folder>.";

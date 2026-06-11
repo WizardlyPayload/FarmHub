@@ -13,6 +13,7 @@
     "clean:build-out": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../tools/app/remove-build-output-folders.ps1",
     "clean:build-out:search": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../tools/app/remove-build-output-folders.ps1 -StopWindowsSearch",
     "start": "electron .",
+    "start:dev": "node ../tools/app/start-dev-electron.mjs",
     "pack": "node ../tools/app/run-electron-builder.mjs pack",
     "pack:in-repo": "electron-builder --dir",
     "pack:fresh": "node ../tools/app/electron-builder-fresh-output.mjs pack",
@@ -28,6 +29,7 @@
     "i18n:fill:force": "node web/locales/mt-fill.mjs --force",
     "i18n:verify": "node web/locales/verify-i18n.mjs",
     "i18n:sync": "node web/locales/sync-keys-from-en.mjs",
+    "i18n:ads": "node ../tools/app/extract-ads-i18n.mjs",
     "verify:electron-pack": "node ../tools/app/verify-electron-pack-files.mjs"
   },
   "build": {
@@ -46,9 +48,12 @@
       "fs25Paths.js",
       "fileReadRetry.js",
       "dataMerger.js",
+      "farmScope.cjs",
+      "mapOverviewResolver.js",
       "detailAnimalsHydrate.js",
       "livestockDetail.js",
       "serverDataCache.js",
+      "mergedSnapshotHold.js",
       "setup.html",
       "icon.ico",
       "web/**/*",
@@ -108,13 +113,14 @@
     }
   },
   "dependencies": {
-    "fast-xml-parser": "^5.7.3",
     "basic-ftp": "^5.0.5",
     "cors": "^2.8.5",
     "electron-store": "^8.2.0",
     "electron-updater": "^6.6.2",
     "express": "^4.19.2",
-    "ws": "^8.16.0"
+    "fast-xml-parser": "^5.7.3",
+    "ws": "^8.16.0",
+    "yauzl": "^2.10.0"
   },
   "devDependencies": {
     "electron": "^29.1.0",

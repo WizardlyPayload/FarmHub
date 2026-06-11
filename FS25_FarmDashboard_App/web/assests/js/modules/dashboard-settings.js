@@ -278,8 +278,9 @@ function syncAppSettingsFooterButtons() {
   const saveDash = document.getElementById("dashboard-settings-save-btn");
   const saveTheme = document.getElementById("app-settings-save-theme-btn");
   const onTheme = id === "app-settings-tab-theme";
+  const onAbout = id === "app-settings-tab-about";
   if (saveTheme) saveTheme.classList.toggle("d-none", !onTheme);
-  if (saveDash) saveDash.classList.toggle("d-none", onTheme);
+  if (saveDash) saveDash.classList.toggle("d-none", onTheme || onAbout);
 }
 
 function renderDesktopAppUpdateStatus(payload) {
@@ -415,7 +416,12 @@ function wireAppSettingsServerControlsOnce(dashboard) {
       }
       api
         .exportModStoreImages()
-        .catch((e) => dashboard.showAlert?.(String(e.message || e), "error"))
+        .then(() =>
+          import("./vehicles.js").then((vehicles) =>
+            vehicles.refreshShopImageFilenamesFromApi(this)
+          )
+        )
+        .catch((e) => this.showAlert?.(String(e.message || e), "error"))
         .finally(() => {
           if (typeof cleanup === "function") cleanup();
           if (btn && prev) btn.textContent = prev;
@@ -498,13 +504,15 @@ export async function populateDashboardSettingsForm() {
 
   await this.loadDashboardUiPreferences();
 
-  const dashPane = document.getElementById("app-settings-pane-dashboard");
-  if (dashPane) applyDom(dashPane);
+  const settingsModal = document.getElementById("appSettingsModal");
+  if (settingsModal) applyDom(settingsModal);
 
   SECTION_KEYS.forEach((key) => {
     const el = document.getElementById(`settings-section-${key}`);
     if (el) el.checked = this.sectionVisibility?.[key] !== false;
   });
+
+  populateAboutModVersions(this);
 
   if (!api) {
     return;
@@ -512,12 +520,14 @@ export async function populateDashboardSettingsForm() {
 
   try {
     const ver = await api.getDesktopAppVersion();
-    const vEl = document.getElementById("settings-desktop-app-version");
-    if (vEl) vEl.textContent = ver && String(ver).trim() ? String(ver) : "—";
+    const vText = ver && String(ver).trim() ? String(ver) : "—";
+    const aboutVer = document.getElementById("settings-about-app-version");
+    if (aboutVer) aboutVer.textContent = vText;
   } catch (_) {
-    const vEl = document.getElementById("settings-desktop-app-version");
-    if (vEl) vEl.textContent = "—";
+    const aboutVer = document.getElementById("settings-about-app-version");
+    if (aboutVer) aboutVer.textContent = "—";
   }
+
   const statusEl = document.getElementById("settings-desktop-update-status");
   if (statusEl) {
     statusEl.textContent = "";
@@ -830,17 +840,39 @@ export async function saveDashboardSettingsFromModal() {
   }
 }
 
+function populateAboutModVersions(dashboard) {
+  const modEl = document.getElementById("settings-about-mod-version");
+  const expectedEl = document.getElementById("settings-about-mod-expected");
+  const check = dashboard?.modVersionCheck;
+  const expected = check?.expectedMin || "3.0.0.0";
+
+  if (expectedEl) expectedEl.textContent = expected;
+
+  if (!modEl) return;
+
+  if (check?.actual) {
+    modEl.textContent = check.actual;
+    return;
+  }
+  if (dashboard?.luaAvailable) {
+    modEl.textContent = t("settings.aboutModUnknown");
+    return;
+  }
+  modEl.textContent = t("settings.aboutModNotConnected");
+}
+
 const UNIFIED_SETTINGS_TAB_IDS = {
   dashboard: "app-settings-tab-dashboard",
   servers: "app-settings-tab-servers",
   mod: "app-settings-tab-mod",
   theme: "app-settings-tab-theme",
+  about: "app-settings-tab-about",
 };
 
 /**
  * Open the unified Settings modal and optionally activate a sidebar tab (servers, mod, etc.).
  * Replaces the old separate navbar “folder” shortcut — all configuration lives here.
- * @param {"dashboard"|"servers"|"mod"|"theme"} [tabKey]
+ * @param {"dashboard"|"servers"|"mod"|"theme"|"about"} [tabKey]
  */
 export function openUnifiedSettingsModal(tabKey) {
   if (!isFarmDashLocalConfigHost()) {

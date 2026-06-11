@@ -9,6 +9,11 @@
 export const SERVER_LIVE_CACHE_SCHEMA_VERSION = '1.0';
 
 import { filterFieldsForFarmView, invalidateFieldsClientCache } from './fields.js';
+import {
+  getPlayerFarmRecords,
+  entityOwnerFarmId,
+  pruneMergedDataToPlayerFarms,
+} from './farmScope.js';
 import { t } from '../i18n/i18n.js';
 import { isFarmDashLocalConfigHost } from './viewer-mode.js';
 
@@ -57,6 +62,33 @@ function inferFarmIdFromFieldOwnership(fields, farms) {
     const oid = Number(f.ownerFarmId ?? f.farmId ?? 0);
     if (!oid || Number.isNaN(oid)) continue;
     counts.set(oid, (counts.get(oid) || 0) + 1);
+  }
+  let best = null;
+  let bestN = -1;
+  for (const [id, n] of counts) {
+    if (n > bestN) {
+      bestN = n;
+      best = id;
+    }
+  }
+  if (best != null) return best;
+  const arr = ensureArray(farms);
+  const pl = arr.find((x) => x && Number(x.id) > 0);
+  return pl ? Number(pl.id) : null;
+}
+
+/** Multi-farm FTP/dedicated: pick farm with the most husbandry pens / heads when fields do not disambiguate. */
+function inferFarmIdFromHusbandryOwnership(husbandryRows, farms) {
+  if (!Array.isArray(husbandryRows) || husbandryRows.length === 0) return null;
+  const counts = new Map();
+  for (const h of husbandryRows) {
+    if (!h || typeof h !== "object") continue;
+    const oid = entityOwnerFarmId(h);
+    if (!oid || Number.isNaN(oid)) continue;
+    const heads = Number(h.animalCount ?? h.numAnimals ?? 0);
+    const inner = getAnimalListFromBuilding(h);
+    const weight = inner.length > 0 ? inner.length : heads > 0 ? heads : 1;
+    counts.set(oid, (counts.get(oid) || 0) + weight);
   }
   let best = null;
   let bestN = -1;
@@ -207,19 +239,143 @@ export async function loadServersAndTabs() {
     }
 }
 
+/** When many saves are configured, switch from tab buttons to a compact dropdown. */
+const SERVER_DROPDOWN_MIN_COUNT = 4;
+let _serverSelectorResizeObserver = null;
+let _serverSelectorLayoutTimer = null;
+
+function escapeSelectorLabel(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function jsAttrString(value) {
+  return String(value ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+function buildServerTabsMarkup(servers, activeServerId) {
+  let html = '<div class="btn-group shadow-sm" role="group" aria-label="Save tabs">';
+  for (const server of servers) {
+    const isActive = sameServerId(server.id, activeServerId)
+      ? "btn-farm-accent text-dark"
+      : "btn-outline-light";
+    const sid = jsAttrString(server.id);
+    const name = escapeSelectorLabel(server.name);
+    html += `<button type="button" class="btn ${isActive} btn-sm fw-bold text-nowrap" onclick="dashboard.switchServer('${sid}')">
+                    <i class="bi bi-hdd-network me-1"></i>${name}
+                 </button>`;
+  }
+  html += "</div>";
+  return html;
+}
+
+function buildServerDropdownMarkup(servers, activeServerId) {
+  const active =
+    servers.find((s) => sameServerId(s.id, activeServerId)) || servers[0];
+  const label = active?.name
+    ? escapeSelectorLabel(active.name)
+    : escapeSelectorLabel(t("nav.selectSave"));
+  let html = `
+    <div class="dropdown farm-server-select-dropdown">
+      <button class="btn btn-outline-light btn-sm dropdown-toggle fw-bold d-inline-flex align-items-center gap-1"
+              type="button" id="serverSaveDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false"
+              title="${escapeSelectorLabel(t("nav.servers"))}">
+        <i class="bi bi-hdd-network flex-shrink-0" aria-hidden="true"></i>
+        <span class="server-select-label">${label}</span>
+      </button>
+      <ul class="dropdown-menu dropdown-menu-dark shadow border-farm-accent" aria-labelledby="serverSaveDropdownBtn">
+  `;
+  for (const server of servers) {
+    const isActive = sameServerId(server.id, activeServerId)
+      ? "active bg-farm-accent text-dark fw-bold"
+      : "";
+    const sid = jsAttrString(server.id);
+    const name = escapeSelectorLabel(server.name);
+    html += `<li><a class="dropdown-item ${isActive}" href="#" onclick="dashboard.switchServer('${sid}'); return false;">
+      <i class="bi bi-hdd-network me-1"></i>${name}
+    </a></li>`;
+  }
+  html += "</ul></div>";
+  return html;
+}
+
+function serverTabsLookOvercrowded(container, serverCount) {
+  if (serverCount >= SERVER_DROPDOWN_MIN_COUNT) return true;
+  const btnGroup = container.querySelector(".btn-group");
+  if (!btnGroup) return false;
+  return btnGroup.scrollWidth > container.clientWidth + 2;
+}
+
+function scheduleServerSelectorLayoutCheck(dashboard) {
+  clearTimeout(_serverSelectorLayoutTimer);
+  _serverSelectorLayoutTimer = setTimeout(() => {
+    _serverSelectorLayoutTimer = null;
+    updateServerSelectorLayout(dashboard);
+  }, 0);
+}
+
+function updateServerSelectorLayout(dashboard) {
+  const container = document.getElementById("server-tabs-container");
+  const servers = dashboard?.availableServers;
+  if (!container || !Array.isArray(servers) || servers.length === 0) return;
+
+  if (dashboard._serverSelectorUseDropdown) {
+    container.innerHTML = buildServerTabsMarkup(servers, dashboard.activeServerId);
+    container.classList.remove("is-dropdown-mode");
+    const stillCrowded = serverTabsLookOvercrowded(container, servers.length);
+    if (stillCrowded) {
+      container.innerHTML = buildServerDropdownMarkup(servers, dashboard.activeServerId);
+      container.classList.add("is-dropdown-mode");
+      return;
+    }
+    dashboard._serverSelectorUseDropdown = false;
+    return;
+  }
+
+  const overcrowded = serverTabsLookOvercrowded(container, servers.length);
+  if (!overcrowded) return;
+  dashboard._serverSelectorUseDropdown = true;
+  container.innerHTML = buildServerDropdownMarkup(servers, dashboard.activeServerId);
+  container.classList.add("is-dropdown-mode");
+}
+
+function ensureServerSelectorResizeObserver(dashboard) {
+  const target = document.querySelector(".farm-navbar-saves");
+  if (!target || _serverSelectorResizeObserver) return;
+  _serverSelectorResizeObserver = new ResizeObserver(() => {
+    scheduleServerSelectorLayoutCheck(dashboard);
+  });
+  _serverSelectorResizeObserver.observe(target);
+  if (typeof window !== "undefined") {
+    window.addEventListener("resize", () => scheduleServerSelectorLayoutCheck(dashboard), {
+      passive: true,
+    });
+  }
+}
+
 export function renderServerTabs() {
     const container = document.getElementById("server-tabs-container");
     if (!container) return;
 
-    let html = '<div class="btn-group shadow-sm" role="group">';
-    this.availableServers.forEach(server => {
-        const isActive = sameServerId(server.id, this.activeServerId) ? 'btn-farm-accent text-dark' : 'btn-outline-light';
-        html += `<button type="button" class="btn ${isActive} btn-sm fw-bold" onclick="dashboard.switchServer('${server.id}')">
-                    <i class="bi bi-hdd-network me-1"></i>${server.name}
-                 </button>`;
-    });
-    html += '</div>';
-    container.innerHTML = html;
+    const servers = this.availableServers || [];
+    if (servers.length === 0) {
+        container.innerHTML = "";
+        container.classList.remove("is-dropdown-mode");
+        return;
+    }
+
+    if (this._serverSelectorUseDropdown) {
+        container.innerHTML = buildServerDropdownMarkup(servers, this.activeServerId);
+        container.classList.add("is-dropdown-mode");
+    } else {
+        container.innerHTML = buildServerTabsMarkup(servers, this.activeServerId);
+        container.classList.remove("is-dropdown-mode");
+        scheduleServerSelectorLayoutCheck(this);
+    }
+    ensureServerSelectorResizeObserver(this);
 }
 
 /**
@@ -444,7 +600,9 @@ export async function checkAPIAvailability() {
       }
       this.scheduleStartupHydrationRetry();
     }
-  } catch (error) {}
+  } catch (error) {
+    console.error("[checkAPIAvailability]", error);
+  }
   if (hasRenderableDashboardData(this)) {
     showDashboardOrFallback(this);
     if (typeof window.farmDashNotifyDataReady === "function") {
@@ -564,23 +722,31 @@ export function scheduleBrowserMergedSnapshotPersist(dashboard, data) {
 export function applyApiMergedDataPayload(dashboard, data) {
   if (!dashboard || !data || data.error) return;
 
+  data = pruneMergedDataToPlayerFarms(data);
+
   dashboard.vehicles = data.vehicles || [];
   dashboard.economy = data.economy || {};
   dashboard.finance = data.finance || {};
   dashboard.weather = data.weather || {};
   dashboard.production = data.production || {};
   dashboard.pastures = data.pastures || [];
-  dashboard.mapTitle = data.mapTitle || null;
+  dashboard.mapTitle = data.mapTitle || data.serverInfo?.mapName || null;
+  dashboard.mapId = data.mapId || data.serverInfo?.mapId || null;
+  dashboard.mapBounds = data.serverInfo?.mapBounds || null;
+  if (typeof dashboard.syncFleetMapOverviewIdentity === "function") {
+    dashboard.syncFleetMapOverviewIdentity(dashboard);
+  }
   dashboard.savegameName = data.savegameName || null;
   dashboard.dataSource = data.dataSource || "unknown";
   dashboard.xmlAvailable = data.xmlAvailable || false;
   dashboard.luaAvailable = data.luaAvailable || false;
+  dashboard.dataTimestamps = data.dataTimestamps || null;
   dashboard.modVersionCheck = data.modVersionCheck || null;
   dashboard.money = data.money || 0;
   dashboard.gameSettings = data.gameSettings || data.settings || {};
   dashboard.husbandryData = ensureHusbandryArray(data.animals);
 
-  dashboard.farms = ensureArray(data.farmInfo);
+  dashboard.farms = getPlayerFarmRecords(data.farmInfo);
   dashboard.playerFarms = dashboard.farms;
   const mpFarmSwitch = dashboard.isFarmDropdownEnabled();
   const farmKey = `dashboard_active_farm_${String(dashboard.activeServerId)}`;
@@ -595,6 +761,7 @@ export function applyApiMergedDataPayload(dashboard, data) {
 
   dashboard.allFields = data.fields || [];
   dashboard.fields = filterFieldsForFarmView(dashboard.allFields, dashboard.activeFarmId ?? 1);
+  const husbandryBuildings = ensureHusbandryArray(data.animals);
   if (dashboard.fields.length === 0 && dashboard.allFields.length > 0) {
     const inferred = inferFarmIdFromFieldOwnership(dashboard.allFields, dashboard.farms);
     if (inferred != null && Number(inferred) !== Number(dashboard.activeFarmId)) {
@@ -607,39 +774,66 @@ export function applyApiMergedDataPayload(dashboard, data) {
       dashboard.fields = filterFieldsForFarmView(dashboard.allFields, dashboard.activeFarmId);
       if (typeof dashboard.renderFarmDropdown === "function") dashboard.renderFarmDropdown();
     }
+  } else if (husbandryBuildings.length > 0) {
+    const ownsLivestock = husbandryBuildings.some(
+      (h) => entityOwnerFarmId(h) === Number(dashboard.activeFarmId ?? 1)
+    );
+    if (!ownsLivestock) {
+      const inferred = inferFarmIdFromHusbandryOwnership(husbandryBuildings, dashboard.farms);
+      if (inferred != null && Number(inferred) !== Number(dashboard.activeFarmId)) {
+        dashboard.activeFarmId = Number(inferred);
+        try {
+          localStorage.setItem(farmKey, String(inferred));
+        } catch (_) {
+          /* ignore */
+        }
+        dashboard.fields = filterFieldsForFarmView(dashboard.allFields, dashboard.activeFarmId);
+        if (typeof dashboard.renderFarmDropdown === "function") dashboard.renderFarmDropdown();
+      }
+    }
   }
 
-  const husbandryBuildings = ensureHusbandryArray(data.animals);
   if (husbandryBuildings.length > 0) {
-    const allAnimals = [];
-    husbandryBuildings.forEach((building) => {
-      const inner = getAnimalListFromBuilding(building);
-      if (!inner.length) return;
-      const ownerFarmId = building.ownerFarmId ?? building.farmId;
-      const hid = building.id ?? building.buildingId;
-      const hname = building.name;
-      inner.forEach((animal) => {
-        allAnimals.push({
-          ...animal,
-          subType: animal.subType || animal.type || animal.animalType,
-          ownerFarmId: animal.ownerFarmId ?? ownerFarmId,
-          farmId: animal.farmId ?? ownerFarmId,
-          husbandryId: animal.husbandryId ?? hid,
-          husbandryName: animal.husbandryName ?? hname,
+    if (
+      dashboard.realtimeConnector &&
+      typeof dashboard.realtimeConnector.updateAnimalsData === "function"
+    ) {
+      dashboard.realtimeConnector.updateAnimalsData(husbandryBuildings);
+    } else {
+      const allAnimals = [];
+      husbandryBuildings.forEach((building) => {
+        const inner = getAnimalListFromBuilding(building);
+        if (!inner.length) return;
+        const ownerFarmId = building.ownerFarmId ?? building.farmId;
+        const hid = building.id ?? building.buildingId;
+        const hname = building.name;
+        inner.forEach((animal) => {
+          allAnimals.push({
+            ...animal,
+            subType: animal.subType || animal.type || animal.animalType,
+            ownerFarmId: animal.ownerFarmId ?? ownerFarmId,
+            farmId: animal.farmId ?? ownerFarmId,
+            husbandryId: animal.husbandryId ?? hid,
+            husbandryName: animal.husbandryName ?? hname,
+          });
         });
       });
-    });
-    const uniqueAnimals = [];
-    const seenIds = new Set();
-    allAnimals.forEach((animal) => {
-      if (!seenIds.has(animal.id)) {
-        seenIds.add(animal.id);
-        uniqueAnimals.push(animal);
+      const uniqueAnimals = [];
+      const seenIds = new Set();
+      allAnimals.forEach((animal) => {
+        if (!seenIds.has(animal.id)) {
+          seenIds.add(animal.id);
+          uniqueAnimals.push(animal);
+        }
+      });
+      dashboard.animals = uniqueAnimals;
+      if (typeof dashboard.parsePastureData === "function") {
+        dashboard.parsePastureData();
       }
-    });
-    dashboard.animals = uniqueAnimals;
+    }
   } else {
     dashboard.animals = [];
+    dashboard.pastures = [];
   }
 
   dashboard.resyncRealtimeAfterBootstrap();
@@ -647,6 +841,9 @@ export function applyApiMergedDataPayload(dashboard, data) {
     window.farmDashNotifyDataReady();
   }
   pushSimHubLiveContext(dashboard);
+  if (typeof dashboard.refreshFleetMapIfVisible === "function") {
+    dashboard.refreshFleetMapIfVisible();
+  }
   if (typeof dashboard.maybeShowModRequiredModal === "function") {
     dashboard.maybeShowModRequiredModal();
   }
@@ -882,7 +1079,7 @@ export function renderFarmDropdown() {
         return;
     }
     if (!Array.isArray(this.farms) || this.farms.length === 0) return;
-    const playerFarms = this.farms.filter(f => Number(f.id) > 0);
+    const playerFarms = getPlayerFarmRecords(this.farms);
     if (playerFarms.length === 0) {
         container.classList.remove("d-flex"); container.classList.add("d-none"); return;
     }

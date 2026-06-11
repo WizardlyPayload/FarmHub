@@ -63,6 +63,168 @@ function sumBaleBucket(bucket) {
   );
 }
 
+/** Per-farm bale rows from Lua `baleInventory.byFarm`, with legacy single-farm fallback. */
+export function resolveBaleInventoryForFarm(baleInventory, farmId) {
+  const inv = baleInventory && typeof baleInventory === "object" ? baleInventory : {};
+  const fid = Number(farmId ?? 1);
+  const empty = { onField: {}, inStorage: {}, offField: {} };
+  if (!Number.isFinite(fid) || fid <= 0) return empty;
+
+  const normalizeRow = (row) => {
+    const storage = row?.inStorage || row?.offField || {};
+    return {
+      onField: row?.onField || {},
+      inStorage: storage,
+      offField: storage,
+    };
+  };
+
+  const byFarm = inv.byFarm;
+  if (byFarm && typeof byFarm === "object") {
+    const row = byFarm[String(fid)] ?? byFarm[fid] ?? null;
+    if (row) return normalizeRow(row);
+    return empty;
+  }
+
+  const bid = Number(inv.farmId);
+  if (Number.isFinite(bid) && bid > 0 && bid !== fid) {
+    return empty;
+  }
+  return normalizeRow(inv);
+}
+
+const CONSUMABLE_FULL_PCT = 95;
+
+function humanizeFillTypeName(fillType) {
+  return String(fillType || "Unknown")
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Primary fill line on a pallet / big bag / IBC (highest level). */
+export function getConsumablePrimaryFill(vehicle) {
+  const levels = vehicle?.fillLevels || {};
+  let best = null;
+  for (const [type, data] of Object.entries(levels)) {
+    if (!data || typeof data !== "object") continue;
+    const level = Number(data.level) || 0;
+    const capacity = Number(data.capacity) || 0;
+    if (level <= 0 && capacity <= 0) continue;
+    const pct =
+      capacity > 0 ? Math.min(100, Math.round((level / capacity) * 100)) : 0;
+    if (!best || level > best.level) {
+      best = { fillType: type, level, capacity, pct };
+    }
+  }
+  return best;
+}
+
+export function getConsumableContainerKind(vehicle) {
+  if (!vehicle || typeof vehicle !== "object") return "pallet";
+  const brandLabel =
+    vehicle.brand &&
+    (typeof vehicle.brand === "string"
+      ? vehicle.brand
+      : vehicle.brand.name || "");
+  const blob = [
+    vehicle.typeName,
+    vehicle.name,
+    vehicle.filename,
+    vehicle.vehicleType,
+    brandLabel,
+  ]
+    .filter(Boolean)
+    .map((s) => String(s).toLowerCase())
+    .join(" ");
+  if (
+    blob.includes("bigbag") ||
+    blob.includes("big_bag") ||
+    /\bbig\s+bag\b/.test(blob)
+  ) {
+    return "bigBag";
+  }
+  if (
+    /\bibc\b/.test(blob) ||
+    blob.includes("liquidtank") ||
+    blob.includes("liquid_tank") ||
+    blob.includes("bulkliquid")
+  ) {
+    return "ibc";
+  }
+  return "pallet";
+}
+
+function inferFillTypeFromVehicleName(vehicle) {
+  const blob = String(
+    `${vehicle?.name || ""} ${vehicle?.typeName || ""} ${vehicle?.filename || ""}`
+  ).toUpperCase();
+  if (blob.includes("LIME")) return "LIME";
+  if (blob.includes("HERBICIDE")) return "HERBICIDE";
+  if (blob.includes("LIQUID_FERT") || blob.includes("LIQUID FERT")) {
+    return "LIQUID_FERTILIZER";
+  }
+  if (blob.includes("FERTILIZER") || blob.includes("FERTILISER")) {
+    return "FERTILIZER";
+  }
+  if (blob.includes("SEEDS") || blob.includes("SEED")) return "SEEDS";
+  if (blob.includes("MANURE")) return "MANURE";
+  if (blob.includes("BALE_WRAP") || blob.includes("WRAP")) return "BALE_WRAP";
+  if (blob.includes("TWINE")) return "BALE_TWINE";
+  if (blob.includes("NET")) return "BALE_NET";
+  return "UNKNOWN";
+}
+
+function consumableContainerLabel(kind) {
+  const map = {
+    pallet: "economy.consumablesContainerPallet",
+    bigBag: "economy.consumablesContainerBigBag",
+    ibc: "economy.consumablesContainerIbc",
+  };
+  return t(map[kind] || map.pallet);
+}
+
+/**
+ * Group pallets / big bags / IBCs by product + container.
+ * Full stacks (≥95%) collapse to a count; partials stay listed individually.
+ */
+export function aggregateConsumables(items) {
+  const groups = new Map();
+  for (const v of items || []) {
+    const primary = getConsumablePrimaryFill(v);
+    const fillType = primary?.fillType || inferFillTypeFromVehicleName(v);
+    const containerKind = getConsumableContainerKind(v);
+    const key = `${fillType}::${containerKind}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        fillType,
+        containerKind,
+        full: 0,
+        partials: [],
+      });
+    }
+    const g = groups.get(key);
+    const pct = primary?.pct ?? (primary ? 0 : 100);
+    if (pct >= CONSUMABLE_FULL_PCT || !primary) {
+      g.full += 1;
+    } else {
+      g.partials.push({
+        pct,
+        level: primary.level,
+        capacity: primary.capacity,
+      });
+    }
+  }
+  for (const g of groups.values()) {
+    g.partials.sort((a, b) => b.pct - a.pct);
+  }
+  return [...groups.values()].sort((a, b) =>
+    humanizeFillTypeName(a.fillType).localeCompare(
+      humanizeFillTypeName(b.fillType)
+    )
+  );
+}
+
 function baleCategoryLabel(key) {
   const map = {
     straw: "economy.baleCatStraw",
@@ -74,21 +236,23 @@ function baleCategoryLabel(key) {
   return t(map[key] || "economy.baleCatOther");
 }
 
-/** HTML: badges per fill type with non-zero counts */
-function baleInventoryBadgesHtml(bucket) {
-  const parts = [];
+/** Itemised breakdown under section totals (each bale category with count). */
+function baleInventoryBreakdownHtml(bucket) {
+  const lines = [];
   for (const key of BALE_CATEGORY_KEYS) {
     const n = Number(bucket?.[key]) || 0;
     if (n <= 0) continue;
     const cls = BALE_BADGE_CLASS[key] || "bg-secondary";
-    parts.push(
-      `<span class="badge ${cls} me-1 mb-1">${baleCategoryLabel(key)}: <strong>${n}</strong></span>`
-    );
+    lines.push(`
+      <div class="d-flex justify-content-between align-items-center small py-1 border-bottom border-secondary border-opacity-25">
+        <span><span class="badge ${cls} me-2">${baleCategoryLabel(key)}</span></span>
+        <strong class="text-white">${n}</strong>
+      </div>`);
   }
-  if (parts.length === 0) {
-    return `<span class="text-muted small">${t("economy.baleInventoryCategoryNone")}</span>`;
+  if (lines.length === 0) {
+    return `<p class="text-muted small mb-0">${t("economy.baleInventoryCategoryNone")}</p>`;
   }
-  return `<div class="d-flex flex-wrap align-items-center">${parts.join("")}</div>`;
+  return `<div class="mt-2">${lines.join("")}</div>`;
 }
 
 export function showEconomySection() {
@@ -459,17 +623,18 @@ export function updateConsumablesBaleSummaryCard(data) {
   }
 
   const farmId = window.dashboard?.activeFarmId ?? 1;
-  const inv = data.baleInventory || {};
-  const onField = inv.onField || {};
-  const offField = inv.offField || {};
+  const { onField, inStorage } = resolveBaleInventoryForFarm(
+    data.baleInventory,
+    farmId
+  );
   const onSum = sumBaleBucket(onField);
-  const offSum = sumBaleBucket(offField);
+  const storageSum = sumBaleBucket(inStorage);
 
   const title = t("economy.consumablesBaleSummaryTitle");
   const subtitle = t("economy.consumablesBaleInventorySubtitle");
 
   let legacyFooter = "";
-  if (onSum === 0 && offSum === 0) {
+  if (onSum === 0 && storageSum === 0) {
     const { total, fieldsWithBales } = sumBalesOnFarmFields(data, farmId);
     if (total > 0) {
       legacyFooter = `
@@ -500,24 +665,24 @@ export function updateConsumablesBaleSummaryCard(data) {
                 <span class="display-6 fw-bold text-info lh-1">${onSum}</span>
               </div>
               <p class="small text-muted mb-2">${t("economy.balesLooseOnFieldsHint")}</p>
-              ${baleInventoryBadgesHtml(onField)}
+              ${baleInventoryBreakdownHtml(onField)}
             </div>
           </div>
           <div class="col-lg-6">
             <div class="border border-secondary border-opacity-50 rounded p-3 h-100 bg-dark bg-opacity-25">
               <div class="d-flex justify-content-between align-items-start mb-2">
                 <h6 class="mb-0 text-warning">
-                  <i class="bi bi-building me-1"></i>${t("economy.balesInYardsSheds")}
+                  <i class="bi bi-building me-1"></i>${t("economy.balesInStorage")}
                 </h6>
-                <span class="display-6 fw-bold text-warning lh-1">${offSum}</span>
+                <span class="display-6 fw-bold text-warning lh-1">${storageSum}</span>
               </div>
-              <p class="small text-muted mb-2">${t("economy.balesInYardsShedsHint")}</p>
-              ${baleInventoryBadgesHtml(offField)}
+              <p class="small text-muted mb-2">${t("economy.balesInStorageHint")}</p>
+              ${baleInventoryBreakdownHtml(inStorage)}
             </div>
           </div>
         </div>
         ${
-          onSum === 0 && offSum === 0 && !legacyFooter
+          onSum === 0 && storageSum === 0 && !legacyFooter
             ? `<p class="text-muted small mt-3 mb-0">${t("economy.baleInventoryEmptyAll")}</p>`
             : ""
         }
@@ -527,22 +692,49 @@ export function updateConsumablesBaleSummaryCard(data) {
   `;
 }
 
-function consumableFillSummaryHtml(vehicle) {
-  const levels = vehicle.fillLevels || {};
-  const keys = Object.keys(levels);
-  if (keys.length === 0) {
-    return `<small class="text-muted">${t("economy.consumablesNoFill")}</small>`;
-  }
-  return keys
-    .map((type) => {
-      const data = levels[type];
-      const pct =
-        data && data.capacity > 0
-          ? Math.round((data.level / data.capacity) * 100)
-          : 0;
-      return `<small class="text-muted d-block">${t("economy.consumablesFillLine", { type: _safe(type), pct })}</small>`;
-    })
-    .join("");
+function renderAggregatedConsumableGroup(group) {
+  const product = humanizeFillTypeName(group.fillType);
+  const container = consumableContainerLabel(group.containerKind);
+  const fullLine =
+    group.full > 0
+      ? `<div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="badge bg-success">${t("economy.consumablesFullCount", { count: group.full })}</span>
+          <span class="small text-muted">${t("economy.consumablesFullLabel")}</span>
+        </div>`
+      : "";
+  const partialLines =
+    group.partials.length > 0
+      ? group.partials
+          .map(
+            (p) =>
+              `<li class="small text-muted">${t("economy.consumablesPartialLine", {
+                pct: p.pct,
+                liters: Math.round(p.level),
+                capacity: Math.round(p.capacity),
+              })}</li>`
+          )
+          .join("")
+      : "";
+  const partialBlock =
+    partialLines.length > 0
+      ? `<ul class="list-unstyled mb-0 ps-2 border-start border-info border-opacity-50">${partialLines}</ul>`
+      : "";
+
+  return `
+    <div class="col-md-6 col-lg-4 mb-4">
+      <div class="card bg-secondary h-100 border border-info border-opacity-25">
+        <div class="card-header">
+          <h6 class="mb-0 text-truncate" title="${_safe(product)}">
+            <i class="bi bi-box-seam text-info me-1"></i>${_safe(product)}
+          </h6>
+          <small class="text-muted">${_safe(container)}</small>
+        </div>
+        <div class="card-body py-3">
+          ${fullLine || ""}
+          ${partialBlock || (group.full <= 0 ? `<small class="text-muted">${t("economy.consumablesNoFill")}</small>` : "")}
+        </div>
+      </div>
+    </div>`;
 }
 
 export function updateConsumablesList(vehicles) {
@@ -564,51 +756,8 @@ export function updateConsumablesList(vehicles) {
     return;
   }
 
-  let html = "";
-  rows.forEach((vehicle) => {
-    const condition = this.calculateCondition(vehicle.damage || 0);
-    const age = vehicle.age || 0;
-    const icon = this.getVehicleIcon(vehicle.vehicleType, vehicle.typeName || "");
-    html += `
-      <div class="col-md-6 col-lg-4 mb-4 consumable-card" data-type="${
-        vehicle.vehicleType || "unknown"
-      }" data-price="${vehicle.price || 0}" data-age="${age}">
-        <div class="card bg-secondary h-100 border border-info border-opacity-25">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <h6 class="mb-0 text-truncate" style="max-width:70%">
-              <i class="bi ${icon} text-info"></i>
-              ${_safe(resolveVehicleDisplayName(vehicle))}
-            </h6>
-            <span class="badge bg-info text-dark text-truncate" style="max-width:45%" title="${_safe(String(vehicle.typeName || ""))}">
-              ${_safe(vehicle.typeName || vehicle.vehicleType || "—")}
-            </span>
-          </div>
-          <div class="card-body">
-            <div class="row mb-2">
-              <div class="col-6">
-                <small class="text-muted">${t("economy.purchasePrice")}</small><br>
-                <strong class="text-success">${this.formatCurrency(vehicle.price || 0)}</strong>
-              </div>
-              <div class="col-6">
-                <small class="text-muted">${t("economy.purchaseCondition")}</small><br>
-                <span class="badge ${condition.class}">${condition.text}</span>
-              </div>
-            </div>
-            <div class="mb-2">
-              <small class="text-muted d-block mb-1">${t("economy.consumablesContents")}</small>
-              ${consumableFillSummaryHtml(vehicle)}
-            </div>
-            <div class="small text-muted">
-              <i class="bi bi-geo-alt me-1"></i>
-              ${Math.round(vehicle.position?.x || 0)}, ${Math.round(vehicle.position?.z || 0)}
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  });
-
-  el.innerHTML = html;
+  const groups = aggregateConsumables(rows);
+  el.innerHTML = groups.map((g) => renderAggregatedConsumableGroup(g)).join("");
 }
 
 export function updateMarketPrices(economyData) {

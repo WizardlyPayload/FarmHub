@@ -24,6 +24,7 @@
     "i18n:audit": "npm run i18n:audit --prefix FS25_FarmDashboard_App",
     "i18n:build": "npm run i18n:build --prefix FS25_FarmDashboard_App",
     "i18n:sync": "npm run i18n:sync --prefix FS25_FarmDashboard_App",
-    "i18n:verify": "npm run i18n:verify --prefix FS25_FarmDashboard_App"
+    "i18n:verify": "npm run i18n:verify --prefix FS25_FarmDashboard_App",
+    "testers:hash": "node tools/generate-testers-password-hash.mjs"
   }
 }

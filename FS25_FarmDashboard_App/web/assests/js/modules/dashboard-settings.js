@@ -844,7 +844,7 @@ function populateAboutModVersions(dashboard) {
   const modEl = document.getElementById("settings-about-mod-version");
   const expectedEl = document.getElementById("settings-about-mod-expected");
   const check = dashboard?.modVersionCheck;
-  const expected = check?.expectedMin || "3.0.0.0";
+  const expected = check?.expectedMin || "3.1.0.0";
 
   if (expectedEl) expectedEl.textContent = expected;
 

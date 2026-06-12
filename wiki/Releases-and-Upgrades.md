@@ -1,11 +1,11 @@
 # Releases & Upgrades
 
-## Current release (4.0.0)
+## Current release (4.1.0)
 
 | Asset | Version |
 |-------|---------|
-| `FS25 Farm Dashboard Setup 4.0.0.exe` | App **4.0.0** |
-| `FS25_FarmDashboard.zip` | Mod **2.3.0.0** |
+| `FS25 Farm Dashboard Setup 4.1.0.exe` | App **4.1.0** |
+| `FS25_FarmDashboard.zip` | Mod **3.1.0.0** |
 
 **Download:** [GitHub Releases](https://github.com/WizardlyPayload/FarmHub/releases)
 
@@ -13,7 +13,7 @@
 
 ### Updating from 3.9.0
 
-Launch the installed app → **Settings → Check for updates** (or wait ~10s) → **Restart and install**. Requires a **published** release with **`latest.yml`** + **`Setup 4.0.0.exe`** (draft releases are invisible to the updater).
+Launch the installed app → **Settings → Check for updates** (or wait ~10s) → **Restart and install**. Requires a **published** release with **`latest.yml`** + **`Setup 4.1.0.exe`** (draft releases are invisible to the updater).
 
 ---
 
@@ -21,8 +21,8 @@ Launch the installed app → **Settings → Check for updates** (or wait ~10s) �
 
 The old repo **[WizardlyPayload/FS25-Farm-Dashboard](https://github.com/WizardlyPayload/FS25-Farm-Dashboard)** shipped app **2.0.0** / mod **2.0.0.0**. **FarmHub** is the canonical project now.
 
-1. Replace mod with **`FS25_FarmDashboard.zip` (2.3.0.0)**; load each save once.
-2. Install app **4.0.0** (or update from **3.9.0** via in-app updater).
+1. Replace mod with **`FS25_FarmDashboard.zip` (3.1.0.0)**; load each save once.
+2. Install app **4.1.0** (or update from **4.0.0** via in-app updater).
 3. Re-check **Settings → Servers & saves** (FTP paths, LAN password rules).
 
 Full delta: [UPGRADE_FROM_FS25-Farm-Dashboard.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/UPGRADE_FROM_FS25-Farm-Dashboard.md)
@@ -72,6 +72,7 @@ Packaged installs use **electron-updater** (GitHub Releases on **FarmHub**).
 
 | Version | Focus |
 |---------|--------|
+| **4.1.0** | Fleet map, storage inventory, mod 3.1 |
 | **4.0.0** | Stable updater + mod version badge |
 | **3.9.0** | Security hardening, cache, forage/rules fixes |
 | **3.0.0** | Rules-first fields, windrows, unified settings, LAN |
@@ -86,7 +87,7 @@ Detail: [CHANGELOG.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs
 Include:
 
 - FS25 version, SP vs dedicated
-- App **4.0.0**, mod **2.3.0.0**
+- App **4.1.0**, mod **3.1.0.0**
 - Local vs FTP
 - Expected vs actual
 

@@ -1,6 +1,6 @@
-# FS25 Farm Dashboard — User manual (v4.0)
+# FS25 Farm Dashboard — User manual (v4.1)
 
-**Farm Dashboard** is the Windows desktop app that reads live farm data from **Farming Simulator 25** (via the in-game **FS25 Farm Dashboard** mod) and renders it in your browser at **[http://localhost:8766](http://localhost:8766)**. **App version 4.0.0**, **mod version 3.0.0.0**.
+**Farm Dashboard** is the Windows desktop app that reads live farm data from **Farming Simulator 25** (via the in-game **FS25 Farm Dashboard** mod) and renders it in your browser at **[http://localhost:8766](http://localhost:8766)**. **App version 4.1.0**, **mod version 3.1.0.0**.
 
 This manual walks every setting, every section, and every modal, with **inline screenshots** (below each section). Where we already have a similar capture, one image is reused instead of asking twice. Screenshot filenames, capture recipes, and the “still to capture” checklist are in [`SCREENSHOTS.md`](./SCREENSHOTS.md).
 
@@ -34,7 +34,7 @@ This manual walks every setting, every section, and every modal, with **inline s
 | ---- | ------- |
 | **Farming Simulator 25** | Game must run with the mod for live data to exist |
 | **FS25 Farm Dashboard mod** | **`FS25_FarmDashboard.zip`** or folder **`FS25_FarmDashboard`** in your FS25 `mods` folder |
-| **FS25 Farm Dashboard app (Windows)** | Installer `FS25 Farm Dashboard Setup 4.0.0.exe` |
+| **FS25 Farm Dashboard app (Windows)** | Installer `FS25 Farm Dashboard Setup 4.1.0.exe` |
 | **Browser** | Edge, Chrome, Firefox — opens [http://localhost:8766](http://localhost:8766) |
 | **(Optional) FTP credentials** | If FS25 runs on a dedicated / rented server you do not own locally |
 | **(Optional) LAN network** | If you want the dashboard on a tablet or second screen |
@@ -81,7 +81,7 @@ After a minute, look in:
 
 ### Stage D — Install the Windows app
 
-1. Run **`FS25 Farm Dashboard Setup 4.0.0.exe`**.
+1. Run **`FS25 Farm Dashboard Setup 4.1.0.exe`**.
 2. Pick installer language on the welcome page; complete the installer.
 3. Launch **Farm Dashboard** from the Start menu.
 
@@ -208,6 +208,7 @@ After Setup, the dashboard shell loads at [http://localhost:8766](http://localho
 | **Game time** | Live game day / hour from the mod. |
 | **Data-source badge** | Combined "XML + Live + API" health pill. |
 | **Weather pill** | Click to open the **Weather forecast** modal. |
+| **Mod version badge** | Appears when the in-game mod is **older than 3.1.0.0** or missing a version export (legacy builds). |
 | **Notification bell** | Count of recent notifications; click for history modal. |
 | **Settings (gear)** | Opens the unified Settings modal (§5). Hidden in viewer mode. |
 | **Home** | Returns to the landing page. |
@@ -220,9 +221,15 @@ After Setup, the dashboard shell loads at [http://localhost:8766](http://localho
 
 *Figure: Close-up crop of only the game time and weather pills.*
 
-The **landing page** shows up to six cards: Livestock, Vehicles, Fields, Economy, Pastures, Productions. Each card has a count badge using the localised pluralised string (`{{count}} animal/animals`, etc.).
+The **landing page** shows up to six section cards: Livestock, Vehicles, Fields, Economy, Pastures, Productions. Each card has a count badge using the localised pluralised string (`{{count}} animal/animals`, etc.).
 
-There is also an **Import mod images** action on the landing page when running locally with API access.
+Above the cards, the hero toolbar also exposes:
+
+| Control | What it does |
+| ------- | ------------ |
+| **Import mod shop images** | Local-only scan of your FS25 `mods` folder for vehicle thumbnails (same flow as Setup §3.7). Hidden on read-only LAN viewer sessions. |
+| **Game time badge** | Live day / hour from the mod. |
+| **Fleet map** | Opens the live **Fleet map** section (§6.8) with a vehicle count badge. |
 
 ![Import button on landing](screenshots/fd-shell-050-import-mod-images.png)
 
@@ -248,7 +255,7 @@ Open with the gear icon. The modal has a left-hand sidebar with four tabs, plus 
 | Control | What it does | Persisted as |
 | ------- | ------------ | ------------ |
 | **Section toggles (6)** | Show / hide Livestock, Vehicles, Fields, Economy, Pastures, Productions cards on the landing page | `uiPreferences.sections` |
-| **Desktop version** | Read-only build version (e.g. `4.0.0`) | — |
+| **Desktop version** | Read-only build version (e.g. `4.1.0`) | — |
 | **Check for updates** | Triggers `electron-updater` against GitHub Releases | — |
 | **Update status** | Live status line during checks | — |
 | **Field exclusions** | Per-server, per-farmland checkboxes; un-tick to hide that parcel from the Fields page | `uiPreferences.excludedFarmlandIdsByServer` |
@@ -317,7 +324,9 @@ Settings written here become `config.xml` on disk (see §9 for the file path).
 | **Config path** | Read-only label showing the actual `config.xml` path | — |
 | **Update interval (ms)** | Legacy key; only used if `collectionCycleMs` missing | XML attr `updateInterval` |
 | **Collection cycle (ms)** | Master cycle. Clamped 5 000 – 1 800 000 by the mod | XML attr `collectionCycleMs` |
-| **Module checkboxes (7)** | Animals, Vehicles, Fields, Weather, Finance, Economy, Production | XML attrs `farmDashboard.modules#…` |
+| **Module checkboxes (7 in UI)** | Animals, Vehicles, Fields, Weather, Finance, Economy, Production | XML attrs `farmDashboard.modules#…` |
+
+Additional collectors (**stock**, **baleInventory**, **redTape**) are toggled in `config.xml` (§9) — they are not yet exposed as checkboxes in this tab.
 
 ![FS25 mod tab with all controls](screenshots/fd-settings-030-mod-tab.png)
 
@@ -404,6 +413,9 @@ Already covered in §4. The six cards are populated by `navigation.js` `updateLa
 
 | Control | What it does |
 | ------- | ------------ |
+| **In workshop** card | Count of vehicles flagged by **Advanced Damage System (ADS)** as currently under service. Only shown when ADS exports data. |
+| **In need of repair** card | Vehicles with ADS breakdowns, overdue service, or inspection warnings. Click to filter. |
+| **Overdue service** card | ADS vehicles past their maintenance interval. |
 | **Total vehicles** card | Click to clear filter and show all |
 | **Low fuel** card | Click to filter `< 25%` fuel |
 | **High damage** card | Click to filter `> 20%` damage |
@@ -414,10 +426,12 @@ Already covered in §4. The six cards are populated by `navigation.js` `updateLa
 | **Apply filters** | Apply the panel values |
 | **Vehicle grid** | Card per vehicle with image, name, fuel, damage, location |
 | **Vehicle image click** | Opens **Vehicle image** modal (§7.8) |
+| **ADS panel on a card** | When **FS25 Advanced Damage System** is installed, motorized cards can show workshop status, pre-shift inspection, damaged parts, and weakest subsystems. |
+| **Vehicle years badge** | Model year and decade label when the mod exports `vehicleYears` metadata. |
 
-![Summary cards](screenshots/fd-section-vehicles-010-summary.png)
+![Summary cards including ADS workshop / repair counts](screenshots/fd-section-vehicles-040-ads-summary.png)
 
-*Figure: Summary cards.*
+*Figure: Summary cards including ADS workshop / repair counts.*
 
 ![Filters panel](screenshots/fd-section-vehicles-020-filters.png)
 
@@ -426,6 +440,12 @@ Already covered in §4. The six cards are populated by `navigation.js` `updateLa
 ![Vehicle grid](screenshots/fd-section-vehicles-030-grid.png)
 
 *Figure: Vehicle grid.*
+
+![Advanced Damage breakdown panel on a vehicle card](screenshots/fd-section-vehicles-050-ads-breakdown.png)
+
+*Figure: Advanced Damage breakdown panel on a vehicle card.*
+
+*(Summary row without ADS mods active may match `fd-section-vehicles-010-summary.png`.)*
 
 ### 6.4 Fields
 
@@ -445,6 +465,8 @@ The most feature-rich section.
 | **PF Soil badge** | Shown when Precision Farming is mapping nitrogen and pH |
 | **Growth bar** | Animated bar showing current stage |
 | **Forage / bale / windrow volume badge** | Loose straw / grass / hay, bale count, or windrow litres when present |
+| **Moisture badge** | Shown when **[FS25 Moisture System](https://github.com/Ozz-Modding/FS25_MoistureSystem)** (or compatible export) reports crop moisture for the field |
+| **Weeds row** | Percent cover with alert threshold; rules engine may suggest mechanical weeding before herbicide on early growth stages |
 | **N mini-bar** | Current vs target nitrogen |
 | **pH mini-bar** | Current pH vs target |
 | **Suggested next step** | One-line recommendation; **Rules** badge if the rules engine produced it |
@@ -466,13 +488,17 @@ The most feature-rich section.
 
 *Figure: One field card with the rules suggestion.*
 
-![Field card with windrow volume badge](screenshots/fd-section-fields-040-card-windrow.png)
+![Field card with moisture, weeds, and rules suggestion](screenshots/fd-section-fields-045-moisture-weeds.png)
 
-*Figure: Field card with windrow volume badge.*
+*Figure: Field card with moisture, weeds, and rules suggestion.*
 
 ![Field card with N + pH mini-bars](screenshots/fd-section-fields-050-card-soil.png)
 
 *Figure: Field card with N + pH mini-bars.*
+
+![Field card — monitor toward harvest (no soil job flagged)](screenshots/fd-section-fields-046-monitor-harvest.png)
+
+*Figure: Field card — monitor toward harvest (no soil job flagged).*
 
 ![Tools & shop block](screenshots/fd-section-fields-060-tools-shop.png)
 
@@ -482,19 +508,60 @@ When install and server setup are correct (§2–§3), Fields loads with live ca
 
 ### 6.5 Economy
 
+The Economy section has up to four tabs: **Market prices**, **Equipment purchases**, **Storage**, and (when the **Red Tape** mod is active on the save) **Compliance**.
+
 | Control | What it does |
 | ------- | ------------ |
 | **Current money** card | Live cash on hand |
 | **Total purchases** card | Equipment value |
 | **Outstanding loan** card | Current debt |
 | **Net worth** card | Assets minus debt |
-| **Equipment Purchases** tab | Shows the Purchases sub-page |
-| **Market Prices** tab | Shows the Market sub-page (placeholder when no API) |
-| **Filter — All equipment** | Show everything |
+| **Market prices** tab | Crop / commodity prices with search |
+| **Equipment purchases** tab | Purchased vehicles and implements with filters and sort |
+| **Storage** tab | Silo & bunker stock table, **Bale stock** summary, and **Pallets & big bags** grid (see below) |
+| **Compliance** tab | Red Tape policies, schemes, tax, grants, and recent events (only when exported) |
+| **Filter — All equipment** | Show everything (Purchases tab) |
 | **Filter — Vehicles** | Limit to vehicles |
 | **Filter — Implements** | Limit to implements |
 | **Sort — Price / Age / Name** | Sort buttons |
 | **Market search** | Filter by crop or location |
+
+#### Storage tab
+
+| Block | What it shows |
+| ----- | ------------- |
+| **Silo & bunker stock** | Expandable table of fill types with litres, best sell point, value, and optional moisture / grade column when exported |
+| **Bale stock** | Two cards: **Loose on cropland** (inside registered field polygons) vs **Storage** (yards, sheds, AUTO BALE STORAGE buildings, and other off-field farmland). Breakdown by straw / grass / hay / silage / other. |
+| **Pallets & big bags** | Pallets, IBCs, and big bags grouped by product |
+
+![Storage tab — silo stock and bale inventory](screenshots/fd-section-economy-040-storage-tab.png)
+
+*Figure: Storage tab — silo stock and bale inventory.*
+
+![Bale storage breakdown by fill type](screenshots/fd-section-economy-041-bale-storage-breakdown.png)
+
+*Figure: Bale storage breakdown by fill type.*
+
+#### Compliance tab (Red Tape mod)
+
+When the save runs **Red Tape** and the mod collector is enabled, Economy gains a **Compliance** tab for the active farm:
+
+| Block | What it shows |
+| ----- | ------------- |
+| **Tier / points / policies** | Compliance tier letter, score, and policy count |
+| **Policies table** | Each policy with warnings, watched flag, and next evaluation day |
+| **Active / available schemes** | Environmental or subsidy schemes |
+| **Tax** | Monthly income / expense summary and statement rows |
+| **Grants** | Open grant applications |
+| **Recent events** | Point awards and evaluation log |
+
+![Compliance overview — policies and tier](screenshots/fd-section-redtape-010-compliance.png)
+
+*Figure: Compliance overview — policies and tier.*
+
+![Recent compliance events log](screenshots/fd-section-redtape-020-events.png)
+
+*Figure: Recent compliance events log.*
 
 ![Summary row](screenshots/fd-section-economy-010-summary.png)
 
@@ -541,6 +608,35 @@ Productions has no user filters; it is read-only.
 ![Chains list](screenshots/fd-section-productions-010-list.png)
 
 *Figure: Chains list.*
+
+### 6.8 Fleet map
+
+Open from the landing **Fleet map** button or `#map` in the URL. The map plots live vehicle positions on your save's PDA **overview** texture (resolved from installed map mods on the PC running the app).
+
+| Control | What it does |
+| ------- | ------------ |
+| **Show all farms** | When ticked, plots every farm's vehicles; when off, only the navbar farm selection |
+| **Plotted count** | Live count of vehicles with valid world coordinates |
+| **Zoom − / +** | Step zoom in and out |
+| **Reset view** | Fit the clipped playable map area |
+| **Fit items** | Zoom to include all visible pins |
+| **Drag / scroll** | Pan and wheel-zoom inside the map stage |
+| **Pin click** | Tooltip with vehicle name, farm, type, and rounded X/Z |
+| **Legend** | Farm colour swatches when the save reports multiple farms |
+
+The app clips decorative borders from desk-style overview images (common on mod maps) so pins align with the in-game PDA playable rectangle. On first open after a map change, the app may rebuild `%APPDATA%\fs25-farm-dashboard\map_overviews\` cache — allow a few seconds.
+
+> **Known limitation:** on **4 km** maps the engine still uses ±1024 m PDA coordinates; vehicles beyond that range may appear shifted. See [README](../FS25_FarmDashboard_App/README.md) fleet-map notes.
+
+![Fleet map with vehicle pins on the playable map area](screenshots/fd-section-fleet-map-010-overview.png)
+
+*Figure: Fleet map with vehicle pins on the playable map area.*
+
+For comparison, the in-game PDA uses the same overview asset:
+
+![In-game PDA map (reference — not the dashboard UI)](screenshots/fd-reference-pda-map.png)
+
+*Figure: In-game PDA map (reference — not the dashboard UI).*
 
 ---
 
@@ -658,7 +754,8 @@ Settings → **FS25 mod** edits this file directly (see §5.3). The file looks l
 <farmDashboard>
   <settings updateInterval="60000" collectionCycleMs="60000" debugBaleScan="false" />
   <modules animals="true" vehicles="true" fields="true" weather="true"
-           finance="true" economy="true" production="true" />
+           finance="true" economy="true" production="true"
+           stock="true" baleInventory="true" redTape="true" />
 </farmDashboard>
 ```
 
@@ -667,7 +764,10 @@ Settings → **FS25 mod** edits this file directly (see §5.3). The file looks l
 | `updateInterval` | int (ms) | Legacy fallback; only used when `collectionCycleMs` is missing |
 | `collectionCycleMs` | 5 000 – 1 800 000 | Master cycle; the mod splits this into one slot per enabled module |
 | `debugBaleScan` | `true` / `false` | Throttled bale-scan logging into FS25's `log.txt`. **Hand-edit only** — see audit gap #2 |
-| `modules.animals` … `modules.production` | bool | Per-collector enable; disabling one shortens the slot for the others |
+| `modules.animals` … `modules.production` | bool | Core collectors (also toggled from Settings → FS25 mod) |
+| `modules.stock` | bool | Silo / bunker / placeable storage scan |
+| `modules.baleInventory` | bool | World bale scan + AUTO BALE STORAGE / object-storage sheds (separate from `stock`) |
+| `modules.redTape` | bool | Compliance export when Red Tape mod is present |
 
 ![`config.xml` in File Explorer](screenshots/fd-mod-010-config-xml-explorer.png)
 
@@ -694,6 +794,11 @@ The mod has **no in-game console command** and **no Giants settings menu entry**
 | **Build / install said `app.asar` is locked** | Run `npm run unlock-install` then re-install. The default `npm run dist` writes the build to `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\` to avoid IDE locks. |
 | **Uninstall asked to wipe user data** | Yes deletes settings, caches, and the registry entry. No keeps your config so a reinstall picks up where you left off. Cancel aborts the uninstall. |
 | **Tablet says 401 / 403** | LAN credentials wrong, or your tablet is outside the IP allowlist. Loopback always bypasses auth unless you ticked "Require auth even from loopback". |
+| **Mod version badge in navbar** | Install **`FS25_FarmDashboard.zip` 3.1.0.0+** on the server / local mods folder, load the save once, and confirm `data.json` shows `serverInfo.modVersion`. |
+| **Fleet map pins offset or on desk border** | Restart the app after upgrading to **4.1.0** (overview cache v6). Delete `%APPDATA%\fs25-farm-dashboard\map_overviews\` and reopen Fleet map. Confirm the PC running the app has the same map mod installed. |
+| **Bale counts look doubled on dedicated** | Requires mod **3.1.0.0+** (deduplicated shed vs world scan). Restart app so merge layer picks up fresh JSON. |
+| **Storage tab empty** | Enable `modules.stock="true"` in `config.xml` (§9) and confirm you own silos / bunkers on the active farm. |
+| **Compliance tab missing** | Red Tape mod must be on the save **and** `modules.redTape="true"`. |
 | **`debugBaleScan` in Settings → FS25 mod has no effect** | Audit gap #2 — hand-edit `config.xml` (§9). |
 
 ---
@@ -702,4 +807,4 @@ The mod has **no in-game console command** and **no Giants settings menu entry**
 
 The full list of filenames, captions, and capture recipes (auto vs manual) lives in [`SCREENSHOTS.md`](./SCREENSHOTS.md). All images sit under [`docs/screenshots/`](./screenshots/).
 
-**Document version:** aligned with app **4.0.0** and mod **3.0.0.0**. **Authors:** [`AUTHORS.md`](./AUTHORS.md).
+**Document version:** aligned with app **4.1.0** and mod **3.1.0.0**. **Authors:** [`AUTHORS.md`](./AUTHORS.md).

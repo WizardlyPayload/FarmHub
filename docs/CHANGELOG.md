@@ -1,6 +1,6 @@
 # Farm Dashboard — Changelog
 
-All notable changes to this project are recorded here. For GitHub release blurbs, see [GITHUB_RELEASE_v4.0.0.md](./GITHUB_RELEASE_v4.0.0.md). For **network exposure and trust assumptions**, see [SECURITY.md](./SECURITY.md).
+All notable changes to this project are recorded here. For GitHub release blurbs, see [GITHUB_RELEASE_v4.1.0.md](./GITHUB_RELEASE_v4.1.0.md). For **network exposure and trust assumptions**, see [SECURITY.md](./SECURITY.md).
 
 ---
 
@@ -8,9 +8,43 @@ All notable changes to this project are recorded here. For GitHub release blurbs
 
 | Artifact | Where it lives | Format |
 |----------|----------------|--------|
-| **Desktop app** | `FS25_FarmDashboard_App/package.json` | Semver (e.g. `4.0.0`) |
-| **FS25 mod** | `FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `2.3.0.0`) |
+| **Desktop app** | `FS25_FarmDashboard_App/package.json` | Semver (e.g. `4.1.0`) |
+| **FS25 mod** | `FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `3.1.0.0`) |
 | **Source headers** | First line of many `.js` / `.lua` files | Often `v2.0.0` historically; bump only when you intentionally resync headers |
+
+---
+
+## 4.1.0 — Fleet map, storage inventory, integrations
+
+**App:** `4.1.0` (`package.json`) · **Mod:** `3.1.0.0` (`modDesc.xml` + Lua; app requires **3.1.0.0+** via `modVersionPolicy.js`).
+
+Narrative: **[RELEASE_v4.1.0.md](./RELEASE_v4.1.0.md)** · GitHub body: **[GITHUB_RELEASE_v4.1.0.md](./GITHUB_RELEASE_v4.1.0.md)**.
+
+### Fleet map
+- **`fleet-map.js`**, **`fleetMapGeo.js`**, **`fleetMapViewport.js`**, **`mapOverviewResolver.js`**, **`mapOverviewTerrainInset.cjs`** — PDA overview resolve, terrain inset clip (cache v6), pan/zoom, multi-farm pins.
+- Known limitation: 4 km maps use ±1024 m PDA bounds — documented in app README.
+
+### Bale & storage
+- **`BaleInventoryCollector.lua`**, **`FillTypeUtils.lua`**, **`InventoryScan.lua`** — unified scan; shed bales via `spec_objectStorage`.
+- **`dataMerger.js`**, **`fillTypeResolve.cjs`** — dedupe on-field rollup; fill-type catalog merge.
+- Economy **Storage** tab: silo table, bale stock cards, pallets (`storage.js`).
+
+### Optional mod integrations
+- **ADS** — breakdown / workshop panels (`vehicleAds.js`); i18n from mod XML (`i18n:ads`).
+- **Moisture System** — field moisture badge when exported.
+- **Red Tape** — Compliance tab (`redTape.js`).
+
+### Rules & fields
+- **`rules-engine.js`** — roll-before-weed on early growth; mechanical weed hints.
+- Field hectares / farm scope fixes (`farmScope.js`, `fields.js`).
+
+### Mod config
+- Separate **`enableBaleInventory`** from **`enableStock`**; **`enableRedTape`** module in `config.xml`.
+
+### Tests & docs
+- **279** Jest + **17** `.mjs` tests; parity tests for farm scope, fleet geo, fill types.
+- **[USER_MANUAL.md](./USER_MANUAL.md)** — fleet map, storage, ADS, Red Tape, moisture; new screenshots embedded.
+- App **4.1.0** / mod **3.1.0.0** across README, wiki, release notes.
 
 ---
 

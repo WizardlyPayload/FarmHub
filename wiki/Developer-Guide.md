@@ -2,7 +2,7 @@
 
 For contributors and maintainers of **FarmHub**. Deep reference: [DEVELOPER_HANDOVER.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/DEVELOPER_HANDOVER.md).
 
-**Versions:** app **4.0.0**, mod **2.3.0.0**
+**Versions:** app **4.1.0**, mod **3.1.0.0**
 
 ---
 
@@ -214,7 +214,7 @@ Priority tie-break (maintenance): lime → N → weeds → roll.
 
 1. Bump `package.json` + `modDesc.xml`
 2. `npm run dist` + `Zip-FarmDashboardMod.ps1`
-3. GitHub Release: `.exe` + `FS25_FarmDashboard.zip` + notes from `docs/GITHUB_RELEASE_v4.0.0.md`
+3. GitHub Release: `.exe` + `FS25_FarmDashboard.zip` + notes from `docs/GITHUB_RELEASE_v4.1.0.md`
 
 ---
 
@@ -266,4 +266,4 @@ Full list: [AUDIT_v3.9_PREFINAL.md](https://github.com/WizardlyPayload/FarmHub/b
 
 **Related:** [Releases & Upgrades](Releases-and-Upgrades) · [Security](Security-and-Network)
 
-*App **4.0.0**, mod **2.3.0.0***
+*App **4.1.0**, mod **3.1.0.0***

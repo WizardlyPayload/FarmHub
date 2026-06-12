@@ -98,6 +98,16 @@ For **[manual]** captures, follow the recipe in each row below and drop the PNG 
 | 61 | `fd-lan-030-tablet-dashboard.png` | LAN guide (planned) | manual | Tablet dashboard home — **separate LAN doc**, not USER_MANUAL |
 | 62 | `fd-mod-010-config-xml-explorer.png` | §9 | manual | File Explorer showing `config.xml` |
 | 63 | `fd-mod-020-config-xml-editor.png` | §9 | manual | `config.xml` open in a text editor |
+| 64 | `fd-section-fleet-map-010-overview.png` | §6.8 | manual | Fleet map with pins on playable area (Witcombe) |
+| 65 | `fd-section-economy-040-storage-tab.png` | §6.5 | manual | Economy → Storage — silo table + bale stock |
+| 66 | `fd-section-economy-041-bale-storage-breakdown.png` | §6.5 | manual | Bale storage card breakdown by fill type |
+| 67 | `fd-section-redtape-010-compliance.png` | §6.5 | manual | Red Tape compliance tab — policies & tier |
+| 68 | `fd-section-redtape-020-events.png` | §6.5 | manual | Red Tape recent events log |
+| 69 | `fd-section-vehicles-040-ads-summary.png` | §6.3 | manual | Vehicles summary with ADS workshop cards |
+| 70 | `fd-section-vehicles-050-ads-breakdown.png` | §6.3 | manual | Vehicle card — ADS breakdown parts table |
+| 71 | `fd-section-fields-045-moisture-weeds.png` | §6.4 | manual | Field card — moisture badge + weed alert + rules |
+| 72 | `fd-section-fields-046-monitor-harvest.png` | §6.4 | manual | Field card — monitor toward harvest |
+| 73 | `fd-reference-pda-map.png` | §6.8 | manual | In-game PDA map (reference only) |
 
 **Not in the user manual** (edge / empty / failure UI — users should not see these if setup is correct): `fd-section-fields-070-waiting`, `fd-section-fields-080-api-error`, `fd-section-productions-020-empty`, `fd-modal-030-refresh-data`, `fd-modal-040-data-changes`, `fd-modal-050-warning-details`.
 
@@ -144,7 +154,7 @@ For **[manual]** captures, follow the recipe in each row below and drop the PNG 
 
 **On disk (2026-05-28 audit):** **56** manifest `fd-*` PNGs + **13** extra `Screenshot …` files (installer steps, errors, spare field cards — not wired into the manual) + `reference-home-network-topology.png`.
 
-**Embedded in [`USER_MANUAL.md`](./USER_MANUAL.md) / [`INSTALL.md`](./INSTALL.md):** **58** inline images, **0** placeholders (2026-05-28).
+**Embedded in [`USER_MANUAL.md`](./USER_MANUAL.md) / [`INSTALL.md`](./INSTALL.md):** **69** inline images (2026-06-12, v4.1 feature pass).
 
 **Not in this manual:** edge/failure UI (waiting, API error, empty productions, refresh/data-changes/warning modals); **farm selection** modal (multi-farm edge case); **tablet LAN** shots (`fd-lan-020`, `fd-lan-030`) — planned for a separate **LAN & tablet** guide; see [`SECURITY.md`](./SECURITY.md) until then.
 

@@ -19,6 +19,18 @@ RENAMES: dict[str, str] = {
     "Screenshot 2026-05-26 222346.png": "fd-setup-060-ftp-polling.png",
     "Screenshot 2026-05-27 214404.png": "fd-modal-060-animal-details.png",
     "Screenshot 2026-05-27 214736.png": "fd-modal-070-pasture-livestock.png",
+    # June 2026 — v4.1 feature captures (Witcombe / dedicated server)
+    "Screenshot 2026-06-12 121714.png": "fd-section-fleet-map-010-overview.png",
+    "Screenshot 2026-06-12 203803.png": "fd-section-economy-040-storage-tab.png",
+    "Screenshot 2026-06-12 104310.png": "fd-section-economy-041-bale-storage-breakdown.png",
+    "Screenshot 2026-06-12 203816.png": "fd-section-redtape-010-compliance.png",
+    "Screenshot 2026-06-12 203823.png": "fd-section-redtape-020-events.png",
+    "Screenshot 2026-06-12 203839.png": "fd-section-vehicles-040-ads-summary.png",
+    "Screenshot 2026-06-12 203913.png": "fd-section-vehicles-050-ads-breakdown.png",
+    "Screenshot 2026-06-12 203936.png": "fd-section-fields-045-moisture-weeds.png",
+    "Screenshot 2026-06-12 120131.png": "fd-section-fields-010-summary.png",
+    "Screenshot 2026-06-12 203944.png": "fd-section-fields-046-monitor-harvest.png",
+    "Screenshot 2026-06-12 123724.png": "fd-reference-pda-map.png",
 }
 
 # same source copied to additional manifest slots

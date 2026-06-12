@@ -30,10 +30,16 @@ describe('assessModVersion', () => {
         });
     });
 
+    test('3.0.x mod is outdated after 4.1 min bump', () => {
+        const res = assessModVersion('3.0.1.0');
+        expect(res.status).toBe('outdated');
+        expect(res.expectedMin).toBe(MIN_MOD_VERSION);
+    });
+
     test('newer mod is ok', () => {
-        const res = assessModVersion('3.0.0.1');
+        const res = assessModVersion('3.1.0.1');
         expect(res.status).toBe('ok');
-        expect(res.actual).toBe('3.0.0.1');
+        expect(res.actual).toBe('3.1.0.1');
     });
 
     test('older mod is outdated', () => {

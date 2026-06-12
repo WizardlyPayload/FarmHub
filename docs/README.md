@@ -12,7 +12,7 @@
 | [CHANGELOG.md](./CHANGELOG.md) | Version history |
 | [SCREENSHOTS.md](./SCREENSHOTS.md) | Screenshot filenames + capture checklist (maintainers) |
 
-**Publishing a release:** [GITHUB_RELEASE_v4.0.0.md](./GITHUB_RELEASE_v4.0.0.md) (paste into GitHub) · [RELEASE_v4.0.0.md](./RELEASE_v4.0.0.md) (long narrative).
+**Publishing a release:** [GITHUB_RELEASE_v4.1.0.md](./GITHUB_RELEASE_v4.1.0.md) (paste into GitHub) · [RELEASE_v4.1.0.md](./RELEASE_v4.1.0.md) (long narrative).
 
 **Wiki:** [../wiki/Home.md](../wiki/Home.md)
 

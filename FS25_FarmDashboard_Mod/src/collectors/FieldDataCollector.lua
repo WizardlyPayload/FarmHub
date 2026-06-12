@@ -1,15 +1,130 @@
--- FS25 FarmDashboard | FieldDataCollector.lua | v2.1.0
+﻿-- FS25 FarmDashboard | FieldDataCollector.lua | v2.1.0
 
 FieldDataCollector = {}
 
 --- Serialized as JSON `null` (see `FarmDashboardDataCollector:toJSON` string handling).
 local FD_JSON_NULL_STR = "__FD_JSON_NULL__"
 
---- Module-local keyed pools (integer/string keys only). Cleared at reuse — reduces GC churn on large saves.
+--- Module-local keyed pools (integer/string keys only). Cleared at reuse â€” reduces GC churn on large saves.
 local _pool_farmlandBaleCounts = {}
+local _pool_farmlandBaleOnFieldBuckets = {}
+local _pool_farmlandBaleYardBuckets = {}
 local _pool_baleSeen = {}
 local _pool_fillIdxSeen = {}
 local _pool_windByIdx = {}
+local _pool_moistureByFarm = {}
+
+local MOISTURE_WORST_MAX = 24
+
+local function _newMoistureFarmRow()
+    return {
+        gradeCounts = { A = 0, B = 0, C = 0, D = 0 },
+        rottingCount = 0,
+        gettingWetCount = 0,
+        worst = {},
+        _worstCount = 0,
+    }
+end
+
+local function _moistureRotLabel(statusNum)
+    local brs = rawget(_G, "BaleRottingSystem")
+    if not brs or not brs.BALE_STATUS or statusNum == nil then return nil end
+    local s = tonumber(statusNum)
+    if s == brs.BALE_STATUS.GETTING_WET then return "gettingWet" end
+    if s == brs.BALE_STATUS.DRYING then return "drying" end
+    if s == brs.BALE_STATUS.ROTTING_SLOWLY then return "rottingSlowly" end
+    if s == brs.BALE_STATUS.ROTTING then return "rotting" end
+    if s == brs.BALE_STATUS.ROTTING_QUICKLY then return "rottingQuickly" end
+    return nil
+end
+
+local function _moistureRotSeverity(rotLabel)
+    if rotLabel == "rottingQuickly" then return 5 end
+    if rotLabel == "rotting" then return 4 end
+    if rotLabel == "rottingSlowly" then return 3 end
+    if rotLabel == "gettingWet" then return 2 end
+    if rotLabel == "drying" then return 1 end
+    return 0
+end
+
+local function _fillTypeNameForIndex(fillTypeIndex)
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.nameForIndex then
+        return FillTypeUtils.nameForIndex(fillTypeIndex)
+    end
+    if fillTypeIndex == nil then return "unknown" end
+    return tostring(fillTypeIndex)
+end
+
+local function _attachFieldMoisture(fData, cx, cz)
+    if not fData or not cx or not cz then return end
+    local ms = _G.g_currentMission and _G.g_currentMission.MoistureSystem
+    if not ms or not ms.getMoistureAtPosition then return end
+    local ok, mFrac = pcall(function() return ms:getMoistureAtPosition(cx, cz) end)
+    if not ok or mFrac == nil then return end
+    local pct = math.floor((tonumber(mFrac) or 0) * 1000 + 0.5) / 10
+    local block = { enabled = true, percent = pct }
+    local fi = tonumber(fData.fruitTypeIndex) or 0
+    if fi > 0 and _G.CropValueMap and _G.CropValueMap.getGrade then
+        local okG, grade = pcall(function() return _G.CropValueMap.getGrade(fi, tonumber(mFrac) or 0) end)
+        if okG and grade then block.grade = grade end
+    end
+    fData.moisture = block
+end
+
+local function _recordBaleMoisture(moistureByFarm, baleItem, ownerFarmId)
+    local ms = _G.g_currentMission and _G.g_currentMission.MoistureSystem
+    if not ms or not baleItem or not ownerFarmId or ownerFarmId <= 0 then return end
+    local fid = tostring(ownerFarmId)
+    if not moistureByFarm[fid] then moistureByFarm[fid] = _newMoistureFarmRow() end
+    local row = moistureByFarm[fid]
+
+    local uid = rawget(baleItem, "uniqueId")
+    local fillTypeIndex = rawget(baleItem, "fillType")
+    if fillTypeIndex == nil and baleItem.getFillType then
+        local ok, ft = pcall(function() return baleItem:getFillType() end)
+        if ok then fillTypeIndex = ft end
+    end
+
+    local moistureFrac = nil
+    if uid and fillTypeIndex and ms.getObjectMoisture then
+        local ok, m = pcall(function() return ms:getObjectMoisture(uid, fillTypeIndex) end)
+        if ok and m ~= nil then moistureFrac = tonumber(m) end
+    end
+
+    local grade = nil
+    if moistureFrac ~= nil and _G.CropValueMap and _G.CropValueMap.getGrade then
+        local okG, g = pcall(function() return _G.CropValueMap.getGrade(fillTypeIndex, moistureFrac) end)
+        if okG and g then grade = g end
+    end
+    if grade and row.gradeCounts[grade] ~= nil then
+        row.gradeCounts[grade] = row.gradeCounts[grade] + 1
+    end
+
+    local rotLabel = nil
+    local brs = _G.g_currentMission and _G.g_currentMission.baleRottingSystem
+    if uid and brs and brs.baleRainExposureTimes then
+        local entry = brs.baleRainExposureTimes[uid]
+        if entry and entry.status then
+            rotLabel = _moistureRotLabel(entry.status)
+        end
+    end
+    if rotLabel == "gettingWet" then
+        row.gettingWetCount = row.gettingWetCount + 1
+    elseif rotLabel == "rottingSlowly" or rotLabel == "rotting" or rotLabel == "rottingQuickly" then
+        row.rottingCount = row.rottingCount + 1
+    end
+
+    if row._worstCount < MOISTURE_WORST_MAX and (moistureFrac ~= nil or rotLabel) then
+        row._worstCount = row._worstCount + 1
+        table.insert(row.worst, {
+            fillType = _fillTypeNameForIndex(fillTypeIndex),
+            moisturePct = moistureFrac ~= nil and math.floor(moistureFrac * 1000 + 0.5) / 10 or nil,
+            grade = grade,
+            rotStatus = rotLabel,
+            severity = _moistureRotSeverity(rotLabel),
+        })
+    end
+end
 
 local function _clearKeyedPool(t)
     for k in pairs(t) do
@@ -41,7 +156,7 @@ function FieldDataCollector:cacheWindrowFillTypeIndices()
     return c
 end
 
---- Gameplay toggles from the **active save** (`careerSavegame.xml` → `settings.*`) — same file on dedi as on client.
+--- Gameplay toggles from the **active save** (`careerSavegame.xml` â†’ `settings.*`) â€” same file on dedi as on client.
 --- Install-dir XML is only defaults for new careers; runtime truth is this save + `g_gameSettings` when exposed.
 FieldDataCollector._lastGameplayFlags = nil
 
@@ -117,7 +232,7 @@ function FieldDataCollector.getCachedGameplayFlags()
     return FieldDataCollector._lastGameplayFlags or FieldDataCollector.readCareerGameplayFlags()
 end
 
---- Dominant tipped windrow class for JSON `windrowType` (Straw / Grass / Hay), or FD_JSON_NULL_STR → JSON null.
+--- Dominant tipped windrow class for JSON `windrowType` (Straw / Grass / Hay), or FD_JSON_NULL_STR â†’ JSON null.
 local function classifyWindrowTypeForJson(strawL, grassL, hayL, totalL)
     local EPS = 0.01
     totalL = tonumber(totalL) or 0
@@ -144,11 +259,107 @@ function FieldDataCollector:init()
     FieldDataCollector._windrowFillIdxCache = nil
     FieldDataCollector._fdCo = nil
     FieldDataCollector._lastGameplayFlags = nil
-    FieldDataCollector._lastBaleInventory = nil
 end
 
+--- Bale economy inventory moved to BaleInventoryCollector + InventoryScan (TSStockCheck pipeline).
 function FieldDataCollector.getLastBaleInventory()
-    return FieldDataCollector._lastBaleInventory
+    if BaleInventoryCollector and BaleInventoryCollector.getLastBaleInventory then
+        return BaleInventoryCollector.getLastBaleInventory()
+    end
+    return nil
+end
+
+FieldDataCollector._baleFieldRollup = nil
+
+--- Yard bale buckets from the field scan (merged into baleInventory.inStorage at assemble).
+--- On-field totals come from BaleInventoryCollector; per-field breakdown stays on fields[].
+function FieldDataCollector.getBaleFieldRollup()
+    return FieldDataCollector._baleFieldRollup
+end
+
+local function _mergeBaleBucketInto(dst, src)
+    if type(dst) ~= "table" or type(src) ~= "table" then return dst end
+    for _, cat in ipairs({ "straw", "grass", "hay", "silage", "other" }) do
+        dst[cat] = (tonumber(dst[cat]) or 0) + (tonumber(src[cat]) or 0)
+    end
+    dst.byFillType = dst.byFillType or {}
+    for label, count in pairs(src.byFillType or {}) do
+        local n = tonumber(count) or 0
+        if n > 0 then
+            dst.byFillType[tostring(label)] = (tonumber(dst.byFillType[tostring(label)]) or 0) + n
+        end
+    end
+    return dst
+end
+
+local function _finalizeBaleFieldRollup(onFieldByParcel, yardByParcel, getFarmIdForParcel, legacyFarmId)
+    local byFarm = {}
+    local function farmRow(fid)
+        local key = tostring(fid)
+        if not byFarm[key] then
+            local factory = rawget(_G, "FillTypeUtils") and FillTypeUtils.newBaleBucket
+            local empty = factory and factory() or { straw = 0, grass = 0, hay = 0, silage = 0, other = 0, byFillType = {} }
+            byFarm[key] = { farmId = fid, onField = factory and factory() or { straw = 0, grass = 0, hay = 0, silage = 0, other = 0, byFillType = {} }, inStorage = factory and factory() or { straw = 0, grass = 0, hay = 0, silage = 0, other = 0, byFillType = {} } }
+        end
+        return byFarm[key]
+    end
+    for parcelId, bucket in pairs(yardByParcel or {}) do
+        local farmId = getFarmIdForParcel(parcelId)
+        if farmId then
+            _mergeBaleBucketInto(farmRow(farmId).inStorage, bucket)
+        end
+    end
+    --- Do not merge onFieldByParcel here — same bales are counted by BaleInventoryCollector.
+    for _, row in pairs(byFarm) do
+        row.offField = row.inStorage
+    end
+    FieldDataCollector._baleFieldRollup = {
+        farmId = legacyFarmId or 0,
+        byFarm = byFarm,
+        onField = byFarm[tostring(legacyFarmId or 1)] and byFarm[tostring(legacyFarmId or 1)].onField or {},
+        inStorage = byFarm[tostring(legacyFarmId or 1)] and byFarm[tostring(legacyFarmId or 1)].inStorage or {},
+        offField = byFarm[tostring(legacyFarmId or 1)] and byFarm[tostring(legacyFarmId or 1)].inStorage or {},
+    }
+end
+
+local function _attachWindrowMoisture(fData, cx, cz, grassIdx, hayIdx, aggG, aggH)
+    local mission = _G.g_currentMission
+    local gpt = mission and mission.groundPropertyTracker
+    if not gpt or type(gpt.getPilePropertiesAtPosition) ~= "function" then return end
+    if (tonumber(aggG) or 0) <= 0 and (tonumber(aggH) or 0) <= 0 then return end
+
+    local DRY_THRESH = 0.07
+    local moistFrac = nil
+    local function probeAt(idx)
+        if not idx or idx <= 0 then return nil end
+        local ok, props = pcall(function() return gpt:getPilePropertiesAtPosition(cx, cz, idx) end)
+        if ok and props and props.moisture ~= nil then return tonumber(props.moisture) end
+        return nil
+    end
+
+    if (tonumber(aggG) or 0) >= (tonumber(aggH) or 0) then
+        moistFrac = probeAt(grassIdx) or probeAt(hayIdx)
+    else
+        moistFrac = probeAt(hayIdx) or probeAt(grassIdx)
+    end
+    if moistFrac == nil then return end
+
+    local pct = math.floor(moistFrac * 1000 + 0.5) / 10
+    local isHayState = moistFrac <= DRY_THRESH or fData.hasLooseHayWindrow == true
+    fData.windrowMoisture = {
+        enabled = true,
+        percent = pct,
+        dryThresholdPct = 7,
+        isHay = isHayState,
+    }
+    if moistFrac <= DRY_THRESH and (tonumber(aggG) or 0) > 0 and fData.windrowType ~= FD_JSON_NULL_STR then
+        fData.windrowType = "Hay"
+        fData.hasLooseHayWindrow = true
+        fData.hasLooseGrassWindrow = false
+    elseif moistFrac > DRY_THRESH and (tonumber(aggG) or 0) > 0 then
+        fData.windrowType = "Grass"
+        fData.hasLooseGrassWindrow = true
+    end
 end
 
 --- Plan v5 B2: state-machine path runs sync; legacy coroutine path retained behind a flag.
@@ -264,7 +475,7 @@ function FieldDataCollector:_collectImpl()
     --- PF mapped N / pH: within this fraction of target counts as "close enough" (field spatial variation).
     local NUTRIENT_CLOSE_FRAC = 0.10
     --- FS25 grass: exactly 4 growth stages on the field map. Other crops use their fruit type's own stage count
-    --- (`numGrowthStates`, min/max harvest) — e.g. maize 7, wheat 8. Grass may still report extra engine indices;
+    --- (`numGrowthStates`, min/max harvest) â€” e.g. maize 7, wheat 8. Grass may still report extra engine indices;
     --- we cap exported `maxGrowthState` to this value for the dashboard while keeping `engineNumGrowthStates` raw.
     local GRASS_GROWTH_STAGES = 4
 
@@ -298,7 +509,7 @@ function FieldDataCollector:_collectImpl()
     end
 
     --- Roller / soil compaction: FS `FieldState.rollerLevel` (FieldState.lua). After `update`, higher values mean *more rolling
-    --- still required* / less compacted; lower = already rolled — opposite of a 0–1 “rolled progress”. We export `rollerLevel`
+    --- still required* / less compacted; lower = already rolled â€” opposite of a 0â€“1 â€œrolled progressâ€. We export `rollerLevel`
     --- as rolled fraction (1 = done, 0 = not rolled) so JSON/UI match the HUD.
     local function readRollerFromState(st)
         if not st then return 0 end
@@ -311,7 +522,7 @@ function FieldDataCollector:_collectImpl()
         return 0
     end
 
-    --- Engine raw: low = already rolled, high = still needs rolling (0–1). Output: rolled fraction 0–1 for JSON/UI.
+    --- Engine raw: low = already rolled, high = still needs rolling (0â€“1). Output: rolled fraction 0â€“1 for JSON/UI.
     local function rollerLevelAsRolledFraction(raw)
         raw = raw or 0
         if raw < 0 then raw = 0 end
@@ -320,7 +531,7 @@ function FieldDataCollector:_collectImpl()
         return 1 - raw
     end
 
-    --- `FieldState.stoneLevel` after `update` — same signal the game uses for stones on the field.
+    --- `FieldState.stoneLevel` after `update` â€” same signal the game uses for stones on the field.
     local function readStoneFromState(st)
         if not st then return 0 end
         local ok, v = pcall(function()
@@ -332,7 +543,7 @@ function FieldDataCollector:_collectImpl()
         return 0
     end
 
-    --- Weed: integer 0–4 = FS stages; else 0–1 fraction; else 0–100 = percent. Normalize to 0–1.
+    --- Weed: integer 0â€“4 = FS stages; else 0â€“1 fraction; else 0â€“100 = percent. Normalize to 0â€“1.
     local function weedNorm01(w)
         w = w or 0
         if w < 0 then w = 0 end
@@ -356,29 +567,21 @@ function FieldDataCollector:_collectImpl()
     end
 
     --- Bale counts per farmland: scan **all** known bale sources (item list + bale manager), dedupe by stable key.
-    --- FS25: `itemSystem.items` may exist but be empty — we must still call `g_baleManager` (previous code skipped it).
+    --- FS25: `itemSystem.items` may exist but be empty â€” we must still call `g_baleManager` (previous code skipped it).
     _clearKeyedPool(_pool_farmlandBaleCounts)
+    _clearKeyedPool(_pool_farmlandBaleOnFieldBuckets)
+    _clearKeyedPool(_pool_farmlandBaleYardBuckets)
     local farmlandBaleCounts = _pool_farmlandBaleCounts
-    --- Physical bales by fill category — per farm, on cropland vs yards/sheds (off registered field geometry).
-    local function newBaleBucket()
-        return { straw = 0, grass = 0, hay = 0, silage = 0, other = 0 }
-    end
-    local function newFarmBaleInv()
-        return { onField = newBaleBucket(), inStorage = newBaleBucket() }
-    end
-    local baleInvByFarm = {}
-    local function ensureBaleInvForFarm(farmId)
-        local fid = tonumber(farmId)
-        if not fid or fid <= 0 then return nil end
-        if not baleInvByFarm[fid] then
-            baleInvByFarm[fid] = newFarmBaleInv()
-        end
-        return baleInvByFarm[fid]
-    end
+    local farmlandBaleOnFieldBuckets = _pool_farmlandBaleOnFieldBuckets
+    local farmlandBaleYardBuckets = _pool_farmlandBaleYardBuckets
+    FieldDataCollector._baleFieldRollup = nil
     do
         local mission = _G.g_currentMission
         local fm = _G.g_farmlandManager
         if mission and fm and type(fm.getFarmlandAtWorldPosition) == "function" then
+            if rawget(_G, "FillTypeUtils") and FillTypeUtils.rebuildCatalog then
+                FillTypeUtils.rebuildCatalog()
+            end
             local BaleRef = rawget(_G, "Bale")
             local function isPhysicalBale(it)
                 if not it then return false end
@@ -393,7 +596,7 @@ function FieldDataCollector:_collectImpl()
                 end
                 return false
             end
-            --- Prefer cheap ItemSystem flags before isa(Bale) — see FarmHub/docs/FS25 Engine Interaction Modules.txt §Module 1.
+            --- Prefer cheap ItemSystem flags before isa(Bale) â€” see FarmHub/docs/FS25 Engine Interaction Modules.txt Â§Module 1.
             local function isHeuristicBale(it)
                 if not it then return false end
                 if it.isBale == true then return true end
@@ -402,7 +605,7 @@ function FieldDataCollector:_collectImpl()
                 if isPhysicalBale(it) then return true end
                 return false
             end
-            --- Try several nodes — FS uses rootNode, componentNode, or first component for bales.
+            --- Try several nodes â€” FS uses rootNode, componentNode, or first component for bales.
             local function itemWorldXZ(it)
                 if not it then return nil, nil end
                 local nids = {}
@@ -426,7 +629,7 @@ function FieldDataCollector:_collectImpl()
                 if type(getWorldTranslation) == "function" then
                     for _, nid in ipairs(nids) do
                         if nid ~= nil and nid ~= 0 then
-                            -- Prefer valid entities; some modded bales briefly report invalid nodes — try anyway below.
+                            -- Prefer valid entities; some modded bales briefly report invalid nodes â€” try anyway below.
                             if type(entityExists) ~= "function" or entityExists(nid) then
                                 local ox, oy, oz = getWorldTranslation(nid)
                                 if ox ~= nil and oz ~= nil then return ox, oz end
@@ -495,16 +698,16 @@ function FieldDataCollector:_collectImpl()
                 end
                 return nil
             end
-            --- A field's farmland parcel can also contain non-field areas — yards, driveways, lanes.
+            --- A field's farmland parcel can also contain non-field areas â€” yards, driveways, lanes.
             --- Counting *every* bale on the parcel attributes yard bales to the small grass field that
             --- happens to share parcel id (e.g. on Witcombe, parcel 98 covers both the 1.16 ha grass
             --- field and a yard area ~110 m away). We pre-compute each registered field's centre + an
             --- effective radius, and only count a bale toward a parcel if there's a field on that
             --- parcel whose centre is within range of the bale.
             ---
-            --- effRadius = equiv-circle radius (sqrt(area/π)) + 50% shape slack (covers most non-circular
-            --- polygons — long rectangular fields included; a 4 ha 200×200 m square has corners ~141 m
-            --- from centre vs. equiv radius 113 m, well under 1.5×) + 2 m boundary tolerance the user
+            --- effRadius = equiv-circle radius (sqrt(area/Ï€)) + 50% shape slack (covers most non-circular
+            --- polygons â€” long rectangular fields included; a 4 ha 200Ã—200 m square has corners ~141 m
+            --- from centre vs. equiv radius 113 m, well under 1.5Ã—) + 2 m boundary tolerance the user
             --- asked for. For fields with bogus posX/posZ, prefer `field:getCenterOfFieldWorldPosition()`.
             local fieldGeometries = {}
             if _G.g_fieldManager and _G.g_fieldManager.fields then
@@ -545,40 +748,37 @@ function FieldDataCollector:_collectImpl()
                 end
                 return bestKey
             end
-            local function incrementFarmlandForBale(it)
+            local function parcelBucket(pool, parcelId)
+                if not parcelId or parcelId <= 0 then return nil end
+                local b = pool[parcelId]
+                if not b then
+                    if rawget(_G, "FillTypeUtils") and FillTypeUtils.newBaleBucket then
+                        b = FillTypeUtils.newBaleBucket()
+                    else
+                        b = { straw = 0, grass = 0, hay = 0, silage = 0, other = 0, byFillType = {} }
+                    end
+                    pool[parcelId] = b
+                end
+                return b
+            end
+            local function tallyBalePlacement(it)
                 local x, z = itemWorldXZ(it)
                 if x == nil or z == nil then return end
-                local key = bestFieldKeyForBaleAtXZ(x, z)
-                if key ~= nil and key > 0 then
-                    farmlandBaleCounts[key] = (farmlandBaleCounts[key] or 0) + 1
+                local parcel = farmlandIdAtWithRing(x, z)
+                if parcel == nil or parcel <= 0 then return end
+                local fieldKey = bestFieldKeyForBaleAtXZ(x, z)
+                if fieldKey ~= nil and fieldKey > 0 then
+                    farmlandBaleCounts[fieldKey] = (farmlandBaleCounts[fieldKey] or 0) + 1
+                    local bucket = parcelBucket(farmlandBaleOnFieldBuckets, parcel)
+                    if bucket and rawget(_G, "FillTypeUtils") and FillTypeUtils.tallyBale then
+                        FillTypeUtils.tallyBale(bucket, it)
+                    end
+                else
+                    local bucket = parcelBucket(farmlandBaleYardBuckets, parcel)
+                    if bucket and rawget(_G, "FillTypeUtils") and FillTypeUtils.tallyBale then
+                        FillTypeUtils.tallyBale(bucket, it)
+                    end
                 end
-            end
-
-            local function classifyBaleFillCategoryFromName(name)
-                name = string.upper(tostring(name or ""))
-                if name == "" then return "other" end
-                if string.find(name, "STRAW", 1, true) then return "straw" end
-                if string.find(name, "SILAGE", 1, true) then return "silage" end
-                if string.find(name, "FERMENT", 1, true) then return "silage" end
-                if string.find(name, "HAY", 1, true) then return "hay" end
-                if string.find(name, "DRYGRASS", 1, true) then return "hay" end
-                if string.find(name, "GRASS_WINDROW", 1, true) then return "grass" end
-                if string.find(name, "GRASS", 1, true) then return "grass" end
-                return "other"
-            end
-
-            local function classifyBaleFillCategory(it)
-                local ftm = rawget(_G, "g_fillTypeManager")
-                local name = ""
-                local idx = tonumber(rawget(it, "fillTypeIndex") or rawget(it, "fillIndex"))
-                if idx and ftm and type(ftm.getFillTypeNameByIndex) == "function" then
-                    local ok, nm = pcall(function() return ftm:getFillTypeNameByIndex(idx) end)
-                    if ok and nm then name = string.upper(tostring(nm)) end
-                end
-                if name == "" and rawget(it, "fillType") ~= nil then
-                    name = string.upper(tostring(rawget(it, "fillType")))
-                end
-                return classifyBaleFillCategoryFromName(name)
             end
 
             local function getFarmIdForParcel(parcelId)
@@ -600,6 +800,11 @@ function FieldDataCollector:_collectImpl()
                     fid = tonumber(rawget(it, "farmId"))
                 end
                 if fid and fid > 0 then return fid end
+                local attrs = rawget(it, "baleAttributes")
+                if attrs then
+                    fid = tonumber(rawget(attrs, "farmId"))
+                    if fid and fid > 0 then return fid end
+                end
                 if type(it.getOwnerFarmId) == "function" then
                     local ok, r = pcall(function() return it:getOwnerFarmId() end)
                     if ok then
@@ -608,6 +813,30 @@ function FieldDataCollector:_collectImpl()
                     end
                 end
                 return nil
+            end
+
+            local function getPlaceableFarmId(placeable)
+                if not placeable then return nil end
+                if type(placeable.getOwnerFarmId) == "function" then
+                    local ok, fid = pcall(function() return placeable:getOwnerFarmId() end)
+                    if ok then
+                        local n = tonumber(fid)
+                        if n and n > 0 then return n end
+                    end
+                end
+                local n = tonumber(rawget(placeable, "ownerFarmId") or rawget(placeable, "farmId"))
+                if n and n > 0 then return n end
+                return nil
+            end
+
+            local function isMountedInBaleStorage(it)
+                local mount = rawget(it, "mountObject")
+                if mount and type(mount) == "table" then
+                    if mount.spec_baleStorage or mount.spec_bales or mount.spec_heapSpawner or mount.spec_objectStorage then
+                        return true
+                    end
+                end
+                return false
             end
 
             local function playerOwnsFieldOnParcel(parcelId)
@@ -623,31 +852,11 @@ function FieldDataCollector:_collectImpl()
                 return false
             end
 
-            local function tallyBaleForInventory(it)
-                local x, z = itemWorldXZ(it)
-                if x == nil or z == nil then return end
-                local cat = classifyBaleFillCategory(it)
-                local ownerFarm = getBaleOwnerFarmId(it)
-                local parcel = farmlandIdAtWithRing(x, z)
-                if (ownerFarm == nil or ownerFarm <= 0) and parcel ~= nil and parcel > 0 then
-                    ownerFarm = getFarmIdForParcel(parcel)
-                end
-                if ownerFarm == nil or ownerFarm <= 0 then return end
-                local inv = ensureBaleInvForFarm(ownerFarm)
-                if not inv then return end
-                local fk = bestFieldKeyForBaleAtXZ(x, z)
-                if fk ~= nil and fk > 0 then
-                    inv.onField[cat] = (inv.onField[cat] or 0) + 1
-                else
-                    inv.inStorage[cat] = (inv.inStorage[cat] or 0) + 1
-                end
-            end
-
             _clearKeyedPool(_pool_baleSeen)
             local baleSeen = _pool_baleSeen
             local function baleDedupKey(it)
                 if not it then return nil end
-                --- uniqueId is stable across saves; id is network id — prefer both for dedup.
+                --- uniqueId is stable across saves; id is network id â€” prefer both for dedup.
                 local uid = rawget(it, "uniqueId")
                 local oid = rawget(it, "id")
                 if uid ~= nil then return "u:" .. tostring(uid) end
@@ -664,6 +873,7 @@ function FieldDataCollector:_collectImpl()
                 local mount = rawget(it, "mountObject")
                 if mount ~= nil then
                     if type(mount) == "table" then
+                        if mount.spec_objectStorage then return false end
                         if mount.spec_baleStorage or mount.spec_bales or mount.spec_heapSpawner then
                             return true
                         end
@@ -682,8 +892,7 @@ function FieldDataCollector:_collectImpl()
                 local dk = baleDedupKey(it)
                 if dk and baleSeen[dk] then return end
                 if dk then baleSeen[dk] = true end
-                tallyBaleForInventory(it)
-                incrementFarmlandForBale(it)
+                tallyBalePlacement(it)
             end
             --- Module 1 (Engine Interaction doc): master list is itemSystem:getItems(); .items is a legacy/shape fallback.
             local itemSys = mission.itemSystem
@@ -697,6 +906,16 @@ function FieldDataCollector:_collectImpl()
             end
             if type(items) == "table" then
                 for _, it in pairs(items) do
+                    tryCountBale(it)
+                    baleCoopTick()
+                end
+            end
+            if itemSys and type(itemSys.itemsToSave) == "table" then
+                for _, wrap in pairs(itemSys.itemsToSave) do
+                    local it = wrap
+                    if type(wrap) == "table" then
+                        it = rawget(wrap, "item") or wrap
+                    end
                     tryCountBale(it)
                     baleCoopTick()
                 end
@@ -760,95 +979,8 @@ function FieldDataCollector:_collectImpl()
                                 likely = true
                             end
                         end
-                        --- Do not call isa(Bale) on every node here — nodeToObject is huge; className + bale fields suffice.
+                        --- Do not call isa(Bale) on every node here â€” nodeToObject is huge; className + bale fields suffice.
                         if likely then tryCountBale(obj) end
-                    end
-                end
-            end
-            --- Bale heaps / sheds: placeable fill volume + explicit bale slots (building storage).
-            do
-                local function fillNameIsBaleForage(name)
-                    name = string.upper(tostring(name or ""))
-                    if name == "" then return false end
-                    if string.find(name, "STRAW", 1, true) then return true end
-                    if string.find(name, "SILAGE", 1, true) then return true end
-                    if string.find(name, "FERMENT", 1, true) then return true end
-                    if string.find(name, "DRYGRASS", 1, true) then return true end
-                    if string.find(name, "GRASS_WINDROW", 1, true) then return true end
-                    if string.find(name, "HAY", 1, true) then return true end
-                    if string.find(name, "GRASS", 1, true) and not string.find(name, "FERT", 1, true) then return true end
-                    return false
-                end
-                local function litersToBaleCount(liters)
-                    local L = tonumber(liters) or 0
-                    if L < 400 then return 0 end
-                    return math.max(1, math.floor(L / 4000 + 0.5))
-                end
-                local function getPlaceableFarmId(placeable)
-                    if not placeable then return nil end
-                    if type(placeable.getOwnerFarmId) == "function" then
-                        local ok, fid = pcall(function() return placeable:getOwnerFarmId() end)
-                        if ok then
-                            local n = tonumber(fid)
-                            if n and n > 0 then return n end
-                        end
-                    end
-                    local n = tonumber(rawget(placeable, "ownerFarmId") or rawget(placeable, "farmId"))
-                    if n and n > 0 then return n end
-                    return nil
-                end
-                --- NOTE: no goto/labels here — GIANTS engine Lua is 5.1-based (goto is a syntax error
-                --- and would kill this whole collector file at load time).
-                local function scanPlaceableForStoredBales(placeable)
-                    local farmId = getPlaceableFarmId(placeable)
-                    if not farmId or farmId <= 0 then return end
-                    local inv = ensureBaleInvForFarm(farmId)
-                    if not inv then return end
-
-                    local function addStoredBaleObject(b)
-                        if not b then return end
-                        if not isHeuristicBale(b) then return end
-                        local cat = classifyBaleFillCategory(b)
-                        inv.inStorage[cat] = (inv.inStorage[cat] or 0) + 1
-                    end
-
-                    local bspec = placeable.spec_baleStorage or placeable.spec_bales or placeable.spec_heapSpawner
-                    if bspec then
-                        local blist = rawget(bspec, "bales") or rawget(bspec, "loadedBales")
-                        if type(blist) == "table" then
-                            for _, b in pairs(blist) do addStoredBaleObject(b) end
-                        end
-                    end
-                    if type(rawget(placeable, "bales")) == "table" then
-                        for _, b in pairs(placeable.bales) do addStoredBaleObject(b) end
-                    end
-
-                    local fuSpec = placeable.spec_fillUnit
-                    if fuSpec and type(fuSpec.fillUnits) == "table" then
-                        local ftm = rawget(_G, "g_fillTypeManager")
-                        for _, fu in pairs(fuSpec.fillUnits) do
-                            if fu and fu.fillLevel and fu.fillLevel > 0 and fu.fillType then
-                                local fname = ""
-                                if ftm and type(ftm.getFillTypeNameByIndex) == "function" then
-                                    local ok, nm = pcall(function() return ftm:getFillTypeNameByIndex(fu.fillType) end)
-                                    if ok and nm then fname = tostring(nm) end
-                                end
-                                if fillNameIsBaleForage(fname) then
-                                    local cat = classifyBaleFillCategoryFromName(fname)
-                                    local n = litersToBaleCount(fu.fillLevel)
-                                    if n > 0 then
-                                        inv.inStorage[cat] = (inv.inStorage[cat] or 0) + n
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-                local ps = mission.placeableSystem
-                if ps and ps.placeables then
-                    for _, placeable in pairs(ps.placeables) do
-                        baleCoopTick()
-                        pcall(scanPlaceableForStoredBales, placeable)
                     end
                 end
             end
@@ -868,44 +1000,24 @@ function FieldDataCollector:_collectImpl()
                             tot = tot + (c or 0)
                         end
                         FarmDashLog.dev(
-                            "Bale scan: uniqueBales=%d bucketKeys=%d totalCounted=%d (itemSys+baleManager+slot+btcMgr+nodeToObject; fields[].baleCountOnField)",
-                            nb, nk, tot
+                            "Bale scan: uniqueBales=%d onFieldKeys=%d yardParcels=%d totalOnField=%d",
+                            nb, nk, (function()
+                                local y = 0
+                                for _ in pairs(farmlandBaleYardBuckets) do y = y + 1 end
+                                return y
+                            end)(), tot
                         )
                     end
                 end
             end
+            _finalizeBaleFieldRollup(
+                farmlandBaleOnFieldBuckets,
+                farmlandBaleYardBuckets,
+                getFarmIdForParcel,
+                currentFarmId
+            )
         end
     end
-
-    local function serializeBaleBucket(src)
-        src = src or {}
-        return {
-            straw = src.straw or 0,
-            grass = src.grass or 0,
-            hay = src.hay or 0,
-            silage = src.silage or 0,
-            other = src.other or 0,
-        }
-    end
-    local byFarmOut = {}
-    for fid, row in pairs(baleInvByFarm) do
-        local key = tostring(tonumber(fid) or fid)
-        local storage = serializeBaleBucket(row.inStorage)
-        byFarmOut[key] = {
-            onField = serializeBaleBucket(row.onField),
-            inStorage = storage,
-            offField = storage,
-        }
-    end
-    local legacyRow = baleInvByFarm[currentFarmId] or newFarmBaleInv()
-    local legacyStorage = serializeBaleBucket(legacyRow.inStorage)
-    FieldDataCollector._lastBaleInventory = {
-        byFarm = byFarmOut,
-        farmId = currentFarmId,
-        onField = serializeBaleBucket(legacyRow.onField),
-        inStorage = legacyStorage,
-        offField = legacyStorage,
-    }
 
     for fieldId, field in pairs(_G.g_fieldManager.fields) do
         
@@ -932,9 +1044,9 @@ function FieldDataCollector:_collectImpl()
             growthState           = 0,
             maxGrowthState        = 0,
             growthStatePercentage = 0,
-            --- Grass only: display ring 1–4 (perennial cycles map engine stage >4 back into the 4 map stages).
+            --- Grass only: display ring 1â€“4 (perennial cycles map engine stage >4 back into the 4 map stages).
             grassRingStage        = 0,
-            --- Raw `numGrowthStates` from fruit desc (per crop); grass may report extra indices vs the 4 map stages — see §2.
+            --- Raw `numGrowthStates` from fruit desc (per crop); grass may report extra indices vs the 4 map stages â€” see Â§2.
             engineNumGrowthStates = 0,
             harvestReady          = false,
             isWithered            = false,
@@ -967,19 +1079,19 @@ function FieldDataCollector:_collectImpl()
             needsFertilizer       = false,
             needsWeeding          = false,
             needsRolling          = false,
-            --- Loose straw / grass / hay (TEDDER + STRAW) from density probes — see windrow block; not cereal swaths alone.
+            --- Loose straw / grass / hay (TEDDER + STRAW) from density probes â€” see windrow block; not cereal swaths alone.
             needsBaling           = false,
             baleableLooseLiters   = 0,
-            --- Split from windrowByFillName for JSON + forage suggestions (STRAW / GRASS_WINDROW / DRYGRASS_WINDROW — Dynamic Ground Material doc).
+            --- Split from windrowByFillName for JSON + forage suggestions (STRAW / GRASS_WINDROW / DRYGRASS_WINDROW â€” Dynamic Ground Material doc).
             looseStrawLiters           = 0,
             looseGrassWindrowLiters      = 0,
             looseDryGrassWindrowLiters   = 0,
-            --- Presence only (rules / next-stage workflow): any probe volume above noise floor for that channel — no need to expose litres in UI.
+            --- Presence only (rules / next-stage workflow): any probe volume above noise floor for that channel â€” no need to expose litres in UI.
             hasLooseStraw                = false,
             hasLooseGrassWindrow         = false,
             hasLooseHayWindrow           = false,
             hasLooseForage               = false,
-            --- Windrow probe diagnostics (see windrow block): util reachable; fill-type count; sum of all probed types at field centre (large sample) — if 0 everywhere but material visible in-game, dedicated/Lua may not see height-map litres.
+            --- Windrow probe diagnostics (see windrow block): util reachable; fill-type count; sum of all probed types at field centre (large sample) â€” if 0 everywhere but material visible in-game, dedicated/Lua may not see height-map litres.
             windrowUtilAvailable         = false,
             windrowFillTypesRegistered   = 0,
             windrowCenterProbeTotalL     = 0,
@@ -1105,7 +1217,7 @@ function FieldDataCollector:_collectImpl()
             end
         end
 
-        -- 1d. Grass: minimum growth state across field samples — the first hit offset often stays on the last
+        -- 1d. Grass: minimum growth state across field samples â€” the first hit offset often stays on the last
         -- "tall" stage briefly after mowing while other strips already read regrowth (fixes stale harvest_ready).
         do
             local fi = fData.fruitTypeIndex or 0
@@ -1142,7 +1254,7 @@ function FieldDataCollector:_collectImpl()
             end
         end
 
-        -- 1b. No crop on probe: center read often misses mulched stubble — max stubble across offsets on this farmland
+        -- 1b. No crop on probe: center read often misses mulched stubble â€” max stubble across offsets on this farmland
         local mulchBefore1b = fData.mulchLevel or 0
         if (fData.fruitTypeIndex or 0) == 0 then
             local soilOffsets = {
@@ -1187,7 +1299,7 @@ function FieldDataCollector:_collectImpl()
             fData.mulchLevel = maxMulch
         end
 
-        -- 1c. Roller: sample multiple points — use worst (least rolled) so one rolled strip does not clear the flag.
+        -- 1c. Roller: sample multiple points â€” use worst (least rolled) so one rolled strip does not clear the flag.
         do
             local minRolled = 1
             local rollerOffsets = {
@@ -1212,7 +1324,7 @@ function FieldDataCollector:_collectImpl()
             fData.rollerLevel = minRolled
         end
 
-        -- 1e. Stones: worst `stoneLevel` across samples (FieldState — matches in-field map / work flags).
+        -- 1e. Stones: worst `stoneLevel` across samples (FieldState â€” matches in-field map / work flags).
         do
             local maxStone = 0
             local stoneOffsets = {
@@ -1359,7 +1471,7 @@ function FieldDataCollector:_collectImpl()
                         fData.growthStatePercentage = math.min(99, math.floor((fData.growthState / maxStateToShow) * 100))
                     end
                 end
-                -- Grass: engine index above the 4 map stages = after cut / internal cycle — keep mown_regrowth for suggestions + UI.
+                -- Grass: engine index above the 4 map stages = after cut / internal cycle â€” keep mown_regrowth for suggestions + UI.
                 if ftUpper == "GRASS" and (fData.growthState or 0) > (fData.maxGrowthState or GRASS_GROWTH_STAGES) then
                     fData.harvestReady = false
                     fData.growthLabel  = "mown_regrowth"
@@ -1396,7 +1508,7 @@ function FieldDataCollector:_collectImpl()
         end
 
         --- Lower end of the "healthy" pH range for this soil type (for UI bar + lime band).
-        --- Tries pH map getters; falls back to optimal − margin (per soil sample).
+        --- Tries pH map getters; falls back to optimal âˆ’ margin (per soil sample).
         local function getPhBarMinForSoilType(pHMap, soilTypeIdx, optimalPh)
             local tryNames = {
                 "getMinimumPHValueForSoilTypeIndex",
@@ -1504,7 +1616,7 @@ function FieldDataCollector:_collectImpl()
         -- 4. STATUS FLAGS AND SUGGESTIONS
         -- ====================================================================
         fData.needsPlowing = periodicPlowingRequired and (fData.plowLevel < 1)
-        -- ~15%+ weeds (handles 0–1, 0–4 stages, or 0–100 percent-style reads)
+        -- ~15%+ weeds (handles 0â€“1, 0â€“4 stages, or 0â€“100 percent-style reads)
         fData.needsWeeding = weedNorm01(fData.weedLevel) > 0.15
 
         if isPF then
@@ -1551,11 +1663,11 @@ function FieldDataCollector:_collectImpl()
                     fData.needsLime = needLimeByPh
                     fData.limeLevel = (not needLimeByPh) and 1 or 0
                 end
-                -- N: within 10% of target → no further mineral fert suggestion (spatial variation across the field).
+                -- N: within 10% of target â†’ no further mineral fert suggestion (spatial variation across the field).
                 fData.needsFertilizer = nTarget > 0 and (nLevel < nTarget * (1 - NUTRIENT_CLOSE_FRAC))
             end
         else
-            -- Without soil maps: spray 0–2 and lime 0–1 — within ~5% of “full” counts as done for suggestion ordering.
+            -- Without soil maps: spray 0â€“2 and lime 0â€“1 â€” within ~5% of â€œfullâ€ counts as done for suggestion ordering.
             fData.needsFertilizer = (fData.fertilizationLevel or 0) < 1.9
             fData.needsLime       = (fData.limeLevel or 0) < 0.95
             fData.nitrogenText    = string.format("%d/2", fData.fertilizationLevel)
@@ -1570,7 +1682,7 @@ function FieldDataCollector:_collectImpl()
             if ftd and string.upper(tostring(ftd.name or "")) == "GRASS" then isGrass = true end
         end
         local mulchLv = fData.mulchLevel or 0
-        --- Grass regrowth after mowing (engine stage above map stages or explicit mown label) — not the same as first growth after seeding; lime + optional organic + mineral fertiliser.
+        --- Grass regrowth after mowing (engine stage above map stages or explicit mown label) â€” not the same as first growth after seeding; lime + optional organic + mineral fertiliser.
         local grassMownRegrowth = isGrass and (
             (fData.growthLabel == "mown_regrowth")
             or ((fData.growthState or 0) > (fData.maxGrowthState or GRASS_GROWTH_STAGES))
@@ -1627,7 +1739,7 @@ function FieldDataCollector:_collectImpl()
             local harvestReason = isGrass and "Grass is ready to cut" or "Crop is ready for harvest"
             table.insert(fData.suggestions, {priority = PR.harvest, type = "harvest", action = harvestAction, reason = harvestReason})
         elseif noCrop and fData.hectares > 0 then
-            --- Fallow: soil scan → mulch (arable) → plow → cultivate → lime → organic → sow (scan first when soil maps are active).
+            --- Fallow: soil scan â†’ mulch (arable) â†’ plow â†’ cultivate â†’ lime â†’ organic â†’ sow (scan first when soil maps are active).
             if isPF and not isScanned then
                 table.insert(fData.suggestions, {priority = PR.fallow_soil, type = "preparation", action = "Soil scan", reason = "Scan field before lime and planting decisions"})
             end
@@ -1684,14 +1796,14 @@ function FieldDataCollector:_collectImpl()
             local deferEarlyN = isPF and isScanned and nTarget > 0 and gsGrow <= 2 and nLevel >= (nTarget * (1 - NUTRIENT_CLOSE_FRAC))
             local limeOkGrow = fData.needsLime and (isGrass or gsGrow <= 3)
 
-            --- Grass after mowing: lime + fertiliser only (no tillage scan — PF scan is optional for pasture; use HUD / manual sampling).
+            --- Grass after mowing: lime + fertiliser only (no tillage scan â€” PF scan is optional for pasture; use HUD / manual sampling).
             if grassMownRegrowth then
                 if isPF and isScanned and limeOkGrow then
                     local tgt = phTarget > 0 and string.format("%.1f", phTarget) or "6.5"
                     local band = phTarget > 0 and string.format("%.1f", phTarget - 0.2) or "6.3"
-                    table.insert(fData.suggestions, {priority = PR.grow_lime, type = "maintenance", action = "Apply lime", reason = string.format("Regrowth after cut — pH %.1f / target %s (below ~%s).%s", phLevel, tgt, band, TYRE_NOTE_ON_CROP)})
+                    table.insert(fData.suggestions, {priority = PR.grow_lime, type = "maintenance", action = "Apply lime", reason = string.format("Regrowth after cut â€” pH %.1f / target %s (below ~%s).%s", phLevel, tgt, band, TYRE_NOTE_ON_CROP)})
                 elseif not isPF and limeOkGrow then
-                    table.insert(fData.suggestions, {priority = PR.grow_lime, type = "maintenance", action = "Apply lime", reason = "Regrowth after mowing — correct pH if needed." .. TYRE_NOTE_ON_CROP})
+                    table.insert(fData.suggestions, {priority = PR.grow_lime, type = "maintenance", action = "Apply lime", reason = "Regrowth after mowing â€” correct pH if needed." .. TYRE_NOTE_ON_CROP})
                 end
                 if isPF and isScanned and nTarget > 0 and fData.needsFertilizer then
                     table.insert(fData.suggestions, {
@@ -1707,7 +1819,7 @@ function FieldDataCollector:_collectImpl()
                 elseif not isPF and fData.needsFertilizer then
                     table.insert(fData.suggestions, {
                         priority = PR.grow_fert, type = "maintenance", action = "Apply fertiliser",
-                        reason = "Grass regrowth after cut — top up with any fertiliser type as needed." .. TYRE_NOTE_ON_CROP
+                        reason = "Grass regrowth after cut â€” top up with any fertiliser type as needed." .. TYRE_NOTE_ON_CROP
                     })
                 end
                 do
@@ -1717,12 +1829,12 @@ function FieldDataCollector:_collectImpl()
                             priority = 208,
                             type = "info",
                             action = "Allow regrowth",
-                            reason = "Lime and fertiliser needs are met — grass will progress toward the next cut.",
+                            reason = "Lime and fertiliser needs are met â€” grass will progress toward the next cut.",
                         })
                     end
                 end
             else
-                --- Growing crop: soil → lime → roll → mechanical weeds → organic → mineral → herbicide.
+                --- Growing crop: soil â†’ lime â†’ roll â†’ mechanical weeds â†’ organic â†’ mineral â†’ herbicide.
                 if isPF and not isScanned then
                     table.insert(fData.suggestions, {priority = PR.grow_soil, type = "info", action = "Soil scan", reason = "Scan field for nitrogen and pH targets"})
                 end
@@ -1734,13 +1846,13 @@ function FieldDataCollector:_collectImpl()
                     table.insert(fData.suggestions, {priority = PR.grow_lime, type = "maintenance", action = "Apply lime", reason = "Soil pH needs correction" .. TYRE_NOTE_ON_CROP})
                 end
                 if fData.needsRolling then
-                    table.insert(fData.suggestions, {priority = PR.grow_roll, type = "maintenance", action = "Roll field", reason = "First growth stage after planting — roll if needed."})
+                    table.insert(fData.suggestions, {priority = PR.grow_roll, type = "maintenance", action = "Roll field", reason = "First growth stage after planting â€” roll if needed."})
                 end
                 if weedUseMechanical then
                     local wp = weedPercentForDisplay(fData.weedLevel)
                     table.insert(fData.suggestions, {
                         priority = PR.grow_weed_m, type = "maintenance", action = "Weed with weeder or hoe",
-                        reason = string.format("Weeds ~%.0f%% — use weeder or hoe at early growth (about stage 2 or below).", wp)
+                        reason = string.format("Weeds ~%.0f%% â€” use weeder or hoe at early growth (about stage 2 or below).", wp)
                     })
                 end
                 if isPF and isScanned and nTarget > 0 and fData.needsFertilizer then
@@ -1752,7 +1864,7 @@ function FieldDataCollector:_collectImpl()
                 if isPF and isScanned and fData.needsFertilizer and nTarget > 0 and not deferEarlyN then
                     table.insert(fData.suggestions, {
                         priority = PR.grow_fert, type = "maintenance", action = "Apply fertiliser (solid or liquid)",
-                        reason = string.format("Nitrogen: %.0f / %.0f kg/ha — mineral fertiliser after organic if used.%s%s", nLevel, nTarget, FERT_ORGANIC_FIRST, TYRE_NOTE_ON_CROP)
+                        reason = string.format("Nitrogen: %.0f / %.0f kg/ha â€” mineral fertiliser after organic if used.%s%s", nLevel, nTarget, FERT_ORGANIC_FIRST, TYRE_NOTE_ON_CROP)
                     })
                 elseif not isPF and fData.needsFertilizer then
                     local reason = string.format("Fertilization level: %d/2.%s", fData.fertilizationLevel or 0, FERT_ORGANIC_FIRST)
@@ -1765,7 +1877,7 @@ function FieldDataCollector:_collectImpl()
                     local wp = weedPercentForDisplay(fData.weedLevel)
                     table.insert(fData.suggestions, {
                         priority = PR.grow_herb, type = "maintenance", action = "Apply herbicide",
-                        reason = string.format("Weeds ~%.0f%% — past early growth; use herbicide sprayer if mechanical weeding is no longer ideal.%s", wp, TYRE_NOTE_ON_CROP)
+                        reason = string.format("Weeds ~%.0f%% â€” past early growth; use herbicide sprayer if mechanical weeding is no longer ideal.%s", wp, TYRE_NOTE_ON_CROP)
                     })
                 end
             end
@@ -1793,13 +1905,13 @@ function FieldDataCollector:_collectImpl()
         end
 
         -- ====================================================================
-        -- Windrow / swath + bales (whole-field — rules-engine.js Layer 1 heuristics)
+        -- Windrow / swath + bales (whole-field â€” rules-engine.js Layer 1 heuristics)
         -- Loose swaths are DensityMapHeightTypes, not FieldState properties.
         -- Module 2 in FarmHub/docs/FS25 Engine Interaction Modules.txt shows getDensityAtWorldPos(terrainDetailHeightId);
         -- FS25 windrow litres per material use DensityMapHeightUtil.getFillLevelAtArea(fillTypeIndex, ...) instead (fill-type channels).
         -- Uses DensityMapHeightUtil.getFillLevelAtArea(fillTypeIndex, sx,sz, wx,wz, hx,hz)
         -- Bale-relevant: STRAW + TEDDER converter sources/targets (grass/hay families) + named windrow fallbacks
-        -- (grass ↔ hay / dry grass), optional HAY; cereal *_SWATH types are probed for totals only.
+        -- (grass â†” hay / dry grass), optional HAY; cereal *_SWATH types are probed for totals only.
         -- windrowByFillName: per-type summed probe volume (engine liters) for UI / classification.
         -- needsBaling / baleableLooseLiters: straw + grass/hay only (not unthreshed crop swaths).
         -- ====================================================================
@@ -1859,7 +1971,7 @@ function FieldDataCollector:_collectImpl()
         end
 
         --- Same entry point as stock / Moisture System (`DensityMapHeightUtil.getFillLevelAtArea`).
-        --- Try several bindings: global can be absent from `rawget(_G,…)` in some loads; mission may expose an instance.
+        --- Try several bindings: global can be absent from `rawget(_G,â€¦)` in some loads; mission may expose an instance.
         local function resolveDensityMapHeightUtil()
             local function tryUtil(u)
                 if u == nil or type(u) ~= "table" then
@@ -1977,7 +2089,7 @@ function FieldDataCollector:_collectImpl()
                 end
                 return list
             end
-            --- Cereal / crop swaths (combine pick-up etc.) — included in windrowLiters / hasWindrow, not in needsBaling.
+            --- Cereal / crop swaths (combine pick-up etc.) â€” included in windrowLiters / hasWindrow, not in needsBaling.
             local swathFillNames = {
                 "WHEAT_SWATH", "BARLEY_SWATH", "OAT_SWATH", "CANOLA_SWATH", "SORGHUM_SWATH", "SOYBEAN_SWATH",
                 "SUNFLOWER_SWATH", "MAIZE_SWATH", "RICE_SWATH", "COTTON_SWATH", "GREENBEAN_SWATH",
@@ -2040,7 +2152,7 @@ function FieldDataCollector:_collectImpl()
                 for _, ent in ipairs(windEntries) do
                     ctot = ctot + fillLevelSumAtRect(dmhu, ent.index, cx, cz, 12.0)
                 end
-                --- One large sample at field centre across STRAW / windrows / swaths — matches what balers read from the same height-map channels.
+                --- One large sample at field centre across STRAW / windrows / swaths â€” matches what balers read from the same height-map channels.
                 fData.windrowCenterProbeTotalL = ctot
             end
 
@@ -2081,7 +2193,7 @@ function FieldDataCollector:_collectImpl()
                     samplesAdded = samplesAdded + 1
                 end
             end
-            --- If every probe was rejected (farmland id mismatch at center/edges, or map returns nil), still sample at field center — otherwise windrow stays blank for valid in-field material.
+            --- If every probe was rejected (farmland id mismatch at center/edges, or map returns nil), still sample at field center â€” otherwise windrow stays blank for valid in-field material.
             if samplesAdded == 0 then
                 addProbeCell(cx, cz)
             end
@@ -2096,7 +2208,7 @@ function FieldDataCollector:_collectImpl()
                 fData.windrowArea = 0
             end
             fData.hasWindrow = (fData.windrowLiters > 0)
-            --- Aggregate per fill name (terrainDetailHeight grass/straw/hay channels — see Dynamic Ground Material & Transform doc).
+            --- Aggregate per fill name (terrainDetailHeight grass/straw/hay channels â€” see Dynamic Ground Material & Transform doc).
             --- Cereal / crop *_SWATH channels count toward looseStrawLiters for dashboard + rules (same as loose harvest residue before baling).
             local aggS, aggG, aggH = 0, 0, 0
             for name, vol in pairs(fData.windrowByFillName) do
@@ -2115,7 +2227,7 @@ function FieldDataCollector:_collectImpl()
             fData.looseStrawLiters = aggS
             fData.looseGrassWindrowLiters = aggG
             fData.looseDryGrassWindrowLiters = aggH
-            --- Noise floor (L) — any amount above this counts as "present" for workflow; not shown as a quantity to the player.
+            --- Noise floor (L) â€” any amount above this counts as "present" for workflow; not shown as a quantity to the player.
             local PRESENCE_EPS = 0.01
             fData.hasLooseStraw = (aggS > PRESENCE_EPS)
             fData.hasLooseGrassWindrow = (aggG > PRESENCE_EPS)
@@ -2123,7 +2235,7 @@ function FieldDataCollector:_collectImpl()
             fData.hasLooseForage = fData.hasLooseStraw or fData.hasLooseGrassWindrow or fData.hasLooseHayWindrow
             --- Align "needs baling / clear forage" step with straw+grass+hay presence (not cereal swath-only heaps).
             fData.needsBaling = fData.hasLooseForage
-            --- Below this combined bale-relevant volume (straw + grass + hay windrows, engine litres), skip forage / baling workflow — trace residue only.
+            --- Below this combined bale-relevant volume (straw + grass + hay windrows, engine litres), skip forage / baling workflow â€” trace residue only.
             local FORAGE_WORKFLOW_MIN_L = 2000
             local combinedForageL = aggS + aggG + aggH
             if combinedForageL < FORAGE_WORKFLOW_MIN_L then
@@ -2135,6 +2247,14 @@ function FieldDataCollector:_collectImpl()
             end
             --- Single dominant class for dashboard (Straw / Grass / Hay); JSON null when empty (see FD_JSON_NULL_STR).
             fData.windrowType = classifyWindrowTypeForJson(aggS, aggG, aggH, fData.windrowLiters)
+            local grassIdx, hayIdx = nil, nil
+            if ftm and type(ftm.getFillTypeIndexByName) == "function" then
+                local okG, gi = pcall(function() return ftm:getFillTypeIndexByName("GRASS_WINDROW") end)
+                if okG then grassIdx = tonumber(gi) end
+                local okH, hi = pcall(function() return ftm:getFillTypeIndexByName("DRYGRASS_WINDROW") end)
+                if okH then hayIdx = tonumber(hi) end
+            end
+            _attachWindrowMoisture(fData, cx, cz, grassIdx, hayIdx, aggG, aggH)
         else
             fData.windrowLiters = 0
             fData.windrowType = FD_JSON_NULL_STR
@@ -2171,6 +2291,10 @@ function FieldDataCollector:_collectImpl()
                 end
             end
             fData.baleCountOnField = n
+            local onFieldBucket = farmlandBaleOnFieldBuckets[displayId]
+            if onFieldBucket and rawget(_G, "FillTypeUtils") and FillTypeUtils.serializeBaleBucket then
+                fData.baleOnFieldByCategory = FillTypeUtils.serializeBaleBucket(onFieldBucket)
+            end
             --- When bales are counted, surface an explicit suggestion (priority before grow_herb / fallow so JSON + UI match).
             if n > 0 then
                 local act = (n == 1) and "Collect or move 1 bale off this field"
@@ -2179,7 +2303,7 @@ function FieldDataCollector:_collectImpl()
                     priority = 18,
                     type     = "maintenance",
                     action   = act,
-                    reason   = "Physical bale(s) on this farmland — clear them before cultivation or drilling.",
+                    reason   = "Physical bale(s) on this farmland â€” clear them before cultivation or drilling.",
                 })
             end
             --- Loose straw / grass / hay: presence-only (next workflow stage when all false).
@@ -2193,28 +2317,28 @@ function FieldDataCollector:_collectImpl()
                 end
                 if hs and not hg and not hh then
                     ins(PR_FORAGE, "Bale loose straw or pick up with a forage wagon",
-                        "Loose straw on the field — bale or collect before tillage or the next pass.")
+                        "Loose straw on the field â€” bale or collect before tillage or the next pass.")
                 elseif hg and not hs and not hh then
                     ins(PR_FORAGE, "Tedder to make hay, or bale wet and wrap for silage",
-                        "Fresh grass windrow on the field — tedder to dry for hay, or bale while wet and wrap bales for silage.")
+                        "Fresh grass windrow on the field â€” tedder to dry for hay, or bale while wet and wrap bales for silage.")
                 elseif hh and not hs and not hg then
                     ins(PR_FORAGE, "Bale hay windrow or collect dry forage",
-                        "Hay / dry grass windrow on the field — bale or load before rain or soil work.")
+                        "Hay / dry grass windrow on the field â€” bale or load before rain or soil work.")
                 elseif hs and hg and hh then
                     ins(PR_FORAGE, "Clear loose straw, grass, or hay windrows",
-                        "Straw, grass, and hay windrows detected on the ground — clear forage before the next field stage.")
+                        "Straw, grass, and hay windrows detected on the ground â€” clear forage before the next field stage.")
                 elseif hs and hg then
                     ins(PR_FORAGE, "Clear loose straw and grass windrows",
-                        "Straw and grass windrows on the field — bale or collect before continuing.")
+                        "Straw and grass windrows on the field â€” bale or collect before continuing.")
                 elseif hs and hh then
                     ins(PR_FORAGE, "Clear loose straw and hay",
-                        "Straw and hay windrows on the field — bale or collect before continuing.")
+                        "Straw and hay windrows on the field â€” bale or collect before continuing.")
                 elseif hg and hh then
                     ins(PR_FORAGE, "Clear grass and hay windrows",
-                        "Grass and hay windrows on the field — finish drying/baling before the next stage.")
+                        "Grass and hay windrows on the field â€” finish drying/baling before the next stage.")
                 else
                     ins(PR_FORAGE, "Clear loose forage on the field",
-                        "Loose forage material detected — bale or collect before the next field stage.")
+                        "Loose forage material detected â€” bale or collect before the next field stage.")
                 end
             end
             if (n or 0) > 0 or (fData.hasLooseForage == true) then
@@ -2227,6 +2351,10 @@ function FieldDataCollector:_collectImpl()
         else
             fData.baleCountOnField = 0
         end
+
+        _attachFieldMoisture(fData, cx, cz)
+        fData.weedPercent = weedPercentForDisplay(fData.weedLevel)
+        fData.weedAlertThresholdPct = 15
 
         table.insert(fieldData, fData)
         fieldCoopTick()

@@ -122,6 +122,10 @@ function EconomyDataCollector:_collectImpl()
 
     EconomyDataCollector._yieldPartialEcon = economyData
     
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.rebuildCatalog then
+        FillTypeUtils.rebuildCatalog()
+    end
+    
     -- Collect all market prices for each sell point
     economyData.marketPrices = self:collectMarketPrices()
     
@@ -131,6 +135,159 @@ function EconomyDataCollector:_collectImpl()
     end
     
     return economyData
+end
+
+local function _economyFillTypeIndexForName(cropName)
+    local ftm = rawget(_G, "g_fillTypeManager")
+    if not ftm or not cropName then return nil end
+    if ftm.nameToIndex and ftm.nameToIndex[cropName] then
+        return tonumber(ftm.nameToIndex[cropName])
+    end
+    if ftm.getFillTypeIndexByName then
+        local ok, idx = pcall(function() return ftm:getFillTypeIndexByName(cropName) end)
+        if ok and idx then return tonumber(idx) end
+    end
+    return nil
+end
+
+local function _economyAttachFillTypeMaps(marketData)
+    marketData.fillTypesByIndex = marketData.fillTypesByIndex or {}
+    marketData.nameToIndex = marketData.nameToIndex or {}
+    local ftm = rawget(_G, "g_fillTypeManager")
+    if not ftm then return end
+
+    if ftm.fillTypeIndexToName then
+        for idx, name in pairs(ftm.fillTypeIndexToName) do
+            marketData.fillTypesByIndex[tostring(idx)] = name
+        end
+    end
+    if ftm.nameToIndex then
+        for name, idx in pairs(ftm.nameToIndex) do
+            marketData.nameToIndex[name] = idx
+            marketData.fillTypesByIndex[tostring(idx)] = name
+        end
+    end
+    if ftm.getFillTypes then
+        local ok, fillTypes = pcall(function() return ftm:getFillTypes() end)
+        if ok and type(fillTypes) == "table" then
+            for idx, fillType in pairs(fillTypes) do
+                if fillType and fillType.name then
+                    marketData.fillTypesByIndex[tostring(fillType.index or idx)] = fillType.name
+                end
+            end
+        end
+    end
+    if ftm.fillTypes then
+        for _, filltype in pairs(ftm.fillTypes) do
+            if filltype and filltype.name then
+                marketData.fillTypesByIndex[tostring(filltype.index)] = filltype.name
+            end
+        end
+    end
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.catalogForJson then
+        for idx, name in pairs(FillTypeUtils.catalogForJson()) do
+            marketData.fillTypesByIndex[tostring(idx)] = name
+        end
+    end
+    for _, station in pairs(marketData.sellPoints or {}) do
+        if type(station) == "table" and type(station.prices) == "table" then
+            for productName, priceInfo in pairs(station.prices) do
+                local idx = priceInfo and priceInfo.fillTypeIndex
+                if not idx then
+                    idx = _economyFillTypeIndexForName(productName)
+                    if priceInfo and idx then priceInfo.fillTypeIndex = idx end
+                end
+                if idx then
+                    marketData.fillTypesByIndex[tostring(idx)] = productName
+                    if marketData.crops[productName] then
+                        marketData.crops[productName].fillTypeIndex = idx
+                    end
+                end
+            end
+        end
+    end
+    for cropName, crop in pairs(marketData.crops or {}) do
+        if crop and not crop.fillTypeIndex then
+            crop.fillTypeIndex = _economyFillTypeIndexForName(cropName)
+        end
+    end
+end
+
+local _SEASON_PERIOD_KEYS = {
+    "EARLY_SPRING", "MID_SPRING", "LATE_SPRING",
+    "EARLY_SUMMER", "MID_SUMMER", "LATE_SUMMER",
+    "EARLY_AUTUMN", "MID_AUTUMN", "LATE_AUTUMN",
+    "EARLY_WINTER", "MID_WINTER", "LATE_WINTER",
+}
+
+local _SEASON_PERIOD_MONTHS = {
+    EARLY_SPRING = "Mar", MID_SPRING = "Apr", LATE_SPRING = "May",
+    EARLY_SUMMER = "Jun", MID_SUMMER = "Jul", LATE_SUMMER = "Aug",
+    EARLY_AUTUMN = "Sep", MID_AUTUMN = "Oct", LATE_AUTUMN = "Nov",
+    EARLY_WINTER = "Dec", MID_WINTER = "Jan", LATE_WINTER = "Feb",
+}
+
+local function _maxPriceMonthForFillType(fillType)
+    if not fillType or not fillType.economy then return nil end
+    local factors = fillType.economy.factors
+    local history = fillType.economy.history
+    if type(factors) ~= "table" and type(history) ~= "table" then return nil end
+
+    local bestKey, bestValue = nil, -1
+    local SP = rawget(_G, "SeasonPeriod")
+
+    if SP then
+        for i = 1, #_SEASON_PERIOD_KEYS do
+            local key = _SEASON_PERIOD_KEYS[i]
+            local period = SP[key]
+            if period ~= nil then
+                local value = 0
+                if type(history) == "table" and history[period] then
+                    value = tonumber(history[period]) or 0
+                elseif type(factors) == "table" and factors[period] then
+                    value = tonumber(factors[period]) or 0
+                end
+                if value > bestValue then
+                    bestValue = value
+                    bestKey = key
+                end
+            end
+        end
+    elseif type(factors) == "table" then
+        for period, factor in pairs(factors) do
+            local value = tonumber(factor) or 0
+            if value > bestValue then
+                bestValue = value
+                local idx = tonumber(period)
+                if idx and idx >= 1 and idx <= #_SEASON_PERIOD_KEYS then
+                    bestKey = _SEASON_PERIOD_KEYS[idx]
+                end
+            end
+        end
+    end
+
+    if bestKey and _SEASON_PERIOD_MONTHS[bestKey] then
+        return _SEASON_PERIOD_MONTHS[bestKey]
+    end
+    return nil
+end
+
+local function _economyEnrichMaxPriceMonths(marketData)
+    if not marketData or type(marketData.crops) ~= "table" then return end
+    local ftm = rawget(_G, "g_fillTypeManager")
+    if not ftm or not ftm.getFillTypeByIndex then return end
+
+    for _, cropData in pairs(marketData.crops) do
+        if cropData and not cropData.maxPriceMonth then
+            local idx = tonumber(cropData.fillTypeIndex)
+            if idx then
+                local ok, fillType = pcall(function() return ftm:getFillTypeByIndex(idx) end)
+                if ok and fillType then
+                    cropData.maxPriceMonth = _maxPriceMonthForFillType(fillType)
+                end
+            end
+        end
+    end
 end
 
 function EconomyDataCollector:collectMarketPrices()
@@ -256,6 +413,7 @@ function EconomyDataCollector:collectMarketPrices()
                 if not marketData.crops[cropName] then
                     marketData.crops[cropName] = {
                         name = cropName,
+                        fillTypeIndex = _economyFillTypeIndexForName(cropName),
                         minPrice = priceInfo.price,
                         maxPrice = priceInfo.price,
                         avgPrice = priceInfo.price,
@@ -299,7 +457,7 @@ function EconomyDataCollector:collectMarketPrices()
         for fillTypeIndex, fillType in pairs(_G.g_fillTypeManager.fillTypes) do
             self:_workYield()
             if fillType and fillType.name then
-                allFillTypes[fillType.name] = fillTypeIndex
+                allFillTypes[fillType.name] = fillType.index or fillTypeIndex
             end
         end
     end
@@ -847,6 +1005,7 @@ function EconomyDataCollector:collectMarketPrices()
                 if not marketData.crops[productName] then
                     marketData.crops[productName] = {
                         name = productName,
+                        fillTypeIndex = _economyFillTypeIndexForName(productName),
                         minPrice = priceInfo.price,
                         maxPrice = priceInfo.price,
                         avgPrice = priceInfo.price,
@@ -943,6 +1102,9 @@ function EconomyDataCollector:collectMarketPrices()
             end
         end
     end
+    
+    _economyAttachFillTypeMaps(marketData)
+    _economyEnrichMaxPriceMonths(marketData)
     
     return marketData
 end
@@ -1126,7 +1288,8 @@ function EconomyDataCollector:getPriceForFillType(fillTypeIndex, fillType)
         price = 0,
         basePrice = 0,
         multiplier = 1,
-        isSpecialEvent = false
+        isSpecialEvent = false,
+        fillTypeIndex = tonumber(fillTypeIndex),
     }
     
     if fillType.pricePerLiter and fillType.pricePerLiter > 0 then
@@ -1471,7 +1634,8 @@ function EconomyDataCollector:getStationFillTypePrice(station, unloadingStation,
         price = 0,
         basePrice = 0,
         multiplier = 1,
-        isSpecialEvent = false
+        isSpecialEvent = false,
+        fillTypeIndex = tonumber(fillTypeIndex),
     }
     
     if fillType.pricePerLiter then

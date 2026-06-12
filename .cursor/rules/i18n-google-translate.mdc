@@ -9,5 +9,6 @@ alwaysApply: false
 When running `npm run i18n:fill` or updating locale JSON files:
 
 - Google Cloud Translation credentials live in **`FS25_FarmDashboard_App/web/locales/.mt-env.local`** (gitignored). Read that file for `GOOGLE_TRANSLATE_API_KEY`; do not paste keys into chat, commits, or rules.
-- After fill: `npm run i18n:build` then `npm run i18n:verify`.
+- After adding keys to `messages/en.json`: run **`npm run i18n:refresh`** (sync → MT fill → build `translations.json` → verify). The app loads `/locales/translations.json` at runtime — `messages/*.json` alone is not enough until `i18n:build` runs.
+- Or manually: `npm run i18n:sync` → `npm run i18n:fill` → `npm run i18n:build` → `npm run i18n:verify`.
 - If fill returns **403 accessNotConfigured**, the GCP project must enable [Cloud Translation API](https://console.cloud.google.com/apis/library/translate.googleapis.com) and allow the API key to call `translate.googleapis.com`.

@@ -157,6 +157,10 @@ export function handleHashChange() {
     hash = "productions";
     window.history.replaceState(null, null, "#productions");
   }
+  if (hash === "storage" || hash === "redtape") {
+    hash = "economy";
+    window.history.replaceState(null, null, "#economy");
+  }
 
   // Check if any data has been loaded (either from API or saved folder)
   if (!this.isDataLoaded && !this.savedFolderData) {
@@ -513,6 +517,32 @@ export function updateLandingPageCounts() {
       "card.badgeProductionChainsOne",
       "card.badgeProductionChainsMany"
     );
+  }
+
+  const economyInfoEl = document.getElementById("economy-info");
+  if (economyInfoEl) {
+    const rt = this.redTape;
+    if (typeof this.isRedTapeModActive === "function" && this.isRedTapeModActive(rt)) {
+      const farm =
+        typeof this.getRedTapeForActiveFarm === "function"
+          ? this.getRedTapeForActiveFarm(rt, this.activeFarmId)
+          : null;
+      economyInfoEl.textContent = farm?.tier
+        ? t("card.redtapeTier", { tier: farm.tier })
+        : t("card.redtapeActive");
+    } else if (typeof this.getStockFillTypeCount === "function") {
+      const stockN = Number(this.getStockFillTypeCount(this.stock, this.activeFarmId)) || 0;
+      economyInfoEl.textContent =
+        stockN > 0
+          ? fmtLandingBadge(
+              stockN,
+              "card.badgeStorageTypesOne",
+              "card.badgeStorageTypesMany"
+            )
+          : t("card.marketBadge");
+    } else {
+      economyInfoEl.textContent = t("card.marketBadge");
+    }
   }
 }
 

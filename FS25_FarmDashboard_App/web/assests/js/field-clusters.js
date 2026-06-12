@@ -196,6 +196,9 @@ export function syntheticFieldFromCluster(cluster) {
     maxGrowthState: Math.max(...sorted.map((f) => Number(f.maxGrowthState) || 0), 1),
     stoneLevel: maxNum("stoneLevel"),
     weedLevel: maxNum("weedLevel"),
+    weedPercent: maxNum("weedPercent"),
+    weedAlertThresholdPct: rep.weedAlertThresholdPct ?? sorted[0]?.weedAlertThresholdPct ?? 15,
+    moisture: rep.moisture?.enabled ? rep.moisture : sorted.find((f) => f.moisture?.enabled)?.moisture ?? null,
     baleCountOnField: maxNum("baleCountOnField"),
     baleCount: maxNum("baleCount"),
   };

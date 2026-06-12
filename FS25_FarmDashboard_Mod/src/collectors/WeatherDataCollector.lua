@@ -162,6 +162,28 @@ function WeatherDataCollector:collect()
         timeSinceLastRain = weather.timeSinceLastRain or 0,
         forecast = self:collectForecast(weather)
     }
+
+    local mission = _G.g_currentMission
+    local ms = mission and mission.MoistureSystem
+    if ms then
+        local moistureBlock = { enabled = true }
+        local pct = tonumber(ms.currentMoisturePercent)
+        if pct ~= nil then
+            moistureBlock.currentPercent = math.floor(pct * 1000 + 0.5) / 10
+        end
+        if ms.settings then
+            moistureBlock.environment = ms.settings.environment
+            moistureBlock.baleRotEnabled = ms.settings.baleRotEnabled == true
+            moistureBlock.showFieldMoisture = ms.settings.showFieldMoisture == true
+        end
+        local ds = mission.dryingSystem
+        if ds and ds.activeDryers then
+            local n = 0
+            for _ in pairs(ds.activeDryers) do n = n + 1 end
+            if n > 0 then moistureBlock.dryingActiveCount = n end
+        end
+        weatherData.moisture = moistureBlock
+    end
     
     return weatherData
 end

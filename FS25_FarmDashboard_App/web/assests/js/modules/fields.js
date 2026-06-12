@@ -12,6 +12,8 @@ import {
     MIN_FORAGE_WORKFLOW_LITERS,
     nitrogenTargetForDisplay,
     PF_NUTRIENT_CLOSE_FRAC,
+    WEED_ALERT_THRESHOLD_PCT,
+    weedPercentForDisplay,
 } from "../rules-engine.js";
 import {
     refreshFieldRulesCache,
@@ -20,6 +22,7 @@ import {
 import { buildToolGuidanceLines } from "../field-suggestion-tools.js";
 import { buildFieldDisplayClusters, syntheticFieldFromCluster } from "../field-clusters.js";
 import { t } from "../i18n/i18n.js";
+import { formatMoisturePercent, moistureGradeLabel } from "./moisture.js";
 
 /**
  * fields.js  —  FarmDashboard FS25
@@ -417,6 +420,21 @@ function isPostHarvestField(field) {
     return false;
 }
 
+function buildFieldMoistureBadge(field) {
+    const m = field?.moisture;
+    if (!m?.enabled || m.percent == null) return "";
+    const pct = formatMoisturePercent(m.percent);
+    const grade = m.grade != null && m.grade !== "" ? moistureGradeLabel(m.grade) : null;
+    const label = grade
+        ? t("fields.cardMoistureWithGrade", { pct, grade })
+        : t("fields.cardMoisture", { pct });
+    return `<div class="mb-2">
+        <span class="badge bg-info text-dark" title="${escapeFieldHtml(t("fields.cardMoistureTitle"))}">
+            <i class="bi bi-droplet-half me-1"></i>${escapeFieldHtml(label)}
+        </span>
+    </div>`;
+}
+
 // ── Individual card HTML ──────────────────────────────────────────────────────
 function buildFieldCard(field) {
     const status     = getFieldStatus(field);
@@ -460,6 +478,7 @@ function buildFieldCard(field) {
                             <strong>${escapeFieldHtml(formatCropName(field.fruitType))}</strong>
                         </div>
                     </div>
+                    ${buildFieldMoistureBadge(field)}
                     ${buildForageDetectionBadges(field)}
                     ${buildWindrowVolumeBadge(field)}
                     ${progress}
@@ -810,6 +829,37 @@ function buildConditions(field) {
         phLabel = field.needsLime ? t("fields.limeNeededSoil") : t("fields.limeOk");
     }
 
+    const weedPct = weedPercentForDisplay(field);
+    const weedThr = Number(field.weedAlertThresholdPct) || WEED_ALERT_THRESHOLD_PCT;
+    const showWeeds = weedPct > 0 || field.needsWeeding === true;
+    let weedProgress = 0;
+    let weedColour = "#198754";
+    let weedLabel = t("fields.weedLevelLow", { pct: weedPct, threshold: weedThr });
+    if (showWeeds) {
+        const ratio = weedThr > 0 ? weedPct / weedThr : 0;
+        weedProgress = Math.min(100, ratio * 100);
+        if (weedPct >= weedThr || field.needsWeeding) {
+            weedColour = "#dc3545";
+            weedLabel = t("fields.weedLevelAlert", { pct: weedPct, threshold: weedThr });
+        } else if (weedPct >= weedThr * 0.6) {
+            weedColour = "#fd7e14";
+            weedLabel = t("fields.weedLevelModerate", { pct: weedPct, threshold: weedThr });
+        } else if (weedPct >= weedThr * 0.3) {
+            weedColour = "#ffc107";
+            weedLabel = t("fields.weedLevelRising", { pct: weedPct, threshold: weedThr });
+        }
+    }
+
+    const weedRow = showWeeds
+        ? `<div class="col-12 mt-2">
+                <small class="text-muted">${escapeFieldHtml(t("fields.soilWeeds"))}</small><br>
+                <strong style="color:${weedColour};font-size:0.8rem;">${escapeFieldHtml(weedLabel)}</strong>
+                <div class="progress mt-1" style="height:4px;background:#2c2c2c;">
+                    <div class="progress-bar" style="width:${weedProgress}%;background:${weedColour};"></div>
+                </div>
+            </div>`
+        : "";
+
     return `
         <div class="row g-2">
             <div class="col-6">
@@ -826,6 +876,7 @@ function buildConditions(field) {
                     <div class="progress-bar" style="width:${phProgress}%;background:${phColour};"></div>
                 </div>
             </div>
+            ${weedRow}
         </div>`;
 }
 
@@ -876,10 +927,15 @@ function buildWindrowVolumeBadge(field) {
     }
     const label = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
     const vol = Math.round(L).toLocaleString(undefined, { maximumFractionDigits: 0 });
+    const wm = field?.windrowMoisture;
+    const moistSuffix =
+        wm?.enabled && wm.percent != null
+            ? ` · ${escapeFieldHtml(String(wm.percent))}%${wm.isHay ? ` (${escapeFieldHtml(t("fields.windrowDryHay"))})` : ""}`
+            : "";
     return `<div class="d-flex flex-wrap gap-1 mt-2 mb-1">
         <span class="badge ${badgeClass}" title="${escapeFieldHtml(t("fields.windrowBadgeTitle"))}">
             <span aria-hidden="true">${emoji}</span>
-            <span class="ms-1">${escapeFieldHtml(label)}: ${escapeFieldHtml(vol)} L</span>
+            <span class="ms-1">${escapeFieldHtml(label)}: ${escapeFieldHtml(vol)} L${moistSuffix}</span>
         </span>
     </div>`;
 }
@@ -919,13 +975,18 @@ function buildForageDetectionBadges(field) {
     // Never show both on the same field: prefer whichever loose windrow amount is larger.
     if (hasGrassWindrow || hasHayWindrow) {
         const showGrass = hasGrassWindrow && (!hasHayWindrow || lg >= lh);
+        const wm = field?.windrowMoisture;
+        const moistHint =
+            wm?.enabled && wm.percent != null
+                ? ` (${wm.percent}%${wm.isHay ? ` · ${t("fields.windrowDryHay")}` : ""})`
+                : "";
         if (showGrass) {
             parts.push(
-                `<span class="badge bg-info text-dark" title="${escapeFieldHtml(t("fields.grassWindrowTitle"))}"><i class="bi bi-circle-square me-1"></i>${escapeFieldHtml(t("fields.grassWindrow"))}</span>`
+                `<span class="badge bg-info text-dark" title="${escapeFieldHtml(t("fields.grassWindrowTitle"))}"><i class="bi bi-circle-square me-1"></i>${escapeFieldHtml(t("fields.grassWindrow"))}${escapeFieldHtml(moistHint)}</span>`
             );
         } else {
             parts.push(
-                `<span class="badge bg-info text-dark" title="${escapeFieldHtml(t("fields.hayWindrowTitle"))}"><i class="bi bi-circle-square me-1"></i>${escapeFieldHtml(t("fields.hayWindrow"))}</span>`
+                `<span class="badge bg-info text-dark" title="${escapeFieldHtml(t("fields.hayWindrowTitle"))}"><i class="bi bi-circle-square me-1"></i>${escapeFieldHtml(t("fields.hayWindrow"))}${escapeFieldHtml(moistHint)}</span>`
             );
         }
     }

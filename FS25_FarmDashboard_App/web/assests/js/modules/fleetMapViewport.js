@@ -8,6 +8,7 @@ export class FleetMapViewport {
     this.viewport = stageEl?.querySelector(".farm-fleet-map-viewport") || null;
     this.transform = stageEl?.querySelector(".farm-fleet-map-transform") || null;
     this.canvas = stageEl?.querySelector(".farm-fleet-map-canvas") || null;
+    this.terrainClip = stageEl?.querySelector("#fleet-map-terrain-clip") || null;
     this.img = stageEl?.querySelector("#fleet-map-overview-img") || null;
     this.scale = 1;
     this.panX = 0;
@@ -83,13 +84,21 @@ export class FleetMapViewport {
   }
 
   getCanvasSize() {
-    const w = Number(this.img?.naturalWidth) || Number(this.canvas?.clientWidth) || 0;
-    const h = Number(this.img?.naturalHeight) || Number(this.canvas?.clientHeight) || 0;
+    const w =
+      Number(this.terrainClip?.clientWidth) ||
+      Number(this.canvas?.clientWidth) ||
+      Number(this.img?.naturalWidth) ||
+      0;
+    const h =
+      Number(this.terrainClip?.clientHeight) ||
+      Number(this.canvas?.clientHeight) ||
+      Number(this.img?.naturalHeight) ||
+      0;
     return { w, h };
   }
 
   syncCanvasSize() {
-    if (!this.canvas || !this.img) return;
+    if (!this.canvas) return;
     const { w, h } = this.getCanvasSize();
     if (!w || !h) return;
     this.canvas.style.width = `${w}px`;

@@ -124,6 +124,16 @@ export function pruneMergedDataToPlayerFarms(data) {
         }
       }
       inv.byFarm = bf;
+      if (inv.moisture?.byFarm) {
+        const mf = {};
+        for (const [key, val] of Object.entries(inv.moisture.byFarm)) {
+          const id = Number(key);
+          if (Number.isFinite(id) && id > 0 && playerIds.has(id)) {
+            mf[String(id)] = val;
+          }
+        }
+        inv.moisture = { ...inv.moisture, byFarm: mf };
+      }
     }
     const bid = Number(inv.farmId);
     if (Number.isFinite(bid) && bid > 0 && !playerIds.has(bid)) {
@@ -132,6 +142,54 @@ export function pruneMergedDataToPlayerFarms(data) {
       inv.offField = {};
     }
     out.baleInventory = inv;
+  }
+
+  if (data.stock?.byFarm && typeof data.stock.byFarm === "object") {
+    const catalog = {
+      ...(data.fillTypeCatalog || {}),
+      ...(data.stock.fillTypeCatalog || {}),
+      ...(data.economy?.fillTypeCatalog || {}),
+      ...(data.economy?.marketPrices?.fillTypesByIndex || {}),
+    };
+    const n2i = data.economy?.marketPrices?.nameToIndex;
+    if (n2i && typeof n2i === "object") {
+      for (const [name, idx] of Object.entries(n2i)) {
+        if (idx != null) catalog[String(idx)] = name;
+      }
+    }
+    for (const [name, crop] of Object.entries(data.economy?.marketPrices?.crops || {})) {
+      const idx = crop?.fillTypeIndex;
+      if (idx != null) catalog[String(idx)] = name;
+    }
+    const stock = {
+      ...data.stock,
+      fillTypeCatalog: catalog,
+      byFarm: {},
+    };
+    for (const [key, val] of Object.entries(data.stock.byFarm)) {
+      const id = Number(key);
+      if (Number.isFinite(id) && id > 0 && playerIds.has(id)) {
+        const row = val && typeof val === "object" ? { ...val } : val;
+        if (row && Array.isArray(row.items)) {
+          row.items = row.items.filter((it) => Number(it?.totalLiters) > 0);
+          row.fillTypeCount = row.items.length;
+        }
+        stock.byFarm[String(id)] = row;
+      }
+    }
+    out.stock = stock;
+    if (Object.keys(catalog).length > 0) out.fillTypeCatalog = catalog;
+  }
+
+  if (data.redTape?.byFarm && typeof data.redTape.byFarm === "object") {
+    const redTape = { ...data.redTape, byFarm: {} };
+    for (const [key, val] of Object.entries(data.redTape.byFarm)) {
+      const id = Number(key);
+      if (Number.isFinite(id) && id > 0 && playerIds.has(id)) {
+        redTape.byFarm[String(id)] = val;
+      }
+    }
+    out.redTape = redTape;
   }
 
   return out;

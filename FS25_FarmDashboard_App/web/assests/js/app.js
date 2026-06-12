@@ -13,6 +13,8 @@ import * as fields        from './modules/fields.js';
 import * as environment   from './modules/environment.js';
 import * as theming       from './modules/theming.js';
 import * as productions   from './modules/productions.js';
+import * as storage       from './modules/storage.js';
+import * as redTape       from './modules/redTape.js';
 import * as fleetMap      from './modules/fleet-map.js';
 import * as dashboardSettings from './modules/dashboard-settings.js';
 import { installFarmDashRemoteViewerGuards } from './modules/viewer-mode.js';
@@ -64,7 +66,7 @@ Object.assign(
   LivestockDashboard.prototype,
   apiStorage, parsers, navigation, notifications,
   changes, livestock, pastures, vehicles, economy,
-  fields, environment, theming, productions, fleetMap, dashboardSettings
+  fields, environment, theming, productions, storage, redTape, fleetMap, dashboardSettings
 );
 
 let dashboard;

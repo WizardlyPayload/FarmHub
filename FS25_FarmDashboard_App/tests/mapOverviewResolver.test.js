@@ -7,6 +7,7 @@ const {
   distinctiveTitleTokens,
   pathMatchesMapIdentity,
   scoreZipArchiveName,
+  findOverviewSourceFile,
 } = require('../mapOverviewResolver');
 
 describe('mapOverviewResolver', () => {
@@ -32,6 +33,19 @@ describe('mapOverviewResolver', () => {
     expect(
       scoreZipArchiveName('C:/mods/FS25_Witcombe_Valley.zip', 'mapwitcombe', tokens)
     ).toBeGreaterThan(scoreZipArchiveName('C:/mods/FS25_Ballam_Road.zip', 'mapwitcombe', tokens));
+  });
+
+  test('findOverviewSourceFile prefers vanilla mapUS over unrelated mod zips', async () => {
+    const modsRoot = `${process.env.USERPROFILE || ''}/Documents/My Games/FarmingSimulator2025/mods`;
+    const result = await findOverviewSourceFile({
+      mapId: 'MapUS',
+      mapTitle: 'Riverbend Springs',
+      modsRoot,
+    });
+    if (!result?.sourcePath) return;
+    const low = result.sourcePath.toLowerCase().replace(/\\/g, '/');
+    expect(low).toContain('/data/maps/mapus/');
+    expect(low).not.toContain('willowriver');
   });
 
   test('scoreOverviewPath ranks vanilla ui path highest', () => {

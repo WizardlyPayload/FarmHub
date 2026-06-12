@@ -25,7 +25,28 @@ export const RULES_ENGINE_FALLBACK_ACTION =
 
 /** Stable kind tag for the generic offline-rules fallback suggestion. */
 export const RULES_ENGINE_FALLBACK_KIND = "fallback";
+/** Matches FieldDataCollector.lua `needsWeeding` threshold (~15% coverage). */
+export const WEED_ALERT_THRESHOLD_PCT = 15;
 let fallbackSuggestionCounter = 0;
+
+/** Normalize FS weed reads (0–4 stages, 0–1 fraction, or 0–100 percent) to 0–1. */
+export function weedNorm01(w) {
+  const n = Number(w);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  if (n <= 4 && n === Math.floor(n)) return Math.min(1, n / 4);
+  if (n <= 1) return Math.min(1, n);
+  return Math.min(1, n / 100);
+}
+
+/** Display percent for field cards (prefers Lua-exported `weedPercent` when present). */
+export function weedPercentForDisplay(fieldOrLevel) {
+  if (fieldOrLevel && typeof fieldOrLevel === "object") {
+    const pre = Number(fieldOrLevel.weedPercent);
+    if (Number.isFinite(pre) && pre >= 0) return Math.min(100, Math.round(pre));
+    return Math.min(100, Math.round(weedNorm01(fieldOrLevel.weedLevel) * 100));
+  }
+  return Math.min(100, Math.round(weedNorm01(fieldOrLevel) * 100));
+}
 
 export function getRulesFallbackCounter() {
   return fallbackSuggestionCounter;

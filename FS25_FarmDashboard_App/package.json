@@ -29,6 +29,7 @@
     "i18n:fill:force": "node web/locales/mt-fill.mjs --force",
     "i18n:verify": "node web/locales/verify-i18n.mjs",
     "i18n:sync": "node web/locales/sync-keys-from-en.mjs",
+    "i18n:refresh": "node web/locales/sync-keys-from-en.mjs && node web/locales/mt-fill.mjs && node web/locales/build-translations.mjs && node web/locales/verify-i18n.mjs",
     "i18n:ads": "node ../tools/app/extract-ads-i18n.mjs",
     "verify:electron-pack": "node ../tools/app/verify-electron-pack-files.mjs"
   },
@@ -50,6 +51,9 @@
       "dataMerger.js",
       "farmScope.cjs",
       "mapOverviewResolver.js",
+      "mapOverviewTerrainInset.cjs",
+      "mapOverviewInsets.cjs",
+      "mapOverviewInsets.cjs",
       "detailAnimalsHydrate.js",
       "livestockDetail.js",
       "serverDataCache.js",

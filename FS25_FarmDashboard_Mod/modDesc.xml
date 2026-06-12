@@ -81,6 +81,8 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
     <extraSourceFiles>
         <sourceFile filename="src/FarmDashboard.lua"/>
         <sourceFile filename="src/FarmDashLog.lua"/>
+        <sourceFile filename="src/FillTypeUtils.lua"/>
+        <sourceFile filename="src/InventoryScan.lua"/>
         <sourceFile filename="src/Diagnostics.lua"/>
         <sourceFile filename="src/FarmDashboardDataCollector.lua"/>
         <sourceFile filename="src/collectors/AnimalDataCollector.lua"/>
@@ -90,5 +92,8 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/collectors/ProductionDataCollector.lua"/>
         <sourceFile filename="src/collectors/VehicleDataCollector.lua"/>
         <sourceFile filename="src/collectors/WeatherDataCollector.lua"/>
+        <sourceFile filename="src/collectors/StockDataCollector.lua"/>
+        <sourceFile filename="src/collectors/BaleInventoryCollector.lua"/>
+        <sourceFile filename="src/collectors/RedTapeDataCollector.lua"/>
     </extraSourceFiles>
 </modDesc>

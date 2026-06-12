@@ -9,6 +9,7 @@
 export const SERVER_LIVE_CACHE_SCHEMA_VERSION = '1.0';
 
 import { filterFieldsForFarmView, invalidateFieldsClientCache } from './fields.js';
+import { buildFillTypeCatalog } from './storage.js';
 import {
   getPlayerFarmRecords,
   entityOwnerFarmId,
@@ -620,6 +621,9 @@ export function applyEmptyApiState() {
   this.finance = {};
   this.weather = {};
   this.production = {};
+  this.stock = { enabled: false, byFarm: {} };
+  this.redTape = { enabled: false, byFarm: {} };
+  this.baleInventory = { farmId: null, onField: {}, offField: {} };
   this.pastures = [];
   this.husbandryData = [];
   this.mapTitle = null;
@@ -729,6 +733,10 @@ export function applyApiMergedDataPayload(dashboard, data) {
   dashboard.finance = data.finance || {};
   dashboard.weather = data.weather || {};
   dashboard.production = data.production || {};
+  dashboard.fillTypeCatalog = buildFillTypeCatalog(data);
+  dashboard.stock = data.stock || { enabled: false, byFarm: {} };
+  dashboard.redTape = data.redTape || { enabled: false, byFarm: {} };
+  dashboard.baleInventory = data.baleInventory || { farmId: null, onField: {}, offField: {} };
   dashboard.pastures = data.pastures || [];
   dashboard.mapTitle = data.mapTitle || data.serverInfo?.mapName || null;
   dashboard.mapId = data.mapId || data.serverInfo?.mapId || null;

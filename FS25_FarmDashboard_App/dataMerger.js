@@ -20,6 +20,216 @@
 const { assessModVersion } = require('./modVersionPolicy.js');
 const { pruneMergedDataToPlayerFarms } = require('./farmScope.cjs');
 
+const BALE_LITER_ESTIMATE = 4000;
+const BALE_INDEX_CATEGORY = {
+    25: 'silage',
+    26: 'grass',
+    30: 'hay',
+    31: 'straw',
+};
+const KNOWN_FILL_INDEX_NAMES = {
+    28: 'GRASS_WINDROW',
+    30: 'DRYGRASS_WINDROW',
+};
+
+function emptyBaleBucket() {
+    return { straw: 0, grass: 0, hay: 0, silage: 0, other: 0, byFillType: {} };
+}
+
+function baleCategoryFromName(name) {
+    const n = String(name || '').toUpperCase();
+    if (!n) return 'other';
+    if (n.includes('STRAW')) return 'straw';
+    if (n.includes('SILAGE') || n.includes('FERMENT')) return 'silage';
+    if (n.includes('DRYGRASS') || n.includes('HAY')) return 'hay';
+    if (n.includes('GRASS_WINDROW') || (n.includes('GRASS') && !n.includes('FERT'))) return 'grass';
+    return 'other';
+}
+
+function tallyBaleBucket(bucket, fillTypeIndex, count, catalog) {
+    const idx = Number(fillTypeIndex);
+    const n = Number(count) || 0;
+    if (!Number.isFinite(idx) || idx <= 0 || n <= 0) return;
+    const out = bucket || emptyBaleBucket();
+    out.byFillType = out.byFillType || {};
+    const label =
+        catalog?.[String(idx)] ||
+        catalog?.[idx] ||
+        KNOWN_FILL_INDEX_NAMES[idx] ||
+        '';
+    let cat = baleCategoryFromName(label);
+    if (cat === 'other' && BALE_INDEX_CATEGORY[idx]) cat = BALE_INDEX_CATEGORY[idx];
+    out[cat] = (Number(out[cat]) || 0) + n;
+    if (label && !/^\d+$/.test(String(label))) {
+        out.byFillType[label] = (Number(out.byFillType[label]) || 0) + n;
+    }
+    return out;
+}
+
+function sumBaleBucket(bucket) {
+    if (!bucket || typeof bucket !== 'object') return 0;
+    let total = 0;
+    for (const cat of ['straw', 'grass', 'hay', 'silage', 'other']) {
+        total += Number(bucket[cat]) || 0;
+    }
+    return total;
+}
+
+function baleInventoryIsEmpty(inv) {
+    if (!inv || typeof inv !== 'object') return true;
+    if (inv.byFarm && typeof inv.byFarm === 'object') {
+        for (const row of Object.values(inv.byFarm)) {
+            if (sumBaleBucket(row?.inStorage) > 0 || sumBaleBucket(row?.onField) > 0) return false;
+        }
+        return true;
+    }
+    return sumBaleBucket(inv.inStorage) + sumBaleBucket(inv.onField) <= 0;
+}
+
+function deriveBaleInventoryFromStock(stock, catalog) {
+    const byFarm = {};
+    if (!stock?.byFarm || typeof stock.byFarm !== 'object') {
+        return { byFarm, farmId: null, onField: {}, inStorage: {}, offField: {} };
+    }
+    for (const [fid, farm] of Object.entries(stock.byFarm)) {
+        const farmId = Number(farm?.farmId ?? fid);
+        if (!Number.isFinite(farmId) || farmId <= 0) continue;
+        const inStorage = emptyBaleBucket();
+        for (const item of farm.items || []) {
+            const idx = Number(item?.fillTypeIndex);
+            if (!Number.isFinite(idx) || idx <= 0) continue;
+            const objectLocs = (item.locations || []).filter(
+                (loc) => loc && (loc.kind === 'objectStorage' || loc.kind === 'objectStorageMod')
+            );
+            if (objectLocs.length === 0) continue;
+            const locLiters = objectLocs.reduce(
+                (sum, loc) => sum + (Number(loc.liters) || 0),
+                0
+            );
+            const totalLiters = Number(item.totalLiters) || 0;
+            const liters = Math.max(locLiters, totalLiters);
+            if (liters <= 0) continue;
+            const baleSize =
+                objectLocs.length > 0 && locLiters > 0
+                    ? locLiters / objectLocs.length
+                    : BALE_LITER_ESTIMATE;
+            const count = Math.max(1, Math.round(liters / baleSize));
+            tallyBaleBucket(inStorage, idx, count, catalog);
+        }
+        if (sumBaleBucket(inStorage) > 0) {
+            byFarm[String(farmId)] = {
+                onField: emptyBaleBucket(),
+                inStorage,
+                offField: inStorage,
+            };
+        }
+    }
+    const legacyFarm = Object.keys(byFarm)[0] || '1';
+    const legacy = byFarm[legacyFarm] || { onField: {}, inStorage: {}, offField: {} };
+    return {
+        byFarm,
+        farmId: Number(legacyFarm) || null,
+        onField: legacy.onField || {},
+        inStorage: legacy.inStorage || {},
+        offField: legacy.offField || legacy.inStorage || {},
+    };
+}
+
+function mergeBaleInventory(primary, secondary) {
+    const out = {
+        ...(primary && typeof primary === 'object' ? primary : {}),
+        byFarm: { ...(primary?.byFarm || {}) },
+    };
+    for (const [fid, row] of Object.entries(secondary?.byFarm || {})) {
+        const cur = out.byFarm[fid] || { onField: emptyBaleBucket(), inStorage: emptyBaleBucket() };
+        const addOn = row?.onField || {};
+        const addStorage = row?.inStorage || row?.offField || {};
+        const onField = emptyBaleBucket();
+        for (const cat of ['straw', 'grass', 'hay', 'silage', 'other']) {
+            onField[cat] = (Number(cur.onField?.[cat]) || 0) + (Number(addOn[cat]) || 0);
+        }
+        onField.byFillType = { ...(cur.onField?.byFillType || {}) };
+        for (const [label, count] of Object.entries(addOn.byFillType || {})) {
+            onField.byFillType[label] = (Number(onField.byFillType[label]) || 0) + (Number(count) || 0);
+        }
+        const inStorage = emptyBaleBucket();
+        for (const cat of ['straw', 'grass', 'hay', 'silage', 'other']) {
+            inStorage[cat] = (Number(cur.inStorage?.[cat]) || 0) + (Number(addStorage[cat]) || 0);
+        }
+        inStorage.byFillType = { ...(cur.inStorage?.byFillType || {}) };
+        for (const [label, count] of Object.entries(addStorage.byFillType || {})) {
+            inStorage.byFillType[label] = (Number(inStorage.byFillType[label]) || 0) + (Number(count) || 0);
+        }
+        out.byFarm[fid] = { onField, inStorage, offField: inStorage };
+    }
+    return out;
+}
+
+function mergeBaleBuckets(primary, secondary) {
+    const out = emptyBaleBucket();
+    for (const src of [primary, secondary]) {
+        if (!src || typeof src !== 'object') continue;
+        for (const cat of ['straw', 'grass', 'hay', 'silage', 'other']) {
+            out[cat] = (Number(out[cat]) || 0) + (Number(src[cat]) || 0);
+        }
+        for (const [label, count] of Object.entries(src.byFillType || {})) {
+            out.byFillType[label] = (Number(out.byFillType[label]) || 0) + (Number(count) || 0);
+        }
+    }
+    return out;
+}
+
+function supplementOnFieldFromFields(baleInventory, fields) {
+    const inv = baleInventory && typeof baleInventory === 'object'
+        ? { ...baleInventory, byFarm: { ...(baleInventory.byFarm || {}) } }
+        : { byFarm: {} };
+    const farmLegacyTotals = {};
+    for (const f of toArr(fields)) {
+        const n = Number(f?.baleCountOnField) || 0;
+        const fid = String(Number(f.ownerFarmId || f.farmId) || 1);
+        const row = inv.byFarm[fid] || { onField: emptyBaleBucket(), inStorage: emptyBaleBucket() };
+        const haveOnField = sumBaleBucket(row.onField);
+        const cat = f?.baleOnFieldByCategory;
+        if (haveOnField === 0 && cat && typeof cat === 'object' && sumBaleBucket(cat) > 0) {
+            row.onField = mergeBaleBuckets(row.onField, cat);
+        } else if (haveOnField === 0 && n > 0) {
+            farmLegacyTotals[fid] = (farmLegacyTotals[fid] || 0) + n;
+        }
+        row.offField = row.inStorage || emptyBaleBucket();
+        inv.byFarm[fid] = row;
+    }
+    for (const [fid, total] of Object.entries(farmLegacyTotals)) {
+        const row = inv.byFarm[fid] || { onField: emptyBaleBucket(), inStorage: emptyBaleBucket() };
+        const have = sumBaleBucket(row.onField);
+        if (have === 0 && total > 0) {
+            row.onField = mergeBaleBuckets(row.onField, { ...emptyBaleBucket(), other: total });
+        }
+        row.offField = row.inStorage || emptyBaleBucket();
+        inv.byFarm[fid] = row;
+    }
+    return inv;
+}
+
+function baleInventoryHasStorage(inv) {
+    if (!inv || typeof inv !== 'object') return false;
+    if (inv.byFarm && typeof inv.byFarm === 'object') {
+        for (const row of Object.values(inv.byFarm)) {
+            if (sumBaleBucket(row?.inStorage) > 0) return true;
+        }
+        return false;
+    }
+    return sumBaleBucket(inv.inStorage) > 0;
+}
+
+function enrichBaleInventoryFromStock(luaData, catalog) {
+    let current = luaData?.baleInventory || { farmId: null, onField: {}, offField: {}, byFarm: {} };
+    current = supplementOnFieldFromFields(current, luaData?.fields);
+    if (!luaData?.stock?.byFarm) return current;
+    if (baleInventoryHasStorage(current)) return current;
+    const derived = deriveBaleInventoryFromStock(luaData.stock, catalog);
+    return mergeBaleInventory(current, derived);
+}
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 /** Lua serialises empty tables as {} — normalise to JS array */
@@ -284,6 +494,188 @@ function attachDataTimestamps(obj, options) {
     return attachModVersionCheck(withTimestamps);
 }
 
+const MAP_CROP_SKIP = new Set(['UNKNOWN', 'EMPTY', 'GRASS', 'MULCHED_STUBBLE']);
+
+function catalogFromMapCrops(luaData, xmlEconomy) {
+    const out = {};
+    const lua = luaData || {};
+    const nameToIndex = lua.economy?.marketPrices?.nameToIndex || {};
+    const cropMap = lua.cropFillTypeIndex || {};
+
+    for (const [crop, idx] of Object.entries(cropMap)) {
+        const n = Number(idx);
+        const label = String(crop || '').trim().toUpperCase();
+        if (n > 0 && label) out[String(n)] = label;
+    }
+    for (const f of toArr(lua.fields)) {
+        const label = String(f?.fruitType || '').trim().toUpperCase();
+        if (!label || MAP_CROP_SKIP.has(label)) continue;
+        const idx = Number(nameToIndex[label] ?? nameToIndex[f.fruitType] ?? cropMap[label]);
+        if (idx > 0) out[String(idx)] = label;
+    }
+    for (const name of Object.keys(xmlEconomy || {})) {
+        const label = String(name || '').trim().toUpperCase();
+        if (!label || MAP_CROP_SKIP.has(label)) continue;
+        const idx = Number(nameToIndex[label] ?? cropMap[label]);
+        if (idx > 0 && !out[String(idx)]) out[String(idx)] = label;
+    }
+    return out;
+}
+
+/** Witcombe-style gap: engine exports 181=RYE and 183=SPELT but omits 182=TRITICALE on dedicated servers. */
+function assignNeighborCropGaps(catalog, stock) {
+    const out = { ...(catalog || {}) };
+    const rye = String(out['181'] || '').trim().toUpperCase();
+    const spelt = String(out['183'] || '').trim().toUpperCase();
+    if (out['182'] || rye !== 'RYE' || spelt !== 'SPELT') return out;
+
+    let needs182 = false;
+    for (const farm of Object.values(stock?.byFarm || {})) {
+        for (const item of farm?.items || []) {
+            if (Number(item?.fillTypeIndex) === 182) needs182 = true;
+        }
+    }
+    if (needs182) out['182'] = 'TRITICALE';
+    return out;
+}
+
+/** Pair unresolved silo indices with map crop names (e.g. index 182 ↔ TRITICALE on Witcombe). */
+function inferCatalogFromStockAndFields(stock, fields, catalog, xmlEconomy) {
+    let out = assignNeighborCropGaps(catalog, stock);
+    const catalogValues = new Set(
+        Object.values(out).map((v) => String(v || '').trim().toUpperCase()).filter(Boolean)
+    );
+
+    for (const [fid, farm] of Object.entries(stock?.byFarm || {})) {
+        const farmId = String(Number(farm?.farmId ?? fid) || fid);
+        const missingIdx = [];
+        for (const item of farm?.items || []) {
+            const idx = Number(item?.fillTypeIndex);
+            if (!Number.isFinite(idx) || idx <= 0) continue;
+            const key = String(idx);
+            if (!out[key] && !/^\d+$/.test(String(item?.fillType || '').trim())) {
+                missingIdx.push(idx);
+            } else if (!out[key] && item?.fillType && !/^\d+$/.test(String(item.fillType))) {
+                out[key] = String(item.fillType).trim().toUpperCase();
+                catalogValues.add(out[key]);
+            }
+        }
+        if (missingIdx.length === 0) continue;
+
+        const farmCrops = new Set();
+        for (const f of toArr(fields)) {
+            if (String(Number(f?.ownerFarmId ?? f?.farmId) || 1) !== farmId) continue;
+            const label = String(f?.fruitType || '').trim().toUpperCase();
+            if (label && !MAP_CROP_SKIP.has(label)) farmCrops.add(label);
+        }
+        const unmapped = [...farmCrops].filter((c) => !catalogValues.has(c));
+        if (unmapped.length === 1 && missingIdx.length === 1) {
+            const crop = unmapped[0];
+            out[String(missingIdx[0])] = crop;
+            catalogValues.add(crop);
+        }
+    }
+
+    const xmlCrops = Object.keys(xmlEconomy || {})
+        .map((n) => String(n).trim().toUpperCase())
+        .filter((n) => n && !MAP_CROP_SKIP.has(n));
+    const stillMissing = [];
+    for (const [fid, farm] of Object.entries(stock?.byFarm || {})) {
+        for (const item of farm?.items || []) {
+            const idx = Number(item?.fillTypeIndex);
+            if (idx > 0 && !out[String(idx)]) stillMissing.push(idx);
+        }
+    }
+    const xmlUnmapped = xmlCrops.filter((c) => !catalogValues.has(c));
+    if (stillMissing.length === 1 && xmlUnmapped.length === 1) {
+        out[String(stillMissing[0])] = xmlUnmapped[0];
+    }
+
+    return out;
+}
+
+function buildFillTypeCatalog(luaData, xmlEconomy) {
+    const lua = luaData || {};
+    const base = {
+        ...(lua.fillTypeCatalog || {}),
+        ...(lua.stock?.fillTypeCatalog || {}),
+        ...(lua.economy?.fillTypeCatalog || {}),
+        ...(lua.economy?.marketPrices?.fillTypesByIndex || {}),
+        ...catalogFromMapCrops(lua, xmlEconomy),
+        ...Object.fromEntries(
+            Object.entries(KNOWN_FILL_INDEX_NAMES).map(([idx, name]) => [String(idx), name])
+        ),
+        ...Object.fromEntries(
+            Object.entries(lua.economy?.marketPrices?.nameToIndex || {}).map(
+                ([name, idx]) => [String(idx), name]
+            )
+        ),
+        ...Object.fromEntries(
+            Object.entries(lua.economy?.marketPrices?.crops || {})
+                .filter(([, crop]) => crop?.fillTypeIndex != null)
+                .map(([name, crop]) => [String(crop.fillTypeIndex), name])
+        ),
+    };
+    const catalog = inferCatalogFromStockAndFields(
+        lua.stock,
+        lua.fields,
+        base,
+        xmlEconomy
+    );
+    return enrichStockFillTypes(lua.stock, catalog).catalog;
+}
+
+function inferFillTypeFromLocations(locations) {
+    const blob = (locations || [])
+        .map((loc) => String(loc?.name || ''))
+        .join(' ')
+        .toLowerCase();
+    if (!blob) return null;
+    if (/herbicide|liquid fert|liquid fertiliser|liquid fertilizer/.test(blob)) {
+        return { name: 'LIQUID_FERTILIZER', display: 'Liquid Fertilizer' };
+    }
+    if (/fertilizer tank|fertiliser tank|stainless steel fertilizer/.test(blob)) {
+        return { name: 'MINERAL_FERTILIZER', display: 'Mineral Fertilizer' };
+    }
+    if (/cow shed|milking|husbandry|dairy/.test(blob)) {
+        return { name: 'STRAW', display: 'Straw' };
+    }
+    return null;
+}
+
+function enrichStockFillTypes(stock, catalog) {
+    const nextCatalog = { ...(catalog || {}) };
+    if (!stock?.byFarm || typeof stock.byFarm !== 'object') {
+        return { stock, catalog: nextCatalog };
+    }
+    const nextStock = { ...stock, byFarm: {} };
+    for (const [fid, farm] of Object.entries(stock.byFarm)) {
+        const items = (farm?.items || []).map((item) => {
+            const idx = Number(item?.fillTypeIndex);
+            const out = { ...item };
+            const mapped = idx > 0 ? nextCatalog[String(idx)] : null;
+            if (mapped && (!out.fillType || /^\d+$/.test(String(out.fillType).trim()))) {
+                out.fillType = mapped;
+            } else if (out.fillTypeDisplay && (!out.fillType || /^\d+$/.test(String(out.fillType).trim()))) {
+                out.fillType = String(out.fillTypeDisplay).trim();
+            } else if (!out.fillType || /^\d+$/.test(String(out.fillType || '').trim())) {
+                const inferred = inferFillTypeFromLocations(out.locations);
+                if (inferred) {
+                    out.fillType = inferred.name;
+                    out.fillTypeDisplay = inferred.display;
+                    if (idx > 0) nextCatalog[String(idx)] = inferred.name;
+                }
+            }
+            if (idx > 0 && out.fillType && !/^\d+$/.test(String(out.fillType))) {
+                nextCatalog[String(idx)] = nextCatalog[String(idx)] || String(out.fillType);
+            }
+            return out;
+        });
+        nextStock.byFarm[fid] = { ...farm, items };
+    }
+    return { stock: nextStock, catalog: nextCatalog };
+}
+
 function mergeData(luaData, xmlData, options = {}) {
     const fieldLiveCache = options.fieldLiveCache || {};
     const lastLuaAt = options.lastLuaAt || null;
@@ -313,6 +705,9 @@ function mergeData(luaData, xmlData, options = {}) {
     if (allowedFarmIds.size === 0) {
         allowedFarmIds = farmIdsFromLuaFields(luaData.fields);
     }
+
+    const fillTypeCatalog = buildFillTypeCatalog(luaData, xmlData.economy);
+    const stockEnriched = enrichStockFillTypes(luaData.stock, fillTypeCatalog);
 
     const mergedCore = {
         dataSource   : 'merged',
@@ -384,8 +779,17 @@ function mergeData(luaData, xmlData, options = {}) {
         // Production — Lua only
         production   : luaData.production || { chains: [], husbandryTotals: {} },
 
-        // Physical bales by fill category — on cropland vs yards/sheds (Lua mod scan)
-        baleInventory: luaData.baleInventory || { farmId: null, onField: {}, offField: {} },
+        // Physical bales — Lua scan + stock objectStorage fallback when mod export is empty
+        baleInventory: enrichBaleInventoryFromStock(luaData, stockEnriched.catalog),
+
+        fillTypeCatalog: stockEnriched.catalog,
+        cropFillTypeIndex: luaData.cropFillTypeIndex || {},
+        stock: {
+            ...stockEnriched.stock,
+            enabled: luaData.stock?.enabled !== false,
+            fillTypeCatalog: { ...stockEnriched.catalog },
+        },
+        redTape: luaData.redTape || { enabled: false, byFarm: {} },
 
         // Placeables — XML
         placeables   : toArr(xmlData.placeables),
@@ -634,10 +1038,17 @@ function mergeFields(xmlFields, luaFields) {
             needsFertilizer: luaField.needsFertilizer ?? xmlField.needsFertilizer,
             plowLevel: luaField.plowLevel ?? xmlField.plowLevel,
             weedLevel: luaField.weedLevel ?? xmlField.weedLevel,
+            weedPercent: luaField.weedPercent ?? xmlField.weedPercent,
+            weedAlertThresholdPct: luaField.weedAlertThresholdPct ?? xmlField.weedAlertThresholdPct ?? 15,
             fertilizationLevel: luaField.fertilizationLevel ?? xmlField.fertilizationLevel,
             limeLevel: luaField.limeLevel ?? xmlField.limeLevel,
             sprayLevel: luaField.sprayLevel ?? xmlField.sprayLevel,
         };
+
+        const moistureBlock =
+            luaField.moisture && typeof luaField.moisture === 'object'
+                ? luaField.moisture
+                : null;
 
         return {
             ...xmlField,    // XML base: soil state, ownership, crop, growthState
@@ -645,6 +1056,7 @@ function mergeFields(xmlFields, luaFields) {
             ...pfOverlay,   // Lua: mapped nitrogen/pH when soil data is active
             ...windBale,    // Lua: windrow + bale counts for post-harvest rules
             ...luaAgronomy,
+            moisture: moistureBlock,
             /** Savegame/XML crop id (stable hint when Lua fruit is empty after harvest). */
             xmlFruitTypeHint: xmlField.fruitType || '',
             // Lua is authoritative: XML uses coarse heuristics (e.g. plowLevel < 1 on growing crops).
@@ -750,15 +1162,74 @@ function mergeVehicles(luaVehicles, xmlVehicles) {
 
 function mergeEconomy(luaEconomy, xmlEconomy) {
     const result = { ...luaEconomy, xmlPriceHistory: xmlEconomy };
+    const catalog = {
+        ...(luaEconomy.fillTypeCatalog || {}),
+        ...(luaEconomy.marketPrices?.fillTypesByIndex || {}),
+        ...Object.fromEntries(
+            Object.entries(luaEconomy.marketPrices?.nameToIndex || {}).map(
+                ([name, idx]) => [String(idx), name]
+            )
+        ),
+        ...Object.fromEntries(
+            Object.entries(luaEconomy.marketPrices?.crops || {})
+                .filter(([, crop]) => crop?.fillTypeIndex != null)
+                .map(([name, crop]) => [String(crop.fillTypeIndex), name])
+        ),
+    };
+    if (Object.keys(catalog).length > 0) {
+        result.fillTypeCatalog = catalog;
+        if (result.marketPrices && typeof result.marketPrices === 'object') {
+            result.marketPrices = { ...result.marketPrices, fillTypesByIndex: catalog };
+        }
+    }
 
     // Enrich Lua crop entries with XML price history
     if (luaEconomy.marketPrices?.crops && xmlEconomy) {
+        const SEASON_PERIODS = [
+            'EARLY_SPRING', 'MID_SPRING', 'LATE_SPRING',
+            'EARLY_SUMMER', 'MID_SUMMER', 'LATE_SUMMER',
+            'EARLY_AUTUMN', 'MID_AUTUMN', 'LATE_AUTUMN',
+            'EARLY_WINTER', 'MID_WINTER', 'LATE_WINTER',
+        ];
+        const SEASON_MONTHS = {
+            EARLY_SPRING: 'Mar', MID_SPRING: 'Apr', LATE_SPRING: 'May',
+            EARLY_SUMMER: 'Jun', MID_SUMMER: 'Jul', LATE_SUMMER: 'Aug',
+            EARLY_AUTUMN: 'Sep', MID_AUTUMN: 'Oct', LATE_AUTUMN: 'Nov',
+            EARLY_WINTER: 'Dec', MID_WINTER: 'Jan', LATE_WINTER: 'Feb',
+        };
+        const maxMonthFromHistory = (history) => {
+            if (!history || typeof history !== 'object') return null;
+            let bestPeriod = null;
+            let bestPrice = -1;
+            for (const period of SEASON_PERIODS) {
+                const price = Number(history[period]);
+                if (!Number.isFinite(price) || price <= 0) continue;
+                if (price > bestPrice) { bestPrice = price; bestPeriod = period; }
+            }
+            if (!bestPeriod) {
+                for (const [period, raw] of Object.entries(history)) {
+                    const price = Number(raw);
+                    if (!Number.isFinite(price) || price <= 0) continue;
+                    if (price > bestPrice) { bestPrice = price; bestPeriod = period; }
+                }
+            }
+            if (!bestPeriod) return null;
+            if (SEASON_MONTHS[bestPeriod]) return SEASON_MONTHS[bestPeriod];
+            const idx = Number(bestPeriod);
+            if (Number.isFinite(idx) && idx >= 1 && idx <= 12) {
+                return SEASON_MONTHS[SEASON_PERIODS[idx - 1]] || null;
+            }
+            return null;
+        };
         for (const [crop, data] of Object.entries(luaEconomy.marketPrices.crops)) {
             const hist = xmlEconomy[crop] || xmlEconomy[crop.toUpperCase()];
             if (hist) {
                 data.priceHistory     = hist.history;
                 data.avgXmlPrice      = hist.avgPrice;
                 data.totalHarvested   = hist.totalAmount;
+                if (!data.maxPriceMonth) {
+                    data.maxPriceMonth = maxMonthFromHistory(hist.history);
+                }
             }
         }
     }
@@ -769,6 +1240,8 @@ function mergeEconomy(luaEconomy, xmlEconomy) {
 
 function buildFromLuaOnly(lua) {
     const allowed = farmIdsFromLuaFields(lua.fields);
+    const fillTypeCatalog = buildFillTypeCatalog(lua);
+    const stockEnriched = enrichStockFillTypes(lua.stock, fillTypeCatalog);
     return {
         dataSource: 'lua_only', xmlAvailable: false, luaAvailable: true,
         lastUpdated: new Date().toISOString(),
@@ -787,7 +1260,15 @@ function buildFromLuaOnly(lua) {
         vehicles: lua.vehicles || [],
         economy: lua.economy   || {},
         production: lua.production || {},
-        baleInventory: lua.baleInventory || { farmId: null, onField: {}, offField: {} },
+        baleInventory: enrichBaleInventoryFromStock(lua, stockEnriched.catalog),
+        fillTypeCatalog: stockEnriched.catalog,
+        cropFillTypeIndex: lua.cropFillTypeIndex || {},
+        stock: {
+            ...stockEnriched.stock,
+            enabled: lua.stock?.enabled !== false,
+            fillTypeCatalog: { ...stockEnriched.catalog },
+        },
+        redTape: lua.redTape || { enabled: false, byFarm: {} },
         placeables: [],
     };
 }
@@ -828,4 +1309,12 @@ function buildFromXmlOnly(xml) {
     };
 }
 
-module.exports = { mergeData, buildFieldLiveFingerprints };
+module.exports = {
+    mergeData,
+    buildFieldLiveFingerprints,
+    buildFillTypeCatalog,
+    deriveBaleInventoryFromStock,
+    enrichBaleInventoryFromStock,
+    supplementOnFieldFromFields,
+    mergeBaleInventory,
+};

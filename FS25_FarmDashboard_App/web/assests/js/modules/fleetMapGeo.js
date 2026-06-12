@@ -43,10 +43,50 @@ export function computeObjectFitContainLayout(natW, natH, boxW, boxH) {
   return { x: (bw - w) / 2, y: (bh - h) / 2, w, h };
 }
 
-/** Default centre terrain inset on PDA overview textures (pins only — image is not cropped). */
+/** Full texture — no PDA desk border detected. */
+export const FULL_TERRAIN_INSET = { left: 0, top: 0, width: 1, height: 1 };
+
+export function isFullBleedTerrainInset(inset) {
+  const c = inset || FULL_TERRAIN_INSET;
+  const area = Number(c.width) * Number(c.height);
+  return (
+    area >= 0.94 &&
+    Number(c.left) <= 0.03 &&
+    Number(c.top) <= 0.03 &&
+    Number(c.left) + Number(c.width) >= 0.97 &&
+    Number(c.top) + Number(c.height) >= 0.97
+  );
+}
+
+/** Pixel size of the playable terrain window inside a full overview texture. */
+export function terrainClipPixelSize(natW, natH, inset) {
+  const nw = Number(natW);
+  const nh = Number(natH);
+  const c = inset || FULL_TERRAIN_INSET;
+  if (!nw || !nh) return { w: 0, h: 0, offsetX: 0, offsetY: 0 };
+  if (isFullBleedTerrainInset(c)) {
+    return { w: nw, h: nh, offsetX: 0, offsetY: 0 };
+  }
+  return {
+    w: nw * Number(c.width),
+    h: nh * Number(c.height),
+    offsetX: nw * Number(c.left),
+    offsetY: nh * Number(c.top),
+  };
+}
+
+/** @deprecated Server-side auto-detect replaces this; kept for tests only. */
 export const DEFAULT_PDA_TERRAIN_INSET = { left: 0.1, top: 0.1, width: 0.8, height: 0.8 };
 
 const STANDARD_TERRAIN_HALVES = [1024, 2048, 4096, 8192];
+const MIN_TERRAIN_HALF = 64;
+
+/** Reject bogus bootstrap values (e.g. terrainSize=1 → halfSize=0.5 before mission load). */
+export function normalizeTerrainHalf(reportedHalf) {
+  const h = Number(reportedHalf);
+  if (!Number.isFinite(h) || h < MIN_TERRAIN_HALF) return 1024;
+  return h;
+}
 
 function positionXZ(point) {
   if (!point || typeof point !== "object") return null;
@@ -106,10 +146,12 @@ export function mapOverviewIdentityKey(mapId, mapTitle) {
 
 export function resolveTerrainBounds(dashboard, vehicles) {
   const raw = dashboard?.mapBounds || dashboard?.serverInfo?.mapBounds;
-  let reportedHalf = Number(raw?.halfSize);
-  if (!Number.isFinite(reportedHalf) || reportedHalf <= 0) {
+  let reportedHalf = normalizeTerrainHalf(raw?.halfSize);
+  if (!raw?.halfSize) {
     const ts = Number(raw?.terrainSize);
-    reportedHalf = Number.isFinite(ts) && ts > 0 ? ts * 0.5 : 1024;
+    if (Number.isFinite(ts) && ts >= MIN_TERRAIN_HALF * 2) {
+      reportedHalf = normalizeTerrainHalf(ts * 0.5);
+    }
   }
 
   const positions = [];
@@ -131,4 +173,23 @@ export function resolveTerrainBounds(dashboard, vehicles) {
   }
 
   return boundsFromTerrainHalf(half);
+}
+
+/**
+ * PDA overview.dds UV layout is usually the engine-standard 2 km halfSize (±1024 m)
+ * even when the save reports a larger terrain (4 km mod maps). Using the full
+ * terrain half for pin projection compresses north–south and clips east–west.
+ */
+export function resolveOverviewTerrainBounds(dashboard) {
+  const raw = dashboard?.mapBounds || dashboard?.serverInfo?.mapBounds;
+  let reportedHalf = normalizeTerrainHalf(raw?.halfSize);
+  const terrainSize = Number(raw?.terrainSize);
+  if (!raw?.halfSize && Number.isFinite(terrainSize) && terrainSize >= MIN_TERRAIN_HALF * 2) {
+    reportedHalf = normalizeTerrainHalf(terrainSize * 0.5);
+  }
+
+  const isLargeTerrain =
+    (Number.isFinite(terrainSize) && terrainSize > 2048) || reportedHalf > 1024;
+  const overviewHalf = isLargeTerrain ? 1024 : reportedHalf;
+  return boundsFromTerrainHalf(overviewHalf);
 }

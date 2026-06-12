@@ -7,6 +7,7 @@ import {
   entityOwnerFarmId,
   pruneMergedDataToPlayerFarms,
 } from "./modules/farmScope.js";
+import { buildFillTypeCatalog } from "./modules/storage.js";
 
 /** Set true only when diagnosing livestock change notifications */
 const VERBOSE_CHANGE_LOG = false;
@@ -455,6 +456,26 @@ class RealtimeConnector {
       this.updateProductionData(data.production);
     }
 
+    if (data.stock) {
+      this.dashboard.stock = data.stock;
+    }
+
+    if (data.fillTypeCatalog || data.economy || data.stock) {
+      this.dashboard.fillTypeCatalog = buildFillTypeCatalog({
+        fillTypeCatalog: data.fillTypeCatalog || this.dashboard.fillTypeCatalog,
+        stock: data.stock || this.dashboard.stock,
+        economy: data.economy || this.dashboard.economy,
+      });
+    }
+
+    if (data.redTape) {
+      this.dashboard.redTape = data.redTape;
+    }
+
+    if (data.baleInventory) {
+      this.dashboard.baleInventory = data.baleInventory;
+    }
+
     if (data.finance) {
       this.updateFinanceData(data.finance);
     }
@@ -463,8 +484,13 @@ class RealtimeConnector {
       this.updateWeatherData(data.weather);
     }
 
+    if (this.dashboard.refreshEconomyIfVisible) {
+      this.dashboard.refreshEconomyIfVisible();
+    }
+
     if (data.economy) {
       this.updateEconomyData(data.economy);
+      this.dashboard.fillTypeCatalog = buildFillTypeCatalog(this.dashboard);
     }
 
     if (data.gameTime) {

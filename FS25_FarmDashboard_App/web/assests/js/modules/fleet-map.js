@@ -8,10 +8,10 @@ import {
 } from "./vehicles.js";
 import {
   worldToMapPercent,
-  applyOverviewCropPercent,
   mapOverviewIdentityKey,
-  resolveTerrainBounds,
-  DEFAULT_PDA_TERRAIN_INSET,
+  resolveOverviewTerrainBounds,
+  FULL_TERRAIN_INSET,
+  terrainClipPixelSize,
 } from "./fleetMapGeo.js";
 import { FleetMapViewport } from "./fleetMapViewport.js";
 
@@ -91,17 +91,55 @@ function resolveMapMeta(dashboard) {
 }
 
 function vehicleMapPercent(x, z, bounds) {
-  const base = worldToMapPercent(x, z, bounds);
-  return applyOverviewCropPercent(base, DEFAULT_PDA_TERRAIN_INSET);
+  return worldToMapPercent(x, z, bounds);
 }
 
 let _overviewFetchKey = "";
 let _overviewFetchPromise = null;
 let _mapViewport = null;
-
+let _terrainInset = { ...FULL_TERRAIN_INSET };
 export function resetFleetMapOverviewCache() {
   _overviewFetchKey = "";
   _overviewFetchPromise = null;
+  _terrainInset = { ...FULL_TERRAIN_INSET };
+}
+
+function applyTerrainInsetFromOverview(data) {
+  const inset = data?.terrainInset;
+  if (inset && Number(inset.width) > 0 && Number(inset.height) > 0) {
+    _terrainInset = {
+      left: Number(inset.left) || 0,
+      top: Number(inset.top) || 0,
+      width: Number(inset.width) || 1,
+      height: Number(inset.height) || 1,
+    };
+    return;
+  }
+  _terrainInset = { ...FULL_TERRAIN_INSET };
+}
+
+export function syncTerrainClipLayout() {
+  const img = document.getElementById("fleet-map-overview-img");
+  const clip = document.getElementById("fleet-map-terrain-clip");
+  const canvas = document.querySelector(".farm-fleet-map-canvas");
+  if (!img || !clip || !canvas) return false;
+
+  const natW = Number(img.naturalWidth);
+  const natH = Number(img.naturalHeight);
+  if (!natW || !natH) return false;
+
+  const { w, h, offsetX, offsetY } = terrainClipPixelSize(natW, natH, _terrainInset);
+  if (!w || !h) return false;
+
+  clip.style.width = `${w}px`;
+  clip.style.height = `${h}px`;
+  canvas.style.width = `${w}px`;
+  canvas.style.height = `${h}px`;
+  img.style.width = `${natW}px`;
+  img.style.height = `${natH}px`;
+  img.style.left = `${-offsetX}px`;
+  img.style.top = `${-offsetY}px`;
+  return true;
 }
 
 export function syncFleetMapOverviewIdentity(dashboard) {
@@ -200,15 +238,21 @@ async function applyMapOverviewBackground(dashboard) {
   const { data } = await _overviewFetchPromise;
   if (_overviewFetchKey !== key) return;
 
+  applyTerrainInsetFromOverview(data);
+
   const viewport = ensureMapViewport();
 
   if (data?.ok && data.url) {
     img.onload = () => {
       stage.classList.add("farm-fleet-map-stage--has-overview");
+      syncTerrainClipLayout();
       viewport?.syncCanvasSize();
       viewport?.fitWholeImage();
       if (hint) {
         hint.textContent = t("map.hint", { map: mapTitle || mapId || t("map.unknownMap") });
+      }
+      if (typeof dashboard?.renderFleetMap === "function") {
+        dashboard.renderFleetMap();
       }
     };
     img.onerror = () => {
@@ -216,10 +260,14 @@ async function applyMapOverviewBackground(dashboard) {
       img.classList.add("d-none");
       if (hint) hint.textContent = t("map.hintNoImage");
     };
-    img.src = `${data.url}?v=${encodeURIComponent(key)}`;
+    const cacheV = data?.cacheVersion ?? key;
+    img.src = `${data.url}?v=${encodeURIComponent(String(cacheV))}`;
     img.alt = mapTitle || mapId || t("map.unknownMap");
     img.classList.remove("d-none");
     img.dataset.loadedUrl = data.url;
+    if (typeof dashboard.renderFleetMap === "function") {
+      dashboard.renderFleetMap();
+    }
     if (img.complete && img.naturalWidth > 0) img.onload();
   } else {
     stage.classList.remove("farm-fleet-map-stage--has-overview");
@@ -271,7 +319,7 @@ export function renderFleetMap() {
   if (countEl) countEl.textContent = t("map.plottedCount", { count: plotted.length });
   if (empty) empty.classList.toggle("d-none", plotted.length > 0);
 
-  const bounds = resolveTerrainBounds(this, plotted);
+  const bounds = resolveOverviewTerrainBounds(this);
   markers.innerHTML = "";
   const pinPoints = [];
 
@@ -353,8 +401,10 @@ export function showMapSection() {
         <div class="farm-fleet-map-viewport" id="fleet-map-viewport">
           <div class="farm-fleet-map-transform" id="fleet-map-transform">
             <div class="farm-fleet-map-canvas">
-              <img id="fleet-map-overview-img" class="farm-fleet-map-overview d-none" alt="" decoding="async" draggable="false" />
-              <div id="fleet-map-markers" class="farm-fleet-map-markers"></div>
+              <div id="fleet-map-terrain-clip" class="farm-fleet-map-terrain-clip">
+                <img id="fleet-map-overview-img" class="farm-fleet-map-overview d-none" alt="" decoding="async" draggable="false" />
+                <div id="fleet-map-markers" class="farm-fleet-map-markers"></div>
+              </div>
             </div>
           </div>
         </div>

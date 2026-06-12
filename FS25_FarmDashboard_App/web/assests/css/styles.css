@@ -2056,10 +2056,16 @@ body.farm-dash-ui.bg-dark::before {
   position: relative;
   display: block;
 }
+.farm-fleet-map-terrain-clip {
+  position: relative;
+  overflow: hidden;
+}
 .farm-fleet-map-overview {
+  position: absolute;
+  left: 0;
+  top: 0;
   display: block;
-  width: 100%;
-  height: 100%;
+  max-width: none;
   pointer-events: none;
   user-select: none;
 }
@@ -2202,4 +2208,183 @@ body.farmdash-remote-viewer .farmdash-local-only {
 
 body.farmdash-remote-viewer .farmdash-remote-only {
   display: block !important;
+}
+
+/* Economy → Storage: in-game “Prices & fluctuations” commodity table */
+.fs-commodity-panel {
+  background: linear-gradient(180deg, #1a1f1c 0%, #121614 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--farm-radius-sm);
+  overflow: hidden;
+}
+
+.fs-commodity-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.fs-commodity-table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+  color: #e8ece9;
+}
+
+.fs-commodity-table thead th {
+  padding: 0.65rem 0.75rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #b8c4bc;
+  background: #0f1311;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+}
+
+.fs-commodity-table tbody td {
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: middle;
+}
+
+.fs-commodity-row {
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.fs-commodity-row:hover {
+  background: rgba(47, 111, 78, 0.22);
+}
+
+.fs-commodity-row.is-expanded {
+  background: rgba(122, 196, 72, 0.35);
+  color: #0e1210;
+}
+
+.fs-commodity-row.is-expanded td {
+  border-bottom-color: transparent;
+}
+
+.fs-commodity-row.is-expanded .fs-commodity-name,
+.fs-commodity-row.is-expanded .fs-value-cell.is-highlight {
+  color: #0e1210;
+}
+
+.fs-commodity-name {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 600;
+  color: #f4f7f5;
+}
+
+.fs-commodity-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--farm-accent);
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.fs-commodity-stock {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fs-commodity-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fs-trend-dot {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.fs-trend-dot.up {
+  background: #3d9e4a;
+  color: #fff;
+}
+
+.fs-trend-dot.down {
+  background: #c0392b;
+  color: #fff;
+}
+
+.fs-trend-dot.flat {
+  background: #4a524d;
+  color: #ccc;
+}
+
+.fs-value-cell {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.fs-value-cell.is-highlight {
+  color: var(--farm-accent);
+  font-weight: 700;
+}
+
+.fs-commodity-station {
+  color: #c5d0c8;
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fs-commodity-row.is-expanded .fs-commodity-station {
+  color: #1a221e;
+}
+
+.fs-commodity-muted {
+  color: #8a9690;
+  font-style: italic;
+}
+
+.fs-commodity-detail-row td {
+  padding: 0;
+  background: #0c100e;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.fs-commodity-detail-inner {
+  padding: 0.5rem 0.75rem 0.75rem 2.85rem;
+}
+
+.fs-commodity-loc-table {
+  width: 100%;
+  font-size: 0.75rem;
+  color: #b8c4bc;
+}
+
+.fs-commodity-loc-table th {
+  font-weight: 600;
+  color: #8a9690;
+  padding: 0.25rem 0.5rem 0.25rem 0;
+  text-align: left;
+}
+
+.fs-commodity-loc-table td {
+  padding: 0.2rem 0.5rem 0.2rem 0;
+  border: none;
 }

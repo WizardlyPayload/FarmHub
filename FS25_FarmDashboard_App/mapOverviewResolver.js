@@ -5,7 +5,17 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
-const { spawn } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
+const {
+  FULL_TERRAIN_INSET,
+  analyzeOverviewTerrain,
+  isFullBleedInset,
+  roundInset,
+} = require('./mapOverviewTerrainInset.cjs');
+const { lookupTerrainInsetOverride } = require('./mapOverviewInsets.cjs');
+
+const OVERVIEW_CACHE_VERSION = 6;
+const TERRAIN_INSET_SAMPLE_SIZE = 512;
 
 const OVERVIEW_NAMES = new Set(['overview.dds', 'overview.png']);
 const OVERVIEW_ENTRY_RE = /(?:^|\/)textures\/ui\/overview\.(dds|png)$/i;
@@ -96,16 +106,18 @@ function getFs25GameDataRoots() {
   };
   const env = process.env.FS25_GAME_PATH || process.env.FARMING_SIMULATOR_2025_PATH;
   if (env) push(env);
-  const steam = path.join(
+  const steamCommon = path.join(
     process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)',
     'Steam',
     'steamapps',
-    'common',
-    'Farming Simulator 2025'
+    'common'
   );
-  push(steam);
+  push(path.join(steamCommon, 'Farming Simulator 25'));
+  push(path.join(steamCommon, 'Farming Simulator 2025'));
   const pf = process.env.ProgramFiles || 'C:\\Program Files';
+  push(path.join(pf, 'Farming Simulator 25'));
   push(path.join(pf, 'Farming Simulator 2025'));
+  push(path.join(pf, 'Epic Games', 'FarmingSimulator25'));
   push(path.join(pf, 'Epic Games', 'FarmingSimulator2025'));
   push(path.join(pf, 'XboxGames', 'Farming Simulator 25', 'Content'));
   push(path.join(pf, 'XboxGames', 'Farming Simulator 2025', 'Content'));
@@ -313,7 +325,12 @@ async function findOverviewInZipArchives(modsRoots, mapSlug, mapTitle, titleToke
   let candidates = [...new Set([...priority, ...archives])];
   if (distinctive.length > 0) {
     const matched = candidates.filter((z) => archiveMatchesMapIdentity(z, mapSlug, mapTitle));
-    if (matched.length > 0) candidates = matched;
+    if (matched.length > 0) {
+      candidates = matched;
+    } else {
+      // e.g. Riverbend Springs (MapUS) — never use another mod's mapUS overview texture
+      return null;
+    }
   }
 
   candidates.sort(
@@ -546,6 +563,96 @@ function cacheKeyForMap(mapSlug, mapId, mapTitle) {
   return `${slug}_${h}`;
 }
 
+async function readPngRgbDownsampled(pngPath, sampleSize = TERRAIN_INSET_SAMPLE_SIZE) {
+  const magick = await resolveMagickExe();
+  if (!magick) return null;
+  const r = spawnSync(
+    magick,
+    [pngPath, '-resize', `${sampleSize}x${sampleSize}!`, '-depth', '8', 'rgb:-'],
+    { encoding: 'buffer', maxBuffer: 16 * 1024 * 1024, windowsHide: true }
+  );
+  if (r.status !== 0 || !r.stdout || r.stdout.length < sampleSize * sampleSize * 3) return null;
+  return { buf: r.stdout, size: sampleSize };
+}
+
+async function analyzeTerrainInsetFromPng(pngPath, mapSlug, mapId) {
+  const sample = await readPngRgbDownsampled(pngPath);
+  if (!sample) {
+    return {
+      pinInset: { ...FULL_TERRAIN_INSET },
+      rawInset: { ...FULL_TERRAIN_INSET },
+      shouldCrop: false,
+      confidence: 0,
+      mode: 'unknown',
+      methods: {},
+    };
+  }
+
+  let analysis = analyzeOverviewTerrain(sample.buf, sample.size);
+  const override = lookupTerrainInsetOverride(mapSlug, mapId);
+  if (override?.inset && (override.force || analysis.confidence < 0.55)) {
+    analysis = {
+      ...analysis,
+      pinInset: override.inset,
+      rawInset: override.inset,
+      confidence: override.force ? 1 : analysis.confidence,
+      shouldCrop: !isFullBleedInset(override.inset),
+      mode: 'override',
+    };
+  }
+  return analysis;
+}
+
+async function detectTerrainInsetFromPng(pngPath, mapSlug, mapId) {
+  const analysis = await analyzeTerrainInsetFromPng(pngPath, mapSlug, mapId);
+  return analysis.pinInset;
+}
+
+async function cropPngToInset(pngPath, inset) {
+  const magick = await resolveMagickExe();
+  if (!magick) return false;
+  const id = spawnSync(magick, [pngPath, '-format', '%w %h', 'info:'], {
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  const parts = String(id.stdout || '')
+    .trim()
+    .split(/\s+/);
+  const nw = Number(parts[0]);
+  const nh = Number(parts[1]);
+  if (!nw || !nh) return false;
+
+  const x = Math.max(0, Math.round(Number(inset.left) * nw));
+  const y = Math.max(0, Math.round(Number(inset.top) * nh));
+  const w = Math.min(nw - x, Math.round(Number(inset.width) * nw));
+  const h = Math.min(nh - y, Math.round(Number(inset.height) * nh));
+  if (w < 32 || h < 32) return false;
+
+  const tmp = `${pngPath}.crop_${crypto.randomBytes(4).toString('hex')}.png`;
+  try {
+    await spawnAsync(magick, [pngPath, '-crop', `${w}x${h}+${x}+${y}`, '+repage', tmp]);
+    if (!(await pathExists(tmp))) return false;
+    await fs.promises.rename(tmp, pngPath);
+    return true;
+  } catch {
+    await fs.promises.rm(tmp, { force: true }).catch(() => {});
+    return false;
+  }
+}
+
+async function postProcessOverviewPng(pngPath, mapSlug, mapId) {
+  const analysis = await analyzeTerrainInsetFromPng(pngPath, mapSlug, mapId);
+  const pinInset = analysis.pinInset || { ...FULL_TERRAIN_INSET };
+  // Keep the full overview PNG; the web UI clips to terrainInset client-side so
+  // pins and imagery always share the same coordinate frame.
+  return {
+    terrainInset: isFullBleedInset(pinInset) ? { ...FULL_TERRAIN_INSET } : pinInset,
+    imageCropped: false,
+    detectedInset: pinInset,
+    analysis,
+  };
+}
+
 async function ensureCachedPng(sourceDescriptor, mapSlug, mapId, mapTitle) {
   let sourcePath = sourceDescriptor;
   let stat;
@@ -569,13 +676,22 @@ async function ensureCachedPng(sourceDescriptor, mapSlug, mapId, mapTitle) {
   try {
     const metaRaw = await fs.promises.readFile(metaPath, 'utf8');
     const meta = JSON.parse(metaRaw);
-    if (
+    const cacheFresh =
+      meta.cacheVersion === OVERVIEW_CACHE_VERSION &&
       meta.sourcePath === cacheSourceKey &&
       meta.mtimeMs === stat.mtimeMs &&
       meta.size === stat.size &&
-      (await pathExists(pngPath))
-    ) {
-      return { pngPath, key, mapTitle: meta.mapTitle || mapTitle || null };
+      meta.terrainInset &&
+      !meta.imageCropped &&
+      (await pathExists(pngPath));
+    if (cacheFresh) {
+      return {
+        pngPath,
+        key,
+        mapTitle: meta.mapTitle || mapTitle || null,
+        terrainInset: meta.terrainInset,
+        imageCropped: !!meta.imageCropped,
+      };
     }
   } catch {
     /* rebuild */
@@ -590,20 +706,39 @@ async function ensureCachedPng(sourceDescriptor, mapSlug, mapId, mapTitle) {
     throw new Error(`Unsupported overview format: ${ext}`);
   }
 
+  const processed = await postProcessOverviewPng(pngPath, mapSlug, mapId);
+
   await fs.promises.writeFile(
     metaPath,
     JSON.stringify({
+      cacheVersion: OVERVIEW_CACHE_VERSION,
       sourcePath: cacheSourceKey,
       mtimeMs: stat.mtimeMs,
       size: stat.size,
       mapSlug,
       mapId: mapId || null,
       mapTitle: mapTitle || null,
+      terrainInset: processed.terrainInset,
+      imageCropped: processed.imageCropped,
+      detectedInset: processed.detectedInset,
+      terrainAnalysis: processed.analysis
+        ? {
+            mode: processed.analysis.mode,
+            confidence: processed.analysis.confidence,
+            pinInset: processed.analysis.pinInset,
+          }
+        : null,
       cachedAt: new Date().toISOString(),
     }),
     'utf8'
   );
-  return { pngPath, key, mapTitle: mapTitle || null };
+  return {
+    pngPath,
+    key,
+    mapTitle: mapTitle || null,
+    terrainInset: processed.terrainInset,
+    imageCropped: processed.imageCropped,
+  };
 }
 
 /**
@@ -633,6 +768,9 @@ async function resolveMapOverviewImage({ mapId, mapTitle, modsRoot, modsRoots })
       sourcePath,
       mapSlug,
       mapTitle: mapTitle || null,
+      terrainInset: cached.terrainInset || { ...FULL_TERRAIN_INSET },
+      imageCropped: false,
+      cacheVersion: OVERVIEW_CACHE_VERSION,
     };
   } catch (e) {
     return {
@@ -652,4 +790,8 @@ module.exports = {
   findOverviewSourceFile,
   resolveMapOverviewImage,
   scoreOverviewPath,
+  analyzeTerrainInsetFromPng,
+  detectTerrainInsetFromPng,
+  postProcessOverviewPng,
+  OVERVIEW_CACHE_VERSION,
 };

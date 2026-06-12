@@ -8,6 +8,8 @@ import {
   isStorageItem,
 } from "./vehicles.js";
 import { filterFieldsForFarmView } from "./fields.js";
+import { renderStockPanel } from "./storage.js";
+import { isRedTapeModActive, renderRedTapePanel } from "./redTape.js";
 
 function _safe(value) {
   const ns =
@@ -236,11 +238,49 @@ function baleCategoryLabel(key) {
   return t(map[key] || "economy.baleCatOther");
 }
 
-/** Itemised breakdown under section totals (each bale category with count). */
+function inferBaleCategoryFromFillName(name) {
+  const u = String(name || "").toUpperCase();
+  if (!u) return "other";
+  if (u.includes("STRAW")) return "straw";
+  if (u.includes("SILAGE") || u.includes("FERMENT")) return "silage";
+  if (u.includes("DRYGRASS") || u.includes("HAY")) return "hay";
+  if (u.includes("GRASS_WINDROW") || (u.includes("GRASS") && !u.includes("FERT"))) {
+    return "grass";
+  }
+  const lower = String(name || "").toLowerCase();
+  if (lower.includes("straw")) return "straw";
+  if (lower.includes("silage") || lower.includes("ferment")) return "silage";
+  if (lower.includes("hay") || lower.includes("dry grass")) return "hay";
+  if (lower.includes("grass") && !lower.includes("fert")) return "grass";
+  return "other";
+}
+
+function mergeBaleBucketForDisplay(bucket) {
+  const base = { ...(bucket || {}) };
+  const named = base.byFillType && typeof base.byFillType === "object" ? base.byFillType : {};
+  const namedSum = Object.values(named).reduce((s, v) => s + (Number(v) || 0), 0);
+  const typedSum = BALE_CATEGORY_KEYS.filter((k) => k !== "other").reduce(
+    (s, k) => s + (Number(base[k]) || 0),
+    0
+  );
+  if (typedSum === 0 && namedSum > 0) {
+    for (const [fillName, count] of Object.entries(named)) {
+      const n = Number(count) || 0;
+      if (n <= 0) continue;
+      const cat = inferBaleCategoryFromFillName(fillName);
+      base[cat] = (Number(base[cat]) || 0) + n;
+    }
+    if ((Number(base.other) || 0) >= namedSum) base.other = 0;
+  }
+  return base;
+}
+
+/** Category badges with counts only (grass / hay / silage / straw). */
 function baleInventoryBreakdownHtml(bucket) {
+  const display = mergeBaleBucketForDisplay(bucket);
   const lines = [];
   for (const key of BALE_CATEGORY_KEYS) {
-    const n = Number(bucket?.[key]) || 0;
+    const n = Number(display?.[key]) || 0;
     if (n <= 0) continue;
     const cls = BALE_BADGE_CLASS[key] || "bg-secondary";
     lines.push(`
@@ -249,13 +289,44 @@ function baleInventoryBreakdownHtml(bucket) {
         <strong class="text-white">${n}</strong>
       </div>`);
   }
+
   if (lines.length === 0) {
     return `<p class="text-muted small mb-0">${t("economy.baleInventoryCategoryNone")}</p>`;
   }
   return `<div class="mt-2">${lines.join("")}</div>`;
 }
 
+function buildEconomyRedTapeTabMarkup(dashboard) {
+  if (!isRedTapeModActive(dashboard.redTape)) return { tab: "", pane: "" };
+  return {
+    tab: `
+              <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="redtape-tab" data-bs-toggle="tab" data-bs-target="#economy-redtape" type="button" role="tab">
+                      <i class="bi bi-file-earmark-ruled me-1"></i> ${t("economy.tabRedTape")}
+                  </button>
+              </li>`,
+    pane: `
+              <div class="tab-pane fade" id="economy-redtape" role="tabpanel">
+                  <div id="economy-redtape-panel" aria-live="polite"></div>
+              </div>`,
+  };
+}
+
+export function refreshEconomySubPanels(dashboard) {
+  if (!dashboard) return;
+  renderStockPanel(dashboard);
+  if (isRedTapeModActive(dashboard.redTape)) {
+    renderRedTapePanel(dashboard);
+  }
+}
+
+export function refreshEconomyIfVisible() {
+  if (this.currentSection !== "economy") return;
+  refreshEconomySubPanels(this);
+}
+
 export function showEconomySection() {
+  const redTapeBits = buildEconomyRedTapeTabMarkup(this);
   const economyHTML = `
           <div class="row mb-4">
               <div class="col-12 text-center">
@@ -326,10 +397,11 @@ export function showEconomySection() {
                   </button>
               </li>
               <li class="nav-item" role="presentation">
-                  <button class="nav-link" id="consumables-tab" data-bs-toggle="tab" data-bs-target="#consumables" type="button" role="tab">
-                      <i class="bi bi-box-seam me-1"></i> ${t("economy.tabConsumables")}
+                  <button class="nav-link" id="storage-tab" data-bs-toggle="tab" data-bs-target="#economy-storage" type="button" role="tab">
+                      <i class="bi bi-boxes me-1"></i> ${t("economy.tabStorage")}
                   </button>
               </li>
+              ${redTapeBits.tab}
           </ul>
 
           <div class="tab-content" id="economyTabContent">
@@ -397,8 +469,10 @@ export function showEconomySection() {
                   </div>
               </div>
 
-              <div class="tab-pane fade" id="consumables" role="tabpanel">
+              <div class="tab-pane fade" id="economy-storage" role="tabpanel">
+                  <div id="economy-storage-stock" class="mb-4" aria-live="polite"></div>
                   <div id="consumables-bale-summary" class="mb-4" aria-live="polite"></div>
+                  <h5 class="text-farm-accent mb-2"><i class="bi bi-box-seam me-2"></i>${t("economy.palletsSectionTitle")}</h5>
                   <p class="text-muted small mb-3">${t("economy.consumablesHelp")}</p>
                   <div class="row" id="consumables-list">
                       <div class="col-12 text-center p-5">
@@ -409,6 +483,7 @@ export function showEconomySection() {
                       </div>
                   </div>
               </div>
+              ${redTapeBits.pane}
           </div>
       `;
 
@@ -431,10 +506,16 @@ export async function loadEconomyData() {
       const raw = data.vehicles || [];
       const equipment = raw.filter((v) => !isStorageItem(v));
       const consumables = raw.filter((v) => isStorageItem(v));
+      if (data.stock) this.stock = data.stock;
+      if (data.redTape) this.redTape = data.redTape;
+      if (data.baleInventory) this.baleInventory = data.baleInventory;
+      if (data.weather) this.weather = data.weather;
       this.updateFinancialSummary({ ...data, vehicles: equipment });
       this.updatePurchasesList(equipment);
       this.updateConsumablesList(consumables);
       this.updateConsumablesBaleSummaryCard(data);
+      refreshEconomySubPanels(this);
+      if (this.updateLandingPageCounts) this.updateLandingPageCounts();
     }
 
     // Try to load economy data, but don't fail if it's not available

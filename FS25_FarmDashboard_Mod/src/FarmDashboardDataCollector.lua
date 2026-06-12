@@ -83,6 +83,169 @@ local function _formatNumber(n)
     return string.format("%.14g", n)
 end
 
+--- Index → name map for all fill types (delegates to FillTypeUtils when loaded).
+local function _buildFillTypeCatalog(data)
+    local catalog = {}
+    local function put(idx, name)
+        local n = tonumber(idx)
+        local nm = tostring(name or "")
+        if n and nm ~= "" and not tonumber(nm) then
+            catalog[tostring(n)] = nm
+        end
+    end
+
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.rebuildCatalog then
+        FillTypeUtils.rebuildCatalog()
+        if FillTypeUtils.enrichCatalogFromData then
+            FillTypeUtils.enrichCatalogFromData(data)
+        end
+        for idx, name in pairs(FillTypeUtils.catalog()) do
+            put(idx, name)
+        end
+    end
+
+    local mp = data and data.economy and data.economy.marketPrices
+    if mp then
+        if mp.fillTypesByIndex then
+            for idx, name in pairs(mp.fillTypesByIndex) do put(idx, name) end
+        end
+        if mp.nameToIndex then
+            for name, idx in pairs(mp.nameToIndex) do put(idx, name) end
+        end
+        for cropName, crop in pairs(mp.crops or {}) do
+            if crop and crop.fillTypeIndex then
+                put(crop.fillTypeIndex, cropName)
+            end
+        end
+        for _, station in pairs(mp.sellPoints or {}) do
+            if type(station) == "table" and type(station.prices) == "table" then
+                for productName, priceInfo in pairs(station.prices) do
+                    if priceInfo and priceInfo.fillTypeIndex then
+                        put(priceInfo.fillTypeIndex, productName)
+                    end
+                end
+            end
+        end
+    end
+
+    return catalog
+end
+
+local function _resolveFillTypeName(idx, catalog)
+    idx = tonumber(idx)
+    if not idx then return nil end
+    local key = tostring(idx)
+    if catalog[key] then return catalog[key] end
+    local ftm = rawget(_G, "g_fillTypeManager")
+    if ftm and ftm.getFillTypeByIndex then
+        local ok, ft = pcall(function() return ftm:getFillTypeByIndex(idx) end)
+        if ok and ft and ft.name and tostring(ft.name) ~= "" and not tonumber(ft.name) then
+            catalog[key] = tostring(ft.name)
+            return catalog[key]
+        end
+    end
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.nameForIndex then
+        local name = FillTypeUtils.nameForIndex(idx)
+        if name then
+            catalog[key] = name
+            return name
+        end
+    end
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.titleForIndex then
+        local title = FillTypeUtils.titleForIndex(idx)
+        if title then
+            catalog[key] = title
+            return title
+        end
+    end
+    return nil
+end
+
+--- Patch stock + bale payloads with resolved names after all modules have collected.
+local function _finalizeFillTypeNames(data)
+    if type(data) ~= "table" then return end
+    local catalog = _buildFillTypeCatalog(data)
+    data.fillTypeCatalog = catalog
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.cropIndexMapForJson then
+        data.cropFillTypeIndex = FillTypeUtils.cropIndexMapForJson()
+    end
+
+    if type(data.stock) == "table" and type(data.stock.byFarm) == "table" then
+        for _, farm in pairs(data.stock.byFarm) do
+            for _, item in ipairs(farm.items or {}) do
+                local idx = tonumber(item.fillTypeIndex)
+                if idx then
+                    local name = _resolveFillTypeName(idx, catalog)
+                    if not name and rawget(_G, "FillTypeUtils") and FillTypeUtils.displayForIndex then
+                        name = FillTypeUtils.displayForIndex(idx)
+                    end
+                    if name then
+                        item.fillType = name
+                        catalog[tostring(idx)] = catalog[tostring(idx)] or name
+                    elseif item.fillType and tonumber(item.fillType) then
+                        item.fillType = ""
+                    end
+                    if (not item.fillType or item.fillType == "") and rawget(_G, "FillTypeUtils") and FillTypeUtils.titleForIndex then
+                        local title = FillTypeUtils.titleForIndex(idx)
+                        if title then
+                            item.fillTypeDisplay = title
+                            catalog[tostring(idx)] = catalog[tostring(idx)] or title
+                        end
+                    end
+                end
+            end
+        end
+        --- Merge resolved stock labels back into catalog (helps app when DS name maps are sparse).
+        for _, farm in pairs(data.stock.byFarm) do
+            for _, item in ipairs(farm.items or {}) do
+                local idx = tonumber(item.fillTypeIndex)
+                if idx then
+                    local key = tostring(idx)
+                    if item.fillType and item.fillType ~= "" then
+                        catalog[key] = item.fillType
+                    elseif item.fillTypeDisplay and item.fillTypeDisplay ~= "" then
+                        catalog[key] = item.fillTypeDisplay
+                    end
+                end
+            end
+        end
+        data.stock.fillTypeCatalog = catalog
+        data.fillTypeCatalog = catalog
+    end
+
+    if type(data.economy) == "table" and data.economy.marketPrices then
+        data.economy.marketPrices.fillTypesByIndex = data.economy.marketPrices.fillTypesByIndex or {}
+        for idx, name in pairs(catalog) do
+            data.economy.marketPrices.fillTypesByIndex[tostring(idx)] = name
+        end
+    end
+    if type(data.economy) == "table" then
+        data.economy.fillTypeCatalog = catalog
+    end
+
+    local function fixBaleBucket(bucket)
+        if not bucket or type(bucket) ~= "table" then return bucket end
+        if rawget(_G, "FillTypeUtils") and FillTypeUtils.reconcileBaleBucket then
+            return FillTypeUtils.reconcileBaleBucket(bucket)
+        end
+        return bucket
+    end
+
+    if type(data.baleInventory) == "table" then
+        if type(data.baleInventory.byFarm) == "table" then
+            for _, row in pairs(data.baleInventory.byFarm) do
+                if type(row) == "table" then
+                    row.onField = fixBaleBucket(row.onField)
+                    row.inStorage = fixBaleBucket(row.inStorage)
+                    row.offField = fixBaleBucket(row.offField or row.inStorage)
+                end
+            end
+        end
+        data.baleInventory.onField = fixBaleBucket(data.baleInventory.onField)
+        data.baleInventory.offField = fixBaleBucket(data.baleInventory.offField)
+    end
+end
+
 -- =====================================================================================
 -- FS25 Engine I/O compatibility (Foundation Lua surface differs by build):
 --   * getFiles requires 3 args: getFiles(directory, patternString, recursiveBool).
@@ -241,7 +404,10 @@ function FarmDashboardDataCollector:init()
         fields     = FieldDataCollector,
         finance    = FinanceDataCollector,
         economy    = EconomyDataCollector,
-        production = ProductionDataCollector
+        production = ProductionDataCollector,
+        stock          = StockDataCollector,
+        baleInventory  = BaleInventoryCollector,
+        redTape        = RedTapeDataCollector,
     }
 
     for name, collector in pairs(self.collectors) do
@@ -673,6 +839,12 @@ function FarmDashboardDataCollector:resetStaggerState()
     if rawget(_G, "WeatherDataCollector") then
         WeatherDataCollector._incWx = false
     end
+    if rawget(_G, "StockDataCollector") then
+        StockDataCollector._inc = nil
+    end
+    if rawget(_G, "RedTapeDataCollector") then
+        RedTapeDataCollector._inc = false
+    end
 end
 
 function FarmDashboardDataCollector:loadConfig()
@@ -686,6 +858,9 @@ function FarmDashboardDataCollector:loadConfig()
         enableFinance       = true,
         enableEconomy       = true,
         enableProduction    = true,
+        enableStock         = true,
+        enableRedTape       = true,
+        stockPlaceablesPerFrame = 4,
         --- When true, FieldDataCollector prints a throttled line to log.txt after bale scans (see FieldDataCollector.lua).
         debugBaleScan       = false,
         --- When true, FarmDash periodically logs median/p99 collectStep + serializer timings. Verification only.
@@ -738,6 +913,8 @@ function FarmDashboardDataCollector:loadConfig()
             self.config.enableFinance    = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#finance"),    true)
             self.config.enableEconomy    = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#economy"),    true)
             self.config.enableProduction = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#production"), true)
+            self.config.enableStock     = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#stock"),     true)
+            self.config.enableRedTape   = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#redTape"),   true)
             self.config.debugBaleScan = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#debugBaleScan"), false)
             self.config.diagnostics = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#diagnostics"), false)
             local arps = getXMLInt(xmlFile, "farmDashboard.settings#animalRowsPerSlice")
@@ -766,6 +943,8 @@ function FarmDashboardDataCollector:loadConfig()
             self.config.useStateMachine_production = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_production"), true)
             local erp = getXMLInt(xmlFile, "farmDashboard.settings#economyRowsPerSlice")
             if erp and erp > 0 then self.config.economyRowsPerSlice = erp end
+            local spp = getXMLInt(xmlFile, "farmDashboard.settings#stockPlaceablesPerFrame")
+            if spp and spp > 0 then self.config.stockPlaceablesPerFrame = spp end
             delete(xmlFile)
         end
     else
@@ -786,6 +965,9 @@ function FarmDashboardDataCollector:loadConfig()
         setXMLBool(xmlFile, "farmDashboard.modules#finance",    true)
         setXMLBool(xmlFile, "farmDashboard.modules#economy",    true)
         setXMLBool(xmlFile, "farmDashboard.modules#production", true)
+        setXMLBool(xmlFile, "farmDashboard.modules#stock", true)
+        setXMLBool(xmlFile, "farmDashboard.modules#redTape", true)
+        setXMLInt(xmlFile, "farmDashboard.settings#stockPlaceablesPerFrame", self.config.stockPlaceablesPerFrame)
         setXMLInt(xmlFile, "farmDashboard.settings#fieldsPerFrame", self.config.fieldsPerFrame)
         setXMLInt(xmlFile, "farmDashboard.settings#baleEntitiesBudget", self.config.baleEntitiesBudget)
         setXMLInt(xmlFile, "farmDashboard.settings#vehiclesPerFrame", self.config.vehiclesPerFrame)
@@ -817,6 +999,7 @@ function FarmDashboardDataCollector:loadConfig()
     self.config.detailMaxAgeSec = math.max(15, math.min(3600, self.config.detailMaxAgeSec or 60))
     self.config.detailFileCapBase = math.max(64, math.min(8192, self.config.detailFileCapBase or 512))
     self.config.economyRowsPerSlice = math.max(8, math.min(2048, self.config.economyRowsPerSlice or 64))
+    self.config.stockPlaceablesPerFrame = math.max(1, math.min(16, self.config.stockPlaceablesPerFrame or 4))
     FarmDashboard.UPDATE_INTERVAL = self.config.collectionCycleMs
 end
 
@@ -853,7 +1036,10 @@ function FarmDashboardDataCollector:getEnabledCollectorOrder()
         { "finance",    "enableFinance" },
         { "weather",    "enableWeather" },
         { "economy",    "enableEconomy" },
-        { "production", "enableProduction" }
+        { "production", "enableProduction" },
+        { "stock",          "enableStock" },
+        { "baleInventory",  "enableStock" },
+        { "redTape",        "enableRedTape" },
     }
     for _, row in ipairs(seq) do
         local name, flag = row[1], row[2]
@@ -871,9 +1057,25 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
     local nowS = (D and D.nowSec and D.nowSec()) or 0
 
     local mc = self.moduleCache
-    local baleInv = nil
-    if FieldDataCollector and FieldDataCollector.getLastBaleInventory then
-        baleInv = FieldDataCollector.getLastBaleInventory()
+    local baleInv = mc.baleInventory
+    if rawget(_G, "InventoryScan") and InventoryScan.mergeBaleExports then
+        if rawget(_G, "FieldDataCollector") and FieldDataCollector.getBaleFieldRollup then
+            local fieldRollup = FieldDataCollector.getBaleFieldRollup()
+            if fieldRollup and type(fieldRollup.byFarm) == "table" and next(fieldRollup.byFarm) then
+                baleInv = InventoryScan.mergeBaleExports(baleInv, fieldRollup)
+            end
+        end
+        if rawget(_G, "StockDataCollector") and StockDataCollector._baleLast then
+            baleInv = InventoryScan.mergeBaleExports(baleInv, StockDataCollector._baleLast)
+        elseif type(mc.stock) == "table" and type(mc.stock.byFarm) == "table" then
+            local farmIds = InventoryScan.collectPlayerFarmIds()
+            local derived = InventoryScan.newBaleState(farmIds)
+            InventoryScan.deriveBaleCountsFromStock(mc.stock.byFarm, derived)
+            baleInv = InventoryScan.mergeBaleExports(
+                baleInv,
+                InventoryScan.finalizeBales(derived, self:getActiveFarmId())
+            )
+        end
     end
     local data = {
         -- Plan v5 Phase 0: schemaVersion + serverTimeSec on every emission.
@@ -890,9 +1092,13 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
         finance    = mc.finance or {},
         weather    = mc.weather or {},
         economy    = mc.economy or {},
-        --- Physical bales by fill + placement (FieldDataCollector last collect).
+        stock      = mc.stock or { enabled = false, byFarm = {} },
+        redTape    = mc.redTape or { enabled = false, byFarm = {} },
+        --- Physical bales by fill + placement (BaleInventoryCollector / InventoryScan).
         baleInventory = baleInv or { farmId = nil, byFarm = {}, onField = {}, offField = {} }
     }
+
+    _finalizeFillTypeNames(data)
 
     if rawget(_G, "FieldDataCollector") and FieldDataCollector.getCachedGameplayFlags then
         data.gameSettings = FieldDataCollector.getCachedGameplayFlags()
@@ -1228,6 +1434,8 @@ function FarmDashboardDataCollector:runIncrementalActiveStep(order)
         economyYieldStride = self.config.economyYieldStride or 55,
         productionChainsPerYield = self.config.productionChainsPerYield or 2,
         productionPlaceablesPerYield = self.config.productionPlaceablesPerYield or 10,
+        stockPlaceablesPerFrame = self.config.stockPlaceablesPerFrame or 4,
+        balePlaceablesPerFrame = self.config.stockPlaceablesPerFrame or 6,
         --- Phase 2: row-count caps as primary safety net + opportunistic wall-clock budget.
         animalRowsPerSlice = arps,
         sliceBudgetMs = sliceMs,
@@ -1803,12 +2011,21 @@ end
 function FarmDashboardDataCollector:getMapBounds()
     local half = 1024
     local ok, ts = pcall(function()
-        if _G.g_currentMission and _G.g_currentMission.terrainSize then
-            return tonumber(_G.g_currentMission.terrainSize) * 0.5
+        local mission = _G.g_currentMission
+        if not mission then return nil end
+        local full = tonumber(mission.terrainSize)
+        if full and full >= 128 then
+            return full * 0.5
+        end
+        if mission.terrainRootNodeId and type(getTerrainSize) == "function" then
+            local size = tonumber(getTerrainSize(mission.terrainRootNodeId))
+            if size and size >= 128 then
+                return size * 0.5
+            end
         end
         return nil
     end)
-    if ok and ts and ts > 0 then
+    if ok and ts and ts >= 64 then
         half = ts
     end
     return {

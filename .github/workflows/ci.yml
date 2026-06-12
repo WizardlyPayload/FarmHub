@@ -23,7 +23,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Run tests
-        run: npm test
+        run: npm run test:all
       - name: Electron pack files (main require closure vs build.files)
         run: npm run verify:electron-pack
       - name: i18n verify (all locales match en + placeholders)

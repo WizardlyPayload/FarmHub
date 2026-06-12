@@ -19,6 +19,7 @@
 
 const { assessModVersion } = require('./modVersionPolicy.js');
 const { pruneMergedDataToPlayerFarms } = require('./farmScope.cjs');
+const { enrichStockFillTypes } = require('./fillTypeResolve.cjs');
 
 const BALE_LITER_ESTIMATE = 4000;
 const BALE_INDEX_CATEGORY = {
@@ -625,57 +626,6 @@ function buildFillTypeCatalog(luaData, xmlEconomy) {
     return enrichStockFillTypes(lua.stock, catalog).catalog;
 }
 
-function inferFillTypeFromLocations(locations) {
-    const blob = (locations || [])
-        .map((loc) => String(loc?.name || ''))
-        .join(' ')
-        .toLowerCase();
-    if (!blob) return null;
-    if (/herbicide|liquid fert|liquid fertiliser|liquid fertilizer/.test(blob)) {
-        return { name: 'LIQUID_FERTILIZER', display: 'Liquid Fertilizer' };
-    }
-    if (/fertilizer tank|fertiliser tank|stainless steel fertilizer/.test(blob)) {
-        return { name: 'MINERAL_FERTILIZER', display: 'Mineral Fertilizer' };
-    }
-    if (/cow shed|milking|husbandry|dairy/.test(blob)) {
-        return { name: 'STRAW', display: 'Straw' };
-    }
-    return null;
-}
-
-function enrichStockFillTypes(stock, catalog) {
-    const nextCatalog = { ...(catalog || {}) };
-    if (!stock?.byFarm || typeof stock.byFarm !== 'object') {
-        return { stock, catalog: nextCatalog };
-    }
-    const nextStock = { ...stock, byFarm: {} };
-    for (const [fid, farm] of Object.entries(stock.byFarm)) {
-        const items = (farm?.items || []).map((item) => {
-            const idx = Number(item?.fillTypeIndex);
-            const out = { ...item };
-            const mapped = idx > 0 ? nextCatalog[String(idx)] : null;
-            if (mapped && (!out.fillType || /^\d+$/.test(String(out.fillType).trim()))) {
-                out.fillType = mapped;
-            } else if (out.fillTypeDisplay && (!out.fillType || /^\d+$/.test(String(out.fillType).trim()))) {
-                out.fillType = String(out.fillTypeDisplay).trim();
-            } else if (!out.fillType || /^\d+$/.test(String(out.fillType || '').trim())) {
-                const inferred = inferFillTypeFromLocations(out.locations);
-                if (inferred) {
-                    out.fillType = inferred.name;
-                    out.fillTypeDisplay = inferred.display;
-                    if (idx > 0) nextCatalog[String(idx)] = inferred.name;
-                }
-            }
-            if (idx > 0 && out.fillType && !/^\d+$/.test(String(out.fillType))) {
-                nextCatalog[String(idx)] = nextCatalog[String(idx)] || String(out.fillType);
-            }
-            return out;
-        });
-        nextStock.byFarm[fid] = { ...farm, items };
-    }
-    return { stock: nextStock, catalog: nextCatalog };
-}
-
 function mergeData(luaData, xmlData, options = {}) {
     const fieldLiveCache = options.fieldLiveCache || {};
     const lastLuaAt = options.lastLuaAt || null;
@@ -723,6 +673,7 @@ function mergeData(luaData, xmlData, options = {}) {
         savegameName : xmlData.career?.savegameName || '',
         saveDate     : xmlData.career?.saveDate     || '',
         mapId        : luaData.serverInfo?.mapId || xmlData.career?.mapId || '',
+        mapBounds    : luaData.serverInfo?.mapBounds || luaData.mapBounds || null,
         settings     : xmlData.career?.settings     || {},
         /** Alias for dashboard client (`apiStorage` / realtime); same object as `settings`. */
         gameSettings : xmlData.career?.settings     || {},
@@ -1238,15 +1189,27 @@ function mergeEconomy(luaEconomy, xmlEconomy) {
 
 // ─── single-source fallbacks ──────────────────────────────────────────────────
 
+function mapMetaFromLua(lua) {
+    const si = lua?.serverInfo || {};
+    return {
+        mapId: si.mapId || '',
+        mapTitle: si.mapName || 'Unknown Map',
+        mapBounds: si.mapBounds || lua?.mapBounds || null,
+    };
+}
+
 function buildFromLuaOnly(lua) {
     const allowed = farmIdsFromLuaFields(lua.fields);
     const fillTypeCatalog = buildFillTypeCatalog(lua);
     const stockEnriched = enrichStockFillTypes(lua.stock, fillTypeCatalog);
+    const mapMeta = mapMetaFromLua(lua);
     return {
         dataSource: 'lua_only', xmlAvailable: false, luaAvailable: true,
         lastUpdated: new Date().toISOString(),
         serverInfo: lua.serverInfo || {},
-        mapTitle: lua.serverInfo?.mapName || 'Unknown Map',
+        mapTitle: mapMeta.mapTitle,
+        mapId: mapMeta.mapId,
+        mapBounds: mapMeta.mapBounds,
         savegameName: '', settings: {}, gameSettings: {}, mods: [],
         gameTime: lua.gameTime || {},
         // Lua may serialise an empty table as {} — must be an array for the UI

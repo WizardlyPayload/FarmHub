@@ -8,7 +8,7 @@ import {
   formatMoisturePercent,
   moistureGradeLabel,
 } from "./moisture.js";
-import { resolveStockItemFillType } from "./fillTypeResolve.js";
+import { resolveStockItemFillType, mergeFillTypeCatalog } from "./fillTypeResolve.js";
 
 const DISPLAY_NAMES = {
   WHEAT: "Wheat",
@@ -160,18 +160,6 @@ function normalizeLocations(locations) {
   if (Array.isArray(locations)) return locations;
   if (locations && typeof locations === "object") return Object.values(locations);
   return [];
-}
-
-function mergeFillTypeCatalog(...sources) {
-  const out = {};
-  for (const src of sources) {
-    if (!src || typeof src !== "object") continue;
-    for (const [k, v] of Object.entries(src)) {
-      const name = String(v ?? "").trim();
-      if (name && !/^\d+$/.test(name)) out[String(k)] = name;
-    }
-  }
-  return out;
 }
 
 function catalogFromMapCrops(dashboard) {

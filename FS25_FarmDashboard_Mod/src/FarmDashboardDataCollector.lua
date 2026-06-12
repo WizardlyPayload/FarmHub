@@ -859,6 +859,7 @@ function FarmDashboardDataCollector:loadConfig()
         enableEconomy       = true,
         enableProduction    = true,
         enableStock         = true,
+        enableBaleInventory = true,
         enableRedTape       = true,
         stockPlaceablesPerFrame = 4,
         --- When true, FieldDataCollector prints a throttled line to log.txt after bale scans (see FieldDataCollector.lua).
@@ -914,6 +915,11 @@ function FarmDashboardDataCollector:loadConfig()
             self.config.enableEconomy    = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#economy"),    true)
             self.config.enableProduction = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#production"), true)
             self.config.enableStock     = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#stock"),     true)
+            local stockOn = self.config.enableStock
+            self.config.enableBaleInventory = Utils.getNoNil(
+                getXMLBool(xmlFile, "farmDashboard.modules#baleInventory"),
+                stockOn
+            )
             self.config.enableRedTape   = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#redTape"),   true)
             self.config.debugBaleScan = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#debugBaleScan"), false)
             self.config.diagnostics = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#diagnostics"), false)
@@ -1038,7 +1044,7 @@ function FarmDashboardDataCollector:getEnabledCollectorOrder()
         { "economy",    "enableEconomy" },
         { "production", "enableProduction" },
         { "stock",          "enableStock" },
-        { "baleInventory",  "enableStock" },
+        { "baleInventory",  "enableBaleInventory" },
         { "redTape",        "enableRedTape" },
     }
     for _, row in ipairs(seq) do

@@ -51,3 +51,5 @@ FS25_Vehicle_Years/
 FS25_MoistureSystem/
 FS25_RedTape/
 FS25_TSStockCheck/
+# Built mod zip — produce via tools/Zip-FarmDashboardMod.ps1
+FS25_FarmDashboard_Mod/FS25_FarmDashboard.zip

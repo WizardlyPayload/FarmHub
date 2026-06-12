@@ -119,6 +119,12 @@ See **[../../docs/CHANGELOG.md](../../docs/CHANGELOG.md)** §**4.0.0**, **[../..
 - **ImageMagick:** Installed automatically during setup when possible (bundled / winget / Chocolatey / official download).
 - **Server Manager:** FTP polling options, HTTP feed fields, mod image scan integration.
 
+### Fleet map (PDA overview)
+
+- Map background is resolved from each map’s `overview.dds` (mods folder or game install). Decorative PDA desk borders are clipped in the UI using auto-detected `terrainInset` metadata.
+- **4 km maps:** vehicle pins use the standard **±1024 m** PDA UV layout even when the save reports `halfSize: 2048`. Entities beyond that range may pin incorrectly until per-map scale metadata exists.
+- Requires **ImageMagick** (or bundled texconv) on the machine serving `/api/map-overview-image`. Clear `%APPDATA%\\fs25-farm-dashboard\\map_overviews\\` if a map image looks stale after an app update.
+
 ---
 
 ## Rules suggestions

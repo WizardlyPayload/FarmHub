@@ -218,7 +218,11 @@ async function applyMapOverviewBackground(dashboard) {
   syncFleetMapOverviewIdentity(dashboard);
   const { mapId, mapTitle } = resolveMapMeta(dashboard);
   const key = mapOverviewIdentityKey(mapId, mapTitle);
-  if (key === _overviewFetchKey && img.dataset.loadedUrl) return;
+  if (key === _overviewFetchKey && img.dataset.loadedUrl) {
+    syncTerrainClipLayout();
+    ensureMapViewport()?.syncCanvasSize();
+    return;
+  }
   _overviewFetchKey = key;
 
   if (hint) hint.textContent = t("map.loadingOverview");

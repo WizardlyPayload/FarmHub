@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<l10n>
+    <texts>
+        <text name="ui_farmdash_category" text="Farm Dashboard"/>
+        <text name="input_FD_OPEN_SETTINGS" text="Open game settings (Farm Dashboard)"/>
+        <text name="ui_farmdash_off" text="Off"/>
+        <text name="ui_farmdash_on" text="On"/>
+
+        <text name="ui_settings_gameplay_category_farmDashboard" text="Farm Dashboard"/>
+        <text name="ui_settings_gameplay_category_farmDashboard_desc" text="Export timing, collectors, and performance budgets for the Farm Dashboard desktop app."/>
+
+        <text name="ui_settings_gameplay_fd_enableAnimals" text="Animals collector"/>
+        <text name="ui_settings_gameplay_fd_enableAnimals_desc" text="Export livestock and husbandry totals."/>
+        <text name="ui_settings_gameplay_fd_enableVehicles" text="Vehicles collector"/>
+        <text name="ui_settings_gameplay_fd_enableVehicles_desc" text="Export fleet positions and vehicle details."/>
+        <text name="ui_settings_gameplay_fd_enableFields" text="Fields collector"/>
+        <text name="ui_settings_gameplay_fd_enableFields_desc" text="Export field crop, soil, and windrow data."/>
+        <text name="ui_settings_gameplay_fd_enableFinance" text="Finance collector"/>
+        <text name="ui_settings_gameplay_fd_enableFinance_desc" text="Export money, loans, and vehicle finance data."/>
+        <text name="ui_settings_gameplay_fd_enableWeather" text="Weather collector"/>
+        <text name="ui_settings_gameplay_fd_enableWeather_desc" text="Export in-game weather and forecast."/>
+        <text name="ui_settings_gameplay_fd_enableEconomy" text="Economy collector"/>
+        <text name="ui_settings_gameplay_fd_enableEconomy_desc" text="Export market prices and economy tables."/>
+        <text name="ui_settings_gameplay_fd_enableProduction" text="Production collector"/>
+        <text name="ui_settings_gameplay_fd_enableProduction_desc" text="Export factories and production chains."/>
+        <text name="ui_settings_gameplay_fd_enableStock" text="Stock / silos collector"/>
+        <text name="ui_settings_gameplay_fd_enableStock_desc" text="Export silo and storage fill levels."/>
+        <text name="ui_settings_gameplay_fd_enableBaleInventory" text="Bale inventory collector"/>
+        <text name="ui_settings_gameplay_fd_enableBaleInventory_desc" text="Export physical bale stock on the map."/>
+        <text name="ui_settings_gameplay_fd_enableRedTape" text="Red Tape collector"/>
+        <text name="ui_settings_gameplay_fd_enableRedTape_desc" text="Export Red Tape mod data when installed."/>
+
+        <text name="ui_settings_gameplay_fd_collectionCycleSec" text="Full collection cycle (sec)"/>
+        <text name="ui_settings_gameplay_fd_collectionCycleSec_desc" text="Time between full export cycles. Higher values reduce CPU use."/>
+        <text name="ui_settings_gameplay_fd_sliceBudgetMs" text="Slice budget (ms)"/>
+        <text name="ui_settings_gameplay_fd_sliceBudgetMs_desc" text="Wall-clock budget per collector slice. Lower values reduce stutter."/>
+        <text name="ui_settings_gameplay_fd_postLoadGraceSec" text="Post-load grace (sec)"/>
+        <text name="ui_settings_gameplay_fd_postLoadGraceSec_desc" text="Delay after loading a save before collectors start."/>
+        <text name="ui_settings_gameplay_fd_fieldsPerFrame" text="Fields per frame"/>
+        <text name="ui_settings_gameplay_fd_fieldsPerFrame_desc" text="Field scan budget per frame."/>
+        <text name="ui_settings_gameplay_fd_vehiclesPerFrame" text="Vehicles per frame"/>
+        <text name="ui_settings_gameplay_fd_vehiclesPerFrame_desc" text="Vehicle scan budget per frame."/>
+        <text name="ui_settings_gameplay_fd_baleEntitiesBudget" text="Field bale budget"/>
+        <text name="ui_settings_gameplay_fd_baleEntitiesBudget_desc" text="Bales scanned per field slice."/>
+        <text name="ui_settings_gameplay_fd_stockPlaceablesPerFrame" text="Stock placeables / frame"/>
+        <text name="ui_settings_gameplay_fd_stockPlaceablesPerFrame_desc" text="Storage placeables processed per frame."/>
+        <text name="ui_settings_gameplay_fd_baleWorldPerFrame" text="World bales / frame"/>
+        <text name="ui_settings_gameplay_fd_baleWorldPerFrame_desc" text="Loose world bales scanned per frame."/>
+        <text name="ui_settings_gameplay_fd_financeVehiclesPerFrame" text="Finance vehicles / frame"/>
+        <text name="ui_settings_gameplay_fd_financeVehiclesPerFrame_desc" text="Vehicles processed per finance slice."/>
+        <text name="ui_settings_gameplay_fd_jsonKeysPerFrame" text="JSON keys / frame"/>
+        <text name="ui_settings_gameplay_fd_jsonKeysPerFrame_desc" text="Top-level JSON keys serialized per frame when writing data.json."/>
+        <text name="ui_settings_gameplay_fd_animalRowsPerSlice" text="Animal rows / slice"/>
+        <text name="ui_settings_gameplay_fd_animalRowsPerSlice_desc" text="Animal rows scanned per livestock slice."/>
+        <text name="ui_settings_gameplay_fd_economyYieldStride" text="Economy yield stride"/>
+        <text name="ui_settings_gameplay_fd_economyYieldStride_desc" text="Rows stepped per economy yield scan."/>
+
+        <text name="ui_settings_gameplay_fd_diagnostics" text="Diagnostics logging"/>
+        <text name="ui_settings_gameplay_fd_diagnostics_desc" text="Log collector timing to log.txt. Trace lines appear only on single-player, host, or dedicated server (not MP clients)."/>
+        <text name="ui_settings_gameplay_fd_debugBaleScan" text="Debug bale scan log"/>
+        <text name="ui_settings_gameplay_fd_debugBaleScan_desc" text="Throttled bale scan lines in log.txt."/>
+    </texts>
+</l10n>

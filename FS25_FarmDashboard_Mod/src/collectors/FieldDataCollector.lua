@@ -362,36 +362,51 @@ local function _attachWindrowMoisture(fData, cx, cz, grassIdx, hayIdx, aggG, agg
     end
 end
 
---- Plan v5 B2: state-machine path runs sync; legacy coroutine path retained behind a flag.
+--- Plan v5 B2: state-machine path runs sync; step iterator spreads work across frames (DS-safe).
 local function _fieldsUseStateMachine()
     local cfg = rawget(_G, "FarmDashboardDataCollector")
     if cfg and cfg.config and cfg.config.useStateMachine_fields ~= nil then
         return cfg.config.useStateMachine_fields and true or false
     end
-    return true
+    return false
 end
 
---- Cooperative micro-stagger: FarmDashboardDataCollector calls collectBegin once, then collectStep each frame.
 function FieldDataCollector:collectBegin()
     if _fieldsUseStateMachine() then
         FieldDataCollector._smState = { stage = "INIT" }
         FieldDataCollector._fdCo = nil
+        FieldDataCollector._fieldStep = nil
         return
     end
+
     FieldDataCollector._smState = nil
-    FieldDataCollector._fdCo = coroutine.create(function(opts)
-        opts = opts or {}
-        FieldDataCollector._yieldEvery = math.max(1, tonumber(opts.batchSize) or 8)
-        FieldDataCollector._baleYieldStride = math.max(4, tonumber(opts.baleBudget) or 48)
-        FieldDataCollector._yieldBaleCounter = 0
-        return FieldDataCollector:_collectImpl()
-    end)
+    FieldDataCollector._fdCo = nil
+    FieldDataCollector._fieldStep = {
+        fieldIds = {},
+        idx = 1,
+        fieldData = {},
+        preambleDone = false,
+        batchSize = 1,
+        partial = false,
+        ctx = nil,
+    }
+
+    local st = FieldDataCollector._fieldStep
+    local fm = _G.g_fieldManager
+    if fm and fm.fields then
+        for id in pairs(fm.fields) do
+            table.insert(st.fieldIds, id)
+        end
+        table.sort(st.fieldIds)
+    end
+
+    FieldDataCollector._yieldEvery = nil
+    FieldDataCollector._baleYieldStride = nil
 end
 
 --- @return boolean done, table fieldArrayPartialOrFinal
 function FieldDataCollector:collectStep(opts)
     opts = opts or {}
-    -- Plan v5 B2: state-machine path. No coroutines, no yield-across-pcall hazard.
     if FieldDataCollector._smState ~= nil then
         FieldDataCollector._yieldEvery = nil
         FieldDataCollector._baleYieldStride = nil
@@ -399,35 +414,34 @@ function FieldDataCollector:collectStep(opts)
         FieldDataCollector._smState = nil
         return true, result or {}
     end
-    if not FieldDataCollector._fdCo then
+
+    local st = FieldDataCollector._fieldStep
+    if not st then
         return true, {}
     end
-    local ok, a, b = coroutine.resume(FieldDataCollector._fdCo, opts)
-    if not ok then
-        FarmDashLog.devWarn("FieldDataCollector coroutine: %s", tostring(a))
-        FieldDataCollector._fdCo = nil
+
+    if not st.preambleDone then
+        st.batchSize = math.max(1, tonumber(opts.batchSize) or 1)
         FieldDataCollector._yieldEvery = nil
         FieldDataCollector._baleYieldStride = nil
-        return true, {}
+        FieldDataCollector._runPreambleOnly = true
+        FieldDataCollector:_collectImpl()
+        FieldDataCollector._runPreambleOnly = nil
+        return false, st.fieldData or {}
     end
-    if a == "progress" then
-        return false, b or {}
+
+    st.batchSize = math.max(1, tonumber(opts.batchSize) or 1)
+    FieldDataCollector._yieldEvery = nil
+    FieldDataCollector._baleYieldStride = nil
+
+    local result = FieldDataCollector:_collectImpl()
+    if st.partial then
+        st.fieldData = result or st.fieldData or {}
+        return false, st.fieldData
     end
-    local st = coroutine.status(FieldDataCollector._fdCo)
-    if st == "dead" then
-        FieldDataCollector._fdCo = nil
-        FieldDataCollector._yieldEvery = nil
-        FieldDataCollector._baleYieldStride = nil
-        return true, a or {}
-    end
-    if st == "suspended" then
-        FarmDashLog.devWarn("FieldDataCollector: unexpected coroutine state; ending slice.")
-        FieldDataCollector._fdCo = nil
-        FieldDataCollector._yieldEvery = nil
-        FieldDataCollector._baleYieldStride = nil
-        return true, (type(a) == "table" and a) or b or {}
-    end
-    return false, b or {}
+
+    FieldDataCollector._fieldStep = nil
+    return true, result or {}
 end
 
 function FieldDataCollector:collect()
@@ -437,7 +451,14 @@ function FieldDataCollector:collect()
 end
 
 function FieldDataCollector:_collectImpl()
+    local st = FieldDataCollector._fieldStep
     local fieldData = {}
+    if st and st.fieldData and #st.fieldData > 0 then
+        fieldData = st.fieldData
+    elseif st then
+        st.fieldData = fieldData
+    end
+
     local function coopProgress()
         if FieldDataCollector._yieldEvery then
             coroutine.yield("progress", fieldData)
@@ -464,41 +485,64 @@ function FieldDataCollector:_collectImpl()
     if not _G.g_currentMission then return fieldData end
     if not _G.g_fieldManager or not _G.g_fieldManager.fields then return fieldData end
 
-    local careerGameplayFlags = FieldDataCollector.readCareerGameplayFlags()
-    local periodicPlowingRequired = (careerGameplayFlags.plowingRequired ~= false)
+    local careerGameplayFlags
+    local periodicPlowingRequired
+    local TYRE_NOTE_ON_CROP
+    local FERT_ORGANIC_FIRST
+    local NUTRIENT_CLOSE_FRAC
+    local GRASS_GROWTH_STAGES
+    local isPF
+    local pfInstance
+    local currentFarmId
+    local probeState
+    local getFarmIdForParcel
 
-    --- Shown on lime / fertiliser / nitrogen / weed-spray suggestions (limit crop trampling).
-    local TYRE_NOTE_ON_CROP = " Use narrow tyres when working on the crop (lime, fertiliser, spray)."
-    --- When combining several nutrient sources, organic liquids/solids before mineral (player guidance).
-    local FERT_ORGANIC_FIRST = " Prefer manure or slurry before solid or liquid mineral fertilizer when using multiple products."
-    --- If N or pH is within this fraction of target, treat as met so the next suggestion can surface (dashboard tuning).
-    --- PF mapped N / pH: within this fraction of target counts as "close enough" (field spatial variation).
-    local NUTRIENT_CLOSE_FRAC = 0.10
-    --- FS25 grass: exactly 4 growth stages on the field map. Other crops use their fruit type's own stage count
-    --- (`numGrowthStates`, min/max harvest) â€” e.g. maize 7, wheat 8. Grass may still report extra engine indices;
-    --- we cap exported `maxGrowthState` to this value for the dashboard while keeping `engineNumGrowthStates` raw.
-    local GRASS_GROWTH_STAGES = 4
+    if st and st.preambleDone and st.ctx then
+        local ctx = st.ctx
+        careerGameplayFlags = ctx.careerGameplayFlags
+        periodicPlowingRequired = ctx.periodicPlowingRequired
+        TYRE_NOTE_ON_CROP = ctx.TYRE_NOTE_ON_CROP
+        FERT_ORGANIC_FIRST = ctx.FERT_ORGANIC_FIRST
+        NUTRIENT_CLOSE_FRAC = ctx.NUTRIENT_CLOSE_FRAC
+        GRASS_GROWTH_STAGES = ctx.GRASS_GROWTH_STAGES
+        isPF = ctx.isPF
+        pfInstance = ctx.pfInstance
+        currentFarmId = ctx.currentFarmId
+        probeState = ctx.probeState
+        getFarmIdForParcel = ctx.getFarmIdForParcel
+    else
+        careerGameplayFlags = FieldDataCollector.readCareerGameplayFlags()
+        periodicPlowingRequired = (careerGameplayFlags.plowingRequired ~= false)
+        TYRE_NOTE_ON_CROP = " Use narrow tyres when working on the crop (lime, fertiliser, spray)."
+        FERT_ORGANIC_FIRST = " Prefer manure or slurry before solid or liquid mineral fertilizer when using multiple products."
+        NUTRIENT_CLOSE_FRAC = 0.10
+        GRASS_GROWTH_STAGES = 4
 
-    -- ====================================================================
-    -- VARIABLE-RATE SOIL DATA (N/pH maps when the game exposes them)
-    -- ====================================================================
-    local isPF = false
-    local pfInstance = nil
-    if _G.FS25_precisionFarming and _G.FS25_precisionFarming.g_precisionFarming then 
-        isPF = true 
-        pfInstance = _G.FS25_precisionFarming.g_precisionFarming
-    elseif _G.g_precisionFarming then 
-        isPF = true 
-        pfInstance = _G.g_precisionFarming
+        isPF = false
+        pfInstance = nil
+        if _G.FS25_precisionFarming and _G.FS25_precisionFarming.g_precisionFarming then
+            isPF = true
+            pfInstance = _G.FS25_precisionFarming.g_precisionFarming
+        elseif _G.g_precisionFarming then
+            isPF = true
+            pfInstance = _G.g_precisionFarming
+        end
+
+        currentFarmId = 1
+        if _G.g_currentMission.getFarmId then
+            currentFarmId = _G.g_currentMission:getFarmId()
+        elseif _G.g_currentMission.player and _G.g_currentMission.player.farmId then
+            currentFarmId = _G.g_currentMission.player.farmId
+        end
+
+        probeState = nil
+        if _G.FieldState and _G.FieldState.new then
+            local okFs, fs = pcall(function() return _G.FieldState.new() end)
+            if okFs then probeState = fs end
+        end
     end
-    
-    local currentFarmId = 1
-    if _G.g_currentMission.getFarmId then
-        currentFarmId = _G.g_currentMission:getFarmId()
-    elseif _G.g_currentMission.player and _G.g_currentMission.player.farmId then
-        currentFarmId = _G.g_currentMission.player.farmId
-    end
-    
+
+    local runBalePreamble = not st or not st.preambleDone
     local function callMethod(instance, methodName, ...)
         if not instance then return nil end
         if type(instance[methodName]) == "function" then
@@ -559,21 +603,16 @@ function FieldDataCollector:_collectImpl()
         return math.min(100, math.floor(weedNorm01(w) * 100 + 0.5))
     end
 
-    -- Create the NPC FieldState object (Used ONLY for unowned fields)
-    local probeState = nil
-    if _G.FieldState and _G.FieldState.new then
-        local ok, fs = pcall(function() return _G.FieldState.new() end)
-        if ok then probeState = fs end
-    end
+    local farmlandBaleCounts = _pool_farmlandBaleCounts
+    local farmlandBaleOnFieldBuckets = _pool_farmlandBaleOnFieldBuckets
+    local farmlandBaleYardBuckets = _pool_farmlandBaleYardBuckets
 
+    if runBalePreamble then
     --- Bale counts per farmland: scan **all** known bale sources (item list + bale manager), dedupe by stable key.
     --- FS25: `itemSystem.items` may exist but be empty â€” we must still call `g_baleManager` (previous code skipped it).
     _clearKeyedPool(_pool_farmlandBaleCounts)
     _clearKeyedPool(_pool_farmlandBaleOnFieldBuckets)
     _clearKeyedPool(_pool_farmlandBaleYardBuckets)
-    local farmlandBaleCounts = _pool_farmlandBaleCounts
-    local farmlandBaleOnFieldBuckets = _pool_farmlandBaleOnFieldBuckets
-    local farmlandBaleYardBuckets = _pool_farmlandBaleYardBuckets
     FieldDataCollector._baleFieldRollup = nil
     do
         local mission = _G.g_currentMission
@@ -781,7 +820,7 @@ function FieldDataCollector:_collectImpl()
                 end
             end
 
-            local function getFarmIdForParcel(parcelId)
+            local function getFarmIdForParcelFn(parcelId)
                 if not parcelId or parcelId <= 0 then return nil end
                 if fm and type(fm.getFarmlandById) == "function" then
                     local ok, land = pcall(function() return fm:getFarmlandById(parcelId) end)
@@ -1010,6 +1049,7 @@ function FieldDataCollector:_collectImpl()
                     end
                 end
             end
+            getFarmIdForParcel = getFarmIdForParcelFn
             _finalizeBaleFieldRollup(
                 farmlandBaleOnFieldBuckets,
                 farmlandBaleYardBuckets,
@@ -1019,8 +1059,48 @@ function FieldDataCollector:_collectImpl()
         end
     end
 
-    for fieldId, field in pairs(_G.g_fieldManager.fields) do
-        
+    if st and runBalePreamble then
+        st.ctx = {
+            careerGameplayFlags = careerGameplayFlags,
+            periodicPlowingRequired = periodicPlowingRequired,
+            TYRE_NOTE_ON_CROP = TYRE_NOTE_ON_CROP,
+            FERT_ORGANIC_FIRST = FERT_ORGANIC_FIRST,
+            NUTRIENT_CLOSE_FRAC = NUTRIENT_CLOSE_FRAC,
+            GRASS_GROWTH_STAGES = GRASS_GROWTH_STAGES,
+            isPF = isPF,
+            pfInstance = pfInstance,
+            currentFarmId = currentFarmId,
+            probeState = probeState,
+            getFarmIdForParcel = getFarmIdForParcel,
+        }
+        st.preambleDone = true
+    end
+    end
+
+    if FieldDataCollector._runPreambleOnly then
+        return fieldData
+    end
+
+    local fieldIterList = {}
+    if st then
+        local batch = st.batchSize or 1
+        local endIdx = math.min(st.idx + batch - 1, #st.fieldIds)
+        for ii = st.idx, endIdx do
+            local fid = st.fieldIds[ii]
+            fieldIterList[#fieldIterList + 1] = { fid, _G.g_fieldManager.fields[fid] }
+        end
+        st.idx = endIdx + 1
+        st.partial = st.idx <= #st.fieldIds
+    else
+        for fieldId, field in pairs(_G.g_fieldManager.fields) do
+            fieldIterList[#fieldIterList + 1] = { fieldId, field }
+        end
+    end
+
+    for _, fieldPair in ipairs(fieldIterList) do
+        local fieldId, field = fieldPair[1], fieldPair[2]
+        if not field then
+        else
         local ownerFarmId = field.farmland and field.farmland.farmId or 0
         local isOwned = (ownerFarmId > 0 and ownerFarmId == currentFarmId)
         local displayId = fieldId
@@ -2358,6 +2438,12 @@ function FieldDataCollector:_collectImpl()
 
         table.insert(fieldData, fData)
         fieldCoopTick()
+        end
+    end
+
+    if st and st.partial then
+        st.fieldData = fieldData
+        return fieldData
     end
 
     table.sort(fieldData, function(a, b) return a.id < b.id end)

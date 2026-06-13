@@ -17,7 +17,7 @@ local function _useStateMachine()
     if cfg and cfg.config and cfg.config.useStateMachine_economy ~= nil then
         return cfg.config.useStateMachine_economy and true or false
     end
-    return true
+    return false
 end
 
 function EconomyDataCollector:_workYield()
@@ -38,7 +38,7 @@ function EconomyDataCollector:collectBegin()
     end
     -- Legacy coroutine path
     EconomyDataCollector._smState = nil
-    EconomyDataCollector._ecoCo = coroutine.create(function(opts)
+    local ok, co = pcall(coroutine.create, function(opts)
         opts = opts or {}
         EconomyDataCollector._yieldStride = math.max(10, tonumber(opts.economyYieldStride) or 55)
         EconomyDataCollector._yieldTick = 0
@@ -48,6 +48,10 @@ function EconomyDataCollector:collectBegin()
         EconomyDataCollector._yieldSnapshot = nil
         return r
     end)
+    if not ok or not co then
+        error("coroutine.create failed: " .. tostring(co))
+    end
+    EconomyDataCollector._ecoCo = co
 end
 
 function EconomyDataCollector:collectStep(opts)

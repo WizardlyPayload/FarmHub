@@ -7,11 +7,11 @@
     modDesc.xml, icon_FarmDashboard.dds (optional), src\
 
   Zip layout is **flat at archive root** (Giants resolves `sourceFile` paths like `src/FarmDashboard.lua` from there):
-    modDesc.xml, icon_FarmDashboard.dds, src/...
+    modDesc.xml, icon_FarmDashboard.dds, src/..., l10n/...
 
   Run tools\Convert-ModIconToDds.mjs after editing icon.png (composites onto tools\modIcon_BG512.png; 512×512 DXT1, icon_modName.dds).
 
-  Do not add other repo files (e.g. stray zips, README, l10n) - only those three roots.
+  Do not add other repo files (e.g. stray zips, README) - only modDesc, icon, src, l10n.
 
   IMPORTANT: Do not use Compress-Archive for FS mods. On Windows it writes zip entry names with
   backslashes (src\collectors\Foo.lua). The GIANTS engine resolves extraSourceFiles using forward
@@ -79,11 +79,32 @@ try {
         $rel = $full.Substring($rootNorm.Length).TrimStart('\', '/').Replace('\', '/')
         [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $full, $rel) | Out-Null
     }
+    foreach ($extraDir in @("l10n")) {
+        $extraPath = Join-Path $ModSource $extraDir
+        if (-not (Test-Path -LiteralPath $extraPath -PathType Container)) { continue }
+        Get-ChildItem -LiteralPath $extraPath -Recurse -File | ForEach-Object {
+            $full = $_.FullName
+            $rel = $full.Substring($rootNorm.Length).TrimStart('\', '/').Replace('\', '/')
+            [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $full, $rel) | Out-Null
+        }
+    }
 } finally {
     $zip.Dispose()
 }
 
-Write-Host "Wrote: $DestZip (only modDesc.xml, icon_FarmDashboard.dds, src/ - POSIX paths inside zip)"
+if (-not (Test-Path -LiteralPath $DestZip)) {
+    throw "Zip was not created: $DestZip"
+}
+
+Write-Host "Wrote: $DestZip (modDesc.xml, icon, src/, l10n/ - POSIX paths inside zip)"
+
+if (-not $CopyTo) {
+    if ($env:FARMDASH_BUILD_OUTPUT) {
+        $CopyTo = Join-Path $env:FARMDASH_BUILD_OUTPUT $OutZipName
+    } else {
+        $CopyTo = Join-Path $env:USERPROFILE "Documents\FarmDash Final Output\$OutZipName"
+    }
+}
 
 if ($CopyTo) {
     $destParent = Split-Path -Parent $CopyTo

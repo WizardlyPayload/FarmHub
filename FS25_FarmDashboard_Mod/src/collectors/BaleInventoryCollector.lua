@@ -1,4 +1,4 @@
--- FS25 FarmDashboard | BaleInventoryCollector.lua | v1.2.0
+-- FS25 FarmDashboard | BaleInventoryCollector.lua | v1.3.0
 -- Physical bale inventory: loose world bales (on-field vs yard) + shed via StockDataCollector merge.
 
 BaleInventoryCollector = {}
@@ -36,7 +36,7 @@ function BaleInventoryCollector:collectBegin()
     BaleInventoryCollector._inc = {
         farmIds = farmIds,
         baleState = InventoryScan.newBaleState(farmIds),
-        worldDone = false,
+        scanCtx = InventoryScan.newLooseBaleScanContext(farmIds),
     }
 end
 
@@ -44,9 +44,10 @@ function BaleInventoryCollector:collectStep(opts)
     local st = BaleInventoryCollector._inc
     if not st then return true, { farmId = 0, byFarm = {}, onField = {}, offField = {} } end
 
-    if not st.worldDone then
-        InventoryScan.scanLooseWorldBales(st.baleState, st.farmIds)
-        st.worldDone = true
+    local budget = math.max(1, tonumber(opts and opts.baleWorldEntitiesPerFrame) or tonumber(opts and opts.baleBudget) or 8)
+    local done = InventoryScan.scanLooseWorldBalesStep(st.scanCtx, st.baleState, budget)
+    if not done then
+        return false, { farmId = 0, byFarm = {}, partial = true }
     end
 
     local result = InventoryScan.finalizeBales(st.baleState, _currentFarmId())

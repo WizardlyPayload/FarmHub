@@ -1,22 +1,20 @@
 #!/usr/bin/env node
 /**
- * Default pack/dist: writes to %LOCALAPPDATA%\fs25-farm-dashboard-electron-out
- * (outside the git/Cursor workspace). Building under FarmHub/... caused Cursor and
- * Windows Search to index app.asar immediately and lock the folder.
+ * Default pack/dist: writes to Documents/FarmDash Final Output
+ * (outside the git/Cursor workspace). Override with FARMDASH_BUILD_OUTPUT.
  */
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import os from 'node:os';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { getFarmDashBuildOutputDir } from './farmdash-build-output.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** Electron app root (`FS25_FarmDashboard_App/`). Script lives in `tools/app/`. */
 const projectDir = path.join(__dirname, '..', '..', 'FS25_FarmDashboard_App');
 
 const mode = process.argv[2] === 'dist' ? 'dist' : 'pack';
-const localAppData = process.env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local');
-const outDir = path.join(localAppData, 'fs25-farm-dashboard-electron-out');
+const outDir = getFarmDashBuildOutputDir();
 fs.mkdirSync(outDir, { recursive: true });
 
 console.error('');

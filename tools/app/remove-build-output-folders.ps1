@@ -19,7 +19,13 @@ $appRoot = Join-Path $repoRoot 'FS25_FarmDashboard_App'
 $packParent = $appRoot
 
 $targets = [System.Collections.Generic.List[string]]::new()
-# Default npm run dist/pack output — outside repo (see tools/run-electron-builder.mjs)
+# Default npm run dist/pack output — Documents/FarmDash Final Output (see tools/app/farmdash-build-output.mjs)
+$docsFinal = Join-Path $env:USERPROFILE 'Documents\FarmDash Final Output'
+if ($env:FARMDASH_BUILD_OUTPUT) {
+    [void]$targets.Add($env:FARMDASH_BUILD_OUTPUT)
+} elseif ($docsFinal) {
+    [void]$targets.Add($docsFinal)
+}
 if ($env:LOCALAPPDATA) {
     [void]$targets.Add((Join-Path $env:LOCALAPPDATA 'fs25-farm-dashboard-electron-out'))
 }

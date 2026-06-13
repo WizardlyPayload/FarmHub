@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8" standalone="no" ?>
+<l10n>
+    <texts>
+        <text name="ui_farmdash_category" text="Farm-Dashboard"/>
+        <text name="input_FD_OPEN_SETTINGS" text="Spieleinstellungen öffnen (Farm-Dashboard)"/>
+        <text name="ui_farmdash_off" text="Aus"/>
+        <text name="ui_farmdash_on" text="An"/>
+
+        <text name="ui_settings_gameplay_category_farmDashboard" text="Farm-Dashboard"/>
+        <text name="ui_settings_gameplay_category_farmDashboard_desc" text="Export-Timing, Sammler und Performance-Budgets für die Farm-Dashboard Desktop-App."/>
+
+        <text name="ui_settings_gameplay_fd_enableAnimals" text="Tiere-Sammler"/>
+        <text name="ui_settings_gameplay_fd_enableAnimals_desc" text="Viehbestand und Stall-Daten exportieren."/>
+        <text name="ui_settings_gameplay_fd_enableVehicles" text="Fahrzeuge-Sammler"/>
+        <text name="ui_settings_gameplay_fd_enableVehicles_desc" text="Flottenpositionen und Fahrzeugdetails exportieren."/>
+        <text name="ui_settings_gameplay_fd_enableFields" text="Felder-Sammler"/>
+        <text name="ui_settings_gameplay_fd_enableFields_desc" text="Feldfrüchte, Boden und Schwaden exportieren."/>
+        <text name="ui_settings_gameplay_fd_enableFinance" text="Finanzen-Sammler"/>
+        <text name="ui_settings_gameplay_fd_enableFinance_desc" text="Geld, Kredite und Fahrzeugfinanzen exportieren."/>
+        <text name="ui_settings_gameplay_fd_enableWeather" text="Wetter-Sammler"/>
+        <text name="ui_settings_gameplay_fd_enableWeather_desc" text="Spielwetter und Vorhersage exportieren."/>
+        <text name="ui_settings_gameplay_fd_enableEconomy" text="Wirtschaft-Sammler"/>
+        <text name="ui_settings_gameplay_fd_enableEconomy_desc" text="Marktpreise und Wirtschaftstabellen exportieren."/>
+        <text name="ui_settings_gameplay_fd_enableProduction" text="Produktion-Sammler"/>
+        <text name="ui_settings_gameplay_fd_enableProduction_desc" text="Fabriken und Produktionsketten exportieren."/>
+        <text name="ui_settings_gameplay_fd_enableStock" text="Lager / Silos-Sammler"/>
+        <text name="ui_settings_gameplay_fd_enableStock_desc" text="Silo- und Lagerfüllstände exportieren."/>
+        <text name="ui_settings_gameplay_fd_enableBaleInventory" text="Ballen-Inventar-Sammler"/>
+        <text name="ui_settings_gameplay_fd_enableBaleInventory_desc" text="Physische Ballen auf der Karte exportieren."/>
+        <text name="ui_settings_gameplay_fd_enableRedTape" text="Red-Tape-Sammler"/>
+        <text name="ui_settings_gameplay_fd_enableRedTape_desc" text="Red-Tape-Mod-Daten exportieren, wenn installiert."/>
+
+        <text name="ui_settings_gameplay_fd_collectionCycleSec" text="Voller Sammelzyklus (Sek.)"/>
+        <text name="ui_settings_gameplay_fd_collectionCycleSec_desc" text="Zeit zwischen vollen Exportzyklen. Höhere Werte reduzieren CPU-Last."/>
+        <text name="ui_settings_gameplay_fd_sliceBudgetMs" text="Slice-Budget (ms)"/>
+        <text name="ui_settings_gameplay_fd_sliceBudgetMs_desc" text="Zeitbudget pro Sammler-Slice. Niedrigere Werte reduzieren Ruckler."/>
+        <text name="ui_settings_gameplay_fd_postLoadGraceSec" text="Grace nach Laden (Sek.)"/>
+        <text name="ui_settings_gameplay_fd_postLoadGraceSec_desc" text="Wartezeit nach Save-Laden, bevor Sammler starten."/>
+        <text name="ui_settings_gameplay_fd_fieldsPerFrame" text="Felder pro Frame"/>
+        <text name="ui_settings_gameplay_fd_fieldsPerFrame_desc" text="Feld-Scan-Budget pro Frame."/>
+        <text name="ui_settings_gameplay_fd_vehiclesPerFrame" text="Fahrzeuge pro Frame"/>
+        <text name="ui_settings_gameplay_fd_vehiclesPerFrame_desc" text="Fahrzeug-Scan-Budget pro Frame."/>
+        <text name="ui_settings_gameplay_fd_baleEntitiesBudget" text="Feld-Ballen-Budget"/>
+        <text name="ui_settings_gameplay_fd_baleEntitiesBudget_desc" text="Ballen pro Feld-Slice."/>
+        <text name="ui_settings_gameplay_fd_stockPlaceablesPerFrame" text="Lager-Placeables / Frame"/>
+        <text name="ui_settings_gameplay_fd_stockPlaceablesPerFrame_desc" text="Lager-Placeables pro Frame."/>
+        <text name="ui_settings_gameplay_fd_baleWorldPerFrame" text="Welt-Ballen / Frame"/>
+        <text name="ui_settings_gameplay_fd_baleWorldPerFrame_desc" text="Lose Welt-Ballen pro Frame."/>
+        <text name="ui_settings_gameplay_fd_financeVehiclesPerFrame" text="Finanz-Fahrzeuge / Frame"/>
+        <text name="ui_settings_gameplay_fd_financeVehiclesPerFrame_desc" text="Fahrzeuge pro Finanz-Slice."/>
+        <text name="ui_settings_gameplay_fd_jsonKeysPerFrame" text="JSON-Keys / Frame"/>
+        <text name="ui_settings_gameplay_fd_jsonKeysPerFrame_desc" text="Top-Level-JSON-Keys pro Frame beim Schreiben von data.json."/>
+        <text name="ui_settings_gameplay_fd_animalRowsPerSlice" text="Tierzeilen / Slice"/>
+        <text name="ui_settings_gameplay_fd_animalRowsPerSlice_desc" text="Tierzeilen pro Vieh-Slice."/>
+        <text name="ui_settings_gameplay_fd_economyYieldStride" text="Economy-Yield-Stride"/>
+        <text name="ui_settings_gameplay_fd_economyYieldStride_desc" text="Zeilen pro Economy-Yield-Scan."/>
+
+        <text name="ui_settings_gameplay_fd_diagnostics" text="Diagnose-Logging"/>
+        <text name="ui_settings_gameplay_fd_diagnostics_desc" text="Sammler-Timing in log.txt. Trace-Zeilen nur in Einzelspieler, als Host oder auf Dedicated Server (nicht MP-Clients)."/>
+        <text name="ui_settings_gameplay_fd_debugBaleScan" text="Debug Ballen-Scan-Log"/>
+        <text name="ui_settings_gameplay_fd_debugBaleScan_desc" text="Gedrosselte Ballen-Scan-Zeilen in log.txt."/>
+    </texts>
+</l10n>

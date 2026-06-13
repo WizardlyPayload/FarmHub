@@ -217,55 +217,82 @@ local function rtSerializeFarm(rt, farmId)
 end
 
 function RedTapeDataCollector:init()
-    RedTapeDataCollector._inc = false
+    RedTapeDataCollector._inc = nil
 end
 
 function RedTapeDataCollector:collectBegin()
-    RedTapeDataCollector._inc = true
+    RedTapeDataCollector._inc = {
+        stage = "init",
+        farmIds = {},
+        farmIdx = 1,
+        byFarm = {},
+    }
 end
 
-function RedTapeDataCollector:collectStep()
-    if RedTapeDataCollector._inc then
-        RedTapeDataCollector._inc = false
-        return true, self:collect()
+function RedTapeDataCollector:collectStep(opts)
+    if not rtEnabled() then
+        RedTapeDataCollector._inc = nil
+        return true, { enabled = false }
     end
-    return true, { enabled = false }
+
+    local st = RedTapeDataCollector._inc
+    if not st then return true, { enabled = false } end
+
+    local per = math.max(1, tonumber(opts and opts.redTapeFarmsPerFrame) or 1)
+    local rt = _G.g_currentMission.RedTape
+
+    if st.stage == "init" then
+        if _G.g_farmManager and _G.g_farmManager.farms then
+            for _, farm in pairs(_G.g_farmManager.farms) do
+                local fid = farm and tonumber(farm.farmId)
+                if fid and fid > 0 then
+                    local hasPlayers = false
+                    if farm.players then
+                        for _ in pairs(farm.players) do hasPlayers = true break end
+                    end
+                    local name = farm.name and tostring(farm.name):match("^%s*(.-)%s*$") or ""
+                    if hasPlayers or name ~= "" then
+                        st.farmIds[#st.farmIds + 1] = fid
+                    end
+                end
+            end
+        end
+        if #st.farmIds < 1 then
+            local mission = _G.g_currentMission
+            if mission and mission.getFarmId then
+                local ok, fid = pcall(function() return mission:getFarmId() end)
+                if ok and fid and fid > 0 then
+                    st.farmIds[#st.farmIds + 1] = fid
+                end
+            end
+        end
+        st.stage = "farms"
+    end
+
+    if st.stage == "farms" then
+        local hi = math.min(st.farmIdx + per - 1, #st.farmIds)
+        for i = st.farmIdx, hi do
+            local fid = st.farmIds[i]
+            local ok, row = pcall(function() return rtSerializeFarm(rt, fid) end)
+            if ok and row then st.byFarm[tostring(fid)] = row end
+        end
+        st.farmIdx = hi + 1
+        if st.farmIdx > #st.farmIds then
+            RedTapeDataCollector._inc = nil
+            return true, { enabled = true, byFarm = st.byFarm }
+        end
+        return false, { enabled = true, byFarm = st.byFarm, partial = true }
+    end
+
+    RedTapeDataCollector._inc = nil
+    return true, { enabled = true, byFarm = st.byFarm }
 end
 
 function RedTapeDataCollector:collect()
-    if not rtEnabled() then
-        return { enabled = false }
+    self:collectBegin()
+    local done, result = false, nil
+    while not done do
+        done, result = self:collectStep({ redTapeFarmsPerFrame = 9999 })
     end
-
-    local rt = _G.g_currentMission.RedTape
-    local byFarm = {}
-    if _G.g_farmManager and _G.g_farmManager.farms then
-        for _, farm in pairs(_G.g_farmManager.farms) do
-            local fid = farm and tonumber(farm.farmId)
-            if fid and fid > 0 then
-                local hasPlayers = false
-                if farm.players then
-                    for _ in pairs(farm.players) do hasPlayers = true break end
-                end
-                local name = farm.name and tostring(farm.name):match("^%s*(.-)%s*$") or ""
-                if hasPlayers or name ~= "" then
-                    local ok, row = pcall(function() return rtSerializeFarm(rt, fid) end)
-                    if ok and row then byFarm[tostring(fid)] = row end
-                end
-            end
-        end
-    end
-
-    if next(byFarm) == nil then
-        local mission = _G.g_currentMission
-        if mission and mission.getFarmId then
-            local ok, fid = pcall(function() return mission:getFarmId() end)
-            if ok and fid and fid > 0 then
-                local ok2, row = pcall(function() return rtSerializeFarm(rt, fid) end)
-                if ok2 and row then byFarm[tostring(fid)] = row end
-            end
-        end
-    end
-
-    return { enabled = true, byFarm = byFarm }
+    return result or { enabled = false }
 end

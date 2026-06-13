@@ -59,7 +59,7 @@ local function _productionUseStateMachine()
     if cfg and cfg.config and cfg.config.useStateMachine_production ~= nil then
         return cfg.config.useStateMachine_production and true or false
     end
-    return true
+    return false
 end
 
 function ProductionDataCollector:collectBegin()
@@ -69,7 +69,7 @@ function ProductionDataCollector:collectBegin()
         return
     end
     ProductionDataCollector._smState = nil
-    ProductionDataCollector._co = coroutine.create(function(opts)
+    local ok, co = pcall(coroutine.create, function(opts)
         opts = opts or {}
         ProductionDataCollector._yieldChains = math.max(1, tonumber(opts.productionChainsPerYield) or 2)
         ProductionDataCollector._yieldPlaceables = math.max(1, tonumber(opts.productionPlaceablesPerYield) or 10)
@@ -82,6 +82,10 @@ function ProductionDataCollector:collectBegin()
         ProductionDataCollector._lastResult = nil
         return r
     end)
+    if not ok or not co then
+        error("coroutine.create failed: " .. tostring(co))
+    end
+    ProductionDataCollector._co = co
 end
 
 function ProductionDataCollector:collectStep(opts)

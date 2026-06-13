@@ -2,7 +2,7 @@
 <!-- FS25 FarmDashboard | modDesc.xml | v3.0.0 -->
 <modDesc descVersion="109">
     <author>JoshWalki / WizardlyPayload</author>
-    <version>3.1.0.0</version>
+    <version>3.2.8.0</version>
     
     <title>
         <en>Farm Dashboard</en>
@@ -77,8 +77,28 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
     <iconFilename>icon_FarmDashboard.dds</iconFilename>
 
     <multiplayer supported="true"/>
+
+    <l10n filenamePrefix="l10n/l10n"/>
+
+    <actions>
+        <action name="FD_OPEN_SETTINGS" category="FARM_DASHBOARD"/>
+    </actions>
+
+    <extraInputBinding>
+        <category name="FARM_DASHBOARD" l10n="ui_farmdash_category"/>
+    </extraInputBinding>
+
+    <inputBinding>
+        <actionBinding action="FD_OPEN_SETTINGS">
+            <binding device="KB_MOUSE_DEFAULT" input="KEY_lctrl KEY_lshift KEY_f" axisComponent="+" neutralInput="0" index="1"/>
+        </actionBinding>
+    </inputBinding>
     
     <extraSourceFiles>
+        <sourceFile filename="src/FarmDashboardSettingsApi.lua"/>
+        <sourceFile filename="src/FarmDashboardSettingsEvent.lua"/>
+        <sourceFile filename="src/FarmDashboardSettingsMenu.lua"/>
+        <sourceFile filename="src/FarmDashboardSettingsGui.lua"/>
         <sourceFile filename="src/FarmDashboard.lua"/>
         <sourceFile filename="src/FarmDashLog.lua"/>
         <sourceFile filename="src/FillTypeUtils.lua"/>

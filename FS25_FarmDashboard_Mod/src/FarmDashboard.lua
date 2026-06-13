@@ -4,7 +4,7 @@
 FarmDashboard = {}
 FarmDashboard.MOD_NAME = "FS25_FarmDashboard"
 FarmDashboard.MOD_DIR = _G.g_currentModDirectory
-FarmDashboard.VERSION = "3.1.0.0"
+FarmDashboard.VERSION = "3.2.8.0"
 FarmDashboard.UPDATE_INTERVAL = 10000
 FarmDashboard.PORT = 8766
 FarmDashboard.readyAt = nil
@@ -18,20 +18,22 @@ local hasLoaded = false
 function FarmDashboard:isAuthority()
     if not _G.g_currentMission then return false end
 
+    -- Dedicated server / MP host: getIsServer() must win over missionDynamicInfo.isClient (both can be true on DS).
+    if _G.g_server ~= nil and type(_G.g_server.getIsServer) == "function" then
+        local ok, isSrv = pcall(function() return _G.g_server:getIsServer() end)
+        if ok and isSrv then
+            return true
+        end
+    end
+
+    if rawget(_G, "g_dedicatedServer") ~= nil then
+        return true
+    end
+
     local md = _G.g_currentMission.missionDynamicInfo
 
     if md and md.isMultiplayer == true and md.isClient == true then
         return false
-    end
-
-    if _G.g_server ~= nil and type(_G.g_server.getIsServer) == "function" then
-        local ok, isSrv = pcall(function() return _G.g_server:getIsServer() end)
-        if ok then
-            if not isSrv and (not md or md.isMultiplayer ~= true) then
-                return true
-            end
-            return isSrv
-        end
     end
 
     if _G.g_connectionManager ~= nil and type(_G.g_connectionManager.getIsClient) == "function" then
@@ -66,12 +68,30 @@ function FarmDashboard:loadMap()
     -- Scripts are loaded via modDesc extraSourceFiles; init once when the map loads.
     FarmDashboardDataCollector:init()
 
+    if FarmDashboardSettingsGui and FarmDashboardSettingsGui.init then
+        FarmDashboardSettingsGui.init()
+    end
+
+    if FarmDashboardSettingsMenu and FarmDashboardSettingsMenu.tryRegister then
+        FarmDashboardSettingsMenu.tryRegister()
+    end
+
     if self:isAuthority() then
         _G.g_currentMission:addUpdateable(FarmDashboard)
         FarmDashboard.isRegistered = true
         local currentTime = _G.g_time or 0
         FarmDashboard.readyAt = (type(currentTime) == "number") and currentTime or 0
         self:bootstrapDataJson()
+        local cfg = FarmDashboardDataCollector and FarmDashboardDataCollector.config
+        local diagOn = cfg and cfg.diagnostics
+        Logging.info("[FarmDash] Export authority on this machine (host/server). diagnostics=%s", tostring(diagOn))
+        if not diagOn then
+            Logging.info(
+                "[FarmDash] For [trace] hitch logs, set diagnostics=true in modSettings/FS25_FarmDashboard/config.xml on THIS machine's profile (not the joining client's PC)."
+            )
+        end
+    else
+        Logging.info("[FarmDash] Multiplayer client — collectors and trace run on host/server only.")
     end
 
     FarmDashboard:startDashboard()

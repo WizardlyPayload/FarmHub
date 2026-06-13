@@ -1,7 +1,6 @@
 -- FS25 FarmDashboard | FarmDashboardDataCollector.lua | v2.3.0 (Plan v5)
 -- Inter-module staggering: one collector slot per collectionCycleMs / N (same as v2).
--- Intra-module: collectors are explicit state machines (no coroutines, no yield-across-pcall)
---   when farmDashboard.settings#useStateMachine_<name>=true (default true).
+-- Intra-module: coroutine slices by default (multi-frame); set useStateMachine_<name>=true for sync one-shot slices.
 -- Row-count caps are the primary safety net; opportunistic wall-clock budgets are advisory.
 -- data.json is emitted progressively as each module slice completes via table.concat parts.
 --
@@ -53,6 +52,7 @@ local REQUESTS_MAX_AGE_SEC      = 300
 local DIRTY_MAX_ENTRIES         = 4096
 local DIRTY_PENS_HARD_CAP       = 256    -- in-memory dirty set cap (B11)
 local POST_LOAD_SILENCE_SEC     = 5      -- ignore inserts for first 5s after onStartMission (B11)
+local POST_LOAD_COLLECTION_GRACE_SEC = 45 -- defer new collector slots after save load (CoursePlay / UI friendly)
 
 -- Must be declared before `jsonWriteStep` / any method that references them. In Lua, a `local`
 -- below a method definition is not an upvalue of that method — the name resolves to a *global*
@@ -349,6 +349,32 @@ local function _pathExists(p)
     return false
 end
 
+--- Dedicated servers may omit debug.traceback; never call it blindly inside xpcall handlers.
+local function _farmDashFormatError(err)
+    local msg = tostring(err)
+    if type(debug) == "table" and type(debug.traceback) == "function" then
+        local okTb, tb = pcall(debug.traceback, "", 2)
+        if okTb and type(tb) == "string" then
+            return msg .. "\n" .. tb
+        end
+    end
+    return msg
+end
+
+local function _probeCoroutinesAvailable()
+    if type(coroutine) ~= "table" or type(coroutine.create) ~= "function" then
+        return false
+    end
+    local ok, co = pcall(coroutine.create, function() end)
+    return ok and co ~= nil
+end
+
+--- Incremental spread for these collectors relies on coroutine.resume/yield in collectStep.
+local COROUTINE_INCREMENTAL_COLLECTORS = {
+    economy = true,
+    production = true,
+}
+
 local function _copyFileFs25BestEffort(src, dst)
     if type(copyFile) ~= "function" or type(src) ~= "string" or type(dst) ~= "string" then
         return false
@@ -397,6 +423,13 @@ local function _movePathBestEffort(src, dst)
 end
 
 function FarmDashboardDataCollector:init()
+    self.coroutinesAvailable = _probeCoroutinesAvailable()
+    if not self.coroutinesAvailable and FarmDashLog and FarmDashLog.devWarn then
+        FarmDashLog.devWarn(
+            "Lua coroutines unavailable on this machine — fields/economy/production use sync collect per slot (no frame spread)"
+        )
+    end
+
     self.collectors = {
         animals    = AnimalDataCollector,
         vehicles   = VehicleDataCollector,
@@ -586,9 +619,7 @@ function FarmDashboardDataCollector:_subscribeToRLEvents()
             if owner and owner.id ~= nil then
                 self_ref:_addDirtyPen(owner)
             end
-        end, function(e)
-            return tostring(e) .. "\n" .. debug.traceback("", 2)
-        end)
+        end, _farmDashFormatError)
         if not ok then
             local D = rawget(_G, "FarmDashDiagnostics")
             local nowS = (D and D.nowSec and D.nowSec()) or 0
@@ -811,6 +842,8 @@ function FarmDashboardDataCollector:resetStaggerState()
     self._slicePendingFinish = nil
     self._jsonWriteJob = nil
     self._jsonWritePending = nil
+    self._jsonPendingDisk = nil
+    self._cycleTailJob = nil
     if rawget(_G, "VehicleDataCollector") then
         VehicleDataCollector._inc = nil
     end
@@ -861,7 +894,10 @@ function FarmDashboardDataCollector:loadConfig()
         enableStock         = true,
         enableBaleInventory = true,
         enableRedTape       = true,
-        stockPlaceablesPerFrame = 4,
+        stockPlaceablesPerFrame = 3,
+        baleWorldEntitiesPerFrame = 8,
+        financeVehiclesPerFrame = 4,
+        redTapeFarmsPerFrame = 1,
         --- When true, FieldDataCollector prints a throttled line to log.txt after bale scans (see FieldDataCollector.lua).
         debugBaleScan       = false,
         --- When true, FarmDash periodically logs median/p99 collectStep + serializer timings. Verification only.
@@ -885,11 +921,13 @@ function FarmDashboardDataCollector:loadConfig()
         detailFileCapBase           = 512,
         --- Phase 5: opportunistic wall-clock budget per slice (ms). Best-effort; row caps are the actual safety net.
         sliceBudgetMs               = 4,
-        --- Plan v5 B1/B2/B3: per-collector kill switches for the state-machine port.
-        --- Default true (use the new state-machine path); set false to fall back to the existing coroutine path.
-        useStateMachine_economy     = true,
-        useStateMachine_fields      = true,
-        useStateMachine_production  = true,
+        --- Plan v5 B1/B2/B3: per-collector kill switches.
+        --- Default false = spread fields/economy/production across frames (fewer hitches).
+        useStateMachine_economy     = false,
+        useStateMachine_fields      = false,
+        useStateMachine_production  = false,
+        --- Seconds after save load before starting new collector slots (reduces CP/menu contention).
+        postLoadCollectionGraceSec  = POST_LOAD_COLLECTION_GRACE_SEC,
         --- Plan v5 B1: row cap for economy state-machine slice.
         economyRowsPerSlice         = 64,
     }
@@ -944,13 +982,51 @@ function FarmDashboardDataCollector:loadConfig()
             local eys = getXMLInt(xmlFile, "farmDashboard.settings#economyYieldStride")
             if eys and eys > 0 then self.config.economyYieldStride = eys end
             -- Plan v5 B1/B2/B3: collector kill switches.
-            self.config.useStateMachine_economy    = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_economy"),    true)
-            self.config.useStateMachine_fields     = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_fields"),     true)
-            self.config.useStateMachine_production = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_production"), true)
+            self.config.useStateMachine_economy    = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_economy"),    false)
+            self.config.useStateMachine_fields     = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_fields"),     false)
+            self.config.useStateMachine_production = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_production"), false)
+            local plg = getXMLInt(xmlFile, "farmDashboard.settings#postLoadCollectionGraceSec")
+            if plg and plg >= 0 then self.config.postLoadCollectionGraceSec = plg end
             local erp = getXMLInt(xmlFile, "farmDashboard.settings#economyRowsPerSlice")
             if erp and erp > 0 then self.config.economyRowsPerSlice = erp end
             local spp = getXMLInt(xmlFile, "farmDashboard.settings#stockPlaceablesPerFrame")
             if spp and spp > 0 then self.config.stockPlaceablesPerFrame = spp end
+            local bwp = getXMLInt(xmlFile, "farmDashboard.settings#baleWorldEntitiesPerFrame")
+            if bwp and bwp > 0 then self.config.baleWorldEntitiesPerFrame = bwp end
+            local fvp = getXMLInt(xmlFile, "farmDashboard.settings#financeVehiclesPerFrame")
+            if fvp and fvp > 0 then self.config.financeVehiclesPerFrame = fvp end
+            local rtp = getXMLInt(xmlFile, "farmDashboard.settings#redTapeFarmsPerFrame")
+            if rtp and rtp > 0 then self.config.redTapeFarmsPerFrame = rtp end
+            if not Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV2Applied"), false) then
+                self.config.useStateMachine_economy = false
+                self.config.useStateMachine_fields = false
+                self.config.useStateMachine_production = false
+                self.config.postLoadCollectionGraceSec = self.config.postLoadCollectionGraceSec or POST_LOAD_COLLECTION_GRACE_SEC
+                setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_economy", false)
+                setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_fields", false)
+                setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_production", false)
+                setXMLInt(xmlFile, "farmDashboard.settings#postLoadCollectionGraceSec", self.config.postLoadCollectionGraceSec)
+                setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV2Applied", true)
+                saveXMLFile(xmlFile)
+            end
+            if not Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV3Applied"), false) then
+                self.config.jsonTopLevelKeysPerFrame = 1
+                self.config.baleWorldEntitiesPerFrame = self.config.baleWorldEntitiesPerFrame or 8
+                self.config.financeVehiclesPerFrame = self.config.financeVehiclesPerFrame or 4
+                self.config.redTapeFarmsPerFrame = self.config.redTapeFarmsPerFrame or 1
+                self.config.stockPlaceablesPerFrame = math.min(self.config.stockPlaceablesPerFrame or 3, 3)
+                self.config.baleEntitiesBudget = math.min(self.config.baleEntitiesBudget or 8, 8)
+                self.config.economyYieldStride = math.min(self.config.economyYieldStride or 20, 20)
+                setXMLInt(xmlFile, "farmDashboard.settings#jsonTopLevelKeysPerFrame", self.config.jsonTopLevelKeysPerFrame)
+                setXMLInt(xmlFile, "farmDashboard.settings#baleWorldEntitiesPerFrame", self.config.baleWorldEntitiesPerFrame)
+                setXMLInt(xmlFile, "farmDashboard.settings#financeVehiclesPerFrame", self.config.financeVehiclesPerFrame)
+                setXMLInt(xmlFile, "farmDashboard.settings#redTapeFarmsPerFrame", self.config.redTapeFarmsPerFrame)
+                setXMLInt(xmlFile, "farmDashboard.settings#stockPlaceablesPerFrame", self.config.stockPlaceablesPerFrame)
+                setXMLInt(xmlFile, "farmDashboard.settings#baleEntitiesBudget", self.config.baleEntitiesBudget)
+                setXMLInt(xmlFile, "farmDashboard.settings#economyYieldStride", self.config.economyYieldStride)
+                setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV3Applied", true)
+                saveXMLFile(xmlFile)
+            end
             delete(xmlFile)
         end
     else
@@ -974,6 +1050,9 @@ function FarmDashboardDataCollector:loadConfig()
         setXMLBool(xmlFile, "farmDashboard.modules#stock", true)
         setXMLBool(xmlFile, "farmDashboard.modules#redTape", true)
         setXMLInt(xmlFile, "farmDashboard.settings#stockPlaceablesPerFrame", self.config.stockPlaceablesPerFrame)
+        setXMLInt(xmlFile, "farmDashboard.settings#baleWorldEntitiesPerFrame", self.config.baleWorldEntitiesPerFrame)
+        setXMLInt(xmlFile, "farmDashboard.settings#financeVehiclesPerFrame", self.config.financeVehiclesPerFrame)
+        setXMLInt(xmlFile, "farmDashboard.settings#redTapeFarmsPerFrame", self.config.redTapeFarmsPerFrame)
         setXMLInt(xmlFile, "farmDashboard.settings#fieldsPerFrame", self.config.fieldsPerFrame)
         setXMLInt(xmlFile, "farmDashboard.settings#baleEntitiesBudget", self.config.baleEntitiesBudget)
         setXMLInt(xmlFile, "farmDashboard.settings#vehiclesPerFrame", self.config.vehiclesPerFrame)
@@ -981,9 +1060,12 @@ function FarmDashboardDataCollector:loadConfig()
         setXMLInt(xmlFile, "farmDashboard.settings#jsonTopLevelKeysPerFrame", self.config.jsonTopLevelKeysPerFrame)
         setXMLInt(xmlFile, "farmDashboard.settings#economyYieldStride", self.config.economyYieldStride)
         -- Plan v5 B1/B2/B3 + B10:
-        setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_economy",    true)
-        setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_fields",     true)
-        setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_production", true)
+        setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_economy",    false)
+        setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_fields",     false)
+        setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_production", false)
+        setXMLInt(xmlFile, "farmDashboard.settings#postLoadCollectionGraceSec", self.config.postLoadCollectionGraceSec)
+        setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV2Applied", true)
+        setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV3Applied", true)
         setXMLInt(xmlFile, "farmDashboard.settings#economyRowsPerSlice", self.config.economyRowsPerSlice)
         saveXMLFile(xmlFile)
         delete(xmlFile)
@@ -1005,8 +1087,199 @@ function FarmDashboardDataCollector:loadConfig()
     self.config.detailMaxAgeSec = math.max(15, math.min(3600, self.config.detailMaxAgeSec or 60))
     self.config.detailFileCapBase = math.max(64, math.min(8192, self.config.detailFileCapBase or 512))
     self.config.economyRowsPerSlice = math.max(8, math.min(2048, self.config.economyRowsPerSlice or 64))
-    self.config.stockPlaceablesPerFrame = math.max(1, math.min(16, self.config.stockPlaceablesPerFrame or 4))
+    self.config.stockPlaceablesPerFrame = math.max(1, math.min(16, self.config.stockPlaceablesPerFrame or 3))
+    self.config.baleWorldEntitiesPerFrame = math.max(4, math.min(64, self.config.baleWorldEntitiesPerFrame or 8))
+    self.config.financeVehiclesPerFrame = math.max(1, math.min(16, self.config.financeVehiclesPerFrame or 4))
+    self.config.redTapeFarmsPerFrame = math.max(1, math.min(8, self.config.redTapeFarmsPerFrame or 1))
+    self.config.postLoadCollectionGraceSec = math.max(0, math.min(300, self.config.postLoadCollectionGraceSec or POST_LOAD_COLLECTION_GRACE_SEC))
     FarmDashboard.UPDATE_INTERVAL = self.config.collectionCycleMs
+end
+
+function FarmDashboardDataCollector:getConfigPath()
+    return getUserProfileAppPath() .. "modSettings/FS25_FarmDashboard/config.xml"
+end
+
+function FarmDashboardDataCollector:applyDiagnosticsFromConfig()
+    local D = rawget(_G, "FarmDashDiagnostics")
+    if D and D.setEnabled and self.config then
+        D:setEnabled(self.config.diagnostics)
+        if self.config.diagnostics and FarmDashboard and FarmDashboard.isAuthority and not FarmDashboard:isAuthority() then
+            if FarmDashLog and FarmDashLog.warnNoAuthorityTrace then
+                FarmDashLog.warnNoAuthorityTrace()
+            end
+        end
+    end
+end
+
+--- Persist current in-memory config to modSettings/config.xml (GUI + shutdown paths).
+function FarmDashboardDataCollector:saveConfig()
+    local cfg = self.config
+    if type(cfg) ~= "table" then return false end
+
+    local configPath = self:getConfigPath()
+    createFolder(getUserProfileAppPath() .. "modSettings/FS25_FarmDashboard/")
+
+    local xmlFile = 0
+    if fileExists(configPath) then
+        xmlFile = loadXMLFile("FarmDashboardConfigSave", configPath)
+    end
+    if not xmlFile or xmlFile == 0 then
+        xmlFile = createXMLFile("FarmDashboardConfigSave", configPath, "farmDashboard")
+    end
+    if not xmlFile or xmlFile == 0 then return false end
+
+    setXMLInt(xmlFile, "farmDashboard.settings#updateInterval", cfg.interval or 10000)
+    setXMLInt(xmlFile, "farmDashboard.settings#collectionCycleMs", cfg.collectionCycleMs or 60000)
+    setXMLBool(xmlFile, "farmDashboard.settings#debugBaleScan", Utils.getNoNil(cfg.debugBaleScan, false))
+    setXMLBool(xmlFile, "farmDashboard.settings#diagnostics", Utils.getNoNil(cfg.diagnostics, false))
+    setXMLInt(xmlFile, "farmDashboard.settings#animalRowsPerSlice", cfg.animalRowsPerSlice or 256)
+    setXMLInt(xmlFile, "farmDashboard.settings#sliceBudgetMs", cfg.sliceBudgetMs or 4)
+    setXMLInt(xmlFile, "farmDashboard.settings#detailMaxAgeSec", cfg.detailMaxAgeSec or 60)
+    setXMLInt(xmlFile, "farmDashboard.settings#detailFileCapBase", cfg.detailFileCapBase or 512)
+    setXMLInt(xmlFile, "farmDashboard.settings#fieldsPerFrame", cfg.fieldsPerFrame or 1)
+    setXMLInt(xmlFile, "farmDashboard.settings#baleEntitiesBudget", cfg.baleEntitiesBudget or 8)
+    setXMLInt(xmlFile, "farmDashboard.settings#vehiclesPerFrame", cfg.vehiclesPerFrame or 2)
+    setXMLInt(xmlFile, "farmDashboard.settings#husbandryPlaceablesPerFrame", cfg.husbandryPlaceablesPerFrame or 1)
+    setXMLInt(xmlFile, "farmDashboard.settings#jsonTopLevelKeysPerFrame", cfg.jsonTopLevelKeysPerFrame or 1)
+    setXMLInt(xmlFile, "farmDashboard.settings#economyYieldStride", cfg.economyYieldStride or 20)
+    setXMLInt(xmlFile, "farmDashboard.settings#stockPlaceablesPerFrame", cfg.stockPlaceablesPerFrame or 3)
+    setXMLInt(xmlFile, "farmDashboard.settings#baleWorldEntitiesPerFrame", cfg.baleWorldEntitiesPerFrame or 8)
+    setXMLInt(xmlFile, "farmDashboard.settings#financeVehiclesPerFrame", cfg.financeVehiclesPerFrame or 4)
+    setXMLInt(xmlFile, "farmDashboard.settings#redTapeFarmsPerFrame", cfg.redTapeFarmsPerFrame or 1)
+    setXMLInt(xmlFile, "farmDashboard.settings#postLoadCollectionGraceSec", cfg.postLoadCollectionGraceSec or POST_LOAD_COLLECTION_GRACE_SEC)
+    setXMLInt(xmlFile, "farmDashboard.settings#economyRowsPerSlice", cfg.economyRowsPerSlice or 64)
+    setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_economy", Utils.getNoNil(cfg.useStateMachine_economy, false))
+    setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_fields", Utils.getNoNil(cfg.useStateMachine_fields, false))
+    setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_production", Utils.getNoNil(cfg.useStateMachine_production, false))
+
+    setXMLBool(xmlFile, "farmDashboard.modules#animals", Utils.getNoNil(cfg.enableAnimals, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#vehicles", Utils.getNoNil(cfg.enableVehicles, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#weather", Utils.getNoNil(cfg.enableWeather, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#fields", Utils.getNoNil(cfg.enableFields, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#finance", Utils.getNoNil(cfg.enableFinance, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#economy", Utils.getNoNil(cfg.enableEconomy, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#production", Utils.getNoNil(cfg.enableProduction, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#stock", Utils.getNoNil(cfg.enableStock, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#baleInventory", Utils.getNoNil(cfg.enableBaleInventory, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#redTape", Utils.getNoNil(cfg.enableRedTape, true))
+
+    saveXMLFile(xmlFile)
+    delete(xmlFile)
+
+    self:applyDiagnosticsFromConfig()
+    FarmDashboard.UPDATE_INTERVAL = cfg.collectionCycleMs or FarmDashboard.UPDATE_INTERVAL
+    return true
+end
+
+--- Unix-ish mission seconds for grace / pause gates (best-effort).
+function FarmDashboardDataCollector:_missionNowSec()
+    local D = rawget(_G, "FarmDashDiagnostics")
+    if D and type(D.nowSec) == "function" then
+        local ok, t = pcall(function() return D.nowSec() end)
+        if ok and type(t) == "number" then return t end
+    end
+    return 0
+end
+
+function FarmDashboardDataCollector:_getCurrentGuiName()
+    local gui = rawget(_G, "g_gui")
+    if not gui then return nil end
+    local ok, name = pcall(function()
+        if type(gui.getCurrentGuiName) == "function" then
+            return gui:getCurrentGuiName()
+        end
+        if gui.currentGuiName then return gui.currentGuiName end
+        if gui.currentGui and gui.currentGui.name then return gui.currentGui.name end
+        return nil
+    end)
+    if ok and name and name ~= "" then return tostring(name) end
+    return nil
+end
+
+--- True when menus, pause, post-load grace, or zero-dt ticks should defer heavy collection.
+function FarmDashboardDataCollector:shouldDeferCollectionWork(dt)
+    if not _G.g_currentMission then return true end
+
+    local nowS = self:_missionNowSec()
+    if type(self._postLoadCollectionGraceUntil) == "number" and nowS < self._postLoadCollectionGraceUntil then
+        return true
+    end
+
+    if type(dt) == "number" and dt <= 0 then
+        return true
+    end
+
+    local mission = _G.g_currentMission
+    local okPaused, paused = pcall(function()
+        if mission.paused then return mission.paused end
+        if type(mission.isPaused) == "function" then return mission:isPaused() end
+        if type(mission.getIsPaused) == "function" then return mission:getIsPaused() end
+        return false
+    end)
+    if okPaused and paused then return true end
+
+    local gui = rawget(_G, "g_gui")
+    if gui and type(gui.getIsGuiVisible) == "function" then
+        local okVis, visible = pcall(function() return gui:getIsGuiVisible() end)
+        if okVis and visible then
+            local name = self:_getCurrentGuiName()
+            if name then
+                local lower = string.lower(name)
+                if lower:find("shop", 1, true)
+                    or lower:find("sell", 1, true)
+                    or lower:find("courseplay", 1, true)
+                    or lower:find("cpglobal", 1, true)
+                    or lower:find("cpsettings", 1, true)
+                    or lower:find("ingamemenu", 1, true)
+                    or lower:find("pause", 1, true)
+                    or lower:find("construction", 1, true)
+                    or lower:find("vehicle", 1, true)
+                then
+                    return true
+                end
+            end
+            return true
+        end
+    end
+
+    return false
+end
+
+--- Drop in-flight incremental work when entering pause/menu (avoids stale vehicle refs during shop sell).
+function FarmDashboardDataCollector:_abortActiveIncrementalWork()
+    local name = self._incActiveModule
+    if name == "vehicles" and rawget(_G, "VehicleDataCollector") then
+        VehicleDataCollector._inc = nil
+    elseif name == "fields" and rawget(_G, "FieldDataCollector") then
+        FieldDataCollector._fdCo = nil
+        FieldDataCollector._smState = nil
+    elseif name == "economy" and rawget(_G, "EconomyDataCollector") then
+        EconomyDataCollector._ecoCo = nil
+        EconomyDataCollector._smState = nil
+    elseif name == "production" and rawget(_G, "ProductionDataCollector") then
+        ProductionDataCollector._co = nil
+        ProductionDataCollector._smState = nil
+    elseif name == "animals" and rawget(_G, "AnimalDataCollector") then
+        AnimalDataCollector._iter = nil
+        AnimalDataCollector._co = nil
+    elseif name == "stock" and rawget(_G, "StockDataCollector") then
+        StockDataCollector._inc = nil
+    end
+    self._incActiveModule = nil
+    self._husbandryJob = nil
+end
+
+function FarmDashboardDataCollector:_updateCollectionPauseLatch(deferHeavy)
+    if deferHeavy then
+        if not self._collectionPausedLatch then
+            self._collectionPausedLatch = true
+            if self._incActiveModule or self._husbandryJob then
+                self:_abortActiveIncrementalWork()
+            end
+        end
+    else
+        self._collectionPausedLatch = false
+    end
 end
 
 --- Plan v5 B6+B8+B11: hook called by FarmDashboard:onStartMission to reset stability state.
@@ -1027,6 +1300,9 @@ function FarmDashboardDataCollector:onMissionLoaded()
     local D = rawget(_G, "FarmDashDiagnostics")
     local nowS = (D and D.nowSec and D.nowSec()) or 0
     self._postLoadSilenceUntil = nowS + POST_LOAD_SILENCE_SEC
+    local graceSec = self.config.postLoadCollectionGraceSec or POST_LOAD_COLLECTION_GRACE_SEC
+    self._postLoadCollectionGraceUntil = nowS + graceSec
+    self._collectionPausedLatch = false
 
     -- Re-bootstrap from disk so we know which pens were already covered last session.
     self:_bootstrapDetailLedgerFromDisk()
@@ -1054,6 +1330,42 @@ function FarmDashboardDataCollector:getEnabledCollectorOrder()
         end
     end
     return order
+end
+
+function FarmDashboardDataCollector:_diagEnabled()
+    local D = rawget(_G, "FarmDashDiagnostics")
+    return D and type(D.isEnabled) == "function" and D:isEnabled()
+end
+
+function FarmDashboardDataCollector:_diagNow()
+    local D = rawget(_G, "FarmDashDiagnostics")
+    if D and type(D.nowSec) == "function" then return D.nowSec() end
+    return nil
+end
+
+function FarmDashboardDataCollector:_diagHitchMs()
+    local slice = self.config and self.config.sliceBudgetMs
+    return math.max(8, type(slice) == "number" and slice or 4)
+end
+
+function FarmDashboardDataCollector:_diagMarkHitch(ms)
+    if type(ms) == "number" and ms >= self:_diagHitchMs() then return " HITCH" end
+    return ""
+end
+
+function FarmDashboardDataCollector:_diagTrace(fmt, ...)
+    if not self:_diagEnabled() then return end
+    if FarmDashLog and FarmDashLog.trace then
+        FarmDashLog.trace(fmt, ...)
+    end
+end
+
+function FarmDashboardDataCollector:_cycleFreshCount(order)
+    local n = 0
+    for _, name in ipairs(order) do
+        if self._cycleFresh and self._cycleFresh[name] then n = n + 1 end
+    end
+    return n
 end
 
 function FarmDashboardDataCollector:assembleDataFromModuleCache()
@@ -1224,23 +1536,34 @@ end
 
 --- @return boolean hasIncrementalCollector
 function FarmDashboardDataCollector:collectorSupportsIncremental(name)
+    if not self.coroutinesAvailable and COROUTINE_INCREMENTAL_COLLECTORS[name] then
+        return false
+    end
     local c = self.collectors[name]
     return c ~= nil and type(c.collectBegin) == "function" and type(c.collectStep) == "function"
+end
+
+function FarmDashboardDataCollector:collectorStepUsesCoroutine(name)
+    return self.coroutinesAvailable and COROUTINE_INCREMENTAL_COLLECTORS[name] == true
 end
 
 function FarmDashboardDataCollector:startModuleSlice(name, order)
     if self:collectorSupportsIncremental(name) then
         local c = self.collectors[name]
-        local ok, err = xpcall(function() c:collectBegin() end, function(e)
-            return tostring(e) .. "\n" .. debug.traceback("", 2)
-        end)
+        local t0 = self:_diagNow()
+        local ok, err = pcall(function() c:collectBegin() end)
+        if t0 and self:_diagEnabled() then
+            local ms = (self:_diagNow() - t0) * 1000
+            self:_diagTrace("collectBegin %s ms=%.2f%s", name, ms, self:_diagMarkHitch(ms))
+        end
         if not ok then
-            FarmDashLog.devWarn("collectBegin failed for %s: %s", tostring(name), tostring(err))
+            FarmDashLog.devWarn("collectBegin failed for %s: %s", tostring(name), _farmDashFormatError(err))
             self:runLegacyModuleSlice(name, order)
             return
         end
     end
     self._incActiveModule = name
+    self:_diagTrace("module active %s (incremental)", name)
 end
 
 --- After a module produces fresh data (partial or final), refresh in-memory payload without disk write.
@@ -1260,6 +1583,10 @@ function FarmDashboardDataCollector:finishModuleSlice(name, order, usedIncrement
     end
 
     self._cycleFresh[name] = true
+    self:_diagTrace(
+        "module done %s incremental=%s cycleProgress=%d/%d nextIdx=%d",
+        name, usedIncremental and "yes" or "no", self:_cycleFreshCount(order), n, self.nextSliceIdx or 1
+    )
     self:refreshAssembledInMemory()
     --- refreshAssembledInMemory already ran assembleDataFromModuleCache; avoid a second full merge before JSON defer.
     if self.data and type(self.data) == "table" then
@@ -1273,30 +1600,89 @@ function FarmDashboardDataCollector:tryFlushAfterFullCycle(order)
     for _, n in ipairs(order) do
         if not self._cycleFresh[n] then return end
     end
+    self._diagExportCycle = (self._diagExportCycle or 0) + 1
+    self:_diagTrace("=== export cycle #%d complete — starting cycle tail ===", self._diagExportCycle)
     self._cycleFresh = {}
+    if not self._cycleTailJob then
+        self._cycleTailJob = { order = order, step = 1 }
+    end
+end
 
-    -- Phase 5.2: at the end of each completed cycle, re-evaluate scale and adapt cadence.
-    self:runAdaptiveProbeOnce()
-    -- Re-verify animal mode in case mods changed during the session (e.g. RL hot-reload).
-    if self._animalMode == "unknown" then
-        self:detectAnimalModeOnce()
+--- Spread end-of-cycle housekeeping across frames (adaptive probe, detail rotation, etc.).
+function FarmDashboardDataCollector:cycleTailStep()
+    local job = self._cycleTailJob
+    if not job then return true end
+
+    local tailNames = {
+        "adaptiveProbe", "detectAnimalMode", "pollRequests",
+        "rotateStaleDetails", "sweepTmp", "autoTuner", "primeDirtyPens",
+    }
+    local stepName = tailNames[job.step] or ("step" .. tostring(job.step))
+    local t0 = self:_diagNow()
+
+    if job.step == 1 then
+        self:runAdaptiveProbeOnce()
+        job.step = 2
+    elseif job.step == 2 then
+        if self._animalMode == "unknown" then
+            self:detectAnimalModeOnce()
+        end
+        job.step = 3
+    elseif job.step == 3 then
+        self:_pollRequestsFile()
+        job.step = 4
+    elseif job.step == 4 then
+        self:_rotateStaleDetailsByAge()
+        job.step = 5
+    elseif job.step == 5 then
+        self:_sweepStaleTmpFiles()
+        job.step = 6
+    elseif job.step == 6 then
+        self:_runAutoTunerOnce()
+        job.step = 7
+    elseif job.step == 7 then
+        if not self._primedAfterFirstCycle then
+            self._primedAfterFirstCycle = true
+            self:_primeDirtyPensFromOwnedHusbandries()
+        end
+        self._cycleTailJob = nil
+        if t0 and self:_diagEnabled() then
+            local ms = (self:_diagNow() - t0) * 1000
+            self:_diagTrace("cycleTail %s ms=%.2f%s — tail finished", stepName, ms, self:_diagMarkHitch(ms))
+        end
+        return true
+    else
+        self._cycleTailJob = nil
+        return true
     end
 
-    -- Phase 7: poll the App's requests.json once per cycle and rotate stale details.
-    self:_pollRequestsFile()
-    self:_rotateStaleDetailsByAge()
-
-    -- Plan v5 B4: cleanup any leftover .tmp files from failed atomic renames.
-    self:_sweepStaleTmpFiles()
-
-    -- Plan v5 B10: always-on autotuner (verbose log only when diagnostics enabled).
-    self:_runAutoTunerOnce()
-
-    -- Plan v5 B8: prime the dirty set after the first cycle so the App gets a complete sync.
-    if not self._primedAfterFirstCycle then
-        self._primedAfterFirstCycle = true
-        self:_primeDirtyPensFromOwnedHusbandries()
+    if t0 and self:_diagEnabled() then
+        local ms = (self:_diagNow() - t0) * 1000
+        self:_diagTrace("cycleTail %s ms=%.2f%s", stepName, ms, self:_diagMarkHitch(ms))
     end
+    return false
+end
+
+--- Deferred disk write so JSON string concat and file I/O do not share one frame.
+function FarmDashboardDataCollector:jsonDiskWriteStep()
+    local pending = self._jsonPendingDisk
+    if not pending then return true end
+
+    local t0 = self:_diagNow()
+    local bytes = pending.jsonString and #pending.jsonString or 0
+    self:_writeJsonStringToDisk(pending.jsonString, pending.savegameDir)
+    self._jsonPendingDisk = nil
+    if t0 and self:_diagEnabled() then
+        local ms = (self:_diagNow() - t0) * 1000
+        self:_diagTrace("jsonDiskWrite bytes=%d ms=%.2f%s", bytes, ms, self:_diagMarkHitch(ms))
+    end
+
+    if self._jsonWritePending then
+        local p = self._jsonWritePending
+        self._jsonWritePending = nil
+        self:beginDeferredJsonWrite(p)
+    end
+    return true
 end
 
 --- Plan v5 B8: rebuild _detailLedger from disk by reading the first 1 KiB of each
@@ -1433,31 +1819,51 @@ function FarmDashboardDataCollector:runIncrementalActiveStep(order)
     end
 
     local opts = {
-        batchSize = self.config.fieldsPerFrame or 8,
-        animalBatch = self.config.animalsPerFrame or 2,
-        baleBudget = self.config.baleEntitiesBudget or 48,
-        vehicleBatch = self.config.vehiclesPerFrame or 12,
-        economyYieldStride = self.config.economyYieldStride or 55,
-        productionChainsPerYield = self.config.productionChainsPerYield or 2,
-        productionPlaceablesPerYield = self.config.productionPlaceablesPerYield or 10,
-        stockPlaceablesPerFrame = self.config.stockPlaceablesPerFrame or 4,
-        balePlaceablesPerFrame = self.config.stockPlaceablesPerFrame or 6,
+        batchSize = self.config.fieldsPerFrame or 1,
+        animalBatch = self.config.animalsPerFrame or 1,
+        baleBudget = self.config.baleEntitiesBudget or 8,
+        baleWorldEntitiesPerFrame = self.config.baleWorldEntitiesPerFrame or 8,
+        vehicleBatch = self.config.vehiclesPerFrame or 2,
+        financeVehiclesPerFrame = self.config.financeVehiclesPerFrame or 4,
+        redTapeFarmsPerFrame = self.config.redTapeFarmsPerFrame or 1,
+        economyYieldStride = self.config.economyYieldStride or 20,
+        productionChainsPerYield = self.config.productionChainsPerYield or 1,
+        productionPlaceablesPerYield = self.config.productionPlaceablesPerYield or 4,
+        stockPlaceablesPerFrame = self.config.stockPlaceablesPerFrame or 3,
+        balePlaceablesPerFrame = self.config.stockPlaceablesPerFrame or 3,
         --- Phase 2: row-count caps as primary safety net + opportunistic wall-clock budget.
         animalRowsPerSlice = arps,
         sliceBudgetMs = sliceMs,
     }
 
-    local results = { xpcall(function() return c:collectStep(opts) end, function(e)
-        return tostring(e) .. "\n" .. debug.traceback("", 2)
-    end) }
-    local ok = results[1]
-    if not ok then
-        FarmDashLog.devWarn("collectStep failed for %s: %s", tostring(name), tostring(results[2]))
-        self.moduleCache[name] = {}
-        self:finishModuleSlice(name, order, true)
-        return
+    local collectTok = D and D:start("collectStep_" .. name)
+    local stepTok = self:_diagNow()
+    local done, payload
+    if self:collectorStepUsesCoroutine(name) then
+        -- coroutine.resume/yield must not cross pcall/xpcall — call collectStep directly.
+        done, payload = c:collectStep(opts)
+    else
+        local ok, stepErr = pcall(function()
+            done, payload = c:collectStep(opts)
+        end)
+        if not ok then
+            if collectTok and D then D:stop(collectTok) end
+            FarmDashLog.devWarn("collectStep failed for %s: %s", tostring(name), _farmDashFormatError(stepErr))
+            self.moduleCache[name] = {}
+            self:finishModuleSlice(name, order, true)
+            return
+        end
     end
-    local done, payload = results[2], results[3]
+    if collectTok and D then D:stop(collectTok) end
+    if stepTok and self:_diagEnabled() then
+        local ms = (self:_diagNow() - stepTok) * 1000
+        self:_diagTrace(
+            "collectStep %s done=%s ms=%.2f frameDt=%.2fms%s",
+            name, tostring(done), ms,
+            D and D.lastUpdateDtMs or 0,
+            self:_diagMarkHitch(ms)
+        )
+    end
 
     if name == "production" and done then
         local prod = payload or {}
@@ -1482,7 +1888,13 @@ end
 
 --- Legacy synchronous collect for one module name.
 function FarmDashboardDataCollector:runLegacyModuleSlice(name, order)
+    self:_diagTrace("legacy collect start %s", name)
+    local t0 = self:_diagNow()
     local result = self:safeCollect(name)
+    if t0 and self:_diagEnabled() then
+        local ms = (self:_diagNow() - t0) * 1000
+        self:_diagTrace("legacy collect done %s ms=%.2f%s", name, ms, self:_diagMarkHitch(ms))
+    end
     if name == "production" then
         local prod = result or {}
         self.moduleCache.production = prod
@@ -1507,13 +1919,25 @@ function FarmDashboardDataCollector:consumeOneModuleSlot(order)
     local idx = self.nextSliceIdx or 1
     if idx > n then idx = 1 end
     local name = order[idx]
+    local cycleMs = self.config.collectionCycleMs or 60000
+    local slotMs = cycleMs / n
+
+    if self:_cycleFreshCount(order) == 0 and not self._incActiveModule then
+        self._diagSlotCycle = (self._diagSlotCycle or 0) + 1
+        self:_diagTrace(
+            "=== slot cycle #%d begin modules=%d slotMs=%.0f cycleMs=%d order=%s ===",
+            self._diagSlotCycle, n, slotMs, cycleMs, table.concat(order, ",")
+        )
+    end
 
     if self:collectorSupportsIncremental(name) then
+        self:_diagTrace("slot #%d/%d start %s (incremental)", idx, n, name)
         self:startModuleSlice(name, order)
         --- First collectStep runs next frame (update drain) so slot boundary does not stack collectBegin + collectStep in one frame.
         return
     end
 
+    self:_diagTrace("slot #%d/%d start %s (legacy)", idx, n, name)
     self:runLegacyModuleSlice(name, order)
 end
 
@@ -1561,20 +1985,34 @@ function FarmDashboardDataCollector:_updateBody(dt)
     local order = self:getEnabledCollectorOrder()
     local n = #order
     local cycleMs = self.config.collectionCycleMs
+    local deferHeavy = self:shouldDeferCollectionWork(dt)
+    self:_updateCollectionPauseLatch(deferHeavy)
 
-    --- Drain incremental / husbandry / deferred JSON even when effDt<=0 (pause, menu, zero-dt ticks).
-    --- Otherwise mid-flight work never advances and data.json can stall permanently behind _jsonWriteJob.
-    if self._incActiveModule then
-        self:runIncrementalActiveStep(order)
-    end
-    if self._husbandryJob then
-        self:husbandryTotalsStep()
-    end
+    --- One engine work unit per frame: JSON serialize, disk write, cycle tail, or collector step.
+    local frameWorkDone = false
+
     if self._jsonWriteJob then
         self:jsonWriteStep()
+        frameWorkDone = true
+    elseif self._jsonPendingDisk then
+        self:jsonDiskWriteStep()
+        frameWorkDone = true
+    elseif self._cycleTailJob then
+        self:cycleTailStep()
+        frameWorkDone = true
     end
 
-    if self._incActiveModule or self._husbandryJob or self._jsonWriteJob then
+    if not deferHeavy and not frameWorkDone then
+        if self._incActiveModule then
+            self:runIncrementalActiveStep(order)
+            frameWorkDone = true
+        elseif self._husbandryJob then
+            self:husbandryTotalsStep()
+            frameWorkDone = true
+        end
+    end
+
+    if self._incActiveModule or self._husbandryJob or self._jsonWriteJob or self._jsonPendingDisk or self._cycleTailJob then
         return
     end
 
@@ -1609,6 +2047,10 @@ function FarmDashboardDataCollector:_updateBody(dt)
     local slotMs = cycleMs / n
 
     if not self.staggerFirstRunDone then
+        if deferHeavy then
+            self:_maybeProcessDetailQueueTail()
+            return
+        end
         self.staggerFirstRunDone = true
         self.nextSliceIdx = 1
         self.slotAccumulator = 0
@@ -1620,12 +2062,18 @@ function FarmDashboardDataCollector:_updateBody(dt)
     self.slotAccumulator = (self.slotAccumulator or 0) + effDt
     --- At most one inter-module slot per engine tick to avoid multi-collector spikes in a single frame.
     if self.slotAccumulator >= slotMs then
-        self.slotAccumulator = self.slotAccumulator - slotMs
-        self:consumeOneModuleSlot(order)
+        if deferHeavy then
+            self.slotAccumulator = math.min(self.slotAccumulator, slotMs)
+        else
+            self.slotAccumulator = self.slotAccumulator - slotMs
+            self:consumeOneModuleSlot(order)
+        end
     end
 
-    -- Phase 7: one cooperative detail write per frame after main work (does not block stagger).
-    self:_maybeProcessDetailQueueTail()
+    -- Phase 7: one cooperative detail write per frame when no collector/JSON work ran this tick.
+    if not frameWorkDone then
+        self:_maybeProcessDetailQueueTail()
+    end
 end
 
 --- Runs after stagger / slot logic. At most one pen per tick; refreshes index when the queue drains.
@@ -1714,6 +2162,8 @@ function FarmDashboardDataCollector:husbandryTotalsStep()
     local per = self.config.husbandryPlaceablesPerFrame or 3
     local n = #job.list
     local hi = math.min(job.idx + per - 1, n)
+    local fromIdx = job.idx
+    local t0 = self:_diagNow()
     for i = job.idx, hi do
         local ok, err = pcall(function()
             self:accumulateHusbandryTotalsForPlaceable(job.list[i], job.totalsByFarm)
@@ -1723,6 +2173,13 @@ function FarmDashboardDataCollector:husbandryTotalsStep()
         end
     end
     job.idx = hi + 1
+    if t0 and self:_diagEnabled() then
+        local ms = (self:_diagNow() - t0) * 1000
+        self:_diagTrace(
+            "husbandryTotals %d-%d/%d ms=%.2f%s",
+            fromIdx, hi, n, ms, self:_diagMarkHitch(ms)
+        )
+    end
     if job.idx > n then
         if self.moduleCache.production then
             local activeFarmId = self:getActiveFarmId()
@@ -1795,6 +2252,7 @@ function FarmDashboardDataCollector:beginDeferredJsonWrite(data)
     -- latest snapshot and apply it when the current job finishes.
     if self._jsonWriteJob then
         self._jsonWritePending = data
+        self:_diagTrace("jsonWrite deferred (job in flight)")
         return
     end
 
@@ -1810,6 +2268,7 @@ function FarmDashboardDataCollector:beginDeferredJsonWrite(data)
         i = 1,
         parts = { "{\n" },
     }
+    self:_diagTrace("jsonWrite begin keys=%d keysPerFrame=%d", #keys, self.config.jsonTopLevelKeysPerFrame or 1)
 end
 
 function FarmDashboardDataCollector:jsonWriteStep()
@@ -1820,16 +2279,10 @@ function FarmDashboardDataCollector:jsonWriteStep()
     local tok = (diag and diag:isEnabled()) and diag:start("jsonWriteStep") or nil
 
     local nk = #job.keys
-    local basePer = math.max(1, self.config.jsonTopLevelKeysPerFrame or 1)
-    -- Typical data.json has < 32 top-level keys. Flushing the whole object in one step avoids
-    -- multi-frame stalls and reduces chances of a second beginDeferred clobbering the job.
-    local per = basePer
-    if nk <= 48 then
-        per = math.max(basePer, nk - job.i + 1)
-    else
-        per = math.min(20, basePer)
-    end
+    local per = math.max(1, self.config.jsonTopLevelKeysPerFrame or 1)
     local parts = job.parts
+    local stepStart = job.i
+    local stepTok = self:_diagNow()
     for _ = 1, per do
         if job.i > nk then break end
         local k = job.keys[job.i]
@@ -1840,9 +2293,7 @@ function FarmDashboardDataCollector:jsonWriteStep()
 
         local okJson, err = xpcall(function()
             self:_toJSONInto(parts, v, false, 1)
-        end, function(e)
-            return tostring(e) .. "\n" .. debug.traceback("", 2)
-        end)
+        end, _farmDashFormatError)
         if not okJson then
             FarmDashLog.devWarn("json chunk toJSON failed for key '%s': %s", tostring(k), tostring(err))
             parts[#parts + 1] = "null"
@@ -1858,22 +2309,31 @@ function FarmDashboardDataCollector:jsonWriteStep()
         local jsonString = table.concat(parts)
         self._lastJsonBytes = #jsonString
         local savegameDir = self:getSavegameDirName()
-        self:_writeJsonStringToDisk(jsonString, savegameDir)
+        self._jsonPendingDisk = { jsonString = jsonString, savegameDir = savegameDir }
         self._jsonWriteJob = nil
         if diag and tok then diag:stop(tok) end
-        -- Apply the latest queued snapshot (if another slice finished while we were serializing).
-        -- Do not recurse into jsonWriteStep here: same-frame tail recursion could stack-deep if many
-        -- snapshots queued; the next update() tick will run jsonWriteStep again immediately while
-        -- _jsonWriteJob is set (still processed before stagger work returns early).
-        if self._jsonWritePending then
-            local p = self._jsonWritePending
-            self._jsonWritePending = nil
-            self:beginDeferredJsonWrite(p)
+        if stepTok and self:_diagEnabled() then
+            local ms = (self:_diagNow() - stepTok) * 1000
+            self:_diagTrace(
+                "jsonWrite complete bytes=%d ms=%.2f%s",
+                #jsonString, ms, self:_diagMarkHitch(ms)
+            )
         end
         return true
     end
 
     if diag and tok then diag:stop(tok) end
+    if stepTok and self:_diagEnabled() then
+        local ms = (self:_diagNow() - stepTok) * 1000
+        local keyList = {}
+        for i = stepStart, math.min(job.i - 1, nk) do
+            keyList[#keyList + 1] = job.keys[i]
+        end
+        self:_diagTrace(
+            "jsonWrite step keys=%d/%d [%s] ms=%.2f%s",
+            job.i - 1, nk, table.concat(keyList, ","), ms, self:_diagMarkHitch(ms)
+        )
+    end
     return false
 end
 
@@ -2409,9 +2869,7 @@ function FarmDashboardDataCollector:_writePenDetail(penKey)
     local detail
     local ok, err = xpcall(function()
         detail = AnimalDataCollector:collectPenDetail(placeable)
-    end, function(e)
-        return tostring(e) .. "\n" .. debug.traceback("", 2)
-    end)
+    end, _farmDashFormatError)
     if not ok or not detail then
         FarmDashLog.devWarn("pen detail collection failed for key=%s: %s", tostring(penKey), tostring(err))
         return false
@@ -2596,7 +3054,12 @@ function FarmDashboardDataCollector:processDetailQueueOnce()
 
     self._dirtyPens[penKey] = nil
     self._dirtyPensCount = math.max(0, (self._dirtyPensCount or 0) - 1)
+    local t0 = self:_diagNow()
     self:_writePenDetail(penKey)
+    if t0 and self:_diagEnabled() then
+        local ms = (self:_diagNow() - t0) * 1000
+        self:_diagTrace("penDetail %s ms=%.2f%s", tostring(penKey), ms, self:_diagMarkHitch(ms))
+    end
 
     return next(self._dirtyPens) ~= nil
 end

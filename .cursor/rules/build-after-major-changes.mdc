@@ -1,0 +1,51 @@
+---
+description: Run release builds after major FarmHub changes (mod + app)
+alwaysApply: true
+---
+
+# Build after major changes
+
+After **major** edits to FarmHub (features, mod collectors, app packaging, version bumps, or pre-release/tester handoff), run a full release build and confirm artifacts in the final output folder.
+
+## When to build
+
+Run `npm run build:all` when changes touch any of:
+
+- `FS25_FarmDashboard_Mod/` (Lua mod, `modDesc.xml`, collectors)
+- `FS25_FarmDashboard_App/` (Electron app, `main.js`, web UI shipped in the installer)
+- Root `package.json` version or `build` / publish config
+- Release docs that reference new app/mod versions
+
+Skip for docs-only typo fixes, comments, or isolated test-only changes with no release impact.
+
+## Command
+
+From repo root:
+
+```bash
+npm run build:all
+```
+
+Equivalent: `npm run package:mod` then `npm run build:app`.
+
+## Output location
+
+Artifacts go to **`%USERPROFILE%\Documents\FarmDash Final Output`** (override: env `FARMDASH_BUILD_OUTPUT`).
+
+Expect after a successful dist:
+
+| File | Required for release |
+|------|----------------------|
+| `FS25_FarmDashboard.zip` | Yes (mod) |
+| `FS25-Farm-Dashboard-Setup-<version>.exe` | Yes (app) |
+| `latest.yml` | Yes (auto-update) |
+
+## Agent workflow
+
+When completing a major change set:
+
+1. Run `npm run build:all` (allow several minutes on Windows).
+2. Verify the three files above exist in FarmDash Final Output.
+3. Tell the user the output path and filenames; do not commit installers to git.
+
+If the build fails, fix the blocker before marking the task done.

@@ -39,7 +39,11 @@ end
 D.nowSec = nowSec
 
 function D:setEnabled(flag)
+    local was = self.enabled
     self.enabled = flag and true or false
+    if self.enabled and not was and FarmDashLog and FarmDashLog.trace then
+        FarmDashLog.trace("diagnostics ON — tracing each collector step, JSON write, and cycle tail (filter log: [trace])")
+    end
     if not self.enabled then
         -- Plan v5 B10: preserve always-on buckets so the autotuner keeps a valid histogram
         -- when verbose diagnostics are turned off mid-session.
@@ -210,6 +214,19 @@ function D:maybeDump(ctx)
     end
     if ctx and ctx.lastFullAgeSec then
         parts[#parts + 1] = string.format("lastFullAge=%ds", math.floor(ctx.lastFullAgeSec))
+    end
+
+    for bucketName, _ in pairs(self.buckets) do
+        if string.sub(bucketName, 1, 12) == "collectStep_" then
+            local st = self:bucketStats(bucketName)
+            if st and st.count > 0 then
+                parts[#parts + 1] = string.format(
+                    "%s=%.2f/%.2fms",
+                    string.sub(bucketName, 13),
+                    st.median, st.p99 or st.max
+                )
+            end
+        end
     end
 
     local line = table.concat(parts, " ")

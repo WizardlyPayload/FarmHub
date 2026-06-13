@@ -286,12 +286,13 @@ end
 
 --- Optional FS25_AdvancedDamageSystem (spec_AdvancedDamageSystem). Aggregate-only; no maintenance log dump.
 function VehicleDataCollector:_serializeAdsData(vehicle)
-    local spec = vehicle and vehicle.spec_AdvancedDamageSystem
-    if not spec or spec.isExcludedVehicle then
-        return nil
-    end
+    local ok, ads = pcall(function()
+        local spec = vehicle and vehicle.spec_AdvancedDamageSystem
+        if not spec or spec.isExcludedVehicle then
+            return nil
+        end
 
-    local ads = { enabled = true }
+        local ads = { enabled = true }
 
     ads.condition = self:_round3(self:_clamp01(spec.conditionLevel))
     ads.serviceLevel = self:_round3(self:_clamp01(spec.serviceLevel))
@@ -400,6 +401,8 @@ function VehicleDataCollector:_serializeAdsData(vehicle)
     end
 
     return ads
+    end)
+    return ok and ads or nil
 end
 
 function VehicleDataCollector:isVehicleYearsLoaded()
@@ -544,6 +547,22 @@ function VehicleDataCollector:ensureVehicleTable()
     return _G.g_currentMission.vehicles
 end
 
+--- Best-effort liveness check before touching specs on a multi-frame snapshot entry.
+function VehicleDataCollector:_isVehicleAlive(vehicle)
+    if vehicle == nil then return false end
+    local ok, alive = pcall(function()
+        if type(vehicle.getIsDeleted) == "function" then
+            return vehicle:getIsDeleted() ~= true
+        end
+        if vehicle.rootNode and type(entityExists) == "function" then
+            return entityExists(vehicle.rootNode)
+        end
+        if vehicle.rootNode then return true end
+        return vehicle.id ~= nil
+    end)
+    return ok and alive == true
+end
+
 function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
     local vData = {}
 
@@ -579,26 +598,34 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
     end
 
     if vehicle.spec_motorized then
-        vData.isMotorized = true
-        vData.engineOn = vehicle.spec_motorized.isMotorStarted or false
-
-        if vehicle.spec_motorized.consumersByFillTypeName then
-            local diesel = vehicle.spec_motorized.consumersByFillTypeName["DIESEL"]
-            if diesel then
-                vData.fuelLevel = diesel.fillLevel or 0
-                vData.fuelCapacity = diesel.capacity or 0
-            else
-                vData.fuelLevel = 0
-                vData.fuelCapacity = 0
+        local okMotor, motorData = pcall(function()
+            local motor = vehicle.spec_motorized
+            local out = { isMotorized = true, engineOn = motor.isMotorStarted or false, fuelLevel = 0, fuelCapacity = 0, speed = 0 }
+            if motor.consumersByFillTypeName then
+                local diesel = motor.consumersByFillTypeName["DIESEL"]
+                if diesel then
+                    out.fuelLevel = diesel.fillLevel or 0
+                    out.fuelCapacity = diesel.capacity or 0
+                end
             end
-        end
-
-        vData.speed = 0
-        if vehicle.getLastSpeed then
-            local success, speed = pcall(function() return vehicle:getLastSpeed() end)
-            if success and speed then
-                vData.speed = speed
+            if vehicle.getLastSpeed then
+                local okSpd, speed = pcall(function() return vehicle:getLastSpeed() end)
+                if okSpd and speed then out.speed = speed end
             end
+            return out
+        end)
+        if okMotor and motorData then
+            vData.isMotorized = motorData.isMotorized
+            vData.engineOn = motorData.engineOn
+            vData.fuelLevel = motorData.fuelLevel
+            vData.fuelCapacity = motorData.fuelCapacity
+            vData.speed = motorData.speed
+        else
+            vData.isMotorized = true
+            vData.engineOn = false
+            vData.fuelLevel = 0
+            vData.fuelCapacity = 0
+            vData.speed = 0
         end
     else
         vData.isMotorized = false
@@ -609,25 +636,31 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
     end
 
     vData.fillLevels = {}
-    if vehicle.spec_fillUnit and vehicle.spec_fillUnit.fillUnits then
-        for _, fillUnit in pairs(vehicle.spec_fillUnit.fillUnits) do
-            if fillUnit.fillType and fillUnit.fillLevel and fillUnit.capacity then
-                local fillTypeName = "unknown"
-                if _G.g_fillTypeManager and _G.g_fillTypeManager.getFillTypeNameByIndex then
-                    local success, name = pcall(function()
-                        return _G.g_fillTypeManager:getFillTypeNameByIndex(fillUnit.fillType)
-                    end)
-                    if success and name then
-                        fillTypeName = name
+    local okFill, fillLevels = pcall(function()
+        local levels = {}
+        if vehicle.spec_fillUnit and vehicle.spec_fillUnit.fillUnits then
+            for _, fillUnit in pairs(vehicle.spec_fillUnit.fillUnits) do
+                if fillUnit.fillType and fillUnit.fillLevel and fillUnit.capacity then
+                    local fillTypeName = "unknown"
+                    if _G.g_fillTypeManager and _G.g_fillTypeManager.getFillTypeNameByIndex then
+                        local success, name = pcall(function()
+                            return _G.g_fillTypeManager:getFillTypeNameByIndex(fillUnit.fillType)
+                        end)
+                        if success and name then
+                            fillTypeName = name
+                        end
                     end
+                    levels[fillTypeName] = {
+                        level = fillUnit.fillLevel,
+                        capacity = fillUnit.capacity
+                    }
                 end
-
-                vData.fillLevels[fillTypeName] = {
-                    level = fillUnit.fillLevel,
-                    capacity = fillUnit.capacity
-                }
             end
         end
+        return levels
+    end)
+    if okFill and type(fillLevels) == "table" then
+        vData.fillLevels = fillLevels
     end
 
     vData.damage = 0
@@ -647,28 +680,34 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
     end
 
     vData.vehicleType = "unknown"
-    if vehicle.spec_motorized then
-        vData.vehicleType = "motorized"
-    elseif vehicle.spec_trailer then
-        vData.vehicleType = "trailer"
-    elseif vehicle.spec_harvester then
-        vData.vehicleType = "harvester"
-    elseif vehicle.spec_sprayer then
-        vData.vehicleType = "sprayer"
-    elseif vehicle.spec_spreader then
-        vData.vehicleType = "spreader"
-    elseif vehicle.spec_cultivator then
-        vData.vehicleType = "cultivator"
-    elseif vehicle.spec_plow then
-        vData.vehicleType = "plow"
-    elseif vehicle.spec_sowingMachine then
-        vData.vehicleType = "seeder"
-    elseif vehicle.spec_attachable then
-        vData.vehicleType = "implement"
+    local okType, vehicleType = pcall(function()
+        if vehicle.spec_motorized then
+            return "motorized"
+        elseif vehicle.spec_trailer then
+            return "trailer"
+        elseif vehicle.spec_harvester then
+            return "harvester"
+        elseif vehicle.spec_sprayer then
+            return "sprayer"
+        elseif vehicle.spec_spreader then
+            return "spreader"
+        elseif vehicle.spec_cultivator then
+            return "cultivator"
+        elseif vehicle.spec_plow then
+            return "plow"
+        elseif vehicle.spec_sowingMachine then
+            return "seeder"
+        elseif vehicle.spec_attachable then
+            return "implement"
+        end
+        return "unknown"
+    end)
+    if okType and vehicleType then
+        vData.vehicleType = vehicleType
     end
 
-    local ads = self:_serializeAdsData(vehicle)
-    if ads then
+    local okAds, ads = pcall(function() return self:_serializeAdsData(vehicle) end)
+    if okAds and ads then
         vData.ads = ads
         if ads.condition ~= nil then
             vData.damage = 1 - ads.condition
@@ -720,7 +759,15 @@ function VehicleDataCollector:collectStep(opts)
     local n = #st.list
     local hi = math.min(st.idx + batch - 1, n)
     for i = st.idx, hi do
-        table.insert(st.out, self:_serializeVehicle(st.list[i], i))
+        local vehicle = st.list[i]
+        if self:_isVehicleAlive(vehicle) then
+            local ok, row = pcall(function() return self:_serializeVehicle(vehicle, i) end)
+            if ok and row then
+                table.insert(st.out, row)
+            elseif not ok and FarmDashLog and FarmDashLog.devWarn then
+                FarmDashLog.devWarn("VehicleDataCollector: skip vehicle %s: %s", tostring(i), tostring(row))
+            end
+        end
     end
     st.idx = hi + 1
 

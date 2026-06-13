@@ -396,14 +396,12 @@ function InventoryScan.bestFieldKeyForBaleAtXZ(x, z, fieldGeometries)
     return bestKey
 end
 
---- Loose world bales: on registered field geometry vs yards/sheds (FieldDataCollector parity).
-function InventoryScan.scanLooseWorldBales(baleState, farmIds)
+--- Shared runtime for loose-world bale scans (sync + incremental).
+local function _buildLooseBaleScanRuntime(baleState, farmIds)
     local m = _mission()
     local fm = _G.g_farmlandManager
-    if not baleState or not m or not fm or type(fm.getFarmlandAtWorldPosition) ~= "function" then return end
-
-    if rawget(_G, "FillTypeUtils") and FillTypeUtils.rebuildCatalog then
-        FillTypeUtils.rebuildCatalog()
+    if not baleState or not m or not fm or type(fm.getFarmlandAtWorldPosition) ~= "function" then
+        return nil
     end
 
     local playerFarmSet = {}
@@ -516,7 +514,6 @@ function InventoryScan.scanLooseWorldBales(baleState, farmIds)
         local mount = rawget(it, "mountObject")
         if mount ~= nil then
             if type(mount) == "table" then
-                --- Auto bale storage / sheds are counted via StockDataCollector placeable scan.
                 if mount.spec_objectStorage then return false end
                 if mount.spec_baleStorage or mount.spec_bales or mount.spec_heapSpawner then
                     return true
@@ -575,72 +572,190 @@ function InventoryScan.scanLooseWorldBales(baleState, farmIds)
         tallyWorldBale(it)
     end
 
-    local itemSys = m.itemSystem
-    local items = nil
-    if itemSys and type(itemSys.getItems) == "function" then
-        local ok, r = pcall(function() return itemSys:getItems() end)
-        if ok and type(r) == "table" then items = r end
-    end
-    if items == nil and itemSys and type(itemSys.items) == "table" then
-        items = itemSys.items
-    end
-    if type(items) == "table" then
-        for _, it in pairs(items) do tryBale(it) end
-    end
-    if itemSys and type(itemSys.itemsToSave) == "table" then
-        for _, wrap in pairs(itemSys.itemsToSave) do
-            local it = wrap
-            if type(wrap) == "table" then it = rawget(wrap, "item") or wrap end
-            tryBale(it)
+    local function nodeObjectLikelyBale(obj)
+        if type(obj) ~= "table" then return false end
+        local cn = rawget(obj, "className")
+        if type(cn) == "string" then
+            local u = string.upper(cn)
+            if u == "BALE" or string.find(u, "BALE", 1, true) then return true end
         end
+        return rawget(obj, "baleType") or rawget(obj, "isRoundBale") or rawget(obj, "isSquareBale")
     end
 
-    local bm = rawget(_G, "g_baleManager")
-    local list = nil
-    if bm then
-        if type(bm.getBales) == "function" then
-            local ok, r = pcall(function() return bm:getBales() end)
-            if ok and r ~= nil then list = r end
-        elseif type(bm.bales) == "table" then
-            list = bm.bales
+    return {
+        m = m,
+        tryBale = tryBale,
+        nodeObjectLikelyBale = nodeObjectLikelyBale,
+    }
+end
+
+local LOOSE_BALE_SOURCES = { "items", "itemsToSave", "baleMgr", "slot", "btc", "nodeObjects" }
+
+function InventoryScan.newLooseBaleScanContext(farmIds)
+    return {
+        farmIds = farmIds,
+        rt = nil,
+        sourceIdx = 1,
+        listData = {},
+        listPos = {},
+        listBuilt = {},
+        enumState = {},
+    }
+end
+
+--- Process up to `budget` bale entities; returns true when scan complete.
+function InventoryScan.scanLooseWorldBalesStep(ctx, baleState, budget)
+    if not ctx or not baleState then return true end
+    budget = math.max(1, tonumber(budget) or 8)
+
+    if not ctx.rt then
+        if rawget(_G, "FillTypeUtils") and FillTypeUtils.rebuildCatalog then
+            FillTypeUtils.rebuildCatalog()
         end
-    end
-    if type(list) == "table" then
-        for _, b in pairs(list) do tryBale(b, true) end
+        ctx.rt = _buildLooseBaleScanRuntime(baleState, ctx.farmIds)
+        if not ctx.rt then return true end
     end
 
-    local SlotSystem = rawget(_G, "SlotSystem")
-    if SlotSystem and m.slotSystem and m.slotSystem.objectLimits then
-        local lim = m.slotSystem.objectLimits[SlotSystem.LIMITED_OBJECT_BALE]
-        if lim and type(lim.objects) == "table" then
-            for _, b in pairs(lim.objects) do tryBale(b, true) end
-        end
-    end
+    local rt = ctx.rt
+    local m = rt.m
+    local spent = 0
 
-    local btc = rawget(_G, "g_baleToCollectManager")
-    if btc and type(btc.getBales) == "function" then
-        local okBtc, bl = pcall(function() return btc:getBales() end)
-        if okBtc and type(bl) == "table" then
-            for _, b in pairs(bl) do tryBale(b, true) end
-        end
-    end
+    while spent < budget do
+        local src = LOOSE_BALE_SOURCES[ctx.sourceIdx]
+        if not src then return true end
 
-    if type(m.nodeToObject) == "table" then
-        for _, obj in pairs(m.nodeToObject) do
-            if type(obj) == "table" then
-                local likely = false
-                local cn = rawget(obj, "className")
-                if type(cn) == "string" then
-                    local u = string.upper(cn)
-                    if u == "BALE" or string.find(u, "BALE", 1, true) then likely = true end
+        if not ctx.listBuilt[src] then
+            local enum = ctx.enumState[src]
+            if not enum then
+                enum = { keys = nil, keyIdx = 1, pairKey = nil, done = false }
+                if src == "items" then
+                    local itemSys = m.itemSystem
+                    local items = nil
+                    if itemSys and type(itemSys.getItems) == "function" then
+                        local ok, r = pcall(function() return itemSys:getItems() end)
+                        if ok and type(r) == "table" then items = r end
+                    end
+                    if items == nil and itemSys and type(itemSys.items) == "table" then
+                        items = itemSys.items
+                    end
+                    enum.tableRef = items
+                elseif src == "itemsToSave" then
+                    enum.tableRef = m.itemSystem and m.itemSystem.itemsToSave
+                elseif src == "baleMgr" then
+                    local bm = rawget(_G, "g_baleManager")
+                    if bm then
+                        if type(bm.getBales) == "function" then
+                            local ok, r = pcall(function() return bm:getBales() end)
+                            if ok and r ~= nil then enum.tableRef = r end
+                        elseif type(bm.bales) == "table" then
+                            enum.tableRef = bm.bales
+                        end
+                    end
+                elseif src == "slot" then
+                    local SlotSystem = rawget(_G, "SlotSystem")
+                    if SlotSystem and m.slotSystem and m.slotSystem.objectLimits then
+                        local lim = m.slotSystem.objectLimits[SlotSystem.LIMITED_OBJECT_BALE]
+                        if lim and type(lim.objects) == "table" then
+                            enum.tableRef = lim.objects
+                        end
+                    end
+                elseif src == "btc" then
+                    local btc = rawget(_G, "g_baleToCollectManager")
+                    if btc and type(btc.getBales) == "function" then
+                        local okBtc, bl = pcall(function() return btc:getBales() end)
+                        if okBtc and type(bl) == "table" then enum.tableRef = bl end
+                    end
+                elseif src == "nodeObjects" then
+                    enum.tableRef = type(m.nodeToObject) == "table" and m.nodeToObject
                 end
-                if not likely and (rawget(obj, "baleType") or rawget(obj, "isRoundBale") or rawget(obj, "isSquareBale")) then
-                    likely = true
+                ctx.enumState[src] = enum
+                ctx.listData[src] = {}
+            end
+
+            if enum.done or not enum.tableRef then
+                ctx.listBuilt[src] = true
+                ctx.listPos[src] = 1
+                ctx.sourceIdx = ctx.sourceIdx + 1
+            else
+                local list = ctx.listData[src]
+                if not enum.seenKeys then enum.seenKeys = {} end
+                local added = 0
+                local cap = math.min(budget - spent, 32)
+
+                if src == "itemsToSave" then
+                    for _, wrap in pairs(enum.tableRef) do
+                        if added >= cap then break end
+                        local it = wrap
+                        if type(wrap) == "table" then it = rawget(wrap, "item") or wrap end
+                        local dk = tostring(it)
+                        if not enum.seenKeys[dk] then
+                            enum.seenKeys[dk] = true
+                            list[#list + 1] = { it = it, assume = false }
+                            added = added + 1
+                        end
+                    end
+                    if added < cap then enum.done = true end
+                elseif src == "nodeObjects" then
+                    for _, obj in pairs(enum.tableRef) do
+                        if added >= cap then break end
+                        local dk = tostring(obj)
+                        if not enum.seenKeys[dk] then
+                            enum.seenKeys[dk] = true
+                            if rt.nodeObjectLikelyBale(obj) then
+                                list[#list + 1] = { it = obj, assume = false }
+                                added = added + 1
+                            end
+                        end
+                    end
+                    if added < cap then enum.done = true end
+                else
+                    for _, it in pairs(enum.tableRef) do
+                        if added >= cap then break end
+                        local dk = tostring(it)
+                        if not enum.seenKeys[dk] then
+                            enum.seenKeys[dk] = true
+                            local assume = src ~= "items"
+                            list[#list + 1] = { it = it, assume = assume }
+                            added = added + 1
+                        end
+                    end
+                    if added < cap then enum.done = true end
                 end
-                if likely then tryBale(obj) end
+
+                if enum.done then
+                    ctx.listBuilt[src] = true
+                    ctx.listPos[src] = 1
+                    ctx.sourceIdx = ctx.sourceIdx + 1
+                end
+                spent = spent + math.max(1, added)
+                if spent >= budget then return false end
+            end
+        else
+            local list = ctx.listData[src] or {}
+            local pos = ctx.listPos[src] or 1
+            while pos <= #list and spent < budget do
+                local entry = list[pos]
+                if entry and entry.it then
+                    rt.tryBale(entry.it, entry.assume)
+                end
+                pos = pos + 1
+                spent = spent + 1
+            end
+            ctx.listPos[src] = pos
+            if pos > #list then
+                ctx.sourceIdx = ctx.sourceIdx + 1
+            else
+                return false
             end
         end
     end
+    return false
+end
+
+--- Loose world bales: on registered field geometry vs yards/sheds (FieldDataCollector parity).
+function InventoryScan.scanLooseWorldBales(baleState, farmIds)
+    local ctx = InventoryScan.newLooseBaleScanContext(farmIds)
+    while not InventoryScan.scanLooseWorldBalesStep(ctx, baleState, 99999) do end
 end
 
 --- TSStockCheck objectStorage object → fillTypeIndex, fillLevel, baleCount.

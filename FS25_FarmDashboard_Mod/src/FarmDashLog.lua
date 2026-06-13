@@ -26,3 +26,20 @@ function FarmDashLog.devWarn(fmt, ...)
         Logging.warning("[FarmDash] " .. tostring(fmt))
     end
 end
+
+--- Per-frame collector / cycle trace (diagnostics only). Prefix [trace] for log filtering.
+function FarmDashLog.trace(fmt, ...)
+    if not FarmDashLog.isVerbose() then return end
+    if select("#", ...) > 0 and type(fmt) == "string" then
+        Logging.info("[FarmDash][trace] " .. string.format(fmt, ...))
+    else
+        Logging.info("[FarmDash][trace] " .. tostring(fmt))
+    end
+end
+
+--- Always logged (not gated by diagnostics). MP clients never run collectors.
+function FarmDashLog.warnNoAuthorityTrace()
+    Logging.warning(
+        "[FarmDash] Diagnostics enabled on multiplayer CLIENT — collector trace only runs on single-player, host, or dedicated server. Check the server log.txt for [FarmDash][trace] lines."
+    )
+end

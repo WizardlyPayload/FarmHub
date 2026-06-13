@@ -737,6 +737,18 @@ function buildVehicleYearsPanelHtml(vehicle) {
 }
 
 export function showVehiclesSection() {
+  const sectionShell = document.getElementById("section-content");
+  const dyn = document.getElementById("section-content-dynamic");
+  if (dyn?.querySelector("#vehicles-grid")) {
+    if (sectionShell) {
+      sectionShell.classList.add("farm-glass-page--vehicles");
+      sectionShell.classList.remove("d-none");
+    }
+    this.bindVehiclesScrollPerf();
+    this.loadVehicles();
+    return;
+  }
+
   const vehiclesHTML = `
             <div class="row mb-4">
                 <div class="col-12 text-center">
@@ -896,7 +908,6 @@ export function showVehiclesSection() {
         `;
 
   document.getElementById("section-content-dynamic").innerHTML = vehiclesHTML;
-  const sectionShell = document.getElementById("section-content");
   if (sectionShell) {
     sectionShell.classList.add("farm-glass-page--vehicles");
     sectionShell.classList.remove("d-none");
@@ -1318,6 +1329,29 @@ export function getLocalVehicleImage(vehicleName, brandName, typeName, hints) {
   return null;
 }
 
+function buildCuratedFuzzyImagePool(
+  curatedAll,
+  vehicleNameNorm,
+  brandNameNorm,
+  directCompactMatch
+) {
+  const fromDirect = curatedAll.filter(directCompactMatch);
+  if (fromDirect.length > 0) return fromDirect;
+  if (!vehicleNameNorm && !brandNameNorm) return [];
+
+  const prefix = vehicleNameNorm.slice(0, 4);
+  const pool = curatedAll.filter((img) => {
+    if (brandNameNorm && img.brandNorm && img.brandNorm.includes(brandNameNorm)) {
+      return true;
+    }
+    if (prefix.length >= 3 && img.modelNorm && img.modelNorm.includes(prefix)) {
+      return true;
+    }
+    return false;
+  });
+  return pool.length > 300 ? pool.slice(0, 300) : pool;
+}
+
 // Dynamic image matching using fuzzy search
 export function findVehicleImageDynamic(vehicleName, brandName, typeName) {
   // Enhanced normalization function
@@ -1709,19 +1743,27 @@ export function findVehicleImageDynamic(vehicleName, brandName, typeName) {
     return modResult.bestMatch.path;
   }
 
-  curatedResult = scoreVehicleImageCache(
+  const curatedFuzzyPool = buildCuratedFuzzyImagePool(
     curatedAll,
     vehicleNameNorm,
     brandNameNorm,
-    typeNameNorm,
-    vehicleName,
-    MIN_SCORE_FUZZY_CURATED
+    directCompactMatch
   );
-  if (curatedResult.bestMatch && curatedResult.bestScore >= MIN_SCORE_FUZZY_CURATED) {
-    console.log(
-      `[LocalImage] Dynamic match (fuzzy): ${vehicleName} -> ${curatedResult.bestMatch.filename} (score: ${curatedResult.bestScore})`
+  if (curatedFuzzyPool.length > 0) {
+    curatedResult = scoreVehicleImageCache(
+      curatedFuzzyPool,
+      vehicleNameNorm,
+      brandNameNorm,
+      typeNameNorm,
+      vehicleName,
+      MIN_SCORE_FUZZY_CURATED
     );
-    return curatedResult.bestMatch.path;
+    if (curatedResult.bestMatch && curatedResult.bestScore >= MIN_SCORE_FUZZY_CURATED) {
+      console.log(
+        `[LocalImage] Dynamic match (fuzzy): ${vehicleName} -> ${curatedResult.bestMatch.filename} (score: ${curatedResult.bestScore})`
+      );
+      return curatedResult.bestMatch.path;
+    }
   }
 
   return null;
@@ -2165,6 +2207,25 @@ export function getBrandImageUrl(brandImagePath, brandName) {
 
 // Vehicle Management Methods
 export async function loadVehicles() {
+  const farmId = window.dashboard?.activeFarmId || this.activeFarmId || 1;
+  const grid = document.getElementById("vehicles-grid");
+  const canPaintFromMemory =
+    grid &&
+    !grid.querySelector(".vehicle-card") &&
+    Array.isArray(this.vehicles) &&
+    this.vehicles.length > 0;
+
+  if (canPaintFromMemory) {
+    const merged = this.vehicles.filter((v) => vehicleMatchesActiveFarm(v, farmId));
+    this.vehicles = merged;
+    this.updateVehicleSummaryCards();
+    if (typeof this.applyVehicleFilters === "function") {
+      this.applyVehicleFilters();
+    } else {
+      this.renderVehicleCards(this.vehicles);
+    }
+  }
+
   try {
     const base =
       typeof window !== "undefined" && window.dashboard?.getAPIBaseURL
@@ -2173,18 +2234,23 @@ export async function loadVehicles() {
     const response = await fetch(`${base}/api/vehicles`);
     if (response.ok) {
       const allVehicles = await response.json();
-      // Filter to only show player-owned vehicles (ownerFarmId: 1)
-      this.vehicles = allVehicles
-        ? allVehicles.filter((v) =>
-            vehicleMatchesActiveFarm(v, window.dashboard?.activeFarmId || 1)
-          )
+      const filtered = allVehicles
+        ? allVehicles.filter((v) => vehicleMatchesActiveFarm(v, farmId))
         : [];
+      const displayVehicles = filtered.filter((v) => !this.isStorageItem(v));
+      const nextFp = vehicleListUiFingerprint(displayVehicles);
+      const sameFleet =
+        nextFp === this._lastVehicleCardsFingerprint &&
+        filtered.length === (this.vehicles?.length ?? 0);
+
+      this.vehicles = filtered;
       this.updateVehicleSummaryCards();
-      // Re-apply dropdown/summary filters so refresh does not reset the view
-      if (typeof this.applyVehicleFilters === "function") {
-        this.applyVehicleFilters();
-      } else {
-        this.renderVehicleCards(this.vehicles);
+      if (!sameFleet) {
+        if (typeof this.applyVehicleFilters === "function") {
+          this.applyVehicleFilters();
+        } else {
+          this.renderVehicleCards(this.vehicles);
+        }
       }
     } else {
       console.error("Failed to load vehicles:", response.statusText);
@@ -2277,10 +2343,30 @@ export function renderVehicleCards(vehicles) {
   }
   this._lastVehicleCardsFingerprint = fingerprint;
 
-  const cards = displayVehicles
-    .map((vehicle) => this.createVehicleCard(vehicle))
-    .join("");
-  grid.innerHTML = cards;
+  if (this._vehicleCardsRenderRaf) {
+    cancelAnimationFrame(this._vehicleCardsRenderRaf);
+    this._vehicleCardsRenderRaf = 0;
+  }
+
+  const BATCH = 8;
+  let index = 0;
+  grid.innerHTML = "";
+
+  const renderBatch = () => {
+    if (index >= displayVehicles.length) {
+      this._vehicleCardsRenderRaf = 0;
+      return;
+    }
+    const slice = displayVehicles.slice(index, index + BATCH);
+    index += BATCH;
+    grid.insertAdjacentHTML(
+      "beforeend",
+      slice.map((vehicle) => this.createVehicleCard(vehicle)).join("")
+    );
+    this._vehicleCardsRenderRaf = requestAnimationFrame(renderBatch);
+  };
+
+  this._vehicleCardsRenderRaf = requestAnimationFrame(renderBatch);
 }
 
 export function createVehicleCard(vehicle) {

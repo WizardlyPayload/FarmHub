@@ -1,4 +1,4 @@
-# Dependencies
+﻿# Dependencies
 node_modules/
 .venv/
 venv/
@@ -29,7 +29,7 @@ desktop.ini
 *.swp
 *.swo
 
-# Giants FS game data extract (huge; keep local only — do not sync to GitHub)
+# Giants FS game data extract (huge; keep local only â€” do not sync to GitHub)
 dataS_py_extracted/
 dataS_py_extract/
 
@@ -41,19 +41,20 @@ FS25_FarmDashboard_App/web/assests/img/items_mod_extract/*
 # (uncomment if you prefer never to commit installers)
 # *.exe
 
-# Marketing site (local / VPS � not pushed to GitHub)
+# Marketing site (local / VPS ï¿½ not pushed to GitHub)
 Website/
 
-# Realistic Livestock mod (local reference only � third-party; do not push to GitHub)
-FS25_RealisticLivestockRM/
-FS25_AdvancedDamageSystem/
-FS25_Vehicle_Years/
-FS25_MoistureSystem/
-FS25_RedTape/
-FS25_TSStockCheck/
-# Built mod zip � produce via tools/Zip-FarmDashboardMod.ps1
+# Third-party FS25 mods (local reference / compat testing — do not push to GitHub)
+FS25_*/
+!FS25_FarmDashboard_App/
+!FS25_FarmDashboard_Mod/
+
+# Built mod zip — produce via tools/Zip-FarmDashboardMod.ps1
 FS25_FarmDashboard_Mod/FS25_FarmDashboard.zip
 
-# Local agent secrets (VPS SSH � never commit)
+# Built mod zip — produce via tools/Zip-FarmDashboardMod.ps1
+FS25_FarmDashboard_Mod/FS25_FarmDashboard.zip
+
+# Local agent secrets (VPS SSH — never commit)
 .cursor/secrets/
 

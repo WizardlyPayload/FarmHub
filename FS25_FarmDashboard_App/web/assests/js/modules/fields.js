@@ -12,8 +12,6 @@ import {
     MIN_FORAGE_WORKFLOW_LITERS,
     nitrogenTargetForDisplay,
     PF_NUTRIENT_CLOSE_FRAC,
-    WEED_ALERT_THRESHOLD_PCT,
-    weedPercentForDisplay,
 } from "../rules-engine.js";
 import {
     refreshFieldRulesCache,
@@ -829,37 +827,6 @@ function buildConditions(field) {
         phLabel = field.needsLime ? t("fields.limeNeededSoil") : t("fields.limeOk");
     }
 
-    const weedPct = weedPercentForDisplay(field);
-    const weedThr = Number(field.weedAlertThresholdPct) || WEED_ALERT_THRESHOLD_PCT;
-    const showWeeds = weedPct > 0 || field.needsWeeding === true;
-    let weedProgress = 0;
-    let weedColour = "#198754";
-    let weedLabel = t("fields.weedLevelLow", { pct: weedPct, threshold: weedThr });
-    if (showWeeds) {
-        const ratio = weedThr > 0 ? weedPct / weedThr : 0;
-        weedProgress = Math.min(100, ratio * 100);
-        if (weedPct >= weedThr || field.needsWeeding) {
-            weedColour = "#dc3545";
-            weedLabel = t("fields.weedLevelAlert", { pct: weedPct, threshold: weedThr });
-        } else if (weedPct >= weedThr * 0.6) {
-            weedColour = "#fd7e14";
-            weedLabel = t("fields.weedLevelModerate", { pct: weedPct, threshold: weedThr });
-        } else if (weedPct >= weedThr * 0.3) {
-            weedColour = "#ffc107";
-            weedLabel = t("fields.weedLevelRising", { pct: weedPct, threshold: weedThr });
-        }
-    }
-
-    const weedRow = showWeeds
-        ? `<div class="col-12 mt-2">
-                <small class="text-muted">${escapeFieldHtml(t("fields.soilWeeds"))}</small><br>
-                <strong style="color:${weedColour};font-size:0.8rem;">${escapeFieldHtml(weedLabel)}</strong>
-                <div class="progress mt-1" style="height:4px;background:#2c2c2c;">
-                    <div class="progress-bar" style="width:${weedProgress}%;background:${weedColour};"></div>
-                </div>
-            </div>`
-        : "";
-
     return `
         <div class="row g-2">
             <div class="col-6">
@@ -876,7 +843,6 @@ function buildConditions(field) {
                     <div class="progress-bar" style="width:${phProgress}%;background:${phColour};"></div>
                 </div>
             </div>
-            ${weedRow}
         </div>`;
 }
 

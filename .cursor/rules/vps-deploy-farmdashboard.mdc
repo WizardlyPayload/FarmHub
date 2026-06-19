@@ -1,0 +1,20 @@
+---
+description: VPS deploy for farmdashboard.co.uk (testers downloads, site files). Read local secrets file for SSH — never commit credentials.
+alwaysApply: false
+---
+
+# farmdashboard.co.uk VPS deploy
+
+When the user asks to upload builds, update the testers page, or deploy `Website/` assets:
+
+1. Read **`.cursor/secrets/farmdashboard-vps.env`** (gitignored) for host, user, paths, and local build output folder.
+2. **Never** put passwords in rules, docs, commits, or PRs. Do not echo credentials in terminal output.
+3. **Testers files** go to `VPS_TESTERS_FILES` (typically `/var/www/farmdashboard/t/fs25-beta/files/`):
+   - `FS25-Farm-Dashboard-Setup-*.exe` from `LOCAL_BUILD_DIR`
+   - `FS25_FarmDashboard.zip` (mod)
+4. **Site assets** from gitignored `Website/` map per `Website/README.md` (css, js, `t/fs25-beta/index.html`).
+5. Large installer (~800MB): prefer **`wget` on the server** from GitHub Releases if available; otherwise `scp`/`WinSCP`. VPS inbound is often ~5–7 Mbps.
+6. Avoid `Install-Module Posh-SSH` in Cursor terminal (NuGet prompts hang). Use external PowerShell, `plink`, or server-side `wget`.
+7. If SSH user `hank` fails, try `VPS_USER_ALT` from the env file.
+
+After deploy, remind user that nginx/Cloudflare must protect `/t/fs25-beta/*` (not just the page password).

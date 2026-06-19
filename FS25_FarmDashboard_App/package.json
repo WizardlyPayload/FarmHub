@@ -1,6 +1,7 @@
 {
   "name": "fs25-farm-dashboard",
-  "version": "4.1.0",
+  "version": "4.1.1",
+  "license": "SEE LICENSE IN LICENSE",
   "description": "Real-time Farm Management Dashboard for FS25",
   "author": "JoshWalki / Wizardlypayload & WizardlyPayload",
   "main": "main.js",
@@ -100,7 +101,10 @@
     "win": {
       "target": "nsis",
       "icon": "icon.ico",
-      "artifactName": "FS25-Farm-Dashboard-Setup-${version}.${ext}"
+      "artifactName": "FS25-Farm-Dashboard-Setup-${version}.${ext}",
+      "publisherName": "JoshWalki / WizardlyPayload",
+      "signDlls": true,
+      "rfc3161TimeStampServer": "http://timestamp.digicert.com"
     },
     "nsis": {
       "oneClick": false,

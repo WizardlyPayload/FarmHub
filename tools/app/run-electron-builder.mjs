@@ -39,6 +39,22 @@ const result = spawnSync(process.execPath, args, {
     env: process.env,
 });
 
+const signingConfigured =
+    process.env.CSC_LINK ||
+    process.env.WIN_CSC_LINK ||
+    process.env.CSC_LINK_BASE64;
+if (mode === 'dist') {
+    console.error('');
+    if (signingConfigured) {
+        console.error('[FarmDash] Code signing: CSC_LINK / WIN_CSC_LINK detected — electron-builder will sign the installer.');
+    } else {
+        console.error('[FarmDash] Code signing: NOT configured (no CSC_LINK / WIN_CSC_LINK).');
+        console.error('           Windows SmartScreen will show "Unknown publisher" until you sign with an Authenticode cert.');
+        console.error('           See tools/app/WINDOWS_CODE_SIGNING.md');
+    }
+    console.error('');
+}
+
 const code = result.status === null ? 1 : result.status;
 if (code === 0) {
     console.error('');

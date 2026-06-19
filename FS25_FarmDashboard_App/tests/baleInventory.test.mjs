@@ -59,6 +59,34 @@ test("buildFillTypeCatalog infers TRITICALE at 182 when RYE/SPELT neighbors exis
   assert.equal(catalog["182"], "TRITICALE");
 });
 
+test("supplement onField prefers field totals when economy scan is partial", () => {
+  const inv = supplementOnFieldFromFields(
+    {
+      byFarm: {
+        "1": {
+          onField: { straw: 0, grass: 0, hay: 0, silage: 0, other: 9, byFillType: {} },
+          inStorage: { straw: 0, grass: 0, hay: 49, silage: 44, other: 3, byFillType: {} },
+        },
+      },
+    },
+    [
+      {
+        ownerFarmId: 1,
+        baleCountOnField: 40,
+        baleOnFieldByCategory: { straw: 0, grass: 0, hay: 40, silage: 0, other: 0, byFillType: {} },
+      },
+      {
+        ownerFarmId: 1,
+        baleCountOnField: 20,
+        baleOnFieldByCategory: { straw: 20, grass: 0, hay: 0, silage: 0, other: 0, byFillType: {} },
+      },
+    ]
+  );
+  assert.equal(inv.byFarm["1"].onField.hay, 40);
+  assert.equal(inv.byFarm["1"].onField.straw, 20);
+  assert.equal(inv.byFarm["1"].inStorage.hay, 49);
+});
+
 test("supplement onField does not double-count when baleInventory already has on-field rows", () => {
   const inv = supplementOnFieldFromFields(
     {

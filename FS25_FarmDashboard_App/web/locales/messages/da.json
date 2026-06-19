@@ -572,7 +572,6 @@
   "settings.aboutAuthorJosh": "JoshWalki (Josh) — original Farm Dashboard-idé, kerne FS25-mod og det første live browser-dashboard",
   "settings.aboutAuthorWizardly": "WizardlyPayload — Windows-desktopapp og FarmHub-fortsættelse: hostede og multiplayer-gårde, dybere mark- og gård-arbejdsgange, sikkerhed, oversættelser og løbende udgivelser",
   "settings.aboutLicenseTitle": "Licens",
-  "settings.aboutLicenseBody": "Copyright © JoshWalki og WizardlyPayload. Alle rettigheder forbeholdes. Denne software er beskyttet; der gives ingen licens til at kopiere, ændre eller distribuere uden skriftlig tilladelse.",
   "settings.aboutGiantsNote": "Farming Simulator 25 og relateret spilindhold er varemærker tilhørende GIANTS Software. Ikke tilknyttet GIANTS.",
   "settings.aboutLinksTitle": "Links",
   "settings.aboutLinkGithub": "GitHub",
@@ -1406,5 +1405,6 @@
   "moisture.grade.poor": "Dårlig",
   "moisture.grade.wet": "Våd",
   "moisture.rot.rotting": "Rådnende",
-  "moisture.rot.gettingwet": "At blive våd"
+  "moisture.rot.gettingwet": "At blive våd",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

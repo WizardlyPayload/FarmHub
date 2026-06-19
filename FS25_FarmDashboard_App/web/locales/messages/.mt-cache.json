@@ -30866,5 +30866,6 @@
   "6730fead52b3c9e4c31f13af31c770820f767798|uk": "Немає аргументів на користь продавця.",
   "7efceec775ced80687d36c3191cd63b20881b258|uk": "на 1000 л",
   "0778dacc93f050f3d3080070bc8ea278ea68fe82|uk": "Показати місця зберігання",
-  "bebfa51d6012cf0f0917995d24f0dbedc35c929e|uk": "Приховати місця зберігання"
+  "bebfa51d6012cf0f0917995d24f0dbedc35c929e|uk": "Приховати місця зберігання",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

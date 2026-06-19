@@ -55,15 +55,50 @@ function FinanceDataCollector:collectStep(opts)
     end
 
     if st.stage == "vehicles_enum" then
+        local dc = rawget(_G, "FarmDashboardDataCollector")
+        if dc and dc.usesCourseplayIncrementalFleet and dc:usesCourseplayIncrementalFleet() then
+            local veh = dc.moduleCache and dc.moduleCache.vehicles
+            if type(veh) == "table" then
+                for _, row in ipairs(veh) do
+                    fd.vehicles.count = fd.vehicles.count + 1
+                    local price = tonumber(row and row.price) or 0
+                    fd.vehicles.totalValue = fd.vehicles.totalValue + price
+                end
+            end
+            fd.totalAssets = fd.money + fd.vehicles.totalValue
+            fd.netWorth = fd.totalAssets - fd.loan
+            FinanceDataCollector._inc = nil
+            return true, fd
+        end
+        if dc and ((dc.shouldSkipLiveFleetScan and dc:shouldSkipLiveFleetScan())
+            or (dc.mayScanLiveFleet and not dc:mayScanLiveFleet())) then
+            local cached = dc.moduleCache and dc.moduleCache.finance
+            if cached then
+                FinanceDataCollector._inc = nil
+                return true, cached
+            end
+            fd.totalAssets = fd.money
+            fd.netWorth = fd.money - fd.loan
+            FinanceDataCollector._inc = nil
+            return true, fd
+        end
         local added = 0
-        if _G.g_currentMission and _G.g_currentMission.vehicles then
-            for _, vehicle in pairs(_G.g_currentMission.vehicles) do
-                if added >= vpf then break end
-                local dk = tostring(vehicle)
-                if not st.vehicleEnumSeen[dk] then
-                    st.vehicleEnumSeen[dk] = true
-                    st.vehicleList[#st.vehicleList + 1] = vehicle
-                    added = added + 1
+        if _G.g_currentMission then
+            local vehicles = _G.g_currentMission.vehicles
+            if not vehicles and _G.g_currentMission.vehicleSystem then
+                vehicles = _G.g_currentMission.vehicleSystem.vehicles
+            end
+            if vehicles then
+                for _, vehicle in pairs(vehicles) do
+                    if added >= vpf then break end
+                    if type(vehicle.getOwnerFarmId) == "function" and type(vehicle.getName) == "function" then
+                        local dk = tostring(vehicle)
+                        if not st.vehicleEnumSeen[dk] then
+                            st.vehicleEnumSeen[dk] = true
+                            st.vehicleList[#st.vehicleList + 1] = vehicle
+                            added = added + 1
+                        end
+                    end
                 end
             end
             if added < vpf then

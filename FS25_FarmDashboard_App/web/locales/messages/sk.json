@@ -572,7 +572,6 @@
   "settings.aboutAuthorJosh": "JoshWalki (Josh) — pôvodný nápad na Farm Dashboard, základný mod pre FS25 a prvý živý dashboard pre prehliadač",
   "settings.aboutAuthorWizardly": "WizardlyPayload — desktopová aplikácia pre Windows a pokračovanie FarmHub: hostované a multiplayerové farmy, hlbšie pracovné postupy na poliach a farmách, zabezpečenie, preklady a prebiehajúce vydania",
   "settings.aboutLicenseTitle": "Licencia",
-  "settings.aboutLicenseBody": "Autorské práva © JoshWalki a WizardlyPayload. Všetky práva vyhradené. Tento softvér je proprietárny; na kopírovanie, úpravu alebo distribúciu bez písomného súhlasu sa neudeľuje žiadna licencia.",
   "settings.aboutGiantsNote": "Farming Simulator 25 a súvisiaci herný obsah sú ochranné známky spoločnosti GIANTS Software. Nie sú prepojené so spoločnosťou GIANTS.",
   "settings.aboutLinksTitle": "Odkazy",
   "settings.aboutLinkGithub": "GitHub",
@@ -1406,5 +1405,6 @@
   "moisture.grade.poor": "Chudobný",
   "moisture.grade.wet": "Mokré",
   "moisture.rot.rotting": "Hnijúci",
-  "moisture.rot.gettingwet": "Zmoknutie"
+  "moisture.rot.gettingwet": "Zmoknutie",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

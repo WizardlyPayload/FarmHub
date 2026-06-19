@@ -572,7 +572,6 @@
   "settings.aboutAuthorJosh": "JoshWalki (Josh) – originali ūkio prietaisų skydelio idėja, pagrindinė FS25 modifikacija ir pirmasis tiesioginis naršyklės prietaisų skydelis",
   "settings.aboutAuthorWizardly": "„WizardlyPayload“ – „Windows“ darbalaukio programėlė ir „FarmHub“ tęsinys: talpinami ir kelių žaidėjų ūkiai, išsamesni lauko ir ūkių darbo eigos, saugumas, vertimai ir nuolat atnaujinami leidimai",
   "settings.aboutLicenseTitle": "Licencija",
-  "settings.aboutLicenseBody": "Autorių teisės © JoshWalki ir WizardlyPayload. Visos teisės saugomos. Ši programinė įranga yra patentuota; be raštiško leidimo nesuteikiama jokia licencija kopijuoti, modifikuoti ar platinti.",
   "settings.aboutGiantsNote": "„Farming Simulator 25“ ir susijęs žaidimo turinys yra „GIANTS Software“ prekių ženklai. Nesusijęs su „GIANTS“.",
   "settings.aboutLinksTitle": "Nuorodos",
   "settings.aboutLinkGithub": "GitHub",
@@ -1406,5 +1405,6 @@
   "moisture.grade.poor": "Prastas",
   "moisture.grade.wet": "Šlapia",
   "moisture.rot.rotting": "Pūvantis",
-  "moisture.rot.gettingwet": "Sušlapti"
+  "moisture.rot.gettingwet": "Sušlapti",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

@@ -572,7 +572,6 @@
   "settings.aboutAuthorJosh": "JoshWalki (Josh) — oryginalny pomysł na Farm Dashboard, główny mod FS25 i pierwszy pulpit nawigacyjny w przeglądarce na żywo",
   "settings.aboutAuthorWizardly": "WizardlyPayload — aplikacja na komputery stacjonarne dla systemu Windows i kontynuacja FarmHub: farmy hostowane i wieloosobowe, bardziej szczegółowe przepływy pracy w terenie i na farmie, bezpieczeństwo, tłumaczenia i bieżące wydania",
   "settings.aboutLicenseTitle": "Licencja",
-  "settings.aboutLicenseBody": "Copyright © JoshWalki i WizardlyPayload. Wszelkie prawa zastrzeżone. To oprogramowanie jest zastrzeżone; nie udziela się licencji na kopiowanie, modyfikowanie ani rozpowszechnianie bez pisemnej zgody.",
   "settings.aboutGiantsNote": "Farming Simulator 25 i powiązane treści z gry są znakami towarowymi GIANTS Software. Nie są powiązane z GIANTS.",
   "settings.aboutLinksTitle": "Spinki do mankietów",
   "settings.aboutLinkGithub": "GitHub",
@@ -1406,5 +1405,6 @@
   "moisture.grade.poor": "Słaby",
   "moisture.grade.wet": "Mokry",
   "moisture.rot.rotting": "Gnicie",
-  "moisture.rot.gettingwet": "Zmoczenie"
+  "moisture.rot.gettingwet": "Zmoczenie",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

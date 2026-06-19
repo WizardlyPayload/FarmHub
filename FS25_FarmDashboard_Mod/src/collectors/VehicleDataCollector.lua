@@ -533,23 +533,28 @@ function VehicleDataCollector:cleanupTypeName(typeName)
     return cleaned
 end
 
+--- Read-only: never assign into g_currentMission.vehicles (can disturb buy/spawn on DS).
 function VehicleDataCollector:ensureVehicleTable()
     if not _G.g_currentMission then return nil end
-    if not _G.g_currentMission.vehicles then
-        if _G.g_currentMission.vehicleSystem and _G.g_currentMission.vehicleSystem.vehicles then
-            _G.g_currentMission.vehicles = _G.g_currentMission.vehicleSystem.vehicles
-        elseif _G.g_currentMission.ownedVehicles then
-            _G.g_currentMission.vehicles = _G.g_currentMission.ownedVehicles
-        else
-            return nil
-        end
+    if _G.g_currentMission.vehicles then
+        return _G.g_currentMission.vehicles
     end
-    return _G.g_currentMission.vehicles
+    if _G.g_currentMission.vehicleSystem and _G.g_currentMission.vehicleSystem.vehicles then
+        return _G.g_currentMission.vehicleSystem.vehicles
+    end
+    if _G.g_currentMission.ownedVehicles then
+        return _G.g_currentMission.ownedVehicles
+    end
+    return nil
 end
 
 --- Best-effort liveness check before touching specs on a multi-frame snapshot entry.
 function VehicleDataCollector:_isVehicleAlive(vehicle)
     if vehicle == nil then return false end
+    -- Skip half-spawned entries (AccessHandler / Courseplay expect full vehicle methods).
+    if type(vehicle.getOwnerFarmId) ~= "function" or type(vehicle.getName) ~= "function" then
+        return false
+    end
     local ok, alive = pcall(function()
         if type(vehicle.getIsDeleted) == "function" then
             return vehicle:getIsDeleted() ~= true
@@ -733,7 +738,85 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
     return vData
 end
 
+function VehicleDataCollector:_cacheRowKey(row)
+    if row == nil then return nil end
+    if row.id ~= nil then return "id:" .. tostring(row.id) end
+    return string.format("n:%s:f:%s", tostring(row.name or ""), tostring(row.ownerFarmId or 0))
+end
+
+function VehicleDataCollector:upsertVehicleInCache(vehicle)
+    if not self:_isVehicleAlive(vehicle) then return end
+    local dc = rawget(_G, "FarmDashboardDataCollector")
+    if not dc then return end
+    local ok, row = pcall(function() return self:_serializeVehicle(vehicle, 0) end)
+    if not ok or type(row) ~= "table" then return end
+    local list = dc.moduleCache.vehicles
+    if type(list) ~= "table" then
+        list = {}
+        dc.moduleCache.vehicles = list
+    end
+    local key = self:_cacheRowKey(row)
+    local replaced = false
+    for i, existing in ipairs(list) do
+        if self:_cacheRowKey(existing) == key then
+            list[i] = row
+            replaced = true
+            break
+        end
+    end
+    if not replaced then
+        table.insert(list, row)
+    end
+end
+
+function VehicleDataCollector:removeVehicleFromCache(vehicle)
+    local dc = rawget(_G, "FarmDashboardDataCollector")
+    if not dc then return end
+    local list = dc.moduleCache.vehicles
+    if type(list) ~= "table" then return end
+    local id = vehicle and vehicle.id
+    for i = #list, 1, -1 do
+        local row = list[i]
+        if row and id ~= nil and row.id == id then
+            table.remove(list, i)
+        end
+    end
+end
+
+function VehicleDataCollector:refreshIncrementalCacheRows()
+    local dc = rawget(_G, "FarmDashboardDataCollector")
+    if not dc or type(dc.usesCourseplayIncrementalFleet) ~= "function" then return end
+    local okInc, incremental = pcall(function() return dc:usesCourseplayIncrementalFleet() end)
+    if not okInc or incremental ~= true then return end
+
+    local list = dc.moduleCache and dc.moduleCache.vehicles
+    if type(list) ~= "table" or #list == 0 then return end
+
+    local vehicles = self:ensureVehicleTable()
+    if not vehicles then return end
+
+    local byId = {}
+    for _, vehicle in pairs(vehicles) do
+        if vehicle and vehicle.id then byId[vehicle.id] = vehicle end
+    end
+    for _, row in ipairs(list) do
+        local vehicle = row and row.id and byId[row.id]
+        if vehicle and self:_isVehicleAlive(vehicle) then
+            self:upsertVehicleInCache(vehicle)
+        end
+    end
+end
+
 function VehicleDataCollector:collectBegin()
+    local dc = rawget(_G, "FarmDashboardDataCollector")
+    if dc and dc.shouldSkipLiveFleetScan and dc:shouldSkipLiveFleetScan() then
+        VehicleDataCollector._inc = { skipLive = true }
+        return
+    end
+    if dc and dc.mayScanLiveFleet and not dc:mayScanLiveFleet() then
+        VehicleDataCollector._inc = { skipLive = true }
+        return
+    end
     VehicleDataCollector._inc = { list = {}, idx = 1, out = {} }
     local st = VehicleDataCollector._inc
     local vehicles = self:ensureVehicleTable()
@@ -742,7 +825,9 @@ function VehicleDataCollector:collectBegin()
         return
     end
     for _, vehicle in pairs(vehicles) do
-        table.insert(st.list, vehicle)
+        if self:_isVehicleAlive(vehicle) then
+            table.insert(st.list, vehicle)
+        end
     end
 end
 
@@ -750,6 +835,13 @@ end
 function VehicleDataCollector:collectStep(opts)
     local st = VehicleDataCollector._inc
     if not st then return true, {} end
+    if st.skipLive then
+        VehicleDataCollector._inc = nil
+        local dc = rawget(_G, "FarmDashboardDataCollector")
+        self:refreshIncrementalCacheRows()
+        local cached = dc and dc.moduleCache and dc.moduleCache.vehicles
+        return true, cached or {}
+    end
     if st.empty then
         VehicleDataCollector._inc = nil
         return true, {}
@@ -779,14 +871,22 @@ function VehicleDataCollector:collectStep(opts)
 end
 
 function VehicleDataCollector:collect()
+    local dc = rawget(_G, "FarmDashboardDataCollector")
+    if dc and ((dc.shouldSkipLiveFleetScan and dc:shouldSkipLiveFleetScan())
+        or (dc.mayScanLiveFleet and not dc:mayScanLiveFleet())) then
+        local cached = dc.moduleCache and dc.moduleCache.vehicles
+        return cached or {}
+    end
     local vehicleData = {}
     local vehicles = self:ensureVehicleTable()
     if not vehicles then return vehicleData end
 
     local vehicleCount = 0
     for _, vehicle in pairs(vehicles) do
-        vehicleCount = vehicleCount + 1
-        table.insert(vehicleData, self:_serializeVehicle(vehicle, vehicleCount))
+        if self:_isVehicleAlive(vehicle) then
+            vehicleCount = vehicleCount + 1
+            table.insert(vehicleData, self:_serializeVehicle(vehicle, vehicleCount))
+        end
     end
 
     return vehicleData

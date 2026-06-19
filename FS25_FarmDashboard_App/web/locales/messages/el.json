@@ -572,7 +572,6 @@
   "settings.aboutAuthorJosh": "JoshWalki (Josh) — πρωτότυπη ιδέα για το Farm Dashboard, βασική τροποποίηση FS25 και ο πρώτος ζωντανός πίνακας ελέγχου προγράμματος περιήγησης",
   "settings.aboutAuthorWizardly": "WizardlyPayload — Εφαρμογή για υπολογιστές Windows και συνέχεια FarmHub: φιλοξενούμενα και πολυπαίκτικα αγροκτήματα, ροές εργασίας βαθύτερου πεδίου και αγροκτημάτων, ασφάλεια, μεταφράσεις και τρέχουσες εκδόσεις",
   "settings.aboutLicenseTitle": "Αδεια",
-  "settings.aboutLicenseBody": "Πνευματικά δικαιώματα © JoshWalki και WizardlyPayload. Με επιφύλαξη παντός δικαιώματος. Αυτό το λογισμικό είναι ιδιόκτητο. Δεν παρέχεται άδεια αντιγραφής, τροποποίησης ή διανομής χωρίς γραπτή άδεια.",
   "settings.aboutGiantsNote": "Το Farming Simulator 25 και το σχετικό περιεχόμενο του παιχνιδιού είναι εμπορικά σήματα της GIANTS Software. Δεν συνδέεται με την GIANTS.",
   "settings.aboutLinksTitle": "Εδαφος διά παιγνίδι γκολφ",
   "settings.aboutLinkGithub": "GitHub",
@@ -1406,5 +1405,6 @@
   "moisture.grade.poor": "Φτωχός",
   "moisture.grade.wet": "Υγρός",
   "moisture.rot.rotting": "Σάπισμα",
-  "moisture.rot.gettingwet": "Βρέχομαι"
+  "moisture.rot.gettingwet": "Βρέχομαι",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

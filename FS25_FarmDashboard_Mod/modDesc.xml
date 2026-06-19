@@ -2,7 +2,7 @@
 <!-- FS25 FarmDashboard | modDesc.xml | v3.0.0 -->
 <modDesc descVersion="109">
     <author>JoshWalki / WizardlyPayload</author>
-    <version>3.2.8.0</version>
+    <version>3.3.20.0</version>
     
     <title>
         <en>Farm Dashboard</en>
@@ -100,6 +100,8 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/FarmDashboardSettingsMenu.lua"/>
         <sourceFile filename="src/FarmDashboardSettingsGui.lua"/>
         <sourceFile filename="src/FarmDashboard.lua"/>
+        <sourceFile filename="src/FarmDashboardVehicleShopGuard.lua"/>
+        <sourceFile filename="src/FarmDashboardCourseplayCompat.lua"/>
         <sourceFile filename="src/FarmDashLog.lua"/>
         <sourceFile filename="src/FillTypeUtils.lua"/>
         <sourceFile filename="src/InventoryScan.lua"/>

@@ -572,7 +572,6 @@
   "settings.aboutAuthorJosh": "JoshWalki (Josh) — l-idea oriġinali tad-Dashboard tal-Farm, il-mod ewlieni tal-FS25, u l-ewwel dashboard tal-browser live",
   "settings.aboutAuthorWizardly": "WizardlyPayload — App tad-desktop tal-Windows u kontinwazzjoni ta' FarmHub: irziezet ospitati u multiplayer, flussi tax-xogħol aktar profondi fuq l-għelieqi u l-irziezet, sigurtà, traduzzjonijiet, u rilaxxi kontinwi",
   "settings.aboutLicenseTitle": "Liċenzja",
-  "settings.aboutLicenseBody": "Drittijiet tal-awtur © JoshWalki u WizardlyPayload. Id-drittijiet kollha riżervati. Dan is-softwer huwa proprjetarju; l-ebda liċenzja ma tingħata biex tikkopja, timmodifika, jew tqassam mingħajr permess bil-miktub.",
   "settings.aboutGiantsNote": "Farming Simulator 25 u l-kontenut tal-logħba relatata huma trademarks ta' GIANTS Software. Mhux affiljati ma' GIANTS.",
   "settings.aboutLinksTitle": "Konnessjonijiet",
   "settings.aboutLinkGithub": "GitHub",
@@ -1406,5 +1405,6 @@
   "moisture.grade.poor": "Fqir",
   "moisture.grade.wet": "Imxarrab",
   "moisture.rot.rotting": "Taħsir",
-  "moisture.rot.gettingwet": "Tixxarrab"
+  "moisture.rot.gettingwet": "Tixxarrab",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

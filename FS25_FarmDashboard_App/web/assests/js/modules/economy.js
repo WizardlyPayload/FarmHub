@@ -26,10 +26,10 @@ function _safe(value) {
     .replace(/'/g, "&#39;");
 }
 
-/** Sum `baleCountOnField` for the active farm — fallback when Lua does not export `baleInventory`. */
+/** Sum `baleCountOnField` (+ category buckets) for the active farm. */
 function sumBalesOnFarmFields(data, farmId) {
   if (!data || typeof data !== "object") {
-    return { total: 0, fieldsWithBales: 0 };
+    return { total: 0, fieldsWithBales: 0, bucket: null };
   }
   const fromPlayer = filterFieldsForFarmView(data.fields || [], farmId);
   const list =
@@ -38,13 +38,43 @@ function sumBalesOnFarmFields(data, farmId) {
       : filterFieldsForFarmView(data.allFields || [], farmId);
   let total = 0;
   let fieldsWithBales = 0;
+  const bucket = {
+    straw: 0,
+    grass: 0,
+    hay: 0,
+    silage: 0,
+    other: 0,
+    byFillType: {},
+  };
   for (const f of list) {
     const n = Number(f?.baleCountOnField ?? 0);
     if (!Number.isFinite(n) || n <= 0) continue;
     total += n;
     fieldsWithBales += 1;
+    const cat = f?.baleOnFieldByCategory;
+    if (cat && typeof cat === "object") {
+      for (const key of BALE_CATEGORY_KEYS) {
+        bucket[key] += Number(cat[key]) || 0;
+      }
+      const named = cat.byFillType;
+      if (named && typeof named === "object") {
+        for (const [label, count] of Object.entries(named)) {
+          bucket.byFillType[label] =
+            (Number(bucket.byFillType[label]) || 0) + (Number(count) || 0);
+        }
+      }
+    }
   }
-  return { total, fieldsWithBales };
+  const bucketSum = BALE_CATEGORY_KEYS.reduce(
+    (s, k) => s + (Number(bucket[k]) || 0),
+    0
+  );
+  if (total > bucketSum) {
+    bucket.other += total - bucketSum;
+  } else if (bucketSum === 0 && total > 0) {
+    bucket.other = total;
+  }
+  return { total, fieldsWithBales, bucket };
 }
 
 const BALE_CATEGORY_KEYS = ["straw", "grass", "hay", "silage", "other"];
@@ -708,7 +738,11 @@ export function updateConsumablesBaleSummaryCard(data) {
     data.baleInventory,
     farmId
   );
-  const onSum = sumBaleBucket(onField);
+  const fieldRollup = sumBalesOnFarmFields(data, farmId);
+  const inventoryOnSum = sumBaleBucket(onField);
+  const onSum = Math.max(inventoryOnSum, fieldRollup.total);
+  const onFieldDisplay =
+    fieldRollup.total > inventoryOnSum ? fieldRollup.bucket : onField;
   const storageSum = sumBaleBucket(inStorage);
 
   const title = t("economy.consumablesBaleSummaryTitle");
@@ -746,7 +780,7 @@ export function updateConsumablesBaleSummaryCard(data) {
                 <span class="display-6 fw-bold text-info lh-1">${onSum}</span>
               </div>
               <p class="small text-muted mb-2">${t("economy.balesLooseOnFieldsHint")}</p>
-              ${baleInventoryBreakdownHtml(onField)}
+              ${baleInventoryBreakdownHtml(onFieldDisplay)}
             </div>
           </div>
           <div class="col-lg-6">

@@ -127,6 +127,6 @@ CI on `main` runs tests, electron-pack verify, and i18n verify — see [`.github
 
 ## Licence & credits
 
-**JoshWalki** & **WizardlyPayload** — [docs/AUTHORS.md](docs/AUTHORS.md) · [LICENSE](LICENSE)
+**FarmHub License** — free for personal and non-commercial use; **commercial use requires permission** from the authors (see [LICENSE](LICENSE)). Copyright **JoshWalki** & **WizardlyPayload** — [docs/AUTHORS.md](docs/AUTHORS.md).
 
 Optional maintenance tips for the desktop app: [Ko-fi](https://ko-fi.com/wizarlypayload) (not required — Farm Dashboard stays free).

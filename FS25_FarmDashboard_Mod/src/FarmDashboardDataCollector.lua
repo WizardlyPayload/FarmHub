@@ -53,6 +53,13 @@ local DIRTY_MAX_ENTRIES         = 4096
 local DIRTY_PENS_HARD_CAP       = 256    -- in-memory dirty set cap (B11)
 local POST_LOAD_SILENCE_SEC     = 5      -- ignore inserts for first 5s after onStartMission (B11)
 local POST_LOAD_COLLECTION_GRACE_SEC = 45 -- defer new collector slots after save load (CoursePlay / UI friendly)
+local VEHICLE_SPAWN_GRACE_MS = 15000
+local VEHICLE_SPAWN_GRACE_SERVER_MS = 45000
+local VEHICLE_SPAWN_GRACE_SERVER_TAIL_MS = 15000
+local VEHICLE_SPAWN_GRACE_CP_MS = 30000
+local VEHICLE_SPAWN_GRACE_CP_TAIL_MS = 15000
+local COURSEPLAY_FLEET_SETTLE_MS = 30000
+local COURSEPLAY_POST_LOAD_SCAN_DELAY_MS = 45000
 
 -- Must be declared before `jsonWriteStep` / any method that references them. In Lua, a `local`
 -- below a method definition is not an upvalue of that method — the name resolves to a *global*
@@ -474,6 +481,11 @@ function FarmDashboardDataCollector:init()
     self._rlSubscriptionTokens = {}
     self._rlEventErrLogAt = 0
     self._rlEventFirstHitLogged = false
+    self._vehicleFleetSubscribed = false
+    self._vehicleSpawnGraceLogAt = 0
+    self._vehicleCountProbe = nil
+    self._vehicleReadyCountProbe = nil
+    self._vehicleSpawnGraceUntilMs = nil
 
     -- Plan v5 B5: pen ID scheme. Detected lazily on first pen access; either "composite-v1"
     -- (configFileName:id when available) or "integer-v1" (raw runtime id).
@@ -744,12 +756,11 @@ function FarmDashboardDataCollector:runAdaptiveProbeOnce()
     end
 
     local totalVehicles = 0
-    local vehicles = _G.g_currentMission.vehicles
-    if not vehicles and _G.g_currentMission.vehicleSystem then
-        vehicles = _G.g_currentMission.vehicleSystem.vehicles
-    end
-    if vehicles then
-        for _ in pairs(vehicles) do totalVehicles = totalVehicles + 1 end
+    if self:_isServerExportHost() or not self:mayScanLiveFleet() then
+        local cached = self.moduleCache and self.moduleCache.vehicles
+        if type(cached) == "table" then totalVehicles = #cached end
+    else
+        totalVehicles = self:_getMissionVehicleCount()
     end
 
     self._lastAnimalProbe = { total = totalAnimals, pens = totalPens, vehicles = totalVehicles }
@@ -1027,6 +1038,23 @@ function FarmDashboardDataCollector:loadConfig()
                 setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV3Applied", true)
                 saveXMLFile(xmlFile)
             end
+            if not Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV4Applied"), false) then
+                setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV4Applied", true)
+                saveXMLFile(xmlFile)
+            end
+            if not Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV5Applied"), false) then
+                if FarmDashboard and FarmDashboard.isDedicatedServer and FarmDashboard:isDedicatedServer() then
+                    if self.config.enableVehicles == false then
+                        self.config.enableVehicles = true
+                        Logging.info(
+                            "[FarmDash] Dedicated server: vehicle export re-enabled (spawn-grace skips live fleet during shop buys)."
+                        )
+                    end
+                end
+                setXMLBool(xmlFile, "farmDashboard.modules#vehicles", Utils.getNoNil(self.config.enableVehicles, true))
+                setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV5Applied", true)
+                saveXMLFile(xmlFile)
+            end
             delete(xmlFile)
         end
     else
@@ -1066,6 +1094,8 @@ function FarmDashboardDataCollector:loadConfig()
         setXMLInt(xmlFile, "farmDashboard.settings#postLoadCollectionGraceSec", self.config.postLoadCollectionGraceSec)
         setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV2Applied", true)
         setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV3Applied", true)
+        setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV4Applied", true)
+        setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV5Applied", true)
         setXMLInt(xmlFile, "farmDashboard.settings#economyRowsPerSlice", self.config.economyRowsPerSlice)
         saveXMLFile(xmlFile)
         delete(xmlFile)
@@ -1171,14 +1201,34 @@ function FarmDashboardDataCollector:saveConfig()
     return true
 end
 
---- Unix-ish mission seconds for grace / pause gates (best-effort).
-function FarmDashboardDataCollector:_missionNowSec()
+--- Mission clock in ms (g_time on DS; diagnostics fallback).
+function FarmDashboardDataCollector:_missionNowMs()
+    if type(_G.g_time) == "number" then return _G.g_time end
     local D = rawget(_G, "FarmDashDiagnostics")
     if D and type(D.nowSec) == "function" then
         local ok, t = pcall(function() return D.nowSec() end)
-        if ok and type(t) == "number" then return t end
+        if ok and type(t) == "number" then return t * 1000 end
     end
     return 0
+end
+
+--- Unix-ish mission seconds for grace / pause gates (best-effort).
+function FarmDashboardDataCollector:_missionNowSec()
+    return self:_missionNowMs() / 1000
+end
+
+function FarmDashboardDataCollector:_getMissionVehicleTable()
+    if not _G.g_currentMission then return nil end
+    if _G.g_currentMission.vehicles then
+        return _G.g_currentMission.vehicles
+    end
+    if _G.g_currentMission.vehicleSystem and _G.g_currentMission.vehicleSystem.vehicles then
+        return _G.g_currentMission.vehicleSystem.vehicles
+    end
+    if _G.g_currentMission.ownedVehicles then
+        return _G.g_currentMission.ownedVehicles
+    end
+    return nil
 end
 
 function FarmDashboardDataCollector:_getCurrentGuiName()
@@ -1196,9 +1246,419 @@ function FarmDashboardDataCollector:_getCurrentGuiName()
     return nil
 end
 
+--- Fleet size for spawn-grace and adaptive cadence (read-only; never mutates mission).
+function FarmDashboardDataCollector:_getMissionVehicleCount()
+    local total = self:_probeMissionFleet()
+    return total
+end
+
+--- Spawn-ready fleet size (both getOwnerFarmId and getName exist — no method calls).
+function FarmDashboardDataCollector:_getMissionVehicleReadyCount()
+    local _, ready = self:_probeMissionFleet()
+    return ready
+end
+
+--- One read-only pass over the fleet table: total slots, spawn-ready count, incomplete flag.
+--- Never walks the live fleet table on MP authority or while Courseplay settle is active.
+function FarmDashboardDataCollector:_probeMissionFleet()
+    if self:_isServerExportHost() or not self:mayScanLiveFleet() then
+        local cached = self.moduleCache and self.moduleCache.vehicles
+        local n = (type(cached) == "table") and #cached or 0
+        local pending = self:_getPendingVehicleLoadCount()
+        local settling = self:_isCourseplayFleetSettleActive()
+        return n, n, pending > 0 or settling
+    end
+
+    local cached = self._fleetProbeCache
+    local gt = _G.g_time
+    if cached and type(gt) == "number" and cached.gt == gt then
+        return cached.total, cached.ready, cached.incomplete
+    end
+
+    local vehicles = self:_getMissionVehicleTable()
+    if not vehicles then
+        self._fleetProbeCache = { gt = gt, total = 0, ready = 0, incomplete = false }
+        return 0, 0, false
+    end
+
+    local total, ready, incomplete = 0, 0, false
+    for _, vehicle in pairs(vehicles) do
+        if vehicle ~= nil then
+            total = total + 1
+            local hasOwner = type(vehicle.getOwnerFarmId) == "function"
+            local hasName = type(vehicle.getName) == "function"
+            if hasOwner and hasName then
+                ready = ready + 1
+            else
+                incomplete = true
+            end
+        end
+    end
+
+    self._fleetProbeCache = { gt = gt, total = total, ready = ready, incomplete = incomplete }
+    return total, ready, incomplete
+end
+
+--- True while the fleet list contains a half-spawned vehicle (no getOwnerFarmId / getName yet).
+function FarmDashboardDataCollector:_fleetHasIncompleteSpawn()
+    if self:_getPendingVehicleLoadCount() > 0 then
+        return true
+    end
+    if not self:mayScanLiveFleet() then
+        return false
+    end
+    local _, _, incomplete = self:_probeMissionFleet()
+    return incomplete == true
+end
+
+--- FS25_Courseplay attaches specs asynchronously; scanning the fleet during that window causes CP errors.
+function FarmDashboardDataCollector:isCourseplayLoaded()
+    if self._courseplayLoaded ~= nil then return self._courseplayLoaded end
+    local loaded = false
+    if _G.g_modIsLoaded and _G.g_modIsLoaded["FS25_Courseplay"] then
+        loaded = true
+    elseif rawget(_G, "CpAIJob") ~= nil or rawget(_G, "CpUtil") ~= nil then
+        loaded = true
+    elseif _G.g_modManager and type(_G.g_modManager.getActiveModByName) == "function" then
+        local ok, mod = pcall(function() return _G.g_modManager:getActiveModByName("FS25_Courseplay") end)
+        if ok and mod ~= nil then loaded = true end
+    end
+    self._courseplayLoaded = loaded
+    return loaded
+end
+
+function FarmDashboardDataCollector:_isCourseplayFleetSettleActive()
+    if not self:isCourseplayLoaded() then return false end
+    if not (FarmDashboard and FarmDashboard.isAuthority and FarmDashboard:isAuthority()) then return false end
+    local untilScan = self._cpAllowFleetScanAfterGTime
+    return type(untilScan) == "number" and type(_G.g_time) == "number" and _G.g_time < untilScan
+end
+
+function FarmDashboardDataCollector:usesCourseplayIncrementalFleet()
+    if not self:isCourseplayLoaded() then return false end
+    if not (FarmDashboard and FarmDashboard.isAuthority and FarmDashboard:isAuthority()) then return false end
+    return self:_isServerExportHost()
+end
+
+--- Safe to call getOwnerFarmId / walk g_currentMission.vehicles (Courseplay + shop spawn).
+function FarmDashboardDataCollector:mayScanLiveFleet()
+    if not (FarmDashboard and FarmDashboard.isAuthority and FarmDashboard:isAuthority()) then
+        return true
+    end
+    if self:usesCourseplayIncrementalFleet() then return false end
+    if self:_getPendingVehicleLoadCount() > 0 then return false end
+    local untilG = self._vehicleSpawnGraceUntilGTime
+    if type(untilG) == "number" and type(_G.g_time) == "number" and _G.g_time < untilG then
+        return false
+    end
+    if self:_isCourseplayFleetSettleActive() then return false end
+    return true
+end
+
+--- Called when engine reports a shop vehicle load started (pendingVehicleLoads became non-empty).
+function FarmDashboardDataCollector:_notifyShopVehicleLoadStarted()
+    if not self:isCourseplayLoaded() then return end
+    self:_beginVehicleSpawnGrace("shop_load_started")
+    Logging.info("[FarmDash] Shop vehicle load started — export paused until spawn completes")
+end
+
+--- Called when engine reports a shop vehicle load finished (pendingVehicleLoads cleared).
+function FarmDashboardDataCollector:_notifyShopVehicleLoadFinished()
+    local tailMs = self:_vehicleSpawnGraceTailMs()
+    if self:isCourseplayLoaded() then
+        local gt = _G.g_time
+        if type(gt) == "number" then
+            self._cpAllowFleetScanAfterGTime = gt + COURSEPLAY_FLEET_SETTLE_MS
+        end
+        Logging.info(
+            "[FarmDash] Shop vehicle load finished — export resumes after %ds settle",
+            math.floor(COURSEPLAY_FLEET_SETTLE_MS / 1000)
+        )
+    end
+    self:_beginVehicleSpawnGrace("pending_load_finished", tailMs)
+end
+
+--- Courseplay incremental fleet: one fully registered vehicle -> moduleCache (no fleet table walk).
+function FarmDashboardDataCollector:onVehicleRegistered(vehicle)
+    if not self.config.enableVehicles then return end
+    if not self:usesCourseplayIncrementalFleet() then return end
+    local vdc = rawget(_G, "VehicleDataCollector")
+    if not vdc or not vdc._isVehicleAlive or not vdc:_isVehicleAlive(vehicle) then
+        if FarmDashboardCourseplayCompat and FarmDashboardCourseplayCompat.queueVehicleRegister then
+            FarmDashboardCourseplayCompat.queueVehicleRegister(vehicle)
+        end
+        return
+    end
+    if vdc.upsertVehicleInCache then
+        vdc:upsertVehicleInCache(vehicle)
+        self:refreshAssembledInMemory()
+    end
+end
+
+function FarmDashboardDataCollector:onVehicleDeleted(vehicle)
+    if not self.config.enableVehicles then return end
+    if not self:usesCourseplayIncrementalFleet() then return end
+    local vdc = rawget(_G, "VehicleDataCollector")
+    if vdc and vdc.removeVehicleFromCache then
+        vdc:removeVehicleFromCache(vehicle)
+        self:refreshAssembledInMemory()
+    end
+end
+
+--- Skip live fleet reads during shop spawn grace or while a half-spawned entry exists (serve moduleCache instead).
+function FarmDashboardDataCollector:shouldSkipLiveFleetScan()
+    if not self:mayScanLiveFleet() then return true end
+    return self:shouldDeferVehicleFleetWork()
+end
+
+function FarmDashboardDataCollector:_enginePendingVehicleLoadActive()
+    local guard = rawget(_G, "FarmDashboardVehicleShopGuard")
+    if guard and type(guard.hasEnginePendingLoads) == "function" then
+        local ok, active = pcall(function() return guard.hasEnginePendingLoads() end)
+        if ok then return active == true end
+    end
+    return false
+end
+
+function FarmDashboardDataCollector:_getPendingVehicleLoadCount()
+    return self:_enginePendingVehicleLoadActive() and 1 or 0
+end
+
+--- Passive shop-load edge detect (no vehicleSystem method hooks).
+function FarmDashboardDataCollector:_pollShopPendingLoads()
+    if not (FarmDashboard and FarmDashboard.isAuthority and FarmDashboard:isAuthority()) then
+        return
+    end
+    local pending = self:_enginePendingVehicleLoadActive()
+    local prev = self._polledPendingLoadsActive
+    if prev == nil then
+        self._polledPendingLoadsActive = pending
+        return
+    end
+    if pending and not prev then
+        if self:isCourseplayLoaded() then
+            self:_notifyShopVehicleLoadStarted()
+        end
+        self:_beginVehicleSpawnGrace("engine.pendingVehicleLoads")
+    elseif not pending and prev then
+        self:_notifyShopVehicleLoadFinished()
+    end
+    self._polledPendingLoadsActive = pending
+end
+
+--- MP host or dedicated server (export authority; shop handled remotely on DS).
+function FarmDashboardDataCollector:_isServerExportHost()
+    if not (FarmDashboard and FarmDashboard.isAuthority and FarmDashboard:isAuthority()) then
+        return false
+    end
+    local md = _G.g_currentMission and _G.g_currentMission.missionDynamicInfo
+    if md and md.isMultiplayer == true then return true end
+    if rawget(_G, "g_dedicatedServer") ~= nil then return true end
+    if _G.g_server ~= nil and type(_G.g_server.getIsServer) == "function" then
+        local ok, isSrv = pcall(function() return _G.g_server:getIsServer() end)
+        if ok and isSrv then return true end
+    end
+    return false
+end
+
+function FarmDashboardDataCollector:_vehicleSpawnGraceTailMs()
+    if self:isCourseplayLoaded() then
+        return VEHICLE_SPAWN_GRACE_CP_TAIL_MS
+    end
+    return VEHICLE_SPAWN_GRACE_SERVER_TAIL_MS
+end
+
+function FarmDashboardDataCollector:_vehicleSpawnGraceDurationMs()
+    if not (FarmDashboard and FarmDashboard.isAuthority and FarmDashboard:isAuthority()) then
+        return VEHICLE_SPAWN_GRACE_MS
+    end
+    if self:isCourseplayLoaded() then
+        return VEHICLE_SPAWN_GRACE_CP_MS
+    end
+    return VEHICLE_SPAWN_GRACE_SERVER_MS
+end
+
+--- True while shop spawn grace is active — pauses ALL export on authority (not only fleet slices).
+function FarmDashboardDataCollector:isExportPausedForVehicleSpawn()
+    if not (FarmDashboard and FarmDashboard.isAuthority and FarmDashboard:isAuthority()) then
+        return false
+    end
+    if self:_getPendingVehicleLoadCount() > 0 then return true end
+    return self:shouldDeferVehicleFleetWork()
+end
+
+function FarmDashboardDataCollector:_isServerShopFreeze()
+    return self:isExportPausedForVehicleSpawn()
+end
+
+--- Extend the fleet spawn grace window (shop buy / sell / config change / incomplete spawn).
+--- @param tailMs number|nil optional shorter grace (e.g. after pending load completes)
+function FarmDashboardDataCollector:_beginVehicleSpawnGrace(reason, tailMs)
+    if not FarmDashboard or not FarmDashboard.isAuthority or not FarmDashboard:isAuthority() then return end
+    local graceMs = tailMs
+    if type(graceMs) ~= "number" then
+        graceMs = self:_vehicleSpawnGraceDurationMs()
+    end
+    local gt = _G.g_time
+    if type(gt) == "number" then
+        local untilG = gt + graceMs
+        if type(self._vehicleSpawnGraceUntilGTime) == "number" and not tailMs then
+            untilG = math.max(self._vehicleSpawnGraceUntilGTime, untilG)
+        end
+        self._vehicleSpawnGraceUntilGTime = untilG
+    end
+    local untilMs = self:_missionNowMs() + graceMs
+    if type(self._vehicleSpawnGraceUntilMs) == "number" and not tailMs then
+        untilMs = math.max(self._vehicleSpawnGraceUntilMs, untilMs)
+    end
+    self._vehicleSpawnGraceUntilMs = untilMs
+
+    if FarmDashboard and FarmDashboard.isAuthority and FarmDashboard:isAuthority() then
+        self:_abortActiveIncrementalWork()
+        self._jsonWriteJob = nil
+        self._jsonPendingDisk = nil
+        self._cycleTailJob = nil
+    end
+
+    local nowS = self:_missionNowSec()
+    if (nowS - (self._vehicleSpawnGraceLogAt or 0)) >= 2 then
+        self._vehicleSpawnGraceLogAt = nowS
+        Logging.info(
+            "[FarmDash] Shop spawn freeze %ds (%s) — server export paused during vehicle spawn",
+            math.floor(graceMs / 1000),
+            tostring(reason or "shop")
+        )
+    end
+end
+
+--- Subscribe to engine shop events when available (optional; vehicleSystem hook is primary on DS).
+function FarmDashboardDataCollector:_subscribeToVehicleFleetEvents()
+    if self._vehicleFleetSubscribed then return end
+    if self:_isServerExportHost() then return end
+    if not (FarmDashboard and FarmDashboard.isAuthority and FarmDashboard:isAuthority()) then return end
+    if not _G.g_messageCenter or type(_G.g_messageCenter.subscribe) ~= "function" then return end
+
+    local self_ref = self
+    local function onFleetMutation(reason)
+        return function(...)
+            local ok, err = xpcall(function()
+                if not (FarmDashboard and FarmDashboard:isAuthority()) then return end
+                self_ref:_beginVehicleSpawnGrace(reason)
+            end, _farmDashFormatError)
+            if not ok and FarmDashLog and FarmDashLog.devWarn then
+                FarmDashLog.devWarn("vehicle fleet event (%s): %s", tostring(reason), tostring(err))
+            end
+        end
+    end
+
+    local eventNames = {
+        "BuyVehicleEvent",
+        "SellVehicleEvent",
+        "ChangeVehicleConfigEvent",
+    }
+    local subscribed = 0
+    for _, name in ipairs(eventNames) do
+        local evt = rawget(_G, name)
+        if evt ~= nil then
+            local subOk = pcall(function()
+                _G.g_messageCenter:subscribe(evt, onFleetMutation(name), self_ref)
+            end)
+            if subOk then subscribed = subscribed + 1 end
+        end
+    end
+
+    if subscribed > 0 then
+        self._vehicleFleetSubscribed = true
+        if FarmDashLog and FarmDashLog.dev then
+            FarmDashLog.dev("subscribed to %d vehicle shop event(s)", subscribed)
+        end
+    end
+end
+
+--- Fallback probe for SP only — MP authority uses shop hooks (never walk fleet table).
+function FarmDashboardDataCollector:_updateVehicleSpawnGrace()
+    if not FarmDashboard or not FarmDashboard.isAuthority or not FarmDashboard:isAuthority() then return end
+    if self:_isServerExportHost() then return end
+    local untilG = self._vehicleSpawnGraceUntilGTime
+    if type(untilG) == "number" and type(_G.g_time) == "number" and _G.g_time < untilG then
+        return
+    end
+
+    local total, ready, incomplete = self:_probeMissionFleet()
+
+    if incomplete then
+        self:_beginVehicleSpawnGrace("incomplete_spawn")
+        self._vehicleCountProbe = total
+        self._vehicleReadyCountProbe = ready
+        return
+    end
+
+    local nowS = self:_missionNowSec()
+    if type(self._postLoadCollectionGraceUntil) == "number" and nowS < self._postLoadCollectionGraceUntil then
+        self._vehicleCountProbe = total
+        self._vehicleReadyCountProbe = ready
+        return
+    end
+
+    local prevTotal = self._vehicleCountProbe
+    local prevReady = self._vehicleReadyCountProbe
+    if type(prevTotal) ~= "number" then
+        self._vehicleCountProbe = total
+        self._vehicleReadyCountProbe = ready
+        return
+    end
+
+    self._vehicleCountProbe = total
+    self._vehicleReadyCountProbe = ready
+
+    if total > prevTotal then
+        self:_beginVehicleSpawnGrace("fleet_total_increased")
+    end
+end
+
+function FarmDashboardDataCollector:shouldDeferVehicleFleetWork()
+    if self:_getPendingVehicleLoadCount() > 0 then return true end
+
+    local untilG = self._vehicleSpawnGraceUntilGTime
+    if type(untilG) == "number" and type(_G.g_time) == "number" and _G.g_time < untilG then
+        return true
+    end
+
+    if self:_isCourseplayFleetSettleActive() then
+        return true
+    end
+
+    if self:_fleetHasIncompleteSpawn() then return true end
+    local untilMs = self._vehicleSpawnGraceUntilMs
+    if type(untilMs) ~= "number" then return false end
+    if self:_missionNowMs() >= untilMs then return false end
+    local total, ready, incomplete = self:_probeMissionFleet()
+    if not incomplete and total > 0 and total == ready then
+        return false
+    end
+    return true
+end
+
+--- Skip fleet-related slots during spawn grace without marking modules done or writing JSON.
+function FarmDashboardDataCollector:_skipFleetSliceForSpawnGrace(order, name)
+    self:_diagTrace("%s deferred (spawn grace)", tostring(name or "fleet"))
+    if name == "vehicles" and rawget(_G, "VehicleDataCollector") then
+        VehicleDataCollector._inc = nil
+    elseif name == "finance" and rawget(_G, "FinanceDataCollector") then
+        FinanceDataCollector._inc = nil
+    end
+    self._incActiveModule = nil
+    local n = #order
+    if n > 0 then
+        self.nextSliceIdx = (self.nextSliceIdx or 1) % n + 1
+    end
+end
+
 --- True when menus, pause, post-load grace, or zero-dt ticks should defer heavy collection.
 function FarmDashboardDataCollector:shouldDeferCollectionWork(dt)
     if not _G.g_currentMission then return true end
+
+    if self:_isServerShopFreeze() then return true end
 
     local nowS = self:_missionNowSec()
     if type(self._postLoadCollectionGraceUntil) == "number" and nowS < self._postLoadCollectionGraceUntil then
@@ -1250,6 +1710,8 @@ function FarmDashboardDataCollector:_abortActiveIncrementalWork()
     local name = self._incActiveModule
     if name == "vehicles" and rawget(_G, "VehicleDataCollector") then
         VehicleDataCollector._inc = nil
+    elseif name == "finance" and rawget(_G, "FinanceDataCollector") then
+        FinanceDataCollector._inc = nil
     elseif name == "fields" and rawget(_G, "FieldDataCollector") then
         FieldDataCollector._fdCo = nil
         FieldDataCollector._smState = nil
@@ -1296,6 +1758,14 @@ function FarmDashboardDataCollector:onMissionLoaded()
     self._idScheme = "integer-v1"
     self._primedAfterFirstCycle = false
     self._rlEventFirstHitLogged = false
+    self._vehicleCountProbe = nil
+    self._vehicleReadyCountProbe = nil
+    self._vehicleSpawnGraceUntilMs = nil
+    self._vehicleSpawnGraceUntilGTime = nil
+    self._fleetProbeCache = nil
+    self._courseplayLoaded = nil
+    self._cpAllowFleetScanAfterGTime = nil
+    self._polledPendingLoadsActive = nil
 
     local D = rawget(_G, "FarmDashDiagnostics")
     local nowS = (D and D.nowSec and D.nowSec()) or 0
@@ -1304,8 +1774,23 @@ function FarmDashboardDataCollector:onMissionLoaded()
     self._postLoadCollectionGraceUntil = nowS + graceSec
     self._collectionPausedLatch = false
 
+    if self:isCourseplayLoaded() and FarmDashboard and FarmDashboard.isAuthority and FarmDashboard:isAuthority() then
+        local gt = _G.g_time
+        if type(gt) == "number" then
+            self._cpAllowFleetScanAfterGTime = gt + (graceSec * 1000) + COURSEPLAY_POST_LOAD_SCAN_DELAY_MS
+        end
+        Logging.info(
+            "[FarmDash] Courseplay detected — fleet scans deferred until save load settles (~%ds)",
+            graceSec + math.floor(COURSEPLAY_POST_LOAD_SCAN_DELAY_MS / 1000)
+        )
+    end
+
     -- Re-bootstrap from disk so we know which pens were already covered last session.
     self:_bootstrapDetailLedgerFromDisk()
+    self:_subscribeToVehicleFleetEvents()
+    if FarmDashboardCourseplayCompat and FarmDashboardCourseplayCompat.install then
+        FarmDashboardCourseplayCompat.install()
+    end
 end
 
 --- Stable order must match slice spacing (one module per slot over collectionCycleMs).
@@ -1548,6 +2033,10 @@ function FarmDashboardDataCollector:collectorStepUsesCoroutine(name)
 end
 
 function FarmDashboardDataCollector:startModuleSlice(name, order)
+    if (name == "vehicles" or name == "finance") and self:shouldSkipLiveFleetScan() then
+        self:_skipFleetSliceForSpawnGrace(order, name)
+        return
+    end
     if self:collectorSupportsIncremental(name) then
         local c = self.collectors[name]
         local t0 = self:_diagNow()
@@ -1792,6 +2281,10 @@ end
 function FarmDashboardDataCollector:runIncrementalActiveStep(order)
     local name = self._incActiveModule
     if not name then return end
+    if (name == "vehicles" or name == "finance") and self:shouldSkipLiveFleetScan() then
+        self:_skipFleetSliceForSpawnGrace(order, name)
+        return
+    end
     local c = self.collectors[name]
     if not c or not c.collectStep then
         self._incActiveModule = nil
@@ -1967,6 +2460,18 @@ function FarmDashboardDataCollector:update(dt)
 end
 
 function FarmDashboardDataCollector:_updateBody(dt)
+    self:_pollShopPendingLoads()
+    if self:_isServerShopFreeze() then
+        self:_updateCollectionPauseLatch(true)
+        return
+    end
+    if not self:_isServerExportHost() then
+        self:_updateVehicleSpawnGrace()
+        if self:_isServerShopFreeze() then
+            self:_updateCollectionPauseLatch(true)
+            return
+        end
+    end
     -- Phase 5: re-detect animal mode until stable (cheap call: returns early once husbandry has data).
     if self._animalMode == nil or self._animalMode == "unknown" then
         self:detectAnimalModeOnce()
@@ -3065,8 +3570,7 @@ function FarmDashboardDataCollector:processDetailQueueOnce()
 end
 
 function FarmDashboardDataCollector:shutdown()
-    -- Plan v5 B7: clean unsubscribe from RL events.
-    if self._rlSubscribed and _G.g_messageCenter then
+    if _G.g_messageCenter then
         local mc = _G.g_messageCenter
         if type(mc.unsubscribeAll) == "function" then
             pcall(function() mc:unsubscribeAll(self) end)
@@ -3077,6 +3581,7 @@ function FarmDashboardDataCollector:shutdown()
         end
         self._rlSubscriptionTokens = {}
         self._rlSubscribed = false
+        self._vehicleFleetSubscribed = false
     end
 
     -- Plan v5 B10: persist auto-tuned value once, here, instead of on every change.

@@ -572,7 +572,6 @@
   "settings.aboutAuthorJosh": "JoshWalki (Josh) — alkuperäinen Farm Dashboard -idea, FS25-ydinmodi ja ensimmäinen live-selaimessa käytettävä kojelauta",
   "settings.aboutAuthorWizardly": "WizardlyPayload — Windows-työpöytäsovellus ja FarmHubin jatkoa: isännöidyt ja moninpelitilat, syvemmät kenttä- ja tilatyönkulut, tietoturva, käännökset ja jatkuvat julkaisut",
   "settings.aboutLicenseTitle": "Lisenssi",
-  "settings.aboutLicenseBody": "Tekijänoikeudet © JoshWalki ja WizardlyPayload. Kaikki oikeudet pidätetään. Tämä ohjelmisto on omistusoikeudella suojattu; lisenssiä kopiointiin, muokkaamiseen tai levittämiseen ei myönnetä ilman kirjallista lupaa.",
   "settings.aboutGiantsNote": "Farming Simulator 25 ja siihen liittyvä pelisisältö ovat GIANTS Softwaren tavaramerkkejä. Ei sidoksissa GIANTSiin.",
   "settings.aboutLinksTitle": "Linkit",
   "settings.aboutLinkGithub": "GitHub",
@@ -1406,5 +1405,6 @@
   "moisture.grade.poor": "Huono",
   "moisture.grade.wet": "Märkä",
   "moisture.rot.rotting": "Mädäntyvä",
-  "moisture.rot.gettingwet": "Kastuminen"
+  "moisture.rot.gettingwet": "Kastuminen",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

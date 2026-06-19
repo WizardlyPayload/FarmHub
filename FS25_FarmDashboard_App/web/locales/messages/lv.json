@@ -572,7 +572,6 @@
   "settings.aboutAuthorJosh": "JoshWalki (Džošs) — oriģināla Farm Dashboard ideja, FS25 pamatmodifikācija un pirmais tiešsaistes pārlūkprogrammas informācijas panelis",
   "settings.aboutAuthorWizardly": "WizardlyPayload — Windows darbvirsmas lietotne un FarmHub turpinājums: mitinātas un vairāku spēlētāju fermas, padziļinātas lauka un fermu darbplūsmas, drošība, tulkojumi un jaunākās versijas",
   "settings.aboutLicenseTitle": "Licence",
-  "settings.aboutLicenseBody": "Autortiesības © JoshWalki un WizardlyPayload. Visas tiesības aizsargātas. Šī programmatūra ir patentēta; bez rakstiskas atļaujas netiek piešķirta licence tās kopēšanai, modificēšanai vai izplatīšanai.",
   "settings.aboutGiantsNote": "Farming Simulator 25 un saistītais spēles saturs ir GIANTS Software preču zīmes. Nav saistīts ar GIANTS.",
   "settings.aboutLinksTitle": "Saites",
   "settings.aboutLinkGithub": "GitHub",
@@ -1406,5 +1405,6 @@
   "moisture.grade.poor": "Nabadzīgs",
   "moisture.grade.wet": "Slapjš",
   "moisture.rot.rotting": "Pūšana",
-  "moisture.rot.gettingwet": "Samirkšana"
+  "moisture.rot.gettingwet": "Samirkšana",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

@@ -1223,7 +1223,12 @@ function requestLivestockDetail(req) {
         getFs25DocumentsRoot,
     });
 }
-expressApp.get('/api/vehicles',   (req, res) => res.json(getDataForServer(req)?.vehicles   || []));
+expressApp.get('/api/vehicles', (req, res) => {
+    const raw = getDataForServer(req)?.vehicles;
+    if (Array.isArray(raw)) return res.json(raw);
+    if (raw && typeof raw === 'object') return res.json(Object.values(raw));
+    res.json([]);
+});
 expressApp.get('/api/fields',     (req, res) => {
     const d = getDataForServer(req);
     const sid = resolveServerIdForRequest(req);

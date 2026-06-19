@@ -572,7 +572,6 @@
   "settings.aboutAuthorJosh": "JoshWalki (Josh) — eredeti Farm Dashboard ötlet, az FS25 mod alapja és az első élő böngészős irányítópult",
   "settings.aboutAuthorWizardly": "WizardlyPayload – Windows asztali alkalmazás és a FarmHub folytatása: hosztolt és többjátékos farmok, mélyebb terepi és farm munkafolyamatok, biztonság, fordítások és folyamatos kiadások",
   "settings.aboutLicenseTitle": "Engedély",
-  "settings.aboutLicenseBody": "Copyright © JoshWalki és WizardlyPayload. Minden jog fenntartva. Ez a szoftver saját tulajdonú; írásos engedély nélkül nem engedélyezett a másolása, módosítása vagy terjesztése.",
   "settings.aboutGiantsNote": "A Farming Simulator 25 és a kapcsolódó játéktartalmak a GIANTS Software védjegyei. Nem áll kapcsolatban a GIANTS-szal.",
   "settings.aboutLinksTitle": "Linkek",
   "settings.aboutLinkGithub": "GitHub",
@@ -1406,5 +1405,6 @@
   "moisture.grade.poor": "Szegény",
   "moisture.grade.wet": "Nedves",
   "moisture.rot.rotting": "Rothadó",
-  "moisture.rot.gettingwet": "Vizesedés"
+  "moisture.rot.gettingwet": "Vizesedés",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

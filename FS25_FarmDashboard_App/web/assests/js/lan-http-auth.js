@@ -158,6 +158,8 @@ function sameOriginHttpBase() {
 async function probeServersWithoutExtraAuth() {
   try {
     const base = sameOriginHttpBase();
+    const status = await fetch(`${base}/api/status`, { cache: "no-store", method: "GET" });
+    if (status.ok) return true;
     const r = await fetch(`${base}/api/servers`, { cache: "no-store", method: "GET" });
     return r.ok;
   } catch (_) {

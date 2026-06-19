@@ -572,7 +572,6 @@
   "settings.aboutAuthorJosh": "JoshWalki (Josh) — ideea originală pentru Farm Dashboard, mod-ul de bază pentru FS25 și primul tablou de bord live pentru browser",
   "settings.aboutAuthorWizardly": "WizardlyPayload — aplicație desktop Windows și continuare FarmHub: ferme găzduite și multiplayer, fluxuri de lucru mai aprofundate pe teren și la fermă, securitate, traduceri și versiuni în curs de desfășurare",
   "settings.aboutLicenseTitle": "Licenţă",
-  "settings.aboutLicenseBody": "Drepturi de autor © JoshWalki și WizardlyPayload. Toate drepturile rezervate. Acest software este proprietate privată; nu se acordă nicio licență pentru copiere, modificare sau distribuire fără permisiune scrisă.",
   "settings.aboutGiantsNote": "Farming Simulator 25 și conținutul jocului aferent sunt mărci comerciale ale GIANTS Software. Nu sunt afiliate cu GIANTS.",
   "settings.aboutLinksTitle": "Linkuri",
   "settings.aboutLinkGithub": "GitHub",
@@ -1406,5 +1405,6 @@
   "moisture.grade.poor": "Sărac",
   "moisture.grade.wet": "Umed",
   "moisture.rot.rotting": "Putregai",
-  "moisture.rot.gettingwet": "Udarea"
+  "moisture.rot.gettingwet": "Udarea",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

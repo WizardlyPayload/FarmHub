@@ -572,7 +572,6 @@
   "settings.aboutAuthorJosh": "JoshWalki (Josh) — an smaoineamh bunaidh don Phainéal Feirme, an mod lárnach FS25, agus an chéad phainéal brabhsálaí beo",
   "settings.aboutAuthorWizardly": "WizardlyPayload — Leanúint ar aghaidh le feidhmchlár deisce Windows agus FarmHub: feirmeacha óstáilte agus il-imreora, sreafaí oibre níos doimhne ar pháirceanna agus ar fheirmeacha, slándáil, aistriúcháin agus eisiúintí leanúnacha",
   "settings.aboutLicenseTitle": "Ceadúnas",
-  "settings.aboutLicenseBody": "Cóipcheart © JoshWalki agus WizardlyPayload. Gach ceart ar cosaint. Is bogearraí dílseánaigh iad seo; ní dheonaítear aon cheadúnas chun cóipeáil, modhnú ná dáileadh a dhéanamh gan cead i scríbhinn.",
   "settings.aboutGiantsNote": "Is trádmharcanna de chuid GIANTS Software iad Farming Simulator 25 agus ábhar cluichí gaolmhar. Níl siad cleamhnaithe le GIANTS.",
   "settings.aboutLinksTitle": "Naisc",
   "settings.aboutLinkGithub": "GitHub",
@@ -1406,5 +1405,6 @@
   "moisture.grade.poor": "Bocht",
   "moisture.grade.wet": "Fliuch",
   "moisture.rot.rotting": "Ag lobhadh",
-  "moisture.rot.gettingwet": "Ag dul fliuch"
+  "moisture.rot.gettingwet": "Ag dul fliuch",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

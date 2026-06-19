@@ -527,6 +527,11 @@ async function hydrateFromFirstServerWithData(dashboard, preferredServerId = "")
 export async function checkAPIAvailability() {
   try {
     await this.loadServersAndTabs();
+    // Remote viewers (demo tunnel, LAN tablets): show the dashboard shell immediately so first
+    // paint is never an empty white page while /api/data hydrates on the host.
+    if (!isFarmDashLocalConfigHost()) {
+      showDashboardOrFallback(this);
+    }
     // Prefer the last server the user viewed; only fall back to others if it has no data.
     const preferredServerId = this.activeServerId != null ? String(this.activeServerId) : "";
     const earlyLiveServer = await hydrateFromFirstServerWithData(this, preferredServerId);
@@ -728,7 +733,11 @@ export function applyApiMergedDataPayload(dashboard, data) {
 
   data = pruneMergedDataToPlayerFarms(data);
 
-  dashboard.vehicles = data.vehicles || [];
+  dashboard.vehicles = Array.isArray(data.vehicles)
+    ? data.vehicles
+    : data.vehicles && typeof data.vehicles === "object"
+      ? Object.values(data.vehicles)
+      : [];
   dashboard.economy = data.economy || {};
   dashboard.finance = data.finance || {};
   dashboard.weather = data.weather || {};
@@ -876,6 +885,9 @@ export async function tryLoadApiData() {
           if (!hasRenderableDashboardData(this)) {
             this.applyEmptyApiState();
           }
+          // Paint the shell before dismissing splash — otherwise remote/demo visitors see a blank page
+          // while startup hydration retries (common on first tunnel load after app cold start).
+          showDashboardOrFallback(this);
           if (typeof window.farmDashNotifyDataReady === "function") {
             window.farmDashNotifyDataReady();
           }
@@ -925,6 +937,10 @@ export function scheduleStartupHydrationRetry() {
       if (_startupHydrationRetryTimer) {
         clearTimeout(_startupHydrationRetryTimer);
         _startupHydrationRetryTimer = null;
+      }
+      showDashboardOrFallback(this);
+      if (typeof window.farmDashNotifyDataReady === "function") {
+        window.farmDashNotifyDataReady();
       }
       return;
     }

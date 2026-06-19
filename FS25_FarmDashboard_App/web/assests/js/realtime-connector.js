@@ -979,7 +979,12 @@ class RealtimeConnector {
 
   updateVehiclesData(vehiclesData) {
     // Keep unfiltered list so farm changes can re-filter without waiting for a new API tick.
-    this.dashboard._allVehiclesMerged = Array.isArray(vehiclesData) ? vehiclesData : [];
+    const allMerged = Array.isArray(vehiclesData)
+      ? vehiclesData
+      : vehiclesData && typeof vehiclesData === "object"
+        ? Object.values(vehiclesData)
+        : [];
+    this.dashboard._allVehiclesMerged = allMerged;
     // Filter to only show vehicles owned by the currently active farm.
     const activeFarmId = window.dashboard?.activeFarmId || 1;
     const playerVehicles = this.dashboard._allVehiclesMerged

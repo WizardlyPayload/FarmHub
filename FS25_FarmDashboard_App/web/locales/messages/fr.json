@@ -572,7 +572,6 @@
   "settings.aboutAuthorJosh": "JoshWalki (Josh) — idée originale du tableau de bord agricole, mod principal pour FS25 et premier tableau de bord en direct pour navigateur",
   "settings.aboutAuthorWizardly": "WizardlyPayload — Application de bureau Windows et suite de FarmHub : fermes hébergées et multijoueurs, flux de travail plus approfondis pour les champs et les fermes, sécurité, traductions et mises à jour régulières",
   "settings.aboutLicenseTitle": "Licence",
-  "settings.aboutLicenseBody": "Copyright © JoshWalki et WizardlyPayload. Tous droits réservés. Ce logiciel est la propriété de JoshWalki et WizardlyPayload ; aucune licence n’est accordée pour le copier, le modifier ou le distribuer sans autorisation écrite.",
   "settings.aboutGiantsNote": "Farming Simulator 25 et le contenu de jeu associé sont des marques déposées de GIANTS Software. Nous ne sommes pas affiliés à GIANTS.",
   "settings.aboutLinksTitle": "Links",
   "settings.aboutLinkGithub": "GitHub",
@@ -1406,5 +1405,6 @@
   "moisture.grade.poor": "Pauvre",
   "moisture.grade.wet": "Mouillé",
   "moisture.rot.rotting": "Pourrissant",
-  "moisture.rot.gettingwet": "Se mouiller"
+  "moisture.rot.gettingwet": "Se mouiller",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

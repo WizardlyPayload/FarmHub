@@ -45,8 +45,8 @@
     scheduled = true;
     var start = window.__farmDashSplashAt || Date.now();
     var elapsed = Date.now() - start;
-    /** Show splash at least ~5s; do not cut shorter than this after data arrives */
-    var minMs = 5200;
+    /** Show splash at least ~5s locally; remote/demo viewers get a shorter gate. */
+    var minMs = window.__farmDashRemoteViewer ? 1200 : 5200;
     /** Hard cap: fade by this time even if data was slow */
     var maxFromStart = 14000;
     var delay = 0;
@@ -55,10 +55,21 @@
     setTimeout(doDismiss, delay);
   };
 
-  /** Safety: never stuck forever if merge hooks miss */
+  /** Safety: never stuck forever if merge hooks miss — still reveal shell if hidden */
   setTimeout(function () {
     if (!dismissed && !scheduled) {
       scheduled = true;
+      try {
+        var landing = document.getElementById('landing-page');
+        if (landing && landing.classList.contains('d-none') && window.dashboard) {
+          if (typeof window.dashboard.showDashboard === 'function') {
+            window.dashboard.showDashboard();
+          } else {
+            landing.classList.remove('d-none');
+            document.getElementById('main-navbar')?.classList.remove('d-none');
+          }
+        }
+      } catch (e) {}
       doDismiss();
     }
   }, 18000);

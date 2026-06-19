@@ -572,7 +572,6 @@
   "settings.aboutAuthorJosh": "ДжошВолкі (Джош) — оригінальна ідея панелі керування фермою, основний мод FS25 та перша панель керування в режимі реального часу в браузері",
   "settings.aboutAuthorWizardly": "WizardlyPayload — додаток для настільних комп’ютерів Windows та продовження FarmHub: розміщені та багатокористувацькі ферми, глибші робочі процеси для полів та ферм, безпека, переклади та поточні релізи",
   "settings.aboutLicenseTitle": "Ліцензія",
-  "settings.aboutLicenseBody": "Авторське право © JoshWalki та WizardlyPayload. Усі права захищено. Це програмне забезпечення є власністю; ліцензія на копіювання, зміну чи розповсюдження без письмового дозволу не надається.",
   "settings.aboutGiantsNote": "Farming Simulator 25 та пов'язаний ігровий контент є торговими марками GIANTS Software. Не пов'язано з GIANTS.",
   "settings.aboutLinksTitle": "Посилання",
   "settings.aboutLinkGithub": "GitHub",
@@ -1406,5 +1405,6 @@
   "moisture.grade.poor": "Бідний",
   "moisture.grade.wet": "Мокрий",
   "moisture.rot.rotting": "Гниття",
-  "moisture.rot.gettingwet": "Намокання"
+  "moisture.rot.gettingwet": "Намокання",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

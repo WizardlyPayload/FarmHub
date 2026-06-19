@@ -180,33 +180,54 @@ function mergeBaleBuckets(primary, secondary) {
     return out;
 }
 
+/** Per-farm totals from field collector (`baleCountOnField` / `baleOnFieldByCategory`). */
+function aggregateOnFieldBucketsFromFields(fields) {
+    const byFarm = {};
+    for (const f of toArr(fields)) {
+        const n = Number(f?.baleCountOnField) || 0;
+        const fid = String(Number(f.ownerFarmId || f.farmId) || 1);
+        if (!byFarm[fid]) {
+            byFarm[fid] = { total: 0, bucket: emptyBaleBucket() };
+        }
+        byFarm[fid].total += n;
+        const cat = f?.baleOnFieldByCategory;
+        if (cat && typeof cat === 'object' && sumBaleBucket(cat) > 0) {
+            byFarm[fid].bucket = mergeBaleBuckets(byFarm[fid].bucket, cat);
+        }
+    }
+    for (const entry of Object.values(byFarm)) {
+        const bucketSum = sumBaleBucket(entry.bucket);
+        if (entry.total > bucketSum) {
+            entry.bucket = mergeBaleBuckets(entry.bucket, {
+                ...emptyBaleBucket(),
+                other: (Number(entry.bucket.other) || 0) + (entry.total - bucketSum),
+            });
+        } else if (bucketSum === 0 && entry.total > 0) {
+            entry.bucket = mergeBaleBuckets(entry.bucket, { ...emptyBaleBucket(), other: entry.total });
+        }
+    }
+    return byFarm;
+}
+
 function supplementOnFieldFromFields(baleInventory, fields) {
     const inv = baleInventory && typeof baleInventory === 'object'
         ? { ...baleInventory, byFarm: { ...(baleInventory.byFarm || {}) } }
         : { byFarm: {} };
-    const farmLegacyTotals = {};
-    for (const f of toArr(fields)) {
-        const n = Number(f?.baleCountOnField) || 0;
-        const fid = String(Number(f.ownerFarmId || f.farmId) || 1);
+    const fieldAgg = aggregateOnFieldBucketsFromFields(fields);
+    for (const [fid, agg] of Object.entries(fieldAgg)) {
         const row = inv.byFarm[fid] || { onField: emptyBaleBucket(), inStorage: emptyBaleBucket() };
         const haveOnField = sumBaleBucket(row.onField);
-        const cat = f?.baleOnFieldByCategory;
-        if (haveOnField === 0 && cat && typeof cat === 'object' && sumBaleBucket(cat) > 0) {
-            row.onField = mergeBaleBuckets(row.onField, cat);
-        } else if (haveOnField === 0 && n > 0) {
-            farmLegacyTotals[fid] = (farmLegacyTotals[fid] || 0) + n;
+        // Field scan is authoritative when the world-entity bale scan is empty or partial (budget cap).
+        if (agg.total > haveOnField) {
+            row.onField = { ...agg.bucket, byFillType: { ...(agg.bucket.byFillType || {}) } };
         }
         row.offField = row.inStorage || emptyBaleBucket();
         inv.byFarm[fid] = row;
     }
-    for (const [fid, total] of Object.entries(farmLegacyTotals)) {
-        const row = inv.byFarm[fid] || { onField: emptyBaleBucket(), inStorage: emptyBaleBucket() };
-        const have = sumBaleBucket(row.onField);
-        if (have === 0 && total > 0) {
-            row.onField = mergeBaleBuckets(row.onField, { ...emptyBaleBucket(), other: total });
+    for (const [fid, row] of Object.entries(inv.byFarm)) {
+        if (!fieldAgg[fid]) {
+            row.offField = row.inStorage || emptyBaleBucket();
         }
-        row.offField = row.inStorage || emptyBaleBucket();
-        inv.byFarm[fid] = row;
     }
     return inv;
 }

@@ -41,6 +41,20 @@ function _safe(value) {
     .replace(/'/g, "&#39;");
 }
 
+/** Lua empty tables and some API paths may yield `{}` instead of `[]`. */
+export function normalizeVehicleList(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === "object") return Object.values(raw);
+  return [];
+}
+
+/** True when the vehicles grid was rebuilt (section navigation) and needs a paint pass. */
+export function vehiclesGridNeedsPaint() {
+  const grid = document.getElementById("vehicles-grid");
+  if (!grid) return false;
+  return !grid.querySelector(".vehicle-card");
+}
+
 /** JSON may send farm ids as string or number — must match `applyApiMergedDataPayload` filtering. */
 export function vehicleMatchesActiveFarm(v, activeFarmId) {
   const vf = Number(v?.ownerFarmId ?? v?.farmId ?? 0);
@@ -915,6 +929,9 @@ export function showVehiclesSection() {
 
   this.bindVehiclesScrollPerf();
 
+  // Section HTML is replaced — stale fingerprint would skip card paint while summary cards still update.
+  this._lastVehicleCardsFingerprint = "";
+
   // Load and display vehicles
   this.loadVehicles();
 }
@@ -978,10 +995,14 @@ export function flushVehiclesUiRefresh() {
   this._vehiclesUiRefreshRaf = requestAnimationFrame(() => {
     this._vehiclesUiRefreshRaf = 0;
     this.updateVehicleSummaryCards();
+    const needsPaint = vehiclesGridNeedsPaint();
     if (typeof this.applyVehicleFilters === "function") {
       this.applyVehicleFilters();
+      if (needsPaint && !document.getElementById("vehicles-grid")?.querySelector(".vehicle-card")) {
+        this.renderVehicleCards(normalizeVehicleList(this.vehicles));
+      }
     } else {
-      this.renderVehicleCards(this.vehicles || []);
+      this.renderVehicleCards(normalizeVehicleList(this.vehicles));
     }
   });
 }
@@ -2233,19 +2254,20 @@ export async function loadVehicles() {
         : getAPIBaseURL();
     const response = await fetch(`${base}/api/vehicles`);
     if (response.ok) {
-      const allVehicles = await response.json();
-      const filtered = allVehicles
-        ? allVehicles.filter((v) => vehicleMatchesActiveFarm(v, farmId))
-        : [];
+      const allVehicles = normalizeVehicleList(await response.json());
+      const filtered = allVehicles.filter((v) =>
+        vehicleMatchesActiveFarm(v, farmId)
+      );
       const displayVehicles = filtered.filter((v) => !this.isStorageItem(v));
       const nextFp = vehicleListUiFingerprint(displayVehicles);
       const sameFleet =
         nextFp === this._lastVehicleCardsFingerprint &&
-        filtered.length === (this.vehicles?.length ?? 0);
+        filtered.length === normalizeVehicleList(this.vehicles).length;
+      const needsPaint = vehiclesGridNeedsPaint();
 
       this.vehicles = filtered;
       this.updateVehicleSummaryCards();
-      if (!sameFleet) {
+      if (!sameFleet || needsPaint) {
         if (typeof this.applyVehicleFilters === "function") {
           this.applyVehicleFilters();
         } else {
@@ -2263,7 +2285,7 @@ export async function loadVehicles() {
 }
 
 export function updateVehicleSummaryCards() {
-  const vehicles = this.vehicles || [];
+  const vehicles = normalizeVehicleList(this.vehicles);
   // Filter out storage items for summary counts
   const displayVehicles = vehicles.filter((v) => !this.isStorageItem(v));
   const totalCount = displayVehicles.length;
@@ -2823,7 +2845,7 @@ export function applyVehicleFilters() {
     document.getElementById("vehicle-status-filter")?.value || "";
 
   // Start by filtering to only show player-owned vehicles (ownerFarmId: 1) and exclude storage items
-  let filteredVehicles = [...(this.vehicles || [])].filter(
+  let filteredVehicles = normalizeVehicleList(this.vehicles).filter(
     (v) =>
       vehicleMatchesActiveFarm(v, this.activeFarmId || 1) &&
       !this.isStorageItem(v)
@@ -2915,7 +2937,7 @@ export function filterVehiclesBySummaryCard(filterType) {
   document.getElementById("vehicle-status-filter").value = "";
 
   // Apply the specific filter based on the summary card clicked, excluding storage items
-  let filteredVehicles = [...(this.vehicles || [])].filter(
+  let filteredVehicles = normalizeVehicleList(this.vehicles).filter(
     (v) => !this.isStorageItem(v)
   );
 

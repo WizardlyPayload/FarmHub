@@ -1,0 +1,23 @@
+{
+  "animalMode": "RL",
+  "idScheme": "composite-v1",
+  "pens": [
+    {
+      "animalCount": 46,
+      "id": "D:/home/sid_8556737/farmingSim_2025/profile/mods/FS25_Witcombe/map/placeables/cowBarn01/cowBarn01.xml:520",
+      "ts": 440.0296532
+    },
+    {
+      "animalCount": 49,
+      "id": "D:/home/sid_8556737/farmingSim_2025/profile/mods/FS25_Witcombe/map/placeables/cowBarnParlour/cowBarnParlour.xml:521",
+      "ts": 440.0485637
+    },
+    {
+      "animalCount": 0,
+      "id": "D:/home/sid_8556737/farmingSim_2025/profile/mods/FS25_Witcombe/map/placeables/sheepBarnSmall/sheepBarnSmall.xml:479",
+      "ts": 440.0540654
+    }
+  ],
+  "schemaVersion": 1,
+  "updatedAt": 440.0550757
+}

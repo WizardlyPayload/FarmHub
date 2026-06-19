@@ -572,7 +572,6 @@
   "settings.aboutAuthorJosh": "JoshWalki (Josh) — ideatore originale di Farm Dashboard, mod principale per FS25 e primo pannello di controllo in tempo reale per browser.",
   "settings.aboutAuthorWizardly": "WizardlyPayload — Applicazione desktop per Windows e continuazione di FarmHub: fattorie ospitate e multigiocatore, flussi di lavoro più approfonditi per campi e fattorie, sicurezza, traduzioni e aggiornamenti continui.",
   "settings.aboutLicenseTitle": "Licenza",
-  "settings.aboutLicenseBody": "Copyright © JoshWalki e WizardlyPayload. Tutti i diritti riservati. Questo software è proprietario; non è concessa alcuna licenza per copiare, modificare o distribuire senza autorizzazione scritta.",
   "settings.aboutGiantsNote": "Farming Simulator 25 e i relativi contenuti di gioco sono marchi registrati di GIANTS Software. Non sono affiliato con GIANTS.",
   "settings.aboutLinksTitle": "Collegamenti",
   "settings.aboutLinkGithub": "GitHub",
@@ -1406,5 +1405,6 @@
   "moisture.grade.poor": "Povero",
   "moisture.grade.wet": "Bagnato",
   "moisture.rot.rotting": "Marciume",
-  "moisture.rot.gettingwet": "Bagnarsi"
+  "moisture.rot.gettingwet": "Bagnarsi",
+  "settings.aboutLicenseBody": "Copyright © JoshWalki and WizardlyPayload. Free for personal and non-commercial use. Commercial use (paid products, services, or monetization) requires prior written permission — contact the authors via the FarmHub GitHub repository. See LICENSE in the repository for full terms."
 }

@@ -363,6 +363,10 @@ function buildFieldLiveFingerprints(luaFields, receivedAt) {
             phLimeBarMax: Number(f.phLimeBarMax) || 0,
             rollerLevel: Number(f.rollerLevel) || 0,
             weedLevel: Number(f.weedLevel) || 0,
+            moisture:
+                f.moisture && typeof f.moisture === 'object' && f.moisture.percent != null
+                    ? { ...f.moisture }
+                    : undefined,
         };
     }
     return out;
@@ -402,6 +406,20 @@ function enrichFieldFromLiveCache(base, cache) {
         out.targetPh = cache.targetPh;
         out.phLimeBarMin = cache.phLimeBarMin;
         out.phLimeBarMax = cache.phLimeBarMax;
+        enriched = true;
+    }
+    const cacheMoist = cache.moisture;
+    const baseMoist = out.moisture;
+    if (
+        cacheMoist &&
+        typeof cacheMoist === 'object' &&
+        cacheMoist.percent != null &&
+        (!baseMoist || baseMoist.percent == null)
+    ) {
+        out.moisture = {
+            ...cacheMoist,
+            enabled: cacheMoist.enabled !== false,
+        };
         enriched = true;
     }
     if (enriched) out._fieldLiveEnrichedFromCache = true;
@@ -667,6 +685,13 @@ function mergeData(luaData, xmlData, options = {}) {
     }
     if (!xmlData) {
         const base = buildFromLuaOnly(luaData);
+        if (fieldLiveCache && Object.keys(fieldLiveCache).length > 0) {
+            base.fields = toArr(base.fields).map((f) => {
+                const id = Number(f.farmlandId ?? f.id);
+                const cache = fieldLiveCache[id];
+                return cache ? enrichFieldFromLiveCache(f, cache) : f;
+            });
+        }
         return pruneMergedDataToPlayerFarms(
             attachDataTimestamps(base, { lastLuaAt, lastXmlAt })
         );
@@ -738,7 +763,8 @@ function mergeData(luaData, xmlData, options = {}) {
                              xmlBase.length > 0
                                  ? xmlBase
                                  : fixFieldOwnership(luaArr, xmlData.farmlandOwnership),
-                             luaArr
+                             luaArr,
+                             fieldLiveCache
                          );
                        })(),
 
@@ -855,6 +881,8 @@ function mergeWeather(luaWeather, xmlEnv) {
         // XML forecast is authoritative (exact game engine values)
         forecast           : xmlEnv.forecast?.length > 0 ? xmlEnv.forecast : (base.forecast || []),
         rawForecast        : xmlEnv.rawForecast || [],
+        // MoistureSystem block is live-only; never drop when merging with XML environment.
+        moisture           : base.moisture,
     };
 }
 
@@ -891,7 +919,7 @@ function fixFieldOwnership(luaFields, farmlandOwnership) {
  * Suggestions: computed in-game in FieldDataCollector.lua from live state. When both
  * XML and Lua exist for a field, only Lua’s suggestions are exposed (single source).
  */
-function mergeFields(xmlFields, luaFields) {
+function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
     // Normalise both to arrays — Lua serialises empty tables as {} not []
     const xmlArr = Array.isArray(xmlFields) ? xmlFields
         : (xmlFields && typeof xmlFields === 'object' ? Object.values(xmlFields) : []);
@@ -1017,10 +1045,14 @@ function mergeFields(xmlFields, luaFields) {
             sprayLevel: luaField.sprayLevel ?? xmlField.sprayLevel,
         };
 
+        const cacheKey = Number(luaField.farmlandId ?? luaField.id ?? xmlField.farmlandId ?? xmlField.id);
+        const cacheMoist = fieldLiveCache[cacheKey]?.moisture;
         const moistureBlock =
             luaField.moisture && typeof luaField.moisture === 'object'
                 ? luaField.moisture
-                : null;
+                : cacheMoist && typeof cacheMoist === 'object' && cacheMoist.percent != null
+                    ? { ...cacheMoist, enabled: cacheMoist.enabled !== false }
+                    : null;
 
         return {
             ...xmlField,    // XML base: soil state, ownership, crop, growthState

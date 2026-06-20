@@ -3,6 +3,27 @@
 
 FillTypeUtils = {}
 
+--- MoistureSystem CropValueMap.getGrade returns 1–4 (Grades.A–D); dashboard export/UI use letter grades.
+function FillTypeUtils.moistureGradeLetter(grade)
+    if grade == nil then return nil end
+    if type(grade) == "string" then
+        local s = string.upper(grade)
+        if s == "A" or s == "B" or s == "C" or s == "D" then return s end
+        return grade
+    end
+    local n = tonumber(grade)
+    if not n then return nil end
+    local cvm = rawget(_G, "CropValueMap")
+    if cvm and cvm.Grades then
+        if n == cvm.Grades.A then return "A" end
+        if n == cvm.Grades.B then return "B" end
+        if n == cvm.Grades.C then return "C" end
+        if n == cvm.Grades.D then return "D" end
+    end
+    local map = { [1] = "A", [2] = "B", [3] = "C", [4] = "D" }
+    return map[n]
+end
+
 local _catalog = nil
 FillTypeUtils._cropIndexMap = nil
 

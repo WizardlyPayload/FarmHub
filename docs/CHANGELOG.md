@@ -14,6 +14,45 @@ All notable changes to this project are recorded here. For GitHub release blurbs
 
 ---
 
+## 4.1.2 — Mod-config save no longer wipes mod settings (tester drop)
+
+**App:** `4.1.2` (`package.json`) · **Mod:** `3.3.21.0` (unchanged; `modDesc.xml` + `FarmDashboard.VERSION`; app requires **3.1.0.0+** via `modVersionPolicy.js`).
+
+### Fixed
+- **In-app "Save mod config" was a destructive full rewrite.** The desktop editor only knew 7 modules + 4 settings, but the mod writes ~20 tuning settings plus the `stock` and `redTape` modules. Saving from the app replaced the whole `config.xml`, silently dropping `diagnostics`, every `*PerFrame` budget, `stock`/`redTape`, and the `collectionSafetyV*Applied` flags — so the mod reverted them to defaults on next load (and could re-trigger one-time migrations). The writer is now a **read-modify-write merge** (`modConfigXml.js`): it patches only the editor-managed keys and preserves everything else verbatim. `stock`/`redTape` are now also parsed/round-tripped.
+
+### Changed
+- Config XML parse/merge logic extracted to `modConfigXml.js` (pure, unit-tested).
+
+### Docs / security
+- Tester gate (`Website/js/testers-gate.js`) annotated as a **convenience gate, not a security boundary** — real protection of `/t/fs25-beta/*` (page **and** `files/`) must be enforced by nginx Basic / Cloudflare Access (already documented in `Website/README.md`).
+
+### Tests
+- **307** Jest tests (added `modConfigXml.test.js` — verifies a save preserves unmanaged keys and round-trips `stock`/`redTape`).
+
+---
+
+## 4.1.1 — Security hardening + offline moisture (tester drop)
+
+**App:** `4.1.1` (`package.json`) · **Mod:** `3.3.21.0` (`modDesc.xml` + `FarmDashboard.VERSION`; app requires **3.1.0.0+** via `modVersionPolicy.js`).
+
+### Security
+- **CORS lockdown** (`main.js`, new `corsPolicy.js`) — cross-origin requests are now allowed only from loopback, **this machine's own NIC IPs on the dashboard port**, and the authorized `farmdashboard.co.uk` domains. Closes a flaw where any page served on port `8766` could read loopback dashboard data cross-origin. Same hardening applied to the write-origin/CSRF check.
+- **`/api/status`** — drops `savegameName`; public/unauthenticated payload is now non-PII map/count metadata only.
+- **HTTP API body cap** — explicit `express.json({ limit: '256kb' })`.
+- **`fileReadRetry.js`** — bounded the `sleepSync` fallback so a missing `SharedArrayBuffer` can't cause a CPU busy-spin / freeze.
+
+### Mod
+- **`FarmDashboard.VERSION`** corrected `3.3.20.0` → `3.3.21.0` so the exported `serverInfo.modVersion` (and the in-app mod badge / compatibility check) matches `modDesc.xml`.
+
+### Offline / last-known state
+- Field soil moisture, environment (MoistureSystem) moisture, and bale moisture now persist across game/server shutdown and minimal exports (`dataMerger.js`, `mergedSnapshotHold.js`), so the dashboard shows last-known status for save/server selection while offline.
+
+### Tests
+- **297** Jest tests (added `corsPolicy.test.js`, `fieldMoistureCache.test.js`).
+
+---
+
 ## 4.1.0 — Fleet map, storage inventory, integrations
 
 **App:** `4.1.0` (`package.json`) · **Mod:** `3.1.0.0` (`modDesc.xml` + Lua; app requires **3.1.0.0+** via `modVersionPolicy.js`).

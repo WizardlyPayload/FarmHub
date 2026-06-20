@@ -43,6 +43,93 @@ function fieldsSectionDegraded(fields) {
     return !arr.some((f) => f && Number(f.hectares) > 0);
 }
 
+function fieldHasMoisture(field) {
+    return !!(field && field.moisture && field.moisture.percent != null);
+}
+
+/** Keep per-field soil moisture when a new export still has hectares but MoistureSystem stopped. */
+function mergeFieldsMoistureForward(prevFields, nextFields) {
+    const prevArr = toArr(prevFields);
+    const nextArr = toArr(nextFields);
+    if (prevArr.length === 0 || nextArr.length === 0) return nextArr;
+    const prevById = new Map();
+    for (const f of prevArr) {
+        if (!fieldHasMoisture(f)) continue;
+        const id = Number(f.farmlandId ?? f.id);
+        if (id > 0) prevById.set(id, f.moisture);
+    }
+    if (prevById.size === 0) return nextArr;
+    return nextArr.map((f) => {
+        const id = Number(f.farmlandId ?? f.id);
+        const prevMoist = id > 0 ? prevById.get(id) : null;
+        if (prevMoist && !fieldHasMoisture(f)) {
+            return {
+                ...f,
+                moisture: { ...prevMoist, enabled: prevMoist.enabled !== false },
+            };
+        }
+        return f;
+    });
+}
+
+function weatherMoisturePresent(weather) {
+    const m = weather && weather.moisture;
+    return !!(m && m.enabled !== false && m.currentPercent != null);
+}
+
+function baleMoistureHasData(baleInventory) {
+    const m = baleInventory && baleInventory.moisture;
+    if (!m || m.enabled === false) return false;
+    const byFarm = m.byFarm;
+    if (!byFarm || typeof byFarm !== 'object') return false;
+    return Object.values(byFarm).some((row) => {
+        if (!row || row.enabled === false) return false;
+        const grades = row.gradeCounts;
+        if (grades && typeof grades === 'object' && Object.values(grades).some((n) => Number(n) > 0)) {
+            return true;
+        }
+        return Array.isArray(row.worst) && row.worst.length > 0;
+    });
+}
+
+function mergeWeatherMoistureForward(prev, next) {
+    if (!next || !prev) return next;
+    if (weatherMoisturePresent(next.weather)) return next;
+    if (!weatherMoisturePresent(prev.weather)) return next;
+    return {
+        ...next,
+        weather: {
+            ...(next.weather || {}),
+            moisture: { ...(prev.weather.moisture || {}) },
+        },
+    };
+}
+
+function mergeBaleMoistureForward(prev, next) {
+    if (!next || !prev) return next;
+    if (baleMoistureHasData(next.baleInventory)) return next;
+    if (!baleMoistureHasData(prev.baleInventory)) return next;
+    return {
+        ...next,
+        baleInventory: {
+            ...(next.baleInventory || {}),
+            moisture: JSON.parse(JSON.stringify(prev.baleInventory.moisture)),
+        },
+    };
+}
+
+function mergeMoistureSectionsForward(prev, next) {
+    if (!prev || !next) return next;
+    let out = next;
+    if (Array.isArray(out.fields)) {
+        const mergedFields = mergeFieldsMoistureForward(prev.fields, out.fields);
+        if (mergedFields !== out.fields) out = { ...out, fields: mergedFields };
+    }
+    out = mergeWeatherMoistureForward(prev, out);
+    out = mergeBaleMoistureForward(prev, out);
+    return out;
+}
+
 /** True when data.json looks like a full in-game export (vs {} / minimal writes on FS exit). */
 function isRichLuaExport(lua) {
     if (!lua || typeof lua !== 'object') return false;
@@ -161,7 +248,23 @@ function updateLiveSectionBackup(state, merged, hydratedLua) {
     }
     for (const src of sources) {
         if (!fieldsSectionDegraded(src.fields)) {
-            state.liveSectionBackup.fields = cloneMerged(toArr(src.fields));
+            const nextFields = cloneMerged(toArr(src.fields));
+            const prevFields = state.liveSectionBackup.fields;
+            state.liveSectionBackup.fields = prevFields
+                ? mergeFieldsMoistureForward(prevFields, nextFields)
+                : nextFields;
+            break;
+        }
+    }
+    for (const src of sources) {
+        if (weatherMoisturePresent(src.weather)) {
+            state.liveSectionBackup.weather = cloneMerged(src.weather);
+            break;
+        }
+    }
+    for (const src of sources) {
+        if (baleMoistureHasData(src.baleInventory)) {
+            state.liveSectionBackup.baleInventory = cloneMerged(src.baleInventory);
             break;
         }
     }
@@ -232,6 +335,43 @@ function applyLiveSectionHold(merged, state, rawLuaData, hydratedLuaData) {
         held = true;
     }
 
+    const backupWeather = state.liveSectionBackup && state.liveSectionBackup.weather;
+    const holdWeather =
+        (backupWeather && weatherMoisturePresent(backupWeather) && backupWeather) ||
+        (snap && weatherMoisturePresent(snap.weather) && snap.weather) ||
+        null;
+    if (!weatherMoisturePresent(out.weather) && holdWeather) {
+        out = {
+            ...out,
+            weather: { ...(out.weather || {}), moisture: cloneMerged(holdWeather.moisture) },
+        };
+        held = true;
+    }
+
+    const backupBale = state.liveSectionBackup && state.liveSectionBackup.baleInventory;
+    const holdBale =
+        (backupBale && baleMoistureHasData(backupBale) && backupBale) ||
+        (snap && baleMoistureHasData(snap.baleInventory) && snap.baleInventory) ||
+        null;
+    if (!baleMoistureHasData(out.baleInventory) && holdBale) {
+        out = {
+            ...out,
+            baleInventory: {
+                ...(out.baleInventory || {}),
+                moisture: cloneMerged(holdBale.moisture),
+            },
+        };
+        held = true;
+    }
+
+    if (Array.isArray(out.fields) && holdFields) {
+        const mergedMoist = mergeFieldsMoistureForward(holdFields, out.fields);
+        if (mergedMoist !== out.fields) {
+            out = { ...out, fields: mergedMoist };
+            held = true;
+        }
+    }
+
     if (!held) return merged;
 
     return {
@@ -254,7 +394,12 @@ function mergeSnapshotSectionsForward(prev, next) {
     }
     if (fieldsSectionDegraded(out.fields) && !fieldsSectionDegraded(prev.fields)) {
         out = { ...out, fields: cloneMerged(toArr(prev.fields)) };
+    } else if (Array.isArray(out.fields) && Array.isArray(prev.fields)) {
+        const mergedFields = mergeFieldsMoistureForward(prev.fields, out.fields);
+        if (mergedFields !== out.fields) out = { ...out, fields: mergedFields };
     }
+    out = mergeWeatherMoistureForward(prev, out);
+    out = mergeBaleMoistureForward(prev, out);
     return out;
 }
 
@@ -289,6 +434,11 @@ function buildHeldPayloadFromState(state) {
 module.exports = {
     productionLooksEmpty,
     fieldsSectionDegraded,
+    fieldHasMoisture,
+    mergeFieldsMoistureForward,
+    weatherMoisturePresent,
+    baleMoistureHasData,
+    mergeMoistureSectionsForward,
     isRichLuaExport,
     isRenderableMerged,
     mergedContentScore,

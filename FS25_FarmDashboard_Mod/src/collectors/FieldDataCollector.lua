@@ -66,7 +66,11 @@ local function _attachFieldMoisture(fData, cx, cz)
     local fi = tonumber(fData.fruitTypeIndex) or 0
     if fi > 0 and _G.CropValueMap and _G.CropValueMap.getGrade then
         local okG, grade = pcall(function() return _G.CropValueMap.getGrade(fi, tonumber(mFrac) or 0) end)
-        if okG and grade then block.grade = grade end
+        if okG and grade and FillTypeUtils.moistureGradeLetter then
+            block.grade = FillTypeUtils.moistureGradeLetter(grade)
+        elseif okG and grade then
+            block.grade = grade
+        end
     end
     fData.moisture = block
 end
@@ -94,7 +98,11 @@ local function _recordBaleMoisture(moistureByFarm, baleItem, ownerFarmId)
     local grade = nil
     if moistureFrac ~= nil and _G.CropValueMap and _G.CropValueMap.getGrade then
         local okG, g = pcall(function() return _G.CropValueMap.getGrade(fillTypeIndex, moistureFrac) end)
-        if okG and g then grade = g end
+        if okG and g and FillTypeUtils.moistureGradeLetter then
+            grade = FillTypeUtils.moistureGradeLetter(g)
+        elseif okG and g then
+            grade = g
+        end
     end
     if grade and row.gradeCounts[grade] ~= nil then
         row.gradeCounts[grade] = row.gradeCounts[grade] + 1
@@ -1297,8 +1305,8 @@ function FieldDataCollector:_collectImpl()
             end
         end
 
-        -- 1d. Grass: minimum growth state across field samples â€” the first hit offset often stays on the last
-        -- "tall" stage briefly after mowing while other strips already read regrowth (fixes stale harvest_ready).
+        -- 1d. Grass: sample growth across the parcel. Use field centre when growth is uniform (matches
+        -- in-game field map). Use minimum only when spread is large or engine stage > map cap (mown mix).
         do
             local fi = fData.fruitTypeIndex or 0
             if fi > 0 and _G.g_fruitTypeManager and probeState and type(probeState.update) == "function" then
@@ -1315,21 +1323,34 @@ function FieldDataCollector:_collectImpl()
                         if not ok or not fm then return false end
                         return fm.id == myFarmlandId
                     end
-                    local localMin = fData.growthState or 999
                     local grassOffsets = {
                         {0, 0}, {5, 5}, {-5, -5}, {5, -5}, {-5, 5},
                         {12, 0}, {-12, 0}, {0, 12}, {0, -12},
                         {20, 0}, {-20, 0}, {0, 20}, {0, -20},
                     }
+                    local centerGs, localMin, localMax = nil, nil, nil
                     for _, off in ipairs(grassOffsets) do
                         local sx, sz = cx + off[1], cz + off[2]
                         if sampleOnThisFarmland(sx, sz) then
                             pcall(function() probeState:update(sx, sz) end)
                             local g = probeState.growthState
-                            if g ~= nil and probeState.fruitTypeIndex == fi and g < localMin then localMin = g end
+                            if g ~= nil and probeState.fruitTypeIndex == fi then
+                                if off[1] == 0 and off[2] == 0 then centerGs = g end
+                                if localMin == nil or g < localMin then localMin = g end
+                                if localMax == nil or g > localMax then localMax = g end
+                            end
                         end
                     end
-                    if localMin < 999 then fData.growthState = localMin end
+                    if localMin ~= nil then
+                        local spread = (localMax or localMin) - localMin
+                        if (localMax or localMin) > GRASS_GROWTH_STAGES or spread >= 2 then
+                            fData.growthState = localMin
+                        elseif centerGs ~= nil then
+                            fData.growthState = centerGs
+                        else
+                            fData.growthState = localMax or localMin
+                        end
+                    end
                 end
             end
         end

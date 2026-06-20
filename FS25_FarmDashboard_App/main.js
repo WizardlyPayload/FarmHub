@@ -54,6 +54,7 @@ const {
     FTP_SAVEGAME_XML_DOWNLOAD_ORDER,
 } = require('./xmlCollector');
 const { mergeData, buildFieldLiveFingerprints } = require('./dataMerger');
+const { isCorsOriginAllowed: corsOriginAllowedPure, isLocalServerHost: isLocalServerHostPure } = require('./corsPolicy');
 const { hydrateLuaDataAnimalsFromDetails } = require('./detailAnimalsHydrate');
 const { loadServerCache, saveServerCache, appendFieldHistory } = require('./serverDataCache');
 const { initAppUpdater, checkForUpdatesNow } = require('./app-updater');
@@ -718,19 +719,23 @@ const MARKETING_SITE_HOSTS = new Set([
     'demo.farmdashboard.co.uk',
 ]);
 
+/**
+ * True when `host` is a hostname this dashboard legitimately serves from:
+ * loopback, or one of THIS machine's own NIC IPs (so http://<thisPcLanIp>:PORT works).
+ * Deliberately NOT "any host on the dashboard port" — that let attacker pages on :PORT
+ * read loopback data cross-origin.
+ */
+function isLocalServerHost(hostname) {
+    return isLocalServerHostPure(hostname, getCachedLocalInterfaceIps());
+}
+
 function corsOriginAllowed(origin, callback) {
-    if (!origin) return callback(null, true);
-    try {
-        const u = new URL(origin);
-        const host = String(u.hostname || '').toLowerCase();
-        if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') return callback(null, true);
-        if (MARKETING_SITE_HOSTS.has(host)) return callback(null, true);
-        const p = u.port || (u.protocol === 'https:' ? '443' : '80');
-        if (String(p) === String(PORT)) return callback(null, true);
-    } catch (_) {
-        /* ignore */
-    }
-    return callback(null, false);
+    const allowed = corsOriginAllowedPure(origin, {
+        port: PORT,
+        marketingHosts: MARKETING_SITE_HOSTS,
+        localIps: getCachedLocalInterfaceIps(),
+    });
+    return callback(null, allowed);
 }
 
 /**
@@ -835,7 +840,8 @@ function allowLanModExportHttp() {
 }
 
 expressApp.use(cors({ origin: corsOriginAllowed }));
-expressApp.use(express.json());
+// Explicit cap (config saves are small JSON). Per-route parsers may set tighter limits (e.g. livestock 8kb).
+expressApp.use(express.json({ limit: '256kb' }));
 expressApp.use(lanAccessHttpMiddleware);
 expressApp.get('/simhub', (_req, res) => {
     res.redirect(302, '/simhub.html');
@@ -1123,11 +1129,14 @@ function isAllowedSameOrigin(originStr, req) {
     if (!originStr) return false;
     try {
         const u = new URL(originStr);
-        if (u.hostname === '127.0.0.1' || u.hostname === 'localhost') return true;
-        if (String(u.port || (u.protocol === 'https:' ? 443 : 80)) === String(PORT)) return true;
-        // Same hostname as the request itself (LAN tablet hitting <hostIp>:8766 with same origin).
-        const hostHeader = String(req.headers && req.headers.host || '').split(':')[0];
-        if (hostHeader && u.hostname === hostHeader) return true;
+        const host = String(u.hostname || '').toLowerCase();
+        const port = String(u.port || (u.protocol === 'https:' ? 443 : 80));
+        if (port !== String(PORT)) return false;
+        // Loopback or this machine's own NIC IPs only — not an arbitrary host on the dashboard port.
+        if (isLocalServerHost(host)) return true;
+        // LAN tablet hitting <hostIp>:PORT with a matching Host header (still must be one of our IPs).
+        const hostHeader = String((req.headers && req.headers.host) || '').split(':')[0].toLowerCase();
+        if (hostHeader && host === hostHeader && isLocalServerHost(hostHeader)) return true;
     } catch (_) { /* ignore */ }
     return false;
 }
@@ -1263,7 +1272,8 @@ function buildPublicStatusPayload() {
     const vehicles = Array.isArray(m.vehicles) ? m.vehicles : [];
     payload.mapTitle = m.mapTitle || m.serverInfo?.mapName || null;
     payload.mapId = m.mapId || m.serverInfo?.mapId || null;
-    payload.savegameName = m.savegameName || null;
+    // savegameName intentionally omitted: it can be a user-chosen string and /api/status is reachable
+    // unauthenticated on LAN. Keep the public payload to non-PII map/count metadata only.
     payload.lastUpdated = m.lastUpdated || null;
     payload.fieldCount = fields.length;
     payload.vehicleCount = vehicles.length;
@@ -3038,54 +3048,7 @@ function getModConfigPath() {
     return path.join(getModConfigDir(), 'config.xml');
 }
 
-function parseModConfigXml(text) {
-    const base = {
-        updateInterval: 10000,
-        collectionCycleMs: 60000,
-        minWriteIntervalMs: 4000,
-        baleScanIntervalCycles: 1,
-        modules: {
-            animals: true,
-            vehicles: true,
-            weather: true,
-            fields: true,
-            finance: true,
-            economy: true,
-            production: true
-        }
-    };
-    if (!text || typeof text !== 'string') return base;
-    const ui = text.match(/updateInterval\s*=\s*"(\d+)"/i);
-    const cc = text.match(/collectionCycleMs\s*=\s*"(\d+)"/i);
-    if (ui) base.updateInterval = Math.max(1000, parseInt(ui[1], 10) || base.updateInterval);
-    if (cc) base.collectionCycleMs = Math.max(5000, parseInt(cc[1], 10) || base.collectionCycleMs);
-    const mwi = text.match(/minWriteIntervalMs\s*=\s*"(\d+)"/i);
-    if (mwi) base.minWriteIntervalMs = Math.max(2000, Math.min(60000, parseInt(mwi[1], 10) || base.minWriteIntervalMs));
-    const bsc = text.match(/baleScanIntervalCycles\s*=\s*"(\d+)"/i);
-    if (bsc) base.baleScanIntervalCycles = Math.max(1, Math.min(20, parseInt(bsc[1], 10) || base.baleScanIntervalCycles));
-    const modNames = ['animals', 'vehicles', 'weather', 'fields', 'finance', 'economy', 'production'];
-    for (const m of modNames) {
-        const re = new RegExp(`${m}\\s*=\\s*"(true|false)"`, 'i');
-        const mm = text.match(re);
-        if (mm) base.modules[m] = mm[1].toLowerCase() === 'true';
-    }
-    return base;
-}
-
-function buildModConfigXml(cfg) {
-    const u = Math.max(1000, Math.min(600000, Number(cfg.updateInterval) || 10000));
-    const c = Math.max(5000, Math.min(1800000, Number(cfg.collectionCycleMs) || 60000));
-    const minW = Math.max(2000, Math.min(60000, Number(cfg.minWriteIntervalMs) || 4000));
-    const baleN = Math.max(1, Math.min(20, Number(cfg.baleScanIntervalCycles) || 1));
-    const M = cfg.modules || {};
-    const b = (k) => (M[k] === false ? 'false' : 'true');
-    return `<?xml version="1.0" encoding="utf-8"?>
-<farmDashboard>
-    <settings updateInterval="${u}" collectionCycleMs="${c}" minWriteIntervalMs="${minW}" baleScanIntervalCycles="${baleN}"/>
-    <modules animals="${b('animals')}" vehicles="${b('vehicles')}" weather="${b('weather')}" fields="${b('fields')}" finance="${b('finance')}" economy="${b('economy')}" production="${b('production')}"/>
-</farmDashboard>
-`;
-}
+const { parseModConfigXml, buildModConfigXml } = require('./modConfigXml');
 
 ipcMain.handle('get-mod-config', async () => {
     const p = getModConfigPath();
@@ -3107,7 +3070,13 @@ ipcMain.handle('save-mod-config', async (_e, cfg) => {
     const p = getModConfigPath();
     try {
         await fs.promises.mkdir(getModConfigDir(), { recursive: true });
-        await fs.promises.writeFile(p, buildModConfigXml(cfg || {}), 'utf8');
+        let existing = null;
+        try {
+            if (await pathExists(p)) existing = await readFileUtf8WithRetryAsync(p);
+        } catch (_) {
+            existing = null;
+        }
+        await fs.promises.writeFile(p, buildModConfigXml(cfg || {}, existing), 'utf8');
         return { ok: true, path: p };
     } catch (e) {
         return { ok: false, error: e.message };

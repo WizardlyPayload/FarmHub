@@ -11,22 +11,28 @@ export function formatMoisturePercent(pct) {
 
 export function moistureGradeLabel(grade) {
   if (grade == null || grade === "") return "—";
-  const key = `moisture.grade.${String(grade).toLowerCase()}`;
+  const g = String(grade).toLowerCase();
+  const letterToKey = { a: "premium", b: "good", c: "average", d: "poor" };
+  const slug = letterToKey[g] || g;
+  const key = `moisture.grade.${slug}`;
   const out = t(key);
   return out === key ? String(grade) : out;
 }
 
 export function moistureRotLabel(rot) {
   if (!rot) return "";
-  const key = `moisture.rot.${String(rot).toLowerCase()}`;
+  const norm = String(rot).toLowerCase().replace(/_/g, "");
+  const alias =
+    norm === "rottingslowly" || norm === "rottingquickly" ? "rotting" : norm;
+  const key = `moisture.rot.${alias}`;
   const out = t(key);
   return out === key ? String(rot) : out;
 }
 
 export function moistureRotBadgeClass(rot) {
-  const r = String(rot || "").toLowerCase();
-  if (r === "rotting") return "bg-danger";
-  if (r === "gettingwet" || r === "getting_wet") return "bg-warning text-dark";
+  const r = String(rot || "").toLowerCase().replace(/_/g, "");
+  if (r === "rotting" || r === "rottingslowly" || r === "rottingquickly") return "bg-danger";
+  if (r === "gettingwet") return "bg-warning text-dark";
   return "bg-secondary";
 }
 

@@ -9,8 +9,10 @@ function sleepSync(ms) {
         const sab = new SharedArrayBuffer(4);
         Atomics.wait(new Int32Array(sab), 0, 0, n);
     } catch {
-        const end = Date.now() + n;
-        while (Date.now() < end) { /* sync fallback */ }
+        // No SharedArrayBuffer: never spin the CPU for the full delay (that would freeze the
+        // process). Cap the busy-wait fallback so a missing primitive can't cause a long hang.
+        const end = Date.now() + Math.min(n, 100);
+        while (Date.now() < end) { /* bounded fallback */ }
     }
 }
 

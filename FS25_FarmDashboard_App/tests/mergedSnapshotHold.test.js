@@ -209,15 +209,16 @@ describe('mergedSnapshotHold', () => {
     test('updateLastGoodMergedSnapshot keeps good fields when next write has degraded fields', () => {
         const state = {
             lastGoodMergedSnapshot: {
-                fields: [{ id: 28, hectares: 3.1 }],
+                fields: [{ id: 28, hectares: 3.1, moisture: { enabled: true, percent: 14.2 } }],
                 vehicles: [{ id: 'v1' }],
             },
         };
         updateLastGoodMergedSnapshot(
             state,
-            { fields: [{ id: 28, fruitType: 'GRASS' }], vehicles: [{ id: 'v1' }] },
+            { fields: [{ id: 28, fruitType: 'GRASS', hectares: 3.1 }], vehicles: [{ id: 'v1' }] },
             { vehicles: [{ id: 'v1' }], finance: { money: 100 }, weather: {}, gameTime: { day: 1 }, economy: {}, fields: [], animals: [], production: {}, farmInfo: [], serverInfo: {}, timestamp: 1 }
         );
         expect(state.lastGoodMergedSnapshot.fields[0].hectares).toBe(3.1);
+        expect(state.lastGoodMergedSnapshot.fields[0].moisture.percent).toBe(14.2);
     });
 });

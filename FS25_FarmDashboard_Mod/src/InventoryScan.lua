@@ -141,7 +141,9 @@ local function _moistureGrade(uniqueId, fillTypeIndex)
         local okG, g = pcall(function()
             return _G.CropValueMap.getGrade(fillTypeIndex, (tonumber(moisture) or 0) / 100)
         end)
-        if okG and g then grade = g end
+        if okG and g then
+            grade = (FillTypeUtils and FillTypeUtils.moistureGradeLetter and FillTypeUtils.moistureGradeLetter(g)) or g
+        end
     end
     return moisture, grade
 end

@@ -1,6 +1,6 @@
 # Farm Dashboard — Changelog
 
-All notable changes to this project are recorded here. For GitHub release blurbs, see [GITHUB_RELEASE_v4.1.0.md](./GITHUB_RELEASE_v4.1.0.md). For **network exposure and trust assumptions**, see [SECURITY.md](./SECURITY.md).
+All notable changes to this project are recorded here. For GitHub release blurbs, see [GITHUB_RELEASE_v4.1.5.md](./GITHUB_RELEASE_v4.1.5.md) (current) · [GITHUB_RELEASE_v4.1.0.md](./GITHUB_RELEASE_v4.1.0.md). For **network exposure and trust assumptions**, see [SECURITY.md](./SECURITY.md).
 
 ---
 
@@ -11,6 +11,60 @@ All notable changes to this project are recorded here. For GitHub release blurbs
 | **Desktop app** | `FS25_FarmDashboard_App/package.json` | Semver (e.g. `4.1.0`) |
 | **FS25 mod** | `FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `3.1.0.0`) |
 | **Source headers** | First line of many `.js` / `.lua` files | Often `v2.0.0` historically; bump only when you intentionally resync headers |
+
+---
+
+## 4.1.5 — Accurate store images for equipment (tester drop)
+
+**App:** `4.1.5` (`package.json`) · **Mod:** `3.3.21.2` (`modDesc.xml` + `FarmDashboard.VERSION`; app requires **3.1.0.0+** via `modVersionPolicy.js`).
+
+### Fixed
+- **Wrong picture shown for some equipment.** The dashboard used to pick a vehicle's image by **fuzzy-matching its display name**, which could land on a sibling/variant icon (e.g. the wrong trim of a tractor, or a same-series implement). The mod now exports the game's own store-icon basename per vehicle (`storeItem.imageFilename` → e.g. `store_t7`), and the app resolves that **exactly** against its shipped image library before any fuzzy guessing. Base-game equipment is now authoritative out of the box; ambiguous/unknown tokens still fall back to the existing fuzzy match, so nothing regresses.
+- **Duplicate vehicles on the fleet tab.** The same physical vehicle could appear twice on dedicated servers when live Lua positions differed from saved XML (merge paired only by position), or briefly when the UI re-rendered the full unfiltered fleet before active-farm filters applied. `mergeVehicles` now pairs Lua/XML records by stable **config file + farm** (position is a tiebreaker only); fleet refresh scopes summary cards and the grid to the active farm.
+
+### Changed
+- **Mod (`VehicleDataCollector.lua`):** exports a new `storeImage` field (the lowercased store-texture basename, no path) for each vehicle. Mod version `3.3.21.1` → `3.3.21.2`.
+- **App (`vehicles.js`):** new exact store-image index (curated `items/` + extracted `items_mod_extract/`), keyed by the `store_*`/`icon_*` basename; curated (base-game) hits win ties, ambiguous keys defer to fuzzy matching. The leaf token is parsed after the final `__` so nested-zip mod keys are handled.
+- **Mod-image extractor (`tools/Export-ModStoreImages.ps1`):** `store_*`/`icon_*` textures are now exported as `ModFolder__store_<basename>.png` (authoritative, exactly matchable) instead of by in-game display name. Non store/icon textures keep display-name naming for the fuzzy fallback. **Migration:** when re-run, any image already extracted under the old display-name convention is renamed in place to the new basename file and the old file is removed — only when that old file actually exists, so there are no duplicates and no re-conversion.
+
+### Tests
+- Full Jest suite + Node `--test` (.mjs) green, including `vehicleStoreImage.test.mjs` (token extraction, curated-vs-mod precedence, ambiguity/unknown fallback, nested-zip keys), `mergeVehicles.test.js` (moved-vehicle dedupe, same-model pairing, cross-farm isolation), `vehicleFarmScope.test.mjs` (active-farm grid scope), and a functional migration test of the mod-image extractor.
+
+---
+
+## 4.1.4 — Courseplay menu crash fix + livestock table/total agreement + grass field status (tester drop)
+
+**App:** `4.1.4` (`package.json`) · **Mod:** `3.3.21.1` (`modDesc.xml` + `FarmDashboard.VERSION`; app requires **3.1.0.0+** via `modVersionPolicy.js`).
+
+### Fixed
+- **Courseplay menu crash (`CpAIJobCombineUnloader.lua:93: attempt to call missing method 'isa' of table`).** Reproduced in single-player after buying a vehicle, then opening the Courseplay combine-unloader menu (it also affected dedicated hosts). Courseplay's `getUnloadingStations()` walks **every** station in `g_currentMission.storageSystem` and calls `station:isa(UnloadingStation)`. Our shop-spawn shield gives half-loaded objects `getOwnerFarmId()`/`getName()` so `accessHandler:canPlayerAccess(station)` doesn't throw — but that made `canPlayerAccess` return *true* for a not-yet-loaded placeholder station, so Courseplay then called `:isa()` on a plain table that has no such method, spamming the error every frame. `FarmDashboardCourseplayCompat.applyIdentityStubs` now also installs a conservative `isa()` (returns `false` for a placeholder — it isn't a real `UnloadingStation` yet) so Courseplay correctly *skips* it, exactly as it would have if `canPlayerAccess` had returned false. The stub is only added when `isa` is genuinely missing (real stations/vehicles expose it via their class), and is removed once the real class method is available, so no loaded object is ever shadowed.
+- **Livestock table now agrees with the pen total/summary (RealisticLivestock).** On a multi-component barn where a per-animal detail file shares a husbandry id with a *different* component, the detail hydrator could replace a pen's full aggregate (e.g. an 80-head Milking Parlour) with an incomplete 7-animal detail file — leaving the summary/total higher than the rows actually shown. The hydrator now **keeps the pen aggregate** whenever a detail file holds fewer heads than the pen already reports, and fans the clusters out to the full pen, so the table rows, the pen card, and the summary total always match.
+- **Mown grass fields no longer show as "Growing".** A grass field that was just cut (fresh, non-hay windrow present, standing crop below the tall ready-to-cut stage) was labelled "Growing · stage 2/4" because regrowth stages overlap the initial growth stages. The app now detects a fresh grass cut (`isFreshlyMownGrass`) and shows a **"Harvested"** badge with a **"Mown · regrowing"** progress bar, matching the game.
+
+### Changed
+- Mod `FarmDashboardCourseplayCompat` bumped to `v3.3.21` internally; mod version `3.3.21.0` → `3.3.21.1`.
+
+### Tests
+- Full Jest suite + Node `--test` (.mjs) green, including the hydrator skip-guard cases and the new `isFreshlyMownGrass` field-status coverage.
+
+---
+
+## 4.1.3 — Correct livestock counts for partially-captured pens (tester drop)
+
+**App:** `4.1.3` (`package.json`) · **Mod:** `3.3.21.0` (unchanged; `modDesc.xml` + `FarmDashboard.VERSION`; app requires **3.1.0.0+** via `modVersionPolicy.js`).
+
+### Fixed
+- **Livestock head counts were too low for some pens (RealisticLivestock).** On a pen where the mod's per-animal capture (`getClusters()`) only returned a subset of the herd, the dashboard counted the *captured rows* instead of the game's real total — e.g. a Milking Parlour with **71/100** in-game showed **7**. The mod already records the engine's authoritative `getNumOfAnimals()` as `numOfAnimalsReported` (the same "x/cap" number the game shows), so the app now **trusts that count** for pen totals and the livestock summary, using captured rows only as a floor. Pens that were already counted correctly (e.g. fully-captured 44/50) are unchanged.
+- The per-pen detail hydrator no longer overwrites `numOfAnimalsReported`/`animalCount` with the captured-row count, and now tags base-game cluster detail rows so every head is counted.
+- Average health is now weighted over the captured rows' own denominator, so partial capture can't dilute the percentage.
+
+> Note: counts/summaries now match the game. The livestock **table** still lists only the individual animals the mod managed to capture for an affected pen until RealisticLivestock exposes the rest; the totals are authoritative.
+
+### Changed
+- New pure, unit-tested `husbandryHeadCount()` helper in `pastures-warnings.js`; `pastures.js` and `livestock.js` delegate pen/summary counts to it.
+
+### Tests
+- **317** Jest tests (added hydrator count-reconciliation cases and `husbandryHeadCount` coverage).
 
 ---
 

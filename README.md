@@ -10,10 +10,10 @@ Real-time farm management dashboard for **Farming Simulator 25** — a Windows d
 
 | Download from Releases | Version |
 |------------------------|---------|
-| **`FS25 Farm Dashboard Setup 4.1.0.exe`** | Windows app |
+| **`FS25-Farm-Dashboard-Setup-4.1.5.exe`** | Windows app |
 | **`FS25_FarmDashboard.zip`** | FS25 mod |
 
-**Current stable line:** App **4.1.0** · Mod **3.1.0.0**
+**Current stable line:** App **4.1.5** · Mod **3.3.21.2**
 
 Install **mod first**, load your save once, then install the app. See **[docs/INSTALL.md](docs/INSTALL.md)** (detailed) or the quick steps below.
 
@@ -39,7 +39,7 @@ More UI shots and install screenshots: **[docs/USER_MANUAL.md](docs/USER_MANUAL.
 ## Quick install
 
 1. **Mod** — Put **`FS25_FarmDashboard.zip`** in `Documents\My Games\FarmingSimulator2025\mods\`, enable on your save, **load the save once**.
-2. **App** — Run **`FS25 Farm Dashboard Setup 4.1.0.exe`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
+2. **App** — Run **`FS25-Farm-Dashboard-Setup-4.1.5.exe`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
 3. **Configure** — **Settings → Servers & saves** (local path or FTP for dedicated servers).
 
 **Full guide:** [docs/USER_MANUAL.md](docs/USER_MANUAL.md) · **Install (detailed):** [docs/INSTALL.md](docs/INSTALL.md) · [GitHub Wiki](https://github.com/WizardlyPayload/FarmHub/wiki)
@@ -54,7 +54,7 @@ This repository (**[FarmHub](https://github.com/WizardlyPayload/FarmHub)**) is *
 |---------|------------|
 | **[JoshWalki / FarmDashboard](https://github.com/JoshWalki/FarmDashboard)** | Original FS25 mod + web dashboard (**Josh Walki**) |
 | **[WizardlyPayload / FS25-Farm-Dashboard](https://github.com/WizardlyPayload/FS25-Farm-Dashboard/releases)** | Public **2.0.0** release — Electron desktop fork of Josh’s work |
-| **[WizardlyPayload / FarmHub](https://github.com/WizardlyPayload/FarmHub/releases)** *(this repo)* | **4.1.0** line — fleet map, storage inventory, FTP/multi-server, rules engine, auto-update |
+| **[WizardlyPayload / FarmHub](https://github.com/WizardlyPayload/FarmHub/releases)** *(this repo)* | **4.1.5** line — fleet map, storage inventory, FTP/multi-server, rules engine, auto-update |
 
 **Coming from 2.0.0 or Josh’s repo?** See **[docs/UPGRADE_FROM_FS25-Farm-Dashboard.md](docs/UPGRADE_FROM_FS25-Farm-Dashboard.md)** for what changed.
 
@@ -62,10 +62,11 @@ This repository (**[FarmHub](https://github.com/WizardlyPayload/FarmHub)**) is *
 
 ---
 
-## What you get in 4.1.0
+## What you get in 4.1.5
 
 - **Live dashboard** — livestock, pastures, vehicles, fields, economy, productions, weather (port **8766**).
 - **Fleet map** — live vehicle pins on the save's PDA overview map.
+- **Accurate equipment pictures** — authoritative store-icon matching (app **4.1.5** + mod **3.3.21.2**).
 - **Storage & bales** — silo stock, on-field vs shed bale counts, fill-type breakdown (Economy → Storage).
 - **Local + FTP** — single-player / LAN host on disk, or dedicated server over FTP.
 - **Offline field rules** — suggested next steps from merged game data (no cloud service).
@@ -73,7 +74,7 @@ This repository (**[FarmHub](https://github.com/WizardlyPayload/FarmHub)**) is *
 - **27 languages**, themes, section backgrounds, unified Settings.
 - **Auto-update** (Windows app) and **mod version badge** when the in-game mod is behind.
 
-**Release notes:** [docs/GITHUB_RELEASE_v4.1.0.md](docs/GITHUB_RELEASE_v4.1.0.md) · **History:** [docs/CHANGELOG.md](docs/CHANGELOG.md)
+**Release notes:** [docs/GITHUB_RELEASE_v4.1.5.md](docs/GITHUB_RELEASE_v4.1.5.md) · **History:** [docs/CHANGELOG.md](docs/CHANGELOG.md)
 
 ---
 

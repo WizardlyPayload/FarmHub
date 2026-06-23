@@ -728,6 +728,18 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
     if storeItem and storeItem.name then
         vData.storeName = storeItem.name
     end
+    -- Authoritative store icon key: the game's own store image basename (e.g. ".../store_t7.dds"
+    -- -> "store_t7"). The desktop app keys its shipped image library by exactly this token, so
+    -- exporting it lets the dashboard pick the correct picture instead of fuzzy-matching the
+    -- localized display name (which mis-picks sibling/variant icons). Basename only — no path.
+    if storeItem and storeItem.imageFilename then
+        local img = tostring(storeItem.imageFilename)
+        local leaf = string.match(img, "([^/\\]+)$") or img
+        leaf = string.gsub(leaf, "%.%w+$", "")
+        if leaf ~= nil and leaf ~= "" then
+            vData.storeImage = string.lower(leaf)
+        end
+    end
     if vehicle.configFileName then
         vData.configFileName = vehicle.configFileName
     elseif vehicle.getConfigFileName then

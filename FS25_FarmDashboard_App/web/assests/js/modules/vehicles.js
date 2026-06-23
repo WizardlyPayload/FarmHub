@@ -96,6 +96,78 @@ const vehicleImageMatchCache = new Map();
 /** Full generateVehicleDisplay() results keyed by name|brand|type. */
 const vehicleDisplayCache = new Map();
 
+/**
+ * Exact store-icon index: FS25 store image basename ("store_t7") -> shipped PNG path(s).
+ * Built lazily from the curated items/ + items_mod_extract/ lists. The mod exports the same
+ * basename (storeItem.imageFilename), so this gives a deterministic, authoritative match that
+ * bypasses fuzzy name guessing. Curated (base-game) paths win ties; ambiguous keys fall through
+ * to fuzzy matching to avoid showing the wrong sibling. Map<token, { curated:[], mod:[] }>.
+ */
+let storeImageIndex = null;
+
+/**
+ * "<cat>__store_t7.png" / "FS25_x__icon_y.png" -> lowercased "store_t7" / "icon_y", else null.
+ * The export always appends the leaf after the FINAL "__" ("${modKey}__${leaf}"), and a mod key
+ * derived from a nested zip path can itself contain "__", so split on the LAST "__".
+ */
+export function extractStoreLeafToken(filenameRaw) {
+  if (!filenameRaw) return null;
+  const base = String(filenameRaw)
+    .replace(/^.*[/\\]/, "")
+    .replace(/\.png$/i, "");
+  const sepIdx = base.lastIndexOf("__");
+  const afterSep = sepIdx >= 0 ? base.slice(sepIdx + 2) : base;
+  const token = afterSep.toLowerCase();
+  return /^(store|icon)_.+/.test(token) ? token : null;
+}
+
+function buildStoreImageIndex() {
+  const idx = new Map();
+  const add = (list, folderPath, bucket) => {
+    for (const filenameRaw of list || []) {
+      const token = extractStoreLeafToken(filenameRaw);
+      if (!token) continue;
+      let entry = idx.get(token);
+      if (!entry) {
+        entry = { curated: [], mod: [] };
+        idx.set(token, entry);
+      }
+      entry[bucket].push(`${folderPath}${normalizeItemImageFilename(filenameRaw)}`);
+    }
+  };
+  add(itemsImageFilenames, "/assests/img/items/", "curated");
+  add(modExtractImageFilenames, "/assests/img/items_mod_extract/", "mod");
+  storeImageIndex = idx;
+  return idx;
+}
+
+/** Normalize the mod-exported store image hint to the index token form ("store_t7"). */
+function normalizeStoreImageHint(storeImage) {
+  if (!storeImage) return null;
+  const leaf = String(storeImage)
+    .replace(/^.*[/\\]/, "")
+    .replace(/\.[a-z0-9]+$/i, "")
+    .trim()
+    .toLowerCase();
+  return leaf || null;
+}
+
+/**
+ * Authoritative exact match from the game's own store image basename.
+ * Prefers a unique curated (base-game) hit, then a unique mod hit. Returns null when the token
+ * is unknown or maps to multiple files in the same bucket (ambiguous -> let fuzzy decide).
+ */
+export function resolveStoreImageExact(storeImage) {
+  const token = normalizeStoreImageHint(storeImage);
+  if (!token) return null;
+  if (!storeImageIndex) buildStoreImageIndex();
+  const entry = storeImageIndex.get(token);
+  if (!entry) return null;
+  if (entry.curated.length === 1) return entry.curated[0];
+  if (entry.curated.length === 0 && entry.mod.length === 1) return entry.mod[0];
+  return null;
+}
+
 function buildVehicleImageCacheKey(vehicleName, brandName, typeName) {
   return `${String(vehicleName ?? "")}\0${String(brandName ?? "")}\0${String(typeName ?? "")}`;
 }
@@ -138,10 +210,12 @@ function vehicleListUiFingerprint(vehicles) {
 
 export function primeItemImageFilenames(list) {
   itemsImageFilenames = Array.isArray(list) ? list : [];
+  storeImageIndex = null;
 }
 
 export function primeModExtractImageFilenames(list) {
   modExtractImageFilenames = Array.isArray(list) ? list : [];
+  storeImageIndex = null;
 }
 
 /** Prime both shop image lists (call before dashboard init or after mod image rescan). */
@@ -153,6 +227,7 @@ export function primeShopImageFilenames({ items, modExtract } = {}) {
 function clearVehicleImageMatchCaches(instance) {
   vehicleImageMatchCache.clear();
   vehicleDisplayCache.clear();
+  storeImageIndex = null;
   if (instance) {
     instance.vehicleImageCacheCurated = null;
     instance.vehicleImageCacheCuratedBuilt = false;
@@ -995,12 +1070,14 @@ export function flushVehiclesUiRefresh() {
   this._vehiclesUiRefreshRaf = requestAnimationFrame(() => {
     this._vehiclesUiRefreshRaf = 0;
     this.updateVehicleSummaryCards();
-    const needsPaint = vehiclesGridNeedsPaint();
     if (typeof this.applyVehicleFilters === "function") {
+      // applyVehicleFilters() is the single source of truth: it paints the grid scoped to the
+      // active farm (+ dropdown filters). Do NOT also renderVehicleCards(this.vehicles) here.
+      // renderVehicleCards clears the grid synchronously but inserts cards on a later
+      // requestAnimationFrame, so a synchronous `!grid.querySelector('.vehicle-card')` check
+      // ALWAYS saw the freshly-cleared grid and fired a second render of the full, unfiltered
+      // fleet (every player farm) — making the same model owned by two farms look duplicated.
       this.applyVehicleFilters();
-      if (needsPaint && !document.getElementById("vehicles-grid")?.querySelector(".vehicle-card")) {
-        this.renderVehicleCards(normalizeVehicleList(this.vehicles));
-      }
     } else {
       this.renderVehicleCards(normalizeVehicleList(this.vehicles));
     }
@@ -1009,11 +1086,9 @@ export function flushVehiclesUiRefresh() {
 
 // Generate vehicle display using local images
 export function generateVehicleDisplay(vehicleName, brandName, typeName, hints) {
-  const cacheKey = buildVehicleImageCacheKey(
-    vehicleName,
-    brandName,
-    typeName
-  );
+  const cacheKey =
+    buildVehicleImageCacheKey(vehicleName, brandName, typeName) +
+    (hints?.storeImage ? `\0${String(hints.storeImage).toLowerCase()}` : "");
   const cachedDisplay = vehicleDisplayCache.get(cacheKey);
   if (cachedDisplay) return cachedDisplay;
 
@@ -1107,13 +1182,22 @@ export function getLocalVehicleImage(vehicleName, brandName, typeName, hints) {
     return null;
   }
 
-  const cacheKey = buildVehicleImageCacheKey(
-    vehicleName,
-    brandName,
-    typeName
-  );
+  const storeImageHint = hints?.storeImage ? String(hints.storeImage) : "";
+  const cacheKey =
+    buildVehicleImageCacheKey(vehicleName, brandName, typeName) +
+    (storeImageHint ? `\0${storeImageHint.toLowerCase()}` : "");
   if (vehicleImageMatchCache.has(cacheKey)) {
     return vehicleImageMatchCache.get(cacheKey);
+  }
+
+  // Authoritative first: the game's own store image basename (exported by the mod) maps directly
+  // to a shipped PNG. This is exact — no fuzzy guessing — so it fixes wrong/variant pictures.
+  if (storeImageHint) {
+    const exact = resolveStoreImageExact(storeImageHint);
+    if (exact) {
+      vehicleImageMatchCache.set(cacheKey, exact);
+      return exact;
+    }
   }
 
   const tryDynamic = (name) => {
@@ -2286,8 +2370,14 @@ export async function loadVehicles() {
 
 export function updateVehicleSummaryCards() {
   const vehicles = normalizeVehicleList(this.vehicles);
-  // Filter out storage items for summary counts
-  const displayVehicles = vehicles.filter((v) => !this.isStorageItem(v));
+  // Scope counts to the active farm (and drop storage items) so the summary cards match the
+  // grid, which applyVehicleFilters() scopes the same way. Without this, on multi-farm servers
+  // the counts tallied every farm while the grid showed only one.
+  const displayVehicles = vehicles.filter(
+    (v) =>
+      vehicleMatchesActiveFarm(v, this.activeFarmId || 1) &&
+      !this.isStorageItem(v)
+  );
   const totalCount = displayVehicles.length;
 
   const lowFuelCount = displayVehicles.filter((v) => {
@@ -2409,6 +2499,7 @@ export function createVehicleCard(vehicle) {
         vehicle.storeName ||
         vehicle.vehicleYears?.storeName ||
         null,
+      storeImage: vehicle.storeImage || null,
     }
   );
 
@@ -2936,9 +3027,13 @@ export function filterVehiclesBySummaryCard(filterType) {
   document.getElementById("vehicle-fuel-filter").value = "";
   document.getElementById("vehicle-status-filter").value = "";
 
-  // Apply the specific filter based on the summary card clicked, excluding storage items
+  // Apply the specific filter based on the summary card clicked. Scope to the active farm
+  // (same as applyVehicleFilters) so a summary-card click never shows other farms' vehicles —
+  // otherwise the same model owned by two farms would look duplicated.
   let filteredVehicles = normalizeVehicleList(this.vehicles).filter(
-    (v) => !this.isStorageItem(v)
+    (v) =>
+      vehicleMatchesActiveFarm(v, this.activeFarmId || 1) &&
+      !this.isStorageItem(v)
   );
 
   switch (filterType) {

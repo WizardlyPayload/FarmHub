@@ -133,15 +133,59 @@ function hydrateLuaDataAnimalsFromDetails(luaData, srv, getLocalLuaJsonPath, opt
             hf > 0 ? hf : (block.ownerFarmId > 0 ? block.ownerFarmId : hf);
         if (block.ownerFarmId && hf && block.ownerFarmId !== hf) return h;
 
-        hydratedPens += 1;
-        totalHeads += block.animals.length;
-
         const ownerFarmId = resolvedFarm > 0 ? resolvedFarm : block.ownerFarmId || hf;
-        const animals = block.animals.map((a) => ({
-            ...a,
-            ownerFarmId: a.ownerFarmId ?? a.farmId ?? ownerFarmId,
-            farmId: a.farmId ?? a.ownerFarmId ?? ownerFarmId,
-        }));
+        const animals = block.animals.map((a) => {
+            const row = {
+                ...a,
+                ownerFarmId: a.ownerFarmId ?? a.farmId ?? ownerFarmId,
+                farmId: a.farmId ?? a.ownerFarmId ?? ownerFarmId,
+            };
+            // Base-game detail rows describe a whole cluster via `count`; tag them so the
+            // renderer's head-counting (which keys off __lodClusterAggregate/clusterCount)
+            // counts every head, not one per group row.
+            const grp = Number(a.count);
+            if (Number.isFinite(grp) && grp > 1) {
+                row.__lodClusterAggregate = true;
+                row.clusterCount = grp;
+            }
+            return row;
+        });
+
+        // Heads actually captured in the detail file (cluster rows count their members).
+        const capturedHeads = animals.reduce((sum, a) => {
+            const c = Number(a.clusterCount);
+            return sum + (a.__lodClusterAggregate && Number.isFinite(c) && c > 0 ? c : 1);
+        }, 0);
+
+        // What the aggregate (lod=agg) export already knows the pen holds: the engine's
+        // getNumOfAnimals() (numOfAnimalsReported), the aggregate animalCount, and the
+        // cluster bucket sum.
+        const reported = Number(h.numOfAnimalsReported);
+        const prevCount = Number(h.animalCount);
+        let clusterSum = 0;
+        if (Array.isArray(h.clusters)) {
+            for (const c of h.clusters) {
+                const cc = Number(c && c.count);
+                if (Number.isFinite(cc) && cc > 0) clusterSum += cc;
+            }
+        }
+        const aggregate = Math.max(
+            Number.isFinite(reported) && reported > 0 ? reported : 0,
+            Number.isFinite(prevCount) && prevCount > 0 ? prevCount : 0,
+            clusterSum
+        );
+
+        // Guard: if the detail file holds FEWER heads than the aggregate already reports,
+        // it is incomplete or cross-matched (RL multi-component barns can share a husbandry
+        // id with a different component's detail file). Replacing the aggregate with it would
+        // hide the rest of the herd, leaving the summary total > the rows shown. Keep the
+        // aggregate so the connector fans the clusters out to the full pen instead.
+        if (aggregate > 0 && capturedHeads < aggregate) {
+            return h;
+        }
+
+        hydratedPens += 1;
+        totalHeads += capturedHeads;
 
         return {
             ...h,
@@ -149,9 +193,14 @@ function hydrateLuaDataAnimalsFromDetails(luaData, srv, getLocalLuaJsonPath, opt
             farmId: ownerFarmId,
             animals,
             lod: 'full',
-            animalCount: animals.length,
-            numOfAnimalsReported: animals.length,
+            animalCount: Math.max(
+                capturedHeads,
+                Number.isFinite(prevCount) && prevCount > 0 ? prevCount : 0
+            ),
+            numOfAnimalsReported:
+                Number.isFinite(reported) && reported > 0 ? reported : capturedHeads,
             __detailHydrated: true,
+            __detailCapturedHeads: capturedHeads,
         };
     });
 

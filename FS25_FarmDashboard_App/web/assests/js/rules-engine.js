@@ -413,6 +413,43 @@ export function classifyWindrowMaterial(field) {
 }
 
 /**
+ * Freshly-mown grass: the standing crop was just cut (the game shows "Harvested"),
+ * leaving a fresh wet grass windrow on the field. FS25 grass is perennial, so the
+ * engine `growthState` after a cut drops back into the low regrowth band (e.g. 2/4),
+ * which overlaps with first-growth indices — so index alone reads as plain "growing".
+ * A fresh (non-hay) grass windrow above the workflow floor is the decisive signal
+ * that the field was just mowed, letting the UI show "Harvested · mown/regrowing"
+ * instead of a misleading "Growing · stage 2/4".
+ */
+export function isFreshlyMownGrass(field) {
+  if (!field || typeof field !== "object") return false;
+  if (!isGrassCrop(field)) return false;
+  if (fieldShowsWithered(field)) return false;
+
+  const material = classifyWindrowMaterial(field);
+  const isHayWindrow =
+    material === "hay" ||
+    field?.windrowMoisture?.isHay === true ||
+    field.hasLooseHayWindrow === true;
+  const isGrassWindrow = material === "grass" || (field.hasLooseGrassWindrow === true && !isHayWindrow);
+  if (!isGrassWindrow || isHayWindrow) return false;
+
+  const lg = Number(field.looseGrassWindrowLiters ?? 0);
+  const wl = Number(field.windrowLiters ?? 0);
+  const meaningful =
+    (field.hasLooseGrassWindrow === true && lg >= MIN_FORAGE_WORKFLOW_LITERS) ||
+    wl >= MIN_FORAGE_WORKFLOW_LITERS;
+  if (!meaningful) return false;
+
+  // A fresh cut means the standing crop sits below the tall, ready-to-cut stage.
+  const gs = Number(field.growthState) || 0;
+  const maxGs = Number(field.maxGrowthState) || 4;
+  if (gs <= 0 || gs >= maxGs) return false;
+  if (field.harvestReady === true) return false;
+  return true;
+}
+
+/**
  * Strict integer bale count on this field — no rounding away small counts.
  * Prefer Lua `baleCountOnField`; then `baleCount`; then `field.bales.length`.
  */

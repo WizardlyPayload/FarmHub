@@ -1110,20 +1110,53 @@ function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
 
 // ─── vehicles ─────────────────────────────────────────────────────────────────
 
-function mergeVehicles(luaVehicles, xmlVehicles) {
-    // Build position-indexed lookup for XML vehicles
-    const xmlByPos = xmlVehicles.filter(v => v.position);
+/** Stable per-vehicle match key: config-file basename + owner farm (lowercased), or '' if unknown. */
+function vehicleConfigKey(v) {
+    const raw = String(v.configFileName || v.filename || '');
+    const base = raw.replace(/\\/g, '/').split('/').pop() || '';
+    const cfg = base.replace(/\.xml$/i, '').toLowerCase();
+    if (!cfg) return '';
+    const farm = Number(v.ownerFarmId ?? v.farmId ?? 0);
+    return `${farm}::${cfg}`;
+}
 
-    const merged = luaVehicles.map(luaV => {
-        let xmlV = null;
+function mergeVehicles(luaVehicles, xmlVehicles) {
+    // Match Lua<->XML by a STABLE config-file + farm key, NOT by position.
+    // Position can't be the primary key: on a live/dedicated server the Lua entry carries the
+    // vehicle's *live* world position while the XML entry carries its *last-saved* position, so
+    // a position-only match (old 5m test) missed for any vehicle that had moved and the SAME
+    // vehicle was emitted twice — once from Lua with its real name, once as an "xml_only" card
+    // named after the config file (e.g. "series9S" alongside "MF 9S"). We bucket XML records by
+    // key and consume each at most once; position is only a tiebreaker among same-model vehicles.
+    const xmlByKey = new Map();
+    for (const xv of xmlVehicles) {
+        const k = vehicleConfigKey(xv);
+        if (!k) continue;
+        if (!xmlByKey.has(k)) xmlByKey.set(k, []);
+        xmlByKey.get(k).push(xv);
+    }
+
+    const takeClosest = (list, luaV) => {
+        if (!list || list.length === 0) return null;
+        let bestIdx = 0;
         if (luaV.position) {
             let best = Infinity;
-            for (const xv of xmlByPos) {
-                const d = Math.hypot(luaV.position.x - xv.position.x,
-                                     luaV.position.z - xv.position.z);
-                if (d < 5 && d < best) { best = d; xmlV = xv; }
+            for (let i = 0; i < list.length; i++) {
+                const xp = list[i].position;
+                if (!xp) continue;
+                const d = Math.hypot(
+                    (luaV.position.x ?? 0) - (xp.x ?? 0),
+                    (luaV.position.z ?? 0) - (xp.z ?? 0)
+                );
+                if (d < best) { best = d; bestIdx = i; }
             }
         }
+        return list.splice(bestIdx, 1)[0];
+    };
+
+    const merged = luaVehicles.map(luaV => {
+        const k = vehicleConfigKey(luaV);
+        const xmlV = k ? takeClosest(xmlByKey.get(k), luaV) : null;
         return {
             ...luaV,
             ownerFarmId   : luaV.ownerFarmId || xmlV?.farmId || 0,
@@ -1131,19 +1164,15 @@ function mergeVehicles(luaVehicles, xmlVehicles) {
             price         : luaV.price  || xmlV?.price  || 0,
             age           : luaV.age    || xmlV?.age    || 0,
             uniqueId      : xmlV?.uniqueId || luaV.id,
-            filename      : xmlV?.filename || '',
+            filename      : xmlV?.filename || luaV.configFileName || '',
             xmlFillLevels : xmlV?.fillLevels || {},
             source        : xmlV ? 'merged' : 'lua_only',
         };
     });
 
-    // Add XML-only vehicles (not in Lua — off-map / stored)
-    const luaPos = luaVehicles.filter(v => v.position).map(v => v.position);
-    for (const xv of xmlVehicles) {
-        if (!xv.position) continue;
-        const present = luaPos.some(lp =>
-            Math.hypot(lp.x - xv.position.x, lp.z - xv.position.z) < 5);
-        if (!present) {
+    // Anything left in the XML buckets has no Lua counterpart → genuinely off-map / stored.
+    for (const list of xmlByKey.values()) {
+        for (const xv of list) {
             merged.push({
                 id: xv.uniqueId, uniqueId: xv.uniqueId,
                 name: xv.name, filename: xv.filename,
@@ -1327,6 +1356,7 @@ function buildFromXmlOnly(xml) {
 
 module.exports = {
     mergeData,
+    mergeVehicles,
     buildFieldLiveFingerprints,
     buildFillTypeCatalog,
     deriveBaleInventoryFromStock,

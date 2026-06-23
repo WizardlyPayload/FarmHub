@@ -9,7 +9,8 @@
   - PNG: Giants-style store_<rest>.png and paths under \store\ (see Test-StoreLikeTexture). Optional \textures\icon\ via -IncludeIconPng.
   - DDS: store_<rest>.dds (primary). Requires ImageMagick (magick) or DirectXTex texconv - see -TexconvPath. icon_*.dds only with -IncludeIconDds.
   - Scans ALL .zip files under ModsRoot at any depth. Unpacked mods: top-level folders, recursive files.
-  - Output filenames use ModFolder__<in-game name>.png when XML maps store_*.dds / store_*.png / icon_*.dds to <name><en> (vehicle/implement blocks, <storeData> blocks, <image> paths, modDesc <title> fallback); otherwise ModFolder__<original texture name>.png. Duplicate display titles in one mod get a _texturebasename suffix.
+  - Output filenames: store_*/icon_* textures are named ModFolder__<original texture name>.png (e.g. ModFolder__store_t7.png). This is authoritative: the desktop app keys its image library by this basename and the mod exports the same token per vehicle, so the dashboard picks the EXACT picture (no fuzzy guessing). Non store_/icon_ textures keep ModFolder__<in-game name>.png from XML <name><en> for the app's fuzzy fallback. Duplicate leaves in one mod get a _texturebasename suffix.
+  - Migration: a previous version named store_/icon_ textures by in-game display name. When re-run, any such legacy file (ModFolder__<in-game name>.png) is renamed in place to the new basename file and the old file is removed (only when the old file actually exists) - no duplicates, no re-convert.
   - If the destination PNG already exists in OutputDir, that texture is skipped (no copy/convert). Use -Force to overwrite.
 
 .PARAMETER IncludeIconDds
@@ -99,6 +100,7 @@ try {
 $script:TextureActionCount = 0
 $script:PngCopied = 0
 $script:DdsConverted = 0
+$script:OutputsMigrated = 0
 $script:OutputsSkippedAlreadyExist = 0
 $script:DdsSkippedNoConverter = 0
 $script:DdsConvertFailed = 0
@@ -411,6 +413,111 @@ function Resolve-LeafPngForExport {
     return (Sanitize-FileNamePart $LeafPngFromTexture)
 }
 
+<#
+  The desktop dashboard keys its image library by the FS25 store-texture basename ("store_t7"),
+  and the mod exports that same token per vehicle (storeItem.imageFilename). So for store_*/icon_*
+  textures we name the export by the basename (exact, authoritative match in the app). Everything
+  else keeps display-name naming for the app's fuzzy fallback.
+#>
+function Get-PreferredLeaf {
+    param(
+        [hashtable] $DisplayNameMap,
+        [string] $TextureFileName,
+        [string] $LeafPngFromTexture
+    )
+    $texBase = [System.IO.Path]::GetFileNameWithoutExtension($TextureFileName).ToLowerInvariant()
+    if ($texBase -match '^(store|icon)_.+') {
+        return (Sanitize-FileNamePart $LeafPngFromTexture)
+    }
+    return (Resolve-LeafPngForExport -DisplayNameMap $DisplayNameMap -TextureFileName $TextureFileName -LeafPngFromTexture $LeafPngFromTexture)
+}
+
+<#
+  Resolve the final destination + any pre-existing OLD (display-name) file to migrate.
+  Returns @{ Dest; DestName; OldDest } where OldDest is a previous-version export of the SAME
+  texture under the legacy display-name convention (null when there is nothing to migrate).
+#>
+function Resolve-ExportTarget {
+    param(
+        [string] $DestRoot,
+        [string] $ModKeyBase,
+        [hashtable] $DisplayNameMap,
+        [string] $TextureFileName,
+        [string] $LeafPngFromTexture,
+        [hashtable] $LeafUsed
+    )
+    $newLeaf = Get-PreferredLeaf -DisplayNameMap $DisplayNameMap -TextureFileName $TextureFileName -LeafPngFromTexture $LeafPngFromTexture
+    $oldLeaf = Resolve-LeafPngForExport -DisplayNameMap $DisplayNameMap -TextureFileName $TextureFileName -LeafPngFromTexture $LeafPngFromTexture
+
+    $leaf = $newLeaf
+    if ($LeafUsed.ContainsKey($leaf)) {
+        $stem = [System.IO.Path]::GetFileNameWithoutExtension($leaf)
+        $texBase = [System.IO.Path]::GetFileNameWithoutExtension($TextureFileName)
+        $leaf = Sanitize-FileNamePart ($stem + "_" + $texBase + ".png")
+        $n = 2
+        while ($LeafUsed.ContainsKey($leaf)) {
+            $leaf = Sanitize-FileNamePart ($stem + "_" + $texBase + "_" + $n + ".png")
+            $n++
+        }
+    }
+    $LeafUsed[$leaf] = $true
+
+    $destName = "${ModKeyBase}__${leaf}"
+    $dest = Join-Path $DestRoot $destName
+
+    $oldDest = $null
+    if ($oldLeaf -and ($oldLeaf -ne $leaf)) {
+        $oldName = "${ModKeyBase}__$(Sanitize-FileNamePart $oldLeaf)"
+        $cand = Join-Path $DestRoot $oldName
+        if ($cand -ne $dest) { $oldDest = $cand }
+    }
+
+    return @{ Dest = $dest; DestName = $destName; OldDest = $oldDest }
+}
+
+<#
+  Migrate a legacy display-name export of this texture to the new basename file, if present.
+  Returns $true when the texture is fully handled by migration (caller should `continue`).
+  Only ever deletes the OLD file when it actually exists (rename = delete-old in one move), or
+  removes a stale old duplicate when the new file already exists.
+#>
+function Invoke-LegacyMigration {
+    param([string] $Dest, [string] $DestName, [string] $OldDest, [switch] $Dry)
+    if (-not $OldDest -or -not (Test-Path -LiteralPath $OldDest)) { return $false }
+
+    $oldLeafName = [System.IO.Path]::GetFileName($OldDest)
+    $newExists = Test-Path -LiteralPath $Dest
+
+    if ($Dry) {
+        if ($newExists -and -not $script:ForceExport) {
+            Write-Output "[DryRun] CLEANUP old duplicate $oldLeafName (new exists)"
+        }
+        else {
+            Write-Output "[DryRun] MIGRATE $oldLeafName -> $DestName"
+        }
+        $script:OutputsMigrated++
+        return $true
+    }
+
+    if ($newExists -and -not $script:ForceExport) {
+        Remove-Item -LiteralPath $OldDest -Force -ErrorAction SilentlyContinue
+        Write-Output "[Cleanup] removed old duplicate $oldLeafName (new already exists)"
+        return $true
+    }
+
+    try {
+        if ($newExists) { Remove-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue }
+        Move-Item -LiteralPath $OldDest -Destination $Dest -Force
+        $script:OutputsMigrated++
+        Write-Output "[Migrated] $oldLeafName -> $DestName"
+        return $true
+    }
+    catch {
+        Write-Warning "Migrate failed ($oldLeafName -> $DestName): $($_.Exception.Message)"
+        return $false
+    }
+}
+
 function Format-Win32CommandLineArg {
     param([string] $Text)
     if ($null -eq $Text) { return '""' }
@@ -516,17 +623,16 @@ function Copy-FromModDirectory {
     foreach ($row in $files) {
         $f = $row.File
         $kind = $row.Kind
-        $texBase = [System.IO.Path]::GetFileNameWithoutExtension($f.Name).ToLowerInvariant()
         $leafPng = Get-DestLeafForTexture -OriginalName $f.Name -Kind $kind
         $base = Sanitize-FileNamePart $ModKey
-        $leaf = Resolve-LeafPngForExport -DisplayNameMap $displayMap -TextureFileName $f.Name -LeafPngFromTexture $leafPng
-        if ($leafUsed.ContainsKey($leaf)) {
-            $stem = [System.IO.Path]::GetFileNameWithoutExtension($leaf)
-            $leaf = Sanitize-FileNamePart ($stem + "_" + $texBase + ".png")
+        $target = Resolve-ExportTarget -DestRoot $DestRoot -ModKeyBase $base -DisplayNameMap $displayMap -TextureFileName $f.Name -LeafPngFromTexture $leafPng -LeafUsed $leafUsed
+        $dest = $target.Dest
+        $destName = $target.DestName
+
+        # Migrate a legacy display-name export of this texture (rename + remove old) before any copy.
+        if (Invoke-LegacyMigration -Dest $dest -DestName $destName -OldDest $target.OldDest -Dry:$Dry) {
+            continue
         }
-        $leafUsed[$leaf] = $true
-        $destName = "${base}__${leaf}"
-        $dest = Join-Path $DestRoot $destName
 
         if ($kind -eq 'dds' -and -not $Dry -and -not $script:DdsConverter) {
             $script:DdsSkippedNoConverter++
@@ -601,17 +707,16 @@ function Expand-TexturesFromZip {
             $kind = Test-StoreLikeTexture -FullPath $fakePath -FileName $name -Length $e.Length
             if (-not $kind) { continue }
 
-            $texBase = [System.IO.Path]::GetFileNameWithoutExtension($name).ToLowerInvariant()
             $leafPng = Get-DestLeafForTexture -OriginalName $name -Kind $kind
             $base = Sanitize-FileNamePart $ModKey
-            $leaf = Resolve-LeafPngForExport -DisplayNameMap $displayMap -TextureFileName $name -LeafPngFromTexture $leafPng
-            if ($leafUsed.ContainsKey($leaf)) {
-                $stem = [System.IO.Path]::GetFileNameWithoutExtension($leaf)
-                $leaf = Sanitize-FileNamePart ($stem + "_" + $texBase + ".png")
+            $target = Resolve-ExportTarget -DestRoot $DestRoot -ModKeyBase $base -DisplayNameMap $displayMap -TextureFileName $name -LeafPngFromTexture $leafPng -LeafUsed $leafUsed
+            $dest = $target.Dest
+            $destName = $target.DestName
+
+            # Migrate a legacy display-name export of this texture (rename + remove old) before any copy.
+            if (Invoke-LegacyMigration -Dest $dest -DestName $destName -OldDest $target.OldDest -Dry:$Dry) {
+                continue
             }
-            $leafUsed[$leaf] = $true
-            $destName = "${base}__${leaf}"
-            $dest = Join-Path $DestRoot $destName
 
             if ($kind -eq 'dds' -and -not $Dry -and -not $script:DdsConverter) {
                 $script:DdsSkippedNoConverter++
@@ -717,6 +822,7 @@ function Write-SummaryJson {
         textureMatches            = $script:TextureActionCount
         pngCopied                 = $script:PngCopied
         ddsConverted              = $script:DdsConverted
+        outputsMigrated           = $script:OutputsMigrated
         outputsSkippedExisting    = $script:OutputsSkippedAlreadyExist
         ddsSkippedNoConverter     = $script:DdsSkippedNoConverter
         ddsConvertFailed          = $script:DdsConvertFailed
@@ -826,8 +932,8 @@ if ($allZips.Count -gt 50) {
 }
 
 Write-Host ""
-Write-Output "Summary: $($script:TextureActionCount) texture match(es); PNG copied: $($script:PngCopied); DDS converted: $($script:DdsConverted); already exported (skipped): $($script:OutputsSkippedAlreadyExist); DDS skipped (no converter): $($script:DdsSkippedNoConverter); top-level folders: $($topFolders.Count); zip archives: $($allZips.Count)."
-if ($script:TextureActionCount -eq 0 -and $script:OutputsSkippedAlreadyExist -eq 0) {
+Write-Output "Summary: $($script:TextureActionCount) texture match(es); PNG copied: $($script:PngCopied); DDS converted: $($script:DdsConverted); migrated from old naming: $($script:OutputsMigrated); already exported (skipped): $($script:OutputsSkippedAlreadyExist); DDS skipped (no converter): $($script:DdsSkippedNoConverter); top-level folders: $($topFolders.Count); zip archives: $($allZips.Count)."
+if ($script:TextureActionCount -eq 0 -and $script:OutputsSkippedAlreadyExist -eq 0 -and $script:OutputsMigrated -eq 0) {
     Write-Host ""
     Write-Output "No matching files. Check ModsRoot, -OnlyIconPrefixedDds / -OnlyStorePrefixedPng, and that mods contain store_*.png / store_*.dds (or use -IncludeIconDds / -IncludeIconPng for icon textures)."
     if ($IncludeDds -and -not $script:DdsConverter) {

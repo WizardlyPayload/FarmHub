@@ -11,7 +11,7 @@ Welcome to the **FS25 Farm Dashboard** (FarmHub) wiki. This project is a **Windo
 | **[Troubleshooting](Troubleshooting)** | “Waiting for data”, FTP, LAN, port 8766 |
 | **[Security & Network](Security-and-Network)** | LAN access, passwords, tablets |
 | **[Developer Guide](Developer-Guide)** | Architecture, build, contribute |
-| **[Releases & Upgrades](Releases-and-Upgrades)** | 4.1.0 notes, upgrade path |
+| **[Releases & Upgrades](Releases-and-Upgrades)** | 4.1.5 notes, upgrade path |
 
 Extended manuals (screenshots, runbooks): [docs folder on GitHub](https://github.com/WizardlyPayload/FarmHub/tree/main/docs).
 
@@ -19,8 +19,8 @@ Extended manuals (screenshots, runbooks): [docs folder on GitHub](https://github
 
 | Component | Version |
 |-----------|---------|
-| **Windows app** | **4.1.0** |
-| **FS25 mod** | **3.1.0.0** |
+| **Windows app** | **4.1.5** |
+| **FS25 mod** | **3.3.21.2** |
 
 Download both from **[GitHub Releases](https://github.com/WizardlyPayload/FarmHub/releases)**.
 
@@ -28,7 +28,7 @@ Download both from **[GitHub Releases](https://github.com/WizardlyPayload/FarmHu
 
 1. **[Install the mod](Installation-Guide#stage-a--install-the-mod)** → `FS25_FarmDashboard.zip` in FS25 `mods`
 2. **[Enable per save & load world](Installation-Guide#stage-b--enable-per-save)** → creates `data.json`
-3. **[Install the Windows app](Installation-Guide#stage-d--install-the-windows-app)** → `FS25 Farm Dashboard Setup 4.1.0.exe`
+3. **[Install the Windows app](Installation-Guide#stage-d--install-the-windows-app)** → `FS25-Farm-Dashboard-Setup-4.1.5.exe`
 4. **Open** [http://localhost:8766](http://localhost:8766)
 
 **Order matters:** mod first → load save → app second.
@@ -98,4 +98,4 @@ FarmHub/
 
 ---
 
-*Last updated: app **4.1.0**, mod **3.1.0.0***
+*Last updated: app **4.1.5**, mod **3.3.21.2***

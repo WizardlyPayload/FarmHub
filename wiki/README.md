@@ -40,4 +40,4 @@ For the longest, screenshot-linked manuals, see the main tree:
 - [docs/DEVELOPER_HANDOVER.md](../docs/DEVELOPER_HANDOVER.md)
 - [docs/CHANGELOG.md](../docs/CHANGELOG.md)
 
-**Versions:** app **4.1.0**, mod **3.1.0.0** (May 2026).
+**Versions:** app **4.1.5**, mod **3.3.21.2** (Jun 2026).

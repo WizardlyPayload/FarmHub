@@ -12,6 +12,7 @@ import {
     MIN_FORAGE_WORKFLOW_LITERS,
     nitrogenTargetForDisplay,
     PF_NUTRIENT_CLOSE_FRAC,
+    isFreshlyMownGrass,
 } from "../rules-engine.js";
 import {
     refreshFieldRulesCache,
@@ -513,6 +514,9 @@ function buildStatusBadge(field) {
         return `<span class="badge" style="background:#ff9800;color:#000">${escapeFieldHtml(
             t("fields.badgeReady")
         )}</span>`;
+    // Freshly-cut grass (fresh windrow on the field) — the game shows this as "Harvested".
+    if (isFreshlyMownGrass(field))
+        return `<span class="badge" style="background:#8d6e63">${escapeFieldHtml(t("fields.badgeHarvested"))}</span>`;
     if (field.needsWork || field.needsRolling)
         return `<span class="badge bg-warning text-dark">${escapeFieldHtml(t("fields.badgeNeedsWork"))}</span>`;
     if ((field.growthState || 0) > 0)
@@ -615,7 +619,7 @@ function tryRegrowthProgressBar(field) {
         const cap = grassStageCapForBar(field);
         const rm = grassRingCurMax(field);
         const cur = rm ? rm.cur : Math.min(rawGs, cap);
-        if (gl === "mown_regrowth" || rawGs > cap) {
+        if (gl === "mown_regrowth" || rawGs > cap || isFreshlyMownGrass(field)) {
             return barHTML(pct, bg, t("fields.barMownRegrowing", { cur, max: cap }), fg);
         }
     }

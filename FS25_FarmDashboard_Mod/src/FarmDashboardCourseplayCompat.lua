@@ -1,4 +1,4 @@
--- FS25 FarmDashboard | FarmDashboardCourseplayCompat.lua | v3.3.20
+-- FS25 FarmDashboard | FarmDashboardCourseplayCompat.lua | v3.3.21
 -- Authority-only: spawn-window stubs for half-initialized shop vehicles + Courseplay stream guards.
 -- Incremental fleet cache via Vehicle.register (no Vehicle.update / fleet-wide per-frame patching).
 
@@ -288,12 +288,22 @@ function FarmDashboardCourseplayCompat.clearSpawnStubs(vehicle)
         end
     end
 
+    -- Drop our placeholder isa() only when the object's real class isa is available underneath.
+    if meta.hadIsa == false then
+        vehicle.isa = nil
+        if type(vehicle.isa) ~= "function" then
+            vehicle.isa = function() return false end
+        else
+            meta.hadIsa = true
+        end
+    end
+
     -- IMPORTANT: never set spec.cpJob = nil here. Courseplay's onWriteStream/onUpdate index
     -- spec.cpJob every frame on the server; nilling our stub re-opens the exact crash window we are
     -- guarding (CpAICombineUnloader.lua:186 "attempt to index nil with 'writeStream'"). The harmless
     -- noop stub is left in place until Courseplay's own onLoad overwrites spec.cpJob with the real job.
 
-    if not vehicleHasStubbedCpJob(vehicle) and vehicleHasRealIdentity(vehicle) then
+    if not vehicleHasStubbedCpJob(vehicle) and vehicleHasRealIdentity(vehicle) and meta.hadIsa ~= false then
         FarmDashboardCourseplayCompat._stubMeta[vehicle] = nil
         removeStubbedEntry(vehicle)
     end
@@ -376,6 +386,25 @@ function FarmDashboardCourseplayCompat.applyIdentityStubs(vehicle)
         changed = true
     elseif meta.hadGetName == nil then
         meta.hadGetName = true
+    end
+
+    -- isa() guard. Once we install getOwnerFarmId()/getName() above, base-game AccessHandler:canPlayerAccess
+    -- returns TRUE for a half-loaded object. Courseplay's CpAIJobCombineUnloader:getUnloadingStations then
+    -- evaluates `unloadingStation:isa(UnloadingStation)` (CpAIJobCombineUnloader.lua:93) on that same object.
+    -- A not-yet-loaded station/object has no isa method -> "attempt to call missing method 'isa' of table"
+    -- spamming every frame the Courseplay menu is open. A placeholder object is by definition not yet a real
+    -- class instance, so a conservative isa() that returns false makes Courseplay correctly SKIP it (exactly
+    -- what would happen if canPlayerAccess had returned false). We only ever add this when isa is genuinely
+    -- missing (real stations/vehicles keep their class isa) and clearSpawnStubs restores it once the real
+    -- class method is available underneath, so we never permanently shadow a loaded object's isa.
+    if type(vehicle.isa) ~= "function" then
+        if meta.hadIsa == nil then
+            meta.hadIsa = false
+        end
+        vehicle.isa = function() return false end
+        changed = true
+    elseif meta.hadIsa == nil then
+        meta.hadIsa = true
     end
 
     if changed then

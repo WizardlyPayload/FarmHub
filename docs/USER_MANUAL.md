@@ -1,6 +1,6 @@
 # FS25 Farm Dashboard — User manual (v4.1)
 
-**Farm Dashboard** is the Windows desktop app that reads live farm data from **Farming Simulator 25** (via the in-game **FS25 Farm Dashboard** mod) and renders it in your browser at **[http://localhost:8766](http://localhost:8766)**. **App version 4.1.0**, **mod version 3.1.0.0**.
+**Farm Dashboard** is the Windows desktop app that reads live farm data from **Farming Simulator 25** (via the in-game **FS25 Farm Dashboard** mod) and renders it in your browser at **[http://localhost:8766](http://localhost:8766)**. **App version 4.1.5**, **mod version 3.3.21.2**.
 
 This manual walks every setting, every section, and every modal, with **inline screenshots** (below each section). Where we already have a similar capture, one image is reused instead of asking twice. Screenshot filenames, capture recipes, and the “still to capture” checklist are in [`SCREENSHOTS.md`](./SCREENSHOTS.md).
 
@@ -34,7 +34,7 @@ This manual walks every setting, every section, and every modal, with **inline s
 | ---- | ------- |
 | **Farming Simulator 25** | Game must run with the mod for live data to exist |
 | **FS25 Farm Dashboard mod** | **`FS25_FarmDashboard.zip`** or folder **`FS25_FarmDashboard`** in your FS25 `mods` folder |
-| **FS25 Farm Dashboard app (Windows)** | Installer `FS25 Farm Dashboard Setup 4.1.0.exe` |
+| **FS25 Farm Dashboard app (Windows)** | Installer `FS25-Farm-Dashboard-Setup-4.1.5.exe` |
 | **Browser** | Edge, Chrome, Firefox — opens [http://localhost:8766](http://localhost:8766) |
 | **(Optional) FTP credentials** | If FS25 runs on a dedicated / rented server you do not own locally |
 | **(Optional) LAN network** | If you want the dashboard on a tablet or second screen |
@@ -81,7 +81,7 @@ After a minute, look in:
 
 ### Stage D — Install the Windows app
 
-1. Run **`FS25 Farm Dashboard Setup 4.1.0.exe`**.
+1. Run **`FS25-Farm-Dashboard-Setup-4.1.5.exe`**.
 2. Pick installer language on the welcome page; complete the installer.
 3. Launch **Farm Dashboard** from the Start menu.
 
@@ -255,7 +255,7 @@ Open with the gear icon. The modal has a left-hand sidebar with four tabs, plus 
 | Control | What it does | Persisted as |
 | ------- | ------------ | ------------ |
 | **Section toggles (6)** | Show / hide Livestock, Vehicles, Fields, Economy, Pastures, Productions cards on the landing page | `uiPreferences.sections` |
-| **Desktop version** | Read-only build version (e.g. `4.1.0`) | — |
+| **Desktop version** | Read-only build version (e.g. `4.1.5`) | — |
 | **Check for updates** | Triggers `electron-updater` against GitHub Releases | — |
 | **Update status** | Live status line during checks | — |
 | **Field exclusions** | Per-server, per-farmland checkboxes; un-tick to hide that parcel from the Fields page | `uiPreferences.excludedFarmlandIdsByServer` |
@@ -807,4 +807,4 @@ The mod has **no in-game console command** and **no Giants settings menu entry**
 
 The full list of filenames, captions, and capture recipes (auto vs manual) lives in [`SCREENSHOTS.md`](./SCREENSHOTS.md). All images sit under [`docs/screenshots/`](./screenshots/).
 
-**Document version:** aligned with app **4.1.0** and mod **3.1.0.0**. **Authors:** [`AUTHORS.md`](./AUTHORS.md).
+**Document version:** aligned with app **4.1.5** and mod **3.3.21.2**. **Authors:** [`AUTHORS.md`](./AUTHORS.md).

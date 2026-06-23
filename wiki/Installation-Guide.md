@@ -17,7 +17,7 @@ Until you load a save with the mod enabled:
 
 ## Stage A — Install the mod
 
-1. Download **`FS25_FarmDashboard.zip` (3.1.0.0)** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
+1. Download **`FS25_FarmDashboard.zip` (3.3.21.2)** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
 2. Copy into FS25 mods folder:
 
    ```
@@ -76,7 +76,7 @@ modSettings\FS25_FarmDashboard\config.xml
 
 ## Stage D — Install the Windows app
 
-1. Download **`FS25 Farm Dashboard Setup 4.1.0.exe`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
+1. Download **`FS25-Farm-Dashboard-Setup-4.1.5.exe`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
 2. Run the installer (pick language on welcome page).
 3. Launch **Farm Dashboard** from the Start menu.
 

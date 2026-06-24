@@ -562,20 +562,28 @@ function catalogFromMapCrops(luaData, xmlEconomy) {
     return out;
 }
 
-/** Witcombe-style gap: engine exports 181=RYE and 183=SPELT but omits 182=TRITICALE on dedicated servers. */
+function stockHasFillIndex(stock, idx) {
+    for (const farm of Object.values(stock?.byFarm || {})) {
+        for (const item of farm?.items || []) {
+            if (Number(item?.fillTypeIndex) === idx) return true;
+        }
+    }
+    return false;
+}
+
+/** Witcombe-style gaps: DS often omits 182=TRITICALE and 190=LINSEED between known neighbors. */
 function assignNeighborCropGaps(catalog, stock) {
     const out = { ...(catalog || {}) };
     const rye = String(out['181'] || '').trim().toUpperCase();
     const spelt = String(out['183'] || '').trim().toUpperCase();
-    if (out['182'] || rye !== 'RYE' || spelt !== 'SPELT') return out;
-
-    let needs182 = false;
-    for (const farm of Object.values(stock?.byFarm || {})) {
-        for (const item of farm?.items || []) {
-            if (Number(item?.fillTypeIndex) === 182) needs182 = true;
-        }
+    if (!out['182'] && rye === 'RYE' && spelt === 'SPELT' && stockHasFillIndex(stock, 182)) {
+        out['182'] = 'TRITICALE';
     }
-    if (needs182) out['182'] = 'TRITICALE';
+    const ryeCut = String(out['189'] || '').trim().toUpperCase();
+    const poppy = String(out['191'] || '').trim().toUpperCase();
+    if (!out['190'] && ryeCut === 'RYE_CUT' && poppy === 'POPPY' && stockHasFillIndex(stock, 190)) {
+        out['190'] = 'LINSEED';
+    }
     return out;
 }
 

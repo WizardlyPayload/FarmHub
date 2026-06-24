@@ -302,6 +302,19 @@ function FillTypeUtils.enrichCatalogFromData(data)
         end
     end
 
+    --- Witcombe-style maps: RYE_CUT=189, LINSEED=190, POPPY=191 — DS often omits 190 from sparse name maps.
+    if observed[190] and (not _catalog[190] or _catalog[190] == "" or tonumber(_catalog[190])) then
+        local ryeCut = _catalog[189] and string.upper(tostring(_catalog[189]))
+        local poppy = _catalog[191] and string.upper(tostring(_catalog[191]))
+        if ryeCut == "RYE_CUT" and poppy == "POPPY" then
+            _put(_catalog, 190, "LINSEED")
+            FillTypeUtils._cropIndexMap.LINSEED = 190
+        elseif cropNames.LINSEED then
+            _put(_catalog, 190, "LINSEED")
+            FillTypeUtils._cropIndexMap.LINSEED = 190
+        end
+    end
+
     return _catalog
 end
 

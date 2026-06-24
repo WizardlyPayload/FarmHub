@@ -59,6 +59,20 @@ test("buildFillTypeCatalog infers TRITICALE at 182 when RYE/SPELT neighbors exis
   assert.equal(catalog["182"], "TRITICALE");
 });
 
+test("buildFillTypeCatalog infers LINSEED at 190 when RYE_CUT/POPPY neighbors exist on DS", () => {
+  const catalog = buildFillTypeCatalog({
+    fillTypeCatalog: { 189: "RYE_CUT", 191: "POPPY" },
+    stock: {
+      byFarm: {
+        "1": {
+          items: [{ fillTypeIndex: 190, totalLiters: 88539, fillType: "" }],
+        },
+      },
+    },
+  });
+  assert.equal(catalog["190"], "LINSEED");
+});
+
 test("supplement onField prefers field totals when economy scan is partial", () => {
   const inv = supplementOnFieldFromFields(
     {

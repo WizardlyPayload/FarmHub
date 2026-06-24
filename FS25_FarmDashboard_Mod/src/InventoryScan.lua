@@ -129,6 +129,31 @@ function InventoryScan.rebuildFillTypeCatalog()
     return out
 end
 
+--- MoistureSystem keys silo fill by storage/loading-station uniqueId (not placeable id).
+local function _siloMoistureUniqueId(spec, placeable, storage)
+    if storage then
+        local uid = rawget(storage, "uniqueId")
+        if uid then return uid end
+    end
+    if spec and spec.storages then
+        for _, st in ipairs(spec.storages) do
+            if st then
+                local uid = rawget(st, "uniqueId")
+                if uid then return uid end
+            end
+        end
+    end
+    if spec and spec.loadingStation then
+        local uid = rawget(spec.loadingStation, "uniqueId")
+        if uid then return uid end
+    end
+    if placeable then
+        local uid = rawget(placeable, "uniqueId")
+        if uid then return uid end
+    end
+    return nil
+end
+
 local function _moistureGrade(uniqueId, fillTypeIndex)
     local ms = _mission() and _mission().MoistureSystem
     if not ms or not uniqueId or fillTypeIndex == nil then return nil, nil end
@@ -893,11 +918,13 @@ function InventoryScan.scanPlaceableForFarm(placeable, farmId, stockState, baleS
 
     if placeable.spec_silo and InventoryScan.placeableOwnedByFarm(placeable, farmId) then
         local spec = placeable.spec_silo
+        local moistureUid = _siloMoistureUniqueId(spec, placeable, nil)
         if spec.storages then
             for _, storage in ipairs(spec.storages) do
                 if storage and tonumber(storage.ownerFarmId) == farmId and storage.fillLevels then
+                    local uid = _siloMoistureUniqueId(spec, placeable, storage) or moistureUid
                     for ftIdx, lit in pairs(storage.fillLevels) do
-                        InventoryScan.addStockLiters(stockState, farmId, ftIdx, lit, pname, "silo", nil, rawget(storage, "uniqueId"))
+                        InventoryScan.addStockLiters(stockState, farmId, ftIdx, lit, pname, "silo", nil, uid)
                     end
                 end
             end
@@ -905,7 +932,7 @@ function InventoryScan.scanPlaceableForFarm(placeable, farmId, stockState, baleS
             local ok, levels = pcall(function() return spec.loadingStation:getAllFillLevels(farmId) end)
             if ok and type(levels) == "table" then
                 for ftIdx, lit in pairs(levels) do
-                    InventoryScan.addStockLiters(stockState, farmId, ftIdx, lit, pname, "silo")
+                    InventoryScan.addStockLiters(stockState, farmId, ftIdx, lit, pname, "silo", nil, moistureUid)
                 end
             end
         end

@@ -45,6 +45,8 @@ const DISPLAY_NAMES = {
   RYE: "Rye",
   TRITICALE: "Triticale",
   SPELT: "Spelt",
+  LINSEED: "Linseed",
+  POPPY: "Poppy",
 };
 
 function formatCommodityLabel(name) {

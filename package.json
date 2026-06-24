@@ -1,6 +1,6 @@
 {
   "name": "farmhub",
-  "version": "4.1.5",
+  "version": "4.2.0",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "description": "FarmHub — FS25 Farm Dashboard (Lua mod + Electron app). Run builds from the repo root.",

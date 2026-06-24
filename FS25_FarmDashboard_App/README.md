@@ -1,6 +1,6 @@
 # FS25 Farm Dashboard
 
-**Version 4.1.5** — Real-time farm management dashboard for *Farming Simulator 25*, with local save folders and dedicated (FTP) servers.
+**Version 4.2.0** — Real-time farm management dashboard for *Farming Simulator 25*, with local save folders and dedicated (FTP) servers.
 
 **Authors:** JoshWalki, WizardlyPayload  
 
@@ -18,7 +18,7 @@
 
 ### 1. Run the installer
 
-1. Run **`FS25 Farm Dashboard Setup 4.1.5.exe`** (or the current release build from `npm run dist`).
+1. Run **`FS25 Farm Dashboard Setup 4.2.0.exe`** (or the current release build from `npm run dist`).
 2. **The first screen is language selection** — choose the language used for the rest of the installer, the **first-run Server Manager** setup, and the default **Dashboard** language (you can change language again inside the app under **Theme & Color Settings**).
 3. The installer installs the app and **automatically runs an ImageMagick helper** so DDS→PNG conversion works without manual downloads when possible (bundled/offline installer, **winget**, **Chocolatey**, or a **download** fallback — see `build/install-imagemagick.ps1`).
 
@@ -66,7 +66,7 @@ npm run dist
 ```
 
 Default output (**[`tools/app/run-electron-builder.mjs`](../../tools/app/run-electron-builder.mjs)** relative to repo root):  
-`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\` — e.g. `FS25 Farm Dashboard Setup 4.1.5.exe`, `latest.yml`, and `win-unpacked/` (version follows `package.json`). See **[`tools/README.md`](../../tools/README.md)**.
+`%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\` — e.g. `FS25 Farm Dashboard Setup 4.2.0.exe`, `latest.yml`, and `win-unpacked/` (version follows `package.json`). See **[`tools/README.md`](../../tools/README.md)**.
 
 ### Fleet map (4.1+)
 
@@ -114,9 +114,9 @@ Build output folders are **gitignored**; installers are produced locally and **n
 
 ---
 
-## Release notes — v4.1.5
+## Release notes — v4.2.0
 
-See **[../../docs/CHANGELOG.md](../../docs/CHANGELOG.md)** §**4.1.5** (accurate store images, duplicate fleet fix, mod-image extractor migration), §**4.1.4** (Courseplay menu crash fix + livestock table/total agreement + grass field status), §**4.1.3** (correct livestock counts for partially-captured pens), §**4.1.2** (mod-config save no longer wipes mod settings), §**4.1.1** (security hardening + offline moisture), and §**4.1.0** (fleet map, storage, integrations). GitHub body: **[../../docs/GITHUB_RELEASE_v4.1.5.md](../../docs/GITHUB_RELEASE_v4.1.5.md)**. Publish checklist: **[../../docs/RELEASE_v4.1.5.md](../../docs/RELEASE_v4.1.5.md)**. Prior: **[../../docs/RELEASE_v4.0.0.md](../../docs/RELEASE_v4.0.0.md)**.
+See **[../../docs/CHANGELOG.md](../../docs/CHANGELOG.md)** §**4.2.0** (Linseed/map crop naming, silo moisture & grade, public release on mod **3.4.0.0**). GitHub body: **[../../docs/GITHUB_RELEASE_v4.2.0.md](../../docs/GITHUB_RELEASE_v4.2.0.md)**. Publish checklist: **[../../docs/RELEASE_v4.2.0.md](../../docs/RELEASE_v4.2.0.md)**.
 
 - **Language first:** NSIS installer welcome page + Server Manager language bar; shared `locale` store and `translations.json` pipeline.
 - **Dashboard i18n:** EU/EEA-oriented locales with English fallback per string.

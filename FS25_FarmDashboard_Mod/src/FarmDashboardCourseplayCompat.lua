@@ -1,4 +1,4 @@
--- FS25 FarmDashboard | FarmDashboardCourseplayCompat.lua | v3.3.21
+-- FS25 FarmDashboard | FarmDashboardCourseplayCompat.lua | v3.4.0
 -- Authority-only: spawn-window stubs for half-initialized shop vehicles + Courseplay stream guards.
 -- Incremental fleet cache via Vehicle.register (no Vehicle.update / fleet-wide per-frame patching).
 

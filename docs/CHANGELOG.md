@@ -1,6 +1,6 @@
 # Farm Dashboard — Changelog
 
-All notable changes to this project are recorded here. For GitHub release blurbs, see [GITHUB_RELEASE_v4.1.5.md](./GITHUB_RELEASE_v4.1.5.md) (current) · [GITHUB_RELEASE_v4.1.0.md](./GITHUB_RELEASE_v4.1.0.md). For **network exposure and trust assumptions**, see [SECURITY.md](./SECURITY.md).
+All notable changes to this project are recorded here. For GitHub release blurbs, see [GITHUB_RELEASE_v4.2.0.md](./GITHUB_RELEASE_v4.2.0.md) (current) · [GITHUB_RELEASE_v4.1.5.md](./GITHUB_RELEASE_v4.1.5.md) · [GITHUB_RELEASE_v4.1.0.md](./GITHUB_RELEASE_v4.1.0.md). For **network exposure and trust assumptions**, see [SECURITY.md](./SECURITY.md).
 
 ---
 
@@ -8,9 +8,28 @@ All notable changes to this project are recorded here. For GitHub release blurbs
 
 | Artifact | Where it lives | Format |
 |----------|----------------|--------|
-| **Desktop app** | `FS25_FarmDashboard_App/package.json` | Semver (e.g. `4.1.0`) |
-| **FS25 mod** | `FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `3.1.0.0`) |
+| **Desktop app** | `FS25_FarmDashboard_App/package.json` | Semver (e.g. `4.2.0`) |
+| **FS25 mod** | `FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `3.4.0.0`) |
 | **Source headers** | First line of many `.js` / `.lua` files | Often `v2.0.0` historically; bump only when you intentionally resync headers |
+
+---
+
+## 4.2.0 — Public release (storage + map crops + 4.1 line)
+
+**App:** `4.2.0` (`package.json`) · **Mod:** `3.4.0.0` (`modDesc.xml` + `FarmDashboard.VERSION`; app requires **3.1.0.0+** via `modVersionPolicy.js`).
+
+Fresh revision numbers for the first public GitHub release on the 4.2 / 3.4 line.
+
+### Fixed
+- **Linseed and other mod-map crops showed as “Fill type #N”.** On Witcombe-style maps the engine catalog often skips index **190** (LINSEED) between **189** (RYE_CUT) and **191** (POPPY), same pattern as Triticale at **182**. Mod `FillTypeUtils.enrichCatalogFromData` and app `assignNeighborCropGaps` / `inferCatalogFromStockAndFields` now resolve **190 → LINSEED** when stock and neighbors match.
+- **Silo moisture and grade always “—” in Economy → Storage.** Silos scanned via `loadingStation:getAllFillLevels()` never passed a `uniqueId` to `MoistureSystem:getObjectMoisture()`. `InventoryScan` now resolves moisture keys from storage, loading station, or placeable `uniqueId` before export.
+
+### Included from 4.1.5 (not previously on GitHub Latest)
+- Authoritative **store images** for vehicles (`storeImage` export + exact app match).
+- **Duplicate fleet entries** fixed on dedicated servers (`mergeVehicles` by config + farm).
+
+### Tests
+- `baleInventory.test.mjs` — LINSEED at 190 inference; full Jest + `.mjs` suite green.
 
 ---
 

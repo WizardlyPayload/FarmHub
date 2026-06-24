@@ -4,8 +4,8 @@
 
 | | |
 | --- | --- |
-| **App** | **4.1.5** (installer from [Releases](https://github.com/WizardlyPayload/FarmHub/releases)) |
-| **Mod** | **3.3.21.2** (`FS25_FarmDashboard.zip`) |
+| **App** | **4.2.0** (installer from [Releases](https://github.com/WizardlyPayload/FarmHub/releases)) |
+| **Mod** | **3.4.0.0** (`FS25_FarmDashboard.zip`) |
 | **Dashboard URL** | [http://localhost:8766](http://localhost:8766) after setup |
 
 **After install:** day-to-day use is in [`USER_MANUAL.md`](./USER_MANUAL.md). **Upgrading from 2.0.0?** See [`UPGRADE_FROM_FS25-Farm-Dashboard.md`](./UPGRADE_FROM_FS25-Farm-Dashboard.md).
@@ -77,7 +77,7 @@ The file should exist and its **Modified** time should advance while you play.
 
 ## Stage D — Install the Windows app
 
-1. Download **`FS25-Farm-Dashboard-Setup-4.1.5.exe`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
+1. Download **`FS25-Farm-Dashboard-Setup-4.2.0.exe`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
 2. Run the installer. Choose language on the welcome page.
 3. Finish setup and launch **Farm Dashboard** from the Start menu.
 

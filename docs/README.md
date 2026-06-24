@@ -12,7 +12,7 @@
 | [CHANGELOG.md](./CHANGELOG.md) | Version history |
 | [SCREENSHOTS.md](./SCREENSHOTS.md) | Screenshot filenames + capture checklist (maintainers) |
 
-**Publishing a release:** [GITHUB_RELEASE_v4.1.5.md](./GITHUB_RELEASE_v4.1.5.md) (paste into GitHub) · [RELEASE_v4.1.5.md](./RELEASE_v4.1.5.md) (publish checklist) · [GITHUB_RELEASE_v4.1.0.md](./GITHUB_RELEASE_v4.1.0.md) (prior).
+**Publishing a release:** [GITHUB_RELEASE_v4.2.0.md](./GITHUB_RELEASE_v4.2.0.md) (paste into GitHub) · [RELEASE_v4.2.0.md](./RELEASE_v4.2.0.md) (publish checklist) · [GITHUB_RELEASE_v4.1.5.md](./GITHUB_RELEASE_v4.1.5.md) (prior tester drop).
 
 **Wiki:** [../wiki/Home.md](../wiki/Home.md)
 
@@ -27,4 +27,4 @@
 
 Planning notes, audits, i18n pipeline, old release copy, and engine reference text live under **[`_internal/`](./_internal/)** — not required for end users.
 
-**Versions:** App **4.1.5** · Mod **3.3.21.2** · Build scripts: [../tools/README.md](../tools/README.md)
+**Versions:** App **4.2.0** · Mod **3.4.0.0** · Build scripts: [../tools/README.md](../tools/README.md)

@@ -20,7 +20,7 @@ Extended manuals (screenshots, runbooks): [docs folder on GitHub](https://github
 | Component | Version |
 |-----------|---------|
 | **Windows app** | **4.2.0** |
-| **FS25 mod** | **3.4.0.0** |
+| **FS25 mod** | **3.4.0.6** |
 
 Download both from **[GitHub Releases](https://github.com/WizardlyPayload/FarmHub/releases)**.
 
@@ -93,9 +93,10 @@ FarmHub/
 ## Support
 
 - **Bugs:** [GitHub Issues](https://github.com/WizardlyPayload/FarmHub/issues) — include app version, mod version, local vs FTP
+- **Community:** [Discord](https://discord.gg/D4sEHM59) — chat, screenshots, quick help
 - **Security:** See [Security & Network](Security-and-Network) — do not post exploits publicly
 - **Authors:** [JoshWalki](https://github.com/JoshWalki) & **WizardlyPayload** · optional [Ko-fi](https://ko-fi.com/wizarlypayload)
 
 ---
 
-*Last updated: app **4.2.0**, mod **3.4.0.0***
+*Last updated: app **4.2.0**, mod **3.4.0.6***

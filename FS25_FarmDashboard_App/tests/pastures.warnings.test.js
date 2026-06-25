@@ -9,6 +9,7 @@
 const {
   countLivestockHeads,
   buildFoodWaterDecisions,
+  computeFoodDurationEstimates,
 } = require("../web/assests/js/pastures-warnings.js");
 
 describe("countLivestockHeads (head-aware)", () => {
@@ -144,5 +145,65 @@ describe("Head-aware counting via clusterCount", () => {
     expect(out).toHaveLength(2);
     expect(out[0].count).toBe(50);
     expect(out[1].count).toBe(50);
+  });
+});
+
+describe("computeFoodDurationEstimates", () => {
+  test("returns null when telemetry is absent", () => {
+    expect(computeFoodDurationEstimates({ hasRealData: false }, {}, 10)).toBeNull();
+  });
+
+  test("returns null when head count is zero", () => {
+    expect(
+      computeFoodDurationEstimates(
+        { hasRealData: true, availableFood: 1000, water: 500 },
+        { foodPerDay: 100, waterPerDay: 50 },
+        0
+      )
+    ).toBeNull();
+  });
+
+  test("uses mod consumption rates when present", () => {
+    const out = computeFoodDurationEstimates(
+      { hasRealData: true, availableFood: 2000, water: 900, straw: 100 },
+      { foodPerDay: 200, waterPerDay: 100, strawPerDay: 25 },
+      10
+    );
+    expect(out.durationEstimated).toBe(false);
+    expect(out.durationDays.food).toBe(10);
+    expect(out.durationDays.water).toBe(9);
+    expect(out.durationDays.straw).toBe(4);
+  });
+
+  test("falls back to per-head defaults when consumption is missing", () => {
+    const out = computeFoodDurationEstimates(
+      { hasRealData: true, availableFood: 400, water: 600, straw: 50 },
+      {},
+      10
+    );
+    expect(out.durationEstimated).toBe(true);
+    expect(out.durationDays.food).toBe(2);
+    expect(out.durationDays.water).toBe(2);
+    expect(out.durationDays.straw).toBe(1);
+  });
+
+  test("sums hay, silage, grass, and forage when availableFood is zero", () => {
+    const out = computeFoodDurationEstimates(
+      {
+        hasRealData: true,
+        availableFood: 0,
+        hay: 100,
+        silage: 100,
+        grass: 0,
+        forage: 100,
+        water: 0,
+        straw: 0,
+      },
+      { foodPerDay: 100 },
+      5
+    );
+    expect(out.durationDays.food).toBe(3);
+    expect(out.durationDays.water).toBeNull();
+    expect(out.durationDays.straw).toBeNull();
   });
 });

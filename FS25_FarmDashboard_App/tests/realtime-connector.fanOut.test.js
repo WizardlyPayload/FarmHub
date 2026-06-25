@@ -8,6 +8,7 @@
 
 const {
   fanOutClustersIndividualRows,
+  isDetailClusterSummaryPen,
   DEFAULT_PEN_HEAD_ROW_CAP,
   DEFAULT_GLOBAL_ROW_CAP,
 } = require("../web/assests/js/realtime-fanout.js");
@@ -28,6 +29,32 @@ describe("LOD per-head fan-out (per pen)", () => {
     expect(out[0].health).toBe(80);
     expect(out[0].__lodSynth).toBe(true);
     expect(husbandry.__lodTrimmed).toBeUndefined();
+  });
+
+  test("falls back to husbandry.animalTypeName when cluster subType is UNKNOWN", () => {
+    const counter = { emitted: 0, cap: 100000 };
+    const husbandry = { id: 12, animalTypeName: "COW" };
+    const out = fanOutClustersIndividualRows(
+      husbandry,
+      [{ count: 2, subType: "UNKNOWN", subTypeIndex: 3 }],
+      1,
+      counter
+    );
+    expect(out.length).toBe(2);
+    expect(out[0].subType).toBe("COW");
+    expect(out[0].animalTypeName).toBe("COW");
+  });
+
+  test("omitted cluster avgHealth uses pen health instead of zero", () => {
+    const counter = { emitted: 0, cap: 100000 };
+    const husbandry = { id: 13, health: 82 };
+    const out = fanOutClustersIndividualRows(
+      husbandry,
+      [{ count: 1, subType: "SHEEP" }],
+      1,
+      counter
+    );
+    expect(out[0].health).toBe(82);
   });
 
   test("default per-pen cap is 4096 heads; remaining heads counted as trimmed", () => {
@@ -170,5 +197,42 @@ describe("LOD per-head fan-out (global cap across pens)", () => {
       counter
     );
     expect(out.map((r) => r.id)).toEqual(["42-c0-h0", "42-c1-h0"]);
+  });
+});
+
+describe("isDetailClusterSummaryPen (base game vs RealisticLivestock)", () => {
+  test("false when any hydrated animal has uniqueId (RL individuals)", () => {
+    expect(
+      isDetailClusterSummaryPen({
+        __detailHydrated: true,
+        animals: [
+          { uniqueId: "410001", subType: "HOLSTEIN" },
+          { type: "cluster", count: 40 },
+        ],
+      })
+    ).toBe(false);
+  });
+
+  test("true only for base-game cluster bucket detail rows", () => {
+    expect(
+      isDetailClusterSummaryPen({
+        __detailHydrated: true,
+        animals: [{ type: "cluster", count: 40, subType: "COW" }],
+      })
+    ).toBe(true);
+    expect(
+      isDetailClusterSummaryPen({
+        lod: "full",
+        animals: [{ type: "cluster", count: 6, subType: "SHEEP" }],
+      })
+    ).toBe(true);
+  });
+
+  test("false for non-hydrated aggregate pens", () => {
+    expect(
+      isDetailClusterSummaryPen({
+        clusters: [{ count: 50, subType: "COW" }],
+      })
+    ).toBe(false);
   });
 });

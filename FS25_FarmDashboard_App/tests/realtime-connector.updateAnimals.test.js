@@ -9,8 +9,77 @@
 
 const {
   fanOutClustersIndividualRows,
+  fanOutAnimalGroupsIndividualRows,
+  resolveAnimalGroupHeadCount,
+  shouldEmitClusterAggregateRow,
+  isDetailClusterSummaryPen,
   DEFAULT_GLOBAL_ROW_CAP,
 } = require("../web/assests/js/realtime-fanout.js");
+
+function appendDetailHydratedAnimals(husbandry, hfarm, formattedAnimals, globalCounter) {
+  const animalsList = husbandry.animals;
+  if (!Array.isArray(animalsList)) return;
+  for (let a = 0; a < animalsList.length; a++) {
+    const animalGroup = animalsList[a];
+    const animalType =
+      animalGroup.subType ||
+      animalGroup.type ||
+      animalGroup.animalType ||
+      "Unknown";
+    const headsInGroup = resolveAnimalGroupHeadCount(animalGroup);
+    if (shouldEmitClusterAggregateRow(animalGroup) && headsInGroup > 1) {
+      const synth = fanOutAnimalGroupsIndividualRows(
+        husbandry,
+        [animalGroup],
+        hfarm,
+        globalCounter
+      );
+      for (let s = 0; s < synth.length; s++) formattedAnimals.push(synth[s]);
+      continue;
+    }
+    if (
+      animalGroup.id &&
+      headsInGroup <= 1 &&
+      (animalGroup.numAnimals === undefined || animalGroup.numAnimals <= 1) &&
+      (animalGroup.count === undefined || Number(animalGroup.count) <= 1) &&
+      (animalGroup.uniqueId ||
+        animalGroup.age !== undefined ||
+        animalGroup.weight !== undefined)
+    ) {
+      // Mirrors production RealisticLivestock individual row in updateAnimalsData.
+      formattedAnimals.push({
+        id: animalGroup.id,
+        name: animalGroup.name || `${animalType} ${animalGroup.id}`,
+        husbandryName: husbandry.name || husbandry.buildingName,
+        husbandryId: husbandry.id || husbandry.buildingId,
+        ownerFarmId: husbandry.ownerFarmId || husbandry.farmId,
+        farmId: hfarm,
+        age: animalGroup.age || animalGroup.ageInMonths || 24,
+        health: animalGroup.health || animalGroup.healthStatus || 100,
+        weight: animalGroup.weight || animalGroup.currentWeight || 350,
+        gender: animalGroup.gender || animalGroup.sex || "female",
+        subType: animalType,
+        location: husbandry.name || husbandry.buildingName,
+        locationType: "pasture",
+        isLactating: animalGroup.isLactating || animalGroup.lactating || false,
+        isPregnant: animalGroup.isPregnant || animalGroup.pregnant || false,
+        isParent: animalGroup.isParent || animalGroup.hasOffspring || false,
+        genetics: animalGroup.genetics || null,
+        productivity: animalGroup.productivity || null,
+        sellPrice: animalGroup.sellPrice || null,
+        uniqueId: animalGroup.uniqueId ?? null,
+        breed: animalGroup.breed ?? null,
+        motherId: animalGroup.motherId ?? null,
+        fatherId: animalGroup.fatherId ?? null,
+        isCastrated: !!animalGroup.isCastrated,
+        birthday: animalGroup.birthday ?? null,
+        dirt: animalGroup.dirt,
+        fitness: animalGroup.fitness,
+        diseaseCount: animalGroup.diseaseCount,
+      });
+    }
+  }
+}
 
 function runUpdateAnimalsScenario(payload, options) {
   const opts = options || {};
@@ -41,13 +110,14 @@ function runUpdateAnimalsScenario(payload, options) {
       (husbandry.__detailHydrated === true || husbandry.lod === "full") &&
       Array.isArray(husbandry.animals) &&
       husbandry.animals.length > 0;
+    const detailIsClusterSummary = isDetailClusterSummaryPen(husbandry);
     const clusters = Array.isArray(husbandry.clusters)
       ? husbandry.clusters
       : null;
     const hasBuckets =
       clusters && clusters.some((c) => c && Number(c.count) > 0);
 
-    if (!detailReady && hasBuckets) {
+    if ((!detailReady || detailIsClusterSummary) && hasBuckets) {
       const synth = fanOutClustersIndividualRows(
         husbandry,
         clusters,
@@ -55,6 +125,11 @@ function runUpdateAnimalsScenario(payload, options) {
         globalCounter
       );
       for (let s = 0; s < synth.length; s++) formattedAnimals.push(synth[s]);
+      if (synth.length > 0) continue;
+    }
+
+    if (detailReady) {
+      appendDetailHydratedAnimals(husbandry, hfarm, formattedAnimals, globalCounter);
     }
   }
 
@@ -119,14 +194,51 @@ describe("updateAnimalsData cluster path (multi-pen)", () => {
           id: 5,
           ownerFarmId: 1,
           __detailHydrated: true,
-          animals: [{ id: "real-1", subType: "COW" }],
+          animals: [{ id: "real-1", subType: "COW", uniqueId: "rl-1" }],
           clusters: [{ count: 99, subType: "COW" }],
         },
       ],
       { activeFarmId: 1 }
     );
-    expect(result.animals.length).toBe(0);
+    expect(result.animals.length).toBe(1);
     expect(result.lodGlobalState.emitted).toBe(0);
+  });
+
+  test("hydrated cluster buckets fan out to one list row per head", () => {
+    const result = runUpdateAnimalsScenario(
+      [
+        {
+          id: 10,
+          ownerFarmId: 1,
+          __detailHydrated: true,
+          clusters: [
+            { count: 40, subType: "COW", gender: "female" },
+            { count: 25, subType: "COW", gender: "female" },
+          ],
+          animals: [
+            {
+              id: 1,
+              type: "cluster",
+              subType: "COW",
+              count: 40,
+              avgWeight: 520,
+              avgHealth: 88,
+            },
+            {
+              id: 2,
+              type: "cluster",
+              subType: "COW",
+              count: 25,
+              weight: 500,
+              health: 90,
+            },
+          ],
+        },
+      ],
+      { activeFarmId: 1 }
+    );
+    expect(result.animals).toHaveLength(65);
+    expect(result.animals.every((a) => a.__lodSynth === true)).toBe(true);
   });
 
   test("empty husbandry array yields zero animals and no cap hit", () => {
@@ -134,5 +246,76 @@ describe("updateAnimalsData cluster path (multi-pen)", () => {
     expect(result.animals.length).toBe(0);
     expect(result.lodGlobalState.emitted).toBe(0);
     expect(result.lodGlobalState.capHit).toBe(false);
+  });
+});
+
+describe("updateAnimalsData RealisticLivestock guardrails", () => {
+  test("RL hydrated individuals are not replaced by LOD cluster fan-out", () => {
+    const result = runUpdateAnimalsScenario(
+      [
+        {
+          id: 5,
+          name: "Cow Barn",
+          ownerFarmId: 1,
+          __detailHydrated: true,
+          lod: "full",
+          animals: [
+            {
+              id: 410001,
+              uniqueId: "410001",
+              subType: "HOLSTEIN",
+              breed: "Holstein",
+              age: 36,
+              weight: 620,
+              health: 94,
+              genetics: { fertility: 0.8, productivity: 0.75 },
+              isLactating: true,
+            },
+            {
+              id: 410002,
+              uniqueId: "410002",
+              subType: "HOLSTEIN",
+              breed: "Holstein",
+              age: 24,
+              weight: 580,
+              health: 91,
+            },
+          ],
+          clusters: [{ count: 99, subType: "COW" }],
+        },
+      ],
+      { activeFarmId: 1 }
+    );
+    expect(result.animals).toHaveLength(2);
+    expect(result.animals.every((a) => !a.__lodSynth)).toBe(true);
+    expect(result.animals.map((a) => a.uniqueId)).toEqual(["410001", "410002"]);
+    expect(result.animals[0].genetics).toEqual({
+      fertility: 0.8,
+      productivity: 0.75,
+    });
+    expect(result.animals[0].breed).toBe("Holstein");
+    expect(result.animals[0].isLactating).toBe(true);
+    expect(result.lodGlobalState.emitted).toBe(0);
+  });
+
+  test("incomplete RL detail does not block cluster fan-out on aggregate pen", () => {
+    const result = runUpdateAnimalsScenario(
+      [
+        {
+          id: 100,
+          ownerFarmId: 1,
+          animalCount: 80,
+          numOfAnimalsReported: 71,
+          clusters: [
+            { count: 40, subType: "COW" },
+            { count: 25, subType: "COW" },
+            { count: 15, subType: "COW" },
+          ],
+        },
+      ],
+      { activeFarmId: 1 }
+    );
+    expect(result.animals.length).toBe(80);
+    expect(result.animals.every((a) => a.__lodSynth === true)).toBe(true);
   });
 });

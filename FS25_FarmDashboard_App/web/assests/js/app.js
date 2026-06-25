@@ -17,6 +17,7 @@ import * as storage       from './modules/storage.js';
 import * as redTape       from './modules/redTape.js';
 import * as fleetMap      from './modules/fleet-map.js';
 import * as dashboardSettings from './modules/dashboard-settings.js';
+import * as urgentNotifications from './modules/urgent-notifications.js';
 import { installFarmDashRemoteViewerGuards } from './modules/viewer-mode.js';
 import { farmdashWaitForLanHttpBasicIfNeeded } from './lan-http-auth.js';
 import { initI18n, t }    from './i18n/i18n.js';
@@ -66,7 +67,8 @@ Object.assign(
   LivestockDashboard.prototype,
   apiStorage, parsers, navigation, notifications,
   changes, livestock, pastures, vehicles, economy,
-  fields, environment, theming, productions, storage, redTape, fleetMap, dashboardSettings
+  fields, environment, theming, productions, storage, redTape, fleetMap, dashboardSettings,
+  urgentNotifications
 );
 
 let dashboard;

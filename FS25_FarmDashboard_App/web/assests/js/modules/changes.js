@@ -845,13 +845,18 @@ export function showChangeToasts(changes) {
         warning.message.includes("Critical") ||
         warning.message.includes("Low")
       ) {
-        this.showAlert(
-          t("changes.toastFoodWarning", {
-            pasture: warning.pastureName,
-            message: warning.message,
+        const msg = t("changes.toastFoodWarning", {
+          pasture: warning.pastureName,
+          message: warning.message,
+        });
+        this.showAlert(msg, "warning");
+        this.addNotificationToHistory({
+          type: "warning",
+          title: t("urgent.pasture.title", {
+            name: warning.pastureName || "Pasture",
           }),
-          "warning"
-        );
+          message: msg,
+        });
       }
     });
   }
@@ -869,5 +874,10 @@ export function showChangeToasts(changes) {
       t("changes.toastHealthCritical", { name: animalName, health }),
       "danger"
     );
+    this.addNotificationToHistory({
+      type: "danger",
+      title: t("urgent.livestock.healthTitle"),
+      message: t("changes.toastHealthCritical", { name: animalName, health }),
+    });
   });
 }

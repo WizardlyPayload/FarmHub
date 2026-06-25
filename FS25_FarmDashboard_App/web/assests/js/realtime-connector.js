@@ -77,6 +77,7 @@ class RealtimeConnector {
     // Store previous data for change comparison
     this.previousData = null;
     this.lastChangeCheck = 0;
+    this.lastUrgentAlertCheck = 0;
     /** Skip handleRealtimeData when merged JSON unchanged (ignores volatile `timestamp`). */
     this.lastRealtimePayloadKey = null;
     /** Milliseconds between /api/data polls when the tab is visible (hidden tab pauses polling). */
@@ -84,6 +85,20 @@ class RealtimeConnector {
     this._httpPollVisibilityHooked = false;
     /** Throttle expensive landing tile refresh while user is deep in another tab. */
     this._lastLandingCountsFromAnimalsAt = 0;
+  }
+
+  /** Sync connection/badge fields without re-rendering the full farm payload. */
+  applyDashboardConnectionMeta(data) {
+    const dash = this.dashboard;
+    if (!dash || !data || typeof data !== "object") return;
+    if (data.dataSource) dash.dataSource = data.dataSource;
+    if (data.xmlAvailable !== undefined) dash.xmlAvailable = data.xmlAvailable;
+    if (data.luaAvailable !== undefined) dash.luaAvailable = data.luaAvailable;
+    if (data.dataTimestamps) dash.dataTimestamps = data.dataTimestamps;
+    if (data.modVersionCheck) dash.modVersionCheck = data.modVersionCheck;
+    if (typeof dash.updateNavbarConnectionStrip === "function") {
+      dash.updateNavbarConnectionStrip();
+    }
   }
 
   // Helper function to generate consistent hash from string
@@ -247,9 +262,19 @@ class RealtimeConnector {
                   delete rest.timestamp;
                   delete rest.dataTimestamps;
                   delete rest.fieldStatusHistory;
-                  return JSON.stringify(rest) + "|" + farmId + "|" + srv;
+                  const conn =
+                    dedupeNs && typeof dedupeNs.connectionDedupeSuffix === "function"
+                      ? dedupeNs.connectionDedupeSuffix(data)
+                      : [
+                          data.dataSource || "",
+                          data.luaAvailable ? 1 : 0,
+                          data.dataTimestamps?.lastLuaReceivedAt || "",
+                          data.dataTimestamps?.liveExportStaleAt || "",
+                        ].join("|");
+                  return JSON.stringify(rest) + "|" + farmId + "|" + srv + "|" + conn;
                 })();
           if (self.lastRealtimePayloadKey === payloadKey) {
+            self.applyDashboardConnectionMeta(data);
             self.isConnected = true;
             self.updateConnectionStatus(true);
             return;
@@ -501,6 +526,10 @@ class RealtimeConnector {
       this.updateFarmInfo(data.farmInfo);
     }
 
+    if (data.collectorModules && typeof data.collectorModules === "object") {
+      this.dashboard.collectorModules = data.collectorModules;
+    }
+
     // Handle merged data top-level fields from dataMerger
     if (data.serverInfo?.mapName && !data.mapTitle) {
       this.dashboard.mapTitle = data.serverInfo.mapName;
@@ -570,11 +599,24 @@ class RealtimeConnector {
               "[ChangeDetection] Skipping livestock toasts — farm/server/save context changed (not real removals)"
             );
           }
+          this.dashboard._urgentAlertsInitialized = false;
+          this.dashboard._urgentAlertKeys = new Set();
         } else {
           this.detectAndShowChanges(oldState);
         }
         this.lastChangeCheck = now;
       }
+    }
+
+    if (
+      this.dashboard.processUrgentAlertTransitions &&
+      (!this.lastUrgentAlertCheck ||
+        Date.now() - this.lastUrgentAlertCheck >= 30000)
+    ) {
+      this.dashboard.processUrgentAlertTransitions(
+        this.dashboard._urgentAlertKeys
+      );
+      this.lastUrgentAlertCheck = Date.now();
     }
 
     this.previousData = newState;
@@ -716,8 +758,18 @@ class RealtimeConnector {
           lodClusters &&
           lodClusters.some((c) => c && Number(c.count) > 0);
 
-        // LOD clusters → one table row per head (no ×N aggregates). Skipped when detail JSON hydrated `animals[]`.
-        if (!detailReady && hasClusterBuckets) {
+        const fanOutNs =
+          (typeof globalThis !== "undefined" && globalThis.farmDashFanOut) ||
+          (typeof window !== "undefined" && window.farmDashFanOut) ||
+          null;
+        const detailIsClusterSummary =
+          fanOutNs &&
+          typeof fanOutNs.isDetailClusterSummaryPen === "function" &&
+          fanOutNs.isDetailClusterSummaryPen(husbandry);
+
+        // LOD clusters → one table row per head. Detail JSON that only has cluster bucket
+        // summaries (base game) still fans out from clusters[] — not one aggregate row per breed.
+        if ((!detailReady || detailIsClusterSummary) && hasClusterBuckets) {
           const synth = this._fanOutClustersIndividualRows(husbandry, lodClusters, hfarm, globalCounter);
           for (let s = 0; s < synth.length; s++) formattedAnimals.push(synth[s]);
           if (synth.length > 0) {
@@ -742,6 +794,25 @@ class RealtimeConnector {
         }
 
         if (animalsList) {
+          const resolveHeadCount =
+            fanOutNs && typeof fanOutNs.resolveAnimalGroupHeadCount === "function"
+              ? fanOutNs.resolveAnimalGroupHeadCount.bind(fanOutNs)
+              : (g) =>
+                  Math.max(
+                    1,
+                    Number(g?.clusterCount ?? g?.count ?? g?.numAnimals ?? 1) || 1
+                  );
+          const shouldAggregateRow =
+            fanOutNs &&
+            typeof fanOutNs.shouldEmitClusterAggregateRow === "function"
+              ? fanOutNs.shouldEmitClusterAggregateRow.bind(fanOutNs)
+              : (g) => g?.__lodClusterAggregate === true;
+          const fanOutGroups =
+            fanOutNs &&
+            typeof fanOutNs.fanOutAnimalGroupsIndividualRows === "function"
+              ? fanOutNs.fanOutAnimalGroupsIndividualRows.bind(fanOutNs)
+              : null;
+
           animalsList.forEach((animalGroup) => {
             // Handle both grouped animals (vanilla) and individual animals (RealisticLivestock)
             const numAnimals = animalGroup.numAnimals || animalGroup.count || 1;
@@ -750,12 +821,30 @@ class RealtimeConnector {
               animalGroup.type ||
               animalGroup.animalType ||
               "Unknown";
+            const headsInGroup = resolveHeadCount(animalGroup);
+
+            if (shouldAggregateRow(animalGroup) && headsInGroup > 1) {
+              if (fanOutGroups) {
+                const synth = fanOutGroups(
+                  husbandry,
+                  [animalGroup],
+                  hfarm,
+                  globalCounter
+                );
+                for (let s = 0; s < synth.length; s++) {
+                  formattedAnimals.push(synth[s]);
+                }
+              }
+              return;
+            }
 
             // If RealisticLivestock provides individual animals with detailed data
             if (
               animalGroup.id &&
+              headsInGroup <= 1 &&
               (animalGroup.numAnimals === undefined ||
                 animalGroup.numAnimals <= 1) &&
+              (animalGroup.count === undefined || Number(animalGroup.count) <= 1) &&
               (animalGroup.uniqueId ||
                 animalGroup.age !== undefined ||
                 animalGroup.weight !== undefined)

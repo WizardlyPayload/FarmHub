@@ -1,5 +1,5 @@
--- FS25 FarmDashboard | RedTapeDataCollector.lua | v1.0.0
--- Optional FS25_RedTape export — policies, schemes, tax, grants, event log (aggregate + capped lists).
+-- FS25 FarmDashboard | RedTapeDataCollector.lua | v1.1.0
+-- Optional FS25_RedTape export — policies, schemes, tax, grants, harvest rotation (aggregate + capped lists).
 
 RedTapeDataCollector = {}
 
@@ -8,6 +8,7 @@ local MAX_TAX_STATEMENTS = 12
 local MAX_POLICIES = 16
 local MAX_SCHEMES = 12
 local MAX_GRANTS = 8
+local MAX_FARMLANDS_ROTATION = 48
 local TIER_NAMES = { [1] = "A", [2] = "B", [3] = "C", [4] = "D" }
 
 local function rtEnabled()
@@ -82,16 +83,17 @@ local function rtSerializePolicies(rt, farmId)
     return out
 end
 
-local function rtSerializeSchemes(schemeSystem, farmId, active)
+local function rtSerializeSchemes(schemeSystem, policySystem, farmId, active)
     if not schemeSystem then return {} end
-    local list = active
-        and (schemeSystem.getActiveSchemesForFarm and schemeSystem:getActiveSchemesForFarm(farmId))
-        or (schemeSystem.getAvailableSchemesForCurrentFarm and schemeSystem:getAvailableSchemesForCurrentFarm())
+    if not active then
+        return rtSerializeAvailableSchemesForFarm(schemeSystem, policySystem, farmId)
+    end
+    local list = schemeSystem.getActiveSchemesForFarm and schemeSystem:getActiveSchemesForFarm(farmId)
     if type(list) ~= "table" then return {} end
     local out = {}
     for _, scheme in pairs(list) do
         if scheme and #out < MAX_SCHEMES then
-            if not active or tonumber(scheme.farmId) == farmId or tonumber(scheme.farmId) == -1 then
+            if tonumber(scheme.farmId) == farmId or tonumber(scheme.farmId) == -1 then
                 table.insert(out, {
                     schemeIndex = tonumber(scheme.schemeIndex),
                     nameKey = rtSchemeNameKey(scheme),
@@ -102,6 +104,138 @@ local function rtSerializeSchemes(schemeSystem, farmId, active)
             end
         end
     end
+    return out
+end
+
+local function rtSerializeAvailableSchemesForFarm(schemeSystem, policySystem, farmId)
+    if not schemeSystem or not policySystem then return {} end
+    local progress = nil
+    if policySystem.getProgressForFarm then
+        local ok, p = pcall(function() return policySystem:getProgressForFarm(farmId) end)
+        if ok then progress = p end
+    end
+    if not progress or not progress.tier then return {} end
+    local farmTier = progress.tier
+    local tierList = schemeSystem.availableSchemes and schemeSystem.availableSchemes[farmTier]
+    if type(tierList) ~= "table" then return {} end
+    local activeSchemes = schemeSystem.getActiveSchemesForFarm and schemeSystem:getActiveSchemesForFarm(farmId) or {}
+    local out = {}
+    for _, scheme in pairs(tierList) do
+        if scheme and #out < MAX_SCHEMES then
+            if tonumber(scheme.tier) ~= tonumber(farmTier) then
+                -- skip wrong tier bucket
+            else
+                local available = true
+                local schemeInfo = _G.RTSchemes and _G.RTSchemes[scheme.schemeIndex]
+                if schemeInfo and schemeInfo.duplicationKey then
+                    for _, active in pairs(activeSchemes) do
+                        local activeInfo = _G.RTSchemes and _G.RTSchemes[active.schemeIndex]
+                        if activeInfo and activeInfo.duplicationKey == schemeInfo.duplicationKey then
+                            available = false
+                            break
+                        end
+                    end
+                end
+                if available then
+                    table.insert(out, {
+                        schemeIndex = tonumber(scheme.schemeIndex),
+                        nameKey = rtSchemeNameKey(scheme),
+                        tier = rtTierLabel(scheme.tier),
+                        watched = scheme.watched == true,
+                        farmId = farmId,
+                    })
+                end
+            end
+        end
+    end
+    return out
+end
+
+local function rtGetFarmlandGatherer(rt)
+    local ig = rt and rt.InfoGatherer
+    if not ig or not ig.gatherers then return nil end
+    if _G.INFO_KEYS and _G.INFO_KEYS.FARMLANDS then
+        return ig.gatherers[_G.INFO_KEYS.FARMLANDS]
+    end
+    return ig.gatherers.farmlands
+end
+
+local function rtFruitDisplayName(fruitName)
+    if not fruitName or fruitName == "" then return nil end
+    if _G.g_fruitTypeManager and _G.g_fruitTypeManager.nameToFruitType then
+        local fruit = _G.g_fruitTypeManager.nameToFruitType[fruitName]
+        if fruit then
+            return fruit.title or fruit.name or fruitName
+        end
+    end
+    return fruitName
+end
+
+local function rtResolveFarmlandFarmId(farmlandId)
+    if not _G.g_farmlandManager or not farmlandId then return nil end
+    local ok, fl = pcall(function()
+        return _G.g_farmlandManager:getFarmlandById(farmlandId)
+    end)
+    if ok and fl then return tonumber(fl.farmId) end
+    return nil
+end
+
+local function rtHistoryToCropRow(history)
+    if type(history) ~= "table" or #history < 1 then return nil end
+    local crops = { "", "", "", "", "" }
+    for i = 1, math.min(5, #history) do
+        local entry = history[i]
+        if entry and entry.name and entry.name ~= "" then
+            local slot = 6 - i
+            if slot >= 1 and slot <= 5 then
+                crops[slot] = rtFruitDisplayName(entry.name) or entry.name
+            end
+        end
+    end
+    for _, c in ipairs(crops) do
+        if c ~= "" then return crops end
+    end
+    return nil
+end
+
+local function rtSerializeCropRotation(rt, farmId)
+    local gatherer = rtGetFarmlandGatherer(rt)
+    if not gatherer then return {} end
+    local out = {}
+    local seen = {}
+
+    local function appendRow(farmlandId, history)
+        local fid = tonumber(farmlandId)
+        if not fid or seen[fid] or #out >= MAX_FARMLANDS_ROTATION then return end
+        local ownerFarm = rtResolveFarmlandFarmId(fid)
+        if ownerFarm ~= farmId then return end
+        local crops = rtHistoryToCropRow(history)
+        if not crops then return end
+        seen[fid] = true
+        table.insert(out, { farmlandId = fid, crops = crops })
+    end
+
+    if gatherer.data then
+        for farmlandId, farmlandData in pairs(gatherer.data) do
+            if farmlandData and farmlandData.harvestedCropsHistory then
+                appendRow(farmlandId, farmlandData.harvestedCropsHistory)
+            end
+        end
+    end
+
+    if _G.g_farmlandManager and _G.g_farmlandManager.farmlands and gatherer.getFarmlandData then
+        for _, farmland in pairs(_G.g_farmlandManager.farmlands) do
+            if farmland and farmland.showOnFarmlandsScreen and farmland.field ~= nil
+                and tonumber(farmland.farmId) == farmId then
+                local ok, farmlandData = pcall(function() return gatherer:getFarmlandData(farmland.id) end)
+                if ok and farmlandData and farmlandData.harvestedCropsHistory then
+                    appendRow(farmland.id, farmlandData.harvestedCropsHistory)
+                end
+            end
+        end
+    end
+
+    table.sort(out, function(a, b) return (a.farmlandId or 0) < (b.farmlandId or 0) end)
     return out
 end
 
@@ -202,14 +336,32 @@ local function rtSerializeFarm(rt, farmId)
     end
 
     local tax = rtSerializeTax(rt.TaxSystem, farmId)
+
+    local activeSchemes = {}
+    local okAct, act = pcall(function()
+        return rtSerializeSchemes(rt.SchemeSystem, rt.PolicySystem, farmId, true)
+    end)
+    if okAct and type(act) == "table" then activeSchemes = act end
+
+    local availableSchemes = {}
+    local okAvail, avail = pcall(function()
+        return rtSerializeSchemes(rt.SchemeSystem, rt.PolicySystem, farmId, false)
+    end)
+    if okAvail and type(avail) == "table" then availableSchemes = avail end
+
+    local cropRotation = {}
+    local okRot, rot = pcall(function() return rtSerializeCropRotation(rt, farmId) end)
+    if okRot and type(rot) == "table" then cropRotation = rot end
+
     return {
         farmId = farmId,
         tier = rtTierLabel(tierNum),
         tierNum = tierNum,
         points = points,
         policies = rtSerializePolicies(rt, farmId),
-        activeSchemes = rtSerializeSchemes(rt.SchemeSystem, farmId, true),
-        availableSchemes = rtSerializeSchemes(rt.SchemeSystem, farmId, false),
+        activeSchemes = activeSchemes,
+        availableSchemes = availableSchemes,
+        cropRotation = cropRotation,
         grants = rtSerializeGrants(rt.GrantSystem, farmId),
         tax = tax,
         events = rtSerializeEvents(rt.EventLog, farmId),

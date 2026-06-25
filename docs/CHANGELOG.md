@@ -14,22 +14,36 @@ All notable changes to this project are recorded here. For GitHub release blurbs
 
 ---
 
-## 4.2.0 — Public release (storage + map crops + 4.1 line)
+## 4.2.0 — Public release (storage, livestock, productions, notifications)
 
-**App:** `4.2.0` (`package.json`) · **Mod:** `3.4.0.0` (`modDesc.xml` + `FarmDashboard.VERSION`; app requires **3.1.0.0+** via `modVersionPolicy.js`).
+**App:** `4.2.0` (`package.json`) · **Mod:** `3.4.0.6` (`modDesc.xml` + `FarmDashboard.VERSION`; app requires **3.1.0.0+** via `modVersionPolicy.js`).
 
 Fresh revision numbers for the first public GitHub release on the 4.2 / 3.4 line.
 
+### Added
+- **Urgent notifications** — bell scans pastures (warning/danger, food &lt; 2 days), vehicles (fuel, wear, ADS breakdowns), and fields (rules-engine urgency ≥ 40); throttled ~30s on live updates.
+- **Pasture food duration** — pen cards and detail modal show estimated days until food runs out when the mod exports consumption data.
+- **Productions layout** — two chain cards per row on wide screens.
+- **`collectorModules` in export** — mod writes which collectors are enabled so the app can explain empty sections when a collector is turned off in-game.
+
 ### Fixed
-- **Linseed and other mod-map crops showed as “Fill type #N”.** On Witcombe-style maps the engine catalog often skips index **190** (LINSEED) between **189** (RYE_CUT) and **191** (POPPY), same pattern as Triticale at **182**. Mod `FillTypeUtils.enrichCatalogFromData` and app `assignNeighborCropGaps` / `inferCatalogFromStockAndFields` now resolve **190 → LINSEED** when stock and neighbors match.
-- **Silo moisture and grade always “—” in Economy → Storage.** Silos scanned via `loadingStation:getAllFillLevels()` never passed a `uniqueId` to `MoistureSystem:getObjectMoisture()`. `InventoryScan` now resolves moisture keys from storage, loading station, or placeable `uniqueId` before export.
+- **Linseed and other mod-map crops showed as “Fill type #N”.** On Witcombe-style maps the engine catalog often skips index **190** (LINSEED) between **189** (RYE_CUT) and **191** (POPPY). Mod `FillTypeUtils.enrichCatalogFromData` and app `assignNeighborCropGaps` / economy sell-point fallback now resolve sparse indices (e.g. **Honey #45**, **Water #118** on Riverbend when **Economy collector** is on).
+- **Silo moisture and grade always “—” in Economy → Storage.** Silos scanned via `loadingStation:getAllFillLevels()` now resolve a `uniqueId` for `MoistureSystem:getObjectMoisture()` before export.
+- **Base-game livestock** — vanilla cow pens show breed labels, health, and value breakdown; clicking a synthetic/LOD animal opens **only** the pen-detail modal (no duplicate legacy modal).
+- **Production chains missing on base maps** — collector scans `productionChainManager.farmIds`, all `productionPoints`, and placeables using FS25’s `spec_productionPoint` shape (not only nested `.productionPoint`); partial incremental collect no longer overwrites cached production with `{}`. **Requires Production collector ON** in ESC → Settings → Farm Dashboard.
+- **Weather forecast showed `null°`.** XML/Lua forecast merge and temperature updater fix min/max display.
+- **Pastures “Avg health” drill-down** could freeze the app on large pens (from late 4.1 tester work).
 
 ### Included from 4.1.5 (not previously on GitHub Latest)
 - Authoritative **store images** for vehicles (`storeImage` export + exact app match).
 - **Duplicate fleet entries** fixed on dedicated servers (`mergeVehicles` by config + farm).
+- **Used equipment yards** hidden on Vehicles tab; **Courseplay** combine-unloader crash fix; RealisticLivestock count/table agreement; mown grass field status; mod-config save preservation; CORS hardening; offline last-known moisture.
+
+### Mod settings (important)
+- Empty **Productions** or **Economy → Storage** names often mean collectors are **disabled** in-game: **ESC → Settings → Farm Dashboard** → enable **Production collector** and **Economy collector**, then wait one export cycle (~60s).
 
 ### Tests
-- `baleInventory.test.mjs` — LINSEED at 190 inference; full Jest + `.mjs` suite green.
+- `storageEconomy.test.mjs`, `productions.farmScope.test.mjs`, `urgent-notifications.test.mjs`, `mergeWeather.test.js`, `pastures.warnings.test.js`; full Jest + `.mjs` suite green.
 
 ---
 
@@ -429,6 +443,8 @@ After pulling, run **`npm install`** under `FS25_FarmDashboard_App` before **`np
 ## Reporting issues
 
 Include: FS25 version, single-player vs dedicated, **mod** version (see `modDesc.xml`), **app** version (see `package.json`), local vs FTP, and steps to reproduce.
+
+**Community:** [Discord](https://discord.gg/D4sEHM59)
 
 ---
 

@@ -1,7 +1,8 @@
-// FS25 FarmDashboard | productions.js | v2.0.0
+// FS25 FarmDashboard | productions.js | v2.1.0
 // Production chains: fill levels + active slots for the active farm.
 
 import { t } from "../i18n/i18n.js";
+import { getPlayerFarmIdSet } from "./farmScope.js";
 
 function escapeHtml(s) {
   if (s == null || s === "") return "";
@@ -21,19 +22,31 @@ export function normalizeProductionChains(production) {
   return [];
 }
 
-export function getOwnedChainsForFarm(production, farmId) {
+export function getOwnedChainsForFarm(production, farmId, farmInfo) {
   const all = normalizeProductionChains(production);
   if (all.length === 0) return [];
 
   let fid = Number(farmId);
   if (!Number.isFinite(fid) || fid <= 0) fid = 1;
 
-  // Strict: only chains whose ownerFarmId matches the selected farm (no fallback to “all map” chains).
-  return all.filter((ch) => Number(ch.ownerFarmId) === fid);
+  const strict = all.filter((ch) => Number(ch.ownerFarmId) === fid);
+  if (strict.length > 0) return strict;
+
+  const playerIds = getPlayerFarmIdSet(farmInfo);
+  if (playerIds.size > 0) {
+    const onPlayerFarms = all.filter((ch) => playerIds.has(Number(ch.ownerFarmId)));
+    if (onPlayerFarms.length > 0) return onPlayerFarms;
+  }
+
+  return strict;
 }
 
 export function getOwnedProductionChainCount() {
-  return getOwnedChainsForFarm(this.production, this.activeFarmId ?? 1).length;
+  return getOwnedChainsForFarm(
+    this.production,
+    this.activeFarmId ?? 1,
+    this.farmInfo
+  ).length;
 }
 
 /** Format storage level: FS often uses liters; some buffers use 0–1 fill ratio */
@@ -125,7 +138,7 @@ function buildChainCard(chain) {
     : `<span class="badge bg-secondary">${escapeHtml(t("productions.chainStopped"))}</span>`;
 
   return `
-    <div class="card bg-secondary border-farm-accent mb-4 shadow-sm">
+    <div class="card bg-secondary border-farm-accent shadow-sm h-100">
       <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <div>
           <h5 class="mb-0 text-farm-accent"><i class="bi bi-building-gear me-2"></i>${name}</h5>
@@ -160,20 +173,30 @@ function buildChainCard(chain) {
 
 export function buildProductionsPageHTML(dashboard) {
   const farmId = dashboard.activeFarmId ?? 1;
-  const chains = getOwnedChainsForFarm(dashboard.production, farmId);
+  const chains = getOwnedChainsForFarm(dashboard.production, farmId, dashboard.farmInfo);
 
   if (chains.length === 0) {
+    const modules = dashboard.collectorModules;
+    const productionOff = modules && modules.production === false;
+    const subtitle = productionOff
+      ? t("productions.subtitleCollectorDisabled")
+      : t("productions.subtitleEmpty");
+    const hint = productionOff
+      ? t("productions.hintCollectorDisabled")
+      : t("productions.hintEmpty");
     return `
       <div class="row mb-4">
         <div class="col-12 text-center">
           <h2 class="text-farm-accent"><i class="bi bi-building-gear me-2"></i>${escapeHtml(t("productions.title"))}</h2>
-          <p class="lead text-muted">${escapeHtml(t("productions.subtitleEmpty"))}</p>
-          <p class="text-muted small">${escapeHtml(t("productions.hintEmpty"))}</p>
+          <p class="lead text-muted">${escapeHtml(subtitle)}</p>
+          <p class="text-muted small">${escapeHtml(hint)}</p>
         </div>
       </div>`;
   }
 
-  const cards = chains.map((c) => buildChainCard(c)).join("");
+  const cards = chains
+    .map((c) => `<div class="col-12 col-lg-6">${buildChainCard(c)}</div>`)
+    .join("");
   const chainSummary =
     chains.length === 1
       ? t("productions.chainCountOne", { count: chains.length, farmId })
@@ -185,8 +208,8 @@ export function buildProductionsPageHTML(dashboard) {
         <p class="text-muted mb-0">${escapeHtml(chainSummary)}</p>
       </div>
     </div>
-    <div class="row">
-      <div class="col-12">${cards}</div>
+    <div class="row g-3">
+      ${cards}
     </div>`;
 }
 

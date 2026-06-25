@@ -118,6 +118,114 @@ function mergeBaleMoistureForward(prev, next) {
     };
 }
 
+function stockHasData(stock) {
+    if (!stock || stock.enabled === false) return false;
+    if (!stock.byFarm || typeof stock.byFarm !== 'object') return false;
+    return Object.values(stock.byFarm).some((farm) => {
+        const items = farm?.items || [];
+        return items.some((item) => Number(item?.totalLiters) > 0);
+    });
+}
+
+function stockSectionEmpty(stock) {
+    return !stockHasData(stock);
+}
+
+function redTapeFarmHasData(farm) {
+    if (!farm || typeof farm !== 'object') return false;
+    if (farm.tier != null && String(farm.tier).trim() !== '') return true;
+    const lists = [
+        farm.policies,
+        farm.activeSchemes,
+        farm.availableSchemes,
+        farm.grants,
+        farm.events,
+        farm.tax?.statements,
+    ];
+    return lists.some((list) => Array.isArray(list) && list.length > 0);
+}
+
+function redTapeHasData(redTape) {
+    if (!redTape || redTape.enabled !== true) return false;
+    if (!redTape.byFarm || typeof redTape.byFarm !== 'object') return false;
+    return Object.values(redTape.byFarm).some(redTapeFarmHasData);
+}
+
+function redTapeSectionEmpty(redTape) {
+    return !redTapeHasData(redTape);
+}
+
+function pickStockHoldSource(state, snap) {
+    const backup = state?.liveSectionBackup?.stock;
+    if (stockHasData(backup)) return backup;
+    if (snap && stockHasData(snap.stock)) return snap.stock;
+    return null;
+}
+
+function pickRedTapeHoldSource(state, snap) {
+    const backup = state?.liveSectionBackup?.redTape;
+    if (redTapeHasData(backup)) return backup;
+    if (snap && redTapeHasData(snap.redTape)) return snap.redTape;
+    return null;
+}
+
+function stockLocationHasMoisture(stock) {
+    if (!stock?.byFarm || typeof stock.byFarm !== 'object') return false;
+    for (const farm of Object.values(stock.byFarm)) {
+        for (const item of farm?.items || []) {
+            for (const loc of item?.locations || []) {
+                if (loc && (loc.moisturePct != null || loc.qualityPct != null || loc.grade)) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+/** Keep silo moisture/quality on stock rows when a shutdown export drops location detail. */
+function mergeStockMoistureForward(prev, next) {
+    if (!next || !prev) return next;
+    if (stockLocationHasMoisture(next.stock)) return next;
+    if (!stockLocationHasMoisture(prev.stock)) return next;
+    const prevStock = prev.stock;
+    const nextStock = next.stock ? { ...next.stock, byFarm: { ...next.stock.byFarm } } : { byFarm: {} };
+    for (const [fid, farm] of Object.entries(nextStock.byFarm || {})) {
+        const prevFarm = prevStock.byFarm?.[fid];
+        if (!prevFarm?.items) continue;
+        const prevByIdx = new Map();
+        for (const item of prevFarm.items) {
+            const idx = Number(item?.fillTypeIndex);
+            if (!Number.isFinite(idx)) continue;
+            prevByIdx.set(idx, item);
+        }
+        nextStock.byFarm[fid] = {
+            ...farm,
+            items: (farm.items || []).map((item) => {
+                const prevItem = prevByIdx.get(Number(item.fillTypeIndex));
+                if (!prevItem?.locations?.length) return item;
+                const prevLocByName = new Map(
+                    prevItem.locations.map((loc) => [String(loc?.name || ''), loc])
+                );
+                const locations = (item.locations || []).map((loc) => {
+                    const key = String(loc?.name || '');
+                    const old = prevLocByName.get(key);
+                    if (!old) return loc;
+                    if (loc.moisturePct != null || loc.qualityPct != null || loc.grade) return loc;
+                    return {
+                        ...loc,
+                        ...(old.moisturePct != null ? { moisturePct: old.moisturePct } : {}),
+                        ...(old.qualityPct != null ? { qualityPct: old.qualityPct } : {}),
+                        ...(old.grade ? { grade: old.grade } : {}),
+                    };
+                });
+                return { ...item, locations };
+            }),
+        };
+    }
+    return { ...next, stock: nextStock };
+}
+
 function mergeMoistureSectionsForward(prev, next) {
     if (!prev || !next) return next;
     let out = next;
@@ -127,6 +235,7 @@ function mergeMoistureSectionsForward(prev, next) {
     }
     out = mergeWeatherMoistureForward(prev, out);
     out = mergeBaleMoistureForward(prev, out);
+    out = mergeStockMoistureForward(prev, out);
     return out;
 }
 
@@ -268,6 +377,18 @@ function updateLiveSectionBackup(state, merged, hydratedLua) {
             break;
         }
     }
+    for (const src of sources) {
+        if (stockHasData(src.stock)) {
+            state.liveSectionBackup.stock = cloneMerged(src.stock);
+            break;
+        }
+    }
+    for (const src of sources) {
+        if (redTapeHasData(src.redTape)) {
+            state.liveSectionBackup.redTape = cloneMerged(src.redTape);
+            break;
+        }
+    }
 }
 
 /**
@@ -364,6 +485,28 @@ function applyLiveSectionHold(merged, state, rawLuaData, hydratedLuaData) {
         held = true;
     }
 
+    const luaStockEmpty =
+        stockSectionEmpty(rawLuaData && rawLuaData.stock) &&
+        stockSectionEmpty(hydratedLuaData && hydratedLuaData.stock);
+    const holdStock = pickStockHoldSource(state, snap);
+    if (stockSectionEmpty(out.stock) && holdStock && luaStockEmpty) {
+        out = {
+            ...out,
+            stock: cloneMerged(holdStock),
+            fillTypeCatalog: out.fillTypeCatalog || holdStock.fillTypeCatalog || snap?.fillTypeCatalog,
+        };
+        held = true;
+    }
+
+    const luaRedTapeEmpty =
+        redTapeSectionEmpty(rawLuaData && rawLuaData.redTape) &&
+        redTapeSectionEmpty(hydratedLuaData && hydratedLuaData.redTape);
+    const holdRedTape = pickRedTapeHoldSource(state, snap);
+    if (redTapeSectionEmpty(out.redTape) && holdRedTape && luaRedTapeEmpty) {
+        out = { ...out, redTape: cloneMerged(holdRedTape) };
+        held = true;
+    }
+
     if (Array.isArray(out.fields) && holdFields) {
         const mergedMoist = mergeFieldsMoistureForward(holdFields, out.fields);
         if (mergedMoist !== out.fields) {
@@ -400,6 +543,13 @@ function mergeSnapshotSectionsForward(prev, next) {
     }
     out = mergeWeatherMoistureForward(prev, out);
     out = mergeBaleMoistureForward(prev, out);
+    out = mergeStockMoistureForward(prev, out);
+    if (stockSectionEmpty(out.stock) && stockHasData(prev.stock)) {
+        out = { ...out, stock: cloneMerged(prev.stock) };
+    }
+    if (redTapeSectionEmpty(out.redTape) && redTapeHasData(prev.redTape)) {
+        out = { ...out, redTape: cloneMerged(prev.redTape) };
+    }
     return out;
 }
 
@@ -428,6 +578,14 @@ function buildHeldPayloadFromState(state) {
         const holdProduction = pickProductionHoldSource(state, snap);
         if (holdProduction) out = { ...out, production: cloneMerged(holdProduction) };
     }
+    if (stockSectionEmpty(out.stock)) {
+        const holdStock = pickStockHoldSource(state, snap);
+        if (holdStock) out = { ...out, stock: cloneMerged(holdStock) };
+    }
+    if (redTapeSectionEmpty(out.redTape)) {
+        const holdRedTape = pickRedTapeHoldSource(state, snap);
+        if (holdRedTape) out = { ...out, redTape: cloneMerged(holdRedTape) };
+    }
     return out;
 }
 
@@ -439,6 +597,8 @@ module.exports = {
     weatherMoisturePresent,
     baleMoistureHasData,
     mergeMoistureSectionsForward,
+    mergeStockMoistureForward,
+    stockLocationHasMoisture,
     isRichLuaExport,
     isRenderableMerged,
     mergedContentScore,
@@ -446,6 +606,10 @@ module.exports = {
     applyMergedSnapshotIfStaleExport,
     applyLiveSectionHold,
     animalsSectionEmpty,
+    stockSectionEmpty,
+    stockHasData,
+    redTapeSectionEmpty,
+    redTapeHasData,
     updateLiveSectionBackup,
     updateLastGoodMergedSnapshot,
     buildHeldPayloadFromState,

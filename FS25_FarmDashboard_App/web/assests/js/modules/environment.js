@@ -1,6 +1,6 @@
 // FS25 FarmDashboard | environment.js | v2.0.0
 
-import { t, applyDom } from "../i18n/i18n.js";
+import { t, tOr, applyDom } from "../i18n/i18n.js";
 
 const MOD_REQUIRED_DISMISS_PREFIX = "farmdash_mod_required_ok_";
 
@@ -12,6 +12,81 @@ function removeLegacyModRequiredBanner() {
   ["farmdash-live-mod-banner", "farmdash-mod-required-banner"].forEach((id) => {
     document.getElementById(id)?.remove();
   });
+}
+
+const LUA_EXPORT_STALE_MS = 90_000;
+
+function isLuaExportStale(lastLuaReceivedAt, nowMs = Date.now()) {
+  if (!lastLuaReceivedAt) return true;
+  const parsed = Date.parse(String(lastLuaReceivedAt));
+  if (Number.isNaN(parsed)) return true;
+  return nowMs - parsed > LUA_EXPORT_STALE_MS;
+}
+
+/**
+ * Navbar data-source pill: Live API (fresh mod export for this save) vs Snap XML (snapshot / XML).
+ * Ignores dashboard API websocket — only the active save's mod export timestamps matter.
+ * @param {{ dataSource?: string, luaAvailable?: boolean, xmlAvailable?: boolean, apiConnected?: boolean, dataTimestamps?: object|null, nowMs?: number }} state
+ */
+export function resolveNavbarConnectionBadge(state = {}) {
+  const src = state.dataSource || "unknown";
+  const ts = state.dataTimestamps || {};
+  const nowMs = Number(state.nowMs) || Date.now();
+  const luaStale = isLuaExportStale(ts.lastLuaReceivedAt, nowMs);
+  const gameLive = !!state.luaAvailable && !luaStale && src !== "xml_only";
+
+  if (src === "unknown" && !state.luaAvailable && !state.xmlAvailable) {
+    return {
+      labelKey: state.apiConnected ? "nav.badgeConnectingApi" : "nav.badgeConnecting",
+      badgeClasses: ["bg-secondary"],
+      titleKey: "nav.badgeConnectingTitle",
+    };
+  }
+
+  if (!gameLive) {
+    const heldSnapshot = !!(
+      ts.liveExportStaleAt || ts.heldFromSnapshotAt || ts.mergeHeldStaleAt
+    );
+    return {
+      labelKey: "nav.badgeSnapXml",
+      badgeClasses: ["bg-info"],
+      titleKey: heldSnapshot
+        ? "nav.badgeSnapXmlHeldTitle"
+        : luaStale
+          ? "nav.badgeSnapXmlStaleTitle"
+          : "nav.badgeSnapXmlTitle",
+    };
+  }
+
+  return {
+    labelKey: "nav.badgeLiveApi",
+    badgeClasses: ["bg-success"],
+    titleKey: "nav.badgeLiveApiTitle",
+  };
+}
+
+let _navbarBadgeStaleTimer = null;
+
+/** Re-run badge when this save's mod export crosses the stale window (no new WS tick required). */
+function scheduleNavbarBadgeFreshnessRefresh(dashboard) {
+  if (_navbarBadgeStaleTimer) {
+    clearTimeout(_navbarBadgeStaleTimer);
+    _navbarBadgeStaleTimer = null;
+  }
+  const ts = dashboard?.dataTimestamps || {};
+  if (!dashboard?.luaAvailable || ts.liveExportStaleAt || ts.heldFromSnapshotAt) return;
+  const lastLua = ts.lastLuaReceivedAt;
+  if (!lastLua) return;
+  const parsed = Date.parse(String(lastLua));
+  if (Number.isNaN(parsed)) return;
+  const remaining = parsed + LUA_EXPORT_STALE_MS - Date.now();
+  if (remaining <= 0) return;
+  _navbarBadgeStaleTimer = setTimeout(() => {
+    _navbarBadgeStaleTimer = null;
+    if (typeof dashboard?.updateNavbarConnectionStrip === "function") {
+      dashboard.updateNavbarConnectionStrip();
+    }
+  }, remaining + 250);
 }
 
 export function formatGameTime(dayTimeMinutes) {
@@ -52,65 +127,32 @@ export function getGameTimeDisplay() {
 }
 
 /**
- * Single navbar badge: XML / Live stream status + dashboard API (websocket) in one line.
+ * Single navbar badge: live mod export vs held snapshot / savegame XML.
  */
 export function updateNavbarConnectionStrip() {
   const dsBadge = document.getElementById("navbar-datasource");
   const dsText = document.getElementById("navbar-datasource-text");
   if (!dsBadge || !dsText) return;
 
-  const src = this.dataSource || "unknown";
-  const apiOn = !!(this.realtimeConnector && this.realtimeConnector.isConnected);
-  const heldSnapshot = !!(this.dataTimestamps && this.dataTimestamps.liveExportStaleAt);
+  const badge = resolveNavbarConnectionBadge({
+    dataSource: this.dataSource,
+    luaAvailable: this.luaAvailable,
+    xmlAvailable: this.xmlAvailable,
+    apiConnected: !!(this.realtimeConnector && this.realtimeConnector.isConnected),
+    dataTimestamps: this.dataTimestamps,
+  });
 
-  let label = "";
-  if (heldSnapshot) {
-    label = apiOn ? "Snapshot + API" : "Snapshot (game offline)";
-  } else if (src === "merged") {
-    label = apiOn ? "XML + Live + API" : "XML + Live";
-  } else if (src === "xml_only") {
-    label = apiOn ? "XML only + API" : "XML only";
-  } else if (src === "lua_only") {
-    label = apiOn ? "Live + API" : "Live only";
-  } else {
-    label = apiOn ? "Connecting… + API" : "Connecting…";
-  }
-
-  dsText.textContent = label;
+  dsText.textContent = t(badge.labelKey);
   dsBadge.className = "badge text-light ms-2";
-  if (heldSnapshot) {
-    dsBadge.classList.add("bg-info");
-  } else if (src === "merged" && apiOn) {
-    dsBadge.classList.add("bg-success");
-  } else if (src === "merged" && !apiOn) {
-    dsBadge.classList.add("bg-secondary");
-  } else if (src === "xml_only") {
-    dsBadge.classList.add("bg-warning", "text-dark");
-  } else if (src === "lua_only") {
-    dsBadge.classList.add(apiOn ? "bg-success" : "bg-info");
-  } else {
-    dsBadge.classList.add("bg-secondary");
+  for (const cls of badge.badgeClasses) {
+    dsBadge.classList.add(cls);
   }
-
+  dsBadge.title = t(badge.titleKey);
   dsBadge.classList.remove("d-none");
 
   this.updateNavbarModVersionBadge();
-
-  if (heldSnapshot) {
-    dsBadge.title =
-      "Showing the last good farm snapshot. FS25 is not exporting live data (game closed or minimal export). " +
-      "Data will refresh when the game writes a full export again.";
-  } else if (src === "xml_only") {
-    dsBadge.title =
-      "Live data missing: enable mod FS25_FarmDashboard for this save (SP / host / dedicated). " +
-      "Joining players do not write data.json. Ensure dashboard Savegame Folder matches modSettings/FS25_FarmDashboard/<folder>.";
-  } else {
-    dsBadge.title = apiOn
-      ? "Savegame XML, live mod data stream, and dashboard API are connected."
-      : "Data source status for this save (dashboard API not connected yet).";
-  }
-
   this.maybeShowModRequiredModal();
+  scheduleNavbarBadgeFreshnessRefresh(this);
 }
 
 /** True when the save has XML but the in-game mod is not exporting live data. */
@@ -256,6 +298,28 @@ export function updateGameTimeDisplay() {
   this.updateWeatherDisplay();
 }
 
+export function formatWeatherTemp(celsius) {
+  const n = Number(celsius);
+  if (!Number.isFinite(n)) return tOr("weather.tempUnavailable", "—");
+  return `${Math.round(n)}°C`;
+}
+
+export function formatForecastTempRange(day, fallbackCelsius) {
+  const min = Number(day?.minTemperature);
+  const max = Number(day?.maxTemperature);
+  if (Number.isFinite(min) && Number.isFinite(max)) {
+    return `${Math.round(min)}° - ${Math.round(max)}°C`;
+  }
+  if (Number.isFinite(min)) return `${Math.round(min)}°C`;
+  if (Number.isFinite(max)) return `${Math.round(max)}°C`;
+  const fb = Number(fallbackCelsius);
+  if (Number.isFinite(fb)) {
+    const base = Math.round(fb);
+    return `${base - 5}° - ${base + 5}°C`;
+  }
+  return tOr("weather.tempUnavailable", "—");
+}
+
 export function getWeatherIcon(weatherType) {
   const type = (weatherType || 'unknown').toLowerCase();
   switch(type) {
@@ -277,9 +341,7 @@ export function updateWeatherDisplay() {
   if (!navbarWeather || !tempElement || !weatherElement) return;
 
   if (this.weather && (this.weather.currentTemperature !== undefined || this.weather.currentWeather !== undefined)) {
-    const temp = this.weather.currentTemperature !== undefined ? 
-      `${Math.round(this.weather.currentTemperature)}°C` : '--°C';
-    tempElement.textContent = temp;
+    tempElement.textContent = formatWeatherTemp(this.weather.currentTemperature);
 
     let weatherCondition = this.weather.currentWeather || 'unknown';
     let weatherIcon = 'bi-cloud';
@@ -316,7 +378,7 @@ export function showWeatherModal() {
     const modalCloudCoverage = document.getElementById('modal-cloud-coverage');
     const modalRainLevel = document.getElementById('modal-rain-level');
     
-    if (modalTemp) modalTemp.textContent = this.weather.currentTemperature !== undefined ? `${Math.round(this.weather.currentTemperature)}°C` : '--°C';
+    if (modalTemp) modalTemp.textContent = formatWeatherTemp(this.weather.currentTemperature);
     if (modalCondition) {
       const weatherType = this.weather.currentWeather || 'unknown';
       modalCondition.textContent = weatherType.charAt(0).toUpperCase() + weatherType.slice(1);
@@ -346,7 +408,7 @@ export function showWeatherModal() {
                   <div class="fs-2 mb-2"><i class="bi ${weatherIcon}"></i></div>
                   <div class="small">
                     <strong>${day.weatherType}</strong><br>
-                    ${day.minTemperature}° - ${day.maxTemperature}°C
+                    ${formatForecastTempRange(day, this.weather.currentTemperature)}
                     ${day.precipitationChance > 0 ? `<br><i class="bi bi-droplet"></i> ${day.precipitationChance}%` : ''}
                   </div>
                 </div>

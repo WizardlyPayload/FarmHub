@@ -53,7 +53,7 @@ const {
     SAVEGAME_XML_FILES,
     FTP_SAVEGAME_XML_DOWNLOAD_ORDER,
 } = require('./xmlCollector');
-const { mergeData, buildFieldLiveFingerprints } = require('./dataMerger');
+const { mergeData, buildFieldLiveFingerprints, supplementRedTapeCropRotation } = require('./dataMerger');
 const { isCorsOriginAllowed: corsOriginAllowedPure, isLocalServerHost: isLocalServerHostPure } = require('./corsPolicy');
 const { hydrateLuaDataAnimalsFromDetails } = require('./detailAnimalsHydrate');
 const { loadServerCache, saveServerCache, appendFieldHistory } = require('./serverDataCache');
@@ -72,6 +72,7 @@ const {
     updateLastGoodMergedSnapshot,
     buildHeldPayloadFromState,
 } = require('./mergedSnapshotHold');
+const { isLuaExportStale } = require('./liveExportFreshness');
 const livestockDetailModule = require('./livestockDetail.js');
 const { validateLanCredentials } = require('./lanCredentialPolicy.js');
 
@@ -1719,10 +1720,33 @@ function rebuildMerged(serverId) {
     const preHeldAt = merged && merged.dataTimestamps && merged.dataTimestamps.heldFromSnapshotAt;
     merged = applyLiveSectionHold(merged, state, state.luaData, luaPayload);
     merged = applyMergedSnapshotIfStaleExport(merged, luaPayload, state);
+    if (state.xmlData?.redTapeHarvest) {
+        merged = supplementRedTapeCropRotation(merged, state.xmlData.redTapeHarvest);
+    }
     if (!preHeldAt && merged && merged.dataTimestamps && merged.dataTimestamps.heldFromSnapshotAt) {
         console.warn(
             `[rebuildMerged] [${serverId}] Serving last good merged snapshot (live export looks minimal or shutdown)`
         );
+    }
+    if (merged && state.luaData) {
+        if (isLuaExportStale(state.lastLuaReceivedAt)) {
+            const ts = { ...(merged.dataTimestamps || {}) };
+            if (!ts.liveExportStaleAt) {
+                ts.liveExportStaleAt = state.lastLuaReceivedAt || new Date().toISOString();
+            }
+            merged = {
+                ...merged,
+                luaAvailable: false,
+                dataTimestamps: ts,
+            };
+        } else if (merged.dataTimestamps?.liveExportStaleAt) {
+            const ts = { ...merged.dataTimestamps };
+            delete ts.liveExportStaleAt;
+            delete ts.heldFromSnapshotAt;
+            delete ts.mergeHeldStaleAt;
+            delete ts.liveSectionsHeldAt;
+            merged = { ...merged, dataTimestamps: ts };
+        }
     }
     state.mergedData = merged;
     if (state.mergedData && state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
@@ -1910,6 +1934,8 @@ async function downloadFtpSavegameXml(srv, saveSlot) {
 
         if (ok > 0) {
             console.log(`[FTP] [${srv.id}] Cached ${ok}/${SAVEGAME_XML_FILES.length} savegame XML -> ${localDir}`);
+            // Moisture System mod (optional — only when FS25_MoistureSystem is on the save).
+            await pullOne('MoistureSystem.xml');
             if (missing.length) {
                 const noPf = missing.filter((n) => n !== 'precisionFarming.xml');
                 const pfOnly = missing.length > 0 && noPf.length === 0;

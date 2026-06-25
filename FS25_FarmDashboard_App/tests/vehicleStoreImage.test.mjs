@@ -74,6 +74,14 @@ test("unknown basename and empty hint return null", () => {
   assert.equal(vehicles.resolveStoreImageExact(null), null);
 });
 
+test("deriveStoreImageHint maps config XML basename to curated store icon", () => {
+  primeWith(["vehicles__store_t7.png"], []);
+  assert.equal(
+    vehicles.deriveStoreImageHint({ configFileName: "data/vehicles/newHolland/t7.xml" }),
+    "store_t7"
+  );
+});
+
 test("getLocalVehicleImage prefers the authoritative store image over fuzzy name match", () => {
   primeWith(["vehicles__store_t7.png", "vehicles__store_t6.png"], []);
   const ctx = {

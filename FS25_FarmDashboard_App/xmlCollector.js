@@ -16,6 +16,7 @@
  *   vehicles.xml        — all owned vehicles with fill levels / damage
  *   economy.xml         — 12-period crop price history
  *   placeables.xml      — all placed buildings / silos
+ *   MoistureSystem.xml  — per-silo crop moisture/quality (optional; Moisture System mod)
  */
 
 const fs = require('fs').promises;
@@ -25,6 +26,7 @@ const os = require('os');
 const { XMLParser } = require('fast-xml-parser');
 const { collectFs25DocumentRoots } = require('./fs25Paths');
 const { readFileUtf8WithRetryAsync } = require('./fileReadRetry');
+const { parseMoistureSystemXml } = require('./stockMoistureFromXml');
 
 // Whole-file read + parse only: fast-xml-parser exposes parse(string), not a supported streaming API for arbitrary savegame XML.
 
@@ -692,6 +694,68 @@ function parseVehiclesXml(xmlStr) {
     return vehicles;
 }
 
+/** FS25_RedTape harvest history from savegame RedTape.xml (works when game is closed). */
+function formatRedTapeCropName(raw) {
+    if (!raw) return '';
+    const s = String(raw).trim();
+    if (!s) return '';
+    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
+function parseRedTapeHarvestHistoryXml(xmlStr, farmlandOwnership) {
+    const byFarm = {};
+    const allRows = [];
+    if (!xmlStr) return { byFarm, allRows };
+
+    const doc = parseXmlToDoc(xmlStr);
+    if (!doc) return { byFarm, allRows };
+
+    const root = unwrapDoc(doc) || doc;
+    const gatherer =
+        root?.infoGatherer?.gatherers?.farmlandGatherer ||
+        root?.infoGatherer?.farmlandGatherer ||
+        root?.farmlandGatherer;
+    const farmlands = ensureArray(gatherer?.farmlands?.farmland);
+
+    for (const fl of farmlands) {
+        const fa = attrs(fl);
+        const farmlandId = Number(fa.id);
+        if (!Number.isFinite(farmlandId)) continue;
+
+        const harvests = ensureArray(fl?.harvestedCropsHistory?.harvest);
+        if (harvests.length === 0) continue;
+
+        const history = harvests.map((h) => {
+            const ha = attrs(h);
+            return { name: ha.name, month: ha.month };
+        });
+
+        const crops = ['', '', '', '', ''];
+        for (let i = 0; i < Math.min(5, history.length); i++) {
+            const name = formatRedTapeCropName(history[i]?.name);
+            if (name) crops[4 - i] = name;
+        }
+        if (!crops.some(Boolean)) continue;
+
+        const row = { farmlandId, crops };
+        allRows.push(row);
+
+        const farmId = farmlandOwnership ? Number(farmlandOwnership.get(farmlandId) || 0) : 0;
+        if (farmId > 0) {
+            const farmKey = String(farmId);
+            if (!byFarm[farmKey]) byFarm[farmKey] = [];
+            byFarm[farmKey].push(row);
+        }
+    }
+
+    for (const key of Object.keys(byFarm)) {
+        byFarm[key].sort((a, b) => (a.farmlandId || 0) - (b.farmlandId || 0));
+    }
+    allRows.sort((a, b) => (a.farmlandId || 0) - (b.farmlandId || 0));
+
+    return { byFarm, allRows };
+}
+
 function parseEconomyXml(xmlStr) {
     if (!xmlStr) return {};
     const doc = parseXmlToDoc(xmlStr);
@@ -709,7 +773,8 @@ function parseEconomyXml(xmlStr) {
         const totalAmount = parseFloat(String(fa.totalAmount || '0'));
         const history = {};
 
-        for (const per of ensureArray(ft.period)) {
+        // FS25 nests periods under <history><period>; legacy saves may use <period> directly.
+        for (const per of ensureArray(ft.history?.period ?? ft.period)) {
             const pa = attrs(per);
             const periodKey = pa.period != null ? String(pa.period) : '';
             let txt = null;
@@ -735,6 +800,19 @@ function parseEconomyXml(xmlStr) {
     return prices;
 }
 
+function collectSiloFillTypesFromPlaceable(pl) {
+    const types = new Set();
+    for (const silo of ensureArray(pl?.silo)) {
+        for (const storage of ensureArray(silo?.storage)) {
+            for (const node of ensureArray(storage?.node)) {
+                const na = attrs(node);
+                if (na.fillType) types.add(String(na.fillType));
+            }
+        }
+    }
+    return [...types];
+}
+
 function parsePlaceablesXml(xmlStr) {
     if (!xmlStr) return [];
     const doc = parseXmlToDoc(xmlStr);
@@ -750,6 +828,9 @@ function parsePlaceablesXml(xmlStr) {
         placeables.push({
             uniqueId: pa.uniqueId != null ? String(pa.uniqueId) : '',
             farmId,
+            filename: pa.filename != null ? String(pa.filename) : '',
+            name: pa.name != null ? String(pa.name) : '',
+            siloFillTypes: collectSiloFillTypesFromPlaceable(pl),
             age: parseFloat(String(pa.age || '0')),
             price: parseFloat(String(pa.price || '0')),
         });
@@ -891,6 +972,8 @@ async function collectXmlData(srv, saveSlot) {
         rawVehicles,
         rawEconomy,
         rawPlaceables,
+        rawMoistureSystem,
+        rawRedTape,
     ] = await Promise.all([
         readFileUtf8WithRetryAsync(file('farmland.xml')),
         readFileUtf8WithRetryAsync(file('careerSavegame.xml')),
@@ -902,6 +985,8 @@ async function collectXmlData(srv, saveSlot) {
         readFileUtf8WithRetryAsync(file('vehicles.xml')),
         readFileUtf8WithRetryAsync(file('economy.xml')),
         readFileUtf8WithRetryAsync(file('placeables.xml')),
+        readFileUtf8WithRetryAsync(file('MoistureSystem.xml')),
+        readFileUtf8WithRetryAsync(file('RedTape.xml')),
     ]);
 
     const { ownership: farmlandOwnership, playerFarmlandIds } = parseFarmlandXml(rawFarmland);
@@ -915,6 +1000,8 @@ async function collectXmlData(srv, saveSlot) {
     const vehicles = parseVehiclesXml(rawVehicles);
     const economy = parseEconomyXml(rawEconomy);
     const placeables = parsePlaceablesXml(rawPlaceables);
+    const moistureSystem = parseMoistureSystemXml(rawMoistureSystem);
+    const redTapeHarvest = parseRedTapeHarvestHistoryXml(rawRedTape, farmlandOwnership);
 
     const playerFields = fields.filter((f) => f.ownerFarmId > 0);
 
@@ -934,6 +1021,8 @@ async function collectXmlData(srv, saveSlot) {
         vehicles,
         economy,
         placeables,
+        moistureSystem,
+        redTapeHarvest,
         pfData,
         savegameDir,
         collectedAt: new Date().toISOString(),
@@ -942,6 +1031,9 @@ async function collectXmlData(srv, saveSlot) {
 
 module.exports = {
     collectXmlData,
+    parseEconomyXml,
+    parseRedTapeHarvestHistoryXml,
+    formatRedTapeCropName,
     getSavegamePath,
     getSavegamePathAsync,
     SAVEGAME_XML_FILES,

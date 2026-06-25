@@ -462,6 +462,27 @@ function showDashboardOrFallback(dashboard) {
   }
 }
 
+function notifyRemoteShellReady() {
+  if (typeof window.farmDashNotifyDataReady === "function") {
+    window.farmDashNotifyDataReady();
+  }
+}
+
+/** Remote/demo: `/api/servers` may 401 until LAN Basic is stored — retry briefly. */
+async function retryLoadServersForRemote(dashboard, attempts = 4) {
+  if (isFarmDashLocalConfigHost()) return !!(dashboard?.availableServers?.length);
+  for (let i = 0; i < attempts; i += 1) {
+    if (Array.isArray(dashboard?.availableServers) && dashboard.availableServers.length > 0) {
+      return true;
+    }
+    if (i > 0) {
+      await new Promise((resolve) => setTimeout(resolve, i === 1 ? 500 : 1200));
+    }
+    await dashboard.loadServersAndTabs();
+  }
+  return Array.isArray(dashboard?.availableServers) && dashboard.availableServers.length > 0;
+}
+
 async function tryHydrateFromDesktopServerCache(dashboard) {
   try {
     if (
@@ -527,10 +548,14 @@ async function hydrateFromFirstServerWithData(dashboard, preferredServerId = "")
 export async function checkAPIAvailability() {
   try {
     await this.loadServersAndTabs();
+    if (!isFarmDashLocalConfigHost() && !(this.availableServers?.length > 0)) {
+      await retryLoadServersForRemote(this);
+    }
     // Remote viewers (demo tunnel, LAN tablets): show the dashboard shell immediately so first
     // paint is never an empty white page while /api/data hydrates on the host.
     if (!isFarmDashLocalConfigHost()) {
       showDashboardOrFallback(this);
+      notifyRemoteShellReady();
     }
     // Prefer the last server the user viewed; only fall back to others if it has no data.
     const preferredServerId = this.activeServerId != null ? String(this.activeServerId) : "";
@@ -577,8 +602,20 @@ export async function checkAPIAvailability() {
         }
         return;
       }
-      // API is online but no server in config — still show the app (Settings / Home to fix)
+      // API is online but no server in config — remote/demo may still be waiting on LAN auth or host boot.
       if (!this.activeServerId) {
+        if (!isFarmDashLocalConfigHost()) {
+          await retryLoadServersForRemote(this, 2);
+          if (this.activeServerId) {
+            const loadedAfterRetry = await this.tryLoadApiData();
+            if (loadedAfterRetry) {
+              showDashboardOrFallback(this);
+              return;
+            }
+          }
+          this.scheduleStartupHydrationRetry();
+          return;
+        }
         this.applyEmptyApiState();
         this.isDataLoaded = true;
         if (typeof this.showDashboard === "function") {
@@ -593,9 +630,7 @@ export async function checkAPIAvailability() {
         }
         if (this.showAlert) {
           this.showAlert(
-            isFarmDashLocalConfigHost()
-              ? "No server configured. Use Settings (gear) or Back to Home to add a server and local saves."
-              : "No server configured on the host PC. Add servers and saves on the machine running Farm Dashboard, then reload.",
+            "No server configured. Use Settings (gear) or Back to Home to add a server and local saves.",
             "warning"
           );
         }
@@ -921,6 +956,9 @@ export function scheduleStartupHydrationRetry() {
   const run = async () => {
     attempts += 1;
     try {
+      if (!this.activeServerId && !isFarmDashLocalConfigHost()) {
+        await this.loadServersAndTabs();
+      }
       const loaded = await this.tryLoadApiData();
       if (loaded || hasRenderableDashboardData(this)) {
         if (_startupHydrationRetryTimer) {
@@ -939,9 +977,17 @@ export function scheduleStartupHydrationRetry() {
         _startupHydrationRetryTimer = null;
       }
       showDashboardOrFallback(this);
-      if (typeof window.farmDashNotifyDataReady === "function") {
-        window.farmDashNotifyDataReady();
+      if (
+        !isFarmDashLocalConfigHost() &&
+        !this.activeServerId &&
+        this.showAlert
+      ) {
+        this.showAlert(
+          "Could not reach farm data yet. Check that Farm Dashboard is running on the host PC with a save configured, then reload.",
+          "warning"
+        );
       }
+      notifyRemoteShellReady();
       return;
     }
     _startupHydrationRetryTimer = setTimeout(run, 1500);

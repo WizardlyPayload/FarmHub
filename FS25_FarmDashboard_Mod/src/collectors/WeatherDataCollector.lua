@@ -28,48 +28,63 @@ function WeatherDataCollector:collect()
     local env = _G.g_currentMission.environment
     local weather = env.weather
     
-    -- Get temperature - prioritize actual current conditions over forecast
-    local temperature = 20
+    -- Get temperature - prioritize engine temperature updater, then property fallbacks
+    local temperature = nil
     local tempSource = "default"
     
-    -- First try actual current weather properties (not forecast)
-    -- Check if there are interpolated/state-based properties that might be more accurate
-    if weather.currentTemperature ~= nil then
-        temperature = weather.currentTemperature
-        tempSource = "weather.currentTemperature"
-    elseif weather.temperature ~= nil then
-        temperature = weather.temperature
-        tempSource = "weather.temperature"
-    elseif weather.currentTemp ~= nil then
-        temperature = weather.currentTemp
-        tempSource = "weather.currentTemp"
-    -- Try weather state properties (might be more current)
-    elseif weather.actualTemperature ~= nil then
-        temperature = weather.actualTemperature
-        tempSource = "weather.actualTemperature"
-    elseif weather.realTimeTemperature ~= nil then
-        temperature = weather.realTimeTemperature
-        tempSource = "weather.realTimeTemperature"
-    -- Try environment object properties  
-    elseif env.currentTemperature ~= nil then
-        temperature = env.currentTemperature
-        tempSource = "env.currentTemperature"
-    elseif env.temperature ~= nil then
-        temperature = env.temperature
-        tempSource = "env.temperature"
-    -- Check if there's a getCurrentTemperature function
-    elseif weather.getCurrentTemperature and type(weather.getCurrentTemperature) == "function" then
+    local function setTemp(val, source)
+        if type(val) == "number" and val == val then
+            temperature = val
+            tempSource = source
+        end
+    end
+
+    if weather.temperatureUpdater and type(weather.temperatureUpdater.getTemperatureAtTime) == "function" then
+        local dayTime = env.dayTime
+        if dayTime == nil and type(env.getDayTime) == "function" then
+            local dtOk, dt = pcall(function() return env:getDayTime() end)
+            if dtOk then dayTime = dt end
+        end
+        if dayTime ~= nil then
+            local ok, temp = pcall(function()
+                return weather.temperatureUpdater:getTemperatureAtTime(dayTime)
+            end)
+            if ok then setTemp(temp, "temperatureUpdater:getTemperatureAtTime") end
+        end
+    end
+
+    if temperature == nil and type(weather.getTemperatureAtTime) == "function" then
+        local day = env.currentDay or 1
+        local dayTime = env.dayTime or 0
+        local ok, temp = pcall(function() return weather:getTemperatureAtTime(day, dayTime) end)
+        if ok then setTemp(temp, "weather:getTemperatureAtTime") end
+    end
+    
+    -- Property fallbacks (not forecast)
+    if temperature == nil and weather.currentTemperature ~= nil then
+        setTemp(weather.currentTemperature, "weather.currentTemperature")
+    elseif temperature == nil and weather.temperature ~= nil then
+        setTemp(weather.temperature, "weather.temperature")
+    elseif temperature == nil and weather.currentTemp ~= nil then
+        setTemp(weather.currentTemp, "weather.currentTemp")
+    elseif temperature == nil and weather.actualTemperature ~= nil then
+        setTemp(weather.actualTemperature, "weather.actualTemperature")
+    elseif temperature == nil and weather.realTimeTemperature ~= nil then
+        setTemp(weather.realTimeTemperature, "weather.realTimeTemperature")
+    elseif temperature == nil and env.currentTemperature ~= nil then
+        setTemp(env.currentTemperature, "env.currentTemperature")
+    elseif temperature == nil and env.temperature ~= nil then
+        setTemp(env.temperature, "env.temperature")
+    elseif temperature == nil and weather.getCurrentTemperature and type(weather.getCurrentTemperature) == "function" then
         local success, temp = pcall(function() return weather:getCurrentTemperature() end)
-        if success and temp then
-            temperature = temp
-            tempSource = "weather:getCurrentTemperature()"
-        end
-    elseif env.getCurrentTemperature and type(env.getCurrentTemperature) == "function" then
+        if success then setTemp(temp, "weather:getCurrentTemperature()") end
+    elseif temperature == nil and env.getCurrentTemperature and type(env.getCurrentTemperature) == "function" then
         local success, temp = pcall(function() return env:getCurrentTemperature() end)
-        if success and temp then
-            temperature = temp
-            tempSource = "env:getCurrentTemperature()"
-        end
+        if success then setTemp(temp, "env:getCurrentTemperature()") end
+    end
+
+    if temperature == nil then
+        temperature = 20
     end
     
     -- Get weather type - prioritize actual current conditions

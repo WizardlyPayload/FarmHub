@@ -5,7 +5,7 @@
 | | |
 | --- | --- |
 | **App** | **4.2.0** (installer from [Releases](https://github.com/WizardlyPayload/FarmHub/releases)) |
-| **Mod** | **3.4.0.0** (`FS25_FarmDashboard.zip`) |
+| **Mod** | **3.4.0.6** (`FS25_FarmDashboard.zip`) |
 | **Dashboard URL** | [http://localhost:8766](http://localhost:8766) after setup |
 
 **After install:** day-to-day use is in [`USER_MANUAL.md`](./USER_MANUAL.md). **Upgrading from 2.0.0?** See [`UPGRADE_FROM_FS25-Farm-Dashboard.md`](./UPGRADE_FROM_FS25-Farm-Dashboard.md).

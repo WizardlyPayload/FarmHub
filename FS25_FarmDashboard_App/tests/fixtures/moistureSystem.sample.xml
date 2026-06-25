@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MoistureSystem>
+    <objectMoisture>
+        <object uniqueId="placeablee76429fe542ad47274bbffb2087544bf">
+            <fillType name="WHEAT" moisture="0.112110" quality="98.901947"/>
+            <fillType name="POPPY" moisture="0.100403" quality="94.949989"/>
+        </object>
+    </objectMoisture>
+</MoistureSystem>

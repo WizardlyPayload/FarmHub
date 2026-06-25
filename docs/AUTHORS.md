@@ -7,4 +7,6 @@
 
 Together: **JoshWalki / WizardlyPayload** are credited on this project. For the in-game mod author string, see `FS25_FarmDashboard_Mod/modDesc.xml`.
 
+**Community:** [Discord — Wizardlypayload FarmDashboard](https://discord.gg/D4sEHM59) — questions, screenshots, and help between releases.
+
 **Optional maintenance tips:** [Ko-fi](https://ko-fi.com/wizarlypayload) — entirely optional; the app and mod stay free regardless.

@@ -58,3 +58,5 @@ FS25_FarmDashboard_Mod/FS25_FarmDashboard.zip
 # Local agent secrets (VPS SSH — never commit)
 .cursor/secrets/
 
+# Unmapped / spare manual screenshots (timestamp grabs, superseded fd-*)
+docs/screenshots/discard/

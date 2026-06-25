@@ -3,6 +3,7 @@
 import { t } from "../i18n/i18n.js";
 import {
   isStorageItem,
+  isUsedEquipmentYardStock,
   resolveVehicleDisplayName,
   vehicleMatchesActiveFarm,
 } from "./vehicles.js";
@@ -61,7 +62,9 @@ function getVehicleSource(dashboard, showAllFarms) {
   const merged = coerceVehicles(dashboard._allVehiclesMerged);
   const scoped = coerceVehicles(dashboard.vehicles);
   const src = showAllFarms && merged.length ? merged : scoped.length ? scoped : merged;
-  return src.filter((v) => v && !isStorageItem(v));
+  return src.filter(
+    (v) => v && !isStorageItem(v) && !isUsedEquipmentYardStock(v)
+  );
 }
 
 function farmLookup(dashboard) {

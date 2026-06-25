@@ -36,7 +36,8 @@ function maybeInstallPublicDemoBanner() {
     bar.setAttribute("role", "status");
     bar.innerHTML =
       '<span><strong>Live demo</strong> — read-only view of a real multiplayer farm. Data updates while we play.</span>' +
-      '<a href="https://www.farmdashboard.co.uk/demo.html" target="_blank" rel="noopener">About this demo</a>';
+      '<a href="https://www.farmdashboard.co.uk/demo.html" target="_blank" rel="noopener">About this demo</a>' +
+      '<a href="https://discord.gg/D4sEHM59" target="_blank" rel="noopener noreferrer">Discord</a>';
     document.body.prepend(bar);
   } catch (_) {
     /* ignore */

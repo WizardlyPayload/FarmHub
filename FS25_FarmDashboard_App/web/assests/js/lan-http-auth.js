@@ -155,16 +155,27 @@ function sameOriginHttpBase() {
   return "";
 }
 
-async function probeServersWithoutExtraAuth() {
+/**
+ * True when the host serves the dashboard API without HTTP Basic on this browser session.
+ * `/api/status` is intentionally unauthenticated; `/api/servers` is not — status-only success
+ * must not skip the LAN login overlay or first-visit bootstrap sees an empty server list.
+ */
+export async function probeRemoteDashboardBootstrap(fetchImpl, baseOrigin) {
   try {
-    const base = sameOriginHttpBase();
-    const status = await fetch(`${base}/api/status`, { cache: "no-store", method: "GET" });
-    if (status.ok) return true;
-    const r = await fetch(`${base}/api/servers`, { cache: "no-store", method: "GET" });
-    return r.ok;
+    const base = String(baseOrigin || "").trim();
+    if (!base) return false;
+    const fetchFn = fetchImpl || fetch;
+    const status = await fetchFn(`${base}/api/status`, { cache: "no-store", method: "GET" });
+    if (!status.ok) return false;
+    const servers = await fetchFn(`${base}/api/servers`, { cache: "no-store", method: "GET" });
+    return servers.ok;
   } catch (_) {
     return false;
   }
+}
+
+async function probeServersWithoutExtraAuth() {
+  return probeRemoteDashboardBootstrap(fetch, sameOriginHttpBase());
 }
 
 async function verifyLanCredentialsWithFetch() {

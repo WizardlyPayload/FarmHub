@@ -1,14 +1,52 @@
 ---
-description: FarmHub i18n machine translation — use local .mt-env.local for Google API key (never commit keys)
-globs: FS25_FarmDashboard_App/web/locales/**
-alwaysApply: false
+description: Mandatory i18n workflow when adding user-visible strings — en.json, Google MT fill, translations.json
+alwaysApply: true
 ---
 
-# i18n machine translation (Farm Dashboard)
+# i18n — every new user-visible string
 
-When running `npm run i18n:fill` or updating locale JSON files:
+Whenever you add or change **any** user-visible text in the Farm Dashboard app (JS modules, HTML, toasts, modals, labels):
 
-- Google Cloud Translation credentials live in **`FS25_FarmDashboard_App/web/locales/.mt-env.local`** (gitignored). Read that file for `GOOGLE_TRANSLATE_API_KEY`; do not paste keys into chat, commits, or rules.
-- After adding keys to `messages/en.json`: run **`npm run i18n:refresh`** (sync → MT fill → build `translations.json` → verify). The app loads `/locales/translations.json` at runtime — `messages/*.json` alone is not enough until `i18n:build` runs.
-- Or manually: `npm run i18n:sync` → `npm run i18n:fill` → `npm run i18n:build` → `npm run i18n:verify`.
-- If fill returns **403 accessNotConfigured**, the GCP project must enable [Cloud Translation API](https://console.cloud.google.com/apis/library/translate.googleapis.com) and allow the API key to call `translate.googleapis.com`.
+## Required workflow (do not skip)
+
+1. **Add English** in `FS25_FarmDashboard_App/web/locales/messages/en.json`.
+   - Use `{{placeholder}}` for dynamic values (e.g. `{{days}}`, `{{count}}`).
+   - Reference from code via `t("key", { placeholder: value })` or `data-i18n="key"`.
+   - Never hardcode user-facing English in production UI paths.
+
+2. **Sync keys** to all locale files:
+   ```bash
+   cd FS25_FarmDashboard_App && npm run i18n:sync
+   ```
+
+3. **Machine-translate** non-English locales with Google Cloud Translation:
+   ```bash
+   cd FS25_FarmDashboard_App && npm run i18n:fill
+   ```
+   - API key is in **`FS25_FarmDashboard_App/web/locales/.mt-env.local`** (gitignored). `mt-fill.mjs` loads it automatically.
+   - Never commit, paste, or log API keys.
+   - For a small set of new keys only: `node web/locales/mt-fill.mjs --keys key.one,key.two`
+   - One-shot full pipeline: `npm run i18n:refresh` (sync → fill → build → verify).
+
+4. **Rebuild runtime catalog** (the app loads this, not `messages/*.json` directly):
+   ```bash
+   cd FS25_FarmDashboard_App && npm run i18n:build
+   ```
+
+5. **Verify** before marking the task done:
+   ```bash
+   cd FS25_FarmDashboard_App && npm run i18n:verify
+   ```
+
+## Runtime gotcha
+
+If the UI shows a raw key like `pastures.card.foodLastsDaysEst`, `translations.json` was not rebuilt or the app was not restarted. Fix: complete steps 3–4, then restart the app.
+
+## Auth troubleshooting
+
+- **403 accessNotConfigured** — enable [Cloud Translation API](https://console.cloud.google.com/apis/library/translate.googleapis.com) for the GCP project; restrict the key to Translation API only.
+- Credentials: `GOOGLE_TRANSLATE_API_KEY` in `.mt-env.local`, or `GOOGLE_APPLICATION_CREDENTIALS` for service-account auth (see `docs/_internal/I18N.md`).
+
+## Code fallback
+
+Prefer proper catalog entries over raw keys. `tOr(key, englishFallback, params)` is acceptable only as a safety net when the catalog is temporarily stale — still run the full i18n pipeline.

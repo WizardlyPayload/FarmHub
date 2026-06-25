@@ -1,8 +1,9 @@
 // FS25 FarmDashboard | pastures.js | v2.0.0
 
-import { t } from "../i18n/i18n.js";
+import { t, tOr } from "../i18n/i18n.js";
 import { formatGenderLabel, fmtWeightKgStr, countLivestockHeads } from "./livestock.js";
 import { entityOwnerFarmId } from "./farmScope.js";
+import { showFarmDashModal } from "../utils/modal-ui.js";
 
 /**
  * Escape a value before embedding it in HTML. Sources can come from the game
@@ -277,7 +278,7 @@ function buildPastureFromHusbandryRow(husbandryData, dashboard) {
     ...husbandryData,
     calculatedMilkProduction: milkProductionData.estimatedStorage,
   };
-  const foodReport = dashboard.calculateFoodReport(foodReportInput);
+  const foodReport = dashboard.calculateFoodReport(foodReportInput, stockingCount);
   const allWarnings = dashboard.calculateAllPastureWarnings(
     husbandryData,
     [],
@@ -410,7 +411,10 @@ export function parsePastureData() {
       //   console.log("[DEBUG] *** FORAGE DATA MISSING ***");
       // }
 
-      const foodReport = this.calculateFoodReport(foodReportInput);
+      const foodReport = this.calculateFoodReport(
+        foodReportInput,
+        countLivestockHeads(stockingAnimals)
+      );
       // Debug logs disabled for milk troubleshooting
       // console.log(
       //   "[DEBUG] ***** FOOD REPORT RETURNED TO parsePastureData *****"
@@ -518,7 +522,10 @@ export function parsePastureData() {
           ...placeable,
           calculatedMilkProduction: milkProductionData.estimatedStorage,
         };
-        const foodReport = this.calculateFoodReport(placeableWithMilk);
+        const foodReport = this.calculateFoodReport(
+          placeableWithMilk,
+          countLivestockHeads(pastureAnimals)
+        );
 
         // Calculate all warnings for this pasture
         const allWarnings = this.calculateAllPastureWarnings(
@@ -540,7 +547,7 @@ export function parsePastureData() {
           id: placeable.uniqueId,
           name: placeable.name,
           animals: pastureAnimals,
-          animalCount: pastureAnimals.length,
+          animalCount: countLivestockHeads(pastureAnimals),
           maleCount: maleCount,
           femaleCount: femaleCount,
           avgHealth: parseFloat(avgHealth),
@@ -607,7 +614,10 @@ export function parsePastureData() {
         ...locationData,
         calculatedMilkProduction: milkProductionData.estimatedStorage,
       };
-      const foodReport = this.calculateFoodReport(locationWithMilk);
+      const foodReport = this.calculateFoodReport(
+        locationWithMilk,
+        countLivestockHeads(pastureAnimals)
+      );
 
       // Calculate all warnings for this pasture
       const allWarnings = this.calculateAllPastureWarnings(
@@ -629,7 +639,7 @@ export function parsePastureData() {
         id: locationData.uniqueId,
         name: locationData.name,
         animals: pastureAnimals,
-        animalCount: pastureAnimals.length,
+        animalCount: countLivestockHeads(pastureAnimals),
         maleCount: maleCount,
         femaleCount: femaleCount,
         avgHealth: parseFloat(avgHealth),
@@ -1066,7 +1076,12 @@ export function calculateMilkProduction(pasture, animals) {
   };
 }
 
-export function calculateFoodReport(husbandryData) {
+export function calculateFoodReport(husbandryData, animalCount) {
+  const headCount =
+    Number(animalCount) > 0
+      ? Number(animalCount)
+      : stockCountFromHusbandry(husbandryData);
+
   // Debug logs disabled for milk troubleshooting
   // console.log("[DEBUG] ===== calculateFoodReport CALLED =====");
   // console.log("[DEBUG] husbandryData received:", husbandryData);
@@ -1245,7 +1260,7 @@ export function calculateFoodReport(husbandryData) {
       // console.log("[DEBUG] Calculated food report result:", result);
       // console.log("[DEBUG] Using aggregated data:", result.hasAggregatedData);
       // console.log("[DEBUG] ***** FOOD REPORT COMPLETE *****");
-      return result;
+      return applyFoodDurationEstimates(result, husbandryData, headCount);
     }
   }
 
@@ -1255,14 +1270,28 @@ export function calculateFoodReport(husbandryData) {
     husbandryData.foodData &&
     typeof husbandryData.foodData === "object"
   ) {
-    return {
-      totalCapacity: husbandryData.foodData.totalCapacity || 1000,
-      totalMixedRation: husbandryData.foodData.totalMixedRation || 0,
-      hay: husbandryData.foodData.hay || 0,
-      silage: husbandryData.foodData.silage || 0,
-      grass: husbandryData.foodData.grass || 0,
-      hasRealData: true,
-    };
+    const fd = husbandryData.foodData;
+    const availableFood =
+      Number(fd.availableFood) ||
+      Number(fd.totalMixedRation) ||
+      Number(fd.food) ||
+      0;
+    return applyFoodDurationEstimates(
+      {
+        totalCapacity: fd.totalCapacity || 1000,
+        availableFood,
+        totalMixedRation: fd.totalMixedRation || availableFood || 0,
+        hay: fd.hay || 0,
+        silage: fd.silage || 0,
+        grass: fd.grass || 0,
+        food: availableFood || fd.food || 0,
+        water: fd.water || 0,
+        straw: fd.straw || 0,
+        hasRealData: true,
+      },
+      husbandryData,
+      headCount
+    );
   }
 
   // Return empty food data to indicate no real data available
@@ -1301,6 +1330,73 @@ export function estimatePastureCapacity(filename) {
   if (lowerFilename.includes("sheepbarn")) return 25;
   if (lowerFilename.includes("horsestable")) return 10;
   return 20; // Default for unknown types
+}
+
+function applyFoodDurationEstimates(foodReport, husbandryData, animalCount) {
+  if (!foodReport || foodReport.hasRealData === false) return foodReport;
+  const pwNs =
+    (typeof globalThis !== "undefined" && globalThis.farmDashPastureWarnings) ||
+    (typeof window !== "undefined" && window.farmDashPastureWarnings) ||
+    null;
+  if (!pwNs || typeof pwNs.computeFoodDurationEstimates !== "function") {
+    return foodReport;
+  }
+  const heads =
+    Number(animalCount) ||
+    Number(husbandryData?.animalCount) ||
+    Number(husbandryData?.numOfAnimalsReported) ||
+    0;
+  const est = pwNs.computeFoodDurationEstimates(
+    foodReport,
+    husbandryData?.consumptionData,
+    heads
+  );
+  if (!est) return foodReport;
+  return { ...foodReport, ...est };
+}
+
+function formatResourceDurationHint(foodReport, resource) {
+  const days = foodReport?.durationDays?.[resource];
+  if (days == null || !Number.isFinite(days)) return "";
+  const rounded =
+    days >= 10 ? Math.round(days) : Math.round(days * 10) / 10;
+  const est = !!foodReport?.durationEstimated;
+  const keys = {
+    food: est ? "pastures.card.foodLastsDaysEst" : "pastures.card.foodLastsDays",
+    water: est
+      ? "pastures.card.waterLastsDaysEst"
+      : "pastures.card.waterLastsDays",
+    straw: est
+      ? "pastures.card.strawLastsDaysEst"
+      : "pastures.card.strawLastsDays",
+  };
+  const key = keys[resource];
+  if (!key) return "";
+  const fallbacks = {
+    food: est
+      ? `food will last ~{{days}} days (estimated)`
+      : `food will last ~{{days}} days`,
+    water: est
+      ? `water will last ~{{days}} days (estimated)`
+      : `water will last ~{{days}} days`,
+    straw: est
+      ? `straw will last ~{{days}} days (estimated)`
+      : `straw will last ~{{days}} days`,
+  };
+  let text = tOr(key, fallbacks[resource], { days: rounded });
+  if (text.includes("{{days}}")) {
+    text = text.split("{{days}}").join(String(rounded));
+  }
+  return text;
+}
+
+function formatFoodDurationHint(foodReport) {
+  return formatResourceDurationHint(foodReport, "food");
+}
+
+function foodDurationHintHtml(foodReport, resource) {
+  const hint = formatResourceDurationHint(foodReport, resource);
+  return hint ? ` <small class="text-muted">(${_safe(hint)})</small>` : "";
 }
 
 export function calculateAllPastureWarnings(pasture, animals, conditionReport, foodReport) {
@@ -1651,8 +1747,9 @@ export function showWarningDetails(pastureId, warningIndex) {
   }
 
   const warning = pasture.allWarnings[warningIndex];
-  const modal = new bootstrap.Modal(document.getElementById("warningModal"));
+  const modalEl = document.getElementById("warningModal");
   const content = document.getElementById("warningDetailsContent");
+  if (!modalEl || !content) return;
 
   // Update modal title
   document.getElementById("warningModalLabel").innerHTML = `
@@ -2094,7 +2191,7 @@ export function showWarningDetails(pastureId, warningIndex) {
   }
 
   content.innerHTML = detailsHTML;
-  modal.show();
+  showFarmDashModal(modalEl);
 }
 
 export function getCapacitySource(pasture) {
@@ -2276,8 +2373,13 @@ export function updatePastureDisplay() {
 }
 
 function formatLowHealthStatusBadges(animal) {
+  const health = Number(animal?.health ?? 0);
   const statuses = [];
-  if (Number(animal?.health ?? 0) < 20) {
+  if (health <= 0 && (animal?.__lodSynth || animal?.__lodSynthEstimate)) {
+    statuses.push(
+      `<span class="badge bg-secondary">${t("common.unknown")}</span>`
+    );
+  } else if (health < 20) {
     statuses.push(
       `<span class="badge bg-danger">${t("pastures.statusCritical")}</span>`
     );
@@ -2305,6 +2407,21 @@ function formatLowHealthStatusBadges(animal) {
   return statuses.join(" ");
 }
 
+/** Skip LOD placeholder rows with no real health telemetry (health/weight both zero). */
+function isLowHealthAnimalCandidate(animal) {
+  if (!animal || animal.__emptyPen) return false;
+  const health = Number(animal.health ?? 0);
+  if (!Number.isFinite(health) || health >= 70) return false;
+  if (
+    health <= 0 &&
+    (animal.__lodSynth || animal.__lodSynthEstimate) &&
+    Number(animal.weight ?? 0) <= 0
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export function getLowHealthAnimalsForActiveFarm(pasturesList) {
   const list =
     Array.isArray(pasturesList) && pasturesList.length > 0
@@ -2314,14 +2431,13 @@ export function getLowHealthAnimalsForActiveFarm(pasturesList) {
   list.forEach((pasture) => {
     const animals = Array.isArray(pasture?.animals) ? pasture.animals : [];
     animals.forEach((animal) => {
-      const health = Number(animal?.health ?? 0);
-      if (Number.isFinite(health) && health < 70) {
-        rows.push({
-          ...animal,
-          health,
-          pastureName: pasture?.name || "Unknown",
-        });
-      }
+      if (!isLowHealthAnimalCandidate(animal)) return;
+      const health = Number(animal.health ?? 0);
+      rows.push({
+        ...animal,
+        health,
+        pastureName: pasture?.name || "Unknown",
+      });
     });
   });
   rows.sort((a, b) => a.health - b.health);
@@ -2348,11 +2464,14 @@ export function showLowHealthAnimalsDrilldown() {
         ${t("pastures.lowHealthAllGood")}
       </div>
     `;
-    new bootstrap.Modal(modalEl).show();
+    showFarmDashModal(modalEl);
     return;
   }
 
-  const rows = affected
+  const LOW_HEALTH_DRILLDOWN_CAP = 200;
+  const displayRows = affected.slice(0, LOW_HEALTH_DRILLDOWN_CAP);
+
+  const rows = displayRows
     .map((animal) => {
       const displayName =
         animal.name && String(animal.name).trim() !== ""
@@ -2402,7 +2521,7 @@ export function showLowHealthAnimalsDrilldown() {
     </div>
   `;
 
-  new bootstrap.Modal(modalEl).show();
+  showFarmDashModal(modalEl);
 }
 
 export function renderPasturesList(pasturesList) {
@@ -2553,7 +2672,7 @@ export function renderPasturesList(pasturesList) {
                                 pasture.foodReport.availableFood ||
                                   pasture.foodReport.totalMixedRation ||
                                   0
-                              ).toFixed(0)}L</span>
+                              ).toFixed(0)}L${foodDurationHintHtml(pasture.foodReport, "food")}</span>
                           </div>
                           ${
                             pasture.foodReport.water > 0
@@ -2562,7 +2681,7 @@ export function renderPasturesList(pasturesList) {
                               <i class="bi bi-droplet me-2 text-info"></i>
                               <span><strong>${t("pastures.card.water")}:</strong> ${parseFloat(
                                 pasture.foodReport.water
-                              ).toFixed(0)}L</span>
+                              ).toFixed(0)}L${foodDurationHintHtml(pasture.foodReport, "water")}</span>
                           </div>`
                               : ""
                           }
@@ -2573,7 +2692,7 @@ export function renderPasturesList(pasturesList) {
                               <i class="bi bi-grid me-2 text-warning"></i>
                               <span><strong>${t("pastures.card.straw")}:</strong> ${parseFloat(
                                 pasture.foodReport.straw
-                              ).toFixed(0)}L</span>
+                              ).toFixed(0)}L${foodDurationHintHtml(pasture.foodReport, "straw")}</span>
                           </div>`
                               : ""
                           }
@@ -2808,7 +2927,7 @@ export function showPastureDetails(pastureId) {
       pasture.foodReport.availableFood ||
         pasture.foodReport.totalMixedRation ||
         0
-    ).toFixed(0)}L</td></tr>
+    ).toFixed(0)}L${foodDurationHintHtml(pasture.foodReport, "food")}</td></tr>
                                               ${
                                                 pasture.foodReport.hay > 0
                                                   ? `<tr><td>${t(
@@ -2842,7 +2961,7 @@ export function showPastureDetails(pastureId) {
                                                       "pastures.details.straw"
                                                     )}:</td><td>${parseFloat(
                                                       pasture.foodReport.straw
-                                                    ).toFixed(0)}L</td></tr>`
+                                                    ).toFixed(0)}L${foodDurationHintHtml(pasture.foodReport, "straw")}</td></tr>`
                                                   : ""
                                               }
                                               ${
@@ -2851,7 +2970,7 @@ export function showPastureDetails(pastureId) {
                                                       "pastures.details.water"
                                                     )}:</td><td>${parseFloat(
                                                       pasture.foodReport.water
-                                                    ).toFixed(0)}L</td></tr>`
+                                                    ).toFixed(0)}L${foodDurationHintHtml(pasture.foodReport, "water")}</td></tr>`
                                                   : ""
                                               }
 

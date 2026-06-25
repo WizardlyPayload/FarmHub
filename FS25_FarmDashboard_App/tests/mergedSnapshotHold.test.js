@@ -6,9 +6,12 @@ const {
     applyLiveSectionHold,
     animalsSectionEmpty,
     fieldsSectionDegraded,
+    stockSectionEmpty,
+    redTapeSectionEmpty,
     updateLiveSectionBackup,
     updateLastGoodMergedSnapshot,
     buildHeldPayloadFromState,
+    mergeMoistureSectionsForward,
 } = require('../mergedSnapshotHold');
 
 describe('mergedSnapshotHold', () => {
@@ -220,5 +223,129 @@ describe('mergedSnapshotHold', () => {
         );
         expect(state.lastGoodMergedSnapshot.fields[0].hectares).toBe(3.1);
         expect(state.lastGoodMergedSnapshot.fields[0].moisture.percent).toBe(14.2);
+    });
+
+    test('mergeMoistureSectionsForward keeps stock silo moisture when next export drops it', () => {
+        const prev = {
+            stock: {
+                byFarm: {
+                    '1': {
+                        items: [{
+                            fillTypeIndex: 2,
+                            locations: [{
+                                name: 'NL16-22 - 2000',
+                                liters: 88000,
+                                moisturePct: 11.2,
+                                qualityPct: 98,
+                            }],
+                        }],
+                    },
+                },
+            },
+        };
+        const next = {
+            stock: {
+                byFarm: {
+                    '1': {
+                        items: [{
+                            fillTypeIndex: 2,
+                            locations: [{ name: 'NL16-22 - 2000', liters: 88000 }],
+                        }],
+                    },
+                },
+            },
+        };
+        const out = mergeMoistureSectionsForward(prev, next);
+        const loc = out.stock.byFarm['1'].items[0].locations[0];
+        expect(loc.moisturePct).toBe(11.2);
+        expect(loc.qualityPct).toBe(98);
+    });
+
+    test('applyLiveSectionHold restores stock and redTape when lua export clears them', () => {
+        const goodStock = {
+            enabled: true,
+            byFarm: {
+                '1': {
+                    items: [{ fillType: 'WHEAT', fillTypeIndex: 2, totalLiters: 120000, locations: [] }],
+                },
+            },
+        };
+        const goodRedTape = {
+            enabled: true,
+            byFarm: {
+                '1': {
+                    tier: 'B',
+                    policies: [{ nameKey: 'rt_policy_noise', warnings: 0 }],
+                    availableSchemes: [{ nameKey: 'rt_scheme_green', tier: 'B' }],
+                },
+            },
+        };
+        const state = { liveSectionBackup: { stock: goodStock, redTape: goodRedTape } };
+        const merged = {
+            fields: [{ id: 1, hectares: 2 }],
+            stock: { enabled: false, byFarm: {} },
+            redTape: { enabled: false, byFarm: {} },
+        };
+        const rawLua = {
+            fields: [{ id: 1, hectares: 2 }],
+            stock: { enabled: false, byFarm: {} },
+            redTape: { enabled: false, byFarm: {} },
+        };
+        const out = applyLiveSectionHold(merged, state, rawLua, null);
+        expect(stockSectionEmpty(out.stock)).toBe(false);
+        expect(out.stock.byFarm['1'].items[0].totalLiters).toBe(120000);
+        expect(redTapeSectionEmpty(out.redTape)).toBe(false);
+        expect(out.redTape.byFarm['1'].tier).toBe('B');
+        expect(out.dataTimestamps.liveSectionsHeldAt).toBeTruthy();
+    });
+
+    test('updateLiveSectionBackup retains stock and redTape across empty writes', () => {
+        const state = { liveSectionBackup: null };
+        updateLiveSectionBackup(
+            state,
+            {
+                stock: {
+                    enabled: true,
+                    byFarm: { '1': { items: [{ fillTypeIndex: 2, totalLiters: 5000 }] } },
+                },
+                redTape: {
+                    enabled: true,
+                    byFarm: { '1': { tier: 'A', policies: [{ nameKey: 'rt_policy_x' }] } },
+                },
+            },
+            null
+        );
+        expect(stockSectionEmpty(state.liveSectionBackup.stock)).toBe(false);
+        expect(redTapeSectionEmpty(state.liveSectionBackup.redTape)).toBe(false);
+        updateLiveSectionBackup(
+            state,
+            { stock: { enabled: false, byFarm: {} }, redTape: { enabled: false, byFarm: {} } },
+            { stock: {}, redTape: {} }
+        );
+        expect(state.liveSectionBackup.stock.byFarm['1'].items[0].totalLiters).toBe(5000);
+        expect(state.liveSectionBackup.redTape.byFarm['1'].tier).toBe('A');
+    });
+
+    test('buildHeldPayloadFromState merges liveSectionBackup stock and redTape', () => {
+        const state = {
+            mergedData: {
+                fields: [{ id: 1, hectares: 1 }],
+                stock: { enabled: false, byFarm: {} },
+                redTape: { enabled: false, byFarm: {} },
+            },
+            liveSectionBackup: {
+                stock: {
+                    enabled: true,
+                    byFarm: { '1': { items: [{ fillTypeIndex: 190, totalLiters: 8000 }] } },
+                },
+                redTape: {
+                    enabled: true,
+                    byFarm: { '1': { tier: 'C', availableSchemes: [{ nameKey: 'rt_scheme_y' }] } },
+                },
+            },
+        };
+        const out = buildHeldPayloadFromState(state);
+        expect(out.stock.byFarm['1'].items[0].fillTypeIndex).toBe(190);
+        expect(out.redTape.byFarm['1'].tier).toBe('C');
     });
 });

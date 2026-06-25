@@ -90,4 +90,28 @@ describe('mergeVehicles dedupe by config+farm key', () => {
         expect(out).toHaveLength(1);
         expect(out[0].source).toBe('lua_only');
     });
+
+    test('lua ownerFarmId 0 is preserved (used equipment yard stock)', () => {
+        const lua = [
+            luaVeh({
+                id: 77,
+                ownerFarmId: 0,
+                isUsedEquipmentYardStock: true,
+            }),
+        ];
+        const xml = [
+            xmlVeh({
+                uniqueId: 'yard1',
+                farmId: 1,
+                ownerFarmId: 1,
+                filename: 'data/vehicles/masseyFerguson/series9S/series9S.xml',
+            }),
+        ];
+        const out = mergeVehicles(lua, xml);
+        const yard = out.find((v) => v.id === 77);
+        expect(yard).toBeTruthy();
+        expect(yard.ownerFarmId).toBe(0);
+        expect(yard.isUsedEquipmentYardStock).toBe(true);
+        expect(out).toHaveLength(2);
+    });
 });

@@ -65,3 +65,16 @@ test("switching active farm re-scopes both the grid and the count", () => {
   vehicles.updateVehicleSummaryCards.call(ctx);
   assert.equal(ctx._texts["total-vehicles-count"], 1);
 });
+
+test("isUsedEquipmentYardStock excludes yard listing from fleet filters", () => {
+  assert.equal(vehicles.isUsedEquipmentYardStock({ isUsedEquipmentYardStock: true }), true);
+  assert.equal(vehicles.isUsedEquipmentYardStock({ ownerFarmId: 1 }), false);
+
+  const ctx = makeCtx();
+  ctx.vehicles = [
+    ...mixedFleet,
+    { id: 5, name: "Yard MF 9S", ownerFarmId: 1, isUsedEquipmentYardStock: true },
+  ];
+  vehicles.updateVehicleSummaryCards.call(ctx);
+  assert.equal(ctx._texts["total-vehicles-count"], 2, "yard stock must not count toward fleet total");
+});

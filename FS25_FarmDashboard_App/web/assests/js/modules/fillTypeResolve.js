@@ -39,6 +39,33 @@ export function inferFillTypeFromLocations(locations) {
   return null;
 }
 
+/** Resolve a fill-type label from economy crops, sell points, and catalogs when index maps are sparse. */
+export function lookupFillTypeNameFromEconomy(fillTypeIndex, economy) {
+  const idx = Number(fillTypeIndex);
+  if (!Number.isFinite(idx) || idx <= 0) return null;
+  const key = String(idx);
+  const mp = economy?.marketPrices || {};
+
+  for (const [name, crop] of Object.entries(mp.crops || {})) {
+    if (Number(crop?.fillTypeIndex) === idx) return name;
+  }
+  if (mp.nameToIndex && typeof mp.nameToIndex === "object") {
+    for (const [name, mapIdx] of Object.entries(mp.nameToIndex)) {
+      if (Number(mapIdx) === idx) return name;
+    }
+  }
+  const fromByIndex = mp.fillTypesByIndex?.[key] || economy?.fillTypeCatalog?.[key];
+  if (fromByIndex && String(fromByIndex).trim() !== "") return String(fromByIndex);
+
+  for (const station of Object.values(mp.sellPoints || {})) {
+    if (!station?.prices || typeof station.prices !== "object") continue;
+    for (const [productName, priceInfo] of Object.entries(station.prices)) {
+      if (Number(priceInfo?.fillTypeIndex) === idx) return productName;
+    }
+  }
+  return null;
+}
+
 export function mergeFillTypeCatalog(...sources) {
   const out = {};
   for (const src of sources) {

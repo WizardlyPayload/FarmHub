@@ -7,6 +7,7 @@ import {
   openPenDetailModal,
   resolveSyntheticAnimal,
 } from "./livestock.penDetail.js";
+import { releaseStuckModalUi, ensureModalOnBody } from "../utils/modal-ui.js";
 
 function _safe(value) {
   const ns =
@@ -21,6 +22,66 @@ function _safe(value) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+/** Pastures drilldown uses the same <70 threshold; skip LOD rows with no health telemetry. */
+function isLivestockLowHealthRow(animal) {
+  if (!animal || animal.__emptyPen) return false;
+  const health = Number(animal.health ?? 0);
+  if (!Number.isFinite(health) || health >= 70) return false;
+  if (
+    health <= 0 &&
+    (animal.__lodSynth || animal.__lodSynthEstimate) &&
+    Number(animal.weight ?? 0) <= 0
+  ) {
+    return false;
+  }
+  return true;
+}
+
+function isUnknownSubTypeLabel(subType) {
+  if (subType == null || subType === "") return true;
+  return String(subType).trim().toLowerCase() === "unknown";
+}
+
+export function resolveAnimalSubTypeRaw(animal) {
+  if (!animal) return "";
+  if (!isUnknownSubTypeLabel(animal.subType)) return String(animal.subType);
+  if (!isUnknownSubTypeLabel(animal.animalTypeName)) return String(animal.animalTypeName);
+  if (!isUnknownSubTypeLabel(animal.type) && animal.type !== "cluster") {
+    return String(animal.type);
+  }
+  return "";
+}
+
+function shouldShowHealthErrorBadge(animal) {
+  if (!animal || animal.health !== 0) return false;
+  if (animal.__lodSynth || animal.__lodSynthEstimate || animal.__lodClusterAggregate) {
+    return false;
+  }
+  return true;
+}
+
+function displayAnimalHealth(animal) {
+  const h = Number(animal?.health);
+  if (Number.isFinite(h) && h > 0) return h;
+  if (animal?.__lodSynth || animal?.__lodClusterAggregate || animal?.__lodSynthEstimate) {
+    return 100;
+  }
+  return Number.isFinite(h) ? h : 100;
+}
+
+export function formatAnimalWeightDisplay(animal, decimals = 1) {
+  const w = Number(animal?.weight ?? 0);
+  if (
+    (animal?.__lodSynth ||
+      animal?.__lodClusterAggregate ||
+      animal?.__lodSynthEstimate) &&
+    (!Number.isFinite(w) || w <= 0)
+  ) {
+    return t("common.notAvailable");
+  }
+  return fmtWeightKgStr(w, decimals);
 }
 
 /** Plan v5 A2: dashboard entrypoint — open the real-detail modal for a husbandry pen. */
@@ -201,7 +262,7 @@ export function renderAnimalsTable() {
 
       // Create status badges
       const statusBadges = [];
-      if (animal.health === 0)
+      if (shouldShowHealthErrorBadge(animal))
         statusBadges.push(`<span class="badge bg-danger">${t("livestock.badgeError")}</span>`);
       if (animal.isPregnant)
         statusBadges.push(
@@ -215,15 +276,15 @@ export function renderAnimalsTable() {
         statusBadges.push(`<span class="badge status-parent">${t("livestock.badgeParent")}</span>`);
 
       // Create health bar
-      const healthClass = this.getHealthClass(animal.health || 100);
+      const healthClass = this.getHealthClass(displayAnimalHealth(animal));
       const healthBar = `
                 <div style="display: flex; align-items: center;">
                     <div class="health-bar">
                         <div class="health-fill ${healthClass}" style="width: ${
-        animal.health || 100
+        displayAnimalHealth(animal)
       }%"></div>
                     </div>
-                    <span>${Math.round(animal.health || 100)}%</span>
+                    <span>${Math.round(displayAnimalHealth(animal))}%</span>
                 </div>
             `;
 
@@ -240,11 +301,11 @@ export function renderAnimalsTable() {
 
       return [
         animalIdDisplay,
-        _safe(this.formatAnimalType(animal.subType || t("common.unknown"))),
+        _safe(this.formatAnimalType(resolveAnimalSubTypeRaw(animal) || t("common.unknown"))),
         fmtAgeMonthsStr(animal.age || 0),
         formatGenderLabel(animal.gender),
         healthBar,
-        fmtWeightKgStr(animal.weight || 0, 1),
+        formatAnimalWeightDisplay(animal, 1),
         `$${this.calculateAnimalValue(animal).value.toLocaleString()}`,
         statusBadges.join(" ") || "-",
         this.formatLocation(
@@ -418,6 +479,7 @@ export function getHealthClass(health) {
 }
 
 export function formatAnimalType(subType) {
+  if (isUnknownSubTypeLabel(subType)) return t("common.unknown");
   // Convert "COW_HEREFORD" to "Hereford Cow"
   const parts = subType.split("_");
   if (parts.length > 1) {
@@ -511,19 +573,13 @@ export function showAnimalDetails(animalId) {
     return;
   }
 
-  // Plan v5 A2: when the animal is synthetic (LOD fan-out), open the pen-detail modal so the
-  // user sees REAL animals from the mod's per-pen file rather than averaged placeholder data.
-  // The original modal is still rendered (so existing UI keeps working), but a hint is added
-  // to the title indicating the data is estimated and the pen drilldown is now available.
-  // Synthetic LOD rows (per-cluster aggregate or legacy per-head synth): pen-detail has real individuals.
+  // Synthetic LOD rows: pen-detail has real individuals — open only that modal (not both).
   if (animal.__lodSynth || animal.__lodClusterAggregate) {
-    try {
-      const penId = animal.husbandryId || animal.huId;
-      if (penId != null) {
-        // Don't await; let the modal open in parallel with the legacy estimated view.
-        openPenDetailModal(String(penId)).catch(() => { /* swallow */ });
-      }
-    } catch (_) { /* ignore */ }
+    const penId = animal.husbandryId || animal.huId;
+    if (penId != null) {
+      openPenDetailModal(String(penId)).catch(() => {});
+    }
+    return;
   }
 
   const modalTitle = document.getElementById("animalDetailsModalLabel");
@@ -597,7 +653,7 @@ export function showAnimalDetails(animalId) {
                                         animal.name || t("livestock.nameFallback", { id: animal.id })
                                       }</td></tr>
                                       <tr><td><strong>${t("livestock.labelType")}</strong></td><td>${this.formatAnimalType(
-                                        animal.subType
+                                        resolveAnimalSubTypeRaw(animal) || t("common.unknown")
                                       )}</td></tr>
                                       <tr><td><strong>${t("livestock.labelGender")}</strong></td><td>${formatGenderLabel(
                                         animal.gender
@@ -621,10 +677,10 @@ export function showAnimalDetails(animalId) {
                               <div class="card-body">
                                   <table class="table table-sm table-borderless table-dark text-light">
                                       <tr><td><strong>${t("livestock.labelHealth")}</strong></td><td>${Math.round(
-                                        animal.health || 0
+                                        displayAnimalHealth(animal)
                                       )}%</td></tr>
-                                      <tr><td><strong>${t("livestock.labelWeight")}</strong></td><td>${fmtWeightKgStr(
-                                        animal.weight || 0,
+                                      <tr><td><strong>${t("livestock.labelWeight")}</strong></td><td>${formatAnimalWeightDisplay(
+                                        animal,
                                         0
                                       )}</td></tr>
                                       <tr><td><strong>${t("livestock.labelReproduction")}</strong></td><td>${(animal.reproduction &&
@@ -860,21 +916,9 @@ export function showAnimalDetails(animalId) {
   }
 }
 
-/** Remove orphan Bootstrap backdrops when no modal is open (prevents dimmed frozen UI). */
-function releaseStuckModalUi() {
-  if (document.querySelector(".modal.show")) return;
-  document.querySelectorAll(".modal-backdrop").forEach((node) => node.remove());
-  document.body.classList.remove("modal-open");
-  document.body.style.removeProperty("overflow");
-  document.body.style.removeProperty("padding-right");
-}
-
 function getExportDataModalEl() {
   const el = document.getElementById("exportDataModal");
-  if (el && el.parentElement !== document.body) {
-    document.body.appendChild(el);
-  }
-  return el;
+  return ensureModalOnBody(el);
 }
 
 const EXPORT_BUTTON_SELECTORS = {
@@ -960,8 +1004,9 @@ export function filterAnimals(filterType, silentRefresh) {
       filteredAnimals = this.animals.filter((animal) => animal.isPregnant);
       break;
     case "health":
-      // Sort by health (highest to lowest) for health filter
-      filteredAnimals = [...this.animals].sort((a, b) => b.health - a.health);
+      filteredAnimals = this.animals
+        .filter((animal) => isLivestockLowHealthRow(animal))
+        .sort((a, b) => Number(a.health ?? 0) - Number(b.health ?? 0));
       break;
     default:
       console.warn("Unknown filter type:", filterType);
@@ -977,7 +1022,7 @@ export function filterAnimals(filterType, silentRefresh) {
     const tableData = filteredAnimals.map((animal) => {
       // Create status badges
       const statusBadges = [];
-      if (animal.health === 0)
+      if (shouldShowHealthErrorBadge(animal))
         statusBadges.push(`<span class="badge bg-danger">${t("livestock.badgeError")}</span>`);
       if (animal.isPregnant)
         statusBadges.push(
@@ -991,25 +1036,25 @@ export function filterAnimals(filterType, silentRefresh) {
         statusBadges.push(`<span class="badge status-parent">${t("livestock.badgeParent")}</span>`);
 
       // Create health bar
-      const healthClass = this.getHealthClass(animal.health);
+      const healthClass = this.getHealthClass(displayAnimalHealth(animal));
       const healthBar = `
                   <div style="display: flex; align-items: center;">
                       <div class="health-bar">
                           <div class="health-fill ${healthClass}" style="width: ${
-        animal.health
+        displayAnimalHealth(animal)
       }%"></div>
                       </div>
-                      <span>${Math.round(animal.health)}%</span>
+                      <span>${Math.round(displayAnimalHealth(animal))}%</span>
                   </div>
               `;
 
       return [
         `<code class="text-muted">${animal.id}</code>`,
-        _safe(this.formatAnimalType(animal.subType)),
+        _safe(this.formatAnimalType(resolveAnimalSubTypeRaw(animal) || t("common.unknown"))),
         fmtAgeMonthsStr(animal.age),
         formatGenderLabel(animal.gender),
         healthBar,
-        fmtWeightKgStr(animal.weight, 1),
+        formatAnimalWeightDisplay(animal, 1),
         `$${this.calculateAnimalValue(animal).value.toLocaleString()}`,
         statusBadges.join(" ") || "-",
         this.formatLocation(resolveAnimalLocationLabel(animal), resolveAnimalLocationType(animal)),
@@ -1034,7 +1079,7 @@ export function filterAnimals(filterType, silentRefresh) {
     all: t("livestock.filterStatusAll", { count: filteredAnimals.length }),
     lactating: t("livestock.filterStatusLactating", { count: filteredAnimals.length }),
     pregnant: t("livestock.filterStatusPregnant", { count: filteredAnimals.length }),
-    health: t("livestock.filterStatusHealth"),
+    health: t("livestock.filterStatusHealth", { count: filteredAnimals.length }),
   };
 
   this.showInfoMessage(
@@ -1440,7 +1485,7 @@ export function updateTableWithFilteredAnimals(filteredAnimals) {
   const tableData = filteredAnimals.map((animal) => {
     // Create status badges
     const statusBadges = [];
-    if (animal.health === 0)
+    if (shouldShowHealthErrorBadge(animal))
       statusBadges.push(`<span class="badge bg-danger">${t("livestock.badgeError")}</span>`);
     if (animal.isPregnant)
       statusBadges.push(
@@ -1454,25 +1499,25 @@ export function updateTableWithFilteredAnimals(filteredAnimals) {
       statusBadges.push(`<span class="badge status-parent">${t("livestock.badgeParent")}</span>`);
 
     // Create health bar
-    const healthClass = this.getHealthClass(animal.health);
+    const healthClass = this.getHealthClass(displayAnimalHealth(animal));
     const healthBar = `
               <div style="display: flex; align-items: center;">
                   <div class="health-bar">
                       <div class="health-fill ${healthClass}" style="width: ${
-      animal.health
+      displayAnimalHealth(animal)
     }%"></div>
                   </div>
-                  <span>${Math.round(animal.health)}%</span>
+                  <span>${Math.round(displayAnimalHealth(animal))}%</span>
               </div>
           `;
 
     return [
       `<code class="text-muted">${animal.id}</code>`,
-      _safe(this.formatAnimalType(animal.subType)),
+      _safe(this.formatAnimalType(resolveAnimalSubTypeRaw(animal) || t("common.unknown"))),
       fmtAgeMonthsStr(animal.age),
       formatGenderLabel(animal.gender),
       healthBar,
-      fmtWeightKgStr(animal.weight, 1),
+      formatAnimalWeightDisplay(animal, 1),
       `$${this.calculateAnimalValue(animal).value.toLocaleString()}`,
       statusBadges.join(" ") || "-",
       this.formatLocation(resolveAnimalLocationLabel(animal), resolveAnimalLocationType(animal)),

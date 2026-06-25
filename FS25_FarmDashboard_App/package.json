@@ -7,7 +7,7 @@
   "main": "main.js",
   "scripts": {
     "test": "jest",
-    "test:mjs": "node --test tests/baleInventory.test.mjs tests/rules-engine-roll-weed.test.mjs tests/vehicleAds.breakdown.test.mjs tests/fieldGrassMown.test.mjs tests/vehicleStoreImage.test.mjs tests/vehicleFarmScope.test.mjs",
+    "test:mjs": "node --test tests/baleInventory.test.mjs tests/rules-engine-roll-weed.test.mjs tests/vehicleAds.breakdown.test.mjs tests/fieldGrassMown.test.mjs tests/vehicleStoreImage.test.mjs tests/vehicleFarmScope.test.mjs tests/storageEconomy.test.mjs tests/navbarConnectionBadge.test.mjs",
     "test:all": "npm test && npm run test:mjs",
     "parity": "node ../tools/app/parity.js",
     "export-fields-csv": "node ../tools/app/export-fields-to-csv.mjs",

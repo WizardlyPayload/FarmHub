@@ -84,9 +84,78 @@
       return out;
     }
 
+    /**
+     * Estimate how many days current pen stock lasts at reported/estimated daily use.
+     * @returns {{ durationDays: { food: number|null, water: number|null, straw: number|null }, durationEstimated: boolean, consumptionPerDay: { food: number, water: number, straw: number } }|null}
+     */
+    function computeFoodDurationEstimates(foodReport, consumptionData, animalCount) {
+      if (!foodReport || foodReport.hasRealData === false) return null;
+      var heads = Number(animalCount) || 0;
+      if (heads <= 0) return null;
+
+      var cons = consumptionData && typeof consumptionData === "object" ? consumptionData : {};
+      var foodPerDay = Number(cons.foodPerDay || cons.food || 0);
+      var waterPerDay = Number(cons.waterPerDay || cons.water || 0);
+      var strawPerDay = Number(cons.strawPerDay || cons.straw || 0);
+      var estimated = !!(
+        cons.foodEstimated ||
+        cons.waterEstimated ||
+        cons.strawEstimated
+      );
+
+      if (foodPerDay <= 0) {
+        foodPerDay = heads * 20;
+        estimated = true;
+      }
+      if (waterPerDay <= 0) {
+        waterPerDay = heads * 30;
+        estimated = true;
+      }
+      if (strawPerDay <= 0) {
+        strawPerDay = heads * 5;
+        estimated = true;
+      }
+
+      var availableFood =
+        Number(foodReport.availableFood) ||
+        Number(foodReport.totalMixedRation) ||
+        Number(foodReport.food) ||
+        0;
+      if (availableFood <= 0) {
+        availableFood =
+          (Number(foodReport.hay) || 0) +
+          (Number(foodReport.silage) || 0) +
+          (Number(foodReport.grass) || 0) +
+          (Number(foodReport.forage) || 0);
+      }
+      var water = Number(foodReport.water) || 0;
+      var straw = Number(foodReport.straw) || 0;
+
+      function daysFor(stock, perDay) {
+        if (!Number.isFinite(stock) || stock <= 0) return null;
+        if (!Number.isFinite(perDay) || perDay <= 0) return null;
+        return stock / perDay;
+      }
+
+      return {
+        durationDays: {
+          food: daysFor(availableFood, foodPerDay),
+          water: daysFor(water, waterPerDay),
+          straw: daysFor(straw, strawPerDay),
+        },
+        durationEstimated: estimated,
+        consumptionPerDay: {
+          food: foodPerDay,
+          water: waterPerDay,
+          straw: strawPerDay,
+        },
+      };
+    }
+
     return {
       countLivestockHeads: countLivestockHeads,
       buildFoodWaterDecisions: buildFoodWaterDecisions,
+      computeFoodDurationEstimates: computeFoodDurationEstimates,
     };
   }
 );

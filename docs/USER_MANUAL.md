@@ -1,6 +1,6 @@
 # FS25 Farm Dashboard — User manual (v4.1)
 
-**Farm Dashboard** is the Windows desktop app that reads live farm data from **Farming Simulator 25** (via the in-game **FS25 Farm Dashboard** mod) and renders it in your browser at **[http://localhost:8766](http://localhost:8766)**. **App version 4.2.0**, **mod version 3.4.0.0**.
+**Farm Dashboard** is the Windows desktop app that reads live farm data from **Farming Simulator 25** (via the in-game **FS25 Farm Dashboard** mod) and renders it in your browser at **[http://localhost:8766](http://localhost:8766)**. **App version 4.2.0**, **mod version 3.4.0.6**.
 
 This manual walks every setting, every section, and every modal, with **inline screenshots** (below each section). Where we already have a similar capture, one image is reused instead of asking twice. Screenshot filenames, capture recipes, and the “still to capture” checklist are in [`SCREENSHOTS.md`](./SCREENSHOTS.md).
 
@@ -492,6 +492,10 @@ The most feature-rich section.
 
 *Figure: Field card with moisture, weeds, and rules suggestion.*
 
+![Field card — grass windrow with tedder / bale suggestion](screenshots/fd-section-fields-047-grass-windrow.png)
+
+*Figure: Field card — grass windrow with tedder / bale suggestion.*
+
 ![Field card with N + pH mini-bars](screenshots/fd-section-fields-050-card-soil.png)
 
 *Figure: Field card with N + pH mini-bars.*
@@ -530,7 +534,7 @@ The Economy section has up to four tabs: **Market prices**, **Equipment purchase
 
 | Block | What it shows |
 | ----- | ------------- |
-| **Silo & bunker stock** | Expandable table of fill types with litres, best sell point, value, and optional moisture / grade column when exported |
+| **Silo & bunker stock** | Expandable table of fill types with litres, best sell point, value, and per-location rows (click the commodity icon to expand). Optional moisture / grade column when exported. Enable **Economy** collector (§9) for sell-point names and prices. |
 | **Bale stock** | Two cards: **Loose on cropland** (inside registered field polygons) vs **Storage** (yards, sheds, AUTO BALE STORAGE buildings, and other off-field farmland). Breakdown by straw / grass / hay / silage / other. |
 | **Pallets & big bags** | Pallets, IBCs, and big bags grouped by product |
 
@@ -599,15 +603,19 @@ When the save runs **Red Tape** and the mod collector is enabled, Economy gains 
 
 | Control | What it does |
 | ------- | ------------ |
-| **Empty state** | Shown when no chains are reported |
-| **Chain card** | Per chain — running / stopped, input storage, output storage, fill levels, recipe, slots |
+| **Empty state** | Shown when no chains are reported — enable **Production** in ESC → Settings → Farm Dashboard (§9) if you own production buildings |
+| **Chain card** | Per chain — running / stopped, input storage, output storage, fill levels, recipe, slots. Cards use a **two-column grid** on wide screens |
 | **Slot row** | One per production slot in the chain |
 
 Productions has no user filters; it is read-only.
 
-![Chains list](screenshots/fd-section-productions-010-list.png)
+![Productions — two chain cards per row](screenshots/fd-section-productions-010-list.png)
 
-*Figure: Chains list.*
+*Figure: Productions — two chain cards per row (Biogas Plant and Cement Factory on Riverbend Springs).*
+
+![Empty productions state](screenshots/fd-section-productions-020-empty.png)
+
+*Figure: Empty productions state when the mod has not exported chains for this farm.*
 
 ### 6.8 Fleet map
 
@@ -674,11 +682,17 @@ Opened from a warning badge (e.g. on a pasture). Resolve the underlying issue in
 
 ### 7.6 Animal details
 
-Opened from a row on the Livestock table.
+Opened from a row on the Livestock table (individual animals with a real ID).
 
 ![Animal details modal](screenshots/fd-modal-060-animal-details.png)
 
 *Figure: Animal details modal.*
+
+**Cluster / LOD rows** on base-game pens open **Pen detail** instead of the full animal sheet — one modal with every head in the pen:
+
+![Pen detail modal](screenshots/fd-modal-065-pen-detail.png)
+
+*Figure: Pen detail modal — all animals in pen #132.*
 
 ### 7.7 Pasture livestock / details
 
@@ -687,6 +701,12 @@ Opened from pasture cards or **View all livestock**.
 ![Pasture livestock modal](screenshots/fd-modal-070-pasture-livestock.png)
 
 *Figure: Pasture livestock modal.*
+
+**Details** on a pasture card opens **Pen information** (3D preview and capacity):
+
+![Pen information modal](screenshots/fd-modal-071-pen-information.png)
+
+*Figure: Pen information modal — Cow Shed (44/50).*
 
 ### 7.8 Vehicle image
 
@@ -797,6 +817,8 @@ The mod has **no in-game console command** and **no Giants settings menu entry**
 | **Mod version badge in navbar** | Install **`FS25_FarmDashboard.zip` 3.1.0.0+** on the server / local mods folder, load the save once, and confirm `data.json` shows `serverInfo.modVersion`. |
 | **Fleet map pins offset or on desk border** | Restart the app after upgrading to **4.1.0** (overview cache v6). Delete `%APPDATA%\fs25-farm-dashboard\map_overviews\` and reopen Fleet map. Confirm the PC running the app has the same map mod installed. |
 | **Bale counts look doubled on dedicated** | Requires mod **3.1.0.0+** (deduplicated shed vs world scan). Restart app so merge layer picks up fresh JSON. |
+| **Fill type shows as `Fill type #…`** | Enable `modules.economy="true"` in `config.xml` (§9) so the app can resolve names from sell points and crops. |
+| **Productions empty** | Enable `modules.production="true"` in `config.xml` (§9) and confirm production buildings exist on the active farm. |
 | **Storage tab empty** | Enable `modules.stock="true"` in `config.xml` (§9) and confirm you own silos / bunkers on the active farm. |
 | **Compliance tab missing** | Red Tape mod must be on the save **and** `modules.redTape="true"`. |
 | **`debugBaleScan` in Settings → FS25 mod has no effect** | Audit gap #2 — hand-edit `config.xml` (§9). |
@@ -807,4 +829,4 @@ The mod has **no in-game console command** and **no Giants settings menu entry**
 
 The full list of filenames, captions, and capture recipes (auto vs manual) lives in [`SCREENSHOTS.md`](./SCREENSHOTS.md). All images sit under [`docs/screenshots/`](./screenshots/).
 
-**Document version:** aligned with app **4.2.0** and mod **3.4.0.0**. **Authors:** [`AUTHORS.md`](./AUTHORS.md).
+**Document version:** aligned with app **4.2.0** and mod **3.4.0.6**. **Authors:** [`AUTHORS.md`](./AUTHORS.md).

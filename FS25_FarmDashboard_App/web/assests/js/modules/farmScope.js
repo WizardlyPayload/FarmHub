@@ -161,6 +161,13 @@ export function pruneMergedDataToPlayerFarms(data) {
       const idx = crop?.fillTypeIndex;
       if (idx != null) catalog[String(idx)] = name;
     }
+    for (const station of Object.values(data.economy?.marketPrices?.sellPoints || {})) {
+      if (!station?.prices || typeof station.prices !== "object") continue;
+      for (const [productName, priceInfo] of Object.entries(station.prices)) {
+        const idx = priceInfo?.fillTypeIndex;
+        if (idx != null) catalog[String(idx)] = productName;
+      }
+    }
     const stock = {
       ...data.stock,
       fillTypeCatalog: catalog,

@@ -13,7 +13,7 @@ Real-time farm management dashboard for **Farming Simulator 25** — a Windows d
 | **`FS25-Farm-Dashboard-Setup-4.2.0.exe`** | Windows app |
 | **`FS25_FarmDashboard.zip`** | FS25 mod |
 
-**Current stable line:** App **4.2.0** · Mod **3.4.0.0**
+**Current stable line:** App **4.2.0** · Mod **3.4.0.6**
 
 Install **mod first**, load your save once, then install the app. See **[docs/INSTALL.md](docs/INSTALL.md)** (detailed) or the quick steps below.
 
@@ -66,8 +66,10 @@ This repository (**[FarmHub](https://github.com/WizardlyPayload/FarmHub)**) is *
 
 - **Live dashboard** — livestock, pastures, vehicles, fields, economy, productions, weather (port **8766**).
 - **Fleet map** — live vehicle pins on the save's PDA overview map.
-- **Storage** — silo stock with **moisture & grade**, correct names for mod-map crops (e.g. Linseed on Witcombe).
-- **Accurate equipment pictures** — authoritative store-icon matching (app **4.2.0** + mod **3.4.0.0**).
+- **Storage** — silo stock with **moisture & grade**, correct names for mod-map and base-map commodities.
+- **Livestock** — base-game cow pens, food-duration hints, urgent pasture alerts.
+- **Productions** — map-owned factories on base maps; two-column layout.
+- **Accurate equipment pictures** — authoritative store-icon matching (app **4.2.0** + mod **3.4.0.6**).
 - **Local + FTP** — single-player / LAN host on disk, or dedicated server over FTP.
 - **Offline field rules** — suggested next steps from merged game data (no cloud service).
 - **Optional integrations** — Advanced Damage System, Moisture System, Red Tape compliance tab.
@@ -123,6 +125,7 @@ CI on `main` runs tests, electron-pack verify, and i18n verify — see [`.github
 | Port **8766** in use | Close other apps on that port; restart Farm Dashboard |
 | LAN tablet will not load | Enable LAN in Settings; use the PC’s **LAN IP** (not `localhost`); allow **inbound TCP 8766** in **Windows Defender Firewall** (Private profile) or your host antivirus firewall; strong password — [docs/SECURITY.md](docs/SECURITY.md) |
 | Mod version badge | Update **`FS25_FarmDashboard.zip`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases) |
+| Questions & community | [Discord](https://discord.gg/D4sEHM59) — chat, screenshots, quick help |
 
 ---
 
@@ -130,4 +133,4 @@ CI on `main` runs tests, electron-pack verify, and i18n verify — see [`.github
 
 **FarmHub License** — free for personal and non-commercial use; **commercial use requires permission** from the authors (see [LICENSE](LICENSE)). Copyright **JoshWalki** & **WizardlyPayload** — [docs/AUTHORS.md](docs/AUTHORS.md).
 
-Optional maintenance tips for the desktop app: [Ko-fi](https://ko-fi.com/wizarlypayload) (not required — Farm Dashboard stays free).
+**Community:** [Discord](https://discord.gg/D4sEHM59) · optional maintenance tips: [Ko-fi](https://ko-fi.com/wizarlypayload) (not required — Farm Dashboard stays free).

@@ -168,6 +168,30 @@ export function resolveStoreImageExact(storeImage) {
   return null;
 }
 
+/** When the mod omits storeImage, guess the FS25 store icon token from the vehicle XML basename. */
+export function deriveStoreImageHint(vehicle) {
+  const direct = vehicle?.storeImage;
+  if (direct != null && String(direct).trim() !== "") {
+    return String(direct).trim();
+  }
+  const cfg = String(vehicle?.configFileName || vehicle?.filename || "")
+    .replace(/\\/g, "/")
+    .trim();
+  const base = cfg.split("/").pop()?.replace(/\.xml$/i, "");
+  if (!base) return null;
+
+  const tokens = new Set([`store_${base.toLowerCase()}`]);
+  const underscored = base.replace(/([a-z])([A-Z0-9])/g, "$1_$2").toLowerCase();
+  tokens.add(`store_${underscored}`);
+  tokens.add(`icon_${base.toLowerCase()}`);
+  tokens.add(`icon_${underscored}`);
+
+  for (const token of tokens) {
+    if (resolveStoreImageExact(token)) return token;
+  }
+  return null;
+}
+
 function buildVehicleImageCacheKey(vehicleName, brandName, typeName) {
   return `${String(vehicleName ?? "")}\0${String(brandName ?? "")}\0${String(typeName ?? "")}`;
 }
@@ -200,6 +224,12 @@ function vehicleCardFingerprint(vehicle) {
     isVehicleAdsOverdue(vehicle) ? 1 : 0,
     getWorstAdsInspectionSeverity(vehicle),
     hasVisibleAdsBreakdowns(vehicle) ? 1 : 0,
+    String(vehicle.storeImage || "").toLowerCase(),
+    String(vehicle.configFileName || vehicle.filename || "")
+      .replace(/\\/g, "/")
+      .split("/")
+      .pop()
+      ?.toLowerCase() || "",
   ].join(":");
 }
 
@@ -255,23 +285,26 @@ export async function refreshShopImageFilenamesFromApi(dashboardInstance) {
   try {
     const r = await fetch("/api/item-image-filenames");
     const data = await r.json();
-    window.__farmdashShopImageFilenames = [
-      ...(Array.isArray(data?.items) ? data.items : []),
-      ...(Array.isArray(data?.modExtract) ? data.modExtract : []),
-    ];
+    const nextItems = Array.isArray(data?.items) ? data.items : [];
+    const nextMod = Array.isArray(data?.modExtract) ? data.modExtract : [];
+    window.__farmdashShopImageFilenames = [...nextItems, ...nextMod];
     if (dashboardInstance && typeof dashboardInstance.setShopImageFilenames === "function") {
       dashboardInstance.setShopImageFilenames({
-        items: data.items || [],
-        modExtract: data.modExtract || [],
+        items: nextItems,
+        modExtract: nextMod,
       });
-      if (typeof dashboardInstance.renderVehicleCards === "function") {
-        dashboardInstance.renderVehicleCards(dashboardInstance.vehicles || []);
+      dashboardInstance._lastVehicleCardsFingerprint = "";
+      if (dashboardInstance.currentSection === "vehicles") {
+        if (typeof dashboardInstance.applyVehicleFilters === "function") {
+          dashboardInstance.applyVehicleFilters();
+        } else if (typeof dashboardInstance.renderVehicleCards === "function") {
+          dashboardInstance.renderVehicleCards(
+            normalizeVehicleList(dashboardInstance.vehicles)
+          );
+        }
       }
     } else {
-      primeShopImageFilenames({
-        items: data.items || [],
-        modExtract: data.modExtract || [],
-      });
+      primeShopImageFilenames({ items: nextItems, modExtract: nextMod });
       clearVehicleImageMatchCaches(null);
     }
     return data;
@@ -835,6 +868,7 @@ export function showVehiclesSection() {
     }
     this.bindVehiclesScrollPerf();
     this.loadVehicles();
+    void refreshShopImageFilenamesFromApi(this);
     return;
   }
 
@@ -2342,7 +2376,9 @@ export async function loadVehicles() {
       const filtered = allVehicles.filter((v) =>
         vehicleMatchesActiveFarm(v, farmId)
       );
-      const displayVehicles = filtered.filter((v) => !this.isStorageItem(v));
+      const displayVehicles = filtered.filter(
+        (v) => !this.isStorageItem(v) && !isUsedEquipmentYardStock(v)
+      );
       const nextFp = vehicleListUiFingerprint(displayVehicles);
       const sameFleet =
         nextFp === this._lastVehicleCardsFingerprint &&
@@ -2376,7 +2412,8 @@ export function updateVehicleSummaryCards() {
   const displayVehicles = vehicles.filter(
     (v) =>
       vehicleMatchesActiveFarm(v, this.activeFarmId || 1) &&
-      !this.isStorageItem(v)
+      !this.isStorageItem(v) &&
+      !isUsedEquipmentYardStock(v)
   );
   const totalCount = displayVehicles.length;
 
@@ -2431,7 +2468,7 @@ export function renderVehicleCards(vehicles) {
 
   // Filter out storage items (pallets and bigBags) from display
   const displayVehicles = vehicles.filter(
-    (vehicle) => !this.isStorageItem(vehicle)
+    (vehicle) => !this.isStorageItem(vehicle) && !isUsedEquipmentYardStock(vehicle)
   );
 
   if (displayVehicles.length === 0) {
@@ -2499,7 +2536,7 @@ export function createVehicleCard(vehicle) {
         vehicle.storeName ||
         vehicle.vehicleYears?.storeName ||
         null,
-      storeImage: vehicle.storeImage || null,
+      storeImage: deriveStoreImageHint(vehicle),
     }
   );
 
@@ -2800,6 +2837,15 @@ export function getDamageBarColor(damagePercentage) {
 }
 
 /**
+ * Used Equipment Yards mod listing stock — spawned for sale, not player fleet.
+ * Flagged in VehicleDataCollector via UsedEquipmentYards.vehicleToItem when the mod is loaded.
+ */
+export function isUsedEquipmentYardStock(vehicle) {
+  if (!vehicle || typeof vehicle !== "object") return false;
+  return vehicle.isUsedEquipmentYardStock === true;
+}
+
+/**
  * Pallets, big bags, and liquid bulk containers (IBCs) — tracked as vehicles/placeables in game data.
  * Match typeName, display name, and filename so items are not missed when typeName is "unknown".
  */
@@ -2939,7 +2985,8 @@ export function applyVehicleFilters() {
   let filteredVehicles = normalizeVehicleList(this.vehicles).filter(
     (v) =>
       vehicleMatchesActiveFarm(v, this.activeFarmId || 1) &&
-      !this.isStorageItem(v)
+      !this.isStorageItem(v) &&
+      !isUsedEquipmentYardStock(v)
   );
 
   // Apply type filter with improved matching
@@ -3033,7 +3080,8 @@ export function filterVehiclesBySummaryCard(filterType) {
   let filteredVehicles = normalizeVehicleList(this.vehicles).filter(
     (v) =>
       vehicleMatchesActiveFarm(v, this.activeFarmId || 1) &&
-      !this.isStorageItem(v)
+      !this.isStorageItem(v) &&
+      !isUsedEquipmentYardStock(v)
   );
 
   switch (filterType) {

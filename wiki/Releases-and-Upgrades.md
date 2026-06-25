@@ -5,7 +5,7 @@
 | Asset | Version |
 |-------|---------|
 | `FS25-Farm-Dashboard-Setup-4.2.0.exe` | App **4.2.0** |
-| `FS25_FarmDashboard.zip` | Mod **3.4.0.0** |
+| `FS25_FarmDashboard.zip` | Mod **3.4.0.6** |
 
 **Download:** [GitHub Releases](https://github.com/WizardlyPayload/FarmHub/releases)
 
@@ -33,7 +33,7 @@ Detail: [CHANGELOG.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs
 
 ## Upgrading from public FS25-Farm-Dashboard (2.0.0)
 
-1. Replace mod with **`FS25_FarmDashboard.zip` (3.4.0.0)**; load each save once.
+1. Replace mod with **`FS25_FarmDashboard.zip` (3.4.0.6)**; load each save once.
 2. Install app **4.2.0** (or update via in-app updater from **4.0.x / 4.1.x**).
 3. Re-check **Settings → Servers & saves**.
 

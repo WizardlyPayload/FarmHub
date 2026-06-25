@@ -422,20 +422,40 @@ function VehicleDataCollector:isVehicleYearsLoaded()
 end
 
 function VehicleDataCollector:_resolveStoreItem(vehicle)
-    if not vehicle or not _G.g_storeManager or not _G.g_storeManager.getItemByXMLFilename then
+    if not vehicle then return nil end
+    if vehicle.storeItem and vehicle.storeItem.imageFilename then
+        return vehicle.storeItem
+    end
+    if not _G.g_storeManager or not _G.g_storeManager.getItemByXMLFilename then
         return nil
     end
     local configFile = vehicle.configFileName
+    if configFile == nil and vehicle.filename then
+        configFile = vehicle.filename
+    end
     if configFile == nil and vehicle.getConfigFileName then
         local ok, fn = pcall(function() return vehicle:getConfigFileName() end)
         if ok then configFile = fn end
     end
     if not configFile then return nil end
-    local ok, item = pcall(function()
-        return _G.g_storeManager:getItemByXMLFilename(configFile)
-    end)
-    if ok then return item end
-    return nil
+
+    local function tryLookup(path)
+        if not path or path == "" then return nil end
+        local ok, item = pcall(function()
+            return _G.g_storeManager:getItemByXMLFilename(path)
+        end)
+        if ok and item then return item end
+        local norm = string.gsub(path, "\\", "/")
+        if norm ~= path then
+            ok, item = pcall(function()
+                return _G.g_storeManager:getItemByXMLFilename(norm)
+            end)
+            if ok and item then return item end
+        end
+        return nil
+    end
+
+    return tryLookup(configFile)
 end
 
 function VehicleDataCollector:_decadeFromModelYear(year)
@@ -549,6 +569,16 @@ function VehicleDataCollector:ensureVehicleTable()
 end
 
 --- Best-effort liveness check before touching specs on a multi-frame snapshot entry.
+--- FS25_UsedEquipmentYards: yard listing stock is a real Vehicle in the world but not player fleet.
+function VehicleDataCollector:_isUsedEquipmentYardStock(vehicle)
+    if vehicle == nil then return false end
+    local uey = rawget(_G, "UsedEquipmentYards")
+    if uey == nil or type(uey.vehicleToItem) ~= "table" then
+        return false
+    end
+    return uey.vehicleToItem[vehicle] ~= nil
+end
+
 function VehicleDataCollector:_isVehicleAlive(vehicle)
     if vehicle == nil then return false end
     -- Skip half-spawned entries (AccessHandler / Courseplay expect full vehicle methods).
@@ -745,6 +775,10 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
     elseif vehicle.getConfigFileName then
         local okCfg, cfgFn = pcall(function() return vehicle:getConfigFileName() end)
         if okCfg and cfgFn then vData.configFileName = cfgFn end
+    end
+
+    if self:_isUsedEquipmentYardStock(vehicle) then
+        vData.isUsedEquipmentYardStock = true
     end
 
     return vData

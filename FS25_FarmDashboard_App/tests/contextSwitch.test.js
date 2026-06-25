@@ -83,6 +83,25 @@ describe("stripVolatile: heartbeat fields don't bust dedupe", () => {
     );
     expect(a).toBe(b);
   });
+
+  test("identical body with fresh lua export => different key", () => {
+    const base = {
+      ...sampleBody,
+      dataSource: "merged",
+      luaAvailable: true,
+      dataTimestamps: { lastLuaReceivedAt: "2026-06-23T12:00:00.000Z" },
+    };
+    const a = computePayloadDedupeKey(base, 1, "srv-A");
+    const b = computePayloadDedupeKey(
+      {
+        ...base,
+        dataTimestamps: { lastLuaReceivedAt: "2026-06-23T12:01:00.000Z" },
+      },
+      1,
+      "srv-A"
+    );
+    expect(a).not.toBe(b);
+  });
 });
 
 describe("Bootstrap-retry: clearing dedupe state lets identical payloads re-render", () => {

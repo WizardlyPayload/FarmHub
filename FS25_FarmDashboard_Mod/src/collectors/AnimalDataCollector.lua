@@ -58,6 +58,41 @@ local function _packBaseClusterKey(c)
     return sti * 1073741824 + ageDecile * 4194304 + male * 2097152 + mix
 end
 
+--- Resolve breed/subtype name from engine cluster row (base game often has subTypeIndex only).
+local function _resolveClusterSubType(c)
+    if not c then return "UNKNOWN" end
+    local direct = c.subType
+    if type(direct) == "string" and direct ~= "" and direct ~= "UNKNOWN" and direct ~= "Unknown" then
+        return direct
+    end
+    local sti = tonumber(c.subTypeIndex)
+    if sti and sti > 0 then
+        local sys = (_G.g_currentMission and _G.g_currentMission.animalSystem) or _G.g_animalManager
+        if sys and sys.getSubTypeByIndex then
+            local ok, st = pcall(function() return sys:getSubTypeByIndex(sti) end)
+            if ok and st and type(st.name) == "string" and st.name ~= "" then
+                return st.name
+            end
+        end
+    end
+    if c.fillType ~= nil then
+        if type(c.fillType) == "string" and c.fillType ~= "" then
+            return c.fillType
+        end
+        if type(c.fillType) == "number" and _G.g_fillTypeManager then
+            local ok, ft = pcall(function() return g_fillTypeManager:getFillTypeByIndex(c.fillType) end)
+            if ok and ft and ft.name then return ft.name end
+        end
+    end
+    return "UNKNOWN"
+end
+
+local function _avgFromSum(sum, count)
+    if type(count) ~= "number" or count <= 0 then return nil end
+    if type(sum) ~= "number" or sum <= 0 then return nil end
+    return sum / count
+end
+
 local function _scaleRlSampledBuckets(st)
     local sc = st.rlScale or 1
     if sc <= 1 then return end
@@ -451,7 +486,7 @@ function AnimalDataCollector:_walkBase(clusters, st, rowsLeft)
     while st.clusterIdx <= n and processed < rowsLeft do
         local c = clusters[keys[st.clusterIdx]]
         if c and type(c.numAnimals) == "number" and c.numAnimals > 0 then
-            local subType = tostring(c.subType or c.fillType or "UNKNOWN")
+            local subType = _resolveClusterSubType(c)
             local subTypeIndex = c.subTypeIndex or 0
             local ageMonths = math.floor(c.age or 0)
             local ageDecile = math.floor(ageMonths / 12)
@@ -621,9 +656,11 @@ function AnimalDataCollector:_finalizePen(placeable, st)
                 isPregnant    = b.isPregnant,
                 isLactating   = b.isLactating,
                 count         = b.count,
-                avgWeight     = (b.count > 0) and (b.sumWeight / b.count) or 0,
-                avgHealth     = (b.count > 0) and (b.sumHealth / b.count) or 0,
             }
+            local avgW = _avgFromSum(b.sumWeight, b.count)
+            local avgH = _avgFromSum(b.sumHealth, b.count)
+            if avgW ~= nil then entry.avgWeight = avgW end
+            if avgH ~= nil then entry.avgHealth = avgH end
             if b.sumGenFert ~= nil then
                 entry.avgGenFert       = (b.count > 0) and (b.sumGenFert       / b.count) or 0
                 entry.avgGenProd       = (b.count > 0) and (b.sumGenProd       / b.count) or 0
@@ -672,7 +709,60 @@ function AnimalDataCollector:_finalizePen(placeable, st)
         row.numOfAnimalsReported = numA
     end
 
+    self:_collectConsumptionData(placeable, row)
+
     return row
+end
+
+--- Daily food/water/straw use (L/day) for pasture duration estimates in the dashboard.
+function AnimalDataCollector:_collectConsumptionData(placeable, row)
+    if not placeable or not row then return end
+
+    local heads = tonumber(row.animalCount) or tonumber(row.numOfAnimalsReported) or 0
+    if heads <= 0 then return end
+
+    local out = {
+        foodPerDay = 0,
+        waterPerDay = 0,
+        strawPerDay = 0,
+        foodEstimated = false,
+        waterEstimated = false,
+        strawEstimated = false,
+    }
+
+    local function litersPerDayFromSpec(spec)
+        if not spec then return 0 end
+        local lph = tonumber(spec.litersPerHour)
+        if lph and lph > 0 then return lph * 24 end
+        local lpd = tonumber(spec.litersPerDay)
+        if lpd and lpd > 0 then return lpd end
+        return 0
+    end
+
+    out.foodPerDay = litersPerDayFromSpec(placeable.spec_husbandryFood)
+    out.waterPerDay = litersPerDayFromSpec(placeable.spec_husbandryWater)
+    out.strawPerDay = litersPerDayFromSpec(placeable.spec_husbandryStraw)
+
+    if out.foodPerDay <= 0 and placeable.getDailyFoodConsumption then
+        local ok, v = pcall(function() return placeable:getDailyFoodConsumption() end)
+        if ok and type(v) == "number" and v > 0 then out.foodPerDay = v end
+    end
+
+    -- Vanilla / RL fallback when the engine has not refreshed litersPerHour this slice.
+    if out.foodPerDay <= 0 then
+        out.foodPerDay = heads * 20
+        out.foodEstimated = true
+    end
+    if out.waterPerDay <= 0 then
+        out.waterPerDay = heads * 30
+        out.waterEstimated = true
+    end
+    if out.strawPerDay <= 0 then
+        out.strawPerDay = heads * 5
+        out.strawEstimated = true
+    end
+
+    row.consumptionData = out
 end
 
 function AnimalDataCollector:_getPosition(placeable)
@@ -771,13 +861,19 @@ function AnimalDataCollector:collectPenDetail(placeable)
             else
                 local n = (type(c.numAnimals) == "number") and c.numAnimals or 0
                 if n > 0 then
+                    local subType = _resolveClusterSubType(c)
+                    local healthValue = c.health
+                    if type(healthValue) == "number" and healthValue <= 2 then
+                        healthValue = healthValue * 100
+                    end
                     out.animals[#out.animals + 1] = {
                         id          = (out.id or 0) * 1000 + nextId,
-                        name        = tostring(c.subType or c.fillType or "Cluster"),
-                        subType     = c.subType,
+                        name        = (subType ~= "UNKNOWN") and subType or tostring(c.fillType or "Cluster"),
+                        subType     = subType,
                         subTypeIndex = c.subTypeIndex,
                         age         = c.age or 0,
-                        weight      = c.weight or 0,
+                        health      = healthValue,
+                        weight      = c.weight,
                         gender      = c.gender or "Unknown",
                         type        = "cluster",
                         count       = n,

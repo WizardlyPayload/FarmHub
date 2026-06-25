@@ -1,4 +1,4 @@
-// FS25 FarmDashboard | redTape.js | v1.1.0
+// FS25 FarmDashboard | redTape.js | v1.2.0
 // FS25_RedTape — rendered inside Economy when the mod export is active.
 
 import { t } from "../i18n/i18n.js";
@@ -94,6 +94,54 @@ function schemeList(schemes, emptyKey) {
       </li>`;
     })
     .join("")}</ul>`;
+}
+
+function cropCell(label) {
+  const text = label && String(label).trim() ? String(label) : "—";
+  return `<td>${escapeHtml(text)}</td>`;
+}
+
+/** Harvest history table (matches in-game Red Tape crop rotation columns). */
+export function buildCropRotationTableHTML(cropRotation) {
+  const rows = Array.isArray(cropRotation) ? cropRotation : [];
+  if (rows.length === 0) {
+    return `<p class="text-muted small mb-0">${escapeHtml(t("redtape.noCropRotation"))}</p>`;
+  }
+  const body = rows
+    .map((row) => {
+      const crops = Array.isArray(row.crops) ? row.crops : [];
+      const fid = row.farmlandId != null ? row.farmlandId : "—";
+      return `<tr>
+        <td>${escapeHtml(t("redtape.farmlandLabel", { id: fid }))}</td>
+        ${cropCell(crops[0])}
+        ${cropCell(crops[1])}
+        ${cropCell(crops[2])}
+        ${cropCell(crops[3])}
+        ${cropCell(crops[4])}
+      </tr>`;
+    })
+    .join("");
+  return `<div class="table-responsive">
+    <table class="table table-sm table-dark mb-0 small">
+      <thead><tr>
+        <th>${t("redtape.colFarmland")}</th>
+        <th>${t("redtape.colCropPrev4")}</th>
+        <th>${t("redtape.colCropPrev3")}</th>
+        <th>${t("redtape.colCropPrev2")}</th>
+        <th>${t("redtape.colCropPrev1")}</th>
+        <th>${t("redtape.colCropRecent")}</th>
+      </tr></thead>
+      <tbody>${body}</tbody>
+    </table>
+  </div>`;
+}
+
+function cropRotationBlock(cropRotation) {
+  return `
+    <div class="card bg-dark border-secondary mb-3">
+      <div class="card-header"><strong>${t("redtape.cropRotationTitle")}</strong></div>
+      <div class="card-body">${buildCropRotationTableHTML(cropRotation)}</div>
+    </div>`;
 }
 
 function taxBlock(tax) {
@@ -199,6 +247,7 @@ export function buildRedTapeTabHTML(dashboard) {
       <div class="card-header"><strong>${t("redtape.policiesTitle")}</strong></div>
       <div class="card-body">${policyTable(farm.policies)}</div>
     </div>
+    ${cropRotationBlock(farm.cropRotation)}
     <div class="row">
       <div class="col-md-6 mb-3">
         <div class="card bg-dark border-secondary h-100">

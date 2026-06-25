@@ -218,6 +218,9 @@ local function _finalizeFillTypeNames(data)
         end
         data.stock.fillTypeCatalog = catalog
         data.fillTypeCatalog = catalog
+        if rawget(_G, "InventoryScan") and InventoryScan.applyStockMoistureToExport then
+            InventoryScan.applyStockMoistureToExport(data.stock)
+        end
     end
 
     if type(data.economy) == "table" and data.economy.marketPrices then
@@ -1914,6 +1917,18 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
     data.adsSummary = self:buildAdsSummary(mc.vehicles)
     data.vehicleYearsSummary = self:buildVehicleYearsSummary(mc.vehicles, data.gameTime)
 
+    data.collectorModules = {
+        animals = self.config.enableAnimals ~= false,
+        vehicles = self.config.enableVehicles ~= false,
+        fields = self.config.enableFields ~= false,
+        finance = self.config.enableFinance ~= false,
+        weather = self.config.enableWeather ~= false,
+        economy = self.config.enableEconomy ~= false,
+        production = self.config.enableProduction ~= false,
+        stock = self.config.enableStock ~= false,
+        redTape = self.config.enableRedTape ~= false,
+    }
+
     self.data = data
     return data
 end
@@ -2368,7 +2383,7 @@ function FarmDashboardDataCollector:runIncrementalActiveStep(order)
             self.moduleCache.production.husbandryTotals = {}
             self:finishModuleSlice("production", order, true)
         end
-    else
+    elseif name ~= "production" then
         self.moduleCache[name] = payload or {}
     end
 

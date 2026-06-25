@@ -1,6 +1,6 @@
 # Screenshots (manifest + capture checklist)
 
-PNG files for [USER_MANUAL.md](./USER_MANUAL.md) and [INSTALL.md](./INSTALL.md) live in [screenshots/](./screenshots/). After adding images, run python tools/embed-manual-screenshots.py from the repo root.
+PNG files for [USER_MANUAL.md](./USER_MANUAL.md) and [INSTALL.md](./INSTALL.md) live in [screenshots/](./screenshots/). After adding images, run `python tools/map-all-screenshots.py` then `python tools/discard-unused-screenshots.py` from the repo root. Spare captures land in [`screenshots/discard/`](./screenshots/discard/) (gitignored).
 
 ---
 
@@ -108,8 +108,12 @@ For **[manual]** captures, follow the recipe in each row below and drop the PNG 
 | 71 | `fd-section-fields-045-moisture-weeds.png` | §6.4 | manual | Field card — moisture badge + weed alert + rules |
 | 72 | `fd-section-fields-046-monitor-harvest.png` | §6.4 | manual | Field card — monitor toward harvest |
 | 73 | `fd-reference-pda-map.png` | §6.8 | manual | In-game PDA map (reference only) |
+| 74 | `fd-section-fields-047-grass-windrow.png` | §6.4 | manual | Field card — grass windrow volume + tedder/bale suggestion |
+| 75 | `fd-modal-065-pen-detail.png` | §7.6 | auto | Pen detail modal — animals in one pen (cluster / LOD rows) |
+| 76 | `fd-modal-071-pen-information.png` | §7.7 | auto | Pen information modal — 3D preview + capacity |
+| 77 | `fd-section-productions-020-empty.png` | §6.7 | auto | Productions empty state (collector off or no buildings) |
 
-**Not in the user manual** (edge / empty / failure UI — users should not see these if setup is correct): `fd-section-fields-070-waiting`, `fd-section-fields-080-api-error`, `fd-section-productions-020-empty`, `fd-modal-030-refresh-data`, `fd-modal-040-data-changes`, `fd-modal-050-warning-details`.
+**Not in the user manual** (edge / empty / failure UI — users should not see these if setup is correct): `fd-section-fields-070-waiting`, `fd-section-fields-080-api-error`, `fd-modal-030-refresh-data`, `fd-modal-040-data-changes`, `fd-modal-050-warning-details`.
 
 ---
 
@@ -136,8 +140,15 @@ For **[manual]** captures, follow the recipe in each row below and drop the PNG 
 | `fd-section-economy-021-consumables-inventory.png` | Economy — bale stock + lime big bags *(extra; add to manifest row if desired)* |
 | `fd-section-economy-030-market.png` | Economy — market prices by crop |
 | `fd-section-pastures-010-summary.png` | Pastures — summary row + first pasture cards |
-| `fd-section-pastures-020-cards.png` | Pastures — additional shed cards + warnings |
+| `fd-section-pastures-020-cards.png` | Pastures — shed cards + active warnings (lactating / low health) |
 | `fd-section-productions-010-list.png` | Productions — input/output storage + inactive slots |
+| `fd-section-productions-020-empty.png` | Productions — empty state when collector off or no chains |
+| `fd-modal-065-pen-detail.png` | Livestock — pen detail modal for cluster rows |
+| `fd-modal-071-pen-information.png` | Pastures — pen information (3D + capacity) |
+| `fd-section-fields-047-grass-windrow.png` | Fields — grass windrow + tedder/bale rules |
+| `fd-shell-020-landing.png` | Landing — six section cards (Riverbend Springs, Live API) |
+| `fd-setup-080-launch-button.png` | Setup — Server Manager with multiple local saves |
+| `fd-section-economy-040-storage-tab.png` | Economy → Storage — resolved fill types + expandable silo rows |
 | `fd-modal-100-mod-export.png` | Import mod images — skip-heavy conversion log |
 | `fd-modal-101-mod-import-progress.png` | Import mod images — mid-batch progress *(extra)* |
 | `fd-settings-010-dashboard-toggles.png` | Settings → Dashboard — sections, updates, hide parcels |
@@ -152,13 +163,13 @@ For **[manual]** captures, follow the recipe in each row below and drop the PNG 
 | `fd-setup-050-add-ftp.png` | Setup — Add dedicated server (FTP + HTTP feed) |
 | `reference-home-network-topology.png` | Home network diagram (pfSense / switches / APs) |
 
-**On disk (2026-05-28 audit):** **56** manifest `fd-*` PNGs + **13** extra `Screenshot …` files (installer steps, errors, spare field cards — not wired into the manual) + `reference-home-network-topology.png`.
+**On disk (2026-06-25 audit):** **60** manifest `fd-*` PNGs + **~120** extra `Screenshot …` files (installer steps, duplicates, in-game-only, speed tests — not wired into the manual) + `reference-home-network-topology.png`.
 
-**Embedded in [`USER_MANUAL.md`](./USER_MANUAL.md) / [`INSTALL.md`](./INSTALL.md):** **69** inline images (2026-06-12, v4.1 feature pass).
+**Embedded in [`USER_MANUAL.md`](./USER_MANUAL.md) / [`INSTALL.md`](./INSTALL.md):** **74** inline images (2026-06-25, v4.2 screenshot pass).
 
-**Not in this manual:** edge/failure UI (waiting, API error, empty productions, refresh/data-changes/warning modals); **farm selection** modal (multi-farm edge case); **tablet LAN** shots (`fd-lan-020`, `fd-lan-030`) — planned for a separate **LAN & tablet** guide; see [`SECURITY.md`](./SECURITY.md) until then.
+**Not in this manual:** edge/failure UI (waiting, API error, refresh/data-changes/warning modals); **farm selection** modal (multi-farm edge case); **tablet LAN** shots (`fd-lan-020`, `fd-lan-030`) — planned for a separate **LAN & tablet** guide; see [`SECURITY.md`](./SECURITY.md) until then.
 
-Workflow: drop PNGs with exact names → `python tools/map-all-screenshots.py` (if still named `Screenshot …`) → `python tools/embed-manual-screenshots.py`.
+Workflow: drop PNGs with exact names → `python tools/map-all-screenshots.py` (if still named `Screenshot …`) → `python tools/discard-unused-screenshots.py` → `python tools/embed-manual-screenshots.py`.
 
 **Resolution:** confirm desktop shots are **1920 × 1080** before release; re-capture any that are not.
 
@@ -346,7 +357,9 @@ None of the standard modals are captured yet except mod import (`fd-modal-100`).
 | `fd-modal-010-notifications.png` | Click **bell** → notification history |
 | `fd-modal-020-export-livestock.png` | Livestock → **Export Data** (or export flow) |
 | `fd-modal-060-animal-details.png` | Livestock row → **Details** |
+| `fd-modal-065-pen-detail.png` | Cluster / LOD livestock row → **Details** (pen detail) |
 | `fd-modal-070-pasture-livestock.png` | Pastures card → **Livestock** |
+| `fd-modal-071-pen-information.png` | Pastures card → **Details** |
 | `fd-modal-080-vehicle-image.png` | Vehicles → open vehicle image / enlarge |
 | `fd-modal-090-weather.png` | Click **weather** pill → forecast modal |
 | `fd-modal-110-farm-selection.png` | Farm dropdown / farm selection when multiple farms |

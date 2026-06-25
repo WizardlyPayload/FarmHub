@@ -2,13 +2,24 @@
 // Farm-wide fill-type stock — Economy → Storage tab (in-game commodity table layout).
 
 import { t } from "../i18n/i18n.js";
+
+/** Persist expanded commodity rows across live data refreshes (~10s). */
+const expandedStockRowKeys = new Set();
+
+function stockRowKey(item, idx) {
+  const ft = Number(item?.fillTypeIndex) || 0;
+  if (ft > 0) return `idx:${ft}`;
+  const name = String(item?.fillType || "").trim().toUpperCase();
+  if (name) return `name:${name}`;
+  return `row:${idx}`;
+}
 import {
   buildMoistureEnvironmentHtml,
   buildBaleMoistureSummaryHtml,
   formatMoisturePercent,
   moistureGradeLabel,
 } from "./moisture.js";
-import { resolveStockItemFillType, mergeFillTypeCatalog } from "./fillTypeResolve.js";
+import { resolveStockItemFillType, mergeFillTypeCatalog, lookupFillTypeNameFromEconomy } from "./fillTypeResolve.js";
 
 const DISPLAY_NAMES = {
   WHEAT: "Wheat",
@@ -231,15 +242,48 @@ function cropKeyForItem(item) {
   return "";
 }
 
+/** economy.xml names that differ from silo / UI labels (e.g. hay is DRYGRASS in save XML). */
+const ECONOMY_CROP_ALIASES = {
+  HAY: ["DRYGRASS", "DRYGRASS_WINDROW"],
+  DRYGRASS_WINDROW: ["DRYGRASS"],
+};
+
+function lookupCropByName(crops, name) {
+  if (!name || !crops || typeof crops !== "object") return null;
+  const upper = String(name).toUpperCase();
+  if (crops[upper]) return crops[upper];
+  if (crops[name]) return crops[name];
+  const found = Object.entries(crops).find(
+    ([cropName]) => String(cropName).toUpperCase() === upper
+  );
+  if (found) return found[1];
+  for (const alt of ECONOMY_CROP_ALIASES[upper] || []) {
+    const hit = lookupCropByName(crops, alt);
+    if (hit) return hit;
+  }
+  return null;
+}
+
 function findCropForItem(item, economy) {
-  const key = cropKeyForItem(item);
   const crops = economy?.marketPrices?.crops || {};
-  if (key && crops[key]) return crops[key];
+  const key = cropKeyForItem(item);
   if (key) {
-    const found = Object.entries(crops).find(
-      ([name]) => name.toUpperCase() === key
+    const byName = lookupCropByName(crops, key);
+    if (byName) return byName;
+  }
+  const idx = Number(item?.fillTypeIndex);
+  if (Number.isFinite(idx)) {
+    const byIdx = Object.values(crops).find(
+      (crop) => Number(crop?.fillTypeIndex) === idx
     );
-    if (found) return found[1];
+    if (byIdx) return byIdx;
+    const catalogName =
+      economy?.fillTypeCatalog?.[String(idx)] ||
+      economy?.marketPrices?.fillTypesByIndex?.[String(idx)];
+    if (catalogName) {
+      const byCatalog = lookupCropByName(crops, catalogName);
+      if (byCatalog) return byCatalog;
+    }
   }
   return null;
 }
@@ -257,6 +301,8 @@ function bestCropLocationPrice(crop) {
 function resolvePricePer1000(item, crop) {
   const fromCrop = bestCropLocationPrice(crop);
   if (fromCrop > 0) return fromCrop;
+  const fromXmlAvg = Number(crop?.avgXmlPrice) || Number(crop?.avgPrice) || 0;
+  if (fromXmlAvg > 0) return fromXmlAvg;
   const modPrice = Number(item?.bestSellPrice) || 0;
   if (modPrice > 0) {
     return modPrice < 50 ? modPrice * 1000 : modPrice;
@@ -278,6 +324,18 @@ function resolveStationName(item, crop) {
     );
     const top = sorted[0];
     if (top?.name && top.name !== "Market Base Prices") return top.name;
+    if (
+      top?.name === "Market Base Prices" &&
+      (Number(top.price) || 0) > 0
+    ) {
+      return top.name;
+    }
+  }
+  if (
+    crop?.bestLocation === "Market Base Prices" &&
+    bestCropLocationPrice(crop) > 0
+  ) {
+    return crop.bestLocation;
   }
   return null;
 }
@@ -292,7 +350,6 @@ function computeValue(liters, pricePer1000) {
 /** Resolve numeric fill types and back-fill sell hints from economy market data. */
 export function enrichStockItem(item, stock, economy, rootCatalog) {
   const out = { ...item, locations: normalizeLocations(item?.locations) };
-  const idx = Number(out.fillTypeIndex);
   const catalog = mergeFillTypeCatalog(
     rootCatalog,
     stock?.fillTypeCatalog,
@@ -318,6 +375,14 @@ export function enrichStockItem(item, stock, economy, rootCatalog) {
     }
   }
   const resolved = resolveStockItemFillType(out, catalog);
+  const idx = Number(resolved.fillTypeIndex);
+  if (idx > 0 && (!resolved.fillType || /^\d+$/.test(String(resolved.fillType).trim()))) {
+    const fromEcon = lookupFillTypeNameFromEconomy(idx, economy);
+    if (fromEcon) {
+      resolved.fillType = fromEcon;
+      catalog[String(idx)] = catalog[String(idx)] || fromEcon;
+    }
+  }
   const crop = findCropForItem(resolved, economy);
   const pricePer1000 = resolvePricePer1000(resolved, crop);
   if (pricePer1000 > 0) {
@@ -343,7 +408,7 @@ export function enrichStockItems(items, stock, economy, rootCatalog) {
     .filter((item) => Number(item.totalLiters) > 0);
 }
 
-function displayFillTypeName(item, catalog) {
+function displayFillTypeName(item, catalog, economy) {
   const idx = Number(item?.fillTypeIndex);
   const cat = catalog && typeof catalog === "object" ? catalog : {};
   let rawKey = "";
@@ -355,6 +420,9 @@ function displayFillTypeName(item, catalog) {
     return formatCommodityLabel(String(item.fillTypeTitle).trim());
   } else if (item?.fillType && !/^\d+$/.test(String(item.fillType).trim())) {
     rawKey = String(item.fillType).trim();
+  } else if (idx > 0 && economy) {
+    const fromEcon = lookupFillTypeNameFromEconomy(idx, economy);
+    if (fromEcon) rawKey = fromEcon;
   }
   if (rawKey) return formatCommodityLabel(rawKey);
   if (idx > 0) return t("storage.fillTypeIndex", { index: idx });
@@ -439,6 +507,16 @@ export function getStockFillTypeCount(stock, farmId) {
   return Array.isArray(row.items) ? row.items.length : 0;
 }
 
+function formatQualityDisplay(loc) {
+  if (loc.qualityPct != null && Number.isFinite(Number(loc.qualityPct))) {
+    return `${Math.round(Number(loc.qualityPct))}%`;
+  }
+  if (loc.grade != null && loc.grade !== "") {
+    return moistureGradeLabel(loc.grade);
+  }
+  return "—";
+}
+
 function locationDetailRows(locations) {
   const list = normalizeLocations(locations);
   if (list.length === 0) {
@@ -455,7 +533,7 @@ function locationDetailRows(locations) {
       .map((loc) => {
         const moist =
           loc.moisturePct != null ? formatMoisturePercent(loc.moisturePct) : "—";
-        const grade = loc.grade != null ? moistureGradeLabel(loc.grade) : "—";
+        const grade = formatQualityDisplay(loc);
         return `<tr>
           <td>${escapeHtml(loc.name || "—")}</td>
           <td>${escapeHtml(loc.kind || "—")}</td>
@@ -467,9 +545,9 @@ function locationDetailRows(locations) {
   </table>`;
 }
 
-function buildCommodityRow(item, idx, catalog) {
-  const rawKey = cropKeyForItem(item) || displayFillTypeName(item, catalog).toUpperCase();
-  const name = escapeHtml(displayFillTypeName(item, catalog));
+function buildCommodityRow(item, idx, catalog, economy) {
+  const rawKey = cropKeyForItem(item) || displayFillTypeName(item, catalog, economy).toUpperCase();
+  const name = escapeHtml(displayFillTypeName(item, catalog, economy));
   const icon = commodityIcon(rawKey);
   const liters = Number(item.totalLiters) || 0;
   const pricePer1000 = item._pricePer1000 ?? resolvePricePer1000(item, item._crop);
@@ -483,9 +561,10 @@ function buildCommodityRow(item, idx, catalog) {
 
   const detailId = `fs-commodity-detail-${idx}`;
   const rowId = `fs-commodity-row-${idx}`;
+  const rowKey = stockRowKey(item, idx);
 
   return `
-    <tr class="fs-commodity-row" id="${rowId}" data-detail-id="${detailId}" tabindex="0"
+    <tr class="fs-commodity-row" id="${rowId}" data-detail-id="${detailId}" data-stock-key="${escapeHtml(rowKey)}" tabindex="0"
         aria-expanded="false" title="${escapeHtml(t("storage.expandRow"))}">
       <td>
         <div class="fs-commodity-name">
@@ -513,9 +592,9 @@ function buildCommodityRow(item, idx, catalog) {
     </tr>`;
 }
 
-function buildCommodityTable(items, catalog) {
+function buildCommodityTable(items, catalog, economy) {
   const sorted = [...items].sort((a, b) =>
-    displayFillTypeName(a, catalog).localeCompare(displayFillTypeName(b, catalog))
+    displayFillTypeName(a, catalog, economy).localeCompare(displayFillTypeName(b, catalog, economy))
   );
 
   return `
@@ -535,7 +614,7 @@ function buildCommodityTable(items, catalog) {
             </tr>
           </thead>
           <tbody>
-            ${sorted.map((item, i) => buildCommodityRow(item, i, catalog)).join("")}
+            ${sorted.map((item, i) => buildCommodityRow(item, i, catalog, economy)).join("")}
           </tbody>
         </table>
       </div>
@@ -553,6 +632,11 @@ function bindCommodityTableInteractions(root) {
     detail.classList.toggle("d-none", !expanded);
     row.setAttribute("aria-expanded", expanded ? "true" : "false");
     row.title = expanded ? t("storage.collapseRow") : t("storage.expandRow");
+    const key = row.dataset?.stockKey;
+    if (key) {
+      if (expanded) expandedStockRowKeys.add(key);
+      else expandedStockRowKeys.delete(key);
+    }
   };
 
   root.querySelectorAll(".fs-commodity-row").forEach((row) => {
@@ -563,6 +647,21 @@ function bindCommodityTableInteractions(root) {
         toggleRow(row);
       }
     });
+  });
+}
+
+function restoreExpandedStockRows(root) {
+  if (!root || expandedStockRowKeys.size === 0) return;
+  root.querySelectorAll(".fs-commodity-row").forEach((row) => {
+    const key = row.dataset?.stockKey;
+    if (!key || !expandedStockRowKeys.has(key)) return;
+    const detailId = row.dataset?.detailId;
+    const detail = detailId ? document.getElementById(detailId) : null;
+    if (!detail) return;
+    row.classList.add("is-expanded");
+    detail.classList.remove("d-none");
+    row.setAttribute("aria-expanded", "true");
+    row.title = t("storage.collapseRow");
   });
 }
 
@@ -584,7 +683,7 @@ export function buildStockPanelHTML(dashboard) {
   const stockBody =
     items.length === 0
       ? `<div class="alert alert-secondary mb-0">${escapeHtml(t("storage.hintEmpty"))}</div>`
-      : buildCommodityTable(items, catalog);
+      : buildCommodityTable(items, catalog, dashboard.economy);
 
   const countLine =
     items.length > 0
@@ -609,5 +708,7 @@ export function renderStockPanel(dashboard) {
   const el = document.getElementById("economy-storage-stock");
   if (!el) return;
   el.innerHTML = buildStockPanelHTML(dashboard);
-  bindCommodityTableInteractions(el.querySelector("#economy-storage-panel-root"));
+  const root = el.querySelector("#economy-storage-panel-root");
+  bindCommodityTableInteractions(root);
+  restoreExpandedStockRows(root);
 }

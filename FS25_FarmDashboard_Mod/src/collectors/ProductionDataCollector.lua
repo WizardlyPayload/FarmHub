@@ -1,13 +1,13 @@
--- FS25 FarmDashboard | ProductionDataCollector.lua | v2.1.0
--- 1) ProductionChainManager:getProductionPointsForFarmId / getFactoriesForFarmId
--- 2) Placeable scan (REQUIRED on many builds): PlaceableProductionPoint.lua has
---    addProductionPoint() commented out — points may never register on the manager.
---    Game UI iterates placeableSystem.placeables + spec_productionPoint (see onBuy).
+-- FS25 FarmDashboard | ProductionDataCollector.lua | v2.2.0
+-- 1) ProductionChainManager: farmIds + productionPoints (map-owned chains on base maps)
+-- 2) Placeable scan: spec_productionPoint / spec_extendedProductionPoint / spec_factory
 
 ProductionDataCollector = {}
 
 local function productionFarmHasHumanPlayers(farm)
-    if not farm or not farm.farmId or farm.farmId <= 0 then return false end
+    if not farm then return false end
+    local fid = tonumber(farm.farmId or farm.id)
+    if not fid or fid <= 0 then return false end
     if farm.players then
         for _ in pairs(farm.players) do
             return true
@@ -17,14 +17,81 @@ local function productionFarmHasHumanPlayers(farm)
     return name ~= ""
 end
 
+local function fillTypeNameSafe(fillTypeIndex)
+    local idx = tonumber(fillTypeIndex)
+    if not idx then return "unknown" end
+    local ftm = rawget(_G, "g_fillTypeManager")
+    if not ftm or not ftm.getFillTypeNameByIndex then return "unknown" end
+    local ok, name = pcall(function() return ftm:getFillTypeNameByIndex(idx) end)
+    if ok and name and tostring(name) ~= "" then return tostring(name) end
+    return "unknown"
+end
+
+--- FS25 base game: spec_productionPoint is often the production point itself (not .productionPoint).
+local function resolveProductionPointFromPlaceable(placeable)
+    if not placeable then return nil end
+    local spec = placeable.spec_productionPoint or placeable.spec_extendedProductionPoint
+    if not spec then return nil end
+    if spec.productionPoint then return spec.productionPoint end
+    if spec.storage or spec.productions or spec.inputFillTypeIds or spec.inputFillTypes
+        or spec.outputFillTypeIds or spec.outputFillTypes or spec.getName then
+        return spec
+    end
+    return nil
+end
+
+--- Owner farm id from placeable / production point (map-owned productions often report 0 until resolved).
+local function resolveProductionOwnerFarmId(placeable, pp, everyone)
+    local candidates = {}
+    local function add(val)
+        local n = tonumber(val)
+        if n and n > 0 and n ~= everyone then
+            table.insert(candidates, n)
+        end
+    end
+    if pp then
+        if pp.getOwnerFarmId then
+            local ok, fid = pcall(function() return pp:getOwnerFarmId() end)
+            if ok then add(fid) end
+        end
+        add(rawget(pp, "ownerFarmId"))
+        add(rawget(pp, "farmId"))
+    end
+    if placeable and placeable.getOwnerFarmId then
+        local ok, fid = pcall(function() return placeable:getOwnerFarmId() end)
+        if ok then add(fid) end
+    end
+    if placeable then
+        add(rawget(placeable, "ownerFarmId"))
+        add(rawget(placeable, "farmId"))
+        local spec = placeable.spec_productionPoint or placeable.spec_extendedProductionPoint
+        if spec then add(rawget(spec, "ownerFarmId")) end
+    end
+    if #candidates > 0 then return candidates[1] end
+    local mission = _G.g_currentMission
+    if mission and mission.getFarmId and (placeable or pp) then
+        local ok, pf = pcall(function() return mission:getFarmId() end)
+        if ok then add(pf) end
+    end
+    if #candidates > 0 then return candidates[1] end
+    return nil
+end
+
 local function productionIsPlayerFarmId(farmId, everyone)
+    farmId = tonumber(farmId)
     if not farmId or farmId <= 0 or farmId == everyone then return false end
     if _G.g_farmManager and _G.g_farmManager.farms then
         for _, farm in pairs(_G.g_farmManager.farms) do
-            if farm and farm.farmId == farmId then
+            local ff = tonumber(farm and (farm.farmId or farm.id))
+            if ff == farmId then
                 return productionFarmHasHumanPlayers(farm)
             end
         end
+    end
+    local mission = _G.g_currentMission
+    if mission and mission.getFarmId then
+        local ok, pf = pcall(function() return mission:getFarmId() end)
+        if ok and tonumber(pf) == farmId then return true end
     end
     return false
 end
@@ -90,7 +157,6 @@ end
 
 function ProductionDataCollector:collectStep(opts)
     if ProductionDataCollector._smState ~= nil then
-        -- Plan v5 B3: state-machine path. Yields gated by _yieldChains/_yieldPlaceables (nil = no-op).
         ProductionDataCollector._yieldChains = nil
         ProductionDataCollector._yieldPlaceables = nil
         local result = ProductionDataCollector._collectImpl(ProductionDataCollector)
@@ -102,7 +168,7 @@ function ProductionDataCollector:collectStep(opts)
     if not ok then
         FarmDashLog.devWarn("ProductionDataCollector coroutine: %s", tostring(a))
         ProductionDataCollector._co = nil
-        return true, { chains = {} }
+        return true, self.lastProductionData or { chains = {} }
     end
     if a == "progress" then
         return false, b or { chains = {} }
@@ -124,6 +190,87 @@ function ProductionDataCollector:collect()
     return self:_collectImpl()
 end
 
+function ProductionDataCollector:_tryAddProductionPoint(result, seenPP, pp, farmId, source, extra)
+    if not pp or seenPP[pp] then return end
+    local fid = tonumber(farmId) or resolveProductionOwnerFarmId(extra and extra.placeable, pp, extra and extra.everyone)
+    if not fid or not productionIsPlayerFarmId(fid, extra and extra.everyone or 0) then return end
+    seenPP[pp] = true
+    local pData = self:collectProductionPointData(pp, fid)
+    if not pData then return end
+    pData.source = source or pData.source
+    if extra then
+        if extra.placeableStoreName then pData.placeableStoreName = extra.placeableStoreName end
+        if extra.placeable and extra.placeable.getName then
+            local ok, pn = pcall(function() return extra.placeable:getName() end)
+            if ok and pn and tostring(pn) ~= "" then pData.name = tostring(pn) end
+        end
+    end
+    table.insert(result.chains, pData)
+    self:_prodYieldAfterChain(result)
+end
+
+function ProductionDataCollector:_tryAddFactory(result, seenFactoryPlaceable, placeable, farmId, source, everyone)
+    if not placeable or seenFactoryPlaceable[placeable] then return end
+    local fid = tonumber(farmId) or resolveProductionOwnerFarmId(placeable, nil, everyone)
+    if not fid or not productionIsPlayerFarmId(fid, everyone) then return end
+    seenFactoryPlaceable[placeable] = true
+    local pData = self:collectFactoryPlaceable(placeable, fid)
+    if not pData then return end
+    pData.source = source or pData.source
+    table.insert(result.chains, pData)
+    self:_prodYieldAfterChain(result)
+end
+
+function ProductionDataCollector:_collectFromProductionChainManager(result, seenPP, seenFactoryPlaceable, everyone)
+    local pcm = _G.g_currentMission and _G.g_currentMission.productionChainManager
+    if not pcm then return end
+
+    if pcm.farmIds then
+        for farmKey, bucket in pairs(pcm.farmIds) do
+            local fid = tonumber(farmKey)
+            if fid and productionIsPlayerFarmId(fid, everyone) and type(bucket) == "table" then
+                for _, pp in ipairs(bucket.productionPoints or {}) do
+                    self:_tryAddProductionPoint(result, seenPP, pp, fid, "chainManager", { everyone = everyone })
+                end
+                for _, placeable in ipairs(bucket.factories or {}) do
+                    self:_tryAddFactory(result, seenFactoryPlaceable, placeable, fid, "chainManager", everyone)
+                end
+            end
+        end
+    end
+
+    if pcm.getProductionPointsForFarmId and _G.g_farmManager and _G.g_farmManager.farms then
+        for _, farm in pairs(_G.g_farmManager.farms) do
+            local fid = tonumber(farm and (farm.farmId or farm.id))
+            if fid and productionFarmHasHumanPlayers(farm) then
+                local points = pcm:getProductionPointsForFarmId(fid) or {}
+                for _, pp in ipairs(points) do
+                    self:_tryAddProductionPoint(result, seenPP, pp, fid, "chainManager", { everyone = everyone })
+                end
+                if pcm.getFactoriesForFarmId then
+                    local factories = pcm:getFactoriesForFarmId(fid) or {}
+                    for _, placeable in ipairs(factories) do
+                        self:_tryAddFactory(result, seenFactoryPlaceable, placeable, fid, "chainManager", everyone)
+                    end
+                end
+            end
+        end
+    end
+
+    for _, pp in ipairs(pcm.productionPoints or {}) do
+        local ok, owner = pcall(function()
+            return pp and pp.getOwnerFarmId and pp:getOwnerFarmId() or rawget(pp, "ownerFarmId")
+        end)
+        if ok and owner and tonumber(owner) and tonumber(owner) ~= everyone then
+            self:_tryAddProductionPoint(result, seenPP, pp, tonumber(owner), "chainManager", { everyone = everyone })
+        end
+    end
+
+    for _, placeable in ipairs(pcm.factories or {}) do
+        self:_tryAddFactory(result, seenFactoryPlaceable, placeable, nil, "chainManager", everyone)
+    end
+end
+
 function ProductionDataCollector:_collectImpl()
     if not _G.g_currentMission then
         return { chains = {} }
@@ -143,83 +290,8 @@ function ProductionDataCollector:_collectImpl()
     local AH = rawget(_G, "AccessHandler")
     local everyone = (AH and AH.EVERYONE) or 0
 
-    local pcm = _G.g_currentMission.productionChainManager
-
-    local function notePP(pp)
-        if pp then seenPP[pp] = true end
-    end
-
-    local function noteFactory(placeable)
-        if placeable then seenFactoryPlaceable[placeable] = true end
-    end
-
-    if pcm then
-        local function addFarmProductions(farmId)
-            if not farmId or farmId == everyone or not productionIsPlayerFarmId(farmId, everyone) then return end
-
-            local points = pcm.getProductionPointsForFarmId and pcm:getProductionPointsForFarmId(farmId) or {}
-            for _, pp in ipairs(points) do
-                notePP(pp)
-                local pData = self:collectProductionPointData(pp, farmId)
-                if pData then
-                    pData.source = "chainManager"
-                    table.insert(result.chains, pData)
-                    self:_prodYieldAfterChain(result)
-                end
-            end
-
-            local factories = pcm.getFactoriesForFarmId and pcm:getFactoriesForFarmId(farmId) or {}
-            for _, placeable in ipairs(factories) do
-                noteFactory(placeable)
-                local pData = self:collectFactoryPlaceable(placeable, farmId)
-                if pData then
-                    pData.source = "chainManager"
-                    table.insert(result.chains, pData)
-                    self:_prodYieldAfterChain(result)
-                end
-            end
-        end
-
-        if _G.g_farmManager and _G.g_farmManager.farms then
-            for _, farm in pairs(_G.g_farmManager.farms) do
-                if farm and farm.farmId and productionFarmHasHumanPlayers(farm) then
-                    addFarmProductions(farm.farmId)
-                end
-            end
-        else
-            if pcm.productionPoints then
-                for _, pp in ipairs(pcm.productionPoints) do
-                    local ok, fid = pcall(function() return pp:getOwnerFarmId() end)
-                    if ok and fid and productionIsPlayerFarmId(fid, everyone) then
-                        notePP(pp)
-                        local pData = self:collectProductionPointData(pp, fid)
-                        if pData then
-                            pData.source = "chainManager"
-                            table.insert(result.chains, pData)
-                            self:_prodYieldAfterChain(result)
-                        end
-                    end
-                end
-            end
-            if pcm.factories then
-                for _, placeable in ipairs(pcm.factories) do
-                    local ok, fid = pcall(function() return placeable:getOwnerFarmId() end)
-                    if ok and fid and productionIsPlayerFarmId(fid, everyone) then
-                        noteFactory(placeable)
-                        local pData = self:collectFactoryPlaceable(placeable, fid)
-                        if pData then
-                            pData.source = "chainManager"
-                            table.insert(result.chains, pData)
-                            self:_prodYieldAfterChain(result)
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    -- Always merge placeables: production points often exist only here (manager add commented in base game).
     ProductionDataCollector._lastResult = result
+    self:_collectFromProductionChainManager(result, seenPP, seenFactoryPlaceable, everyone)
     self:mergePlaceableProductions(result, seenPP, seenFactoryPlaceable, everyone)
 
     self.lastProductionData = result
@@ -235,34 +307,15 @@ function ProductionDataCollector:mergePlaceableProductions(result, seenPP, seenF
 
     for _, placeable in ipairs(ps.placeables) do
         self:_prodYieldPlaceableScan()
-        if placeable and placeable.spec_productionPoint and placeable.spec_productionPoint.productionPoint then
-            local pp = placeable.spec_productionPoint.productionPoint
-            if not seenPP[pp] then
-                local ok, fid = pcall(function() return placeable:getOwnerFarmId() end)
-                if ok and fid and productionIsPlayerFarmId(fid, everyone) then
-                    seenPP[pp] = true
-                    local pData = self:collectProductionPointData(pp, fid)
-                    if pData then
-                        pData.source = "placeable"
-                        if placeable.storeName then
-                            pData.placeableStoreName = placeable.storeName
-                        end
-                        table.insert(result.chains, pData)
-                        self:_prodYieldAfterChain(result)
-                    end
-                end
-            end
-        elseif placeable and placeable.spec_factory and not seenFactoryPlaceable[placeable] then
-            local ok, fid = pcall(function() return placeable:getOwnerFarmId() end)
-            if ok and fid and productionIsPlayerFarmId(fid, everyone) then
-                seenFactoryPlaceable[placeable] = true
-                local pData = self:collectFactoryPlaceable(placeable, fid)
-                if pData then
-                    pData.source = "placeable"
-                    table.insert(result.chains, pData)
-                    self:_prodYieldAfterChain(result)
-                end
-            end
+        local pp = resolveProductionPointFromPlaceable(placeable)
+        if pp then
+            self:_tryAddProductionPoint(result, seenPP, pp, nil, "placeable", {
+                everyone = everyone,
+                placeable = placeable,
+                placeableStoreName = placeable.storeName,
+            })
+        elseif placeable and placeable.spec_factory then
+            self:_tryAddFactory(result, seenFactoryPlaceable, placeable, nil, "placeable", everyone)
         end
     end
 end
@@ -279,14 +332,16 @@ end
 --- Split storage fill levels into input / output using ProductionPoint type maps when available.
 function ProductionDataCollector:fillLevelsFromStorage(pp, data)
     if not pp or not pp.storage or not pp.storage.getFillLevels then return end
-    local levels = pp.storage:getFillLevels()
-    if not levels then return end
+    local ok, levels = pcall(function() return pp.storage:getFillLevels() end)
+    if not ok or not levels then return end
 
     for fillTypeIndex, level in pairs(levels) do
         if type(fillTypeIndex) == "number" and type(level) == "number" then
-            local ftName = _G.g_fillTypeManager:getFillTypeNameByIndex(fillTypeIndex) or "unknown"
-            local isIn = pp.inputFillTypeIds and pp.inputFillTypeIds[fillTypeIndex]
-            local isOut = pp.outputFillTypeIds and pp.outputFillTypeIds[fillTypeIndex]
+            local ftName = fillTypeNameSafe(fillTypeIndex)
+            local isIn = (pp.inputFillTypeIds and pp.inputFillTypeIds[fillTypeIndex])
+                or (pp.inputFillTypes and pp.inputFillTypes[fillTypeIndex])
+            local isOut = (pp.outputFillTypeIds and pp.outputFillTypeIds[fillTypeIndex])
+                or (pp.outputFillTypes and pp.outputFillTypes[fillTypeIndex])
             if isIn then
                 data.inputFillLevels[ftName] = level
             elseif isOut then
@@ -334,6 +389,8 @@ function ProductionDataCollector:collectProductionPointData(pp, farmId)
     if pp.getName then
         local ok, n = pcall(function() return pp:getName() end)
         if ok and n and tostring(n) ~= "" then name = tostring(n) end
+    elseif pp.name and tostring(pp.name) ~= "" then
+        name = tostring(pp.name)
     end
 
     local pid = pp.id or 0
@@ -383,7 +440,7 @@ function ProductionDataCollector:collectProductionPointData(pp, farmId)
             if production.inputs then
                 for _, input in pairs(production.inputs) do
                     table.insert(prodData.inputs, {
-                        fillType = _G.g_fillTypeManager:getFillTypeNameByIndex(input.type) or "unknown",
+                        fillType = fillTypeNameSafe(input.type),
                         recipeAmount = input.amount or 0,
                     })
                 end
@@ -391,7 +448,7 @@ function ProductionDataCollector:collectProductionPointData(pp, farmId)
             if production.outputs then
                 for _, output in pairs(production.outputs) do
                     table.insert(prodData.outputs, {
-                        fillType = _G.g_fillTypeManager:getFillTypeNameByIndex(output.type) or "unknown",
+                        fillType = fillTypeNameSafe(output.type),
                         recipeAmount = output.amount or 0,
                     })
                 end
@@ -427,11 +484,11 @@ function ProductionDataCollector:collectFactoryPlaceable(placeable, farmId)
     }
 
     if spec.storage and spec.storage.getFillLevels then
-        local levels = spec.storage:getFillLevels()
-        if levels then
+        local ok, levels = pcall(function() return spec.storage:getFillLevels() end)
+        if ok and levels then
             for fillTypeIndex, level in pairs(levels) do
                 if type(fillTypeIndex) == "number" and type(level) == "number" then
-                    local ftName = _G.g_fillTypeManager:getFillTypeNameByIndex(fillTypeIndex) or "unknown"
+                    local ftName = fillTypeNameSafe(fillTypeIndex)
                     if placeable.inputFillTypeIdsArray then
                         local isIn = false
                         for _, idx in ipairs(placeable.inputFillTypeIdsArray) do
@@ -464,18 +521,28 @@ function ProductionDataCollector:collectFactoryPlaceable(placeable, farmId)
             }
             if production.inputs then
                 for _, input in pairs(production.inputs) do
-                    local ft = _G.g_fillTypeManager:getFillTypeByIndex(input.type)
+                    local ftm = rawget(_G, "g_fillTypeManager")
+                    local ftName = "unknown"
+                    if ftm and ftm.getFillTypeByIndex then
+                        local ok, ft = pcall(function() return ftm:getFillTypeByIndex(input.type) end)
+                        if ok and ft and ft.name then ftName = ft.name end
+                    end
                     table.insert(prodData.inputs, {
-                        fillType = (ft and ft.name) or "unknown",
+                        fillType = ftName,
                         recipeAmount = input.amount or 0,
                     })
                 end
             end
             if production.outputs then
                 for _, output in pairs(production.outputs) do
-                    local ft = _G.g_fillTypeManager:getFillTypeByIndex(output.type)
+                    local ftm = rawget(_G, "g_fillTypeManager")
+                    local ftName = "unknown"
+                    if ftm and ftm.getFillTypeByIndex then
+                        local ok, ft = pcall(function() return ftm:getFillTypeByIndex(output.type) end)
+                        if ok and ft and ft.name then ftName = ft.name end
+                    end
                     table.insert(prodData.outputs, {
-                        fillType = (ft and ft.name) or "unknown",
+                        fillType = ftName,
                         recipeAmount = output.amount or 0,
                     })
                 end

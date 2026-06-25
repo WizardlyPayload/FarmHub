@@ -25,6 +25,21 @@
   function () {
     var VOLATILE_FIELDS = ["timestamp", "dataTimestamps", "fieldStatusHistory"];
 
+    /** Badge / connection fields — must bust dedupe when live export resumes. */
+    function connectionDedupeSuffix(data) {
+      if (!data || typeof data !== "object") return "";
+      var ts = data.dataTimestamps || {};
+      return [
+        data.dataSource || "",
+        data.luaAvailable ? 1 : 0,
+        data.xmlAvailable ? 1 : 0,
+        ts.lastLuaReceivedAt || "",
+        ts.liveExportStaleAt || "",
+        ts.heldFromSnapshotAt || "",
+        ts.mergeHeldStaleAt || "",
+      ].join("|");
+    }
+
     function stripVolatile(data) {
       if (!data || typeof data !== "object") return {};
       var rest = {};
@@ -52,12 +67,15 @@
         "|" +
         Number(farmId != null ? farmId : 1) +
         "|" +
-        String(serverId != null ? serverId : "")
+        String(serverId != null ? serverId : "") +
+        "|" +
+        connectionDedupeSuffix(data)
       );
     }
 
     return {
       computePayloadDedupeKey: computePayloadDedupeKey,
+      connectionDedupeSuffix: connectionDedupeSuffix,
       stripVolatile: stripVolatile,
       VOLATILE_FIELDS: VOLATILE_FIELDS,
     };

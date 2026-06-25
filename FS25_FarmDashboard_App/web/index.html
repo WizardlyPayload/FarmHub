@@ -571,15 +571,6 @@
           </div>
         </div>
 
-        <div class="modal fade" id="warningModal" tabindex="-1" aria-hidden="true">
-          <div class="modal-dialog modal-lg">
-            <div class="modal-content bg-dark text-light">
-              <div class="modal-header"><h5 class="modal-title" id="warningModalLabel"><i class="bi bi-exclamation-triangle me-2 text-warning"></i><span data-i18n="warning.title">Warning Details</span></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-              <div class="modal-body"><div id="warningDetailsContent"></div></div>
-              <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.close">Close</button></div>
-            </div>
-          </div>
-        </div>
       </div>
 
       <div class="modal fade" id="dataChangesModal" tabindex="-1" aria-hidden="true">
@@ -663,6 +654,16 @@
     </main>
 
     <!-- Must be a direct child of body (not inside <main>): .farm-dash-main uses z-index:1 so modals inside main never stack above #main-navbar (1030). -->
+    <div class="modal fade" id="warningModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light">
+          <div class="modal-header"><h5 class="modal-title" id="warningModalLabel"><i class="bi bi-exclamation-triangle me-2 text-warning"></i><span data-i18n="warning.title">Warning Details</span></h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
+          <div class="modal-body"><div id="warningDetailsContent"></div></div>
+          <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.close">Close</button></div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade" id="animalDetailsModal" tabindex="-1" aria-hidden="true">
       <div class="modal-dialog modal-xl">
         <div class="modal-content bg-dark text-light">
@@ -1048,6 +1049,7 @@
                       <a href="https://github.com/WizardlyPayload/FarmHub" target="_blank" rel="noopener noreferrer" class="farmdash-about-link"><i class="bi bi-github me-1" aria-hidden="true"></i><span data-i18n="settings.aboutLinkGithub">GitHub</span></a>
                       <a href="https://github.com/WizardlyPayload/FarmHub/releases" target="_blank" rel="noopener noreferrer" class="farmdash-about-link"><i class="bi bi-download me-1" aria-hidden="true"></i><span data-i18n="settings.aboutLinkReleases">Releases</span></a>
                       <a href="https://farmdashboard.co.uk" target="_blank" rel="noopener noreferrer" class="farmdash-about-link"><i class="bi bi-globe2 me-1" aria-hidden="true"></i><span data-i18n="settings.aboutLinkWebsite">Website</span></a>
+                      <a href="https://discord.gg/D4sEHM59" target="_blank" rel="noopener noreferrer" class="farmdash-about-link"><i class="bi bi-discord me-1" aria-hidden="true"></i>Discord</a>
                       <a href="https://ko-fi.com/wizarlypayload" target="_blank" rel="noopener noreferrer" class="farmdash-about-link"><i class="bi bi-cup-hot me-1" aria-hidden="true"></i>Ko-fi</a>
                     </div>
                   </div>

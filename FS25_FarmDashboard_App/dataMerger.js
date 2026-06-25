@@ -20,6 +20,7 @@
 const { assessModVersion } = require('./modVersionPolicy.js');
 const { pruneMergedDataToPlayerFarms } = require('./farmScope.cjs');
 const { enrichStockFillTypes } = require('./fillTypeResolve.cjs');
+const { enrichStockMoistureFromXml } = require('./stockMoistureFromXml');
 
 const BALE_LITER_ESTIMATE = 4000;
 const BALE_INDEX_CATEGORY = {
@@ -642,6 +643,20 @@ function inferCatalogFromStockAndFields(stock, fields, catalog, xmlEconomy) {
     return out;
 }
 
+function catalogFromSellPoints(luaData) {
+    const out = {};
+    const sellPoints = luaData?.economy?.marketPrices?.sellPoints;
+    if (!sellPoints || typeof sellPoints !== 'object') return out;
+    for (const station of Object.values(sellPoints)) {
+        if (!station?.prices || typeof station.prices !== 'object') continue;
+        for (const [productName, priceInfo] of Object.entries(station.prices)) {
+            const idx = priceInfo?.fillTypeIndex;
+            if (idx != null) out[String(idx)] = productName;
+        }
+    }
+    return out;
+}
+
 function buildFillTypeCatalog(luaData, xmlEconomy) {
     const lua = luaData || {};
     const base = {
@@ -650,6 +665,7 @@ function buildFillTypeCatalog(luaData, xmlEconomy) {
         ...(lua.economy?.fillTypeCatalog || {}),
         ...(lua.economy?.marketPrices?.fillTypesByIndex || {}),
         ...catalogFromMapCrops(lua, xmlEconomy),
+        ...catalogFromSellPoints(lua),
         ...Object.fromEntries(
             Object.entries(KNOWN_FILL_INDEX_NAMES).map(([idx, name]) => [String(idx), name])
         ),
@@ -712,6 +728,12 @@ function mergeData(luaData, xmlData, options = {}) {
 
     const fillTypeCatalog = buildFillTypeCatalog(luaData, xmlData.economy);
     const stockEnriched = enrichStockFillTypes(luaData.stock, fillTypeCatalog);
+    const stockWithMoisture = enrichStockMoistureFromXml(
+        stockEnriched.stock,
+        xmlData.moistureSystem,
+        xmlData.placeables,
+        stockEnriched.catalog
+    );
 
     const mergedCore = {
         dataSource   : 'merged',
@@ -780,7 +802,7 @@ function mergeData(luaData, xmlData, options = {}) {
         vehicles     : mergeVehicles(toArr(luaData.vehicles), toArr(xmlData.vehicles)),
 
         // Economy — XML history + Lua live sell points
-        economy      : mergeEconomy(luaData.economy || {}, xmlData.economy || {}),
+        economy      : mergeEconomy(luaData.economy || {}, xmlData.economy || {}, fillTypeCatalog),
 
         // Production — Lua only
         production   : luaData.production || { chains: [], husbandryTotals: {} },
@@ -791,7 +813,7 @@ function mergeData(luaData, xmlData, options = {}) {
         fillTypeCatalog: stockEnriched.catalog,
         cropFillTypeIndex: luaData.cropFillTypeIndex || {},
         stock: {
-            ...stockEnriched.stock,
+            ...stockWithMoisture,
             enabled: luaData.stock?.enabled !== false,
             fillTypeCatalog: { ...stockEnriched.catalog },
         },
@@ -872,22 +894,128 @@ function mergeGameTime(luaTime, xmlEnv) {
 
 // ─── weather ──────────────────────────────────────────────────────────────────
 
+function isFiniteWeatherTemp(v) {
+    if (v == null || v === "") return false;
+    const n = Number(v);
+    return Number.isFinite(n);
+}
+
+function forecastDayHasTemps(day) {
+    if (!day || typeof day !== 'object') return false;
+    return isFiniteWeatherTemp(day.minTemperature) || isFiniteWeatherTemp(day.maxTemperature);
+}
+
+function normalizeWeatherSlug(typeName) {
+    if (typeName == null || typeName === '') return 'unknown';
+    const s = String(typeName).trim().toLowerCase().replace(/^weathertype\./i, '');
+    const map = {
+        sun: 'sun',
+        sunny: 'sun',
+        clear: 'sun',
+        partially_cloudy: 'cloudy',
+        partiallycloudy: 'cloudy',
+        cloudy: 'cloudy',
+        overcast: 'cloudy',
+        rain: 'rain',
+        rainy: 'rain',
+        thunder: 'rain',
+        snow: 'snow',
+        snowy: 'snow',
+        fog: 'fog',
+        foggy: 'fog',
+        hail: 'hail',
+    };
+    return map[s] || s;
+}
+
+function synthesizeForecastTemps(currentTemp, dayIndex) {
+    const base = isFiniteWeatherTemp(currentTemp) ? Math.round(currentTemp) : 20;
+    const variation = ((dayIndex * 13 + 7) % 5) - 2;
+    return {
+        minTemperature: base - 5 + variation,
+        maxTemperature: base + 5 + variation,
+    };
+}
+
+/**
+ * XML environment forecast has accurate day/type slots but no temperatures.
+ * Lua collector provides temps — merge instead of replacing wholesale.
+ */
+function mergeForecastDays(luaForecast, xmlForecast, currentTemp) {
+    const lua = Array.isArray(luaForecast) ? luaForecast : [];
+    const xml = Array.isArray(xmlForecast) ? xmlForecast : [];
+
+    if (xml.length === 0) return lua.slice(0, 7);
+    if (!xml.some(forecastDayHasTemps) && lua.some(forecastDayHasTemps)) {
+        return lua.slice(0, 7).map((day, i) => {
+            const x = xml[i];
+            if (!x) return day;
+            return {
+                ...day,
+                day: x.day ?? day.day ?? i + 1,
+                weatherType: normalizeWeatherSlug(x.weatherType || day.weatherType),
+                precipitationChance:
+                    day.precipitationChance ?? x.precipitationChance ?? 0,
+            };
+        });
+    }
+
+    const merged = xml.slice(0, 7).map((xDay, i) => {
+        const lDay = lua[i] || {};
+        let minT = isFiniteWeatherTemp(xDay.minTemperature)
+            ? xDay.minTemperature
+            : lDay.minTemperature;
+        let maxT = isFiniteWeatherTemp(xDay.maxTemperature)
+            ? xDay.maxTemperature
+            : lDay.maxTemperature;
+        if (!isFiniteWeatherTemp(minT) && !isFiniteWeatherTemp(maxT)) {
+            const synth = synthesizeForecastTemps(currentTemp, i + 1);
+            minT = synth.minTemperature;
+            maxT = synth.maxTemperature;
+        } else if (!isFiniteWeatherTemp(minT) && isFiniteWeatherTemp(maxT)) {
+            minT = maxT - 8;
+        } else if (isFiniteWeatherTemp(minT) && !isFiniteWeatherTemp(maxT)) {
+            maxT = minT + 8;
+        }
+        return {
+            day: xDay.day ?? lDay.day ?? i + 1,
+            weatherType: normalizeWeatherSlug(xDay.weatherType || lDay.weatherType),
+            minTemperature: minT,
+            maxTemperature: maxT,
+            precipitationChance:
+                xDay.precipitationChance ?? lDay.precipitationChance ?? 0,
+            allTypes: xDay.allTypes,
+        };
+    });
+
+    if (merged.some(forecastDayHasTemps)) return merged;
+    return lua.length > 0 ? lua.slice(0, 7) : merged;
+}
+
 function mergeWeather(luaWeather, xmlEnv) {
     const base = luaWeather || {};
     if (!xmlEnv) return base;
 
+    const currentTemp = base.currentTemperature;
+    const forecast = mergeForecastDays(
+        base.forecast,
+        xmlEnv.forecast,
+        currentTemp
+    );
+
     return {
-        // Lua provides live temperature; XML provides accurate forecast
-        currentTemperature : base.currentTemperature,
-        currentWeather     : base.currentWeather     || xmlEnv.currentWeather || 'SUN',
+        // Lua provides live temperature; XML provides accurate forecast slots
+        currentTemperature : currentTemp,
+        currentWeather     : normalizeWeatherSlug(
+            base.currentWeather || xmlEnv.currentWeather
+        ),
         currentSeason      : xmlEnv.currentSeason    || 'SPRING',
         windSpeed          : base.windSpeed,
         cloudCoverage      : base.cloudCoverage,
         rainLevel          : base.rainLevel,
         snowLevel          : base.snowLevel,
         timeSinceLastRain  : base.timeSinceLastRain,
-        // XML forecast is authoritative (exact game engine values)
-        forecast           : xmlEnv.forecast?.length > 0 ? xmlEnv.forecast : (base.forecast || []),
+        forecast,
         rawForecast        : xmlEnv.rawForecast || [],
         // MoistureSystem block is live-only; never drop when merging with XML environment.
         moisture           : base.moisture,
@@ -1167,8 +1295,8 @@ function mergeVehicles(luaVehicles, xmlVehicles) {
         const xmlV = k ? takeClosest(xmlByKey.get(k), luaV) : null;
         return {
             ...luaV,
-            ownerFarmId   : luaV.ownerFarmId || xmlV?.farmId || 0,
-            farmId        : luaV.ownerFarmId || xmlV?.farmId || 0,
+            ownerFarmId   : luaV.ownerFarmId ?? xmlV?.farmId ?? 0,
+            farmId        : luaV.ownerFarmId ?? xmlV?.farmId ?? 0,
             price         : luaV.price  || xmlV?.price  || 0,
             age           : luaV.age    || xmlV?.age    || 0,
             uniqueId      : xmlV?.uniqueId || luaV.id,
@@ -1201,9 +1329,10 @@ function mergeVehicles(luaVehicles, xmlVehicles) {
 
 // ─── economy ──────────────────────────────────────────────────────────────────
 
-function mergeEconomy(luaEconomy, xmlEconomy) {
+function mergeEconomy(luaEconomy, xmlEconomy, mergedCatalog = {}) {
     const result = { ...luaEconomy, xmlPriceHistory: xmlEconomy };
     const catalog = {
+        ...(mergedCatalog || {}),
         ...(luaEconomy.fillTypeCatalog || {}),
         ...(luaEconomy.marketPrices?.fillTypesByIndex || {}),
         ...Object.fromEntries(
@@ -1262,19 +1391,117 @@ function mergeEconomy(luaEconomy, xmlEconomy) {
             }
             return null;
         };
+        const applyXmlHistory = (data, hist) => {
+            data.priceHistory = hist.history;
+            data.avgXmlPrice = hist.avgPrice;
+            data.totalHarvested = hist.totalAmount;
+            if (!data.maxPrice) data.maxPrice = hist.maxPrice;
+            if (!data.minPrice) data.minPrice = hist.minPrice;
+            if (!data.avgPrice) data.avgPrice = hist.avgPrice;
+            if (!data.maxPriceMonth) {
+                data.maxPriceMonth = maxMonthFromHistory(hist.history);
+            }
+            const basePrice = Number(hist.avgPrice) || Number(hist.maxPrice) || 0;
+            if (basePrice > 0 && (!Array.isArray(data.locations) || data.locations.length === 0)) {
+                data.locations = [{ name: 'Market Base Prices', price: basePrice }];
+                if (!data.bestLocation) data.bestLocation = 'Market Base Prices';
+            }
+        };
+
         for (const [crop, data] of Object.entries(luaEconomy.marketPrices.crops)) {
             const hist = xmlEconomy[crop] || xmlEconomy[crop.toUpperCase()];
-            if (hist) {
-                data.priceHistory     = hist.history;
-                data.avgXmlPrice      = hist.avgPrice;
-                data.totalHarvested   = hist.totalAmount;
-                if (!data.maxPriceMonth) {
-                    data.maxPriceMonth = maxMonthFromHistory(hist.history);
-                }
+            if (hist) applyXmlHistory(data, hist);
+        }
+
+        const catalogNames = new Set(
+            Object.values(catalog).map((name) => String(name).toUpperCase()).filter(Boolean)
+        );
+        if (!result.marketPrices) {
+            result.marketPrices = { ...(luaEconomy.marketPrices || {}) };
+        }
+        if (!result.marketPrices.crops) {
+            result.marketPrices.crops = { ...(luaEconomy.marketPrices?.crops || {}) };
+        }
+        for (const [cropName, hist] of Object.entries(xmlEconomy || {})) {
+            if (!hist?.history || Object.keys(hist.history).length === 0) continue;
+            const upper = String(cropName).toUpperCase();
+            const inLua = Boolean(
+                result.marketPrices.crops[cropName] || result.marketPrices.crops[upper]
+            );
+            if (!catalogNames.has(upper) && !inLua) continue;
+
+            let data = result.marketPrices.crops[cropName] || result.marketPrices.crops[upper];
+            if (!data) {
+                data = { name: cropName };
+                result.marketPrices.crops[cropName] = data;
+            }
+            applyXmlHistory(data, hist);
+            const idx = Object.entries(catalog).find(
+                ([, name]) => String(name).toUpperCase() === upper
+            )?.[0];
+            if (idx != null && data.fillTypeIndex == null) {
+                data.fillTypeIndex = Number(idx);
             }
         }
     }
     return result;
+}
+
+/** Inject cropRotation from RedTape.xml onto farms that already have live Red Tape data. */
+function redTapeFarmHasLiveSections(farm) {
+    if (!farm || typeof farm !== 'object') return false;
+    if (farm.tier != null && String(farm.tier).trim() !== '') return true;
+    const lists = [
+        farm.policies,
+        farm.activeSchemes,
+        farm.availableSchemes,
+        farm.grants,
+        farm.events,
+        farm.tax?.statements,
+    ];
+    return lists.some((list) => Array.isArray(list) && list.length > 0);
+}
+
+function mergeRedTapeCropRotation(luaRedTape, xmlHarvest) {
+    const base =
+        luaRedTape && typeof luaRedTape === 'object'
+            ? { ...luaRedTape, byFarm: { ...(luaRedTape.byFarm || {}) } }
+            : { enabled: false, byFarm: {} };
+    const xmlByFarm = xmlHarvest?.byFarm;
+    const allRows = Array.isArray(xmlHarvest?.allRows) ? xmlHarvest.allRows : [];
+    const hasAssigned = xmlByFarm && Object.values(xmlByFarm).some((rows) => Array.isArray(rows) && rows.length > 0);
+
+    const applyRows = (farmKey, existing, rows) => {
+        if (!Array.isArray(rows) || rows.length === 0) return;
+        if (!redTapeFarmHasLiveSections(existing)) return;
+        const luaRows = existing.cropRotation;
+        if (Array.isArray(luaRows) && luaRows.length > 0) return;
+        base.byFarm[farmKey] = { ...existing, cropRotation: rows };
+    };
+
+    if (xmlByFarm && typeof xmlByFarm === 'object') {
+        for (const [farmKey, rows] of Object.entries(xmlByFarm)) {
+            applyRows(farmKey, base.byFarm[farmKey] || {}, rows);
+        }
+    }
+
+    if (!hasAssigned && allRows.length > 0) {
+        for (const farmKey of Object.keys(base.byFarm)) {
+            applyRows(farmKey, base.byFarm[farmKey] || {}, allRows);
+        }
+    }
+
+    return base;
+}
+
+function supplementRedTapeCropRotation(merged, xmlHarvest) {
+    if (!merged || typeof merged !== 'object') return merged;
+    const redTape = mergeRedTapeCropRotation(merged.redTape, xmlHarvest);
+    return { ...merged, redTape };
+}
+
+function buildRedTapeFromXmlHarvest(xmlHarvest) {
+    return { enabled: false, byFarm: {} };
 }
 
 // ─── single-source fallbacks ──────────────────────────────────────────────────
@@ -1365,10 +1592,14 @@ function buildFromXmlOnly(xml) {
 module.exports = {
     mergeData,
     mergeVehicles,
+    mergeRedTapeCropRotation,
+    supplementRedTapeCropRotation,
     buildFieldLiveFingerprints,
     buildFillTypeCatalog,
     deriveBaleInventoryFromStock,
     enrichBaleInventoryFromStock,
     supplementOnFieldFromFields,
     mergeBaleInventory,
+    mergeWeather,
+    mergeForecastDays,
 };

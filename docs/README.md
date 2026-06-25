@@ -27,4 +27,4 @@
 
 Planning notes, audits, i18n pipeline, old release copy, and engine reference text live under **[`_internal/`](./_internal/)** — not required for end users.
 
-**Versions:** App **4.2.0** · Mod **3.4.0.0** · Build scripts: [../tools/README.md](../tools/README.md)
+**Versions:** App **4.2.0** · Mod **3.4.0.6** · Build scripts: [../tools/README.md](../tools/README.md)

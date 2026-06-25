@@ -211,7 +211,7 @@ export function showPasturesSection() {
                       <div class="card-body text-center">
                           <h5 class="card-title">${t("pastures.avgHealth")}</h5>
                           <h2 class="display-4" id="pasture-avg-health">0%</h2>
-                          <small class="d-block text-light-emphasis" id="pasture-low-health-count">0 low-health</small>
+                          <small class="d-block text-light-emphasis" id="pasture-low-health-count">${t("pastures.summary.lowHealthCount", { count: 0 })}</small>
                       </div>
                   </div>
               </div>
@@ -2346,7 +2346,9 @@ export function updatePastureDisplay() {
   if (birthWarningsEl) birthWarningsEl.textContent = totalBirthWarnings;
   if (pastureHealthEl) pastureHealthEl.textContent = avgHealth + "%";
   if (lowHealthCountEl) {
-    lowHealthCountEl.textContent = `${lowHealthAnimals.length} low-health`;
+    lowHealthCountEl.textContent = t("pastures.summary.lowHealthCount", {
+      count: lowHealthAnimals.length,
+    });
   }
 
   // Update pastures list (only if pastures container exists)

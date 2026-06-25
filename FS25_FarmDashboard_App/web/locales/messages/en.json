@@ -427,6 +427,7 @@
   "pastures.activeLivestock": "Active Livestock",
   "pastures.birthWarnings": "Birth Warnings",
   "pastures.avgHealth": "Avg Health",
+  "pastures.summary.lowHealthCount": "{{count}} low-health",
   "pastures.overview": "Pasture Overview",
   "pastures.viewAllLivestock": "View All Livestock",
   "pastures.emptyPenHint": "No animals in this pen.",

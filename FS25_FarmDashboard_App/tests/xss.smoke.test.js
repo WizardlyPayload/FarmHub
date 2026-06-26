@@ -115,7 +115,7 @@ describe("livestock.js: table cells escape game-sourced labels", () => {
   const text = readFile("web/assests/js/modules/livestock.js");
   test("formatAnimalType column wrapped with _safe in main row builder", () => {
     expect(text).toMatch(
-      /_safe\(this\.formatAnimalType\(animal\.subType \|\| t\("common\.unknown"\)\)\)/
+      /_safe\(this\.formatAnimalType\(resolveAnimalSubTypeRaw\(animal\) \|\| t\("common\.unknown"\)\)\)/
     );
   });
   test("formatLocation escapes location text and type for badge/title", () => {

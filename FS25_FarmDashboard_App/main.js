@@ -60,8 +60,10 @@ const { loadServerCache, saveServerCache, appendFieldHistory } = require('./serv
 const { initAppUpdater, checkForUpdatesNow } = require('./app-updater');
 const {
     collectFs25DocumentRoots,
+    collectFs25ModsDirectories,
     collectFarmDashboardModSettingsRoots,
     selectPreferredFs25UserDataRoot,
+    selectPreferredFs25ModsDirectory,
 } = require('./fs25Paths');
 const { readFileUtf8WithRetryAsync } = require('./fileReadRetry');
 const {
@@ -294,7 +296,9 @@ async function runExportModStoreImages(progressSender) {
         return { ok: false, error: err };
     }
 
-    const modsRoot = path.join(getFs25DocumentsRoot(), 'mods');
+    const modsRoot = selectPreferredFs25ModsDirectory(getElectronDocumentsPath)
+        || path.join(getFs25DocumentsRoot(), 'mods');
+    const modsRootsChecked = collectFs25ModsDirectories(getElectronDocumentsPath);
     const outputDir = resolveModStoreImagesOutputDir();
     try {
         await fs.promises.mkdir(outputDir, { recursive: true });
@@ -462,6 +466,12 @@ async function runExportModStoreImages(progressSender) {
     const failed = summary.ddsConvertFailed || 0;
 
     const detailLines = [
+        `Mods folder scanned:`,
+        summary.modsRoot || modsRoot,
+        modsRootsChecked.length > 1
+            ? `(Also checked ${modsRootsChecked.length - 1} other candidate folder(s); used the one with mod content.)`
+            : null,
+        '',
         `New exports this run: ${n}`,
         skippedExisting > 0 ? `Already exported (skipped; run PowerShell with -Force to overwrite): ${skippedExisting}` : null,
         `PNG copied (source was already PNG): ${png}`,
@@ -481,6 +491,14 @@ async function runExportModStoreImages(progressSender) {
     if (n === 0 && skippedExisting === 0) {
         boxType = 'warning';
         msg = 'No matching shop/icon textures were found under your FS25 mods folder.';
+        if ((summary.topLevelModFolders ?? 0) === 0 && (summary.zipArchivesScanned ?? 0) === 0) {
+            detailLines.push(
+                '',
+                'The scanned folder appears empty (no mod .zip files or unpacked mod folders).',
+                'If you use FSG Mod Assistant, your active collection is usually set via modsDirectoryOverride in gameSettings.xml — Farm Dashboard follows that path when present.',
+                'In FSG Mod Assistant, confirm the active collection is enabled and launch the game once so gameSettings.xml is updated.'
+            );
+        }
     } else if (n === 0 && skippedExisting > 0) {
         msg = `Nothing new to export. ${skippedExisting} texture(s) were already in the output folder (skipped).`;
     } else {
@@ -869,15 +887,7 @@ expressApp.get('/api/map-overview-image', async (req, res) => {
         return res.status(400).json({ ok: false, error: 'missing_map_id' });
     }
     try {
-        const modsRoots = collectFs25DocumentRoots(getElectronDocumentsPath)
-            .map((root) => path.join(root, 'mods'))
-            .filter((p) => {
-                try {
-                    return fs.existsSync(p);
-                } catch (_) {
-                    return false;
-                }
-            });
+        const modsRoots = collectFs25ModsDirectories(getElectronDocumentsPath);
         const modsRoot = modsRoots[0] || path.join(getFs25DocumentsRoot(), 'mods');
         const result = await resolveMapOverviewImage({ mapId, mapTitle, modsRoot, modsRoots });
         if (!result.ok) {

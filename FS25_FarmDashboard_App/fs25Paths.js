@@ -85,6 +85,168 @@ function collectFs25DocumentRoots(getDocumentsPath) {
 }
 
 /**
+ * Read modsDirectoryOverride from gameSettings.xml (FSG Mod Assistant / custom mod collections).
+ * @returns {string|null} Absolute path to the active mods folder, or null.
+ */
+function readModsDirectoryOverride(fs25Root) {
+    const gs = path.join(fs25Root, 'gameSettings.xml');
+    if (!fs.existsSync(gs)) return null;
+    let raw;
+    try {
+        raw = fs.readFileSync(gs, 'utf8');
+    } catch (_) {
+        return null;
+    }
+    const attr = raw.match(/\bmodsDirectoryOverride\s*=\s*"([^"]*)"/i);
+    const inner = raw.match(/<modsDirectoryOverride[^>]*>([^<]*)<\/modsDirectoryOverride>/is);
+    const val = (attr && attr[1]) || (inner && inner[1]);
+    if (!val || !String(val).trim()) return null;
+    let p = String(val).trim().replace(/\//g, path.sep);
+    try {
+        if (!path.isAbsolute(p)) {
+            p = path.resolve(fs25Root, p);
+        }
+        p = path.normalize(p);
+        if (!fs.existsSync(p)) return null;
+        return p;
+    } catch (_) {
+        return null;
+    }
+}
+
+/** True when a folder looks like an FS25 mods directory (zips or unpacked modDesc.xml at top level). */
+function looksLikeModsDirectory(dir) {
+    if (!dir || typeof dir !== 'string') return false;
+    try {
+        if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return false;
+    } catch (_) {
+        return false;
+    }
+    try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
+        for (const e of entries) {
+            if (e.isFile() && e.name.toLowerCase().endsWith('.zip')) return true;
+            if (e.isDirectory()) {
+                try {
+                    if (fs.existsSync(path.join(dir, e.name, 'modDesc.xml'))) return true;
+                } catch (_) { /* ignore */ }
+            }
+        }
+    } catch (_) { /* ignore */ }
+    return false;
+}
+
+/**
+ * Rough content score so we pick a populated mods folder over an empty default tree.
+ * @param {string} modsDir
+ * @returns {number}
+ */
+function scoreModsDirectory(modsDir) {
+    if (!modsDir || typeof modsDir !== 'string') return 0;
+    try {
+        if (!fs.existsSync(modsDir) || !fs.statSync(modsDir).isDirectory()) return 0;
+    } catch (_) {
+        return 0;
+    }
+    let score = 1;
+    try {
+        const entries = fs.readdirSync(modsDir, { withFileTypes: true });
+        let zips = 0;
+        let folders = 0;
+        for (const e of entries) {
+            if (e.isFile() && e.name.toLowerCase().endsWith('.zip')) {
+                zips++;
+                if (zips >= 100) break;
+            } else if (e.isDirectory()) {
+                folders++;
+                if (folders >= 100) break;
+            }
+        }
+        score += zips * 2 + folders;
+    } catch (_) { /* ignore */ }
+    return score;
+}
+
+/**
+ * Candidate mods folders for one FS25 user-data root (override, default mods/, or collection root).
+ * @param {string} fs25Root
+ * @returns {string[]}
+ */
+function resolveModsDirectoryCandidatesForRoot(fs25Root) {
+    if (!fs25Root || typeof fs25Root !== 'string') return [];
+    const out = [];
+    const seen = new Set();
+    const add = (p) => {
+        if (!p || typeof p !== 'string') return;
+        try {
+            const k = pathKey(p);
+            if (seen.has(k)) return;
+            seen.add(k);
+            out.push(path.normalize(p));
+        } catch (_) { /* ignore */ }
+    };
+
+    const gs = path.join(fs25Root, 'gameSettings.xml');
+    if (fs.existsSync(gs)) {
+        const override = readModsDirectoryOverride(fs25Root);
+        if (override) add(override);
+        add(path.join(fs25Root, 'mods'));
+        return out;
+    }
+    if (looksLikeModsDirectory(fs25Root)) {
+        add(fs25Root);
+        return out;
+    }
+    add(path.join(fs25Root, 'mods'));
+    return out;
+}
+
+/**
+ * All plausible FS25 mods directories (deduped, highest content score first).
+ * Honors modsDirectoryOverride (FSG Mod Assistant collections) and MS Store paths.
+ * @param {() => string | null | undefined} [getDocumentsPath]
+ * @returns {string[]}
+ */
+function collectFs25ModsDirectories(getDocumentsPath) {
+    const roots = collectFs25DocumentRoots(getDocumentsPath);
+    const overrideKeys = new Set();
+    for (const root of roots) {
+        const override = readModsDirectoryOverride(root);
+        if (override) overrideKeys.add(pathKey(override));
+    }
+
+    const seen = new Set();
+    const scored = [];
+    for (const root of roots) {
+        for (const candidate of resolveModsDirectoryCandidatesForRoot(root)) {
+            const k = pathKey(candidate);
+            if (seen.has(k)) continue;
+            seen.add(k);
+            let score = scoreModsDirectory(candidate);
+            if (overrideKeys.has(k)) score += 1000;
+            scored.push({ path: candidate, score });
+        }
+    }
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((x) => x.path);
+}
+
+/**
+ * Best mods folder for scanning (override/collection with content beats empty default mods/).
+ * @param {() => string | null | undefined} [getDocumentsPath]
+ * @returns {string|null}
+ */
+function selectPreferredFs25ModsDirectory(getDocumentsPath) {
+    const dirs = collectFs25ModsDirectories(getDocumentsPath);
+    for (const d of dirs) {
+        try {
+            if (fs.existsSync(d)) return d;
+        } catch (_) { /* ignore */ }
+    }
+    return dirs[0] || null;
+}
+
+/**
  * If gameSettings.xml points mods elsewhere (modsDirectoryOverride), include that FS25 root too.
  */
 function appendRootsFromGameSettingsXml(fs25Root, derivedOut, seenKeys) {
@@ -254,8 +416,14 @@ function collectFarmDashboardModSettingsRoots(getDocumentsPath) {
 
 module.exports = {
     collectFs25DocumentRoots,
+    collectFs25ModsDirectories,
     collectFarmDashboardModSettingsRoots,
     collectMsStoreLocalCacheRoots,
+    looksLikeModsDirectory,
+    readModsDirectoryOverride,
+    resolveModsDirectoryCandidatesForRoot,
     scoreFs25UserDataRoot,
+    scoreModsDirectory,
     selectPreferredFs25UserDataRoot,
+    selectPreferredFs25ModsDirectory,
 };

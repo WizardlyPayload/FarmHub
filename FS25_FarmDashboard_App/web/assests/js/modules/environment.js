@@ -16,11 +16,13 @@ function removeLegacyModRequiredBanner() {
 
 const LUA_EXPORT_STALE_MS = 90_000;
 
-function isLuaExportStale(lastLuaReceivedAt, nowMs = Date.now()) {
+function isLuaExportStale(lastLuaReceivedAt, nowMs = Date.now(), staleMs = LUA_EXPORT_STALE_MS) {
   if (!lastLuaReceivedAt) return true;
   const parsed = Date.parse(String(lastLuaReceivedAt));
   if (Number.isNaN(parsed)) return true;
-  return nowMs - parsed > LUA_EXPORT_STALE_MS;
+  const windowMs = Number(staleMs);
+  const limit = Number.isFinite(windowMs) && windowMs > 0 ? windowMs : LUA_EXPORT_STALE_MS;
+  return nowMs - parsed > limit;
 }
 
 /**
@@ -32,7 +34,8 @@ export function resolveNavbarConnectionBadge(state = {}) {
   const src = state.dataSource || "unknown";
   const ts = state.dataTimestamps || {};
   const nowMs = Number(state.nowMs) || Date.now();
-  const luaStale = isLuaExportStale(ts.lastLuaReceivedAt, nowMs);
+  const staleMs = Number(ts.luaExportStaleMs) || LUA_EXPORT_STALE_MS;
+  const luaStale = isLuaExportStale(ts.lastLuaReceivedAt, nowMs, staleMs);
   const gameLive = !!state.luaAvailable && !luaStale && src !== "xml_only";
 
   if (src === "unknown" && !state.luaAvailable && !state.xmlAvailable) {
@@ -79,7 +82,8 @@ function scheduleNavbarBadgeFreshnessRefresh(dashboard) {
   if (!lastLua) return;
   const parsed = Date.parse(String(lastLua));
   if (Number.isNaN(parsed)) return;
-  const remaining = parsed + LUA_EXPORT_STALE_MS - Date.now();
+  const staleMs = Number(ts.luaExportStaleMs) || LUA_EXPORT_STALE_MS;
+  const remaining = parsed + staleMs - Date.now();
   if (remaining <= 0) return;
   _navbarBadgeStaleTimer = setTimeout(() => {
     _navbarBadgeStaleTimer = null;

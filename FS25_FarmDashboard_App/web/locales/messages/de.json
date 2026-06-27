@@ -1,6 +1,10 @@
 {
   "page.title": "Farm-Dashboard",
   "splash.loading": "Ihre Farmdaten werden geladen …",
+  "demo.splashHint": "Die Live-Daten sind noch nicht eingetroffen – drücken Sie in wenigen Sekunden die Aktualisierungstaste (F5), falls dieser Bildschirm leer bleibt.",
+  "demo.dataWaitTitle": "Live-Daten sind noch nicht eingetroffen.",
+  "demo.dataWaitHint": "Drücken Sie in Ihrem Browser auf Aktualisieren (F5) – die Demo kann beim ersten Besuch einen Moment dauern.",
+  "demo.dataWaitRefresh": "Seite aktualisieren",
   "nav.brand": "Farm-Dashboard",
   "nav.loading": "Lädt...",
   "nav.dataSource": "Datenquelle",

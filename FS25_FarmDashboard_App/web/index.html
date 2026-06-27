@@ -64,6 +64,10 @@
         try {
           var h = String(location.hostname || "").toLowerCase();
           var local = !h || h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]";
+          if (h === "demo.farmdashboard.co.uk") {
+            document.body.classList.add("farmdash-public-demo");
+            document.body.classList.add("farmdash-demo-data-pending");
+          }
           if (!local) {
             document.body.classList.add("farmdash-remote-viewer");
             window.__farmDashRemoteViewer = true;
@@ -105,7 +109,19 @@
           <div class="farm-splash-progress mx-auto">
             <div id="farm-splash-progress-bar" class="farm-splash-progress-bar"></div>
           </div>
+          <p class="farm-splash__demo-hint farmdash-public-demo-only text-warning small mt-3 mb-0" data-i18n="demo.splashHint">
+            Live data hasn&apos;t arrived yet — press Refresh (F5) in a few seconds if this screen stays empty.
+          </p>
         </div>
+      </div>
+    </div>
+
+    <div id="farmdash-demo-data-wait" class="farmdash-demo-data-wait farmdash-public-demo-only" role="status" aria-live="polite" aria-hidden="true">
+      <div class="farmdash-demo-data-wait__panel">
+        <i class="bi bi-arrow-clockwise fs-2 text-farm-accent mb-2" aria-hidden="true"></i>
+        <h2 class="h5 text-white mb-2" data-i18n="demo.dataWaitTitle">Live data hasn&apos;t arrived yet</h2>
+        <p class="text-muted small mb-3" data-i18n="demo.dataWaitHint">Press Refresh in your browser (F5) — the demo can take a moment on the first visit.</p>
+        <button type="button" class="btn btn-farm-accent btn-sm" id="farmdash-demo-refresh-btn" data-i18n="demo.dataWaitRefresh">Refresh page</button>
       </div>
     </div>
     

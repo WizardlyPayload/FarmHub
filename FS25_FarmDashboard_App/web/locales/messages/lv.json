@@ -1,6 +1,10 @@
 {
   "page.title": "Lauksaimniecības informācijas panelis",
   "splash.loading": "Notiek jūsu saimniecības datu ielāde…",
+  "demo.splashHint": "Tiešraides dati vēl nav saņemti — ja šis ekrāns paliek tukšs, pēc dažām sekundēm nospiediet taustiņu Atsvaidzināt (F5).",
+  "demo.dataWaitTitle": "Tiešraides dati vēl nav saņemti.",
+  "demo.dataWaitHint": "Pārlūkprogrammā nospiediet pogu Atsvaidzināt (F5) — demonstrācijas palaišana pirmajā apmeklējuma reizē var aizņemt kādu brīdi.",
+  "demo.dataWaitRefresh": "Atsvaidzināt lapu",
   "nav.brand": "Saimniecības panelis",
   "nav.loading": "Notiek ielāde...",
   "nav.dataSource": "Datu avots",

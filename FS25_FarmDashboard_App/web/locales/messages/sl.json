@@ -1,6 +1,10 @@
 {
   "page.title": "Nadzorna plošča za kmetijstvo",
   "splash.loading": "Nalaganje podatkov o vaši kmetiji …",
+  "demo.splashHint": "Podatki v živo še niso prispeli – če ta zaslon ostane prazen, čez nekaj sekund pritisnite Osveži (F5).",
+  "demo.dataWaitTitle": "Podatki v živo še niso prispeli",
+  "demo.dataWaitHint": "Pritisnite Osveži v brskalniku (F5) – predstavitev lahko ob prvem obisku traja nekaj časa.",
+  "demo.dataWaitRefresh": "Osveži stran",
   "nav.brand": "Kmetijska plošča",
   "nav.loading": "Nalaganje ...",
   "nav.dataSource": "Vir podatkov",

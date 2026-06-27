@@ -101,12 +101,16 @@ export function formatGenderLabel(gender) {
   return t("livestock.genderUnknown");
 }
 
-export function fmtAgeMonthsStr(m) {
+export function roundAgeMonths(m) {
   const n = Number(m);
-  if (!Number.isFinite(n)) return t("livestock.fmtAgeMonths", { months: 0 });
-  const rounded =
-    Math.abs(n - Math.round(n)) < 0.001 ? Math.round(n) : Math.round(n * 10) / 10;
-  return t("livestock.fmtAgeMonths", { months: rounded });
+  if (!Number.isFinite(n)) return 0;
+  return Math.abs(n - Math.round(n)) < 0.001
+    ? Math.round(n)
+    : Math.round(n * 10) / 10;
+}
+
+export function fmtAgeMonthsStr(m) {
+  return t("livestock.fmtAgeMonths", { months: roundAgeMonths(m) });
 }
 
 export function fmtWeightKgStr(w, decimals = 1) {

@@ -169,9 +169,9 @@ Restart game.
 
 ## Updates
 
-- **Check for updates:** Settings → Dashboard (needs packaged build + GitHub Releases)
-- **3.9 → 4.0:** see [UPDATER_QA.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/_internal/UPDATER_QA.md)
-- Manual: download latest `.exe` from Releases
+- **Check for updates:** Settings → Dashboard (needs packaged build + GitHub Releases with **`latest.yml`**)
+- **4.0.x / 4.1.x → 4.2.0:** in-app updater when release is **Published**; always replace **mod zip** on every host
+- Manual: download **`FS25-Farm-Dashboard-Setup-4.2.0.exe`** + **`FS25_FarmDashboard.zip`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases)
 
 ---
 
@@ -240,12 +240,23 @@ Uninstall app separately if needed.
 
 ---
 
+## Fleet, storage & dedicated server
+
+| Symptom | Fix |
+|---------|-----|
+| **Extra vehicles on fleet (dealership demos)** | Showroom floor stock on a player farm — especially after buying a **new farm** on dedicated. Update to app **4.2.0** + mod **3.4.0.6**, restart the app. |
+| **Fill type shows as `Fill type #147` (or similar)** | Update to **4.2.0** / mod **3.4.0.6**. Enable **Economy collector** in ESC → Settings → Farm Dashboard. |
+| **Productions / Storage empty** | Enable **Production** and **Economy** collectors in-game (defaults can be off on existing saves). Wait one export cycle (~60s). |
+| **Duplicate vehicles on fleet** | Requires **4.1.5+** merge; confirm mod **3.4.0.6** on the server. |
+
+---
+
 ## Still stuck?
 
 Open a [GitHub Issue](https://github.com/WizardlyPayload/FarmHub/issues) with:
 
 - FS25 version, SP vs dedicated
-- App **4.1.0**, mod **3.1.0.0**
+- App **4.2.0**, mod **3.4.0.6**
 - Local vs FTP
 - Steps + screenshots
 

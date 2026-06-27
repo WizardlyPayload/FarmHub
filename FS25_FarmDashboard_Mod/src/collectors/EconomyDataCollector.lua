@@ -128,6 +128,9 @@ function EconomyDataCollector:_collectImpl()
     
     if rawget(_G, "FillTypeUtils") and FillTypeUtils.rebuildCatalog then
         FillTypeUtils.rebuildCatalog()
+        if FillTypeUtils.probeAllFillTypes then
+            FillTypeUtils.probeAllFillTypes()
+        end
     end
     
     -- Collect all market prices for each sell point
@@ -191,6 +194,17 @@ local function _economyAttachFillTypeMaps(marketData)
     if rawget(_G, "FillTypeUtils") and FillTypeUtils.catalogForJson then
         for idx, name in pairs(FillTypeUtils.catalogForJson()) do
             marketData.fillTypesByIndex[tostring(idx)] = name
+        end
+    end
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.catalogTitlesForJson then
+        marketData.fillTypeTitles = FillTypeUtils.catalogTitlesForJson()
+        for idx, title in pairs(marketData.fillTypeTitles) do
+            local key = tostring(idx)
+            if not marketData.fillTypesByIndex[key]
+                or marketData.fillTypesByIndex[key] == ""
+                or tonumber(marketData.fillTypesByIndex[key]) then
+                marketData.fillTypesByIndex[key] = title
+            end
         end
     end
     for _, station in pairs(marketData.sellPoints or {}) do

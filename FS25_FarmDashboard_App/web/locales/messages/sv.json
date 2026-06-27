@@ -1,6 +1,10 @@
 {
   "page.title": "Jordbruksinstrumentpanel",
   "splash.loading": "Laddar dina gårdsdata…",
+  "demo.splashHint": "Livedata har inte anlänt än — tryck på Uppdatera (F5) om några sekunder om skärmen förblir tom.",
+  "demo.dataWaitTitle": "Livedata har inte kommit än",
+  "demo.dataWaitHint": "Tryck på Uppdatera i din webbläsare (F5) — demon kan ta en stund vid första besöket.",
+  "demo.dataWaitRefresh": "Uppdatera sidan",
   "nav.brand": "Gårdspanel",
   "nav.loading": "Laddar...",
   "nav.dataSource": "Datakälla",

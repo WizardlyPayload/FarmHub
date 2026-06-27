@@ -109,6 +109,14 @@ local function _buildFillTypeCatalog(data)
         for idx, name in pairs(FillTypeUtils.catalog()) do
             put(idx, name)
         end
+        if FillTypeUtils.catalogTitlesForJson then
+            for idx, title in pairs(FillTypeUtils.catalogTitlesForJson()) do
+                local key = tostring(idx)
+                if not catalog[key] or catalog[key] == "" or tonumber(catalog[key]) then
+                    put(idx, title)
+                end
+            end
+        end
     end
 
     local mp = data and data.economy and data.economy.marketPrices
@@ -171,8 +179,34 @@ end
 --- Patch stock + bale payloads with resolved names after all modules have collected.
 local function _finalizeFillTypeNames(data)
     if type(data) ~= "table" then return end
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.enrichFromMissionPlaceables then
+        FillTypeUtils.enrichFromMissionPlaceables()
+    end
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.enrichCatalogFromData then
+        FillTypeUtils.enrichCatalogFromData(data)
+    end
     local catalog = _buildFillTypeCatalog(data)
     data.fillTypeCatalog = catalog
+    data.fillTypeTitles = {}
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.catalogTitlesForJson then
+        data.fillTypeTitles = FillTypeUtils.catalogTitlesForJson()
+    end
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.collectObservedIndices then
+        for idx in pairs(FillTypeUtils.collectObservedIndices(data)) do
+            local key = tostring(idx)
+            if not catalog[key] or catalog[key] == "" or tonumber(catalog[key]) then
+                local name = _resolveFillTypeName(idx, catalog)
+                if not name and FillTypeUtils.displayForIndex then
+                    name = FillTypeUtils.displayForIndex(idx)
+                end
+                if not name and FillTypeUtils.titleForIndex then
+                    name = FillTypeUtils.titleForIndex(idx)
+                end
+                if name then catalog[key] = name end
+            end
+        end
+        data.fillTypeCatalog = catalog
+    end
     if rawget(_G, "FillTypeUtils") and FillTypeUtils.cropIndexMapForJson then
         data.cropFillTypeIndex = FillTypeUtils.cropIndexMapForJson()
     end
@@ -218,6 +252,7 @@ local function _finalizeFillTypeNames(data)
         end
         data.stock.fillTypeCatalog = catalog
         data.fillTypeCatalog = catalog
+        data.stock.fillTypeTitles = data.fillTypeTitles
         if rawget(_G, "InventoryScan") and InventoryScan.applyStockMoistureToExport then
             InventoryScan.applyStockMoistureToExport(data.stock)
         end
@@ -228,9 +263,21 @@ local function _finalizeFillTypeNames(data)
         for idx, name in pairs(catalog) do
             data.economy.marketPrices.fillTypesByIndex[tostring(idx)] = name
         end
+        if data.fillTypeTitles then
+            data.economy.marketPrices.fillTypeTitles = data.fillTypeTitles
+            for idx, title in pairs(data.fillTypeTitles) do
+                local key = tostring(idx)
+                if not data.economy.marketPrices.fillTypesByIndex[key]
+                    or data.economy.marketPrices.fillTypesByIndex[key] == ""
+                    or tonumber(data.economy.marketPrices.fillTypesByIndex[key]) then
+                    data.economy.marketPrices.fillTypesByIndex[key] = title
+                end
+            end
+        end
     end
     if type(data.economy) == "table" then
         data.economy.fillTypeCatalog = catalog
+        data.economy.fillTypeTitles = data.fillTypeTitles or {}
     end
 
     local function fixBaleBucket(bucket)
@@ -2048,7 +2095,7 @@ function FarmDashboardDataCollector:collectorStepUsesCoroutine(name)
 end
 
 function FarmDashboardDataCollector:startModuleSlice(name, order)
-    if (name == "vehicles" or name == "finance") and self:shouldSkipLiveFleetScan() then
+    if (name == "vehicles" or name == "finance") and self:shouldDeferVehicleFleetWork() then
         self:_skipFleetSliceForSpawnGrace(order, name)
         return
     end
@@ -2296,7 +2343,7 @@ end
 function FarmDashboardDataCollector:runIncrementalActiveStep(order)
     local name = self._incActiveModule
     if not name then return end
-    if (name == "vehicles" or name == "finance") and self:shouldSkipLiveFleetScan() then
+    if (name == "vehicles" or name == "finance") and self:shouldDeferVehicleFleetWork() then
         self:_skipFleetSliceForSpawnGrace(order, name)
         return
     end
@@ -3028,30 +3075,38 @@ function FarmDashboardDataCollector:getFarmInfo()
     local farms = {}
     if _G.g_farmManager then
         for _, farm in pairs(_G.g_farmManager.farms) do
-            local farmData = {
-                id      = farm.farmId,
-                farmId  = farm.farmId,
-                name    = farm.name   or ("Farm " .. tostring(farm.farmId)),
-                color   = farm.color  or 0,
-                loan    = farm.loan   or 0,
-                money   = farm.money  or 0,
-                players = {}
-            }
-            farmData.isPlayer = false
-            if farm.players then
-                for _, player in pairs(farm.players) do
+            local farmId = tonumber(farm.farmId) or 0
+            if farmId > 0 then
+                local farmData = {
+                    id      = farmId,
+                    farmId  = farmId,
+                    name    = farm.name   or ("Farm " .. tostring(farmId)),
+                    color   = farm.color  or 0,
+                    loan    = farm.loan   or 0,
+                    money   = farm.money  or 0,
+                    players = {},
+                    isPlayer = false,
+                }
+                if farm.players then
+                    for _, player in pairs(farm.players) do
+                        farmData.isPlayer = true
+                        table.insert(farmData.players, {
+                            name   = player.nickname or "Unknown",
+                            id     = player.userId
+                        })
+                    end
+                end
+                local farmName = farm.name and tostring(farm.name):match("^%s*(.-)%s*$") or ""
+                if not farmData.isPlayer and farmName ~= "" then
                     farmData.isPlayer = true
-                    table.insert(farmData.players, {
-                        name   = player.nickname or "Unknown",
-                        id     = player.userId
-                    })
+                end
+                -- Dedicated MP: only farms with assigned players (excludes 0, 100, empty NPC slots).
+                if farmId == 0 or farmId == 100 then
+                    -- skip contractor pool / unassigned
+                elseif #farmData.players > 0 then
+                    table.insert(farms, farmData)
                 end
             end
-            local farmName = farm.name and tostring(farm.name):match("^%s*(.-)%s*$") or ""
-            if not farmData.isPlayer and farmName ~= "" then
-                farmData.isPlayer = true
-            end
-            table.insert(farms, farmData)
         end
     end
     return farms

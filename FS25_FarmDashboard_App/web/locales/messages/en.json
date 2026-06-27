@@ -1,6 +1,10 @@
 {
   "page.title": "Farming Dashboard",
   "splash.loading": "Loading your farm data…",
+  "demo.splashHint": "Live data hasn't arrived yet — press Refresh (F5) in a few seconds if this screen stays empty.",
+  "demo.dataWaitTitle": "Live data hasn't arrived yet",
+  "demo.dataWaitHint": "Press Refresh in your browser (F5) — the demo can take a moment on the first visit.",
+  "demo.dataWaitRefresh": "Refresh page",
   "nav.brand": "Farm Dashboard",
   "nav.loading": "Loading...",
   "nav.dataSource": "Data source",

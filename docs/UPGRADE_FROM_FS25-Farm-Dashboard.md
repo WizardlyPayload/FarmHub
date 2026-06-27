@@ -9,7 +9,7 @@ Use this document to understand **what changed** and **what was added** since th
 ## 1) Repository + release channels
 
 - **Repo name changed**: public repo → **FarmHub** (this repo).
-- **Release line**: app **4.1.0** / mod **3.1.0.0** (current) vs public **2.0.0**.
+- **Release line**: app **4.2.0** / mod **3.4.0.6** (current) vs public **2.0.0**.
 - **Docs consolidated**: everything lives under `docs/` with a master index in `docs/README.md`.
 
 ---

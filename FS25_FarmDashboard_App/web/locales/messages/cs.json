@@ -1,6 +1,10 @@
 {
   "page.title": "Zemědělský řídicí panel",
   "splash.loading": "Načítání dat vaší farmy…",
+  "demo.splashHint": "Živá data ještě nedorazila – pokud tato obrazovka zůstane prázdná, stiskněte po několika sekundách tlačítko Obnovit (F5).",
+  "demo.dataWaitTitle": "Živá data ještě nedorazila",
+  "demo.dataWaitHint": "Stiskněte tlačítko Obnovit v prohlížeči (F5) – demo může při první návštěvě chvíli trvat.",
+  "demo.dataWaitRefresh": "Obnovit stránku",
   "nav.brand": "Panel farmy",
   "nav.loading": "Načítání...",
   "nav.dataSource": "Zdroj dat",

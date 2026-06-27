@@ -1,6 +1,10 @@
 {
   "page.title": "Panel rolniczy",
   "splash.loading": "Ładowanie danych gospodarstwa…",
+  "demo.splashHint": "Dane na żywo jeszcze nie dotarły — jeśli ekran pozostanie pusty, naciśnij przycisk Odśwież (F5) za kilka sekund.",
+  "demo.dataWaitTitle": "Dane na żywo jeszcze nie dotarły",
+  "demo.dataWaitHint": "Kliknij Odśwież w przeglądarce (F5) — przy pierwszej wizycie demo może potrwać chwilę.",
+  "demo.dataWaitRefresh": "Odśwież stronę",
   "nav.brand": "Panel farmy",
   "nav.loading": "Ładowanie...",
   "nav.dataSource": "Źródło danych",

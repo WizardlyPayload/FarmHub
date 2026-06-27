@@ -1,6 +1,10 @@
 {
   "page.title": "Põllumajanduse armatuurlaud",
   "splash.loading": "Teie talu andmete laadimine…",
+  "demo.splashHint": "Reaalajas andmeid pole veel saabunud – kui ekraan jääb tühjaks, vajutage mõne sekundi pärast värskendamisklahvi (F5).",
+  "demo.dataWaitTitle": "Reaalajas andmeid pole veel saabunud",
+  "demo.dataWaitHint": "Vajuta brauseris nuppu „Värskenda” (F5) – demo esmakülastusel võib see veidi aega võtta.",
+  "demo.dataWaitRefresh": "Värskenda lehte",
   "nav.brand": "Talupaneel",
   "nav.loading": "Laadimine...",
   "nav.dataSource": "Andmeallikas",

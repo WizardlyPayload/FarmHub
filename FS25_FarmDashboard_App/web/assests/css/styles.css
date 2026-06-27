@@ -2210,6 +2210,54 @@ body.farmdash-remote-viewer .farmdash-remote-only {
   display: block !important;
 }
 
+.farmdash-public-demo-only {
+  display: none !important;
+}
+
+body.farmdash-public-demo .farmdash-public-demo-only.farm-splash__demo-hint {
+  display: block !important;
+}
+
+.farm-splash__demo-hint {
+  display: none;
+}
+
+body.farmdash-public-demo:not(.farmdash-demo-data-pending) .farm-splash__demo-hint {
+  display: none !important;
+}
+
+.farmdash-demo-data-wait {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+body.farmdash-public-demo.farmdash-demo-data-pending .farmdash-demo-data-wait {
+  display: flex !important;
+}
+
+body.farmdash-public-demo.has-farmdash-splash.farmdash-demo-data-pending .farmdash-demo-data-wait {
+  display: none !important;
+}
+
+.farmdash-demo-data-wait__panel {
+  max-width: 26rem;
+  width: 100%;
+  padding: 1.75rem 1.5rem;
+  border-radius: 1.25rem;
+  text-align: center;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35);
+}
+
 /* Economy → Storage: in-game “Prices & fluctuations” commodity table */
 .fs-commodity-panel {
   background: linear-gradient(180deg, #1a1f1c 0%, #121614 100%);

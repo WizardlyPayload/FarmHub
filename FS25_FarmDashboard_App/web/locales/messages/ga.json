@@ -1,6 +1,10 @@
 {
   "page.title": "Painéal Feirmeoireachta",
   "splash.loading": "Ag lódáil do shonraí feirme…",
+  "demo.splashHint": "Níl sonraí beo tagtha fós — brúigh Athnuachan (F5) i gceann cúpla soicind má fhanann an scáileán seo folamh.",
+  "demo.dataWaitTitle": "Níl sonraí beo tagtha fós",
+  "demo.dataWaitHint": "Brúigh Athnuachan i do bhrabhsálaí (F5) — d’fhéadfadh go dtógfadh an taispeántas tamall ar an gcéad chuairt.",
+  "demo.dataWaitRefresh": "Athnuachan leathanach",
   "nav.brand": "Painéal Feirme",
   "nav.loading": "Ag lódáil...",
   "nav.dataSource": "Foinse sonraí",

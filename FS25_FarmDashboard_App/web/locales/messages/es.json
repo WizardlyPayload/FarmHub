@@ -1,6 +1,10 @@
 {
   "page.title": "Panel agrícola",
   "splash.loading": "Cargando los datos de su granja…",
+  "demo.splashHint": "Los datos en directo aún no han llegado; pulse Actualizar (F5) en unos segundos si esta pantalla permanece vacía.",
+  "demo.dataWaitTitle": "Los datos en directo aún no han llegado.",
+  "demo.dataWaitHint": "Pulsa la tecla de actualizar de tu navegador (F5); la demostración puede tardar un momento en la primera visita.",
+  "demo.dataWaitRefresh": "Actualizar página",
   "nav.brand": "Panel de granja",
   "nav.loading": "Cargando...",
   "nav.dataSource": "Fuente de datos",

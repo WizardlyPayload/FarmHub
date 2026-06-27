@@ -1,6 +1,10 @@
 {
   "page.title": "Mezőgazdasági irányítópult",
   "splash.loading": "A gazdaság adatainak betöltése…",
+  "demo.splashHint": "Az élő adatok még nem érkeztek meg – ha a képernyő üres marad, néhány másodperc múlva nyomja meg a Frissítés (F5) gombot.",
+  "demo.dataWaitTitle": "Élő adatok még nem érkeztek meg",
+  "demo.dataWaitHint": "Nyomd meg a böngésző Frissítés (F5) gombját – a demó megjelenése az első látogatáskor eltarthat egy ideig.",
+  "demo.dataWaitRefresh": "Oldal frissítése",
   "nav.brand": "Farm irányító",
   "nav.loading": "Betöltés...",
   "nav.dataSource": "Adatforrás",

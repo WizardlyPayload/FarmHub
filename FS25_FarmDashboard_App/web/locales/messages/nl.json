@@ -1,6 +1,10 @@
 {
   "page.title": "Landbouwdashboard",
   "splash.loading": "Uw boerderijgegevens worden geladen...",
+  "demo.splashHint": "Er zijn nog geen live gegevens beschikbaar. Druk over een paar seconden op Vernieuwen (F5) als dit scherm leeg blijft.",
+  "demo.dataWaitTitle": "Livegegevens zijn nog niet beschikbaar.",
+  "demo.dataWaitHint": "Druk op Vernieuwen in uw browser (F5) — de demo kan de eerste keer even duren.",
+  "demo.dataWaitRefresh": "Vernieuw de pagina",
   "nav.brand": "Farmdashboard",
   "nav.loading": "Laden...",
   "nav.dataSource": "Gegevensbron",

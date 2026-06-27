@@ -86,6 +86,7 @@ Optional subtitle on the page:
 3. Full dashboard: home cards, fields, vehicles, **fleet map**, economy, etc.
 4. Data refreshes via the app’s normal **HTTP + WebSocket** pipeline (same as LAN tablet).
 5. They **cannot** open Settings or change servers (remote viewer mode).
+6. If live FTP data has not arrived yet (common on first visit), a **read-only banner** and **Refresh page** overlay explain that they should press **F5** or use the refresh button — the demo can take a moment while the app polls the server.
 
 ---
 

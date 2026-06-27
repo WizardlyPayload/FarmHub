@@ -122,7 +122,7 @@ function stockHasData(stock) {
     if (!stock || stock.enabled === false) return false;
     if (!stock.byFarm || typeof stock.byFarm !== 'object') return false;
     return Object.values(stock.byFarm).some((farm) => {
-        const items = farm?.items || [];
+        const items = toArr(farm?.items);
         return items.some((item) => Number(item?.totalLiters) > 0);
     });
 }
@@ -172,7 +172,7 @@ function pickRedTapeHoldSource(state, snap) {
 function stockLocationHasMoisture(stock) {
     if (!stock?.byFarm || typeof stock.byFarm !== 'object') return false;
     for (const farm of Object.values(stock.byFarm)) {
-        for (const item of farm?.items || []) {
+        for (const item of toArr(farm?.items)) {
             for (const loc of item?.locations || []) {
                 if (loc && (loc.moisturePct != null || loc.qualityPct != null || loc.grade)) {
                     return true;
@@ -410,7 +410,11 @@ function applyMergedSnapshotIfStaleExport(merged, luaPayload, state) {
     if (!mergedEmpty && !mergedMuchSmaller) return merged;
     if (!snapRich) return merged;
 
-    return stampHeldSnapshot(snap, state);
+    const held = stampHeldSnapshot(snap, state);
+    if (Array.isArray(merged.farmInfo)) {
+        return { ...held, farmInfo: merged.farmInfo };
+    }
+    return held;
 }
 
 /**

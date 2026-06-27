@@ -1,6 +1,10 @@
 {
   "page.title": "Landbruksdashbord",
   "splash.loading": "Laster inn gårdsdataene dine …",
+  "demo.splashHint": "Live-data har ikke ankommet ennå – trykk Oppdater (F5) om noen sekunder hvis denne skjermen forblir tom.",
+  "demo.dataWaitTitle": "Livedata har ikke kommet ennå",
+  "demo.dataWaitHint": "Trykk på Oppdater i nettleseren din (F5) – demoen kan ta litt tid ved første besøk.",
+  "demo.dataWaitRefresh": "Oppdater siden",
   "nav.brand": "Gårdspanel",
   "nav.loading": "Laster inn...",
   "nav.dataSource": "Datakilde",

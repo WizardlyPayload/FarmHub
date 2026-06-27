@@ -460,6 +460,7 @@ function showDashboardOrFallback(dashboard) {
     if (dashboard.updateNavbar) dashboard.updateNavbar();
     if (window.location.hash) dashboard.handleHashChange();
   }
+  syncPublicDemoDataWaitNotice(dashboard);
 }
 
 function notifyRemoteShellReady() {
@@ -680,6 +681,7 @@ export function applyEmptyApiState() {
   this.animals = [];
   if (this.activeFarmId == null) this.activeFarmId = 1;
   this.renderFarmDropdown();
+  syncPublicDemoDataWaitNotice(this);
 }
 
 /**
@@ -715,6 +717,19 @@ export function hasRenderableDashboardData(dashboard) {
   if (Array.isArray(dashboard.vehicles) && dashboard.vehicles.length > 0) return true;
   if (dashboard.mapTitle || dashboard.savegameName) return true;
   return false;
+}
+
+function syncPublicDemoDataWaitNotice(dashboard) {
+  if (typeof document === "undefined") return;
+  try {
+    if (String(window.location?.hostname || "").toLowerCase() !== "demo.farmdashboard.co.uk") return;
+    const pending = !hasRenderableDashboardData(dashboard || window.dashboard);
+    document.body.classList.toggle("farmdash-demo-data-pending", pending);
+    const el = document.getElementById("farmdash-demo-data-wait");
+    if (el) el.setAttribute("aria-hidden", pending ? "false" : "true");
+  } catch (_) {
+    /* ignore */
+  }
 }
 
 export function readBrowserMergedSnapshot(serverId) {
@@ -768,11 +783,15 @@ export function applyApiMergedDataPayload(dashboard, data) {
 
   data = pruneMergedDataToPlayerFarms(data);
 
-  dashboard.vehicles = Array.isArray(data.vehicles)
+  const allVehicles = Array.isArray(data.vehicles)
     ? data.vehicles
     : data.vehicles && typeof data.vehicles === "object"
       ? Object.values(data.vehicles)
       : [];
+  dashboard._allVehiclesMerged = allVehicles;
+  dashboard.vehicles = allVehicles;
+  dashboard._lastVehicleCardsFingerprint = "";
+  dashboard._lastAdsFleetEnabled = allVehicles.some((v) => v?.ads?.enabled);
   dashboard.economy = data.economy || {};
   dashboard.finance = data.finance || {};
   dashboard.weather = data.weather || {};
@@ -845,6 +864,12 @@ export function applyApiMergedDataPayload(dashboard, data) {
     }
   }
 
+  if (Array.isArray(dashboard._allVehiclesMerged) && dashboard.activeFarmId != null) {
+    dashboard.vehicles = dashboard._allVehiclesMerged.filter(
+      (v) => entityOwnerFarmId(v) === Number(dashboard.activeFarmId)
+    );
+  }
+
   if (husbandryBuildings.length > 0) {
     if (
       dashboard.realtimeConnector &&
@@ -899,6 +924,7 @@ export function applyApiMergedDataPayload(dashboard, data) {
   if (typeof dashboard.maybeShowModRequiredModal === "function") {
     dashboard.maybeShowModRequiredModal();
   }
+  syncPublicDemoDataWaitNotice(dashboard);
 }
 
 export async function tryLoadApiData() {
@@ -1188,6 +1214,12 @@ export function switchFarm(farmId, event) {
 
     if (this.allFields && this.allFields.length) {
         this.fields = filterFieldsForFarmView(this.allFields, fid);
+    }
+
+    if (Array.isArray(this._allVehiclesMerged)) {
+        this.vehicles = this._allVehiclesMerged.filter(
+            (v) => entityOwnerFarmId(v) === fid
+        );
     }
 
     const currentSection = this.getCurrentSection ? this.getCurrentSection() : null;

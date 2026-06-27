@@ -66,7 +66,8 @@ This repository (**[FarmHub](https://github.com/WizardlyPayload/FarmHub)**) is *
 
 - **Live dashboard** — livestock, pastures, vehicles, fields, economy, productions, weather (port **8766**).
 - **Fleet map** — live vehicle pins on the save's PDA overview map.
-- **Storage** — silo stock with **moisture & grade**, correct names for mod-map and base-map commodities.
+- **Storage** — silo stock with **moisture & grade**, correct names for mod-map and base-map commodities (incl. **Pig Food** and other sparse fill types); bale categories.
+- **Fleet scope** — dealership showroom demos no longer clutter player farms on dedicated multiplayer saves.
 - **Livestock** — base-game cow pens, food-duration hints, urgent pasture alerts.
 - **Productions** — map-owned factories on base maps; two-column layout.
 - **Accurate equipment pictures** — authoritative store-icon matching (app **4.2.0** + mod **3.4.0.6**).

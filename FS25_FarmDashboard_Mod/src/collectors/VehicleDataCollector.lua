@@ -579,6 +579,124 @@ function VehicleDataCollector:_isUsedEquipmentYardStock(vehicle)
     return uey.vehicleToItem[vehicle] ~= nil
 end
 
+--- Config path hints for map traffic / rail (farm 0) — never player fleet.
+function VehicleDataCollector:_isMapTrafficConfig(configPath)
+    if configPath == nil or configPath == "" then return false end
+    local norm = string.lower(tostring(configPath):gsub("\\", "/"))
+    return norm:find("/trafficvehicles/", 1, true) ~= nil
+        or norm:find("/traffic/", 1, true) ~= nil
+        or norm:find("trafficvehicle", 1, true) ~= nil
+end
+
+function VehicleDataCollector:_resolveConfigPath(vehicle)
+    if vehicle.configFileName then return vehicle.configFileName end
+    if vehicle.getConfigFileName then
+        local ok, cfg = pcall(function() return vehicle:getConfigFileName() end)
+        if ok and cfg then return cfg end
+    end
+    if vehicle.filename then return vehicle.filename end
+    return nil
+end
+
+function VehicleDataCollector:_vehiclePropertyState(vehicle)
+    if vehicle.getPropertyState then
+        local ok, ps = pcall(function() return vehicle:getPropertyState() end)
+        if ok and ps ~= nil then return ps end
+    end
+    return rawget(vehicle, "propertyState")
+end
+
+function VehicleDataCollector:_propertyStateIsShowroom(vehicle)
+    if vehicle.getIsInShowroom then
+        local ok, showroom = pcall(function() return vehicle:getIsInShowroom() end)
+        if ok and showroom == true then return true end
+    end
+    local ps = self:_vehiclePropertyState(vehicle)
+    if ps == nil then return false end
+    local vps = rawget(_G, "VehiclePropertyState")
+    if vps and vps.SHOP_CONFIG ~= nil and ps == vps.SHOP_CONFIG then return true end
+    if type(ps) == "string" and string.upper(tostring(ps)) == "SHOP_CONFIG" then return true end
+    return false
+end
+
+function VehicleDataCollector:_propertyStateIsPlayerOwned(vehicle)
+    if self:_propertyStateIsShowroom(vehicle) then return false end
+    local ps = self:_vehiclePropertyState(vehicle)
+    if ps == nil then return true end
+    local vps = rawget(_G, "VehiclePropertyState")
+    if vps then
+        if ps == vps.OWNED or ps == vps.LEASED then return true end
+        if ps == vps.SHOP_CONFIG or ps == vps.SOLD then return false end
+        -- Dedicated MP often exposes propertyState as a numeric enum; treat as owned unless shop/sold.
+        if type(ps) == "number" then return true end
+    end
+    local psStr = string.upper(tostring(ps))
+    if psStr == "SHOP_CONFIG" or psStr == "NONE" or psStr == "SOLD" then return false end
+    if psStr == "OWNED" or psStr == "LEASED" or psStr == "" then return true end
+    -- Enum index when VehiclePropertyState global is unavailable in this context.
+    if tonumber(psStr) ~= nil then return true end
+    return false
+end
+
+function VehicleDataCollector:_vehicleNeedsSaving(vehicle)
+    if vehicle.getNeedsSaving then
+        local ok, ns = pcall(function() return vehicle:getNeedsSaving() end)
+        if ok and ns ~= nil then return ns == true end
+    end
+    return nil
+end
+
+function VehicleDataCollector:_serializePropertyState(vehicle)
+    local ps = self:_vehiclePropertyState(vehicle)
+    if ps == nil then return nil end
+    local vps = rawget(_G, "VehiclePropertyState")
+    if vps then
+        if vps.OWNED ~= nil and ps == vps.OWNED then return "OWNED" end
+        if vps.LEASED ~= nil and ps == vps.LEASED then return "LEASED" end
+        if vps.SHOP_CONFIG ~= nil and ps == vps.SHOP_CONFIG then return "SHOP_CONFIG" end
+        if vps.SOLD ~= nil and ps == vps.SOLD then return "SOLD" end
+        if type(ps) == "number" then return "OWNED" end
+    end
+    if type(ps) == "string" then return string.upper(ps) end
+    if type(ps) == "number" then return "OWNED" end
+    return tostring(ps)
+end
+
+--- Export gate: player-owned fleet only — no dealership floor stock, map traffic, or transient pool noise.
+function VehicleDataCollector:_shouldExportVehicle(vehicle)
+    if not self:_isVehicleAlive(vehicle) then return false end
+    if self:_isUsedEquipmentYardStock(vehicle) then return true end
+
+    local configPath = self:_resolveConfigPath(vehicle)
+    if self:_isMapTrafficConfig(configPath) then return false end
+    if self:_propertyStateIsShowroom(vehicle) then return false end
+
+    local ownerFarmId = 0
+    if vehicle.getOwnerFarmId then
+        local ok, fid = pcall(function() return vehicle:getOwnerFarmId() end)
+        if ok and fid then ownerFarmId = tonumber(fid) or 0 end
+    end
+    local rawOwner = tonumber(rawget(vehicle, "ownerFarmId"))
+    if rawOwner and rawOwner > 0 and rawOwner ~= 100 and (ownerFarmId == 0 or ownerFarmId == 100) then
+        ownerFarmId = rawOwner
+    end
+
+    if ownerFarmId == 0 then return false end
+
+    local ps = self:_serializePropertyState(vehicle)
+    if ps == "SHOP_CONFIG" or ps == "SOLD" then return false end
+
+    -- Contractor pool on dedicated MP: only persisted savegame fleet (not live dealership demos).
+    if ownerFarmId == 100 then
+        local needsSaving = self:_vehicleNeedsSaving(vehicle)
+        if needsSaving == false then return false end
+        return true
+    end
+
+    -- Player farms: export all in-world fleet (ADS, fuel, live state). Showroom/traffic filtered above.
+    return true
+end
+
 function VehicleDataCollector:_isVehicleAlive(vehicle)
     if vehicle == nil then return false end
     -- Skip half-spawned entries (AccessHandler / Courseplay expect full vehicle methods).
@@ -622,6 +740,28 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
         if success and farmId then
             vData.ownerFarmId = farmId
         end
+    end
+    -- Dedicated MP: getOwnerFarmId() often returns 100 (contractor pool) for a newly created farm's fleet.
+    -- Prefer the savegame field when it already has the real owner; merge layer resolves remaining pool rows.
+    local rawOwner = tonumber(rawget(vehicle, "ownerFarmId"))
+    if rawOwner and rawOwner > 0 and rawOwner ~= 100 and (vData.ownerFarmId == 0 or vData.ownerFarmId == 100) then
+        vData.ownerFarmId = rawOwner
+    end
+    if vData.ownerFarmId == 100 then
+        vData.ownerFarmIdPool = true
+    end
+
+    local uid = rawget(vehicle, "uniqueId")
+    if uid ~= nil then
+        vData.uniqueId = tostring(uid)
+    end
+    local propState = self:_serializePropertyState(vehicle)
+    if propState ~= nil then
+        vData.propertyState = propState
+    end
+    local needsSaving = self:_vehicleNeedsSaving(vehicle)
+    if needsSaving ~= nil then
+        vData.needsSaving = needsSaving
     end
 
     vData.position = { x = 0, y = 0, z = 0 }
@@ -791,7 +931,7 @@ function VehicleDataCollector:_cacheRowKey(row)
 end
 
 function VehicleDataCollector:upsertVehicleInCache(vehicle)
-    if not self:_isVehicleAlive(vehicle) then return end
+    if not self:_shouldExportVehicle(vehicle) then return end
     local dc = rawget(_G, "FarmDashboardDataCollector")
     if not dc then return end
     local ok, row = pcall(function() return self:_serializeVehicle(vehicle, 0) end)
@@ -855,11 +995,8 @@ end
 
 function VehicleDataCollector:collectBegin()
     local dc = rawget(_G, "FarmDashboardDataCollector")
-    if dc and dc.shouldSkipLiveFleetScan and dc:shouldSkipLiveFleetScan() then
-        VehicleDataCollector._inc = { skipLive = true }
-        return
-    end
-    if dc and dc.mayScanLiveFleet and not dc:mayScanLiveFleet() then
+    -- Only defer during shop spawn grace — not for Courseplay incremental mode on dedicated servers.
+    if dc and dc.shouldDeferVehicleFleetWork and dc:shouldDeferVehicleFleetWork() then
         VehicleDataCollector._inc = { skipLive = true }
         return
     end
@@ -871,7 +1008,7 @@ function VehicleDataCollector:collectBegin()
         return
     end
     for _, vehicle in pairs(vehicles) do
-        if self:_isVehicleAlive(vehicle) then
+        if self:_shouldExportVehicle(vehicle) then
             table.insert(st.list, vehicle)
         end
     end
@@ -898,7 +1035,7 @@ function VehicleDataCollector:collectStep(opts)
     local hi = math.min(st.idx + batch - 1, n)
     for i = st.idx, hi do
         local vehicle = st.list[i]
-        if self:_isVehicleAlive(vehicle) then
+        if self:_shouldExportVehicle(vehicle) then
             local ok, row = pcall(function() return self:_serializeVehicle(vehicle, i) end)
             if ok and row then
                 table.insert(st.out, row)
@@ -929,7 +1066,7 @@ function VehicleDataCollector:collect()
 
     local vehicleCount = 0
     for _, vehicle in pairs(vehicles) do
-        if self:_isVehicleAlive(vehicle) then
+        if self:_shouldExportVehicle(vehicle) then
             vehicleCount = vehicleCount + 1
             table.insert(vehicleData, self:_serializeVehicle(vehicle, vehicleCount))
         end

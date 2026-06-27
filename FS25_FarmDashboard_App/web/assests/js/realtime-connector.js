@@ -1073,6 +1073,13 @@ class RealtimeConnector {
       : vehiclesData && typeof vehiclesData === "object"
         ? Object.values(vehiclesData)
         : [];
+    const prevAdsCount = (this.dashboard._allVehiclesMerged || []).filter(
+      (v) => v?.ads?.enabled
+    ).length;
+    const nextAdsCount = allMerged.filter((v) => v?.ads?.enabled).length;
+    if (prevAdsCount !== nextAdsCount) {
+      this.dashboard._lastVehicleCardsFingerprint = "";
+    }
     this.dashboard._allVehiclesMerged = allMerged;
     // Filter to only show vehicles owned by the currently active farm.
     const activeFarmId = window.dashboard?.activeFarmId || 1;

@@ -1,6 +1,10 @@
 {
   "page.title": "Painel agrícola",
   "splash.loading": "Carregando os dados da sua fazenda…",
+  "demo.splashHint": "Os dados em tempo real ainda não chegaram — pressione Atualizar (F5) em alguns segundos se esta tela permanecer vazia.",
+  "demo.dataWaitTitle": "Os dados em tempo real ainda não chegaram.",
+  "demo.dataWaitHint": "Pressione Atualizar no seu navegador (F5) — a demonstração pode demorar um pouco na primeira visita.",
+  "demo.dataWaitRefresh": "Atualizar página",
   "nav.brand": "Painel da quinta",
   "nav.loading": "Carregando...",
   "nav.dataSource": "Fonte de dados",

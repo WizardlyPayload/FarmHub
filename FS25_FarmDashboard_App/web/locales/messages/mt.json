@@ -1,6 +1,10 @@
 {
   "page.title": "Dashboard tal-Biedja",
   "splash.loading": "Qed tiċċarġja d-dejta tar-razzett tiegħek…",
+  "demo.splashHint": "Id-dejta diretta għadha ma waslitx — agħfas Aġġorna (F5) fi ftit sekondi jekk dan l-iskrin jibqa' vojt.",
+  "demo.dataWaitTitle": "Id-dejta diretta għadha ma waslitx",
+  "demo.dataWaitHint": "Agħfas Refresh fil-browser tiegħek (F5) — id-demo tista’ tieħu ftit ħin fl-ewwel żjara.",
+  "demo.dataWaitRefresh": "Aġġorna l-paġna",
   "nav.brand": "Pannell tal-ferma",
   "nav.loading": "Qed jitgħabba...",
   "nav.dataSource": "Sors tad-dejta",

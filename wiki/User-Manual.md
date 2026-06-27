@@ -2,7 +2,7 @@
 
 Complete guide to **FS25 Farm Dashboard** — every screen, setting, section, and modal.
 
-**Current versions:** app **4.1.0**, mod **3.1.0.0**
+**Current versions:** app **4.2.0**, mod **3.4.0.6**
 
 ---
 
@@ -27,6 +27,18 @@ Screenshot manifest and capture recipes: **[docs/SCREENSHOTS.md](https://github.
 
 ---
 
+## What's new in 4.2 (summary)
+
+| Feature | Where |
+|---------|--------|
+| Sparse fill types (Pig Food, Linseed, …) | Economy → **Storage** |
+| Bale categories (straw/grass/hay/silage) | Economy → **Storage** |
+| No dealership clutter on player farms | **Vehicles** / fleet tab |
+| Urgent notifications (incl. ADS breakdowns) | Navbar bell |
+| Public demo refresh hint | [demo.farmdashboard.co.uk](https://demo.farmdashboard.co.uk) |
+
+See also **4.1** features below.
+
 ## What's new in 4.1 (summary)
 
 | Feature | Where |
@@ -41,8 +53,8 @@ Screenshot manifest and capture recipes: **[docs/SCREENSHOTS.md](https://github.
 
 ## Install reminder
 
-1. **`FS25_FarmDashboard.zip` (3.1.0.0)** → enable on save → load once
-2. **`Setup 4.1.0.exe`** → http://localhost:8766/
+1. **`FS25_FarmDashboard.zip` (3.4.0.6)** → enable on save → load once
+2. **`Setup 4.2.0.exe`** → http://localhost:8766/
 3. Dedicated servers: deploy **new mod zip** + configure FTP in Settings
 
-*Aligned with app **4.1.0**, mod **3.1.0.0***
+*Aligned with app **4.2.0**, mod **3.4.0.6***

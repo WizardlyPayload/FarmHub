@@ -116,7 +116,7 @@ Build output folders are **gitignored**; installers are produced locally and **n
 
 ## Release notes — v4.2.0
 
-See **[../../docs/CHANGELOG.md](../../docs/CHANGELOG.md)** §**4.2.0** (Linseed/map crop naming, silo moisture & grade, public release on mod **3.4.0.0**). GitHub body: **[../../docs/GITHUB_RELEASE_v4.2.0.md](../../docs/GITHUB_RELEASE_v4.2.0.md)**. Publish checklist: **[../../docs/RELEASE_v4.2.0.md](../../docs/RELEASE_v4.2.0.md)**.
+See **[../../docs/CHANGELOG.md](../../docs/CHANGELOG.md)** §**4.2.0** (dealership clutter fix, Pig Food / sparse fill types, bale categories, silo moisture & grade, public release on mod **3.4.0.6**). GitHub body: **[../../docs/GITHUB_RELEASE_v4.2.0.md](../../docs/GITHUB_RELEASE_v4.2.0.md)**. Publish checklist: **[../../docs/RELEASE_v4.2.0.md](../../docs/RELEASE_v4.2.0.md)**.
 
 - **Language first:** NSIS installer welcome page + Server Manager language bar; shared `locale` store and `translations.json` pipeline.
 - **Dashboard i18n:** EU/EEA-oriented locales with English fallback per string.

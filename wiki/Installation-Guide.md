@@ -17,7 +17,7 @@ Until you load a save with the mod enabled:
 
 ## Stage A — Install the mod
 
-1. Download **`FS25_FarmDashboard.zip` (3.4.0.0)** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
+1. Download **`FS25_FarmDashboard.zip` (3.4.0.6)** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
 2. Copy into FS25 mods folder:
 
    ```

@@ -74,7 +74,7 @@ const {
     updateLastGoodMergedSnapshot,
     buildHeldPayloadFromState,
 } = require('./mergedSnapshotHold');
-const { isLuaExportStale } = require('./liveExportFreshness');
+const { isLuaExportStale, resolveLuaExportStaleMs } = require('./liveExportFreshness');
 const livestockDetailModule = require('./livestockDetail.js');
 const { validateLanCredentials } = require('./lanCredentialPolicy.js');
 
@@ -1664,6 +1664,34 @@ async function hydrateLuaSnapshotFromDiskAtBoot(srv) {
     }
 }
 
+function getLuaExportStaleMs() {
+    const cfg = store.get('config') || {};
+    return resolveLuaExportStaleMs(getFtpPollingOptions(cfg).intervalMinutes);
+}
+
+function stampLuaExportFreshness(merged, state) {
+    if (!merged || !state) return merged;
+    const staleMs = getLuaExportStaleMs();
+    const ts = { ...(merged.dataTimestamps || {}), luaExportStaleMs: staleMs };
+    if (state.luaData) {
+        if (isLuaExportStale(state.lastLuaReceivedAt, Date.now(), staleMs)) {
+            if (!ts.liveExportStaleAt) {
+                ts.liveExportStaleAt = state.lastLuaReceivedAt || new Date().toISOString();
+            }
+            return {
+                ...merged,
+                luaAvailable: false,
+                dataTimestamps: ts,
+            };
+        }
+        delete ts.liveExportStaleAt;
+        delete ts.heldFromSnapshotAt;
+        delete ts.mergeHeldStaleAt;
+        delete ts.liveSectionsHeldAt;
+    }
+    return { ...merged, dataTimestamps: ts };
+}
+
 function rebuildMerged(serverId) {
     const state = serverStates[serverId];
     if (!state) return;
@@ -1738,26 +1766,7 @@ function rebuildMerged(serverId) {
             `[rebuildMerged] [${serverId}] Serving last good merged snapshot (live export looks minimal or shutdown)`
         );
     }
-    if (merged && state.luaData) {
-        if (isLuaExportStale(state.lastLuaReceivedAt)) {
-            const ts = { ...(merged.dataTimestamps || {}) };
-            if (!ts.liveExportStaleAt) {
-                ts.liveExportStaleAt = state.lastLuaReceivedAt || new Date().toISOString();
-            }
-            merged = {
-                ...merged,
-                luaAvailable: false,
-                dataTimestamps: ts,
-            };
-        } else if (merged.dataTimestamps?.liveExportStaleAt) {
-            const ts = { ...merged.dataTimestamps };
-            delete ts.liveExportStaleAt;
-            delete ts.heldFromSnapshotAt;
-            delete ts.mergeHeldStaleAt;
-            delete ts.liveSectionsHeldAt;
-            merged = { ...merged, dataTimestamps: ts };
-        }
-    }
+    merged = stampLuaExportFreshness(merged, state);
     state.mergedData = merged;
     if (state.mergedData && state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
         state.mergedData.fieldStatusHistory = state.fieldHistory;

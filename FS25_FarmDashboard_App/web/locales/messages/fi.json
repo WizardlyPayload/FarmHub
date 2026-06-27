@@ -1,6 +1,10 @@
 {
   "page.title": "Maatalouden kojelauta",
   "splash.loading": "Ladataan maatilasi tietoja…",
+  "demo.splashHint": "Live-dataa ei ole vielä saapunut — paina Päivitä (F5) muutaman sekunnin kuluttua, jos tämä näyttö pysyy tyhjänä.",
+  "demo.dataWaitTitle": "Live-dataa ei ole vielä saapunut",
+  "demo.dataWaitHint": "Paina selaimessasi Päivitä-painiketta (F5) – demon käynnistyminen voi kestää hetken ensimmäisellä käynnillä.",
+  "demo.dataWaitRefresh": "Päivitä sivu",
   "nav.brand": "Maatilan hallinta",
   "nav.loading": "Ladataan...",
   "nav.dataSource": "Tietolähde",

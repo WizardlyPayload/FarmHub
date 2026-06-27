@@ -18,8 +18,8 @@
  */
 
 const { assessModVersion } = require('./modVersionPolicy.js');
-const { pruneMergedDataToPlayerFarms } = require('./farmScope.cjs');
-const { enrichStockFillTypes } = require('./fillTypeResolve.cjs');
+const { pruneMergedDataToPlayerFarms, getPlayerFarmIdSet } = require('./farmScope.cjs');
+const { enrichStockFillTypes, applyFillTypeTitles, enrichStockFillTypesFromPlaceables } = require('./fillTypeResolve.cjs');
 const { enrichStockMoistureFromXml } = require('./stockMoistureFromXml');
 
 const BALE_LITER_ESTIMATE = 4000;
@@ -97,7 +97,7 @@ function deriveBaleInventoryFromStock(stock, catalog) {
         const farmId = Number(farm?.farmId ?? fid);
         if (!Number.isFinite(farmId) || farmId <= 0) continue;
         const inStorage = emptyBaleBucket();
-        for (const item of farm.items || []) {
+        for (const item of toArr(farm?.items)) {
             const idx = Number(item?.fillTypeIndex);
             if (!Number.isFinite(idx) || idx <= 0) continue;
             const objectLocs = (item.locations || []).filter(
@@ -244,13 +244,59 @@ function baleInventoryHasStorage(inv) {
     return sumBaleBucket(inv.inStorage) > 0;
 }
 
+function baleBucketIsAllOther(bucket) {
+    if (!bucket || typeof bucket !== 'object') return false;
+    const other = Number(bucket.other) || 0;
+    if (other <= 0) return false;
+    const typed =
+        (Number(bucket.straw) || 0) +
+        (Number(bucket.grass) || 0) +
+        (Number(bucket.hay) || 0) +
+        (Number(bucket.silage) || 0);
+    const named = Object.keys(bucket.byFillType || {}).filter(
+        (k) => !/^\d+$/.test(String(k))
+    ).length;
+    return typed === 0 && named === 0;
+}
+
+function baleBucketHasTypedCategories(bucket) {
+    if (!bucket) return false;
+    return (
+        (Number(bucket.straw) || 0) +
+        (Number(bucket.grass) || 0) +
+        (Number(bucket.hay) || 0) +
+        (Number(bucket.silage) || 0)
+    ) > 0;
+}
+
 function enrichBaleInventoryFromStock(luaData, catalog) {
     let current = luaData?.baleInventory || { farmId: null, onField: {}, offField: {}, byFarm: {} };
     current = supplementOnFieldFromFields(current, luaData?.fields);
     if (!luaData?.stock?.byFarm) return current;
-    if (baleInventoryHasStorage(current)) return current;
     const derived = deriveBaleInventoryFromStock(luaData.stock, catalog);
-    return mergeBaleInventory(current, derived);
+
+    if (current.byFarm && typeof current.byFarm === 'object') {
+        for (const [fid, row] of Object.entries(current.byFarm)) {
+            const derivedRow = derived.byFarm?.[fid];
+            if (!derivedRow) continue;
+            for (const slot of ['inStorage', 'onField']) {
+                const bucket = row?.[slot];
+                if (!baleBucketIsAllOther(bucket)) continue;
+                const replacement = derivedRow[slot];
+                if (baleBucketHasTypedCategories(replacement)) {
+                    row[slot] = replacement;
+                    if (slot === 'inStorage') {
+                        row.offField = derivedRow.offField || replacement;
+                    }
+                }
+            }
+        }
+    }
+
+    if (!baleInventoryHasStorage(current)) {
+        return mergeBaleInventory(current, derived);
+    }
+    return current;
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -565,27 +611,16 @@ function catalogFromMapCrops(luaData, xmlEconomy) {
 
 function stockHasFillIndex(stock, idx) {
     for (const farm of Object.values(stock?.byFarm || {})) {
-        for (const item of farm?.items || []) {
+        for (const item of toArr(farm?.items)) {
             if (Number(item?.fillTypeIndex) === idx) return true;
         }
     }
     return false;
 }
 
-/** Witcombe-style gaps: DS often omits 182=TRITICALE and 190=LINSEED between known neighbors. */
+/** Witcombe-style gaps — kept only as last-resort heuristic in inferCatalogFromStockAndFields. */
 function assignNeighborCropGaps(catalog, stock) {
-    const out = { ...(catalog || {}) };
-    const rye = String(out['181'] || '').trim().toUpperCase();
-    const spelt = String(out['183'] || '').trim().toUpperCase();
-    if (!out['182'] && rye === 'RYE' && spelt === 'SPELT' && stockHasFillIndex(stock, 182)) {
-        out['182'] = 'TRITICALE';
-    }
-    const ryeCut = String(out['189'] || '').trim().toUpperCase();
-    const poppy = String(out['191'] || '').trim().toUpperCase();
-    if (!out['190'] && ryeCut === 'RYE_CUT' && poppy === 'POPPY' && stockHasFillIndex(stock, 190)) {
-        out['190'] = 'LINSEED';
-    }
-    return out;
+    return { ...(catalog || {}) };
 }
 
 /** Pair unresolved silo indices with map crop names (e.g. index 182 ↔ TRITICALE on Witcombe). */
@@ -598,7 +633,7 @@ function inferCatalogFromStockAndFields(stock, fields, catalog, xmlEconomy) {
     for (const [fid, farm] of Object.entries(stock?.byFarm || {})) {
         const farmId = String(Number(farm?.farmId ?? fid) || fid);
         const missingIdx = [];
-        for (const item of farm?.items || []) {
+        for (const item of toArr(farm?.items)) {
             const idx = Number(item?.fillTypeIndex);
             if (!Number.isFinite(idx) || idx <= 0) continue;
             const key = String(idx);
@@ -630,7 +665,7 @@ function inferCatalogFromStockAndFields(stock, fields, catalog, xmlEconomy) {
         .filter((n) => n && !MAP_CROP_SKIP.has(n));
     const stillMissing = [];
     for (const [fid, farm] of Object.entries(stock?.byFarm || {})) {
-        for (const item of farm?.items || []) {
+        for (const item of toArr(farm?.items)) {
             const idx = Number(item?.fillTypeIndex);
             if (idx > 0 && !out[String(idx)]) stillMissing.push(idx);
         }
@@ -657,18 +692,25 @@ function catalogFromSellPoints(luaData) {
     return out;
 }
 
+function collectFillTypeTitles(lua) {
+    const src = lua || {};
+    return {
+        ...(src.fillTypeTitles || {}),
+        ...(src.stock?.fillTypeTitles || {}),
+        ...(src.economy?.fillTypeTitles || {}),
+        ...(src.economy?.marketPrices?.fillTypeTitles || {}),
+    };
+}
+
 function buildFillTypeCatalog(luaData, xmlEconomy) {
     const lua = luaData || {};
-    const base = {
+    const titles = collectFillTypeTitles(lua);
+    const gameCatalog = applyFillTypeTitles({
         ...(lua.fillTypeCatalog || {}),
-        ...(lua.stock?.fillTypeCatalog || {}),
         ...(lua.economy?.fillTypeCatalog || {}),
         ...(lua.economy?.marketPrices?.fillTypesByIndex || {}),
         ...catalogFromMapCrops(lua, xmlEconomy),
         ...catalogFromSellPoints(lua),
-        ...Object.fromEntries(
-            Object.entries(KNOWN_FILL_INDEX_NAMES).map(([idx, name]) => [String(idx), name])
-        ),
         ...Object.fromEntries(
             Object.entries(lua.economy?.marketPrices?.nameToIndex || {}).map(
                 ([name, idx]) => [String(idx), name]
@@ -679,14 +721,21 @@ function buildFillTypeCatalog(luaData, xmlEconomy) {
                 .filter(([, crop]) => crop?.fillTypeIndex != null)
                 .map(([name, crop]) => [String(crop.fillTypeIndex), name])
         ),
+        ...(lua.stock?.fillTypeCatalog || {}),
+    }, titles);
+    const withFallbacks = {
+        ...gameCatalog,
+        ...Object.fromEntries(
+            Object.entries(KNOWN_FILL_INDEX_NAMES).map(([idx, name]) => [String(idx), name])
+        ),
     };
     const catalog = inferCatalogFromStockAndFields(
         lua.stock,
         lua.fields,
-        base,
+        withFallbacks,
         xmlEconomy
     );
-    return enrichStockFillTypes(lua.stock, catalog).catalog;
+    return enrichStockFillTypes(lua.stock, applyFillTypeTitles(catalog, titles), titles).catalog;
 }
 
 function mergeData(luaData, xmlData, options = {}) {
@@ -721,13 +770,18 @@ function mergeData(luaData, xmlData, options = {}) {
         );
     }
 
-    let allowedFarmIds = farmIdsOwningFarmland(toArr(xmlData.farmlandsArray));
-    if (allowedFarmIds.size === 0) {
-        allowedFarmIds = farmIdsFromLuaFields(luaData.fields);
-    }
-
     const fillTypeCatalog = buildFillTypeCatalog(luaData, xmlData.economy);
-    const stockEnriched = enrichStockFillTypes(luaData.stock, fillTypeCatalog);
+    const fillTypeTitles = collectFillTypeTitles(luaData);
+    const fromPlaceables = enrichStockFillTypesFromPlaceables(
+        luaData.stock,
+        xmlData.placeables,
+        fillTypeCatalog
+    );
+    const stockEnriched = enrichStockFillTypes(
+        fromPlaceables.stock,
+        fromPlaceables.catalog,
+        fillTypeTitles
+    );
     const stockWithMoisture = enrichStockMoistureFromXml(
         stockEnriched.stock,
         xmlData.moistureSystem,
@@ -755,11 +809,8 @@ function mergeData(luaData, xmlData, options = {}) {
         gameSettings : xmlData.career?.settings     || {},
         mods         : xmlData.career?.mods         || [],
 
-        // Farms — XML has players/stats, Lua has live money; drop savegame-only farm slots with no owned land
-        farmInfo     : filterFarmsByFarmlandOwnership(
-            mergeFarms(toArr(xmlData.farms), toArr(luaData.farmInfo)),
-            allowedFarmIds
-        ),
+        // Farms — XML has players/stats, Lua has live money; synthesize rows from asset ownership when farms.xml lags
+        farmInfo     : buildMergedFarmInfo(luaData, xmlData),
 
         // Money — Lua is live
         money        : luaData.finance?.money ?? luaData.money ?? xmlData.career?.money ?? 0,
@@ -799,7 +850,11 @@ function mergeData(luaData, xmlData, options = {}) {
                        })(),
 
         // Vehicles — merge XML (ownership/price) with Lua (live state)
-        vehicles     : mergeVehicles(toArr(luaData.vehicles), toArr(xmlData.vehicles)),
+        vehicles     : finalizeMergedVehicles(
+            luaData,
+            xmlData,
+            mergeVehicles(toArr(luaData.vehicles), toArr(xmlData.vehicles))
+        ),
 
         // Economy — XML history + Lua live sell points
         economy      : mergeEconomy(luaData.economy || {}, xmlData.economy || {}, fillTypeCatalog),
@@ -811,13 +866,18 @@ function mergeData(luaData, xmlData, options = {}) {
         baleInventory: enrichBaleInventoryFromStock(luaData, stockEnriched.catalog),
 
         fillTypeCatalog: stockEnriched.catalog,
+        fillTypeTitles,
         cropFillTypeIndex: luaData.cropFillTypeIndex || {},
         stock: {
             ...stockWithMoisture,
             enabled: luaData.stock?.enabled !== false,
             fillTypeCatalog: { ...stockEnriched.catalog },
+            fillTypeTitles: { ...fillTypeTitles },
         },
         redTape: luaData.redTape || { enabled: false, byFarm: {} },
+
+        adsSummary         : luaData.adsSummary || null,
+        vehicleYearsSummary: luaData.vehicleYearsSummary || null,
 
         // Placeables — XML
         placeables   : toArr(xmlData.placeables),
@@ -844,7 +904,153 @@ function farmIdsOwningFarmland(farmlandsArray) {
     return s;
 }
 
-/** Fallback when XML farmlands missing: farm IDs that appear on fields in live Lua data. */
+/** Normalize one farm row; Lua/JSON may use farmId, omit id, or key farms as an object. */
+function normalizeFarmRecord(f, fallbackId) {
+    if (!f || typeof f !== 'object') return null;
+    const id = Number(f.id ?? f.farmId ?? fallbackId);
+    if (!Number.isFinite(id) || id <= 0) return null;
+    return { ...f, id, farmId: id };
+}
+
+/** farmInfo / farms.xml list — array or Lua `{}` keyed by farm id. */
+function farmRecordsFromExport(raw) {
+    if (!raw) return [];
+    const out = [];
+    const seen = new Set();
+    const add = (f, fallbackId) => {
+        const n = normalizeFarmRecord(f, fallbackId);
+        if (!n || seen.has(n.id)) return;
+        seen.add(n.id);
+        out.push(n);
+    };
+    if (Array.isArray(raw)) {
+        for (const f of raw) add(f);
+    } else if (typeof raw === 'object') {
+        for (const [key, f] of Object.entries(raw)) {
+            add(f, Number(key));
+        }
+    }
+    return out;
+}
+
+function farmIdsFromKeyedByFarm(obj) {
+    const s = new Set();
+    if (!obj || typeof obj !== 'object') return s;
+    for (const key of Object.keys(obj)) {
+        const id = Number(key);
+        if (Number.isFinite(id) && id > 0) s.add(id);
+    }
+    return s;
+}
+
+function farmIdHasOwnedFields(luaData, farmId) {
+    const id = Number(farmId);
+    if (!Number.isFinite(id) || id <= 0) return false;
+    return toArr(luaData?.fields).some((f) => Number(f.ownerFarmId) === id);
+}
+
+function farmIdHasVehicles(luaData, farmId) {
+    const id = Number(farmId);
+    if (!Number.isFinite(id) || id <= 0) return false;
+    return toArr(luaData?.vehicles).some(
+        (v) => Number(v.ownerFarmId ?? v.farmId) === id
+    );
+}
+
+function farmIdHasLivestock(luaData, farmId) {
+    const id = Number(farmId);
+    if (!Number.isFinite(id) || id <= 0) return false;
+    return toArr(luaData?.animals).some((a) => {
+        if (Number(a.ownerFarmId ?? a.farmId) !== id) return false;
+        const count = Number(a.animalCount ?? a.numOfAnimalsReported ?? 0);
+        if (count > 0) return true;
+        const clusters = a.clusters;
+        if (Array.isArray(clusters)) {
+            return clusters.some((c) => c && Number(c.count) > 0);
+        }
+        return false;
+    });
+}
+
+function farmIdHasStock(luaData, farmId) {
+    const id = Number(farmId);
+    if (!Number.isFinite(id) || id <= 0) return false;
+    const farm = luaData?.stock?.byFarm?.[String(id)] ?? luaData?.stock?.byFarm?.[id];
+    if (!farm) return false;
+    return toArr(farm.items).some((item) => Number(item?.totalLiters) > 0);
+}
+
+function farmIdHasBaleInventory(luaData, farmId) {
+    const id = Number(farmId);
+    if (!Number.isFinite(id) || id <= 0) return false;
+    const inv = luaData?.baleInventory?.byFarm?.[String(id)] ?? luaData?.baleInventory?.byFarm?.[id];
+    if (!inv || typeof inv !== 'object') return false;
+    for (const bucket of ['onField', 'offField', 'inStorage']) {
+        const part = inv[bucket];
+        if (!part || typeof part !== 'object') continue;
+        if (Number(part.grass) > 0 || Number(part.hay) > 0 || Number(part.straw) > 0
+            || Number(part.silage) > 0 || Number(part.other) > 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function luaFarmRecordIsPlayer(farm) {
+    if (!farm || typeof farm !== 'object') return false;
+    if (farm.isPlayer === true) return true;
+    const players = farm.players;
+    return Array.isArray(players) && players.length > 0;
+}
+
+/**
+ * Player-scope farm ids from live Lua — excludes contractor pools (vehicles-only),
+ * empty pens, and empty keyed byFarm stubs.
+ */
+function farmIdsFromLuaPlayerScope(luaData) {
+    const s = new Set();
+    if (!luaData || typeof luaData !== 'object') return s;
+
+    for (const f of farmRecordsFromExport(luaData.farmInfo)) {
+        if (luaFarmRecordIsPlayer(f)) s.add(f.id);
+    }
+
+    const fieldOwners = new Set();
+    for (const f of toArr(luaData.fields)) {
+        const id = Number(f.ownerFarmId);
+        if (id > 0) {
+            fieldOwners.add(id);
+            s.add(id);
+        }
+    }
+
+    for (const id of fieldOwners) {
+        if (farmIdHasVehicles(luaData, id) || farmIdHasLivestock(luaData, id)
+            || farmIdHasStock(luaData, id) || farmIdHasBaleInventory(luaData, id)) {
+            s.add(id);
+        }
+    }
+
+    for (const a of toArr(luaData.animals)) {
+        const id = Number(a.ownerFarmId ?? a.farmId);
+        if (id <= 0) continue;
+        if (farmIdHasLivestock(luaData, id) && fieldOwners.has(id)) s.add(id);
+    }
+
+    for (const c of toArr(luaData.production?.chains)) {
+        const id = Number(c.ownerFarmId ?? c.farmId);
+        if (id > 0 && fieldOwners.has(id)) s.add(id);
+    }
+
+    return s;
+}
+
+/** @deprecated use farmIdsFromLuaPlayerScope */
+function farmIdsFromLuaExport(luaData) {
+    return farmIdsFromLuaPlayerScope(luaData);
+}
+
+/** @deprecated use farmIdsFromLuaExport */
 function farmIdsFromLuaFields(luaFields) {
     const s = new Set();
     for (const f of toArr(luaFields)) {
@@ -854,29 +1060,168 @@ function farmIdsFromLuaFields(luaFields) {
     return s;
 }
 
+/** Farmland owners — prefer live Lua field ownership; XML lags after farm delete on FTP. */
+function collectOwnedFarmlandFarmIds(luaData, xmlData) {
+    const fromLua = new Set();
+    for (const f of toArr(luaData?.fields)) {
+        const id = Number(f.ownerFarmId);
+        if (id > 0) fromLua.add(id);
+    }
+    if (fromLua.size > 0) return fromLua;
+    return farmIdsOwningFarmland(toArr(xmlData?.farmlandsArray));
+}
+
+function luaHasFarmRoster(luaData) {
+    return farmRecordsFromExport(luaData?.farmInfo).some((f) => Number(f.id) > 0);
+}
+
+/**
+ * Farms allowed in the farm picker. Live Lua roster wins; stale FTP XML cannot resurrect deleted farms.
+ */
+function collectAllowedFarmIds(luaData, xmlData) {
+    const allowed = collectOwnedFarmlandFarmIds(luaData, xmlData);
+    for (const id of farmIdsFromLuaPlayerScope(luaData || {})) {
+        allowed.add(id);
+    }
+    const luaFarmIds = new Set(
+        farmRecordsFromExport(luaData?.farmInfo).map((f) => Number(f.id)).filter((id) => id > 0)
+    );
+    const hasLuaRoster = luaHasFarmRoster(luaData);
+    for (const f of farmRecordsFromExport(xmlData?.farms)) {
+        if (!farmHasAssignedPlayers(f)) continue;
+        if (!hasLuaRoster || luaFarmIds.has(f.id)) allowed.add(f.id);
+    }
+    if (allowed.size === 0) {
+        for (const f of farmRecordsFromExport(xmlData?.farms)) {
+            if (farmHasAssignedPlayers(f)) allowed.add(f.id);
+        }
+    }
+    return allowed;
+}
+
+function shouldSynthesizeFarmId(farmId, luaData, xmlData) {
+    const id = Number(farmId);
+    if (!Number.isFinite(id) || id <= 0) return false;
+    const luaFarm = farmRecordsFromExport(luaData?.farmInfo).find((f) => f.id === id);
+    const inLuaRoster = luaHasFarmRoster(luaData);
+    const inLua = Boolean(luaFarm);
+
+    if (inLuaRoster && !inLua) {
+        if (!farmIdHasOwnedFields(luaData, id)) return false;
+        return farmIdHasVehicles(luaData, id) || farmIdHasLivestock(luaData, id)
+            || farmIdHasStock(luaData, id) || farmIdHasBaleInventory(luaData, id);
+    }
+
+    if (collectOwnedFarmlandFarmIds(luaData, xmlData).has(id)) return true;
+    const xmlFarm = farmRecordsFromExport(xmlData?.farms).find((f) => f.id === id);
+    if (farmHasAssignedPlayers(xmlFarm) && (!inLuaRoster || inLua)) return true;
+    if (luaFarmRecordIsPlayer(luaFarm)) return true;
+    if (!farmIdHasOwnedFields(luaData, id)) return false;
+    return farmIdHasVehicles(luaData, id) || farmIdHasLivestock(luaData, id)
+        || farmIdHasStock(luaData, id) || farmIdHasBaleInventory(luaData, id);
+}
+
+function resolveSynthesizedIsPlayer(farmId, luaFarm, xmlFarm, xmlData, luaData) {
+    if (luaFarmRecordIsPlayer(luaFarm)) return true;
+    if (farmHasAssignedPlayers(xmlFarm)) return true;
+    if (collectOwnedFarmlandFarmIds(luaData, xmlData).has(Number(farmId))) return true;
+    return false;
+}
+
+function farmHasAssignedPlayers(farm) {
+    if (!farm || typeof farm !== 'object') return false;
+    if (farm.isPlayer === true) return true;
+    const players = farm.players;
+    return Array.isArray(players) && players.length > 0;
+}
+
 function filterFarmsByFarmlandOwnership(farms, allowedFarmIds) {
     const arr = toArr(farms);
     if (!allowedFarmIds || allowedFarmIds.size === 0) return arr;
-    return arr.filter((f) => allowedFarmIds.has(Number(f.id)));
+    return arr.filter((f) => {
+        const id = Number(f.id);
+        if (allowedFarmIds.has(id)) return true;
+        return farmHasAssignedPlayers(f);
+    });
 }
 
-function mergeFarms(xmlFarms, luaFarms) {
-    const luaMap = new Map(luaFarms.map(f => [f.id, f]));
-    const xmlMap = new Map(xmlFarms.map(f => [f.id, f]));
-    const allIds = new Set([...xmlMap.keys(), ...luaMap.keys()]);
-    return Array.from(allIds).sort().map(id => {
+function mergeFarms(xmlFarms, luaFarms, restrictToLuaRoster = false) {
+    const luaMap = new Map();
+    for (const f of luaFarms) {
+        const n = normalizeFarmRecord(f);
+        if (n) luaMap.set(n.id, n);
+    }
+    const xmlMap = new Map();
+    for (const f of xmlFarms) {
+        const n = normalizeFarmRecord(f);
+        if (n) xmlMap.set(n.id, n);
+    }
+    const luaPlayerIds = [...luaMap.keys()].filter((id) => luaFarmRecordIsPlayer(luaMap.get(id) || {}));
+    const allIds = restrictToLuaRoster && luaPlayerIds.length > 0
+        ? new Set(luaPlayerIds)
+        : new Set([...xmlMap.keys(), ...luaMap.keys()]);
+    return Array.from(allIds).sort((a, b) => a - b).map((id) => {
         const xml = xmlMap.get(id) || {};
         const lua = luaMap.get(id) || {};
         return {
             id,
             name       : xml.name       || lua.name       || `Farm ${id}`,
-            color      : xml.color      || 1,
+            color      : xml.color      || lua.color      || 1,
             money      : lua.money      ?? xml.money       ?? 0,
             loan       : lua.loan       ?? xml.loan        ?? 0,
-            players    : xml.players    || [],
+            players    : xml.players?.length ? xml.players : (lua.players || []),
             statistics : xml.statistics || {},
+            isPlayer   : lua.isPlayer === true
+                || (Array.isArray(lua.players) && lua.players.length > 0)
+                || (Array.isArray(xml.players) && xml.players.length > 0)
+                || Boolean(String(lua.name || xml.name || '').trim()),
         };
     });
+}
+
+/**
+ * Dedicated / multi-farm: farmland.xml or live assets may reference a farmId before farms.xml
+ * lists that farm — synthesize a picker row so the dashboard can scope to it.
+ */
+function synthesizeMissingFarms(farms, neededIds, luaData, xmlData) {
+    const have = new Set(farms.map((f) => Number(f.id)));
+    const luaById = new Map(farmRecordsFromExport(luaData?.farmInfo).map((f) => [f.id, f]));
+    const xmlById = new Map(farmRecordsFromExport(xmlData?.farms).map((f) => [f.id, f]));
+    const out = [...farms];
+    for (const rawId of neededIds) {
+        const id = Number(rawId);
+        if (!Number.isFinite(id) || id <= 0 || have.has(id)) continue;
+        if (!shouldSynthesizeFarmId(id, luaData, xmlData)) continue;
+        const lua = luaById.get(id) || {};
+        const xml = xmlById.get(id) || {};
+        const isPlayer = resolveSynthesizedIsPlayer(id, lua, xml, xmlData, luaData);
+        if (!isPlayer) continue;
+        out.push({
+            id,
+            farmId: id,
+            name: String(lua.name || xml.name || `Farm ${id}`),
+            color: lua.color ?? xml.color ?? 1,
+            money: lua.money ?? xml.money ?? 0,
+            loan: lua.loan ?? xml.loan ?? 0,
+            players: xml.players?.length ? xml.players : (lua.players || []),
+            statistics: xml.statistics || {},
+            isPlayer: true,
+        });
+        have.add(id);
+    }
+    return out.sort((a, b) => a.id - b.id);
+}
+
+function buildMergedFarmInfo(luaData, xmlData) {
+    const allowedFarmIds = collectAllowedFarmIds(luaData, xmlData);
+    const luaRoster = luaHasFarmRoster(luaData);
+    let farms = mergeFarms(
+        farmRecordsFromExport(xmlData?.farms),
+        farmRecordsFromExport(luaData?.farmInfo),
+        luaRoster
+    );
+    farms = synthesizeMissingFarms(farms, allowedFarmIds, luaData, xmlData);
+    return filterFarmsByFarmlandOwnership(farms, allowedFarmIds);
 }
 
 // ─── game time ────────────────────────────────────────────────────────────────
@@ -1246,30 +1591,484 @@ function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
 
 // ─── vehicles ─────────────────────────────────────────────────────────────────
 
-/** Stable per-vehicle match key: config-file basename + owner farm (lowercased), or '' if unknown. */
-function vehicleConfigKey(v) {
+/** Config-file basename only (lowercased), or '' if unknown. */
+function vehicleConfigBasename(v) {
     const raw = String(v.configFileName || v.filename || '');
     const base = raw.replace(/\\/g, '/').split('/').pop() || '';
-    const cfg = base.replace(/\.xml$/i, '').toLowerCase();
+    return base.replace(/\.xml$/i, '').toLowerCase();
+}
+
+function vehicleUniqueId(v) {
+    const uid = v?.uniqueId;
+    if (uid == null || uid === '') return '';
+    return String(uid);
+}
+
+/** Stable per-vehicle match key: config-file basename + owner farm (lowercased), or '' if unknown. */
+function vehicleConfigKey(v) {
+    const cfg = vehicleConfigBasename(v);
     if (!cfg) return '';
     const farm = Number(v.ownerFarmId ?? v.farmId ?? 0);
     return `${farm}::${cfg}`;
 }
 
+function isTransientVehicleFarmId(farmId) {
+    const id = Number(farmId);
+    return id === 0 || id === 100;
+}
+
+/** Dedicated-server contractor pool id — NOT farm 0 (map traffic / rail). */
+function isVehiclePoolFarmId(farmId) {
+    return Number(farmId) === 100;
+}
+
+/** Live dealership / showroom floor stock (mod sets needsSaving=false; savegame may still tag pool 100). */
+function isDealershipFloorStock(v) {
+    if (v?.isUsedEquipmentYardStock === true) return false;
+    if (String(v?.propertyState || '').toUpperCase() === 'SHOP_CONFIG') return true;
+    if (v?.needsSaving === false) return true;
+    return false;
+}
+
+/** Pool-100 live row that may belong to a player farm (not dealership demos). */
+function isPlayerOwnedPoolLiveVehicle(v, xmlIndex) {
+    const owner = Number(v?.ownerFarmId ?? v?.farmId ?? 0);
+    if (!isVehiclePoolFarmId(owner)) return false;
+    if (isDealershipFloorStock(v)) return false;
+    if (isMapTrafficVehicle(v)) return false;
+    if (!xmlIndex) return true;
+    const uid = vehicleUniqueId(v);
+    const cfg = vehicleConfigBasename(v);
+    if (uid && xmlIndex.playerFarmByUniqueId?.has(uid)) return true;
+    if (uid && xmlIndex.poolUniqueIds?.has(uid)) return true;
+    if (cfg && xmlIndex.poolByConfig.has(cfg)) return true;
+    return false;
+}
+
+function vehicleConfigPath(v) {
+    return String(v?.configFileName || v?.filename || '').replace(/\\/g, '/').toLowerCase();
+}
+
+function isMapTrafficVehicle(v) {
+    const cfg = vehicleConfigPath(v);
+    return cfg.includes('/trafficvehicles/') || cfg.includes('/traffic/') || cfg.includes('trafficvehicle');
+}
+
+/** Index vehicles.xml for savegame-backed pool reassignment and uniqueId pairing. */
+function buildPoolVehicleXmlIndex(xmlVehicles) {
+    const poolByConfig = new Set();
+    const playerFarmByConfig = new Map();
+    const byUniqueId = new Map();
+    const poolUniqueIds = new Set();
+    const playerFarmByUniqueId = new Map();
+
+    for (const xv of toArr(xmlVehicles)) {
+        const uid = vehicleUniqueId(xv);
+        if (uid) byUniqueId.set(uid, xv);
+
+        const cfg = vehicleConfigBasename(xv);
+        const farm = Number(xv.farmId ?? xv.ownerFarmId ?? 0);
+        const prop = String(xv.propertyState || 'OWNED').toUpperCase();
+        if (prop === 'SOLD' || prop === 'SHOP_CONFIG') continue;
+
+        if (uid) {
+            if (isVehiclePoolFarmId(farm)) poolUniqueIds.add(uid);
+            else if (farm > 0 && !isTransientVehicleFarmId(farm)) playerFarmByUniqueId.set(uid, farm);
+        }
+
+        if (!cfg) continue;
+        if (isVehiclePoolFarmId(farm)) {
+            poolByConfig.add(cfg);
+            continue;
+        }
+        if (farm > 0 && !isTransientVehicleFarmId(farm)) {
+            if (!playerFarmByConfig.has(cfg)) playerFarmByConfig.set(cfg, new Set());
+            playerFarmByConfig.get(cfg).add(farm);
+        }
+    }
+    return { poolByConfig, playerFarmByConfig, byUniqueId, poolUniqueIds, playerFarmByUniqueId };
+}
+
+/** Human-readable title from vehicles.xml config basename (e.g. vario700Gen6 → Vario 700 Gen6). */
+function formatConfigDisplayName(rawName) {
+    const s = String(rawName || '').replace(/\.xml$/i, '').trim();
+    if (!s) return 'Vehicle';
+    return s
+        .replace(/([a-z])([A-Z0-9])/g, '$1 $2')
+        .replace(/([0-9])([A-Za-z])/g, '$1 $2')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Infer vehicleType / typeName / isMotorized from GIANTS store-item path in vehicles.xml. */
+function inferVehicleMetaFromFilename(filename) {
+    const p = String(filename || '').replace(/\\/g, '/').toLowerCase();
+    const base = p.split('/').pop()?.replace(/\.xml$/i, '') || '';
+    const motorizedHint = /vario|tractor|magnum|series|forza|axion|puma|t7|t8|wheelloader|telehandler|excavator|skidder/i.test(base);
+    if (p.includes('/tractors/') || p.includes('/data/vehicles/tractor') || (p.includes('/i3d/') && motorizedHint)) {
+        return { vehicleType: 'tractor', typeName: 'tractor', isMotorized: true };
+    }
+    if (p.includes('/wheelloader/') || p.includes('/loaders/') || p.includes('/telehandlers/')) {
+        return { vehicleType: 'motorized', typeName: 'wheelLoader', isMotorized: true };
+    }
+    if (p.includes('/cars/') || p.includes('/pickups/')) {
+        return { vehicleType: 'motorized', typeName: 'car', isMotorized: true };
+    }
+    if (p.includes('/trailers/')) {
+        return { vehicleType: 'trailer', typeName: 'trailer', isMotorized: false };
+    }
+    if (
+        p.includes('/tools/') || p.includes('/cultivators/') || p.includes('/mowers/')
+        || p.includes('/plows/') || p.includes('/harvesters/') || p.includes('/forage/')
+        || p.includes('/weights/') || p.includes('/bale') || p.includes('/windrow/')
+        || p.includes('/sprayers/') || p.includes('/planters/')
+    ) {
+        return { vehicleType: 'implement', typeName: 'implement', isMotorized: false };
+    }
+    return { vehicleType: 'implement', typeName: 'implement', isMotorized: false };
+}
+
+function buildXmlOnlyVehicleRow(xv) {
+    const owner = Number(xv.farmId ?? xv.ownerFarmId ?? 0);
+    const meta = inferVehicleMetaFromFilename(xv.filename);
+    const rawName = String(xv.name || '').trim();
+    const displayName = formatConfigDisplayName(rawName || vehicleConfigBasename(xv));
+    return {
+        id            : xv.uniqueId || rawName || vehicleConfigBasename(xv) || 'xml',
+        uniqueId      : xv.uniqueId || '',
+        name          : displayName,
+        filename      : xv.filename || '',
+        configFileName: xv.filename || '',
+        farmId        : owner,
+        ownerFarmId   : owner,
+        price         : xv.price || 0,
+        age           : xv.age || 0,
+        operatingTime : xv.operatingTime || 0,
+        damage        : xv.damage ?? 0,
+        fillLevels    : xv.fillLevels || {},
+        propertyState : xv.propertyState || 'OWNED',
+        xmlFillLevels : xv.fillLevels || {},
+        position      : xv.position || { x: 0, y: 0, z: 0 },
+        vehicleType   : xv.vehicleType || meta.vehicleType,
+        typeName      : xv.typeName || meta.typeName,
+        isMotorized   : xv.isMotorized ?? meta.isMotorized,
+        engineOn      : false,
+        speed         : 0,
+        brand         : xv.brand || 'Unknown',
+        source        : 'xml_only',
+    };
+}
+
+function vehiclePositionDistance(a, b) {
+    if (!a?.position || !b?.position) return Infinity;
+    return Math.hypot(
+        (a.position.x ?? 0) - (b.position.x ?? 0),
+        (a.position.z ?? 0) - (b.position.z ?? 0)
+    );
+}
+
+/** Pair savegame-only rows with nearby live Lua rows (same config) so ADS/live state attach. */
+function pairXmlOnlyWithNearbyLua(merged) {
+    const xmlOnly = [];
+    const luaCandidates = [];
+    for (const v of merged) {
+        if (v?.source === 'xml_only') xmlOnly.push(v);
+        else if (v?.source === 'lua_only' || v?.source === 'merged'
+            || Number(v.ownerFarmId ?? v.farmId) === 100) {
+            luaCandidates.push(v);
+        }
+    }
+    if (xmlOnly.length === 0 || luaCandidates.length === 0) return merged;
+
+    const usedLua = new Set();
+    const out = merged.map((v) => {
+        if (v?.source !== 'xml_only') return v;
+        const cfg = vehicleConfigBasename(v);
+        if (!cfg) return v;
+
+        let best = null;
+        let bestDist = 40;
+        for (const lv of luaCandidates) {
+            if (usedLua.has(lv)) continue;
+            if (vehicleConfigBasename(lv) !== cfg) continue;
+            const d = vehiclePositionDistance(v, lv);
+            if (d < bestDist) {
+                bestDist = d;
+                best = lv;
+            }
+        }
+        if (!best) return v;
+
+        usedLua.add(best);
+        const owner = Number(v.ownerFarmId ?? v.farmId ?? 0);
+        return {
+            ...best,
+            ...v,
+            ownerFarmId   : owner,
+            farmId        : owner,
+            uniqueId      : v.uniqueId || best.uniqueId || best.id,
+            name          : best.name && best.name !== 'Unknown' ? best.name : v.name,
+            vehicleType   : best.vehicleType || v.vehicleType,
+            typeName      : best.typeName || v.typeName,
+            isMotorized   : best.isMotorized ?? v.isMotorized,
+            operatingTime : best.operatingTime ?? v.operatingTime,
+            ads           : best.ads,
+            source        : 'merged',
+        };
+    });
+
+    return out.filter((v) => !(usedLua.has(v) && v?.source === 'lua_only'));
+}
+
+function isSavegameBackedPoolVehicle(v, xmlIndex, poolTargetFarmId) {
+    if (!xmlIndex) return false;
+    if (isDealershipFloorStock(v)) return false;
+    const uid = vehicleUniqueId(v);
+    if (uid && xmlIndex.playerFarmByUniqueId?.has(uid)) return true;
+    if (uid && poolTargetFarmId > 0 && xmlIndex.playerFarmByUniqueId?.get(uid) === Number(poolTargetFarmId)) {
+        return true;
+    }
+    const cfg = vehicleConfigBasename(v);
+    if (!cfg) return false;
+    const playerFarms = xmlIndex.playerFarmByConfig?.get(cfg);
+    if (playerFarms?.size === 1) {
+        const farm = [...playerFarms][0];
+        if (uid && xmlIndex.playerFarmByUniqueId?.get(uid) === farm) return true;
+        if (poolTargetFarmId > 0 && farm === Number(poolTargetFarmId)) {
+            if (uid && xmlIndex.poolUniqueIds?.has(uid)) return true;
+            if (xmlIndex.poolByConfig.has(cfg)) return true;
+        }
+    }
+    if (uid && playerFarms?.size > 1) {
+        const farm = xmlIndex.playerFarmByUniqueId?.get(uid);
+        if (farm && playerFarms.has(farm)) return true;
+    }
+    // Dedicated-server new farm: fleet row persisted under pool 100 in savegame.
+    if (poolTargetFarmId > 0) {
+        if (uid && xmlIndex.poolUniqueIds?.has(uid)) return true;
+        // Config-only pool rows are ambiguous when the model also exists on dealership floor.
+        if (cfg && xmlIndex.poolByConfig.has(cfg) && !xmlIndex.playerFarmByConfig?.has(cfg)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function buildLuaConfigClaimsByFarm(luaVehicles) {
+    const claims = new Set();
+    for (const lv of toArr(luaVehicles)) {
+        const farm = Number(lv.ownerFarmId ?? lv.farmId ?? 0);
+        if (isTransientVehicleFarmId(farm)) continue;
+        const k = vehicleConfigKey(lv);
+        if (k) claims.add(k);
+    }
+    return claims;
+}
+
+function resolveMergedOwnerFarmId(luaV, xmlV) {
+    if (luaV?.isUsedEquipmentYardStock === true) {
+        return Number(luaV.ownerFarmId ?? luaV.farmId ?? 0);
+    }
+    const uid = vehicleUniqueId(luaV) || vehicleUniqueId(xmlV);
+    if (uid && xmlV) {
+        const xmlFarm = Number(xmlV.farmId ?? xmlV.ownerFarmId ?? 0);
+        if (xmlFarm > 0 && !isTransientVehicleFarmId(xmlFarm)) return xmlFarm;
+    }
+    const luaFarm = Number(luaV?.ownerFarmId ?? luaV?.farmId ?? 0);
+    const xmlFarm = Number(xmlV?.farmId ?? xmlV?.ownerFarmId ?? 0);
+    if (luaFarm > 0 && !isTransientVehicleFarmId(luaFarm)) return luaFarm;
+    if (xmlFarm > 0 && !isTransientVehicleFarmId(xmlFarm)) return xmlFarm;
+    return luaFarm || xmlFarm || 0;
+}
+
+function playerFarmIdsFromInfo(farmInfo) {
+    return getPlayerFarmIdSet(farmRecordsFromExport(farmInfo));
+}
+
+function livestockHeadCountOnFarm(luaData, farmId) {
+    const id = Number(farmId);
+    let total = 0;
+    for (const a of toArr(luaData?.animals)) {
+        if (Number(a.ownerFarmId ?? a.farmId) !== id) continue;
+        total += Number(a.animalCount ?? a.numOfAnimalsReported ?? 0);
+        if (Array.isArray(a.clusters)) {
+            for (const c of a.clusters) total += Number(c?.count ?? 0);
+        }
+    }
+    return total;
+}
+
+function countAssignedFleetOnFarm(vehicles, farmId) {
+    const id = Number(farmId);
+    return toArr(vehicles).filter((v) => {
+        if (v?.isUsedEquipmentYardStock === true) return false;
+        const owner = Number(v.ownerFarmId ?? v.farmId ?? 0);
+        return owner === id && !isVehiclePoolFarmId(owner);
+    }).length;
+}
+
+function vehicleHasLiveFleetSignal(v) {
+    if (v?.source === 'merged' || v?.source === 'lua_only') return true;
+    if (v?.ads?.enabled === true) return true;
+    if (v?.isMotorized === true) return true;
+    if (Number(v?.speed) > 0) return true;
+    return false;
+}
+
+function countLiveFleetOnFarm(vehicles, farmId) {
+    const id = Number(farmId);
+    return toArr(vehicles).filter((v) => {
+        if (v?.isUsedEquipmentYardStock === true) return false;
+        if (v.source === 'xml_only') return false;
+        if (!vehicleHasLiveFleetSignal(v)) return false;
+        const owner = Number(v.ownerFarmId ?? v.farmId ?? 0);
+        return owner === id && !isTransientVehicleFarmId(owner);
+    }).length;
+}
+
+function farmIdHasOwnedFieldsFromSources(luaData, xmlData, farmId) {
+    if (farmIdHasOwnedFields(luaData, farmId)) return true;
+    const id = Number(farmId);
+    for (const f of toArr(xmlData?.fields || xmlData?.allFields)) {
+        if (Number(f?.ownerFarmId ?? f?.farmId) === id) return true;
+    }
+    for (const row of toArr(xmlData?.farmlandsArray)) {
+        if (Number(row?.farmId) === id) return true;
+    }
+    return false;
+}
+
+function farmHasAssignableAssetsFromSources(luaData, xmlData, farmId) {
+    return farmIdHasOwnedFieldsFromSources(luaData, xmlData, farmId)
+        || farmIdHasLivestock(luaData, farmId)
+        || farmIdHasStock(luaData, farmId)
+        || farmIdHasBaleInventory(luaData, farmId);
+}
+
+function countAdsEnabledOnFarm(vehicles, farmId) {
+    const id = Number(farmId);
+    return toArr(vehicles).filter((v) => {
+        const owner = Number(v.ownerFarmId ?? v.farmId ?? 0);
+        return owner === id && v?.ads?.enabled === true;
+    }).length;
+}
+
+/**
+ * When vehicles.xml tags a new DS farm fleet as pool 100, pick the player farm that owns
+ * land/livestock but has the thinnest live fleet — per savegame row, not bulk reassignment.
+ */
+function inferTransientVehiclePoolFarmId(vehicles, luaData, farmInfo, xmlData = null, xmlIndex = null) {
+    const playerIds = playerFarmIdsFromInfo(farmInfo);
+    if (playerIds.size === 0) return null;
+
+    const index = xmlIndex || buildPoolVehicleXmlIndex(toArr(xmlData?.vehicles));
+    const poolVehicles = toArr(vehicles).filter((v) => isPlayerOwnedPoolLiveVehicle(v, index));
+    if (poolVehicles.length === 0) return null;
+
+    let bestId = null;
+    let bestScore = -Infinity;
+    for (const id of playerIds) {
+        if (!farmHasAssignableAssetsFromSources(luaData, xmlData, id)) continue;
+        const liveFleet = countLiveFleetOnFarm(vehicles, id);
+        if (liveFleet > Math.max(3, poolVehicles.length)) continue;
+
+        const heads = livestockHeadCountOnFarm(luaData, id);
+        const assignedFleet = countAssignedFleetOnFarm(vehicles, id);
+        let score = heads * 1000 + (liveFleet === 0 ? 500 : 100) + assignedFleet * 150;
+        if (farmIdHasLivestock(luaData, id)) score += 250;
+        // ADS bonus only when savegame has pool-100 rows not yet on a player farm (not dealership demos).
+        const unassignedPoolAds = poolVehicles.filter(
+            (v) => v?.ads?.enabled === true
+                && isSavegameBackedPoolVehicle(v, index, id)
+                && !index.playerFarmByUniqueId?.has(vehicleUniqueId(v))
+        ).length;
+        if (unassignedPoolAds > 0 && countAdsEnabledOnFarm(vehicles, id) === 0) score += 2000;
+        if (score > bestScore) {
+            bestScore = score;
+            bestId = id;
+        }
+    }
+    if (bestId == null || bestScore <= 0) return null;
+    return bestId;
+}
+
+/** Drop live pool-100 rows with no player-farm savegame backing (dealership floor stock). */
+function dropUnbackedPoolVehicles(vehicles, xmlIndex, poolTargetFarmId = null) {
+    return toArr(vehicles).filter((v) => {
+        if (v?.isUsedEquipmentYardStock === true) return true;
+        if (isMapTrafficVehicle(v)) return false;
+        const owner = Number(v.ownerFarmId ?? v.farmId ?? 0);
+        if (!isVehiclePoolFarmId(owner)) return true;
+        return isSavegameBackedPoolVehicle(v, xmlIndex, poolTargetFarmId);
+    });
+}
+
+/** Per-vehicle pool-100 → player farm when savegame confirms ownership. */
+function resolvePool100Ownership(vehicles, luaData, farmInfo, xmlData, xmlIndex) {
+    const index = xmlIndex || buildPoolVehicleXmlIndex(toArr(xmlData?.vehicles));
+    const transientTarget = inferTransientVehiclePoolFarmId(vehicles, luaData, farmInfo, xmlData, index);
+    return toArr(vehicles).map((v) => {
+        const owner = Number(v.ownerFarmId ?? v.farmId ?? 0);
+        if (!isVehiclePoolFarmId(owner)) return v;
+
+        const uid = vehicleUniqueId(v);
+        if (uid && index.playerFarmByUniqueId?.has(uid)) {
+            const farm = index.playerFarmByUniqueId.get(uid);
+            return { ...v, ownerFarmId: farm, farmId: farm };
+        }
+
+        const cfg = vehicleConfigBasename(v);
+        const playerFarms = cfg ? index.playerFarmByConfig?.get(cfg) : null;
+        if (playerFarms?.size === 1) {
+            const farm = [...playerFarms][0];
+            if (isSavegameBackedPoolVehicle(v, index, farm)) {
+                return { ...v, ownerFarmId: farm, farmId: farm };
+            }
+        }
+
+        if (transientTarget != null && isSavegameBackedPoolVehicle(v, index, transientTarget)) {
+            return { ...v, ownerFarmId: transientTarget, farmId: transientTarget };
+        }
+
+        return v;
+    });
+}
+
+function finalizeMergedVehicles(luaData, xmlData, mergedVehicles) {
+    const farmInfo = buildMergedFarmInfo(luaData, xmlData ?? null);
+    const xmlIndex = buildPoolVehicleXmlIndex(toArr(xmlData?.vehicles));
+    const transientTarget = inferTransientVehiclePoolFarmId(
+        mergedVehicles, luaData, farmInfo, xmlData ?? null, xmlIndex
+    );
+    let out = pairXmlOnlyWithNearbyLua(mergedVehicles);
+    out = dropUnbackedPoolVehicles(out, xmlIndex, transientTarget);
+    out = resolvePool100Ownership(out, luaData, farmInfo, xmlData ?? null, xmlIndex);
+    return out.filter((v) => {
+        if (v?.isUsedEquipmentYardStock === true) return true;
+        if (isMapTrafficVehicle(v)) return false;
+        const owner = Number(v.ownerFarmId ?? v.farmId ?? 0);
+        return owner > 0 && !isVehiclePoolFarmId(owner);
+    });
+}
+
 function mergeVehicles(luaVehicles, xmlVehicles) {
-    // Match Lua<->XML by a STABLE config-file + farm key, NOT by position.
-    // Position can't be the primary key: on a live/dedicated server the Lua entry carries the
-    // vehicle's *live* world position while the XML entry carries its *last-saved* position, so
-    // a position-only match (old 5m test) missed for any vehicle that had moved and the SAME
-    // vehicle was emitted twice — once from Lua with its real name, once as an "xml_only" card
-    // named after the config file (e.g. "series9S" alongside "MF 9S"). We bucket XML records by
-    // key and consume each at most once; position is only a tiebreaker among same-model vehicles.
+    const luaConfigClaims = buildLuaConfigClaimsByFarm(luaVehicles);
+    const xmlByUid = new Map();
     const xmlByKey = new Map();
+    const xmlByCfg = new Map();
     for (const xv of xmlVehicles) {
+        const uid = vehicleUniqueId(xv);
+        if (uid && !xmlByUid.has(uid)) xmlByUid.set(uid, xv);
         const k = vehicleConfigKey(xv);
-        if (!k) continue;
-        if (!xmlByKey.has(k)) xmlByKey.set(k, []);
-        xmlByKey.get(k).push(xv);
+        if (k) {
+            if (!xmlByKey.has(k)) xmlByKey.set(k, []);
+            xmlByKey.get(k).push(xv);
+        }
+        const cfg = vehicleConfigBasename(xv);
+        if (cfg) {
+            if (!xmlByCfg.has(cfg)) xmlByCfg.set(cfg, []);
+            xmlByCfg.get(cfg).push(xv);
+        }
     }
 
     const takeClosest = (list, luaV) => {
@@ -1290,41 +2089,121 @@ function mergeVehicles(luaVehicles, xmlVehicles) {
         return list.splice(bestIdx, 1)[0];
     };
 
-    const merged = luaVehicles.map(luaV => {
+    const removeFromBuckets = (xmlV) => {
+        const k = vehicleConfigKey(xmlV);
+        if (k) {
+            const farmBucket = xmlByKey.get(k);
+            if (farmBucket) {
+                const idx = farmBucket.indexOf(xmlV);
+                if (idx >= 0) farmBucket.splice(idx, 1);
+            }
+        }
+        const cfg = vehicleConfigBasename(xmlV);
+        if (cfg) {
+            const cfgBucket = xmlByCfg.get(cfg);
+            if (cfgBucket) {
+                const idx = cfgBucket.indexOf(xmlV);
+                if (idx >= 0) cfgBucket.splice(idx, 1);
+            }
+        }
+    };
+
+    const takeXmlMatch = (luaV) => {
+        const uid = vehicleUniqueId(luaV);
+        if (uid && xmlByUid.has(uid)) {
+            const xmlV = xmlByUid.get(uid);
+            xmlByUid.delete(uid);
+            removeFromBuckets(xmlV);
+            return xmlV;
+        }
+        if (luaV?.id != null) {
+            const idStr = String(luaV.id);
+            if (xmlByUid.has(idStr)) {
+                const xmlV = xmlByUid.get(idStr);
+                xmlByUid.delete(idStr);
+                removeFromBuckets(xmlV);
+                return xmlV;
+            }
+            for (const [xuid, xmlV] of xmlByUid.entries()) {
+                if (xuid === idStr || xuid.endsWith(idStr) || idStr.endsWith(xuid)) {
+                    xmlByUid.delete(xuid);
+                    removeFromBuckets(xmlV);
+                    return xmlV;
+                }
+            }
+        }
+
         const k = vehicleConfigKey(luaV);
-        const xmlV = k ? takeClosest(xmlByKey.get(k), luaV) : null;
+        const keyed = k ? xmlByKey.get(k) : null;
+        if (keyed && keyed.length > 0) {
+            return takeClosest(keyed, luaV);
+        }
+        if (luaV?.isUsedEquipmentYardStock === true) return null;
+        const luaFarm = Number(luaV.ownerFarmId ?? luaV.farmId ?? 0);
+        if (!isTransientVehicleFarmId(luaFarm)) return null;
+        const cfg = vehicleConfigBasename(luaV);
+        const cfgList = cfg ? xmlByCfg.get(cfg) : null;
+        if (!cfgList || cfgList.length === 0) return null;
+        const eligible = cfgList.filter((xv) => {
+            const xk = vehicleConfigKey(xv);
+            return !(xk && luaConfigClaims.has(xk));
+        });
+        if (eligible.length === 0) return null;
+        const poolXml = eligible.filter((xv) =>
+            isVehiclePoolFarmId(Number(xv.farmId ?? xv.ownerFarmId ?? 0))
+        );
+        if (poolXml.length > 0) {
+            const xmlV = takeClosest(poolXml, luaV);
+            if (xmlV) {
+                removeFromBuckets(xmlV);
+                return xmlV;
+            }
+        }
+        return null;
+    };
+
+    const merged = luaVehicles.map(luaV => {
+        const xmlV = takeXmlMatch(luaV);
+        const ownerFarmId = resolveMergedOwnerFarmId(luaV, xmlV);
         return {
             ...luaV,
-            ownerFarmId   : luaV.ownerFarmId ?? xmlV?.farmId ?? 0,
-            farmId        : luaV.ownerFarmId ?? xmlV?.farmId ?? 0,
+            ownerFarmId,
+            farmId        : ownerFarmId,
             price         : luaV.price  || xmlV?.price  || 0,
             age           : luaV.age    || xmlV?.age    || 0,
-            uniqueId      : xmlV?.uniqueId || luaV.id,
+            uniqueId      : vehicleUniqueId(xmlV) || vehicleUniqueId(luaV) || luaV.id,
             filename      : xmlV?.filename || luaV.configFileName || '',
+            propertyState : luaV.propertyState || xmlV?.propertyState || '',
             xmlFillLevels : xmlV?.fillLevels || {},
             source        : xmlV ? 'merged' : 'lua_only',
         };
     });
 
-    // Anything left in the XML buckets has no Lua counterpart → genuinely off-map / stored.
     for (const list of xmlByKey.values()) {
         for (const xv of list) {
-            merged.push({
-                id: xv.uniqueId, uniqueId: xv.uniqueId,
-                name: xv.name, filename: xv.filename,
-                farmId: xv.farmId, ownerFarmId: xv.farmId,
-                price: xv.price, age: xv.age,
-                operatingTime: xv.operatingTime,
-                damage: xv.damage, fillLevels: xv.fillLevels,
-                xmlFillLevels: xv.fillLevels,
-                position: xv.position,
-                isMotorized: false, engineOn: false, speed: 0,
-                source: 'xml_only',
-            });
+            const owner = Number(xv.farmId ?? xv.ownerFarmId ?? 0);
+            if (isVehiclePoolFarmId(owner)) continue;
+            merged.push(buildXmlOnlyVehicleRow(xv));
         }
     }
 
     return merged;
+}
+
+/** @deprecated use resolvePool100Ownership */
+function resolveTransientVehicleOwnership(vehicles, luaData, farmInfo, xmlData = null, xmlIndex = null) {
+    const index = xmlIndex || buildPoolVehicleXmlIndex(toArr(xmlData?.vehicles));
+    const transientTarget = inferTransientVehiclePoolFarmId(vehicles, luaData, farmInfo, xmlData, index);
+    let out = dropUnbackedPoolVehicles(vehicles, index, transientTarget);
+    return resolvePool100Ownership(out, luaData, farmInfo, xmlData ?? null, index);
+}
+
+/** @deprecated retained for tests — savegame-backed pool rows only */
+function isLikelyPlayerOwnedPoolVehicle(v, xmlIndex = null, poolTargetFarmId = null) {
+    if (v?.isUsedEquipmentYardStock === true) return false;
+    if (isMapTrafficVehicle(v)) return false;
+    if (isDealershipFloorStock(v)) return false;
+    return Boolean(xmlIndex && isSavegameBackedPoolVehicle(v, xmlIndex, poolTargetFarmId));
 }
 
 // ─── economy ──────────────────────────────────────────────────────────────────
@@ -1515,10 +2394,17 @@ function mapMetaFromLua(lua) {
     };
 }
 
+function normalizeXmlVehiclesForMerge(vehicles) {
+    return toArr(vehicles).map((v) => {
+        const owner = Number(v.ownerFarmId ?? v.farmId ?? 0);
+        return { ...v, ownerFarmId: owner, farmId: owner };
+    });
+}
+
 function buildFromLuaOnly(lua) {
-    const allowed = farmIdsFromLuaFields(lua.fields);
     const fillTypeCatalog = buildFillTypeCatalog(lua);
-    const stockEnriched = enrichStockFillTypes(lua.stock, fillTypeCatalog);
+    const fillTypeTitles = collectFillTypeTitles(lua);
+    const stockEnriched = enrichStockFillTypes(lua.stock, fillTypeCatalog, fillTypeTitles);
     const mapMeta = mapMetaFromLua(lua);
     return {
         dataSource: 'lua_only', xmlAvailable: false, luaAvailable: true,
@@ -1530,23 +2416,25 @@ function buildFromLuaOnly(lua) {
         savegameName: '', settings: {}, gameSettings: {}, mods: [],
         gameTime: lua.gameTime || {},
         // Lua may serialise an empty table as {} — must be an array for the UI
-        farmInfo: filterFarmsByFarmlandOwnership(toArr(lua.farmInfo), allowed),
+        farmInfo: buildMergedFarmInfo(lua, null),
         money: lua.finance?.money ?? lua.money ?? 0,
         finance: lua.finance || {},
         weather: lua.weather || {},
         missions: [],
         animals: lua.animals || [],
         fields: toArr(lua.fields).map(normalizeFieldMulch),
-        vehicles: lua.vehicles || [],
+        vehicles: finalizeMergedVehicles(lua, null, toArr(lua.vehicles)),
         economy: lua.economy   || {},
         production: lua.production || {},
         baleInventory: enrichBaleInventoryFromStock(lua, stockEnriched.catalog),
         fillTypeCatalog: stockEnriched.catalog,
+        fillTypeTitles,
         cropFillTypeIndex: lua.cropFillTypeIndex || {},
         stock: {
             ...stockEnriched.stock,
             enabled: lua.stock?.enabled !== false,
             fillTypeCatalog: { ...stockEnriched.catalog },
+            fillTypeTitles: { ...fillTypeTitles },
         },
         redTape: lua.redTape || { enabled: false, byFarm: {} },
         placeables: [],
@@ -1554,7 +2442,6 @@ function buildFromLuaOnly(lua) {
 }
 
 function buildFromXmlOnly(xml) {
-    const allowed = farmIdsOwningFarmland(toArr(xml.farmlandsArray));
     return {
         dataSource: 'xml_only', xmlAvailable: true, luaAvailable: false,
         lastUpdated: new Date().toISOString(),
@@ -1569,7 +2456,7 @@ function buildFromXmlOnly(xml) {
             hour: xml.environment.hour, minute: xml.environment.minute,
             day: xml.environment.currentDay, dayTime: xml.environment.dayTime,
         } : {},
-        farmInfo: filterFarmsByFarmlandOwnership(toArr(xml.farms), allowed),
+        farmInfo: buildMergedFarmInfo(null, xml),
         money: xml.career?.money || 0,
         finance: { money: xml.career?.money || 0 },
         weather: xml.environment ? {
@@ -1580,7 +2467,7 @@ function buildFromXmlOnly(xml) {
         missions: xml.missions || [],
         animals: [],
         fields: toArr((xml.allFields && xml.allFields.length > 0) ? xml.allFields : (xml.fields || [])).map(normalizeFieldMulch),
-        vehicles: xml.vehicles || [],
+        vehicles: finalizeMergedVehicles(null, xml, normalizeXmlVehiclesForMerge(xml.vehicles)),
         economy: { xmlPriceHistory: xml.economy || {} },
         production: {},
         placeables: xml.placeables || [],
@@ -1592,6 +2479,12 @@ function buildFromXmlOnly(xml) {
 module.exports = {
     mergeData,
     mergeVehicles,
+    inferTransientVehiclePoolFarmId,
+    resolveTransientVehicleOwnership,
+    isVehiclePoolFarmId,
+    isLikelyPlayerOwnedPoolVehicle,
+    buildPoolVehicleXmlIndex,
+    isSavegameBackedPoolVehicle,
     mergeRedTapeCropRotation,
     supplementRedTapeCropRotation,
     buildFieldLiveFingerprints,

@@ -19,7 +19,7 @@ import {
   formatMoisturePercent,
   moistureGradeLabel,
 } from "./moisture.js";
-import { resolveStockItemFillType, mergeFillTypeCatalog, lookupFillTypeNameFromEconomy } from "./fillTypeResolve.js";
+import { resolveStockItemFillType, mergeFillTypeCatalog, lookupFillTypeNameFromEconomy, applyFillTypeTitles, titleForIndex, enrichStockFillTypesFromPlaceables } from "./fillTypeResolve.js";
 
 const DISPLAY_NAMES = {
   WHEAT: "Wheat",
@@ -197,6 +197,17 @@ function catalogFromMapCrops(dashboard) {
   return out;
 }
 
+function collectFillTypeTitles(dashboard) {
+  const economy = dashboard?.economy || {};
+  const mp = economy.marketPrices || {};
+  return mergeFillTypeCatalog(
+    dashboard?.fillTypeTitles,
+    dashboard?.stock?.fillTypeTitles,
+    economy.fillTypeTitles,
+    mp.fillTypeTitles
+  );
+}
+
 /** Build index→name catalog from every export path (mod root, stock, economy, market maps). */
 export function buildFillTypeCatalog(dashboard) {
   const economy = dashboard?.economy || {};
@@ -220,16 +231,24 @@ export function buildFillTypeCatalog(dashboard) {
       if (idx != null) fromSellPoints[String(idx)] = productName;
     }
   }
-  return mergeFillTypeCatalog(
-    dashboard?.fillTypeCatalog,
-    dashboard?.stock?.fillTypeCatalog,
-    economy.fillTypeCatalog,
-    mp.fillTypesByIndex,
-    catalogFromMapCrops(dashboard),
-    fromNameToIndex,
-    fromCrops,
-    fromSellPoints
+  const titles = collectFillTypeTitles(dashboard);
+  return applyFillTypeTitles(
+    mergeFillTypeCatalog(
+      dashboard?.fillTypeCatalog,
+      economy.fillTypeCatalog,
+      mp.fillTypesByIndex,
+      catalogFromMapCrops(dashboard),
+      fromNameToIndex,
+      fromCrops,
+      fromSellPoints,
+      dashboard?.stock?.fillTypeCatalog
+    ),
+    titles
   );
+}
+
+export function resolveFillTypeTitles(dashboard) {
+  return collectFillTypeTitles(dashboard);
 }
 
 export function resolveFillTypeCatalog(dashboard) {
@@ -348,8 +367,13 @@ function computeValue(liters, pricePer1000) {
 }
 
 /** Resolve numeric fill types and back-fill sell hints from economy market data. */
-export function enrichStockItem(item, stock, economy, rootCatalog) {
+export function enrichStockItem(item, stock, economy, rootCatalog, placeables, farmId) {
   const out = { ...item, locations: normalizeLocations(item?.locations) };
+  const titles = mergeFillTypeCatalog(
+    stock?.fillTypeTitles,
+    economy?.fillTypeTitles,
+    economy?.marketPrices?.fillTypeTitles
+  );
   const catalog = mergeFillTypeCatalog(
     rootCatalog,
     stock?.fillTypeCatalog,
@@ -363,24 +387,45 @@ export function enrichStockItem(item, stock, economy, rootCatalog) {
         ])
       )
   );
+  const mergedCatalog = applyFillTypeTitles(catalog, titles);
   for (const [name, crop] of Object.entries(economy?.marketPrices?.crops || {})) {
     const cidx = crop?.fillTypeIndex;
-    if (cidx != null && !catalog[String(cidx)]) catalog[String(cidx)] = name;
+    if (cidx != null && !mergedCatalog[String(cidx)]) mergedCatalog[String(cidx)] = name;
   }
   for (const station of Object.values(economy?.marketPrices?.sellPoints || {})) {
     if (!station?.prices || typeof station.prices !== "object") continue;
     for (const [productName, priceInfo] of Object.entries(station.prices)) {
       const cidx = priceInfo?.fillTypeIndex;
-      if (cidx != null && !catalog[String(cidx)]) catalog[String(cidx)] = productName;
+      if (cidx != null && !mergedCatalog[String(cidx)]) mergedCatalog[String(cidx)] = productName;
     }
   }
-  const resolved = resolveStockItemFillType(out, catalog);
+  const stockIdx = Number(out.fillTypeIndex);
+  const fromPlaceables = enrichStockFillTypesFromPlaceables(
+    { byFarm: { 0: { farmId: farmId || 0, items: [out] } } },
+    placeables,
+    mergedCatalog
+  );
+  const placeableItem = fromPlaceables.stock.byFarm["0"]?.items?.[0];
+  if (placeableItem?.fillType && (!out.fillType || /^\d+$/.test(String(out.fillType).trim()))) {
+    out.fillType = placeableItem.fillType;
+    if (stockIdx > 0) {
+      mergedCatalog[String(stockIdx)] = mergedCatalog[String(stockIdx)] || placeableItem.fillType;
+    }
+  }
+  const resolved = resolveStockItemFillType(out, mergedCatalog, titles);
   const idx = Number(resolved.fillTypeIndex);
+  if (idx > 0 && (!resolved.fillType || /^\d+$/.test(String(resolved.fillType).trim()))) {
+    const fromTitle = titleForIndex(idx, titles);
+    if (fromTitle) {
+      resolved.fillType = fromTitle;
+      mergedCatalog[String(idx)] = mergedCatalog[String(idx)] || fromTitle;
+    }
+  }
   if (idx > 0 && (!resolved.fillType || /^\d+$/.test(String(resolved.fillType).trim()))) {
     const fromEcon = lookupFillTypeNameFromEconomy(idx, economy);
     if (fromEcon) {
       resolved.fillType = fromEcon;
-      catalog[String(idx)] = catalog[String(idx)] || fromEcon;
+      mergedCatalog[String(idx)] = mergedCatalog[String(idx)] || fromEcon;
     }
   }
   const crop = findCropForItem(resolved, economy);
@@ -401,16 +446,17 @@ export function enrichStockItem(item, stock, economy, rootCatalog) {
   return resolved;
 }
 
-export function enrichStockItems(items, stock, economy, rootCatalog) {
+export function enrichStockItems(items, stock, economy, rootCatalog, placeables, farmId) {
   const list = Array.isArray(items) ? items : [];
   return list
-    .map((item) => enrichStockItem(item, stock, economy, rootCatalog))
+    .map((item) => enrichStockItem(item, stock, economy, rootCatalog, placeables, farmId))
     .filter((item) => Number(item.totalLiters) > 0);
 }
 
-function displayFillTypeName(item, catalog, economy) {
+function displayFillTypeName(item, catalog, economy, titles) {
   const idx = Number(item?.fillTypeIndex);
   const cat = catalog && typeof catalog === "object" ? catalog : {};
+  const titleMap = titles && typeof titles === "object" ? titles : {};
   let rawKey = "";
   if (idx > 0 && (cat[String(idx)] || cat[idx])) {
     rawKey = cat[String(idx)] || cat[idx];
@@ -418,11 +464,16 @@ function displayFillTypeName(item, catalog, economy) {
     return formatCommodityLabel(String(item.fillTypeDisplay).trim());
   } else if (item?.fillTypeTitle) {
     return formatCommodityLabel(String(item.fillTypeTitle).trim());
-  } else if (item?.fillType && !/^\d+$/.test(String(item.fillType).trim())) {
-    rawKey = String(item.fillType).trim();
-  } else if (idx > 0 && economy) {
+  } else if (idx > 0) {
+    const fromTitles = titleForIndex(idx, titleMap);
+    if (fromTitles) return formatCommodityLabel(fromTitles);
+  }
+  if (!rawKey && idx > 0 && economy) {
     const fromEcon = lookupFillTypeNameFromEconomy(idx, economy);
     if (fromEcon) rawKey = fromEcon;
+  }
+  if (!rawKey && item?.fillType && !/^\d+$/.test(String(item.fillType).trim())) {
+    rawKey = String(item.fillType).trim();
   }
   if (rawKey) return formatCommodityLabel(rawKey);
   if (idx > 0) return t("storage.fillTypeIndex", { index: idx });
@@ -545,9 +596,9 @@ function locationDetailRows(locations) {
   </table>`;
 }
 
-function buildCommodityRow(item, idx, catalog, economy) {
-  const rawKey = cropKeyForItem(item) || displayFillTypeName(item, catalog, economy).toUpperCase();
-  const name = escapeHtml(displayFillTypeName(item, catalog, economy));
+function buildCommodityRow(item, idx, catalog, economy, titles) {
+  const rawKey = cropKeyForItem(item) || displayFillTypeName(item, catalog, economy, titles).toUpperCase();
+  const name = escapeHtml(displayFillTypeName(item, catalog, economy, titles));
   const icon = commodityIcon(rawKey);
   const liters = Number(item.totalLiters) || 0;
   const pricePer1000 = item._pricePer1000 ?? resolvePricePer1000(item, item._crop);
@@ -592,9 +643,11 @@ function buildCommodityRow(item, idx, catalog, economy) {
     </tr>`;
 }
 
-function buildCommodityTable(items, catalog, economy) {
+function buildCommodityTable(items, catalog, economy, titles) {
   const sorted = [...items].sort((a, b) =>
-    displayFillTypeName(a, catalog, economy).localeCompare(displayFillTypeName(b, catalog, economy))
+    displayFillTypeName(a, catalog, economy, titles).localeCompare(
+      displayFillTypeName(b, catalog, economy, titles)
+    )
   );
 
   return `
@@ -614,7 +667,7 @@ function buildCommodityTable(items, catalog, economy) {
             </tr>
           </thead>
           <tbody>
-            ${sorted.map((item, i) => buildCommodityRow(item, i, catalog, economy)).join("")}
+            ${sorted.map((item, i) => buildCommodityRow(item, i, catalog, economy, titles)).join("")}
           </tbody>
         </table>
       </div>
@@ -671,11 +724,14 @@ export function buildStockPanelHTML(dashboard) {
   const stock = dashboard.stock;
   const farmRow = getStockForActiveFarm(stock, farmId);
   const catalog = resolveFillTypeCatalog(dashboard);
+  const titles = collectFillTypeTitles(dashboard);
   const items = enrichStockItems(
     farmRow?.items,
     stock,
     dashboard.economy,
-    catalog
+    catalog,
+    dashboard.placeables,
+    farmId
   );
   const envHtml = buildMoistureEnvironmentHtml(dashboard.weather);
   const baleMoistHtml = buildBaleMoistureSummaryHtml(dashboard.baleInventory, farmId);
@@ -683,7 +739,7 @@ export function buildStockPanelHTML(dashboard) {
   const stockBody =
     items.length === 0
       ? `<div class="alert alert-secondary mb-0">${escapeHtml(t("storage.hintEmpty"))}</div>`
-      : buildCommodityTable(items, catalog, dashboard.economy);
+      : buildCommodityTable(items, catalog, dashboard.economy, titles);
 
   const countLine =
     items.length > 0

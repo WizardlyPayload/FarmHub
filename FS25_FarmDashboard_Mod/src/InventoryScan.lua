@@ -113,10 +113,20 @@ end
 function InventoryScan.rebuildFillTypeCatalog()
     if rawget(_G, "FillTypeUtils") and FillTypeUtils.rebuildCatalog then
         FillTypeUtils.rebuildCatalog()
+        if FillTypeUtils.probeAllFillTypes then
+            FillTypeUtils.probeAllFillTypes()
+        end
     end
     local out = {}
     if rawget(_G, "FillTypeUtils") and FillTypeUtils.catalogForJson then
         out = FillTypeUtils.catalogForJson()
+    end
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.catalogTitlesForJson then
+        for idx, title in pairs(FillTypeUtils.catalogTitlesForJson()) do
+            if not out[tostring(idx)] or out[tostring(idx)] == "" or tonumber(out[tostring(idx)]) then
+                out[tostring(idx)] = title
+            end
+        end
     end
     local ftm = _ftm()
     if ftm and ftm.fillTypes then
@@ -597,7 +607,7 @@ local function _stockEnsureItem(farmBucket, fillTypeIndex)
     return farmBucket._idx[key]
 end
 
-function InventoryScan.addStockLiters(stockState, farmId, fillTypeIndex, liters, locName, kind, extra, uniqueId)
+function InventoryScan.addStockLiters(stockState, farmId, fillTypeIndex, liters, locName, kind, extra, uniqueId, placeable)
     if not stockState or not farmId then return end
     local lit = _roundLiters(liters)
     if lit <= 0 then return end
@@ -606,6 +616,13 @@ function InventoryScan.addStockLiters(stockState, farmId, fillTypeIndex, liters,
     local item = _stockEnsureItem(bucket, fillTypeIndex)
     if not item then return end
     item.totalLiters = item.totalLiters + lit
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.resolveIndexAtPlaceable and placeable then
+        if not item.fillType or item.fillType == "" then
+            local name, title = FillTypeUtils.resolveIndexAtPlaceable(placeable, item.fillTypeIndex)
+            if name and name ~= "" then item.fillType = name end
+            if title and title ~= "" then item.fillTypeTitle = item.fillTypeTitle or title end
+        end
+    end
     if item._locCount >= MAX_LOCATIONS_PER_FILL then return end
     item._locCount = item._locCount + 1
     local idx = item.fillTypeIndex
@@ -1222,7 +1239,7 @@ function InventoryScan.scanPlaceableForFarm(placeable, farmId, stockState, baleS
                         local n = tonumber(lit) or 0
                         if n > 0 then
                             siloLitersFromStorages = siloLitersFromStorages + n
-                            InventoryScan.addStockLiters(stockState, farmId, ftIdx, lit, pname, "silo", nil, moistureUid)
+                            InventoryScan.addStockLiters(stockState, farmId, ftIdx, lit, pname, "silo", nil, moistureUid, placeable)
                         end
                     end
                 end
@@ -1232,7 +1249,7 @@ function InventoryScan.scanPlaceableForFarm(placeable, farmId, stockState, baleS
             local ok, levels = pcall(function() return spec.loadingStation:getAllFillLevels(farmId) end)
             if ok and type(levels) == "table" then
                 for ftIdx, lit in pairs(levels) do
-                    InventoryScan.addStockLiters(stockState, farmId, ftIdx, lit, pname, "silo", nil, moistureUid)
+                    InventoryScan.addStockLiters(stockState, farmId, ftIdx, lit, pname, "silo", nil, moistureUid, placeable)
                 end
             end
         end
@@ -1243,7 +1260,7 @@ function InventoryScan.scanPlaceableForFarm(placeable, farmId, stockState, baleS
         local extUid = _siloMoistureUniqueId(placeable, nil, storage)
         if storage and _storageOwnedByFarm(storage, farmId) and storage.fillLevels then
             for ftIdx, lit in pairs(storage.fillLevels) do
-                InventoryScan.addStockLiters(stockState, farmId, ftIdx, lit, pname, "siloExtension", nil, extUid)
+                InventoryScan.addStockLiters(stockState, farmId, ftIdx, lit, pname, "siloExtension", nil, extUid, placeable)
             end
         end
     end
@@ -1254,7 +1271,7 @@ function InventoryScan.scanPlaceableForFarm(placeable, farmId, stockState, baleS
             local ls = spec.loadingStation
             for ftIdx, lit in pairs(spec.storage.fillLevels) do
                 if lit > 0 and (not ls or not ls.supportedFillTypes or ls.supportedFillTypes[ftIdx]) then
-                    InventoryScan.addStockLiters(stockState, farmId, ftIdx, lit, pname, "husbandry")
+                    InventoryScan.addStockLiters(stockState, farmId, ftIdx, lit, pname, "husbandry", nil, nil, placeable)
                 end
             end
         end

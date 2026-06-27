@@ -11,6 +11,7 @@ import {
   countActiveAdsBreakdowns,
   summarizeAdsFleet,
   buildAdsVehiclePanelHtml,
+  vehicleHasAds,
   vehicleNeedsAdsWarning,
   isVehicleInNeedOfRepair,
   getWorstAdsInspectionSeverity,
@@ -219,6 +220,9 @@ function vehicleCardFingerprint(vehicle) {
     Math.round(getVehicleDamageFraction(vehicle) * 100),
     Math.round(getVehicleConditionFraction(vehicle) * 100),
     getVehicleModelYear(vehicle) ?? "",
+    vehicleHasAds(vehicle) ? 1 : 0,
+    Math.round((Number(vehicle?.ads?.condition) || 0) * 100),
+    Math.round((Number(vehicle?.ads?.serviceLevel) || 0) * 100),
     countActiveAdsBreakdowns(vehicle),
     isVehicleInAdsService(vehicle) ? 1 : 0,
     isVehicleAdsOverdue(vehicle) ? 1 : 0,
@@ -2380,9 +2384,14 @@ export async function loadVehicles() {
         (v) => !this.isStorageItem(v) && !isUsedEquipmentYardStock(v)
       );
       const nextFp = vehicleListUiFingerprint(displayVehicles);
+      const adsFleet = summarizeAdsFleet(displayVehicles);
+      const adsFleetChanged =
+        Boolean(adsFleet.enabled) !== Boolean(this._lastAdsFleetEnabled);
+      this._lastAdsFleetEnabled = Boolean(adsFleet.enabled);
       const sameFleet =
         nextFp === this._lastVehicleCardsFingerprint &&
-        filtered.length === normalizeVehicleList(this.vehicles).length;
+        filtered.length === normalizeVehicleList(this.vehicles).length &&
+        !adsFleetChanged;
       const needsPaint = vehiclesGridNeedsPaint();
 
       this.vehicles = filtered;
@@ -2753,7 +2762,7 @@ export function createVehicleCard(vehicle) {
                 vehicle.vehicleType,
                 vehicle.typeName
               )}">
-                ${vehicle.typeName || vehicle.vehicleType}
+                ${vehicle.typeName || vehicle.vehicleType || t("vehicles.optImplements")}
               </span>
             </div>
           </div>

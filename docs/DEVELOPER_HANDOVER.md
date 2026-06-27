@@ -1,13 +1,13 @@
-# FarmHub — Developer handover (v4.1)
+# FarmHub — Developer handover (v4.2)
 
-This is the **single maintainer reference** for **FarmHub**: the **FS25 Farm Dashboard** Electron + web app and the **FS25 Farm Dashboard** Lua mod. It targets a new contributor shipping fixes or features on the **4.0.x** line without breaking LAN, merge, or mod export contracts.
+This is the **single maintainer reference** for **FarmHub**: the **FS25 Farm Dashboard** Electron + web app and the **FS25 Farm Dashboard** Lua mod. It targets a new contributor shipping fixes or features on the **4.2.x** line without breaking LAN, merge, or mod export contracts.
 
 **Documentation map:** Public users → [README.md](../README.md), [INSTALL.md](./INSTALL.md), [USER_MANUAL.md](./USER_MANUAL.md), [SCREENSHOTS.md](./SCREENSHOTS.md). Internal → [_internal/README.md](./_internal/README.md) (planning, audits, i18n, updater QA).
 
 | Artifact | Where | Current value |
 | -------- | ----- | ------------- |
-| Desktop app | `FS25_FarmDashboard_App/package.json` | **`4.1.0`** |
-| Lua mod | `FS25_FarmDashboard_Mod/modDesc.xml` | **`3.1.0.0`** |
+| Desktop app | `FS25_FarmDashboard_App/package.json` | **`4.2.0`** |
+| Lua mod | `FS25_FarmDashboard_Mod/modDesc.xml` | **`3.4.0.6`** |
 | HTTP / WebSocket port | `main.js` `PORT` | **`8766`** |
 | Companion docs | [`USER_MANUAL.md`](./USER_MANUAL.md) · [`SECURITY.md`](./SECURITY.md) · [`CHANGELOG.md`](./CHANGELOG.md) · [`_internal/I18N.md`](./_internal/I18N.md) · [`_internal/AUDIT_v3.9_PREFINAL.md`](./_internal/AUDIT_v3.9_PREFINAL.md) | — |
 
@@ -555,7 +555,7 @@ There is **no rotating log file**. Console output goes to stdout / DevTools. If 
 
 ## 13. Known gaps from the audits
 
-**Current release posture:** [`RELEASE_v4.1.0.md`](./RELEASE_v4.1.0.md) (feature **4.1.0** line). Prior stable: [`RELEASE_v4.0.0.md`](./RELEASE_v4.0.0.md).
+**Current release posture:** [`RELEASE_v4.2.0.md`](./RELEASE_v4.2.0.md) (public **4.2.0** line). Prior stable: [`RELEASE_v4.0.0.md`](./RELEASE_v4.0.0.md).
 
 **Historical v3.0 gap analysis:** [`AUDIT_v3.0.md`](./AUDIT_v3.0.md) listed code-vs-docs items; several UX/engineering follow-ups below were captured there and may still apply until closed in code:
 

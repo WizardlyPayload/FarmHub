@@ -1,6 +1,10 @@
 {
   "page.title": "Tablou de bord pentru agricultură",
   "splash.loading": "Se încarcă datele fermei…",
+  "demo.splashHint": "Datele live nu au sosit încă — apăsați Reîmprospătare (F5) în câteva secunde dacă acest ecran rămâne gol.",
+  "demo.dataWaitTitle": "Datele live nu au ajuns încă",
+  "demo.dataWaitHint": "Apăsați butonul Refresh din browser (F5) — demonstrația poate dura puțin la prima vizită.",
+  "demo.dataWaitRefresh": "Reîmprospătați pagina",
   "nav.brand": "Panou fermă",
   "nav.loading": "Încărcare...",
   "nav.dataSource": "Sursă de date",

@@ -1,6 +1,10 @@
 {
   "page.title": "Cruscotto agricolo",
   "splash.loading": "Caricamento dei dati della tua azienda agricola…",
+  "demo.splashHint": "I dati in tempo reale non sono ancora disponibili: se la schermata rimane vuota, premi Aggiorna (F5) tra qualche secondo.",
+  "demo.dataWaitTitle": "I dati in tempo reale non sono ancora arrivati.",
+  "demo.dataWaitHint": "Fai clic su Aggiorna nel tuo browser (F5): la demo potrebbe richiedere qualche istante la prima volta che la visiti.",
+  "demo.dataWaitRefresh": "Pagina aggiornata",
   "nav.brand": "Cruscotto",
   "nav.loading": "Caricamento...",
   "nav.dataSource": "Fonte dei dati",

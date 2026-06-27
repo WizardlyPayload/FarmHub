@@ -1,6 +1,10 @@
 {
   "page.title": "Mælaborð fyrir landbúnað",
   "splash.loading": "Hleður inn gögn um býlið þitt…",
+  "demo.splashHint": "Lifandi gögn eru ekki komin enn — ýttu á Endurnýja (F5) eftir nokkrar sekúndur ef þessi skjár er tómur.",
+  "demo.dataWaitTitle": "Gögn í beinni eru ekki komin enn",
+  "demo.dataWaitHint": "Ýttu á Endurnýja í vafranum þínum (F5) — kynningin getur tekið smá stund við fyrstu heimsókn.",
+  "demo.dataWaitRefresh": "Endurnýja síðu",
   "nav.brand": "Bændaspjald",
   "nav.loading": "Hleður...",
   "nav.dataSource": "Gagnaheimild",

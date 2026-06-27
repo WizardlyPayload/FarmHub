@@ -2,7 +2,7 @@
 
 **Authors:** **JoshWalki** (Josh) / Wizardlypayload and **WizardlyPayload** — see [AUTHORS.md](./AUTHORS.md).
 
-This document describes how the **desktop app** exposes data, what is **optional** vs **default-locked**, and how that fits a **home / LAN** setup. It is written for **4.1.0**; review again after major upgrades.
+This document describes how the **desktop app** exposes data, what is **optional** vs **default-locked**, and how that fits a **home / LAN** setup. It is written for **4.2.0**; review again after major upgrades.
 
 ---
 
@@ -76,4 +76,4 @@ The FS25 mod only writes **`data.json`** under the user profile. It does not ope
 
 ## Reporting security concerns
 
-For **public** security issues (e.g. unintended remote code execution via the app), contact the maintainers via the GitHub repository’s channels (**JoshWalki** & **WizardlyPayload** — [AUTHORS.md](./AUTHORS.md)). Include app version **4.1.0** and platform **Windows**.
+For **public** security issues (e.g. unintended remote code execution via the app), contact the maintainers via the GitHub repository’s channels (**JoshWalki** & **WizardlyPayload** — [AUTHORS.md](./AUTHORS.md)). Include app version **4.2.0** and platform **Windows**.

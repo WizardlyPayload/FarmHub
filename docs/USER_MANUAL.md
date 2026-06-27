@@ -814,10 +814,11 @@ The mod has **no in-game console command** and **no Giants settings menu entry**
 | **Build / install said `app.asar` is locked** | Run `npm run unlock-install` then re-install. The default `npm run dist` writes the build to `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\` to avoid IDE locks. |
 | **Uninstall asked to wipe user data** | Yes deletes settings, caches, and the registry entry. No keeps your config so a reinstall picks up where you left off. Cancel aborts the uninstall. |
 | **Tablet says 401 / 403** | LAN credentials wrong, or your tablet is outside the IP allowlist. Loopback always bypasses auth unless you ticked "Require auth even from loopback". |
-| **Mod version badge in navbar** | Install **`FS25_FarmDashboard.zip` 3.1.0.0+** on the server / local mods folder, load the save once, and confirm `data.json` shows `serverInfo.modVersion`. |
-| **Fleet map pins offset or on desk border** | Restart the app after upgrading to **4.1.0** (overview cache v6). Delete `%APPDATA%\fs25-farm-dashboard\map_overviews\` and reopen Fleet map. Confirm the PC running the app has the same map mod installed. |
+| **Mod version badge in navbar** | Install **`FS25_FarmDashboard.zip` 3.1.0.0+** (current release **3.4.0.6**) on the server / local mods folder, load the save once, and confirm `data.json` shows `serverInfo.modVersion`. |
+| **Extra vehicles on fleet (dealership demos)** | Showroom floor stock or contractor-pool demos on a player farm — especially after buying a **new farm** on dedicated. Update to app **4.2.0** + mod **3.4.0.6**, restart the app, and confirm merge filters dealership clutter. |
+| **Fleet map pins offset or on desk border** | Restart the app after upgrading to **4.1.0+** (overview cache v6). Delete `%APPDATA%\fs25-farm-dashboard\map_overviews\` and reopen Fleet map. Confirm the PC running the app has the same map mod installed. |
 | **Bale counts look doubled on dedicated** | Requires mod **3.1.0.0+** (deduplicated shed vs world scan). Restart app so merge layer picks up fresh JSON. |
-| **Fill type shows as `Fill type #…`** | Enable `modules.economy="true"` in `config.xml` (§9) so the app can resolve names from sell points and crops. |
+| **Fill type shows as `Fill type #…`** | Update to **4.2.0** / mod **3.4.0.6** for sparse indices (e.g. **Pig Food #147**). Enable **Economy collector** in ESC → Settings → Farm Dashboard (§9) so the app can resolve names from sell points and crops. |
 | **Productions empty** | Enable `modules.production="true"` in `config.xml` (§9) and confirm production buildings exist on the active farm. |
 | **Storage tab empty** | Enable `modules.stock="true"` in `config.xml` (§9) and confirm you own silos / bunkers on the active farm. |
 | **Compliance tab missing** | Red Tape mod must be on the save **and** `modules.redTape="true"`. |

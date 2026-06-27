@@ -1,6 +1,10 @@
 {
   "page.title": "Tableau de bord agricole",
   "splash.loading": "Chargement des données de votre exploitation…",
+  "demo.splashHint": "Les données en direct ne sont pas encore arrivées — appuyez sur Actualiser (F5) dans quelques secondes si cet écran reste vide.",
+  "demo.dataWaitTitle": "Les données en direct ne sont pas encore disponibles.",
+  "demo.dataWaitHint": "Appuyez sur Actualiser dans votre navigateur (F5) — la démo peut prendre un moment lors de la première visite.",
+  "demo.dataWaitRefresh": "Actualiser la page",
   "nav.brand": "Tableau de bord",
   "nav.loading": "Chargement...",
   "nav.dataSource": "Source des données",

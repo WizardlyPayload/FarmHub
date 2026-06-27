@@ -659,7 +659,9 @@ function parseVehiclesXml(xmlStr) {
     for (const veh of ensureArray(root.vehicle)) {
         const outerAttrs = attrs(veh);
         const farmId = parseInt(String(outerAttrs.farmId || '0'), 10);
+        const propertyState = String(outerAttrs.propertyState || 'OWNED').toUpperCase();
         if (farmId === 0) continue;
+        if (propertyState === 'SHOP_CONFIG' || propertyState === 'SOLD') continue;
 
         const fillLevels = {};
         for (const unit of collectTagRecursive(veh, 'unit', [])) {
@@ -800,8 +802,48 @@ function parseEconomyXml(xmlStr) {
     return prices;
 }
 
+function placeableFilenameBasename(filename) {
+    const parts = String(filename || '').replace(/\\/g, '/').split('/');
+    const base = parts[parts.length - 1] || '';
+    return base.replace(/\.xml$/i, '');
+}
+
+function humanizeBasename(base) {
+    return String(base || '')
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function collectFillTypesRecursive(node, types, levels, depth) {
+    if (!node || typeof node !== 'object' || depth > 8) return;
+    if (Array.isArray(node)) {
+        node.forEach((child) => collectFillTypesRecursive(child, types, levels, depth + 1));
+        return;
+    }
+    const a = attrs(node);
+    if (a.fillType != null && String(a.fillType).trim() !== '') {
+        const ft = String(a.fillType).trim();
+        types.add(ft);
+        if (a.fillLevel != null) {
+            const lit = parseFloat(String(a.fillLevel));
+            if (Number.isFinite(lit) && lit > 0) {
+                levels[ft] = (Number(levels[ft]) || 0) + lit;
+            }
+        }
+    }
+    for (const val of Object.values(node)) {
+        if (val && typeof val === 'object') {
+            collectFillTypesRecursive(val, types, levels, depth + 1);
+        }
+    }
+}
+
 function collectSiloFillTypesFromPlaceable(pl) {
     const types = new Set();
+    const levels = {};
+    collectFillTypesRecursive(pl, types, levels, 0);
     for (const silo of ensureArray(pl?.silo)) {
         for (const storage of ensureArray(silo?.storage)) {
             for (const node of ensureArray(storage?.node)) {
@@ -810,7 +852,7 @@ function collectSiloFillTypesFromPlaceable(pl) {
             }
         }
     }
-    return [...types];
+    return { types: [...types], levels };
 }
 
 function parsePlaceablesXml(xmlStr) {
@@ -825,12 +867,19 @@ function parsePlaceablesXml(xmlStr) {
         const pa = attrs(pl);
         const farmId = parseInt(String(pa.farmId || '0'), 10);
         if (farmId === 0) continue;
+        const filename = pa.filename != null ? String(pa.filename) : '';
+        const siloMeta = collectSiloFillTypesFromPlaceable(pl);
+        const xmlName = pa.name != null ? String(pa.name) : '';
+        const baseName = placeableFilenameBasename(filename);
         placeables.push({
             uniqueId: pa.uniqueId != null ? String(pa.uniqueId) : '',
             farmId,
-            filename: pa.filename != null ? String(pa.filename) : '',
-            name: pa.name != null ? String(pa.name) : '',
-            siloFillTypes: collectSiloFillTypesFromPlaceable(pl),
+            filename,
+            name: xmlName,
+            displayName: xmlName || humanizeBasename(baseName) || baseName,
+            basename: baseName,
+            siloFillTypes: siloMeta.types,
+            storageFillLevels: siloMeta.levels,
             age: parseFloat(String(pa.age || '0')),
             price: parseFloat(String(pa.price || '0')),
         });

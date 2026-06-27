@@ -114,4 +114,33 @@ describe('mergeVehicles dedupe by config+farm key', () => {
         expect(yard.isUsedEquipmentYardStock).toBe(true);
         expect(out).toHaveLength(2);
     });
+
+    test('lua farm 100 resolves to xml player farm and keeps ADS payload (livestock / DS pool quirk)', () => {
+        const cfg = 'data/vehicles/fendt/vario1000/vario1000.xml';
+        const lua = [
+            luaVeh({
+                id: 537,
+                name: '1000 Vario',
+                ownerFarmId: 100,
+                configFileName: cfg,
+                position: { x: -530, y: 71, z: 969 },
+                ads: { enabled: true, condition: 0.95, breakdownCount: 0 },
+            }),
+        ];
+        const xml = [
+            xmlVeh({
+                uniqueId: 'v537',
+                name: '1000 Vario',
+                farmId: 3,
+                ownerFarmId: 3,
+                filename: cfg,
+                position: { x: -530, y: 71, z: 969 },
+            }),
+        ];
+        const out = mergeVehicles(lua, xml);
+        expect(out).toHaveLength(1);
+        expect(out[0].source).toBe('merged');
+        expect(out[0].ownerFarmId).toBe(3);
+        expect(out[0].ads?.enabled).toBe(true);
+    });
 });

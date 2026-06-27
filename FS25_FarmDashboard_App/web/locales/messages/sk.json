@@ -1,6 +1,10 @@
 {
   "page.title": "Poľnohospodársky dashboard",
   "splash.loading": "Načítavajú sa údaje o vašej farme…",
+  "demo.splashHint": "Aktuálne dáta ešte nedorazili – ak táto obrazovka zostane prázdna, stlačte o niekoľko sekúnd tlačidlo Obnoviť (F5).",
+  "demo.dataWaitTitle": "Živé dáta ešte nedorazili",
+  "demo.dataWaitHint": "Stlačte tlačidlo Obnoviť vo vašom prehliadači (F5) – ukážka môže pri prvej návšteve chvíľu trvať.",
+  "demo.dataWaitRefresh": "Obnoviť stránku",
   "nav.brand": "Panel farmy",
   "nav.loading": "Načítava sa...",
   "nav.dataSource": "Zdroj údajov",

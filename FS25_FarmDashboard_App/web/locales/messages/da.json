@@ -1,6 +1,10 @@
 {
   "page.title": "Landbrugsdashboard",
   "splash.loading": "Indlæser dine gårddata…",
+  "demo.splashHint": "Livedata er ikke ankommet endnu — tryk på Opdater (F5) om et par sekunder, hvis denne skærm forbliver tom.",
+  "demo.dataWaitTitle": "Livedata er ikke ankommet endnu",
+  "demo.dataWaitHint": "Tryk på Opdater i din browser (F5) — demoen kan tage et øjeblik ved første besøg.",
+  "demo.dataWaitRefresh": "Opdater side",
   "nav.brand": "Farm-dashboard",
   "nav.loading": "Indlæser...",
   "nav.dataSource": "Datakilde",

@@ -1,6 +1,6 @@
 # FS25 Farm Dashboard 4.1.5 (superseded)
 
-> **Current release:** [RELEASE_NOTES_4.2.md](RELEASE_NOTES_4.2.md) — App **4.2.0** · Mod **3.4.0.0**
+> **Current release:** [RELEASE_NOTES_4.2.md](RELEASE_NOTES_4.2.md) — App **4.2.0** · Mod **3.4.0.6**
 
 App 4.1.5 · Mod 3.3.21.2 · Windows 10/11
 

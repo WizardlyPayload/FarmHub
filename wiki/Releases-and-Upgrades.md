@@ -52,6 +52,6 @@ Packaged installs use **electron-updater** (GitHub Releases on **FarmHub**).
 
 ## Reporting issues
 
-Include FS25 version, SP vs dedicated, **app 4.2.0**, **mod 3.4.0.0**, local vs FTP.
+Include FS25 version, SP vs dedicated, **app 4.2.0**, **mod 3.4.0.6**, local vs FTP.
 
 [Open an issue](https://github.com/WizardlyPayload/FarmHub/issues)

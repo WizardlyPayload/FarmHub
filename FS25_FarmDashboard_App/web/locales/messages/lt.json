@@ -1,6 +1,10 @@
 {
   "page.title": "Ūkininkavimo prietaisų skydelis",
   "splash.loading": "Įkeliami jūsų ūkio duomenys…",
+  "demo.splashHint": "Tiesioginiai duomenys dar neatvyko – jei šis ekranas lieka tuščias, po kelių sekundžių paspauskite „Atnaujinti“ (F5).",
+  "demo.dataWaitTitle": "Tiesioginiai duomenys dar neatvyko",
+  "demo.dataWaitHint": "Naršyklėje paspauskite „Atnaujinti“ (F5) – demonstracinė versija gali užtrukti šiek tiek laiko pirmojo apsilankymo metu.",
+  "demo.dataWaitRefresh": "Atnaujinti puslapį",
   "nav.brand": "Ūkio skydelis",
   "nav.loading": "Kraunama...",
   "nav.dataSource": "Duomenų šaltinis",

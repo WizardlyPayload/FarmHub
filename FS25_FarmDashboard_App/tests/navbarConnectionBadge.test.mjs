@@ -63,6 +63,21 @@ test("resolveNavbarConnectionBadge shows Snap XML for xml-only saves", () => {
   assert.ok(badge.badgeClasses.includes("bg-info"));
 });
 
+test("resolveNavbarConnectionBadge stays Live API between 2-min FTP polls", () => {
+  const badge = resolveNavbarConnectionBadge({
+    dataSource: "merged",
+    luaAvailable: true,
+    xmlAvailable: true,
+    apiConnected: true,
+    nowMs: NOW,
+    dataTimestamps: {
+      lastLuaReceivedAt: "2026-06-23T11:58:30.000Z",
+      luaExportStaleMs: 165_000,
+    },
+  });
+  assert.equal(badge.labelKey, "nav.badgeLiveApi");
+});
+
 test("resolveNavbarConnectionBadge ignores api websocket for dedicated server still live", () => {
   const badge = resolveNavbarConnectionBadge({
     dataSource: "merged",

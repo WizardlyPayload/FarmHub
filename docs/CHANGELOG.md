@@ -9,7 +9,7 @@ All notable changes to this project are recorded here. For GitHub release blurbs
 | Artifact | Where it lives | Format |
 |----------|----------------|--------|
 | **Desktop app** | `FS25_FarmDashboard_App/package.json` | Semver (e.g. `4.2.0`) |
-| **FS25 mod** | `FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `3.4.0.0`) |
+| **FS25 mod** | `FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `3.4.0.6`) |
 | **Source headers** | First line of many `.js` / `.lua` files | Often `v2.0.0` historically; bump only when you intentionally resync headers |
 
 ---
@@ -25,9 +25,13 @@ Fresh revision numbers for the first public GitHub release on the 4.2 / 3.4 line
 - **Pasture food duration** — pen cards and detail modal show estimated days until food runs out when the mod exports consumption data.
 - **Productions layout** — two chain cards per row on wide screens.
 - **`collectorModules` in export** — mod writes which collectors are enabled so the app can explain empty sections when a collector is turned off in-game.
+- **Public demo UX** — [demo.farmdashboard.co.uk](https://demo.farmdashboard.co.uk) shows a read-only banner and a **Refresh page** hint when live FTP data has not arrived yet (first visit).
 
 ### Fixed
-- **Linseed and other mod-map crops showed as “Fill type #N”.** On Witcombe-style maps the engine catalog often skips index **190** (LINSEED) between **189** (RYE_CUT) and **191** (POPPY). Mod `FillTypeUtils.enrichCatalogFromData` and app `assignNeighborCropGaps` / economy sell-point fallback now resolve sparse indices (e.g. **Honey #45**, **Water #118** on Riverbend when **Economy collector** is on).
+- **Dealership demo vehicles on player farms** — On dedicated multiplayer saves (especially after buying a **new farm**), showroom floor stock and contractor-pool demos could appear on your fleet tab — sometimes with **Advanced Damage System (ADS)** data attached. Merge now drops live pool-100 rows with no player-farm savegame backing and filters dealership floor stock (`needsSaving=false`).
+- **Linseed, Pig Food, and other mod-map crops showed as “Fill type #N”.** On Witcombe-style maps the engine catalog often skips index **190** (LINSEED) between **189** (RYE_CUT) and **191** (POPPY). Sparse silo indices such as **Pig Food (#147)** now resolve from mod-exported `fillTypeTitles` and savegame placeable fill types. Mod `FillTypeUtils.enrichCatalogFromData` and app `assignNeighborCropGaps` / economy sell-point fallback also cover gaps (e.g. **Honey #45**, **Water #118** on Riverbend when **Economy collector** is on).
+- **Bale categories in Storage** — straw, grass, hay, and silage bales are categorized consistently in shed stock and on-field rollups (mod `baleCategoryFromIndex` + app merge parity).
+- **Farm-scoped merge** — transient contractor pool and dealership clutter are pruned so vehicles, stock, and bales stay on player-owned farms only (multi-farm dedicated saves).
 - **Silo moisture and grade always “—” in Economy → Storage.** Silos scanned via `loadingStation:getAllFillLevels()` now resolve a `uniqueId` for `MoistureSystem:getObjectMoisture()` before export.
 - **Base-game livestock** — vanilla cow pens show breed labels, health, and value breakdown; clicking a synthetic/LOD animal opens **only** the pen-detail modal (no duplicate legacy modal).
 - **Production chains missing on base maps** — collector scans `productionChainManager.farmIds`, all `productionPoints`, and placeables using FS25’s `spec_productionPoint` shape (not only nested `.productionPoint`); partial incremental collect no longer overwrites cached production with `{}`. **Requires Production collector ON** in ESC → Settings → Farm Dashboard.
@@ -43,7 +47,7 @@ Fresh revision numbers for the first public GitHub release on the 4.2 / 3.4 line
 - Empty **Productions** or **Economy → Storage** names often mean collectors are **disabled** in-game: **ESC → Settings → Farm Dashboard** → enable **Production collector** and **Economy collector**, then wait one export cycle (~60s).
 
 ### Tests
-- `storageEconomy.test.mjs`, `productions.farmScope.test.mjs`, `urgent-notifications.test.mjs`, `mergeWeather.test.js`, `pastures.warnings.test.js`; full Jest + `.mjs` suite green.
+- `storageEconomy.test.mjs`, `productions.farmScope.test.mjs`, `mergeFarmScope.test.js`, `mergeTransientPool.integration.test.js`, `fillTypeResolve.parity.test.js`, `urgent-notifications.test.mjs`, `mergeWeather.test.js`, `pastures.warnings.test.js`; full Jest + `.mjs` suite green.
 
 ---
 

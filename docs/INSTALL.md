@@ -154,7 +154,7 @@ After launch, open **[http://localhost:8766](http://localhost:8766)** in the app
 | **Waiting for data** | Stage B + C; correct path in Settings |
 | **Port 8766 in use** | Close other apps on 8766; restart Farm Dashboard |
 | **FTP never updates** | Check credentials, slot name, firewall; interval ≥ 1 min |
-| **Blank after upgrade** | Update **both** app and mod from the same release line |
+| **Blank after upgrade** | Update **both** app (**4.2.0**) and mod (**3.4.0.6**) from the same release line |
 
 More detail: [`USER_MANUAL.md` §10](./USER_MANUAL.md#10-troubleshooting) · [`SECURITY.md`](./SECURITY.md) (LAN).
 

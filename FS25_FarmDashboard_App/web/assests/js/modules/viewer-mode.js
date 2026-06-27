@@ -44,10 +44,30 @@ function maybeInstallPublicDemoBanner() {
   }
 }
 
+function installPublicDemoRefreshButton() {
+  try {
+    const h = String(window.location?.hostname || "").toLowerCase();
+    if (h !== "demo.farmdashboard.co.uk") return;
+    const btn = document.getElementById("farmdash-demo-refresh-btn");
+    if (!btn || btn.dataset.bound === "1") return;
+    btn.dataset.bound = "1";
+    btn.addEventListener("click", () => {
+      try {
+        window.location.reload();
+      } catch (_) {
+        /* ignore */
+      }
+    });
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 /** Block Settings modal when opened programmatically on remote viewers. */
 export function installFarmDashRemoteViewerGuards() {
   if (typeof document === "undefined") return;
   maybeInstallPublicDemoBanner();
+  installPublicDemoRefreshButton();
   if (isFarmDashLocalConfigHost()) return;
   const modalEl = document.getElementById("appSettingsModal");
   if (!modalEl) return;

@@ -7,7 +7,7 @@
 
 ## Summary
 
-**4.2.0** is the first **public** release on the 4.2 / 3.4 line. Headlines: **storage naming & silo moisture**, **base-game livestock**, **production chains on base maps**, **urgent notifications**, **weather temps**, plus the **4.1.x** stability and fleet fixes.
+**4.2.0** is the first **public** release on the 4.2 / 3.4 line. Headlines: **storage naming & silo moisture** (incl. Pig Food / sparse fill types), **dealership clutter removed from player farms**, **bale categorization**, **base-game livestock**, **production chains on base maps**, **urgent notifications**, **weather temps**, **public demo refresh UX**, plus the **4.1.x** stability and fleet fixes.
 
 ---
 

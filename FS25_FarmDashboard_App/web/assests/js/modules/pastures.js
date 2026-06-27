@@ -1,7 +1,12 @@
 // FS25 FarmDashboard | pastures.js | v2.0.0
 
 import { t, tOr } from "../i18n/i18n.js";
-import { formatGenderLabel, fmtWeightKgStr, countLivestockHeads } from "./livestock.js";
+import {
+  formatGenderLabel,
+  fmtAgeMonthsStr,
+  fmtWeightKgStr,
+  countLivestockHeads,
+} from "./livestock.js";
 import { entityOwnerFarmId } from "./farmScope.js";
 import { showFarmDashModal } from "../utils/modal-ui.js";
 
@@ -1832,7 +1837,7 @@ export function showWarningDetails(pastureId, warningIndex) {
                           </div>
                           ${Math.round(animal.health)}%
                       </td>
-                      <td>${animal.age || 0} months</td>
+                      <td>${fmtAgeMonthsStr(animal.age || 0)}</td>
                       <td>${
                         statusBadges.join(" ") ||
                         `<span class="badge bg-success">${t(
@@ -3265,10 +3270,7 @@ export function renderPastureLivestockTable(animals, title) {
                                     animal.subType
                                   )}</td>
                                   <td>${formatGenderLabel(animal.gender)}</td>
-                                  <td>${t(
-                                    "pastures.livestockTable.ageMonths",
-                                    { age: animal.age }
-                                  )}</td>
+                                  <td>${fmtAgeMonthsStr(animal.age || 0)}</td>
                                   <td>${healthBar}</td>
                                   <td>${fmtWeightKgStr(animal.weight, 1)}</td>
                                   <td>$${this.calculateAnimalValue(

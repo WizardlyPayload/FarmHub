@@ -1,6 +1,10 @@
 {
   "page.title": "Nadzorna ploča za poljoprivredu",
   "splash.loading": "Učitavanje podataka vaše farme…",
+  "demo.splashHint": "Podaci uživo još nisu stigli — pritisnite Osvježi (F5) za nekoliko sekundi ako ovaj zaslon ostane prazan.",
+  "demo.dataWaitTitle": "Podaci uživo još nisu stigli",
+  "demo.dataWaitHint": "Pritisnite Osvježi u pregledniku (F5) — demo može potrajati neko vrijeme prilikom prvog posjeta.",
+  "demo.dataWaitRefresh": "Osvježi stranicu",
   "nav.brand": "Farm panel",
   "nav.loading": "Učitavanje...",
   "nav.dataSource": "Izvor podataka",

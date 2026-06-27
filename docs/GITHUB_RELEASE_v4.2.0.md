@@ -46,7 +46,7 @@ Build output (default): `%USERPROFILE%\Documents\FarmDash Final Output\` when us
 ## What's new in 4.2.0
 
 ### Storage & economy
-- **Map-specific crop names** — e.g. Witcombe **Linseed**, Riverbend **Honey** / **Water** (not “Fill type #N”) when Economy collector is on.
+- **Map-specific crop names** — e.g. Witcombe **Linseed**, Riverbend **Honey** / **Water**, **Pig Food (#147)** (not “Fill type #N”) when Economy collector is on.
 - **Silo moisture & grade** — per-location moisture % and quality in Economy → Storage.
 
 ### Livestock & pastures
@@ -59,10 +59,15 @@ Build output (default): `%USERPROFILE%\Documents\FarmDash Final Output\` when us
 - **Two-column productions layout** — denser grid on wide screens.
 - **Weather forecast temps** — fixed `null°` and sparse XML merge.
 
-### Notifications & fleet
-- **Urgent notifications** — pastures, fuel/wear/breakdowns, high-priority field tasks.
+### Fleet & farm scope
+- **No dealership clutter on your farms** — showroom demos and contractor-pool floor stock no longer appear on player fleet tabs (including after buying a **new farm** on dedicated servers).
+- **Correct bale categories** — straw, grass, hay, and silage breakdown in Economy → Storage.
+- **Urgent notifications** — pastures, fuel/wear/**ADS breakdowns**, high-priority field tasks.
 - **Correct store images** and **no duplicate vehicles** on dedicated servers (4.1.5 line).
 - **Courseplay**, RealisticLivestock, grass field status, security hardening (4.1.x).
+
+### Public demo
+- **[demo.farmdashboard.co.uk](https://demo.farmdashboard.co.uk)** — read-only banner; **Refresh page** hint when live data has not arrived yet.
 
 **Full history:** [CHANGELOG.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/CHANGELOG.md)
 

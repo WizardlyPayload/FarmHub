@@ -1,0 +1,32 @@
+﻿2026-06-27T23:28:03.7982241Z Current runner version: '2.335.1'
+2026-06-27T23:28:03.8039448Z ##[group]Runner Image Provisioner
+2026-06-27T23:28:03.8040717Z Hosted Compute Agent
+2026-06-27T23:28:03.8041615Z Version: 20260611.554
+2026-06-27T23:28:03.8042625Z Commit: 5e0782fdc9014723d3be820dd114dd31555c2bd1
+2026-06-27T23:28:03.8043811Z Build Date: 2026-06-11T21:40:46Z
+2026-06-27T23:28:03.8044877Z Worker ID: {f2338de8-0a15-4574-a567-5db63b2db9e8}
+2026-06-27T23:28:03.8046103Z Azure Region: westus
+2026-06-27T23:28:03.8046940Z ##[endgroup]
+2026-06-27T23:28:03.8048971Z ##[group]Operating System
+2026-06-27T23:28:03.8049956Z Microsoft Windows Server 2025
+2026-06-27T23:28:03.8050880Z 10.0.26100
+2026-06-27T23:28:03.8051698Z Datacenter
+2026-06-27T23:28:03.8052504Z ##[endgroup]
+2026-06-27T23:28:03.8053763Z ##[group]Runner Image
+2026-06-27T23:28:03.8054770Z Image: windows-2025-vs2026
+2026-06-27T23:28:03.8055675Z Version: 20260622.153.1
+2026-06-27T23:28:03.8057674Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20260622.153/images/windows/Windows2025-VS2026-Readme.md
+2026-06-27T23:28:03.8061216Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20260622.153
+2026-06-27T23:28:03.8062939Z ##[endgroup]
+2026-06-27T23:28:03.8064890Z ##[group]GITHUB_TOKEN Permissions
+2026-06-27T23:28:03.8067411Z Contents: read
+2026-06-27T23:28:03.8068659Z Metadata: read
+2026-06-27T23:28:03.8069629Z Packages: read
+2026-06-27T23:28:03.8070435Z ##[endgroup]
+2026-06-27T23:28:03.8073481Z Secret source: Actions
+2026-06-27T23:28:03.8074744Z Prepare workflow directory
+2026-06-27T23:28:03.8674199Z Prepare all required actions
+2026-06-27T23:28:03.8730401Z Getting action download info
+2026-06-27T23:28:04.1979444Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
+2026-06-27T23:28:04.4019724Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-06-27T23:28:04.8572378Z Complete job name: test

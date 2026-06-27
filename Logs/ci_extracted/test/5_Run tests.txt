@@ -1,0 +1,448 @@
+﻿2026-06-27T23:29:02.5223028Z ##[group]Run npm run test:all
+2026-06-27T23:29:02.5223401Z [36;1mnpm run test:all[0m
+2026-06-27T23:29:02.5287386Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-06-27T23:29:02.5287783Z ##[endgroup]
+2026-06-27T23:29:03.2076273Z 
+2026-06-27T23:29:03.2076828Z > fs25-farm-dashboard@4.2.0 test:all
+2026-06-27T23:29:03.2077232Z > npm test && npm run test:mjs
+2026-06-27T23:29:03.2077408Z 
+2026-06-27T23:29:03.5640975Z 
+2026-06-27T23:29:03.5641769Z > fs25-farm-dashboard@4.2.0 test
+2026-06-27T23:29:03.5642324Z > jest
+2026-06-27T23:29:03.5642515Z 
+2026-06-27T23:29:05.8398358Z PASS tests/mergedSnapshotHold.test.js
+2026-06-27T23:29:06.0417101Z PASS tests/realtime-connector.updateAnimals.test.js
+2026-06-27T23:29:06.2900984Z PASS tests/xss.smoke.test.js
+2026-06-27T23:29:06.3782672Z PASS tests/livestockDetail.test.js
+2026-06-27T23:29:06.4051310Z   ● Console
+2026-06-27T23:29:06.4051959Z 
+2026-06-27T23:29:06.4052393Z     console.warn
+2026-06-27T23:29:06.4053299Z       [livestockDetail] details/animals_42.json schemaVersion=99 > 1; ignoring
+2026-06-27T23:29:06.4054180Z 
+2026-06-27T23:29:06.4055594Z     [0m [90m 595 |[39m     [90m// Reject schemaVersion > supported. schemaVersion missing = treat as legacy and pass through.[39m
+2026-06-27T23:29:06.4083763Z      [90m 596 |[39m     [36mif[39m (detail[33m.[39mschemaVersion [33m!==[39m undefined [33m&&[39m detail[33m.[39mschemaVersion [33m>[39m [33mDETAIL_SCHEMA_VERSION[39m) {
+2026-06-27T23:29:06.4087393Z     [31m[1m>[22m[39m[90m 597 |[39m         console[33m.[39mwarn([32m`[livestockDetail] details/animals_${fileSegment}.json schemaVersion=${detail.schemaVersion} > ${DETAIL_SCHEMA_VERSION}; ignoring`[39m)[33m;[39m
+2026-06-27T23:29:06.4150521Z      [90m     |[39m                 [31m[1m^[22m[39m
+2026-06-27T23:29:06.4177690Z      [90m 598 |[39m         [36mreturn[39m [36mnull[39m[33m;[39m
+2026-06-27T23:29:06.4195706Z      [90m 599 |[39m     }
+2026-06-27T23:29:06.4257890Z      [90m 600 |[39m[0m
+2026-06-27T23:29:06.4287836Z 
+2026-06-27T23:29:06.4330916Z       at Object.warn (livestockDetail.js:597:17)
+2026-06-27T23:29:06.4352367Z       at Object.<anonymous> (tests/livestockDetail.test.js:84:20)
+2026-06-27T23:29:06.4363104Z 
+2026-06-27T23:29:06.5384603Z PASS tests/realtime-connector.fanOut.test.js
+2026-06-27T23:29:06.6001032Z PASS tests/pastures.warnings.test.js
+2026-06-27T23:29:06.6896850Z PASS tests/mergeFarmScope.test.js
+2026-06-27T23:29:06.7196853Z PASS tests/mergeVehicles.test.js
+2026-06-27T23:29:06.7790689Z PASS tests/fieldMoistureCache.test.js
+2026-06-27T23:29:06.8765023Z PASS tests/mergeTransientPool.integration.test.js
+2026-06-27T23:29:06.8771274Z   ● Console
+2026-06-27T23:29:06.8771754Z 
+2026-06-27T23:29:06.8772062Z     console.warn
+2026-06-27T23:29:06.8773109Z       [skip] live cache not present at C:\Users\runneradmin\AppData\Roaming\fs25-farm-dashboard\data_srv_1780959672019.json
+2026-06-27T23:29:06.8774003Z 
+2026-06-27T23:29:06.8775220Z     [0m [90m 37 |[39m     test([32m'lua-only: dealership pool-100 ADS demos do not land on livestock farm 3'[39m[33m,[39m () [33m=>[39m {
+2026-06-27T23:29:06.8790210Z      [90m 38 |[39m         [36mif[39m ([33m![39mfs[33m.[39mexistsSync([33mCACHE_PATH[39m)) {
+2026-06-27T23:29:06.8791919Z     [31m[1m>[22m[39m[90m 39 |[39m             console[33m.[39mwarn([32m'[skip] live cache not present at'[39m[33m,[39m [33mCACHE_PATH[39m)[33m;[39m
+2026-06-27T23:29:06.8794611Z      [90m    |[39m                     [31m[1m^[22m[39m
+2026-06-27T23:29:06.8795438Z      [90m 40 |[39m             [36mreturn[39m[33m;[39m
+2026-06-27T23:29:06.8796155Z      [90m 41 |[39m         }
+2026-06-27T23:29:06.8798346Z      [90m 42 |[39m         [36mconst[39m cache [33m=[39m [33mJSON[39m[33m.[39mparse(fs[33m.[39mreadFileSync([33mCACHE_PATH[39m[33m,[39m [32m'utf8'[39m))[33m;[39m[0m
+2026-06-27T23:29:06.8799715Z 
+2026-06-27T23:29:06.8800322Z       at Object.warn (tests/mergeTransientPool.integration.test.js:39:21)
+2026-06-27T23:29:06.8803942Z 
+2026-06-27T23:29:06.8804316Z     console.warn
+2026-06-27T23:29:06.8805771Z       [skip] live cache not present at C:\Users\runneradmin\AppData\Roaming\fs25-farm-dashboard\data_srv_1780959672019.json
+2026-06-27T23:29:06.8806947Z 
+2026-06-27T23:29:06.8808069Z     [0m [90m 60 |[39m     test([32m'with savegame xml: pool-100 player fleet maps onto livestock farm 3'[39m[33m,[39m () [33m=>[39m {
+2026-06-27T23:29:06.8809611Z      [90m 61 |[39m         [36mif[39m ([33m![39mfs[33m.[39mexistsSync([33mCACHE_PATH[39m)) {
+2026-06-27T23:29:06.8811347Z     [31m[1m>[22m[39m[90m 62 |[39m             console[33m.[39mwarn([32m'[skip] live cache not present at'[39m[33m,[39m [33mCACHE_PATH[39m)[33m;[39m
+2026-06-27T23:29:06.8841794Z      [90m    |[39m                     [31m[1m^[22m[39m
+2026-06-27T23:29:06.8843494Z      [90m 63 |[39m             [36mreturn[39m[33m;[39m
+2026-06-27T23:29:06.8844409Z      [90m 64 |[39m         }
+2026-06-27T23:29:06.8848318Z      [90m 65 |[39m         [36mconst[39m cache [33m=[39m [33mJSON[39m[33m.[39mparse(fs[33m.[39mreadFileSync([33mCACHE_PATH[39m[33m,[39m [32m'utf8'[39m))[33m;[39m[0m
+2026-06-27T23:29:06.8893672Z 
+2026-06-27T23:29:06.8895039Z       at Object.warn (tests/mergeTransientPool.integration.test.js:62:21)
+2026-06-27T23:29:06.8928727Z 
+2026-06-27T23:29:06.9422198Z PASS tests/setup.validation.test.js
+2026-06-27T23:29:07.0479215Z PASS tests/i18n.coverage.test.js
+2026-06-27T23:29:07.0615716Z PASS tests/modConfigXml.test.js
+2026-06-27T23:29:07.1449648Z PASS tests/detailAnimalsHydrate.test.js
+2026-06-27T23:29:07.1506658Z   ● Console
+2026-06-27T23:29:07.1523647Z 
+2026-06-27T23:29:07.1531467Z     console.log
+2026-06-27T23:29:07.1589789Z       [DetailHydrate] +71 animals across 1 pens from C:\Users\RUNNER~1\AppData\Local\Temp\fd-hydrate-Jf7z21\savegame1\details
+2026-06-27T23:29:07.1592401Z 
+2026-06-27T23:29:07.1684341Z       at log (detailAnimalsHydrate.js:208:17)
+2026-06-27T23:29:07.1685223Z 
+2026-06-27T23:29:07.1685533Z     console.log
+2026-06-27T23:29:07.1687106Z       [DetailHydrate] +5 animals across 1 pens from C:\Users\RUNNER~1\AppData\Local\Temp\fd-hydrate-PeWIcY\savegame1\details
+2026-06-27T23:29:07.1688176Z 
+2026-06-27T23:29:07.1688578Z       at log (detailAnimalsHydrate.js:208:17)
+2026-06-27T23:29:07.1689487Z 
+2026-06-27T23:29:07.1852903Z PASS tests/contextSwitch.test.js
+2026-06-27T23:29:07.1891869Z PASS tests/fleetMapGeo.test.js
+2026-06-27T23:29:07.2652678Z PASS tests/wireFormats.test.js
+2026-06-27T23:29:07.3381739Z PASS tests/fillTypeResolve.parity.test.js
+2026-06-27T23:29:07.3811910Z PASS tests/packagedModules.test.js
+2026-06-27T23:29:07.4232592Z PASS tests/stockMoistureFromXml.test.js
+2026-06-27T23:29:07.4363805Z PASS tests/lanCredentialPolicy.test.js
+2026-06-27T23:29:07.4993004Z PASS tests/fs25Paths.test.js
+2026-06-27T23:29:07.5293864Z PASS tests/xmlCollector.fields.test.js
+2026-06-27T23:29:07.5620262Z PASS tests/corsPolicy.test.js
+2026-06-27T23:29:07.7725718Z PASS tests/mapOverviewWitcombeCrop.test.js
+2026-06-27T23:29:07.8086610Z PASS tests/mapOverviewResolver.test.js
+2026-06-27T23:29:07.9378158Z PASS tests/modVersionPolicy.test.js
+2026-06-27T23:29:08.0335869Z PASS tests/mapOverviewTerrainInset.test.js
+2026-06-27T23:29:08.0336901Z PASS tests/mergeWeather.test.js
+2026-06-27T23:29:08.0858491Z PASS tests/redTapeHarvestXml.test.js
+2026-06-27T23:29:08.1292371Z PASS tests/mergeRedTapeCropRotation.test.js
+2026-06-27T23:29:08.1324773Z PASS tests/farmScope.test.js
+2026-06-27T23:29:08.1702785Z PASS tests/fleetMapGeo.parity.test.js
+2026-06-27T23:29:08.2131472Z PASS tests/mapOverviewWitcombe.integration.test.js
+2026-06-27T23:29:08.2397923Z PASS tests/xmlCollector.economy.test.js
+2026-06-27T23:29:08.2492070Z PASS tests/farmScope.parity.test.js
+2026-06-27T23:29:08.2709824Z 
+2026-06-27T23:29:08.2714407Z Test Suites: 36 passed, 36 total
+2026-06-27T23:29:08.2714964Z Tests:       375 passed, 375 total
+2026-06-27T23:29:08.2715415Z Snapshots:   0 total
+2026-06-27T23:29:08.2717408Z Time:        3.943 s
+2026-06-27T23:29:08.2717768Z Ran all test suites.
+2026-06-27T23:29:08.6916881Z 
+2026-06-27T23:29:08.6917541Z > fs25-farm-dashboard@4.2.0 test:mjs
+2026-06-27T23:29:08.6919969Z > node --test tests/baleInventory.test.mjs tests/rules-engine-roll-weed.test.mjs tests/vehicleAds.breakdown.test.mjs tests/fieldGrassMown.test.mjs tests/vehicleStoreImage.test.mjs tests/vehicleFarmScope.test.mjs tests/storageEconomy.test.mjs tests/navbarConnectionBadge.test.mjs tests/livestock.fmtAge.test.mjs
+2026-06-27T23:29:08.6921839Z 
+2026-06-27T23:29:08.7998442Z TAP version 13
+2026-06-27T23:29:08.8779904Z # (node:4820) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/a/FarmHub/FarmHub/FS25_FarmDashboard_App/web/assests/js/modules/economy.js is not specified and it doesn't parse as CommonJS.
+2026-06-27T23:29:08.8782698Z # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+2026-06-27T23:29:08.8784946Z # To eliminate this warning, add "type": "module" to D:\\a\\FarmHub\\FarmHub\\FS25_FarmDashboard_App\\package.json.
+2026-06-27T23:29:08.8786525Z # (Use `node --trace-warnings ...` to show where the warning was created)
+2026-06-27T23:29:08.9595461Z # Subtest: supplement onField from field baleCountOnField when economy scan empty
+2026-06-27T23:29:08.9598302Z ok 1 - supplement onField from field baleCountOnField when economy scan empty
+2026-06-27T23:29:08.9605256Z   ---
+2026-06-27T23:29:08.9614594Z   duration_ms: 4.046
+2026-06-27T23:29:08.9624140Z   ...
+2026-06-27T23:29:08.9625161Z # Subtest: buildFillTypeCatalog resolves map-specific crops like TRITICALE
+2026-06-27T23:29:08.9646179Z ok 2 - buildFillTypeCatalog resolves map-specific crops like TRITICALE
+2026-06-27T23:29:08.9647640Z   ---
+2026-06-27T23:29:08.9648215Z   duration_ms: 2.1457
+2026-06-27T23:29:08.9648785Z   ...
+2026-06-27T23:29:08.9689784Z # Subtest: buildFillTypeCatalog infers TRITICALE at 182 when RYE/SPELT neighbors exist on DS
+2026-06-27T23:29:08.9718263Z not ok 3 - buildFillTypeCatalog infers TRITICALE at 182 when RYE/SPELT neighbors exist on DS
+2026-06-27T23:29:08.9733880Z   ---
+2026-06-27T23:29:08.9734493Z   duration_ms: 3.1656
+2026-06-27T23:29:08.9735537Z   location: 'D:\\a\\FarmHub\\FarmHub\\FS25_FarmDashboard_App\\tests\\baleInventory.test.mjs:48:1'
+2026-06-27T23:29:08.9744144Z   failureType: 'testCodeFailure'
+2026-06-27T23:29:08.9744854Z   error: |-
+2026-06-27T23:29:08.9745453Z     Expected values to be strictly equal:
+2026-06-27T23:29:08.9746195Z     + actual - expected
+2026-06-27T23:29:08.9746720Z     
+2026-06-27T23:29:08.9747139Z     + undefined
+2026-06-27T23:29:08.9747608Z     - 'TRITICALE'
+2026-06-27T23:29:08.9748088Z   code: 'ERR_ASSERTION'
+2026-06-27T23:29:08.9748591Z   name: 'AssertionError'
+2026-06-27T23:29:08.9749118Z   expected: 'TRITICALE'
+2026-06-27T23:29:08.9749639Z   operator: 'strictEqual'
+2026-06-27T23:29:08.9750144Z   stack: |-
+2026-06-27T23:29:08.9751172Z     TestContext.<anonymous> (file:///D:/a/FarmHub/FarmHub/FS25_FarmDashboard_App/tests/baleInventory.test.mjs:59:10)
+2026-06-27T23:29:08.9752931Z     Test.runInAsyncScope (node:async_hooks:206:9)
+2026-06-27T23:29:08.9753749Z     Test.run (node:internal/test_runner/test:796:25)
+2026-06-27T23:29:08.9754761Z     Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+2026-06-27T23:29:08.9755996Z     Test.postRun (node:internal/test_runner/test:889:19)
+2026-06-27T23:29:08.9756960Z     Test.run (node:internal/test_runner/test:835:12)
+2026-06-27T23:29:08.9758596Z     async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+2026-06-27T23:29:08.9759584Z   ...
+2026-06-27T23:29:08.9768918Z # Subtest: buildFillTypeCatalog infers LINSEED at 190 when RYE_CUT/POPPY neighbors exist on DS
+2026-06-27T23:29:08.9773375Z not ok 4 - buildFillTypeCatalog infers LINSEED at 190 when RYE_CUT/POPPY neighbors exist on DS
+2026-06-27T23:29:08.9774444Z   ---
+2026-06-27T23:29:08.9774979Z   duration_ms: 0.6661
+2026-06-27T23:29:08.9776028Z   location: 'D:\\a\\FarmHub\\FarmHub\\FS25_FarmDashboard_App\\tests\\baleInventory.test.mjs:62:1'
+2026-06-27T23:29:08.9777518Z   failureType: 'testCodeFailure'
+2026-06-27T23:29:08.9778180Z   error: |-
+2026-06-27T23:29:08.9778754Z     Expected values to be strictly equal:
+2026-06-27T23:29:08.9779458Z     + actual - expected
+2026-06-27T23:29:08.9779996Z     
+2026-06-27T23:29:08.9780475Z     + undefined
+2026-06-27T23:29:08.9781041Z     - 'LINSEED'
+2026-06-27T23:29:08.9781588Z   code: 'ERR_ASSERTION'
+2026-06-27T23:29:08.9782201Z   name: 'AssertionError'
+2026-06-27T23:29:08.9784281Z   expected: 'LINSEED'
+2026-06-27T23:29:08.9784907Z   operator: 'strictEqual'
+2026-06-27T23:29:08.9785500Z   stack: |-
+2026-06-27T23:29:08.9786614Z     TestContext.<anonymous> (file:///D:/a/FarmHub/FarmHub/FS25_FarmDashboard_App/tests/baleInventory.test.mjs:73:10)
+2026-06-27T23:29:08.9788490Z     Test.runInAsyncScope (node:async_hooks:206:9)
+2026-06-27T23:29:08.9789678Z     Test.run (node:internal/test_runner/test:796:25)
+2026-06-27T23:29:08.9791524Z     Test.processPendingSubtests (node:internal/test_runner/test:526:18)
+2026-06-27T23:29:08.9793015Z     Test.postRun (node:internal/test_runner/test:889:19)
+2026-06-27T23:29:08.9793725Z     Test.run (node:internal/test_runner/test:835:12)
+2026-06-27T23:29:08.9794579Z     async Test.processPendingSubtests (node:internal/test_runner/test:526:7)
+2026-06-27T23:29:08.9795292Z   ...
+2026-06-27T23:29:08.9796042Z # Subtest: supplement onField prefers field totals when economy scan is partial
+2026-06-27T23:29:08.9797112Z ok 5 - supplement onField prefers field totals when economy scan is partial
+2026-06-27T23:29:08.9797680Z   ---
+2026-06-27T23:29:08.9797946Z   duration_ms: 0.4195
+2026-06-27T23:29:08.9798257Z   ...
+2026-06-27T23:29:08.9798980Z # Subtest: supplement onField does not double-count when baleInventory already has on-field rows
+2026-06-27T23:29:08.9800148Z ok 6 - supplement onField does not double-count when baleInventory already has on-field rows
+2026-06-27T23:29:08.9800851Z   ---
+2026-06-27T23:29:08.9801132Z   duration_ms: 0.3411
+2026-06-27T23:29:08.9801435Z   ...
+2026-06-27T23:29:08.9802099Z # Subtest: enrich skips stock derive when Lua already exported inStorage counts
+2026-06-27T23:29:08.9807001Z ok 7 - enrich skips stock derive when Lua already exported inStorage counts
+2026-06-27T23:29:08.9807839Z   ---
+2026-06-27T23:29:08.9808294Z   duration_ms: 1.3006
+2026-06-27T23:29:08.9808772Z   ...
+2026-06-27T23:29:08.9809744Z # Subtest: supplement onField uses per-field bale category breakdown when exported
+2026-06-27T23:29:08.9811337Z ok 8 - supplement onField uses per-field bale category breakdown when exported
+2026-06-27T23:29:08.9812167Z   ---
+2026-06-27T23:29:08.9812596Z   duration_ms: 0.8606
+2026-06-27T23:29:08.9813041Z   ...
+2026-06-27T23:29:08.9813722Z # Subtest: enrich merges shed storage without wiping on-field totals
+2026-06-27T23:29:08.9814681Z ok 9 - enrich merges shed storage without wiping on-field totals
+2026-06-27T23:29:08.9815406Z   ---
+2026-06-27T23:29:08.9815853Z   duration_ms: 1.1338
+2026-06-27T23:29:08.9816311Z   ...
+2026-06-27T23:29:08.9817131Z # Subtest: derive bale inventory from stock objectStorage when mod export is empty
+2026-06-27T23:29:08.9818340Z ok 10 - derive bale inventory from stock objectStorage when mod export is empty
+2026-06-27T23:29:08.9819162Z   ---
+2026-06-27T23:29:08.9819621Z   duration_ms: 0.6402
+2026-06-27T23:29:08.9820091Z   ...
+2026-06-27T23:29:08.9820769Z # Subtest: resolveBaleInventoryForFarm uses inStorage from byFarm
+2026-06-27T23:29:08.9825366Z ok 11 - resolveBaleInventoryForFarm uses inStorage from byFarm
+2026-06-27T23:29:08.9826069Z   ---
+2026-06-27T23:29:08.9826665Z   duration_ms: 0.2918
+2026-06-27T23:29:08.9827203Z   ...
+2026-06-27T23:29:08.9828049Z # Subtest: resolveBaleInventoryForFarm falls back offField to inStorage
+2026-06-27T23:29:08.9829354Z ok 12 - resolveBaleInventoryForFarm falls back offField to inStorage
+2026-06-27T23:29:08.9830132Z   ---
+2026-06-27T23:29:08.9830572Z   duration_ms: 0.2469
+2026-06-27T23:29:08.9831628Z   ...
+2026-06-27T23:29:08.9832434Z # Subtest: aggregateConsumables groups full pallets and lists partials
+2026-06-27T23:29:08.9833682Z ok 13 - aggregateConsumables groups full pallets and lists partials
+2026-06-27T23:29:08.9834528Z   ---
+2026-06-27T23:29:08.9834984Z   duration_ms: 0.7277
+2026-06-27T23:29:08.9835478Z   ...
+2026-06-27T23:29:09.0064291Z # (node:1272) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/a/FarmHub/FarmHub/FS25_FarmDashboard_App/web/assests/js/rules-engine.js is not specified and it doesn't parse as CommonJS.
+2026-06-27T23:29:09.0072410Z # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+2026-06-27T23:29:09.0133215Z # To eliminate this warning, add "type": "module" to D:\\a\\FarmHub\\FarmHub\\FS25_FarmDashboard_App\\package.json.
+2026-06-27T23:29:09.0137623Z # (Use `node --trace-warnings ...` to show where the warning was created)
+2026-06-27T23:29:09.0139975Z # Subtest: freshly-cut grass with a fresh windrow reads as mown (not growing)
+2026-06-27T23:29:09.0141416Z ok 14 - freshly-cut grass with a fresh windrow reads as mown (not growing)
+2026-06-27T23:29:09.0142554Z   ---
+2026-06-27T23:29:09.0143031Z   duration_ms: 3.1517
+2026-06-27T23:29:09.0143483Z   ...
+2026-06-27T23:29:09.0144183Z # Subtest: a dried-grass (hay) windrow is NOT a fresh-cut signal
+2026-06-27T23:29:09.0145132Z ok 15 - a dried-grass (hay) windrow is NOT a fresh-cut signal
+2026-06-27T23:29:09.0145823Z   ---
+2026-06-27T23:29:09.0146239Z   duration_ms: 2.0998
+2026-06-27T23:29:09.0146677Z   ...
+2026-06-27T23:29:09.0147284Z # Subtest: grass with no meaningful windrow stays 'growing'
+2026-06-27T23:29:09.0148123Z ok 16 - grass with no meaningful windrow stays 'growing'
+2026-06-27T23:29:09.0148716Z   ---
+2026-06-27T23:29:09.0149067Z   duration_ms: 0.2905
+2026-06-27T23:29:09.0149468Z   ...
+2026-06-27T23:29:09.0150140Z # Subtest: tall grass at the ready-to-cut stage is not 'mown'
+2026-06-27T23:29:09.0151306Z ok 17 - tall grass at the ready-to-cut stage is not 'mown'
+2026-06-27T23:29:09.0151975Z   ---
+2026-06-27T23:29:09.0152362Z   duration_ms: 0.4027
+2026-06-27T23:29:09.0152797Z   ...
+2026-06-27T23:29:09.0153490Z # Subtest: a small wisp of leftover grass below the workflow floor is ignored
+2026-06-27T23:29:09.0154566Z ok 18 - a small wisp of leftover grass below the workflow floor is ignored
+2026-06-27T23:29:09.0155258Z   ---
+2026-06-27T23:29:09.0155662Z   duration_ms: 0.2225
+2026-06-27T23:29:09.0156089Z   ...
+2026-06-27T23:29:09.0156687Z # Subtest: non-grass crops are never flagged as mown grass
+2026-06-27T23:29:09.0157605Z ok 19 - non-grass crops are never flagged as mown grass
+2026-06-27T23:29:09.0158276Z   ---
+2026-06-27T23:29:09.0158654Z   duration_ms: 0.1632
+2026-06-27T23:29:09.0159055Z   ...
+2026-06-27T23:29:09.0160834Z # (node:5412) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/a/FarmHub/FarmHub/FS25_FarmDashboard_App/web/assests/js/modules/livestock.js is not specified and it doesn't parse as CommonJS.
+2026-06-27T23:29:09.0162964Z # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+2026-06-27T23:29:09.0164555Z # To eliminate this warning, add "type": "module" to D:\\a\\FarmHub\\FarmHub\\FS25_FarmDashboard_App\\package.json.
+2026-06-27T23:29:09.0165840Z # (Use `node --trace-warnings ...` to show where the warning was created)
+2026-06-27T23:29:09.0166857Z # Subtest: roundAgeMonths rounds RL fractional ages to one decimal
+2026-06-27T23:29:09.0169109Z ok 20 - roundAgeMonths rounds RL fractional ages to one decimal
+2026-06-27T23:29:09.0169735Z   ---
+2026-06-27T23:29:09.0170081Z   duration_ms: 2.8587
+2026-06-27T23:29:09.0170758Z   ...
+2026-06-27T23:29:09.0171487Z # Subtest: roundAgeMonths snaps near-integer ages to whole months
+2026-06-27T23:29:09.0172431Z ok 21 - roundAgeMonths snaps near-integer ages to whole months
+2026-06-27T23:29:09.0173053Z   ---
+2026-06-27T23:29:09.0173424Z   duration_ms: 0.2569
+2026-06-27T23:29:09.0174979Z   ...
+2026-06-27T23:29:09.0175632Z # Subtest: roundAgeMonths treats non-finite input as zero
+2026-06-27T23:29:09.0176511Z ok 22 - roundAgeMonths treats non-finite input as zero
+2026-06-27T23:29:09.0177117Z   ---
+2026-06-27T23:29:09.0177528Z   duration_ms: 0.2434
+2026-06-27T23:29:09.0177992Z   ...
+2026-06-27T23:29:09.0179787Z # (node:1368) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/a/FarmHub/FarmHub/FS25_FarmDashboard_App/web/assests/js/modules/environment.js is not specified and it doesn't parse as CommonJS.
+2026-06-27T23:29:09.0181928Z # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+2026-06-27T23:29:09.0183424Z # To eliminate this warning, add "type": "module" to D:\\a\\FarmHub\\FarmHub\\FS25_FarmDashboard_App\\package.json.
+2026-06-27T23:29:09.0184699Z # (Use `node --trace-warnings ...` to show where the warning was created)
+2026-06-27T23:29:09.0265606Z # Subtest: resolveNavbarConnectionBadge shows Live API when lua export is fresh for this save
+2026-06-27T23:29:09.0279255Z ok 23 - resolveNavbarConnectionBadge shows Live API when lua export is fresh for this save
+2026-06-27T23:29:09.0312423Z   ---
+2026-06-27T23:29:09.0313432Z   duration_ms: 2.8464
+2026-06-27T23:29:09.0323016Z   ...
+2026-06-27T23:29:09.0324911Z # Subtest: resolveNavbarConnectionBadge shows Snap XML when lua export is stale even if apiConnected
+2026-06-27T23:29:09.0326484Z ok 24 - resolveNavbarConnectionBadge shows Snap XML when lua export is stale even if apiConnected
+2026-06-27T23:29:09.0327784Z   ---
+2026-06-27T23:29:09.0328384Z   duration_ms: 0.3216
+2026-06-27T23:29:09.0329589Z   ...
+2026-06-27T23:29:09.0330898Z # Subtest: resolveNavbarConnectionBadge shows Snap XML when snapshot is held and export stale
+2026-06-27T23:29:09.0333608Z ok 25 - resolveNavbarConnectionBadge shows Snap XML when snapshot is held and export stale
+2026-06-27T23:29:09.0335574Z   ---
+2026-06-27T23:29:09.0336630Z   duration_ms: 0.3813
+2026-06-27T23:29:09.0337274Z   ...
+2026-06-27T23:29:09.0339185Z # Subtest: resolveNavbarConnectionBadge shows Snap XML for xml-only saves
+2026-06-27T23:29:09.0341040Z ok 26 - resolveNavbarConnectionBadge shows Snap XML for xml-only saves
+2026-06-27T23:29:09.0341758Z   ---
+2026-06-27T23:29:09.0342065Z   duration_ms: 0.2943
+2026-06-27T23:29:09.0342368Z   ...
+2026-06-27T23:29:09.0344296Z # Subtest: resolveNavbarConnectionBadge stays Live API between 2-min FTP polls
+2026-06-27T23:29:09.0354183Z ok 27 - resolveNavbarConnectionBadge stays Live API between 2-min FTP polls
+2026-06-27T23:29:09.0354902Z   ---
+2026-06-27T23:29:09.0355249Z   duration_ms: 0.2868
+2026-06-27T23:29:09.0355563Z   ...
+2026-06-27T23:29:09.0357508Z # Subtest: resolveNavbarConnectionBadge ignores api websocket for dedicated server still live
+2026-06-27T23:29:09.0358862Z ok 28 - resolveNavbarConnectionBadge ignores api websocket for dedicated server still live
+2026-06-27T23:29:09.0359680Z   ---
+2026-06-27T23:29:09.0360011Z   duration_ms: 0.2644
+2026-06-27T23:29:09.0360401Z   ...
+2026-06-27T23:29:09.0629961Z # (node:7856) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/a/FarmHub/FarmHub/FS25_FarmDashboard_App/web/assests/js/rules-engine.js is not specified and it doesn't parse as CommonJS.
+2026-06-27T23:29:09.0643191Z # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+2026-06-27T23:29:09.0681151Z # To eliminate this warning, add "type": "module" to D:\\a\\FarmHub\\FarmHub\\FS25_FarmDashboard_App\\package.json.
+2026-06-27T23:29:09.0684274Z # (Use `node --trace-warnings ...` to show where the warning was created)
+2026-06-27T23:29:09.0686457Z # Subtest: roll is suggested before mechanical weed at early growth
+2026-06-27T23:29:09.0687810Z ok 29 - roll is suggested before mechanical weed at early growth
+2026-06-27T23:29:09.0689134Z   ---
+2026-06-27T23:29:09.0727198Z   duration_ms: 5.8462
+2026-06-27T23:29:09.0730895Z   ...
+2026-06-27T23:29:09.0732801Z # Subtest: weed is suggested when roll is not required
+2026-06-27T23:29:09.0733988Z ok 30 - weed is suggested when roll is not required
+2026-06-27T23:29:09.0735702Z   ---
+2026-06-27T23:29:09.0737967Z   duration_ms: 0.5673
+2026-06-27T23:29:09.0739071Z   ...
+2026-06-27T23:29:09.0740381Z # Subtest: PF nitrogen within 10% skips add-N and moves to next step
+2026-06-27T23:29:09.0742462Z ok 31 - PF nitrogen within 10% skips add-N and moves to next step
+2026-06-27T23:29:09.0745068Z   ---
+2026-06-27T23:29:09.0749514Z   duration_ms: 0.8463
+2026-06-27T23:29:09.0750030Z   ...
+2026-06-27T23:29:09.0750664Z # Subtest: PF nitrogen below 10% gap still suggests top-up
+2026-06-27T23:29:09.0751479Z ok 32 - PF nitrogen below 10% gap still suggests top-up
+2026-06-27T23:29:09.0752077Z   ---
+2026-06-27T23:29:09.0752502Z   duration_ms: 0.8545
+2026-06-27T23:29:09.0752950Z   ...
+2026-06-27T23:29:09.0978642Z # (node:3812) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/a/FarmHub/FarmHub/FS25_FarmDashboard_App/web/assests/js/modules/storage.js is not specified and it doesn't parse as CommonJS.
+2026-06-27T23:29:09.0981198Z # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+2026-06-27T23:29:09.0982824Z # To eliminate this warning, add "type": "module" to D:\\a\\FarmHub\\FarmHub\\FS25_FarmDashboard_App\\package.json.
+2026-06-27T23:29:09.0984221Z # (Use `node --trace-warnings ...` to show where the warning was created)
+2026-06-27T23:29:09.1171698Z # Subtest: enrichStockItem resolves TRITICALE by fillTypeIndex from merged economy
+2026-06-27T23:29:09.1181194Z ok 33 - enrichStockItem resolves TRITICALE by fillTypeIndex from merged economy
+2026-06-27T23:29:09.1184334Z   ---
+2026-06-27T23:29:09.1191071Z   duration_ms: 3.7179
+2026-06-27T23:29:09.1191567Z   ...
+2026-06-27T23:29:09.1192242Z # Subtest: enrichStockItem maps hay aliases to DRYGRASS economy rows
+2026-06-27T23:29:09.1193292Z ok 34 - enrichStockItem maps hay aliases to DRYGRASS economy rows
+2026-06-27T23:29:09.1194015Z   ---
+2026-06-27T23:29:09.1194434Z   duration_ms: 0.4726
+2026-06-27T23:29:09.1195329Z   ...
+2026-06-27T23:29:09.1196177Z # Subtest: enrichStockItem resolves sparse catalog indices from economy sell points
+2026-06-27T23:29:09.1197698Z ok 35 - enrichStockItem resolves sparse catalog indices from economy sell points
+2026-06-27T23:29:09.1198555Z   ---
+2026-06-27T23:29:09.1199006Z   duration_ms: 1.5971
+2026-06-27T23:29:09.1199431Z   ...
+2026-06-27T23:29:09.1393487Z # (node:712) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/a/FarmHub/FarmHub/FS25_FarmDashboard_App/web/assests/js/modules/vehicleAds.js is not specified and it doesn't parse as CommonJS.
+2026-06-27T23:29:09.1396612Z # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+2026-06-27T23:29:09.1398251Z # To eliminate this warning, add "type": "module" to D:\\a\\FarmHub\\FarmHub\\FS25_FarmDashboard_App\\package.json.
+2026-06-27T23:29:09.1399831Z # (Use `node --trace-warnings ...` to show where the warning was created)
+2026-06-27T23:29:09.2018414Z # Subtest: falls back to breakdown id list when breakdownParts missing
+2026-06-27T23:29:09.2020666Z ok 36 - falls back to breakdown id list when breakdownParts missing
+2026-06-27T23:29:09.2021521Z   ---
+2026-06-27T23:29:09.2022014Z   duration_ms: 3.3571
+2026-06-27T23:29:09.2022508Z   ...
+2026-06-27T23:29:09.2038465Z # Subtest: breakdown panel lists part rows when breakdownParts exported
+2026-06-27T23:29:09.2082333Z ok 37 - breakdown panel lists part rows when breakdownParts exported
+2026-06-27T23:29:09.2088866Z   ---
+2026-06-27T23:29:09.2090678Z   duration_ms: 41.832
+2026-06-27T23:29:09.2091166Z   ...
+2026-06-27T23:29:09.2273915Z # (node:6388) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/a/FarmHub/FarmHub/FS25_FarmDashboard_App/web/assests/js/modules/vehicles.js is not specified and it doesn't parse as CommonJS.
+2026-06-27T23:29:09.2277809Z # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+2026-06-27T23:29:09.2283485Z # To eliminate this warning, add "type": "module" to D:\\a\\FarmHub\\FarmHub\\FS25_FarmDashboard_App\\package.json.
+2026-06-27T23:29:09.2285293Z # (Use `node --trace-warnings ...` to show where the warning was created)
+2026-06-27T23:29:09.2287191Z # [SummaryCardFilter] Applied filter "all", showing 2 vehicles
+2026-06-27T23:29:09.2288081Z # [SummaryCardFilter] Applied filter "all", showing 1 vehicles
+2026-06-27T23:29:09.2289156Z # Subtest: filterVehiclesBySummaryCard('all') renders only the active farm's vehicles
+2026-06-27T23:29:09.2290342Z ok 38 - filterVehiclesBySummaryCard('all') renders only the active farm's vehicles
+2026-06-27T23:29:09.2291072Z   ---
+2026-06-27T23:29:09.2291722Z   duration_ms: 4.1559
+2026-06-27T23:29:09.2292062Z   ...
+2026-06-27T23:29:09.2292650Z # Subtest: updateVehicleSummaryCards total counts only the active farm
+2026-06-27T23:29:09.2293605Z ok 39 - updateVehicleSummaryCards total counts only the active farm
+2026-06-27T23:29:09.2294503Z   ---
+2026-06-27T23:29:09.2294907Z   duration_ms: 0.9121
+2026-06-27T23:29:09.2295252Z   ...
+2026-06-27T23:29:09.2295879Z # Subtest: switching active farm re-scopes both the grid and the count
+2026-06-27T23:29:09.2298428Z ok 40 - switching active farm re-scopes both the grid and the count
+2026-06-27T23:29:09.2299059Z   ---
+2026-06-27T23:29:09.2299373Z   duration_ms: 0.6029
+2026-06-27T23:29:09.2299711Z   ...
+2026-06-27T23:29:09.2300499Z # Subtest: isUsedEquipmentYardStock excludes yard listing from fleet filters
+2026-06-27T23:29:09.2301768Z ok 41 - isUsedEquipmentYardStock excludes yard listing from fleet filters
+2026-06-27T23:29:09.2302443Z   ---
+2026-06-27T23:29:09.2302745Z   duration_ms: 0.5044
+2026-06-27T23:29:09.2303073Z   ...
+2026-06-27T23:29:09.2304610Z # (node:3760) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///D:/a/FarmHub/FarmHub/FS25_FarmDashboard_App/web/assests/js/modules/vehicles.js is not specified and it doesn't parse as CommonJS.
+2026-06-27T23:29:09.2306582Z # Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+2026-06-27T23:29:09.2308029Z # To eliminate this warning, add "type": "module" to D:\\a\\FarmHub\\FarmHub\\FS25_FarmDashboard_App\\package.json.
+2026-06-27T23:29:09.2309203Z # (Use `node --trace-warnings ...` to show where the warning was created)
+2026-06-27T23:29:09.2733505Z # Subtest: extractStoreLeafToken pulls the store_/icon_ basename token
+2026-06-27T23:29:09.2736424Z ok 42 - extractStoreLeafToken pulls the store_/icon_ basename token
+2026-06-27T23:29:09.2737369Z   ---
+2026-06-27T23:29:09.2737834Z   duration_ms: 1.9198
+2026-06-27T23:29:09.2739083Z   ...
+2026-06-27T23:29:09.2744241Z # Subtest: unique curated store basename resolves to the exact curated PNG
+2026-06-27T23:29:09.2751343Z ok 43 - unique curated store basename resolves to the exact curated PNG
+2026-06-27T23:29:09.2752188Z   ---
+2026-06-27T23:29:09.2752554Z   duration_ms: 0.9375
+2026-06-27T23:29:09.2752980Z   ...
+2026-06-27T23:29:09.2762219Z # Subtest: curated wins over a mod file with the same basename
+2026-06-27T23:29:09.2764608Z ok 44 - curated wins over a mod file with the same basename
+2026-06-27T23:29:09.2765423Z   ---
+2026-06-27T23:29:09.2765883Z   duration_ms: 0.3076
+2026-06-27T23:29:09.2766375Z   ...
+2026-06-27T23:29:09.2767826Z # Subtest: a unique mod-only basename resolves to the mod PNG
+2026-06-27T23:29:09.2768878Z ok 45 - a unique mod-only basename resolves to the mod PNG
+2026-06-27T23:29:09.2769638Z   ---
+2026-06-27T23:29:09.2770621Z   duration_ms: 0.1914
+2026-06-27T23:29:09.2771103Z   ...
+2026-06-27T23:29:09.2772011Z # Subtest: ambiguous basename (2+ curated) returns null so fuzzy matching can decide
+2026-06-27T23:29:09.2775491Z ok 46 - ambiguous basename (2+ curated) returns null so fuzzy matching can decide
+2026-06-27T23:29:09.2776450Z   ---
+2026-06-27T23:29:09.2776918Z   duration_ms: 0.1936
+2026-06-27T23:29:09.2777405Z   ...
+2026-06-27T23:29:09.2779394Z # Subtest: unknown basename and empty hint return null
+2026-06-27T23:29:09.2798896Z ok 47 - unknown basename and empty hint return null
+2026-06-27T23:29:09.2799874Z   ---
+2026-06-27T23:29:09.2800438Z   duration_ms: 0.1945
+2026-06-27T23:29:09.2800935Z   ...
+2026-06-27T23:29:09.2801690Z # Subtest: deriveStoreImageHint maps config XML basename to curated store icon
+2026-06-27T23:29:09.2802841Z ok 48 - deriveStoreImageHint maps config XML basename to curated store icon
+2026-06-27T23:29:09.2803608Z   ---
+2026-06-27T23:29:09.2803995Z   duration_ms: 0.4756
+2026-06-27T23:29:09.2804445Z   ...
+2026-06-27T23:29:09.2805308Z # Subtest: getLocalVehicleImage prefers the authoritative store image over fuzzy name match
+2026-06-27T23:29:09.2813096Z ok 49 - getLocalVehicleImage prefers the authoritative store image over fuzzy name match
+2026-06-27T23:29:09.2814015Z   ---
+2026-06-27T23:29:09.2814417Z   duration_ms: 0.598
+2026-06-27T23:29:09.2814830Z   ...
+2026-06-27T23:29:09.2918208Z 1..49
+2026-06-27T23:29:09.2918536Z # tests 49
+2026-06-27T23:29:09.2919487Z # suites 0
+2026-06-27T23:29:09.2920170Z # pass 47
+2026-06-27T23:29:09.2920413Z # fail 2
+2026-06-27T23:29:09.2920768Z # cancelled 0
+2026-06-27T23:29:09.2921312Z # skipped 0
+2026-06-27T23:29:09.2922088Z # todo 0
+2026-06-27T23:29:09.2930410Z # duration_ms 526.9953
+2026-06-27T23:29:09.4602962Z ##[error]Process completed with exit code 1.

@@ -609,23 +609,9 @@ function catalogFromMapCrops(luaData, xmlEconomy) {
     return out;
 }
 
-function stockHasFillIndex(stock, idx) {
-    for (const farm of Object.values(stock?.byFarm || {})) {
-        for (const item of toArr(farm?.items)) {
-            if (Number(item?.fillTypeIndex) === idx) return true;
-        }
-    }
-    return false;
-}
-
-/** Witcombe-style gaps — kept only as last-resort heuristic in inferCatalogFromStockAndFields. */
-function assignNeighborCropGaps(catalog, stock) {
-    return { ...(catalog || {}) };
-}
-
-/** Pair unresolved silo indices with map crop names (e.g. index 182 ↔ TRITICALE on Witcombe). */
+/** Pair unresolved silo indices with field crops, economy xml, and mod-exported catalog data. */
 function inferCatalogFromStockAndFields(stock, fields, catalog, xmlEconomy) {
-    let out = assignNeighborCropGaps(catalog, stock);
+    let out = { ...(catalog || {}) };
     const catalogValues = new Set(
         Object.values(out).map((v) => String(v || '').trim().toUpperCase()).filter(Boolean)
     );

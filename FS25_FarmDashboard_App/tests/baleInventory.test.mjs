@@ -45,10 +45,10 @@ test("buildFillTypeCatalog resolves map-specific crops like TRITICALE", () => {
   assert.equal(catalog["182"], "TRITICALE");
 });
 
-test("buildFillTypeCatalog infers TRITICALE at 182 when RYE/SPELT neighbors exist on DS", () => {
+test("buildFillTypeCatalog resolves sparse index from mod stock.fillTypeCatalog", () => {
   const catalog = buildFillTypeCatalog({
-    fillTypeCatalog: { 181: "RYE", 183: "SPELT" },
     stock: {
+      fillTypeCatalog: { 182: "TRITICALE" },
       byFarm: {
         "1": {
           items: [{ fillTypeIndex: 182, totalLiters: 8206, fillType: "" }],
@@ -59,18 +59,33 @@ test("buildFillTypeCatalog infers TRITICALE at 182 when RYE/SPELT neighbors exis
   assert.equal(catalog["182"], "TRITICALE");
 });
 
-test("buildFillTypeCatalog infers LINSEED at 190 when RYE_CUT/POPPY neighbors exist on DS", () => {
+test("buildFillTypeCatalog maps lone field crop to missing stock index", () => {
   const catalog = buildFillTypeCatalog({
-    fillTypeCatalog: { 189: "RYE_CUT", 191: "POPPY" },
+    fields: [{ fruitType: "LINSEED", ownerFarmId: 1 }],
     stock: {
       byFarm: {
         "1": {
+          farmId: 1,
           items: [{ fillTypeIndex: 190, totalLiters: 88539, fillType: "" }],
         },
       },
     },
   });
   assert.equal(catalog["190"], "LINSEED");
+});
+
+test("buildFillTypeCatalog resolves sparse index from fillTypeTitles export", () => {
+  const catalog = buildFillTypeCatalog({
+    fillTypeTitles: { 182: "Triticale" },
+    stock: {
+      byFarm: {
+        "1": {
+          items: [{ fillTypeIndex: 182, totalLiters: 8206, fillType: "" }],
+        },
+      },
+    },
+  });
+  assert.equal(catalog["182"], "Triticale");
 });
 
 test("supplement onField prefers field totals when economy scan is partial", () => {

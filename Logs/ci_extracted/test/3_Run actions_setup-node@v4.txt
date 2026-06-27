@@ -1,0 +1,31 @@
+﻿2026-06-27T23:28:20.1202207Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-06-27T23:28:20.1205558Z ##[group]Run actions/setup-node@v4
+2026-06-27T23:28:20.1205952Z with:
+2026-06-27T23:28:20.1206225Z   node-version: 20
+2026-06-27T23:28:20.1206525Z   cache: npm
+2026-06-27T23:28:20.1206986Z   cache-dependency-path: FS25_FarmDashboard_App/package-lock.json
+2026-06-27T23:28:20.1207581Z   always-auth: false
+2026-06-27T23:28:20.1207908Z   check-latest: false
+2026-06-27T23:28:20.1215290Z   token: ***
+2026-06-27T23:28:20.1215591Z ##[endgroup]
+2026-06-27T23:28:20.3737068Z Attempting to download 20...
+2026-06-27T23:28:20.3995681Z (node:1416) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-06-27T23:28:20.3997221Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-06-27T23:28:21.1194976Z Acquiring 20.20.2 - x64 from https://github.com/actions/node-versions/releases/download/20.20.2-23521894959/node-20.20.2-win32-x64.7z
+2026-06-27T23:28:21.7137722Z Extracting ...
+2026-06-27T23:28:24.7227753Z Adding to the cache ...
+2026-06-27T23:28:31.7807528Z ##[group]Environment details
+2026-06-27T23:28:33.8336142Z node: v20.20.2
+2026-06-27T23:28:33.8336746Z npm: 10.8.2
+2026-06-27T23:28:33.8337131Z yarn: 1.22.22
+2026-06-27T23:28:33.8337834Z ##[endgroup]
+2026-06-27T23:28:33.9450459Z [command]C:\Windows\system32\cmd.exe /D /S /C "C:\hostedtoolcache\windows\node\20.20.2\x64\npm.cmd config get cache"
+2026-06-27T23:28:34.6592566Z C:\npm\cache
+2026-06-27T23:28:36.1619456Z Cache hit for: node-cache-Windows-x64-npm-ecfe861001d6d419eeb7f9d230aff4c556d666502ed7fad2954c47c702cb7f5e
+2026-06-27T23:28:36.1745540Z (node:1416) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+2026-06-27T23:28:37.4502075Z Received 29360128 of 70147361 (41.9%), 28.0 MBs/sec
+2026-06-27T23:28:37.8809453Z Received 70147361 of 70147361 (100.0%), 46.7 MBs/sec
+2026-06-27T23:28:37.8812677Z Cache Size: ~67 MB (70147361 B)
+2026-06-27T23:28:37.8911056Z [command]"C:\Program Files\Git\usr\bin\tar.exe" -xf D:/a/_temp/f821cd61-2876-4133-8fc8-2ab650927584/cache.tzst -P -C D:/a/FarmHub/FarmHub --force-local --use-compress-program "zstd -d"
+2026-06-27T23:28:41.0489090Z Cache restored successfully
+2026-06-27T23:28:41.0545788Z Cache restored from key: node-cache-Windows-x64-npm-ecfe861001d6d419eeb7f9d230aff4c556d666502ed7fad2954c47c702cb7f5e

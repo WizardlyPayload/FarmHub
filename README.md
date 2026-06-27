@@ -73,7 +73,7 @@ This repository (**[FarmHub](https://github.com/WizardlyPayload/FarmHub)**) is *
 - **Accurate equipment pictures** — authoritative store-icon matching (app **4.2.0** + mod **3.4.0.6**).
 - **Local + FTP** — single-player / LAN host on disk, or dedicated server over FTP.
 - **Offline field rules** — suggested next steps from merged game data (no cloud service).
-- **Optional integrations** — Advanced Damage System, Moisture System, Red Tape compliance tab.
+- **Optional integrations** — Precision Farming, Advanced Damage System, Moisture System, Red Tape, Realistic Livestock RM, Vehicle Years; Courseplay and Used Equipment Yards tested alongside — [full mod list](docs/GITHUB_RELEASE_v4.2.0.md#third-party-mods).
 - **27 languages**, themes, unified Settings.
 - **Auto-update** (Windows app) and **mod version badge** when the in-game mod is behind.
 

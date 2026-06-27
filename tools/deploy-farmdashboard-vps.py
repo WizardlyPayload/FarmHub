@@ -121,40 +121,57 @@ def sftp_put_atomic(sftp: paramiko.SFTPClient, local: Path, remote: str) -> None
     print(f"  Done in {elapsed:.0f}s", flush=True)
 
 
+def ensure_remote_dir(sftp: paramiko.SFTPClient, remote_dir: str) -> None:
+    cur = ""
+    for part in remote_dir.split("/"):
+        if not part:
+            continue
+        cur += "/" + part
+        try:
+            sftp.stat(cur)
+        except OSError:
+            try:
+                sftp.mkdir(cur)
+            except OSError:
+                pass
+
+
 def upload_website_assets(client: paramiko.SSHClient, env: dict[str, str]) -> None:
     web_root = env["VPS_WEB_ROOT"].rstrip("/")
     website = ROOT / "Website"
-    rels = [
-        "js/testers-config.js",
-        "js/testers-gate.js",
-        "css/testers.css",
-        "t/fs25-beta/index.html",
-    ]
+    skip_dirs = {"nginx", "tools", "files"}
+    uploads: list[tuple[Path, str]] = []
+
+    for html in sorted(website.glob("*.html")):
+        uploads.append((html, f"{web_root}/{html.name}"))
+
+    for extra in ("robots.txt",):
+        local = website / extra
+        if local.is_file():
+            uploads.append((local, f"{web_root}/{extra}"))
+
+    for sub in ("css", "js", "assets", "t"):
+        base = website / sub
+        if not base.is_dir():
+            continue
+        for local in sorted(base.rglob("*")):
+            if not local.is_file():
+                continue
+            rel = local.relative_to(website).as_posix()
+            if any(part in skip_dirs for part in local.relative_to(base).parts):
+                continue
+            if "/files/" in rel and rel.endswith((".exe", ".zip")):
+                continue
+            uploads.append((local, f"{web_root}/{rel}"))
+
     sftp = client.open_sftp()
     try:
-        for rel in rels:
-            local = website / Path(rel)
-            if not local.is_file():
-                print(f"  Skip missing {local}", flush=True)
-                continue
-            remote = f"{web_root}/{rel.replace(chr(92), '/')}"
-            remote_dir = remote.rsplit("/", 1)[0]
-            cur = ""
-            for part in remote_dir.split("/"):
-                if not part:
-                    continue
-                cur += "/" + part
-                try:
-                    sftp.stat(cur)
-                except OSError:
-                    try:
-                        sftp.mkdir(cur)
-                    except OSError:
-                        pass
+        for local, remote in uploads:
+            ensure_remote_dir(sftp, remote.rsplit("/", 1)[0])
             sftp_put_atomic(sftp, local, remote)
     finally:
         sftp.close()
-    print("Website testers assets uploaded.", flush=True)
+    print(f"Website assets uploaded ({len(uploads)} files).", flush=True)
 
 
 def main() -> int:

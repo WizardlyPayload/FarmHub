@@ -73,6 +73,32 @@ Build output (default): `%USERPROFILE%\Documents\FarmDash Final Output\` when us
 
 ---
 
+## Third-party mods
+
+Farm Dashboard works with **base-game FS25** on its own. These optional mods add extra panels or data when installed on the save. None are required.
+
+### Integrated (extra dashboard UI)
+
+| Mod | What you get |
+|-----|----------------|
+| [Precision Farming](https://www.farming-simulator.com/mod.php?mod_id=318936&title=fs2025) (Giants) | N / pH bars and scan state on **Fields** |
+| [Advanced Damage System](https://github.com/id577/FS25_AdvancedDamageSystem) | Workshop, inspection, and breakdown panels on **Vehicles**; urgent bell alerts (PC — GitHub release, WIP) |
+| [Moisture System](https://www.farming-simulator.com/mod.php?mod_id=354130&title=fs2025) · [GitHub](https://github.com/Ozz-Modding/FS25_MoistureSystem) | Field moisture badge; silo **moisture & grade** in Economy → Storage |
+| [Red Tape](https://www.farming-simulator.com/mod.php?mod_id=343291&title=fs2025) · [GitHub](https://github.com/Ozz-Modding/FS25_RedTape) | **Compliance** tab under Economy (policies, schemes, tax, events) |
+| [Realistic Livestock RM](https://github.com/rittermod/FS25_RealisticLivestockRM) | Individual animals, genetics, and authoritative pen totals on **Livestock** / **Pastures** |
+| [Vehicle Years](https://www.farming-simulator.com/mod.php?mod_id=308890&title=fs2025) · [GitLab](https://gitlab.com/thalley/fs25_vehicle_years) | Model year / decade badge on vehicle cards |
+
+### Tested alongside (no extra UI — coexistence)
+
+| Mod | Notes |
+|-----|--------|
+| [Courseplay](https://www.farming-simulator.com/mod.php?mod_id=331515&title=fs2025) · [GitHub](https://github.com/Courseplay/Courseplay_FS25) | Safe fleet export with Courseplay on the save; combine-unloader menu crash fix (4.1.4+) |
+| [Used Equipment Yards](https://www.farming-simulator.com/mod.php?mod_id=359834&title=fs2025) · [GitHub](https://github.com/Ozz-Modding/FS25_UsedEquipmentYards) | Yard listing stock is filtered off your **Vehicles** tab |
+
+> **Realistic Livestock:** the dashboard targets the maintained **[Realistic Livestock RM](https://github.com/rittermod/FS25_RealisticLivestockRM)** fork (`FS25_RealisticLivestockRM`). Arrow-kb’s original mod is discontinued; RM migrates save data automatically.
+
+---
+
 ## Dedicated server
 
 Install mod on the **host**, restart server, load save once. For FTP: confirm `data.json` updates. Fleet map offset? Delete `%APPDATA%\fs25-farm-dashboard\map_overviews\` and reopen Fleet map.

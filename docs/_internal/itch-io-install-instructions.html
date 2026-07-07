@@ -1,528 +1,184 @@
 <!--
-  FS25 Farm Dashboard — itch.io installation instructions (HTML)
+  FS25 Farm Dashboard — itch.io INSTALLATION INSTRUCTIONS (itch-safe HTML)
 
-  HOW TO USE
-  1. itch.io → Edit project → Installation instructions → switch to HTML mode (if available).
-  2. Paste everything inside the outer <div> below (or the whole file).
-  3. Keep the main Description as itch-io-page-description.html — this file is the install tab.
+  Paste into: Edit project → Installation instructions → <> HTML mode.
+  Uses the same itch-safe tags as itch-io-page-description.html.
 
-  IMAGES load from GitHub raw (WizardlyPayload/FarmHub main). Push to main before publishing.
-  Full guide with more detail: docs/INSTALL.md
+  Full guide: docs/INSTALL.md
 -->
 
-<div
-  style="
-    font-family: 'Segoe UI', system-ui, -apple-system, 'Plus Jakarta Sans', Roboto, sans-serif;
-    color: #f4f7f5;
-    margin: 0;
-    line-height: 1.5;
-    background: linear-gradient(168deg, #0e1210 0%, #141a17 40%, #121a16 100%);
-  "
->
-  <!-- ═══════════════════ HEADER ═══════════════════ -->
-  <div
-    style="
-      background-color: #0e1210;
-      background-image: linear-gradient(
-          165deg,
-          rgba(14, 18, 16, 0.92) 0%,
-          rgba(14, 18, 16, 0.72) 50%,
-          rgba(14, 18, 16, 0.95) 100%
-        ),
-        url('https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/FS25_FarmDashboard_App/web/assests/img/Dashboard%20PIctures/Background.png');
-      background-size: cover;
-      background-position: center;
-      padding: 2rem 1.25rem 2.25rem;
-      text-align: center;
-      border-bottom: 1px solid rgba(152, 163, 154, 0.15);
-    "
-  >
-    <div
-      style="
-        max-width: 48rem;
-        margin: 0 auto;
-        padding: 1.75rem 1.35rem 1.9rem;
-        border-radius: 1.25rem;
-        background: rgba(23, 31, 28, 0.78);
-        border: 1px solid rgba(152, 163, 154, 0.22);
-        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.42);
-      "
-    >
-      <p
-        style="
-          margin: 0 0 0.45rem;
-          font-size: 0.72rem;
-          font-weight: 600;
-          letter-spacing: 0.16em;
-          text-transform: uppercase;
-          color: #e8c547;
-        "
-      >
-        Installation guide
-      </p>
-      <h1
-        style="
-          margin: 0 0 0.75rem;
-          font-size: clamp(1.55rem, 3.5vw, 2rem);
-          font-weight: 700;
-          letter-spacing: -0.03em;
-          line-height: 1.2;
-          color: #f4f7f5;
-        "
-      >
-        Install mod first, then the Windows app
-      </h1>
-      <p style="margin: 0; font-size: 0.95rem; color: rgba(244, 247, 245, 0.9); max-width: 36rem; margin-left: auto; margin-right: auto">
-        Read the steps <strong>in order</strong>. The in-game mod writes
-        <code style="color: #a5f3b5; background: rgba(0,0,0,0.25); padding: 0.1rem 0.35rem; border-radius: 0.35rem">data.json</code>
-        while you play — the desktop app only reads that file.
-      </p>
-      <p style="margin: 0.85rem 0 0; font-size: 0.86rem; color: #98a39a">
-        App <strong style="color: #e8c547">4.2.0</strong> · Mod <strong style="color: #e8c547">3.4.0.6</strong>
-        · Dashboard at <strong style="color: #a5f3b5">http://localhost:8766</strong> after setup
-      </p>
-    </div>
-  </div>
+<p><strong><span style="color:#b8860b">Read these steps in order</span></strong> — install the <strong>mod first</strong>, then the Windows app.</p>
 
-  <!-- ═══════════════════ IMPORTANT CALLOUT ═══════════════════ -->
-  <div
-    style="
-      margin: 1.75rem 1.25rem 0;
-      max-width: 52rem;
-      margin-left: auto;
-      margin-right: auto;
-      padding: 1.1rem 1.2rem;
-      border-radius: 1rem;
-      background: rgba(232, 197, 71, 0.08);
-      border: 1px solid rgba(232, 197, 71, 0.28);
-      font-size: 0.9rem;
-      color: #e2e8f0;
-      line-height: 1.55;
-    "
-  >
-    <strong style="color: #e8c547">Why mod before app?</strong>
-    The Windows app does <em>not</em> run inside FS25. Until you load a save with the mod enabled at least once,
-    <code style="color: #a5f3b5">data.json</code> is missing and the dashboard shows
-    <strong>“waiting for data”</strong> — even if the installer finished successfully.
-  </div>
+<p>The desktop app does <em>not</em> run inside FS25. It only reads <code>data.json</code>, which the in-game mod creates while you play. Until you load a save with the mod enabled, the dashboard shows <strong>“waiting for data”</strong> even after the installer finishes.</p>
 
-  <!-- ═══════════════════ STAGE A ═══════════════════ -->
-  <div style="padding: 2rem 1.25rem 0.5rem; max-width: 52rem; margin: 0 auto">
-    <p
-      style="
-        margin: 0 0 0.5rem;
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: #e8c547;
-      "
-    >
-      Stage A — Install the mod
-    </p>
-    <ol style="margin: 0 0 1rem; padding-left: 1.35rem; color: #b8c4bc; font-size: 0.92rem; line-height: 1.65">
-      <li>
-        Download <strong style="color: #f0fdf4">FS25_FarmDashboard.zip</strong> from this page or
-        <a href="https://github.com/WizardlyPayload/FarmHub/releases" style="color: #e8c547">GitHub Releases</a>.
-      </li>
-      <li>
-        Copy the zip into your FS25 <strong>mods</strong> folder (do not rename unless you know the game still loads it):
-        <br />
-        <code style="color: #a5f3b5; font-size: 0.84rem">Documents\My Games\FarmingSimulator2025\mods\</code>
-        <br />
-        <span style="font-size: 0.85rem; color: #98a39a"
-          >Alternative: extract to <code>mods\FS25_FarmDashboard\</code> with <code>modDesc.xml</code> at the folder root.</span
-        >
-      </li>
-      <li>Start <strong>Farming Simulator 25</strong> once so the game registers the mod.</li>
-    </ol>
-    <div
-      style="
-        border-radius: 1rem;
-        overflow: hidden;
-        border: 1px solid rgba(152, 163, 154, 0.22);
-        box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35);
-      "
-    >
-      <img
-        src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-010-mod-folder.png"
-        alt="FS25_FarmDashboard zip in the mods folder"
-        style="display: block; width: 100%; height: auto"
-      />
-    </div>
-    <p style="margin: 0.65rem 0 0; font-size: 0.84rem; color: #98a39a">
-      File Explorer — <strong>FS25_FarmDashboard</strong> as a zip or folder under <strong>mods</strong>.
-    </p>
-  </div>
+<p><strong>App 4.2.0</strong> · <strong>Mod 3.4.0.6</strong> · Dashboard at <strong>http://localhost:8766</strong> after setup</p>
 
-  <!-- ═══════════════════ STAGE B ═══════════════════ -->
-  <div style="padding: 2rem 1.25rem 0.5rem; max-width: 52rem; margin: 0 auto">
-    <p
-      style="
-        margin: 0 0 0.5rem;
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: #e8c547;
-      "
-    >
-      Stage B — Enable on every save
-    </p>
-    <p style="margin: 0 0 0.75rem; font-size: 0.9rem; color: #b8c4bc">
-      Repeat for <strong>each savegame</strong> (and each dedicated-server save) that should use the dashboard:
-    </p>
-    <ol style="margin: 0 0 1rem; padding-left: 1.35rem; color: #b8c4bc; font-size: 0.92rem; line-height: 1.65">
-      <li>Open the save’s <strong>Mods</strong> list in FS25.</li>
-      <li>Enable <strong>Farm Dashboard</strong> / <strong>FS25 Farm Dashboard</strong>.</li>
-      <li><strong>Load the save and enter the world</strong> — the main menu alone is not enough.</li>
-    </ol>
-    <div
-      style="
-        border-radius: 1rem;
-        overflow: hidden;
-        border: 1px solid rgba(152, 163, 154, 0.22);
-        box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35);
-      "
-    >
-      <img
-        src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-020-fs25-mod-enabled.png"
-        alt="Farm Dashboard mod enabled in the save mod list"
-        style="display: block; width: 100%; height: auto"
-      />
-    </div>
-  </div>
+<hr />
 
-  <!-- ═══════════════════ STAGE C ═══════════════════ -->
-  <div style="padding: 2rem 1.25rem 0.5rem; max-width: 52rem; margin: 0 auto">
-    <p
-      style="
-        margin: 0 0 0.5rem;
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: #e8c547;
-      "
-    >
-      Stage C — Confirm data.json is updating
-    </p>
-    <p style="margin: 0 0 0.75rem; font-size: 0.9rem; color: #b8c4bc">
-      After about one minute in-game, check this path on your PC (or the server profile for FTP):
-    </p>
-    <p
-      style="
-        margin: 0 0 1rem;
-        padding: 0.75rem 1rem;
-        border-radius: 0.65rem;
-        background: rgba(0, 0, 0, 0.28);
-        border: 1px solid rgba(152, 163, 154, 0.18);
-        font-size: 0.82rem;
-        color: #a5f3b5;
-        word-break: break-all;
-        line-height: 1.5;
-      "
-    >
-      %USERPROFILE%\Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\&lt;savegame&gt;\data.json
-    </p>
-    <p style="margin: 0 0 1rem; font-size: 0.9rem; color: #b8c4bc">
-      The file should exist and its <strong>Modified</strong> time should advance while you play.
-    </p>
-    <div
-      style="
-        border-radius: 1rem;
-        overflow: hidden;
-        border: 1px solid rgba(152, 163, 154, 0.22);
-        box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35);
-      "
-    >
-      <img
-        src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-030-datajson-explorer.png"
-        alt="data.json with a recent modified timestamp in File Explorer"
-        style="display: block; width: 100%; height: auto"
-      />
-    </div>
-  </div>
+<h2>Stage A — Install the mod</h2>
 
-  <!-- ═══════════════════ STAGE D ═══════════════════ -->
-  <div style="padding: 2rem 1.25rem 0.5rem; max-width: 52rem; margin: 0 auto">
-    <p
-      style="
-        margin: 0 0 0.5rem;
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: #e8c547;
-      "
-    >
-      Stage D — Install the Windows app
-    </p>
-    <ol style="margin: 0 0 1rem; padding-left: 1.35rem; color: #b8c4bc; font-size: 0.92rem; line-height: 1.65">
-      <li>
-        Download and run <strong style="color: #f0fdf4">FS25-Farm-Dashboard-Setup-4.2.0.exe</strong> from this page or
-        <a href="https://github.com/WizardlyPayload/FarmHub/releases" style="color: #e8c547">GitHub Releases</a>.
-      </li>
-      <li>Choose your language on the welcome page and complete the installer.</li>
-      <li>Launch <strong>Farm Dashboard</strong> from the Start menu.</li>
-    </ol>
-    <div style="display: table; width: 100%; border-spacing: 0.65rem">
-      <div style="display: table-row">
-        <div style="display: table-cell; width: 50%; vertical-align: top">
-          <div
-            style="
-              border-radius: 0.85rem;
-              overflow: hidden;
-              border: 1px solid rgba(152, 163, 154, 0.22);
-              box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-            "
-          >
-            <img
-              src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-040-installer-welcome.png"
-              alt="Installer welcome page"
-              style="display: block; width: 100%; height: auto"
-            />
-          </div>
-        </div>
-        <div style="display: table-cell; width: 50%; vertical-align: top">
-          <div
-            style="
-              border-radius: 0.85rem;
-              overflow: hidden;
-              border: 1px solid rgba(152, 163, 154, 0.22);
-              box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-            "
-          >
-            <img
-              src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-045-installer-finished.png"
-              alt="Installer finished page"
-              style="display: block; width: 100%; height: auto"
-            />
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+<ol>
+  <li>Download <strong>FS25_FarmDashboard.zip</strong> from this page or <a href="https://github.com/WizardlyPayload/FarmHub/releases">GitHub Releases</a>.</li>
+  <li>Copy the zip into your FS25 <strong>mods</strong> folder:
+    <br /><code>Documents\My Games\FarmingSimulator2025\mods\</code>
+    <br /><em>Alternative:</em> extract to <code>mods\FS25_FarmDashboard\</code> with <code>modDesc.xml</code> at the folder root.</li>
+  <li>Start <strong>Farming Simulator 25</strong> once so the game registers the mod.</li>
+</ol>
 
-  <!-- ═══════════════════ STAGE E ═══════════════════ -->
-  <div style="padding: 2rem 1.25rem 0.5rem; max-width: 52rem; margin: 0 auto">
-    <p
-      style="
-        margin: 0 0 0.5rem;
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: #e8c547;
-      "
-    >
-      Stage E — First launch &amp; Server Manager
-    </p>
-    <p style="margin: 0 0 0.85rem; font-size: 0.9rem; color: #b8c4bc">
-      On first launch the app opens <strong>Server Manager</strong> if no servers are configured yet.
-    </p>
-    <div
-      style="
-        border-radius: 1rem;
-        overflow: hidden;
-        border: 1px solid rgba(152, 163, 154, 0.22);
-        box-shadow: 0 10px 32px rgba(0, 0, 0, 0.35);
-        margin-bottom: 1.1rem;
-      "
-    >
-      <img
-        src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-050-app-first-launch.png"
-        alt="Farm Dashboard Server Manager on first launch"
-        style="display: block; width: 100%; height: auto"
-      />
-    </div>
+<figure>
+  <img
+    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-010-mod-folder.png"
+    alt="FS25_FarmDashboard zip in the mods folder"
+  />
+  <figcaption><code>FS25_FarmDashboard</code> as a zip or folder under <strong>mods</strong>.</figcaption>
+</figure>
 
-    <div
-      style="
-        padding: 1.15rem 1.2rem;
-        border-radius: 1rem;
-        background: rgba(23, 31, 28, 0.65);
-        border: 1px solid rgba(232, 197, 71, 0.18);
-      "
-    >
-      <p style="margin: 0 0 0.75rem; font-size: 0.95rem; font-weight: 600; color: #f4f7f5; text-align: center">
-        Setup walk-through
-      </p>
-      <ul style="list-style: none; margin: 0; padding: 0">
-        <li style="padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #e2e8f0; font-size: 0.9rem">
-          <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.35rem">1</span>
-          Pick your language (top-right on Setup).
-        </li>
-        <li style="padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #e2e8f0; font-size: 0.9rem">
-          <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.35rem">2</span>
-          Click <strong>Auto-detect saves</strong> for local PC play, or add a row manually.
-        </li>
-        <li style="padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #e2e8f0; font-size: 0.9rem">
-          <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.35rem">3</span>
-          For <strong>GPortal / Nitrado</strong> hosts: add <strong>Dedicated Server (FTP)</strong> with host, credentials, profile path, and save slot.
-        </li>
-        <li style="padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #e2e8f0; font-size: 0.9rem">
-          <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.35rem">4</span>
-          Optional: <strong>Scan FS25 mods for dashboard images</strong> (vehicle icons from your mod folder).
-        </li>
-        <li style="padding: 0.5rem 0; color: #e2e8f0; font-size: 0.9rem">
-          <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.35rem">5</span>
-          With at least one server in the list, click <strong>Launch Dashboard</strong> → open
-          <strong>http://localhost:8766</strong>.
-        </li>
-      </ul>
-    </div>
-  </div>
+<hr />
 
-  <!-- ═══════════════════ DEDICATED SERVER ═══════════════════ -->
-  <div
-    style="
-      margin: 2rem 1.25rem 0;
-      max-width: 52rem;
-      margin-left: auto;
-      margin-right: auto;
-      padding: 1.25rem 1.2rem;
-      border-radius: 1rem;
-      background: rgba(47, 111, 78, 0.12);
-      border: 1px solid rgba(47, 111, 78, 0.35);
-    "
-  >
-    <p
-      style="
-        margin: 0 0 0.65rem;
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: #a5f3b5;
-      "
-    >
-      Dedicated server (FTP)
-    </p>
-    <ol style="margin: 0; padding-left: 1.25rem; color: #cde9d6; font-size: 0.9rem; line-height: 1.6">
-      <li>Complete Stages <strong>A–C</strong> on the server — mod enabled, save loaded, <code>data.json</code> present on the server profile.</li>
-      <li>In Setup or <strong>Settings → Servers &amp; saves</strong>, add FTP host, port, username, password, base profile path, and save slot folder.</li>
-      <li>Optional <strong>HTTP feed</strong> (Giants dedicated XML on port <strong>8080</strong>) improves vehicle age, prices, and market history when available.</li>
-      <li>Set <strong>Poll every</strong> (1–25 minutes). Local saves use file watching; FTP uses this schedule.</li>
-    </ol>
-  </div>
+<h2>Stage B — Enable on every save</h2>
 
-  <!-- ═══════════════════ POST-INSTALL CHECKS ═══════════════════ -->
-  <div style="padding: 2rem 1.25rem 0.5rem; max-width: 52rem; margin: 0 auto">
-    <p
-      style="
-        text-align: center;
-        margin: 0 0 0.85rem;
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: #e8c547;
-      "
-    >
-      Post-install checks
-    </p>
-    <div
-      style="
-        border-radius: 1rem;
-        overflow: hidden;
-        border: 1px solid rgba(152, 163, 154, 0.2);
-        background: rgba(23, 31, 28, 0.55);
-      "
-    >
-      <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem">
-        <tr style="background: rgba(47, 111, 78, 0.2)">
-          <th style="text-align: left; padding: 0.65rem 0.85rem; color: #e8c547; font-weight: 600; border-bottom: 1px solid rgba(152,163,154,0.2)">Check</th>
-          <th style="text-align: left; padding: 0.65rem 0.85rem; color: #e8c547; font-weight: 600; border-bottom: 1px solid rgba(152,163,154,0.2)">Expected</th>
-        </tr>
-        <tr>
-          <td style="padding: 0.6rem 0.85rem; color: #f4f7f5; border-bottom: 1px solid rgba(255,255,255,0.05)">Landing page</td>
-          <td style="padding: 0.6rem 0.85rem; color: #98a39a; border-bottom: 1px solid rgba(255,255,255,0.05)">Section cards with counts (or zeros until data arrives)</td>
-        </tr>
-        <tr>
-          <td style="padding: 0.6rem 0.85rem; color: #f4f7f5; border-bottom: 1px solid rgba(255,255,255,0.05)">Data-source badge</td>
-          <td style="padding: 0.6rem 0.85rem; color: #98a39a; border-bottom: 1px solid rgba(255,255,255,0.05)">XML + Live + API (or subset if unavailable)</td>
-        </tr>
-        <tr>
-          <td style="padding: 0.6rem 0.85rem; color: #f4f7f5; border-bottom: 1px solid rgba(255,255,255,0.05)">Settings → Servers</td>
-          <td style="padding: 0.6rem 0.85rem; color: #98a39a; border-bottom: 1px solid rgba(255,255,255,0.05)">Correct local path or FTP host + save slot</td>
-        </tr>
-        <tr>
-          <td style="padding: 0.6rem 0.85rem; color: #f4f7f5">Wrong save empty</td>
-          <td style="padding: 0.6rem 0.85rem; color: #98a39a">Repeat Stage B for that save</td>
-        </tr>
-      </table>
-    </div>
-  </div>
+<p>Repeat for <strong>each savegame</strong> (and each dedicated-server save) that should use the dashboard:</p>
 
-  <!-- ═══════════════════ TROUBLESHOOTING ═══════════════════ -->
-  <div style="padding: 2rem 1.25rem 1rem; max-width: 52rem; margin: 0 auto">
-    <p
-      style="
-        text-align: center;
-        margin: 0 0 0.85rem;
-        font-size: 0.75rem;
-        font-weight: 600;
-        letter-spacing: 0.12em;
-        text-transform: uppercase;
-        color: #e8c547;
-      "
-    >
-      Troubleshooting
-    </p>
-    <div
-      style="
-        border-radius: 1rem;
-        overflow: hidden;
-        border: 1px solid rgba(152, 163, 154, 0.2);
-        background: rgba(23, 31, 28, 0.55);
-      "
-    >
-      <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem">
-        <tr style="background: rgba(232, 197, 71, 0.1)">
-          <th style="text-align: left; padding: 0.65rem 0.85rem; color: #e8c547; font-weight: 600; border-bottom: 1px solid rgba(152,163,154,0.2)">Symptom</th>
-          <th style="text-align: left; padding: 0.65rem 0.85rem; color: #e8c547; font-weight: 600; border-bottom: 1px solid rgba(152,163,154,0.2)">Fix</th>
-        </tr>
-        <tr>
-          <td style="padding: 0.6rem 0.85rem; color: #f4f7f5; border-bottom: 1px solid rgba(255,255,255,0.05)"><strong>Waiting for data</strong></td>
-          <td style="padding: 0.6rem 0.85rem; color: #98a39a; border-bottom: 1px solid rgba(255,255,255,0.05)">Stages B + C; verify path in Settings → Servers</td>
-        </tr>
-        <tr>
-          <td style="padding: 0.6rem 0.85rem; color: #f4f7f5; border-bottom: 1px solid rgba(255,255,255,0.05)"><strong>Port 8766 in use</strong></td>
-          <td style="padding: 0.6rem 0.85rem; color: #98a39a; border-bottom: 1px solid rgba(255,255,255,0.05)">Close other apps on 8766; restart Farm Dashboard</td>
-        </tr>
-        <tr>
-          <td style="padding: 0.6rem 0.85rem; color: #f4f7f5; border-bottom: 1px solid rgba(255,255,255,0.05)"><strong>FTP never updates</strong></td>
-          <td style="padding: 0.6rem 0.85rem; color: #98a39a; border-bottom: 1px solid rgba(255,255,255,0.05)">Check credentials, slot name, firewall; interval ≥ 1 min</td>
-        </tr>
-        <tr>
-          <td style="padding: 0.6rem 0.85rem; color: #f4f7f5"><strong>Blank after upgrade</strong></td>
-          <td style="padding: 0.6rem 0.85rem; color: #98a39a">Update <strong>both</strong> app (4.2.0) and mod (3.4.0.6) from the same release</td>
-        </tr>
-      </table>
-    </div>
-  </div>
+<ol>
+  <li>Open the save’s <strong>Mods</strong> list in FS25.</li>
+  <li>Enable <strong>Farm Dashboard</strong> / <strong>FS25 Farm Dashboard</strong>.</li>
+  <li><strong>Load the save and enter the world</strong> — the main menu alone is not enough.</li>
+</ol>
 
-  <!-- ═══════════════════ FOOTER ═══════════════════ -->
-  <div
-    style="
-      margin-top: 1.5rem;
-      padding: 1.5rem 1.25rem 2rem;
-      text-align: center;
-      border-top: 1px solid rgba(152, 163, 154, 0.15);
-      background: #0e1210;
-    "
-  >
-    <p style="margin: 0 0 0.65rem; font-size: 0.88rem; color: #98a39a">
-      Full written guide:
-      <a href="https://github.com/WizardlyPayload/FarmHub/blob/main/docs/INSTALL.md" style="color: #e8c547; text-decoration: none">INSTALL.md</a>
-      · Day-to-day use:
-      <a href="https://github.com/WizardlyPayload/FarmHub/blob/main/docs/USER_MANUAL.md" style="color: #e8c547; text-decoration: none">User manual</a>
-      · Upgrading from 2.0.0:
-      <a href="https://github.com/WizardlyPayload/FarmHub/blob/main/docs/UPGRADE_FROM_FS25-Farm-Dashboard.md" style="color: #e8c547; text-decoration: none">Upgrade guide</a>
-    </p>
-    <p style="margin: 0; font-size: 0.78rem; color: #5a6b62">
-      Not affiliated with GIANTS Software. Farming Simulator is a trademark of GIANTS Software GmbH.
-    </p>
-  </div>
-</div>
+<figure>
+  <img
+    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-020-fs25-mod-enabled.png"
+    alt="Farm Dashboard mod enabled in the save mod list"
+  />
+  <figcaption>Mod ticked in the save’s mod list.</figcaption>
+</figure>
+
+<hr />
+
+<h2>Stage C — Confirm data.json is updating</h2>
+
+<p>After about one minute in-game, check this path on your PC (or the server profile for FTP):</p>
+
+<p><code>Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\&lt;savegame&gt;\data.json</code></p>
+
+<p>The file should exist and its <strong>Modified</strong> time should advance while you play.</p>
+
+<figure>
+  <img
+    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-030-datajson-explorer.png"
+    alt="data.json with a recent modified timestamp in File Explorer"
+  />
+  <figcaption>File Explorer — recent <code>data.json</code> timestamp while playing.</figcaption>
+</figure>
+
+<hr />
+
+<h2>Stage D — Install the Windows app</h2>
+
+<ol>
+  <li>Download and run <strong>FS25-Farm-Dashboard-Setup-4.2.0.exe</strong> from this page or <a href="https://github.com/WizardlyPayload/FarmHub/releases">GitHub Releases</a>.</li>
+  <li>Choose your language on the welcome page and complete the installer.</li>
+  <li>Launch <strong>Farm Dashboard</strong> from the Start menu.</li>
+</ol>
+
+<figure>
+  <img
+    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-040-installer-welcome.png"
+    alt="Installer welcome page"
+  />
+  <figcaption>Installer welcome — pick your language.</figcaption>
+</figure>
+
+<figure>
+  <img
+    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-045-installer-finished.png"
+    alt="Installer finished page"
+  />
+  <figcaption>Installer finished — launch Farm Dashboard.</figcaption>
+</figure>
+
+<hr />
+
+<h2>Stage E — First launch &amp; Server Manager</h2>
+
+<p>On first launch the app opens <strong>Server Manager</strong> if no servers are configured yet.</p>
+
+<figure>
+  <img
+    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-050-app-first-launch.png"
+    alt="Farm Dashboard Server Manager on first launch"
+  />
+  <figcaption>Server Manager before you add a save or FTP server.</figcaption>
+</figure>
+
+<h3>Setup walk-through</h3>
+
+<ol>
+  <li>Pick your language (top-right on Setup).</li>
+  <li>Click <strong>Auto-detect saves</strong> for local PC play, or add a row manually.</li>
+  <li>For <strong>GPortal / Nitrado</strong> hosts: add <strong>Dedicated Server (FTP)</strong> with host, credentials, profile path, and save slot.</li>
+  <li>Optional: <strong>Scan FS25 mods for dashboard images</strong> (vehicle icons from your mod folder).</li>
+  <li>With at least one server in the list, click <strong>Launch Dashboard</strong> → open <strong>http://localhost:8766</strong>.</li>
+</ol>
+
+<hr />
+
+<h2>Dedicated server (FTP)</h2>
+
+<ol>
+  <li>Complete Stages <strong>A–C</strong> on the server — mod enabled, save loaded, <code>data.json</code> present on the server profile.</li>
+  <li>In Setup or <strong>Settings → Servers &amp; saves</strong>, add FTP host, port, username, password, base profile path, and save slot folder.</li>
+  <li>Optional <strong>HTTP feed</strong> (Giants dedicated XML on port <strong>8080</strong>) improves vehicle age, prices, and market history when available.</li>
+  <li>Set <strong>Poll every</strong> (1–25 minutes). Local saves use file watching; FTP uses this schedule.</li>
+</ol>
+
+<hr />
+
+<h2>Post-install checks</h2>
+
+<dl>
+  <dt><strong>Landing page</strong></dt>
+  <dd>Section cards with counts (or zeros until data arrives).</dd>
+  <dt><strong>Data-source badge</strong></dt>
+  <dd>XML + Live + API (or a subset if unavailable).</dd>
+  <dt><strong>Settings → Servers</strong></dt>
+  <dd>Correct local path or FTP host + save slot.</dd>
+  <dt><strong>Wrong save empty</strong></dt>
+  <dd>Repeat Stage B for that save.</dd>
+</dl>
+
+<hr />
+
+<h2>Troubleshooting</h2>
+
+<details>
+  <summary><strong>Waiting for data</strong></summary>
+  <p>Complete Stages B and C. Verify the save path in <strong>Settings → Servers</strong>. The mod must be enabled and you must have entered the world at least once.</p>
+</details>
+
+<details>
+  <summary><strong>Port 8766 in use</strong></summary>
+  <p>Close other apps using port 8766, then restart Farm Dashboard.</p>
+</details>
+
+<details>
+  <summary><strong>FTP never updates</strong></summary>
+  <p>Check FTP credentials, save slot folder name, and firewall. Set poll interval to at least 1 minute. Confirm <code>data.json</code> exists on the server profile.</p>
+</details>
+
+<details>
+  <summary><strong>Blank or broken after upgrade</strong></summary>
+  <p>Update <strong>both</strong> the app (<strong>4.2.0</strong>) and mod (<strong>3.4.0.6</strong>) from the same release line.</p>
+</details>
+
+<hr />
+
+<p>
+  <a href="https://github.com/WizardlyPayload/FarmHub/blob/main/docs/INSTALL.md"><strong>Full install guide (INSTALL.md)</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/WizardlyPayload/FarmHub/blob/main/docs/USER_MANUAL.md"><strong>User manual</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/WizardlyPayload/FarmHub/blob/main/docs/UPGRADE_FROM_FS25-Farm-Dashboard.md"><strong>Upgrade from 2.0.0</strong></a>
+</p>
+
+<p><small><em>Not affiliated with GIANTS Software. Farming Simulator is a trademark of GIANTS Software GmbH.</em></small></p>

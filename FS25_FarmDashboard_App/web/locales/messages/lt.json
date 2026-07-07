@@ -59,6 +59,7 @@
   "map.hint": "{{map}} – vilkite, jei norite panoraminti vaizdą, slinkite, jei norite priartinti. Norėdami pereiti prie savo transporto priemonių parko, naudokite „Fit“ elementus.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Nepavyko įkelti {{map}} apžvalgos. Įsitikinkite, kad FS25_*{{hint}}*.zip yra jūsų modifikacijų aplanke kompiuteryje, kuriame veikia ūkio ataskaitų skydas.",
+  "map.hintNoImageDlc": "Nepavyko įkelti {{map}} apžvalgos. Šis žemėlapis yra iš oficialaus DLC paketo (ne modifikacijų aplanko .zip). Vieną kartą įkelkite išsaugojimą žaidime su įjungtu ūkio prietaisų skydelio modifikavimu, kad apžvalga būtų išsaugota talpykloje, tada iš naujo atidarykite laivyno žemėlapį. Prisegimai vis tiek veikia be fono.",
   "map.loadingOverview": "Įkeliamas žemėlapio vaizdas…",
   "map.zoomIn": "Priartinti",
   "map.zoomOut": "Atitolinti",

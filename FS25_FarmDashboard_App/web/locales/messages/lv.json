@@ -59,6 +59,7 @@
   "map.hint": "{{map}} — velciet, lai pārvietotos pa horizontāli, ritiniet, lai tuvinātu. Izmantojiet Fit priekšmetus, lai pārietu uz savu floti.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Nevarēja ielādēt {{map}} pārskatu. Pārliecinieties, vai FS25_*{{hint}}*.zip atrodas jūsu modifikāciju mapē datorā, kurā darbojas Farm Dashboard.",
+  "map.hintNoImageDlc": "Nevarēja ielādēt {{map}} pārskatu. Šī karte ir no oficiālas DLC pakotnes (nevis modifikāciju mapes .zip formātā). Ielādējiet saglabāto karti spēlē vienreiz ar iespējotu saimniecības informācijas paneļa modifikāciju, lai pārskats tiktu saglabāts kešatmiņā, pēc tam atveriet flotes karti vēlreiz. Piespraudes joprojām darbojas bez fona.",
   "map.loadingOverview": "Notiek kartes attēla ielāde…",
   "map.zoomIn": "Tuvināt",
   "map.zoomOut": "Tālināt",

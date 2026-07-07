@@ -59,6 +59,7 @@
   "map.hint": "{{map}} — dragðu til að fletta, skrunaðu til aðdráttar. Notaðu Fit hluti til að hoppa í flotann þinn.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Gat ekki hlaðið yfirliti fyrir {{map}}. Staðfestið að FS25_*{{hint}}*.zip sé í möppunni þinni fyrir breytingar á tölvunni sem keyrir Farm Dashboard.",
+  "map.hintNoImageDlc": "Gat ekki hlaðið yfirliti fyrir {{map}}. Þetta kort er úr opinberum DLC pakka (ekki .zip skrá fyrir mods). Hlaðið vista skrána í leiknum einu sinni með Farm Dashboard mod virka svo yfirlitið sé vistað í skyndiminni, opnið síðan flotakortið aftur. Pinnar virka enn án bakgrunns.",
   "map.loadingOverview": "Hleður mynd af korti…",
   "map.zoomIn": "Aðdráttur",
   "map.zoomOut": "Aðdráttur",

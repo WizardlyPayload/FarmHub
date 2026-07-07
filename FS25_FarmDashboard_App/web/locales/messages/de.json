@@ -59,6 +59,7 @@
   "map.hint": "{{map}} – Ziehen zum Verschieben, Scrollen zum Zoomen. Nutze die Fit-Elemente, um zu deiner Flotte zu springen.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Die Übersicht für {{map}} konnte nicht geladen werden. Bitte überprüfen Sie, ob sich die Datei FS25_*{{hint}}*.zip im Mods-Ordner des PCs befindet, auf dem Farm Dashboard ausgeführt wird.",
+  "map.hintNoImageDlc": "Die Übersicht für {{map}} konnte nicht geladen werden. Diese Karte stammt aus einem offiziellen DLC-Paket (nicht aus einem Mods-Ordner als .zip-Datei). Lade den Spielstand einmal im Spiel mit aktiviertem Farm Dashboard-Mod, damit die Übersicht zwischengespeichert wird, und öffne dann die Flottenkarte erneut. Die Markierungen funktionieren auch ohne Hintergrund.",
   "map.loadingOverview": "Karte wird geladen…",
   "map.zoomIn": "Vergrößern",
   "map.zoomOut": "Herauszoomen",

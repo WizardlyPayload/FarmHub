@@ -59,6 +59,7 @@
   "map.hint": "{{map}} — przeciągnij, aby przesunąć, przewiń, aby powiększyć. Użyj opcji „Dopasuj elementy”, aby przejść do swojej floty.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Nie udało się załadować przeglądu dla {{map}}. Sprawdź, czy plik FS25_*{{hint}}*.zip znajduje się w folderze mods na komputerze z aplikacją Farm Dashboard.",
+  "map.hintNoImageDlc": "Nie udało się załadować podglądu dla {{map}}. Ta mapa pochodzi z oficjalnego pakietu DLC (nie z folderu modów .zip). Wczytaj raz zapis gry z włączonym modem Farm Dashboard, aby podgląd został zapisany w pamięci podręcznej, a następnie ponownie otwórz mapę Fleet. Pinezki nadal działają bez tła.",
   "map.loadingOverview": "Ładowanie obrazu mapy…",
   "map.zoomIn": "Powiększ",
   "map.zoomOut": "Oddal",

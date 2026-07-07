@@ -59,6 +59,7 @@
   "map.hint": "{{map}} – potiahnutím posúvate, posúvaním priblížujete. Na prechod na vašu flotilu použite funkciu Prispôsobiť položky.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Nepodarilo sa načítať prehľad pre {{map}}. Skontrolujte, či je súbor FS25_*{{hint}}*.zip v priečinku s modmi na počítači, na ktorom je spustený Farm Dashboard.",
+  "map.hintNoImageDlc": "Nepodarilo sa načítať prehľad pre {{map}}. Táto mapa pochádza z oficiálneho DLC balíčka (nie z priečinka mods .zip). Načítajte uloženú mapu v hre raz s povoleným modom Farm Dashboard, aby sa prehľad uložil do vyrovnávacej pamäte, a potom znova otvorte mapu flotily. Piny fungujú aj bez pozadia.",
   "map.loadingOverview": "Načítava sa obrázok mapy…",
   "map.zoomIn": "Priblížiť",
   "map.zoomOut": "Oddialiť",

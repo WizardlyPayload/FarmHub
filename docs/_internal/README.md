@@ -14,7 +14,8 @@ These files are kept in the repo for development and release work. **Players do 
 | [VALIDATION-RUNBOOK.md](./VALIDATION-RUNBOOK.md) | Diagnostics soak profiles |
 | [_internal/RELEASE_READINESS_v3.9.md](./_internal/RELEASE_READINESS_v3.9.md) | Historical ship checklist |
 | [CURSOR_SESSION_MEMORY.md](./CURSOR_SESSION_MEMORY.md) | Cursor session notes |
-| [itch-io-page-description.html](./itch-io-page-description.html) | itch.io HTML blurb |
+| [itch-io-page-description.html](./itch-io-page-description.html) | Full itch.io HTML page (hero, screenshots, features) — preview with [itch-io-preview.html](./itch-io-preview.html) |
+| [itch-io-install-instructions.html](./itch-io-install-instructions.html) | itch.io **Installation instructions** tab (stages A–E, FTP, troubleshooting) — preview with [itch-io-install-preview.html](./itch-io-install-preview.html) |
 
 **Archived releases:** [archive-releases/](./archive-releases/) (`RELEASE_v2.0.0.md`, `RELEASE_v3.0.0.md`, `RELEASE_v3.9.0.md`, `GITHUB_RELEASE_v3.9.0.md`).
 

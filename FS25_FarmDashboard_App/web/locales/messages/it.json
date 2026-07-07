@@ -59,6 +59,7 @@
   "map.hint": "{{map}} — trascina per spostarti, scorri per ingrandire. Usa gli oggetti di adattamento per passare alla tua flotta.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Impossibile caricare la panoramica per {{map}}. Verificare che il file FS25_*{{hint}}*.zip sia presente nella cartella delle mod sul PC su cui è in esecuzione Farm Dashboard.",
+  "map.hintNoImageDlc": "Impossibile caricare la panoramica per {{map}}. Questa mappa proviene da un pacchetto DLC ufficiale (non da una cartella .zip delle mod). Carica il salvataggio nel gioco una volta con la mod Farm Dashboard abilitata in modo che la panoramica venga memorizzata nella cache, quindi riapri la mappa Fleet. I segnaposto funzionano comunque anche senza lo sfondo.",
   "map.loadingOverview": "Caricamento dell'immagine della mappa…",
   "map.zoomIn": "Ingrandisci",
   "map.zoomOut": "Riduci lo zoom",

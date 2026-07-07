@@ -56,4 +56,21 @@ describe('mapOverviewResolver', () => {
       scoreOverviewPath(random, 'mapus')
     );
   });
+
+  test('resolveDlcPackages matches Kinlaig to highlandsFishingPack', () => {
+    const { resolveDlcPackages, isLikelyDlcMap } = require('../mapOverviewResolver');
+    expect(resolveDlcPackages('mapkinlaig', 'Kinlaig', ['kinlaig'])).toEqual([
+      'highlandsFishingPack',
+    ]);
+    expect(isLikelyDlcMap('mapkinlaig', 'Kinlaig', ['kinlaig'])).toBe(true);
+    expect(resolveDlcPackages('mapus', 'Riverbend Springs', ['riverbend'])).toEqual([]);
+  });
+
+  test('pdlcPackageOverviewCandidates includes map/textures/ui path', () => {
+    const { pdlcPackageOverviewCandidates } = require('../mapOverviewResolver');
+    const paths = pdlcPackageOverviewCandidates('C:/pdlc/highlandsFishingPack', 'mapkinlaig');
+    expect(paths.some((p) => p.replace(/\\/g, '/').includes('map/textures/ui/overview.dds'))).toBe(
+      true
+    );
+  });
 });

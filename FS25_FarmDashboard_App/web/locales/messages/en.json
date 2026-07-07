@@ -59,6 +59,7 @@
   "map.hint": "{{map}} — drag to pan, scroll to zoom. Use Fit items to jump to your fleet.",
   "map.hintNoImage": "Could not load the map overview image. The dashboard reads map .zip files from your FS25 mods folder on this PC (e.g. FS25_Witcombe.zip). Use Fit items — pins still work without the background.",
   "map.hintNoImageNamed": "Could not load overview for {{map}}. Confirm FS25_*{{hint}}*.zip is in your mods folder on the PC running Farm Dashboard.",
+  "map.hintNoImageDlc": "Could not load overview for {{map}}. This map is from an official DLC pack (not a mods-folder .zip). Load the save in-game once with the Farm Dashboard mod enabled so the overview is cached, then reopen Fleet map. Pins still work without the background.",
   "map.loadingOverview": "Loading map image…",
   "map.zoomIn": "Zoom in",
   "map.zoomOut": "Zoom out",

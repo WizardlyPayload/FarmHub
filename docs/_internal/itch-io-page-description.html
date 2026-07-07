@@ -1,197 +1,516 @@
 <!--
-  FS25 Farm Dashboard — Itch.io page description (HTML)
+  FS25 Farm Dashboard — itch.io page description (HTML)
 
-  Paste into: Dashboard → Edit game → Description (set format to HTML if available).
+  HOW TO USE
+  1. itch.io → Edit project → Description → switch to HTML mode (if available).
+  2. Paste everything inside the outer <div> below (or the whole file).
+  3. Upload a COVER image separately in itch (recommended: Background.png or landing screenshot).
+  4. Set your download files: FS25-Farm-Dashboard-Setup-*.exe + FS25_FarmDashboard.zip
 
-  Image URL: hosted from the FarmHub GitHub repo (raw.githubusercontent.com). If you fork
-  the repo, update the USER/REPO/BRANCH portion of the URL below to match your fork.
-  Source file in repo:
-  FS25_FarmDashboard_App/web/assests/img/Dashboard PIctures/Background.png
+  IMAGES load from GitHub raw (WizardlyPayload/FarmHub main). If you fork, replace
+  the base URL below. Local paths in repo:
+    - FS25_FarmDashboard_App/web/assests/img/Dashboard PIctures/Background.png
+    - docs/screenshots/fd-*.png
 
-  Colours match web/assests/css/styles.css (glass hero, farm-primary, farm-accent).
+  Theme colours match web/assests/css/styles.css
 -->
 
 <div
   style="
-    font-family: 'Segoe UI', system-ui, -apple-system, 'Plus Jakarta Sans', sans-serif;
-    color: #e8eef3;
+    font-family: 'Segoe UI', system-ui, -apple-system, 'Plus Jakarta Sans', Roboto, sans-serif;
+    color: #f4f7f5;
     margin: 0;
-    border-radius: 0;
-    overflow: hidden;
+    line-height: 1.5;
+    background: linear-gradient(168deg, #0e1210 0%, #141a17 40%, #121a16 100%);
   "
 >
-  <!-- Hero: full-bleed background + slate scrim (same feel as #splash-screen / #farm-dash-bg) -->
+  <!-- ═══════════════════ HERO ═══════════════════ -->
   <div
     style="
       background-color: #0e1210;
       background-image: linear-gradient(
-        165deg,
-        rgba(15, 23, 42, 0.92) 0%,
-        rgba(15, 23, 42, 0.58) 45%,
-        rgba(15, 23, 42, 0.85) 100%
+          165deg,
+          rgba(14, 18, 16, 0.88) 0%,
+          rgba(14, 18, 16, 0.55) 42%,
+          rgba(14, 18, 16, 0.92) 100%
         ),
         url('https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/FS25_FarmDashboard_App/web/assests/img/Dashboard%20PIctures/Background.png');
-      background-size: cover, cover;
-      background-position: center, center;
-      background-repeat: no-repeat;
-      padding: 1.75rem 1.1rem 2rem;
+      background-size: cover;
+      background-position: center;
+      padding: 2.5rem 1.25rem 2.75rem;
       text-align: center;
+      border-bottom: 1px solid rgba(152, 163, 154, 0.15);
     "
   >
     <div
       style="
-        max-width: 44rem;
+        max-width: 52rem;
         margin: 0 auto;
-        padding: 1.6rem 1.4rem 1.75rem;
+        padding: 2rem 1.5rem 2.1rem;
         border-radius: 1.25rem;
-        background: rgba(15, 23, 42, 0.5);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+        background: rgba(23, 31, 28, 0.72);
+        border: 1px solid rgba(152, 163, 154, 0.22);
+        box-shadow: 0 20px 56px rgba(0, 0, 0, 0.45);
       "
     >
       <p
         style="
-          margin: 0 0 0.4rem 0;
-          font-size: 0.7rem;
+          margin: 0 0 0.5rem;
+          font-size: 0.72rem;
           font-weight: 600;
-          letter-spacing: 0.14em;
+          letter-spacing: 0.16em;
           text-transform: uppercase;
           color: #e8c547;
         "
       >
-        Farming Simulator 25 · live data
+        Farming Simulator 25 · live farm data
       </p>
-      <h2
+      <h1
         style="
-          margin: 0 0 0.75rem 0;
-          font-size: 1.65rem;
+          margin: 0 0 0.85rem;
+          font-size: clamp(1.75rem, 4vw, 2.35rem);
           font-weight: 700;
           letter-spacing: -0.03em;
-          line-height: 1.2;
-          color: #f8fafc;
+          line-height: 1.15;
+          color: #f4f7f5;
         "
       >
-        <span style="color: #e8c547">⬡</span> Farm Management Dashboard
-      </h2>
+        <span style="color: #e8c547">⬡</span> FS25 Farm Management Dashboard
+      </h1>
       <p
         style="
-          margin: 0 auto 0.2rem;
-          max-width: 36rem;
-          font-size: 1.05rem;
-          line-height: 1.55;
-          color: rgba(226, 232, 240, 0.92);
+          margin: 0 auto 1.1rem;
+          max-width: 40rem;
+          font-size: 1.08rem;
+          color: rgba(244, 247, 245, 0.92);
         "
       >
-        Your field, your fleet, your money — in one browser, updating while you play. A
-        <strong style="color: #f1f5f9">lightweight in-game mod</strong> plus a
-        <strong style="color: #f1f5f9">Windows desktop app</strong> that serves the same glassy
-        home experience you get at <code style="color: #a5f3b5">http://localhost:8766</code>.
+        Your fields, fleet, livestock, economy, and productions — in one glassy dashboard that
+        updates while you play. A lightweight <strong>in-game mod</strong> exports live data; a
+        <strong>Windows desktop app</strong> serves the UI in your browser at
+        <code style="color: #a5f3b5; background: rgba(0,0,0,0.25); padding: 0.1rem 0.35rem; border-radius: 0.35rem">localhost:8766</code>.
       </p>
-      <p style="margin: 1rem 0 0; font-size: 0.9rem; color: #a8b3aa">
-        Livestock · Vehicles · Fields · Economy · Pastures · Productions — with optional
-        <strong style="color: #cde9d6">FTP</strong> for dedicated / hosted servers.
+      <p style="margin: 0 0 1.25rem; font-size: 0.88rem; color: #98a39a">
+        App <strong style="color: #e8c547">4.2.0</strong> · Mod <strong style="color: #e8c547">3.4.0.6</strong>
+        · 27 languages · local saves or <strong>FTP</strong> dedicated servers
+      </p>
+      <p style="margin: 0; font-size: 0.95rem">
+        <a
+          href="https://github.com/WizardlyPayload/FarmHub/releases"
+          style="
+            display: inline-block;
+            margin: 0.25rem 0.4rem;
+            padding: 0.65rem 1.25rem;
+            background: linear-gradient(135deg, #2f6f4e, #275e42);
+            color: #fff;
+            text-decoration: none;
+            font-weight: 600;
+            border-radius: 0.65rem;
+            border: 1px solid rgba(232, 197, 71, 0.35);
+            box-shadow: 0 4px 16px rgba(47, 111, 78, 0.35);
+          "
+          >Download on GitHub</a
+        >
+        <a
+          href="https://github.com/WizardlyPayload/FarmHub"
+          style="
+            display: inline-block;
+            margin: 0.25rem 0.4rem;
+            padding: 0.65rem 1.25rem;
+            color: #e8c547;
+            text-decoration: none;
+            font-weight: 600;
+            border-radius: 0.65rem;
+            border: 1px solid rgba(232, 197, 71, 0.35);
+          "
+          >Documentation</a
+        >
       </p>
     </div>
   </div>
 
-  <div
-    style="
-      padding: 1.35rem 1.1rem 1.5rem;
-      background: linear-gradient(168deg, #0e1210 0%, #131a17 55%, #0f1412 100%);
-    "
-  >
-    <div
-      style="
-        max-width: 40rem;
-        margin: 0 auto 1rem;
-        text-align: center;
-        color: #98a39a;
-        font-size: 0.95rem;
-        line-height: 1.5;
-      "
-    >
-      Stop juggling spreadsheets. Open the dashboard on a second monitor or tablet and run your
-      operation with the same look and feel as the in-app UI.
-    </div>
-
-    <ul
-      style="
-        list-style: none;
-        margin: 0 auto 1.1rem;
-        padding: 0;
-        max-width: 38rem;
-        border-radius: 1rem;
-        background: rgba(20, 28, 24, 0.6);
-        border: 1px solid rgba(232, 197, 71, 0.2);
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
-        overflow: hidden;
-      "
-    >
-      <li
-        style="
-          padding: 0.7rem 1.1rem;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-          color: #e2e8f0;
-          font-size: 0.95rem;
-        "
-      >
-        <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.35rem">▸</span> Mod
-        exports live farm data to <code style="color: #a5f3b5">data.json</code> from your save or
-        server
-      </li>
-      <li
-        style="
-          padding: 0.7rem 1.1rem;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-          color: #e2e8f0;
-          font-size: 0.95rem;
-        "
-      >
-        <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.35rem">▸</span> App
-        merges Lua export with savegame context when XML is available — real dashboard, not a
-        static page
-      </li>
-      <li style="padding: 0.7rem 1.1rem; color: #e2e8f0; font-size: 0.95rem">
-        <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.35rem">▸</span> Built for
-        <strong>Windows</strong>; local disk paths or <strong>FTP</strong> for GPortal-style hosts
-      </li>
-    </ul>
-
+  <!-- ═══════════════════ LANDING SHOT ═══════════════════ -->
+  <div style="padding: 2rem 1.25rem 0.5rem; max-width: 56rem; margin: 0 auto">
     <p
       style="
         text-align: center;
-        font-size: 0.8rem;
+        margin: 0 0 0.75rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
         text-transform: uppercase;
-        letter-spacing: 0.1em;
         color: #e8c547;
-        margin: 0 0 0.4rem 0;
+      "
+    >
+      At a glance
+    </p>
+    <div
+      style="
+        border-radius: 1rem;
+        overflow: hidden;
+        border: 1px solid rgba(152, 163, 154, 0.22);
+        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+      "
+    >
+      <img
+        src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-shell-020-landing.png"
+        alt="Farm Management Dashboard home screen with live KPIs and section cards"
+        style="display: block; width: 100%; height: auto; vertical-align: middle"
+      />
+    </div>
+    <p style="text-align: center; margin: 0.75rem 0 0; font-size: 0.85rem; color: #98a39a">
+      Home dashboard — game time, weather, farm picker, and one-click access to every section.
+    </p>
+  </div>
+
+  <!-- ═══════════════════ FEATURE GRID ═══════════════════ -->
+  <div style="padding: 2.25rem 1.25rem 1rem; max-width: 56rem; margin: 0 auto">
+    <h2
+      style="
+        text-align: center;
+        margin: 0 0 1.25rem;
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #f4f7f5;
+      "
+    >
+      Everything your save exports — one place
+    </h2>
+
+    <!-- Row 1 -->
+    <div style="display: table; width: 100%; border-spacing: 0.75rem; margin-bottom: 0.75rem">
+      <div style="display: table-row">
+        <div style="display: table-cell; width: 50%; vertical-align: top">
+          <div
+            style="
+              background: rgba(23, 31, 28, 0.85);
+              border: 1px solid rgba(152, 163, 154, 0.2);
+              border-radius: 1rem;
+              overflow: hidden;
+              box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+            "
+          >
+            <img
+              src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-section-fields-030-card-rules.png"
+              alt="Fields with suggested next step and crop rules"
+              style="display: block; width: 100%; height: auto"
+            />
+            <div style="padding: 0.85rem 1rem 1rem">
+              <strong style="color: #e8c547; font-size: 0.95rem">Fields</strong>
+              <p style="margin: 0.35rem 0 0; font-size: 0.85rem; color: #98a39a">
+                Crop state, weeds, moisture, PF bars, and offline “do this first” suggestions.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div style="display: table-cell; width: 50%; vertical-align: top">
+          <div
+            style="
+              background: rgba(23, 31, 28, 0.85);
+              border: 1px solid rgba(152, 163, 154, 0.2);
+              border-radius: 1rem;
+              overflow: hidden;
+              box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+            "
+          >
+            <img
+              src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-section-livestock-010-summary.png"
+              alt="Livestock summary and animal table"
+              style="display: block; width: 100%; height: auto"
+            />
+            <div style="padding: 0.85rem 1rem 1rem">
+              <strong style="color: #e8c547; font-size: 0.95rem">Livestock</strong>
+              <p style="margin: 0.35rem 0 0; font-size: 0.85rem; color: #98a39a">
+                Pens, health, food days-left, and individual animals when Realistic Livestock is active.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2 -->
+    <div style="display: table; width: 100%; border-spacing: 0.75rem; margin-bottom: 0.75rem">
+      <div style="display: table-row">
+        <div style="display: table-cell; width: 50%; vertical-align: top">
+          <div
+            style="
+              background: rgba(23, 31, 28, 0.85);
+              border: 1px solid rgba(152, 163, 154, 0.2);
+              border-radius: 1rem;
+              overflow: hidden;
+              box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+            "
+          >
+            <img
+              src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-section-vehicles-030-grid.png"
+              alt="Vehicle fleet grid with condition and cargo"
+              style="display: block; width: 100%; height: auto"
+            />
+            <div style="padding: 0.85rem 1rem 1rem">
+              <strong style="color: #e8c547; font-size: 0.95rem">Vehicles</strong>
+              <p style="margin: 0.35rem 0 0; font-size: 0.85rem; color: #98a39a">
+                Fleet cards, wear, fuel, cargo, store images, and optional ADS breakdown.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div style="display: table-cell; width: 50%; vertical-align: top">
+          <div
+            style="
+              background: rgba(23, 31, 28, 0.85);
+              border: 1px solid rgba(152, 163, 154, 0.2);
+              border-radius: 1rem;
+              overflow: hidden;
+              box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+            "
+          >
+            <img
+              src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-section-economy-040-storage-tab.png"
+              alt="Economy storage tab with silo stock and bales"
+              style="display: block; width: 100%; height: auto"
+            />
+            <div style="padding: 0.85rem 1rem 1rem">
+              <strong style="color: #e8c547; font-size: 0.95rem">Economy &amp; storage</strong>
+              <p style="margin: 0.35rem 0 0; font-size: 0.85rem; color: #98a39a">
+                Market prices, silo stock, moisture grades, pallets, big bags, and bale inventory.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3 -->
+    <div style="display: table; width: 100%; border-spacing: 0.75rem">
+      <div style="display: table-row">
+        <div style="display: table-cell; width: 50%; vertical-align: top">
+          <div
+            style="
+              background: rgba(23, 31, 28, 0.85);
+              border: 1px solid rgba(152, 163, 154, 0.2);
+              border-radius: 1rem;
+              overflow: hidden;
+              box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+            "
+          >
+            <img
+              src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-section-fleet-map-010-overview.png"
+              alt="Fleet map with live vehicle pins on PDA overview"
+              style="display: block; width: 100%; height: auto"
+            />
+            <div style="padding: 0.85rem 1rem 1rem">
+              <strong style="color: #e8c547; font-size: 0.95rem">Fleet map</strong>
+              <p style="margin: 0.35rem 0 0; font-size: 0.85rem; color: #98a39a">
+                Live pins on your map’s PDA overview — pan, zoom, multi-farm colours.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div style="display: table-cell; width: 50%; vertical-align: top">
+          <div
+            style="
+              background: rgba(23, 31, 28, 0.85);
+              border: 1px solid rgba(152, 163, 154, 0.2);
+              border-radius: 1rem;
+              overflow: hidden;
+              box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+            "
+          >
+            <img
+              src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-section-productions-010-list.png"
+              alt="Production chains and fill levels"
+              style="display: block; width: 100%; height: auto"
+            />
+            <div style="padding: 0.85rem 1rem 1rem">
+              <strong style="color: #e8c547; font-size: 0.95rem">Productions &amp; pastures</strong>
+              <p style="margin: 0.35rem 0 0; font-size: 0.85rem; color: #98a39a">
+                Factory fill levels, recipes, and pasture food / water / straw estimates.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ SECTION BANNERS (marketing art) ═══════════════════ -->
+  <div style="padding: 2rem 1.25rem; max-width: 56rem; margin: 0 auto">
+    <p
+      style="
+        text-align: center;
+        margin: 0 0 1rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #e8c547;
+      "
+    >
+      Built for second-monitor farming
+    </p>
+    <div style="text-align: center; font-size: 0">
+      <img
+        src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/FS25_FarmDashboard_App/web/assests/img/Dashboard%20PIctures/Fields.png"
+        alt=""
+        style="
+          display: inline-block;
+          width: 48%;
+          max-width: 16rem;
+          margin: 1%;
+          border-radius: 0.75rem;
+          border: 1px solid rgba(152, 163, 154, 0.2);
+          vertical-align: top;
+        "
+      />
+      <img
+        src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/FS25_FarmDashboard_App/web/assests/img/Dashboard%20PIctures/Economy.png"
+        alt=""
+        style="
+          display: inline-block;
+          width: 48%;
+          max-width: 16rem;
+          margin: 1%;
+          border-radius: 0.75rem;
+          border: 1px solid rgba(152, 163, 154, 0.2);
+          vertical-align: top;
+        "
+      />
+      <img
+        src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/FS25_FarmDashboard_App/web/assests/img/Dashboard%20PIctures/Livestock.png"
+        alt=""
+        style="
+          display: inline-block;
+          width: 48%;
+          max-width: 16rem;
+          margin: 1%;
+          border-radius: 0.75rem;
+          border: 1px solid rgba(152, 163, 154, 0.2);
+          vertical-align: top;
+        "
+      />
+      <img
+        src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/FS25_FarmDashboard_App/web/assests/img/Dashboard%20PIctures/Vehicles.png"
+        alt=""
+        style="
+          display: inline-block;
+          width: 48%;
+          max-width: 16rem;
+          margin: 1%;
+          border-radius: 0.75rem;
+          border: 1px solid rgba(152, 163, 154, 0.2);
+          vertical-align: top;
+        "
+      />
+    </div>
+  </div>
+
+  <!-- ═══════════════════ HOW IT WORKS ═══════════════════ -->
+  <div
+    style="
+      margin: 0 1.25rem 2rem;
+      max-width: 52rem;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 1.5rem 1.25rem;
+      border-radius: 1rem;
+      background: rgba(23, 31, 28, 0.65);
+      border: 1px solid rgba(232, 197, 71, 0.18);
+    "
+  >
+    <h2 style="margin: 0 0 1rem; font-size: 1.2rem; text-align: center; color: #f4f7f5">
+      How it works
+    </h2>
+    <ul style="list-style: none; margin: 0; padding: 0; max-width: 38rem; margin-left: auto; margin-right: auto">
+      <li style="padding: 0.55rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #e2e8f0; font-size: 0.92rem">
+        <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.4rem">1</span>
+        The <strong>mod</strong> writes live farm data to <code style="color: #a5f3b5">data.json</code> from your save (SP, MP host, or dedicated).
+      </li>
+      <li style="padding: 0.55rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #e2e8f0; font-size: 0.92rem">
+        <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.4rem">2</span>
+        The <strong>Windows app</strong> merges Lua export with savegame XML when available — a real dashboard, not a static page.
+      </li>
+      <li style="padding: 0.55rem 0; border-bottom: 1px solid rgba(255,255,255,0.06); color: #e2e8f0; font-size: 0.92rem">
+        <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.4rem">3</span>
+        Open <strong>http://localhost:8766</strong> on a second monitor, tablet (LAN), or phone on your Wi‑Fi.
+      </li>
+      <li style="padding: 0.55rem 0; color: #e2e8f0; font-size: 0.92rem">
+        <span style="color: #2f6f4e; font-weight: 700; margin-right: 0.4rem">4</span>
+        Optional <strong>FTP</strong> mode for GPortal / Nitrado-style hosts — no game running on the dashboard PC.
+      </li>
+    </ul>
+  </div>
+
+  <!-- ═══════════════════ QUICK START ═══════════════════ -->
+  <div style="padding: 0 1.25rem 2rem; max-width: 40rem; margin: 0 auto">
+    <p
+      style="
+        text-align: center;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #e8c547;
+        margin: 0 0 0.6rem;
       "
     >
       Quick start
     </p>
-    <ol
-      style="
-        max-width: 32rem;
-        margin: 0 auto 1rem;
-        padding-left: 1.2rem;
-        color: #b8c4bc;
-        font-size: 0.92rem;
-        line-height: 1.55;
-      "
-    >
-      <li>Install the mod, enable it, and load your save once.</li>
-      <li>Install the Farm Dashboard <strong style="color: #f0fdf4">.exe</strong> and run it.</li>
-      <li>Open the dashboard in your browser; adjust paths or FTP in Settings if needed.</li>
+    <ol style="margin: 0; padding-left: 1.35rem; color: #b8c4bc; font-size: 0.92rem; line-height: 1.65">
+      <li>Download <strong style="color: #f0fdf4">FS25_FarmDashboard.zip</strong> → put in your FS25 <code>mods</code> folder → enable on your save.</li>
+      <li>Load the save <strong>once in-game</strong> so the mod creates <code>data.json</code>.</li>
+      <li>Install and run <strong style="color: #f0fdf4">FS25-Farm-Dashboard-Setup-4.2.0.exe</strong>.</li>
+      <li>Open the dashboard; point <strong>Settings → Servers</strong> at your save path or FTP if needed.</li>
     </ol>
+  </div>
 
-    <p style="text-align: center; margin: 0; font-size: 0.88rem; color: #7a877e">
-      Authors: <strong style="color: #9ca3af">JoshWalki</strong> &amp;
-      <strong style="color: #9ca3af">WizardlyPayload</strong> ·
-      <a
-        href="https://github.com/WizardlyPayload/FS25-Farm-Dashboard"
-        style="color: #e8c547; text-decoration: none; border-bottom: 1px solid rgba(232, 197, 71, 0.4)"
-        >docs &amp; releases on GitHub</a
-      >
+  <!-- ═══════════════════ INTEGRATIONS ═══════════════════ -->
+  <div
+    style="
+      margin: 0 1.25rem 2rem;
+      max-width: 52rem;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 1.15rem 1.25rem;
+      border-radius: 1rem;
+      background: rgba(47, 111, 78, 0.12);
+      border: 1px solid rgba(47, 111, 78, 0.35);
+      text-align: center;
+      font-size: 0.88rem;
+      color: #98a39a;
+      line-height: 1.55;
+    "
+  >
+    Works alongside <strong style="color: #cde9d6">Precision Farming</strong>,
+    <strong style="color: #cde9d6">Realistic Livestock</strong>,
+    <strong style="color: #cde9d6">Advanced Damage System</strong>,
+    <strong style="color: #cde9d6">Moisture System</strong>,
+    <strong style="color: #cde9d6">Red Tape</strong>, Courseplay, and more — see the
+    <a href="https://github.com/WizardlyPayload/FarmHub/blob/main/docs/GITHUB_RELEASE_v4.2.0.md" style="color: #e8c547">release notes</a>.
+  </div>
+
+  <!-- ═══════════════════ FOOTER ═══════════════════ -->
+  <div
+    style="
+      padding: 1.5rem 1.25rem 2rem;
+      text-align: center;
+      border-top: 1px solid rgba(152, 163, 154, 0.15);
+      background: #0e1210;
+    "
+  >
+    <p style="margin: 0 0 0.5rem; font-size: 0.9rem; color: #98a39a">
+      <strong style="color: #f4f7f5">JoshWalki</strong> (original mod &amp; concept) ·
+      <strong style="color: #f4f7f5">WizardlyPayload</strong> (app, releases, maintenance)
+    </p>
+    <p style="margin: 0; font-size: 0.85rem">
+      <a href="https://github.com/WizardlyPayload/FarmHub/releases" style="color: #e8c547; text-decoration: none">Releases</a>
+      ·
+      <a href="https://github.com/WizardlyPayload/FarmHub/wiki" style="color: #e8c547; text-decoration: none">Wiki</a>
+      ·
+      <a href="https://github.com/WizardlyPayload/FarmHub/blob/main/docs/USER_MANUAL.md" style="color: #e8c547; text-decoration: none">User manual</a>
+    </p>
+    <p style="margin: 0.75rem 0 0; font-size: 0.78rem; color: #5a6b62">
+      Not affiliated with GIANTS Software. Farming Simulator is a trademark of GIANTS Software GmbH.
     </p>
   </div>
 </div>

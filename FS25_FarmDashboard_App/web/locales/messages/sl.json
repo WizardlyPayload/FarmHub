@@ -59,6 +59,7 @@
   "map.hint": "{{map}} – povlecite za pomik, pomaknite se za povečavo. Za skok na svojo floto uporabite Prilagodi elemente.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Pregleda za {{map}} ni bilo mogoče naložiti. Preverite, ali je datoteka FS25_*{{hint}}*.zip v mapi z modi v računalniku, na katerem se izvaja Farm Dashboard.",
+  "map.hintNoImageDlc": "Pregleda za {{map}} ni bilo mogoče naložiti. Ta zemljevid je iz uradnega paketa DLC (ne iz mape mods .zip). Shranjeno datoteko naložite v igri enkrat z omogočenim modom Farm Dashboard, da se pregled shrani v predpomnilnik, nato pa znova odprite zemljevid flote. Znaki še vedno delujejo brez ozadja.",
   "map.loadingOverview": "Nalaganje slike zemljevida …",
   "map.zoomIn": "Povečaj",
   "map.zoomOut": "Pomanjšaj",

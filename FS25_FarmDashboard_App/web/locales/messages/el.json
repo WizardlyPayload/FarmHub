@@ -59,6 +59,7 @@
   "map.hint": "{{map}} — σύρετε για μετατόπιση, κάντε κύλιση για μεγέθυνση. Χρησιμοποιήστε στοιχεία Fit για να μεταβείτε στον στόλο σας.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Δεν ήταν δυνατή η φόρτωση της επισκόπησης για το {{map}}. Επιβεβαιώστε ότι το αρχείο FS25_*{{hint}}*.zip βρίσκεται στον φάκελο mods στον υπολογιστή που εκτελεί το Farm Dashboard.",
+  "map.hintNoImageDlc": "Δεν ήταν δυνατή η φόρτωση της επισκόπησης για το {{map}}. Αυτός ο χάρτης προέρχεται από ένα επίσημο πακέτο DLC (όχι από φάκελο mods-file .zip). Φορτώστε το αποθηκευμένο στοιχείο στο παιχνίδι μία φορά με ενεργοποιημένη τη λειτουργία Farm Dashboard, ώστε η επισκόπηση να αποθηκευτεί στην προσωρινή μνήμη και, στη συνέχεια, ανοίξτε ξανά τον χάρτη του Στόλου. Οι καρφίτσες εξακολουθούν να λειτουργούν χωρίς το φόντο.",
   "map.loadingOverview": "Φόρτωση εικόνας χάρτη…",
   "map.zoomIn": "Μεγέθυνση",
   "map.zoomOut": "Σμίκρυνση",

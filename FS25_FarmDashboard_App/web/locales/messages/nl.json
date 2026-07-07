@@ -59,6 +59,7 @@
   "map.hint": "{{map}} — sleep om te pannen, scroll om in te zoomen. Gebruik 'Items aanpassen' om naar je vloot te springen.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Het overzicht voor {{map}} kon niet worden geladen. Controleer of FS25_*{{hint}}*.zip zich in de mods-map bevindt op de pc waarop Farm Dashboard draait.",
+  "map.hintNoImageDlc": "Het overzicht voor {{map}} kon niet worden geladen. Deze kaart is afkomstig uit een officieel DLC-pakket (niet uit een .zip-bestand in een mods-map). Laad de savegame eenmaal in-game met de Farm Dashboard-mod ingeschakeld, zodat het overzicht in de cache wordt opgeslagen, en open vervolgens Fleet Map opnieuw. De markeringen werken nog steeds zonder achtergrond.",
   "map.loadingOverview": "Kaartafbeelding laden…",
   "map.zoomIn": "Zoom in",
   "map.zoomOut": "Uitzoomen",

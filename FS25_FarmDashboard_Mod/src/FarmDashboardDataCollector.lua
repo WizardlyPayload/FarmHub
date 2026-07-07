@@ -449,6 +449,82 @@ local function _copyFileFs25BestEffort(src, dst)
     return false
 end
 
+local function _parentDir(filePath)
+    if type(filePath) ~= "string" or filePath == "" then return nil end
+    return filePath:match("^(.+)[/\\][^/\\]+$")
+end
+
+--- Cache PDA overview.dds for the desktop fleet map (DLC maps are not in mods/*.zip).
+function FarmDashboardDataCollector:_exportMapOverviewForDashboard()
+    if self._mapOverviewExportDone then return end
+    if not _G.g_currentMission or not _G.g_currentMission.missionInfo then return end
+    local info = _G.g_currentMission.missionInfo
+    local mapId = (info.mapId and tostring(info.mapId) ~= "") and tostring(info.mapId) or nil
+    local mapTitle = (info.mapTitle and tostring(info.mapTitle) ~= "") and tostring(info.mapTitle) or nil
+    if not mapId and not mapTitle then return end
+
+    local key = mapId or mapTitle
+    local destDir = getUserProfileAppPath() .. "modSettings/FS25_FarmDashboard/mapOverview/" .. key .. "/"
+    createFolder(destDir)
+    local destDds = destDir .. "overview.dds"
+
+    local candidates = {}
+    local function addCandidate(p)
+        if type(p) == "string" and p ~= "" then
+            candidates[#candidates + 1] = p
+        end
+    end
+
+    if info.mapXMLFilename and type(info.mapXMLFilename) == "string" then
+        local mapDir = _parentDir(info.mapXMLFilename)
+        if mapDir then
+            addCandidate(mapDir .. "/textures/ui/overview.dds")
+            addCandidate(mapDir .. "/overview.dds")
+        end
+    end
+    if info.filename and type(info.filename) == "string" then
+        local mapDir = _parentDir(info.filename)
+        if mapDir then
+            addCandidate(mapDir .. "/textures/ui/overview.dds")
+            addCandidate(mapDir .. "/overview.dds")
+        end
+    end
+    if _G.g_currentMission.baseDirectory and type(_G.g_currentMission.baseDirectory) == "string" then
+        local base = _G.g_currentMission.baseDirectory
+        if not base:match("[/\\]$") then base = base .. "/" end
+        addCandidate(base .. "textures/ui/overview.dds")
+        addCandidate(base .. "overview.dds")
+        addCandidate(base .. "map/textures/ui/overview.dds")
+        addCandidate(base .. "map/overview.dds")
+    end
+
+    for i = 1, #candidates do
+        local src = candidates[i]
+        if _pathExists(src) and _copyFileFs25BestEffort(src, destDds) then
+            local meta = {
+                mapId = mapId,
+                mapTitle = mapTitle,
+                sourcePath = src,
+                exportedAt = os and os.time and os.time() or 0,
+            }
+            local metaPath = destDir .. "meta.json"
+            if type(io) == "table" and type(io.open) == "function" then
+                local okJson, jsonBody = pcall(function() return toJSON(meta) end)
+                if okJson and jsonBody then
+                    local fh = io.open(metaPath, "w")
+                    if fh then
+                        pcall(function() fh:write(jsonBody) end)
+                        pcall(function() fh:close() end)
+                    end
+                end
+            end
+            self._mapOverviewExportDone = true
+            FarmDashLog.dev("exported map overview for fleet map: %s", key)
+            return
+        end
+    end
+end
+
 --- Cap for read/write fallback when rename/copy fail (atomic write recovery only). Bounds hitch vs huge tmp→final copies.
 local MOVE_FALLBACK_READ_MAX = 2 * 1024 * 1024
 
@@ -2807,6 +2883,7 @@ function FarmDashboardDataCollector:beginDeferredJsonWrite(data)
             data.serverInfo.mapId = tostring(info.mapId)
         end
     end
+    pcall(function() self:_exportMapOverviewForDashboard() end)
     -- Plan v5 Phase 0: schemaVersion + serverTimeSec.
     data.schemaVersion = DATA_SCHEMA_VERSION
     if data.serverTimeSec == nil then

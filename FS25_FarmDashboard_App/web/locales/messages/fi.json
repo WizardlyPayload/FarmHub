@@ -59,6 +59,7 @@
   "map.hint": "{{map}} – vedä panoroidaksesi, vieritä zoomataksesi. Käytä Fit-esineitä siirtyäksesi laivastoosi.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "{{map}}:n yleiskatsauksen lataaminen epäonnistui. Varmista, että FS25_*{{hint}}*.zip on mods-kansiossa tietokoneella, jossa on Farm Dashboard.",
+  "map.hintNoImageDlc": "{{map}}:n yleiskatsausta ei voitu ladata. Tämä kartta on virallisesta DLC-paketista (ei mods-kansiosta .zip). Lataa tallennus pelissä kerran Farm Dashboard -modi käytössä, jotta yleiskatsaus on välimuistissa, ja avaa sitten laivastokartta uudelleen. Kiinnikkeet toimivat edelleen ilman taustaa.",
   "map.loadingOverview": "Karttakuvaa ladataan…",
   "map.zoomIn": "Lähennä",
   "map.zoomOut": "Loitonna",

@@ -59,6 +59,7 @@
   "map.hint": "{{map}} — Faites glisser pour vous déplacer, faites défiler pour zoomer. Utilisez les éléments Fit pour accéder à votre flotte.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Impossible de charger l'aperçu pour {{map}}. Vérifiez que le fichier FS25_*{{hint}}*.zip se trouve bien dans le dossier mods de l'ordinateur exécutant Farm Dashboard.",
+  "map.hintNoImageDlc": "Impossible de charger la vue d'ensemble pour {{map}}. Cette carte provient d'un pack DLC officiel (et non d'un fichier .zip d'un dossier de mods). Chargez la sauvegarde en jeu une fois avec le mod Farm Dashboard activé afin que la vue d'ensemble soit mise en cache, puis rouvrez la carte Fleet. Les marqueurs fonctionnent toujours sans arrière-plan.",
   "map.loadingOverview": "Chargement de l'image de la carte…",
   "map.zoomIn": "Zoomer",
   "map.zoomOut": "Dézoomer",

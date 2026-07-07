@@ -59,6 +59,7 @@
   "map.hint": "{{map}} — povucite za pomicanje, pomaknite se za zumiranje. Koristite Prilagodi stavke za prelazak na svoju flotu.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Nije moguće učitati pregled za {{map}}. Provjerite je li FS25_*{{hint}}*.zip u mapi modova na računalu na kojem je pokrenut Farm Dashboard.",
+  "map.hintNoImageDlc": "Nije moguće učitati pregled za {{map}}. Ova karta je iz službenog DLC paketa (ne iz .zip datoteke mape modova). Učitajte spremljenu kartu u igri jednom s omogućenim modom Farm Dashboard kako bi se pregled predmemorirao, a zatim ponovno otvorite kartu flote. Pinovi i dalje rade bez pozadine.",
   "map.loadingOverview": "Učitavanje slike karte…",
   "map.zoomIn": "Uvećaj",
   "map.zoomOut": "Smanji",

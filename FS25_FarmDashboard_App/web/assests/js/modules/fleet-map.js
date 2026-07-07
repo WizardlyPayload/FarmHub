@@ -285,6 +285,8 @@ async function applyMapOverviewBackground(dashboard) {
       const label = mapTitle || mapId || t("map.unknownMap");
       if (data?.error === "missing_map_id") {
         hint.textContent = t("map.hintNoImage");
+      } else if (data?.hintKind === "dlc" && label && label !== t("map.unknownMap")) {
+        hint.textContent = t("map.hintNoImageDlc", { map: label });
       } else if (label && label !== t("map.unknownMap")) {
         const token = String(label).split(/[^A-Za-z0-9]+/).find((p) => p.length >= 4) || "";
         hint.textContent = t("map.hintNoImageNamed", { map: label, hint: token || label });

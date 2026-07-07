@@ -59,6 +59,7 @@
   "map.hint": "{{map}} — tarraing chun panáil, scrollaigh chun zúmáil. Bain úsáid as míreanna Fit chun léim chuig do chabhlach.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Níorbh fhéidir forbhreathnú a lódáil le haghaidh {{map}}. Deimhnigh go bhfuil FS25_*{{hint}}*.zip i do fhillteán mods ar an ríomhaire ina bhfuil Farm Painéal na bhFeirme.",
+  "map.hintNoImageDlc": "Níorbh fhéidir forbhreathnú a luchtú do {{map}}. Tá an léarscáil seo ó phacáiste DLC oifigiúil (ní fillteán mods .zip). Luchtaigh an sábháil sa chluiche uair amháin agus an mod Painéal na Feirme cumasaithe ionas go mbeidh an forbhreathnú taisceáilte, ansin athoscail léarscáil an Fhlít. Oibríonn bioráin fós gan an cúlra.",
   "map.loadingOverview": "Íomhá léarscáile á lódáil…",
   "map.zoomIn": "Zúmáil isteach",
   "map.zoomOut": "Zúmáil amach",

@@ -59,6 +59,7 @@
   "map.hint": "{{map}} — плъзнете за панорамиране, превъртете за мащабиране. Използвайте „Побиране на елементи“, за да преминете към вашия автопарк.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Не можа да се зареди общ преглед за {{map}}. Уверете се, че FS25_*{{hint}}*.zip е в папката с модове на компютъра, на който работи Farm Dashboard.",
+  "map.hintNoImageDlc": "Не можа да се зареди общият преглед за {{map}}. Тази карта е от официален DLC пакет (не е .zip архив с папка mods). Заредете запазената карта в играта веднъж с активиран мод Farm Dashboard, така че общият преглед да се кешира, след което отворете отново картата на флота. Pins все още работят без фон.",
   "map.loadingOverview": "Зареждане на изображението на картата…",
   "map.zoomIn": "Увеличаване",
   "map.zoomOut": "Намаляване на мащаба",

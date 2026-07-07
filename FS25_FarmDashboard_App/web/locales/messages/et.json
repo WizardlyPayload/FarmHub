@@ -59,6 +59,7 @@
   "map.hint": "{{map}} – lohista panoraamimiseks, keri suumimiseks. Kasuta Fit esemeid oma laevastiku juurde liikumiseks.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "{{map}} ülevaate laadimine ebaõnnestus. Veenduge, et FS25_*{{hint}}*.zip asub Farm Dashboardiga arvuti modifikatsioonide kaustas.",
+  "map.hintNoImageDlc": "{{map}} ülevaate laadimine ebaõnnestus. See kaart pärineb ametlikust DLC paketist (mitte modifikatsioonide kaustast .zip). Laadige salvestus mängusiseselt üks kord, kui farmi armatuurlaua modifikatsioon on lubatud, et ülevaade oleks vahemällu salvestatud, seejärel avage laevastiku kaart uuesti. Nööpnõelad töötavad ikka ka ilma taustata.",
   "map.loadingOverview": "Kaardipildi laadimine…",
   "map.zoomIn": "Suumi sisse",
   "map.zoomOut": "Suumi välja",

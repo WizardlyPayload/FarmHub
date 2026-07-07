@@ -59,6 +59,7 @@
   "map.hint": "{{map}} — húzással pásztázhatsz, görgetéssel nagyíthatsz. Használd a Fit elemeket a flottádhoz ugráshoz.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Nem sikerült betölteni az {{map}} áttekintését. Ellenőrizd, hogy az FS25_*{{hint}}*.zip fájl megtalálható-e a Farm Dashboardot futtató számítógép mod mappájában.",
+  "map.hintNoImageDlc": "Nem sikerült betölteni az {{map}} áttekintését. Ez a pálya egy hivatalos DLC csomagból származik (nem egy .zip formátumú mod mappa). Töltsd be a mentést a játékban egyszer a Farm Dashboard moddal, hogy az áttekintés gyorsítótárazva legyen, majd nyisd meg újra a Flottatérképet. A kitűzők a háttér nélkül is működnek.",
   "map.loadingOverview": "Térképkép betöltése…",
   "map.zoomIn": "Nagyítás",
   "map.zoomOut": "Kicsinyítés",

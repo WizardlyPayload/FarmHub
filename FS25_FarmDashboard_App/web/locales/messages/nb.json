@@ -59,6 +59,7 @@
   "map.hint": "{{map}} – dra for å panorere, bla for å zoome. Bruk Tilpass-elementer for å hoppe til flåten din.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Kunne ikke laste inn oversikten for {{map}}. Bekreft at FS25_*{{hint}}*.zip er i modsmappen din på PC-en som kjører Farm Dashboard.",
+  "map.hintNoImageDlc": "Kunne ikke laste oversikten for {{map}}. Dette kartet er fra en offisiell DLC-pakke (ikke en .zip-fil for mods-mapper). Last inn lagrede filer i spillet én gang med Farm Dashboard-modden aktivert, slik at oversikten blir mellomlagret, og åpne deretter Fleet-kartet på nytt. Pins fungerer fortsatt uten bakgrunn.",
   "map.loadingOverview": "Laster inn kartbilde…",
   "map.zoomIn": "Zoom inn",
   "map.zoomOut": "Zoom ut",

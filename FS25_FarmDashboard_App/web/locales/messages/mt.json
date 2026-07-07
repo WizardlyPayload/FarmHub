@@ -59,6 +59,7 @@
   "map.hint": "{{map}} — iddreggja biex tiġbed il-paġna, skrollja biex tiżżumja. Uża l-oġġetti Fit biex taqbeż għall-flotta tiegħek.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Ma setgħetx titgħabba l-ħarsa ġenerali għal {{map}}. Ikkonferma li FS25_*{{hint}}*.zip jinsab fil-folder tal-mods tiegħek fuq il-PC li qed iħaddem Farm Dashboard.",
+  "map.hintNoImageDlc": "Ma setgħetx titgħabba l-ħarsa ġenerali għal {{map}}. Din il-mappa hija minn pakkett DLC uffiċjali (mhux mods-folder .zip). Tella' s-save fil-logħba darba bil-mod Farm Dashboard attivat sabiex il-ħarsa ġenerali tinżamm fil-cache, imbagħad erġa' iftaħ il-mappa tal-Fleet. Il-pins xorta jaħdmu mingħajr l-isfond.",
   "map.loadingOverview": "Qed tiċċarġja l-immaġni tal-mappa…",
   "map.zoomIn": "Żum 'il ġewwa",
   "map.zoomOut": "Żum 'il barra",

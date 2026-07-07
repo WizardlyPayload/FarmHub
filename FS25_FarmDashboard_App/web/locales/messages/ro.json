@@ -59,6 +59,7 @@
   "map.hint": "{{map}} — trageți pentru panoramare, derulați pentru zoom. Folosiți elementele Fit pentru a accesa flota dvs.",
   "map.hintNoImage": "Could not find overview.dds for this map on this PC — install the map mod under Documents\\My Games\\FarmingSimulator2025\\mods, or run the game once so base maps are present. Pins still use live positions.",
   "map.hintNoImageNamed": "Nu s-a putut încărca prezentarea generală pentru {{map}}. Confirmați că fișierul FS25_*{{hint}}*.zip se află în folderul de mod-uri de pe PC-ul pe care rulează Farm Dashboard.",
+  "map.hintNoImageDlc": "Nu s-a putut încărca prezentarea generală pentru {{map}}. Această hartă este dintr-un pachet DLC oficial (nu un .zip de folder cu mod-uri). Încărcați o dată salvarea în joc cu modul Farm Dashboard activat, astfel încât prezentarea generală să fie stocată în cache, apoi redeschideți harta Fleet. Pin-urile funcționează în continuare fără fundal.",
   "map.loadingOverview": "Se încarcă imaginea hărții…",
   "map.zoomIn": "Măriți",
   "map.zoomOut": "Micșorare",

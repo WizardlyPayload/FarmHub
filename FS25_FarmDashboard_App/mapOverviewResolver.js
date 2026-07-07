@@ -13,8 +13,29 @@ const {
   roundInset,
 } = require('./mapOverviewTerrainInset.cjs');
 const { lookupTerrainInsetOverride } = require('./mapOverviewInsets.cjs');
+const { collectFs25DocumentRoots } = require('./fs25Paths');
 
 const OVERVIEW_CACHE_VERSION = 6;
+
+/** Official DLC map packs (folder name under `<game>/pdlc/`, without `.dlc`). */
+const MAP_DLC_PACKAGE_HINTS = [
+  {
+    packages: ['highlandsFishingPack'],
+    match(slug, title, tokens) {
+      if (tokens.includes('kinlaig')) return true;
+      if (slug && slug.includes('kinlaig')) return true;
+      return /kinlaig/i.test(title || '');
+    },
+  },
+  {
+    packages: ['plainsAndPrairiesPack'],
+    match(slug, title, tokens) {
+      if (tokens.includes('prairie') || tokens.includes('prairies')) return true;
+      if (slug && (slug.includes('prairie') || slug.includes('plains'))) return true;
+      return /prairie|plains/i.test(title || '');
+    },
+  },
+];
 const TERRAIN_INSET_SAMPLE_SIZE = 512;
 
 const OVERVIEW_NAMES = new Set(['overview.dds', 'overview.png']);
@@ -96,13 +117,15 @@ function getMapOverviewCacheDir() {
   );
 }
 
-function getFs25GameDataRoots() {
+function getFs25GameInstallRoots() {
   const roots = [];
   const push = (p) => {
     if (!p || typeof p !== 'string') return;
-    const data = path.join(p, 'data');
-    const maps = path.join(data, 'maps');
-    if (fs.existsSync(maps)) roots.push(data);
+    try {
+      if (fs.existsSync(p)) roots.push(path.normalize(p));
+    } catch (_) {
+      /* ignore */
+    }
   };
   const env = process.env.FS25_GAME_PATH || process.env.FARMING_SIMULATOR_2025_PATH;
   if (env) push(env);
@@ -122,6 +145,132 @@ function getFs25GameDataRoots() {
   push(path.join(pf, 'XboxGames', 'Farming Simulator 25', 'Content'));
   push(path.join(pf, 'XboxGames', 'Farming Simulator 2025', 'Content'));
   return [...new Set(roots)];
+}
+
+function getFs25GameDataRoots() {
+  const roots = [];
+  for (const installRoot of getFs25GameInstallRoots()) {
+    const data = path.join(installRoot, 'data');
+    const maps = path.join(data, 'maps');
+    if (fs.existsSync(maps)) roots.push(data);
+  }
+  return [...new Set(roots)];
+}
+
+function getFs25PdlcRoots() {
+  const roots = [];
+  const add = (p) => {
+    if (!p) return;
+    try {
+      if (fs.existsSync(p)) roots.push(path.normalize(p));
+    } catch (_) {
+      /* ignore */
+    }
+  };
+  for (const installRoot of getFs25GameInstallRoots()) {
+    add(path.join(installRoot, 'pdlc'));
+  }
+  for (const docRoot of collectFs25DocumentRoots()) {
+    add(path.join(docRoot, 'pdlc'));
+  }
+  return [...new Set(roots)];
+}
+
+function resolveDlcPackages(mapSlug, mapTitle, titleTokens) {
+  const tokens = titleTokens || titleTokensFromMapTitle(mapTitle);
+  const out = new Set();
+  for (const hint of MAP_DLC_PACKAGE_HINTS) {
+    if (hint.match(mapSlug, mapTitle, tokens)) {
+      for (const pkg of hint.packages) out.add(pkg);
+    }
+  }
+  return [...out];
+}
+
+function isLikelyDlcMap(mapSlug, mapTitle, titleTokens) {
+  return resolveDlcPackages(mapSlug, mapTitle, titleTokens).length > 0;
+}
+
+function pdlcPackageOverviewCandidates(packageDir, mapSlug) {
+  const bases = [path.join(packageDir, 'map')];
+  if (mapSlug) bases.push(path.join(packageDir, 'maps', mapSlug));
+  const names = ['overview.dds', 'overview.png'];
+  const out = [];
+  for (const base of bases) {
+    out.push(path.join(base, 'textures', 'ui', 'overview.dds'));
+    out.push(path.join(base, 'textures', 'ui', 'overview.png'));
+    for (const name of names) out.push(path.join(base, name));
+  }
+  return out;
+}
+
+async function findOverviewInPdlcPackages(pdlcRoots, packages, mapSlug, mapTitle, titleTokens) {
+  if (!packages || packages.length === 0) return null;
+  for (const pdlcRoot of pdlcRoots || []) {
+    if (!(await pathExists(pdlcRoot))) continue;
+    for (const pkg of packages) {
+      const pkgDir = path.join(pdlcRoot, pkg);
+      const hit = await findFirstExisting(pdlcPackageOverviewCandidates(pkgDir, mapSlug));
+      if (hit) return { sourcePath: hit, mapSlug, sourceKind: 'file', dlcPackage: pkg };
+      const walked = await walkForOverview(pkgDir, mapSlug, mapTitle, titleTokens, 8, 8000);
+      if (walked) return { sourcePath: walked, mapSlug, sourceKind: 'file', dlcPackage: pkg };
+    }
+  }
+  return null;
+}
+
+async function findOverviewInModSettingsExport(mapId, mapTitle, mapSlug) {
+  const docRoots = collectFs25DocumentRoots();
+  const keys = new Set();
+  if (mapId) keys.add(String(mapId));
+  if (mapSlug) keys.add(String(mapSlug));
+  const slugFromTitle = normalizeMapSlug(null, mapTitle);
+  if (slugFromTitle) keys.add(slugFromTitle);
+
+  for (const docRoot of docRoots) {
+    const base = path.join(docRoot, 'modSettings', 'FS25_FarmDashboard', 'mapOverview');
+    if (!(await pathExists(base))) continue;
+
+    for (const key of keys) {
+      for (const name of ['overview.dds', 'overview.png']) {
+        const candidate = path.join(base, key, name);
+        if (await pathExists(candidate)) return candidate;
+      }
+    }
+
+    let entries;
+    try {
+      entries = await fs.promises.readdir(base, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const ent of entries) {
+      if (!ent.isDirectory()) continue;
+      const dir = path.join(base, ent.name);
+      for (const name of ['overview.dds', 'overview.png']) {
+        const candidate = path.join(dir, name);
+        if (!(await pathExists(candidate))) continue;
+        const metaPath = path.join(dir, 'meta.json');
+        try {
+          const meta = JSON.parse(await fs.promises.readFile(metaPath, 'utf8'));
+          const metaTitle = String(meta.mapTitle || '').toLowerCase();
+          const metaId = String(meta.mapId || '').toLowerCase();
+          const wantTitle = String(mapTitle || '').toLowerCase();
+          const wantId = String(mapId || '').toLowerCase();
+          if (
+            (wantId && metaId === wantId) ||
+            (wantTitle && metaTitle && metaTitle === wantTitle) ||
+            (mapSlug && ent.name.toLowerCase() === mapSlug.toLowerCase())
+          ) {
+            return candidate;
+          }
+        } catch {
+          if (mapSlug && ent.name.toLowerCase() === mapSlug.toLowerCase()) return candidate;
+        }
+      }
+    }
+  }
+  return null;
 }
 
 function vanillaOverviewCandidates(gameDataRoot, mapSlug) {
@@ -431,6 +580,24 @@ async function findOverviewSourceFile({ mapId, mapTitle, modsRoot, modsRoots }) 
   const mapSlug = normalizeMapSlug(mapId, mapTitle);
   const titleTokens = titleTokensFromMapTitle(mapTitle);
   const roots = normalizeModsRoots(modsRoot, modsRoots);
+  const dlcPackages = resolveDlcPackages(mapSlug, mapTitle, titleTokens);
+
+  const modSettingsHit = await findOverviewInModSettingsExport(mapId, mapTitle, mapSlug);
+  if (modSettingsHit) {
+    return { sourcePath: modSettingsHit, mapSlug, sourceKind: 'file', sourceOrigin: 'modSettings' };
+  }
+
+  if (dlcPackages.length > 0) {
+    const pdlcHit = await findOverviewInPdlcPackages(
+      getFs25PdlcRoots(),
+      dlcPackages,
+      mapSlug,
+      mapTitle,
+      titleTokens
+    );
+    if (pdlcHit) return { ...pdlcHit, sourceOrigin: 'pdlc' };
+  }
+
   const candidates = [];
 
   for (const dataRoot of getFs25GameDataRoots()) {
@@ -465,6 +632,15 @@ async function findOverviewSourceFile({ mapId, mapTitle, modsRoot, modsRoots }) 
     if (!(await pathExists(modsDir))) continue;
     const walked = await walkForOverview(modsDir, mapSlug, mapTitle, titleTokens);
     if (walked) return { sourcePath: walked, mapSlug, sourceKind: 'file' };
+  }
+
+  if (dlcPackages.length > 0) {
+    return {
+      sourcePath: null,
+      mapSlug,
+      likelyDlc: true,
+      dlcPackages,
+    };
   }
 
   return { sourcePath: null, mapSlug };
@@ -752,9 +928,11 @@ async function resolveMapOverviewImage({ mapId, mapTitle, modsRoot, modsRoots })
       return {
         ok: false,
         error: 'overview_not_found',
+        hintKind: found.likelyDlc ? 'dlc' : 'mod',
         mapTitle: mapTitle || null,
         mapId: mapId || null,
         mapSlug: found.mapSlug || null,
+        dlcPackages: found.dlcPackages || null,
       };
     }
     const descriptor =
@@ -787,6 +965,13 @@ module.exports = {
   pathMatchesMapIdentity,
   scoreZipArchiveName,
   getMapOverviewCacheDir,
+  getFs25GameInstallRoots,
+  getFs25PdlcRoots,
+  resolveDlcPackages,
+  isLikelyDlcMap,
+  findOverviewInModSettingsExport,
+  findOverviewInPdlcPackages,
+  pdlcPackageOverviewCandidates,
   findOverviewSourceFile,
   resolveMapOverviewImage,
   scoreOverviewPath,
@@ -794,4 +979,5 @@ module.exports = {
   detectTerrainInsetFromPng,
   postProcessOverviewPng,
   OVERVIEW_CACHE_VERSION,
+  MAP_DLC_PACKAGE_HINTS,
 };

@@ -145,7 +145,7 @@ def upload_website_assets(client: paramiko.SSHClient, env: dict[str, str]) -> No
     for html in sorted(website.glob("*.html")):
         uploads.append((html, f"{web_root}/{html.name}"))
 
-    for extra in ("robots.txt",):
+    for extra in ("robots.txt", "sitemap.xml"):
         local = website / extra
         if local.is_file():
             uploads.append((local, f"{web_root}/{extra}"))

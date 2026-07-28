@@ -9,9 +9,13 @@
 
 <p><strong><span style="color:#b8860b">Read these steps in order</span></strong> — install the <strong>mod first</strong>, then the Windows app.</p>
 
-<p>The desktop app does <em>not</em> run inside FS25. It only reads <code>data.json</code>, which the in-game mod creates while you play. Until you load a save with the mod enabled, the dashboard shows <strong>“waiting for data”</strong> even after the installer finishes.</p>
+<p>The desktop app does <em>not</em> run inside FS25. It only reads <code>data.json</code>, which the in-game mod creates while you play (or while a dedicated server runs with the mod). Until you load a save with the mod enabled, the dashboard shows <strong>“waiting for data”</strong> even after the installer finishes.</p>
 
-<p><strong>App 4.2.0</strong> · <strong>Mod 3.4.0.6</strong> · Dashboard at <strong>http://localhost:8766</strong> after setup</p>
+<p><strong>App 4.2.1</strong> · <strong>Mod 3.4.0.7</strong> · Dashboard at <strong>http://localhost:8766</strong> after setup</p>
+
+<p><strong>Updating from 4.2 / 3.4.0.6:</strong> close Farm Dashboard and Farming Simulator → download the new Setup and <code>FS25_FarmDashboard.zip</code> → replace the app and the mod zip in <code>Documents\My Games\FarmingSimulator2025\mods\</code> (delete any old unpacked folder) → load the save → start the app. Dedicated: replace the mod on the host, restart the server, then update joined clients.</p>
+
+<p><strong>Dedicated servers:</strong> prefer <strong>join as client</strong> (same mod on a joined PC → local <code>data.json</code> → app <strong>Local</strong> mode — <strong>no FTP</strong>). <strong>FTP</strong> remains available for headless-only hosts. Giants port <strong>8080</strong> is an optional XML feed, not a substitute for <code>data.json</code>.</p>
 
 <hr />
 
@@ -27,7 +31,7 @@
 
 <figure>
   <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-010-mod-folder.png"
+    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/doc-screenshots/fd-install-010-mod-folder.png"
     alt="FS25_FarmDashboard zip in the mods folder"
   />
   <figcaption><code>FS25_FarmDashboard</code> as a zip or folder under <strong>mods</strong>.</figcaption>
@@ -47,7 +51,7 @@
 
 <figure>
   <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-020-fs25-mod-enabled.png"
+    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/doc-screenshots/fd-install-020-fs25-mod-enabled.png"
     alt="Farm Dashboard mod enabled in the save mod list"
   />
   <figcaption>Mod ticked in the save’s mod list.</figcaption>
@@ -57,15 +61,15 @@
 
 <h2>Stage C — Confirm data.json is updating</h2>
 
-<p>After about one minute in-game, check this path on your PC (or the server profile for FTP):</p>
+<p>After about one minute in-game, check this path on your PC:</p>
 
 <p><code>Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\&lt;savegame&gt;\data.json</code></p>
 
-<p>The file should exist and its <strong>Modified</strong> time should advance while you play.</p>
+<p>The file should exist and its <strong>Modified</strong> time should advance while you play. For dedicated <strong>join as client</strong>, confirm this path on the <em>joined client</em> PC (not only on the server). For <strong>FTP</strong>, confirm the file on the server profile you will poll.</p>
 
 <figure>
   <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-030-datajson-explorer.png"
+    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/doc-screenshots/fd-install-030-datajson-explorer.png"
     alt="data.json with a recent modified timestamp in File Explorer"
   />
   <figcaption>File Explorer — recent <code>data.json</code> timestamp while playing.</figcaption>
@@ -76,14 +80,14 @@
 <h2>Stage D — Install the Windows app</h2>
 
 <ol>
-  <li>Download and run <strong>FS25-Farm-Dashboard-Setup-4.2.0.exe</strong> from this page (recommended) or <a href="https://github.com/WizardlyPayload/FarmHub/releases">GitHub Releases</a>.</li>
+  <li>Download and run <strong>FS25-Farm-Dashboard-Setup-4.2.1.exe</strong> from this page (recommended) or <a href="https://github.com/WizardlyPayload/FarmHub/releases">GitHub Releases</a>.</li>
   <li>Choose your language on the welcome page and complete the installer.</li>
   <li>Launch <strong>Farm Dashboard</strong> from the Start menu.</li>
 </ol>
 
 <figure>
   <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-040-installer-welcome.png"
+    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/doc-screenshots/fd-install-040-installer-welcome.png"
     alt="Installer welcome page"
   />
   <figcaption>Installer welcome — pick your language.</figcaption>
@@ -91,7 +95,7 @@
 
 <figure>
   <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-045-installer-finished.png"
+    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/doc-screenshots/fd-install-045-installer-finished.png"
     alt="Installer finished page"
   />
   <figcaption>Installer finished — launch Farm Dashboard.</figcaption>
@@ -105,31 +109,47 @@
 
 <figure>
   <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/screenshots/fd-install-050-app-first-launch.png"
+    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/doc-screenshots/fd-install-050-app-first-launch.png"
     alt="Farm Dashboard Server Manager on first launch"
   />
-  <figcaption>Server Manager before you add a save or FTP server.</figcaption>
+  <figcaption>Server Manager before you add a Local save (SP or join-as-client) or FTP server.</figcaption>
 </figure>
 
 <h3>Setup walk-through</h3>
 
 <ol>
   <li>Pick your language (top-right on Setup).</li>
-  <li>Click <strong>Auto-detect saves</strong> for local PC play, or add a row manually.</li>
-  <li>For <strong>GPortal / Nitrado</strong> hosts: add <strong>Dedicated Server (FTP)</strong> with host, credentials, profile path, and save slot.</li>
+  <li>Click <strong>Auto-detect saves</strong> for local PC play (or for a dedicated <strong>join-as-client</strong> mirror already writing on this PC), or add a row manually.</li>
+  <li>For dedicated hosts: prefer <strong>Local</strong> after join-as-client (see below). For headless-only / GPortal-style FTP: add <strong>Dedicated Server (FTP)</strong> with host, credentials, profile path, and save slot.</li>
   <li>Optional: <strong>Scan FS25 mods for dashboard images</strong> (vehicle icons from your mod folder).</li>
   <li>With at least one server in the list, click <strong>Launch Dashboard</strong> → open <strong>http://localhost:8766</strong>.</li>
 </ol>
 
 <hr />
 
-<h2>Dedicated server (FTP)</h2>
+<h2>Dedicated server — join as client (no FTP)</h2>
+
+<p>Recommended when someone can stay connected to the dedicated server. The same mod automatically mirrors <code>data.json</code> from the dedicated authority to every joined client; the desktop app watches that local folder. Works for the legacy app (<strong>4.2.1</strong> line) and <strong>v5</strong>.</p>
+
+<ol>
+  <li>Install <strong>FS25_FarmDashboard.zip</strong> on the <strong>dedicated server</strong> (Stages A–B on that save).</li>
+  <li>On the PC that runs Farm Dashboard, install the <strong>same</strong> updated mod and <strong>join the server as a client</strong> (spare/alt account or admin playing).</li>
+  <li>Mirroring starts automatically when you join — no in-game opt-in switch.</li>
+  <li>Confirm local <code>Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\mirror_&lt;slot&gt;\data.json</code> updates while the client stays connected.</li>
+  <li>In Setup or <strong>Settings → Servers &amp; saves</strong>, add a <strong>Local</strong> server (or Auto-detect) pointing at that folder — <strong>no FTP</strong>.</li>
+</ol>
+
+<p><strong>Limits:</strong> needs at least one connected client; empty server (zero players) does not mirror until someone joins; large exports may lag a few seconds; requires the updated mod with export mirror on server and client.</p>
+
+<hr />
+
+<h2>Dedicated server — FTP (Advanced)</h2>
 
 <ol>
   <li>Complete Stages <strong>A–C</strong> on the server — mod enabled, save loaded, <code>data.json</code> present on the server profile.</li>
   <li>In Setup or <strong>Settings → Servers &amp; saves</strong>, add FTP host, port, username, password, base profile path, and save slot folder.</li>
-  <li>Optional <strong>HTTP feed</strong> (Giants dedicated XML on port <strong>8080</strong>) improves vehicle age, prices, and market history when available.</li>
-  <li>Set <strong>Poll every</strong> (1–25 minutes). Local saves use file watching; FTP uses this schedule.</li>
+  <li>Optional <strong>HTTP feed</strong> (Giants dedicated XML on port <strong>8080</strong>) improves vehicle age, prices, and market history when available — it does <strong>not</strong> replace <code>data.json</code>.</li>
+  <li>Set <strong>Poll every</strong> (1–25 minutes). Local saves (including join-as-client) use file watching; FTP uses this schedule.</li>
 </ol>
 
 <hr />
@@ -142,7 +162,7 @@
   <dt><strong>Data-source badge</strong></dt>
   <dd>XML + Live + API (or a subset if unavailable).</dd>
   <dt><strong>Settings → Servers</strong></dt>
-  <dd>Correct local path or FTP host + save slot.</dd>
+  <dd>Correct local path (SP or join-as-client) or FTP host + save slot.</dd>
   <dt><strong>Wrong save empty</strong></dt>
   <dd>Repeat Stage B for that save.</dd>
 </dl>
@@ -162,13 +182,18 @@
 </details>
 
 <details>
+  <summary><strong>Join-as-client: no local data.json</strong></summary>
+  <p>Keep the client connected. Confirm the same updated mod on server and client. An empty dedicated server with zero players does not mirror until someone joins — use FTP for headless-only.</p>
+</details>
+
+<details>
   <summary><strong>FTP never updates</strong></summary>
-  <p>Check FTP credentials, save slot folder name, and firewall. Set poll interval to at least 1 minute. Confirm <code>data.json</code> exists on the server profile.</p>
+  <p>Check FTP credentials, save slot folder name, and firewall. Set poll interval to at least 1 minute. Confirm <code>data.json</code> exists on the server profile. Prefer join-as-client when someone can stay connected.</p>
 </details>
 
 <details>
   <summary><strong>Blank or broken after upgrade</strong></summary>
-  <p>Update <strong>both</strong> the app (<strong>4.2.0</strong>) and mod (<strong>3.4.0.6</strong>) from the same release line.</p>
+  <p>Update <strong>both</strong> the app (<strong>4.2.1</strong>) and mod (<strong>3.4.0.7</strong>) from the same release line.</p>
 </details>
 
 <hr />

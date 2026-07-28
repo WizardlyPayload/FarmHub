@@ -19,9 +19,16 @@
 
   This script uses ZipArchive + CreateEntryFromFile with '/' entry names (POSIX paths inside the zip).
 
+  -VersionOverride stamps modDesc.xml + FarmDashboard.VERSION in a **staging copy** only.
+  Working-tree RF edition (e.g. 5.0.0.1) is left unchanged. Use for classic public zips
+  (e.g. 3.4.0.7) without switching the local RF deploy line.
+
 .EXAMPLE
   Set-Location "...\MAIN CODEBASE\FarmHub"
   .\tools\Zip-FarmDashboardMod.ps1
+
+.EXAMPLE
+  .\tools\Zip-FarmDashboardMod.ps1 -VersionOverride 3.4.0.7
 
 .EXAMPLE
   .\tools\Zip-FarmDashboardMod.ps1 -CopyTo "C:\Users\Graham\Documents\FS25_FarmDashboard.zip"
@@ -30,7 +37,9 @@
 param(
     [string] $RepoRoot = "",
     [string] $OutZipName = "FS25_FarmDashboard.zip",
-    [string] $CopyTo = ""
+    [string] $CopyTo = "",
+    # Stamp this version into the zip only (does not edit the working tree).
+    [string] $VersionOverride = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -55,6 +64,42 @@ if (-not (Test-Path -LiteralPath $SrcTree -PathType Container)) {
     throw "Missing src folder: $SrcTree"
 }
 
+$PackRoot = $ModSource
+$Staging = $null
+if ($VersionOverride) {
+    if ($VersionOverride -notmatch '^\d+(\.\d+){1,3}$') {
+        throw "VersionOverride must look like 3.4.0.7 (got: $VersionOverride)"
+    }
+    $Staging = Join-Path $env:TEMP ("FarmDashModPack_" + [guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Path $Staging -Force | Out-Null
+    Copy-Item -LiteralPath $ModDesc -Destination (Join-Path $Staging "modDesc.xml") -Force
+    if (Test-Path -LiteralPath $IconDds) {
+        Copy-Item -LiteralPath $IconDds -Destination (Join-Path $Staging "icon_FarmDashboard.dds") -Force
+    }
+    Copy-Item -LiteralPath $SrcTree -Destination (Join-Path $Staging "src") -Recurse -Force
+    $l10nSrc = Join-Path $ModSource "l10n"
+    if (Test-Path -LiteralPath $l10nSrc -PathType Container) {
+        Copy-Item -LiteralPath $l10nSrc -Destination (Join-Path $Staging "l10n") -Recurse -Force
+    }
+
+    $stagedDesc = Join-Path $Staging "modDesc.xml"
+    $descText = [System.IO.File]::ReadAllText($stagedDesc)
+    $descText = [regex]::Replace($descText, '(?s)(<!--\s*FS25 FarmDashboard\s*\|\s*modDesc\.xml\s*\|\s*)v[\d.]+', "`${1}v$VersionOverride")
+    $descText = [regex]::Replace($descText, '(<version>)[^<]+(</version>)', "`${1}$VersionOverride`${2}")
+    [System.IO.File]::WriteAllText($stagedDesc, $descText)
+
+    $stagedLua = Join-Path $Staging "src\FarmDashboard.lua"
+    if (-not (Test-Path -LiteralPath $stagedLua)) {
+        throw "Missing FarmDashboard.lua in staging: $stagedLua"
+    }
+    $luaText = [System.IO.File]::ReadAllText($stagedLua)
+    $luaText = [regex]::Replace($luaText, '(FarmDashboard\.VERSION\s*=\s*")[^"]+(")', "`${1}$VersionOverride`${2}")
+    [System.IO.File]::WriteAllText($stagedLua, $luaText)
+
+    $PackRoot = $Staging
+    Write-Host "VersionOverride $VersionOverride applied in staging (working tree unchanged)"
+}
+
 if (Test-Path -LiteralPath $DestZip) {
     Remove-Item -LiteralPath $DestZip -Force
 }
@@ -62,16 +107,20 @@ if (Test-Path -LiteralPath $DestZip) {
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-$rootNorm = $ModSource.TrimEnd('\', '/')
+$rootNorm = $PackRoot.TrimEnd('\', '/')
+$packDesc = Join-Path $PackRoot "modDesc.xml"
+$packIcon = Join-Path $PackRoot "icon_FarmDashboard.dds"
+$packSrc = Join-Path $PackRoot "src"
+
 $zip = [System.IO.Compression.ZipFile]::Open($DestZip, [System.IO.Compression.ZipArchiveMode]::Create)
 try {
-    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $ModDesc, "modDesc.xml") | Out-Null
-    if (Test-Path -LiteralPath $IconDds) {
-        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $IconDds, "icon_FarmDashboard.dds") | Out-Null
+    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $packDesc, "modDesc.xml") | Out-Null
+    if (Test-Path -LiteralPath $packIcon) {
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $packIcon, "icon_FarmDashboard.dds") | Out-Null
     } else {
         Write-Warning "icon_FarmDashboard.dds not in mod folder - zip will omit it. Run tools\Convert-ModIconToDds.mjs (needs icon.png source in mod folder)."
     }
-    Get-ChildItem -LiteralPath $SrcTree -Recurse -File | ForEach-Object {
+    Get-ChildItem -LiteralPath $packSrc -Recurse -File | ForEach-Object {
         $full = $_.FullName
         if (-not $full.StartsWith($rootNorm, [StringComparison]::OrdinalIgnoreCase)) {
             throw "Unexpected path under src: $full"
@@ -80,7 +129,7 @@ try {
         [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $full, $rel) | Out-Null
     }
     foreach ($extraDir in @("l10n")) {
-        $extraPath = Join-Path $ModSource $extraDir
+        $extraPath = Join-Path $PackRoot $extraDir
         if (-not (Test-Path -LiteralPath $extraPath -PathType Container)) { continue }
         Get-ChildItem -LiteralPath $extraPath -Recurse -File | ForEach-Object {
             $full = $_.FullName
@@ -90,6 +139,9 @@ try {
     }
 } finally {
     $zip.Dispose()
+    if ($Staging -and (Test-Path -LiteralPath $Staging)) {
+        Remove-Item -LiteralPath $Staging -Recurse -Force -ErrorAction SilentlyContinue
+    }
 }
 
 if (-not (Test-Path -LiteralPath $DestZip)) {

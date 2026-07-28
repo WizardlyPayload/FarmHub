@@ -2,7 +2,7 @@
 
 Complete guide to **FS25 Farm Dashboard** — every screen, setting, section, and modal.
 
-**Current versions:** app **4.2.0**, mod **3.4.0.6**
+**Current versions:** app **4.2.1**, mod **3.4.0.7** (classic)
 
 ---
 
@@ -53,8 +53,8 @@ See also **4.1** features below.
 
 ## Install reminder
 
-1. **`FS25_FarmDashboard.zip` (3.4.0.6)** → enable on save → load once
-2. **`Setup 4.2.0.exe`** → http://localhost:8766/
-3. Dedicated servers: deploy **new mod zip** + configure FTP in Settings
+1. **`FS25_FarmDashboard.zip` (3.4.0.7)** → enable on save → load once
+2. **`Setup 4.2.1.exe`** → http://localhost:8766/
+3. Dedicated servers: deploy **new mod zip** on server **and** client → prefer **join as client** + Local mode ([Installation Guide](Installation-Guide#dedicated-servers-join-as-client-or-ftp)), or configure **FTP** (Advanced) in Settings
 
-*Aligned with app **4.2.0**, mod **3.4.0.6***
+*Aligned with app **4.2.1**, mod **3.4.0.7***

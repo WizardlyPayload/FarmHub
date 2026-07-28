@@ -1,6 +1,6 @@
-# Farm Dashboard — Changelog
+﻿# Farm Dashboard — Changelog
 
-All notable changes to this project are recorded here. For GitHub release blurbs, see [GITHUB_RELEASE_v4.2.0.md](./GITHUB_RELEASE_v4.2.0.md) (current) · [GITHUB_RELEASE_v4.1.5.md](./GITHUB_RELEASE_v4.1.5.md) · [GITHUB_RELEASE_v4.1.0.md](./GITHUB_RELEASE_v4.1.0.md). For **network exposure and trust assumptions**, see [SECURITY.md](./SECURITY.md).
+All notable changes to this project are recorded here. For GitHub release blurbs, see [GITHUB_RELEASE_v4.2.1.md](./GITHUB_RELEASE_v4.2.1.md) (current classic) · [GITHUB_RELEASE_v4.2.0.md](./GITHUB_RELEASE_v4.2.0.md) · [GITHUB_RELEASE_v4.1.5.md](./GITHUB_RELEASE_v4.1.5.md). For **network exposure and trust assumptions**, see [SECURITY.md](./SECURITY.md). Classic vs RF product lines: [COMPATIBILITY.md](./COMPATIBILITY.md).
 
 ---
 
@@ -8,12 +8,38 @@ All notable changes to this project are recorded here. For GitHub release blurbs
 
 | Artifact | Where it lives | Format |
 |----------|----------------|--------|
-| **Desktop app** | `FS25_FarmDashboard_App/package.json` | Semver (e.g. `4.2.0`) |
-| **FS25 mod** | `FS25_FarmDashboard_Mod/modDesc.xml` and `FarmDashboard.VERSION` in Lua | Giants style (e.g. `3.4.0.6`) |
+| **Desktop app** | `FS25_FarmDashboard_App/package.json` | Semver (e.g. `4.2.1`) |
+| **FS25 mod (classic public zip)** | Stamped at pack time via `npm run package:mod:classic` → **3.4.0.7** | Giants style |
+| **FS25 mod (RF / local tree)** | `FS25_FarmDashboard_Mod/modDesc.xml` + `FarmDashboard.VERSION` | e.g. `5.0.0.1` RF edition |
 | **Source headers** | First line of many `.js` / `.lua` files | Often `v2.0.0` historically; bump only when you intentionally resync headers |
 
 ---
 
+
+## 4.2.1 — FS 1.21 copyFile hotfix + join-as-client (classic patch)
+
+**App:** `4.2.1` (`package.json`) · **Classic mod zip:** `3.4.0.7` · app requires **3.1.0.0+** via `modVersionPolicy.js`.
+
+Public classic patch on the 4.2 / 3.4 line. Classic UI remains default (`useNewUi` false). This does **not** replace Realistic Farming edition 5.x (`latest-rf.yml`).
+
+### Fixed (headline)
+- **Farming Simulator 1.21 `copyFile` log spam** — After FS 1.21, the mod could flood the game log with repeated copyFile type errors while trying to save a map overview image. The copy now uses the correct yes/no (Bool) flag the engine expects, and a failed overview export is latched so it does not retry every cycle. Noisy logs / map-overview hiccup only — the game itself is not broken.
+
+### Added
+- **Dedicated join-as-client export mirror** — authority streams `data.json` to an opted-in MP client (`FarmDashboardExportEvent` / allowExportMirror); client writes local `modSettings\FS25_FarmDashboard\<slot>\data.json` for **Local** watch. **FTP remains Advanced** for empty / headless dedicated.
+- **Setup join-as-client UX** — legacy Setup guides mirror / receive-server-export for dedicated without FTP.
+
+### Fixed
+- **Track A** merge and related test hardening for the 4.2.1 release line.
+
+### Changed
+- Classic public mod zip `3.4.0.6` → `3.4.0.7` (copyFile fix + export mirror + settings). Packaged with `package:mod:classic` so the RF working-tree modDesc can stay on the 5.x line.
+- App `4.2.0` → `4.2.1`. NEW APP packaging stays **opt-in** only.
+
+### Docs
+- Install / user manual / wiki / itch copy for update steps from 4.2 / 3.4.0.6; join-as-client notes; see also [RELEASE_NOTE_JOIN_AS_CLIENT.md](./_internal/RELEASE_NOTE_JOIN_AS_CLIENT.md).
+
+---
 ## 4.2.0 — Public release (storage, livestock, productions, notifications)
 
 **App:** `4.2.0` (`package.json`) · **Mod:** `3.4.0.6` (`modDesc.xml` + `FarmDashboard.VERSION`; app requires **3.1.0.0+** via `modVersionPolicy.js`).

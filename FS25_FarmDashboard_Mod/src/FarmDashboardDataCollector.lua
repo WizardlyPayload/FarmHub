@@ -308,7 +308,7 @@ end
 --   * getFiles requires 3 args: getFiles(directory, patternString, recursiveBool).
 --     (Passing bool as arg2 yields "Expected: String. Actual: Bool".)
 --   * io.open is often sandboxed to mode "w" only — avoid "r"/"rb" (use readFile if present).
---   * copyFile requires 3 args on FS25 — try bool then numeric overloads best-effort.
+--   * copyFile(src, dst, forceOverwrite: Bool) — Bool only; never Number 1/0.
 --   * `os` may be nil — os.rename unavailable; use copy/delete or direct write.
 -- =====================================================================================
 
@@ -432,15 +432,16 @@ local COROUTINE_INCREMENTAL_COLLECTORS = {
     production = true,
 }
 
+--- copyFile(src, dst, forceOverwrite: Bool). Never pass Number 1/0 — engine type-checks
+--- arg3 as Bool even inside pcall, and wrong-type trials flood the script log every cycle.
 local function _copyFileFs25BestEffort(src, dst)
     if type(copyFile) ~= "function" or type(src) ~= "string" or type(dst) ~= "string" then
         return false
     end
+    -- forceOverwrite true first; false only if dest already exists and true did not stick.
     local trials = {
         function() copyFile(src, dst, true) end,
         function() copyFile(src, dst, false) end,
-        function() copyFile(src, dst, 1) end,
-        function() copyFile(src, dst, 0) end,
     }
     for _, fn in ipairs(trials) do
         local ok = pcall(fn)
@@ -522,6 +523,15 @@ function FarmDashboardDataCollector:_exportMapOverviewForDashboard()
             FarmDashLog.dev("exported map overview for fleet map: %s", key)
             return
         end
+    end
+
+    -- Latch failure so we never retry every export cycle (log spam / hitch). Optional asset.
+    self._mapOverviewExportDone = true
+    if type(Logging) == "table" and type(Logging.warning) == "function" then
+        Logging.warning(string.format(
+            "[FarmDash] map overview export failed once for %s (fleet map may lack overview.dds); not retrying",
+            tostring(key)
+        ))
     end
 end
 

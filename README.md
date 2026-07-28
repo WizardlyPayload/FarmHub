@@ -10,10 +10,10 @@ Real-time farm management dashboard for **Farming Simulator 25** — a Windows d
 
 | Download from Releases | Version |
 |------------------------|---------|
-| **`FS25-Farm-Dashboard-Setup-4.2.0.exe`** | Windows app |
+| **`FS25-Farm-Dashboard-Setup-4.2.1.exe`** | Windows app |
 | **`FS25_FarmDashboard.zip`** | FS25 mod |
 
-**Current stable line:** App **4.2.0** · Mod **3.4.0.6**
+**Current stable line (classic):** App **4.2.1** · Mod **3.4.0.7** — hotfix for Farming Simulator 1.21 copyFile log spam (see [release notes](docs/GITHUB_RELEASE_v4.2.1.md)).
 
 Install **mod first**, load your save once, then install the app. See **[docs/INSTALL.md](docs/INSTALL.md)** (detailed) or the quick steps below.
 
@@ -28,9 +28,9 @@ Open the dashboard at **[http://localhost:8766](http://localhost:8766)** after s
 | | |
 | --- | --- |
 | **Home** | **Fields** |
-| ![Farm Management Dashboard landing](docs/screenshots/fd-shell-020-landing.png) | ![Fields section with summary and cards](docs/screenshots/fd-section-fields-010-summary.png) |
+| ![Farm Management Dashboard landing](docs/doc-screenshots/fd-shell-020-landing.png) | ![Fields section with summary and cards](docs/doc-screenshots/fd-section-fields-010-summary.png) |
 | **Livestock** | **Productions** |
-| ![Livestock summary and animals table](docs/screenshots/fd-section-livestock-010-summary.png) | ![Productions storage and chains](docs/screenshots/fd-section-productions-010-list.png) |
+| ![Livestock summary and animals table](docs/doc-screenshots/fd-section-livestock-010-summary.png) | ![Productions storage and chains](docs/doc-screenshots/fd-section-productions-010-list.png) |
 
 More UI shots and install screenshots: **[docs/USER_MANUAL.md](docs/USER_MANUAL.md)** · capture checklist: **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)**
 
@@ -39,7 +39,7 @@ More UI shots and install screenshots: **[docs/USER_MANUAL.md](docs/USER_MANUAL.
 ## Quick install
 
 1. **Mod** — Put **`FS25_FarmDashboard.zip`** in `Documents\My Games\FarmingSimulator2025\mods\`, enable on your save, **load the save once**.
-2. **App** — Run **`FS25-Farm-Dashboard-Setup-4.2.0.exe`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
+2. **App** — Run **`FS25-Farm-Dashboard-Setup-4.2.1.exe`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
 3. **Configure** — **Settings → Servers & saves** (local path or FTP for dedicated servers).
 
 **Full guide:** [docs/USER_MANUAL.md](docs/USER_MANUAL.md) · **Install (detailed):** [docs/INSTALL.md](docs/INSTALL.md) · [GitHub Wiki](https://github.com/WizardlyPayload/FarmHub/wiki)
@@ -54,7 +54,7 @@ This repository (**[FarmHub](https://github.com/WizardlyPayload/FarmHub)**) is *
 |---------|------------|
 | **[JoshWalki / FarmDashboard](https://github.com/JoshWalki/FarmDashboard)** | Original FS25 mod + web dashboard (**Josh Walki**) |
 | **[WizardlyPayload / FS25-Farm-Dashboard](https://github.com/WizardlyPayload/FS25-Farm-Dashboard/releases)** | Public **2.0.0** release — Electron desktop fork of Josh’s work |
-| **[WizardlyPayload / FarmHub](https://github.com/WizardlyPayload/FarmHub/releases)** *(this repo)* | **4.2.0** line — fleet map, storage, FTP/multi-server, rules engine, auto-update |
+| **[WizardlyPayload / FarmHub](https://github.com/WizardlyPayload/FarmHub/releases)** *(this repo)* | **4.2.1** classic line — fleet map, storage, FTP/multi-server, rules engine, auto-update |
 
 **Coming from 2.0.0 or Josh’s repo?** See **[docs/UPGRADE_FROM_FS25-Farm-Dashboard.md](docs/UPGRADE_FROM_FS25-Farm-Dashboard.md)** for what changed.
 
@@ -62,7 +62,7 @@ This repository (**[FarmHub](https://github.com/WizardlyPayload/FarmHub)**) is *
 
 ---
 
-## What you get in 4.2.0
+## What you get in 4.2.1
 
 - **Live dashboard** — livestock, pastures, vehicles, fields, economy, productions, weather (port **8766**).
 - **Fleet map** — live vehicle pins on the save's PDA overview map.
@@ -70,14 +70,15 @@ This repository (**[FarmHub](https://github.com/WizardlyPayload/FarmHub)**) is *
 - **Fleet scope** — dealership showroom demos no longer clutter player farms on dedicated multiplayer saves.
 - **Livestock** — base-game cow pens, food-duration hints, urgent pasture alerts.
 - **Productions** — map-owned factories on base maps; two-column layout.
-- **Accurate equipment pictures** — authoritative store-icon matching (app **4.2.0** + mod **3.4.0.6**).
+- **Accurate equipment pictures** — authoritative store-icon matching (app **4.2.1** + mod **3.4.0.7**).
+- **FS 1.21 copyFile hotfix** — stops repeated map-overview copy errors in the game log after the 1.21 update.
 - **Local + FTP** — single-player / LAN host on disk, or dedicated server over FTP.
 - **Offline field rules** — suggested next steps from merged game data (no cloud service).
 - **Optional integrations** — Precision Farming, Advanced Damage System, Moisture System, Red Tape, Realistic Livestock RM, Vehicle Years; Courseplay and Used Equipment Yards tested alongside — [full mod list](docs/GITHUB_RELEASE_v4.2.0.md#third-party-mods).
 - **27 languages**, themes, unified Settings.
 - **Auto-update** (Windows app) and **mod version badge** when the in-game mod is behind.
 
-**Release notes:** [docs/GITHUB_RELEASE_v4.2.0.md](docs/GITHUB_RELEASE_v4.2.0.md) · **History:** [docs/CHANGELOG.md](docs/CHANGELOG.md)
+**Release notes:** [docs/GITHUB_RELEASE_v4.2.1.md](docs/GITHUB_RELEASE_v4.2.1.md) · **History:** [docs/CHANGELOG.md](docs/CHANGELOG.md)
 
 ---
 

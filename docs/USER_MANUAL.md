@@ -1,12 +1,12 @@
 # FS25 Farm Dashboard — User manual (v4.1)
 
-**Farm Dashboard** is the Windows desktop app that reads live farm data from **Farming Simulator 25** (via the in-game **FS25 Farm Dashboard** mod) and renders it in your browser at **[http://localhost:8766](http://localhost:8766)**. **App version 4.2.0**, **mod version 3.4.0.6**.
+**Farm Dashboard** is the Windows desktop app that reads live farm data from **Farming Simulator 25** (via the in-game **FS25 Farm Dashboard** mod) and renders it in your browser at **[http://localhost:8766](http://localhost:8766)**. **App version 4.2.1**, **mod version 3.4.0.7** (classic public line).
 
 This manual walks every setting, every section, and every modal, with **inline screenshots** (below each section). Where we already have a similar capture, one image is reused instead of asking twice. Screenshot filenames, capture recipes, and the “still to capture” checklist are in [`SCREENSHOTS.md`](./SCREENSHOTS.md).
 
 **Companion docs:** [`INSTALL.md`](./INSTALL.md) · [`SECURITY.md`](./SECURITY.md) · [`CHANGELOG.md`](./CHANGELOG.md) · [`SCREENSHOTS.md`](./SCREENSHOTS.md)
 
-> **Screenshots not visible?** Open **Markdown Preview** (`Ctrl+Shift+V`) while this file is focused — the editor tab alone shows text, not pictures. Images are in [`screenshots/`](./screenshots/) beside this file. On GitHub they appear only after PNGs are **committed and pushed**.
+> **Screenshots not visible?** Open **Markdown Preview** (`Ctrl+Shift+V`) while this file is focused — the editor tab alone shows text, not pictures. Images are in [`doc-screenshots/`](./doc-screenshots/) beside this file. On GitHub they appear only after PNGs are **committed and pushed**.
 
 ---
 
@@ -14,7 +14,7 @@ This manual walks every setting, every section, and every modal, with **inline s
 
 1. [What you need](#1-what-you-need)
 2. [Install order (Stages A–E)](#2-install-order-stages-ae)
-3. [First-run Setup](#3-first-run-setup)
+3. [First-run Setup](#3-first-run-setup) (incl. [§3.4a join-as-client](#34a-dedicated-server--join-as-client-no-ftp))
 4. [Main screen map](#4-main-screen-map)
 5. [Settings modal — every tab and control](#5-settings-modal--every-tab-and-control)
 6. [Dashboard sections](#6-dashboard-sections)
@@ -36,7 +36,8 @@ This manual walks every setting, every section, and every modal, with **inline s
 | **FS25 Farm Dashboard mod** | **`FS25_FarmDashboard.zip`** or folder **`FS25_FarmDashboard`** in your FS25 `mods` folder |
 | **FS25 Farm Dashboard app (Windows)** | Installer `FS25-Farm-Dashboard-Setup-4.2.0.exe` |
 | **Browser** | Edge, Chrome, Firefox — opens [http://localhost:8766](http://localhost:8766) |
-| **(Optional) FTP credentials** | If FS25 runs on a dedicated / rented server you do not own locally |
+| **(Optional) Dedicated join-as-client** | Same mod on a PC that joins the dedicated server — mirrors `data.json` locally; desktop app uses **Local** mode (**no FTP**). See [§3.4a](#34a-dedicated-server--join-as-client-no-ftp) |
+| **(Optional) FTP credentials** | Advanced: headless dedicated / rented host when nobody can stay joined |
 | **(Optional) LAN network** | If you want the dashboard on a tablet or second screen |
 
 ---
@@ -50,7 +51,7 @@ Do these **in order**. Skipping a stage is the most common reason the dashboard 
 1. Copy **`FS25_FarmDashboard.zip`** into **`Documents\My Games\FarmingSimulator2025\mods\`** (recommended), **or** copy/extract so you have **`mods\FS25_FarmDashboard\`** with **`modDesc.xml`** at that folder root (same layout as the release zip from **`tools\Zip-FarmDashboardMod.ps1`**).
 2. Start FS25 once so it sees the mod.
 
-![**`FS25_FarmDashboard`** visible under FS25 **`mods\`** (folder **or** `.zip`)](screenshots/fd-install-010-mod-folder.png)
+![**`FS25_FarmDashboard`** visible under FS25 **`mods\`** (folder **or** `.zip`)](doc-screenshots/fd-install-010-mod-folder.png)
 
 *Figure: **`FS25_FarmDashboard`** visible under FS25 **`mods\`** (folder **or** `.zip`).*
 
@@ -61,7 +62,7 @@ For **every** savegame where you want the dashboard:
 1. Enable **FS25 Farm Dashboard** in the save's mod list.
 2. Load the save and enter the world (the main menu alone does not start collectors).
 
-![Mod ticked in the save's mod list](screenshots/fd-install-020-fs25-mod-enabled.png)
+![Mod ticked in the save's mod list](doc-screenshots/fd-install-020-fs25-mod-enabled.png)
 
 *Figure: Mod ticked in the save's mod list.*
 
@@ -75,7 +76,7 @@ After a minute, look in:
 
 `data.json` should be present and have a recent **modified** timestamp.
 
-![`data.json` shown in File Explorer with a fresh timestamp](screenshots/fd-install-030-datajson-explorer.png)
+![`data.json` shown in File Explorer with a fresh timestamp](doc-screenshots/fd-install-030-datajson-explorer.png)
 
 *Figure: `data.json` shown in File Explorer with a fresh timestamp.*
 
@@ -85,11 +86,11 @@ After a minute, look in:
 2. Pick installer language on the welcome page; complete the installer.
 3. Launch **Farm Dashboard** from the Start menu.
 
-![NSIS welcome page (language pick)](screenshots/fd-install-040-installer-welcome.png)
+![NSIS welcome page (language pick)](doc-screenshots/fd-install-040-installer-welcome.png)
 
 *Figure: NSIS welcome page (language pick).*
 
-![Installer "Finished" page](screenshots/fd-install-045-installer-finished.png)
+![Installer "Finished" page](doc-screenshots/fd-install-045-installer-finished.png)
 
 *Figure: Installer "Finished" page.*
 
@@ -97,7 +98,7 @@ After a minute, look in:
 
 The app starts the Express server on `127.0.0.1:8766`, opens its window, and walks you through Setup if no servers are configured (see §3). After Setup completes you land on the **dashboard home** (§4).
 
-![App window on first launch, before Setup](screenshots/fd-install-050-app-first-launch.png)
+![App window on first launch, before Setup](doc-screenshots/fd-install-050-app-first-launch.png)
 
 *Figure: App window on first launch, before Setup.*
 
@@ -114,7 +115,7 @@ The Setup page (`setup.html`) is a **left/right split**:
 
 Top-right of the Setup page. Picking a language switches the page (and persists `farmdash_locale` for the main app too).
 
-![Language dropdown highlighted](screenshots/fd-setup-010-language-corner.png)
+![Language dropdown highlighted](doc-screenshots/fd-setup-010-language-corner.png)
 
 *Figure: Language dropdown highlighted.*
 
@@ -122,7 +123,7 @@ Top-right of the Setup page. Picking a language switches the page (and persists 
 
 Each row shows the server name, source type, and a **Remove** button. The list is empty on first run.
 
-![Empty list, ready for first add](screenshots/fd-setup-020-empty-server-list.png)
+![Empty list, ready for first add](doc-screenshots/fd-setup-020-empty-server-list.png)
 
 *Figure: Empty list, ready for first add.*
 
@@ -130,26 +131,55 @@ Each row shows the server name, source type, and a **Remove** button. The list i
 
 Right-side button. Scans `Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\` and proposes one **Local** server per save it finds. Accept to add them to the list.
 
-![Auto-detect result with two saves found](screenshots/fd-setup-030-auto-detect.png)
+![Auto-detect result with two saves found](doc-screenshots/fd-setup-030-auto-detect.png)
 
 *Figure: Auto-detect result with two saves found.*
 
 ### 3.4 Add server (Local)
 
+Use **Local** for single-player / listen-host saves on this PC, **and** for dedicated servers when you use **join as client** (mirrored `data.json` on this PC — see [§3.4a](#34a-dedicated-server--join-as-client-no-ftp)).
+
 | Field | What to enter |
 | ----- | ------------- |
-| Display name | Friendly label, e.g. "PC main save" |
+| Display name | Friendly label, e.g. "PC main save" or "Dedi via client" |
 | Mode | **Local** |
 | Local path | Full path to the folder containing `data.json`, e.g. `…\modSettings\FS25_FarmDashboard\savegame1` |
-| (Optional) HTTP feed | Only when your host documents an extra XML/HTTP source |
+| (Optional) HTTP feed | Only when your host documents an extra XML/HTTP source (does **not** replace `data.json`) |
 
-![Add-server form filled in for Local](screenshots/fd-setup-040-add-local.png)
+![Add-server form filled in for Local](doc-screenshots/fd-setup-040-add-local.png)
 
 *Figure: Add-server form filled in for Local.*
 
+### 3.4a Dedicated server — join as client (no FTP)
+
+Preferred path for most dedicated / rented hosts when **someone can stay connected** as a multiplayer client. The **same mod** mirrors `data.json` from the dedicated **authority** to an opted-in joined client via MP events. The client writes a normal local file; the desktop app watches it in **Local** mode — **no FTP**.
+
+Works for the legacy app (**4.2.1** line) and **v5** (NEW APP): both use Local file watch on that folder.
+
+**Steps**
+
+1. Install **Farm Dashboard** on the **dedicated server** (mod enabled on that save).
+2. On the PC that runs the desktop app, install the **same** updated mod, then **join the server as a client** (spare/alt account or admin playing).
+3. **Opt in** to receive the mirrored export. Setup wizard / in-game labels may say *Mirror export to this client*, *Receive server export*, or similar until UI copy is final.
+4. Authority streams the export; the client writes:
+
+   ```
+   %USERPROFILE%\Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\<slot>\data.json
+   ```
+
+5. In Setup or **Settings → Servers & saves**, add **Local** (or **Auto-detect saves**) pointing at that folder.
+
+**Limits (honest)**
+
+- Needs **at least one** connected client with the mod and opt-in. Empty server (zero players) = **no mirror** until someone joins — use [FTP (§3.5)](#35-add-server-ftp) for headless-only admins.
+- Large exports may lag a few seconds behind the authority write.
+- Requires the **updated mod** with export mirror (landing with the **4.2.1** / **v5** release line) on **server and client**.
+
+Full install checklist: [`INSTALL.md` — Dedicated server](./INSTALL.md#dedicated-server-join-as-client-or-ftp).
+
 ### 3.5 Add server (FTP)
 
-For a dedicated / rented FS25 server you do **not** play on locally.
+**Advanced.** For a dedicated / rented FS25 server when **nobody** can stay joined as a client, or you prefer remote polling. FTP is **not** removed; join-as-client is an alternative, not a replacement for headless hosts.
 
 | Field | Notes |
 | ----- | ----- |
@@ -159,15 +189,15 @@ For a dedicated / rented FS25 server you do **not** play on locally.
 | User, password | FTP credentials |
 | Remote dir | The folder containing the savegame's `data.json` (often `modSettings/FS25_FarmDashboard/<savegame>/`) |
 | Save slot | Slot number / folder name when needed |
-| (Optional) HTTP feed | Only when your host documents one |
+| (Optional) HTTP feed | Giants-style XML (often port **8080**) when your host documents one — **not** a substitute for `data.json` |
 
-![Add-server form filled in for FTP (blur secrets)](screenshots/fd-setup-050-add-ftp.png)
+![Add-server form filled in for FTP (blur secrets)](doc-screenshots/fd-setup-050-add-ftp.png)
 
 *Figure: Add-server form filled in for FTP (blur secrets).*
 
 ### 3.6 FTP polling
 
-Polling settings apply to **all FTP servers** at once.
+Polling settings apply to **all FTP servers** at once. **Local** servers (including join-as-client mirrors) use file watching and ignore this block.
 
 | Control | Range | Default | Effect |
 | ------- | ----- | ------- | ------ |
@@ -175,7 +205,7 @@ Polling settings apply to **all FTP servers** at once.
 | Interval (minutes) | 1 – 25 | 5 | Time between polls per server |
 | Schedule | **Sync** / **Staggered** | Sync | Sync = all servers fire on the boundary; Staggered = offset each server by `interval / number of servers` |
 
-![FTP polling block](screenshots/fd-setup-060-ftp-polling.png)
+![FTP polling block](doc-screenshots/fd-setup-060-ftp-polling.png)
 
 *Figure: FTP polling block.*
 
@@ -183,7 +213,7 @@ Polling settings apply to **all FTP servers** at once.
 
 Right-side button. Runs a background PowerShell helper to extract vehicle thumbnails from your installed mods. Has a progress overlay and can take a long time (capped at 90 minutes).
 
-![Mod images progress overlay](screenshots/fd-setup-070-mod-images.png)
+![Mod images progress overlay](doc-screenshots/fd-setup-070-mod-images.png)
 
 *Figure: Mod images progress overlay.*
 
@@ -191,7 +221,7 @@ Right-side button. Runs a background PowerShell helper to extract vehicle thumbn
 
 Saves the config and reloads to the dashboard home.
 
-![Setup ready to launch with one server](screenshots/fd-setup-080-launch-button.png)
+![Setup ready to launch with one server](doc-screenshots/fd-setup-080-launch-button.png)
 
 *Figure: Setup ready to launch with one server.*
 
@@ -213,11 +243,11 @@ After Setup, the dashboard shell loads at [http://localhost:8766](http://localho
 | **Settings (gear)** | Opens the unified Settings modal (§5). Hidden in viewer mode. |
 | **Home** | Returns to the landing page. |
 
-![Farm Management Dashboard home — top bar, six section cards, and count badges](screenshots/fd-shell-020-landing.png)
+![Farm Management Dashboard home — top bar, six section cards, and count badges](doc-screenshots/fd-shell-020-landing.png)
 
 *Figure: **Home (landing page)** — server tabs, farm dropdown, game time, data-source and weather pills, notification bell, and settings. The six cards (Livestock, Vehicles, Fields, Economy, Pastures, Productions) show live counts. This one capture also covers `fd-shell-010-navbar`, `fd-shell-040-landing-badges`, and `fd-section-000-landing` in the manifest.*
 
-![Close-up crop of only the game time and weather pills](screenshots/fd-shell-030-game-time-weather.png)
+![Close-up crop of only the game time and weather pills](doc-screenshots/fd-shell-030-game-time-weather.png)
 
 *Figure: Close-up crop of only the game time and weather pills.*
 
@@ -231,7 +261,7 @@ Above the cards, the hero toolbar also exposes:
 | **Game time badge** | Live day / hour from the mod. |
 | **Fleet map** | Opens the live **Fleet map** section (§6.8) with a vehicle count badge. |
 
-![Import button on landing](screenshots/fd-shell-050-import-mod-images.png)
+![Import button on landing](doc-screenshots/fd-shell-050-import-mod-images.png)
 
 *Figure: Import button on landing.*
 
@@ -244,7 +274,7 @@ Open with the gear icon. The modal has a left-hand sidebar with four tabs, plus 
 - **Save** — saves the current tab's controls.
 - **Save theme** — only on Appearance; saves theme colours.
 
-![Settings modal open on the first tab](screenshots/fd-settings-010-dashboard-toggles.png)
+![Settings modal open on the first tab](doc-screenshots/fd-settings-010-dashboard-toggles.png)
 
 *Figure: Settings modal open on the first tab.*
 
@@ -262,21 +292,21 @@ Open with the gear icon. The modal has a left-hand sidebar with four tabs, plus 
 | **Field clusters** | Group several parcels into one **field card** — Auto (heuristic) or Manual (paste comma-separated ids) | `uiPreferences.fieldClusterPrefsByServer` |
 | **SimHub view** | Cluster ids, pasture ids, production keys, plus a help text — feeds the optional `simhub.html` overlay page | `uiPreferences.simHubView` |
 
-![Section toggles + version](screenshots/fd-settings-010-dashboard-toggles.png)
+![Section toggles + version](doc-screenshots/fd-settings-010-dashboard-toggles.png)
 
 *Figure: Section toggles + version.*
 
-![Field exclusions list](screenshots/fd-settings-010-dashboard-toggles.png)
+![Field exclusions list](doc-screenshots/fd-settings-010-dashboard-toggles.png)
 
 *Figure: Field exclusions list.*
 
 *(Same UI as `fd-settings-015-dashboard-exclusions.png` — shown using `fd-settings-010-dashboard-toggles.png`.)*
 
-![Field clusters block](screenshots/fd-settings-016-dashboard-clusters.png)
+![Field clusters block](doc-screenshots/fd-settings-016-dashboard-clusters.png)
 
 *Figure: Field clusters block.*
 
-![SimHub view block](screenshots/fd-settings-017-dashboard-simhub.png)
+![SimHub view block](doc-screenshots/fd-settings-017-dashboard-simhub.png)
 
 *Figure: SimHub view block.*
 
@@ -293,25 +323,25 @@ Open with the gear icon. The modal has a left-hand sidebar with four tabs, plus 
 | **Mod images scan** | Same as Setup §3.7 | — |
 | **FTP polling** | Initial delay, interval (minutes), schedule (Sync / Staggered) | `config.ftpPolling` |
 | **Server list** | Current servers; **Remove** per row | `config.servers` |
-| **Add server form** | Same fields as Setup §3.4 / §3.5 | `config.servers` |
+| **Add server form** | Same fields as Setup §3.4 / §3.5 (use **Local** for join-as-client — §3.4a; **FTP** remains Advanced) | `config.servers` |
 
-![Servers tab top-half (LAN + servers list)](screenshots/fd-settings-020-servers-list.png)
+![Servers tab top-half (LAN + servers list)](doc-screenshots/fd-settings-020-servers-list.png)
 
 *Figure: Servers tab top-half (LAN + servers list).*
 
-![LAN block close-up](screenshots/fd-lan-010-toggle-on.png)
+![LAN block close-up](doc-screenshots/fd-lan-010-toggle-on.png)
 
 *Figure: LAN block close-up.*
 
 *(Same UI as `fd-settings-021-servers-lan.png` — shown using `fd-lan-010-toggle-on.png`.)*
 
-![FTP polling block](screenshots/fd-settings-020-servers-list.png)
+![FTP polling block](doc-screenshots/fd-settings-020-servers-list.png)
 
 *Figure: FTP polling block.*
 
 *(Same UI as `fd-settings-022-servers-ftp-polling.png` — shown using `fd-settings-020-servers-list.png`.)*
 
-![Add-server form expanded](screenshots/fd-settings-023-servers-add-server.png)
+![Add-server form expanded](doc-screenshots/fd-settings-023-servers-add-server.png)
 
 *Figure: Add-server form expanded.*
 
@@ -328,7 +358,7 @@ Settings written here become `config.xml` on disk (see §9 for the file path).
 
 Additional collectors (**stock**, **baleInventory**, **redTape**) are toggled in `config.xml` (§9) — they are not yet exposed as checkboxes in this tab.
 
-![FS25 mod tab with all controls](screenshots/fd-settings-030-mod-tab.png)
+![FS25 mod tab with all controls](doc-screenshots/fd-settings-030-mod-tab.png)
 
 *Figure: FS25 mod tab with all controls.*
 
@@ -348,13 +378,13 @@ Additional collectors (**stock**, **baleInventory**, **redTape**) are toggled in
 | **Reset** | Reset the current tab to defaults | same |
 | **Save theme** (footer) | Persists colour set | same |
 
-![Language picker](screenshots/fd-settings-041-appearance-theme.png)
+![Language picker](doc-screenshots/fd-settings-041-appearance-theme.png)
 
 *Figure: Language picker.*
 
 *(Same UI as `fd-settings-040-appearance-language.png` — shown using `fd-settings-041-appearance-theme.png`.)*
 
-![Theme editor with colour pickers](screenshots/fd-settings-041-appearance-theme.png)
+![Theme editor with colour pickers](doc-screenshots/fd-settings-041-appearance-theme.png)
 
 *Figure: Theme editor with colour pickers.*
 
@@ -370,7 +400,7 @@ Every section section header has a back-to-home button. Sections live under `web
 
 Already covered in §4. The six cards are populated by `navigation.js` `updateLandingPageCounts()`. Card visibility follows the toggles in Settings → Dashboard.
 
-![Full landing with all six cards](screenshots/fd-shell-020-landing.png)
+![Full landing with all six cards](doc-screenshots/fd-shell-020-landing.png)
 
 *Figure: Full landing with all six cards.*
 
@@ -395,15 +425,15 @@ Already covered in §4. The six cards are populated by `navigation.js` `updateLa
 | **Export** | Opens the export modal (§7.2) |
 | **Row "View" button** | Opens **Animal details** modal (§7.6) |
 
-![Summary cards row](screenshots/fd-section-livestock-010-summary.png)
+![Summary cards row](doc-screenshots/fd-section-livestock-010-summary.png)
 
 *Figure: Summary cards row.*
 
-![Filter panel expanded](screenshots/fd-section-livestock-020-filters.png)
+![Filter panel expanded](doc-screenshots/fd-section-livestock-020-filters.png)
 
 *Figure: Filter panel expanded.*
 
-![Animals table](screenshots/fd-section-livestock-030-table.png)
+![Animals table](doc-screenshots/fd-section-livestock-030-table.png)
 
 *Figure: Animals table.*
 
@@ -429,19 +459,19 @@ Already covered in §4. The six cards are populated by `navigation.js` `updateLa
 | **ADS panel on a card** | When **FS25 Advanced Damage System** is installed, motorized cards can show workshop status, pre-shift inspection, damaged parts, and weakest subsystems. |
 | **Vehicle years badge** | Model year and decade label when the mod exports `vehicleYears` metadata. |
 
-![Summary cards including ADS workshop / repair counts](screenshots/fd-section-vehicles-040-ads-summary.png)
+![Summary cards including ADS workshop / repair counts](doc-screenshots/fd-section-vehicles-040-ads-summary.png)
 
 *Figure: Summary cards including ADS workshop / repair counts.*
 
-![Filters panel](screenshots/fd-section-vehicles-020-filters.png)
+![Filters panel](doc-screenshots/fd-section-vehicles-020-filters.png)
 
 *Figure: Filters panel.*
 
-![Vehicle grid](screenshots/fd-section-vehicles-030-grid.png)
+![Vehicle grid](doc-screenshots/fd-section-vehicles-030-grid.png)
 
 *Figure: Vehicle grid.*
 
-![Advanced Damage breakdown panel on a vehicle card](screenshots/fd-section-vehicles-050-ads-breakdown.png)
+![Advanced Damage breakdown panel on a vehicle card](doc-screenshots/fd-section-vehicles-050-ads-breakdown.png)
 
 *Figure: Advanced Damage breakdown panel on a vehicle card.*
 
@@ -474,37 +504,37 @@ The most feature-rich section.
 | **Waiting state** | Rendered when no merge data has arrived yet |
 | **API error strip** | Rendered when the fetch fails. Background polling auto-retries every 5 seconds (no explicit retry button) |
 
-![Summary row](screenshots/fd-section-fields-010-summary.png)
+![Summary row](doc-screenshots/fd-section-fields-010-summary.png)
 
 *Figure: Summary row.*
 
-![Filter buttons + search](screenshots/fd-section-fields-010-summary.png)
+![Filter buttons + search](doc-screenshots/fd-section-fields-010-summary.png)
 
 *Figure: Filter buttons + search.*
 
 *(Same UI as `fd-section-fields-020-filter-bar.png` — shown using `fd-section-fields-010-summary.png`.)*
 
-![One field card with the rules suggestion](screenshots/fd-section-fields-030-card-rules.png)
+![One field card with the rules suggestion](doc-screenshots/fd-section-fields-030-card-rules.png)
 
 *Figure: One field card with the rules suggestion.*
 
-![Field card with moisture, weeds, and rules suggestion](screenshots/fd-section-fields-045-moisture-weeds.png)
+![Field card with moisture, weeds, and rules suggestion](doc-screenshots/fd-section-fields-045-moisture-weeds.png)
 
 *Figure: Field card with moisture, weeds, and rules suggestion.*
 
-![Field card — grass windrow with tedder / bale suggestion](screenshots/fd-section-fields-047-grass-windrow.png)
+![Field card — grass windrow with tedder / bale suggestion](doc-screenshots/fd-section-fields-047-grass-windrow.png)
 
 *Figure: Field card — grass windrow with tedder / bale suggestion.*
 
-![Field card with N + pH mini-bars](screenshots/fd-section-fields-050-card-soil.png)
+![Field card with N + pH mini-bars](doc-screenshots/fd-section-fields-050-card-soil.png)
 
 *Figure: Field card with N + pH mini-bars.*
 
-![Field card — monitor toward harvest (no soil job flagged)](screenshots/fd-section-fields-046-monitor-harvest.png)
+![Field card — monitor toward harvest (no soil job flagged)](doc-screenshots/fd-section-fields-046-monitor-harvest.png)
 
 *Figure: Field card — monitor toward harvest (no soil job flagged).*
 
-![Tools & shop block](screenshots/fd-section-fields-060-tools-shop.png)
+![Tools & shop block](doc-screenshots/fd-section-fields-060-tools-shop.png)
 
 *Figure: Tools & shop block.*
 
@@ -538,11 +568,11 @@ The Economy section has up to four tabs: **Market prices**, **Equipment purchase
 | **Bale stock** | Two cards: **Loose on cropland** (inside registered field polygons) vs **Storage** (yards, sheds, AUTO BALE STORAGE buildings, and other off-field farmland). Breakdown by straw / grass / hay / silage / other. |
 | **Pallets & big bags** | Pallets, IBCs, and big bags grouped by product |
 
-![Storage tab — silo stock and bale inventory](screenshots/fd-section-economy-040-storage-tab.png)
+![Storage tab — silo stock and bale inventory](doc-screenshots/fd-section-economy-040-storage-tab.png)
 
 *Figure: Storage tab — silo stock and bale inventory.*
 
-![Bale storage breakdown by fill type](screenshots/fd-section-economy-041-bale-storage-breakdown.png)
+![Bale storage breakdown by fill type](doc-screenshots/fd-section-economy-041-bale-storage-breakdown.png)
 
 *Figure: Bale storage breakdown by fill type.*
 
@@ -559,23 +589,23 @@ When the save runs **Red Tape** and the mod collector is enabled, Economy gains 
 | **Grants** | Open grant applications |
 | **Recent events** | Point awards and evaluation log |
 
-![Compliance overview — policies and tier](screenshots/fd-section-redtape-010-compliance.png)
+![Compliance overview — policies and tier](doc-screenshots/fd-section-redtape-010-compliance.png)
 
 *Figure: Compliance overview — policies and tier.*
 
-![Recent compliance events log](screenshots/fd-section-redtape-020-events.png)
+![Recent compliance events log](doc-screenshots/fd-section-redtape-020-events.png)
 
 *Figure: Recent compliance events log.*
 
-![Summary row](screenshots/fd-section-economy-010-summary.png)
+![Summary row](doc-screenshots/fd-section-economy-010-summary.png)
 
 *Figure: Summary row.*
 
-![Purchases tab with filters and sort](screenshots/fd-section-economy-020-purchases.png)
+![Purchases tab with filters and sort](doc-screenshots/fd-section-economy-020-purchases.png)
 
 *Figure: Purchases tab with filters and sort.*
 
-![Market tab (or placeholder)](screenshots/fd-section-economy-030-market.png)
+![Market tab (or placeholder)](doc-screenshots/fd-section-economy-030-market.png)
 
 *Figure: Market tab (or placeholder).*
 
@@ -591,11 +621,11 @@ When the save runs **Red Tape** and the mod collector is enabled, Economy gains 
 | **Pasture cards** | Click to open per-pasture details modal (§7.7) |
 | **Warning badges** | Click to open warning details modal (§7.5) |
 
-![Summary row](screenshots/fd-section-pastures-010-summary.png)
+![Summary row](doc-screenshots/fd-section-pastures-010-summary.png)
 
 *Figure: Summary row.*
 
-![Pasture cards grid](screenshots/fd-section-pastures-020-cards.png)
+![Pasture cards grid](doc-screenshots/fd-section-pastures-020-cards.png)
 
 *Figure: Pasture cards grid.*
 
@@ -609,11 +639,11 @@ When the save runs **Red Tape** and the mod collector is enabled, Economy gains 
 
 Productions has no user filters; it is read-only.
 
-![Productions — two chain cards per row](screenshots/fd-section-productions-010-list.png)
+![Productions — two chain cards per row](doc-screenshots/fd-section-productions-010-list.png)
 
 *Figure: Productions — two chain cards per row (Biogas Plant and Cement Factory on Riverbend Springs).*
 
-![Empty productions state](screenshots/fd-section-productions-020-empty.png)
+![Empty productions state](doc-screenshots/fd-section-productions-020-empty.png)
 
 *Figure: Empty productions state when the mod has not exported chains for this farm.*
 
@@ -636,13 +666,13 @@ The app clips decorative borders from desk-style overview images (common on mod 
 
 > **Known limitation:** on **4 km** maps the engine still uses ±1024 m PDA coordinates; vehicles beyond that range may appear shifted. See [README](../FS25_FarmDashboard_App/README.md) fleet-map notes.
 
-![Fleet map with vehicle pins on the playable map area](screenshots/fd-section-fleet-map-010-overview.png)
+![Fleet map with vehicle pins on the playable map area](doc-screenshots/fd-section-fleet-map-010-overview.png)
 
 *Figure: Fleet map with vehicle pins on the playable map area.*
 
 For comparison, the in-game PDA uses the same overview asset:
 
-![In-game PDA map (reference — not the dashboard UI)](screenshots/fd-reference-pda-map.png)
+![In-game PDA map (reference — not the dashboard UI)](doc-screenshots/fd-reference-pda-map.png)
 
 *Figure: In-game PDA map (reference — not the dashboard UI).*
 
@@ -654,7 +684,7 @@ For comparison, the in-game PDA uses the same overview asset:
 
 Bell → opens the modal. Lists up to 10 most recent notifications with a **Clear all** button.
 
-![Notification history modal](screenshots/fd-modal-010-notifications.png)
+![Notification history modal](doc-screenshots/fd-modal-010-notifications.png)
 
 *Figure: Notification history modal.*
 
@@ -662,7 +692,7 @@ Bell → opens the modal. Lists up to 10 most recent notifications with a **Clea
 
 Livestock section → **Export**. Format options + download.
 
-![Export modal](screenshots/fd-section-livestock-020-filters.png)
+![Export modal](doc-screenshots/fd-section-livestock-020-filters.png)
 
 *Figure: Export modal.*
 
@@ -684,13 +714,13 @@ Opened from a warning badge (e.g. on a pasture). Resolve the underlying issue in
 
 Opened from a row on the Livestock table (individual animals with a real ID).
 
-![Animal details modal](screenshots/fd-modal-060-animal-details.png)
+![Animal details modal](doc-screenshots/fd-modal-060-animal-details.png)
 
 *Figure: Animal details modal.*
 
 **Cluster / LOD rows** on base-game pens open **Pen detail** instead of the full animal sheet — one modal with every head in the pen:
 
-![Pen detail modal](screenshots/fd-modal-065-pen-detail.png)
+![Pen detail modal](doc-screenshots/fd-modal-065-pen-detail.png)
 
 *Figure: Pen detail modal — all animals in pen #132.*
 
@@ -698,13 +728,13 @@ Opened from a row on the Livestock table (individual animals with a real ID).
 
 Opened from pasture cards or **View all livestock**.
 
-![Pasture livestock modal](screenshots/fd-modal-070-pasture-livestock.png)
+![Pasture livestock modal](doc-screenshots/fd-modal-070-pasture-livestock.png)
 
 *Figure: Pasture livestock modal.*
 
 **Details** on a pasture card opens **Pen information** (3D preview and capacity):
 
-![Pen information modal](screenshots/fd-modal-071-pen-information.png)
+![Pen information modal](doc-screenshots/fd-modal-071-pen-information.png)
 
 *Figure: Pen information modal — Cow Shed (44/50).*
 
@@ -712,7 +742,7 @@ Opened from pasture cards or **View all livestock**.
 
 Opened by clicking a vehicle image.
 
-![Vehicle image modal](screenshots/fd-modal-080-vehicle-image.png)
+![Vehicle image modal](doc-screenshots/fd-modal-080-vehicle-image.png)
 
 *Figure: Vehicle image modal.*
 
@@ -720,7 +750,7 @@ Opened by clicking a vehicle image.
 
 Opened by clicking the navbar weather pill.
 
-![Weather forecast modal](screenshots/fd-modal-090-weather.png)
+![Weather forecast modal](doc-screenshots/fd-modal-090-weather.png)
 
 *Figure: Weather forecast modal.*
 
@@ -728,7 +758,7 @@ Opened by clicking the navbar weather pill.
 
 Shown while the mod-image scan is running.
 
-![Mod export progress modal](screenshots/fd-modal-100-mod-export.png)
+![Mod export progress modal](doc-screenshots/fd-modal-100-mod-export.png)
 
 *Figure: Mod export progress modal.*
 
@@ -750,7 +780,7 @@ The dashboard can serve a tablet on your LAN. Always set both **a username and a
 6. On the tablet, open `http://<PC-LAN-IP>:8766`. The browser prompts for the credentials you set.
 7. (Optional) append `?viewer=1` for read-only viewer mode on the tablet (hides the gear and any destructive buttons).
 
-![LAN access toggle on with credentials](screenshots/fd-lan-010-toggle-on.png)
+![LAN access toggle on with credentials](doc-screenshots/fd-lan-010-toggle-on.png)
 
 *Figure: LAN access toggle on with credentials.*
 
@@ -789,15 +819,15 @@ Settings → **FS25 mod** edits this file directly (see §5.3). The file looks l
 | `modules.baleInventory` | bool | World bale scan + AUTO BALE STORAGE / object-storage sheds (separate from `stock`) |
 | `modules.redTape` | bool | Compliance export when Red Tape mod is present |
 
-![`config.xml` in File Explorer](screenshots/fd-mod-010-config-xml-explorer.png)
+![`config.xml` in File Explorer](doc-screenshots/fd-mod-010-config-xml-explorer.png)
 
 *Figure: `config.xml` in File Explorer.*
 
-![`config.xml` open in a text editor](screenshots/fd-mod-020-config-xml-editor.png)
+![`config.xml` open in a text editor](doc-screenshots/fd-mod-020-config-xml-editor.png)
 
 *Figure: `config.xml` open in a text editor.*
 
-The mod has **no in-game console command** and **no Giants settings menu entry**; the file above is the only configuration surface.
+The mod has **no in-game console command** and **no Giants settings menu entry** for collectors; `config.xml` above is the collector surface. **Export mirror / join-as-client opt-in** (dedicated → joined client) is a separate in-game or mod-settings control — see [§3.4a](#34a-dedicated-server--join-as-client-no-ftp). Setup wizard labels may still be finalising (*Mirror export*, *Receive server export*, etc.).
 
 ---
 
@@ -805,9 +835,10 @@ The mod has **no in-game console command** and **no Giants settings menu entry**
 
 | Symptom | What to check |
 | ------- | ------------- |
-| **Blank dashboard / "waiting for field data"** | Stage B — mod enabled and save **loaded into the world**, not just the main menu. Stage C — `data.json` exists and the **modified** time is moving. Settings → Servers & saves — path or FTP credentials match the file you confirmed. |
+| **Blank dashboard / "waiting for field data"** | Stage B — mod enabled and save **loaded into the world**, not just the main menu. Stage C — `data.json` exists and the **modified** time is moving. Settings → Servers & saves — **Local** path (SP or join-as-client) or FTP credentials match the file you confirmed. |
 | **API error strip** ("retrying every 5 s") | Background polling re-arms automatically. If it persists, confirm the path is correct or the FTP credentials are valid. There is no manual retry button (audit gap #3). |
 | **Wrong farm shown** | Top-bar farm dropdown picks the active farm. Settings → Dashboard exclusions might also be hiding fields you expected. |
+| **Join-as-client: no / stale local `data.json`** | Client still connected with the **same updated mod**? Mirror **opt-in** enabled? Empty dedicated (zero players) does not mirror — join someone or use FTP. Large exports can lag a few seconds. |
 | **FTP not ticking** | Settings → Servers & saves: interval must be 1 – 25 minutes. Sync vs Staggered does **not** disable polling. |
 | **Notifications empty after upgrade** | History is capped at 10 and stored in browser `localStorage`; reinstalling the desktop app does not clear the bell, but clearing browser data will. |
 | **Language picker did not change everything** | The page reloads on language change — wait for the reload. If a string still falls back to English, the key is missing for that language; see [`I18N.md`](./I18N.md). |
@@ -828,6 +859,6 @@ The mod has **no in-game console command** and **no Giants settings menu entry**
 
 ## 11. Screenshot index
 
-The full list of filenames, captions, and capture recipes (auto vs manual) lives in [`SCREENSHOTS.md`](./SCREENSHOTS.md). All images sit under [`docs/screenshots/`](./screenshots/).
+The full list of filenames, captions, and capture recipes (auto vs manual) lives in [`SCREENSHOTS.md`](./SCREENSHOTS.md). All images sit under [`docs/doc-screenshots/`](./doc-screenshots/).
 
 **Document version:** aligned with app **4.2.0** and mod **3.4.0.6**. **Authors:** [`AUTHORS.md`](./AUTHORS.md).

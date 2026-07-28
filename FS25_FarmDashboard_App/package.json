@@ -1,13 +1,13 @@
 {
   "name": "fs25-farm-dashboard",
-  "version": "4.2.0",
+  "version": "4.2.1",
   "license": "SEE LICENSE IN LICENSE",
   "description": "Real-time Farm Management Dashboard for FS25",
   "author": "JoshWalki / Wizardlypayload & WizardlyPayload",
   "main": "main.js",
   "scripts": {
     "test": "jest",
-    "test:mjs": "node --test tests/baleInventory.test.mjs tests/rules-engine-roll-weed.test.mjs tests/vehicleAds.breakdown.test.mjs tests/fieldGrassMown.test.mjs tests/vehicleStoreImage.test.mjs tests/vehicleFarmScope.test.mjs tests/storageEconomy.test.mjs tests/navbarConnectionBadge.test.mjs tests/livestock.fmtAge.test.mjs",
+    "test:mjs": "node --test tests/*.test.mjs",
     "test:all": "npm test && npm run test:mjs",
     "parity": "node ../tools/app/parity.js",
     "export-fields-csv": "node ../tools/app/export-fields-to-csv.mjs",
@@ -17,11 +17,15 @@
     "clean:build-out:search": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File ../tools/app/remove-build-output-folders.ps1 -StopWindowsSearch",
     "start": "electron .",
     "start:dev": "node ../tools/app/start-dev-electron.mjs",
+    "start:dev:sync": "node ../tools/app/start-dev-electron.mjs --sync-config",
+    "start:new-ui": "node ../tools/app/start-dev-electron.mjs --sync-config",
     "pack": "node ../tools/app/run-electron-builder.mjs pack",
+    "pack:rf": "node ../tools/app/run-electron-builder.mjs pack --rf",
     "pack:in-repo": "electron-builder --dir",
     "pack:fresh": "node ../tools/app/electron-builder-fresh-output.mjs pack",
     "pack:alt": "electron-builder --dir --config.directories.output=electron-pack-out-alt",
     "dist": "node ../tools/app/run-electron-builder.mjs dist",
+    "dist:rf": "node ../tools/app/run-electron-builder.mjs dist --rf",
     "dist:in-repo": "electron-builder --win",
     "dist:fresh": "node ../tools/app/electron-builder-fresh-output.mjs dist",
     "dist:alt": "electron-builder --win --config.directories.output=electron-pack-out-alt",
@@ -34,7 +38,10 @@
     "i18n:sync": "node web/locales/sync-keys-from-en.mjs",
     "i18n:refresh": "node web/locales/sync-keys-from-en.mjs && node web/locales/mt-fill.mjs && node web/locales/build-translations.mjs && node web/locales/verify-i18n.mjs",
     "i18n:ads": "node ../tools/app/extract-ads-i18n.mjs",
-    "verify:electron-pack": "node ../tools/app/verify-electron-pack-files.mjs"
+    "verify:electron-pack": "node ../tools/app/verify-electron-pack-files.mjs",
+    "copy:ui-v2": "node ../tools/app/copy-ui-v2.mjs",
+    "prepack": "node ../tools/app/copy-ui-v2.mjs",
+    "predist": "node ../tools/app/copy-ui-v2.mjs"
   },
   "build": {
     "appId": "com.farmdashboard.app",
@@ -68,6 +75,7 @@
       "setup.html",
       "icon.ico",
       "web/**/*",
+      "ui-v2/**/*",
       "node_modules/**/*"
     ],
     "extraResources": [

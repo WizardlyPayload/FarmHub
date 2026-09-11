@@ -1,5 +1,9 @@
 // FS25 FarmDashboard | tests/mapOverviewResolver.test.js
 
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
 const {
   normalizeMapSlug,
   scoreOverviewPath,
@@ -8,6 +12,8 @@ const {
   pathMatchesMapIdentity,
   scoreZipArchiveName,
   findOverviewSourceFile,
+  resolveMapOverviewImage,
+  findOverviewInModSettingsExport,
 } = require('../mapOverviewResolver');
 
 describe('mapOverviewResolver', () => {
@@ -72,5 +78,163 @@ describe('mapOverviewResolver', () => {
     expect(paths.some((p) => p.replace(/\\/g, '/').includes('map/textures/ui/overview.dds'))).toBe(
       true
     );
+  });
+
+  test('mapIdTailSlug extracts the map id from dotted pdlc/mod ids', () => {
+    const { mapIdTailSlug } = require('../mapOverviewResolver');
+    expect(mapIdTailSlug('pdlc_highlandsFishingPack.mapKinlaig')).toBe('mapkinlaig');
+    expect(mapIdTailSlug('FS25_SomeMap.someMap01')).toBe('somemap01');
+    expect(mapIdTailSlug('MapUS')).toBe('');
+    expect(mapIdTailSlug('')).toBe('');
+  });
+
+  test('resolveDlcPackagesForMap recognises every known Kinlaig id/title shape', () => {
+    const { resolveDlcPackagesForMap } = require('../mapOverviewResolver');
+    expect(resolveDlcPackagesForMap('mapKinlaig', '')).toEqual(['highlandsFishingPack']);
+    expect(resolveDlcPackagesForMap('', 'Kinlaig')).toEqual(['highlandsFishingPack']);
+    expect(resolveDlcPackagesForMap('pdlc_highlandsFishingPack.mapKinlaig', '')).toEqual([
+      'highlandsFishingPack',
+    ]);
+    expect(resolveDlcPackagesForMap('', 'Highlands Fishing')).toEqual(['highlandsFishingPack']);
+  });
+
+  test('resolveDlcPackagesForMap does not flag ordinary mod maps as DLC', () => {
+    const { resolveDlcPackagesForMap } = require('../mapOverviewResolver');
+    expect(resolveDlcPackagesForMap('MapUS', 'Riverbend Springs')).toEqual([]);
+    expect(resolveDlcPackagesForMap('mapWitcombeValley', 'Witcombe Valley')).toEqual([]);
+    expect(resolveDlcPackagesForMap('FS25_LakesideFishing.map01', 'Lakeside Fishing Village')).toEqual([]);
+  });
+});
+
+describe('mapOverviewResolver DLC hint + modSettings export', () => {
+  let tmpRoot;
+  let savedEnv;
+  const KINLAIG_MAP_ID = 'pdlc_highlandsFishingPack.mapKinlaig';
+
+  const modSettingsMapOverviewDir = () =>
+    path.join(
+      tmpRoot,
+      'Documents',
+      'My Games',
+      'FarmingSimulator2025',
+      'modSettings',
+      'FS25_FarmDashboard',
+      'mapOverview'
+    );
+
+  beforeAll(() => {
+    savedEnv = {
+      USERPROFILE: process.env.USERPROFILE,
+      APPDATA: process.env.APPDATA,
+      FS25_GAME_PATH: process.env.FS25_GAME_PATH,
+      FARMING_SIMULATOR_2025_PATH: process.env.FARMING_SIMULATOR_2025_PATH,
+    };
+    tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'farmdash-overview-test-'));
+    process.env.USERPROFILE = tmpRoot;
+    process.env.APPDATA = path.join(tmpRoot, 'AppData', 'Roaming');
+    delete process.env.FS25_GAME_PATH;
+    delete process.env.FARMING_SIMULATOR_2025_PATH;
+  });
+
+  afterAll(() => {
+    for (const [k, v] of Object.entries(savedEnv)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  test('missing overview on Kinlaig (dotted pdlc mapId, no title) reports the DLC hint', async () => {
+    const result = await resolveMapOverviewImage({
+      mapId: KINLAIG_MAP_ID,
+      mapTitle: '',
+      modsRoots: [path.join(tmpRoot, 'no-such-mods')],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.hintKind).toBe('dlc');
+    expect(result.dlcPackages).toEqual(['highlandsFishingPack']);
+  });
+
+  test('missing overview on a mod map still reports the mods-zip hint', async () => {
+    const result = await resolveMapOverviewImage({
+      mapId: 'mapWitcombeValley',
+      mapTitle: 'Witcombe Valley',
+      modsRoots: [path.join(tmpRoot, 'no-such-mods')],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.hintKind).toBe('mod');
+  });
+
+  test('unexpected resolver failure on a DLC map keeps hintKind dlc (never mods-zip hint)', async () => {
+    // The mod exported an overview.dds, but this machine has no DDS converter → the
+    // conversion throws. The catch path must still identify the map as DLC.
+    const exportDir = path.join(modSettingsMapOverviewDir(), KINLAIG_MAP_ID);
+    fs.mkdirSync(exportDir, { recursive: true });
+    fs.writeFileSync(path.join(exportDir, 'overview.dds'), Buffer.from('not-a-real-dds'));
+    try {
+      const result = await resolveMapOverviewImage({
+        mapId: KINLAIG_MAP_ID,
+        mapTitle: 'Kinlaig',
+        modsRoots: [],
+      });
+      expect(result.ok).toBe(false);
+      expect(result.hintKind).toBe('dlc');
+    } finally {
+      fs.rmSync(exportDir, { recursive: true, force: true });
+    }
+  });
+
+  test('findOverviewInModSettingsExport matches the exact exported mapId folder', async () => {
+    const exportDir = path.join(modSettingsMapOverviewDir(), KINLAIG_MAP_ID);
+    fs.mkdirSync(exportDir, { recursive: true });
+    const overviewPath = path.join(exportDir, 'overview.png');
+    fs.writeFileSync(overviewPath, Buffer.from('png-bytes'));
+    try {
+      const hit = await findOverviewInModSettingsExport(KINLAIG_MAP_ID, 'Kinlaig', '');
+      expect(hit).toBe(overviewPath);
+    } finally {
+      fs.rmSync(exportDir, { recursive: true, force: true });
+    }
+  });
+
+  test('findOverviewInModSettingsExport matches a tail-slug folder for dotted mapIds', async () => {
+    const exportDir = path.join(modSettingsMapOverviewDir(), 'mapKinlaig');
+    fs.mkdirSync(exportDir, { recursive: true });
+    const overviewPath = path.join(exportDir, 'overview.png');
+    fs.writeFileSync(overviewPath, Buffer.from('png-bytes'));
+    try {
+      const hit = await findOverviewInModSettingsExport(KINLAIG_MAP_ID, '', '');
+      expect(hit).toBe(overviewPath);
+    } finally {
+      fs.rmSync(exportDir, { recursive: true, force: true });
+    }
+  });
+
+  test('mod-exported overview.png resolves end-to-end without touching .dlc archives', async () => {
+    const exportDir = path.join(modSettingsMapOverviewDir(), KINLAIG_MAP_ID);
+    fs.mkdirSync(exportDir, { recursive: true });
+    // Tiny valid 1x1 PNG so the copy path succeeds (terrain analysis degrades gracefully
+    // without ImageMagick and keeps the full-bleed inset).
+    const png1x1 = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+      'base64'
+    );
+    fs.writeFileSync(path.join(exportDir, 'overview.png'), png1x1);
+    fs.writeFileSync(
+      path.join(exportDir, 'meta.json'),
+      JSON.stringify({ mapId: KINLAIG_MAP_ID, mapTitle: 'Kinlaig' })
+    );
+    try {
+      const result = await resolveMapOverviewImage({
+        mapId: KINLAIG_MAP_ID,
+        mapTitle: 'Kinlaig',
+        modsRoots: [],
+      });
+      expect(result.ok).toBe(true);
+      expect(String(result.url || '')).toMatch(/^\/map-overview-cache\/.+\.png$/);
+      expect(String(result.sourcePath).toLowerCase()).toContain('modsettings');
+    } finally {
+      fs.rmSync(exportDir, { recursive: true, force: true });
+    }
   });
 });

@@ -11,5 +11,6 @@ if (files.length === 0) {
     console.error('No tests/*.test.mjs files found');
     process.exit(1);
 }
-const result = spawnSync(process.execPath, ['--test', ...files], { stdio: 'inherit' });
+const args = ['--experimental-strip-types', '--test', ...files];
+const result = spawnSync(process.execPath, args, { stdio: 'inherit' });
 process.exit(result.status == null ? 1 : result.status);

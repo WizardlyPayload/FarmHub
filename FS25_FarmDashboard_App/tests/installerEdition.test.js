@@ -42,4 +42,11 @@ describe('installer / uninstall edition ownership', () => {
         expect(magick).toMatch(/install-imagemagick\.ps1/);
         expect(magick).toMatch(/\$R0 == "1223"/);
     });
+
+    test('V5 registration still runs when EstimatedSize is missing', () => {
+        const block = nsh.split('!macro customInstall')[1].split('!macroend')[0];
+        expect(block).toMatch(/ReadRegDWORD \$R5 SHELL_CONTEXT "\$\{UNINSTALL_REGISTRY_KEY\}" "EstimatedSize"/);
+        expect(block).toMatch(/StrCpy \$R5 "0"/);
+        expect(block).toMatch(/-EstimatedSizeKB \$R5/);
+    });
 });

@@ -103,7 +103,7 @@ describe('last-good filesystem commit', () => {
 
 describe('provenance and freshness regressions',()=>{
     const detail=productionFunctions('FS25_FarmDashboard_App/detailAnimalsHydrate.js',
-        ['countCapturedHeads','hasUniqueIndividuals','husbandryAggregateHeadCount','shouldSkipIncompleteDetail','applyDetailBlockToHusbandry','makeCacheEntry'],
+        ['countCapturedHeads','hasUniqueIndividuals','husbandryAggregateHeadCount','shouldSkipIncompleteDetail','applyDetailBlockToHusbandry','makeCacheEntry','rememberDetailEntry'],
         {UNIQUE_CAPTURE_RATIO:.8});
     test('authoritative zero excludes retained detail',()=>{
         const result=detail.applyDetailBlockToHusbandry({id:7,animalCount:0,numOfAnimalsReported:0,clusters:[]},{ownerFarmId:1,animals:[{uniqueId:'old'}]});
@@ -112,9 +112,33 @@ describe('provenance and freshness regressions',()=>{
     test('missing count is not treated as zero',()=>{
         const result=detail.applyDetailBlockToHusbandry({id:7},{ownerFarmId:1,animals:[{uniqueId:'current'}]});
         expect(result.husbandry.animals).toHaveLength(1);
+        expect(result.husbandry.animalCount).toBe(1);
+        expect(result.husbandry.numOfAnimalsReported).toBe(1);
+    });
+    test('null numOfAnimalsReported is not coerced to an empty pen',()=>{
+        const result=detail.applyDetailBlockToHusbandry(
+            {id:7,animalCount:5,numOfAnimalsReported:null},
+            {ownerFarmId:1,animals:[{uniqueId:'a'},{uniqueId:'b'},{uniqueId:'c'},{uniqueId:'d'},{uniqueId:'e'}]}
+        );
+        expect(result.hydrated).toBe(true);
+        expect(result.husbandry.animals).toHaveLength(5);
+        expect(result.husbandry.animalCount).toBe(5);
+        expect(result.husbandry.numOfAnimalsReported).toBe(5);
     });
     test('detail generation survives caching',()=>{
         expect(detail.makeCacheEntry({mtimeMs:1,size:2},{placeableId:7,generatedAt:123},[]).generatedAt).toBe(123);
+    });
+    test('rememberDetailEntry keeps the longer unique-id list when timestamps match',()=>{
+        const map=new Map();
+        const long={placeableId:7,ownerFarmId:1,animals:[{uniqueId:'a'},{uniqueId:'b'},{uniqueId:'c'}]};
+        const short={placeableId:7,ownerFarmId:1,animals:[{uniqueId:'a'}]};
+        detail.rememberDetailEntry(map,long);
+        detail.rememberDetailEntry(map,short);
+        expect(map.get('7|1').animals).toHaveLength(3);
+        const reversed=new Map();
+        detail.rememberDetailEntry(reversed,short);
+        detail.rememberDetailEntry(reversed,long);
+        expect(reversed.get('7|1').animals).toHaveLength(3);
     });
     test('individual XML identity changes below maximum mtime',async()=>{
         let changed=1000;

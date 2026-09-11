@@ -349,10 +349,8 @@ async function findOverviewInModSettingsExport(mapId, mapTitle, mapSlug) {
     if (!(await pathExists(base))) continue;
 
     for (const key of keys) {
-      for (const name of ['overview.dds', 'overview.png']) {
-        const candidate = path.join(base, key, name);
-        if (await pathExists(candidate)) return candidate;
-      }
+      const hit = await findModSettingsOverviewFile(path.join(base, key));
+      if (hit) return hit;
     }
 
     let entries;
@@ -366,26 +364,24 @@ async function findOverviewInModSettingsExport(mapId, mapTitle, mapSlug) {
       if (!ent.isDirectory()) continue;
       const dir = path.join(base, ent.name);
       const entNameMatches = keysLower.has(ent.name.toLowerCase());
-      for (const name of ['overview.dds', 'overview.png']) {
-        const candidate = path.join(dir, name);
-        if (!(await pathExists(candidate))) continue;
-        const metaPath = path.join(dir, 'meta.json');
-        try {
-          const meta = JSON.parse(await fs.promises.readFile(metaPath, 'utf8'));
-          const metaTitle = String(meta.mapTitle || '').toLowerCase();
-          const metaId = String(meta.mapId || '').toLowerCase();
-          const wantTitle = String(mapTitle || '').toLowerCase();
-          const wantId = String(mapId || '').toLowerCase();
-          if (
-            (wantId && metaId === wantId) ||
-            (wantTitle && metaTitle && metaTitle === wantTitle) ||
-            entNameMatches
-          ) {
-            return candidate;
-          }
-        } catch {
-          if (entNameMatches) return candidate;
+      const candidate = await findModSettingsOverviewFile(dir);
+      if (!candidate) continue;
+      const metaPath = path.join(dir, 'meta.json');
+      try {
+        const meta = JSON.parse(await fs.promises.readFile(metaPath, 'utf8'));
+        const metaTitle = String(meta.mapTitle || '').toLowerCase();
+        const metaId = String(meta.mapId || '').toLowerCase();
+        const wantTitle = String(mapTitle || '').toLowerCase();
+        const wantId = String(mapId || '').toLowerCase();
+        if (
+          (wantId && metaId === wantId) ||
+          (wantTitle && metaTitle && metaTitle === wantTitle) ||
+          entNameMatches
+        ) {
+          return candidate;
         }
+      } catch {
+        if (entNameMatches) return candidate;
       }
     }
   }
@@ -429,6 +425,22 @@ async function pathExists(p) {
   } catch {
     return false;
   }
+}
+
+async function resolveExistingPath(candidate) {
+  if (!(await pathExists(candidate))) return null;
+  try {
+    return await fs.promises.realpath(candidate);
+  } catch {
+    return candidate;
+  }
+}
+
+/** Prefer PNG so a leftover DDS does not force a converter on an already-exported overview. */
+async function findModSettingsOverviewFile(dir) {
+  const png = await resolveExistingPath(path.join(dir, 'overview.png'));
+  if (png) return png;
+  return resolveExistingPath(path.join(dir, 'overview.dds'));
 }
 
 async function findFirstExisting(paths) {
@@ -839,14 +851,26 @@ async function resolveTexconvExe() {
 }
 
 function spawnAsync(file, args, opts = {}) {
+  const { timeoutMs = 12000, ...spawnOpts } = opts;
   return new Promise((resolve, reject) => {
-    const child = spawn(file, args, { windowsHide: true, ...opts });
+    const child = spawn(file, args, { windowsHide: true, ...spawnOpts });
     let err = '';
+    let settled = false;
+    const finish = (fn) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn();
+    };
+    const timer = setTimeout(() => {
+      try { child.kill(); } catch { /* ignore */ }
+      finish(() => reject(new Error(`${path.basename(file)} timed out`)));
+    }, timeoutMs);
     child.stderr?.on('data', (d) => { err += d.toString(); });
-    child.on('error', reject);
+    child.on('error', (e) => finish(() => reject(e)));
     child.on('close', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(err || `${path.basename(file)} exited ${code}`));
+      if (code === 0) finish(resolve);
+      else finish(() => reject(new Error(err || `${path.basename(file)} exited ${code}`)));
     });
   });
 }

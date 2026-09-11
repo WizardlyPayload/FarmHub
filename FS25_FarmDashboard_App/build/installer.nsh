@@ -213,7 +213,12 @@ FunctionEnd
 !macro customInstall
   !if "${APP_ID}" == "com.farmdashboard.rf"
     DetailPrint "Registering V5 with Windows Installed apps..."
+    ClearErrors
     ReadRegDWORD $R5 SHELL_CONTEXT "${UNINSTALL_REGISTRY_KEY}" "EstimatedSize"
+    IfErrors 0 +2
+      StrCpy $R5 "0"
+    StrCmp $R5 "" 0 +2
+      StrCpy $R5 "0"
     nsExec::ExecToLog 'powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$INSTDIR\resources\windows-install-state.ps1" -Action Register -InstallDirectory "$INSTDIR" -Scope "$installMode" -Version "${VERSION}" -EstimatedSizeKB $R5'
     Pop $R0
     ${If} $R0 != "0"

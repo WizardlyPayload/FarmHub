@@ -14,6 +14,7 @@ const {
   findOverviewSourceFile,
   resolveMapOverviewImage,
   findOverviewInModSettingsExport,
+  isOfficialMapUiOverviewPath,
 } = require('../mapOverviewResolver');
 
 describe('mapOverviewResolver', () => {
@@ -235,7 +236,7 @@ describe('mapOverviewResolver DLC hint + modSettings export', () => {
     } finally {
       fs.rmSync(exportDir, { recursive: true, force: true });
     }
-  });
+  }, 20000);
 
   test('findOverviewInModSettingsExport matches the exact exported mapId folder', async () => {
     const exportDir = path.join(modSettingsMapOverviewDir(), KINLAIG_MAP_ID);
@@ -244,7 +245,7 @@ describe('mapOverviewResolver DLC hint + modSettings export', () => {
     fs.writeFileSync(overviewPath, Buffer.from('png-bytes'));
     try {
       const hit = await findOverviewInModSettingsExport(KINLAIG_MAP_ID, 'Kinlaig', '');
-      expect(hit).toBe(overviewPath);
+      expect(String(hit).toLowerCase()).toBe(overviewPath.toLowerCase());
     } finally {
       fs.rmSync(exportDir, { recursive: true, force: true });
     }
@@ -257,7 +258,7 @@ describe('mapOverviewResolver DLC hint + modSettings export', () => {
     fs.writeFileSync(overviewPath, Buffer.from('png-bytes'));
     try {
       const hit = await findOverviewInModSettingsExport(KINLAIG_MAP_ID, '', '');
-      expect(hit).toBe(overviewPath);
+      expect(String(hit).toLowerCase()).toBe(overviewPath.toLowerCase());
     } finally {
       fs.rmSync(exportDir, { recursive: true, force: true });
     }

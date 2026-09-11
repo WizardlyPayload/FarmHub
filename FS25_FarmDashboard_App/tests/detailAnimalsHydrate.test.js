@@ -102,6 +102,20 @@ describe('detailAnimalsHydrate count reconciliation', () => {
         expect(pen.animals.map((a) => a.clusterCount)).toEqual([40, 25, 6]);
     });
 
+    test('null numOfAnimalsReported does not wipe a stocked pen', () => {
+        writeDetail(350, {
+            animals: Array.from({ length: 5 }, (_, i) => ({ id: i, uniqueId: String(i), gender: 'female' })),
+        });
+        const out = hydrate({
+            animals: [{ id: 350, ownerFarmId: 1, animalCount: 5, numOfAnimalsReported: null }],
+        });
+        const pen = out.animals[0];
+        expect(pen.__detailHydrated).toBe(true);
+        expect(pen.animals).toHaveLength(5);
+        expect(pen.animalCount).toBe(5);
+        expect(pen.numOfAnimalsReported).toBe(5);
+    });
+
     test('full individual capture is unchanged', () => {
         writeDetail(300, {
             animals: Array.from({ length: 5 }, (_, i) => ({ id: i, gender: 'female' })),
@@ -195,6 +209,30 @@ describe('detailAnimalsHydrate count reconciliation', () => {
         });
         expect(out.animals[0].animals.map((a) => a.uniqueId)).toEqual(['510000', '510001', '510002', '510003']);
         expect(out.animals[1].animals.map((a) => a.uniqueId)).toEqual(['800000', '800001']);
+    });
+
+    test('equal-timestamp unique-id files keep the longer capture', () => {
+        fs.writeFileSync(
+            path.join(detailsDir, 'animals_short_600.json'),
+            JSON.stringify({
+                placeableId: 600,
+                ownerFarmId: 1,
+                animals: [{ uniqueId: '1' }, { uniqueId: '2' }],
+            })
+        );
+        fs.writeFileSync(
+            path.join(detailsDir, 'animals_long_600.json'),
+            JSON.stringify({
+                placeableId: 600,
+                ownerFarmId: 1,
+                animals: [{ uniqueId: '1' }, { uniqueId: '2' }, { uniqueId: '3' }, { uniqueId: '4' }],
+            })
+        );
+        const out = hydrate({
+            animals: [{ id: 600, ownerFarmId: 1, animalCount: 4, numOfAnimalsReported: 4 }],
+        });
+        expect(out.animals[0].animals).toHaveLength(4);
+        expect(out.animals[0].animals.map((a) => a.uniqueId)).toEqual(['1', '2', '3', '4']);
     });
 
     test('empty animals object does not hide a full unique-id file', () => {

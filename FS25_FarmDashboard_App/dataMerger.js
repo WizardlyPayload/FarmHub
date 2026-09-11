@@ -546,7 +546,7 @@ function enrichFieldFromLiveCache(base, cache) {
     if (
         cache.soilFertilizer &&
         typeof cache.soilFertilizer === 'object' &&
-        !(out.soilFertilizer && out.soilFertilizer.enabled !== false)
+        !out.soilFertilizer
     ) {
         out.soilFertilizer = { ...cache.soilFertilizer };
         enriched = true;
@@ -554,7 +554,7 @@ function enrichFieldFromLiveCache(base, cache) {
     if (
         cache.cropStress &&
         typeof cache.cropStress === 'object' &&
-        !(out.cropStress && out.cropStress.enabled !== false)
+        !out.cropStress
     ) {
         out.cropStress = { ...cache.cropStress };
         enriched = true;

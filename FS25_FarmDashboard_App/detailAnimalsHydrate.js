@@ -68,10 +68,8 @@ function rememberDetailEntry(map, entry) {
         if (nextAt >= prevAt) map.set(key, entry);
         return;
     }
-    if (nextU === prevU && nextN < prevN && nextU) {
-        map.set(key, entry);
-        return;
-    }
+    // Same (or missing) timestamps: keep the richer unique-id capture. A later
+    // incomplete animals_*.json must not hide animals already written for this pen.
     if (nextU === prevU && nextN > prevN) map.set(key, entry);
 }
 
@@ -159,8 +157,8 @@ function applyDetailBlockToHusbandry(h, block) {
             farmId: ownerFarmId,
             animals,
             lod: 'full',
-            animalCount: Number.isFinite(reported) && reported >= 0 ? reported : capturedHeads,
-            numOfAnimalsReported: Number.isFinite(reported) && reported >= 0 ? reported : capturedHeads,
+            animalCount: Number.isFinite(reported) && reported > 0 ? reported : capturedHeads,
+            numOfAnimalsReported: Number.isFinite(reported) && reported > 0 ? reported : capturedHeads,
             __detailHydrated: true,
             __detailCapturedHeads: capturedHeads,
         },

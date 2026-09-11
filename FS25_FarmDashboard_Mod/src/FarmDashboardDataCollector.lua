@@ -455,6 +455,27 @@ local function _parentDir(filePath)
     return filePath:match("^(.+)[/\\][^/\\]+$")
 end
 
+--- Overview export retries across collection cycles (~1/min): DLC maps (e.g. Kinlaig in
+--- highlandsFishingPack) mount inside proprietary .dlc containers the desktop app cannot open,
+--- so this in-game export is the only reliable overview source — don't latch failure on the
+--- first miss (HUD map overlay / VFS paths may not be ready during the first cycles).
+local MAP_OVERVIEW_EXPORT_MAX_ATTEMPTS = 5
+
+--- Folder name under mapOverview/: keep the raw mapId/title readable, but strip characters
+--- Windows cannot use in folder names (meta.json keeps the exact ids for the desktop app).
+local function _sanitizeMapOverviewKey(key)
+    local sanitized = tostring(key):gsub('[/\\:%*%?"<>|]', "_")
+    return sanitized
+end
+
+local function _overviewImageExtension(p)
+    if type(p) ~= "string" then return nil end
+    local low = p:lower()
+    if low:match("%.dds$") then return ".dds" end
+    if low:match("%.png$") then return ".png" end
+    return nil
+end
+
 --- Cache PDA overview.dds for the desktop fleet map (DLC maps are not in mods/*.zip).
 function FarmDashboardDataCollector:_exportMapOverviewForDashboard()
     if self._mapOverviewExportDone then return end
@@ -464,73 +485,123 @@ function FarmDashboardDataCollector:_exportMapOverviewForDashboard()
     local mapTitle = (info.mapTitle and tostring(info.mapTitle) ~= "") and tostring(info.mapTitle) or nil
     if not mapId and not mapTitle then return end
 
-    local key = mapId or mapTitle
+    local attempt = (self._mapOverviewExportAttempts or 0) + 1
+    self._mapOverviewExportAttempts = attempt
+
+    local key = _sanitizeMapOverviewKey(mapId or mapTitle)
     local destDir = getUserProfileAppPath() .. "modSettings/FS25_FarmDashboard/mapOverview/" .. key .. "/"
     createFolder(destDir)
-    local destDds = destDir .. "overview.dds"
 
     local candidates = {}
+    local candidateSeen = {}
     local function addCandidate(p)
-        if type(p) == "string" and p ~= "" then
+        if type(p) == "string" and p ~= "" and not candidateSeen[p] then
+            candidateSeen[p] = true
             candidates[#candidates + 1] = p
         end
     end
+    local function addDirCandidates(dir)
+        if type(dir) ~= "string" or dir == "" then return end
+        if not dir:match("[/\\]$") then dir = dir .. "/" end
+        addCandidate(dir .. "textures/ui/overview.dds")
+        addCandidate(dir .. "textures/ui/overview.png")
+        addCandidate(dir .. "overview.dds")
+        addCandidate(dir .. "overview.png")
+    end
 
-    if info.mapXMLFilename and type(info.mapXMLFilename) == "string" then
+    -- The texture the in-game PDA map is rendering right now — authoritative even for DLC maps,
+    -- but the HUD may not be built during the first collection cycles (hence the retry loop).
+    local okOverlay, overlayFile = pcall(function()
+        local hud = _G.g_currentMission.hud
+        local ingameMap = hud and hud.ingameMap
+        local overlay = ingameMap and ingameMap.mapOverlay
+        return overlay and overlay.filename
+    end)
+    if okOverlay and _overviewImageExtension(overlayFile) then
+        addCandidate(overlayFile)
+    end
+
+    if type(info.mapXMLFilename) == "string" then
         local mapDir = _parentDir(info.mapXMLFilename)
-        if mapDir then
-            addCandidate(mapDir .. "/textures/ui/overview.dds")
-            addCandidate(mapDir .. "/overview.dds")
-        end
+        if mapDir then addDirCandidates(mapDir) end
     end
-    if info.filename and type(info.filename) == "string" then
+    if type(info.map) == "table" and type(info.map.mapXMLFilename) == "string" then
+        local mapDir = _parentDir(info.map.mapXMLFilename)
+        if mapDir then addDirCandidates(mapDir) end
+    end
+    if type(info.filename) == "string" then
         local mapDir = _parentDir(info.filename)
-        if mapDir then
-            addCandidate(mapDir .. "/textures/ui/overview.dds")
-            addCandidate(mapDir .. "/overview.dds")
-        end
+        if mapDir then addDirCandidates(mapDir) end
     end
-    if _G.g_currentMission.baseDirectory and type(_G.g_currentMission.baseDirectory) == "string" then
-        local base = _G.g_currentMission.baseDirectory
+    local function addBaseDirCandidates(base)
+        if type(base) ~= "string" or base == "" then return end
         if not base:match("[/\\]$") then base = base .. "/" end
-        addCandidate(base .. "textures/ui/overview.dds")
-        addCandidate(base .. "overview.dds")
-        addCandidate(base .. "map/textures/ui/overview.dds")
-        addCandidate(base .. "map/overview.dds")
+        addDirCandidates(base)
+        addDirCandidates(base .. "map")
     end
+    addBaseDirCandidates(_G.g_currentMission.baseDirectory)
+    if type(info.map) == "table" then
+        addBaseDirCandidates(info.map.baseDirectory)
+    end
+    addBaseDirCandidates(info.baseDirectory)
 
     for i = 1, #candidates do
         local src = candidates[i]
-        if _pathExists(src) and _copyFileFs25BestEffort(src, destDds) then
-            local meta = {
-                mapId = mapId,
-                mapTitle = mapTitle,
-                sourcePath = src,
-                exportedAt = os and os.time and os.time() or 0,
-            }
-            local metaPath = destDir .. "meta.json"
-            if type(io) == "table" and type(io.open) == "function" then
-                local okJson, jsonBody = pcall(function() return toJSON(meta) end)
-                if okJson and jsonBody then
-                    local fh = io.open(metaPath, "w")
-                    if fh then
-                        pcall(function() fh:write(jsonBody) end)
-                        pcall(function() fh:close() end)
+        if _pathExists(src) then
+            local ext = _overviewImageExtension(src) or ".dds"
+            local dest = destDir .. "overview" .. ext
+            if _copyFileFs25BestEffort(src, dest) then
+                -- Drop a stale export in the other format so the desktop app never picks it first.
+                local staleExt = (ext == ".dds") and ".png" or ".dds"
+                local stale = destDir .. "overview" .. staleExt
+                if type(deleteFile) == "function" and _pathExists(stale) then
+                    pcall(function() deleteFile(stale) end)
+                end
+                local meta = {
+                    mapId = mapId,
+                    mapTitle = mapTitle,
+                    sourcePath = src,
+                    exportedAt = os and os.time and os.time() or 0,
+                }
+                local metaPath = destDir .. "meta.json"
+                if type(io) == "table" and type(io.open) == "function" then
+                    local okJson, jsonBody = pcall(function() return toJSON(meta) end)
+                    if okJson and jsonBody then
+                        local fh = io.open(metaPath, "w")
+                        if fh then
+                            pcall(function() fh:write(jsonBody) end)
+                            pcall(function() fh:close() end)
+                        end
                     end
                 end
+                self._mapOverviewExportDone = true
+                FarmDashLog.dev("exported map overview for fleet map: %s (source: %s)", key, src)
+                return
             end
-            self._mapOverviewExportDone = true
-            FarmDashLog.dev("exported map overview for fleet map: %s", key)
-            return
         end
     end
 
-    -- Latch failure so we never retry every export cycle (log spam / hitch). Optional asset.
+    if attempt < MAP_OVERVIEW_EXPORT_MAX_ATTEMPTS then
+        -- Cheap retry next collection cycle: candidate sources (HUD overlay, DLC VFS mounts)
+        -- can appear after mission load settles. Diagnostics-only line — no log spam.
+        FarmDashLog.dev(
+            "map overview export attempt %d/%d found no readable source for %s; retrying next cycle",
+            attempt, MAP_OVERVIEW_EXPORT_MAX_ATTEMPTS, key
+        )
+        return
+    end
+
+    -- Out of attempts: latch so we never retry every export cycle forever. Optional asset.
     self._mapOverviewExportDone = true
+    local previousExport = _pathExists(destDir .. "overview.dds") or _pathExists(destDir .. "overview.png")
+    if previousExport then
+        FarmDashLog.dev("map overview export found no new source for %s; keeping previous export", key)
+        return
+    end
     if type(Logging) == "table" and type(Logging.warning) == "function" then
         Logging.warning(string.format(
-            "[FarmDash] map overview export failed once for %s (fleet map may lack overview.dds); not retrying",
-            tostring(key)
+            "[FarmDash] map overview export failed after %d attempts for %s (fleet map may lack overview image); not retrying this session",
+            MAP_OVERVIEW_EXPORT_MAX_ATTEMPTS, tostring(key)
         ))
     end
 end

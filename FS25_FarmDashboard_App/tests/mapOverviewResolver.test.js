@@ -245,7 +245,7 @@ describe('mapOverviewResolver DLC hint + modSettings export', () => {
     fs.writeFileSync(overviewPath, Buffer.from('png-bytes'));
     try {
       const hit = await findOverviewInModSettingsExport(KINLAIG_MAP_ID, 'Kinlaig', '');
-      expect(String(hit).toLowerCase()).toBe(overviewPath.toLowerCase());
+      expect(fs.realpathSync(hit).toLowerCase()).toBe(fs.realpathSync(overviewPath).toLowerCase());
     } finally {
       fs.rmSync(exportDir, { recursive: true, force: true });
     }
@@ -258,7 +258,7 @@ describe('mapOverviewResolver DLC hint + modSettings export', () => {
     fs.writeFileSync(overviewPath, Buffer.from('png-bytes'));
     try {
       const hit = await findOverviewInModSettingsExport(KINLAIG_MAP_ID, '', '');
-      expect(String(hit).toLowerCase()).toBe(overviewPath.toLowerCase());
+      expect(fs.realpathSync(hit).toLowerCase()).toBe(fs.realpathSync(overviewPath).toLowerCase());
     } finally {
       fs.rmSync(exportDir, { recursive: true, force: true });
     }

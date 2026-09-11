@@ -2436,3 +2436,43 @@ body.farmdash-public-demo.has-farmdash-splash.farmdash-demo-data-pending .farmda
   padding: 0.2rem 0.5rem 0.2rem 0;
   border: none;
 }
+
+.fd-uistate {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: center;
+  text-align: center;
+  padding: 1.25rem 1rem;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+}
+
+.fd-uistate--error {
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+.fd-uistate--pending {
+  border-style: solid;
+  border-color: rgba(137, 180, 250, 0.45);
+}
+
+.fd-skeleton__line,
+.fd-skeleton__card {
+  border-radius: 8px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.14), rgba(255,255,255,0.06));
+  background-size: 200% 100%;
+  animation: fd-skeleton-shimmer 1.15s ease-in-out infinite;
+}
+.fd-skeleton__line { height: 0.8rem; width: 60%; }
+.fd-skeleton__card { height: 3.5rem; width: 100%; }
+@keyframes fd-skeleton-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+.fd-helper {
+  margin: 0.5rem 1rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: 10px;
+  background: rgba(250, 204, 21, 0.12);
+  border: 1px solid rgba(250, 204, 21, 0.35);
+}

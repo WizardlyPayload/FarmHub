@@ -36,6 +36,6 @@ describe('fleetMapGeo browser/cjs parity', () => {
         },
       },
     };
-    expect(cjs.resolveOverviewTerrainBounds(dash).halfSize).toBe(1024);
+    expect(cjs.resolveOverviewTerrainBounds(dash).halfSize).toBe(2048);
   });
 });

@@ -41,6 +41,8 @@ FarmDashboardSettingsMenu.ITEMS = {
     { id = "enableStock", key = "enableStock", values = { false, true }, strings = offOnStrings },
     { id = "enableBaleInventory", key = "enableBaleInventory", values = { false, true }, strings = offOnStrings },
     { id = "enableRedTape", key = "enableRedTape", values = { false, true }, strings = offOnStrings },
+    { id = "enableInvoices", key = "enableInvoices", values = { false, true }, strings = offOnStrings },
+    { id = "enableHirePurchasing", key = "enableHirePurchasing", values = { false, true }, strings = offOnStrings },
     { id = "collectionCycleSec", key = "collectionCycleMs", values = rangeValues(60, 1800, 60), toDisplay = function(v) return math.floor((v or 60000) / 1000) end, toStore = function(v) return v * 1000 end },
     { id = "sliceBudgetMs", key = "sliceBudgetMs", values = rangeValues(1, 16, 1) },
     { id = "postLoadGraceSec", key = "postLoadCollectionGraceSec", values = rangeValues(0, 120, 15) },
@@ -118,10 +120,10 @@ end
 
 function FarmDashboardSettingsMenu.syncControlPermissions()
     local api = rawget(_G, "FarmDashboardSettingsApi")
-    local canChange = api and api:canChangeSettings()
     for _, itemDef in ipairs(FarmDashboardSettingsMenu.ITEMS) do
         local control = FarmDashboardSettingsMenu.CONTROLS[itemDef.id]
         if control and control.setDisabled then
+            local canChange = api and api:canChangeSettingKey(itemDef.key)
             control:setDisabled(not canChange)
         end
     end
@@ -136,7 +138,7 @@ function FarmDashboardSettingsControls.onMenuOptionChanged(self, state, menuOpti
     if not itemDef then return end
 
     local api = rawget(_G, "FarmDashboardSettingsApi")
-    if not api or not api:canChangeSettings() then
+    if not api or not api:canChangeSettingKey(itemDef.key) then
         FarmDashboardSettingsMenu.syncControl(itemDef)
         return
     end

@@ -247,6 +247,41 @@
 
     #ftp-fields { display: none; }
 
+    .setup-callout {
+      margin: 0 0 16px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      border: 1px solid #45475a;
+      background: #181825;
+    }
+    .setup-callout h4 {
+      margin: 0 0 8px;
+      color: #89b4fa;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    .setup-callout p {
+      margin: 0 0 8px;
+      color: #a6adc8;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .setup-callout ul.setup-callout-steps {
+      margin: 0 0 8px;
+      padding-left: 1.1rem;
+      list-style: none;
+      color: #cdd6f4;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .setup-callout li { margin-bottom: 4px; }
+    .setup-callout .setup-callout-note {
+      margin: 0;
+      color: #a6adc8;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+
     /* v3.9: per-field validation feedback */
     input.is-invalid {
       border-color: #f38ba8 !important;
@@ -379,21 +414,27 @@
       text-decoration: none;
     }
     .setup-site-footer a:hover { text-decoration: underline; }
+
+    .setup-local-only {
+      display: none;
+      max-width: min(920px, 100%);
+      margin: 0 auto 16px;
+      padding: 16px 18px;
+      border-radius: 10px;
+      border: 1px solid #f9e2af;
+      background: rgba(249, 226, 175, 0.12);
+      color: #f9e2af;
+    }
+    .setup-local-only.is-visible { display: block; }
+    body.setup-blocked .container { display: none; }
   </style>
 </head>
 <body>
-<script>
-(function () {
-  try {
-    var h = String(location.hostname || "").toLowerCase();
-    var local = !h || h === "localhost" || h === "127.0.0.1" || h === "::1" || h === "[::1]";
-    if (!local) {
-      var q = location.search || "";
-      window.location.replace("/" + q);
-    }
-  } catch (e) {}
-})();
-</script>
+<div id="setupLocalOnlyPanel" class="setup-local-only" role="alert">
+  <strong data-setup-i18n="setup.errLocalOnlyTitle">Setup stays on this PC</strong>
+  <p data-setup-i18n="setup.errLocalOnly">Setup is only available on the PC running Farm Dashboard.</p>
+  <p><a href="/" data-setup-i18n="setup.backToDashboard">Open the dashboard</a></p>
+</div>
 
 <div class="setup-lang-corner">
   <label for="setup-lang-select" class="setup-lang-corner-label" data-setup-i18n="setup.langHeading">Language</label>
@@ -413,7 +454,7 @@ Use Auto-Detect or add one manually →</div>
 
     <hr class="section-divider"/>
 
-    <h3 style="margin:0 0 8px;color:#89b4fa;font-size:16px;" data-setup-i18n="setup.ftpHeading">FTP polling</h3>
+    <h3 style="margin:0 0 8px;color:#89b4fa;font-size:16px;" data-setup-i18n="setup.ftpAdvancedTitle">Advanced — FTP polling</h3>
     <p class="hint" style="margin-bottom:12px;" data-setup-i18n="setup.ftpPollHint">
       Applies to dedicated (FTP) servers. Local saves use file watching, not this schedule.
     </p>
@@ -462,7 +503,20 @@ Use Auto-Detect or add one manually →</div>
 
     <div class="radio-group">
       <label><input type="radio" name="mode" value="local" checked> <span data-setup-i18n="setup.modeLocal">Local PC</span></label>
-      <label><input type="radio" name="mode" value="ftp"> <span data-setup-i18n="setup.modeFtp">Dedicated Server (FTP)</span></label>
+      <label><input type="radio" name="mode" value="ftp"> <span data-setup-i18n="setup.modeFtp">Dedicated Server (FTP) — Advanced</span></label>
+    </div>
+
+    <div class="setup-callout" id="dedicated-join-callout" role="note">
+      <h4 data-setup-i18n="setup.dedicatedJoinTitle">Dedicated server — join as client (no FTP)</h4>
+      <p data-setup-i18n="setup.dedicatedJoinIntro">Preferred for most dedicated servers: the mod mirrors live data to a joined client PC. Use Local mode below — FTP is optional Advanced only.</p>
+      <ul class="setup-callout-steps">
+        <li data-setup-i18n="setup.dedicatedJoinStep1">1. Install the Farm Dashboard mod on the dedicated server.</li>
+        <li data-setup-i18n="setup.dedicatedJoinStep2">2. On this PC (the one running Farm Dashboard), join that server as a client with the same mod enabled.</li>
+        <li data-setup-i18n="setup.dedicatedJoinStep3">3. Join that server as a client with the same mod — export mirroring starts automatically when you join (no in-game switch). FTP remains Advanced for server hosts who have FTP access.</li>
+        <li data-setup-i18n="setup.dedicatedJoinStep4">4. The client writes data.json under Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\mirror_&lt;slot&gt;\ (separate from your local savegame folders so they never overwrite each other).</li>
+        <li data-setup-i18n="setup.dedicatedJoinStep5">5. Add a Local PC server here (or Auto-Detect) and pick the mirror_* subfolder. No FTP required while someone is joined.</li>
+      </ul>
+      <p class="setup-callout-note" data-setup-i18n="setup.dedicatedJoinLimits">Mirror needs at least one connected client with the mod. An empty dedicated server with zero players will not update until someone joins. Large exports may lag a few seconds behind the server. FTP remains Advanced for moderators with FTP access. Mirrored folders use a mirror_ prefix so they never conflict with single-player savegame slots on this PC.</p>
     </div>
 
     <!-- LOCAL -->
@@ -472,7 +526,7 @@ Use Auto-Detect or add one manually →</div>
         <input type="text" id="localPath"
                placeholder="C:\Users\...\FarmingSimulator2025\modSettings\FS25_FarmDashboard"
                autocomplete="off"/>
-        <div class="hint" data-setup-i18n="setup.localHint">Leave blank to use the default Documents path.</div>
+        <div class="hint" data-setup-i18n="setup.localHint">Leave blank for the default Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard path (same folder the mod writes for local and join-as-client mirrors).</div>
       </div>
       <div class="form-group">
         <label for="localSubFolder"><span data-setup-i18n="setup.saveFolder">Savegame Folder</span> <span class="optional-badge">optional</span></label>
@@ -545,7 +599,7 @@ Use Auto-Detect or add one manually →</div>
   </div><!-- /right-panel -->
 </div><!-- /container -->
 
-<p class="setup-site-footer">JoshWalki · WizardlyPayload · <a href="https://discord.gg/D4sEHM59" target="_blank" rel="noopener noreferrer">Discord</a> · <a href="https://ko-fi.com/wizarlypayload" target="_blank" rel="noopener noreferrer">Ko-fi</a></p>
+<p class="setup-site-footer">JoshWalki · WizardlyPayload · <a href="https://discord.gg/qsSTRwG2" target="_blank" rel="noopener noreferrer">Discord</a> · <a href="https://ko-fi.com/wizarlypayload" target="_blank" rel="noopener noreferrer">Ko-fi</a></p>
 
 <div id="modExportProgressModal" class="fd-modexp-overlay" style="display: none" aria-hidden="true">
   <div class="fd-modexp-panel">
@@ -558,6 +612,7 @@ Use Auto-Detect or add one manually →</div>
 </div>
 
 <script src="web/assests/js/setup-i18n.js"></script>
+<script src="web/assests/js/ux-classify.js"></script>
 <script src="web/assests/js/setup-validation.js"></script>
 <script src="web/assests/js/modExportProgress.js"></script>
 <script>
@@ -876,6 +931,14 @@ function saveAndLaunch() {
     Promise.resolve(fdApi.saveSettings(payload))
       .then(function (res) {
         if (res && res.ok === false) throw new Error(res.error || 'Save failed');
+        if (fdApi && typeof fdApi.launchDashboard === 'function') {
+          return Promise.resolve(fdApi.launchDashboard()).then(function (launchRes) {
+            if (launchRes && launchRes.ok === false) {
+              throw new Error(launchRes.error || 'Launch failed');
+            }
+            showSuccessCard();
+          });
+        }
         showSuccessCard();
       })
       .catch(function (e) {
@@ -896,7 +959,7 @@ function saveAndLaunch() {
   })
     .then(function (r) {
       return r.json().then(function (data) {
-        if (!r.ok) throw new Error((data && data.error) || r.statusText || 'Save failed');
+        if (!r.ok) throw new Error((data && data.errorCode) || (data && data.error) || r.statusText || 'Save failed');
         return data;
       });
     })
@@ -941,13 +1004,47 @@ function applyLoadedSetupConfig(cfg) {
   loadFtpPollingFromConfig(cfg || {});
 }
 
+function showSetupLocalOnly(msg) {
+  var panel = document.getElementById('setupLocalOnlyPanel');
+  if (panel) {
+    var p = panel.querySelector('p');
+    if (p && msg) p.textContent = msg;
+    panel.classList.add('is-visible');
+  }
+  try { document.body.classList.add('setup-blocked'); } catch (_) {}
+}
+
 if (fdApi && typeof fdApi.getCurrentConfig === 'function') {
   fdApi.getCurrentConfig().then(applyLoadedSetupConfig);
 } else {
-  fetch((window.location && window.location.origin ? window.location.origin : '') + '/api/setup-config')
-    .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('Config load failed')); })
+  var headers = { 'Cache-Control': 'no-store' };
+  if (window.__FARMDASH_SETUP_TOKEN) {
+    headers['X-Setup-Token'] = window.__FARMDASH_SETUP_TOKEN;
+  }
+  fetch((window.location && window.location.origin ? window.location.origin : '') + '/api/setup-config', {
+    cache: 'no-store',
+    headers: headers,
+  })
+    .then(function (r) {
+      if (r.status === 401 || r.status === 403) {
+        return r.json().then(function (body) {
+          var code = body && body.errorCode;
+          var copy =
+            (window.farmDashSetupValidation && window.farmDashSetupValidation.mapSaveError
+              ? window.farmDashSetupValidation.mapSaveError(code || body.error || 'E_SETUP_LOCAL_ONLY', st)
+              : (body && body.error) || 'Setup is only available on the PC running Farm Dashboard.');
+          showSetupLocalOnly(copy);
+          throw new Error(code || 'E_SETUP_LOCAL_ONLY');
+        });
+      }
+      if (!r.ok) return Promise.reject(new Error('Config load failed'));
+      return r.json();
+    })
     .then(applyLoadedSetupConfig)
-    .catch(function () { /* first visit or empty */ });
+    .catch(function (e) {
+      if (e && /E_SETUP_LOCAL_ONLY|E_INVALID_TOKEN/.test(String(e.message || e))) return;
+      /* first visit or empty */
+    });
 }
 })();
 </script>

@@ -8,9 +8,32 @@ const {
   pathMatchesMapIdentity,
   scoreZipArchiveName,
   findOverviewSourceFile,
+  isOfficialMapUiOverviewPath,
 } = require('../mapOverviewResolver');
 
 describe('mapOverviewResolver', () => {
+  test('parseMapXmlMeta reads width and imageFilename', () => {
+    const { parseMapXmlMeta } = require('../mapOverviewResolver');
+    const meta = parseMapXmlMeta(
+      '<map width="2048" height="2048" imageFilename="$data/maps/mapUS/textures/ui/overview.png">'
+    );
+    expect(meta.width).toBe(2048);
+    expect(meta.height).toBe(2048);
+    expect(meta.imageFilename).toContain('overview.png');
+  });
+
+  test('official map.xml overview path is the terrain image, not a PDA crop', () => {
+    expect(
+      isOfficialMapUiOverviewPath('C:/game/data/maps/mapUS/textures/ui/overview.png')
+    ).toBe(true);
+    expect(
+      isOfficialMapUiOverviewPath('C:/mods/FS25_Carpathian/maps/ui/mapOverview.dds')
+    ).toBe(true);
+    expect(
+      isOfficialMapUiOverviewPath('C:/modSettings/FS25_FarmDashboard/mapOverview/MapUS/overview.dds')
+    ).toBe(false);
+  });
+
   test('normalizeMapSlug prefers mapId', () => {
     expect(normalizeMapSlug('mapUS', 'Riverside')).toBe('mapus');
     expect(normalizeMapSlug('MapEU', '')).toBe('mapeu');
@@ -26,6 +49,31 @@ describe('mapOverviewResolver', () => {
     expect(pathMatchesMapIdentity('C:/mods/FS25_Witcombe_Valley.zip', 'mapwitcombe', 'Witcombe Valley')).toBe(true);
     expect(pathMatchesMapIdentity('C:/mods/FS25_Ballam_Road.zip', 'mapwitcombe', 'Witcombe Valley')).toBe(false);
     expect(pathMatchesMapIdentity('C:/mods/FS25_Ballam_Road.zip', 'mapballam', 'Ballam Road Dairy Farming')).toBe(true);
+  });
+
+  test('SaxlinghamXL title matches FS25_Saxlingham_XL.zip despite underscore', () => {
+    expect(titleTokensFromMapTitle('SaxlinghamXL')).toEqual(['saxlingham', 'xl']);
+    expect(distinctiveTitleTokens('SaxlinghamXL')).toEqual(['saxlingham', 'xl']);
+    expect(
+      pathMatchesMapIdentity(
+        'C:/mods/FS25_Saxlingham_XL.zip',
+        'fs25_saxlingham_xl',
+        'SaxlinghamXL'
+      )
+    ).toBe(true);
+    expect(
+      scoreZipArchiveName(
+        'C:/mods/FS25_Saxlingham_XL.zip',
+        'fs25_saxlingham_xl',
+        titleTokensFromMapTitle('SaxlinghamXL')
+      )
+    ).toBeGreaterThan(
+      scoreZipArchiveName(
+        'C:/mods/FS25_Saxlingham_crossplay.zip',
+        'fs25_saxlingham_xl',
+        titleTokensFromMapTitle('SaxlinghamXL')
+      )
+    );
   });
 
   test('scoreZipArchiveName ranks matching mod archives', () => {
@@ -55,6 +103,12 @@ describe('mapOverviewResolver', () => {
     expect(scoreOverviewPath(vanilla, 'mapus')).toBeGreaterThan(
       scoreOverviewPath(random, 'mapus')
     );
+  });
+
+  test('scoreOverviewPath accepts mapOverview.dds and maps/overview.dds', () => {
+    expect(scoreOverviewPath('maps/ui/mapOverview.dds', 'mapeu')).toBeGreaterThan(0);
+    expect(scoreOverviewPath('maps/overview.dds', 'mapalma')).toBeGreaterThan(0);
+    expect(scoreOverviewPath('map/overview.dds', 'mapbackroads')).toBeGreaterThan(0);
   });
 
   test('resolveDlcPackages matches Kinlaig to highlandsFishingPack', () => {

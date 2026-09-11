@@ -1,4 +1,4 @@
-﻿# Dependencies
+# Dependencies
 node_modules/
 .venv/
 venv/
@@ -13,8 +13,14 @@ out/
 electron-pack-out/
 electron-pack-out-alt/
 
+# NEW APP Vite output copied into the Electron app for packaging (regenerate via npm run build:ui)
+FS25_FarmDashboard_App/ui-v2/
+
 # Logs and local env
 *.log
+Logs/
+__pycache__/
+tools/__pycache__/
 .env
 .env.*
 
@@ -58,7 +64,10 @@ FS25_FarmDashboard_Mod/FS25_FarmDashboard.zip
 # Local agent secrets (VPS SSH — never commit)
 .cursor/secrets/
 
-# Unmapped / spare manual screenshots (timestamp grabs, superseded fd-*)
-docs/screenshots/discard/
-docs/screenshots/Screenshot 2026-07-07 192528.png
-docs/screenshots/Screenshot 2026-07-07 192542.png
+# Temporary GPortal FTP probe dumps (tools/_tmp-ftp-probe.mjs) — local server save/config, never commit
+.local-ftp-probe/
+
+# WIP screenshot drop zone (Windows Screen grabs / new-UI captures).
+# Rename to fd-* then promote into docs/doc-screenshots/ for the docs.
+docs/screenshots/*
+!docs/screenshots/.gitkeep

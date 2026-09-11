@@ -11,11 +11,14 @@ const {
   analyzeOverviewTerrain,
   isFullBleedInset,
   roundInset,
+  squareizeTerrainInset,
 } = require('./mapOverviewTerrainInset.cjs');
 const { lookupTerrainInsetOverride } = require('./mapOverviewInsets.cjs');
 const { collectFs25DocumentRoots } = require('./fs25Paths');
+const { sanitizeMapSlug, joinContained } = require('./safeFsIdentity.cjs');
 
-const OVERVIEW_CACHE_VERSION = 6;
+// v17: never crop overview — IngameMap Overlay 0–1 is map.xml imageFilename (game hotspot UV).
+const OVERVIEW_CACHE_VERSION = 17;
 
 /** Official DLC map packs (folder name under `<game>/pdlc/`, without `.dlc`). */
 const MAP_DLC_PACKAGE_HINTS = [
@@ -38,21 +41,79 @@ const MAP_DLC_PACKAGE_HINTS = [
 ];
 const TERRAIN_INSET_SAMPLE_SIZE = 512;
 
-const OVERVIEW_NAMES = new Set(['overview.dds', 'overview.png']);
-const OVERVIEW_ENTRY_RE = /(?:^|\/)textures\/ui\/overview\.(dds|png)$/i;
-const OVERVIEW_ENTRY_FALLBACK_RE = /(?:^|\/)overview\.(dds|png)$/i;
+const OVERVIEW_NAMES = new Set([
+  'overview.dds',
+  'overview.png',
+  'mapoverview.dds',
+  'mapoverview.png',
+]);
+const OVERVIEW_ENTRY_RE = /(?:^|\/)(?:textures\/ui\/|maps\/ui\/)(?:overview|mapoverview)\.(dds|png)$/i;
+const OVERVIEW_ENTRY_FALLBACK_RE = /(?:^|\/)(?:map)?overview\.(dds|png)$/i;
+
+/** Giants map.xml `<map width height imageFilename>` — overlay UV 0–1 of that image. */
+function parseMapXmlMeta(xmlText) {
+  const head = String(xmlText || '').slice(0, 8000);
+  const tag = /<map\b([^>]*)>/i.exec(head);
+  if (!tag) return null;
+  const attrs = tag[1];
+  const width = Number((/\bwidth\s*=\s*"([^"]+)"/i.exec(attrs) || [])[1]);
+  const height = Number((/\bheight\s*=\s*"([^"]+)"/i.exec(attrs) || [])[1]);
+  const imageFilename = String((/\bimageFilename\s*=\s*"([^"]+)"/i.exec(attrs) || [])[1] || '').trim();
+  return {
+    width: Number.isFinite(width) && width >= 128 ? width : null,
+    height: Number.isFinite(height) && height >= 128 ? height : null,
+    imageFilename,
+  };
+}
+
+function isOfficialMapUiOverviewPath(filePath) {
+  return OVERVIEW_ENTRY_RE.test(String(filePath || '').replace(/\\/g, '/'));
+}
 
 function normalizeMapSlug(mapId, mapTitle) {
   const raw = String(mapId || mapTitle || '').trim();
   if (!raw) return '';
   const cleaned = raw.replace(/\.[^.\\/]+$/, '').replace(/[\s'"]+/g, '');
-  if (/^map[a-z0-9]+$/i.test(cleaned)) return cleaned.toLowerCase();
+  let slug = cleaned.toLowerCase();
+  if (/^map[a-z0-9]+$/i.test(cleaned)) slug = cleaned.toLowerCase();
   if (/^[a-z]{2,3}$/i.test(cleaned) && mapTitle) {
     const t = String(mapTitle).toLowerCase();
-    if (t.includes('us') || t.includes('america')) return 'mapus';
-    if (t.includes('eu') || t.includes('europe')) return 'mapeu';
+    if (t.includes('us') || t.includes('america')) slug = 'mapus';
+    else if (t.includes('eu') || t.includes('europe')) slug = 'mapeu';
   }
-  return cleaned.toLowerCase();
+  return sanitizeMapSlug(slug) || '';
+}
+
+function compactAlnum(s) {
+  return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+const MAP_SIZE_SUFFIX_RE = /^(xl|xxl|2x|4x|16x)$/;
+
+function keepTitleToken(tok) {
+  if (!tok) return false;
+  if (MAP_SIZE_SUFFIX_RE.test(tok)) return true;
+  return tok.length >= 4;
+}
+
+/** Split CamelCase and size suffixes so SaxlinghamXL → saxlingham, xl. */
+function splitMapTitlePieces(mapTitle) {
+  const out = [];
+  for (const chunk of String(mapTitle || '').split(/[^A-Za-z0-9]+/)) {
+    if (!chunk) continue;
+    const camel = chunk.match(/[A-Z]+(?![a-z])|[A-Z]?[a-z]+|\d+[xX]?|\d+/g);
+    const parts = camel && camel.length ? camel : [chunk];
+    for (const part of parts) {
+      const low = part.toLowerCase();
+      const sized = low.match(/^(.*?)(xl|xxl|2x|4x|16x)$/);
+      if (sized && sized[1].length >= 4) {
+        out.push(sized[1], sized[2]);
+      } else {
+        out.push(low);
+      }
+    }
+  }
+  return out;
 }
 
 /** Distinct tokens from a display title — used to rank mod zips (e.g. Witcombe Valley → witcombe). */
@@ -60,8 +121,8 @@ function titleTokensFromMapTitle(mapTitle) {
   if (!mapTitle) return [];
   const seen = new Set();
   const out = [];
-  for (const tok of String(mapTitle).toLowerCase().split(/[^a-z0-9]+/)) {
-    if (tok.length < 4 || seen.has(tok)) continue;
+  for (const tok of splitMapTitlePieces(mapTitle)) {
+    if (!keepTitleToken(tok) || seen.has(tok)) continue;
     seen.add(tok);
     out.push(tok);
   }
@@ -77,13 +138,22 @@ function distinctiveTitleTokens(mapTitle) {
   return titleTokensFromMapTitle(mapTitle).filter((t) => !GENERIC_MAP_TITLE_TOKENS.has(t));
 }
 
+function pathIncludesToken(filePath, token) {
+  const tok = String(token || '').toLowerCase();
+  if (!tok) return false;
+  const lower = String(filePath || '').toLowerCase().replace(/\\/g, '/');
+  if (lower.includes(tok)) return true;
+  const compactTok = compactAlnum(tok);
+  return compactTok.length >= 2 && compactAlnum(lower).includes(compactTok);
+}
+
 function pathMatchesMapIdentity(filePath, mapSlug, mapTitle) {
   const lower = String(filePath || '').toLowerCase().replace(/\\/g, '/');
   const distinctive = distinctiveTitleTokens(mapTitle);
   if (distinctive.length > 0) {
-    return distinctive.some((tok) => lower.includes(tok));
+    return distinctive.some((tok) => pathIncludesToken(lower, tok));
   }
-  if (mapSlug && lower.includes(mapSlug)) return true;
+  if (mapSlug && pathIncludesToken(lower, mapSlug)) return true;
   return !mapTitle && !mapSlug;
 }
 
@@ -94,9 +164,9 @@ function archiveMatchesMapIdentity(zipPath, mapSlug, mapTitle) {
 function scoreZipArchiveName(zipPath, mapSlug, titleTokens) {
   const base = path.basename(zipPath).toLowerCase();
   let score = 0;
-  if (mapSlug && base.includes(mapSlug)) score += 60;
+  if (mapSlug && pathIncludesToken(base, mapSlug)) score += 60;
   for (const tok of titleTokens || []) {
-    if (base.includes(tok)) score += 40;
+    if (pathIncludesToken(base, tok)) score += 40;
   }
   return score;
 }
@@ -289,14 +359,16 @@ function scoreOverviewPath(filePath, mapSlug, titleTokens) {
   let score = 0;
   if (lower.endsWith('/textures/ui/overview.dds') || lower.endsWith('/textures/ui/overview.png')) {
     score += 40;
-  } else if (lower.endsWith('/overview.dds') || lower.endsWith('/overview.png')) {
+  } else if (/\/(?:maps\/)?ui\/(?:map)?overview\.(dds|png)$/.test(lower)) {
+    score += 32;
+  } else if (/(?:^|\/)(?:map)?overview\.(dds|png)$/.test(lower)) {
     score += 25;
   }
   if (mapSlug && lower.includes(`/maps/${mapSlug}/`)) score += 80;
   if (mapSlug && lower.includes(`/${mapSlug}/`)) score += 35;
-  if (mapSlug && lower.includes(mapSlug)) score += 15;
+  if (mapSlug && pathIncludesToken(lower, mapSlug)) score += 15;
   for (const tok of titleTokens || []) {
-    if (lower.includes(tok)) score += 25;
+    if (pathIncludesToken(lower, tok)) score += 25;
   }
   return score;
 }
@@ -389,10 +461,13 @@ async function findOverviewInZip(yauzl, zipPath, mapSlug, titleTokens) {
     zipfile.on('entry', (entry) => {
       const name = entry.fileName.replace(/\\/g, '/');
       const low = name.toLowerCase();
+      if (low.includes('__macosx') || /(^|\/)\._/.test(low)) {
+        zipfile.readEntry();
+        return;
+      }
       const isOverview =
         OVERVIEW_ENTRY_RE.test(low) ||
         OVERVIEW_ENTRY_FALLBACK_RE.test(low) ||
-        /(?:^|\/)map\/textures\/ui\/overview\.(dds|png)$/i.test(low) ||
         OVERVIEW_NAMES.has(path.basename(low));
       if (!isOverview) {
         zipfile.readEntry();
@@ -646,6 +721,28 @@ async function findOverviewSourceFile({ mapId, mapTitle, modsRoot, modsRoots }) 
   return { sourcePath: null, mapSlug };
 }
 
+async function findMagickInProgramFiles() {
+  const roots = [
+    process.env.ProgramFiles || 'C:\\Program Files',
+    process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)',
+  ];
+  for (const root of roots) {
+    if (!root) continue;
+    let entries = [];
+    try {
+      entries = await fs.promises.readdir(root, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const ent of entries) {
+      if (!ent.isDirectory() || !/^ImageMagick/i.test(ent.name)) continue;
+      const exe = path.join(root, ent.name, 'magick.exe');
+      if (await pathExists(exe)) return exe;
+    }
+  }
+  return null;
+}
+
 async function resolveMagickExe() {
   const names = ['magick.exe', 'magick'];
   for (const name of names) {
@@ -658,6 +755,8 @@ async function resolveMagickExe() {
       /* next */
     }
   }
+  const fromPf = await findMagickInProgramFiles();
+  if (fromPf) return fromPf;
   const bundledDirs = [
     path.join(__dirname, 'resources', 'imagemagick'),
     path.join(process.resourcesPath || '', 'imagemagick'),
@@ -735,7 +834,7 @@ async function convertDdsToPng(sourcePath, destPng) {
 function cacheKeyForMap(mapSlug, mapId, mapTitle) {
   const identity = `${mapSlug || ''}|${mapId || ''}|${mapTitle || ''}`.toLowerCase();
   const h = crypto.createHash('sha1').update(identity).digest('hex').slice(0, 12);
-  const slug = (mapSlug || mapTitle || mapId || 'map').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 40);
+  const slug = sanitizeMapSlug(mapSlug) || sanitizeMapSlug(String(mapTitle || mapId || 'map').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 40)) || 'map';
   return `${slug}_${h}`;
 }
 
@@ -751,7 +850,7 @@ async function readPngRgbDownsampled(pngPath, sampleSize = TERRAIN_INSET_SAMPLE_
   return { buf: r.stdout, size: sampleSize };
 }
 
-async function analyzeTerrainInsetFromPng(pngPath, mapSlug, mapId) {
+async function analyzeTerrainInsetFromPng(pngPath, mapSlug, mapId, sourcePath) {
   const sample = await readPngRgbDownsampled(pngPath);
   if (!sample) {
     return {
@@ -767,20 +866,23 @@ async function analyzeTerrainInsetFromPng(pngPath, mapSlug, mapId) {
   let analysis = analyzeOverviewTerrain(sample.buf, sample.size);
   const override = lookupTerrainInsetOverride(mapSlug, mapId);
   if (override?.inset && (override.force || analysis.confidence < 0.55)) {
+    const rawInset = roundInset(override.inset);
+    // Override supplies true UV; do not bake DISPLAY_LEFT_PAD into the crop.
+    const pinInset = roundInset(squareizeTerrainInset(rawInset, "center"));
     analysis = {
       ...analysis,
-      pinInset: override.inset,
-      rawInset: override.inset,
+      pinInset,
+      rawInset,
       confidence: override.force ? 1 : analysis.confidence,
-      shouldCrop: !isFullBleedInset(override.inset),
+      shouldCrop: !isFullBleedInset(rawInset),
       mode: 'override',
     };
   }
   return analysis;
 }
 
-async function detectTerrainInsetFromPng(pngPath, mapSlug, mapId) {
-  const analysis = await analyzeTerrainInsetFromPng(pngPath, mapSlug, mapId);
+async function detectTerrainInsetFromPng(pngPath, mapSlug, mapId, sourcePath) {
+  const analysis = await analyzeTerrainInsetFromPng(pngPath, mapSlug, mapId, sourcePath);
   return analysis.pinInset;
 }
 
@@ -800,8 +902,14 @@ async function cropPngToInset(pngPath, inset) {
 
   const x = Math.max(0, Math.round(Number(inset.left) * nw));
   const y = Math.max(0, Math.round(Number(inset.top) * nh));
-  const w = Math.min(nw - x, Math.round(Number(inset.width) * nw));
-  const h = Math.min(nh - y, Math.round(Number(inset.height) * nh));
+  let w = Math.min(nw - x, Math.round(Number(inset.width) * nw));
+  let h = Math.min(nh - y, Math.round(Number(inset.height) * nh));
+  // World terrain is square — keep the crop square after pixel rounding.
+  if (Math.abs(w - h) > 0 && Math.abs(w - h) <= 3) {
+    const side = Math.min(w, h);
+    w = side;
+    h = side;
+  }
   if (w < 32 || h < 32) return false;
 
   const tmp = `${pngPath}.crop_${crypto.randomBytes(4).toString('hex')}.png`;
@@ -816,16 +924,24 @@ async function cropPngToInset(pngPath, inset) {
   }
 }
 
-async function postProcessOverviewPng(pngPath, mapSlug, mapId) {
-  const analysis = await analyzeTerrainInsetFromPng(pngPath, mapSlug, mapId);
-  const pinInset = analysis.pinInset || { ...FULL_TERRAIN_INSET };
-  // Keep the full overview PNG; the web UI clips to terrainInset client-side so
-  // pins and imagery always share the same coordinate frame.
+async function postProcessOverviewPng(pngPath, mapSlug, mapId, sourcePath) {
+  // Keep the whole overview.dds. Playable world is the centre 50%
+  // (IngameMap mapExtension). Overlay UV is remapped in fleetMapGeo; cropping
+  // the PNG would hide the authored scenery and double-shift pins.
+  const full = { ...FULL_TERRAIN_INSET };
   return {
-    terrainInset: isFullBleedInset(pinInset) ? { ...FULL_TERRAIN_INSET } : pinInset,
+    terrainInset: full,
+    clipTerrainInset: full,
     imageCropped: false,
-    detectedInset: pinInset,
-    analysis,
+    detectedInset: full,
+    analysis: {
+      mode: 'ingame-map',
+      shouldCrop: false,
+      confidence: 1,
+      pinInset: full,
+      rawInset: full,
+      mapXml: null,
+    },
   };
 }
 
@@ -858,7 +974,6 @@ async function ensureCachedPng(sourceDescriptor, mapSlug, mapId, mapTitle) {
       meta.mtimeMs === stat.mtimeMs &&
       meta.size === stat.size &&
       meta.terrainInset &&
-      !meta.imageCropped &&
       (await pathExists(pngPath));
     if (cacheFresh) {
       return {
@@ -866,6 +981,7 @@ async function ensureCachedPng(sourceDescriptor, mapSlug, mapId, mapTitle) {
         key,
         mapTitle: meta.mapTitle || mapTitle || null,
         terrainInset: meta.terrainInset,
+        clipTerrainInset: meta.clipTerrainInset || meta.terrainInset,
         imageCropped: !!meta.imageCropped,
       };
     }
@@ -882,7 +998,7 @@ async function ensureCachedPng(sourceDescriptor, mapSlug, mapId, mapTitle) {
     throw new Error(`Unsupported overview format: ${ext}`);
   }
 
-  const processed = await postProcessOverviewPng(pngPath, mapSlug, mapId);
+  const processed = await postProcessOverviewPng(pngPath, mapSlug, mapId, cacheSourceKey);
 
   await fs.promises.writeFile(
     metaPath,
@@ -895,6 +1011,7 @@ async function ensureCachedPng(sourceDescriptor, mapSlug, mapId, mapTitle) {
       mapId: mapId || null,
       mapTitle: mapTitle || null,
       terrainInset: processed.terrainInset,
+      clipTerrainInset: processed.clipTerrainInset,
       imageCropped: processed.imageCropped,
       detectedInset: processed.detectedInset,
       terrainAnalysis: processed.analysis
@@ -902,6 +1019,7 @@ async function ensureCachedPng(sourceDescriptor, mapSlug, mapId, mapTitle) {
             mode: processed.analysis.mode,
             confidence: processed.analysis.confidence,
             pinInset: processed.analysis.pinInset,
+            rawInset: processed.analysis.rawInset,
           }
         : null,
       cachedAt: new Date().toISOString(),
@@ -913,6 +1031,7 @@ async function ensureCachedPng(sourceDescriptor, mapSlug, mapId, mapTitle) {
     key,
     mapTitle: mapTitle || null,
     terrainInset: processed.terrainInset,
+    clipTerrainInset: processed.clipTerrainInset,
     imageCropped: processed.imageCropped,
   };
 }
@@ -946,8 +1065,10 @@ async function resolveMapOverviewImage({ mapId, mapTitle, modsRoot, modsRoots })
       sourcePath,
       mapSlug,
       mapTitle: mapTitle || null,
+      // After v9 crop these are full-bleed; otherwise raw/clip UV for remapping / legacy clip.
       terrainInset: cached.terrainInset || { ...FULL_TERRAIN_INSET },
-      imageCropped: false,
+      clipTerrainInset: cached.clipTerrainInset || cached.terrainInset || { ...FULL_TERRAIN_INSET },
+      imageCropped: !!cached.imageCropped,
       cacheVersion: OVERVIEW_CACHE_VERSION,
     };
   } catch (e) {
@@ -973,11 +1094,15 @@ module.exports = {
   findOverviewInPdlcPackages,
   pdlcPackageOverviewCandidates,
   findOverviewSourceFile,
+  resolveMagickExe,
   resolveMapOverviewImage,
   scoreOverviewPath,
   analyzeTerrainInsetFromPng,
   detectTerrainInsetFromPng,
   postProcessOverviewPng,
+  convertDdsToPng,
+  isOfficialMapUiOverviewPath,
+  parseMapXmlMeta,
   OVERVIEW_CACHE_VERSION,
   MAP_DLC_PACKAGE_HINTS,
 };

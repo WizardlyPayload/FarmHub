@@ -113,4 +113,108 @@ describe('detailAnimalsHydrate count reconciliation', () => {
         expect(pen.animalCount).toBe(5);
         expect(pen.animals).toHaveLength(5);
     });
+
+    test('RL unique-id file hydrates when capture is at least 80% of the aggregate', () => {
+        writeDetail(400, {
+            animals: Array.from({ length: 90 }, (_, i) => ({
+                id: `400:${1000 + i}:0`,
+                uniqueId: String(1000 + i),
+                gender: 'female',
+                weight: 200 + i,
+                health: 80 + (i % 10),
+            })),
+        });
+        const out = hydrate({
+            animals: [
+                {
+                    id: 400,
+                    ownerFarmId: 1,
+                    animalCount: 100,
+                    numOfAnimalsReported: 100,
+                    clusters: [{ count: 100 }],
+                },
+            ],
+        });
+        const pen = out.animals[0];
+        expect(pen.__detailHydrated).toBe(true);
+        expect(pen.animals).toHaveLength(90);
+        expect(pen.animals[0].uniqueId).toBe('1000');
+        expect(pen.animals[1].weight).toBe(201);
+    });
+
+    test('tiny unique-id mismatch still skipped (wrong component file)', () => {
+        writeDetail(500, {
+            animals: Array.from({ length: 7 }, (_, i) => ({
+                uniqueId: String(10 + i),
+                gender: 'female',
+            })),
+        });
+        const out = hydrate({
+            animals: [
+                {
+                    id: 500,
+                    ownerFarmId: 1,
+                    animalCount: 71,
+                    numOfAnimalsReported: 71,
+                    clusters: [{ count: 71 }],
+                },
+            ],
+        });
+        expect(out.animals[0].__detailHydrated).not.toBe(true);
+        expect(out.animals[0].animals).toBeUndefined();
+    });
+
+    test('same placeable id on two farms keeps each farm\'s richest file', () => {
+        fs.writeFileSync(
+            path.join(detailsDir, 'animals_farm1_568.json'),
+            JSON.stringify({
+                placeableId: 568,
+                ownerFarmId: 1,
+                animals: Array.from({ length: 4 }, (_, i) => ({
+                    uniqueId: String(510000 + i),
+                    weight: 200 + i,
+                })),
+            })
+        );
+        fs.writeFileSync(
+            path.join(detailsDir, 'animals_farm15_568.json'),
+            JSON.stringify({
+                placeableId: 568,
+                ownerFarmId: 15,
+                animals: Array.from({ length: 2 }, (_, i) => ({
+                    uniqueId: String(800000 + i),
+                    weight: 300 + i,
+                })),
+            })
+        );
+        const out = hydrate({
+            animals: [
+                { id: 568, ownerFarmId: 1, animalCount: 4, numOfAnimalsReported: 4 },
+                { id: 568, ownerFarmId: 15, animalCount: 2, numOfAnimalsReported: 2 },
+            ],
+        });
+        expect(out.animals[0].animals.map((a) => a.uniqueId)).toEqual(['510000', '510001', '510002', '510003']);
+        expect(out.animals[1].animals.map((a) => a.uniqueId)).toEqual(['800000', '800001']);
+    });
+
+    test('empty animals object does not hide a full unique-id file', () => {
+        fs.writeFileSync(
+            path.join(detailsDir, 'animals_empty_568.json'),
+            JSON.stringify({ placeableId: 568, ownerFarmId: 1, animals: {} })
+        );
+        fs.writeFileSync(
+            path.join(detailsDir, 'animals_full_568.json'),
+            JSON.stringify({
+                placeableId: 568,
+                ownerFarmId: 1,
+                animals: [{ uniqueId: '510016', weight: 234.6, health: 99 }],
+            })
+        );
+        const out = hydrate({
+            animals: [{ id: 568, ownerFarmId: 1, animalCount: 1, numOfAnimalsReported: 1 }],
+        });
+        expect(out.animals[0].__detailHydrated).toBe(true);
+        expect(out.animals[0].animals).toHaveLength(1);
+        expect(out.animals[0].animals[0].uniqueId).toBe('510016');
+    });
 });

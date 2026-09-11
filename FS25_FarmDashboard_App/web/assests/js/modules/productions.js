@@ -22,6 +22,19 @@ export function normalizeProductionChains(production) {
   return [];
 }
 
+/** Map / EVERYONE / owner 0 — never treat as player-owned. */
+export function isPublicProductionChain(chain) {
+  if (!chain) return false;
+  if (chain.isPublic === true) return true;
+  if (chain.isOwned === false) return true;
+  const oid = Number(chain.ownerFarmId);
+  return !Number.isFinite(oid) || oid <= 0;
+}
+
+export function getPublicChains(production) {
+  return normalizeProductionChains(production).filter(isPublicProductionChain);
+}
+
 export function getOwnedChainsForFarm(production, farmId, farmInfo) {
   const all = normalizeProductionChains(production);
   if (all.length === 0) return [];
@@ -29,16 +42,35 @@ export function getOwnedChainsForFarm(production, farmId, farmInfo) {
   let fid = Number(farmId);
   if (!Number.isFinite(fid) || fid <= 0) fid = 1;
 
-  const strict = all.filter((ch) => Number(ch.ownerFarmId) === fid);
+  // Never treat public/map chains (owner 0 / isPublic) as owned.
+  const ownedOnly = all.filter((ch) => !isPublicProductionChain(ch));
+
+  const strict = ownedOnly.filter((ch) => Number(ch.ownerFarmId) === fid);
   if (strict.length > 0) return strict;
 
   const playerIds = getPlayerFarmIdSet(farmInfo);
   if (playerIds.size > 0) {
-    const onPlayerFarms = all.filter((ch) => playerIds.has(Number(ch.ownerFarmId)));
+    const onPlayerFarms = ownedOnly.filter((ch) => playerIds.has(Number(ch.ownerFarmId)));
     if (onPlayerFarms.length > 0) return onPlayerFarms;
   }
 
   return strict;
+}
+
+/** Owned chains for the farm, optionally including map/public productions. */
+export function getChainsForFarmView(production, farmId, farmInfo, includePublic = false) {
+  const owned = getOwnedChainsForFarm(production, farmId, farmInfo);
+  if (!includePublic) return owned;
+  const publicChains = getPublicChains(production);
+  const seen = new Set(owned.map((c) => String(c.id ?? c.name)));
+  const merged = owned.slice();
+  for (const ch of publicChains) {
+    const key = String(ch.id ?? ch.name);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(ch);
+  }
+  return merged;
 }
 
 export function getOwnedProductionChainCount() {

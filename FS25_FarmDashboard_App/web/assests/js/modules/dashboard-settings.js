@@ -513,6 +513,7 @@ export async function populateDashboardSettingsForm() {
   });
 
   populateAboutModVersions(this);
+  populateUxHealth(this);
 
   if (!api) {
     return;
@@ -675,18 +676,56 @@ export async function populateDashboardSettingsForm() {
   try {
     const lan = await api.getLanAccessSettings();
     const lanEn = document.getElementById("settings-lan-enabled");
-    if (lanEn) lanEn.checked = !!lan.lanAccessEnabled;
     const lanU = document.getElementById("settings-lan-username");
-    if (lanU) lanU.value = lan.lanUsername || "admin";
     const lanP = document.getElementById("settings-lan-password");
+    const lanIps = document.getElementById("settings-lan-allowed-ips");
+    const lanOpt = document.getElementById("settings-lan-auth-optional");
+    if (lanEn) lanEn.checked = !!lan.lanAccessEnabled;
+    if (lanU) lanU.value = lan.lanUsername || "admin";
     if (lanP) {
       lanP.value = typeof lan.lanPassword === "string" ? lan.lanPassword : "";
       lanP.placeholder = "••••••••";
     }
-    const lanIps = document.getElementById("settings-lan-allowed-ips");
     if (lanIps) lanIps.value = lan.lanAllowedIPs || "";
-    const lanOpt = document.getElementById("settings-lan-auth-optional");
     if (lanOpt) lanOpt.checked = !!lan.lanAuthOptional;
+    if (lanEn && !lanEn.dataset.uxBound) {
+      lanEn.dataset.uxBound = "1";
+      lanEn.addEventListener("change", () => {
+        if (lanEn.checked && !confirm(t("ux.lan.confirmEnable"))) {
+          lanEn.checked = false;
+        }
+        syncLanRiskBadge();
+      });
+    }
+    if (lanOpt && !lanOpt.dataset.uxBound) {
+      lanOpt.dataset.uxBound = "1";
+      lanOpt.addEventListener("change", () => {
+        syncLanRiskBadge();
+        syncLanOptionalBanner();
+      });
+    }
+    const restoreBtn = document.getElementById("settings-lan-restore-default");
+    if (restoreBtn && !restoreBtn.dataset.uxBound) {
+      restoreBtn.dataset.uxBound = "1";
+      restoreBtn.addEventListener("click", async () => {
+        if (typeof api.restoreLanDefaults !== "function") return;
+        try {
+          const res = await api.restoreLanDefaults();
+          if (!res?.ok) return;
+          const next = await api.getLanAccessSettings();
+          if (lanEn) lanEn.checked = !!next.lanAccessEnabled;
+          if (lanU) lanU.value = next.lanUsername || "admin";
+          if (lanP) lanP.value = typeof next.lanPassword === "string" ? next.lanPassword : "";
+          if (lanIps) lanIps.value = next.lanAllowedIPs || "";
+          if (lanOpt) lanOpt.checked = !!next.lanAuthOptional;
+          syncLanRiskBadge();
+          syncLanOptionalBanner();
+        } catch (e) {
+          console.warn("[dashboard-settings] restore LAN", e);
+        }
+      });
+    }
+    syncLanRiskBadge();
     syncLanOptionalBanner();
   } catch (e) {
     console.warn("[dashboard-settings] LAN access", e);
@@ -840,6 +879,25 @@ export async function saveDashboardSettingsFromModal() {
   }
 }
 
+function syncLanRiskBadge() {
+  const badge = document.getElementById("settings-lan-risk-badge");
+  const lanEn = document.getElementById("settings-lan-enabled");
+  const lanOpt = document.getElementById("settings-lan-auth-optional");
+  if (!badge) return;
+  if (!lanEn?.checked) {
+    badge.textContent = t("ux.lan.localOnly");
+    badge.className = "badge text-bg-success";
+    return;
+  }
+  if (lanOpt?.checked) {
+    badge.textContent = t("ux.lan.exposedHigh");
+    badge.className = "badge text-bg-danger";
+    return;
+  }
+  badge.textContent = t("ux.lan.exposedAuth");
+  badge.className = "badge text-bg-warning";
+}
+
 function populateAboutModVersions(dashboard) {
   const modEl = document.getElementById("settings-about-mod-version");
   const expectedEl = document.getElementById("settings-about-mod-expected");
@@ -859,6 +917,26 @@ function populateAboutModVersions(dashboard) {
     return;
   }
   modEl.textContent = t("settings.aboutModNotConnected");
+}
+
+function populateUxHealth(dashboard) {
+  const host = document.getElementById("settings-ux-health");
+  if (!host) return;
+  const ts = dashboard?.dataTimestamps || {};
+  const diag = dashboard?.diagnostics || {};
+  const eventsEl = document.getElementById("settings-ux-events");
+  host.textContent = [
+    t("ux.health.modVersion") + ": " + (diag.modVersion || dashboard?.modVersionCheck?.actual || "—"),
+    t("ux.health.lastExport") + ": " + (ts.fetchedAt || dashboard?.lastUpdated || "—"),
+    t("ux.freshness.stale") + ": " + (ts.isStale ? t("ux.freshness.stale") : t("ux.freshness.live")),
+  ].join(" · ");
+  const api = getFarmDashApi();
+  if (api?.getSetupStatus && eventsEl) {
+    api.getSetupStatus().then((st) => {
+      const rows = Array.isArray(st?.recentEvents) ? st.recentEvents : [];
+      eventsEl.textContent = rows.map((e) => `${e.code}: ${e.message}`).join(" | ") || t("ux.health.none");
+    }).catch(() => {});
+  }
 }
 
 const UNIFIED_SETTINGS_TAB_IDS = {

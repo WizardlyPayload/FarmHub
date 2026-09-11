@@ -316,11 +316,6 @@ export function formatForecastTempRange(day, fallbackCelsius) {
   }
   if (Number.isFinite(min)) return `${Math.round(min)}°C`;
   if (Number.isFinite(max)) return `${Math.round(max)}°C`;
-  const fb = Number(fallbackCelsius);
-  if (Number.isFinite(fb)) {
-    const base = Math.round(fb);
-    return `${base - 5}° - ${base + 5}°C`;
-  }
   return tOr("weather.tempUnavailable", "—");
 }
 

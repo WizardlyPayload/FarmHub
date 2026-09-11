@@ -21,7 +21,9 @@ import {
 import { buildToolGuidanceLines } from "../field-suggestion-tools.js";
 import { buildFieldDisplayClusters, syntheticFieldFromCluster } from "../field-clusters.js";
 import { t } from "../i18n/i18n.js";
+import { renderUiStateHtml } from "./uiState.js";
 import { formatMoisturePercent, moistureGradeLabel } from "./moisture.js";
+import { isMowableForageCrop } from "../forage-crop-types.js";
 
 /**
  * fields.js  —  FarmDashboard FS25
@@ -130,7 +132,7 @@ const HARVEST_ORANGE = "#ff9800";
 /** Grass is perennial in FS; never treat as arable "withered" in the UI. */
 function fieldShowsWithered(field) {
     if (!field || !field.isWithered) return false;
-    if (String(field.fruitType || "").toUpperCase() === "GRASS") return false;
+    if (isMowableForageCrop(field)) return false;
     return true;
 }
 
@@ -309,12 +311,11 @@ function renderFields(filterType = "all", searchTerm = "") {
     if (!container) return;
 
     if (displayFieldRows.length === 0 && currentFields.length === 0) {
-        container.innerHTML = `
-            <div class="col-12 text-center py-5 text-muted">
-                <i class="bi bi-hourglass-split display-1 mb-3"></i>
-                <h4>${escapeFieldHtml(t("fields.waitingDataTitle"))}</h4>
-                <p>${escapeFieldHtml(t("fields.waitingDataBody"))}</p>
-            </div>`;
+        container.innerHTML = renderUiStateHtml({
+            state: "empty",
+            title: t("fields.waitingDataTitle"),
+            body: t("fields.waitingDataBody"),
+        });
         return;
     }
 
@@ -583,14 +584,14 @@ function isSoilTilledField(field) {
 /** Grass: map shows 4 growth steps; higher engine stages = after cut / regrowth. */
 function grassStageCapForBar(field) {
     let max = Math.max(1, Number(field.maxGrowthState) || 4);
-    if ((field.fruitType || "").toUpperCase() === "GRASS" && max > 4) max = 4;
+    if (isMowableForageCrop(field) && max > 4) max = 4;
     return max;
 }
 
 /** Prefer mod `grassRingStage` (1–4) so mown regrowth never shows e.g. 5/4 vs the map. */
 function grassRingCurMax(field) {
     const ftU = (field.fruitType || "").toUpperCase();
-    if (ftU !== "GRASS") return null;
+    if (!isMowableForageCrop(field)) return null;
     const max = grassStageCapForBar(field);
     const ring = Number(field.grassRingStage);
     if (Number.isFinite(ring) && ring > 0) {
@@ -615,7 +616,7 @@ function tryRegrowthProgressBar(field) {
     const bg = greenGradientForPercent(pct);
     const fg = contrastForBg(bg);
 
-    if (ftU === "GRASS") {
+    if (isMowableForageCrop(field)) {
         const cap = grassStageCapForBar(field);
         const rm = grassRingCurMax(field);
         const cur = rm ? rm.cur : Math.min(rawGs, cap);
@@ -643,9 +644,9 @@ function buildProgressBar(field) {
         const pct = Math.min(100, Math.max(0, field.growthStatePercentage || 0));
         let max = Math.max(1, Number(field.maxGrowthState) || 1);
         const ftU = (field.fruitType || "").toUpperCase();
-        if (ftU === "GRASS" && max > 4) max = 4;
+        if (isMowableForageCrop(field) && max > 4) max = 4;
         const rawGs = Number(field.growthState) || 0;
-        const rm = ftU === "GRASS" ? grassRingCurMax(field) : null;
+        const rm = isMowableForageCrop(field) ? grassRingCurMax(field) : null;
         let cur = rm ? rm.cur : rawGs;
         if (!rm && cur > max) cur = max;
         const bg = greenGradientForPercent(pct);
@@ -680,9 +681,9 @@ function buildProgressBar(field) {
     const pct = field.growthStatePercentage || 0;
     let max = Math.max(1, Number(field.maxGrowthState) || 1);
     const ftU = (field.fruitType || "").toUpperCase();
-    if (ftU === "GRASS" && max > 4) max = 4;
+    if (isMowableForageCrop(field) && max > 4) max = 4;
     const rawGs = Number(field.growthState) || 0;
-    if (ftU === "GRASS" && rawGs > max) {
+    if (isMowableForageCrop(field) && rawGs > max) {
         const cap = grassStageCapForBar(field);
         const rm = grassRingCurMax(field);
         const cur = rm ? rm.cur : ((rawGs - 1) % cap) + 1;
@@ -695,7 +696,7 @@ function buildProgressBar(field) {
         );
     }
     let cur = rawGs;
-    if (ftU === "GRASS") {
+    if (isMowableForageCrop(field)) {
         const rm = grassRingCurMax(field);
         if (rm) cur = rm.cur;
     }
@@ -1007,7 +1008,7 @@ function isWinterSeasonFromDashboard() {
  */
 function getWinterFieldSeasonalNote(field) {
     if (!isWinterSeasonFromDashboard()) return "";
-    if (String(field.fruitType || "").toUpperCase() === "GRASS") return "";
+    if (isMowableForageCrop(field)) return "";
     const hasCrop = (field.fruitTypeIndex || 0) > 0 && (field.growthState || 0) > 0;
     if (!hasCrop) return "";
     if (field.harvestReady || fieldIsAlreadyHarvested(field)) return "";
@@ -1237,13 +1238,12 @@ function showFieldsApiError() {
     if (!el) return;
     // Only show error if we have no data at all
     if (currentFields.length > 0) return;
-    el.innerHTML = `
-        <div class="col-12 text-center py-5 text-muted">
-            <i class="bi bi-wifi-off display-1 mb-3"></i>
-            <h4>${escapeFieldHtml(t("fields.apiErrorTitle"))}</h4>
-            <p>${escapeFieldHtml(t("fields.apiErrorBody"))}</p>
-            <small>${escapeFieldHtml(t("fields.apiErrorRetrying"))}</small>
-        </div>`;
+    el.innerHTML = renderUiStateHtml({
+        state: "error",
+        title: t("fields.apiErrorTitle"),
+        body: t("fields.apiErrorBody"),
+        showRetry: true,
+    });
 }
 
 // ── Static HTML shell ─────────────────────────────────────────────────────────

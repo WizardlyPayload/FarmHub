@@ -31,8 +31,12 @@ function walk(dir) {
 
 let failed = 0;
 const files = walk(modSrc);
+if (files.length === 0) {
+  console.error('FAIL: no Lua source files selected');
+  process.exit(1);
+}
 for (const f of files) {
-  const src = fs.readFileSync(f, "utf8");
+  const src = fs.readFileSync(f, "utf8").replace(/^\uFEFF/, "");
   try {
     luaparse.parse(src, { luaVersion: "5.1" });
     console.log(`OK    ${path.relative(modSrc, f)}`);

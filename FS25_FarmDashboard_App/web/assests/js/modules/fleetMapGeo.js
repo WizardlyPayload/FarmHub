@@ -176,9 +176,9 @@ export function resolveTerrainBounds(dashboard, vehicles) {
 }
 
 /**
- * PDA overview.dds UV layout is usually the engine-standard 2 km halfSize (±1024 m)
- * even when the save reports a larger terrain (4 km mod maps). Using the full
- * terrain half for pin projection compresses north–south and clips east–west.
+ * PDA overview.dds spans the playable terrain. Use the save's reported halfSize
+ * (±1024 for 2 km, ±2048 for 4 km, etc.) so pins land on the satellite sub-rect.
+ * Do not squash 4 km maps onto a 2 km UV — that clamps outer vehicles to the edge.
  */
 export function resolveOverviewTerrainBounds(dashboard) {
   const raw = dashboard?.mapBounds || dashboard?.serverInfo?.mapBounds;
@@ -187,9 +187,5 @@ export function resolveOverviewTerrainBounds(dashboard) {
   if (!raw?.halfSize && Number.isFinite(terrainSize) && terrainSize >= MIN_TERRAIN_HALF * 2) {
     reportedHalf = normalizeTerrainHalf(terrainSize * 0.5);
   }
-
-  const isLargeTerrain =
-    (Number.isFinite(terrainSize) && terrainSize > 2048) || reportedHalf > 1024;
-  const overviewHalf = isLargeTerrain ? 1024 : reportedHalf;
-  return boundsFromTerrainHalf(overviewHalf);
+  return boundsFromTerrainHalf(reportedHalf);
 }

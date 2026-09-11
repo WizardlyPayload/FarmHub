@@ -23,6 +23,27 @@ describe('field moisture offline persistence', () => {
         expect(fps[28].moisture.grade).toBe('B');
     });
 
+    test('buildFieldLiveFingerprints caches soil, outline, and position', () => {
+        const outline = [[-2038, 10], [2037, 10], [2037, 80]];
+        const fps = buildFieldLiveFingerprints([
+            {
+                farmlandId: 28,
+                hectares: 3.1,
+                posX: -1236,
+                posZ: 1797,
+                soilFertilizer: { enabled: true, organicMatter: 4.1 },
+                cropStress: { enabled: true, moisturePercent: 12 },
+                outline,
+                fruitMapColor: '#E8C547',
+            },
+        ]);
+        expect(fps[28].soilFertilizer.organicMatter).toBe(4.1);
+        expect(fps[28].cropStress.moisturePercent).toBe(12);
+        expect(fps[28].outline).toEqual(outline);
+        expect(fps[28].posX).toBe(-1236);
+        expect(fps[28].fruitMapColor).toBe('#E8C547');
+    });
+
     test('mergeFields falls back to fieldLiveCache when live moisture missing', () => {
         const cache = buildFieldLiveFingerprints([
             {
@@ -54,6 +75,56 @@ describe('field moisture offline persistence', () => {
         );
         const field = merged.fields.find((f) => Number(f.farmlandId ?? f.id) === 28);
         expect(field.moisture.percent).toBe(22);
+    });
+
+    test('mergeData upgrades 2 km mapBounds from cached field position and outline', () => {
+        const outline = [
+            [-2038, -100],
+            [2037, -100],
+            [2037, 200],
+        ];
+        const cache = buildFieldLiveFingerprints([
+            {
+                farmlandId: 28,
+                hectares: 3.1,
+                posX: -1236,
+                posZ: 1797,
+                fruitType: 'WHEAT',
+                outline,
+                soilFertilizer: { enabled: true, organicMatter: 2.2 },
+            },
+        ]);
+        const merged = mergeData(
+            {
+                serverInfo: {
+                    saveSlot: 'savegame1',
+                    mapBounds: { halfSize: 1024, terrainSize: 2048, minX: -1024, maxX: 1024, minZ: -1024, maxZ: 1024 },
+                },
+                fields: {},
+                finance: {},
+                gameTime: { day: 1 },
+                weather: {},
+                economy: {},
+                animals: [],
+                production: {},
+                farmInfo: [],
+                realisticFarming: { soilFertilizer: { enabled: false } },
+            },
+            {
+                allFields: [{ farmlandId: 28, id: 28, fruitType: 'WHEAT', ownerFarmId: 1 }],
+                farmlandsArray: [{ farmId: 1, id: 28 }],
+                farms: [{ id: 1, name: 'Farm 1' }],
+                career: { mapTitle: 'Montana Map' },
+                environment: { forecast: [] },
+            },
+            { fieldLiveCache: cache }
+        );
+        const field = merged.fields.find((f) => Number(f.farmlandId ?? f.id) === 28);
+        expect(merged.mapBounds.halfSize).toBe(2048);
+        expect(merged.mapBounds.terrainSize).toBe(4096);
+        expect(field.posX).toBe(-1236);
+        expect(field.outline).toEqual(outline);
+        expect(field.soilFertilizer.organicMatter).toBe(2.2);
     });
 
     test('mergeWeather keeps MoistureSystem block when XML environment is present', () => {
@@ -90,6 +161,25 @@ describe('field moisture offline persistence', () => {
         const next = [{ farmlandId: 5, hectares: 2, fruitType: 'BARLEY' }];
         const out = mergeFieldsMoistureForward(prev, next);
         expect(out[0].moisture.percent).toBe(16.1);
+    });
+
+    test('mergeFieldsMoistureForward keeps soilFertilizer and outline', () => {
+        const outline = [[-2000, -100], [2000, -100], [2000, 100]];
+        const prev = [
+            {
+                farmlandId: 5,
+                hectares: 2,
+                posX: -1236,
+                posZ: 1797,
+                soilFertilizer: { enabled: true, organicMatter: 3.1 },
+                outline,
+            },
+        ];
+        const next = [{ farmlandId: 5, hectares: 2, fruitType: 'BARLEY' }];
+        const out = mergeFieldsMoistureForward(prev, next);
+        expect(out[0].soilFertilizer.organicMatter).toBe(3.1);
+        expect(out[0].outline).toEqual(outline);
+        expect(out[0].posX).toBe(-1236);
     });
 
     test('applyLiveSectionHold restores weather and bale moisture when live export drops them', () => {

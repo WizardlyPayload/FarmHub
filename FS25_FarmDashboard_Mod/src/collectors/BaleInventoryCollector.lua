@@ -7,7 +7,7 @@ BaleInventoryCollector._last = nil
 BaleInventoryCollector._inc = nil
 
 local function _mission()
-    return rawget(_G, "g_currentMission")
+    return _G.g_currentMission
 end
 
 local function _currentFarmId()

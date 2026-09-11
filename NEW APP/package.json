@@ -1,0 +1,26 @@
+{
+  "name": "@farmhub/ui-v2",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "prebuild": "node scripts/copy-locales.mjs",
+    "dev": "vite",
+    "dev:ui": "node ../tools/app/run-vite-dev.mjs",
+    "dev:ui:isolated": "node ../tools/app/run-vite-dev.mjs --isolated",
+    "build": "vite build",
+    "postbuild": "node ../tools/app/copy-ui-v2.mjs",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/table-core": "^8.21.3",
+    "preact": "^10.26.5",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.1",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.3"
+  }
+}

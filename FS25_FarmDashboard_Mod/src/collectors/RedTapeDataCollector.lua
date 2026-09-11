@@ -11,9 +11,36 @@ local MAX_GRANTS = 8
 local MAX_FARMLANDS_ROTATION = 48
 local TIER_NAMES = { [1] = "A", [2] = "B", [3] = "C", [4] = "D" }
 
+--- Soft detect Red Tape (mod list and/or live mission object).
+local function rtModLoaded()
+    if _G.g_modIsLoaded and (_G.g_modIsLoaded["FS25_RedTape"] or _G.g_modIsLoaded["FS25_RedTape_CareerSavegame"]) then
+        return true
+    end
+    if _G.g_modManager and _G.g_modManager.getActiveModByName then
+        for _, name in ipairs({ "FS25_RedTape", "FS25_RedTape_CareerSavegame" }) do
+            local ok, mod = pcall(function()
+                return _G.g_modManager:getActiveModByName(name)
+            end)
+            if ok and mod ~= nil then
+                return true
+            end
+        end
+    end
+    if _G.g_currentMission and _G.g_currentMission.RedTape ~= nil then
+        return true
+    end
+    if rawget(_G, "RedTape") ~= nil or rawget(_G, "RTPolicies") ~= nil then
+        return true
+    end
+    return false
+end
+
 local function rtEnabled()
-    local rt = _G.g_currentMission and _G.g_currentMission.RedTape
-    return rt ~= nil
+    return _G.g_currentMission and _G.g_currentMission.RedTape ~= nil
+end
+
+function RedTapeDataCollector.isModLoaded()
+    return rtModLoaded()
 end
 
 local function rtTierLabel(tierNum)
@@ -83,6 +110,8 @@ local function rtSerializePolicies(rt, farmId)
     return out
 end
 
+local rtSerializeAvailableSchemesForFarm
+
 local function rtSerializeSchemes(schemeSystem, policySystem, farmId, active)
     if not schemeSystem then return {} end
     if not active then
@@ -107,7 +136,7 @@ local function rtSerializeSchemes(schemeSystem, policySystem, farmId, active)
     return out
 end
 
-local function rtSerializeAvailableSchemesForFarm(schemeSystem, policySystem, farmId)
+rtSerializeAvailableSchemesForFarm = function(schemeSystem, policySystem, farmId)
     if not schemeSystem or not policySystem then return {} end
     local progress = nil
     if policySystem.getProgressForFarm then
@@ -382,13 +411,19 @@ function RedTapeDataCollector:collectBegin()
 end
 
 function RedTapeDataCollector:collectStep(opts)
-    if not rtEnabled() then
+    if not rtModLoaded() then
         RedTapeDataCollector._inc = nil
         return true, { enabled = false }
     end
 
+    -- Mod present but mission RedTape not ready yet — keep UI/enabled stub.
+    if not rtEnabled() then
+        RedTapeDataCollector._inc = nil
+        return true, { enabled = true, byFarm = {} }
+    end
+
     local st = RedTapeDataCollector._inc
-    if not st then return true, { enabled = false } end
+    if not st then return true, { enabled = true, byFarm = {} } end
 
     local per = math.max(1, tonumber(opts and opts.redTapeFarmsPerFrame) or 1)
     local rt = _G.g_currentMission.RedTape

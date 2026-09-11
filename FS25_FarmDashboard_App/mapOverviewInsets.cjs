@@ -1,14 +1,16 @@
-// FS25 FarmDashboard | mapOverviewInsets.cjs
-// Optional manual terrain insets when auto-detection is uncertain (fractions 0–1).
+﻿// FS25 FarmDashboard | mapOverviewInsets.cjs
+// Optional manual terrain insets when auto-detection is uncertain (fractions 0-1).
+// Prefer improving mapOverviewTerrainInset.cjs over adding force overrides.
 
 const { roundInset } = require('./mapOverviewTerrainInset.cjs');
 
 /**
  * Curated overrides keyed by map slug fragment (lowercase).
- * Add entries only after verifying pins on a real save — auto-detect handles most maps.
+ * Prefer force:false so high-confidence auto wins.
  */
 const TERRAIN_INSET_OVERRIDES = {
-  // Auto-detect handles Witcombe; add overrides here only when a map still misaligns after testing.
+  // Non-force fallback for Witcombe UV; frame-edge refine should win first.
+  witcombe: { left: 0.25, top: 0.25, width: 0.5, height: 0.5, force: false },
 };
 
 function slugKeys(mapSlug, mapId) {

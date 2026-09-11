@@ -1,6 +1,11 @@
 // FS25 FarmDashboard | lan-http-auth.js
-// Patches global fetch to send HTTP Basic for same-origin /api/* on LAN/tablet hosts.
-// Credentials: sessionStorage + localStorage (Safari on iPhone often breaks tab-only storage; localStorage keeps sign-in stable).
+// Canonical LAN bootstrap contract:
+//   installLanHttpBasicFetchPatch() — call once, as early as possible, before any /api fetch.
+//   farmdashBootstrapLanViewerAuth() — remote viewers only; opens overlay, verifies stored Basic,
+//     then resolveLanGateWaiters(). Call once from index.html (before app.js / realtime-connector).
+//   farmdashWaitForLanHttpBasicIfNeeded() — call once from app.js before dashboard init. Does not
+//     open the overlay. Times out with E_LAN_TIMEOUT so startup cannot hang forever.
+// Credentials: sessionStorage + localStorage (Safari on iPhone often breaks tab-only storage).
 
 const STORAGE_KEY = "farmdash_lan_http_basic_v1";
 
@@ -47,6 +52,8 @@ function clearLanHttpBasicStoredToken() {
   }
 }
 
+export const LAN_AUTH_GATE_TIMEOUT_MS = 30000;
+
 /** Pending `farmdashWaitForLanHttpBasicIfNeeded()` resolvers (real tablets waiting on the overlay). */
 const _lanGateWaiters = [];
 
@@ -86,6 +93,18 @@ function setLanAuthPendingUi(pending) {
   } catch (_) {
     /* ignore */
   }
+}
+
+function lanAuthCopy(key, fallback) {
+  try {
+    if (typeof window !== "undefined" && typeof window.t === "function") {
+      const v = window.t(key);
+      if (v && v !== key) return v;
+    }
+  } catch (_) {
+    /* i18n may not be loaded yet */
+  }
+  return fallback;
 }
 
 function hostnameImpliesLocalDashboard() {
@@ -132,15 +151,36 @@ export function farmdashHasLanHttpBasic() {
 }
 
 /**
- * Resolved before any bootstrap `fetch`/dashboard init on remote viewers once credentials exist
- * or when not a remote hostname.
+ * Resolved before any bootstrap `fetch`/dashboard init on remote viewers.
+ * Stored tokens are not enough — bootstrap verifies first, then resolves waiters.
+ * Times out so a missing overlay cannot hang startup forever.
  */
-export function farmdashWaitForLanHttpBasicIfNeeded() {
-  if (typeof window === "undefined") return Promise.resolve();
-  if (!window.__farmDashRemoteViewer) return Promise.resolve();
-  if (farmdashHasLanHttpBasic()) return Promise.resolve();
+export function farmdashWaitForLanHttpBasicIfNeeded(options = {}) {
+  const win = typeof globalThis !== "undefined" ? globalThis.window : undefined;
+  if (!win) return Promise.resolve();
+  if (!win.__farmDashRemoteViewer) return Promise.resolve();
+  const timeoutMs = Number(options.timeoutMs);
+  const waitMs = Number.isFinite(timeoutMs) ? timeoutMs : LAN_AUTH_GATE_TIMEOUT_MS;
   return new Promise((resolve) => {
-    _lanGateWaiters.push(resolve);
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      try {
+        globalThis.document?.body?.classList.add("farmdash-lan-auth-timeout");
+        globalThis.sessionStorage?.setItem("farmdash_last_error_code", "E_LAN_TIMEOUT");
+      } catch (_) {
+        /* ignore */
+      }
+      done();
+    }, waitMs);
+    _lanGateWaiters.push(() => {
+      clearTimeout(timer);
+      done();
+    });
   });
 }
 
@@ -181,7 +221,16 @@ async function probeServersWithoutExtraAuth() {
 async function verifyLanCredentialsWithFetch() {
   const base = sameOriginHttpBase();
   const r = await fetch(`${base}/api/servers`, { cache: "no-store", method: "GET" });
-  return r.ok;
+  return { ok: !!r.ok, status: Number(r.status) || 0 };
+}
+
+/** @param {number} status @param {boolean} [networkError] */
+export function interpretLanVerifyResult(status, networkError) {
+  if (networkError) return "network";
+  const n = Number(status);
+  if (n === 401 || n === 403) return "auth";
+  if (n >= 200 && n < 300) return "ok";
+  return "network";
 }
 
 /**
@@ -225,12 +274,27 @@ export function farmdashBootstrapLanViewerAuth() {
       b.disabled = true;
       try {
         farmdashSetLanHttpBasic(u, p);
-        const ok = await verifyLanCredentialsWithFetch();
-        if (!ok) {
+        const result = await verifyLanCredentialsWithFetch();
+        const kind = interpretLanVerifyResult(result.status, false);
+        if (kind !== "ok") {
           farmdashClearLanHttpBasic();
+          try {
+            sessionStorage.setItem(
+              "farmdash_last_error_code",
+              kind === "auth" ? "E_AUTH_MISSING" : "E_NETWORK"
+            );
+          } catch (_) {}
           if (errEl) {
             errEl.textContent =
-              "That username/password was rejected by the host. Check LAN login in Farm Dashboard Settings on the PC.";
+              kind === "auth"
+                ? lanAuthCopy(
+                    "lan.authRejected",
+                    "That username/password was rejected by the host. Check LAN login in Farm Dashboard Settings on the PC."
+                  )
+                : lanAuthCopy(
+                    "lan.authUnreachable",
+                    "Could not reach the dashboard API from this browser. Check Wi‑Fi and that the PC app is running."
+                  );
             errEl.classList.remove("d-none");
           }
           return;
@@ -240,8 +304,10 @@ export function farmdashBootstrapLanViewerAuth() {
       } catch (_) {
         farmdashClearLanHttpBasic();
         if (errEl) {
-          errEl.textContent =
-            "Could not reach the dashboard API from this browser. Check Wi‑Fi and that the PC app is running.";
+          errEl.textContent = lanAuthCopy(
+            "lan.authUnreachable",
+            "Could not reach the dashboard API from this browser. Check Wi‑Fi and that the PC app is running."
+          );
           errEl.classList.remove("d-none");
         }
       } finally {
@@ -277,10 +343,61 @@ export function farmdashBootstrapLanViewerAuth() {
         return;
       }
       attachHandlersOnce();
-      if (farmdashHasLanHttpBasic()) {
-        openOverlay(false);
+      const ov = document.getElementById("farmdash-lan-auth-overlay");
+      const errEl = document.getElementById("farmdash-lan-auth-error");
+      if (!ov) {
         resolveLanGateWaiters();
         return;
+      }
+
+      function showAuthOverlay(kind) {
+        if (errEl) {
+          if (kind === "auth") {
+            errEl.textContent = lanAuthCopy(
+              "lan.authStale",
+              "Saved LAN login was rejected. Enter the current username and password from Farm Dashboard Settings on the PC."
+            );
+            errEl.classList.remove("d-none");
+          } else if (kind === "network") {
+            errEl.textContent = lanAuthCopy(
+              "lan.authUnreachable",
+              "Could not reach the dashboard API from this browser. Check Wi‑Fi and that the PC app is running."
+            );
+            errEl.classList.remove("d-none");
+          }
+        }
+        openOverlay(true);
+        try {
+          document.getElementById("farmdash-lan-auth-pass")?.focus();
+        } catch (_) {}
+      }
+
+      if (farmdashHasLanHttpBasic()) {
+        try {
+          const result = await verifyLanCredentialsWithFetch();
+          const kind = interpretLanVerifyResult(result.status, false);
+          if (kind === "ok") {
+            openOverlay(false);
+            resolveLanGateWaiters();
+            return;
+          }
+          farmdashClearLanHttpBasic();
+          try {
+            sessionStorage.setItem(
+              "farmdash_last_error_code",
+              kind === "auth" ? "E_AUTH_MISSING" : "E_NETWORK"
+            );
+          } catch (_) {}
+          showAuthOverlay(kind);
+          return;
+        } catch (_) {
+          farmdashClearLanHttpBasic();
+          try {
+            sessionStorage.setItem("farmdash_last_error_code", "E_NETWORK");
+          } catch (_) {}
+          showAuthOverlay("network");
+          return;
+        }
       }
       // Host trusts this TCP client without Basic (e.g. this PC opened via its own LAN IP — see main.js).
       if (await probeServersWithoutExtraAuth()) {

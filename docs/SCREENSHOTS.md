@@ -1,10 +1,10 @@
 # Screenshots (manifest + capture checklist)
 
-PNG files for [USER_MANUAL.md](./USER_MANUAL.md) and [INSTALL.md](./INSTALL.md) live in [screenshots/](./screenshots/). After adding images, run `python tools/map-all-screenshots.py` then `python tools/discard-unused-screenshots.py` from the repo root. Spare captures land in [`screenshots/discard/`](./screenshots/discard/) (gitignored).
+Committed PNGs for [USER_MANUAL.md](./USER_MANUAL.md) and [INSTALL.md](./INSTALL.md) live in [`doc-screenshots/`](./doc-screenshots/). Drop raw / new-UI captures into [`screenshots/`](./screenshots/) (gitignored WIP inbox). Rename to `fd-*`, then promote into `doc-screenshots/` and point the docs at that path. Helpers: `python tools/map-all-screenshots.py`, `python tools/rename-new-screenshots.py`, `python tools/discard-unused-screenshots.py` (from repo root).
 
 ---
 
-This is the canonical list of every screenshot referenced from [`USER_MANUAL.md`](./USER_MANUAL.md) and [`DEVELOPER_HANDOVER.md`](./DEVELOPER_HANDOVER.md). All images live under [`docs/screenshots/`](./screenshots/).
+This is the canonical list of every screenshot referenced from [`USER_MANUAL.md`](./USER_MANUAL.md) and [`DEVELOPER_HANDOVER.md`](./DEVELOPER_HANDOVER.md). Published images live under [`docs/doc-screenshots/`](./doc-screenshots/).
 
 ## Conventions
 
@@ -27,7 +27,7 @@ For **[auto]** capture in one go:
 4. Open `http://localhost:8766` in a browser viewport sized **1920 × 1080** (landscape). Stop other browser tabs that might steal focus.
 5. Tell me you are ready; I will drive the captures via the `cursor-ide-browser` MCP.
 
-For **[manual]** captures, follow the recipe in each row below and drop the PNG into [`docs/screenshots/`](./screenshots/) using the exact filename.
+For **[manual]** captures, follow the recipe in each row below: drop the PNG into the WIP inbox [`docs/screenshots/`](./screenshots/), rename to the exact filename, then copy it into [`docs/doc-screenshots/`](./doc-screenshots/).
 
 ---
 
@@ -169,7 +169,7 @@ For **[manual]** captures, follow the recipe in each row below and drop the PNG 
 
 **Not in this manual:** edge/failure UI (waiting, API error, refresh/data-changes/warning modals); **farm selection** modal (multi-farm edge case); **tablet LAN** shots (`fd-lan-020`, `fd-lan-030`) — planned for a separate **LAN & tablet** guide; see [`SECURITY.md`](./SECURITY.md) until then.
 
-Workflow: drop PNGs with exact names → `python tools/map-all-screenshots.py` (if still named `Screenshot …`) → `python tools/discard-unused-screenshots.py` → `python tools/embed-manual-screenshots.py`.
+Workflow: drop WIP PNGs into `docs/screenshots/` → rename (`map-all` / `rename-new`) → promote into `docs/doc-screenshots/` (`discard-unused-screenshots.py`) → `python tools/embed-manual-screenshots.py`.
 
 **Resolution:** confirm desktop shots are **1920 × 1080** before release; re-capture any that are not.
 
@@ -190,15 +190,16 @@ If the app is not running when capture starts, the MCP step fails fast and I lea
 ## Adding a new screenshot to the docs
 
 1. Append a row to the table above with a fresh `fd-<area>-<n>-<slug>.png` filename and a one-line capture recipe.
-2. Reference the same filename from the relevant manual / handover section.
-3. Drop the PNG into [`docs/screenshots/`](./screenshots/).
-4. If the image is auto-capturable, also update the walk-through steps in §"How auto capture runs" above so a fresh run captures it next time.
+2. Reference the same filename from the relevant manual / handover section as `doc-screenshots/<filename>`.
+3. Drop the raw PNG into the WIP inbox [`docs/screenshots/`](./screenshots/) (gitignored — fine for new-UI captures until they are ready).
+4. Rename to the exact `fd-*` name and **copy/move** into [`docs/doc-screenshots/`](./doc-screenshots/) so it can be committed.
+5. If the image is auto-capturable, also update the walk-through steps in §"How auto capture runs" above so a fresh run captures it next time.
 
 ---
 
 ## Still to capture
 
-Use this checklist after you add new PNGs under [`docs/screenshots/`](./screenshots/). Drop files with the **exact filename** shown (1920×1080 desktop unless noted). Then ask a maintainer to run:
+Use this checklist after you promote new PNGs into [`docs/doc-screenshots/`](./doc-screenshots/). Drop files with the **exact filename** shown (1920×1080 desktop unless noted). Then ask a maintainer to run:
 
 ```bash
 python tools/embed-manual-screenshots.py
@@ -414,7 +415,7 @@ None of the standard modals are captured yet except mod import (`fd-modal-100`).
 
 ## After you finish
 
-1. Copy all PNGs into `docs/screenshots/`.
+1. Drop WIP captures in `docs/screenshots/` (inbox), rename to `fd-*`, then promote into `docs/doc-screenshots/`.
 2. Run `python tools/embed-manual-screenshots.py` (or ask in Cursor to scan and rename any stragglers still named `Screenshot …`).
 3. Skim [`USER_MANUAL.md`](./USER_MANUAL.md) in GitHub preview — search for **Screenshot pending**; there should be none left.
 4. Update [`SCREENSHOTS.md`](./SCREENSHOTS.md) capture status if you add new filenames.

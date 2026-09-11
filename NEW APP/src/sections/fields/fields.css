@@ -1,0 +1,957 @@
+.fd-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.fd-fields__header h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.55rem;
+}
+
+.fd-fields__header p {
+  margin: 0;
+  color: var(--farm-text-muted);
+}
+
+.fd-fields__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.fd-fields__stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--farm-text);
+  margin: 0.25rem 0 0;
+}
+
+.fd-fields__stat-unit {
+  font-size: 0.75rem;
+  color: var(--farm-text-muted);
+}
+
+.fd-fields__toolbar {
+  align-items: flex-start;
+}
+
+.fd-fields__toolbar-start,
+.fd-fields__toolbar-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.fd-fields__toolbar-end {
+  margin-left: auto;
+}
+
+.fd-fields__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  color: var(--farm-text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.fd-fields__toggle input {
+  accent-color: var(--farm-accent);
+}
+
+.fd-fields__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--farm-text-muted);
+}
+
+.fd-fields__sort select {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--farm-border);
+  border-radius: 10px;
+  color: var(--farm-text);
+  padding: 0.45rem 0.65rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
+.fd-field-suggestion__fleet-link {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin: 0.15rem 0;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.45rem;
+  border: 1px solid var(--farm-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--farm-text);
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.fd-field-suggestion__fleet-link:hover {
+  border-color: var(--farm-accent);
+  color: var(--farm-accent);
+}
+
+.fd-fields__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.fd-fields__filter.is-active {
+  border-color: var(--farm-accent);
+  color: var(--farm-accent);
+}
+
+.fd-fields__search {
+  min-width: min(280px, 100%);
+  flex: 1;
+  max-width: 360px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--farm-border);
+  border-radius: 10px;
+  color: var(--farm-text);
+  padding: 0.5rem 0.75rem;
+  font-family: inherit;
+}
+
+/* Two field cards per row on desktop; stack on narrow panes. */
+.fd-fields__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.fd-fields__grid > .fd-card,
+.fd-fields__grid > .fd-field-card {
+  min-height: 0;
+}
+
+.fd-fields__empty-hint {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--farm-text-muted);
+}
+
+.fd-field-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.fd-field-card__shape {
+  flex: 0 0 2.75rem;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.4rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--farm-border);
+}
+
+.fd-field-card__shape polygon {
+  fill: var(--farm-accent);
+  fill-opacity: 0.4;
+  stroke: var(--farm-accent);
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+
+.fd-field-card__title {
+  margin: 0;
+  font-size: 1.05rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1 1 auto;
+}
+
+.fd-field-card__meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.fd-field-card__meta small {
+  display: block;
+  color: var(--farm-text-muted);
+  font-size: 0.75rem;
+}
+
+.fd-field-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.5rem 0;
+}
+
+.fd-field-progress {
+  position: relative;
+  height: 20px;
+  background: #2c2c2c;
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 0.5rem 0;
+}
+
+.fd-field-progress__fill {
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+.fd-field-progress__label {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.fd-field-soil {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.fd-field-soil small {
+  color: var(--farm-text-muted);
+  font-size: 0.72rem;
+}
+
+.fd-field-soil strong {
+  display: block;
+  font-size: 0.78rem;
+  margin: 0.15rem 0;
+}
+
+.fd-field-soil__bar {
+  height: 4px;
+  background: #2c2c2c;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.fd-field-soil__fill {
+  height: 100%;
+}
+
+.fd-rf-land-panels {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+}
+
+.fd-rf-land-panels.is-dominant {
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.fd-field-card.is-rf-dominant {
+  border-color: rgba(34, 139, 94, 0.45);
+}
+
+.fd-field-card__vanilla.is-secondary {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed var(--farm-border);
+  opacity: 0.88;
+}
+
+.fd-field-card__vanilla-label {
+  margin: 0 0 0.55rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--farm-text-muted);
+}
+
+.fd-rf-land-panel {
+  padding: 0.7rem;
+  border: 1px solid var(--farm-border);
+  border-radius: 10px;
+  background: rgba(34, 139, 94, 0.08);
+}
+
+.fd-fields__triage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.fd-fields__triage-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.fd-fields__triage-chip {
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.fd-fields__triage-chip.is-good {
+  background: rgba(53, 196, 106, 0.18);
+  color: #86efac;
+}
+
+.fd-fields__triage-chip.is-fair {
+  background: rgba(234, 179, 8, 0.18);
+  color: #fde68a;
+}
+
+.fd-fields__triage-chip.is-poor {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+
+.fd-fields__triage-note {
+  font-size: 0.7rem;
+  color: var(--farm-text-muted);
+}
+
+.fd-fields__stand-down {
+  margin: 0 0 0.85rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  border-radius: 8px;
+  background: rgba(234, 179, 8, 0.08);
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--farm-text);
+}
+
+/* ── Soil Fertilizer reading panel ─────────────────────────────── */
+
+.fd-rf-soil-panel {
+  padding: 0.7rem;
+  border: 1px solid var(--farm-border);
+  border-radius: 10px;
+  background: rgba(34, 139, 94, 0.06);
+}
+
+.fd-rf-soil-panel.is-dominant {
+  padding: 0.85rem;
+  border-color: rgba(34, 139, 94, 0.45);
+  background: rgba(34, 139, 94, 0.1);
+}
+
+.fd-rf-soil-panel__flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+}
+
+.fd-rf-soil-panel__note {
+  margin: 0 0 0.6rem;
+  font-size: 0.72rem;
+  color: var(--farm-text-muted);
+}
+
+.fd-rf-soil-panel__note.is-alert {
+  color: #fecaca;
+}
+
+.fd-field-card__urgency {
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.fd-field-card__urgency.is-good {
+  color: #4ade80;
+}
+
+.fd-field-card__urgency.is-fair {
+  color: #facc15;
+}
+
+.fd-field-card__urgency.is-poor {
+  color: #fb7185;
+}
+
+.fd-field-card__subhead {
+  margin: 0.1rem 0 0.75rem;
+  font-size: 0.76rem;
+  color: var(--farm-text-muted);
+}
+
+.fd-field-card__vanilla-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.fd-field-card__vanilla-head .fd-field-card__vanilla-label {
+  margin-bottom: 0;
+}
+
+.fd-rf-soil-bars {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.fd-rf-soil-bar {
+  display: grid;
+  grid-template-columns: 3.2rem 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
+.fd-rf-soil-bar__label {
+  color: var(--farm-text-muted);
+}
+
+.fd-rf-soil-bar__track {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+/* Unscouted disease: hatched, so an empty bar never reads as "clean". */
+.fd-rf-soil-bar__track.is-unscouted {
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 255, 255, 0.13) 0 3px,
+    rgba(255, 255, 255, 0.03) 3px 7px
+  );
+}
+
+.fd-rf-soil-bar__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 180ms ease-out;
+}
+
+.fd-rf-soil-bar__fill.is-good {
+  background: #35c46a;
+}
+
+.fd-rf-soil-bar__fill.is-fair {
+  background: #eab308;
+}
+
+.fd-rf-soil-bar__fill.is-poor {
+  background: #ef4444;
+}
+
+.fd-rf-soil-bar__fill.is-unknown {
+  background: var(--farm-text-muted);
+}
+
+.fd-rf-soil-bar__value {
+  min-width: 4.6rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.fd-rf-soil-bar__value.is-good {
+  color: #4ade80;
+}
+
+.fd-rf-soil-bar__value.is-fair {
+  color: #facc15;
+}
+
+.fd-rf-soil-bar__value.is-poor {
+  color: #fb7185;
+}
+
+.fd-rf-soil-bar__value.is-unknown,
+.fd-rf-soil-bar__value.is-unscouted {
+  color: var(--farm-text-muted);
+  font-style: italic;
+  font-weight: 500;
+}
+
+.fd-rf-treatment {
+  margin-top: 0.8rem;
+  padding: 0.6rem 0 0.1rem 0.65rem;
+  border-left: 3px solid var(--farm-text-muted);
+}
+
+.fd-rf-treatment.is-urgent {
+  border-left-color: #ef4444;
+}
+
+.fd-rf-treatment.is-watch {
+  border-left-color: #eab308;
+}
+
+.fd-rf-treatment.is-ok {
+  border-left-color: #35c46a;
+}
+
+.fd-rf-treatment__eyebrow {
+  display: block;
+  font-size: 0.63rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--farm-text-muted);
+}
+
+.fd-rf-treatment__title {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.86rem;
+}
+
+.fd-rf-treatment.is-urgent .fd-rf-treatment__title {
+  color: #fca5a5;
+}
+
+.fd-rf-treatment.is-watch .fd-rf-treatment__title {
+  color: #fde68a;
+}
+
+.fd-rf-treatment.is-ok .fd-rf-treatment__title {
+  color: #86efac;
+}
+
+.fd-rf-treatment__reasons {
+  margin: 0.28rem 0 0;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--farm-text);
+}
+
+.fd-rf-treatment__also {
+  margin: 0.28rem 0 0;
+  font-size: 0.71rem;
+  line-height: 1.4;
+  color: #fcd34d;
+}
+
+.fd-rf-treatment__toggle {
+  margin-top: 0.4rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.68rem;
+  color: var(--farm-text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.fd-rf-treatment__toggle:hover {
+  color: var(--farm-text);
+}
+
+.fd-rf-treatment__list {
+  list-style: none;
+  margin: 0.45rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.fd-rf-treatment__list li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.45rem;
+  align-items: start;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.fd-rf-soil-panel__details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0.4rem 0.7rem;
+  margin: 0.75rem 0 0;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--farm-border);
+}
+
+.fd-rf-soil-panel__details dt {
+  font-size: 0.66rem;
+  color: var(--farm-text-muted);
+}
+
+.fd-rf-soil-panel__details dd {
+  margin: 0.1rem 0 0;
+  font-size: 0.75rem;
+}
+
+.fd-rf-land-panel.is-critical {
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(127, 29, 29, 0.16);
+}
+
+.fd-rf-land-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+  font-size: 0.8rem;
+}
+
+.fd-rf-land-panel__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.fd-rf-land-panel__note {
+  display: grid;
+  gap: 0.15rem;
+  margin: 0.55rem 0 0;
+  font-size: 0.72rem;
+}
+
+.fd-rf-land-panel__note--alert {
+  color: #fecaca;
+}
+
+.fd-rf-land-panel__note small {
+  color: var(--farm-text-muted);
+}
+
+.fd-rf-treat-plan {
+  margin: 0.15rem 0 0.75rem;
+  padding: 0.65rem 0.7rem;
+  border-radius: 8px;
+  border: 1px solid rgba(250, 204, 21, 0.35);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.fd-rf-treat-plan.is-clear {
+  border-color: rgba(74, 222, 128, 0.35);
+}
+
+.fd-rf-treat-plan__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.45rem;
+  font-size: 0.78rem;
+  color: #facc15;
+}
+
+.fd-rf-treat-plan.is-clear .fd-rf-treat-plan__header {
+  color: #4ade80;
+}
+
+.fd-rf-treat-plan__empty {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--farm-text-muted);
+}
+
+.fd-rf-treat-plan__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.fd-rf-treat-plan__row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.45rem;
+  align-items: start;
+  font-size: 0.74rem;
+}
+
+.fd-rf-treat-plan__text {
+  color: var(--farm-text);
+  line-height: 1.35;
+}
+
+.fd-rf-treat-plan__rates {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--farm-text-muted);
+  font-size: 0.65rem;
+}
+
+.fd-rf-treat-plan__row.is-urgent .fd-rf-treat-plan__text {
+  color: #fecaca;
+}
+
+.fd-rf-treat-plan__row.is-watch .fd-rf-treat-plan__text {
+  color: #fde68a;
+}
+
+.fd-rf-treat-plan__row.is-ok .fd-rf-treat-plan__text {
+  color: #bbf7d0;
+}
+
+.fd-rf-stage-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.7rem;
+}
+
+.fd-rf-stage-row small {
+  display: block;
+  color: var(--farm-text-muted);
+  font-size: 0.68rem;
+}
+
+.fd-rf-stage-row strong {
+  display: block;
+  margin: 0.15rem 0;
+  font-size: 0.78rem;
+}
+
+.fd-rf-stage-row__hint {
+  margin-top: 0.1rem !important;
+}
+
+.fd-rf-pressures {
+  margin-top: 0.55rem;
+}
+
+.fd-rf-nutrients {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.fd-rf-nutrient__label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+}
+
+.fd-rf-nutrient__label span,
+.fd-rf-land-panel__metrics small,
+.fd-rf-outlook small {
+  color: var(--farm-text-muted);
+}
+
+.fd-rf-nutrient__label strong.is-good {
+  color: #4ade80;
+}
+
+.fd-rf-nutrient__label strong.is-fair {
+  color: #facc15;
+}
+
+.fd-rf-nutrient__label strong.is-poor {
+  color: #fb7185;
+}
+
+.fd-rf-nutrient__label strong.is-unknown {
+  color: var(--farm-text-muted);
+}
+
+.fd-rf-meter {
+  height: 4px;
+  margin-top: 0.2rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #2c2c2c;
+}
+
+.fd-rf-meter__fill {
+  display: block;
+  height: 100%;
+}
+
+.fd-rf-meter__fill.is-good {
+  background: #22c55e;
+}
+
+.fd-rf-meter__fill.is-fair {
+  background: #eab308;
+}
+
+.fd-rf-meter__fill.is-poor {
+  background: #e11d48;
+}
+
+.fd-rf-meter__fill.is-unknown {
+  background: #64748b;
+}
+
+.fd-rf-land-panel__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+@media (min-width: 520px) {
+  .fd-rf-land-panel__metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .fd-rf-stage-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 519px) {
+  .fd-rf-stage-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fd-rf-land-panel__metrics small,
+.fd-rf-land-panel__metrics strong {
+  display: block;
+  font-size: 0.72rem;
+}
+
+.fd-rf-land-panel__metrics strong {
+  margin-top: 0.15rem;
+}
+
+.fd-rf-outlook {
+  margin-top: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--farm-border);
+}
+
+.fd-rf-outlook > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.25rem;
+}
+
+.fd-rf-outlook span {
+  font-size: 0.7rem;
+  color: var(--farm-text);
+}
+
+.fd-rf-outlook__approx {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.65rem;
+  color: var(--farm-text-muted);
+}
+
+.fd-field-suggestion {
+  margin-top: 0.85rem;
+  padding: 0.75rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+  border-left: 3px solid #facc15;
+}
+
+.fd-field-suggestion__summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--farm-text-muted);
+  font-size: 0.75rem;
+}
+
+.fd-field-suggestion.is-collapsible:not([open]) {
+  padding-bottom: 0.55rem;
+}
+
+.fd-rf-outlook > summary {
+  cursor: pointer;
+  color: var(--farm-text-muted);
+  font-size: 0.72rem;
+}
+
+.fd-field-suggestion__action {
+  color: #facc15;
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: block;
+  margin-top: 0.25rem;
+}
+
+.fd-field-suggestion__reason {
+  color: var(--farm-text-muted);
+  font-size: 0.8rem;
+  margin-top: 0.45rem;
+  line-height: 1.35;
+}
+
+.fd-field-suggestion__tools {
+  margin-top: 0.65rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--farm-border);
+}
+
+.fd-field-suggestion__tools small {
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--farm-text-muted);
+  font-size: 0.68rem;
+  margin: 0.35rem 0 0.2rem;
+}
+
+.fd-field-suggestion__tools div {
+  font-size: 0.8rem;
+  color: var(--farm-text);
+  opacity: 0.9;
+  margin-bottom: 0.2rem;
+}
+
+.fd-field-suggestion__season {
+  color: #38bdf8;
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid var(--farm-border);
+}
+
+.fd-fields__empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--farm-text-muted);
+}
+
+.fd-fields__empty h3 {
+  margin: 0 0 0.5rem;
+  color: var(--farm-text);
+}
+
+@media (max-width: 900px) {
+  .fd-fields__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .fd-fields__stats {
+    grid-template-columns: 1fr;
+  }
+
+  .fd-fields__grid {
+    grid-template-columns: 1fr;
+  }
+}

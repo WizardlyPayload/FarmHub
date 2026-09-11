@@ -20,8 +20,10 @@ function posixRel(p) {
 function matchesFilesEntry(relPosix, entry) {
     if (entry === relPosix) return true;
     if (entry === '*.js' && /^[^/]+\.js$/.test(relPosix)) return true;
-    if (entry === 'web/**/*' && relPosix.startsWith('web/')) return true;
-    if (entry === 'node_modules/**/*' && relPosix.startsWith('node_modules/')) return true;
+    if (entry.endsWith('/**/*')) {
+        const prefix = entry.slice(0, -'/**/*'.length);
+        return prefix !== '' && (relPosix === prefix || relPosix.startsWith(prefix + '/'));
+    }
     return false;
 }
 
@@ -100,6 +102,20 @@ function main() {
 
     if (!isCovered('web/index.html', files)) {
         missing.push('web/**/* (must include web/index.html)');
+    }
+
+    if (!isCovered('ui-v2/index.html', files)) {
+        missing.push('ui-v2/**/* (must include ui-v2/index.html)');
+    }
+
+    const uiV2Dir = path.join(projectDir, 'ui-v2');
+    const uiV2Required = ['index.html', 'setup.html', 'simhub.html'];
+    const uiV2Missing = uiV2Required.filter((f) => !fs.existsSync(path.join(uiV2Dir, f)));
+    if (uiV2Missing.length) {
+        console.error('[verify-electron-pack] ui-v2 is required for packaging but incomplete:');
+        for (const f of uiV2Missing) console.error('  -', path.join(uiV2Dir, f));
+        console.error('Run: npm run build:ui  (from repo root) or  npm run build --prefix "NEW APP"');
+        process.exit(1);
     }
 
     if (missing.length) {

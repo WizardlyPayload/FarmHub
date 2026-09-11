@@ -1,135 +1,101 @@
 <!--
-  FS25 Farm Dashboard — itch.io DESCRIPTION (itch-safe HTML)
+  FS25 Farm Dashboard â€” itch.io DESCRIPTION (itch-safe HTML)
 
-  itch.io strips most inline CSS on divs (backgrounds, flex, table layout, shadows).
-  This version uses only tags that survive the sanitizer: h2, h3, p, strong, em, a,
-  ul, ol, li, hr, figure, figcaption, img, dl, dt, dd, code, details, summary, mark.
+  itch.io strips most inline CSS on divs. Use h2, h3, p, strong, em, a,
+  ul, ol, li, hr, figure, figcaption, img, dl, dt, dd, code, details, summary.
 
   HOW TO USE
-  1. Edit project → Description → <> HTML mode.
-  2. Paste from the first <p> below through the footer <p> (keep a backup copy here).
-  3. Do NOT switch back to rich-text mode — it may rewrite your markup.
-  4. Cover image + screenshots column: set separately in itch Edit project (not in HTML).
+  1. Edit project â†’ Description â†’ <> HTML mode.
+  2. Paste from the first <p> below through the footer <p>.
+  3. Do NOT switch back to rich-text mode.
+  4. Cover + screenshots column: set in itch Edit project (not in this HTML).
 
-  Images: GitHub raw on WizardlyPayload/FarmHub main (push before publishing).
+  itch.io strips off-site <img> on the public page (the editor still shows them).
+  Host shots on img.itch.zone via Add image, then paste those URLs here.
 -->
 
-<p><strong><span style="color:#b8860b">Farming Simulator 25 · live farm data</span></strong></p>
+<p><strong><span style="color:#b8860b">Farming Simulator 25 Â· live farm data Â· V5</span></strong></p>
 
-<h2><strong>⬡ FS25 Farm Management Dashboard</strong></h2>
+<h2><strong>â¬¡ FS25 Farm Dashboard V5</strong></h2>
 
-<p>Your fields, fleet, livestock, economy, and productions — in one dashboard that updates while you play. A lightweight <strong>in-game mod</strong> exports live data; a <strong>Windows desktop app</strong> serves the UI in your browser at <code>localhost:8766</code>.</p>
+<p>Your fields, fleet, pastures, storage, economy, productions, and <strong>fleet map</strong> â€” on new screens that update while you play. A lightweight <strong>in-game mod</strong> exports live data; a <strong>Windows desktop app</strong> shows it on a second monitor or LAN tablet.</p>
 
-<p><strong>App 4.2.1</strong> · <strong>Mod 3.4.0.7</strong> · 27 languages · local saves, dedicated <strong>join as client</strong> (no FTP), or <strong>FTP</strong> (Advanced)</p>
+<p><strong>App 5.0.3</strong> Â· <strong>Mod 5.0.0.3</strong> Â· 27 languages Â· local saves, dedicated <strong>join as client</strong> (no FTP), or <strong>FTP</strong> (Advanced)</p>
 
-<p><strong><span style="color:#b8860b">Hotfix for Farming Simulator 1.21:</span></strong> after the game’s 1.21 update, the mod could fill the game log with repeated copyFile errors while saving a map overview image. <strong>4.2.1 / 3.4.0.7</strong> uses the correct yes/no flag and stops retrying forever. This is noisy logs / a map-overview hiccup — not a broken game. <strong>How to update:</strong> close the app and FS25 → download the new Setup + <code>FS25_FarmDashboard.zip</code> → replace the app and the mod in <code>Documents\My Games\FarmingSimulator2025\mods\</code> → load the save → start the app. Dedicated hosts: replace the mod on the server, restart, then update clients.</p>
+<p><strong>Classic V4 is still here.</strong> If you like the old six home cards, keep <strong>Farm Dashboard V4</strong> (4.2.1). V5 is a <em>separate</em> install. Auto-update on V4 will <strong>not</strong> replace it with V5 â€” you only get the new screens if you download the V5 Setup. One in-game mod works with both.</p>
 
 <p>
-  <a href="https://wizardlypayload.itch.io/farm-dashobaord-fs25"><strong>Download on itch.io</strong></a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/WizardlyPayload/FarmHub/releases"><strong>Also on GitHub</strong></a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/WizardlyPayload/FarmHub/wiki"><strong>Documentation</strong></a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/WizardlyPayload/FarmHub/blob/main/docs/USER_MANUAL.md"><strong>User manual</strong></a>
+  <a href="https://www.farmdashboard.co.uk/install.html"><strong>Install guide</strong></a>
+  &nbsp;Â·&nbsp;
+  <a href="https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.0.3"><strong>GitHub V5 5.0.3</strong></a>
+  &nbsp;Â·&nbsp;
+  <a href="https://www.farmdashboard.co.uk/legacy.html"><strong>Stay on classic V4</strong></a>
+  &nbsp;Â·&nbsp;
+  <a href="https://www.farmdashboard.co.uk/map.html"><strong>Fleet map</strong></a>
 </p>
 
 <hr />
 
-<h2>At a glance</h2>
+<h2>New screens</h2>
 
 <figure>
   <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/doc-screenshots/fd-shell-020-landing.png"
-    alt="Farm Management Dashboard home screen with live KPIs and section cards"
+    src="https://img.itch.zone/aW1nLzI5ODk2NzkxLnBuZw==/original/VIkycv.png"
+    alt="Farm Dashboard V5 save overview with sidebar and field tiles"
   />
-  <figcaption>Home dashboard — game time, weather, farm picker, and one-click access to every section.</figcaption>
+  <figcaption>Save overview â€” sidebar, weather, money, activity, and field tiles.</figcaption>
+</figure>
+
+<figure>
+  <img
+    src="https://img.itch.zone/aW1nLzI5ODk2NzkzLnBuZw==/original/37IgzN.png"
+    alt="Field Management with Order menu and soil cards"
+  />
+  <figcaption><strong><span style="color:#b8860b">Fields</span></strong> â€” crop stage, Order menu, GPS groups, soil bars, next-step rules.</figcaption>
+</figure>
+
+<figure>
+  <img
+    src="https://img.itch.zone/aW1nLzI5ODk2Nzk0LnBuZw==/original/IP7atQ.png"
+    alt="Pasture Management in Farm Dashboard V5"
+  />
+  <figcaption><strong><span style="color:#b8860b">Pastures</span></strong> â€” sheds, food duration, birth warnings, animal detail. (Old Livestock card lives here.)</figcaption>
+</figure>
+
+<figure>
+  <img
+    src="https://img.itch.zone/aW1nLzI5ODk2Nzk1LnBuZw==/original/EApc2u.png"
+    alt="Vehicle fleet cards in Farm Dashboard V5"
+  />
+  <figcaption><strong><span style="color:#b8860b">Vehicles</span></strong> â€” farm-scoped fleet, fuel, wear, store images.</figcaption>
+</figure>
+
+<figure>
+  <img
+    src="https://img.itch.zone/aW1nLzI5ODk2Nzk2LnBuZw==/original/A0%2FyJH.png"
+    alt="Storage silos and depot stock in Farm Dashboard V5"
+  />
+  <figcaption><strong><span style="color:#b8860b">Storage</span></strong> â€” silos, moisture, grade, map names, bales. Own screen in V5.</figcaption>
 </figure>
 
 <hr />
 
-<h2>Everything your save exports — one place</h2>
+<h2>Fleet map &amp; layers</h2>
 
 <figure>
   <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/doc-screenshots/fd-section-fields-030-card-rules.png"
-    alt="Fields with suggested next step and crop rules"
+    src="https://img.itch.zone/aW1nLzI5ODk2Nzk3LnBuZw==/original/TVbBSu.png"
+    alt="Fleet map with vehicle pins on the Riverbend overview"
   />
-  <figcaption><strong><span style="color:#b8860b">Fields</span></strong> — Crop state, weeds, moisture, PF bars, and offline “do this first” suggestions.</figcaption>
+  <figcaption><strong><span style="color:#b8860b">Fleet map</span></strong> â€” live pins on the real PDA overview. Pan, zoom, farm colours.</figcaption>
 </figure>
 
 <figure>
   <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/doc-screenshots/fd-section-livestock-010-summary.png"
-    alt="Livestock summary and animal table"
+    src="https://img.itch.zone/aW1nLzI5ODk2Nzk5LnBuZw==/original/p301kv.png"
+    alt="Fleet map overlay dropdown listing crops, growth, soil, and other layers"
   />
-  <figcaption><strong><span style="color:#b8860b">Livestock</span></strong> — Pens, health, food days-left, and individual animals when Realistic Livestock is active.</figcaption>
-</figure>
-
-<figure>
-  <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/doc-screenshots/fd-section-vehicles-030-grid.png"
-    alt="Vehicle fleet grid with condition and cargo"
-  />
-  <figcaption><strong><span style="color:#b8860b">Vehicles</span></strong> — Fleet cards, wear, fuel, cargo, store images, and optional ADS breakdown.</figcaption>
-</figure>
-
-<figure>
-  <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/doc-screenshots/fd-section-economy-040-storage-tab.png"
-    alt="Economy storage tab with silo stock and bales"
-  />
-  <figcaption><strong><span style="color:#b8860b">Economy &amp; storage</span></strong> — Market prices, silo stock, moisture grades, pallets, big bags, and bale inventory.</figcaption>
-</figure>
-
-<figure>
-  <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/doc-screenshots/fd-section-fleet-map-010-overview.png"
-    alt="Fleet map with live vehicle pins on PDA overview"
-  />
-  <figcaption><strong><span style="color:#b8860b">Fleet map</span></strong> — Live pins on your map’s PDA overview — pan, zoom, multi-farm colours.</figcaption>
-</figure>
-
-<figure>
-  <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/docs/doc-screenshots/fd-section-productions-010-list.png"
-    alt="Production chains and fill levels"
-  />
-  <figcaption><strong><span style="color:#b8860b">Productions &amp; pastures</span></strong> — Factory fill levels, recipes, and pasture food / water / straw estimates.</figcaption>
-</figure>
-
-<hr />
-
-<h2>Built for second-monitor farming</h2>
-
-<p>Use the dashboard on a second monitor, tablet on your LAN, or phone on Wi‑Fi while you play.</p>
-
-<figure>
-  <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/FS25_FarmDashboard_App/web/assests/img/Dashboard%20PIctures/Fields.png"
-    alt="Fields section banner art"
-  />
-</figure>
-
-<figure>
-  <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/FS25_FarmDashboard_App/web/assests/img/Dashboard%20PIctures/Economy.png"
-    alt="Economy section banner art"
-  />
-</figure>
-
-<figure>
-  <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/FS25_FarmDashboard_App/web/assests/img/Dashboard%20PIctures/Livestock.png"
-    alt="Livestock section banner art"
-  />
-</figure>
-
-<figure>
-  <img
-    src="https://raw.githubusercontent.com/WizardlyPayload/FarmHub/main/FS25_FarmDashboard_App/web/assests/img/Dashboard%20PIctures/Vehicles.png"
-    alt="Vehicles section banner art"
-  />
+  <figcaption><strong><span style="color:#b8860b">Layers</span></strong> â€” Overlay dropdown: crops, growth, farm ownership, weeds, soil, Precision Farming / Soil Fertilizer when those mods export data.</figcaption>
 </figure>
 
 <hr />
@@ -137,39 +103,39 @@
 <h2>How it works</h2>
 
 <ol>
-  <li>The <strong>mod</strong> writes live farm data to <code>data.json</code> from your save (SP, MP host, or dedicated).</li>
-  <li>On a <strong>dedicated</strong> host you can <strong>join as a client</strong> with the same mod — the authority mirrors the export to that PC’s local <code>data.json</code> so the app uses <strong>Local</strong> mode (<strong>no FTP</strong>). <strong>FTP</strong> remains for headless-only admins.</li>
-  <li>The <strong>Windows app</strong> merges the Lua export with savegame XML when available — a real dashboard, not a static page.</li>
-  <li>Open <strong>http://localhost:8766</strong> on a second monitor, tablet (LAN), or phone on your Wi‑Fi.</li>
+  <li>The <strong>mod</strong> writes live farm data to <code>data.json</code> (SP, MP host, or dedicated).</li>
+  <li>On a <strong>dedicated</strong> host you can <strong>join as a client</strong> â€” the authority mirrors the export so the app uses <strong>Local</strong> mode (<strong>no FTP</strong>). <strong>FTP</strong> remains for headless-only admins.</li>
+  <li>The <strong>Windows app</strong> merges the Lua export with savegame XML when available.</li>
+  <li>V5 listens at <strong>http://localhost:8768</strong>. Classic V4 stays on <strong>8766</strong> if you keep it installed.</li>
 </ol>
 
 <h2>Quick start</h2>
 
 <ol>
-  <li>Download <strong>FS25_FarmDashboard.zip</strong> and <strong>FS25-Farm-Dashboard-Setup-4.2.1.exe</strong> from <a href="https://wizardlypayload.itch.io/farm-dashobaord-fs25">itch.io</a> (recommended) or <a href="https://github.com/WizardlyPayload/FarmHub/releases">GitHub Releases</a> → enable the mod on your save.</li>
-  <li>Load the save <strong>once in-game</strong> so the mod creates <code>data.json</code>.</li>
-  <li>Install and run <strong>FS25-Farm-Dashboard-Setup-4.2.1.exe</strong> from the same download page.</li>
-  <li>Open the dashboard; point <strong>Settings → Servers</strong> at your save path. Dedicated: prefer join-as-client + Local, or FTP if headless — see Installation instructions below.</li>
+  <li>Download <strong>FS25_FarmDashboard.zip</strong> and <strong>FS25-Farm-Dashboard-V5-Setup-5.0.3.exe</strong> from this page (filenames include <strong>V5</strong>).</li>
+  <li>Enable the mod, load the save <strong>in-world</strong> once so <code>data.json</code> is created.</li>
+  <li>Run the V5 Setup. Start Menu: <strong>Farm Dashboard V5</strong>.</li>
+  <li>Prefer the classic cards? Download the <strong>V4</strong> Setup instead (or keep the one you already have). You do not have to switch.</li>
 </ol>
 
-<p><em>Full step-by-step install guide is in the <strong>Installation instructions</strong> section below the description on this page.</em></p>
+<p><em>Full steps are in the <strong>Installation instructions</strong> section below this description.</em></p>
 
 <hr />
 
 <h2>Works alongside</h2>
 
-<p>Precision Farming, Realistic Livestock, Advanced Damage System, Moisture System, Red Tape, Courseplay, and more — see the <a href="https://github.com/WizardlyPayload/FarmHub/blob/main/docs/GITHUB_RELEASE_v4.2.1.md">release notes</a>.</p>
+<p>Precision Farming, Realistic Livestock, Advanced Damage System, Red Tape, Courseplay, and optional Realistic Farming companions â€” extra sidebar panels appear only when those mods are loaded. Vanilla FS25 + this mod is enough.</p>
 
 <hr />
 
-<p><strong>JoshWalki</strong> (original mod &amp; concept) · <strong>WizardlyPayload</strong> (app, releases, maintenance)</p>
+<p><strong>JoshWalki</strong> (original mod &amp; concept) Â· <strong>WizardlyPayload</strong> (app, releases, maintenance)</p>
 
 <p>
-  <a href="https://github.com/WizardlyPayload/FarmHub/releases">Releases</a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/WizardlyPayload/FarmHub/wiki">Wiki</a>
-  &nbsp;·&nbsp;
-  <a href="https://github.com/WizardlyPayload/FarmHub/blob/main/docs/INSTALL.md">Install guide</a>
+  <a href="https://www.farmdashboard.co.uk/">Website</a>
+  &nbsp;Â·&nbsp;
+  <a href="https://github.com/WizardlyPayload/FarmHub/releases">GitHub Releases</a>
+  &nbsp;Â·&nbsp;
+  <a href="https://www.farmdashboard.co.uk/install.html">Install guide</a>
 </p>
 
 <p><small><em>Not affiliated with GIANTS Software. Farming Simulator is a trademark of GIANTS Software GmbH.</em></small></p>

@@ -127,7 +127,7 @@ CI on `main` runs tests, electron-pack verify, and i18n verify — see [`.github
 | Port **8766** in use | Close other apps on that port; restart Farm Dashboard |
 | LAN tablet will not load | Enable LAN in Settings; use the PC’s **LAN IP** (not `localhost`); allow **inbound TCP 8766** in **Windows Defender Firewall** (Private profile) or your host antivirus firewall; strong password — [docs/SECURITY.md](docs/SECURITY.md) |
 | Mod version badge | Update **`FS25_FarmDashboard.zip`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases) |
-| Questions & community | [Discord](https://discord.gg/D4sEHM59) — chat, screenshots, quick help |
+| Questions & community | [Discord](https://discord.gg/qsSTRwG2) — chat, screenshots, quick help |
 
 ---
 
@@ -135,4 +135,4 @@ CI on `main` runs tests, electron-pack verify, and i18n verify — see [`.github
 
 **FarmHub License** — free for personal and non-commercial use; **commercial use requires permission** from the authors (see [LICENSE](LICENSE)). Copyright **JoshWalki** & **WizardlyPayload** — [docs/AUTHORS.md](docs/AUTHORS.md).
 
-**Community:** [Discord](https://discord.gg/D4sEHM59) · optional maintenance tips: [Ko-fi](https://ko-fi.com/wizarlypayload) (not required — Farm Dashboard stays free).
+**Community:** [Discord](https://discord.gg/qsSTRwG2) · optional maintenance tips: [Ko-fi](https://ko-fi.com/wizarlypayload) (not required — Farm Dashboard stays free).

@@ -20,8 +20,33 @@ function readJson(p) {
   return JSON.parse(fs.readFileSync(p, 'utf8'));
 }
 
+function sleepMs(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 function writeJson(p, obj) {
-  fs.writeFileSync(p, JSON.stringify(obj, null, 2) + '\n', 'utf8');
+  const payload = JSON.stringify(obj, null, 2) + '\n';
+  let lastErr;
+  for (let i = 0; i < 10; i++) {
+    const tmp = `${p}.${process.pid}.${i}.tmp`;
+    try {
+      fs.writeFileSync(tmp, payload, 'utf8');
+      try {
+        fs.renameSync(tmp, p);
+        try { fs.unlinkSync(tmp); } catch { /* renamed already */ }
+        return;
+      } catch {
+        fs.copyFileSync(tmp, p);
+        try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+        return;
+      }
+    } catch (e) {
+      lastErr = e;
+      try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+      sleepMs(120 * (i + 1));
+    }
+  }
+  throw lastErr;
 }
 
 const PLACEHOLDER_RE = /\{\{\s*([A-Za-z_][\w]*)\s*\}\}/g;

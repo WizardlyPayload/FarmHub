@@ -49,7 +49,7 @@ Repeat for **every** savegame you want on the dashboard:
 2. **Load the save and enter the world** (main menu alone is not enough).
 3. Play ~1 minute so collectors run.
 
-Dedicated / rented server: enable the mod **on the server** and load the save there too.
+Dedicated / rented server: enable the mod **on the server** and load the save there too. Then either **join as a client** on the dashboard PC (Local mode — no FTP) or use **FTP** (Advanced). See [Dedicated servers](#dedicated-servers-join-as-client-or-ftp).
 
 ---
 
@@ -86,8 +86,8 @@ modSettings\FS25_FarmDashboard\config.xml
 
 1. **Setup** opens if no servers are configured.
 2. **Auto-detect saves** (recommended) or **Add server** manually:
-   - **Local:** path to the folder containing `data.json`
-   - **FTP:** host, port, user, password, remote directory with `data.json`
+   - **Local:** path to the folder containing `data.json` (single-player **or** dedicated **join-as-client** mirror on this PC)
+   - **FTP (Advanced):** host, port, user, password, remote directory with `data.json` (headless-only)
 3. Click **Launch**.
 4. Open a browser: **[http://localhost:8766](http://localhost:8766)**
 
@@ -95,11 +95,41 @@ Later changes: **Settings (gear) → Servers & saves**.
 
 ---
 
-## Dedicated / FTP servers
+## Dedicated servers (join as client or FTP)
+
+Dedicated hosts write `data.json` on the **authority** (dedicated process). The desktop app needs that file on the PC where Farm Dashboard runs.
+
+| Path | When | App mode |
+|------|------|----------|
+| **Join as client** (recommended) | Someone can join with the same mod | **Local** — **no FTP** |
+| **FTP** (Advanced) | Empty / headless server, or prefer remote poll | **FTP** |
+
+Same flow for legacy app **4.2.1** and **v5**: Local watches the client’s folder. Giants **:8080** HTTP is an optional XML feed only — **not** a substitute for `data.json`. FTP remains supported.
+
+### Join as client (no FTP)
+
+Requires the **updated mod** with **export mirror** (ships with the **4.2.1** / **v5** line) on **server and client**.
+
+1. Install the mod on the **dedicated server**; enable it on that save.
+2. On the dashboard PC, install the same mod and **join as a multiplayer client** (spare/alt account or admin playing).
+3. **Opt in** to mirror the export to this client (labels may say *Mirror export to this client*, *Receive server export*, or similar).
+4. Client writes:
+
+   ```
+   %USERPROFILE%\Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\<slot>\data.json
+   ```
+
+5. In the app, add a **Local** server (or Auto-detect) pointing at that folder.
+
+**Limits:** needs at least one connected opted-in client; empty server = no mirror; large exports may lag a few seconds; FTP still covers headless-only admins.
+
+### FTP (Advanced)
 
 1. Mod active on the **server**; save loaded so `data.json` exists on the host profile.
 2. In the app, add an **FTP** server pointing at that path.
 3. Set **FTP polling** (1–25 minutes; sync or staggered) under Settings.
+
+Full detail: [docs/INSTALL.md](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/INSTALL.md#dedicated-server-join-as-client-or-ftp) · [USER_MANUAL §3.4a](https://github.com/WizardlyPayload/FarmHub/blob/main/docs/USER_MANUAL.md#34a-dedicated-server--join-as-client-no-ftp).
 
 ---
 
@@ -108,7 +138,8 @@ Later changes: **Settings (gear) → Servers & saves**.
 | Problem | Fix |
 |---------|-----|
 | **Waiting for data** | Stage B + C — mod enabled, world loaded, `data.json` fresh |
-| **Wrong path** | Settings → Servers & saves → correct local folder or FTP dir |
+| **Wrong path** | Settings → Servers & saves → correct local folder (or FTP dir) |
+| **Join-as-client empty** | Client connected + mirror opt-in? Updated mod on both sides? |
 | **Port 8766 in use** | Close other Farm Dashboard instances; see [Troubleshooting](Troubleshooting#port-8766-already-in-use) |
 | **Tablet cannot connect** | Enable LAN + strong password — [Security & Network](Security-and-Network) |
 

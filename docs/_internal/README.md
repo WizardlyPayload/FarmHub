@@ -16,6 +16,7 @@ These files are kept in the repo for development and release work. **Players do 
 | [CURSOR_SESSION_MEMORY.md](./CURSOR_SESSION_MEMORY.md) | Cursor session notes |
 | [itch-io-page-description.html](./itch-io-page-description.html) | itch.io **Description** (itch-safe HTML: `figure`, `h2`, `dl` — no div/CSS layouts) — preview locally only approximates itch |
 | [itch-io-install-instructions.html](./itch-io-install-instructions.html) | itch.io **Installation instructions** (same safe format) — preview with [itch-io-install-preview.html](./itch-io-install-preview.html) |
+| [RELEASE_NOTE_JOIN_AS_CLIENT.md](./RELEASE_NOTE_JOIN_AS_CLIENT.md) | Draft release blurb — dedicated join-as-client (4.2.1 + v5) |
 
 **Archived releases:** [archive-releases/](./archive-releases/) (`RELEASE_v2.0.0.md`, `RELEASE_v3.0.0.md`, `RELEASE_v3.9.0.md`, `GITHUB_RELEASE_v3.9.0.md`).
 

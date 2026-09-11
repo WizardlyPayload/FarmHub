@@ -26,6 +26,14 @@ describe('fillTypeResolve parity (cjs vs browser module contract)', () => {
     expect(merged).toEqual({ 1: 'WHEAT', 3: 'BARLEY', 2: '42' });
   });
 
+  test('mergeFillTypeCatalog keeps engine names over sell-point titles', () => {
+    const merged = cjs.mergeFillTypeCatalog(
+      { 190: 'SOYBEAN2' },
+      { 190: 'American Soybean' }
+    );
+    expect(merged['190']).toBe('SOYBEAN2');
+  });
+
   test('applyFillTypeTitles fills sparse catalog gaps from localized titles', () => {
     const catalog = { 42: 'WHEAT' };
     const titles = { 147: 'Pig Food' };
@@ -69,6 +77,18 @@ describe('fillTypeResolve parity (cjs vs browser module contract)', () => {
     const catalog = buildFillTypeCatalog(lua, {});
     expect(catalog['42']).toBe('WHEAT');
     expect(catalog['147']).toBe('Pig Food');
+  });
+
+  test('buildFillTypeCatalog fills map extras without replacing lua names', () => {
+    const lua = {
+      fillTypeCatalog: { 6: 'CUSTOM_CROP' },
+      stock: { byFarm: {} },
+      fields: [],
+    };
+    const catalog = buildFillTypeCatalog(lua, {}, { 6: 'SORGHUM', 190: 'LINSEED', 30: 'DRYGRASS_WINDROW' });
+    expect(catalog['6']).toBe('CUSTOM_CROP');
+    expect(catalog['190']).toBe('LINSEED');
+    expect(catalog['30']).toBe('DRYGRASS_WINDROW');
   });
 
   test('enrichStockFillTypesFromPlaceables resolves index from savegame silo fill types', () => {

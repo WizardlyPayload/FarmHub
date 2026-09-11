@@ -74,7 +74,7 @@ function validateLanCredentials(payload) {
   if (password.length < MIN_PASSWORD_LENGTH) {
     return { ok: false, error: "password_too_short", field: "lanPassword" };
   }
-  if (KNOWN_WEAK_PASSWORDS.has(password.toLowerCase())) {
+  if (!password.trim() || KNOWN_WEAK_PASSWORDS.has(password.toLowerCase())) {
     return { ok: false, error: "weak_password", field: "lanPassword" };
   }
   return { ok: true };

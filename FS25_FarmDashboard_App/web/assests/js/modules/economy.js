@@ -964,7 +964,7 @@ export function updateMarketPrices(economyData) {
     ].includes(nameUpper)) {
       greenhouse[name] = priceInfo;
     } else if ([
-      "MANURE", "SLURRY", "OILSEED_RADISH", "LIME", "SOLID_FERTILIZER", "LIQUID_FERTILIZER", "HERBICIDE",
+      "MANURE", "SLURRY", "OILSEED_RADISH", "OILSEEDRADISH", "OIL_SEED_RADISH", "MUSTARD", "LIME", "SOLID_FERTILIZER", "LIQUID_FERTILIZER", "HERBICIDE",
       "SILAGE_ADDITIVE", "DIGESTATE"
     ].includes(nameUpper)) {
       yieldBoost[name] = priceInfo;
@@ -1125,7 +1125,7 @@ export function displayMarketPrices(marketData) {
     ].includes(nameUpper)) {
       categories.greenhouse.items[cropName] = cropData;
     } else if ([
-      "MANURE", "SLURRY", "OILSEED_RADISH", "LIME", "SOLID_FERTILIZER", "LIQUID_FERTILIZER", "HERBICIDE",
+      "MANURE", "SLURRY", "OILSEED_RADISH", "OILSEEDRADISH", "OIL_SEED_RADISH", "MUSTARD", "LIME", "SOLID_FERTILIZER", "LIQUID_FERTILIZER", "HERBICIDE",
       "SILAGE_ADDITIVE", "DIGESTATE"
     ].includes(nameUpper)) {
       categories.yieldBoost.items[cropName] = cropData;

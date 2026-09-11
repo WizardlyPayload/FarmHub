@@ -1,8 +1,49 @@
-﻿# Farm Dashboard — Changelog
+# Farm Dashboard — Changelog
 
-All notable changes to this project are recorded here. For GitHub release blurbs, see [GITHUB_RELEASE_v4.2.1.md](./GITHUB_RELEASE_v4.2.1.md) (current classic) · [GITHUB_RELEASE_v4.2.0.md](./GITHUB_RELEASE_v4.2.0.md) · [GITHUB_RELEASE_v4.1.5.md](./GITHUB_RELEASE_v4.1.5.md). For **network exposure and trust assumptions**, see [SECURITY.md](./SECURITY.md). Classic vs RF product lines: [COMPATIBILITY.md](./COMPATIBILITY.md).
+All notable changes to this project are recorded here. For GitHub release blurbs, see [GITHUB_RELEASE_v4.2.1.md](./GITHUB_RELEASE_v4.2.1.md) (current V4 public) · [GITHUB_RELEASE_v4.2.0.md](./GITHUB_RELEASE_v4.2.0.md) · [GITHUB_RELEASE_v4.1.5.md](./GITHUB_RELEASE_v4.1.5.md). For **network exposure and trust assumptions**, see [SECURITY.md](./SECURITY.md). V4 vs V5 product lines: [COMPATIBILITY.md](./COMPATIBILITY.md).
 
 ---
+
+## Unreleased — audit remediation (2026-09-05)
+
+### Security
+- LAN auth matches Express routing (case and trailing slashes). Hostile browser Origins are rejected on WebSocket and local writes. Save-slot / map / detail paths stay inside their cache roots. Changing LAN credentials rotates the WebSocket secret.
+- FTP uses TLS only when the server is configured for FTPS. HTTP XML feeds cap redirects, size, and total time.
+- Desktop runtime moves off Electron 29 onto a currently supported Electron 43 line (with electron-builder 26).
+
+### Data
+- Save switches ignore late HTTP from the previous save. Multiplayer mirrors no longer pick up an unrelated local savegame of the same slot number. Empty successful sections are not back-filled from last week’s data. Livestock cluster totals and zero health are reconciled honestly.
+
+### Setup / UI
+- Failed setup loads show Retry and block Launch. Startup retries after a failed first server list. Settings does not claim a full sync if the in-game mod save failed. Phone header wraps. Dialogs trap focus and handle Escape.
+- Setup fields use programmatic label associations. Livestock, pastures, changes, and export dialogs trap keyboard focus.
+
+### Packaging
+- Classic and RF electron-builder configs use `win.signtoolOptions` (electron-builder 26). Production `npm audit --omit=dev` is clean after updater/js-yaml/qs/fast-uri/body-parser overrides.
+- User-facing names are **Farm Dashboard V4** and **Farm Dashboard V5**. The rebuild is not an “RF edition”. Internal update feed stays `latest-rf.yml`.
+
+### Mod
+- Loose-world bales are processed after enumeration. Export rename failures no longer look like success. Shared JSON tables serialize fully. Courseplay finance uses the same farm and sell-value basis. Several field, invoice, hire-purchase, and soil export defects are corrected.
+
+---
+
+## Unreleased — guided setup, data states, and diagnostics
+
+### Added
+- Shared UX state contract (`docs/UX-STATE-CONTRACT.md`) with loading / pending / error / empty / success / stale, a machine-readable setup status API (`GET /api/setup-status`, IPC `get-setup-status`), and last-5 in-app status events.
+- Guided first-run steps (detect → connect → auth → service) plus recovery actions per error code (`E_AUTH_MISSING`, `E_LAN_BLOCKED`, `E_INVALID_TOKEN`, `E_LUA_STALE`, `E_SERVER_OFFLINE`, and related).
+- Data freshness chips (`fetchedAt`, `isStale`, `staleReason`, `confidence`, `cacheUsedDueToFailure`) and XML `collectionHealth` (`collectionDurationMs`, `sourceLagSeconds`, `parseErrors`).
+- Settings **Health** panel, LAN risk badges (local-only / LAN exposed / high risk) with confirm + restore default, and explicit save lifecycle (pending → saved / synced / failed) plus unsaved indicator.
+
+### Changed
+- Central retry policy with jitter (no per-module retry loops). Stale cache is labelled; it is never shown as live.
+- LAN security copy calls out local-only vs exposed. Mod export can include a `diagnostics` object (version / authority / missing pieces) when the Lua attach is present.
+- Remote LAN login verifies stored credentials against `/api/servers` before skipping the overlay. Stale tokens prompt again instead of failing silently. `/api/status` stays public; other `/api/*` routes stay protected.
+- Setup is **local-first**: `/setup.html` and `/api/setup-config` are for this PC only (tablets are redirected / 403 `E_SETUP_LOCAL_ONLY`). POST still requires `X-Setup-Token`. LAN overlay timeout is `E_LAN_TIMEOUT`, distinct from a rejected password.
+- Setup save errors and retry classification share one classifier (`ux-classify.js`). Setup steps keep a distinct `pending` state (not collapsed to loading).
+
+### Migration
+- Additive JSON only. Existing configs keep working. First launch still uses setup; after upgrade, open Settings → Health if a save looks stale. Re-enable LAN still requires the confirm step.
 
 ## Versioning
 
@@ -10,7 +51,7 @@ All notable changes to this project are recorded here. For GitHub release blurbs
 |----------|----------------|--------|
 | **Desktop app** | `FS25_FarmDashboard_App/package.json` | Semver (e.g. `4.2.1`) |
 | **FS25 mod (classic public zip)** | Stamped at pack time via `npm run package:mod:classic` → **3.4.0.7** | Giants style |
-| **FS25 mod (RF / local tree)** | `FS25_FarmDashboard_Mod/modDesc.xml` + `FarmDashboard.VERSION` | e.g. `5.0.0.1` RF edition |
+| **FS25 mod (V5 / local tree)** | `FS25_FarmDashboard_Mod/modDesc.xml` + `FarmDashboard.VERSION` | e.g. `5.0.0.1` V5 |
 | **Source headers** | First line of many `.js` / `.lua` files | Often `v2.0.0` historically; bump only when you intentionally resync headers |
 
 ---
@@ -20,7 +61,7 @@ All notable changes to this project are recorded here. For GitHub release blurbs
 
 **App:** `4.2.1` (`package.json`) · **Classic mod zip:** `3.4.0.7` · app requires **3.1.0.0+** via `modVersionPolicy.js`.
 
-Public classic patch on the 4.2 / 3.4 line. Classic UI remains default (`useNewUi` false). This does **not** replace Realistic Farming edition 5.x (`latest-rf.yml`).
+Public V4 patch on the 4.2 / 3.4 line. Classic UI remains default (`useNewUi` false). This does **not** replace Farm Dashboard V5 (`latest-rf.yml`).
 
 ### Fixed (headline)
 - **Farming Simulator 1.21 `copyFile` log spam** — After FS 1.21, the mod could flood the game log with repeated copyFile type errors while trying to save a map overview image. The copy now uses the correct yes/no (Bool) flag the engine expects, and a failed overview export is latched so it does not retry every cycle. Noisy logs / map-overview hiccup only — the game itself is not broken.

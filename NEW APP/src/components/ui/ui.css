@@ -1,0 +1,68 @@
+.fd-card {
+  background: var(--farm-surface);
+  border: 1px solid var(--farm-border);
+  border-radius: 14px;
+  padding: 1rem 1.1rem;
+  backdrop-filter: blur(var(--farm-glass-blur, 12px));
+  -webkit-backdrop-filter: blur(var(--farm-glass-blur, 12px));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+.fd-card__title {
+  margin: 0 0 0.75rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--farm-text);
+}
+
+.fd-card__body {
+  color: var(--farm-text-muted);
+}
+
+.fd-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--farm-text);
+}
+
+.fd-badge--accent {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--farm-accent);
+}
+
+.fd-badge--warn {
+  background: rgba(234, 179, 8, 0.18);
+  color: #facc15;
+}
+
+.fd-badge--danger {
+  background: rgba(239, 68, 68, 0.18);
+  color: #f87171;
+}
+
+.fd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: none;
+  border-radius: 10px;
+  padding: 0.45rem 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.fd-btn--primary {
+  background: var(--farm-accent);
+  color: #041016;
+}
+
+.fd-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

@@ -33,7 +33,7 @@ local _SKIP_CROP_NAMES = {
 }
 
 local function _ftm()
-    return rawget(_G, "g_fillTypeManager")
+    return _G.g_fillTypeManager
 end
 
 --- Resolve a fill-type index from a number, string name, or FillType table.
@@ -222,7 +222,10 @@ function FillTypeUtils.probeAllFillTypes(maxHint, observed)
     end
 
     maxIdx = math.max(maxIdx, 1)
-    maxIdx = math.min(maxIdx + 16, 512)
+    if ftm.fillTypes then
+        maxIdx = math.max(maxIdx, #ftm.fillTypes)
+    end
+    maxIdx = math.min(maxIdx + 16, 1024)
 
     for i = 1, maxIdx do
         local cached = _catalog[i]
@@ -309,7 +312,7 @@ end
 
 local function _registerMoistureObject(uid, idx)
     if uid == nil then return end
-    local mission = rawget(_G, "g_currentMission")
+    local mission = _G.g_currentMission
     local ms = mission and (mission.MoistureSystem or mission.moistureSystem)
     if not ms or not ms.objectInfo then return end
     local bucket = ms.objectInfo[tostring(uid)] or ms.objectInfo[uid]
@@ -329,7 +332,7 @@ end
 function FillTypeUtils.enrichFromMissionPlaceables()
     _catalog = _catalog or {}
     _titles = _titles or {}
-    local mission = rawget(_G, "g_currentMission")
+    local mission = _G.g_currentMission
     if not mission or not mission.placeableSystem or not mission.placeableSystem.placeables then return end
     for _, placeable in pairs(mission.placeableSystem.placeables) do
         if type(placeable) == "table" then
@@ -508,9 +511,13 @@ function FillTypeUtils.rebuildCatalog()
         end
     end
     if ftm.fillTypes then
-        for _, filltype in pairs(ftm.fillTypes) do
+        for i = 1, #ftm.fillTypes do
+            local filltype = ftm.fillTypes[i]
             if filltype and filltype.name then
-                _put(_catalog, filltype.index, filltype.name)
+                _put(_catalog, filltype.index or i, filltype.name)
+            end
+            if filltype and filltype.title then
+                _putTitle(_titles, filltype.index or i, filltype.title)
             end
         end
     end
@@ -608,7 +615,7 @@ function FillTypeUtils.enrichCatalogFromData(data)
         end
     end
 
-    local frm = rawget(_G, "g_fruitTypeManager")
+    local frm = _G.g_fruitTypeManager
     if frm and frm.fruitTypes then
         for _, fruit in pairs(frm.fruitTypes) do
             if fruit and fruit.name then addCrop(fruit.name) end
@@ -842,7 +849,7 @@ local function _fillTypeIndexFromMoistureSystem(entity)
     if not entity then return nil end
     local uid = rawget(entity, "uniqueId")
     if not uid then return nil end
-    local mission = rawget(_G, "g_currentMission")
+    local mission = _G.g_currentMission
     local ms = mission and mission.MoistureSystem
     if not ms then return nil end
 
@@ -904,7 +911,7 @@ function FillTypeUtils.fillTypeIndexFromEntity(it)
         if bt == nil then return nil end
         local coerced = FillTypeUtils.coerceFillTypeIndex(bt)
         if coerced then return coerced end
-        local btm = rawget(_G, "g_baleManager")
+        local btm = _G.g_baleManager
         if btm and type(btm.baleTypes) == "table" then
             local entry = btm.baleTypes[bt] or btm.baleTypes[tonumber(bt)]
             if entry then

@@ -1,0 +1,24 @@
+---
+description: UI bug reports and fixes target NEW APP / ui-v2, not legacy web/
+alwaysApply: true
+---
+
+# Active UI = NEW APP (not legacy)
+
+When the user reports dashboard/UI problems, bugs, or feature requests, assume **NEW APP** (`NEW APP/`, packaged as `FS25_FarmDashboard_App/ui-v2/`).
+
+## Do
+
+- Fix logic and UI in `NEW APP/src/` (sections, `src/lib/`, store, settings, etc.).
+- Rebuild/copy with `npm run build:ui` from repo root when the packaged Electron UI must pick up changes.
+- Keep shared Electron/backend (`main.js`, `dataMerger.js`, collectors) in scope when the bug is data/API — but **screen behaviour** is NEW APP.
+
+## Do not (unless they explicitly ask)
+
+- Change legacy `FS25_FarmDashboard_App/web/` UI modules (`web/assests/js/modules/*`, `web/index.html`) for the same report.
+- Assume “refresh the old dashboard” is enough after a NEW APP-only fix.
+- Do not “backport” NEW APP behaviour fixes into legacy web unless they explicitly want both UIs changed. People who stay on classic UI must keep the previous app behaviour.
+
+## Mirror note
+
+Some helpers were ported from `web/` into `NEW APP/src/lib/` (e.g. productions farm scope). Prefer fixing the TypeScript copy in NEW APP; only update legacy if they ask for parity or dual maintenance.

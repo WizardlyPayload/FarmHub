@@ -1,6 +1,7 @@
 // FS25 FarmDashboard | notifications.js | v2.0.0
 
 import { t } from "../i18n/i18n.js";
+import { renderUiStateHtml } from "./uiState.js";
 
 function escapeNotificationHtml(s) {
   if (s == null) return "";
@@ -57,12 +58,11 @@ export function displayNotificationHistory() {
   if (!content) return;
 
   if (this.notificationHistory.length === 0) {
-    content.innerHTML = `
-      <div class="text-center text-muted py-4">
-        <i class="bi bi-bell-slash fs-1 mb-3"></i>
-        <p>${escapeNotificationHtml(t("notifications.empty"))}</p>
-      </div>
-    `;
+    content.innerHTML = renderUiStateHtml({
+      state: "empty",
+      title: t("notifications.empty"),
+      body: t("ux.helper.whatToCheck"),
+    });
     return;
   }
 

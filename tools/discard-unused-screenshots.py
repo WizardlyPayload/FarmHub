@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Move unreferenced screenshots to docs/screenshots/discard/."""
+"""Promote KEEP / referenced screenshots into docs/doc-screenshots/; tidy WIP inbox."""
 from __future__ import annotations
 
 import re
@@ -7,8 +7,9 @@ import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SHOT = ROOT / "docs" / "screenshots"
-DISCARD = SHOT / "discard"
+INBOX = ROOT / "docs" / "screenshots"
+PUBLISHED = ROOT / "docs" / "doc-screenshots"
+DISCARD = INBOX / "discard"
 
 # Canonical fd-* kept for USER_MANUAL, INSTALL, README (direct refs + alias targets).
 KEEP: set[str] = {
@@ -74,13 +75,12 @@ KEEP: set[str] = {
     "fd-modal-100-mod-export.png",
     "fd-mod-010-config-xml-explorer.png",
     "fd-mod-020-config-xml-editor.png",
-    ".gitkeep",
 }
 
 
 def collect_referenced() -> set[str]:
     names: set[str] = set(KEEP)
-    pat = re.compile(r"screenshots/([A-Za-z0-9_.-]+\.png)")
+    pat = re.compile(r"(?:doc-)?screenshots/([A-Za-z0-9_.-]+\.png)")
     for md in (ROOT / "docs").glob("*.md"):
         text = md.read_text(encoding="utf-8")
         names.update(pat.findall(text))
@@ -91,21 +91,34 @@ def collect_referenced() -> set[str]:
 
 
 def main() -> None:
+    PUBLISHED.mkdir(parents=True, exist_ok=True)
     DISCARD.mkdir(parents=True, exist_ok=True)
     keep = collect_referenced()
+    promoted: list[str] = []
     moved: list[str] = []
-    for path in sorted(SHOT.iterdir()):
-        if not path.is_file():
-            continue
-        if path.name in keep:
-            continue
-        dest = DISCARD / path.name
-        if dest.exists():
-            dest.unlink()
-        shutil.move(str(path), str(dest))
-        moved.append(path.name)
-    print(f"Kept {len(keep)} manifest file(s) in {SHOT}")
-    print(f"Moved {len(moved)} file(s) to {DISCARD}")
+
+    # Promote KEEP / referenced fd-* from inbox into published docs folder.
+    if INBOX.is_dir():
+        for path in sorted(INBOX.iterdir()):
+            if not path.is_file():
+                continue
+            if path.name in (".gitkeep",):
+                continue
+            if path.name in keep:
+                dest = PUBLISHED / path.name
+                shutil.copy2(path, dest)
+                promoted.append(path.name)
+                continue
+            # Spare / timestamp grabs stay local only — park in discard/
+            dest = DISCARD / path.name
+            if dest.exists():
+                dest.unlink()
+            shutil.move(str(path), str(dest))
+            moved.append(path.name)
+
+    print(f"Published folder: {PUBLISHED} ({len(list(PUBLISHED.glob('*.png')))} PNGs)")
+    print(f"Promoted {len(promoted)} file(s) from inbox -> doc-screenshots")
+    print(f"Moved {len(moved)} unused inbox file(s) to {DISCARD}")
     if moved:
         for name in moved[:20]:
             print(f"  {name}")

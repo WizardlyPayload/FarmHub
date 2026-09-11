@@ -10,11 +10,12 @@ local MAX_FARMS = 8
 local BALE_LITER_ESTIMATE = 4000
 
 local function _mission()
-    return rawget(_G, "g_currentMission")
+    -- Engine globals resolve through _G __index; rawget is always nil in the mod sandbox.
+    return _G.g_currentMission
 end
 
 local function _ftm()
-    return rawget(_G, "g_fillTypeManager")
+    return _G.g_fillTypeManager
 end
 
 local function _roundLiters(n)
@@ -163,7 +164,7 @@ local function _objectInfoBucket(ms, uniqueId)
     return ms.objectInfo[key] or ms.objectInfo[uniqueId]
 end
 
-local function _collectPlaceableMoistureIds(placeable, spec)
+local function _collectPlaceableMoistureIds(placeable, spec, storage)
     local out, seen = {}, {}
     local function add(entity)
         local uid = _readUniqueId(entity)
@@ -177,14 +178,42 @@ local function _collectPlaceableMoistureIds(placeable, spec)
         add(tbl)
         for k, v in pairs(tbl) do
             if type(v) == "table" and type(k) == "string" then
-                if k:sub(1, 4) == "spec" or k:find("Trigger", 1, true) or k:find("info", 1, true) then
+                if k:sub(1, 4) == "spec"
+                    or k:find("Trigger", 1, true)
+                    or k:find("info", 1, true)
+                    or k == "storages"
+                    or k == "loadingStation"
+                    or k == "storage"
+                    or k == "owningPlaceable"
+                then
                     walk(v, depth + 1)
                 end
+            elseif type(v) == "table" and type(k) == "number" then
+                -- storage arrays are 1-indexed lists
+                walk(v, depth + 1)
             end
         end
     end
+    -- Moisture System keys object moisture by storage / loading-station uniqueId
+    -- more often than placeable.uniqueId — try those first when scoring.
+    add(storage)
+    if spec then
+        if spec.storages then
+            for _, st in ipairs(spec.storages) do add(st) end
+        end
+        if spec.loadingStation then
+            add(spec.loadingStation)
+            if spec.loadingStation.owningPlaceable then
+                add(spec.loadingStation.owningPlaceable)
+            end
+        end
+        if placeable and placeable.spec_infoTrigger then
+            add(placeable.spec_infoTrigger)
+        end
+        walk(spec, 0)
+    end
+    add(placeable)
     walk(placeable, 0)
-    if spec then walk(spec, 0) end
     return out
 end
 
@@ -227,20 +256,14 @@ local function _scoreMoistureUid(ms, uid, siloFills)
     return score
 end
 
-local function _resolveMoistureUidForPlaceable(ms, placeable)
+local function _resolveMoistureUidForPlaceable(ms, placeable, storage)
     if not ms or not placeable or not placeable.spec_silo then return nil end
     local siloFills = _siloFillTypeSet(placeable)
     if not next(siloFills) then return nil end
     local bestUid, bestScore = nil, 0
-    for _, uid in ipairs(_collectPlaceableMoistureIds(placeable, placeable.spec_silo)) do
+    for _, uid in ipairs(_collectPlaceableMoistureIds(placeable, placeable.spec_silo, storage)) do
         local score = _scoreMoistureUid(ms, uid, siloFills)
         if score > bestScore then bestScore, bestUid = score, uid end
-    end
-    if ms.objectInfo then
-        for uid, _ in pairs(ms.objectInfo) do
-            local score = _scoreMoistureUid(ms, uid, siloFills)
-            if score > bestScore then bestScore, bestUid = score, tostring(uid) end
-        end
     end
     if bestScore > 0 then return bestUid end
     return nil
@@ -263,25 +286,24 @@ local function _buildSiloMoistureUidByLocation()
     return out
 end
 
-local function _patchLocationMoisture(loc, uid, fillTypeIndex)
-    if not loc or not uid then return end
-    local mPct, grade, qualityPct = _moistureGrade(uid, fillTypeIndex)
-    if mPct ~= nil then loc.moisturePct = mPct end
-    if qualityPct ~= nil then loc.qualityPct = qualityPct end
-    if grade then loc.grade = grade end
-end
-
 local function _siloMoistureUniqueId(placeable, spec, storage)
-    local uid = _readUniqueId(placeable)
+    -- Prefer storage / loading-station IDs (Moisture System object keys), then scored match.
+    local uid = _readUniqueId(storage)
     if uid then return uid end
+    if spec and spec.storages then
+        for _, st in ipairs(spec.storages) do
+            uid = _readUniqueId(st)
+            if uid then return uid end
+        end
+    end
     if spec and spec.loadingStation then
         local ls = spec.loadingStation
+        uid = _readUniqueId(ls)
+        if uid then return uid end
         if ls.owningPlaceable then
             uid = _readUniqueId(ls.owningPlaceable)
             if uid then return uid end
         end
-        uid = _readUniqueId(ls)
-        if uid then return uid end
     end
     if placeable and placeable.spec_infoTrigger then
         uid = _readUniqueId(placeable.spec_infoTrigger)
@@ -289,10 +311,10 @@ local function _siloMoistureUniqueId(placeable, spec, storage)
     end
     local ms = _moistureSystem()
     if ms and placeable and placeable.spec_silo then
-        uid = _resolveMoistureUidForPlaceable(ms, placeable)
+        uid = _resolveMoistureUidForPlaceable(ms, placeable, storage)
         if uid then return uid end
     end
-    return nil
+    return _readUniqueId(placeable)
 end
 
 local function _moistureGradeFromInfo(info, fillTypeIndex)
@@ -304,7 +326,7 @@ local function _moistureGradeFromInfo(info, fillTypeIndex)
     if info.quality ~= nil then
         qualityPct = math.floor(tonumber(info.quality) + 0.5)
     end
-    if qualityPct == nil and moisture ~= nil and _G.CropValueMap and _G.CropValueMap.getGrade then
+    if moisture ~= nil and _G.CropValueMap and _G.CropValueMap.getGrade then
         local okG, g = pcall(function()
             return _G.CropValueMap.getGrade(fillTypeIndex, (tonumber(moisture) or 0) / 100)
         end)
@@ -327,25 +349,6 @@ local function _fillTypeNameForIndex(fillTypeIndex)
         return FillTypeUtils.nameForIndex(idx)
     end
     return nil
-end
-
-local function _moistureGradeScanByFillType(ms, fillTypeIndex)
-    if not ms or not ms.objectInfo or fillTypeIndex == nil then return nil, nil, nil end
-    local ftName = _fillTypeNameForIndex(fillTypeIndex)
-    if not ftName then return nil, nil, nil end
-    local idx = InventoryScan.resolveFillTypeIndex(fillTypeIndex) or tonumber(fillTypeIndex)
-    local bestScore, bestM, bestG, bestQ = 0, nil, nil, nil
-    for uid, bucket in pairs(ms.objectInfo) do
-        if type(bucket) == "table" and bucket[ftName] then
-            local m, g, q = _moistureGradeFromInfo(bucket[ftName], idx)
-            local score = (m ~= nil and 1 or 0) + (q ~= nil and 1 or 0)
-            if score > bestScore then
-                bestScore, bestM, bestG, bestQ = score, m, g, q
-            end
-        end
-    end
-    if bestScore > 0 then return bestM, bestG, bestQ end
-    return nil, nil, nil
 end
 
 local function _moistureGrade(uniqueId, fillTypeIndex)
@@ -403,7 +406,7 @@ local function _moistureGrade(uniqueId, fillTypeIndex)
             end
         end
     end
-    if qualityPct == nil and moisture ~= nil and grade == nil and _G.CropValueMap and _G.CropValueMap.getGrade then
+    if moisture ~= nil and grade == nil and _G.CropValueMap and _G.CropValueMap.getGrade then
         local okG, g = pcall(function()
             return _G.CropValueMap.getGrade(idx, (tonumber(moisture) or 0) / 100)
         end)
@@ -411,11 +414,15 @@ local function _moistureGrade(uniqueId, fillTypeIndex)
             grade = (FillTypeUtils and FillTypeUtils.moistureGradeLetter and FillTypeUtils.moistureGradeLetter(g)) or g
         end
     end
-    if moisture == nil and qualityPct == nil and grade == nil then
-        local sm, sg, sq = _moistureGradeScanByFillType(ms, idx)
-        moisture, grade, qualityPct = sm, sg, sq
-    end
     return moisture, grade, qualityPct
+end
+
+local function _patchLocationMoisture(loc, uid, fillTypeIndex)
+    if not loc or not uid then return end
+    local mPct, grade, qualityPct = _moistureGrade(uid, fillTypeIndex)
+    if mPct ~= nil then loc.moisturePct = mPct end
+    if qualityPct ~= nil then loc.qualityPct = qualityPct end
+    if grade then loc.grade = grade end
 end
 
 local function _applyMoistureToLoc(loc, uniqueId, fillTypeIndex)
@@ -463,11 +470,6 @@ function InventoryScan.applyStockMoistureToExport(stock)
                             local uid = locNameToUid[loc.name]
                             if uid then
                                 _patchLocationMoisture(loc, uid, idx)
-                            else
-                                local m, g, q = _moistureGradeScanByFillType(_moistureSystem(), idx)
-                                if m ~= nil then loc.moisturePct = m end
-                                if q ~= nil then loc.qualityPct = q end
-                                if g then loc.grade = g end
                             end
                         end
                     end
@@ -607,7 +609,7 @@ local function _stockEnsureItem(farmBucket, fillTypeIndex)
     return farmBucket._idx[key]
 end
 
-function InventoryScan.addStockLiters(stockState, farmId, fillTypeIndex, liters, locName, kind, extra, uniqueId, placeable)
+function InventoryScan.addStockLiters(stockState, farmId, fillTypeIndex, liters, locName, kind, extra, uniqueId, placeable, locFields)
     if not stockState or not farmId then return end
     local lit = _roundLiters(liters)
     if lit <= 0 then return end
@@ -629,10 +631,38 @@ function InventoryScan.addStockLiters(stockState, farmId, fillTypeIndex, liters,
     local mPct, grade, qualityPct = _moistureGrade(uniqueId, idx)
     local loc = { name = tostring(locName or "Storage"), kind = kind or "storage", liters = lit }
     if extra and extra ~= "" then loc.extra = tostring(extra) end
+    if type(locFields) == "table" then
+        for k, v in pairs(locFields) do
+            if v ~= nil then loc[k] = v end
+        end
+    end
     if mPct ~= nil then loc.moisturePct = mPct end
     if qualityPct ~= nil then loc.qualityPct = qualityPct end
     if grade then loc.grade = grade end
     table.insert(item.locations, loc)
+end
+
+--- Resolve BunkerSilo state constants; fallbacks match FS25 (STATE_FILL=1 … STATE_DRAIN=4).
+function InventoryScan.bunkerStateConstants()
+    local fill, closed, fermented, drain = 1, 2, 3, 4
+    local bs = rawget(_G, "BunkerSilo")
+    if type(bs) == "table" then
+        if bs.STATE_FILL ~= nil then fill = bs.STATE_FILL end
+        if bs.STATE_CLOSED ~= nil then closed = bs.STATE_CLOSED end
+        if bs.STATE_FERMENTED ~= nil then fermented = bs.STATE_FERMENTED end
+        if bs.STATE_DRAIN ~= nil then drain = bs.STATE_DRAIN end
+    end
+    return fill, closed, fermented, drain
+end
+
+function InventoryScan.bunkerStateName(state, fill, closed, fermented, drain)
+    local s = tonumber(state)
+    if s == nil then return nil end
+    if s == fill then return "fill" end
+    if s == closed then return "closed" end
+    if s == fermented then return "fermented" end
+    if s == drain then return "drain" end
+    return tostring(s)
 end
 
 function InventoryScan.tallyBale(baleState, farmId, placement, fillTypeIndex, count)
@@ -981,7 +1011,7 @@ function InventoryScan.scanLooseWorldBalesStep(ctx, baleState, budget)
                 elseif src == "itemsToSave" then
                     enum.tableRef = m.itemSystem and m.itemSystem.itemsToSave
                 elseif src == "baleMgr" then
-                    local bm = rawget(_G, "g_baleManager")
+                    local bm = _G.g_baleManager
                     if bm then
                         if type(bm.getBales) == "function" then
                             local ok, r = pcall(function() return bm:getBales() end)
@@ -1014,7 +1044,11 @@ function InventoryScan.scanLooseWorldBalesStep(ctx, baleState, budget)
             if enum.done or not enum.tableRef then
                 ctx.listBuilt[src] = true
                 ctx.listPos[src] = 1
-                ctx.sourceIdx = ctx.sourceIdx + 1
+                -- Empty/missing tables skip processing. A finished list stays selected
+                -- so the next loop iteration can call tryBale (MOD-01).
+                if not enum.tableRef then
+                    ctx.sourceIdx = ctx.sourceIdx + 1
+                end
             else
                 local list = ctx.listData[src]
                 if not enum.seenKeys then enum.seenKeys = {} end
@@ -1064,7 +1098,6 @@ function InventoryScan.scanLooseWorldBalesStep(ctx, baleState, budget)
                 if enum.done then
                     ctx.listBuilt[src] = true
                     ctx.listPos[src] = 1
-                    ctx.sourceIdx = ctx.sourceIdx + 1
                 end
                 spent = spent + math.max(1, added)
                 if spent >= budget then return false end
@@ -1230,11 +1263,11 @@ function InventoryScan.scanPlaceableForFarm(placeable, farmId, stockState, baleS
 
     if placeable.spec_silo and InventoryScan.placeableOwnedByFarm(placeable, farmId) then
         local spec = placeable.spec_silo
-        local moistureUid = _siloMoistureUniqueId(placeable, spec, nil)
         local siloLitersFromStorages = 0
         if spec.storages then
             for _, storage in ipairs(spec.storages) do
                 if storage and _storageOwnedByFarm(storage, farmId) and storage.fillLevels then
+                    local moistureUid = _siloMoistureUniqueId(placeable, spec, storage)
                     for ftIdx, lit in pairs(storage.fillLevels) do
                         local n = tonumber(lit) or 0
                         if n > 0 then
@@ -1246,6 +1279,7 @@ function InventoryScan.scanPlaceableForFarm(placeable, farmId, stockState, baleS
             end
         end
         if siloLitersFromStorages <= 0 and spec.loadingStation and spec.loadingStation.getAllFillLevels then
+            local moistureUid = _siloMoistureUniqueId(placeable, spec, nil)
             local ok, levels = pcall(function() return spec.loadingStation:getAllFillLevels(farmId) end)
             if ok and type(levels) == "table" then
                 for ftIdx, lit in pairs(levels) do
@@ -1295,19 +1329,64 @@ function InventoryScan.scanPlaceableForFarm(placeable, farmId, stockState, baleS
     if placeable.spec_bunkerSilo and tonumber(placeable.ownerFarmId) == farmId and placeable.spec_bunkerSilo.bunkerSilo then
         local bs = placeable.spec_bunkerSilo.bunkerSilo
         local fillLevel = tonumber(bs.fillLevel) or 0
-        local ftIdx = bs.inputFillType
-        local extra = ""
-        if rawget(_G, "BunkerSilo") and bs.state ~= nil then
-            if bs.state == BunkerSilo.STATE_FILL and bs.compactedPercent then
-                extra = "compacting " .. tostring(math.floor(bs.compactedPercent)) .. "%"
-            elseif bs.state == BunkerSilo.STATE_CLOSED and bs.fermentingPercent then
-                extra = "fermenting " .. tostring(math.ceil((tonumber(bs.fermentingPercent) or 0) * 100)) .. "%"
-            elseif bs.state == BunkerSilo.STATE_DRAIN or bs.state == BunkerSilo.STATE_FERMENTED then
-                ftIdx = bs.outputFillType or ftIdx
+        local inputIdx = InventoryScan.resolveFillTypeIndex(bs.inputFillType)
+        local outputIdx = InventoryScan.resolveFillTypeIndex(bs.outputFillType)
+        local ftIdx = inputIdx
+        local stateFill, stateClosed, stateFermented, stateDrain = InventoryScan.bunkerStateConstants()
+        local stateName = InventoryScan.bunkerStateName(bs.state, stateFill, stateClosed, stateFermented, stateDrain)
+        local compactedPct = tonumber(bs.compactedPercent)
+        if compactedPct ~= nil then
+            compactedPct = math.floor(math.max(0, math.min(100, compactedPct)) + 0.5)
+        end
+        -- FS25: fermentingPercent is 0..1; export 0..100 for UI.
+        local fermentingPct = nil
+        local fermentRaw = tonumber(bs.fermentingPercent)
+        if fermentRaw ~= nil then
+            if fermentRaw <= 1 then
+                fermentingPct = math.ceil(math.max(0, math.min(1, fermentRaw)) * 100)
+            else
+                fermentingPct = math.floor(math.max(0, math.min(100, fermentRaw)) + 0.5)
             end
         end
+        local extra = ""
+        local s = tonumber(bs.state)
+        -- Match game HUD: CLOSED / FERMENTED / DRAIN report output (silage), FILL uses input (chaff).
+        if s ~= nil then
+            if s == stateFill then
+                if compactedPct ~= nil then
+                    extra = "compacting " .. tostring(compactedPct) .. "%"
+                end
+            elseif s == stateClosed then
+                ftIdx = outputIdx or ftIdx
+                if fermentingPct ~= nil then
+                    extra = "fermenting " .. tostring(fermentingPct) .. "%"
+                end
+            elseif s == stateFermented or s == stateDrain then
+                ftIdx = outputIdx or ftIdx
+            elseif outputIdx and s ~= stateFill then
+                -- Unknown state but not filling: prefer output when available.
+                ftIdx = outputIdx
+            end
+        end
+        local inputName = nil
+        local outputName = nil
+        if inputIdx then
+            inputName = select(1, InventoryScan.fillTypeMeta(inputIdx))
+        end
+        if outputIdx then
+            outputName = select(1, InventoryScan.fillTypeMeta(outputIdx))
+        end
+        local locFields = {
+            bunkerState = stateName,
+            inputFillType = inputName or nil,
+            outputFillType = outputName or nil,
+            inputFillTypeIndex = inputIdx,
+            outputFillTypeIndex = outputIdx,
+            fermentingPercent = fermentingPct,
+            compactedPercent = compactedPct,
+        }
         if fillLevel > 0 and ftIdx then
-            InventoryScan.addStockLiters(stockState, farmId, ftIdx, fillLevel, pname, "bunkerSilo", extra)
+            InventoryScan.addStockLiters(stockState, farmId, ftIdx, fillLevel, pname, "bunkerSilo", extra, nil, placeable, locFields)
         end
     end
 

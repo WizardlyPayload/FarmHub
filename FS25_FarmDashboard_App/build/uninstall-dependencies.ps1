@@ -1,165 +1,56 @@
-# Farm Dashboard — remove optional dependencies installed by setup (ImageMagick only).
-# Skips removal if ImageMagick was already on the PC before Farm Dashboard setup.
-
 #Requires -Version 5.1
-
-$ErrorActionPreference = 'SilentlyContinue'
-$FarmDashRegistryKey = 'HKCU:\Software\fs25-farm-dashboard'
-$log = Join-Path $env:TEMP 'FarmDashImageMagickUninstall.log'
-
-function Write-Log([string] $m) {
-    $line = "[{0}] {1}" -f (Get-Date -Format 'o'), $m
-    Add-Content -LiteralPath $log -Value $line -Encoding utf8 -ErrorAction SilentlyContinue
-}
-
-function Start-HiddenProcess {
-    param(
-        [Parameter(Mandatory)][string] $FilePath,
-        [string[]] $ArgumentList = @(),
-        [switch] $Wait
-    )
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $FilePath
-    if ($ArgumentList.Count -gt 0) {
-        $psi.Arguments = [string]::Join(' ', $ArgumentList)
+# Full removal only. Do not remove external or still-shared ImageMagick installations.
+param([ValidateSet('Classic', 'Rf', 'V4', 'V5')][string]$Edition = 'V4', [switch]$CheckOnly)
+$ErrorActionPreference = 'Stop'
+$script:FarmDashNativeDependencyRegistry = $Edition -in @('V5', 'Rf')
+$script:FarmDashAllowDependencyRecovery = $false
+if ($script:FarmDashNativeDependencyRegistry) { . (Join-Path $PSScriptRoot 'windows-install-state.ps1') }
+. (Join-Path $PSScriptRoot 'imagemagick-common.ps1')
+$script:DependencyLog = Join-Path $env:TEMP 'FarmDashImageMagickUninstall.log'
+function Invoke-FarmDashDependencyRemoval([string]$EditionName, [bool]$PreflightOnly = $false) {
+    $state = Get-DependencyState
+    Write-DependencyLog ("ImageMagick removal: edition=" + $EditionName + '; identity=' + [Security.Principal.WindowsIdentity]::GetCurrent().Name + '; process64=' + [Environment]::Is64BitProcess + '; ownership=' + [string]$state.ImageMagickInstalledByFarmDash)
+    if ($state.ImageMagickInstalledByFarmDash -ne '1') {
+        Write-DependencyLog 'ImageMagick is not owned by Farm Dashboard. Preserving it.'
+        return 0
     }
-    $psi.UseShellExecute = $false
-    $psi.CreateNoWindow = $true
-    $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
-    $p = [System.Diagnostics.Process]::Start($psi)
-    if ($Wait -and $p) {
-        $p.WaitForExit()
-        return $p
+    if (Test-OtherDashboardInstalled $EditionName) {
+        Write-DependencyLog 'Another Dashboard edition is installed and may need ImageMagick. Preserving the shared dependency and its ownership record.'
+        return 0
     }
-    return $p
-}
-
-function Clear-FarmDashImageMagickRegistry {
-    try {
-        if (-not (Test-Path -LiteralPath $FarmDashRegistryKey)) { return }
-        Remove-ItemProperty -LiteralPath $FarmDashRegistryKey -Name 'ImageMagickInstalledByFarmDash' -ErrorAction SilentlyContinue
-        Remove-ItemProperty -LiteralPath $FarmDashRegistryKey -Name 'ImageMagickInstallMethod' -ErrorAction SilentlyContinue
-        Remove-ItemProperty -LiteralPath $FarmDashRegistryKey -Name 'ImageMagickUninstallExe' -ErrorAction SilentlyContinue
-    } catch { }
-}
-
-function Find-ImageMagickUninstaller {
-    try {
-        $props = Get-ItemProperty -LiteralPath $FarmDashRegistryKey -ErrorAction Stop
-        if ($props.ImageMagickUninstallExe -and (Test-Path -LiteralPath $props.ImageMagickUninstallExe)) {
-            return $props.ImageMagickUninstallExe
-        }
-    } catch { }
-    foreach ($root in @(
-            [Environment]::GetEnvironmentVariable('ProgramFiles'),
-            [Environment]::GetEnvironmentVariable('ProgramFiles(x86)')
-        )) {
-        if ([string]::IsNullOrWhiteSpace($root)) { continue }
-        $dirs = @(Get-ChildItem -Path $root -Directory -Filter 'ImageMagick*' -ErrorAction SilentlyContinue)
-        foreach ($d in $dirs) {
-            foreach ($name in @('unins000.exe', 'uninstall.exe')) {
-                $u = Join-Path $d.FullName $name
-                if (Test-Path -LiteralPath $u) { return $u }
-            }
-        }
+    $exe = Resolve-OwnedImageMagick $state
+    if (-not $exe -or -not (Test-Path -LiteralPath $exe -PathType Leaf)) {
+        Write-DependencyLog 'The recorded ImageMagick executable is already absent. Clearing only dependency ownership values.'
+        if (-not $PreflightOnly) { Clear-DependencyOwnership }
+        return 0
     }
-    return $null
-}
-
-function Uninstall-ImageMagickInno([string] $UninstallExe) {
-    if (-not $UninstallExe) { return $false }
-    Write-Log "Running ImageMagick uninstaller: $UninstallExe"
-    try {
-        $p = Start-HiddenProcess -FilePath $UninstallExe -ArgumentList @(
-            '/VERYSILENT', '/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART'
-        ) -Wait
-        Write-Log "Inno uninstall exit: $($p.ExitCode)"
-        return ($p.ExitCode -eq 0)
-    } catch {
-        Write-Log "Inno uninstall error: $($_.Exception.Message)"
-        return $false
+    $unins = Get-AdjacentImageMagickUninstaller $exe
+    if (-not $unins) { throw 'Owned ImageMagick is present but its adjacent uninstaller is missing. Ownership has been retained for repair.' }
+    Assert-ImageMagickTarget $exe $unins
+    if ($state.ImageMagickUninstallExe -and [IO.Path]::GetFullPath([string]$state.ImageMagickUninstallExe) -ne $unins) {
+        throw 'ImageMagick uninstaller path changed. Ownership has been retained for review.'
     }
-}
-
-function Uninstall-ImageMagickWinget {
-    $winget = Get-Command winget.exe -ErrorAction SilentlyContinue
-    if (-not $winget) { return $false }
-    Write-Log 'Trying winget uninstall ImageMagick.ImageMagick ...'
-    try {
-        $p = Start-HiddenProcess -FilePath $winget.Source -ArgumentList @(
-            'uninstall', '--id', 'ImageMagick.ImageMagick', '-e',
-            '--accept-source-agreements', '--silent'
-        ) -Wait
-        Write-Log "winget uninstall exit: $($p.ExitCode)"
-        return ($p.ExitCode -eq 0)
-    } catch {
-        Write-Log "winget uninstall error: $($_.Exception.Message)"
-        return $false
+    if ($state.ImageMagickUninstallSHA256 -and
+        (Get-FileHash -LiteralPath $unins -Algorithm SHA256).Hash -ne $state.ImageMagickUninstallSHA256) {
+        throw 'ImageMagick uninstaller changed. Ownership has been retained for review.'
     }
-}
-
-function Uninstall-ImageMagickChoco {
-    $choco = Get-Command choco.exe -ErrorAction SilentlyContinue
-    if (-not $choco) { return $false }
-    Write-Log 'Trying Chocolatey uninstall imagemagick ...'
-    try {
-        $p = Start-HiddenProcess -FilePath $choco.Source -ArgumentList @(
-            'uninstall', 'imagemagick', '-y', '--force'
-        ) -Wait
-        Write-Log "choco uninstall exit: $($p.ExitCode)"
-        return ($p.ExitCode -eq 0)
-    } catch {
-        Write-Log "choco uninstall error: $($_.Exception.Message)"
-        return $false
+    if (-not (Test-DependencyAdministrator)) {
+        Write-DependencyLog 'Administrator permission is required to remove the owned ImageMagick installation. Re-run the Dashboard uninstaller as administrator; no hidden UAC prompt was opened.'
+        return 740
     }
-}
-
-function Test-MagickStillPresent {
-    foreach ($name in @('magick.exe', 'magick')) {
-        $c = Get-Command $name -ErrorAction SilentlyContinue
-        if ($c -and $c.Source -and (Test-Path -LiteralPath $c.Source)) { return $true }
+    if ($PreflightOnly) { return 0 }
+    $code = Invoke-DependencyProcess $unins @('/VERYSILENT', '/SILENT', '/SUPPRESSMSGBOXES', '/NORESTART')
+    if ($code -ne 0) {
+        Write-DependencyLog ("ImageMagick removal failed (exit " + $code + '). Ownership retained; Dashboard uninstall must stop for retry.')
+        return $code
     }
-    return $false
+    if (Test-Path -LiteralPath $exe) { throw 'ImageMagick remains after its uninstaller returned success. Ownership has been retained.' }
+    Clear-DependencyOwnership
+    Write-DependencyLog 'Owned ImageMagick removal verified. Dependency ownership values cleared.'
+    return 0
 }
-
-Write-Log '--- Farm Dashboard dependency uninstall start ---'
-
-try {
-    $props = Get-ItemProperty -LiteralPath $FarmDashRegistryKey -ErrorAction Stop
-} catch {
-    Write-Log 'No Farm Dashboard registry key; nothing to remove.'
-    exit 0
+try { exit (Invoke-FarmDashDependencyRemoval $Edition $CheckOnly.IsPresent) }
+catch {
+    Write-DependencyLog ("ImageMagick removal incomplete: " + $_.Exception.Message)
+    exit 1
 }
-
-if ($props.ImageMagickInstalledByFarmDash -ne '1') {
-    Write-Log 'ImageMagick was not installed by Farm Dashboard setup; skipping.'
-    exit 0
-}
-
-$method = [string]$props.ImageMagickInstallMethod
-Write-Log "Removing ImageMagick (install method: $method)."
-
-$unins = Find-ImageMagickUninstaller
-if ($unins) { Uninstall-ImageMagickInno -UninstallExe $unins | Out-Null }
-
-if (Test-MagickStillPresent) {
-    switch ($method) {
-        'winget' { Uninstall-ImageMagickWinget | Out-Null }
-        'choco'  { Uninstall-ImageMagickChoco | Out-Null }
-        default  {
-            Uninstall-ImageMagickWinget | Out-Null
-            if (Test-MagickStillPresent) { Uninstall-ImageMagickChoco | Out-Null }
-        }
-    }
-}
-
-if (Test-MagickStillPresent) {
-    Write-Log 'ImageMagick may still be installed (manual removal from Settings > Apps may be needed).'
-} else {
-    Write-Log 'ImageMagick removed successfully.'
-}
-
-Clear-FarmDashImageMagickRegistry
-Remove-Item -LiteralPath (Join-Path $env:TEMP 'FarmDashImageMagickInstall.log') -Force -ErrorAction SilentlyContinue
-
-exit 0

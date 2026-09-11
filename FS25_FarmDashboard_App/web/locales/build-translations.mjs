@@ -29,6 +29,35 @@ const ALL_LANGS = [
 
 const PLACEHOLDER_RE = /\{\{\s*([A-Za-z_][\w]*)\s*\}\}/g;
 
+function sleepMs(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
+function writeJsonRetry(filePath, obj) {
+  const payload = JSON.stringify(obj, null, 2);
+  let lastErr;
+  for (let i = 0; i < 10; i++) {
+    const tmp = `${filePath}.${process.pid}.${i}.tmp`;
+    try {
+      fs.writeFileSync(tmp, payload, 'utf8');
+      try {
+        fs.renameSync(tmp, filePath);
+        try { fs.unlinkSync(tmp); } catch { /* renamed already */ }
+        return;
+      } catch {
+        fs.copyFileSync(tmp, filePath);
+        try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+        return;
+      }
+    } catch (e) {
+      lastErr = e;
+      try { fs.unlinkSync(tmp); } catch { /* ignore */ }
+      sleepMs(120 * (i + 1));
+    }
+  }
+  throw lastErr;
+}
+
 function readLocale(code) {
   const full = path.join(MESSAGES_DIR, `${code}.json`);
   if (!fs.existsSync(full)) return {};
@@ -112,7 +141,7 @@ function main() {
   }
 
   const out = { version: 1, strings };
-  fs.writeFileSync(OUT_PATH, JSON.stringify(out, null, 2), 'utf8');
+  writeJsonRetry(OUT_PATH, out);
   console.log(
     `Wrote translations.json with ${enKeys.length} keys across ${ALL_LANGS.length} locales`
   );

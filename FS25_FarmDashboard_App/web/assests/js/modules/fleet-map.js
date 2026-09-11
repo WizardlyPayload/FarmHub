@@ -285,10 +285,12 @@ async function applyMapOverviewBackground(dashboard) {
     img.dataset.loadedUrl = "";
     if (hint) {
       const label = mapTitle || mapId || t("map.unknownMap");
-      if (data?.error === "missing_map_id") {
-        hint.textContent = t("map.hintNoImage");
-      } else if (data?.hintKind === "dlc" && label && label !== t("map.unknownMap")) {
+      if (data?.hintKind === "dlc") {
+        // Known DLC map (e.g. Kinlaig): never suggest a mods-folder zip — DLC packs ship
+        // as proprietary .dlc containers; the in-game mod caches the overview instead.
         hint.textContent = t("map.hintNoImageDlc", { map: label });
+      } else if (data?.error === "missing_map_id") {
+        hint.textContent = t("map.hintNoImage");
       } else if (label && label !== t("map.unknownMap")) {
         const token = String(label).split(/[^A-Za-z0-9]+/).find((p) => p.length >= 4) || "";
         hint.textContent = t("map.hintNoImageNamed", { map: label, hint: token || label });

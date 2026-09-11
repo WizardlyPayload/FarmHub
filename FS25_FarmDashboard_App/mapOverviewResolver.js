@@ -22,9 +22,12 @@ const MAP_DLC_PACKAGE_HINTS = [
   {
     packages: ['highlandsFishingPack'],
     match(slug, title, tokens) {
-      if (tokens.includes('kinlaig')) return true;
-      if (slug && slug.includes('kinlaig')) return true;
-      return /kinlaig/i.test(title || '');
+      if (tokens.includes('kinlaig') || tokens.includes('highland') || tokens.includes('highlands')) {
+        return true;
+      }
+      // Covers mapIds like `pdlc_highlandsFishingPack.mapKinlaig` (slug keeps the pack name).
+      if (slug && (slug.includes('kinlaig') || slug.includes('highland'))) return true;
+      return /kinlaig|highlands?[\s_-]*fishing/i.test(title || '');
     },
   },
   {
@@ -53,6 +56,30 @@ function normalizeMapSlug(mapId, mapTitle) {
     if (t.includes('eu') || t.includes('europe')) return 'mapeu';
   }
   return cleaned.toLowerCase();
+}
+
+/**
+ * Mod/DLC savegames use dotted mapIds like `pdlc_highlandsFishingPack.mapKinlaig` —
+ * `normalizeMapSlug` keeps the pack prefix; this returns the map's own id tail (`mapkinlaig`).
+ */
+function mapIdTailSlug(mapId) {
+  const raw = String(mapId || '').trim();
+  if (!raw.includes('.')) return '';
+  const tail = raw
+    .split('.')
+    .pop()
+    .replace(/[\s'"]+/g, '')
+    .toLowerCase();
+  return /^[a-z0-9_-]+$/.test(tail) ? tail : '';
+}
+
+function mapSlugCandidates(mapId, mapTitle) {
+  const slugs = [];
+  const primary = normalizeMapSlug(mapId, mapTitle);
+  if (primary) slugs.push(primary);
+  const tail = mapIdTailSlug(mapId);
+  if (tail && tail !== primary) slugs.push(tail);
+  return slugs;
 }
 
 /** Distinct tokens from a display title — used to rank mod zips (e.g. Witcombe Valley → witcombe). */
@@ -176,19 +203,27 @@ function getFs25PdlcRoots() {
   return [...new Set(roots)];
 }
 
-function resolveDlcPackages(mapSlug, mapTitle, titleTokens) {
+function resolveDlcPackages(mapSlug, mapTitle, titleTokens, extraSlugs) {
   const tokens = titleTokens || titleTokensFromMapTitle(mapTitle);
+  const slugs = [mapSlug, ...(Array.isArray(extraSlugs) ? extraSlugs : [])].filter(Boolean);
+  if (slugs.length === 0) slugs.push('');
   const out = new Set();
   for (const hint of MAP_DLC_PACKAGE_HINTS) {
-    if (hint.match(mapSlug, mapTitle, tokens)) {
+    if (slugs.some((slug) => hint.match(slug, mapTitle, tokens))) {
       for (const pkg of hint.packages) out.add(pkg);
     }
   }
   return [...out];
 }
 
-function isLikelyDlcMap(mapSlug, mapTitle, titleTokens) {
-  return resolveDlcPackages(mapSlug, mapTitle, titleTokens).length > 0;
+function isLikelyDlcMap(mapSlug, mapTitle, titleTokens, extraSlugs) {
+  return resolveDlcPackages(mapSlug, mapTitle, titleTokens, extraSlugs).length > 0;
+}
+
+/** DLC packages for a raw mapId/mapTitle pair (checks pack-prefixed and tail slugs). */
+function resolveDlcPackagesForMap(mapId, mapTitle) {
+  const [primary, ...extra] = mapSlugCandidates(mapId, mapTitle);
+  return resolveDlcPackages(primary || '', mapTitle, titleTokensFromMapTitle(mapTitle), extra);
 }
 
 function pdlcPackageOverviewCandidates(packageDir, mapSlug) {
@@ -204,16 +239,26 @@ function pdlcPackageOverviewCandidates(packageDir, mapSlug) {
   return out;
 }
 
-async function findOverviewInPdlcPackages(pdlcRoots, packages, mapSlug, mapTitle, titleTokens) {
+async function findOverviewInPdlcPackages(pdlcRoots, packages, mapSlug, mapTitle, titleTokens, extraSlugs) {
   if (!packages || packages.length === 0) return null;
+  const slugs = [mapSlug, ...(Array.isArray(extraSlugs) ? extraSlugs : [])].filter(Boolean);
+  if (slugs.length === 0) slugs.push(null);
   for (const pdlcRoot of pdlcRoots || []) {
     if (!(await pathExists(pdlcRoot))) continue;
     for (const pkg of packages) {
       const pkgDir = path.join(pdlcRoot, pkg);
-      const hit = await findFirstExisting(pdlcPackageOverviewCandidates(pkgDir, mapSlug));
-      if (hit) return { sourcePath: hit, mapSlug, sourceKind: 'file', dlcPackage: pkg };
-      const walked = await walkForOverview(pkgDir, mapSlug, mapTitle, titleTokens, 8, 8000);
-      if (walked) return { sourcePath: walked, mapSlug, sourceKind: 'file', dlcPackage: pkg };
+      for (const slug of slugs) {
+        const hit = await findFirstExisting(pdlcPackageOverviewCandidates(pkgDir, slug));
+        if (hit) return { sourcePath: hit, mapSlug, sourceKind: 'file', dlcPackage: pkg };
+      }
+      for (const slug of slugs) {
+        const walked = await walkForOverview(pkgDir, slug, mapTitle, titleTokens, 8, 8000);
+        if (walked) return { sourcePath: walked, mapSlug, sourceKind: 'file', dlcPackage: pkg };
+      }
+      // Inside the matched DLC package any overview texture belongs to that pack's map —
+      // dotted mapIds (pdlc_pack.mapX) never appear literally in the extracted paths.
+      const relaxed = await walkForOverview(pkgDir, null, null, titleTokens, 8, 8000);
+      if (relaxed) return { sourcePath: relaxed, mapSlug, sourceKind: 'file', dlcPackage: pkg };
     }
   }
   return null;
@@ -224,6 +269,8 @@ async function findOverviewInModSettingsExport(mapId, mapTitle, mapSlug) {
   const keys = new Set();
   if (mapId) keys.add(String(mapId));
   if (mapSlug) keys.add(String(mapSlug));
+  const tailSlug = mapIdTailSlug(mapId);
+  if (tailSlug) keys.add(tailSlug);
   const slugFromTitle = normalizeMapSlug(null, mapTitle);
   if (slugFromTitle) keys.add(slugFromTitle);
 
@@ -244,9 +291,11 @@ async function findOverviewInModSettingsExport(mapId, mapTitle, mapSlug) {
     } catch {
       continue;
     }
+    const keysLower = new Set([...keys].map((k) => k.toLowerCase()));
     for (const ent of entries) {
       if (!ent.isDirectory()) continue;
       const dir = path.join(base, ent.name);
+      const entNameMatches = keysLower.has(ent.name.toLowerCase());
       for (const name of ['overview.dds', 'overview.png']) {
         const candidate = path.join(dir, name);
         if (!(await pathExists(candidate))) continue;
@@ -260,12 +309,12 @@ async function findOverviewInModSettingsExport(mapId, mapTitle, mapSlug) {
           if (
             (wantId && metaId === wantId) ||
             (wantTitle && metaTitle && metaTitle === wantTitle) ||
-            (mapSlug && ent.name.toLowerCase() === mapSlug.toLowerCase())
+            entNameMatches
           ) {
             return candidate;
           }
         } catch {
-          if (mapSlug && ent.name.toLowerCase() === mapSlug.toLowerCase()) return candidate;
+          if (entNameMatches) return candidate;
         }
       }
     }
@@ -578,9 +627,10 @@ function normalizeModsRoots(modsRoot, modsRoots) {
 
 async function findOverviewSourceFile({ mapId, mapTitle, modsRoot, modsRoots }) {
   const mapSlug = normalizeMapSlug(mapId, mapTitle);
+  const extraSlugs = mapSlugCandidates(mapId, mapTitle).filter((s) => s !== mapSlug);
   const titleTokens = titleTokensFromMapTitle(mapTitle);
   const roots = normalizeModsRoots(modsRoot, modsRoots);
-  const dlcPackages = resolveDlcPackages(mapSlug, mapTitle, titleTokens);
+  const dlcPackages = resolveDlcPackages(mapSlug, mapTitle, titleTokens, extraSlugs);
 
   const modSettingsHit = await findOverviewInModSettingsExport(mapId, mapTitle, mapSlug);
   if (modSettingsHit) {
@@ -593,7 +643,8 @@ async function findOverviewSourceFile({ mapId, mapTitle, modsRoot, modsRoots }) 
       dlcPackages,
       mapSlug,
       mapTitle,
-      titleTokens
+      titleTokens,
+      extraSlugs
     );
     if (pdlcHit) return { ...pdlcHit, sourceOrigin: 'pdlc' };
   }
@@ -921,6 +972,10 @@ async function ensureCachedPng(sourceDescriptor, mapSlug, mapId, mapTitle) {
  * @returns {Promise<{ ok: boolean, url?: string, sourcePath?: string, mapSlug?: string, mapTitle?: string, error?: string }>}
  */
 async function resolveMapOverviewImage({ mapId, mapTitle, modsRoot, modsRoots }) {
+  // Resolved before the lookup so even unexpected failures (e.g. a broken DDS conversion)
+  // still tell the UI this is a DLC map — never suggest "put FS25_*.zip in mods" for those.
+  const dlcPackagesForMap = resolveDlcPackagesForMap(mapId, mapTitle);
+  const hintKindForMap = dlcPackagesForMap.length > 0 ? 'dlc' : 'mod';
   try {
     const found = await findOverviewSourceFile({ mapId, mapTitle, modsRoot, modsRoots });
     const { sourcePath, mapSlug, sourceKind, zipHit } = found;
@@ -928,11 +983,11 @@ async function resolveMapOverviewImage({ mapId, mapTitle, modsRoot, modsRoots })
       return {
         ok: false,
         error: 'overview_not_found',
-        hintKind: found.likelyDlc ? 'dlc' : 'mod',
+        hintKind: found.likelyDlc ? 'dlc' : hintKindForMap,
         mapTitle: mapTitle || null,
         mapId: mapId || null,
         mapSlug: found.mapSlug || null,
-        dlcPackages: found.dlcPackages || null,
+        dlcPackages: found.dlcPackages || (dlcPackagesForMap.length > 0 ? dlcPackagesForMap : null),
       };
     }
     const descriptor =
@@ -954,12 +1009,19 @@ async function resolveMapOverviewImage({ mapId, mapTitle, modsRoot, modsRoots })
     return {
       ok: false,
       error: e && e.message ? e.message : String(e),
+      hintKind: hintKindForMap,
+      mapTitle: mapTitle || null,
+      mapId: mapId || null,
+      mapSlug: normalizeMapSlug(mapId, mapTitle) || null,
+      dlcPackages: dlcPackagesForMap.length > 0 ? dlcPackagesForMap : null,
     };
   }
 }
 
 module.exports = {
   normalizeMapSlug,
+  mapIdTailSlug,
+  mapSlugCandidates,
   titleTokensFromMapTitle,
   distinctiveTitleTokens,
   pathMatchesMapIdentity,
@@ -968,6 +1030,7 @@ module.exports = {
   getFs25GameInstallRoots,
   getFs25PdlcRoots,
   resolveDlcPackages,
+  resolveDlcPackagesForMap,
   isLikelyDlcMap,
   findOverviewInModSettingsExport,
   findOverviewInPdlcPackages,

@@ -1,5 +1,6 @@
 const {
     mergeData,
+    mergeFields,
     buildFieldLiveFingerprints,
 } = require('../dataMerger');
 const {
@@ -75,6 +76,26 @@ describe('field moisture offline persistence', () => {
         );
         const field = merged.fields.find((f) => Number(f.farmlandId ?? f.id) === 28);
         expect(field.moisture.percent).toBe(22);
+    });
+
+    test('empty lua outline does not wipe XML or cache polygons', () => {
+        const xmlOutline = [[0, 0], [10, 0], [10, 10]];
+        const cacheOutline = [[-5, -5], [5, -5], [5, 5]];
+        const cache = buildFieldLiveFingerprints([
+            { farmlandId: 28, outline: cacheOutline },
+        ]);
+        const merged = mergeFields(
+            [{ farmlandId: 28, id: 28, ownerFarmId: 1, outline: xmlOutline }],
+            [{ farmlandId: 28, id: 28, ownerFarmId: 1, outline: [] }],
+            cache
+        );
+        expect(merged[0].outline).toEqual(xmlOutline);
+        const cacheOnly = mergeFields(
+            [{ farmlandId: 28, id: 28, ownerFarmId: 1 }],
+            [{ farmlandId: 28, id: 28, ownerFarmId: 1, outline: [] }],
+            cache
+        );
+        expect(cacheOnly[0].outline).toEqual(cacheOutline);
     });
 
     test('omitted live soilFertilizer and cropStress are treated as disabled, not cached', () => {

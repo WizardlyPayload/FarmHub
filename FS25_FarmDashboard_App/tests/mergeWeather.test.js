@@ -1,5 +1,5 @@
 // FS25 FarmDashboard | tests/mergeWeather.test.js
-const { mergeWeather, mergeForecastDays } = require("../dataMerger.js");
+const { mergeWeather, mergeForecastDays, luaForecastIsLive } = require("../dataMerger.js");
 
 describe("mergeForecastDays", () => {
   test("keeps Lua temperatures and Lua types when XML forecast has null temps", () => {
@@ -79,7 +79,42 @@ describe("mergeWeather", () => {
     );
     expect(merged.currentWeather).toBe("snow");
     expect(merged.currentTemperature).toBe(16);
-    expect(merged.forecast).toEqual([]);
+    expect(merged.forecast[0].weatherType).toBe("sun");
+  });
+
+  test("temperature-only Lua does not wipe XML forecast days", () => {
+    const xmlForecast = [
+      { day: 1, weatherType: "RAIN", minTemperature: 8, maxTemperature: 12 },
+      { day: 2, weatherType: "SUN", minTemperature: 10, maxTemperature: 16 },
+    ];
+    const merged = mergeWeather(
+      { currentTemperature: 9.5 },
+      { currentWeather: "CLOUDY", forecast: xmlForecast }
+    );
+    expect(luaForecastIsLive({ currentTemperature: 9.5 })).toBe(false);
+    expect(merged.forecast).toHaveLength(2);
+    expect(merged.forecast[0].weatherType).toBe("rain");
+    expect(merged.forecast[1].maxTemperature).toBe(16);
+  });
+
+  test("empty Lua forecast array does not wipe XML forecast", () => {
+    const merged = mergeWeather(
+      { currentTemperature: 4, currentWeather: "unknown", forecast: [] },
+      { currentWeather: "SUN", forecast: [{ day: 1, weatherType: "CLOUDY", minTemperature: 3, maxTemperature: 7 }] }
+    );
+    expect(merged.currentWeather).toBe("unknown");
+    expect(merged.forecast[0].weatherType).toBe("cloudy");
+    expect(merged.forecast[0].minTemperature).toBe(3);
+  });
+
+  test("null Lua weather keeps XML forecast", () => {
+    const merged = mergeWeather(null, {
+      currentWeather: "RAIN",
+      currentTemperature: 6,
+      forecast: [{ day: 1, weatherType: "SNOW", minTemperature: -1, maxTemperature: 2 }],
+    });
+    expect(merged.currentWeather).toBe("rain");
+    expect(merged.forecast[0].weatherType).toBe("snow");
   });
 
   test("live Lua unknown is not filled from XML sun", () => {

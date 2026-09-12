@@ -7,6 +7,8 @@ const {
   candidateBasenames,
   prefetchFillTypeHudCache,
   ensureFillTypeHudPng,
+  writeHudPngFromBuffer,
+  fileLooksLikePng,
   lookupHudSource,
   extractHudRoots,
   isLikelyHudEntry,
@@ -142,4 +144,13 @@ describe("fillTypeHud", () => {
     expect(magic[0]).toBe(0x89);
     expect(magic[1]).toBe(0x50);
   }, 30000);
+
+  test("writeHudPngFromBuffer commits atomically and leaves a valid PNG", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "fd-hud-atomic-"));
+    const dest = path.join(root, "WHEAT.png");
+    await writeHudPngFromBuffer(PNG_1x1, dest);
+    expect(fileLooksLikePng(dest)).toBe(true);
+    const leftovers = fs.readdirSync(root).filter((name) => name.endsWith(".tmp"));
+    expect(leftovers).toEqual([]);
+  });
 });

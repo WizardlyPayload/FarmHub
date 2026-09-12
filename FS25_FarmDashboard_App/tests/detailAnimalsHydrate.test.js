@@ -5,9 +5,27 @@ const path = require('path');
 const {
     getFtpCachedDetailsDir,
     getDetailsDirForHydration,
+    getLocalDetailsDirForServer,
     hydrateLuaDataAnimalsFromDetails,
     rememberDetailEntry,
 } = require('../detailAnimalsHydrate');
+
+describe('detailAnimalsHydrate local slot isolation', () => {
+    test('getLocalDetailsDirForServer does not fall back to a sibling save slot', () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fd-hydrate-slot-'));
+        const primary = path.join(root, 'savegame2');
+        const other = path.join(root, 'savegame1', 'details');
+        fs.mkdirSync(other, { recursive: true });
+        fs.writeFileSync(path.join(other, 'animals_1.json'), '{}');
+        const srv = { mode: 'local', localSubFolder: 'savegame1' };
+        const dir = getLocalDetailsDirForServer(srv, () => path.join(primary, 'data.json'), {
+            serverState: { lastSaveSlot: 'savegame1' },
+        });
+        expect(dir).toBe(path.join(primary, 'details'));
+        expect(dir).not.toBe(other);
+        expect(fs.existsSync(dir)).toBe(false);
+    });
+});
 
 describe('detailAnimalsHydrate FTP paths', () => {
     test('getFtpCachedDetailsDir uses serverState.lastSaveSlot', () => {

@@ -358,26 +358,39 @@ function fileLooksLikePng(filePath) {
   }
 }
 
+function hudStagingPath(destPng) {
+  return `${destPng}.${process.pid}.${crypto.randomBytes(6).toString("hex")}.tmp`;
+}
+
+async function commitHudPng(tmpPng, destPng) {
+  if (!fileLooksLikePng(tmpPng)) {
+    await fs.promises.unlink(tmpPng).catch(() => {});
+    throw new Error("hud cache write is not a PNG");
+  }
+  await fs.promises.rename(tmpPng, destPng);
+}
+
 async function writeHudPngFromBuffer(buf, destPng) {
+  await fs.promises.mkdir(path.dirname(destPng), { recursive: true });
+  const staged = hudStagingPath(destPng);
   if (bufferLooksLikePng(buf)) {
-    await fs.promises.writeFile(destPng, buf);
+    await fs.promises.writeFile(staged, buf);
+    await commitHudPng(staged, destPng);
     return;
   }
-  const tmp = path.join(os.tmpdir(), `fd_hud_${crypto.randomBytes(6).toString("hex")}.dds`);
-  await fs.promises.writeFile(tmp, buf);
+  const ddsTmp = path.join(os.tmpdir(), `fd_hud_${crypto.randomBytes(6).toString("hex")}.dds`);
+  await fs.promises.writeFile(ddsTmp, buf);
   try {
-    await convertDdsToPng(tmp, destPng);
+    await convertDdsToPng(ddsTmp, staged);
+    await commitHudPng(staged, destPng);
   } finally {
-    await fs.promises.unlink(tmp).catch(() => {});
+    await fs.promises.unlink(ddsTmp).catch(() => {});
+    await fs.promises.unlink(staged).catch(() => {});
   }
 }
 
 async function materializeHudFile(sourcePath, destPng) {
   const buf = await fs.promises.readFile(sourcePath);
-  if (bufferLooksLikePng(buf)) {
-    await fs.promises.copyFile(sourcePath, destPng);
-    return;
-  }
   await writeHudPngFromBuffer(buf, destPng);
 }
 
@@ -507,7 +520,6 @@ async function prefetchOneZip(zipPath, hudByName) {
             const dest = cachePngPath(name);
             try {
               if (fileLooksLikePng(dest)) return;
-              if (fs.existsSync(dest)) fs.unlinkSync(dest);
             } catch {
               /* extract */
             }
@@ -683,4 +695,5 @@ module.exports = {
   bufferLooksLikePng,
   bufferLooksLikeDds,
   fileLooksLikePng,
+  writeHudPngFromBuffer,
 };

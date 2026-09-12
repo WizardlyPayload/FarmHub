@@ -197,28 +197,13 @@ function hydrateHusbandryArray(arr, byKey, detailsDir) {
     return out;
 }
 
-function getLocalDetailsDirForServer(srv, getLocalLuaJsonPath, options = {}) {
+function getLocalDetailsDirForServer(srv, getLocalLuaJsonPath) {
     if (typeof getLocalLuaJsonPath !== 'function' || !srv) return null;
     const jsonPath = getLocalLuaJsonPath(srv);
     if (!jsonPath) return null;
-    const primary = path.join(path.dirname(jsonPath), 'details');
-    try {
-        if (fs.existsSync(primary)) return primary;
-    } catch (_) {
-        /* keep looking */
-    }
-    const slot = (options.serverState && options.serverState.lastSaveSlot) || srv.localSubFolder;
-    if (!slot) return primary;
-    const parent = path.dirname(path.dirname(jsonPath));
-    const alt = path.join(parent, slot, 'details');
-    if (alt !== primary) {
-        try {
-            if (fs.existsSync(alt)) return alt;
-        } catch (_) {
-            /* fall through */
-        }
-    }
-    return primary;
+    // Never walk a sibling save slot. A missing primary details/ must stay
+    // missing — slot switch / empty save must not hydrate another farm's animals.
+    return path.join(path.dirname(jsonPath), 'details');
 }
 
 /** FTP: cached copies of host `details/animals_*.json` under userData (synced by pollFtp). */

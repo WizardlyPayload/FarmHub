@@ -501,6 +501,13 @@ function liveRfKeyOmitted(field, key) {
     return !!(field && typeof field === 'object' && !Object.prototype.hasOwnProperty.call(field, key));
 }
 
+function pickFieldOutline(...candidates) {
+    for (const outline of candidates) {
+        if (Array.isArray(outline) && outline.length >= 3) return outline;
+    }
+    return undefined;
+}
+
 function pickLiveRfLandBlock(liveField, xmlField, cacheRow, key) {
     if (liveField && Object.prototype.hasOwnProperty.call(liveField, key)) {
         return liveField[key];
@@ -1435,6 +1442,10 @@ function luaWeatherIsLive(luaWeather) {
     return false;
 }
 
+function luaForecastIsLive(luaWeather) {
+    return !!(luaWeather && Array.isArray(luaWeather.forecast) && luaWeather.forecast.length > 0);
+}
+
 function mergeForecastDays(luaForecast, xmlForecast, _currentTemp, luaLive) {
     const lua = Array.isArray(luaForecast) ? luaForecast : [];
     const xml = Array.isArray(xmlForecast) ? xmlForecast : [];
@@ -1517,7 +1528,7 @@ function mergeWeather(luaWeather, xmlEnv) {
         base.forecast,
         xmlEnv.forecast,
         currentTemp,
-        luaLive
+        luaForecastIsLive(luaWeather)
     );
 
     return {
@@ -1767,8 +1778,8 @@ function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
             // (lua-as-base when XML fields were empty) still showed Soil Fertilizer.
             soilFertilizer: pickLiveRfLandBlock(luaField, xmlField, cacheRow, 'soilFertilizer'),
             cropStress: pickLiveRfLandBlock(luaField, xmlField, cacheRow, 'cropStress'),
-            // Compact field polygon (world X/Z) + PDA fruit colour — Lua only.
-            outline: luaField.outline || xmlField.outline || cacheRow?.outline,
+            // Compact field polygon (world X/Z). Empty [] must not wipe XML/cache.
+            outline: pickFieldOutline(luaField.outline, xmlField.outline, cacheRow?.outline),
             paintedBlobKey: luaField.paintedBlobKey || xmlField.paintedBlobKey || cacheRow?.paintedBlobKey,
             mapHectares: luaField.mapHectares ?? xmlField.mapHectares ?? cacheRow?.mapHectares,
             fruitMapColor: luaField.fruitMapColor || xmlField.fruitMapColor || cacheRow?.fruitMapColor,
@@ -2763,5 +2774,8 @@ module.exports = {
     mergeBaleInventory,
     mergeWeather,
     mergeForecastDays,
+    luaWeatherIsLive,
+    luaForecastIsLive,
+    mergeFields,
     applyResolvedMapBounds,
 };

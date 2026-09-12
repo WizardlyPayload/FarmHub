@@ -1435,10 +1435,21 @@ function finiteOrUndef(v) {
     return isFiniteWeatherTemp(v) ? v : undefined;
 }
 
+function luaHasCurrentWeatherType(luaWeather) {
+    if (!luaWeather || typeof luaWeather !== 'object') return false;
+    if (!Object.prototype.hasOwnProperty.call(luaWeather, 'currentWeather')) return false;
+    const raw = luaWeather.currentWeather;
+    return raw != null && String(raw).trim() !== '';
+}
+
+function luaHasCurrentTemperature(luaWeather) {
+    return isFiniteWeatherTemp(luaWeather?.currentTemperature);
+}
+
 function luaWeatherIsLive(luaWeather) {
     if (!luaWeather || typeof luaWeather !== 'object') return false;
-    if (Object.prototype.hasOwnProperty.call(luaWeather, 'currentWeather')) return true;
-    if (Object.prototype.hasOwnProperty.call(luaWeather, 'currentTemperature')) return true;
+    if (luaHasCurrentWeatherType(luaWeather)) return true;
+    if (luaHasCurrentTemperature(luaWeather)) return true;
     if (Array.isArray(luaWeather.forecast) && luaWeather.forecast.length > 0) return true;
     return false;
 }
@@ -1514,7 +1525,7 @@ function mergeForecastDays(luaForecast, xmlForecast, _currentTemp, luaLive) {
 
 function mergeWeather(luaWeather, xmlEnv) {
     const luaLive = luaWeatherIsLive(luaWeather);
-    const base = luaLive ? luaWeather : (luaWeather || {});
+    const base = luaWeather && typeof luaWeather === 'object' ? luaWeather : {};
     if (!xmlEnv) {
         if (!luaLive) return base;
         return {
@@ -1524,7 +1535,9 @@ function mergeWeather(luaWeather, xmlEnv) {
         };
     }
 
-    const currentTemp = luaLive ? base.currentTemperature : xmlEnv.currentTemperature;
+    const currentTemp = luaHasCurrentTemperature(base)
+        ? base.currentTemperature
+        : xmlEnv.currentTemperature;
     const forecast = mergeForecastDays(
         base.forecast,
         xmlEnv.forecast,
@@ -1534,18 +1547,18 @@ function mergeWeather(luaWeather, xmlEnv) {
 
     return {
         currentTemperature : currentTemp,
-        currentWeather     : luaLive
+        currentWeather     : luaHasCurrentWeatherType(base)
             ? normalizeWeatherSlug(base.currentWeather)
             : normalizeWeatherSlug(xmlEnv.currentWeather),
         currentSeason      : xmlEnv.currentSeason    || base.currentSeason,
-        windSpeed          : luaLive ? base.windSpeed : (base.windSpeed ?? xmlEnv.windSpeed),
-        cloudCoverage      : luaLive ? base.cloudCoverage : (base.cloudCoverage ?? xmlEnv.cloudCoverage),
-        rainLevel          : luaLive ? base.rainLevel : (base.rainLevel ?? xmlEnv.rainLevel),
-        snowLevel          : luaLive ? base.snowLevel : (base.snowLevel ?? xmlEnv.snowLevel),
-        timeSinceLastRain  : luaLive ? base.timeSinceLastRain : base.timeSinceLastRain,
+        windSpeed          : base.windSpeed ?? xmlEnv.windSpeed,
+        cloudCoverage      : base.cloudCoverage ?? xmlEnv.cloudCoverage,
+        rainLevel          : base.rainLevel ?? xmlEnv.rainLevel,
+        snowLevel          : base.snowLevel ?? xmlEnv.snowLevel,
+        timeSinceLastRain  : base.timeSinceLastRain ?? xmlEnv.timeSinceLastRain,
         forecast,
         rawForecast        : xmlEnv.rawForecast || [],
-        moisture           : base.moisture,
+        moisture           : base.moisture ?? xmlEnv.moisture,
     };
 }
 

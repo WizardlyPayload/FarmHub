@@ -147,8 +147,6 @@ function applyDetailBlockToHusbandry(h, block) {
     });
 
     const capturedHeads = countCapturedHeads(animals);
-    const reported = Number(h.numOfAnimalsReported);
-    const prevCount = Number(h.animalCount);
     const aggregate = husbandryAggregateHeadCount(h);
 
     if (shouldSkipIncompleteDetail(capturedHeads, aggregate, animals)) {
@@ -162,8 +160,8 @@ function applyDetailBlockToHusbandry(h, block) {
             farmId: ownerFarmId,
             animals,
             lod: 'full',
-            animalCount: Number.isFinite(reported) && reported > 0 ? reported : capturedHeads,
-            numOfAnimalsReported: Number.isFinite(reported) && reported > 0 ? reported : capturedHeads,
+            animalCount: Math.max(aggregate, capturedHeads),
+            numOfAnimalsReported: Math.max(aggregate, capturedHeads),
             __detailHydrated: true,
             __detailCapturedHeads: capturedHeads,
         },

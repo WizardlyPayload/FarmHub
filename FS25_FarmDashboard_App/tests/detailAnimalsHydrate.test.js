@@ -171,8 +171,27 @@ describe('detailAnimalsHydrate count reconciliation', () => {
         const pen = out.animals[0];
         expect(pen.__detailHydrated).toBe(true);
         expect(pen.animals).toHaveLength(90);
+        expect(pen.animalCount).toBe(100);
+        expect(pen.numOfAnimalsReported).toBe(100);
         expect(pen.animals[0].uniqueId).toBe('1000');
         expect(pen.animals[1].weight).toBe(201);
+    });
+
+    test('80% unique-id hydrate keeps the prior aggregate when reported is missing', () => {
+        writeDetail(410, {
+            animals: Array.from({ length: 8 }, (_, i) => ({
+                uniqueId: String(2000 + i),
+                gender: 'female',
+            })),
+        });
+        const out = hydrate({
+            animals: [{ id: 410, ownerFarmId: 1, animalCount: 10, numOfAnimalsReported: null }],
+        });
+        const pen = out.animals[0];
+        expect(pen.__detailHydrated).toBe(true);
+        expect(pen.animals).toHaveLength(8);
+        expect(pen.animalCount).toBe(10);
+        expect(pen.numOfAnimalsReported).toBe(10);
     });
 
     test('tiny unique-id mismatch still skipped (wrong component file)', () => {

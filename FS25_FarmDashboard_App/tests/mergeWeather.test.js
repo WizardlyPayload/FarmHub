@@ -92,9 +92,33 @@ describe("mergeWeather", () => {
       { currentWeather: "CLOUDY", forecast: xmlForecast }
     );
     expect(luaForecastIsLive({ currentTemperature: 9.5 })).toBe(false);
+    expect(merged.currentTemperature).toBe(9.5);
+    expect(merged.currentWeather).toBe("cloudy");
     expect(merged.forecast).toHaveLength(2);
     expect(merged.forecast[0].weatherType).toBe("rain");
     expect(merged.forecast[1].maxTemperature).toBe(16);
+  });
+
+  test("temperature-only Lua keeps XML wind and does not invent unknown weather", () => {
+    const merged = mergeWeather(
+      { currentTemperature: 9.5 },
+      { currentWeather: "CLOUDY", windSpeed: 4.2, cloudCoverage: 0.6, rainLevel: 0 }
+    );
+    expect(merged.currentTemperature).toBe(9.5);
+    expect(merged.currentWeather).toBe("cloudy");
+    expect(merged.windSpeed).toBe(4.2);
+    expect(merged.cloudCoverage).toBe(0.6);
+    expect(merged.rainLevel).toBe(0);
+  });
+
+  test("null Lua currentWeather does not replace XML type with unknown", () => {
+    const merged = mergeWeather(
+      { currentTemperature: 7, currentWeather: null },
+      { currentWeather: "RAIN", windSpeed: 2 }
+    );
+    expect(merged.currentWeather).toBe("rain");
+    expect(merged.currentTemperature).toBe(7);
+    expect(merged.windSpeed).toBe(2);
   });
 
   test("empty Lua forecast array does not wipe XML forecast", () => {

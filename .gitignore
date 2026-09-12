@@ -13,6 +13,9 @@ out/
 electron-pack-out/
 electron-pack-out-alt/
 
+# NEW APP Vite output copied into the Electron app (regenerate via npm run build:ui)
+FS25_FarmDashboard_App/ui-v2/
+
 # Logs and local env
 *.log
 .env

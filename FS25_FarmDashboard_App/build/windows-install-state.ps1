@@ -4,7 +4,7 @@ param(
     [ValidateSet('Library', 'Register', 'Remove')][string]$Action = 'Library',
     [string]$InstallDirectory,
     [ValidateSet('CurrentUser', 'all')][string]$Scope = 'CurrentUser',
-    [string]$Version = '5.0.2',
+    [string]$Version = '5.0.3',
     [uint32]$EstimatedSizeKB = 0
 )
 

@@ -39,27 +39,27 @@ const outDir = isV5 ? getFarmDashV5BuildOutputDir() : getFarmDashBuildOutputDir(
 fs.mkdirSync(outDir, { recursive: true });
 
 if (isV5) {
-    // Stale channel name from older configs. Never delete a sibling V4 latest.yml.
+    // Stale channel name from older configs. Never delete a sibling V4 latest.yml
+    // outside this V5 drop folder.
     const staleRf = path.join(outDir, 'rf.yml');
     if (fs.existsSync(staleRf)) {
         fs.unlinkSync(staleRf);
         console.error('[FarmDash V5] Removed stale rf.yml from output before build.');
     }
-}
-const copyUiScript = path.join(__dirname, 'copy-ui-v2.mjs');
-const newAppIndex = path.join(__dirname, '..', '..', 'NEW APP', 'dist', 'index.html');
-if (fs.existsSync(copyUiScript) && fs.existsSync(newAppIndex)) {
-    const copyUi = spawnSync(process.execPath, [copyUiScript], {
-        cwd: projectDir,
-        stdio: 'inherit',
-        env: process.env,
-    });
-    if (copyUi.status !== 0) {
-        console.error('[FarmDash] ui-v2 copy failed — build NEW APP first: npm run build:ui');
-        process.exit(copyUi.status === null ? 1 : copyUi.status);
+    const staleClassic = path.join(outDir, 'latest.yml');
+    if (fs.existsSync(staleClassic)) {
+        fs.unlinkSync(staleClassic);
+        console.error('[FarmDash V5] Removed leftover latest.yml from V5 output before build.');
     }
-} else {
-    console.error('[FarmDash] Skipping ui-v2 copy (NEW APP dist not present on this branch).');
+}
+const copyUi = spawnSync(process.execPath, [path.join(__dirname, 'copy-ui-v2.mjs')], {
+    cwd: projectDir,
+    stdio: 'inherit',
+    env: process.env,
+});
+if (copyUi.status !== 0) {
+    console.error('[FarmDash] ui-v2 copy failed — build NEW APP first: npm run build:ui');
+    process.exit(copyUi.status === null ? 1 : copyUi.status);
 }
 
 console.error('');

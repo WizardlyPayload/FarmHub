@@ -21,7 +21,7 @@ for (const scope of ['user', 'machine']) {
     const key = Object.keys(state.records).find(key => key.includes('\\Uninstall\\'));
     assert.ok(key.startsWith(scope === 'machine' ? '2147483650:' : '2147483651:S-1-'));
     const entry = state.records[key];
-    assert.equal(entry.DisplayName, 'FS25 Farm Dashboard V5 5.0.1');
+    assert.equal(entry.DisplayName, 'FS25 Farm Dashboard V5 5.0.3');
     assert.match(entry.UninstallString, scope === 'machine' ? /" \/allusers$/ : /" \/currentuser$/);
     assert.equal(entry.SystemComponent, 0);
     assert.equal(entry.NoRemove, 0);

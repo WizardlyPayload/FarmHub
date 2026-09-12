@@ -10,7 +10,7 @@
     "setup": "npm run install:app",
     "start": "npm run start --prefix FS25_FarmDashboard_App",
     "test": "npm test --prefix FS25_FarmDashboard_App",
-    "build:ui": "npm run build --prefix \"NEW APP\" && node tools/app/copy-ui-v2.mjs",
+    "build:ui": "node tools/app/copy-ui-v2.mjs",
     "copy:ui-v2": "node tools/app/copy-ui-v2.mjs",
     "dev:ui": "node tools/app/run-vite-dev.mjs",
     "dev:ui:installed": "node tools/app/run-vite-dev.mjs",

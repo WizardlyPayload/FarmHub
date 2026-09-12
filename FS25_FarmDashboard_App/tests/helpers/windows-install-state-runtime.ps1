@@ -62,7 +62,7 @@ $uninstaller = Join-Path $fixture 'Uninstall FS25 Farm Dashboard V5.exe'
 $scope = if ($Case -eq 'machine') { 'all' } else { 'CurrentUser' }
 $errorText = $null
 try {
-    Register-FarmDashNativeInstallation $fixture $scope '5.0.1' 1234
+    Register-FarmDashNativeInstallation $fixture $scope '5.0.3' 1234
     if ($Case -in @('missing-optional-value', 'enumeration-access-denied')) {
         $script:optionalValue = Read-FarmDashNativeString $scope 'Uninstall' 'AbsentOptionalValue'
     }

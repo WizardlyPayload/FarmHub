@@ -20,15 +20,21 @@ const legacyChannelName = path.join(outDir, 'rf.yml');
 
 if (fs.existsSync(classic)) {
   const classicText = fs.readFileSync(classic, 'utf8');
-  if (/Farm-Dashboard-(?:V5|RF)-Setup/i.test(classicText)) {
-    console.error('');
-    console.error('[FarmDash V5] HARD RULE VIOLATION: V4 latest.yml points at a V5 installer:');
-    console.error(`  ${classic}`);
-    console.error('  V5 must publish latest-rf.yml only. Refusing to continue.');
-    console.error('  See docs/COMPATIBILITY.md');
-    console.error('');
-    process.exit(1);
+  const pointsAtV5 = /Farm-Dashboard-(?:V5|RF)-Setup/i.test(classicText);
+  try {
+    fs.unlinkSync(classic);
+  } catch (err) {
+    console.error('[FarmDash V5] Could not remove stray latest.yml:', err.message);
   }
+  console.error('');
+  console.error('[FarmDash V5] HARD RULE VIOLATION: latest.yml must not exist in the V5 output directory:');
+  console.error(`  Removed: ${classic}`);
+  if (pointsAtV5) {
+    console.error('  That file pointed at a V5 installer and would have upgraded V4 clients.');
+  }
+  console.error('  V5 must publish latest-rf.yml only. Do not write classic latest.yml here.');
+  console.error('');
+  process.exit(1);
 }
 
 // Stale/wrong channel name from older configs — must not ship alongside latest-rf.yml.

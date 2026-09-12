@@ -65,7 +65,7 @@ const {
     hasHttpFeed,
     downloadHttpFeedSavegameXml,
 } = require('./httpFeedXml');
-const { mergeData, buildFieldLiveFingerprints, supplementRedTapeCropRotation, applyResolvedMapBounds } = require('./dataMerger');
+const { mergeData, buildFieldLiveFingerprints, supplementRedTapeCropRotation, applyResolvedMapBounds, worldItemsForMapBounds } = require('./dataMerger');
 const { isCorsOriginAllowed: corsOriginAllowedPure, isLocalServerHost: isLocalServerHostPure } = require('./corsPolicy');
 const lanHttpPath = require('./lanHttpPath.cjs');
 const safeFsIdentity = require('./safeFsIdentity.cjs');
@@ -1473,7 +1473,10 @@ function cloneMergedDataWithFieldExclusions(mergedData, serverId) {
     const mapFields = key ? mapFieldOutlineMemo.get(key) : null;
     if (mapFields) fields = attachOutlinesToFieldList(fields, mapFields);
     else warmupMapFieldOutlines(serverId, mergedData);
-    return applyResolvedMapBounds({ ...mergedData, fields });
+    return applyResolvedMapBounds(
+        { ...mergedData, fields },
+        worldItemsForMapBounds(mergedData.fields, mergedData.vehicles)
+    );
 }
 
 expressApp.get('/api/data',       (req, res) => {

@@ -479,18 +479,25 @@ function worldItemsForMapBounds(fields, vehicles) {
 }
 
 /** Never leave a 4 km map on the 2 km default just because Lua reported terrainSize=2048. */
-function applyResolvedMapBounds(merged) {
+function applyResolvedMapBounds(merged, worldItems) {
     if (!merged || typeof merged !== 'object') return merged;
     const raw = merged.mapBounds || merged.serverInfo?.mapBounds || null;
-    const next = resolveFleetMapTerrainBounds(
-        { mapBounds: raw },
-        worldItemsForMapBounds(merged.fields, merged.vehicles)
-    );
+    const items = Array.isArray(worldItems)
+        ? worldItems
+        : worldItemsForMapBounds(merged.fields, merged.vehicles);
+    const next = resolveFleetMapTerrainBounds({ mapBounds: raw }, items);
     const si =
         merged.serverInfo && typeof merged.serverInfo === 'object'
             ? { ...merged.serverInfo, mapBounds: next }
             : { mapBounds: next };
     return { ...merged, mapBounds: next, serverInfo: si };
+}
+
+/** Infer terrain size from the full world, then drop non-player farms. */
+function pruneAndResolveMapBounds(merged) {
+    if (!merged || typeof merged !== 'object') return merged;
+    const worldItems = worldItemsForMapBounds(merged.fields, merged.vehicles);
+    return applyResolvedMapBounds(pruneMergedDataToPlayerFarms(merged), worldItems);
 }
 
 /**
@@ -889,10 +896,8 @@ function mergeData(luaData, xmlData, options = {}) {
             lastLuaAt,
             lastXmlAt
         );
-        return applyResolvedMapBounds(
-            pruneMergedDataToPlayerFarms(
-                attachDataTimestamps({ ...base, fields }, stampOpts)
-            )
+        return pruneAndResolveMapBounds(
+            attachDataTimestamps({ ...base, fields }, stampOpts)
         );
     }
     if (!xmlData) {
@@ -904,10 +909,8 @@ function mergeData(luaData, xmlData, options = {}) {
                 return cache ? enrichFieldFromLiveCache(f, cache, { rfFromLiveExport: true }) : f;
             });
         }
-        return applyResolvedMapBounds(
-            pruneMergedDataToPlayerFarms(
-                attachDataTimestamps(base, stampOpts)
-            )
+        return pruneAndResolveMapBounds(
+            attachDataTimestamps(base, stampOpts)
         );
     }
 
@@ -1037,10 +1040,8 @@ function mergeData(luaData, xmlData, options = {}) {
         xmlEconomy   : xmlData.economy        || {},
     };
 
-    return applyResolvedMapBounds(
-        pruneMergedDataToPlayerFarms(
-            attachDataTimestamps(mergedCore, stampOpts)
-        )
+    return pruneAndResolveMapBounds(
+        attachDataTimestamps(mergedCore, stampOpts)
     );
 }
 
@@ -2778,4 +2779,6 @@ module.exports = {
     luaForecastIsLive,
     mergeFields,
     applyResolvedMapBounds,
+    worldItemsForMapBounds,
+    pruneAndResolveMapBounds,
 };

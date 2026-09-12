@@ -4,7 +4,10 @@ const {
     mergeData,
     resolveTransientVehicleOwnership,
     inferTransientVehiclePoolFarmId,
+    applyResolvedMapBounds,
+    pruneAndResolveMapBounds,
 } = require('../dataMerger');
+const { pruneMergedDataToPlayerFarms } = require('../farmScope.cjs');
 
 const baseLua = {
     serverInfo: { mapName: 'Test Map', saveSlot: 'savegame1' },
@@ -703,5 +706,107 @@ describe('mergeData farm picker (multi-farm dedicated)', () => {
         expect(farm3.length).toBeGreaterThanOrEqual(2);
         expect(farm3.some((v) => /vario1000/i.test(String(v.name || v.filename || '')))).toBe(true);
         expect((merged.farmInfo || []).map((f) => f.id)).toEqual(expect.arrayContaining([1, 2, 3]));
+    });
+
+    test('map bounds stay 4 km when prune drops far-side NPC fields', () => {
+        const lua = {
+            ...baseLua,
+            serverInfo: {
+                mapName: 'Test Map',
+                saveSlot: 'savegame1',
+                mapBounds: { halfSize: 1024, terrainSize: 2048, minX: -1024, maxX: 1024, minZ: -1024, maxZ: 1024 },
+            },
+            farmInfo: [
+                { id: 1, name: 'Home Farm', isPlayer: true, players: [{ name: 'Host' }] },
+            ],
+            fields: [
+                { farmlandId: 10, ownerFarmId: 1, name: 'Yard', posX: 40, posZ: 80 },
+                { farmlandId: 99, ownerFarmId: 8, name: 'Far NPC', posX: -1236, posZ: 1797 },
+            ],
+            vehicles: [
+                { id: 1, name: 'Tractor', ownerFarmId: 1, x: 50, z: 90 },
+            ],
+        };
+        const xml = {
+            ...baseXml,
+            farms: [{ id: 1, name: 'Home Farm', players: [{ nickname: 'Host' }] }],
+            farmlandsArray: [
+                { farmlandId: 10, farmId: 1 },
+                { farmlandId: 99, farmId: 8 },
+            ],
+            allFields: [
+                { farmlandId: 10, ownerFarmId: 1, name: 'Yard', posX: 40, posZ: 80 },
+                { farmlandId: 99, ownerFarmId: 8, name: 'Far NPC', posX: -1236, posZ: 1797 },
+            ],
+        };
+
+        const merged = mergeData(lua, xml);
+        expect((merged.farmInfo || []).map((f) => Number(f.id))).toEqual([1]);
+        expect((merged.fields || []).map((f) => Number(f.ownerFarmId))).toEqual([1]);
+        expect((merged.vehicles || []).every((v) => Number(v.ownerFarmId) === 1)).toBe(true);
+        expect(merged.mapBounds.halfSize).toBe(2048);
+        expect(merged.mapBounds.terrainSize).toBe(4096);
+        expect(merged.serverInfo.mapBounds.halfSize).toBe(2048);
+
+        const nearOnly = applyResolvedMapBounds(pruneMergedDataToPlayerFarms({
+            ...merged,
+            mapBounds: { halfSize: 1024, terrainSize: 2048 },
+            serverInfo: { ...(merged.serverInfo || {}), mapBounds: { halfSize: 1024, terrainSize: 2048 } },
+        }));
+        expect(nearOnly.mapBounds.halfSize).toBe(1024);
+        expect(pruneAndResolveMapBounds({
+            ...merged,
+            farmInfo: lua.farmInfo,
+            fields: lua.fields,
+            vehicles: lua.vehicles,
+            mapBounds: { halfSize: 1024, terrainSize: 2048 },
+            serverInfo: { mapBounds: { halfSize: 1024, terrainSize: 2048 } },
+        }).mapBounds.halfSize).toBe(2048);
+    });
+
+    test('lua-only merge still uses unpruned far NPC points for 4 km bounds', () => {
+        const lua = {
+            ...baseLua,
+            serverInfo: {
+                mapName: 'Test Map',
+                mapBounds: { halfSize: 1024, terrainSize: 2048 },
+            },
+            farmInfo: [
+                { id: 1, name: 'Home Farm', isPlayer: true, players: [{ name: 'Host' }] },
+            ],
+            fields: [
+                { farmlandId: 10, ownerFarmId: 1, name: 'Yard', posX: 40, posZ: 80 },
+                { farmlandId: 99, ownerFarmId: 8, name: 'Far NPC', posX: -1236, posZ: 1797 },
+            ],
+        };
+
+        const merged = mergeData(lua, null);
+        expect((merged.farmInfo || []).map((f) => Number(f.id))).toEqual([1]);
+        expect((merged.fields || []).map((f) => Number(f.ownerFarmId))).toEqual([1]);
+        expect(merged.mapBounds.halfSize).toBe(2048);
+        expect(merged.mapBounds.terrainSize).toBe(4096);
+    });
+
+    test('one stray far NPC point still cannot jump two size classes after prune', () => {
+        const lua = {
+            ...baseLua,
+            serverInfo: {
+                mapName: 'Test Map',
+                mapBounds: { halfSize: 1024, terrainSize: 2048 },
+            },
+            farmInfo: [
+                { id: 1, name: 'Home Farm', isPlayer: true, players: [{ name: 'Host' }] },
+            ],
+            fields: [
+                { farmlandId: 10, ownerFarmId: 1, name: 'Yard', posX: 40, posZ: 80 },
+                { farmlandId: 11, ownerFarmId: 1, name: 'South', posX: 120, posZ: -80 },
+                { farmlandId: 99, ownerFarmId: 8, name: 'Stray', posX: 6400, posZ: -10 },
+            ],
+        };
+
+        const merged = mergeData(lua, null);
+        expect((merged.fields || []).every((f) => Number(f.ownerFarmId) === 1)).toBe(true);
+        expect(merged.mapBounds.halfSize).toBe(1024);
+        expect(merged.mapBounds.terrainSize).toBe(2048);
     });
 });

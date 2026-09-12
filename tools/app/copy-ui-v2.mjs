@@ -1,10 +1,7 @@
 #!/usr/bin/env node
 /**
  * Copies NEW APP Vite dist → FS25_FarmDashboard_App/ui-v2 for Electron packaging.
- *
- * On the installer/edition slice the NEW APP tree is not present yet. Skip
- * (exit 0) so prepack/predist/build:ui/pack can run. The NEW APP PR restores
- * a hard failure when dist is incomplete.
+ * electron-builder ships ui-v2/** next to main.js (reliable in asar); do not rely on ../NEW APP/dist.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,9 +21,9 @@ function rmDirSafe(dir) {
 function main() {
   const missing = required.filter((f) => !fs.existsSync(path.join(srcDir, f)));
   if (missing.length) {
-    console.error('[copy-ui-v2] Skipping — NEW APP dist not present on this branch.');
+    console.error('[copy-ui-v2] NEW APP dist incomplete. Run: npm run build --prefix "NEW APP"');
     console.error('[copy-ui-v2] Missing:', missing.map((f) => path.join(srcDir, f)).join(', '));
-    process.exit(0);
+    process.exit(1);
   }
 
   rmDirSafe(destDir);

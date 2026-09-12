@@ -104,6 +104,10 @@
         "to": "imagemagick-common.ps1"
       },
       {
+        "from": "build/windows-install-state.ps1",
+        "to": "windows-install-state.ps1"
+      },
+      {
         "from": "resources/imagemagick",
         "to": "imagemagick",
         "filter": [

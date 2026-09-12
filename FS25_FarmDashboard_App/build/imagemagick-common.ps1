@@ -156,9 +156,21 @@ function Test-OtherDashboardInstalled([string]$Edition) {
         foreach ($scope in @('CurrentUser', 'all')) {
             $arguments = Get-FarmDashRegistryArguments $scope 'Install'
             $arguments.sSubKeyName = $arguments.sSubKeyName.Replace('11de34ca-2bb0-58cf-bf02-9951a95a886c', $other)
+            $keyArguments = @{ hDefKey = $arguments.hDefKey; sSubKeyName = $arguments.sSubKeyName }
             $arguments.sValueName = 'InstallLocation'
             $result = Invoke-FarmDashRegistryService 'GetStringValue' $arguments
-            if ($result.ReturnValue -notin @(0, 2)) { throw 'Cannot determine whether another Dashboard needs ImageMagick.' }
+            if ($result.ReturnValue -eq 2) { continue }
+            if ($result.ReturnValue -eq 1) {
+                # Same StdRegProv 1 as Read-FarmDashNativeString: key exists but
+                # this string may be absent. A leftover Software\{guid} key must
+                # not abort Full uninstall; wrong types / denied reads still throw.
+                $enumeration = Invoke-FarmDashRegistryService 'EnumValues' $keyArguments
+                if ($enumeration.ReturnValue -eq 2 -or
+                    ($enumeration.ReturnValue -eq 0 -and @($enumeration.sNames) -notcontains 'InstallLocation')) {
+                    continue
+                }
+            }
+            if ($result.ReturnValue -ne 0) { throw 'Cannot determine whether another Dashboard needs ImageMagick.' }
             if ($result.sValue -and (Test-Path -LiteralPath (Join-Path $result.sValue 'resources\app.asar') -PathType Leaf)) {
                 return $true
             }

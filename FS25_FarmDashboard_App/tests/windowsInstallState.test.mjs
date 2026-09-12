@@ -82,6 +82,15 @@ test('retired ownership cannot be resurrected from an old private record', optio
   assert.equal(state.ownership.executable, null);
   assert.equal(state.ownership.recovery, false);
 });
+test('a leftover other-edition key without InstallLocation does not abort uninstall', options, () => {
+  const state = run('other-edition-missing-install-location');
+  assert.equal(state.error, null);
+  assert.equal(state.otherEditionPresent, false);
+  assert.ok(state.calls.includes('EnumValues'));
+});
+test('a wrong-type other-edition InstallLocation remains an error', options, () => {
+  assert.match(run('other-edition-wrong-install-location-type').error, /another Dashboard needs ImageMagick/);
+});
 test('the Full-uninstall preflight cannot launch removal or clear ownership', options, () => {
   const state = run('preflight-only');
   assert.equal(state.error, null);

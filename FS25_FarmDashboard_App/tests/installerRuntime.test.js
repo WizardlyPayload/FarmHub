@@ -120,6 +120,19 @@ test('both packaging definitions include the shared dependency helper', () => {
   expect(pkg.build.extraResources).toContainEqual({
     from: 'build/imagemagick-common.ps1', to: 'imagemagick-common.ps1',
   });
-  expect(fs.readFileSync(path.join(root, 'electron-builder.rf.yml'), 'utf8'))
-    .toContain('from: build/imagemagick-common.ps1');
+  expect(pkg.build.extraResources).toContainEqual({
+    from: 'build/windows-install-state.ps1', to: 'windows-install-state.ps1',
+  });
+  const rfYml = fs.readFileSync(path.join(root, 'electron-builder.rf.yml'), 'utf8');
+  expect(rfYml).toContain('from: build/imagemagick-common.ps1');
+  expect(rfYml).toContain('from: build/windows-install-state.ps1');
+});
+
+test('all-users customInstall writes install-locale.txt in the current-user profile', () => {
+  const nsis = fs.readFileSync(path.join(root, 'build/installer.nsh'), 'utf8');
+  const customInstall = nsis.split('!macro customInstall')[1].split('!macroend')[0];
+  expect(customInstall).toContain('install-locale.txt');
+  expect(customInstall).toMatch(/\$installMode == "all"/);
+  expect(customInstall).toContain('SetShellVarContext current');
+  expect(customInstall).toContain('SetShellVarContext all');
 });

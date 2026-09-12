@@ -1,6 +1,8 @@
 ; Farm Dashboard NSIS — language first (customWelcomePage), then ImageMagick after install (customInstall).
 ; Persists installer_locale in HKCU + %TEMP% so "Install for all users" (UAC restart) keeps the same language pre-selected.
-; Writes %APPDATA%\fs25-farm-dashboard\install-locale.txt (2-letter code) for the app to read on first launch.
+; Writes the installing user's roaming profile install-locale.txt (2-letter code)
+; for first launch. All-users setup must use the current-user shell context so
+; $APPDATA is not ProgramData.
 ; Requires nsis.warningsAsErrors = false in package.json for some NSIS builds.
 
 ; Replaces electron-builder's default app-running check. Default taskkill omits /T, so GPU/helper child
@@ -237,12 +239,22 @@ FunctionEnd
     StrCmp $R9 "" 0 FarmDash_InstallLocaleReady
     StrCpy $R9 "en"
   FarmDash_InstallLocaleReady:
+    ; All-users / elevated setup has SetShellVarContext all, so $APPDATA is
+    ; ProgramData. The app reads userData from the launching user's roaming
+    ; profile — switch to current before writing install-locale.txt.
+    ${if} $installMode == "all"
+      SetShellVarContext current
+    ${endif}
     CreateDirectory "$APPDATA\$R7"
     ClearErrors
     FileOpen $1 "$APPDATA\$R7\install-locale.txt" w
-    IfErrors FarmDash_InstallLocaleDone
+    IfErrors FarmDash_InstallLocaleRestore
     FileWrite $1 $R9
     FileClose $1
+  FarmDash_InstallLocaleRestore:
+    ${if} $installMode == "all"
+      SetShellVarContext all
+    ${endif}
   FarmDash_InstallLocaleDone:
   IfFileExists "$INSTDIR\resources\install-imagemagick.ps1" FarmDash_RunMagick FarmDash_MagickDone
   FarmDash_RunMagick:
@@ -362,7 +374,10 @@ FarmDashUnEdReady:
     IfFileExists "$INSTDIR\resources\uninstall-dependencies.ps1" FarmDash_UnCheckCommon
     Goto FarmDash_UnHelpersMissing
   FarmDash_UnCheckCommon:
-    IfFileExists "$INSTDIR\resources\imagemagick-common.ps1" FarmDash_UnHelpersReady
+    IfFileExists "$INSTDIR\resources\imagemagick-common.ps1" FarmDash_UnCheckState
+    Goto FarmDash_UnHelpersMissing
+  FarmDash_UnCheckState:
+    IfFileExists "$INSTDIR\resources\windows-install-state.ps1" FarmDash_UnHelpersReady
   FarmDash_UnHelpersMissing:
     StrCpy $R0 "missing-helper"
     !insertmacro FarmDashAssertCleanupSuccess "Cleanup helper validation"

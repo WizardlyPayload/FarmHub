@@ -79,6 +79,21 @@ try {
         $observed = Get-DependencyState
         $script:ownershipResult = @{ flag = $observed.ImageMagickInstalledByFarmDash; executable = $observed.ImageMagickExecutable; recovery = $script:FarmDashDependencyRecoveryPending }
     }
+    if ($Case -in @('other-edition-missing-install-location', 'other-edition-wrong-install-location-type')) {
+        . (Join-Path $SourceRoot 'build\imagemagick-common.ps1')
+        $otherArgs = Get-FarmDashRegistryArguments 'CurrentUser' 'Install'
+        $otherArgs.sSubKeyName = $otherArgs.sSubKeyName.Replace(
+            '11de34ca-2bb0-58cf-bf02-9951a95a886c',
+            '2079a287-5a88-5a64-b630-f5040f92dd25'
+        )
+        $otherKey = [string]$otherArgs.hDefKey + ':' + $otherArgs.sSubKeyName
+        if ($Case -eq 'other-edition-wrong-install-location-type') {
+            $script:records[$otherKey] = @{ InstallLocation = [uint32]1 }
+        } else {
+            $script:records[$otherKey] = @{ DisplayName = 'FS25 Farm Dashboard V4' }
+        }
+        $script:otherEditionPresent = Test-OtherDashboardInstalled 'V5'
+    }
     if ($Case -eq 'preflight-only') {
         $tokens = $null; $parseErrors = $null
         $ast = [Management.Automation.Language.Parser]::ParseFile((Join-Path $SourceRoot 'build\uninstall-dependencies.ps1'), [ref]$tokens, [ref]$parseErrors)
@@ -109,6 +124,7 @@ $state = [ordered]@{ case = $Case; error = $errorText; scope = $scope; records =
 if ($Case -eq 'missing-optional-value') { $state.optionalValue = $script:optionalValue }
 if ($script:ownershipResult) { $state.ownership = $script:ownershipResult }
 if ($Case -eq 'preflight-only') { $state.preflightExitCode = $script:preflightResult }
+if ($null -ne $script:otherEditionPresent) { $state.otherEditionPresent = [bool]$script:otherEditionPresent }
 # These are the two inert files just created, never actual installed files.
 foreach ($file in @($exe, $uninstaller)) {
     if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file -Force }

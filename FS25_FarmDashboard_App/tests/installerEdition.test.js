@@ -70,5 +70,18 @@ describe('installer / uninstall edition ownership', () => {
         const otherFn = magickCommon.split('function Test-OtherDashboardInstalled')[1].split('function Register-DependencyConsumer')[0];
         expect(otherFn).not.toMatch(/FarmDashNativeDependencyRegistry/);
         expect(otherFn).not.toMatch(/Get-ItemProperty -LiteralPath \$key/);
+        expect(otherFn).toMatch(/ReturnValue -eq 1/);
+        expect(otherFn).toMatch(/EnumValues/);
+        expect(otherFn).not.toMatch(/-notin @\(0, 2\)/);
+    });
+
+    test('V4 extraResources ships windows-install-state.ps1 for Full uninstall', () => {
+        const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+        expect(pkg.build.extraResources).toEqual(expect.arrayContaining([
+            { from: 'build/windows-install-state.ps1', to: 'windows-install-state.ps1' },
+        ]));
+        const unInstall = nsh.split('!macro customUnInstall')[1].split('!macroend')[0];
+        expect(unInstall).toMatch(/windows-install-state\.ps1/);
+        expect(deps).toMatch(/windows-install-state\.ps1/);
     });
 });

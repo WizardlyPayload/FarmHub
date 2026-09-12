@@ -23,14 +23,12 @@ const FARMDASH_DEV =
     process.env.FARMDASH_DEV === 'true' ||
     process.env.FARMDASH_DEV === 'yes';
 
+const editionPolicy = require('./editionPolicy.cjs');
+const PRODUCT_LINE = editionPolicy.resolveProductLine();
+editionPolicy.applySessionPaths(app, { productLine: PRODUCT_LINE, isDev: FARMDASH_DEV });
+
 function resolveFarmdashPort() {
-    const raw = process.env.FARMDASH_PORT;
-    if (raw != null && String(raw).trim() !== '') {
-        const n = parseInt(String(raw).trim(), 10);
-        if (Number.isFinite(n) && n >= 1024 && n <= 65535) return n;
-        console.warn('[FarmDash] Invalid FARMDASH_PORT — using default for this mode');
-    }
-    return FARMDASH_DEV ? 8767 : 8766;
+    return editionPolicy.resolvePort({ isDev: FARMDASH_DEV, productLine: PRODUCT_LINE });
 }
 
 const FARMDASH_PORT = resolveFarmdashPort();
@@ -1415,9 +1413,7 @@ let httpPortInUseDialogShown = false;
 function showHttpPortInUseDialog() {
     if (httpPortInUseDialogShown) return;
     httpPortInUseDialogShown = true;
-    const msg =
-        `Port ${PORT} is already in use — the dashboard API cannot start.\n\n` +
-        'Close any other Farm Dashboard window, end leftover "Electron" or "FS25 Farm Dashboard" tasks in Task Manager, then restart the app.';
+    const msg = editionPolicy.portInUseMessage({ productLine: PRODUCT_LINE, port: PORT });
     try {
         if (app && app.isReady && app.isReady()) {
             dialog.showErrorBox('Farm Dashboard — port in use', msg);
@@ -2669,9 +2665,11 @@ function attachEditContextMenu(webContents) {
 
 function createWindow() {
     ensureSetupWriteToken();
-    const winTitle = FARMDASH_DEV
-        ? `FS25 Farm Dashboard (dev :${PORT})`
-        : 'FS25 Farm Dashboard';
+    const winTitle = editionPolicy.windowTitle({
+        productLine: PRODUCT_LINE,
+        isDev: FARMDASH_DEV,
+        port: PORT,
+    });
     mainWindow = new BrowserWindow({
         width: 1400, height: 900,
         title: winTitle,

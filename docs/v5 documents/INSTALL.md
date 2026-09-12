@@ -40,7 +40,7 @@ On a **dedicated / rented server**, the mod must be active on that server. You c
 
 3. Start **Farming Simulator 25** once so the game registers the mod.
 
-![File Explorer showing **`FS25_FarmDashboard`** (`.zip` or folder) under **`mods\`**](doc-screenshots/fd-install-010-mod-folder.png)
+![File Explorer showing **`FS25_FarmDashboard`** (`.zip` or folder) under **`mods\`**](../doc-screenshots/fd-install-010-mod-folder.png)
 
 *Figure: File Explorer showing **`FS25_FarmDashboard`** (`.zip` or folder) under **`mods\`**. Shared with classic — the zip is one product.*
 
@@ -54,7 +54,7 @@ Repeat for **each savegame** (and each dedicated-server save) that should use th
 2. Enable **Farm Dashboard** / **FS25 Farm Dashboard**.
 3. **Load the save and enter the world** (main menu alone is not enough).
 
-![Mod ticked in the save’s mod list](doc-screenshots/fd-install-020-fs25-mod-enabled.png)
+![Mod ticked in the save’s mod list](../doc-screenshots/fd-install-020-fs25-mod-enabled.png)
 
 *Figure: Mod ticked in the save’s mod list.*
 
@@ -70,7 +70,7 @@ After about one minute in-game, check:
 
 The file should exist and its **Modified** time should advance while you play.
 
-![File Explorer on that folder with a recent `data.json` timestamp](doc-screenshots/fd-install-030-datajson-explorer.png)
+![File Explorer on that folder with a recent `data.json` timestamp](../doc-screenshots/fd-install-030-datajson-explorer.png)
 
 *Figure: File Explorer on that folder with a recent `data.json` timestamp.*
 

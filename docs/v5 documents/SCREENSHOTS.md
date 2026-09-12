@@ -1,6 +1,6 @@
 # V5 screenshots (manifest + capture checklist)
 
-Committed PNGs for [USER_MANUAL.md](./USER_MANUAL.md) and [INSTALL.md](./INSTALL.md) live in [`doc-screenshots/`](./doc-screenshots/).
+Committed V5 UI PNGs for [USER_MANUAL.md](./USER_MANUAL.md) and [INSTALL.md](./INSTALL.md) live in [`doc-screenshots/`](./doc-screenshots/). Shared install/mod/PDA shots are not duplicated here — they live in [`../doc-screenshots/`](../doc-screenshots/).
 
 This pack is **NEW APP / V5 only**. Do not promote classic `docs/doc-screenshots/fd-shell-*` landing-card shots here.
 

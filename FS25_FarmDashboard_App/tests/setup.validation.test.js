@@ -165,6 +165,8 @@ describe("setup.html: i18n keys for new copy exist", () => {
     "setup.errPath",
     "setup.errToken",
     "setup.successSaved",
+    "setup.errLanTimeout",
+    "setup.errLocalOnly",
   ];
   test.each(REQUIRED)("messages/en.json has key %s", (key) => {
     expect(typeof en[key]).toBe("string");

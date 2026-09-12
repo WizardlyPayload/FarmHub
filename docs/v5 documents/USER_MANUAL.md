@@ -63,7 +63,7 @@ Do these **in order**. Skipping a stage is the most common reason the dashboard 
 1. Copy **`FS25_FarmDashboard.zip`** into **`Documents\My Games\FarmingSimulator2025\mods\`**, **or** extract to **`mods\FS25_FarmDashboard\`** with **`modDesc.xml`** at that folder root.
 2. Start FS25 once so it sees the mod.
 
-![**`FS25_FarmDashboard`** under FS25 **`mods\`**](doc-screenshots/fd-install-010-mod-folder.png)
+![**`FS25_FarmDashboard`** under FS25 **`mods\`**](../doc-screenshots/fd-install-010-mod-folder.png)
 
 *Figure: **`FS25_FarmDashboard`** under FS25 **`mods\`** (folder or `.zip`).*
 
@@ -72,7 +72,7 @@ Do these **in order**. Skipping a stage is the most common reason the dashboard 
 1. Enable **FS25 Farm Dashboard** in the save's mod list.
 2. Load the save and **enter the world**.
 
-![Mod ticked in the save's mod list](doc-screenshots/fd-install-020-fs25-mod-enabled.png)
+![Mod ticked in the save's mod list](../doc-screenshots/fd-install-020-fs25-mod-enabled.png)
 
 *Figure: Mod ticked in the save's mod list.*
 
@@ -84,7 +84,7 @@ Do these **in order**. Skipping a stage is the most common reason the dashboard 
 
 `data.json` should have a recent **modified** timestamp.
 
-![`data.json` in File Explorer](doc-screenshots/fd-install-030-datajson-explorer.png)
+![`data.json` in File Explorer](../doc-screenshots/fd-install-030-datajson-explorer.png)
 
 *Figure: `data.json` with a fresh timestamp.*
 
@@ -467,7 +467,7 @@ On first open after a map change, overview cache may rebuild (`map_overviews` un
 
 In-game PDA (reference only):
 
-![In-game PDA map](doc-screenshots/fd-reference-pda-map.png)
+![In-game PDA map](../doc-screenshots/fd-reference-pda-map.png)
 
 *Figure: In-game PDA — not the dashboard UI.*
 
@@ -624,11 +624,11 @@ Settings → **FS25 mod** edits this file. Example shape:
 | `modules.redTape` | Compliance export when Red Tape is present |
 | `debugBaleScan` | Hand-edit only |
 
-![`config.xml` in Explorer](doc-screenshots/fd-mod-010-config-xml-explorer.png)
+![`config.xml` in Explorer](../doc-screenshots/fd-mod-010-config-xml-explorer.png)
 
 *Figure: `config.xml` on disk.*
 
-![`config.xml` in an editor](doc-screenshots/fd-mod-020-config-xml-editor.png)
+![`config.xml` in an editor](../doc-screenshots/fd-mod-020-config-xml-editor.png)
 
 *Figure: `config.xml` open in a text editor.*
 

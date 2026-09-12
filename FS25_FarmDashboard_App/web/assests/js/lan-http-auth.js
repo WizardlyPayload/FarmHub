@@ -184,15 +184,6 @@ export function farmdashWaitForLanHttpBasicIfNeeded(options = {}) {
   });
 }
 
-/** @param {number} status @param {boolean} [networkError] */
-export function interpretLanVerifyResult(status, networkError) {
-  if (networkError) return "network";
-  const n = Number(status);
-  if (n === 401 || n === 403) return "auth";
-  if (n >= 200 && n < 300) return "ok";
-  return "network";
-}
-
 function sameOriginHttpBase() {
   if (
     typeof window !== "undefined" &&

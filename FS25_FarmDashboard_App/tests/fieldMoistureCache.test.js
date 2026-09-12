@@ -77,6 +77,41 @@ describe('field moisture offline persistence', () => {
         expect(field.moisture.percent).toBe(22);
     });
 
+    test('omitted live soilFertilizer and cropStress are treated as disabled, not cached', () => {
+        const cache = buildFieldLiveFingerprints([
+            {
+                farmlandId: 28,
+                hectares: 3.1,
+                soilFertilizer: { enabled: true, organicMatter: 4.1 },
+                cropStress: { enabled: true, moisturePercent: 12 },
+            },
+        ]);
+        const merged = mergeData(
+            {
+                serverInfo: { saveSlot: 'savegame1' },
+                fields: [{
+                    farmlandId: 28,
+                    id: 28,
+                    ownerFarmId: 1,
+                    hectares: 3.1,
+                    fruitType: 'WHEAT',
+                }],
+                finance: { money: 1 },
+                gameTime: { day: 1 },
+                weather: {},
+                economy: {},
+                animals: [],
+                production: {},
+                farmInfo: [{ id: 1, name: 'Farm 1' }],
+            },
+            null,
+            { fieldLiveCache: cache }
+        );
+        const field = merged.fields.find((f) => Number(f.farmlandId ?? f.id) === 28);
+        expect(field.soilFertilizer).toBeUndefined();
+        expect(field.cropStress).toBeUndefined();
+    });
+
     test('live disabled soilFertilizer and cropStress are not restored from cache', () => {
         const cache = buildFieldLiveFingerprints([
             {

@@ -138,6 +138,17 @@ describe("fleetMapGeo", () => {
     ).toBe(2048);
   });
 
+  test("inferSymmetricalTerrainHalf ignores one stray point that would jump two size classes", () => {
+    expect(
+      inferSymmetricalTerrainHalf(1024, [
+        { x: -49, z: 718 },
+        { x: 120, z: -80 },
+        { x: 12, z: 400 },
+        { x: 6400, z: -10 },
+      ])
+    ).toBe(1024);
+  });
+
   test("inferSymmetricalTerrainHalf keeps 4 km when i3d rim verts sit just inside ±2048", () => {
     expect(
       inferSymmetricalTerrainHalf(1024, [

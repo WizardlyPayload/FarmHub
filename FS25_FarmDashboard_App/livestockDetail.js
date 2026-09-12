@@ -437,7 +437,10 @@ async function readDirtyIndex(srv, opts = {}) {
     let mtimeMs = 0;
     try { mtimeMs = fs.statSync(indexPath).mtimeMs || 0; } catch (_) { /* ignore */ }
     const cached = dirtyIndexCache.get(srv.id);
-    if (cached && cached.mtimeMs === mtimeMs) return cached;
+    // Key the hit on the resolved file path too: the same server id can point at a
+    // different save slot (or a different tmp dir in tests). Matching mtimeMs alone
+    // then returns the previous slot's pens and integer UI ids stay unresolved.
+    if (cached && cached.mtimeMs === mtimeMs && cached.indexPath === indexPath) return cached;
 
     const raw = readJsonSafe(indexPath);
     if (!raw || typeof raw !== 'object') return null;
@@ -465,6 +468,7 @@ async function readDirtyIndex(srv, opts = {}) {
     }
     const view = {
         mtimeMs,
+        indexPath,
         ts: Number(raw.updatedAt) || 0,
         idScheme: typeof raw.idScheme === 'string' ? raw.idScheme : 'integer-v1',
         pens: pensMap,
@@ -527,11 +531,13 @@ async function read(opts) {
     let detail = null;
     let cachedAtMs = 0;
     let fromCache = false;
+    let locatedPenKey = null;
 
     if (srv.mode === 'local') {
         const slotDir = getLocalSlotPath(srv, getFs25DocumentsRoot);
         const detailsDir = slotDir ? path.join(slotDir, 'details') : null;
         const located = findDetailInDirectory(detailsDir, canonicalKey, resolvedPenKey);
+        if (located && located.penKey) locatedPenKey = located.penKey;
         const p = located ? located.path : getDetailPathLocal(srv, fileSegment, getFs25DocumentsRoot);
         if (!p || !fs.existsSync(p)) return null;
         try { cachedAtMs = fs.statSync(p).mtimeMs || 0; } catch (_) { /* ignore */ }
@@ -558,6 +564,7 @@ async function read(opts) {
             if (!ok && !fs.existsSync(localCache)) {
                 const located = findDetailInDirectory(bulkDetailsDir, canonicalKey, resolvedPenKey);
                 if (!located) return null;
+                if (located.penKey) locatedPenKey = located.penKey;
                 try { cachedAtMs = fs.statSync(located.path).mtimeMs || 0; } catch (_) { /* ignore */ }
                 detail = readJsonSafe(located.path);
                 fromCache = true;
@@ -569,9 +576,13 @@ async function read(opts) {
         }
 
         if (!detail) {
+            const located = fs.existsSync(localCache)
+                ? null
+                : findDetailInDirectory(bulkDetailsDir, canonicalKey, resolvedPenKey);
+            if (located && located.penKey) locatedPenKey = located.penKey;
             const readPath = fs.existsSync(localCache)
                 ? localCache
-                : (findDetailInDirectory(bulkDetailsDir, canonicalKey, resolvedPenKey) || {}).path;
+                : (located && located.path);
             if (!readPath || !fs.existsSync(readPath)) return null;
             try { cachedAtMs = fs.statSync(readPath).mtimeMs || 0; } catch (_) { /* ignore */ }
             detail = readJsonSafe(readPath);
@@ -594,7 +605,7 @@ async function read(opts) {
         dirtyAt,
         cachedAt: Math.floor(cachedAtMs / 1000),
         fromCache,
-        penKey: resolvedPenKey,
+        penKey: locatedPenKey || resolvedPenKey,
         detail: sanitizeDetailDoc(detail),
     };
 }

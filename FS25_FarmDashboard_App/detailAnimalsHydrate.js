@@ -65,7 +65,12 @@ function rememberDetailEntry(map, entry) {
     const prevAt = Number(prev.generatedAt) || 0;
     const nextAt = Number(entry.generatedAt) || 0;
     if (nextAt > 0 && prevAt > 0 && nextAt !== prevAt) {
-        if (nextAt >= prevAt) map.set(key, entry);
+        if (nextAt >= prevAt) {
+            // A newer incomplete / non-unique file must not hide a richer unique-id capture.
+            if (prevU && !nextU) return;
+            if (prevU && nextU && nextN < prevN) return;
+            map.set(key, entry);
+        }
         return;
     }
     // Same (or missing) timestamps: keep the richer unique-id capture. A later
@@ -390,4 +395,7 @@ module.exports = {
     getLocalDetailsDirForServer,
     getFtpCachedDetailsDir,
     getDetailsDirForHydration,
+    rememberDetailEntry,
+    countCapturedHeads,
+    hasUniqueIndividuals,
 };

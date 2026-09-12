@@ -497,7 +497,21 @@ function applyResolvedMapBounds(merged) {
  * Overlay cached live-only values (area, position, PF soil data) onto an XML row that lacks them.
  * Geometry never regresses; PF values are better stale than blank when the live export drops out.
  */
-function enrichFieldFromLiveCache(base, cache) {
+function liveRfKeyOmitted(field, key) {
+    return !!(field && typeof field === 'object' && !Object.prototype.hasOwnProperty.call(field, key));
+}
+
+function pickLiveRfLandBlock(liveField, xmlField, cacheRow, key) {
+    if (liveField && Object.prototype.hasOwnProperty.call(liveField, key)) {
+        return liveField[key];
+    }
+    if (liveField) {
+        return xmlField?.[key] || { enabled: false };
+    }
+    return xmlField?.[key] || cacheRow?.[key];
+}
+
+function enrichFieldFromLiveCache(base, cache, options = {}) {
     if (!cache) return base;
     const out = { ...base };
     let enriched = false;
@@ -546,7 +560,8 @@ function enrichFieldFromLiveCache(base, cache) {
     if (
         cache.soilFertilizer &&
         typeof cache.soilFertilizer === 'object' &&
-        !out.soilFertilizer
+        !out.soilFertilizer &&
+        !(options.rfFromLiveExport && liveRfKeyOmitted(base, 'soilFertilizer'))
     ) {
         out.soilFertilizer = { ...cache.soilFertilizer };
         enriched = true;
@@ -554,7 +569,8 @@ function enrichFieldFromLiveCache(base, cache) {
     if (
         cache.cropStress &&
         typeof cache.cropStress === 'object' &&
-        !out.cropStress
+        !out.cropStress &&
+        !(options.rfFromLiveExport && liveRfKeyOmitted(base, 'cropStress'))
     ) {
         out.cropStress = { ...cache.cropStress };
         enriched = true;
@@ -878,7 +894,7 @@ function mergeData(luaData, xmlData, options = {}) {
             base.fields = toArr(base.fields).map((f) => {
                 const id = Number(f.farmlandId ?? f.id);
                 const cache = fieldLiveCache[id];
-                return cache ? enrichFieldFromLiveCache(f, cache) : f;
+                return cache ? enrichFieldFromLiveCache(f, cache, { rfFromLiveExport: true }) : f;
             });
         }
         return applyResolvedMapBounds(
@@ -1749,8 +1765,8 @@ function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
             // RF land collectors attach these on the Lua row. XML has no equivalent;
             // dropping them here is why Montana showed vanilla bars while Witcombe
             // (lua-as-base when XML fields were empty) still showed Soil Fertilizer.
-            soilFertilizer: luaField.soilFertilizer || xmlField.soilFertilizer || cacheRow?.soilFertilizer,
-            cropStress: luaField.cropStress || xmlField.cropStress || cacheRow?.cropStress,
+            soilFertilizer: pickLiveRfLandBlock(luaField, xmlField, cacheRow, 'soilFertilizer'),
+            cropStress: pickLiveRfLandBlock(luaField, xmlField, cacheRow, 'cropStress'),
             // Compact field polygon (world X/Z) + PDA fruit colour — Lua only.
             outline: luaField.outline || xmlField.outline || cacheRow?.outline,
             paintedBlobKey: luaField.paintedBlobKey || xmlField.paintedBlobKey || cacheRow?.paintedBlobKey,
@@ -2377,7 +2393,18 @@ function mergeVehicles(luaVehicles, xmlVehicles) {
             }
         }
         if (isDealershipFloorStock(luaV)) return null;
-        const xmlV = takeClosest(eligible, luaV);
+        // A single leftover same-config XML can still be the pool-100 remap
+        // (livestock farm). Several leftovers without uniqueId/positions must
+        // not collapse onto index 0 of the wrong farm.
+        if (eligible.length === 1) {
+            const only = eligible[0];
+            removeFromBuckets(only);
+            return only;
+        }
+        if (!luaV.position) return null;
+        const positioned = eligible.filter((xv) => xv && xv.position);
+        if (positioned.length === 0) return null;
+        const xmlV = takeClosest(positioned, luaV);
         if (xmlV) {
             removeFromBuckets(xmlV);
             return xmlV;

@@ -143,4 +143,41 @@ describe('mergeVehicles dedupe by config+farm key', () => {
         expect(out[0].ownerFarmId).toBe(3);
         expect(out[0].ads?.enabled).toBe(true);
     });
+
+    test('transient live row without uniqueId or position does not steal another farm index 0', () => {
+        const cfg = 'data/vehicles/fendt/vario1000/vario1000.xml';
+        const lua = [
+            luaVeh({
+                id: 801,
+                name: '1000 Vario',
+                ownerFarmId: 100,
+                configFileName: cfg,
+                uniqueId: '',
+                position: undefined,
+            }),
+        ];
+        const xml = [
+            xmlVeh({
+                uniqueId: 'farm2-vario',
+                name: '1000 Vario',
+                farmId: 2,
+                ownerFarmId: 2,
+                filename: cfg,
+                position: { x: -10, y: 0, z: 20 },
+            }),
+            xmlVeh({
+                uniqueId: 'farm3-vario',
+                name: '1000 Vario',
+                farmId: 3,
+                ownerFarmId: 3,
+                filename: cfg,
+                position: { x: 400, y: 0, z: 80 },
+            }),
+        ];
+        const out = mergeVehicles(lua, xml);
+        expect(out.some((v) => v.source === 'merged')).toBe(false);
+        expect(out.filter((v) => v.source === 'xml_only')).toHaveLength(2);
+        expect(out.find((v) => v.uniqueId === 'farm2-vario').ownerFarmId).toBe(2);
+        expect(out.find((v) => v.uniqueId === 'farm3-vario').ownerFarmId).toBe(3);
+    });
 });

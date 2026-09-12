@@ -6,6 +6,7 @@ const {
     getFtpCachedDetailsDir,
     getDetailsDirForHydration,
     hydrateLuaDataAnimalsFromDetails,
+    rememberDetailEntry,
 } = require('../detailAnimalsHydrate');
 
 describe('detailAnimalsHydrate FTP paths', () => {
@@ -254,5 +255,27 @@ describe('detailAnimalsHydrate count reconciliation', () => {
         expect(out.animals[0].__detailHydrated).toBe(true);
         expect(out.animals[0].animals).toHaveLength(1);
         expect(out.animals[0].animals[0].uniqueId).toBe('510016');
+    });
+});
+
+describe('rememberDetailEntry unique-id capture', () => {
+    test('keeps richer unique-id capture over a newer incomplete file', () => {
+        const map = new Map();
+        const rich = {
+            placeableId: 7,
+            ownerFarmId: 1,
+            generatedAt: 1000,
+            animals: [{ uniqueId: 'a' }, { uniqueId: 'b' }, { uniqueId: 'c' }],
+        };
+        const newerIncomplete = {
+            placeableId: 7,
+            ownerFarmId: 1,
+            generatedAt: 2000,
+            animals: [{ clusterCount: 12, __lodClusterAggregate: true }],
+        };
+        rememberDetailEntry(map, rich);
+        rememberDetailEntry(map, newerIncomplete);
+        expect(map.get('7|1').animals).toEqual(rich.animals);
+        expect(map.get('7|1').generatedAt).toBe(1000);
     });
 });

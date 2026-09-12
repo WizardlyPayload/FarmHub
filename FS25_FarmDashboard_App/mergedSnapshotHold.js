@@ -1,6 +1,22 @@
 // FS25 FarmDashboard | mergedSnapshotHold.js
 // Hold last good merged dashboard when FS25 writes minimal/shutdown data.json.
 
+/** Per-server generation so overlapping rebuildMerged awaits cannot publish an older merge. */
+function createMergeRebuildGate() {
+    const gens = new Map();
+    return {
+        begin(serverId) {
+            const key = String(serverId);
+            const next = (gens.get(key) || 0) + 1;
+            gens.set(key, next);
+            return next;
+        },
+        isCurrent(serverId, gen) {
+            return gens.get(String(serverId)) === gen;
+        },
+    };
+}
+
 function productionLooksEmpty(p) {
     if (!p || typeof p !== 'object') return true;
     const chains = p.chains;
@@ -784,4 +800,5 @@ module.exports = {
     updateLiveSectionBackup,
     updateLastGoodMergedSnapshot,
     buildHeldPayloadFromState,
+    createMergeRebuildGate,
 };

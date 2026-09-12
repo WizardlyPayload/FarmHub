@@ -94,7 +94,9 @@ const {
     updateLiveSectionBackup,
     updateLastGoodMergedSnapshot,
     buildHeldPayloadFromState,
+    createMergeRebuildGate,
 } = require('./mergedSnapshotHold');
+const mergeRebuildGate = createMergeRebuildGate();
 const { isLuaExportStale, resolveLuaExportStaleMs } = require('./liveExportFreshness');
 const livestockDetailModule = require('./livestockDetail.js');
 const { validateLanCredentials } = require('./lanCredentialPolicy.js');
@@ -2262,6 +2264,9 @@ function stampLuaExportFreshness(merged, state) {
 async function rebuildMerged(serverId) {
     const state = serverStates[serverId];
     if (!state) return;
+    const gen = mergeRebuildGate.begin(serverId);
+    const stillCurrent = () =>
+        mergeRebuildGate.isCurrent(serverId, gen) && serverStates[serverId] === state;
     let luaPayload = state.luaData;
     const srv = getServersFromStore().find((s) => String(s.id) === String(serverId));
     if (srv && state.luaData && (srv.mode === 'local' || srv.mode === 'ftp')) {
@@ -2280,6 +2285,7 @@ async function rebuildMerged(serverId) {
             luaPayload = state.luaData;
         }
     }
+    if (!stillCurrent()) return;
     let merged;
     try {
         const mapHint = {
@@ -2304,6 +2310,7 @@ async function rebuildMerged(serverId) {
         merged = null;
     }
     if (!merged) {
+        if (!stillCurrent()) return;
         if (state.mergedData) {
             state.mergedData = applyFreshnessMeta(
                 {
@@ -2355,6 +2362,7 @@ async function rebuildMerged(serverId) {
             `[rebuildMerged] [${serverId}] Serving last good merged snapshot (live export looks minimal or shutdown)`
         );
     }
+    if (!stillCurrent()) return;
     merged = stampLuaExportFreshness(merged, state);
     const fillHit = mapFillResultForMerged(merged);
     merged.fillTypeHudEpoch =

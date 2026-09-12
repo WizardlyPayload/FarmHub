@@ -12,7 +12,25 @@ const {
     updateLastGoodMergedSnapshot,
     buildHeldPayloadFromState,
     mergeMoistureSectionsForward,
+    createMergeRebuildGate,
 } = require('../mergedSnapshotHold');
+
+describe('createMergeRebuildGate', () => {
+    test('a newer begin invalidates the previous generation on the same server', () => {
+        const gate = createMergeRebuildGate();
+        const first = gate.begin('srv');
+        const second = gate.begin('srv');
+        expect(gate.isCurrent('srv', first)).toBe(false);
+        expect(gate.isCurrent('srv', second)).toBe(true);
+    });
+
+    test('generations are independent per server id', () => {
+        const gate = createMergeRebuildGate();
+        const a = gate.begin('a');
+        gate.begin('b');
+        expect(gate.isCurrent('a', a)).toBe(true);
+    });
+});
 
 describe('mergedSnapshotHold', () => {
     test('isRichLuaExport rejects shutdown stub', () => {

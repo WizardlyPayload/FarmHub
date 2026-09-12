@@ -47,6 +47,8 @@ function clearLanHttpBasicStoredToken() {
   }
 }
 
+export const LAN_AUTH_GATE_TIMEOUT_MS = 30000;
+
 /** Pending `farmdashWaitForLanHttpBasicIfNeeded()` resolvers (real tablets waiting on the overlay). */
 const _lanGateWaiters = [];
 
@@ -132,16 +134,45 @@ export function farmdashHasLanHttpBasic() {
 }
 
 /**
- * Resolved before any bootstrap `fetch`/dashboard init on remote viewers once credentials exist
- * or when not a remote hostname.
+ * Resolved before any bootstrap `fetch`/dashboard init on remote viewers.
+ * Times out so a missing overlay cannot hang startup forever.
  */
-export function farmdashWaitForLanHttpBasicIfNeeded() {
-  if (typeof window === "undefined") return Promise.resolve();
-  if (!window.__farmDashRemoteViewer) return Promise.resolve();
-  if (farmdashHasLanHttpBasic()) return Promise.resolve();
+export function farmdashWaitForLanHttpBasicIfNeeded(options = {}) {
+  const win = typeof globalThis !== "undefined" ? globalThis.window : undefined;
+  if (!win) return Promise.resolve();
+  if (!win.__farmDashRemoteViewer) return Promise.resolve();
+  const timeoutMs = Number(options.timeoutMs);
+  const waitMs = Number.isFinite(timeoutMs) ? timeoutMs : LAN_AUTH_GATE_TIMEOUT_MS;
   return new Promise((resolve) => {
-    _lanGateWaiters.push(resolve);
+    let settled = false;
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      try {
+        globalThis.document?.body?.classList.add("farmdash-lan-auth-timeout");
+        globalThis.sessionStorage?.setItem("farmdash_last_error_code", "E_LAN_TIMEOUT");
+      } catch (_) {
+        /* ignore */
+      }
+      done();
+    }, waitMs);
+    _lanGateWaiters.push(() => {
+      clearTimeout(timer);
+      done();
+    });
   });
+}
+
+/** @param {number} status @param {boolean} [networkError] */
+export function interpretLanVerifyResult(status, networkError) {
+  if (networkError) return "network";
+  const n = Number(status);
+  if (n === 401 || n === 403) return "auth";
+  if (n >= 200 && n < 300) return "ok";
+  return "network";
 }
 
 function sameOriginHttpBase() {

@@ -55,9 +55,10 @@ function parseMoistureSystemXml(xmlStr) {
     return { byObjectUid };
 }
 
-function buildUidCandidatesByFillType(placeables) {
+function buildUidCandidatesByFillType(placeables, farmId = null) {
     const out = new Map();
     for (const pl of placeables || []) {
+        if (farmId != null && Number(pl.farmId) !== Number(farmId)) continue;
         const uid = String(pl.uniqueId || '').trim();
         if (!uid) continue;
         for (const fillType of pl.siloFillTypes || []) {
@@ -140,12 +141,14 @@ function enrichStockMoistureFromXml(stock, moistureData, placeables, fillTypeCat
         return stock;
     }
 
-    const uidByFill = buildUidCandidatesByFillType(placeables);
     const out = { ...stock, byFarm: { ...(stock.byFarm || {}) } };
     let anyPatched = false;
 
     for (const [farmKey, farmRow] of Object.entries(stock.byFarm || {})) {
         if (!farmRow || !Array.isArray(farmRow.items)) continue;
+        const farmId = Number(farmRow.farmId ?? farmKey);
+        const farmPlaceables = (placeables || []).filter((pl) => Number(pl.farmId) === farmId);
+        const uidByFill = buildUidCandidatesByFillType(farmPlaceables);
         const items = farmRow.items.map((item) => {
             if (!item || !Array.isArray(item.locations)) return item;
             const fillTypeName = resolveFillTypeName(item, fillTypeCatalog);
@@ -153,7 +156,7 @@ function enrichStockMoistureFromXml(stock, moistureData, placeables, fillTypeCat
             const candidates = uidByFill.get(fillTypeName) || [];
             const locations = item.locations.map((loc) => {
                 if (!loc || !SILO_KINDS.has(String(loc.kind || ''))) return loc;
-                const uid = pickMoistureUid(candidates, loc.name, placeables);
+                const uid = pickMoistureUid(candidates, loc.name, farmPlaceables);
                 const nextLoc = { ...loc };
                 if (patchLocationFromXml(nextLoc, fillTypeName, uid, byObjectUid)) {
                     anyPatched = true;

@@ -20,8 +20,13 @@
   This script uses ZipArchive + CreateEntryFromFile with '/' entry names (POSIX paths inside the zip).
 
   -VersionOverride stamps modDesc.xml + FarmDashboard.VERSION in a **staging copy** only.
-  Working-tree RF edition (e.g. 5.0.0.1) is left unchanged. Use for classic public zips
-  (e.g. 3.4.0.7) without switching the local RF deploy line.
+  Working-tree V5 (e.g. 5.0.0.1) is left unchanged. Use for V4 public zips
+  (e.g. 3.4.0.8) without switching the local V5 deploy line.
+
+  The archive filename is always FS25_FarmDashboard.zip, including release copies.
+  Keep version numbers inside the mod metadata, never in the ZIP filename.
+  V5 mod packages default to Documents\FarmDash Release. Classic version overrides
+  retain their separate output location. FARMDASH_BUILD_OUTPUT can override the folder.
 
 .EXAMPLE
   Set-Location "...\MAIN CODEBASE\FarmHub"
@@ -43,6 +48,26 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# Fail before creating or replacing files if a caller tries to rename the mod.
+# Keep OutZipName for compatible callers, but do not allow versioned identities.
+$CanonicalZipName = "FS25_FarmDashboard.zip"
+if ($OutZipName -cne $CanonicalZipName) {
+    throw "OutZipName must remain $CanonicalZipName. Put the version in modDesc.xml, not the ZIP filename."
+}
+
+if (-not $CopyTo) {
+    if ($env:FARMDASH_BUILD_OUTPUT) {
+        $CopyTo = Join-Path $env:FARMDASH_BUILD_OUTPUT $CanonicalZipName
+    } elseif ($VersionOverride) {
+        $CopyTo = Join-Path $env:USERPROFILE "Documents\FarmDash Final Output\$CanonicalZipName"
+    } else {
+        $CopyTo = Join-Path $env:USERPROFILE "Documents\FarmDash Release\$CanonicalZipName"
+    }
+}
+if ((Split-Path -Leaf $CopyTo) -cne $CanonicalZipName) {
+    throw "CopyTo must end in $CanonicalZipName. Choose a different folder if needed, not a different mod filename."
+}
 
 if (-not $RepoRoot) {
     $RepoRoot = Split-Path -Parent $PSScriptRoot
@@ -150,14 +175,6 @@ if (-not (Test-Path -LiteralPath $DestZip)) {
 
 Write-Host "Wrote: $DestZip (modDesc.xml, icon, src/, l10n/ - POSIX paths inside zip)"
 
-if (-not $CopyTo) {
-    if ($env:FARMDASH_BUILD_OUTPUT) {
-        $CopyTo = Join-Path $env:FARMDASH_BUILD_OUTPUT $OutZipName
-    } else {
-        $CopyTo = Join-Path $env:USERPROFILE "Documents\FarmDash Final Output\$OutZipName"
-    }
-}
-
 if ($CopyTo) {
     $destParent = Split-Path -Parent $CopyTo
     if ($destParent -and -not (Test-Path -LiteralPath $destParent)) {
@@ -165,4 +182,51 @@ if ($CopyTo) {
     }
     Copy-Item -LiteralPath $DestZip -Destination $CopyTo -Force
     Write-Host "Copied to: $CopyTo"
+}
+
+# Local playtest: copy the working-tree zip into FS25 mods. Skip VersionOverride
+# (classic public stamp) so it does not overwrite the RF test zip.
+if (-not $VersionOverride) {
+    $fs25Mods = $env:FARMDASH_FS25_MODS
+    if (-not $fs25Mods) {
+        $fs25Mods = Join-Path $env:USERPROFILE "Documents\My Games\FarmingSimulator2025\mods"
+    }
+    if (Test-Path -LiteralPath $fs25Mods -PathType Container) {
+        $modsZip = Join-Path $fs25Mods $CanonicalZipName
+        Copy-Item -LiteralPath $DestZip -Destination $modsZip -Force
+        Write-Host "Copied to FS25 mods: $modsZip"
+        # Giants SP loads an unpacked `FS25_FarmDashboard` folder over the zip.
+        # Keep that tree in sync so playtest actually runs this pack.
+        $modsFolder = Join-Path $fs25Mods "FS25_FarmDashboard"
+        if (Test-Path -LiteralPath $modsFolder -PathType Container) {
+            Copy-Item -LiteralPath (Join-Path $ModSource "modDesc.xml") -Destination (Join-Path $modsFolder "modDesc.xml") -Force
+            foreach ($iconName in @("icon.png", "icon_FarmDashboard.dds")) {
+                $iconSrc = Join-Path $ModSource $iconName
+                if (Test-Path -LiteralPath $iconSrc) {
+                    Copy-Item -LiteralPath $iconSrc -Destination (Join-Path $modsFolder $iconName) -Force
+                }
+            }
+            $srcSrc = Join-Path $ModSource "src"
+            $srcDest = Join-Path $modsFolder "src"
+            & robocopy $srcSrc $srcDest /E /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
+            if ($LASTEXITCODE -ge 8) {
+                Write-Warning "robocopy src into unpacked mod folder failed (exit $LASTEXITCODE)"
+            }
+            $l10nSrc = Join-Path $ModSource "l10n"
+            if (Test-Path -LiteralPath $l10nSrc -PathType Container) {
+                $l10nDest = Join-Path $modsFolder "l10n"
+                & robocopy $l10nSrc $l10nDest /E /NFL /NDL /NJH /NJS /nc /ns /np | Out-Null
+                if ($LASTEXITCODE -ge 8) {
+                    Write-Warning "robocopy l10n into unpacked mod folder failed (exit $LASTEXITCODE)"
+                }
+            }
+            # robocopy uses 0-7 for success; reset so npm does not treat the pack as failed.
+            if ($LASTEXITCODE -lt 8) {
+                $global:LASTEXITCODE = 0
+            }
+            Write-Host "Synced unpacked FS25 mod folder: $modsFolder"
+        }
+    } else {
+        Write-Warning "FS25 mods folder not found (skip local copy): $fs25Mods"
+    }
 }

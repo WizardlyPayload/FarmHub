@@ -75,4 +75,34 @@ describe('stockMoistureFromXml', () => {
         const out = enrichStockMoistureFromXml(stock, moistureSystem, [{ uniqueId: 'uid1', siloFillTypes: ['WHEAT'] }], {});
         expect(out.byFarm['1'].items[0].locations[0].moisturePct).toBe(9.1);
     });
+
+    test('keeps silo moisture scoped to each stock farm', () => {
+        const moistureSystem = parseMoistureSystemXml(
+            '<objectMoisture>' +
+            '<object uniqueId="farm1"><fillType name="WHEAT" moisture="0.1" quality="90"/></object>' +
+            '<object uniqueId="farm2"><fillType name="WHEAT" moisture="0.3" quality="70"/></object>' +
+            '</objectMoisture>'
+        );
+        const stock = {
+            byFarm: {
+                '1': {
+                    farmId: 1,
+                    items: [{ fillType: 'WHEAT', locations: [{ kind: 'silo', name: 'Shared model', liters: 100 }] }],
+                },
+                '2': {
+                    farmId: 2,
+                    items: [{ fillType: 'WHEAT', locations: [{ kind: 'silo', name: 'Shared model', liters: 100 }] }],
+                },
+            },
+        };
+        const placeables = [
+            { uniqueId: 'farm1', farmId: 1, name: 'Shared model', siloFillTypes: ['WHEAT'] },
+            { uniqueId: 'farm2', farmId: 2, name: 'Shared model', siloFillTypes: ['WHEAT'] },
+        ];
+
+        const out = enrichStockMoistureFromXml(stock, moistureSystem, placeables, {});
+
+        expect(out.byFarm['1'].items[0].locations[0].moisturePct).toBe(10);
+        expect(out.byFarm['2'].items[0].locations[0].moisturePct).toBe(30);
+    });
 });

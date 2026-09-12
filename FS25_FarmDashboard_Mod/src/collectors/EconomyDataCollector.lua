@@ -145,7 +145,7 @@ function EconomyDataCollector:_collectImpl()
 end
 
 local function _economyFillTypeIndexForName(cropName)
-    local ftm = rawget(_G, "g_fillTypeManager")
+    local ftm = _G.g_fillTypeManager
     if not ftm or not cropName then return nil end
     if ftm.nameToIndex and ftm.nameToIndex[cropName] then
         return tonumber(ftm.nameToIndex[cropName])
@@ -160,7 +160,7 @@ end
 local function _economyAttachFillTypeMaps(marketData)
     marketData.fillTypesByIndex = marketData.fillTypesByIndex or {}
     marketData.nameToIndex = marketData.nameToIndex or {}
-    local ftm = rawget(_G, "g_fillTypeManager")
+    local ftm = _G.g_fillTypeManager
     if not ftm then return end
 
     if ftm.fillTypeIndexToName then
@@ -290,9 +290,46 @@ local function _maxPriceMonthForFillType(fillType)
     return nil
 end
 
+--- 12-period price curve formerly sourced from economy.xml on the desktop merge.
+local function _priceHistoryForFillType(fillType)
+    if not fillType or not fillType.economy then return nil end
+    local factors = fillType.economy.factors
+    local history = fillType.economy.history
+    if type(factors) ~= "table" and type(history) ~= "table" then return nil end
+
+    local out = {}
+    local sum, count = 0, 0
+    local SP = rawget(_G, "SeasonPeriod")
+
+    for i = 1, #_SEASON_PERIOD_KEYS do
+        local key = _SEASON_PERIOD_KEYS[i]
+        local value = nil
+        if SP and SP[key] ~= nil then
+            local period = SP[key]
+            if type(history) == "table" and history[period] ~= nil then
+                value = tonumber(history[period])
+            elseif type(factors) == "table" and factors[period] ~= nil then
+                value = tonumber(factors[period])
+            end
+        elseif type(factors) == "table" and factors[i] ~= nil then
+            value = tonumber(factors[i])
+        elseif type(history) == "table" and history[i] ~= nil then
+            value = tonumber(history[i])
+        end
+        if value ~= nil and value == value then
+            out[key] = value
+            sum = sum + value
+            count = count + 1
+        end
+    end
+
+    if count == 0 then return nil end
+    return out, sum / count
+end
+
 local function _economyEnrichMaxPriceMonths(marketData)
     if not marketData or type(marketData.crops) ~= "table" then return end
-    local ftm = rawget(_G, "g_fillTypeManager")
+    local ftm = _G.g_fillTypeManager
     if not ftm or not ftm.getFillTypeByIndex then return end
 
     for _, cropData in pairs(marketData.crops) do
@@ -302,6 +339,36 @@ local function _economyEnrichMaxPriceMonths(marketData)
                 local ok, fillType = pcall(function() return ftm:getFillTypeByIndex(idx) end)
                 if ok and fillType then
                     cropData.maxPriceMonth = _maxPriceMonthForFillType(fillType)
+                end
+            end
+        end
+    end
+end
+
+--- Attach season priceHistory from live g_fillTypeManager (replaces desktop economy.xml).
+local function _economyEnrichPriceHistories(marketData)
+    if not marketData or type(marketData.crops) ~= "table" then return end
+    local ftm = _G.g_fillTypeManager
+    if not ftm or not ftm.getFillTypeByIndex then return end
+
+    for _, cropData in pairs(marketData.crops) do
+        if cropData and type(cropData.priceHistory) ~= "table" then
+            local idx = tonumber(cropData.fillTypeIndex)
+            if idx then
+                local ok, fillType = pcall(function() return ftm:getFillTypeByIndex(idx) end)
+                if ok and fillType then
+                    local hist, avg = _priceHistoryForFillType(fillType)
+                    if hist then
+                        cropData.priceHistory = hist
+                        if avg and avg > 0 then
+                            if not cropData.avgPrice or tonumber(cropData.avgPrice) == 0 then
+                                cropData.avgPrice = avg
+                            end
+                            if not cropData.avgXmlPrice then
+                                cropData.avgXmlPrice = avg
+                            end
+                        end
+                    end
                 end
             end
         end
@@ -717,205 +784,9 @@ function EconomyDataCollector:collectMarketPrices()
         end
     end
     
-    -- Method 7: Force-add comprehensive Bakery and Dairy stations
-    
-    local bakeryProducts = {
-        "MILK", "GOAT_MILK", "BUFFALO_MILK", "GOATMILK", "BUFFALOMILK", 
-        "MILK_BOTTLED", "GOATMILK_BOTTLED", "BUFFALOMILK_BOTTLED",
-        "FLOUR", "SUGAR", "EGG", "BUTTER", "HONEY", "BREAD", "CAKE"
-    }
-    
-    local dairyProducts = {
-        "MILK", "GOAT_MILK", "BUFFALO_MILK", "GOATMILK", "BUFFALOMILK",
-        "MILK_BOTTLED", "GOATMILK_BOTTLED", "BUFFALOMILK_BOTTLED",
-        "CHOCOLATE_MILK", "CONDENSED_MILK", "CHOCOLATEMILKCOW", "CHOCOLATEMILKGOAT", 
-        "CHOCOLATEMILKBUFFALO", "CREAM", "BUTTER", "CHEESE", "YOGURT", "KEFIR"
-    }
-    
-    local bakeryExists = false
-    local dairyExists = false
-    for _, station in pairs(marketData.sellPoints) do
-        if station.name == "Bakery" then
-            local hasProducts = false
-            for _ in pairs(station.prices) do hasProducts = true break end
-            if hasProducts then bakeryExists = true end
-        end
-        if station.name == "Dairy" then
-            local hasProducts = false
-            for _ in pairs(station.prices) do hasProducts = true break end
-            if hasProducts then dairyExists = true end
-        end
-    end
-    
-    local bakeryStation = nil
-    for _, station in pairs(marketData.sellPoints) do
-        if station.name == "Bakery" then
-            bakeryStation = station
-            break
-        end
-    end
-    
-    if not bakeryStation then
-        bakeryStation = {
-            name = "Bakery",
-            id = 201,
-            position = {x = 0, y = 0, z = 0},
-            prices = {},
-            isSpecialEvent = false
-        }
-        table.insert(marketData.sellPoints, bakeryStation)
-    end
-    
-    if bakeryStation then
-        for _, productName in pairs(bakeryProducts) do
-            local marketPrice = 0
-            
-            for _, station in pairs(marketData.sellPoints) do
-                if station.name == "Market Base Prices" and station.prices[productName] then
-                    marketPrice = station.prices[productName].price
-                    break
-                end
-            end
-            
-            if marketPrice == 0 then
-                for _, station in pairs(marketData.sellPoints) do
-                    if station.prices[productName] then
-                        marketPrice = station.prices[productName].price
-                        break
-                    end
-                end
-            end
-            
-            if marketPrice > 0 then
-                bakeryStation.prices[productName] = {
-                    price = marketPrice * 0.80,
-                    basePrice = marketPrice,
-                    multiplier = 0.80,
-                    isSpecialEvent = false
-                }
-            end
-        end
-    end
-    
-    local dairyStation = nil
-    for _, station in pairs(marketData.sellPoints) do
-        if station.name == "Dairy" then
-            dairyStation = station
-            break
-        end
-    end
-    
-    if not dairyStation then
-        dairyStation = {
-            name = "Dairy",
-            id = 202,
-            position = {x = 0, y = 0, z = 0},
-            prices = {},
-            isSpecialEvent = false
-        }
-        table.insert(marketData.sellPoints, dairyStation)
-    end
-    
-    if dairyStation then
-        for _, productName in pairs(dairyProducts) do
-            local marketPrice = 0
-            
-            for _, station in pairs(marketData.sellPoints) do
-                if station.name == "Market Base Prices" and station.prices[productName] then
-                    marketPrice = station.prices[productName].price
-                    break
-                end
-            end
-            
-            if marketPrice == 0 then
-                for _, station in pairs(marketData.sellPoints) do
-                    if station.prices[productName] then
-                        marketPrice = station.prices[productName].price
-                        break
-                    end
-                end
-            end
-            
-            if marketPrice > 0 then
-                dairyStation.prices[productName] = {
-                    price = marketPrice * 0.85,
-                    basePrice = marketPrice,
-                    multiplier = 0.85,
-                    isSpecialEvent = false
-                }
-            end
-        end
-    end
-    
-    local function addStationToCrop(cropName, stationName, price, multiplier)
-        if marketData.crops[cropName] then
-            if not marketData.crops[cropName].locations then
-                marketData.crops[cropName].locations = {}
-            end
-            
-            local locationExists = false
-            for _, location in pairs(marketData.crops[cropName].locations) do
-                if location.name == stationName then
-                    locationExists = true
-                    break
-                end
-            end
-            
-            if not locationExists then
-                table.insert(marketData.crops[cropName].locations, {
-                    name = stationName,
-                    price = price,
-                    multiplier = multiplier
-                })
-                
-                local allPrices = {}
-                for _, location in pairs(marketData.crops[cropName].locations) do
-                    table.insert(allPrices, location.price)
-                end
-                
-                table.sort(allPrices)
-                marketData.crops[cropName].minPrice = allPrices[1]
-                marketData.crops[cropName].maxPrice = allPrices[#allPrices]
-                
-                local sum = 0
-                for _, p in pairs(allPrices) do sum = sum + p end
-                marketData.crops[cropName].avgPrice = sum / #allPrices
-                
-                for _, location in pairs(marketData.crops[cropName].locations) do
-                    if location.price == marketData.crops[cropName].maxPrice then
-                        marketData.crops[cropName].bestLocation = location.name
-                    end
-                    if location.price == marketData.crops[cropName].minPrice then
-                        marketData.crops[cropName].worstLocation = location.name
-                    end
-                end
-            end
-        end
-    end
-    
-    if not bakeryExists then
-        for _, station in pairs(marketData.sellPoints) do
-            if station.name == "Bakery" then
-                for productName, priceInfo in pairs(station.prices) do
-                    addStationToCrop(productName, "Bakery", priceInfo.price, priceInfo.multiplier)
-                end
-                break
-            end
-        end
-    end
-    
-    if not dairyExists then
-        for _, station in pairs(marketData.sellPoints) do
-            if station.name == "Dairy" then
-                for productName, priceInfo in pairs(station.prices) do
-                    addStationToCrop(productName, "Dairy", priceInfo.price, priceInfo.multiplier)
-                end
-                break
-            end
-        end
-    end
-    
-    -- Method 8: Force-add logical products to specific stations based on their type
+    -- Method 7 (synthetic Bakery/Dairy stations) removed: only real selling stations are exported.
+
+    -- Method 8: Force-add logical products to existing named stations only.
     
     local function addProductToStation(stationName, productName, price, multiplier)
         for _, station in pairs(marketData.sellPoints) do
@@ -984,8 +855,6 @@ function EconomyDataCollector:collectMarketPrices()
         ["Ketchup Production"] = {"TOMATO", "SUGAR"},
         ["Tailor Shop"] = {"FABRIC", "WOOL", "COTTON"},
         ["Corn Dryer"] = {"CORN_DRY", "MAIZE"},
-        ["Bakery"] = {"MILK", "GOAT_MILK", "BUFFALO_MILK", "GOATMILK", "BUFFALOMILK", "MILK_BOTTLED", "GOATMILK_BOTTLED", "BUFFALOMILK_BOTTLED", "FLOUR", "SUGAR", "EGG", "BUTTER", "HONEY", "BREAD", "CAKE"},
-        ["Dairy"] = {"MILK", "GOAT_MILK", "BUFFALO_MILK", "GOATMILK", "BUFFALOMILK", "MILK_BOTTLED", "GOATMILK_BOTTLED", "BUFFALOMILK_BOTTLED", "CHOCOLATE_MILK", "CONDENSED_MILK", "CHOCOLATEMILKCOW", "CHOCOLATEMILKGOAT", "CHOCOLATEMILKBUFFALO", "CREAM", "BUTTER", "CHEESE", "YOGURT", "KEFIR"}
     }
     
     for stationName, products in pairs(productionMappings) do
@@ -1123,6 +992,7 @@ function EconomyDataCollector:collectMarketPrices()
     
     _economyAttachFillTypeMaps(marketData)
     _economyEnrichMaxPriceMonths(marketData)
+    _economyEnrichPriceHistories(marketData)
     
     return marketData
 end
@@ -1761,11 +1631,7 @@ function EconomyDataCollector:isValidCropName(name)
     if string.len(name) > 40 then
         return false
     end
-    
-    if string.find(name, "[A-Z][A-Z][A-Z][A-Z][A-Z][A-Z][A-Z]") then
-        return false
-    end
-    
+
     return true
 end
 

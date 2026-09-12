@@ -43,8 +43,12 @@
 // =====================================================================================
 
 const path = require('path');
+const fileCommit = require('./fileCommit.cjs');
+const detailValidation = new Map();
 const fs = require('fs');
 const ftp = require('basic-ftp');
+const { ftpAccessOptions } = require('./ftpAccess.cjs');
+const { sanitizeIdScheme, joinContained } = require('./safeFsIdentity.cjs');
 
 // Plan v5 wire-format constants
 const REQUESTS_SCHEMA_VERSION = 1;
@@ -184,6 +188,9 @@ function findDetailInDirectory(detailsDir, canonicalKey, resolvedPenKey) {
     const asInt = validatePenId(canonicalKey);
     if (asInt == null) return null;
     try {
+        let best = null;
+        let bestN = -1;
+        let bestUnique = false;
         for (const name of fs.readdirSync(detailsDir)) {
             if (!name.startsWith('animals_') || !name.endsWith('.json')) continue;
             const fp = path.join(detailsDir, name);
@@ -191,14 +198,34 @@ function findDetailInDirectory(detailsDir, canonicalKey, resolvedPenKey) {
             if (!doc || typeof doc !== 'object') continue;
             const placeableId = Number(doc.placeableId);
             const penIdStr = doc.penId != null ? String(doc.penId) : '';
-            if (placeableId === asInt || penIdStr === String(canonicalKey) || penIdStr.endsWith(`:${asInt}`)) {
-                return {
+            if (placeableId !== asInt && penIdStr !== String(canonicalKey) && !penIdStr.endsWith(`:${asInt}`)) {
+                continue;
+            }
+            const animals = Array.isArray(doc.animals)
+                ? doc.animals
+                : doc.animals && typeof doc.animals === 'object'
+                  ? Object.values(doc.animals)
+                  : [];
+            const n = animals.length;
+            let unique = false;
+            for (const a of animals) {
+                if (a && a.uniqueId != null && String(a.uniqueId).trim() !== '') {
+                    unique = true;
+                    break;
+                }
+            }
+            const better = (unique && !bestUnique) || (unique === bestUnique && n > bestN);
+            if (better) {
+                best = {
                     path: fp,
                     penKey: penIdStr || resolvedPenKey,
                     fileSegment: name.slice(8, -5),
                 };
+                bestN = n;
+                bestUnique = unique;
             }
         }
+        return best;
     } catch (e) {
         console.warn('[livestockDetail] findDetailInDirectory', detailsDir, e.message);
     }
@@ -246,7 +273,12 @@ function sanitizeDetailDoc(detail) {
     for (const key of DETAIL_ROOT_KEYS) {
         if (detail[key] === undefined) continue;
         if (key === 'animals') {
-            const arr = Array.isArray(detail.animals) ? detail.animals.slice(0, DETAIL_ANIMALS_CAP) : [];
+            const rawAnimals = Array.isArray(detail.animals)
+                ? detail.animals
+                : detail.animals && typeof detail.animals === 'object'
+                  ? Object.values(detail.animals)
+                  : [];
+            const arr = rawAnimals.slice(0, DETAIL_ANIMALS_CAP);
             out.animals = arr.map((a) => {
                 const o = sanitizeJsonLike(a, 0);
                 return o && typeof o === 'object' ? o : {};
@@ -284,8 +316,12 @@ function getLocalSlotPath(srv, getFs25DocumentsRoot) {
     }
     const folderName = (srv && srv.localSubFolder) ||
         String((srv && srv.name) || '').replace(/[<>:"/\\|?*]/g, '').trim();
-    if (!folderName) return null;
-    return path.join(basePath, folderName);
+    if (!folderName || folderName.includes('..') || /[\\/]/.test(folderName)) return null;
+    try {
+        return joinContained(basePath, folderName);
+    } catch (_) {
+        return null;
+    }
 }
 
 function getDetailPathLocal(srv, fileSegment, getFs25DocumentsRoot) {
@@ -308,9 +344,10 @@ function getDirtyIndexPathLocal(srv, getFs25DocumentsRoot) {
 
 /** Cache key includes idScheme so a scheme change automatically busts the cached file. */
 function getFtpDetailCachePath(userDataPath, srv, idScheme, fileSegment) {
-    const scheme = idScheme || 'integer-v1';
+    const scheme = sanitizeIdScheme(idScheme);
     const safeSeg = String(fileSegment).replace(/[^A-Za-z0-9._-]/g, '_').slice(-120);
-    return path.join(userDataPath, `livestock_detail_${srv.id}_${scheme}_${safeSeg}.json`);
+    const root = path.resolve(String(userDataPath || ''));
+    return joinContained(root, `livestock_detail_${srv.id}_${scheme}_${safeSeg}.json`);
 }
 
 function getFtpRequestsCachePath(userDataPath, srv) {
@@ -335,80 +372,29 @@ function readJsonSafe(p) {
 
 /**
  * Atomic write on Windows: write tmp, then renameSync directly to target. Node renames are atomic
- * across the same volume on NTFS. Retry x3 on EBUSY/EEXIST/EPERM with short backoff. As a last
- * resort, delete the target then rename. Logs once per first failure.
+ * across the same volume on NTFS. Retry x3 on EBUSY/EEXIST/EPERM with short backoff. Failure preserves the last-good target and staged bytes; no spin or destructive fallback.
  */
 function writeJsonAtomic(p, obj) {
-    const tmp = p + '.tmp';
-    let lastErr = null;
-    try {
-        fs.mkdirSync(path.dirname(p), { recursive: true });
-        fs.writeFileSync(tmp, JSON.stringify(obj, null, 2));
-    } catch (e) {
-        console.warn('[livestockDetail] writeJsonAtomic prep', p, e.message);
-        return false;
-    }
-
-    for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-            fs.renameSync(tmp, p);
-            return true;
-        } catch (e) {
-            lastErr = e;
-            if (e && (e.code === 'EBUSY' || e.code === 'EPERM' || e.code === 'EEXIST')) {
-                // Brief backoff then retry; on the 3rd attempt fall through to delete+rename.
-                const sleep = 25 * (attempt + 1);
-                const t = Date.now() + sleep;
-                while (Date.now() < t) { /* spin */ }
-                continue;
-            }
-            break;
-        }
-    }
-    try {
-        if (fs.existsSync(p)) fs.unlinkSync(p);
-        fs.renameSync(tmp, p);
-        return true;
-    } catch (e) {
-        try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch (_) { /* ignore */ }
-        console.warn('[livestockDetail] writeJsonAtomic', p, (lastErr && lastErr.message) || e.message);
-        return false;
-    }
+    return fileCommit.writeJsonAtomicSync(p, obj);
 }
 
 async function ftpDownloadOne(srv, remotePath, localPath) {
     const client = new ftp.Client(60000);
     client.ftp.verbose = false;
     try {
-        await client.access({
-            host: srv.ftpHost, port: parseInt(srv.ftpPort, 10) || 21,
-            user: srv.ftpUser, password: srv.ftpPass, secure: false,
-        });
-        const tmp = localPath + '.tmp';
-        try { if (fs.existsSync(tmp)) fs.unlinkSync(tmp); } catch (_) { /* ignore */ }
-        await client.downloadTo(tmp, remotePath);
-        if (fs.existsSync(tmp) && fs.statSync(tmp).size > 0) {
-            if (fs.existsSync(localPath)) fs.unlinkSync(localPath);
-            fs.renameSync(tmp, localPath);
-            return true;
-        }
+        await client.access(ftpAccessOptions(srv));
+        return await fileCommit.downloadAndCommit(client, remotePath, localPath + '.tmp', localPath);
+    } catch (error) {
+        console.warn('[livestockDetail] FTP detail download failed: ' + error.message);
         return false;
-    } catch (e) {
-        console.warn(`[livestockDetail] FTP download ${remotePath}: ${e.message}`);
-        return false;
-    } finally {
-        client.close();
-    }
+    } finally { client.close(); }
 }
 
 async function ftpUploadOne(srv, localPath, remotePath) {
     const client = new ftp.Client(60000);
     client.ftp.verbose = false;
     try {
-        await client.access({
-            host: srv.ftpHost, port: parseInt(srv.ftpPort, 10) || 21,
-            user: srv.ftpUser, password: srv.ftpPass, secure: false,
-        });
+        await client.access(ftpAccessOptions(srv));
         const dir = remotePath.replace(/\\/g, '/').split('/').slice(0, -1).join('/');
         if (dir) {
             try { await client.ensureDir(dir); } catch (_) { /* ignore */ }
@@ -557,16 +543,18 @@ async function read(opts) {
         const remote = `${slotRemote}/details/animals_${fileSegment}.json`;
         const bulkDetailsDir = getFtpDetailsCacheDir(userDataPath, srv, serverStates);
 
-        let localTs = 0;
-        if (fs.existsSync(localCache)) {
-            try { localTs = (fs.statSync(localCache).mtimeMs || 0) / 1000; } catch (_) { /* ignore */ }
-        }
-
-        const needsFetch = !fs.existsSync(localCache)
-            || (dirtyAt > 0 && dirtyAt > localTs + ID_SCHEME_TS_TOLERANCE_SEC);
+        const validationKey = localCache + '|' + JSON.stringify([srv.ftpHost, srv.ftpPort, slotRemote]);
+        const previousValidation = detailValidation.get(validationKey);
+        const needsFetch = !fs.existsSync(localCache) || !previousValidation
+            || previousValidation.dirtyAt !== dirtyAt
+            || Date.now() - previousValidation.checkedAt >= 60000;
 
         if (needsFetch) {
             const ok = await ftpDownloadOne(srv, remote, localCache);
+            if (ok) {
+                detailValidation.set(validationKey, { dirtyAt, checkedAt: Date.now() });
+                if (detailValidation.size > 512) detailValidation.delete(detailValidation.keys().next().value);
+            }
             if (!ok && !fs.existsSync(localCache)) {
                 const located = findDetailInDirectory(bulkDetailsDir, canonicalKey, resolvedPenKey);
                 if (!located) return null;

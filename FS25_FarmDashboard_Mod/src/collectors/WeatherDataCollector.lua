@@ -83,13 +83,10 @@ function WeatherDataCollector:collect()
         if success then setTemp(temp, "env:getCurrentTemperature()") end
     end
 
-    if temperature == nil then
-        temperature = 20
-    end
-    
-    -- Get weather type - prioritize actual current conditions
-    local weatherType = 0
-    local weatherSource = "default"
+    -- Get weather type - prioritize actual current conditions.
+    -- Do not default to 0 (sun); missing type exports as unknown.
+    local weatherType = nil
+    local weatherSource = "missing"
     
     if weather.currentWeatherType ~= nil then
         weatherType = weather.currentWeatherType
@@ -204,6 +201,31 @@ function WeatherDataCollector:collect()
 end
 
 function WeatherDataCollector:getWeatherTypeName(weatherType)
+    if weatherType == nil then
+        return "unknown"
+    end
+    if type(weatherType) == "string" then
+        local s = string.lower(weatherType)
+        s = string.gsub(s, "^weathertype%.", "")
+        s = string.gsub(s, "%s+", "_")
+        local names = {
+            sun = "sun",
+            sunny = "sun",
+            clear = "sun",
+            rain = "rain",
+            rainy = "rain",
+            thunder = "rain",
+            cloudy = "cloudy",
+            overcast = "cloudy",
+            partially_cloudy = "cloudy",
+            snow = "snow",
+            snowy = "snow",
+            fog = "fog",
+            foggy = "fog",
+            hail = "hail",
+        }
+        return names[s] or "unknown"
+    end
     local weatherTypes = {
         [0] = "sun",
         [1] = "rain",
@@ -212,7 +234,6 @@ function WeatherDataCollector:getWeatherTypeName(weatherType)
         [4] = "fog",
         [5] = "hail"
     }
-    
     return weatherTypes[weatherType] or "unknown"
 end
 
@@ -226,43 +247,21 @@ function WeatherDataCollector:collectForecast(weather)
             for i = 1, math.min(7, #weather.forecast) do
                 local forecastData = weather.forecast[i]
                 if forecastData then
+                    local typeVal = forecastData.weatherType or 
+                        forecastData.weatherTypeIndex or 
+                        forecastData.weather
                     table.insert(forecast, {
                         day = i,
-                        weatherType = self:getWeatherTypeName(
-                            forecastData.weatherType or 
-                            forecastData.weatherTypeIndex or 
-                            forecastData.weather or 0
-                        ),
-                        minTemperature = forecastData.minTemperature or forecastData.minTemp or forecastData.tempMin or 15,
-                        maxTemperature = forecastData.maxTemperature or forecastData.maxTemp or forecastData.tempMax or 25,
+                        weatherType = self:getWeatherTypeName(typeVal),
+                        minTemperature = forecastData.minTemperature or forecastData.minTemp or forecastData.tempMin,
+                        maxTemperature = forecastData.maxTemperature or forecastData.maxTemp or forecastData.tempMax,
                         precipitationChance = forecastData.precipitationChance or forecastData.rainChance or forecastData.precipitation or 0
                     })
                 end
             end
         end
     end
-    
-    -- If no forecast data found, generate a stable 3-day forecast.
-    -- Seed from current game day so values are consistent within a day
-    -- but change naturally as days progress — no random flicker on each collect.
-    if #forecast == 0 then
-        local currentTemp = weather.currentTemperature or 20
-        local currentType = weather.currentWeatherType or 0
-        local env2 = _G.g_currentMission and _G.g_currentMission.environment
-        local seed = env2 and (env2.currentDay or 1) or 1
 
-        for i = 1, 3 do
-            -- Simple deterministic variation: different offset per day using seed
-            local variation = ((seed * 7 + i * 13) % 5) - 2  -- produces -2..2
-            table.insert(forecast, {
-                day = i,
-                weatherType = self:getWeatherTypeName(currentType),
-                minTemperature = math.floor(currentTemp - 5 + variation),
-                maxTemperature = math.floor(currentTemp + 5 + variation),
-                precipitationChance = currentType == 1 and 70 or (currentType == 3 and 80 or 20)
-            })
-        end
-    end
-    
+    -- Empty forecast is honest unknown. Do not synthesize a 3-day band.
     return forecast
 end

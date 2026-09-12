@@ -4,23 +4,65 @@ function clamp(n, lo, hi) {
   return Math.max(lo, Math.min(hi, n));
 }
 
-function worldToMapPercent(x, z, bounds) {
-  const spanX = bounds.maxX - bounds.minX || 1;
-  const spanZ = bounds.maxZ - bounds.minZ || 1;
+/** Giants IngameMap PC — playable world is the centre half of overview.dds. */
+const INGAME_MAP_WORLD_INSET = { left: 0.25, top: 0.25, width: 0.5, height: 0.5 };
+
+function ingameMapWorldToLocalPercent(x, z, terrainSize, clampFrame) {
+  const ts = Number(terrainSize);
+  const size = Number.isFinite(ts) && ts >= 128 ? ts : 2048;
+  const left = ((Number(x) + size * 0.5) / size) * 100;
+  const top = ((Number(z) + size * 0.5) / size) * 100;
+  if (clampFrame === false) return { left, top };
   return {
-    left: clamp(((Number(x) - bounds.minX) / spanX) * 100, 0.5, 99.5),
-    top: clamp(((Number(z) - bounds.minZ) / spanZ) * 100, 0.5, 99.5),
+    left: clamp(left, 0.5, 99.5),
+    top: clamp(top, 0.5, 99.5),
   };
 }
 
-function applyOverviewCropPercent(point, crop) {
+function terrainUvPercent(x, z, bounds, clampFrame) {
+  const ts = Number(bounds?.terrainSize);
+  if (Number.isFinite(ts) && ts >= 128) {
+    return ingameMapWorldToLocalPercent(x, z, ts, clampFrame);
+  }
+  const spanX = bounds.maxX - bounds.minX || 1;
+  const spanZ = bounds.maxZ - bounds.minZ || 1;
+  const left = ((Number(x) - bounds.minX) / spanX) * 100;
+  const top = ((Number(z) - bounds.minZ) / spanZ) * 100;
+  if (clampFrame === false) return { left, top };
+  return {
+    left: clamp(left, 0.5, 99.5),
+    top: clamp(top, 0.5, 99.5),
+  };
+}
+
+function applyOverviewCropPercent(point, crop, clampFrame) {
   const c = crop || { left: 0, top: 0, width: 1, height: 1 };
   const w = Number(c.width) > 0 ? Number(c.width) : 1;
   const h = Number(c.height) > 0 ? Number(c.height) : 1;
+  const left = (Number(c.left) + (point.left / 100) * w) * 100;
+  const top = (Number(c.top) + (point.top / 100) * h) * 100;
+  if (clampFrame === false) return { left, top };
   return {
-    left: clamp((Number(c.left) + (point.left / 100) * w) * 100, 0.5, 99.5),
-    top: clamp((Number(c.top) + (point.top / 100) * h) * 100, 0.5, 99.5),
+    left: clamp(left, 0.5, 99.5),
+    top: clamp(top, 0.5, 99.5),
   };
+}
+
+function fleetMapPercent(x, z, bounds, options) {
+  const clampFrame = options?.clampFrame !== false;
+  const terrain = terrainUvPercent(x, z, bounds, false);
+  if (options?.hideBorder) {
+    if (clampFrame === false) return terrain;
+    return {
+      left: clamp(terrain.left, 0.5, 99.5),
+      top: clamp(terrain.top, 0.5, 99.5),
+    };
+  }
+  return applyOverviewCropPercent(terrain, INGAME_MAP_WORLD_INSET, clampFrame);
+}
+
+function worldToMapPercent(x, z, bounds, clampFrame) {
+  return fleetMapPercent(x, z, bounds, { clampFrame: clampFrame !== false });
 }
 
 function computeObjectFitContainLayout(natW, natH, boxW, boxH) {
@@ -84,8 +126,9 @@ function normalizeTerrainHalf(reportedHalf) {
 
 function positionXZ(point) {
   if (!point || typeof point !== "object") return null;
-  const x = Number(point.x ?? point[0]);
-  const z = Number(point.z ?? point[1]);
+  const nested = point.position && typeof point.position === "object" ? point.position : null;
+  const x = Number(nested?.x ?? point.x ?? point.posX ?? point[0]);
+  const z = Number(nested?.z ?? point.z ?? point.posZ ?? point[1]);
   if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
   if (Math.abs(x) < 0.5 && Math.abs(z) < 0.5) return null;
   return { x, z };
@@ -104,9 +147,12 @@ function inferSymmetricalTerrainHalf(reportedHalf, points) {
   const need = maxAbs * 1.02;
   if (need <= half * 1.05) return half;
   for (const step of STANDARD_TERRAIN_HALVES) {
-    if (need <= step) return step;
+    if (step < half) continue;
+    // Rim vertices on a 4 km map sit at ~±2038 m. need is then ~2078, which is
+    // greater than 2048 but still that size class — not an 8 km world.
+    if (maxAbs <= step * 1.02) return step;
   }
-  return Math.ceil(maxAbs / 1024) * 1024;
+  return Math.max(half, Math.ceil(maxAbs / 1024) * 1024);
 }
 
 function boundsFromTerrainHalf(half) {
@@ -117,13 +163,42 @@ function boundsFromTerrainHalf(half) {
   return { minX: -h, maxX: h, minZ: -h, maxZ: h, halfSize: h, terrainSize: h * 2 };
 }
 
+/**
+ * Playable world metres from map.xml / getTerrainSize.
+ * Overview.dds is typically 2× pixels; Giants still maps the world into the centre
+ * half of that image (INGAME_MAP_WORLD_INSET), not onto the whole texture.
+ */
+function overviewMetresFromEngine(raw) {
+  const w = Number(raw?.mapWidth);
+  if (Number.isFinite(w) && w >= MIN_TERRAIN_HALF * 2) return w;
+  const h = Number(raw?.mapHeight);
+  if (Number.isFinite(h) && h >= MIN_TERRAIN_HALF * 2) return h;
+  const ts = Number(raw?.terrainSize);
+  if (Number.isFinite(ts) && ts >= MIN_TERRAIN_HALF * 2) return ts;
+  const half = Number(raw?.halfSize);
+  if (Number.isFinite(half) && half >= MIN_TERRAIN_HALF) return half * 2;
+  return 2048;
+}
+
+function withMapXmlSizes(bounds, raw) {
+  const out = { ...bounds };
+  const w = Number(raw?.mapWidth);
+  const h = Number(raw?.mapHeight);
+  if (Number.isFinite(w) && w >= MIN_TERRAIN_HALF * 2) out.mapWidth = w;
+  if (Number.isFinite(h) && h >= MIN_TERRAIN_HALF * 2) out.mapHeight = h;
+  return out;
+}
+
 function resolveTerrainBounds(dashboard, vehicles) {
   const raw = dashboard?.mapBounds || dashboard?.serverInfo?.mapBounds;
   let reportedHalf = normalizeTerrainHalf(raw?.halfSize);
   if (!raw?.halfSize) {
     const ts = Number(raw?.terrainSize);
+    const mapW = Number(raw?.mapWidth);
     if (Number.isFinite(ts) && ts >= MIN_TERRAIN_HALF * 2) {
       reportedHalf = normalizeTerrainHalf(ts * 0.5);
+    } else if (Number.isFinite(mapW) && mapW >= MIN_TERRAIN_HALF * 2) {
+      reportedHalf = normalizeTerrainHalf(mapW * 0.5);
     }
   }
   const positions = [];
@@ -144,21 +219,24 @@ function resolveTerrainBounds(dashboard, vehicles) {
   return boundsFromTerrainHalf(half);
 }
 
+/** Playable world size — map.xml width, then getTerrainSize. Photo placement uses INGAME_MAP_WORLD_INSET. */
 function resolveOverviewTerrainBounds(dashboard) {
   const raw = dashboard?.mapBounds || dashboard?.serverInfo?.mapBounds;
-  let reportedHalf = normalizeTerrainHalf(raw?.halfSize);
-  const terrainSize = Number(raw?.terrainSize);
-  if (!raw?.halfSize && Number.isFinite(terrainSize) && terrainSize >= MIN_TERRAIN_HALF * 2) {
-    reportedHalf = normalizeTerrainHalf(terrainSize * 0.5);
-  }
-  const isLargeTerrain =
-    (Number.isFinite(terrainSize) && terrainSize > 2048) || reportedHalf > 1024;
-  const overviewHalf = isLargeTerrain ? 1024 : reportedHalf;
-  return boundsFromTerrainHalf(overviewHalf);
+  const metres = overviewMetresFromEngine(raw);
+  return withMapXmlSizes(boundsFromTerrainHalf(metres * 0.5), raw);
+}
+
+function resolveFleetMapTerrainBounds(dashboard, worldItems) {
+  const raw = dashboard?.mapBounds || dashboard?.serverInfo?.mapBounds;
+  const base = resolveOverviewTerrainBounds(dashboard);
+  const half = inferSymmetricalTerrainHalf(base.halfSize || 1024, worldItems);
+  return withMapXmlSizes(boundsFromTerrainHalf(half), raw);
 }
 
 module.exports = {
   worldToMapPercent,
+  fleetMapPercent,
+  ingameMapWorldToLocalPercent,
   applyOverviewCropPercent,
   computeObjectFitContainLayout,
   mapOverviewIdentityKey,
@@ -167,7 +245,10 @@ module.exports = {
   normalizeTerrainHalf,
   resolveTerrainBounds,
   resolveOverviewTerrainBounds,
+  resolveFleetMapTerrainBounds,
+  overviewMetresFromEngine,
   FULL_TERRAIN_INSET,
+  INGAME_MAP_WORLD_INSET,
   isFullBleedTerrainInset,
   terrainClipPixelSize,
 };

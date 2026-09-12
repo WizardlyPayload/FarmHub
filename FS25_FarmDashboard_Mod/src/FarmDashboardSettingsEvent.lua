@@ -1,5 +1,6 @@
 -- FS25 FarmDashboard | FarmDashboardSettingsEvent.lua | v1.0.0
 -- Multiplayer sync for in-game settings (Moisture System pattern).
+-- Export mirror streams automatically to joined clients (no opt-in registry).
 
 FarmDashboardSettingsEvent = {}
 FarmDashboardSettingsEvent_mt = Class(FarmDashboardSettingsEvent, Event)
@@ -55,17 +56,32 @@ function FarmDashboardSettingsEvent:run(connection)
         return
     end
 
-    api:applySyncedSettings(self.boolValues, self.intValues, false)
+    local fromClient = api:canBroadcastSettings() and connection ~= nil and not api:connectionIsServer(connection)
+    local fromServer = api:connectionIsServer(connection)
 
-    if api:canBroadcastSettings() and connection ~= nil and not api:connectionIsServer(connection) then
+    if fromClient then
+        -- Non-admins must not push collector/timing config onto the authority.
+        local isAdmin = false
+        if connection ~= nil and type(connection.getIsServerAdmin) == "function" then
+            local ok, v = pcall(function() return connection:getIsServerAdmin() end)
+            isAdmin = ok and v == true
+        end
+        if not isAdmin then
+            return
+        end
+
+        api:applySyncedSettings(self.boolValues, self.intValues, false)
         local dc = api:getCollector()
         if dc then
             pcall(function() dc:saveConfig() end)
         end
         g_server:broadcastEvent(FarmDashboardSettingsEvent.newFromConfig())
+        return
     end
 
-    if api:connectionIsServer(connection) then
+    api:applySyncedSettings(self.boolValues, self.intValues, false)
+
+    if fromServer then
         if FarmDashboardSettingsMenu and FarmDashboardSettingsMenu.syncAllControls then
             FarmDashboardSettingsMenu.syncAllControls()
         end

@@ -28,12 +28,25 @@ files:
   - dataMerger.js
   - corsPolicy.js
   - editionPolicy.cjs
+  - fileCommit.cjs
   - modConfigXml.js
   - fillTypeResolve.cjs
   - farmScope.cjs
+  - mapFillTypes.cjs
+  - fillTypeHud.cjs
   - mapOverviewResolver.js
   - mapOverviewTerrainInset.cjs
   - mapOverviewInsets.cjs
+  - mapFieldOutlines.cjs
+  - httpFeedXml.js
+  - setupAccessPolicy.cjs
+  - setupConfigMerge.cjs
+  - uxContract.cjs
+  - fleetMapOverlays.cjs
+  - fleetMapGeo.cjs
+  - lanHttpPath.cjs
+  - safeFsIdentity.cjs
+  - ftpAccess.cjs
   - package.json
   - detailAnimalsHydrate.js
   - livestockDetail.js

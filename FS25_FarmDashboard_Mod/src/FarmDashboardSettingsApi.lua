@@ -14,8 +14,13 @@ FarmDashboardSettingsApi.BOOL_KEYS = {
     "enableStock",
     "enableBaleInventory",
     "enableRedTape",
+    "enableInvoices",
+    "enableHirePurchasing",
     "diagnostics",
     "debugBaleScan",
+    --- XML/network compat only — ExportMirror always streams to joined clients (ignored at runtime).
+    "allowExportMirror",
+    "mirrorExport",
 }
 
 FarmDashboardSettingsApi.INT_KEYS = {
@@ -44,8 +49,12 @@ local BOOL_DEFAULTS = {
     enableStock = true,
     enableBaleInventory = true,
     enableRedTape = true,
+    enableInvoices = true,
+    enableHirePurchasing = true,
     diagnostics = false,
     debugBaleScan = false,
+    allowExportMirror = true,
+    mirrorExport = true,
 }
 
 local INT_DEFAULTS = {
@@ -121,6 +130,10 @@ function FarmDashboardSettingsApi:canChangeSettings()
     return Utils.getNoNil(g_currentMission.isMasterUser, false)
 end
 
+function FarmDashboardSettingsApi:canChangeSettingKey(_key)
+    return self:canChangeSettings()
+end
+
 function FarmDashboardSettingsApi:clampInt(key, value)
     local spec = INT_CLAMP[key]
     if not spec or type(value) ~= "number" then
@@ -141,6 +154,7 @@ function FarmDashboardSettingsApi:packConfigForNetwork()
     return boolValues, intValues
 end
 
+--- @param persist boolean|nil
 function FarmDashboardSettingsApi:applySyncedSettings(boolValues, intValues, persist)
     local dc = self:getCollector()
     if not dc then

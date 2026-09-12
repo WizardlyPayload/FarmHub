@@ -58,11 +58,15 @@ function FinanceDataCollector:collectStep(opts)
         local dc = rawget(_G, "FarmDashboardDataCollector")
         if dc and dc.usesCourseplayIncrementalFleet and dc:usesCourseplayIncrementalFleet() then
             local veh = dc.moduleCache and dc.moduleCache.vehicles
+            local farmId = tonumber(fd.farmId) or 1
             if type(veh) == "table" then
                 for _, row in ipairs(veh) do
-                    fd.vehicles.count = fd.vehicles.count + 1
-                    local price = tonumber(row and row.price) or 0
-                    fd.vehicles.totalValue = fd.vehicles.totalValue + price
+                    local owner = tonumber(row and (row.ownerFarmId or row.farmId))
+                    if owner == nil or owner == farmId then
+                        fd.vehicles.count = fd.vehicles.count + 1
+                        local price = tonumber(row and (row.sellValue or row.sellPrice or row.price)) or 0
+                        fd.vehicles.totalValue = fd.vehicles.totalValue + price
+                    end
                 end
             end
             fd.totalAssets = fd.money + fd.vehicles.totalValue

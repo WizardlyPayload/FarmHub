@@ -1,4 +1,4 @@
-﻿-- FS25 FarmDashboard | FieldDataCollector.lua | v2.1.0
+-- FS25 FarmDashboard | FieldDataCollector.lua | v2.1.0
 
 FieldDataCollector = {}
 
@@ -15,6 +15,75 @@ local _pool_windByIdx = {}
 local _pool_moistureByFarm = {}
 
 local MOISTURE_WORST_MAX = 24
+
+--- Perennial mowable forage (grass, meadow, alfalfa, clover, mod variants) — mower not grain combine.
+local function isMowableForageFruitName(name)
+    if name == nil or name == "" then return false end
+    local u = string.upper(tostring(name))
+    if u == "GRASS" or u == "MEADOW" or u == "ALFALFA" or u == "CLOVER" then return true end
+    if string.find(u, "CLOVER", 1, true) then return true end
+    if string.find(u, "MEADOW", 1, true) then return true end
+    if string.find(u, "ALFALFA", 1, true) then
+        if string.find(u, "WINDROW", 1, true) or string.find(u, "BALE", 1, true) then
+            return false
+        end
+        return true
+    end
+    return false
+end
+
+--- FieldGroundType enum ordinals (scripts/field/FieldGroundType.lua).
+--- FieldState.groundType is the enum, not the densmap encoded value.
+--- NONE=1 must not be treated as prepared tillage.
+local FD_GROUND_TYPE_NAME = {
+    [1] = "NONE",
+    [2] = "STUBBLE_TILLAGE",
+    [3] = "CULTIVATED",
+    [4] = "SEEDBED",
+    [5] = "PLOWED",
+    [6] = "ROLLED_SEEDBED",
+    [7] = "RIDGE",
+    [8] = "SOWN",
+    [9] = "DIRECT_SOWN",
+    [10] = "PLANTED",
+    [11] = "RIDGE_SOWN",
+    [12] = "ROLLER_LINES",
+    [13] = "HARVEST_READY",
+    [14] = "HARVEST_READY_OTHER",
+    [15] = "GRASS",
+    [16] = "GRASS_CUT",
+}
+
+local function isPreparedSeedbedGroundValue(gType)
+    local g = tonumber(gType) or 0
+    local FGT = rawget(_G, "FieldGroundType")
+    local first = (type(FGT) == "table" and tonumber(FGT.STUBBLE_TILLAGE)) or 2
+    local last = (type(FGT) == "table" and tonumber(FGT.RIDGE)) or 7
+    return g >= first and g <= last
+end
+
+local function clearPhantomCropOnPreparedGround(fData)
+    if not fData or not isPreparedSeedbedGroundValue(fData.groundType) then return false end
+    if (fData.fruitTypeIndex or 0) == 0 and (fData.growthState or 0) == 0 then
+        return false
+    end
+    -- Cultivator/plow set prepared ground; fruit density can still report MEADOW/GRASS (or stale arable).
+    fData.fruitTypeIndex = 0
+    fData.growthState = 0
+    fData.harvestReady = false
+    fData.isWithered = false
+    fData.isHarvested = false
+    fData.growthLabel = "empty"
+    fData.stateName = "Cultivated"
+    fData.growthStateName = nil
+    fData.grassRingStage = nil
+    return true
+end
+
+--- FS25 spinach: two-cut vegetable (harvest → regrow → 2nd harvest → done). Not grass, not one-shot arable.
+local function isSpinachFruitName(name)
+    return string.upper(tostring(name or "")) == "SPINACH"
+end
 
 local function _newMoistureFarmRow()
     return {
@@ -55,17 +124,497 @@ local function _fillTypeNameForIndex(fillTypeIndex)
     return tostring(fillTypeIndex)
 end
 
-local function _attachFieldMoisture(fData, cx, cz)
+--- Shared 15-point field sample ring: center + inner 8 + outer 6 (unit fractions × radius).
+--- Farmland-guarded iterators skip neighbour parcels. Windrow keeps its denser size-scaled grid.
+local FIELD_SAMPLE_RING = {
+    {0, 0},
+    -- inner 8 (cardinals + diagonals)
+    {0.4, 0}, {-0.4, 0}, {0, 0.4}, {0, -0.4},
+    {0.28, 0.28}, {-0.28, -0.28}, {0.28, -0.28}, {-0.28, 0.28},
+    -- outer 6 (hexagon)
+    {0.75, 0}, {-0.75, 0},
+    {0.375, 0.65}, {-0.375, 0.65},
+    {0.375, -0.65}, {-0.375, -0.65},
+}
+
+local function _fieldSampleRadiusM(fieldAreaSqm)
+    local r = math.sqrt(math.max(1, tonumber(fieldAreaSqm) or 1) / math.pi)
+    return math.max(10, math.min(r, 90))
+end
+
+--- Compact field outline for the desktop map (LiveMap-style shapes, not a densmap dump).
+--- Engine: Field.densityMapPolygon is world X/Z from map polygon nodes
+--- (`DensityMapPolygon:updateFromNodes` / `:getVerticesList`). Cap vertices so data.json
+--- stays small — do not export the full ring.
+local FIELD_OUTLINE_MAX_POINTS = 64
+
+local function _round1(n)
+    return math.floor((tonumber(n) or 0) * 10 + 0.5) / 10
+end
+
+--- Linear 0–1 channel to sRGB 0–255 (IEC 61966-2-1). FruitTypeDesc.defaultMapColor is Color.r/g/b.
+local function _linearChannelToSrgbByte(c)
+    c = tonumber(c) or 0
+    if c < 0 then
+        c = 0
+    elseif c > 1 then
+        c = 1
+    end
+    local s
+    if c > 0.0031308 then
+        s = 1.055 * (c ^ (1 / 2.4)) - 0.055
+    else
+        s = 12.92 * c
+    end
+    local b = math.floor(s * 255 + 0.5)
+    if b < 0 then
+        return 0
+    end
+    if b > 255 then
+        return 255
+    end
+    return b
+end
+
+local function _fruitMapColorHex(fruitTypeIndex)
+    local idx = tonumber(fruitTypeIndex) or 0
+    if idx <= 0 then
+        return nil
+    end
+    local mgr = _G.g_fruitTypeManager
+    if type(mgr) ~= "table" or type(mgr.getFruitTypeByIndex) ~= "function" then
+        return nil
+    end
+    local desc = mgr:getFruitTypeByIndex(idx)
+    local col = desc and desc.defaultMapColor
+    if type(col) ~= "table" then
+        return nil
+    end
+    return string.format(
+        "#%02X%02X%02X",
+        _linearChannelToSrgbByte(col.r),
+        _linearChannelToSrgbByte(col.g),
+        _linearChannelToSrgbByte(col.b)
+    )
+end
+
+local function _compactFieldOutline(field)
+    if type(field) ~= "table" then
+        return nil
+    end
+    local xs, zs = {}, {}
+    local poly = field.densityMapPolygon
+    --- LiveMap: raw pointsX/pointsZ are already world X/Z from DensityMapPolygon:updateFromNodes
+    --- (`getWorldTranslation`). Prefer that over getVerticesList (origin/scale).
+    if type(poly) == "table" and type(poly.pointsX) == "table" and type(poly.pointsZ) == "table" then
+        local n = math.min(#poly.pointsX, #poly.pointsZ)
+        for i = 1, n do
+            local x, z = tonumber(poly.pointsX[i]), tonumber(poly.pointsZ[i])
+            if x and z then
+                xs[#xs + 1] = x
+                zs[#zs + 1] = z
+            end
+        end
+    end
+    if #xs < 3 and type(poly) == "table" and type(poly.getVerticesList) == "function" then
+        local ok, list = pcall(function()
+            return poly:getVerticesList()
+        end)
+        if ok and type(list) == "table" then
+            xs, zs = {}, {}
+            for i = 1, #list - 1, 2 do
+                local x, z = tonumber(list[i]), tonumber(list[i + 1])
+                if x and z then
+                    xs[#xs + 1] = x
+                    zs[#zs + 1] = z
+                end
+            end
+        end
+    end
+    if #xs < 3 and type(field.polygonPoints) == "table" then
+        xs, zs = {}, {}
+        for i = 1, #field.polygonPoints do
+            local ok, x, _, z = pcall(getWorldTranslation, field.polygonPoints[i])
+            if ok and type(x) == "number" and type(z) == "number" then
+                xs[#xs + 1] = x
+                zs[#zs + 1] = z
+            end
+        end
+    end
+    local n = #xs
+    if n < 3 then
+        return nil
+    end
+    if n >= 4 then
+        local dx = (xs[1] or 0) - (xs[n] or 0)
+        local dz = (zs[1] or 0) - (zs[n] or 0)
+        if (dx * dx + dz * dz) < 0.25 then
+            n = n - 1
+        end
+    end
+    local step = 1
+    if n > FIELD_OUTLINE_MAX_POINTS then
+        step = math.ceil(n / FIELD_OUTLINE_MAX_POINTS)
+    end
+    local out = {}
+    for i = 1, n, step do
+        out[#out + 1] = { _round1(xs[i]), _round1(zs[i]) }
+    end
+    if ((n - 1) % step) ~= 0 then
+        out[#out + 1] = { _round1(xs[n]), _round1(zs[n]) }
+    end
+    if #out < 3 then
+        return nil
+    end
+    return out
+end
+
+--- GPS / worker menu outlines are NOT the map i3d polygon. AISettingsDialog draws
+--- FieldCourseField.fieldRootBoundary after BoundaryDetectionTask walks
+--- `getDensityAtWorldPos(terrainDetailId) ~= 0` (painted ground). Merged and
+--- extended fields are one connected painted blob. Static Field.densityMapPolygon
+--- never updates. Call that engine task (not a homemade walker), then cap verts.
+local PAINTED_OUTLINE_MAX_PUMPS = 400
+local PAINTED_OUTLINE_FRAME_BUDGET = 0.008
+
+local function _terrainDetailOnField(x, z)
+    local mission = _G.g_currentMission
+    if type(mission) ~= "table" then
+        return false
+    end
+    local id = mission.terrainDetailId
+    if id == nil or id == 0 then
+        return false
+    end
+    local ok, v = pcall(getDensityAtWorldPos, id, x, 0, z)
+    return ok and v ~= nil and v ~= 0
+end
+
+local function _paintedFieldResolutionM()
+    local mission = _G.g_currentMission
+    local size = tonumber(mission and mission.terrainSize) or 2048
+    local mapSize = tonumber(mission and mission.terrainDetailMapSize) or 1024
+    if mapSize < 8 then
+        mapSize = 1024
+    end
+    local res = size / mapSize
+    if res < 0.25 then
+        res = 0.25
+    end
+    return res
+end
+
+local function _snapTerrainPixel(x, z, res)
+    return math.floor(x / res + 0.5) * res, math.floor(z / res + 0.5) * res
+end
+
+local function _snapCoursePixel(x, z)
+    local mgr = _G.g_fieldCourseManager
+    if mgr and type(mgr.roundToTerrainDetailPixel) == "function" then
+        local ok, nx, nz = pcall(function()
+            return mgr:roundToTerrainDetailPixel(x, z)
+        end)
+        if ok and nx ~= nil and nz ~= nil then
+            return nx, nz
+        end
+    end
+    return _snapTerrainPixel(x, z, _paintedFieldResolutionM())
+end
+
+local function _downsampleXZ(xs, zs, maxPoints)
+    local n = #xs
+    if n < 3 or n ~= #zs then
+        return nil
+    end
+    if n >= 4 then
+        local dx = (xs[1] or 0) - (xs[n] or 0)
+        local dz = (zs[1] or 0) - (zs[n] or 0)
+        if (dx * dx + dz * dz) < 0.25 then
+            n = n - 1
+        end
+    end
+    local step = 1
+    if n > maxPoints then
+        step = math.ceil(n / maxPoints)
+    end
+    local out = {}
+    for i = 1, n, step do
+        out[#out + 1] = { _round1(xs[i]), _round1(zs[i]) }
+    end
+    if ((n - 1) % step) ~= 0 then
+        out[#out + 1] = { _round1(xs[n]), _round1(zs[n]) }
+    end
+    if #out < 3 then
+        return nil
+    end
+    return out
+end
+
+local function _outlineFromBoundaryPositions(pts)
+    if type(pts) ~= "table" or #pts < 8 then
+        return nil
+    end
+    local FU = _G.FieldCourseUtil
+    if type(FU) == "table" then
+        pcall(function()
+            if type(FU.pointAveragePositions) == "function" then
+                FU.pointAveragePositions(pts)
+            end
+            if type(FU.douglasPeucker) == "function" then
+                FU.douglasPeucker(pts, 0.5)
+            end
+        end)
+    end
+    local xs, zs = {}, {}
+    for i = 1, #pts do
+        local p = pts[i]
+        if type(p) == "table" then
+            xs[#xs + 1] = p[1]
+            zs[#zs + 1] = p[2]
+        end
+    end
+    return _downsampleXZ(xs, zs, FIELD_OUTLINE_MAX_POINTS)
+end
+
+local function _outlineAreaSqm(outline)
+    local n = type(outline) == "table" and #outline or 0
+    if n < 3 then
+        return nil
+    end
+    local sum = 0
+    for i = 1, n do
+        local j = i % n + 1
+        local a, b = outline[i], outline[j]
+        local x1, z1 = tonumber(a and a[1]), tonumber(a and a[2])
+        local x2, z2 = tonumber(b and b[1]), tonumber(b and b[2])
+        if x1 and z1 and x2 and z2 then
+            sum = sum + (x1 * z2 - x2 * z1)
+        end
+    end
+    return math.abs(sum) * 0.5
+end
+
+local function _outlineBlobKey(outline)
+    local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+    for i = 1, #outline do
+        local p = outline[i]
+        local x, z = tonumber(p and p[1]), tonumber(p and p[2])
+        if x and z then
+            if x < minX then minX = x end
+            if x > maxX then maxX = x end
+            if z < minZ then minZ = z end
+            if z > maxZ then maxZ = z end
+        end
+    end
+    if minX == math.huge then
+        return nil
+    end
+    local function q(n)
+        return math.floor(n / 8 + 0.5) * 8
+    end
+    return string.format("b:%d:%d:%d:%d", q(minX), q(minZ), q(maxX), q(maxZ))
+end
+
+--- Painted GPS outline is the live field. Keep map i3d hectares only when the
+--- walk is clearly too small (failed contour), so cards and stats match the blob.
+local function _applyPaintedFieldMetrics(fData, outline, mapHa)
+    if type(fData) ~= "table" or type(outline) ~= "table" then
+        return
+    end
+    local key = _outlineBlobKey(outline)
+    if key then
+        fData.paintedBlobKey = key
+    end
+    local sqm = _outlineAreaSqm(outline)
+    if not sqm or sqm < 50 then
+        return
+    end
+    local paintedHa = sqm / 10000
+    local map = tonumber(mapHa) or 0
+    if map > 0.05 and paintedHa < map * 0.85 then
+        return
+    end
+    fData.mapHectares = map
+    fData.hectares = math.floor(paintedHa * 100 + 0.5) / 100
+    fData.fieldAreaInSqm = sqm
+end
+
+--- Same rice polygon GPS uses when the cursor is in a rice placeable.
+local function _riceFieldOutline(x, z)
+    local PR = _G.PlaceableRiceField
+    if type(PR) ~= "table" or type(PR.getRiceFieldAtPosition) ~= "function" then
+        return nil
+    end
+    local y = 0
+    local terrain = _G.g_terrainNode
+    if terrain ~= nil then
+        local okY, hy = pcall(getTerrainHeightAtWorldPos, terrain, x, 0, z)
+        if okY and type(hy) == "number" then
+            y = hy
+        end
+    end
+    local ok, _, _, _, riceField = pcall(function()
+        return PR.getRiceFieldAtPosition(x, y, z)
+    end)
+    if not ok or type(riceField) ~= "table" or type(riceField.polygon) ~= "table" then
+        return nil
+    end
+    local poly = riceField.polygon
+    if type(poly.getNumVertices) ~= "function" or type(poly.getVertex) ~= "function" then
+        return nil
+    end
+    local okN, numVerts = pcall(function()
+        return poly:getNumVertices()
+    end)
+    if not okN or type(numVerts) ~= "number" or numVerts < 3 then
+        return nil
+    end
+    local xs, zs = {}, {}
+    for i = 1, numVerts do
+        local okV, vx, vz = pcall(function()
+            return poly:getVertex(i)
+        end)
+        if okV and vx ~= nil and vz ~= nil then
+            xs[#xs + 1] = vx
+            zs[#zs + 1] = vz
+        end
+    end
+    return _downsampleXZ(xs, zs, FIELD_OUTLINE_MAX_POINTS)
+end
+
+local function _pumpBoundaryDetectionTask(task, yieldFn)
+    local pumps = 0
+    while pumps < PAINTED_OUTLINE_MAX_PUMPS do
+        pumps = pumps + 1
+        local okU, cont = pcall(function()
+            return task:update(16, PAINTED_OUTLINE_FRAME_BUDGET)
+        end)
+        if not okU then
+            return false
+        end
+        if cont ~= true then
+            return true
+        end
+        if type(yieldFn) == "function" then
+            yieldFn()
+        end
+    end
+    return false
+end
+
+local function _newBoundaryDetectionTask(x, z)
+    local BDT = _G.BoundaryDetectionTask
+    if type(BDT) ~= "table" or type(BDT.new) ~= "function" then
+        return nil
+    end
+    local ok, task = pcall(BDT.new, x, z)
+    if ok and type(task) == "table" and type(task.update) == "function" then
+        return task
+    end
+    return nil
+end
+
+--- Engine GPS boundary at a painted pixel. Yields while the task still has budget left.
+local function _detectGpsFieldBoundary(startX, startZ, yieldFn)
+    local rice = _riceFieldOutline(startX, startZ)
+    if type(rice) == "table" and #rice >= 3 then
+        return rice
+    end
+    local sx, sz = _snapCoursePixel(tonumber(startX) or 0, tonumber(startZ) or 0)
+    local candidates = { { sx, sz } }
+    local res = _paintedFieldResolutionM()
+    local radius = math.max(res * 8, 8)
+    for _, off in ipairs(FIELD_SAMPLE_RING) do
+        local cx = sx + (off[1] or 0) * radius
+        local cz = sz + (off[2] or 0) * radius
+        cx, cz = _snapCoursePixel(cx, cz)
+        candidates[#candidates + 1] = { cx, cz }
+    end
+    for i = 1, #candidates do
+        local px, pz = candidates[i][1], candidates[i][2]
+        if _terrainDetailOnField(px, pz) then
+            local task = _newBoundaryDetectionTask(px, pz)
+            if task ~= nil and _pumpBoundaryDetectionTask(task, yieldFn) then
+                local painted = _outlineFromBoundaryPositions(task.boundaryPositions)
+                if type(painted) == "table" and #painted >= 3 then
+                    return painted
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function _fieldOutlineForMap(field, cx, cz, yieldFn, isOwned)
+    if isOwned then
+        local painted = _detectGpsFieldBoundary(cx, cz, yieldFn)
+        if type(painted) == "table" and #painted >= 3 then
+            return painted, true
+        end
+    end
+    local ok, outline = pcall(_compactFieldOutline, field)
+    if ok and type(outline) == "table" and #outline >= 3 then
+        return outline, false
+    end
+    return nil, false
+end
+
+local function _sampleOnFarmlandId(sx, sz, myFarmlandId)
+    if not myFarmlandId then return true end
+    local fmgr = _G.g_farmlandManager
+    if not fmgr or type(fmgr.getFarmlandAtWorldPosition) ~= "function" then
+        return true
+    end
+    local ok, fm = pcall(function()
+        return fmgr:getFarmlandAtWorldPosition(sx, sz)
+    end)
+    if not ok or not fm then return false end
+    return fm.id == myFarmlandId
+end
+
+--- Call `fn(sx, sz, isCenter)` for each farmland-valid ring point. Probe failures belong in `fn` (pcall).
+local function _forEachFieldSampleRing(cx, cz, radiusM, farmlandId, fn)
+    if type(fn) ~= "function" or not cx or not cz then return end
+    local r = tonumber(radiusM) or 20
+    for i, off in ipairs(FIELD_SAMPLE_RING) do
+        local sx = cx + off[1] * r
+        local sz = cz + off[2] * r
+        if _sampleOnFarmlandId(sx, sz, farmlandId) then
+            fn(sx, sz, i == 1)
+        end
+    end
+end
+
+--- Average MoistureSystem samples over the 15-point ring. No-op if MoistureSystem absent.
+local function _attachFieldMoisture(fData, cx, cz, fieldAreaSqm, farmlandId)
     if not fData or not cx or not cz then return end
     local ms = _G.g_currentMission and _G.g_currentMission.MoistureSystem
     if not ms or not ms.getMoistureAtPosition then return end
-    local ok, mFrac = pcall(function() return ms:getMoistureAtPosition(cx, cz) end)
-    if not ok or mFrac == nil then return end
-    local pct = math.floor((tonumber(mFrac) or 0) * 1000 + 0.5) / 10
-    local block = { enabled = true, percent = pct }
+    local radius = _fieldSampleRadiusM(fieldAreaSqm or fData.fieldAreaInSqm)
+    local sum, n, minF, maxF = 0, 0, nil, nil
+    _forEachFieldSampleRing(cx, cz, radius, farmlandId, function(sx, sz)
+        local ok, mFrac = pcall(function() return ms:getMoistureAtPosition(sx, sz) end)
+        if not ok or mFrac == nil then return end
+        local v = tonumber(mFrac)
+        if v == nil then return end
+        sum = sum + v
+        n = n + 1
+        if minF == nil or v < minF then minF = v end
+        if maxF == nil or v > maxF then maxF = v end
+    end)
+    if n == 0 then return end
+    local mFrac = sum / n
+    local pct = math.floor(mFrac * 1000 + 0.5) / 10
+    local block = {
+        enabled = true,
+        percent = pct,
+        minPercent = math.floor((minF or mFrac) * 1000 + 0.5) / 10,
+        maxPercent = math.floor((maxF or mFrac) * 1000 + 0.5) / 10,
+        sampleCount = n,
+    }
     local fi = tonumber(fData.fruitTypeIndex) or 0
     if fi > 0 and _G.CropValueMap and _G.CropValueMap.getGrade then
-        local okG, grade = pcall(function() return _G.CropValueMap.getGrade(fi, tonumber(mFrac) or 0) end)
+        local okG, grade = pcall(function() return _G.CropValueMap.getGrade(fi, mFrac) end)
         if okG and grade and FillTypeUtils.moistureGradeLetter then
             block.grade = FillTypeUtils.moistureGradeLetter(grade)
         elseif okG and grade then
@@ -144,7 +693,7 @@ end
 FieldDataCollector._windrowFillIdxCache = nil
 
 function FieldDataCollector:cacheWindrowFillTypeIndices()
-    local ftm = rawget(_G, "g_fillTypeManager")
+    local ftm = _G.g_fillTypeManager
     if not ftm or type(ftm.getFillTypeIndexByName) ~= "function" then
         return nil
     end
@@ -199,7 +748,7 @@ function FieldDataCollector.readCareerGameplayFlags()
         stonesEnabled   = true,
     }
 
-    local m = rawget(_G, "g_currentMission")
+    local m = _G.g_currentMission
     local xmlPath = m and farmDashJoinSavePath(m.missionInfo and m.missionInfo.savegameDirectory, "careerSavegame.xml")
     if xmlPath then
         local okLoad, fh = pcall(loadXMLFile, "FarmDashCareerGameplay", xmlPath)
@@ -217,7 +766,7 @@ function FieldDataCollector.readCareerGameplayFlags()
         out.plowingRequired = m.plowingRequiredEnabled == true
     end
 
-    local ggs = rawget(_G, "g_gameSettings")
+    local ggs = _G.g_gameSettings
     local GS = rawget(_G, "GameSettings")
     if ggs and type(ggs.getValue) == "function" and GS and GS.SETTING then
         for _, name in ipairs({ "PLOWING_REQUIRED", "PERIODIC_PLOWING", "PLOWING" }) do
@@ -388,6 +937,21 @@ function FieldDataCollector:collectBegin()
     end
 
     FieldDataCollector._smState = nil
+    FieldDataCollector._fieldStep = nil
+    local okCo, co = pcall(coroutine.create, function()
+        FieldDataCollector._yieldEvery = 8
+        FieldDataCollector._baleYieldStride = 24
+        FieldDataCollector._yieldBaleCounter = 0
+        local r = FieldDataCollector:_collectImpl()
+        FieldDataCollector._yieldEvery = nil
+        FieldDataCollector._baleYieldStride = nil
+        return r
+    end)
+    if okCo and co then
+        FieldDataCollector._fdCo = co
+        return
+    end
+
     FieldDataCollector._fdCo = nil
     FieldDataCollector._fieldStep = {
         fieldIds = {},
@@ -423,6 +987,25 @@ function FieldDataCollector:collectStep(opts)
         return true, result or {}
     end
 
+    if FieldDataCollector._fdCo then
+        local ok, a, b = coroutine.resume(FieldDataCollector._fdCo)
+        if not ok then
+            FieldDataCollector._fdCo = nil
+            FieldDataCollector._yieldEvery = nil
+            return true, {}
+        end
+        if a == "progress" then
+            return false, b
+        end
+        local stCo = coroutine.status(FieldDataCollector._fdCo)
+        if stCo == "dead" then
+            FieldDataCollector._fdCo = nil
+            FieldDataCollector._yieldEvery = nil
+            return true, a or {}
+        end
+        return false, b
+    end
+
     local st = FieldDataCollector._fieldStep
     if not st then
         return true, {}
@@ -435,7 +1018,8 @@ function FieldDataCollector:collectStep(opts)
         FieldDataCollector._runPreambleOnly = true
         FieldDataCollector:_collectImpl()
         FieldDataCollector._runPreambleOnly = nil
-        return false, st.fieldData or {}
+        -- nil payload: do not replace a complete fields cache with an empty preamble.
+        return false, nil
     end
 
     st.batchSize = math.max(1, tonumber(opts.batchSize) or 1)
@@ -502,6 +1086,7 @@ function FieldDataCollector:_collectImpl()
     local isPF
     local pfInstance
     local currentFarmId
+    local playerFarmIdSet
     local probeState
     local getFarmIdForParcel
 
@@ -516,6 +1101,7 @@ function FieldDataCollector:_collectImpl()
         isPF = ctx.isPF
         pfInstance = ctx.pfInstance
         currentFarmId = ctx.currentFarmId
+        playerFarmIdSet = ctx.playerFarmIdSet or {}
         probeState = ctx.probeState
         getFarmIdForParcel = ctx.getFarmIdForParcel
     else
@@ -541,6 +1127,23 @@ function FieldDataCollector:_collectImpl()
             currentFarmId = _G.g_currentMission:getFarmId()
         elseif _G.g_currentMission.player and _G.g_currentMission.player.farmId then
             currentFarmId = _G.g_currentMission.player.farmId
+        end
+        -- Dedicated / multi-farm: deep-probe every named player farm, not only the
+        -- authority's getFarmId() (often 0 or one online farm on dedicated).
+        playerFarmIdSet = {}
+        if InventoryScan and type(InventoryScan.collectPlayerFarmIds) == "function" then
+            local okIds, ids = pcall(function() return InventoryScan.collectPlayerFarmIds() end)
+            if okIds and type(ids) == "table" then
+                for _, fid in ipairs(ids) do
+                    local n = tonumber(fid)
+                    if n and n > 0 then
+                        playerFarmIdSet[n] = true
+                    end
+                end
+            end
+        end
+        if next(playerFarmIdSet) == nil and currentFarmId and currentFarmId > 0 then
+            playerFarmIdSet[currentFarmId] = true
         end
 
         probeState = nil
@@ -893,6 +1496,7 @@ function FieldDataCollector:_collectImpl()
                     local pid = fld.farmland and fld.farmland.id
                     if pid == parcelId then
                         local of = tonumber(fld.farmland and fld.farmland.farmId) or 0
+                        if playerFarmIdSet and playerFarmIdSet[of] then return true end
                         if of == currentFarmId then return true end
                     end
                 end
@@ -968,7 +1572,7 @@ function FieldDataCollector:_collectImpl()
                 end
             end
             --- Always merge bale manager list (round/round wrapped etc.), not only when items is missing.
-            local bm = rawget(_G, "g_baleManager")
+            local bm = _G.g_baleManager
             local list = nil
             if bm then
                 if type(bm.getBales) == "function" then
@@ -1078,6 +1682,7 @@ function FieldDataCollector:_collectImpl()
             isPF = isPF,
             pfInstance = pfInstance,
             currentFarmId = currentFarmId,
+            playerFarmIdSet = playerFarmIdSet,
             probeState = probeState,
             getFarmIdForParcel = getFarmIdForParcel,
         }
@@ -1110,7 +1715,11 @@ function FieldDataCollector:_collectImpl()
         if not field then
         else
         local ownerFarmId = field.farmland and field.farmland.farmId or 0
-        local isOwned = (ownerFarmId > 0 and ownerFarmId == currentFarmId)
+        -- Deep-probe all named player farms on dedicated/MP (not only getFarmId()).
+        local isOwned = ownerFarmId > 0 and (
+            (playerFarmIdSet and playerFarmIdSet[ownerFarmId] == true)
+            or ownerFarmId == currentFarmId
+        )
         local displayId = fieldId
         
         if field.farmland and field.farmland.id and field.farmland.id > 0 then
@@ -1150,8 +1759,10 @@ function FieldDataCollector:_collectImpl()
             stubbleLevel          = 0,
             sprayLevel            = 0,
             stoneLevel            = 0,
+            waterLevel            = 0,
             groundType            = 0,
             isPrecisionFarming    = isPF,
+            pfSoilTypeIndex       = 0,
             nitrogenLevel         = 0,
             targetNitrogen        = 0,
             phValue               = 0,
@@ -1194,16 +1805,19 @@ function FieldDataCollector:_collectImpl()
             if ok and x and z then cx, cz = x, z end
         end
 
+        local myFarmlandId = field.farmland and field.farmland.id or nil
+        local sampleRadius = _fieldSampleRadiusM(fData.fieldAreaInSqm)
+
         -- ====================================================================
-        -- 1. THE HYBRID PROBE 
+        -- 1. THE HYBRID PROBE (shared 15-point farmland-guarded ring)
         -- ====================================================================
         if not isOwned then
             -- [UNOWNED FIELDS]: Use the NPC Contract Planner (Saves CPU, highly accurate for AI)
             if probeState and type(probeState.update) == "function" then
                 local foundCrop = false
-                local offsets = { {0,0}, {5,5}, {-5,-5}, {5,-5}, {-5,5} }
-                for _, off in ipairs(offsets) do
-                    pcall(function() probeState:update(cx + off[1], cz + off[2]) end)
+                _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz)
+                    if foundCrop then return end
+                    pcall(function() probeState:update(sx, sz) end)
                     if probeState.fruitTypeIndex and probeState.fruitTypeIndex > 0 then
                         fData.fruitTypeIndex     = probeState.fruitTypeIndex
                         fData.growthState        = probeState.growthState or 0
@@ -1214,9 +1828,8 @@ function FieldDataCollector:_collectImpl()
                         fData.mulchLevel         = probeState.stubbleShredLevel or 0
                         fData.groundType         = probeState.groundType or 0
                         foundCrop = true
-                        break
                     end
-                end
+                end)
                 if not foundCrop then
                     pcall(function() probeState:update(cx, cz) end)
                     fData.fertilizationLevel = probeState.sprayLevel or 0
@@ -1228,18 +1841,15 @@ function FieldDataCollector:_collectImpl()
                 end
             end
         else
-            -- [OWNED FIELDS]: Use the same FieldState world sampling as unowned/NPC fields.
-            -- HUD (fieldInfoSystem.getFieldInfoAtWorldPosition) + getFruitTypeIndexAtWorldPos(2-arg)
-            -- were giving stale data for player farmland; FieldState:update matches FieldManager / map.
-            local offsets = { {0,0}, {5,5}, {-5,-5}, {5,-5}, {-5,5}, {10,0}, {-10,0}, {0,10}, {0,-10} }
+            -- [OWNED FIELDS]: Prefer center crop; max weed across ring. FieldState:update matches FieldManager / map.
             local foundCrop = false
 
             if probeState and type(probeState.update) == "function" then
                 local maxWeed = 0
-                for _, off in ipairs(offsets) do
-                    pcall(function() probeState:update(cx + off[1], cz + off[2]) end)
+                _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz, isCenter)
+                    pcall(function() probeState:update(sx, sz) end)
                     if probeState.fruitTypeIndex and probeState.fruitTypeIndex > 0 then
-                        if off[1] == 0 and off[2] == 0 then
+                        if isCenter then
                             fData.fruitTypeIndex     = probeState.fruitTypeIndex
                             fData.growthState        = probeState.growthState or 0
                             fData.fertilizationLevel = probeState.sprayLevel or 0
@@ -1261,7 +1871,7 @@ function FieldDataCollector:_collectImpl()
                         local w = tonumber(probeState.weedState) or 0
                         if w > maxWeed then maxWeed = w end
                     end
-                end
+                end)
                 if foundCrop then
                     fData.weedLevel = maxWeed
                 else
@@ -1311,36 +1921,17 @@ function FieldDataCollector:_collectImpl()
             local fi = fData.fruitTypeIndex or 0
             if fi > 0 and _G.g_fruitTypeManager and probeState and type(probeState.update) == "function" then
                 local ftd = _G.g_fruitTypeManager:getFruitTypeByIndex(fi)
-                if ftd and string.upper(tostring(ftd.name or "")) == "GRASS" then
-                    local myFarmlandId = field.farmland and field.farmland.id or nil
-                    local function sampleOnThisFarmland(sx, sz)
-                        if not myFarmlandId or not _G.g_farmlandManager or not _G.g_farmlandManager.getFarmlandAtWorldPosition then
-                            return true
-                        end
-                        local ok, fm = pcall(function()
-                            return _G.g_farmlandManager:getFarmlandAtWorldPosition(sx, sz)
-                        end)
-                        if not ok or not fm then return false end
-                        return fm.id == myFarmlandId
-                    end
-                    local grassOffsets = {
-                        {0, 0}, {5, 5}, {-5, -5}, {5, -5}, {-5, 5},
-                        {12, 0}, {-12, 0}, {0, 12}, {0, -12},
-                        {20, 0}, {-20, 0}, {0, 20}, {0, -20},
-                    }
+                if ftd and isMowableForageFruitName(ftd.name) then
                     local centerGs, localMin, localMax = nil, nil, nil
-                    for _, off in ipairs(grassOffsets) do
-                        local sx, sz = cx + off[1], cz + off[2]
-                        if sampleOnThisFarmland(sx, sz) then
-                            pcall(function() probeState:update(sx, sz) end)
-                            local g = probeState.growthState
-                            if g ~= nil and probeState.fruitTypeIndex == fi then
-                                if off[1] == 0 and off[2] == 0 then centerGs = g end
-                                if localMin == nil or g < localMin then localMin = g end
-                                if localMax == nil or g > localMax then localMax = g end
-                            end
+                    _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz, isCenter)
+                        pcall(function() probeState:update(sx, sz) end)
+                        local g = probeState.growthState
+                        if g ~= nil and probeState.fruitTypeIndex == fi then
+                            if isCenter then centerGs = g end
+                            if localMin == nil or g < localMin then localMin = g end
+                            if localMax == nil or g > localMax then localMax = g end
                         end
-                    end
+                    end)
                     if localMin ~= nil then
                         local spread = (localMax or localMin) - localMin
                         if (localMax or localMin) > GRASS_GROWTH_STAGES or spread >= 2 then
@@ -1355,58 +1946,31 @@ function FieldDataCollector:_collectImpl()
             end
         end
 
-        -- 1b. No crop on probe: center read often misses mulched stubble â€” max stubble across offsets on this farmland
+        -- 1b. No crop on probe: center read often misses mulched stubble — max stubble across ring on this farmland
         local mulchBefore1b = fData.mulchLevel or 0
         if (fData.fruitTypeIndex or 0) == 0 then
-            local soilOffsets = {
-                {0, 0}, {5, 5}, {-5, -5}, {5, -5}, {-5, 5},
-                {10, 0}, {-10, 0}, {0, 10}, {0, -10},
-                {20, 0}, {-20, 0}, {0, 20}, {0, -20},
-                {15, 15}, {-15, -15}
-            }
-            local myFarmlandId = field.farmland and field.farmland.id or nil
-            local function sampleOnThisFarmland(sx, sz)
-                if not myFarmlandId or not _G.g_farmlandManager or not _G.g_farmlandManager.getFarmlandAtWorldPosition then
-                    return true
-                end
-                local ok, fm = pcall(function()
-                    return _G.g_farmlandManager:getFarmlandAtWorldPosition(sx, sz)
-                end)
-                if not ok or not fm then return false end
-                return fm.id == myFarmlandId
-            end
             local maxMulch = mulchBefore1b
             if probeState and type(probeState.update) == "function" then
-                for _, off in ipairs(soilOffsets) do
-                    local sx, sz = cx + off[1], cz + off[2]
-                    if sampleOnThisFarmland(sx, sz) then
-                        pcall(function() probeState:update(sx, sz) end)
-                        local m = probeState.stubbleShredLevel or 0
-                        if m > maxMulch then maxMulch = m end
-                    end
-                end
+                _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz)
+                    pcall(function() probeState:update(sx, sz) end)
+                    local m = probeState.stubbleShredLevel or 0
+                    if m > maxMulch then maxMulch = m end
+                end)
             end
             if field.fieldState and type(field.fieldState.update) == "function" then
-                for _, off in ipairs(soilOffsets) do
-                    local sx, sz = cx + off[1], cz + off[2]
-                    if sampleOnThisFarmland(sx, sz) then
-                        pcall(function() field.fieldState:update(sx, sz) end)
-                        local fs = field.fieldState
-                        local m = fs and fs.stubbleShredLevel or 0
-                        if m > maxMulch then maxMulch = m end
-                    end
-                end
+                _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz)
+                    pcall(function() field.fieldState:update(sx, sz) end)
+                    local fs = field.fieldState
+                    local m = fs and fs.stubbleShredLevel or 0
+                    if m > maxMulch then maxMulch = m end
+                end)
             end
             fData.mulchLevel = maxMulch
         end
 
-        -- 1c. Roller: sample multiple points â€” use worst (least rolled) so one rolled strip does not clear the flag.
+        -- 1c. Roller: sample ring — use worst (least rolled) so one rolled strip does not clear the flag.
         do
             local minRolled = 1
-            local rollerOffsets = {
-                {0, 0}, {5, 5}, {-5, -5}, {5, -5}, {-5, 5},
-                {10, 0}, {-10, 0}, {0, 10}, {0, -10},
-            }
             local function sampleRollerAt(px, pz)
                 local raw = 0
                 if field.fieldState and type(field.fieldState.update) == "function" then
@@ -1419,47 +1983,53 @@ function FieldDataCollector:_collectImpl()
                 local rolled = rollerLevelAsRolledFraction(raw)
                 if rolled < minRolled then minRolled = rolled end
             end
-            for _, off in ipairs(rollerOffsets) do
-                sampleRollerAt(cx + off[1], cz + off[2])
-            end
+            _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz)
+                sampleRollerAt(sx, sz)
+            end)
             fData.rollerLevel = minRolled
         end
 
-        -- 1e. Stones: worst `stoneLevel` across samples (FieldState â€” matches in-field map / work flags).
+        -- 1e. Stones: worst `stoneLevel` across ring (FieldState — matches in-field map / work flags).
+        -- Watered overlay uses the same probe (FieldState.waterLevel) so we do not walk the ring twice.
         do
             local maxStone = 0
-            local stoneOffsets = {
-                {0, 0}, {5, 5}, {-5, -5}, {5, -5}, {-5, 5},
-                {10, 0}, {-10, 0}, {0, 10}, {0, -10},
-            }
+            local maxWater = 0
+            local function takeWater(st)
+                if not st then return end
+                local w = tonumber(st.waterLevel)
+                if w and w > maxWater then maxWater = w end
+            end
             if probeState and type(probeState.update) == "function" then
-                for _, off in ipairs(stoneOffsets) do
-                    pcall(function() probeState:update(cx + off[1], cz + off[2]) end)
+                _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz)
+                    pcall(function() probeState:update(sx, sz) end)
                     local sl = readStoneFromState(probeState)
                     if sl > maxStone then maxStone = sl end
-                end
+                    takeWater(probeState)
+                end)
             end
             if field.fieldState and type(field.fieldState.update) == "function" then
-                for _, off in ipairs(stoneOffsets) do
-                    pcall(function() field.fieldState:update(cx + off[1], cz + off[2]) end)
+                _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz)
+                    pcall(function() field.fieldState:update(sx, sz) end)
                     local sl = readStoneFromState(field.fieldState)
                     if sl > maxStone then maxStone = sl end
-                end
+                    takeWater(field.fieldState)
+                end)
             end
             fData.stoneLevel = maxStone
+            fData.waterLevel = maxWater
         end
 
-        -- Engine GroundType cache: only adjust "visual dirt" when there is NO crop.
-        -- If we clobber growthState with groundType while fruit is planted, rolling / stage-1 tasks
-        -- disagree with the in-game field map (e.g. field still shows "needs rolling").
-        local gType = fData.groundType
-        if (fData.fruitTypeIndex or 0) == 0 then
-            if gType == 3 or gType == 4 then
-                if fData.growthState == 0 then fData.growthState = 1 end
+        -- Prepared seedbed (maps_fieldGround.xml values 1–6): clear stale fruit (e.g. MEADOW after cultivate).
+        -- Do NOT invent growthState>0 here — that made empty tilled parcels show as "Growing".
+        clearPhantomCropOnPreparedGround(fData)
+        do
+            local gNum = tonumber(fData.groundType) or 0
+            fData.groundTypeName = FD_GROUND_TYPE_NAME[gNum]
+            if (fData.fruitTypeIndex or 0) == 0 and isPreparedSeedbedGroundValue(gNum) then
+                fData.growthState = 0
                 fData.harvestReady = false
-            elseif gType == 1 or gType == 2 then
-                fData.growthState  = 0
-                fData.harvestReady = false
+                fData.growthLabel = "empty"
+                fData.stateName = "Cultivated"
             end
         end
 
@@ -1474,13 +2044,14 @@ function FieldDataCollector:_collectImpl()
                 fData.maxGrowthState = fData.engineNumGrowthStates
                 local ftUpper = string.upper(tostring(fData.fruitType or ""))
                 -- Grass: map/UI has exactly GRASS_GROWTH_STAGES; engine index range can be larger (mown / internal).
-                if ftUpper == "GRASS" and fData.maxGrowthState > GRASS_GROWTH_STAGES then
+                if isMowableForageFruitName(ftUpper) and fData.maxGrowthState > GRASS_GROWTH_STAGES then
                     fData.maxGrowthState = GRASS_GROWTH_STAGES
                 end
                 local gs             = fData.growthState
                 local gsName         = ftDesc.growthStateToName and ftDesc.growthStateToName[gs]
                 local gsNameLower    = gsName and string.lower(tostring(gsName)) or nil
-                
+                fData.growthStateName = gsName
+
                 local minHarvest = ftDesc.minHarvestingGrowthState or fData.maxGrowthState
                 local maxHarvest = ftDesc.maxHarvestingGrowthState or fData.maxGrowthState
                 local maxStateToShow = minHarvest
@@ -1491,10 +2062,12 @@ function FieldDataCollector:_collectImpl()
                 -- Grass is perennial: do not use arable "withered" / over-max rules (regrowth confuses them).
                 -- Withered: trust the engine name only. `gs > maxHarvestingGrowthState` matches post-harvest /
                 -- stubble / extra engine stages (e.g. maize gs 10 vs max harvest 7) and must NOT imply withered.
-                local isWitheredState = (gsName == "withered")
+                local isWitheredState = (gsName == "withered" or gsName == "dead")
                 local isPostHarvestState = false
-                if ftUpper ~= "GRASS" and gsNameLower then
-                    if gsNameLower == "harvested"
+                if not isMowableForageFruitName(ftUpper) and gsNameLower then
+                    -- Spinach first-cut "harvested" regenerates — handled in spinach override below.
+                    if (not isSpinachFruitName(ftUpper) and gsNameLower == "harvested")
+                        or gsNameLower == "harvestedsecond"
                         or gsNameLower == "cut"
                         or gsNameLower == "mown"
                         or gsNameLower == "mowed"
@@ -1510,27 +2083,29 @@ function FieldDataCollector:_collectImpl()
                 --- often remain harvestable (previously stayed "growing" at e.g. gs 10 vs maxHarvest 9).
                 local numGs = ftDesc.numGrowthStates or fData.maxGrowthState or 0
                 local inHarvestWindow = false
-                if ftUpper ~= "GRASS" and ftDesc.minHarvestingGrowthState then
+                if not isMowableForageFruitName(ftUpper) and not isSpinachFruitName(ftUpper) and ftDesc.minHarvestingGrowthState then
                     if gs >= minHarvest and gs <= maxHarvest then
                         inHarvestWindow = (gs == maxHarvest)
                     elseif gs > maxHarvest and numGs > 0 and gs <= numGs and not isWitheredState then
                         inHarvestWindow = true
                     end
                 end
+                local isHarvestReadyNamed = (gsName == "harvestReady" or gsName == "harvestReadySecond"
+                    or (gsNameLower ~= nil and gsNameLower:find("^harvestready", 1) ~= nil))
                 if isPostHarvestState then
                     fData.isHarvested  = true
                     fData.harvestReady = false
                     fData.growthLabel  = "harvested"
                     fData.stateName    = "Harvested"
-                elseif ftUpper ~= "GRASS" and isWitheredState then
+                elseif not isMowableForageFruitName(ftUpper) and isWitheredState then
                     fData.isWithered   = true
                     fData.growthLabel  = "withered"
                     fData.stateName    = "Withered"
                     fData.harvestReady = false
-                elseif gsName == "harvestReady" or (ftUpper ~= "GRASS" and inHarvestWindow) then
+                elseif isHarvestReadyNamed or (not isMowableForageFruitName(ftUpper) and inHarvestWindow) then
                     fData.harvestReady = true
                     fData.growthLabel  = "harvest_ready"
-                    fData.stateName    = "Ready"
+                    fData.stateName    = (gsName == "harvestReadySecond") and "Ready (2nd cut)" or "Ready"
                 elseif gs > 0 then
                     fData.growthLabel  = "growing"
                     fData.stateName    = "Growing"
@@ -1540,7 +2115,7 @@ function FieldDataCollector:_collectImpl()
                 end
 
                 -- FS25 grass: mown / early regrowth may use distinct `growthStateToName` entries at the same index as tall grass.
-                if ftUpper == "GRASS" and gsName then
+                if isMowableForageFruitName(ftUpper) and gsName then
                     local ln = string.lower(tostring(gsName))
                     if ln == "cut" or ln == "mown" or ln == "mowed" or ln:find("stubble", 1, true)
                         or ln == "secondgrowth" or ln == "thirdgrowth" then
@@ -1549,20 +2124,93 @@ function FieldDataCollector:_collectImpl()
                         fData.stateName    = "Mown / regrowing"
                     end
                 end
+
+                -- FS25 spinach: two-cut cycle (see data/foliage/spinach/spinach.xml).
+                -- States past numGrowthStates (7): dead(8), harvested(9, regenerates), harvestedSecond(10, final).
+                local spinachPctLocked = false
+                if isSpinachFruitName(ftUpper) then
+                    local ln = gsNameLower or ""
+                    fData.isWithered = false
+                    if ln == "dead" or ln == "withered" then
+                        fData.isWithered   = true
+                        fData.isHarvested  = false
+                        fData.harvestReady = false
+                        fData.growthLabel  = "withered"
+                        fData.stateName    = "Withered"
+                        fData.growthStatePercentage = 100
+                        spinachPctLocked = true
+                    elseif ln == "harvestready" or ln == "harvestreadysecond" then
+                        fData.isHarvested  = false
+                        fData.harvestReady = true
+                        fData.growthLabel  = "harvest_ready"
+                        fData.stateName    = (ln == "harvestreadysecond") and "Ready (2nd cut)" or "Ready"
+                        fData.growthStatePercentage = 100
+                        spinachPctLocked = true
+                    elseif ln == "harvested" then
+                        -- 1st cut — crop regenerates into the second cycle
+                        fData.isHarvested  = false
+                        fData.harvestReady = false
+                        fData.growthLabel  = "mown_regrowth"
+                        fData.stateName    = "Harvested · regenerating"
+                        fData.growthStatePercentage = 15
+                        spinachPctLocked = true
+                    elseif ln == "harvestedsecond" then
+                        fData.isHarvested  = true
+                        fData.harvestReady = false
+                        fData.growthLabel  = "harvested"
+                        fData.stateName    = "Harvested"
+                        fData.growthStatePercentage = 100
+                        spinachPctLocked = true
+                    elseif ln == "greenmiddlesecond" or ln == "greenbigsecond" then
+                        fData.isHarvested  = false
+                        fData.harvestReady = false
+                        fData.growthLabel  = "mown_regrowth"
+                        fData.stateName    = "Regrowing (2nd cut)"
+                        local secondCur = (ln == "greenbigsecond") and 2 or 1
+                        fData.growthStatePercentage = math.min(99, math.floor((secondCur / 3) * 100))
+                        spinachPctLocked = true
+                    elseif (gs or 0) > (numGs or 0) and (numGs or 0) > 0 then
+                        -- Name missing: index past numGrowthStates — dead / harvested / harvestedSecond
+                        local over = (gs or 0) - (numGs or 0)
+                        if over == 1 then
+                            fData.isWithered   = true
+                            fData.isHarvested  = false
+                            fData.harvestReady = false
+                            fData.growthLabel  = "withered"
+                            fData.stateName    = "Withered"
+                            fData.growthStatePercentage = 100
+                        elseif over == 2 then
+                            fData.isHarvested  = false
+                            fData.harvestReady = false
+                            fData.growthLabel  = "mown_regrowth"
+                            fData.stateName    = "Harvested · regenerating"
+                            fData.growthStatePercentage = 15
+                        else
+                            fData.isHarvested  = true
+                            fData.harvestReady = false
+                            fData.growthLabel  = "harvested"
+                            fData.stateName    = "Harvested"
+                            fData.growthStatePercentage = 100
+                        end
+                        spinachPctLocked = true
+                    end
+                end
                 
-                if maxStateToShow > 0 then
+                if maxStateToShow > 0 and not spinachPctLocked then
                     -- Use engine stage count for the bar when it exceeds yield-based maxStateToShow (avoids 7/8 barley at 100%).
                     local denom = maxStateToShow
-                    if ftUpper ~= "GRASS" and numGs > 0 then
+                    if not isMowableForageFruitName(ftUpper) and numGs > 0 then
                         denom = math.max(maxStateToShow, numGs)
                     end
                     fData.growthStatePercentage = math.min(100, math.floor((fData.growthState / denom) * 100))
                     if fData.harvestReady then fData.growthStatePercentage = 100 end
+                elseif fData.harvestReady then
+                    fData.growthStatePercentage = 100
                 end
 
                 -- Grass: only the last of the 4 map stages is "ready to cut" (not earlier engine-ready substates).
                 --- Do not overwrite mown / regrowth labels set from `growthStateToName` (cut / stubble / second growth).
-                if ftUpper == "GRASS" and (fData.maxGrowthState or 0) > 0 and (fData.growthState or 0) > 0
+                if isMowableForageFruitName(ftUpper) and (fData.maxGrowthState or 0) > 0 and (fData.growthState or 0) > 0
                     and (fData.growthState or 0) < fData.maxGrowthState
                     and fData.growthLabel ~= "mown_regrowth" then
                     fData.harvestReady = false
@@ -1573,7 +2221,7 @@ function FieldDataCollector:_collectImpl()
                     end
                 end
                 -- Grass: engine index above the 4 map stages = after cut / internal cycle â€” keep mown_regrowth for suggestions + UI.
-                if ftUpper == "GRASS" and (fData.growthState or 0) > (fData.maxGrowthState or GRASS_GROWTH_STAGES) then
+                if isMowableForageFruitName(ftUpper) and (fData.growthState or 0) > (fData.maxGrowthState or GRASS_GROWTH_STAGES) then
                     fData.harvestReady = false
                     fData.growthLabel  = "mown_regrowth"
                     fData.stateName    = "Mown / regrowing"
@@ -1583,7 +2231,7 @@ function FieldDataCollector:_collectImpl()
                     end
                 end
 
-                if ftUpper == "GRASS" and (fData.growthState or 0) > 0 then
+                if isMowableForageFruitName(ftUpper) and (fData.growthState or 0) > 0 then
                     local gsv = fData.growthState or 0
                     if fData.growthLabel == "mown_regrowth" or gsv > GRASS_GROWTH_STAGES then
                         fData.grassRingStage = ((gsv - 1) % GRASS_GROWTH_STAGES) + 1
@@ -1629,42 +2277,27 @@ function FieldDataCollector:_collectImpl()
         end
 
         if isPF and pfInstance then
-            local baseRadius = math.sqrt(fData.fieldAreaInSqm / math.pi)
-            local sampleOffsets = {
-                {0, 0}, {0.25, 0}, {-0.25, 0}, {0, 0.25}, {0, -0.25},
-                {0.5, 0.5}, {-0.5, -0.5}, {0.5, -0.5}, {-0.5, 0.5},
-                {0.6, 0}, {-0.6, 0}, {0, 0.6}, {0, -0.6}
-            }
-            local sumN, sumNTarget, validN = 0, 0, 0
+            local sumN, sumNTarget, validN, validNTarget = 0, 0, 0, 0
             local sumPh, sumPhTarget, validPh = 0, 0, 0
+            local soilTypeCounts = {}
+            local soilTypeBest, soilTypeBestN = 0, 0
 
-            -- Ignore sample points that fall on a neighbour field (offsets can cross the boundary).
-            local myFarmlandId = field.farmland and field.farmland.id or nil
-            local function sampleOnThisFarmland(sx, sz)
-                if not myFarmlandId or not _G.g_farmlandManager or not _G.g_farmlandManager.getFarmlandAtWorldPosition then
-                    return true
-                end
-                local ok, fm = pcall(function()
-                    return _G.g_farmlandManager:getFarmlandAtWorldPosition(sx, sz)
-                end)
-                if not ok or not fm then return false end
-                return fm.id == myFarmlandId
-            end
-
-            for _, offset in ipairs(sampleOffsets) do
-                local sX = cx + (offset[1] * baseRadius)
-                local sZ = cz + (offset[2] * baseRadius)
-                if not sampleOnThisFarmland(sX, sZ) then
-                    -- skip points outside this field's farmland (prevents neighbour field bleed in samples)
-                else
+            _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sX, sZ)
                 local soilType = callMethod(pfInstance.soilMap, "getTypeIndexAtWorldPos", sX, sZ)
                 
                 if soilType and type(soilType) == "number" and soilType > 0 then
                     isScanned = true
+                    local nType = math.floor(soilType)
+                    soilTypeCounts[nType] = (soilTypeCounts[nType] or 0) + 1
+                    if soilTypeCounts[nType] > soilTypeBestN then
+                        soilTypeBestN = soilTypeCounts[nType]
+                        soilTypeBest = nType
+                    end
                     local ptN = callMethod(pfInstance.nitrogenMap, "getLevelAtWorldPos", sX, sZ)
                     if ptN and type(ptN) == "number" then
                         if ptN <= 45 and ptN % 1 == 0 then ptN = math.max(0, (ptN - 1) * 5) end
-                        if ptN > 0 then sumN = sumN + ptN; validN = validN + 1 end
+                        sumN = sumN + ptN
+                        validN = validN + 1
                     end
                     local ptNTgt = callMethod(pfInstance.nitrogenMap, "getTargetLevelAtWorldPos", sX, sZ)
                     if ptNTgt == nil or ptNTgt == 0 then
@@ -1673,6 +2306,7 @@ function FieldDataCollector:_collectImpl()
                     if ptNTgt and type(ptNTgt) == "number" then
                         if ptNTgt <= 45 and ptNTgt % 1 == 0 then ptNTgt = math.max(0, (ptNTgt - 1) * 5) end
                         sumNTarget = sumNTarget + ptNTgt
+                        validNTarget = validNTarget + 1
                     end
                     local ptPh = callMethod(pfInstance.pHMap, "getLevelAtWorldPos", sX, sZ)
                     if ptPh and type(ptPh) == "number" then
@@ -1693,11 +2327,12 @@ function FieldDataCollector:_collectImpl()
                         end
                     end
                 end
-                end
-            end
+            end)
 
-            if validN  > 0 then nLevel  = sumN  / validN;  nTarget  = sumNTarget  / validN  end
+            if validN  > 0 then nLevel  = sumN  / validN end
+            if validNTarget > 0 then nTarget = sumNTarget / validNTarget end
             if validPh > 0 then phLevel = sumPh / validPh; phTarget = sumPhTarget / validPh end
+            fData.pfSoilTypeIndex = soilTypeBest
         end
 
         local phBarMinAvg = 0
@@ -1718,7 +2353,7 @@ function FieldDataCollector:_collectImpl()
         -- ====================================================================
         fData.needsPlowing = periodicPlowingRequired and (fData.plowLevel < 1)
         -- ~15%+ weeds (handles 0â€“1, 0â€“4 stages, or 0â€“100 percent-style reads)
-        fData.needsWeeding = weedNorm01(fData.weedLevel) > 0.15
+        fData.needsWeeding = (careerGameplayFlags.weedsEnabled ~= false) and weedNorm01(fData.weedLevel) > 0.15
 
         if isPF then
             if not isScanned then
@@ -1732,10 +2367,10 @@ function FieldDataCollector:_collectImpl()
                 --- Grass: PF map can report very high kg/ha targets; keep raw `targetNitrogen` for logic, cap dashboard display only.
                 local nTextTarget = nTarget
                 local ftUpN = string.upper(tostring(fData.fruitType or ""))
-                local grassForN = (ftUpN == "GRASS")
+                local grassForN = isMowableForageFruitName(ftUpN)
                 if not grassForN and (fData.fruitTypeIndex or 0) > 0 and _G.g_fruitTypeManager then
                     local ftdN = _G.g_fruitTypeManager:getFruitTypeByIndex(fData.fruitTypeIndex)
-                    if ftdN and string.upper(tostring(ftdN.name or "")) == "GRASS" then grassForN = true end
+                    if ftdN and isMowableForageFruitName(ftdN.name) then grassForN = true end
                 end
                 if grassForN and nTarget > 0 then
                     nTextTarget = math.min(nTarget, math.max(nLevel * 1.15 + 30, 90))
@@ -1777,10 +2412,10 @@ function FieldDataCollector:_collectImpl()
 
         --- Grass: use fruit type manager when index is set (name is still "unknown" until end of collect for some fields).
         local fruitUp = string.upper(tostring(fData.fruitType or ""))
-        local isGrass = (fruitUp == "GRASS")
+        local isGrass = isMowableForageFruitName(fruitUp)
         if not isGrass and (fData.fruitTypeIndex or 0) > 0 and _G.g_fruitTypeManager then
             local ftd = _G.g_fruitTypeManager:getFruitTypeByIndex(fData.fruitTypeIndex)
-            if ftd and string.upper(tostring(ftd.name or "")) == "GRASS" then isGrass = true end
+            if ftd and isMowableForageFruitName(ftd.name) then isGrass = true end
         end
         local mulchLv = fData.mulchLevel or 0
         --- Grass regrowth after mowing (engine stage above map stages or explicit mown label) â€” not the same as first growth after seeding; lime + optional organic + mineral fertiliser.
@@ -1803,12 +2438,16 @@ function FieldDataCollector:_collectImpl()
             local gs = fData.growthState or 0
             local ftUp = string.upper(tostring(fData.fruitType or ""))
             local inFirstStage = false
-            if ftUp == "GRASS" and engMax > GRASS_GROWTH_STAGES then
+            if isMowableForageFruitName(ftUp) and engMax > GRASS_GROWTH_STAGES then
                 inFirstStage = (math.ceil((gs * GRASS_GROWTH_STAGES) / engMax) == 1)
             else
                 inFirstStage = (gs == 1)
             end
             fData.needsRolling = inFirstStage
+        end
+
+        if careerGameplayFlags.limeRequired == false then
+            fData.needsLime = false
         end
 
         fData.needsWork = fData.needsFertilizer or fData.needsLime or fData.needsWeeding or fData.needsPlowing or fData.needsRolling
@@ -2453,9 +3092,26 @@ function FieldDataCollector:_collectImpl()
             fData.baleCountOnField = 0
         end
 
-        _attachFieldMoisture(fData, cx, cz)
+        _attachFieldMoisture(fData, cx, cz, fData.fieldAreaInSqm, myFarmlandId)
         fData.weedPercent = weedPercentForDisplay(fData.weedLevel)
         fData.weedAlertThresholdPct = 15
+
+        -- Do not pcall this whole call: GPS task yields, and Lua 5.1 cannot yield across pcall.
+        local outline, painted = _fieldOutlineForMap(field, cx, cz, coopProgress, isOwned)
+        if type(outline) == "table" and #outline >= 3 then
+            fData.outline = outline
+            if painted then
+                _applyPaintedFieldMetrics(fData, outline, fData.hectares)
+            end
+        end
+        --- GPS boundary task yields internally; extra yield so one slice cannot hitch.
+        if FieldDataCollector._yieldEvery then
+            coopProgress()
+        end
+        local okColor, hex = pcall(_fruitMapColorHex, fData.fruitTypeIndex)
+        if okColor and type(hex) == "string" and hex ~= "" then
+            fData.fruitMapColor = hex
+        end
 
         table.insert(fieldData, fData)
         fieldCoopTick()

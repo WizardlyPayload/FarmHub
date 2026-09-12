@@ -223,7 +223,9 @@ function collectFs25ModsDirectories(getDocumentsPath) {
             if (seen.has(k)) continue;
             seen.add(k);
             let score = scoreModsDirectory(candidate);
-            if (overrideKeys.has(k)) score += 1000;
+            // Only boost a live FSG override when it actually contains mods.
+            // An empty leftover override must not beat the real Documents\...\mods folder.
+            if (overrideKeys.has(k) && looksLikeModsDirectory(candidate)) score += 1000;
             scored.push({ path: candidate, score });
         }
     }

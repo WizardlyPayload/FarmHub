@@ -30,12 +30,20 @@ function inferFillTypeFromLocations(locations) {
   return null;
 }
 
+function isFillTypeIdent(raw) {
+  return /^[A-Za-z][A-Za-z0-9_]*$/.test(String(raw || '').trim());
+}
+
 function mergeFillTypeCatalog(...sources) {
   const out = {};
   for (const src of sources) {
     if (!src || typeof src !== 'object') continue;
     for (const [key, val] of Object.entries(src)) {
-      if (val != null && String(val).trim() !== '') out[String(key)] = String(val);
+      if (val == null || String(val).trim() === '') continue;
+      const next = String(val);
+      const cur = out[String(key)];
+      if (cur && isFillTypeIdent(cur) && !isFillTypeIdent(next)) continue;
+      out[String(key)] = next;
     }
   }
   return out;

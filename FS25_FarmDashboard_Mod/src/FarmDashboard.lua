@@ -4,16 +4,16 @@
 FarmDashboard = {}
 FarmDashboard.MOD_NAME = "FS25_FarmDashboard"
 FarmDashboard.MOD_DIR = _G.g_currentModDirectory
-FarmDashboard.VERSION = "3.4.0.6"
+FarmDashboard.VERSION = "5.0.0.3"
 FarmDashboard.UPDATE_INTERVAL = 10000
 FarmDashboard.PORT = 8766
 FarmDashboard.readyAt = nil
 
 local hasLoaded = false
 
---- Collectors and data.json: SP + MP host / dedicated — not MP clients.
+--- Collectors and data.json: SP + MP host / dedicated â€” not MP clients.
 --- Multiplayer must follow g_server:getIsServer() whenever it exists (dedicated / host). Earlier refactor gated that on
---- missionDynamicInfo.isMultiplayer, which can be nil on servers and skipped the real server check — breaking exports.
+--- missionDynamicInfo.isMultiplayer, which can be nil on servers and skipped the real server check â€” breaking exports.
 --- Single-player workaround: if getIsServer() is false but the save is not multiplayer, still allow local writes.
 function FarmDashboard:isAuthority()
     if not _G.g_currentMission then return false end
@@ -26,7 +26,7 @@ function FarmDashboard:isAuthority()
         end
     end
 
-    if rawget(_G, "g_dedicatedServer") ~= nil then
+    if _G.g_dedicatedServer ~= nil then
         return true
     end
 
@@ -46,7 +46,7 @@ end
 
 --- Headless dedicated server (not MP host playing on the same machine).
 function FarmDashboard:isDedicatedServer()
-    return rawget(_G, "g_dedicatedServer") ~= nil
+    return _G.g_dedicatedServer ~= nil
 end
 
 --- MP host or dedicated server process (export authority without a local shop GUI).
@@ -54,7 +54,7 @@ function FarmDashboard:isServerExportHost()
     if not self:isAuthority() then return false end
     local md = _G.g_currentMission and _G.g_currentMission.missionDynamicInfo
     if md and md.isMultiplayer == true then return true end
-    if rawget(_G, "g_dedicatedServer") ~= nil then return true end
+    if _G.g_dedicatedServer ~= nil then return true end
     if _G.g_server ~= nil and type(_G.g_server.getIsServer) == "function" then
         local ok, isSrv = pcall(function() return _G.g_server:getIsServer() end)
         if ok and isSrv then return true end
@@ -118,7 +118,7 @@ function FarmDashboard:loadMap()
         Logging.info(
             "[FarmDash] spawn guard: mp=%s dedicated=%s isServer=%s serverExportHost=%s courseplay=%s",
             tostring(md and md.isMultiplayer),
-            tostring(rawget(_G, "g_dedicatedServer") ~= nil),
+            tostring(_G.g_dedicatedServer ~= nil),
             tostring(isSrv),
             tostring(self:isServerExportHost()),
             tostring(FarmDashboardDataCollector and FarmDashboardDataCollector.isCourseplayLoaded
@@ -130,7 +130,7 @@ function FarmDashboard:loadMap()
             )
         end
     else
-        Logging.info("[FarmDash] Multiplayer client — collectors and trace run on host/server only.")
+        Logging.info("[FarmDash] Multiplayer client â€” collectors run on host/server only. Export mirror streams automatically while joined (writes mirror_<slot>/data.json locally).")
     end
 
     FarmDashboard:startDashboard()
@@ -180,8 +180,8 @@ function FarmDashboard:update(dt)
         return
     end
 
-    if FarmDashboardCourseplayCompat and FarmDashboardCourseplayCompat.shieldFleetIfNeeded then
-        pcall(function() FarmDashboardCourseplayCompat.shieldFleetIfNeeded() end)
+    if FarmDashboardCourseplayCompat and FarmDashboardCourseplayCompat.tick then
+        pcall(function() FarmDashboardCourseplayCompat.tick() end)
     end
 
     if not FarmDashboard.readyAt or not _G.g_time then return end
@@ -193,13 +193,17 @@ function FarmDashboard:update(dt)
         pcall(function() dc:_pollShopPendingLoads() end)
     end
 
-    if FarmDashboardCourseplayCompat and FarmDashboardCourseplayCompat.tick then
-        pcall(function() FarmDashboardCourseplayCompat.tick() end)
+    -- Keep export-mirror streaming alive even while shop spawn pause blocks fleet scans.
+    -- Without this, a started job stalls for the whole grace window (and GPortal joins
+    -- during that window never receive chunks).
+    -- _pendingJob: payloads queued by the stream-interval throttle also need the pump.
+    local mirror = rawget(_G, "FarmDashboardExportMirror")
+    if mirror and mirror.update and (mirror._job or mirror._pendingJob) then
+        pcall(function() mirror:update(dt) end)
     end
 
-    if dc and dc.isExportPausedForVehicleSpawn and dc:isExportPausedForVehicleSpawn() then
-        return
-    end
+    -- Do not freeze fields / soil / weather because Courseplay is spawning a vehicle.
+    -- DataCollector already skips vehicle/finance slices during spawn grace.
 
     if FarmDashboardVehicleShopGuard and FarmDashboardVehicleShopGuard.tryInstall then
         FarmDashboardVehicleShopGuard.tryInstall()
@@ -216,6 +220,30 @@ function FarmDashboard:update(dt)
             FarmDashLog.devWarn("Update error: %s", tostring(err))
         end
     end
+end
+
+function FarmDashboard:buildExportDiagnostics()
+    local gameVersion = nil
+    pcall(function()
+        if type(_G.getAppVersion) == "function" then
+            gameVersion = tostring(_G.getAppVersion())
+        elseif type(getAppVersion) == "function" then
+            gameVersion = tostring(getAppVersion())
+        end
+    end)
+    local missing = {}
+    if not FarmDashboardDataCollector then
+        missing[#missing + 1] = "FarmDashboardDataCollector"
+    end
+    return {
+        modVersion = self.VERSION,
+        gameVersion = gameVersion,
+        isAuthority = self:isAuthority() == true,
+        lastExportGameTime = (type(_G.g_time) == "number") and _G.g_time or 0,
+        lastXmlSampleTime = nil,
+        missingDependencies = missing,
+        compatible = #missing == 0,
+    }
 end
 
 function FarmDashboard:startDashboard()

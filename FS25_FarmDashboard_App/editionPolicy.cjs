@@ -210,6 +210,27 @@ function readElectronStoreConfig(storeJsonPath) {
     }
 }
 
+/** Compare Windows file: URLs correctly even when unit tests run on POSIX. */
+function looksLikeWindowsPath(p) {
+    const s = String(p || '');
+    return /^[A-Za-z]:[\\/]/.test(s) || /^\/[A-Za-z]:[\\/]/.test(s);
+}
+
+function normalizeComparablePath(p) {
+    const s = String(p || '');
+    if (looksLikeWindowsPath(s)) {
+        return path.win32.normalize(s.replace(/^\/([A-Za-z]:)/, '$1').replace(/\//g, '\\'));
+    }
+    return path.resolve(s);
+}
+
+function toPosixRel(documentPath, root) {
+    if (looksLikeWindowsPath(documentPath) || looksLikeWindowsPath(root)) {
+        return path.win32.relative(root, documentPath).replace(/\\/g, '/');
+    }
+    return path.relative(root, documentPath).replace(/\\/g, '/');
+}
+
 /**
  * Trusted desktop IPC: packaged/setup file documents, or exact loopback dashboard origin.
  * Does not accept LAN IPs or other ports.
@@ -224,9 +245,9 @@ function isTrustedDashboardIpcUrl(rawUrl, opts) {
         if (u.protocol === 'file:') {
             if (u.hostname && u.hostname !== 'localhost') return false;
             const { fileURLToPath } = require('url');
-            const documentPath = path.resolve(fileURLToPath(u));
-            const root = path.resolve(o.appDirectory || __dirname);
-            const relative = path.relative(root, documentPath).replace(/\\/g, '/');
+            const documentPath = normalizeComparablePath(fileURLToPath(u));
+            const root = normalizeComparablePath(o.appDirectory || __dirname);
+            const relative = toPosixRel(documentPath, root);
             return ['setup.html', 'index.html', 'ui-v2/setup.html', 'ui-v2/index.html',
                 'ui-v2/simhub.html', 'web/index.html', 'web/simhub.html'].includes(relative);
         }

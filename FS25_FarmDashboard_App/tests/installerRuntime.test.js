@@ -108,6 +108,8 @@ test('NSIS propagates cleanup failures before built-in file removal', () => {
   expect(nsis).toContain('SetErrorLevel 1');
   expect(nsis).toContain('!insertmacro FarmDashAssertCleanupSuccess "User profile cleanup"');
   expect(nsis).toContain('!insertmacro FarmDashAssertCleanupSuccess "ImageMagick removal"');
+  expect(nsis).toContain('-Edition $R4 -CheckOnly');
+  expect(nsis).toContain('ExecShell "runas"');
   expect(nsis).toContain('!define APP_PACKAGE_NAME "fs25-farm-dashboard-rf"');
   const languageLeave = nsis.split('Function FarmDashLangPageLeave')[1].split('FunctionEnd')[0];
   expect(languageLeave).not.toContain('CreateDirectory "$APPDATA');

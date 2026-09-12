@@ -270,7 +270,12 @@ FunctionEnd
 ; Runs at start of uninstall (before files are removed). Ask whether to keep profile data.
 !macro customUnInit
   StrCpy $FarmDashWipeUserData "0"
-  !if "${APP_ID}" == "com.farmdashboard.rf"
+  StrCpy $R4 "V4"
+  StrCmp "${APP_ID}" "com.farmdashboard.rf" 0 FarmDashUnInitEdReady
+  StrCpy $R4 "V5"
+  FarmDashUnInitEdReady:
+    ; V4 and V5 both honor --delete-app-data so a UAC relaunch can finish Full
+    ; uninstall after ImageMagick returns 740 (admin required).
     ClearErrors
     ${GetParameters} $R9
     ${GetOptions} $R9 "--delete-app-data" $R8
@@ -278,7 +283,6 @@ FunctionEnd
       StrCpy $FarmDashWipeUserData "1"
       Goto FarmDashUnInitDone
     ${EndIf}
-  !endif
   ${If} ${Silent}
     Goto FarmDashUnInitDone
   ${EndIf}
@@ -293,30 +297,28 @@ FunctionEnd
   FarmDashUnWipe:
     StrCpy $FarmDashWipeUserData "1"
   FarmDashUnInitDone:
-  !if "${APP_ID}" == "com.farmdashboard.rf"
-    ${If} $FarmDashWipeUserData == "1"
-      nsExec::ExecToLog 'powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$INSTDIR\resources\uninstall-dependencies.ps1" -Edition V5 -CheckOnly'
-      Pop $R0
-      ${If} $R0 == "740"
-        ${If} ${Silent}
-          SetErrorLevel 740
-          Abort "Administrator permission is required for Full uninstall"
-        ${EndIf}
-        ; Keep current-user installation scope while requesting a normal UAC
-        ; prompt. The explicit argument preserves Full removal after restart.
-        ClearErrors
-        ExecShell "runas" "$INSTDIR\${UNINSTALL_FILENAME}" "/currentuser --delete-app-data"
-        ${If} ${Errors}
-          MessageBox MB_OK|MB_ICONINFORMATION "Full uninstall needs administrator permission to remove Dashboard-owned ImageMagick. Permission was not granted; the Dashboard and its uninstaller have been kept." /SD IDOK
-          SetErrorLevel 740
-          Abort "Full uninstall permission was not granted"
-        ${EndIf}
-        Quit
-      ${Else}
-        !insertmacro FarmDashAssertCleanupSuccess "Full uninstall preparation"
+  ${If} $FarmDashWipeUserData == "1"
+    nsExec::ExecToLog 'powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$INSTDIR\resources\uninstall-dependencies.ps1" -Edition $R4 -CheckOnly'
+    Pop $R0
+    ${If} $R0 == "740"
+      ${If} ${Silent}
+        SetErrorLevel 740
+        Abort "Administrator permission is required for Full uninstall"
       ${EndIf}
+      ; Keep current-user installation scope while requesting a normal UAC
+      ; prompt. The explicit argument preserves Full removal after restart.
+      ClearErrors
+      ExecShell "runas" "$INSTDIR\${UNINSTALL_FILENAME}" "/currentuser --delete-app-data"
+      ${If} ${Errors}
+        MessageBox MB_OK|MB_ICONINFORMATION "Full uninstall needs administrator permission to remove Dashboard-owned ImageMagick. Permission was not granted; the Dashboard and its uninstaller have been kept." /SD IDOK
+        SetErrorLevel 740
+        Abort "Full uninstall permission was not granted"
+      ${EndIf}
+      Quit
+    ${Else}
+      !insertmacro FarmDashAssertCleanupSuccess "Full uninstall preparation"
     ${EndIf}
-  !endif
+  ${EndIf}
 !macroend
 
 ; Before built-in file removal: failure must preserve the executable and uninstaller.

@@ -5,6 +5,8 @@ const path = require('path');
 
 const nsh = fs.readFileSync(path.join(__dirname, '..', 'build', 'installer.nsh'), 'utf8');
 const ps1 = fs.readFileSync(path.join(__dirname, '..', 'build', 'uninstall-user-data.ps1'), 'utf8');
+const deps = fs.readFileSync(path.join(__dirname, '..', 'build', 'uninstall-dependencies.ps1'), 'utf8');
+const magickCommon = fs.readFileSync(path.join(__dirname, '..', 'build', 'imagemagick-common.ps1'), 'utf8');
 
 describe('installer / uninstall edition ownership', () => {
     test('language combo defaults to English when nothing was saved', () => {
@@ -48,5 +50,25 @@ describe('installer / uninstall edition ownership', () => {
         expect(block).toMatch(/ReadRegDWORD \$R5 SHELL_CONTEXT "\$\{UNINSTALL_REGISTRY_KEY\}" "EstimatedSize"/);
         expect(block).toMatch(/StrCpy \$R5 "0"/);
         expect(block).toMatch(/-EstimatedSizeKB \$R5/);
+    });
+
+    test('V4 Full uninstall gets the same 740 UAC relaunch as V5', () => {
+        const unInit = nsh.split('!macro customUnInit')[1].split('!macroend')[0];
+        expect(unInit).toMatch(/-Edition \$R4 -CheckOnly/);
+        expect(unInit).toMatch(/\$R0 == "740"/);
+        expect(unInit).toMatch(/ExecShell "runas"/);
+        expect(unInit).toMatch(/--delete-app-data/);
+        expect(unInit).not.toMatch(/!if "\$\{APP_ID\}" == "com\.farmdashboard\.rf"/);
+        expect(unInit).not.toMatch(/-Edition V5 -CheckOnly/);
+    });
+
+    test('V4 other-edition detection uses native 64-bit registry views', () => {
+        expect(deps).toMatch(/\. \(Join-Path \$PSScriptRoot 'windows-install-state\.ps1'\)/);
+        expect(magickCommon).toMatch(/Get-FarmDashRegistryArguments/);
+        expect(magickCommon).toMatch(/RegistryView\]::Registry64/);
+        expect(magickCommon).toMatch(/OpenBaseKey/);
+        const otherFn = magickCommon.split('function Test-OtherDashboardInstalled')[1].split('function Register-DependencyConsumer')[0];
+        expect(otherFn).not.toMatch(/FarmDashNativeDependencyRegistry/);
+        expect(otherFn).not.toMatch(/Get-ItemProperty -LiteralPath \$key/);
     });
 });

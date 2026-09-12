@@ -4,7 +4,9 @@ param([ValidateSet('Classic', 'Rf', 'V4', 'V5')][string]$Edition = 'V4', [switch
 $ErrorActionPreference = 'Stop'
 $script:FarmDashNativeDependencyRegistry = $Edition -in @('V5', 'Rf')
 $script:FarmDashAllowDependencyRecovery = $false
-if ($script:FarmDashNativeDependencyRegistry) { . (Join-Path $PSScriptRoot 'windows-install-state.ps1') }
+# Always load native registry helpers so V4 Full uninstall can see an all-users
+# V5 install in the 64-bit hive. Ownership writes stay edition-gated above.
+. (Join-Path $PSScriptRoot 'windows-install-state.ps1')
 . (Join-Path $PSScriptRoot 'imagemagick-common.ps1')
 $script:DependencyLog = Join-Path $env:TEMP 'FarmDashImageMagickUninstall.log'
 function Invoke-FarmDashDependencyRemoval([string]$EditionName, [bool]$PreflightOnly = $false) {

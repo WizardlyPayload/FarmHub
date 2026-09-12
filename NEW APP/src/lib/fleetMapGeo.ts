@@ -223,9 +223,22 @@ function positionXZ(point: unknown): { x: number; z: number } | null {
   return { x, z };
 }
 
+function sizeClassForAbs(half: number, abs: number): number {
+  const need = abs * 1.02;
+  if (need <= half * 1.05) return half;
+  for (const step of STANDARD_TERRAIN_HALVES) {
+    if (step < half) continue;
+    // Rim vertices on a 4 km map sit at ~±2038 m. need is then ~2078, which is
+    // greater than 2048 but still that size class — not an 8 km world.
+    if (abs <= step * 1.02) return step;
+  }
+  return Math.max(half, Math.ceil(abs / 1024) * 1024);
+}
+
 /**
  * When the mod reports halfSize=1024 but entities sit beyond ±1024 (common on 4 km maps),
  * bump to the next standard terrain half so pins are not clamped to the image edge.
+ * One stray coordinate must not jump past the next standard size class.
  */
 export function inferSymmetricalTerrainHalf(
   reportedHalf: number,
@@ -234,25 +247,26 @@ export function inferSymmetricalTerrainHalf(
   let half = Number(reportedHalf);
   if (!Number.isFinite(half) || half <= 0) half = 1024;
 
-  let maxAbs = 0;
+  const absValues: number[] = [];
   for (const raw of points || []) {
     const row = raw as { position?: unknown };
     const p = positionXZ(row?.position ?? raw);
     if (!p) continue;
-    maxAbs = Math.max(maxAbs, Math.abs(p.x), Math.abs(p.z));
+    absValues.push(Math.max(Math.abs(p.x), Math.abs(p.z)));
   }
-  if (maxAbs <= 0) return half;
-
-  const need = maxAbs * 1.02;
-  if (need <= half * 1.05) return half;
-
-  for (const step of STANDARD_TERRAIN_HALVES) {
-    if (step < half) continue;
-    // Rim vertices on a 4 km map sit at ~±2038 m. need is then ~2078, which is
-    // greater than 2048 but still that size class — not an 8 km world.
-    if (maxAbs <= step * 1.02) return step;
+  if (absValues.length === 0) return half;
+  absValues.sort((a, b) => a - b);
+  let maxAbs = absValues[absValues.length - 1];
+  if (absValues.length >= 2) {
+    const second = absValues[absValues.length - 2];
+    const maxClass = sizeClassForAbs(half, maxAbs);
+    const secondClass = sizeClassForAbs(half, second);
+    const nextClass = STANDARD_TERRAIN_HALVES.find((step) => step > half) || half;
+    if (maxClass > secondClass && maxClass > nextClass) {
+      maxAbs = second;
+    }
   }
-  return Math.max(half, Math.ceil(maxAbs / 1024) * 1024);
+  return sizeClassForAbs(half, maxAbs);
 }
 
 export function boundsFromTerrainHalf(half: number): MapBounds {

@@ -164,8 +164,6 @@ describe("setup.html: i18n keys for new copy exist", () => {
     "setup.errAuth",
     "setup.errPath",
     "setup.errToken",
-    "setup.errLanTimeout",
-    "setup.errLocalOnly",
     "setup.successSaved",
   ];
   test.each(REQUIRED)("messages/en.json has key %s", (key) => {

@@ -1,14 +1,23 @@
 // FS25 FarmDashboard | setup-validation.js | v3.9.0
 //
-// Pure helpers for setup-screen validation. Loaded as a regular browser
-// script (`window.farmDashSetupValidation`) AND as a CommonJS module
-// (`module.exports`) so Jest tests exercise the same `mapSaveError` logic
-// that ships in setup.html. The function maps low-level save/launch
-// errors to actionable, localizable copy via the caller-supplied `st`
-// translator.
+// Thin shim: classification lives in ux-classify.js. This file formats
+// setup save/launch copy and FTP field checks. Loaded as a browser script
+// (`window.farmDashSetupValidation`) AND as a CommonJS module for Jest.
 
 (function (root, factory) {
-  var api = factory();
+  var classify =
+    (typeof require === "function"
+      ? (function () {
+          try {
+            return require("./ux-classify.js");
+          } catch (_) {
+            return null;
+          }
+        })()
+      : null) ||
+    (root && root.farmDashUxClassify) ||
+    null;
+  var api = factory(classify);
   if (typeof module === "object" && module && module.exports) {
     module.exports = api;
   }
@@ -19,11 +28,11 @@
   typeof globalThis !== "undefined"
     ? globalThis
     : typeof window !== "undefined"
-    ? window
-    : typeof self !== "undefined"
-    ? self
-    : this,
-  function () {
+      ? window
+      : typeof self !== "undefined"
+        ? self
+        : this,
+  function (classify) {
     function passThrough(_key, params, fallback) {
       var v = String(fallback != null ? fallback : "");
       if (params && typeof params === "object") {
@@ -36,43 +45,35 @@
       return v;
     }
 
+    function classifyError(rawMsg) {
+      if (classify && typeof classify.classifyRawError === "function") {
+        return classify.classifyRawError(rawMsg);
+      }
+      return "E_SAVE_FAILED";
+    }
+
+    function recoveryActionForCode(code) {
+      if (classify && typeof classify.nextActionForCode === "function") {
+        return classify.nextActionForCode(code);
+      }
+      return "open_setup";
+    }
+
     /**
      * Map a raw save/launch error string to actionable copy.
+     * Classification is shared; this only picks the setup translation key.
      * @param {string} rawMsg
      * @param {(key: string, params?: any, fallback?: string) => string} [st]
      */
     function mapSaveError(rawMsg, st) {
       var translate = typeof st === "function" ? st : passThrough;
-      var s = String(rawMsg || "").toLowerCase();
-      if (
-        /econn|enotfound|etimedout|timeout|unreachable|refused|network/i.test(s)
-      ) {
-        return translate(
-          "setup.errNetwork",
-          null,
-          "Server unreachable. Check the host and port and confirm the dedicated server or FTP service is running."
-        );
-      }
-      if (/auth|unauthor|forbidden|403|401|denied|password|user/i.test(s)) {
-        return translate(
-          "setup.errAuth",
-          null,
-          "Username or password rejected by the server."
-        );
-      }
-      if (/enoent|not.?found|missing|path|directory|folder/i.test(s)) {
-        return translate(
-          "setup.errPath",
-          null,
-          "Save folder not found. Confirm the save has been loaded once with the FS25 mod enabled."
-        );
-      }
-      if (/token/i.test(s)) {
-        return translate(
-          "setup.errToken",
-          null,
-          "Setup token expired. Reload this page and try again."
-        );
+      var code = classifyError(rawMsg);
+      var copy =
+        classify && typeof classify.saveCopyForCode === "function"
+          ? classify.saveCopyForCode(code)
+          : null;
+      if (copy) {
+        return translate(copy.key, null, copy.fallback);
       }
       return translate(
         "setup.toastCouldNotSave",
@@ -81,10 +82,6 @@
       );
     }
 
-    /**
-     * Determine which FTP fields are missing on a payload-like object.
-     * Returns an array of field ids that should be marked invalid.
-     */
     function findMissingFtpFields(srv) {
       var s = srv || {};
       var missing = [];
@@ -97,6 +94,8 @@
     return {
       mapSaveError: mapSaveError,
       findMissingFtpFields: findMissingFtpFields,
+      classifyError: classifyError,
+      recoveryActionForCode: recoveryActionForCode,
     };
   }
 );

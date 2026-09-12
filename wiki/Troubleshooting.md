@@ -19,16 +19,16 @@ Common problems and fixes for **FS25 Farm Dashboard**. Also see [INSTALL.md](htt
    %USERPROFILE%\Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\<savegame>\data.json
    ```
 
-5. **Settings → Servers & saves** path or FTP directory is correct
+5. **Settings → Servers & saves** path is correct (**Local** folder for SP or join-as-client, or FTP remote dir)
 
-**Fix:** [Installation Guide](Installation-Guide) stages B–C, then restart the app.
+**Fix:** [Installation Guide](Installation-Guide) stages B–C, then restart the app. Dedicated: [join as client or FTP](Installation-Guide#dedicated-servers-join-as-client-or-ftp).
 
 ---
 
 ## API error strip (retrying every 5 s)
 
 - App auto-retries; no manual button
-- Confirm FS25 running with mod on that save
+- Confirm FS25 running with mod on that save (or joined client still connected for mirror)
 - Local: verify folder path
 - FTP: verify host, port, credentials, remote path contains `data.json`
 - FTP interval must be **1–25 minutes**
@@ -58,8 +58,23 @@ Close duplicate Farm Dashboard instances or conflicting apps, then restart.
 
 - Mod disabled for save
 - Save not entered (menu only)
-- MP **client** (mod only exports on authority — host/SP)
-- Increase wait time; check `config.xml` module toggles
+- MP **client without mirror opt-in** (authority still owns the scan; opted-in clients only write a mirrored copy)
+- Dedicated **empty** (zero players) — no join-as-client mirror until someone joins; use FTP or join a client
+- Increase wait time; check `config.xml` module toggles; confirm updated mod with export mirror on server + client
+
+---
+
+## Join-as-client mirror not writing locally
+
+| Check | Detail |
+|-------|--------|
+| Mod | Same **updated** Farm Dashboard mod (export mirror) on **dedicated + client** |
+| Opt-in | Mirror / receive-export setting enabled on the joined client (labels may vary) |
+| Connection | Client still in the session — disconnect stops the local write |
+| Path | `%USERPROFILE%\Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\<slot>\data.json` |
+| App | **Local** mode pointing at that folder (not FTP) — works for **4.2.1** and **v5** |
+
+See [Installation Guide — Dedicated](Installation-Guide#dedicated-servers-join-as-client-or-ftp).
 
 ---
 
@@ -77,6 +92,7 @@ Close duplicate Farm Dashboard instances or conflicting apps, then restart.
 - Refresh browser; check data-source badge
 - Known fix in 3.9: realtime must match active server
 - If XML and Lua disagree, Lua wins for `harvestReady` / suggestions when live is newer
+- Join-as-client: large exports may lag a few seconds behind authority
 
 ---
 
@@ -88,6 +104,7 @@ Close duplicate Farm Dashboard instances or conflicting apps, then restart.
 | Path | Remote dir must contain `data.json` |
 | Server | Game running with mod on dedicated host |
 | Cache | FTP **never** uses offline desktop cache — wait for poll |
+| Alternative | Prefer [join as client](Installation-Guide#join-as-client-no-ftp) when someone can stay connected |
 
 Test credentials with FileZilla first.
 
@@ -257,7 +274,7 @@ Open a [GitHub Issue](https://github.com/WizardlyPayload/FarmHub/issues) with:
 
 - FS25 version, SP vs dedicated
 - App **4.2.0**, mod **3.4.0.6**
-- Local vs FTP
+- Local / join-as-client / FTP
 - Steps + screenshots
 
 **Security:** private message to maintainers — not a public issue.

@@ -644,6 +644,8 @@
       <script src="assests/js/realtime-fanout.js"></script>
       <script src="assests/js/realtime-dedupe.js"></script>
       <script src="assests/js/pastures-warnings.js"></script>
+      <script src="assests/js/ux-classify.js"></script>
+      <!-- LAN: patch + overlay bootstrap here (before realtime-connector). Wait once in app.js — do not wait here. -->
       <script type="module">
         import {
           installLanHttpBasicFetchPatch,
@@ -822,6 +824,8 @@
 
                   <div class="tab-pane fade" id="app-settings-pane-servers" role="tabpanel" aria-labelledby="app-settings-tab-servers" tabindex="0">
                     <h6 class="text-farm-accent" data-i18n="settings.lanTitle">Remote / LAN access</h6>
+                    <p class="mb-2"><span id="settings-lan-risk-badge" class="badge text-bg-success" data-i18n="ux.lan.localOnly">Local-only</span></p>
+                    <p class="mb-2"><button type="button" class="btn btn-sm btn-outline-secondary" id="settings-lan-restore-default" data-i18n="ux.lan.restoreDefault">Restore local-only default</button></p>
                     <p class="small text-muted mb-2" data-i18n="settings.lanIntro" data-i18n-html="">Turn on <strong>LAN access</strong> below — until then, phones and tablets cannot use <code class="text-light">http://&lt;this-PC-LAN-IP&gt;:8766</code> (the server listens on this PC only). After enabling, open that URL from your tablet on the same Wi‑Fi. This app still uses <strong>127.0.0.1</strong> locally without a password. You may need an inbound Windows Firewall rule for TCP 8766. Changing these options restarts the built-in web server.</p>
                     <p class="small text-warning mb-3 border border-secondary rounded px-2 py-2 bg-dark" data-i18n="settings.lanTimeoutTroubleshoot" data-i18n-html=""><strong>Other devices time out?</strong> If this PC can open its own LAN IP but phones or tablets never load the page, that is almost always the Wi‑Fi/router: use the <strong>same</strong> network (not guest/IoT), turn off <strong>AP / client isolation</strong> if your router has it, and check both devices use the <strong>same subnet</strong> (e.g. 192.168.1.x). Some VPN or security suites block device-to-device traffic even when Windows Firewall is off.</p>
                     <div class="form-check mb-3">
@@ -861,8 +865,8 @@
                     </div>
                     <p class="small text-muted mb-2" data-i18n="setup.modImagesHint">Copies shop PNGs from FS25 mods into the dashboard.</p>
                     <hr class="border-secondary my-3"/>
-                    <h6 class="text-farm-accent small" data-i18n="setup.ftpHeading">FTP polling</h6>
-                    <p class="small text-muted" data-i18n="setup.ftpPollHint">Applies to dedicated (FTP) servers.</p>
+                    <h6 class="text-farm-accent small" data-i18n="setup.ftpAdvancedTitle">Advanced — FTP polling</h6>
+                    <p class="small text-muted" data-i18n="setup.ftpPollHint">Applies to dedicated (FTP) servers. Local saves use file watching, not this schedule.</p>
                     <div class="row g-2 mb-3">
                       <div class="col-md-6">
                         <label class="form-label small" for="app-settings-sm-ftp-delay" data-i18n="setup.delayLabel">Delay before first poll (seconds)</label>
@@ -888,13 +892,25 @@
                     </div>
                     <div class="d-flex flex-wrap gap-3 mb-2 small">
                       <div class="form-check"><input class="form-check-input" type="radio" name="app-settings-sm-mode" id="app-settings-sm-mode-local" value="local" checked/><label class="form-check-label" for="app-settings-sm-mode-local" data-i18n="setup.modeLocal">Local PC</label></div>
-                      <div class="form-check"><input class="form-check-input" type="radio" name="app-settings-sm-mode" id="app-settings-sm-mode-ftp" value="ftp"/><label class="form-check-label" for="app-settings-sm-mode-ftp" data-i18n="setup.modeFtp">Dedicated Server (FTP)</label></div>
+                      <div class="form-check"><input class="form-check-input" type="radio" name="app-settings-sm-mode" id="app-settings-sm-mode-ftp" value="ftp"/><label class="form-check-label" for="app-settings-sm-mode-ftp" data-i18n="setup.modeFtp">Dedicated Server (FTP) — Advanced</label></div>
+                    </div>
+                    <div class="alert alert-secondary border-secondary py-2 px-3 mb-3 small" role="note">
+                      <div class="fw-semibold text-farm-accent mb-1" data-i18n="setup.dedicatedJoinTitle">Dedicated server — join as client (no FTP)</div>
+                      <p class="mb-2 text-muted" data-i18n="setup.dedicatedJoinIntro">Preferred for most dedicated servers: the mod mirrors live data to a joined client PC. Use Local mode below — FTP is optional Advanced only.</p>
+                      <ul class="mb-2 ps-3 list-unstyled">
+                        <li data-i18n="setup.dedicatedJoinStep1">1. Install the Farm Dashboard mod on the dedicated server.</li>
+                        <li data-i18n="setup.dedicatedJoinStep2">2. On this PC (the one running Farm Dashboard), join that server as a client with the same mod enabled.</li>
+                        <li data-i18n="setup.dedicatedJoinStep3">3. Join that server as a client with the same mod — export mirroring starts automatically when you join (no in-game switch). FTP remains Advanced for server hosts who have FTP access.</li>
+                        <li data-i18n="setup.dedicatedJoinStep4">4. The client writes data.json under Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\mirror_&lt;slot&gt;\ (separate from your local savegame folders so they never overwrite each other).</li>
+                        <li data-i18n="setup.dedicatedJoinStep5">5. Add a Local PC server here (or Auto-Detect) and pick the mirror_* subfolder. No FTP required while someone is joined.</li>
+                      </ul>
+                      <p class="mb-0 text-muted" data-i18n="setup.dedicatedJoinLimits">Mirror needs at least one connected client with the mod. An empty dedicated server with zero players will not update until someone joins. Large exports may lag a few seconds behind the server. FTP remains Advanced for moderators with FTP access. Mirrored folders use a mirror_ prefix so they never conflict with single-player savegame slots on this PC.</p>
                     </div>
                     <div id="app-settings-sm-local-fields">
                       <div class="mb-2">
                         <label class="form-label small" for="app-settings-sm-local-path"><span data-i18n="setup.localPath">modSettings Base Path</span></label>
                         <input type="text" class="form-control form-control-sm bg-secondary text-light border-secondary" id="app-settings-sm-local-path" autocomplete="off"/>
-                        <div class="form-text small" data-i18n="setup.localHint">Leave blank for default Documents path.</div>
+                        <div class="form-text small" data-i18n="setup.localHint">Leave blank for the default Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard path (same folder the mod writes for local and join-as-client mirrors).</div>
                       </div>
                       <div class="mb-2">
                         <label class="form-label small" for="app-settings-sm-local-sub"><span data-i18n="setup.saveFolder">Savegame Folder</span></label>
@@ -1042,6 +1058,9 @@
                       <dt class="col-sm-5 text-muted" data-i18n="settings.aboutModExpectedLabel">Minimum mod for this app</dt>
                       <dd class="col-sm-7 mb-1"><span id="settings-about-mod-expected" class="text-light">—</span></dd>
                     </dl>
+                    <h6 class="text-farm-accent" data-i18n="ux.health.title">Connection health</h6>
+                    <p class="small text-muted" id="settings-ux-health">—</p>
+                    <p class="small text-muted" id="settings-ux-events" data-i18n="ux.events.title">Recent status</p>
 
                     <h6 class="text-farm-accent" data-i18n="settings.desktopAppTitle">Desktop app — updates</h6>
                     <p class="small text-muted mb-2" data-i18n="settings.desktopAppHint">The Farm Dashboard installer checks GitHub Releases for new versions. FS25 mod updates use Giants Mod Hub or in-game mods.</p>
@@ -1131,16 +1150,16 @@
 
     <div id="farmdash-lan-auth-overlay" class="farmdash-lan-auth-overlay d-none" aria-hidden="true">
       <div class="farmdash-lan-auth-panel card bg-dark text-light border-secondary shadow-lg p-4 mx-3" style="max-width: 22rem">
-        <h2 class="h5 mb-2">LAN access</h2>
-        <p class="small text-muted mb-3">
-          Enter the LAN username and password from Farm Dashboard → Settings → LAN on the host PC (defaults are not secure — change them there).
+        <h2 class="h5 mb-2" data-i18n="lan.authTitle">LAN login</h2>
+        <p class="small text-muted mb-3" data-i18n="lan.authHint">
+          Enter the username and password from Farm Dashboard Settings on the host PC.
         </p>
-        <label class="form-label small" for="farmdash-lan-auth-user">Username</label>
+        <label class="form-label small" for="farmdash-lan-auth-user" data-i18n="settings.lanUserLabel">Username</label>
         <input type="text" id="farmdash-lan-auth-user" class="form-control form-control-sm mb-2" autocomplete="username" />
-        <label class="form-label small" for="farmdash-lan-auth-pass">Password</label>
+        <label class="form-label small" for="farmdash-lan-auth-pass" data-i18n="settings.lanPassLabel">Password</label>
         <input type="password" id="farmdash-lan-auth-pass" class="form-control form-control-sm mb-2" autocomplete="current-password" />
         <p id="farmdash-lan-auth-error" class="small text-danger mb-3 d-none" role="alert"></p>
-        <button type="button" id="farmdash-lan-auth-submit" class="btn btn-farm-accent w-100">Continue</button>
+        <button type="button" id="farmdash-lan-auth-submit" class="btn btn-farm-accent w-100" data-i18n="lan.authSubmit">Sign in</button>
       </div>
     </div>
 

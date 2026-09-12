@@ -1,4 +1,6 @@
 import { t } from "./i18n/i18n.js";
+import { isMowableForageCrop } from "./forage-crop-types.js";
+import { isCoverCrop } from "./cover-crop-types.js";
 
 /**
  * FS25 FarmDashboard — Layer 1 local heuristic suggestions (offline-safe).
@@ -6,7 +8,8 @@ import { t } from "./i18n/i18n.js";
  *
  * Priority pipeline (highest → lowest) aligns with FieldDataCollector.lua suggestion PR order:
  *
- *   A) Blockers: withered → harvest-ready → loose straw/grass/hay presence (hasLooseStraw / hasLooseGrassWindrow / hasLooseHayWindrow; legacy litre fields optional) →
+ *   A) Blockers: withered → harvest-ready (mow forage / cultivate cover crops / combine cash crops) →
+ *      loose straw/grass/hay presence (hasLooseStraw / hasLooseGrassWindrow / hasLooseHayWindrow; legacy litre fields optional) →
  *      generic swath/windrow (incl. needsBaling / baleableLooseLiters) → physical bales on field → soil scan when variable-rate maps apply but not scanned
  *   B) Fallow (no crop): mulch stubble → plough → lime (before seed) → cultivate mulched soil →
  *      pre-drill N / organic → sow when soil prep + scan data allow
@@ -80,7 +83,7 @@ export function getFieldStableId(field) {
 
 function fieldShowsWithered(f) {
   if (!f || !f.isWithered) return false;
-  if (String(f.fruitType || "").toUpperCase() === "GRASS") return false;
+  if (isGrassCrop(f)) return false;
   return true;
 }
 
@@ -154,8 +157,7 @@ function fruitUpper(field) {
 }
 
 function isGrassCrop(field) {
-  if (fruitUpper(field) === "GRASS") return true;
-  return false;
+  return isMowableForageCrop(field);
 }
 
 /** Use PF map N for ratio/gap copy when PF is on (call sites also gate on scan + target). */
@@ -405,8 +407,8 @@ export function classifyWindrowMaterial(field) {
   if (pairs.length === 0) return null;
   const top = pairs[0][0];
   if (top === "STRAW") return "straw";
-  if (top === "GRASS_WINDROW") return "grass";
-  if (top === "DRYGRASS_WINDROW") return "hay";
+  if (top === "GRASS_WINDROW" || top === "ALFALFA_WINDROW") return "grass";
+  if (top === "DRYGRASS_WINDROW" || top === "DRYALFALFA_WINDROW") return "hay";
   if (top.includes("_SWATH")) return "crop_swath";
   if (pairs.length >= 2 && pairs[1][1] > 0 && pairs[0][1] / (pairs[1][1] + 1) < 3) return "mixed";
   return "mixed";
@@ -1004,12 +1006,21 @@ export function getLocalFieldSuggestion(field, opts = {}) {
 
   // ── A2. Harvest-ready ───────────────────────────────────────────────────────
   if (effectiveHarvestReady(field)) {
-    const ft = fruitUpper(field);
-    if (ft === "GRASS") {
+    if (isGrassCrop(field)) {
       return {
         action: t("rules.action.mowGrass"),
         actionKey: "rules.action.mowGrass",
         reason: t("rules.reason.grassReadyMow"),
+        source: "rules",
+      };
+    }
+    // Catch / cover crops (oilseed radish, map mustard, …): cultivate in — never combine.
+    if (isCoverCrop(field)) {
+      const label = displayCropLabel(field);
+      return {
+        action: t("rules.action.cultivateCoverCrop", { label }),
+        actionKey: "rules.action.cultivateCoverCrop",
+        reason: t("rules.reason.cultivateCoverCrop", { label }),
         source: "rules",
       };
     }

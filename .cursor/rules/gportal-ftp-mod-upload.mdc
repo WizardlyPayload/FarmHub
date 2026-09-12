@@ -1,0 +1,37 @@
+---
+description: Upload FS25_FarmDashboard.zip to GPortal dedicated via FTP. Read local secrets — never commit credentials.
+alwaysApply: false
+---
+
+# GPortal dedicated — FTP mod upload
+
+When the user asks to upload / push the Farm Dashboard **mod** to the Witcombe (or other) **GPortal dedicated** server:
+
+1. Read **`.cursor/secrets/gportal-ftp.env`** (gitignored) for host, port, user, password, remote mods path.
+2. **Never** put passwords in rules, docs, commits, PRs, chat summaries, or terminal echo. Do not print `GPORTAL_FTP_PASS`.
+3. Prefer packaging then uploading:
+   ```bash
+   npm run upload:gportal-mod
+   ```
+   Or step by step:
+   ```bash
+   npm run package:mod
+   node tools/upload-gportal-mod.mjs
+   ```
+   List remote folder (path discovery):
+   ```bash
+   node tools/upload-gportal-mod.mjs --list
+   ```
+4. Local zip default: `%USERPROFILE%\Documents\FarmDash Final Output\FS25_FarmDashboard.zip`
+   Remote mods folder for this GPortal box: **`/profile/mods`** (set in secrets as `GPORTAL_FTP_REMOTE_MODS`).
+5. After upload, tell the user they only need to **restart the dedicated server** and **rejoin / restart the game client** — do not claim the dedicated hot-reloads the zip.
+6. If `--list` shows mods live elsewhere, update `GPORTAL_FTP_REMOTE_MODS` in the secrets file (still gitignored).
+7. This FTP path is for **mod zip deploy** only. Live dashboard data prefers join-as-client mirror; do not reintroduce FTP polling as the primary dedicated data path unless the user asks.
+
+## Never leave incomplete uploads in mods/
+
+**House rule:** do **not** drop `.part`, `.tmp`, `.upload`, `.filepart`, or similar incomplete files into the remote (or local) `mods/` folder.
+
+`tools/upload-gportal-mod.mjs` stages to a temp name in the **parent** of mods (`FS25_FarmDashboard.zip.__uploading__`), then **renames** into `mods/FS25_FarmDashboard.zip` only after the transfer completes. On failure it deletes the staging file. It also sweeps and removes any FarmDashboard orphan incomplete names already in `mods/`.
+
+Agents must use this script (or the same stage-outside-mods-then-rename pattern). Never upload directly as `Something.zip.part` into `mods/`.

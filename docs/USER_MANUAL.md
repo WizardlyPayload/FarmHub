@@ -777,8 +777,10 @@ The dashboard can serve a tablet on your LAN. Always set both **a username and a
 3. (Optional) **IP allowlist** — comma-separated IPs / CIDRs allowed to connect.
 4. (Optional) tick **Require auth even from loopback** if other people use this PC.
 5. Save. The HTTP server now binds `0.0.0.0:8766`.
-6. On the tablet, open `http://<PC-LAN-IP>:8766`. The browser prompts for the credentials you set.
+6. On the tablet, open `http://<PC-LAN-IP>:8766`. Sign in with the LAN username and password from Settings (the in-app prompt, not a change to Setup).
 7. (Optional) append `?viewer=1` for read-only viewer mode on the tablet (hides the gear and any destructive buttons).
+
+**Tablets cannot run Setup.** Adding servers, FTP, or save folders stays on the PC (`setup.html` and Settings → Servers & saves). If you open `/setup.html` from the phone you are sent back to the dashboard. See [`SECURITY.md`](./SECURITY.md) (Setup wizard is local-first).
 
 ![LAN access toggle on with credentials](doc-screenshots/fd-lan-010-toggle-on.png)
 
@@ -844,7 +846,9 @@ The mod has **no in-game console command** and **no Giants settings menu entry**
 | **Language picker did not change everything** | The page reloads on language change — wait for the reload. If a string still falls back to English, the key is missing for that language; see [`I18N.md`](./I18N.md). |
 | **Build / install said `app.asar` is locked** | Run `npm run unlock-install` then re-install. The default `npm run dist` writes the build to `%LOCALAPPDATA%\fs25-farm-dashboard-electron-out\` to avoid IDE locks. |
 | **Uninstall asked to wipe user data** | Yes deletes settings, caches, and the registry entry. No keeps your config so a reinstall picks up where you left off. Cancel aborts the uninstall. |
-| **Tablet says 401 / 403** | LAN credentials wrong, or your tablet is outside the IP allowlist. Loopback always bypasses auth unless you ticked "Require auth even from loopback". |
+| **Tablet says 401 / 403** | LAN credentials wrong, or your tablet is outside the IP allowlist. Loopback always bypasses auth unless you ticked "Require auth even from loopback". Opening **Setup** from a tablet is blocked on purpose — use the PC. |
+| **Setup on a tablet bounced to the dashboard** | Expected. Configure servers on the PC. |
+| **LAN login timed out** | The overlay did not finish in 30 seconds (`E_LAN_TIMEOUT`). Check Wi‑Fi and that the desktop app is running, then retry. This is not the same as a wrong password. |
 | **Mod version badge in navbar** | Install **`FS25_FarmDashboard.zip` 3.1.0.0+** (current release **3.4.0.6**) on the server / local mods folder, load the save once, and confirm `data.json` shows `serverInfo.modVersion`. |
 | **Extra vehicles on fleet (dealership demos)** | Showroom floor stock or contractor-pool demos on a player farm — especially after buying a **new farm** on dedicated. Update to app **4.2.0** + mod **3.4.0.6**, restart the app, and confirm merge filters dealership clutter. |
 | **Fleet map pins offset or on desk border** | Restart the app after upgrading to **4.1.0+** (overview cache v6). Delete `%APPDATA%\fs25-farm-dashboard\map_overviews\` and reopen Fleet map. Confirm the PC running the app has the same map mod installed. |

@@ -1,6 +1,7 @@
 // FS25 FarmDashboard | livestock.js | v2.3.0 (Plan v5 A2)
 
 import { t } from "../i18n/i18n.js";
+import { renderUiStateHtml } from "./uiState.js";
 import {
   loadPenDetail,
   requestPenRefresh,
@@ -217,7 +218,11 @@ export function renderAnimalsTable() {
     } else {
       // If no DataTable, show empty message
       document.getElementById("animals-tbody").innerHTML =
-        `<tr><td colspan="10" class="text-center text-muted">${t("livestock.noAnimalsFound")}</td></tr>`;
+        `<tr><td colspan="10">${renderUiStateHtml({
+          state: "empty",
+          title: t("livestock.noAnimalsFound"),
+          body: t("livestock.emptyNoAnimalsBody"),
+        })}</td></tr>`;
     }
     return;
   }

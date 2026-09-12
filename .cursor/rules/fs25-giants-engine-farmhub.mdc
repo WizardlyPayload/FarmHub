@@ -33,6 +33,7 @@ alwaysApply: true
 
 - **`toJSON` has no max depth or cycle detection** — only safe if every collector outputs **acyclic plain data**. If adding new fields, never stash **userdata**, **function**, or **engine object references** in the assembled table.
 - Prefer extending existing **aggregate-first** patterns in collectors over new per-point arrays.
+- **Never pass Number `1`/`0` where Giants expects Bool** (e.g. `copyFile` arg3). Type-check errors still print inside `pcall`; “compat trial” loops with wrong types flood the log. Latch failed optional exports so mid-cycle collectors do not retry forever.
 
 ## Dashboard merge (Node)
 

@@ -5,8 +5,10 @@
 | Document | When to use it |
 | -------- | -------------- |
 | [../README.md](../README.md) | **Start here** — download, quick install, overview |
-| [INSTALL.md](./INSTALL.md) | Step-by-step install (mod → app → setup) |
-| [USER_MANUAL.md](./USER_MANUAL.md) | Every screen, setting, section, and modal |
+| [**v5 documents/**](./v5%20documents/README.md) | **Farm Dashboard V5 (new screens)** — full manual, install, screenshots, testers, security (port 8768). Classic V4 manuals below stay as they are. |
+| [TESTERS.md](./TESTERS.md) | **Tester drop** — new rebuild vs classic, one mod, full feature checklist |
+| [INSTALL.md](./INSTALL.md) | Step-by-step install (mod → app → setup; dedicated join-as-client or FTP) — **classic V4 UI** |
+| [USER_MANUAL.md](./USER_MANUAL.md) | Every **classic** screen, setting, section, and modal (incl. §3.4a join-as-client) |
 | [SECURITY.md](./SECURITY.md) | LAN access, passwords, firewall |
 | [UPGRADE_FROM_FS25-Farm-Dashboard.md](./UPGRADE_FROM_FS25-Farm-Dashboard.md) | Upgrading from the public 2.0.0 line |
 | [CHANGELOG.md](./CHANGELOG.md) | Version history |

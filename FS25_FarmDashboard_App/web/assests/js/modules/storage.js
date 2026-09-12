@@ -568,6 +568,57 @@ function formatQualityDisplay(loc) {
   return "—";
 }
 
+/** Bunker content label from exported state (not raw fillType alone). */
+export function bunkerLocationLabel(loc) {
+  if (!loc || String(loc.kind || "") !== "bunkerSilo") return null;
+  const state = String(loc.bunkerState || "").toLowerCase();
+  const fermentPct = Number(loc.fermentingPercent);
+  const compactPct = Number(loc.compactedPercent);
+
+  if (state === "closed") {
+    if (Number.isFinite(fermentPct)) {
+      return t("storage.bunker.fermenting", { pct: Math.round(fermentPct) });
+    }
+    return t("storage.bunker.fermentingUnknown");
+  }
+  if (state === "fermented" || state === "drain") {
+    return t("storage.bunker.silage");
+  }
+  if (state === "fill") {
+    if (Number.isFinite(compactPct) && compactPct > 0) {
+      return t("storage.bunker.chaffCompacting", { pct: Math.round(compactPct) });
+    }
+    return t("storage.bunker.chaff");
+  }
+
+  const extra = String(loc.extra || "").trim().toLowerCase();
+  if (extra.startsWith("fermenting")) {
+    const m = extra.match(/(\d+)/);
+    if (m) return t("storage.bunker.fermenting", { pct: Number(m[1]) });
+    return t("storage.bunker.fermentingUnknown");
+  }
+  if (extra.startsWith("compacting")) {
+    const m = extra.match(/(\d+)/);
+    if (m) return t("storage.bunker.chaffCompacting", { pct: Number(m[1]) });
+    return t("storage.bunker.chaff");
+  }
+
+  const out = String(loc.outputFillType || "").toUpperCase();
+  const inn = String(loc.inputFillType || "").toUpperCase();
+  if (out === "SILAGE" || out.includes("SILAGE")) return t("storage.bunker.silage");
+  if (inn === "CHAFF" || inn.includes("CHAFF")) return t("storage.bunker.chaff");
+  return t("storage.bunker.generic");
+}
+
+export function locationKindLabel(loc) {
+  const bunker = bunkerLocationLabel(loc);
+  if (bunker) return bunker;
+  const kind = String(loc?.kind || "").trim();
+  if (!kind) return "—";
+  if (kind === "bunkerSilo") return t("storage.bunker.generic");
+  return kind;
+}
+
 function locationDetailRows(locations) {
   const list = normalizeLocations(locations);
   if (list.length === 0) {
@@ -587,7 +638,7 @@ function locationDetailRows(locations) {
         const grade = formatQualityDisplay(loc);
         return `<tr>
           <td>${escapeHtml(loc.name || "—")}</td>
-          <td>${escapeHtml(loc.kind || "—")}</td>
+          <td>${escapeHtml(locationKindLabel(loc))}</td>
           <td class="text-end">${formatLiters(loc.liters)}</td>
           <td>${moist !== "—" || grade !== "—" ? `${moist} · ${escapeHtml(grade)}` : "—"}</td>
         </tr>`;

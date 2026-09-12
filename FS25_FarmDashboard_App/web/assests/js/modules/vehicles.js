@@ -2530,7 +2530,7 @@ export function renderVehicleCards(vehicles) {
 export function createVehicleCard(vehicle) {
   const brandName = resolveVehicleBrandLabel(vehicle.brand);
   const brandImagePath =
-    typeof vehicle.brand === "object" && vehicle.brand.image
+    vehicle.brand && typeof vehicle.brand === "object" && vehicle.brand.image
       ? vehicle.brand.image
       : null;
 

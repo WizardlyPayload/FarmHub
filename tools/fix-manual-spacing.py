@@ -13,7 +13,7 @@ t = re.sub(r"(\*\(Same UI as[^)]+\)\*)\n(?!\n)", r"\1\n\n", t)
 prev = None
 out = []
 for line in t.splitlines():
-    m = re.search(r'<img src="\./screenshots/([^"]+)"', line)
+    m = re.search(r'<img src="\./(?:doc-)?screenshots/([^"]+)"', line)
     if m and m.group(1) == prev:
         continue
     if m:

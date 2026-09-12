@@ -33,6 +33,7 @@ function suggestionVarietySeed(field, roleId, actionKey, suffix = "") {
 const ACTION_KEY_TO_ROLES = {
   "rules.action.cultivateReseed": ["cultivator", "seeder"],
   "rules.action.combineHarvest": ["harvester", "tractor", "grain_trailer"],
+  "rules.action.cultivateCoverCrop": ["cultivator", "seeder"],
   "rules.action.mowGrass": ["mower", "forage_wagon", "baler", "wrapper"],
   "rules.action.runSoilScan": ["soil_scanner"],
   "rules.action.mulchStubble": ["mulcher"],
@@ -218,10 +219,11 @@ const TOOL_ROLES = [
 ];
 
 function vehicleHaystack(v) {
-  const brand =
-    v && typeof v.brand === "object"
-      ? `${v.brand.title || ""} ${v.brand.name || ""}`
-      : String(v?.brand || "");
+  // Lua exports brand:null for some implements; typeof null === "object".
+  const bo = v?.brand && typeof v.brand === "object" ? v.brand : null;
+  const brand = bo
+    ? `${bo.title || ""} ${bo.name || ""}`
+    : String(v?.brand || "");
   return [
     v?.filename,
     v?.name,
@@ -307,6 +309,11 @@ export function inferToolRoleIds(field, action, actionKey) {
     push("harvester");
     push("tractor");
     push("grain_trailer");
+    return roles;
+  }
+  if (a.includes("cover crop") || (a.includes("cultivate in") && a.includes("cover"))) {
+    push("cultivator");
+    push("seeder");
     return roles;
   }
   if (a.includes("mow") || a.includes("grass is ready")) {
@@ -470,10 +477,10 @@ export function inferToolRoleIds(field, action, actionKey) {
 }
 
 function displayNameForVehicle(v) {
-  const bo = v && typeof v.brand === "object" ? v.brand : null;
+  const bo = v?.brand && typeof v.brand === "object" ? v.brand : null;
   const brand = bo
     ? `${String(bo.title || "").trim()} ${String(bo.name || "").trim()}`.trim()
-    : String(v?.brand || "").trim();
+    : String(typeof v?.brand === "string" ? v.brand : "").trim();
   const tn = (v.typeName || "").trim();
   const n = (v.name || "").trim();
   const model =

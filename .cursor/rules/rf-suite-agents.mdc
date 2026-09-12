@@ -1,0 +1,17 @@
+---
+description: Realistic Farming → Farm Dashboard agent kit
+globs:
+alwaysApply: false
+---
+
+# RF suite → Farm Dashboard
+
+**Ownership:** Realistic Farming *suite* dashboard work stays in FarmHub; **Dash** owns FarmHub. This kit is not permission to edit Realistic-Farming suite repos or RF ledgers. Farm Dashboard product lines are **V4** and **V5** — not an “RF edition”.
+
+When working on Realistic Farming integration in FarmHub:
+
+1. Read `docs/rf-suite/AGENTS.md` first (ownership + **dual-ledger** rule).
+2. Locked schemas: `docs/rf-suite/SCHEMAS.md`. Handles: `docs/rf-suite/HANDLES.md`.
+3. API source of truth: local `C:\Users\Graham\Documents\Realistic-Farming` (do not re-clone). Read `ecosystem-dev-tracking/ecosystem-map.md` — do **not** append to RF `CLAUDE-LOG.md` for dashboard build chatter.
+4. NEW APP only. Soft-detect, pcall, aggregates, authority-only. OM is 0–10. Zero PF hybrid.
+5. V4 `latest.yml` must never receive V5 — see `docs/COMPATIBILITY.md`.

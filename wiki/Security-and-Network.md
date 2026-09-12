@@ -90,7 +90,9 @@ Prefer **Settings → Scan FS25 mods** from the desktop app (IPC) instead.
 
 ## FTP credentials
 
-Stored in **electron-store** under your Windows user profile. Protect with:
+Used only for the **Advanced** dedicated path. Prefer [join as client](Installation-Guide#join-as-client-no-ftp) + Local mode when someone can stay connected — that path does not store FTP passwords.
+
+When you do use FTP, credentials are stored in **electron-store** under your Windows user profile. Protect with:
 
 - Strong Windows account password
 - Disk encryption (BitLocker) on portable PCs

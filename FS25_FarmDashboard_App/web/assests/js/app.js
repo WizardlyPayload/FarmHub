@@ -74,6 +74,7 @@ Object.assign(
 let dashboard;
 document.addEventListener('DOMContentLoaded', async () => {
   installFarmDashRemoteViewerGuards();
+  // Single wait: overlay bootstrap already ran from index.html. Do not call farmdashBootstrapLanViewerAuth again.
   try {
     await farmdashWaitForLanHttpBasicIfNeeded();
   } catch (e) {

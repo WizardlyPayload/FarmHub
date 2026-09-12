@@ -9,11 +9,12 @@ For contributors and maintainers of **FarmHub**. Deep reference: [DEVELOPER_HAND
 ## Architecture
 
 ```
-FS25 (Lua mod, authority only)
-    │ writes data.json (+ optional config.xml)
+FS25 (Lua mod)
+    │ authority writes data.json
+    │ optional: MP mirror → opted-in client writes local data.json
     ▼
 Electron main (Node.js)
-    ├── fs.watch (local) / FTP poll (remote)
+    ├── fs.watch (local / join-as-client) / FTP poll (remote Advanced)
     ├── xmlCollector + dataMerger.mergeData()
     ├── Express HTTP + WebSocket :8766
     └── electron-store, auto-updater
@@ -26,7 +27,8 @@ Chromium renderer (web/)
 
 **Rules:**
 
-- Mod runs only when `isAuthority()` (SP / host / dedicated).
+- Mod **collects** only when `isAuthority()` (SP / host / dedicated).
+- Opted-in MP **clients** may **mirror** the authority export to local `data.json` (join-as-client; no FTP).
 - Export **aggregate** JSON — no huge coordinate dumps.
 - Collectors use **`pcall`** on density / PF APIs (mod conflicts).
 

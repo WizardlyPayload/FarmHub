@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { enrichStockItem } from "../web/assests/js/modules/storage.js";
+import { enrichStockItem, bunkerLocationLabel, locationKindLabel } from "../web/assests/js/modules/storage.js";
 
 test("enrichStockItem resolves TRITICALE by fillTypeIndex from merged economy", () => {
   const economy = {
@@ -98,4 +98,37 @@ test("enrichStockItem resolves sparse catalog indices from economy sell points",
     {}
   );
   assert.equal(water.fillType, "WATER");
+});
+
+test("bunkerLocationLabel maps bunker state to chaff / fermenting / silage", () => {
+  assert.equal(bunkerLocationLabel({ kind: "silo" }), null);
+  assert.equal(
+    bunkerLocationLabel({ kind: "bunkerSilo", bunkerState: "fill" }),
+    "storage.bunker.chaff"
+  );
+  assert.equal(
+    bunkerLocationLabel({ kind: "bunkerSilo", bunkerState: "fill", compactedPercent: 40 }),
+    "storage.bunker.chaffCompacting"
+  );
+  assert.equal(
+    bunkerLocationLabel({ kind: "bunkerSilo", bunkerState: "closed", fermentingPercent: 55 }),
+    "storage.bunker.fermenting"
+  );
+  assert.equal(
+    bunkerLocationLabel({ kind: "bunkerSilo", bunkerState: "fermented" }),
+    "storage.bunker.silage"
+  );
+  assert.equal(
+    bunkerLocationLabel({ kind: "bunkerSilo", bunkerState: "drain" }),
+    "storage.bunker.silage"
+  );
+  assert.equal(
+    bunkerLocationLabel({ kind: "bunkerSilo", extra: "fermenting 12%" }),
+    "storage.bunker.fermenting"
+  );
+  assert.equal(
+    locationKindLabel({ kind: "bunkerSilo", bunkerState: "fermented" }),
+    "storage.bunker.silage"
+  );
+  assert.equal(locationKindLabel({ kind: "husbandry" }), "husbandry");
 });

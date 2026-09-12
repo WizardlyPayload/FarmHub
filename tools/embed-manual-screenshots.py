@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Embed docs/screenshots into USER_MANUAL.md and INSTALL.md as Markdown images."""
+"""Embed docs/doc-screenshots into USER_MANUAL.md and INSTALL.md as Markdown images."""
 import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
-SHOT = DOCS / "screenshots"
+SHOT = DOCS / "doc-screenshots"
+REL = "doc-screenshots"
 
 ALIASES: dict[str, str] = {
     "fd-shell-010-navbar.png": "fd-shell-020-landing.png",
@@ -49,7 +50,7 @@ def resolve(name: str) -> str | None:
 
 def image_block(file: str, caption: str) -> str:
     cap = re.sub(r"\s+", " ", caption.strip().rstrip("."))
-    return f"![{cap}](screenshots/{file})\n\n*Figure: {cap}.*\n"
+    return f"![{cap}]({REL}/{file})\n\n*Figure: {cap}.*\n"
 
 
 def missing_block(name: str, caption: str) -> str:
@@ -94,7 +95,7 @@ def main() -> None:
     if install.is_file():
         process_file(install)
     t = manual.read_text(encoding="utf-8")
-    embedded = len(re.findall(r"!\[[^\]]*\]\(screenshots/", t))
+    embedded = len(re.findall(rf"!\[[^\]]*\]\({REL}/", t))
     missing = t.count("Screenshot not yet added")
     print(f"manual images={embedded} still_missing={missing}")
 

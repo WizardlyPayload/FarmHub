@@ -2,7 +2,21 @@
 
 Player-facing history for the **V5 / new screens** line. Classic 4.x notes stay in [`../CHANGELOG.md`](../CHANGELOG.md).
 
-**App 5.0.4** (working tree) · last GitHub public **5.0.3** · **Mod 5.0.0.3** · Update feed **`latest-rf.yml` only**.
+**App 5.0.5** (working tree) · last GitHub public **5.0.3** · **Mod 5.0.0.4** · Update feed **`latest-rf.yml` only**.
+
+---
+
+## 5.0.5 — working tree (2026-09-13, not on GitHub yet)
+
+DEV bump after **5.0.4**. GitHub Latest stays **5.0.3**. Next GitHub public release is **5.1.0**.
+
+- Map load no longer crashes when `FarmDashboardDataCollector` failed to load (`pcall` around `:init()`).
+- One-shot collectionSafetyV7 turns fields / economy / production collectors back on if Esc settings had persisted them Off.
+- Dairy Core cards show the placeable barn name instead of a truncated uniqueId.
+
+### Product
+- App **5.0.5** · installer `FS25-Farm-Dashboard-V5-Setup-5.0.5.exe`
+- Mod **5.0.0.4**
 
 ---
 

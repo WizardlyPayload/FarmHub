@@ -195,8 +195,9 @@ if (-not $VersionOverride) {
         $modsZip = Join-Path $fs25Mods $CanonicalZipName
         Copy-Item -LiteralPath $DestZip -Destination $modsZip -Force
         Write-Host "Copied to FS25 mods: $modsZip"
-        # Giants SP loads an unpacked `FS25_FarmDashboard` folder over the zip.
-        # Keep that tree in sync so playtest actually runs this pack.
+        # Giants SP loads an unpacked FS25_FarmDashboard folder over the zip.
+        # Keep that tree complete: an empty leftover folder makes extraSourceFiles
+        # fail while FarmDashboard.lua still runs. Sync when the folder already exists.
         $modsFolder = Join-Path $fs25Mods "FS25_FarmDashboard"
         if (Test-Path -LiteralPath $modsFolder -PathType Container) {
             Copy-Item -LiteralPath (Join-Path $ModSource "modDesc.xml") -Destination (Join-Path $modsFolder "modDesc.xml") -Force

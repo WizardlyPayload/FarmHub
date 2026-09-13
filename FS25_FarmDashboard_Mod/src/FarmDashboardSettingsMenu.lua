@@ -80,7 +80,13 @@ end
 
 function FarmDashboardSettingsMenu.getStateIndex(itemDef)
     local cfgVal = FarmDashboardSettingsMenu.getConfigValue(itemDef)
-    if cfgVal == nil then return 1 end
+    if cfgVal == nil then
+        -- Boolean items default ON (values = { false, true }). Index 1 is Off.
+        if itemDef.values[1] == false or itemDef.values[1] == true then
+            return 2
+        end
+        return 1
+    end
 
     local compareVal = cfgVal
     if itemDef.toDisplay then
@@ -108,14 +114,20 @@ end
 function FarmDashboardSettingsMenu.syncControl(itemDef)
     local control = FarmDashboardSettingsMenu.CONTROLS[itemDef.id]
     if control and control.setState then
+        local prev = FarmDashboardSettingsMenu._syncing
+        FarmDashboardSettingsMenu._syncing = true
         control:setState(FarmDashboardSettingsMenu.getStateIndex(itemDef))
+        FarmDashboardSettingsMenu._syncing = prev
     end
 end
 
 function FarmDashboardSettingsMenu.syncAllControls()
+    local prev = FarmDashboardSettingsMenu._syncing
+    FarmDashboardSettingsMenu._syncing = true
     for _, itemDef in ipairs(FarmDashboardSettingsMenu.ITEMS) do
         FarmDashboardSettingsMenu.syncControl(itemDef)
     end
+    FarmDashboardSettingsMenu._syncing = prev
 end
 
 function FarmDashboardSettingsMenu.syncControlPermissions()
@@ -130,6 +142,7 @@ function FarmDashboardSettingsMenu.syncControlPermissions()
 end
 
 function FarmDashboardSettingsControls.onMenuOptionChanged(self, state, menuOption)
+    if FarmDashboardSettingsMenu._syncing then return end
     local id = menuOption.id
     local itemDef = nil
     for _, def in ipairs(FarmDashboardSettingsMenu.ITEMS) do
@@ -167,6 +180,7 @@ function FarmDashboardSettingsMenu.addSettingsToMenu()
     end
 
     FarmDashboardSettingsControls.name = settingsPage.name
+    FarmDashboardSettingsMenu._syncing = true
 
     local function addMultiMenuOption(itemDef)
         local originalBox = settingsPage.multiVolumeVoiceBox
@@ -243,6 +257,7 @@ function FarmDashboardSettingsMenu.addSettingsToMenu()
     end)
 
     FarmDashboardSettingsMenu.registered = true
+    FarmDashboardSettingsMenu._syncing = false
     if FarmDashLog and FarmDashLog.dev then
         FarmDashLog.dev("Farm Dashboard settings injected into gameplay settings page")
     end

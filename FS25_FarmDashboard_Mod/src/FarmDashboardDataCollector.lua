@@ -1425,6 +1425,31 @@ function FarmDashboardDataCollector:loadConfig()
                 setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV6Applied", true)
                 saveXMLFile(xmlFile)
             end
+            -- ESC settings clone used to fire onClick at inject time and persist Off for
+            -- fields / economy / production. Restore those core exporters once.
+            if not Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV7Applied"), false) then
+                local restored = {}
+                if self.config.enableFields ~= true then
+                    self.config.enableFields = true
+                    restored[#restored + 1] = "fields"
+                end
+                if self.config.enableEconomy ~= true then
+                    self.config.enableEconomy = true
+                    restored[#restored + 1] = "economy"
+                end
+                if self.config.enableProduction ~= true then
+                    self.config.enableProduction = true
+                    restored[#restored + 1] = "production"
+                end
+                setXMLBool(xmlFile, "farmDashboard.modules#fields", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#economy", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#production", true)
+                setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV7Applied", true)
+                saveXMLFile(xmlFile)
+                if #restored > 0 then
+                    Logging.info("[FarmDash] Re-enabled export modules: %s", table.concat(restored, ", "))
+                end
+            end
             -- Ensure all core + optional module collectors default ON (older installs may have toggled off).
             if not Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#modulesDefaultOnApplied"), false) then
                 self.config.enableAnimals = true
@@ -1503,6 +1528,8 @@ function FarmDashboardDataCollector:loadConfig()
         setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV4Applied", true)
         setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV5Applied", true)
         setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV6Applied", true)
+        setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV7Applied", true)
+        setXMLBool(xmlFile, "farmDashboard.settings#modulesDefaultOnApplied", true)
         setXMLInt(xmlFile, "farmDashboard.settings#economyRowsPerSlice", self.config.economyRowsPerSlice)
         saveXMLFile(xmlFile)
         delete(xmlFile)
@@ -1597,6 +1624,8 @@ function FarmDashboardDataCollector:saveConfig()
     setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_fields", Utils.getNoNil(cfg.useStateMachine_fields, false))
     setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_production", Utils.getNoNil(cfg.useStateMachine_production, false))
     setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV6Applied", true)
+    setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV7Applied", true)
+    setXMLBool(xmlFile, "farmDashboard.settings#modulesDefaultOnApplied", true)
 
     setXMLBool(xmlFile, "farmDashboard.modules#animals", Utils.getNoNil(cfg.enableAnimals, true))
     setXMLBool(xmlFile, "farmDashboard.modules#vehicles", Utils.getNoNil(cfg.enableVehicles, true))
@@ -2334,6 +2363,10 @@ function FarmDashboardDataCollector:ensureModLinkedCollectorsEnabled(persist)
         local coll = rawget(_G, row[1])
         if coll and type(coll.isModLoaded) == "function" and coll.isModLoaded() then
             forceOn(row[2])
+            -- Soil / crop-stress overlays are merged onto field rows.
+            if row[1] == "RfSoilFertilizerDataCollector" or row[1] == "RfCropStressDataCollector" then
+                forceOn("enableFields")
+            end
         end
     end
 

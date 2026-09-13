@@ -70,3 +70,9 @@ export function shortBarnLabel(barnId: string): string {
   if (raw.length <= 12) return raw;
   return `${raw.slice(0, 6)}…${raw.slice(-4)}`;
 }
+
+export function barnDisplayName(barn: RfDairyBarn | null | undefined): string {
+  const name = String(barn?.name || "").trim();
+  if (name) return name;
+  return shortBarnLabel(barn?.barnId || "");
+}

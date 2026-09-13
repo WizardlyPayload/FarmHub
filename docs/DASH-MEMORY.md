@@ -36,7 +36,7 @@ Cold-start bank for the **Dash** FarmHub product seat. Skimmable bullets only. D
 | Line | App / mod | Auto-update | Output |
 |------|-----------|-------------|--------|
 | **V4** (classic 4.x) | `package.json` **4.2.2**; classic screens; Start Menu **Farm Dashboard V4** | **`latest.yml` only** | Private candidates under `Documents/FarmDash Release Candidates\`; do not treat `FarmDash Final Output` 4.2.1 as this rebuild |
-| **V5** (rebuild 5.x) | App **5.0.4** (working tree) via `electron-builder.rf.yml` `extraMetadata` (package.json stays 4.2.2); last GitHub public **5.0.3**; shortcut **Farm Dashboard V5**; same in-game mod zip works with both | **`latest-rf.yml` only** — never V4 | **`Documents/FarmDash Release/`** (flat zip + V5 Setup.exe) |
+| **V5** (rebuild 5.x) | App **5.0.5** (working tree) via `electron-builder.rf.yml` `extraMetadata` (package.json stays 4.2.2); last GitHub public **5.0.3**; shortcut **Farm Dashboard V5**; same in-game mod zip works with both | **`latest-rf.yml` only** — never V4 | **`Documents/FarmDash Release/`** (flat zip + V5 Setup.exe) |
 
 Never put the V5 Setup.exe on V4 `latest.yml`. Guard: `tools/app/assert-rf-update-channel.mjs`. Story: [`COMPATIBILITY.md`](./COMPATIBILITY.md). Tester checklist: [`TESTERS.md`](./TESTERS.md). Do **not** call V5 “RF edition” in product-facing names.
 
@@ -48,9 +48,15 @@ Never put the V5 Setup.exe on V4 `latest.yml`. Guard: `tools/app/assert-rf-updat
 | **PUBLIC** | GitHub (and matching itch) release | Every time a new version is published on GitHub |
 | **DEV** | Local / tester working-tree stamp | Every app change after the last GitHub release; **reset to 0** on the next GitHub publish |
 
-Last GitHub public: **5.0.3**. This working tree: **5.0.4**. Next GitHub publish: **5.1.0**. Mod zip is four-part (`5.0.0.x` in `modDesc.xml`); bump its last number only when the Lua zip actually changes. Do not stamp a working-tree installer with the same three-part version as GitHub Latest.
+Last GitHub public: **5.0.3**. This working tree: **5.0.5**. Next GitHub publish: **5.1.0**. Mod zip is four-part (`5.0.0.x` in `modDesc.xml`); bump its last number only when the Lua zip actually changes. Do not stamp a working-tree installer with the same three-part version as GitHub Latest.
 
 **Ports / demos:** installed V4 `:8766` (`%APPDATA%\fs25-farm-dashboard`); installed V5 `:8768` (`%APPDATA%\fs25-farm-dashboard-rf`); repo NEW UI `:8767` (`%LOCALAPPDATA%\fs25-farm-dashboard-dev`) via `npm run dev:new-ui`. Do not proxy Vite at `:5173` to installed `:8766` when testing new merge/collectors.
+
+#### 2026-09-13 — V5 5.0.5 DEV (Riverbend collectors, not GitHub yet)
+- In-game `loadSharedI3DFileFinished` red text was `FarmDashboard.lua:87` calling `:init()` after extraSourceFiles failed (incomplete unpacked `mods/FS25_FarmDashboard` folder). loadMap is now pcall-guarded.
+- Live `config.xml` had **fields / economy / production off**, so merged fields, RF map overlays, and productions vanished. ESC settings clone could persist Off; inject no longer writes on setState. One-shot collectionSafetyV7 turns those three back on.
+- Dairy Core cards use placeable `getName()` instead of truncated uniqueId.
+- App **5.0.5**, mod **5.0.0.4**. GitHub stays **5.0.3**. Rescued from closed #7 tip `390db3ae`; ui-v2 lock stayed on main via #14.
 
 #### 2026-09-13 — V5 5.0.4 DEV (not GitHub yet)
 - App **5.0.4** after GitHub **5.0.3**. V5 no longer packs or serves classic `web/index.html` / root `setup.html`. New screens only. Mod zip still **5.0.0.3** (no Lua change). Drop: `Documents/FarmDash Release\FS25-Farm-Dashboard-V5-Setup-5.0.4.exe`.
@@ -167,7 +173,7 @@ Classic web/  OR  NEW APP (ui-v2) when flagged
 ## 7. Open / watch items
 
 - **Classic 4.2 GitHub/itch hotfix** for `copyFile` / map-overview latch still **owed** on public V4 feed (local/GPortal mod may already be 5.0.0.1; V4 app line is separate).
-- **V5 publish:** GitHub Latest remains **5.0.3** until Wizard asks to publish. Working-tree drop is **5.0.4** in `Documents/FarmDash Release\` (`FS25-Farm-Dashboard-V5-Setup-5.0.4.exe`). Authenticode signing still open; **do not** publish onto V4 Latest. User-facing name is Farm Dashboard V5 (not “RF edition”).
+- **V5 publish:** GitHub Latest remains **5.0.3** until Wizard asks to publish. Working-tree drop is **5.0.5** in `Documents/FarmDash Release\` (`FS25-Farm-Dashboard-V5-Setup-5.0.5.exe`). Authenticode signing still open; **do not** publish onto V4 Latest. User-facing name is Farm Dashboard V5 (not “RF edition”).
 - **In-game SP/MP smoke** for RF soil/treatmentPlan after dedicated restart (often pending after GPortal upload).
 - **NEW APP parity:** live QA; some P0/P1 rows still open (`NEW APP/PARITY.md`, `PARITY_GAPS.md`) — Fields cluster prefs, nav icons, etc.
 - **Website demo** on `:8766` classic stays separate from repo `:8767` NEW UI.

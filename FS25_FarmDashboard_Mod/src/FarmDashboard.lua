@@ -4,7 +4,7 @@
 FarmDashboard = {}
 FarmDashboard.MOD_NAME = "FS25_FarmDashboard"
 FarmDashboard.MOD_DIR = _G.g_currentModDirectory
-FarmDashboard.VERSION = "5.0.0.3"
+FarmDashboard.VERSION = "5.0.0.4"
 FarmDashboard.UPDATE_INTERVAL = 10000
 FarmDashboard.PORT = 8766
 FarmDashboard.readyAt = nil
@@ -83,8 +83,22 @@ function FarmDashboard:loadMap()
     if hasLoaded then return end
     hasLoaded = true
 
-    -- Scripts are loaded via modDesc extraSourceFiles; init once when the map loads.
-    FarmDashboardDataCollector:init()
+    -- extraSourceFiles can fail (leftover unpacked mods/FS25_FarmDashboard folder, or a
+    -- zip Giants cannot resolve). Never throw from loadMap — this runs inside i3d
+    -- streaming (loadSharedI3DFileFinished) and a nil :init() aborts the callback.
+    local dc = rawget(_G, "FarmDashboardDataCollector")
+    if dc and type(dc.init) == "function" then
+        local ok, err = pcall(function()
+            dc:init()
+        end)
+        if not ok then
+            Logging.warning("[FarmDash] DataCollector init failed: %s", tostring(err))
+        end
+    else
+        Logging.warning(
+            "[FarmDash] FarmDashboardDataCollector did not load. If both FS25_FarmDashboard.zip and an unpacked FS25_FarmDashboard folder exist, Giants uses the folder — keep that folder complete or delete it."
+        )
+    end
 
     if FarmDashboardSettingsGui and FarmDashboardSettingsGui.init then
         FarmDashboardSettingsGui.init()

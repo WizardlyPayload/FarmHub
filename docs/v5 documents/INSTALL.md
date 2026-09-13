@@ -4,8 +4,8 @@
 
 | | |
 | --- | --- |
-| **App** | **5.0.4** — installer `FS25-Farm-Dashboard-V5-Setup-5.0.4.exe` (Start Menu: **Farm Dashboard V5**) |
-| **Mod** | **5.0.0.3** (`FS25_FarmDashboard.zip` — **same zip** as classic V4) |
+| **App** | **5.0.5** — installer `FS25-Farm-Dashboard-V5-Setup-5.0.5.exe` (Start Menu: **Farm Dashboard V5**) |
+| **Mod** | **5.0.0.4** (`FS25_FarmDashboard.zip` — **same zip** as classic V4) |
 | **Dashboard URL** | Installed V5: [http://localhost:8768](http://localhost:8768) after setup |
 | **Update feed** | `latest-rf.yml` only — **never** V4 `latest.yml` |
 
@@ -83,7 +83,7 @@ The file should exist and its **Modified** time should advance while you play.
 
 ## Stage D — Install the Windows **V5** app
 
-1. Download **`FS25-Farm-Dashboard-V5-Setup-5.0.4.exe`**. Older local 5.0.x builds may still say `…-RF-Setup-…` on disk — treat those as V5 too.
+1. Download **`FS25-Farm-Dashboard-V5-Setup-5.0.5.exe`**. Older local 5.0.x builds may still say `…-RF-Setup-…` on disk — treat those as V5 too.
 2. Run the installer. Choose language on the welcome page.
 3. Finish setup and launch **Farm Dashboard V5** from the Start menu.
 

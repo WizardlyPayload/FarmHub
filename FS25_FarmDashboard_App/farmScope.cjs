@@ -174,6 +174,26 @@ function pruneMergedDataToPlayerFarms(data) {
     }
     out.redTape = redTape;
   }
+  if (data.invoices?.byFarm && typeof data.invoices.byFarm === "object") {
+    const invoices = { ...data.invoices, byFarm: {} };
+    for (const [key, val] of Object.entries(data.invoices.byFarm)) {
+      const id = Number(key);
+      if (Number.isFinite(id) && id > 0 && playerIds.has(id)) {
+        invoices.byFarm[String(id)] = val;
+      }
+    }
+    out.invoices = invoices;
+  }
+  if (data.hirePurchasing?.byFarm && typeof data.hirePurchasing.byFarm === "object") {
+    const hirePurchasing = { ...data.hirePurchasing, byFarm: {} };
+    for (const [key, val] of Object.entries(data.hirePurchasing.byFarm)) {
+      const id = Number(key);
+      if (Number.isFinite(id) && id > 0 && playerIds.has(id)) {
+        hirePurchasing.byFarm[String(id)] = val;
+      }
+    }
+    out.hirePurchasing = hirePurchasing;
+  }
   return out;
 }
 

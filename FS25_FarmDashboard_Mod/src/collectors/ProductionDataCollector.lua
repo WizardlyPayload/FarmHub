@@ -20,7 +20,7 @@ end
 local function fillTypeNameSafe(fillTypeIndex)
     local idx = tonumber(fillTypeIndex)
     if not idx then return "unknown" end
-    local ftm = rawget(_G, "g_fillTypeManager")
+    local ftm = _G.g_fillTypeManager
     if not ftm or not ftm.getFillTypeNameByIndex then return "unknown" end
     local ok, name = pcall(function() return ftm:getFillTypeNameByIndex(idx) end)
     if ok and name and tostring(name) ~= "" then return tostring(name) end
@@ -67,14 +67,10 @@ local function resolveProductionOwnerFarmId(placeable, pp, everyone)
         local spec = placeable.spec_productionPoint or placeable.spec_extendedProductionPoint
         if spec then add(rawget(spec, "ownerFarmId")) end
     end
+    -- Never fall back to mission:getFarmId() — that wrongly assigns map/EVERYONE
+    -- productions to the local player's farm. Unresolved / public → 0.
     if #candidates > 0 then return candidates[1] end
-    local mission = _G.g_currentMission
-    if mission and mission.getFarmId and (placeable or pp) then
-        local ok, pf = pcall(function() return mission:getFarmId() end)
-        if ok then add(pf) end
-    end
-    if #candidates > 0 then return candidates[1] end
-    return nil
+    return 0
 end
 
 local function productionIsPlayerFarmId(farmId, everyone)
@@ -192,12 +188,24 @@ end
 
 function ProductionDataCollector:_tryAddProductionPoint(result, seenPP, pp, farmId, source, extra)
     if not pp or seenPP[pp] then return end
-    local fid = tonumber(farmId) or resolveProductionOwnerFarmId(extra and extra.placeable, pp, extra and extra.everyone)
-    if not fid or not productionIsPlayerFarmId(fid, extra and extra.everyone or 0) then return end
+    local everyone = (extra and extra.everyone) or 0
+    local fid = tonumber(farmId)
+    if not fid then
+        fid = resolveProductionOwnerFarmId(extra and extra.placeable, pp, everyone)
+    end
+    fid = tonumber(fid) or 0
+    local isPublic = fid <= 0 or fid == everyone
+    if isPublic then
+        fid = 0
+    elseif not productionIsPlayerFarmId(fid, everyone) then
+        return
+    end
     seenPP[pp] = true
     local pData = self:collectProductionPointData(pp, fid)
     if not pData then return end
     pData.source = source or pData.source
+    pData.isPublic = isPublic
+    pData.isOwned = not isPublic
     if extra then
         if extra.placeableStoreName then pData.placeableStoreName = extra.placeableStoreName end
         if extra.placeable and extra.placeable.getName then
@@ -211,12 +219,24 @@ end
 
 function ProductionDataCollector:_tryAddFactory(result, seenFactoryPlaceable, placeable, farmId, source, everyone)
     if not placeable or seenFactoryPlaceable[placeable] then return end
-    local fid = tonumber(farmId) or resolveProductionOwnerFarmId(placeable, nil, everyone)
-    if not fid or not productionIsPlayerFarmId(fid, everyone) then return end
+    everyone = everyone or 0
+    local fid = tonumber(farmId)
+    if not fid then
+        fid = resolveProductionOwnerFarmId(placeable, nil, everyone)
+    end
+    fid = tonumber(fid) or 0
+    local isPublic = fid <= 0 or fid == everyone
+    if isPublic then
+        fid = 0
+    elseif not productionIsPlayerFarmId(fid, everyone) then
+        return
+    end
     seenFactoryPlaceable[placeable] = true
     local pData = self:collectFactoryPlaceable(placeable, fid)
     if not pData then return end
     pData.source = source or pData.source
+    pData.isPublic = isPublic
+    pData.isOwned = not isPublic
     table.insert(result.chains, pData)
     self:_prodYieldAfterChain(result)
 end
@@ -261,8 +281,10 @@ function ProductionDataCollector:_collectFromProductionChainManager(result, seen
         local ok, owner = pcall(function()
             return pp and pp.getOwnerFarmId and pp:getOwnerFarmId() or rawget(pp, "ownerFarmId")
         end)
-        if ok and owner and tonumber(owner) and tonumber(owner) ~= everyone then
-            self:_tryAddProductionPoint(result, seenPP, pp, tonumber(owner), "chainManager", { everyone = everyone })
+        local oid = ok and tonumber(owner) or nil
+        -- Include player-owned and public/EVERYONE (owner 0); skip AI farms via _tryAdd.
+        if oid == nil or oid == everyone or oid <= 0 or productionIsPlayerFarmId(oid, everyone) then
+            self:_tryAddProductionPoint(result, seenPP, pp, oid, "chainManager", { everyone = everyone })
         end
     end
 
@@ -521,7 +543,7 @@ function ProductionDataCollector:collectFactoryPlaceable(placeable, farmId)
             }
             if production.inputs then
                 for _, input in pairs(production.inputs) do
-                    local ftm = rawget(_G, "g_fillTypeManager")
+                    local ftm = _G.g_fillTypeManager
                     local ftName = "unknown"
                     if ftm and ftm.getFillTypeByIndex then
                         local ok, ft = pcall(function() return ftm:getFillTypeByIndex(input.type) end)
@@ -535,7 +557,7 @@ function ProductionDataCollector:collectFactoryPlaceable(placeable, farmId)
             end
             if production.outputs then
                 for _, output in pairs(production.outputs) do
-                    local ftm = rawget(_G, "g_fillTypeManager")
+                    local ftm = _G.g_fillTypeManager
                     local ftName = "unknown"
                     if ftm and ftm.getFillTypeByIndex then
                         local ok, ft = pcall(function() return ftm:getFillTypeByIndex(output.type) end)
@@ -555,10 +577,25 @@ function ProductionDataCollector:collectFactoryPlaceable(placeable, farmId)
 end
 
 function ProductionDataCollector:getPositionFromObject(obj)
-    if obj and obj.rootNode then
-        local success, x, y, z = pcall(getWorldTranslation, obj.rootNode)
-        if success and x and y and z then
-            return { x = x, y = y, z = z }
+    local candidates = { obj }
+    if type(obj) == "table" then
+        candidates[#candidates + 1] = obj.owningPlaceable
+        candidates[#candidates + 1] = obj.placeable
+        candidates[#candidates + 1] = obj.owner
+        candidates[#candidates + 1] = obj.parentPlaceable
+    end
+    for i = 1, #candidates do
+        local cand = candidates[i]
+        if type(cand) == "table" then
+            local node = cand.rootNode or cand.nodeId
+            if node ~= nil then
+                local success, x, y, z = pcall(getWorldTranslation, node)
+                if success and type(x) == "number" and type(z) == "number" then
+                    if math.abs(x) > 0.5 or math.abs(z) > 0.5 then
+                        return { x = x, y = y or 0, z = z }
+                    end
+                end
+            end
         end
     end
     return { x = 0, y = 0, z = 0 }

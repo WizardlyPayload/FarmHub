@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- FS25 FarmDashboard | modDesc.xml | v3.0.0 -->
+<!-- FS25 FarmDashboard | modDesc.xml | v5.0.0.3 (V5) -->
 <modDesc descVersion="109">
     <author>JoshWalki / WizardlyPayload</author>
-    <version>3.4.0.6</version>
+    <version>5.0.0.3</version>
     
     <title>
         <en>Farm Dashboard</en>
@@ -10,10 +10,10 @@
     </title>
     
     <description>
-        <en><![CDATA[Farm Dashboard combines a lightweight Farming Simulator 25 mod with a free Windows desktop app. Keep playing as normal — the mod exports live farm data in the background while the app turns it into a full management dashboard in your browser.
+        <en><![CDATA[Farm Dashboard combines a lightweight Farming Simulator 25 mod with a free Windows desktop app. Keep playing as normal â€” the mod exports live farm data in the background while the app turns it into a full management dashboard in your browser.
 
 In-game mod:
-- Silent background export — no hotkeys and no extra panels in FS25
+- Silent background export â€” no hotkeys and no extra panels in FS25
 - Fields, crops, soil, windrows, and bales on the map
 - Vehicles with fleet positions for the live map view
 - Livestock and husbandry totals; pen-level detail when supported
@@ -22,13 +22,13 @@ In-game mod:
 - Single-player, multiplayer host, and dedicated server (export on authority only)
 
 Windows app:
-- Home hub — one screen for livestock, vehicles, fields, economy, pastures, and productions
-- Fields — growth stage, Precision Farming N/pH where available, windrow and bale badges, suggested next-step hints
-- Livestock — herd summary, search and filters, per-animal health, weight, value, and location
-- Vehicles — fleet cards with condition, operating hours, cargo, and coordinates; live fleet map with map overview
-- Productions — input/output storage, recipes, cycle rates, and slot status
-- Economy — money, loans, market board, purchases, consumables, and physical bale stock
-- Pastures — grazing areas with status and warnings
+- Home hub â€” one screen for livestock, vehicles, fields, economy, pastures, and productions
+- Fields â€” growth stage, Precision Farming N/pH where available, windrow and bale badges, suggested next-step hints
+- Livestock â€” herd summary, search and filters, per-animal health, weight, value, and location
+- Vehicles â€” fleet cards with condition, operating hours, cargo, and coordinates; live fleet map with map overview
+- Productions â€” input/output storage, recipes, cycle rates, and slot status
+- Economy â€” money, loans, market board, purchases, consumables, and physical bale stock
+- Pastures â€” grazing areas with status and warnings
 - Multiple local saves and dedicated servers (folder watch or FTP polling)
 - Live in-game clock and weather; optional LAN access from other devices on your network
 - Themes and 27 UI languages
@@ -36,40 +36,40 @@ Windows app:
 Install the mod from ModHub, enable it on your save, and load into the world once. Download the Windows app and step-by-step setup (local saves, dedicated/FTP, LAN) here:
 https://github.com/WizardlyPayload/FarmHub/wiki
 
-Multiplayer: only the host or dedicated server writes export data. Clients can join normally — the mod does not alter gameplay.
+Multiplayer: only the host or dedicated server writes export data. Joined clients automatically receive a chunked local mirror (liveData.json + mirror_<slot>/data.json) for the desktop app â€” no in-game toggle; the mod does not alter gameplay.
 
 Works alongside common mods where APIs are available (e.g. Precision Farming, Realistic Livestock, Advanced Damage System, Vehicle Years).
 
 https://github.com/WizardlyPayload/FarmHub]]></en>
-        <de><![CDATA[Farm Dashboard verbindet einen schlanken Farming Simulator 25 Mod mit einer kostenlosen Windows-Desktop-App. Weiter normal spielen — der Mod exportiert Live-Daten im Hintergrund, die App zeigt sie als vollständiges Management-Dashboard im Browser.
+        <de><![CDATA[Farm Dashboard verbindet einen schlanken Farming Simulator 25 Mod mit einer kostenlosen Windows-Desktop-App. Weiter normal spielen â€” der Mod exportiert Live-Daten im Hintergrund, die App zeigt sie als vollstÃ¤ndiges Management-Dashboard im Browser.
 
 Mod im Spiel:
-- Stiller Hintergrund-Export — keine Hotkeys, keine zusätzlichen FS25-UI-Panels
-- Felder, Früchte, Boden, Schwaden und Ballen auf der Karte
-- Fahrzeuge inkl. Flottenpositionen für die Live-Karte
-- Viehbestand und Stall-Daten; Stall-Details wo unterstützt
-- Produktionsketten, Lagerfüllstände und aktive Fabrikslots
+- Stiller Hintergrund-Export â€” keine Hotkeys, keine zusÃ¤tzlichen FS25-UI-Panels
+- Felder, FrÃ¼chte, Boden, Schwaden und Ballen auf der Karte
+- Fahrzeuge inkl. Flottenpositionen fÃ¼r die Live-Karte
+- Viehbestand und Stall-Daten; Stall-Details wo unterstÃ¼tzt
+- Produktionsketten, LagerfÃ¼llstÃ¤nde und aktive Fabrikslots
 - Wirtschaft, Marktpreise, Finanzen und Wetter
 - Einzelspieler, Multiplayer-Host und Dedicated Server (Export nur auf Authority)
 
 Windows-App:
-- Startseite — Livestock, Fahrzeuge, Felder, Wirtschaft, Weiden und Produktion auf einen Blick
-- Felder — Wachstumsstadium, Precision-Farming N/pH wo verfügbar, Schwaden-/Ballen-Badges, Hinweise zum nächsten Schritt
-- Vieh — Herdenübersicht, Suche/Filter, Gesundheit, Gewicht, Wert und Standort pro Tier
-- Fahrzeuge — Flottenkarten mit Zustand, Betriebsstunden, Ladung und Koordinaten; Live-Flottenkarte mit Kartenübersicht
-- Produktion — Input-/Output-Lager, Rezepte, Zyklusraten und Slot-Status
-- Wirtschaft — Geld, Kredite, Markt, Käufe, Verbrauchsmaterial und physische Ballen
-- Weiden — Weideflächen mit Status und Warnungen
-- Mehrere lokale Saves und Dedicated Server (Ordnerüberwachung oder FTP)
-- Live-Spieluhr und Wetter; optional LAN-Zugriff von anderen Geräten im Netzwerk
+- Startseite â€” Livestock, Fahrzeuge, Felder, Wirtschaft, Weiden und Produktion auf einen Blick
+- Felder â€” Wachstumsstadium, Precision-Farming N/pH wo verfÃ¼gbar, Schwaden-/Ballen-Badges, Hinweise zum nÃ¤chsten Schritt
+- Vieh â€” HerdenÃ¼bersicht, Suche/Filter, Gesundheit, Gewicht, Wert und Standort pro Tier
+- Fahrzeuge â€” Flottenkarten mit Zustand, Betriebsstunden, Ladung und Koordinaten; Live-Flottenkarte mit KartenÃ¼bersicht
+- Produktion â€” Input-/Output-Lager, Rezepte, Zyklusraten und Slot-Status
+- Wirtschaft â€” Geld, Kredite, Markt, KÃ¤ufe, Verbrauchsmaterial und physische Ballen
+- Weiden â€” WeideflÃ¤chen mit Status und Warnungen
+- Mehrere lokale Saves und Dedicated Server (OrdnerÃ¼berwachung oder FTP)
+- Live-Spieluhr und Wetter; optional LAN-Zugriff von anderen GerÃ¤ten im Netzwerk
 - Themes und 27 UI-Sprachen
 
 Mod von ModHub installieren, im Save aktivieren und einmal in die Welt laden. Windows-App und Anleitung (lokal, Dedicated/FTP, LAN):
 https://github.com/WizardlyPayload/FarmHub/wiki
 
-Multiplayer: Nur Host oder Dedicated Server schreiben Exportdaten. Clients können normal beitreten — kein Gameplay-Eingriff.
+Multiplayer: Nur Host oder Dedicated Server schreiben Exportdaten. Beigetretene Clients erhalten automatisch einen chunkweisen lokalen Spiegel (liveData.json + mirror_<slot>/data.json) fÃ¼r die Desktop-App (kein Schalter im Spiel) â€” kein Gameplay-Eingriff.
 
-Kompatibel mit gängigen Mods wo APIs verfügbar sind (z. B. Precision Farming, Realistic Livestock, Advanced Damage System, Vehicle Years).
+Kompatibel mit gÃ¤ngigen Mods wo APIs verfÃ¼gbar sind (z. B. Precision Farming, Realistic Livestock, Advanced Damage System, Vehicle Years).
 
 https://github.com/WizardlyPayload/FarmHub]]></de>
     </description>
@@ -97,6 +97,8 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
     <extraSourceFiles>
         <sourceFile filename="src/FarmDashboardSettingsApi.lua"/>
         <sourceFile filename="src/FarmDashboardSettingsEvent.lua"/>
+        <sourceFile filename="src/FarmDashboardExportEvent.lua"/>
+        <sourceFile filename="src/FarmDashboardExportMirror.lua"/>
         <sourceFile filename="src/FarmDashboardSettingsMenu.lua"/>
         <sourceFile filename="src/FarmDashboardSettingsGui.lua"/>
         <sourceFile filename="src/FarmDashboard.lua"/>
@@ -117,5 +119,23 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/collectors/StockDataCollector.lua"/>
         <sourceFile filename="src/collectors/BaleInventoryCollector.lua"/>
         <sourceFile filename="src/collectors/RedTapeDataCollector.lua"/>
+        <sourceFile filename="src/collectors/InvoicesDataCollector.lua"/>
+        <sourceFile filename="src/collectors/HirePurchasingDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfSoilFertilizerDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfCropStressDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfTaxDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfMarketDynamicsDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfFuelCostsDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfWorkerCostsDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfIncomeDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfWorkplaceTriggersDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfDairyDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfNpcFavorDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfWorldEventsDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfProStaffDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfFertilizerDepotDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfWeatherGuardDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfTimeGuardDataCollector.lua"/>
+        <sourceFile filename="src/collectors/rf/RfPresenceDataCollector.lua"/>
     </extraSourceFiles>
 </modDesc>

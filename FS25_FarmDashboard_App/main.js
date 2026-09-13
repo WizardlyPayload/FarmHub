@@ -35,7 +35,16 @@ const FARMDASH_PORT = resolveFarmdashPort();
 const {
     getMapOverviewCacheDir,
     resolveMapOverviewImage,
+    resolveMagickExe,
 } = require('./mapOverviewResolver');
+const { resolveMapFieldOutlines, attachOutlinesToFieldList } = require('./mapFieldOutlines.cjs');
+const { getVanillaFillTypeCatalog, resolveMapFillTypeCatalog } = require('./mapFillTypes.cjs');
+const {
+    ensureFillTypeHudPng,
+    prefetchFillTypeHudCache,
+    getFillTypeHudCacheDir,
+    fileLooksLikePng,
+} = require('./fillTypeHud.cjs');
 
 const LAN_ACCESS_DEFAULTS = {
     lanAccessEnabled: false,
@@ -48,12 +57,26 @@ const LAN_ACCESS_DEFAULTS = {
 
 const {
     collectXmlData,
+    getSavegameXmlFingerprint,
     SAVEGAME_XML_FILES,
     FTP_SAVEGAME_XML_DOWNLOAD_ORDER,
 } = require('./xmlCollector');
-const { mergeData, buildFieldLiveFingerprints, supplementRedTapeCropRotation } = require('./dataMerger');
+const {
+    hasHttpFeed,
+    downloadHttpFeedSavegameXml,
+} = require('./httpFeedXml');
+const { mergeData, buildFieldLiveFingerprints, supplementRedTapeCropRotation, applyResolvedMapBounds, worldItemsForMapBounds } = require('./dataMerger');
 const { isCorsOriginAllowed: corsOriginAllowedPure, isLocalServerHost: isLocalServerHostPure } = require('./corsPolicy');
-const { hydrateLuaDataAnimalsFromDetails } = require('./detailAnimalsHydrate');
+const lanHttpPath = require('./lanHttpPath.cjs');
+const safeFsIdentity = require('./safeFsIdentity.cjs');
+const fileCommit = require('./fileCommit.cjs');
+const { ftpAccessOptions } = require('./ftpAccess.cjs');
+const setupAccessPolicy = require('./setupAccessPolicy.cjs');
+const {
+    resolveServersForSave,
+    configNeedsServerReboot,
+} = require('./setupConfigMerge.cjs');
+const { hydrateLuaDataAnimalsFromDetails, hydrateLuaDataAnimalsFromDetailsAsync } = require('./detailAnimalsHydrate');
 const { loadServerCache, saveServerCache, appendFieldHistory } = require('./serverDataCache');
 const { initAppUpdater, checkForUpdatesNow } = require('./app-updater');
 const {
@@ -63,7 +86,7 @@ const {
     selectPreferredFs25UserDataRoot,
     selectPreferredFs25ModsDirectory,
 } = require('./fs25Paths');
-const { readFileUtf8WithRetryAsync } = require('./fileReadRetry');
+const { readFileUtf8WithRetryAsync, delay: delayMs } = require('./fileReadRetry');
 const {
     shouldIgnoreMinimalLuaExport,
     applyMergedSnapshotIfStaleExport,
@@ -71,10 +94,18 @@ const {
     updateLiveSectionBackup,
     updateLastGoodMergedSnapshot,
     buildHeldPayloadFromState,
+    createMergeRebuildGate,
 } = require('./mergedSnapshotHold');
+const mergeRebuildGate = createMergeRebuildGate();
 const { isLuaExportStale, resolveLuaExportStaleMs } = require('./liveExportFreshness');
 const livestockDetailModule = require('./livestockDetail.js');
 const { validateLanCredentials } = require('./lanCredentialPolicy.js');
+const {
+    buildSetupStatus,
+    createUxEventLog,
+    applyFreshnessMeta,
+    ERROR_CODES,
+} = require('./uxContract.cjs');
 
 const store = new Store({ defaults: { ...LAN_ACCESS_DEFAULTS } });
 
@@ -137,6 +168,25 @@ function ensureLanWsSecret() {
     return s;
 }
 
+function closeAllWebSocketClients(reason) {
+    const why = String(reason || 'policy_changed');
+    for (const ws of Array.from(clients || [])) {
+        try {
+            if (ws && ws.readyState === WebSocket.OPEN) ws.close(4001, why);
+        } catch (_) {
+            /* ignore */
+        }
+    }
+    if (clients && typeof clients.clear === 'function') clients.clear();
+}
+
+function rotateLanWsSecret(reason) {
+    const s = crypto.randomBytes(24).toString('hex');
+    store.set('lanWsSecret', s);
+    closeAllWebSocketClients(reason || 'lan_credentials_rotated');
+    return s;
+}
+
 function ensureSetupWriteToken() {
     let t = store.get('farmdashSetupWriteToken');
     if (typeof t === 'string' && t.length >= 16) return t;
@@ -195,25 +245,74 @@ function stripUtf8Bom(s) {
     return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
 }
 let mainWindow;
+const ftpPollInFlight = new Map();
+const ftpActiveClients = new Map();
+
+function registerTrustedHandle(channel, handler) {
+    ipcMain.handle(channel, (event, ...args) => {
+        if (!isTrustedDashboardIpcSender(event)) {
+            throw Object.assign(new Error('untrusted_sender'), { code: 'UNTRUSTED_IPC_SENDER' });
+        }
+        return handler(event, ...args);
+    });
+}
+
+function registerTrustedEvent(channel, handler) {
+    ipcMain.on(channel, (event, ...args) => {
+        if (!isTrustedDashboardIpcSender(event)) {
+            console.warn('[IPC] Rejected untrusted sender for ' + channel);
+            return;
+        }
+        return handler(event, ...args);
+    });
+}
 let serverStates = {};   // id → { luaData, xmlData, mergedData, watcher, intervals[] }
+const uxEventLog = createUxEventLog();
+let uxRequiresRestart = false;
+
+function pushUxEvent(code, message, source) {
+    const row = uxEventLog.push({
+        code: code || ERROR_CODES.E_NETWORK,
+        message: String(message || ''),
+        source: source || 'setup',
+    });
+    console.log(`[UX] ${row.source} ${row.code}: ${row.message}`);
+    return row;
+}
 /** Timeouts/intervals for coordinated multi-FTP polling (cleared in stopAllWatchers). */
 let ftpPollingTimers = [];
 /** Debounce writing serverLiveCache JSON to disk after merge. */
 const serverCacheSaveTimers = {};
+const ftpPollGenerations = Object.create(null);
 
 
-/** PowerShell script: repo tools/ or packaged resources/tools/ */
+/** PowerShell script: packaged resources/tools, then FarmHub/tools (dev). */
+function modExportScriptCandidates() {
+    const list = [];
+    if (process.resourcesPath) {
+        list.push(path.join(process.resourcesPath, 'tools', 'Export-ModStoreImages.ps1'));
+    }
+    // Dev: FS25_FarmDashboard_App/../tools  →  FarmHub/tools
+    list.push(path.join(__dirname, '..', 'tools', 'Export-ModStoreImages.ps1'));
+    list.push(path.join(__dirname, 'tools', 'Export-ModStoreImages.ps1'));
+    return list;
+}
+
 async function resolveModExportScriptPath() {
-    if (app.isPackaged) {
-        const p = path.join(process.resourcesPath, 'tools', 'Export-ModStoreImages.ps1');
+    const seen = new Set();
+    let last = '';
+    for (const p of modExportScriptCandidates()) {
+        if (!p || seen.has(p)) continue;
+        seen.add(p);
+        last = p;
         try {
             await fs.promises.access(p, fs.constants.F_OK);
             return p;
         } catch {
-            /* fall through to dev repo path */
+            /* try next */
         }
     }
-    return path.join(__dirname, '..', '..', 'tools', 'Export-ModStoreImages.ps1');
+    return last || path.join(__dirname, '..', 'tools', 'Export-ModStoreImages.ps1');
 }
 
 /**
@@ -255,6 +354,26 @@ function sendModExportProgress(sender, payload) {
     }
 }
 
+/** Native MessageBox unless the NEW APP (or other UI) asked to own the completion dialog. */
+async function presentModExportDialog(progressSender, suppressNative, { boxType, message, detail, summary, ok }) {
+    sendModExportProgress(progressSender, {
+        type: 'result',
+        ok: !!ok,
+        boxType: boxType || 'info',
+        message: message || '',
+        detail: detail || '',
+        summary: summary || null,
+    });
+    if (suppressNative || !mainWindow) return;
+    await dialog.showMessageBox(mainWindow, {
+        type: boxType || 'info',
+        title: 'Mod shop images',
+        message: message || '',
+        detail: detail || undefined,
+        buttons: ['OK'],
+    });
+}
+
 function createPowerShellLineSplitter(onLine) {
     let buf = '';
     return {
@@ -274,7 +393,9 @@ function createPowerShellLineSplitter(onLine) {
 }
 
 /** Shared by ipcMain.handle and POST /api/export-mod-store-images (fallback when IPC is unavailable). */
-async function runExportModStoreImages(progressSender) {
+async function runExportModStoreImages(progressSender, options) {
+    const opts = options && typeof options === 'object' ? options : {};
+    const suppressNative = opts.suppressNative === true;
     if (process.platform !== 'win32') {
         const msg = 'Mod image export runs only on Windows (PowerShell + FS mods folder layout).';
         if (mainWindow) {
@@ -302,15 +423,12 @@ async function runExportModStoreImages(progressSender) {
         await fs.promises.mkdir(outputDir, { recursive: true });
     } catch (e) {
         const err = e && e.message ? e.message : String(e);
-        if (mainWindow) {
-            await dialog.showMessageBox(mainWindow, {
-                type: 'error',
-                title: 'Mod shop images',
-                message: 'Could not create output folder for exported images.',
-                detail: `${outputDir}\n\n${err}`,
-                buttons: ['OK']
-            });
-        }
+        await presentModExportDialog(progressSender, suppressNative, {
+            boxType: 'error',
+            message: 'Could not create output folder for exported images.',
+            detail: `${outputDir}\n\n${err}`,
+            ok: false,
+        });
         return { ok: false, error: err };
     }
     const summaryJson = path.join(app.getPath('temp'), 'farmdash-mod-export-summary.json');
@@ -323,6 +441,7 @@ async function runExportModStoreImages(progressSender) {
     }
 
     const texconv = await resolveBundledTexconvPath();
+    const magick = await resolveMagickExe().catch(() => null);
     const args = [
         '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', scriptPath,
         '-ModsRoot', modsRoot,
@@ -330,6 +449,7 @@ async function runExportModStoreImages(progressSender) {
         '-SummaryJsonPath', summaryJson
     ];
     if (texconv) args.push('-TexconvPath', texconv);
+    if (magick) args.push('-MagickPath', magick);
 
     console.log('[export-mod-store-images] Starting PowerShell:', scriptPath);
     console.log('[export-mod-store-images] ModsRoot:', modsRoot);
@@ -398,15 +518,12 @@ async function runExportModStoreImages(progressSender) {
     } catch (e) {
         const err = e && e.message ? e.message : String(e);
         const timedOut = /timed out/i.test(err);
-        if (mainWindow) {
-            await dialog.showMessageBox(mainWindow, {
-                type: 'error',
-                title: 'Mod shop images',
-                message: timedOut ? 'Mod image export timed out or was stopped.' : 'Could not start PowerShell.',
-                detail: err,
-                buttons: ['OK']
-            });
-        }
+        await presentModExportDialog(progressSender, suppressNative, {
+            boxType: 'error',
+            message: timedOut ? 'Mod image export timed out or was stopped.' : 'Could not start PowerShell.',
+            detail: err,
+            ok: false,
+        });
         return { ok: false, error: err };
     }
 
@@ -431,28 +548,23 @@ async function runExportModStoreImages(progressSender) {
             `PowerShell exit code: ${exitCode}`,
             `Script: ${scriptPath}`
         ].join('\n');
-        if (mainWindow) {
-            await dialog.showMessageBox(mainWindow, {
-                type: 'error',
-                title: 'Mod shop images',
-                message: 'Export did not produce a summary file.',
-                detail,
-                buttons: ['OK']
-            });
-        }
+        await presentModExportDialog(progressSender, suppressNative, {
+            boxType: 'error',
+            message: 'Export did not produce a summary file.',
+            detail,
+            ok: false,
+        });
         return { ok: false, error: 'No summary JSON', exitCode, stderr };
     }
 
     if (summary.ok === false) {
-        if (mainWindow) {
-            await dialog.showMessageBox(mainWindow, {
-                type: 'error',
-                title: 'Mod shop images',
-                message: summary.error || 'Export failed',
-                detail: `Mods folder:\n${summary.modsRoot || modsRoot}`,
-                buttons: ['OK']
-            });
-        }
+        await presentModExportDialog(progressSender, suppressNative, {
+            boxType: 'error',
+            message: summary.error || 'Export failed',
+            detail: `Mods folder:\n${summary.modsRoot || modsRoot}`,
+            summary,
+            ok: false,
+        });
         return summary;
     }
 
@@ -505,20 +617,18 @@ async function runExportModStoreImages(progressSender) {
         }`;
     }
 
-    if (mainWindow) {
-        await dialog.showMessageBox(mainWindow, {
-            type: boxType,
-            title: 'Mod shop images',
-            message: msg,
-            detail: detailLines.join('\n'),
-            buttons: ['OK']
-        });
-    }
+    await presentModExportDialog(progressSender, suppressNative, {
+        boxType,
+        message: msg,
+        detail: detailLines.join('\n'),
+        summary,
+        ok: true,
+    });
 
     return { ...summary, ok: true };
 }
 
-ipcMain.handle('export-mod-store-images', (event) => runExportModStoreImages(event.sender));
+registerTrustedHandle('export-mod-store-images', (event, opts) => runExportModStoreImages(event.sender, opts));
 
 // ── Express / WebSocket ───────────────────────────────────────────────────────
 const expressApp = express();
@@ -600,31 +710,10 @@ function normalizeIpForAllowlist(ip) {
 
 /**
  * When `lanAuthOptional` is true, GET/HEAD may skip Basic auth only for static/readme routes — never for live data,
- * tokens, or server manager JSON. Paths are Express `req.path` (no query).
+ * tokens, or server manager JSON. Matching is case-insensitive and ignores trailing slashes (Express default).
  */
 function isLanSensitiveHttpPath(reqPath) {
-    const p = String(reqPath || '').split('?')[0] || '';
-    if (!p.startsWith('/api/')) return false;
-    const sensitive = new Set([
-        '/api/lan-ws-token',
-        '/api/setup-config',
-        '/api/data',
-        '/api/animals',
-        '/api/vehicles',
-        '/api/fields',
-        '/api/production',
-        '/api/finance',
-        '/api/weather',
-        '/api/economy',
-        '/api/farmlands',
-        '/api/simhub-view-config',
-        '/api/simhub-session',
-        '/api/servers',
-        '/api/livestock',
-    ]);
-    if (sensitive.has(p)) return true;
-    if (p.startsWith('/api/livestock/')) return true;
-    return false;
+    return lanHttpPath.isLanSensitiveHttpPath(reqPath);
 }
 
 /** Logs actionable LAN hints when HTTP starts (visible in the Electron main-process console / debug). */
@@ -711,24 +800,6 @@ function redactConfigForHttpGet(config) {
 }
 
 /** Preserve FTP / feed secrets when LAN setup POST omits redacted fields (GET never returns cleartext). */
-function mergeServersPreserveSecrets(prevServers, incomingServers) {
-    if (!Array.isArray(incomingServers)) return [];
-    const prevById = new Map((prevServers || []).map((s) => [String(s.id), s]));
-    return incomingServers.map((inc) => {
-        if (!inc || typeof inc !== 'object') return inc;
-        const prev = prevById.get(String(inc.id));
-        const out = { ...inc };
-        delete out.ftpPassSet;
-        delete out.httpFeedCodeSet;
-        if (inc.mode === 'ftp' && prev) {
-            const emptyPass = inc.ftpPass == null || String(inc.ftpPass).trim() === '';
-            if (emptyPass && prev.ftpPass) out.ftpPass = prev.ftpPass;
-        }
-        const emptyCode = inc.httpFeedCode == null || String(inc.httpFeedCode).trim() === '';
-        if (emptyCode && prev && prev.httpFeedCode) out.httpFeedCode = prev.httpFeedCode;
-        return out;
-    });
-}
 
 const MARKETING_SITE_HOSTS = new Set([
     'www.farmdashboard.co.uk',
@@ -782,7 +853,9 @@ function checkLanAccessForRequest(req) {
 
     const method = String(req.method || 'GET').toUpperCase();
     const isWsUpgrade = String(req.headers?.upgrade || '').toLowerCase() === 'websocket';
-    const pathOnly = req.path || (req.url && String(req.url).split('?')[0]) || '';
+    const pathOnly = lanHttpPath.normalizeHttpPath(
+        req.path || (req.url && String(req.url).split('?')[0]) || ''
+    );
     /**
      * Remote tablets need the HTML/JS/CSS shell and a health check without the browser's HTTP Basic
      * dialog. Farm data stays on /api/* (sensitive list + other /api routes still require auth below).
@@ -791,7 +864,7 @@ function checkLanAccessForRequest(req) {
     if (
         (method === 'GET' || method === 'HEAD') &&
         !isWsUpgrade &&
-        (!pathOnly.startsWith('/api/') || pathOnly === '/api/status')
+        lanHttpPath.maySkipLanBasicForGet(pathOnly, false)
     ) {
         return { ok: true };
     }
@@ -799,7 +872,7 @@ function checkLanAccessForRequest(req) {
         cfg.lanAuthOptional &&
         (method === 'GET' || method === 'HEAD') &&
         !isWsUpgrade &&
-        !isLanSensitiveHttpPath(pathOnly)
+        lanHttpPath.maySkipLanBasicForGet(pathOnly, true)
     ) {
         return { ok: true };
     }
@@ -845,15 +918,88 @@ function isLocalhostSocket(req) {
     return isLoopbackIp(requestRemoteAddress(req));
 }
 
-/** Local dashboard UI (this PC): loopback or same host opened via LAN IP. */
-function isLocalDashboardClient(req) {
-    return isRequestFromThisMachine(req);
+function isSetupLocalClient(req) {
+    return isLocalhostSocket(req) || isRequestFromThisMachine(req);
 }
 
+function setupTokenMatches(req) {
+    const expected = String(store.get('farmdashSetupWriteToken') || '');
+    const got = String((req && req.headers && req.headers['x-setup-token']) || '').trim();
+    return !!expected && got === expected;
+}
+
+/**
+ * Local-first setup gate. Same helper for /setup.html, GET/POST /api/setup-config.
+ * Loopback and same-machine NIC IPs are allowed. Other LAN clients are 403 unless
+ * FARMDASH_ALLOW_REMOTE_SETUP=1. Writes also require X-Setup-Token.
+ */
+/** Host header must be this machine (loopback or NIC IP). A reverse proxy with a public Host must not inherit setup trust. */
+function setupHostAllowed(req) {
+    const raw = String((req.headers && req.headers.host) || '').trim();
+    if (!raw) return isLocalhostSocket(req);
+    const host = raw.split(':')[0].toLowerCase();
+    return isLocalServerHost(host);
+}
+
+function evaluateSetupAccess(req, requireToken) {
+    const remoteAllowed = setupAccessPolicy.isRemoteSetupAllowed();
+    const isLocalClient = isSetupLocalClient(req) && (remoteAllowed || setupHostAllowed(req));
+    return setupAccessPolicy.canAccessSetupPayload(req, {
+        isLocalClient,
+        remoteAllowed,
+        requireToken: !!requireToken,
+        tokenMatches: setupTokenMatches(req),
+    });
+}
+
+function denySetupAccess(req, res, decision) {
+    res.setHeader('Cache-Control', 'no-store');
+    if (setupAccessPolicy.wantsJsonSetupDenial(req)) {
+        return res.status(decision.status || 403).json({
+            ok: false,
+            error: decision.error || setupAccessPolicy.LOCAL_ONLY_MESSAGE,
+            errorCode: decision.errorCode || setupAccessPolicy.ERROR_SETUP_LOCAL_ONLY,
+        });
+    }
+    return res.redirect(302, setupAccessPolicy.setupDeniedLocation());
+}
 
 /** Allow POST /api/export-mod-store-images from LAN (default: localhost only). Power users: set env FARMDASH_ALLOW_LAN_EXPORT=1 */
 function allowLanModExportHttp() {
     return process.env.FARMDASH_ALLOW_LAN_EXPORT === '1';
+}
+
+/**
+ * NEW APP Vite output is copied to App/ui-v2 at build time (tools/app/copy-ui-v2.mjs).
+ * Prefer packaged ui-v2 next to main.js; fall back to repo NEW APP/dist for local Vite builds.
+ */
+function resolveNewUiDistDir() {
+    const packaged = path.join(__dirname, 'ui-v2');
+    if (fs.existsSync(path.join(packaged, 'index.html'))) return packaged;
+    const repoDist = path.join(__dirname, '..', 'NEW APP', 'dist');
+    if (fs.existsSync(path.join(repoDist, 'index.html'))) return repoDist;
+    return packaged;
+}
+
+function readPackagedProductLine() {
+    return PRODUCT_LINE;
+}
+
+function isRfProductLine() {
+    return editionPolicy.isV5ProductLine(readPackagedProductLine());
+}
+
+function shouldServeNewUi() {
+    if (process.env.FARMDASH_UI_V2 === '0' || process.env.FARMDASH_UI_V2 === 'false') return false;
+    if (isRfProductLine()) return true;
+    if (process.env.FARMDASH_UI_V2 === '1' || process.env.FARMDASH_UI_V2 === 'true') return true;
+    try {
+        const prefs = store.get('uiPreferences') || {};
+        if (prefs.useNewUi !== undefined) return prefs.useNewUi === true;
+        return false;
+    } catch (_) {
+        return false;
+    }
 }
 
 expressApp.use(cors({ origin: corsOriginAllowed }));
@@ -878,6 +1024,48 @@ expressApp.use('/map-overview-cache', (req, res, next) => {
         return res.status(503).end();
     }
 });
+let fillTypeHudCacheStatic = null;
+expressApp.use('/fill-type-hud', (req, res, next) => {
+    if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+    const name = String(req.path || '').replace(/^\/+/, '');
+    if (!name || name.includes('/') || name.includes('\\')) return next();
+    try {
+        const dest = path.join(getFillTypeHudCacheDir(), name);
+        if (fileLooksLikePng(dest)) {
+            if (!fillTypeHudCacheStatic) {
+                fillTypeHudCacheStatic = express.static(getFillTypeHudCacheDir(), {
+                    fallthrough: true,
+                    maxAge: '1h',
+                });
+            }
+            return fillTypeHudCacheStatic(req, res, next);
+        }
+    } catch {
+        /* convert below */
+    }
+    return next();
+});
+expressApp.get('/fill-type-hud/:name', async (req, res) => {
+    let raw = String(req.params.name || '');
+    try {
+        raw = decodeURIComponent(raw);
+    } catch {
+        /* keep raw */
+    }
+    raw = raw.replace(/\.png$/i, '').trim();
+    if (!raw) return res.status(400).end();
+    try {
+        const png = await ensureFillTypeHudPng(
+            raw,
+            hudSourcesForMap(req.query.mapId, req.query.mapTitle)
+        );
+        if (!png) return res.status(404).end();
+        return res.type('png').sendFile(path.resolve(png));
+    } catch (e) {
+        console.warn('[fill-type-hud]', e && e.message ? e.message : e);
+        return res.status(404).end();
+    }
+});
 expressApp.get('/api/map-overview-image', async (req, res) => {
     const mapId = String(req.query.mapId || '').trim();
     const mapTitle = String(req.query.mapTitle || '').trim();
@@ -898,6 +1086,61 @@ expressApp.get('/api/map-overview-image', async (req, res) => {
         return res.status(500).json({ ok: false, error: msg });
     }
 });
+expressApp.get('/api/map-field-outlines', async (req, res) => {
+    const mapId = String(req.query.mapId || '').trim();
+    const mapTitle = String(req.query.mapTitle || '').trim();
+    if (!mapId && !mapTitle) {
+        return res.status(400).json({ ok: false, error: 'missing_map_id', fields: [] });
+    }
+    try {
+        const modsRoots = collectFs25ModsDirectories(getElectronDocumentsPath);
+        const modsRoot = modsRoots[0] || path.join(getFs25DocumentsRoot(), 'mods');
+        const result = await resolveMapFieldOutlines({ mapId, mapTitle, modsRoot, modsRoots });
+        return res.json(result);
+    } catch (e) {
+        const msg = e && e.message ? e.message : String(e);
+        console.warn('[map-field-outlines]', msg);
+        return res.status(500).json({ ok: false, error: msg, fields: [] });
+    }
+});
+const newUiDistDir = resolveNewUiDistDir();
+const newUiEnabled = shouldServeNewUi() && fs.existsSync(path.join(newUiDistDir, 'index.html'));
+
+/**
+ * Setup must inject __FARMDASH_SETUP_TOKEN before static middleware.
+ * When FARMDASH_UI_V2 / useNewUi is on, serve NEW APP dist/setup.html (not legacy App/setup.html).
+ */
+expressApp.get('/setup.html', async (req, res) => {
+    try {
+        const access = evaluateSetupAccess(req, false);
+        if (!access.ok) return denySetupAccess(req, res, access);
+        ensureSetupWriteToken();
+        const token = String(store.get('farmdashSetupWriteToken') || '');
+        const newUiSetup = path.join(newUiDistDir, 'setup.html');
+        const p =
+            newUiEnabled && fs.existsSync(newUiSetup)
+                ? newUiSetup
+                : path.join(__dirname, 'setup.html');
+        let html = await fs.promises.readFile(p, 'utf8');
+        const inj = `<script>window.__FARMDASH_SETUP_TOKEN=${JSON.stringify(token)};</script>`;
+        const i = html.indexOf('</head>');
+        if (i === -1) {
+            html = inj + html;
+        } else {
+            html = html.slice(0, i) + inj + html.slice(i);
+        }
+        res.setHeader('Cache-Control', 'no-store');
+        res.type('html').send(html);
+    } catch (e) {
+        console.error('[setup.html]', e);
+        res.status(500).end();
+    }
+});
+
+if (newUiEnabled) {
+    expressApp.use(express.static(newUiDistDir));
+    console.log('[UI] Serving NEW APP from', newUiDistDir);
+}
 expressApp.use(express.static(path.join(__dirname, 'web')));
 /** setup.html uses src="web/assests/..." — same paths work over http://host:8766/… and file:// */
 expressApp.use('/web', express.static(path.join(__dirname, 'web')));
@@ -920,30 +1163,20 @@ expressApp.get('/app-brand-icon.ico', async (req, res) => {
         res.status(404).end();
     }
 });
-expressApp.get('/', (req, res) => res.sendFile(path.join(__dirname, 'web', 'index.html')));
-expressApp.get('/setup.html', async (req, res) => {
-    try {
-        ensureSetupWriteToken();
-        const token = String(store.get('farmdashSetupWriteToken') || '');
-        const p = path.join(__dirname, 'setup.html');
-        let html = await fs.promises.readFile(p, 'utf8');
-        const inj = `<script>window.__FARMDASH_SETUP_TOKEN=${JSON.stringify(token)};</script>`;
-        const i = html.indexOf('</head>');
-        if (i === -1) {
-            html = inj + html;
-        } else {
-            html = html.slice(0, i) + inj + html.slice(i);
-        }
-        res.type('html').send(html);
-    } catch (e) {
-        console.error('[setup.html]', e);
-        res.status(500).end();
+expressApp.get('/', (req, res) => {
+    const newUiIndex = path.join(newUiDistDir, 'index.html');
+    if (newUiEnabled && fs.existsSync(newUiIndex)) {
+        return res.sendFile(newUiIndex);
     }
+    return res.sendFile(path.join(__dirname, 'web', 'index.html'));
 });
 
-/** Setup wizard JSON — FTP / feed secrets never included (use ftpPassSet / httpFeedCodeSet). Electron uses IPC for full config. */
+/** Setup wizard JSON — FTP / feed secrets never included (use ftpPassSet / httpFeedCodeSet). Electron uses IPC for full config. Local-first: not for LAN tablets. */
 expressApp.get('/api/setup-config', (req, res) => {
     try {
+        const access = evaluateSetupAccess(req, false);
+        if (!access.ok) return denySetupAccess(req, res, access);
+        res.setHeader('Cache-Control', 'no-store');
         res.json(redactConfigForHttpGet(store.get('config') || {}));
     } catch (e) {
         console.error('[api/setup-config GET]', e);
@@ -958,11 +1191,8 @@ expressApp.get('/api/setup-config', (req, res) => {
 expressApp.post('/api/setup-config', async (req, res) => {
     try {
         ensureSetupWriteToken();
-        const expected = String(store.get('farmdashSetupWriteToken') || '');
-        const got = String(req.headers['x-setup-token'] || '').trim();
-        if (!expected || got !== expected) {
-            return res.status(403).json({ ok: false, error: 'Forbidden' });
-        }
+        const access = evaluateSetupAccess(req, true);
+        if (!access.ok) return denySetupAccess(req, res, access);
         const body = req.body;
         if (!body || typeof body !== 'object') {
             return res.status(400).json({ ok: false, error: 'Expected JSON body' });
@@ -971,6 +1201,7 @@ expressApp.post('/api/setup-config', async (req, res) => {
             return res.status(400).json({ ok: false, error: 'servers array required' });
         }
         await applyFarmdashSetupConfig(body);
+        res.setHeader('Cache-Control', 'no-store');
         res.json({ ok: true });
     } catch (e) {
         console.error('[api/setup-config POST]', e);
@@ -1085,6 +1316,150 @@ function filterFieldsByExclusions(fields, serverId) {
     return fields.filter((f) => f != null && !ex.has(Number(f.farmlandId ?? f.id)));
 }
 
+const mapFieldOutlineMemo = new Map();
+const mapFieldOutlineWarmup = new Set();
+const mapFillTypeMemo = new Map();
+const mapFillTypeWarmup = new Set();
+
+function outlineMemoKeyFromMerged(merged) {
+    if (!merged || typeof merged !== 'object') return '';
+    const mapId = String(merged.mapId || (merged.serverInfo && merged.serverInfo.mapId) || '').trim();
+    const mapTitle = String(merged.mapTitle || (merged.serverInfo && merged.serverInfo.mapName) || '').trim();
+    if (!mapId && !mapTitle) return '';
+    return `${mapId}::${mapTitle}`;
+}
+
+function warmupMapFieldOutlines(serverId, merged) {
+    const key = outlineMemoKeyFromMerged(merged);
+    if (!key || mapFieldOutlineMemo.has(key) || mapFieldOutlineWarmup.has(key)) return;
+    mapFieldOutlineWarmup.add(key);
+    const mapId = String(merged.mapId || (merged.serverInfo && merged.serverInfo.mapId) || '').trim();
+    const mapTitle = String(merged.mapTitle || (merged.serverInfo && merged.serverInfo.mapName) || '').trim();
+    const modsRoots = collectFs25ModsDirectories(getElectronDocumentsPath);
+    const modsRoot = modsRoots[0] || path.join(getFs25DocumentsRoot(), 'mods');
+    resolveMapFieldOutlines({ mapId, mapTitle, modsRoot, modsRoots })
+        .then((result) => {
+            if (result && result.ok && Array.isArray(result.fields) && result.fields.length > 0) {
+                mapFieldOutlineMemo.set(key, result.fields);
+                const state = serverId ? serverStates[serverId] : null;
+                if (state && state.mergedData) broadcast(serverId, state.mergedData);
+            }
+        })
+        .catch((e) => {
+            console.warn('[map-field-outlines] warmup', e && e.message ? e.message : e);
+        })
+        .finally(() => mapFieldOutlineWarmup.delete(key));
+}
+
+function mapFillResultForMerged(merged) {
+    const key = outlineMemoKeyFromMerged(merged);
+    if (key && mapFillTypeMemo.has(key)) return mapFillTypeMemo.get(key);
+    return null;
+}
+
+function mapFillCatalogForMerged(merged) {
+    const hit = mapFillResultForMerged(merged);
+    if (hit && hit.catalog) return hit.catalog;
+    if (hit && typeof hit === 'object' && !hit.catalog) {
+        // legacy memo stored the catalog object itself
+        const keys = Object.keys(hit);
+        if (keys.length > 1 && hit['1'] === 'UNKNOWN') return hit;
+    }
+    return getVanillaFillTypeCatalog();
+}
+
+function mapFillTitlesForMerged(merged) {
+    const hit = mapFillResultForMerged(merged);
+    return (hit && hit.titlesByIndex) || null;
+}
+
+function hudSourcesForMap(mapId, mapTitle) {
+    const key = `${String(mapId || '').trim()}::${String(mapTitle || '').trim()}`;
+    if (key !== '::' && mapFillTypeMemo.has(key)) {
+        const hit = mapFillTypeMemo.get(key);
+        return (hit && hit.hudByName) || {};
+    }
+    const merged = getActiveMergedDataForStatus();
+    const fromActive = mapFillResultForMerged(merged);
+    return (fromActive && fromActive.hudByName) || {};
+}
+
+let vanillaFillTypeHudEpoch = 0;
+let vanillaFillTypeHudWarmupStarted = false;
+
+function stampFillTypeHudEpochOnServers(epoch) {
+    vanillaFillTypeHudEpoch = epoch;
+    for (const [sid, st] of Object.entries(serverStates || {})) {
+        if (!st || !st.mergedData) continue;
+        st.mergedData.fillTypeHudEpoch = epoch;
+        try {
+            broadcast(sid, st.mergedData);
+        } catch {
+            /* ignore */
+        }
+    }
+}
+
+function startVanillaFillTypeHudWarmup() {
+    if (vanillaFillTypeHudWarmupStarted) return;
+    vanillaFillTypeHudWarmupStarted = true;
+    prefetchFillTypeHudCache({})
+        .then((wrote) => {
+            const epoch = Date.now();
+            console.log('[fill-type-hud] vanilla warmup wrote', wrote);
+            stampFillTypeHudEpochOnServers(epoch);
+        })
+        .catch((e) => {
+            console.warn('[fill-type-hud] vanilla warmup', e && e.message ? e.message : e);
+            stampFillTypeHudEpochOnServers(Date.now());
+        });
+}
+
+function warmupFillTypeHudIcons(serverId, result) {
+    if (!result || result.hudPrefetchStarted) return;
+    result.hudPrefetchStarted = true;
+    prefetchFillTypeHudCache(result.hudByName || {})
+        .then(() => {
+            result.hudPrefetched = true;
+            result.hudEpoch = Date.now();
+            vanillaFillTypeHudEpoch = result.hudEpoch;
+            if (serverId && serverStates[serverId]) rebuildMerged(serverId);
+        })
+        .catch((e) => {
+            console.warn('[fill-type-hud] prefetch', e && e.message ? e.message : e);
+            result.hudEpoch = Date.now();
+            vanillaFillTypeHudEpoch = result.hudEpoch;
+            if (serverId && serverStates[serverId]) rebuildMerged(serverId);
+        });
+}
+
+function warmupMapFillTypes(serverId, merged) {
+    const key = outlineMemoKeyFromMerged(merged);
+    if (!key) return;
+    if (mapFillTypeMemo.has(key)) {
+        warmupFillTypeHudIcons(serverId, mapFillTypeMemo.get(key));
+        return;
+    }
+    if (mapFillTypeWarmup.has(key)) return;
+    mapFillTypeWarmup.add(key);
+    const mapId = String(merged.mapId || (merged.serverInfo && merged.serverInfo.mapId) || '').trim();
+    const mapTitle = String(merged.mapTitle || (merged.serverInfo && merged.serverInfo.mapName) || '').trim();
+    const modsRoots = collectFs25ModsDirectories(getElectronDocumentsPath);
+    const modsRoot = modsRoots[0] || path.join(getFs25DocumentsRoot(), 'mods');
+    resolveMapFillTypeCatalog({ mapId, mapTitle, modsRoot, modsRoots })
+        .then((result) => {
+            if (result && result.catalog && Object.keys(result.catalog).length > 1) {
+                mapFillTypeMemo.set(key, result);
+                warmupFillTypeHudIcons(serverId, result);
+                if (serverId && serverStates[serverId]) rebuildMerged(serverId);
+            }
+        })
+        .catch((e) => {
+            console.warn('[map-fill-types] warmup', e && e.message ? e.message : e);
+        })
+        .finally(() => mapFillTypeWarmup.delete(key));
+}
+
 function cloneMergedDataWithFieldExclusions(mergedData, serverId) {
     if (!mergedData) return null;
     const raw =
@@ -1093,8 +1468,15 @@ function cloneMergedDataWithFieldExclusions(mergedData, serverId) {
             : Array.isArray(mergedData.allFields) && mergedData.allFields.length > 0
               ? mergedData.allFields
               : mergedData.fields;
-    const fields = filterFieldsByExclusions(Array.isArray(raw) ? raw : [], serverId);
-    return { ...mergedData, fields };
+    let fields = filterFieldsByExclusions(Array.isArray(raw) ? raw : [], serverId);
+    const key = outlineMemoKeyFromMerged(mergedData);
+    const mapFields = key ? mapFieldOutlineMemo.get(key) : null;
+    if (mapFields) fields = attachOutlinesToFieldList(fields, mapFields);
+    else warmupMapFieldOutlines(serverId, mergedData);
+    return applyResolvedMapBounds(
+        { ...mergedData, fields },
+        worldItemsForMapBounds(mergedData.fields, mergedData.vehicles)
+    );
 }
 
 expressApp.get('/api/data',       (req, res) => {
@@ -1128,11 +1510,17 @@ function takeRateLimitToken(ip, capacity = 10, refillSec = 30) {
     return true;
 }
 function getRequestOrigin(req) {
-    const o = req.headers && (req.headers.origin || req.headers.referer || '');
-    if (!o) return '';
+    const headers = req.headers || {};
+    const hasOrigin = Object.prototype.hasOwnProperty.call(headers, 'origin');
+    const hasReferer = Object.prototype.hasOwnProperty.call(headers, 'referer');
+    if (!hasOrigin && !hasReferer) return '';
+    const raw = hasOrigin ? headers.origin : headers.referer;
+    if (typeof raw !== 'string' || !raw.trim()) return 'null';
     try {
-        return new URL(String(o)).origin;
-    } catch (_) { return ''; }
+        const parsed = new URL(raw);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return 'null';
+        return parsed.origin;
+    } catch (_) { return 'null'; }
 }
 function isAllowedSameOrigin(originStr, req) {
     if (!originStr) return false;
@@ -1150,12 +1538,21 @@ function isAllowedSameOrigin(originStr, req) {
     return false;
 }
 function enforceWriteOriginAndToken(req, res) {
-    if (isLocalhostSocket(req)) return null; // loopback always passes
-    // Origin/Referer same-origin required from non-loopback
     const origin = getRequestOrigin(req);
-    if (!isAllowedSameOrigin(origin, req)) {
+    // Browser pages always send Origin/Referer. Reject hostile origins even on loopback.
+    // Native/curl with no Origin still allowed from this machine.
+    if (origin) {
+        if (!isAllowedSameOrigin(origin, req) && !corsOriginAllowedPure(origin, {
+            port: PORT,
+            marketingHosts: MARKETING_SITE_HOSTS,
+            localIps: getCachedLocalInterfaceIps(),
+        })) {
+            return { code: 403, body: { ok: false, error: 'origin not allowed' } };
+        }
+    } else if (!isLocalhostSocket(req) && !isRequestFromThisMachine(req)) {
         return { code: 403, body: { ok: false, error: 'origin not allowed' } };
     }
+    if (isLocalhostSocket(req)) return null;
     // When LAN access is enabled the API binds beyond localhost — require setup token for writes.
     // With LAN off, only local processes reach the port; same-origin check above still applies for browsers.
     const lanOn = !!getLanSecurityFromStore().lanAccessEnabled;
@@ -1273,7 +1670,9 @@ function buildPublicStatusPayload() {
     const m = getActiveMergedDataForStatus();
     const payload = {
         status: 'online',
-        service: 'fs25-farm-dashboard',
+        service: editionPolicy.isV5ProductLine(PRODUCT_LINE) ? 'fs25-farm-dashboard-rf' : 'fs25-farm-dashboard',
+        productLine: PRODUCT_LINE,
+        port: PORT,
         appVersion: app.getVersion(),
     };
     if (!m) return payload;
@@ -1291,6 +1690,104 @@ function buildPublicStatusPayload() {
 }
 
 expressApp.get('/api/status', (req, res) => res.json(buildPublicStatusPayload()));
+
+function anyServerMerged() {
+    return Object.values(serverStates || {}).some((s) => s && s.mergedData);
+}
+
+function anyServerLuaFresh() {
+    const now = Date.now();
+    const staleMs = getLuaExportStaleMs();
+    return Object.values(serverStates || {}).some(
+        (s) => s && s.lastLuaReceivedAt && !isLuaExportStale(s.lastLuaReceivedAt, now, staleMs)
+    );
+}
+
+function anyServerXml() {
+    return Object.values(serverStates || {}).some((s) => s && (s.xmlData || s.lastXmlReceivedAt));
+}
+
+function anyServerPathDenied() {
+    return Object.values(serverStates || {}).some((s) => {
+        const w = s && s.mergedData && s.mergedData.serverInfo && s.mergedData.serverInfo.configWarning;
+        return w && /denied|eacces|permission/i.test(String(w));
+    });
+}
+
+function firstMergedModCheck() {
+    for (const s of Object.values(serverStates || {})) {
+        if (s && s.mergedData && s.mergedData.modVersionCheck) return s.mergedData.modVersionCheck;
+    }
+    return {};
+}
+
+function buildRuntimeSetupStatus(opts) {
+    const tokenOk = opts && Object.prototype.hasOwnProperty.call(opts, 'setupTokenValid')
+        ? !!opts.setupTokenValid
+        : true;
+    return buildSetupStatus({
+        config: store.get('config') || {},
+        httpListening: !!(server && server.listening),
+        hasMergedData: anyServerMerged(),
+        luaFresh: anyServerLuaFresh(),
+        xmlAvailable: anyServerXml(),
+        setupTokenValid: tokenOk,
+        lan: getLanSecurityFromStore(),
+        modVersionCheck: firstMergedModCheck(),
+        pathDenied: anyServerPathDenied(),
+        requiresRestart: uxRequiresRestart,
+        recentEvents: uxEventLog.list(),
+    });
+}
+
+async function runSetupHandshake(tokenValid) {
+    const config = store.get('config') || {};
+    const servers = Array.isArray(config.servers) ? config.servers : [];
+    pushUxEvent(ERROR_CODES.E_NETWORK, 'Setup handshake started', 'setup');
+    for (const srv of servers) {
+        if (!srv || srv.mode === 'ftp') continue;
+        try {
+            const luaPath = getLocalLuaJsonPathForServer(srv);
+            if (!luaPath) continue;
+            try {
+                await fs.promises.access(luaPath);
+            } catch (e) {
+                const code = e && e.code;
+                if (code === 'EACCES' || code === 'EPERM') {
+                    pushUxEvent(ERROR_CODES.E_PERMISSION_DENIED, `Cannot read export for ${srv.name || srv.id}`, 'setup');
+                } else if (code === 'ENOENT') {
+                    pushUxEvent(ERROR_CODES.E_LUA_STALE, `No data.json yet for ${srv.name || srv.id}`, 'mod');
+                }
+            }
+        } catch (_) {
+            /* ignore per-server probe */
+        }
+    }
+    const status = buildRuntimeSetupStatus({ setupTokenValid: tokenValid !== false });
+    pushUxEvent(status.lastErrorCode || ERROR_CODES.E_NETWORK, `Handshake ${status.status}`, 'setup');
+    return status;
+}
+
+expressApp.get('/api/setup-status', (req, res) => {
+    try {
+        const tokenOk = isLocalhostSocket(req) || setupTokenMatches(req);
+        res.json(buildRuntimeSetupStatus({ setupTokenValid: tokenOk || !getLanSecurityFromStore().lanAccessEnabled }));
+    } catch (e) {
+        console.error('[api/setup-status]', e);
+        res.status(500).json({ error: String(e.message || e) });
+    }
+});
+
+expressApp.post('/api/setup-handshake', async (req, res) => {
+    try {
+        const tokenOk = isLocalhostSocket(req) || setupTokenMatches(req);
+        const status = await runSetupHandshake(tokenOk || !getLanSecurityFromStore().lanAccessEnabled);
+        res.json(status);
+    } catch (e) {
+        console.error('[api/setup-handshake]', e);
+        res.status(500).json({ error: String(e.message || e) });
+    }
+});
 
 expressApp.get('/api/simhub-view-config', (req, res) => {
     try {
@@ -1360,8 +1857,10 @@ expressApp.post('/api/export-mod-store-images', async (req, res) => {
             error: 'Mod image export is only allowed from this PC (localhost). Use the Farm Dashboard app, or set FARMDASH_ALLOW_LAN_EXPORT=1 to allow this endpoint from your LAN.'
         });
     }
+    const gate = enforceWriteOriginAndToken(req, res);
+    if (gate) return res.status(gate.code).json(gate.body);
     try {
-        const result = await runExportModStoreImages();
+        const result = await runExportModStoreImages(null, { suppressNative: true });
         res.json(result);
     } catch (e) {
         console.error('[export-mod-store-images] HTTP:', e);
@@ -1369,8 +1868,22 @@ expressApp.post('/api/export-mod-store-images', async (req, res) => {
     }
 });
 
+function webSocketOriginAllowed(req) {
+    const origin = getRequestOrigin(req);
+    if (!origin) {
+        // Non-browser clients (no Origin). Allow only this machine.
+        return isLoopbackIp(requestRemoteAddress(req)) || isRequestFromThisMachine(req);
+    }
+    return corsOriginAllowedPure(origin, {
+        port: PORT,
+        marketingHosts: MARKETING_SITE_HOSTS,
+        localIps: getCachedLocalInterfaceIps(),
+    }) || isAllowedSameOrigin(origin, req);
+}
+
 function checkWebSocketLanAccess(info) {
     const req = info.req;
+    if (!webSocketOriginAllowed(req)) return false;
     const rawIp = requestRemoteAddress(req);
     const expressIp = req.ip ? String(req.ip) : '';
     if (isLoopbackIp(expressIp) || isLoopbackIp(rawIp)) return true;
@@ -1458,6 +1971,7 @@ function listenFarmdashHttp(bindHost, onListening) {
                             logLanStartupHints(bindHost);
                             logWindowsSocketsForFarmdashPort();
                             if (typeof onListening === 'function') onListening();
+                            startVanillaFillTypeHudWarmup();
                             finish();
                         });
                     } catch (e) {
@@ -1486,30 +2000,53 @@ function closeHttpServer(done) {
         return;
     }
     wss = null;
+    let finished = false;
     const finish = () => {
+        if (finished) return;
+        finished = true;
         server = null;
         if (typeof done === 'function') done();
+    };
+    // Renderer Save IPC used to deadlock here: http.close() waits for keep-alive +
+    // the dashboard WebSocket the Settings modal still holds.
+    clients.forEach((ws) => {
+        try {
+            ws.terminate();
+        } catch (_) { /* ignore */ }
+    });
+    clients.clear();
+    const killTimer = setTimeout(() => {
+        try {
+            if (httpSrv && typeof httpSrv.closeAllConnections === 'function') {
+                httpSrv.closeAllConnections();
+            }
+        } catch (_) { /* ignore */ }
+        finish();
+    }, 2000);
+    const finishAndClear = () => {
+        clearTimeout(killTimer);
+        finish();
     };
     if (wsSrv) {
         try {
             wsSrv.close(() => {
                 if (httpSrv && httpSrv.listening) {
-                    httpSrv.close(finish);
+                    httpSrv.close(finishAndClear);
                 } else {
-                    finish();
+                    finishAndClear();
                 }
             });
         } catch (_) {
             if (httpSrv && httpSrv.listening) {
-                httpSrv.close(finish);
+                httpSrv.close(finishAndClear);
             } else {
-                finish();
+                finishAndClear();
             }
         }
     } else if (httpSrv && httpSrv.listening) {
-        httpSrv.close(finish);
+        httpSrv.close(finishAndClear);
     } else {
-        finish();
+        finishAndClear();
     }
 }
 
@@ -1522,11 +2059,25 @@ function restartHttpServer(done) {
     });
 }
 
+const lastBroadcastHashByServer = {};
+
 function broadcast(serverId, data) {
     if (data == null) return;
     const payload = cloneMergedDataWithFieldExclusions(data, serverId) || data;
-    const msg = JSON.stringify({ type: 'data', serverId, data: payload, timestamp: new Date().toISOString() });
-    clients.forEach(c => { if (c.readyState === WebSocket.OPEN) c.send(msg); });
+    const body = { type: 'data', serverId, data: payload };
+    const hash = crypto.createHash('sha256').update(JSON.stringify(body)).digest('hex');
+    if (lastBroadcastHashByServer[serverId] === hash) return;
+    lastBroadcastHashByServer[serverId] = hash;
+    const msg = JSON.stringify({ ...body, timestamp: new Date().toISOString() });
+    const maxBuffered = 2 * 1024 * 1024;
+    clients.forEach((c) => {
+        if (c.readyState !== WebSocket.OPEN) return;
+        if (typeof c.bufferedAmount === 'number' && c.bufferedAmount > maxBuffered) {
+            try { c.close(1013, 'slow_consumer'); } catch (_) { /* ignore */ }
+            return;
+        }
+        c.send(msg);
+    });
 }
 
 // ── Data processing ───────────────────────────────────────────────────────────
@@ -1590,11 +2141,23 @@ function hydrateServerCacheFromDisk(serverId) {
     state.fieldHistory = disk.fieldHistory || {};
     state.lastLuaReceivedAt = disk.lastLuaAt || null;
     state.lastXmlReceivedAt = disk.lastXmlAt || null;
-    state.mergedData = JSON.parse(JSON.stringify(disk.mergedSnapshot));
+    state.mergedData = applyResolvedMapBounds(
+        applyFreshnessMeta(JSON.parse(JSON.stringify(disk.mergedSnapshot)), {
+            lastLuaAt: disk.lastLuaAt || null,
+            lastXmlAt: disk.lastXmlAt || null,
+            cacheUsedDueToFailure: true,
+            source: 'cache',
+            collectionHealth:
+                disk.mergedSnapshot &&
+                disk.mergedSnapshot.dataTimestamps &&
+                disk.mergedSnapshot.dataTimestamps.collectionHealth,
+        })
+    );
     state.mergedData.dataTimestamps = {
         ...(state.mergedData.dataTimestamps || {}),
         loadedFromDiskCacheAt: new Date().toISOString(),
     };
+    pushUxEvent(ERROR_CODES.E_CACHE_FALLBACK, `Restored last-known snapshot for ${serverId}`, 'merge');
     if (disk.lastKnownSaveSlot && typeof disk.lastKnownSaveSlot === 'string') {
         state.lastSaveSlot = disk.lastKnownSaveSlot;
     } else {
@@ -1669,33 +2232,49 @@ function stampLuaExportFreshness(merged, state) {
     if (!merged || !state) return merged;
     const staleMs = getLuaExportStaleMs();
     const ts = { ...(merged.dataTimestamps || {}), luaExportStaleMs: staleMs };
+    let next = merged;
     if (state.luaData) {
         if (isLuaExportStale(state.lastLuaReceivedAt, Date.now(), staleMs)) {
             if (!ts.liveExportStaleAt) {
                 ts.liveExportStaleAt = state.lastLuaReceivedAt || new Date().toISOString();
             }
-            return {
+            next = {
                 ...merged,
                 luaAvailable: false,
                 dataTimestamps: ts,
             };
+            return applyFreshnessMeta(next, {
+                lastLuaAt: state.lastLuaReceivedAt || null,
+                lastXmlAt: state.lastXmlReceivedAt || null,
+                staleMs,
+                collectionHealth: state.xmlData && state.xmlData.collectionHealth,
+            });
         }
         delete ts.liveExportStaleAt;
         delete ts.heldFromSnapshotAt;
         delete ts.mergeHeldStaleAt;
         delete ts.liveSectionsHeldAt;
     }
-    return { ...merged, dataTimestamps: ts };
+    next = { ...merged, dataTimestamps: ts };
+    return applyFreshnessMeta(next, {
+        lastLuaAt: state.lastLuaReceivedAt || null,
+        lastXmlAt: state.lastXmlReceivedAt || null,
+        staleMs,
+        collectionHealth: state.xmlData && state.xmlData.collectionHealth,
+    });
 }
 
-function rebuildMerged(serverId) {
+async function rebuildMerged(serverId) {
     const state = serverStates[serverId];
     if (!state) return;
+    const gen = mergeRebuildGate.begin(serverId);
+    const stillCurrent = () =>
+        mergeRebuildGate.isCurrent(serverId, gen) && serverStates[serverId] === state;
     let luaPayload = state.luaData;
     const srv = getServersFromStore().find((s) => String(s.id) === String(serverId));
     if (srv && state.luaData && (srv.mode === 'local' || srv.mode === 'ftp')) {
         try {
-            luaPayload = hydrateLuaDataAnimalsFromDetails(
+            luaPayload = await hydrateLuaDataAnimalsFromDetailsAsync(
                 state.luaData,
                 srv,
                 getLocalLuaJsonPathForServer,
@@ -1709,26 +2288,50 @@ function rebuildMerged(serverId) {
             luaPayload = state.luaData;
         }
     }
+    if (!stillCurrent()) return;
     let merged;
     try {
+        const mapHint = {
+            mapId: (luaPayload && luaPayload.serverInfo && luaPayload.serverInfo.mapId)
+                || (state.xmlData && state.xmlData.career && state.xmlData.career.mapId)
+                || '',
+            mapTitle: (luaPayload && luaPayload.serverInfo && luaPayload.serverInfo.mapName)
+                || (state.xmlData && state.xmlData.career && state.xmlData.career.mapTitle)
+                || '',
+            serverInfo: luaPayload && luaPayload.serverInfo,
+        };
         merged = mergeData(luaPayload, state.xmlData, {
             fieldLiveCache: state.fieldLiveCache || {},
             lastLuaAt: state.lastLuaReceivedAt || null,
             lastXmlAt: state.lastXmlReceivedAt || null,
+            mapFillTypeCatalog: mapFillCatalogForMerged(mapHint),
+            mapFillTypeTitles: mapFillTitlesForMerged(mapHint),
+            collectionHealth: state.xmlData && state.xmlData.collectionHealth,
         });
     } catch (e) {
         console.warn('[rebuildMerged] merge threw', serverId, e && e.message ? e.message : e);
         merged = null;
     }
     if (!merged) {
+        if (!stillCurrent()) return;
         if (state.mergedData) {
-            state.mergedData = {
-                ...state.mergedData,
-                dataTimestamps: {
-                    ...(state.mergedData.dataTimestamps || {}),
-                    mergeHeldStaleAt: new Date().toISOString(),
+            state.mergedData = applyFreshnessMeta(
+                {
+                    ...state.mergedData,
+                    dataTimestamps: {
+                        ...(state.mergedData.dataTimestamps || {}),
+                        mergeHeldStaleAt: new Date().toISOString(),
+                    },
                 },
-            };
+                {
+                    lastLuaAt: state.lastLuaReceivedAt || null,
+                    lastXmlAt: state.lastXmlReceivedAt || null,
+                    cacheUsedDueToFailure: true,
+                    staleMs: getLuaExportStaleMs(),
+                    collectionHealth: state.xmlData && state.xmlData.collectionHealth,
+                }
+            );
+            pushUxEvent(ERROR_CODES.E_LUA_STALE, `Merge unavailable; kept last snapshot (${serverId})`, 'merge');
             if (state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
                 state.mergedData.fieldStatusHistory = state.fieldHistory;
             }
@@ -1762,8 +2365,14 @@ function rebuildMerged(serverId) {
             `[rebuildMerged] [${serverId}] Serving last good merged snapshot (live export looks minimal or shutdown)`
         );
     }
+    if (!stillCurrent()) return;
     merged = stampLuaExportFreshness(merged, state);
+    const fillHit = mapFillResultForMerged(merged);
+    merged.fillTypeHudEpoch =
+        (fillHit && fillHit.hudEpoch) || vanillaFillTypeHudEpoch || merged.fillTypeHudEpoch;
     state.mergedData = merged;
+    warmupMapFieldOutlines(serverId, merged);
+    warmupMapFillTypes(serverId, merged);
     if (state.mergedData && state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
         state.mergedData.fieldStatusHistory = state.fieldHistory;
     }
@@ -1780,19 +2389,76 @@ function rebuildMerged(serverId) {
     schedulePersistServerCache(serverId);
 }
 
+/**
+ * Mirror join-as-client writes truncate then rewrite data.json (~800KB+).
+ * fs.watch often fires mid-write → "Unexpected end of JSON input". Keep previous luaData.
+ */
+function parseLuaJsonObject(raw) {
+    if (raw == null) return { ok: false, reason: 'empty' };
+    if (typeof raw !== 'string') {
+        if (raw && typeof raw === 'object' && !Array.isArray(raw)) return { ok: true, data: raw };
+        return { ok: false, reason: 'not-object' };
+    }
+    const text = String(raw).trim();
+    if (!text) return { ok: false, reason: 'empty' };
+    try {
+        const data = JSON.parse(text);
+        if (data == null || typeof data !== 'object' || Array.isArray(data)) {
+            return { ok: false, reason: 'not-object' };
+        }
+        return { ok: true, data };
+    } catch (e) {
+        return { ok: false, reason: 'parse', error: e };
+    }
+}
+
+async function readLocalLuaJsonReady(luaJsonPath, serverId) {
+    const maxAttempts = 10;
+    let lastReason = 'empty';
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const raw = await readFileUtf8WithRetryAsync(luaJsonPath, {
+            maxAttempts: 2,
+            baseDelayMs: 40,
+        });
+        if (raw == null) {
+            lastReason = 'missing';
+            await delayMs(40 * attempt);
+            continue;
+        }
+        const stripped = stripUtf8Bom(raw);
+        const parsed = parseLuaJsonObject(stripped);
+        if (parsed.ok) return stripped;
+        lastReason = parsed.reason || 'parse';
+        // Incomplete write — wait for the writer to finish.
+        await delayMs(60 * attempt);
+    }
+    if (lastReason === 'parse') {
+        console.warn(
+            `[Local] [${serverId}] data.json still incomplete after retries; keeping previous export`
+        );
+    }
+    return null;
+}
+
 function processLuaData(serverId, raw) {
     try {
-        const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        const state = serverStates[serverId];
-        if (!state) return;
-
-        // FS exit / partial writes can yield JSON `null` or non-objects — do not wipe live state.
-        if (data == null || typeof data !== 'object' || Array.isArray(data)) {
-            console.warn(
-                `[processLuaData] [${serverId}] ignored invalid Lua JSON (expected object); keeping previous export`
-            );
+        const parsed = parseLuaJsonObject(typeof raw === 'string' ? stripUtf8Bom(raw) : raw);
+        if (!parsed.ok) {
+            // Mid-write / truncated mirror is expected during join-as-client streams — stay quiet-ish.
+            if (parsed.reason === 'parse') {
+                console.warn(
+                    `[processLuaData] ${serverId}: Unexpected end of JSON input (incomplete write); keeping previous export`
+                );
+            } else {
+                console.warn(
+                    `[processLuaData] [${serverId}] ignored invalid Lua JSON (${parsed.reason}); keeping previous export`
+                );
+            }
             return;
         }
+        const data = parsed.data;
+        const state = serverStates[serverId];
+        if (!state) return;
 
         if (shouldIgnoreMinimalLuaExport(data, state)) {
             console.warn(
@@ -1818,23 +2484,41 @@ function processLuaData(serverId, raw) {
         state.luaData = data;
 
         const nowIso = new Date().toISOString();
-        state.lastLuaReceivedAt = nowIso;
+        state.lastLuaReceiptAt = nowIso;
+        const producedAt = data.collectedAt || data.serverInfo?.collectedAt || data.exportGeneratedAt || null;
+        const contentHash = crypto.createHash('sha256').update(JSON.stringify({
+            collectedAt: producedAt,
+            animals: data.animals,
+            vehicles: data.vehicles,
+            fields: data.fields,
+            production: data.production,
+            stock: data.stock,
+            finance: data.finance,
+        })).digest('hex');
+        if (state.lastLuaContentHash !== contentHash) {
+            state.lastLuaContentHash = contentHash;
+            state.lastLuaReceivedAt = producedAt || nowIso;
+        }
         try {
             const fps = buildFieldLiveFingerprints(data.fields || [], nowIso);
-            state.fieldLiveCache = { ...(state.fieldLiveCache || {}), ...fps };
-            state.fieldHistory = appendFieldHistory(state.fieldHistory || {}, fps);
+            if (Object.keys(fps).length > 0) {
+                state.fieldLiveCache = { ...(state.fieldLiveCache || {}), ...fps };
+                state.fieldHistory = appendFieldHistory(state.fieldHistory || {}, fps);
+            }
         } catch (e) {
             console.warn('[Cache] fingerprint', serverId, e.message);
         }
 
         // If we don't have XML yet (or saveSlot changed), trigger XML poll now
-        const saveSlot = data.serverInfo?.saveSlot;
+        const saveSlot = safeFsIdentity.sanitizeSaveSlot(data.serverInfo?.saveSlot, state.lastSaveSlot || 'savegame1');
         if (saveSlot && saveSlot !== state.lastSaveSlot) {
             state.lastSaveSlot = saveSlot;
             triggerXmlPoll(serverId);
         }
 
-        rebuildMerged(serverId);
+        void rebuildMerged(serverId).catch((e) => {
+            console.warn('[rebuildMerged]', serverId, e && e.message ? e.message : e);
+        });
 
         console.log(`[${new Date().toISOString()}] [${serverId}] Lua data updated`);
     } catch (e) {
@@ -1844,8 +2528,9 @@ function processLuaData(serverId, raw) {
 
 /** Pull savegame XML from FTP (e.g. GPortal: profile/savegameN/…) into userData/ftpXmlCache. */
 async function downloadFtpSavegameXml(srv, saveSlot) {
-    const slot = saveSlot || srv.localSubFolder || 'savegame1';
-    const localDir = path.join(app.getPath('userData'), 'ftpXmlCache', srv.id, slot);
+    const slot = safeFsIdentity.sanitizeSaveSlot(saveSlot || srv.localSubFolder, 'savegame1');
+    const cacheRoot = path.join(app.getPath('userData'), 'ftpXmlCache', String(srv.id));
+    const localDir = safeFsIdentity.joinContained(cacheRoot, slot);
     await fs.promises.mkdir(localDir, { recursive: true });
 
     const remoteDir = srv.ftpSavegameRemoteDir
@@ -1853,12 +2538,10 @@ async function downloadFtpSavegameXml(srv, saveSlot) {
         : `${String(srv.ftpBasePath || 'profile').replace(/\\/g, '/').replace(/\/$/, '')}/${slot}`;
 
     const client = new ftp.Client(120000);
+    ftpActiveClients.set(srv.id, client);
     client.ftp.verbose = false;
     try {
-        await client.access({
-            host: srv.ftpHost, port: parseInt(srv.ftpPort) || 21,
-            user: srv.ftpUser, password: srv.ftpPass, secure: false
-        });
+        await client.access(ftpAccessOptions(srv));
 
         const retryOpts = { maxAttempts: 5, retryDelayMs: 400 };
         const retryOptsCooldown = { maxAttempts: 6, retryDelayMs: 600 };
@@ -2011,16 +2694,41 @@ async function triggerXmlPoll(serverId) {
         if (srv.mode === 'ftp') {
             await downloadFtpSavegameXml(srv, saveSlot);
         }
+        if (hasHttpFeed(srv)) {
+            const result = await downloadHttpFeedSavegameXml(srv, saveSlot, app.getPath('userData'));
+            if (result.ok) {
+                console.log(
+                    `[HTTP-Feed] [${serverId}] saved ${result.saved.join(', ')}` +
+                    (result.skipped.length ? ` (skipped empty: ${result.skipped.join(', ')})` : '')
+                );
+            } else if (result.failed?.length) {
+                console.warn(`[HTTP-Feed] [${serverId}] download issues:`, result.failed);
+            }
+        }
+        const fingerprint = await getSavegameXmlFingerprint(srv, effectiveSlot);
+        if (
+            fingerprint &&
+            state?.xmlData &&
+            state.lastXmlFingerprint === fingerprint
+        ) {
+            return;
+        }
         const xmlData = await collectXmlData(srv, saveSlot);
         if (xmlData) {
             serverStates[serverId].xmlData = xmlData;
             serverStates[serverId].lastXmlReceivedAt = new Date().toISOString();
-            rebuildMerged(serverId);
+            serverStates[serverId].lastXmlFingerprint = fingerprint || null;
+            await rebuildMerged(serverId);
             console.log(`[XML] [${serverId}] XML data updated (slot=${effectiveSlot})`);
         } else if (srv.mode === 'ftp') {
             console.warn(
                 `[XML] [${serverId}] Parsed XML is empty (no usable savegame in ftpXmlCache for slot=${effectiveSlot}). ` +
                 'If Lua never loads, the slot may be wrong — set this server\'s save slot to match the host (e.g. savegame3).'
+            );
+        } else if (hasHttpFeed(srv)) {
+            console.warn(
+                `[XML] [${serverId}] HTTP feed configured but no usable XML in httpXmlCache yet ` +
+                `(hosts often only expose careerSavegame / vehicles / economy).`
             );
         }
     } catch (e) {
@@ -2056,13 +2764,14 @@ async function startLocalWatching(srv) {
     console.log(`[Local] Watching: ${luaJsonPath}`);
 
     let lastMtimeMs = 0;
+    let readDebounceTimer = null;
     const updateMtime = (mtimeMs) => {
         if (Number.isFinite(mtimeMs) && mtimeMs > 0) lastMtimeMs = mtimeMs;
     };
-    const readFile = (knownMtimeMs) => {
-        readFileUtf8WithRetryAsync(luaJsonPath)
+    const readFileNow = (knownMtimeMs) => {
+        readLocalLuaJsonReady(luaJsonPath, srv.id)
             .then((raw) => {
-                if (raw != null) processLuaData(srv.id, stripUtf8Bom(raw));
+                if (raw != null) processLuaData(srv.id, raw);
                 if (Number.isFinite(knownMtimeMs)) {
                     updateMtime(knownMtimeMs);
                 } else {
@@ -2074,6 +2783,14 @@ async function startLocalWatching(srv) {
             .catch((e) => {
                 console.warn(`[Local] read data.json [${srv.id}]:`, e && e.message ? e.message : e);
             });
+    };
+    // Debounce: join-as-client mirror truncates then streams ~800KB; many watch events mid-write.
+    const readFile = (knownMtimeMs) => {
+        if (readDebounceTimer) clearTimeout(readDebounceTimer);
+        readDebounceTimer = setTimeout(() => {
+            readDebounceTimer = null;
+            readFileNow(knownMtimeMs);
+        }, 350);
     };
 
     // fs.watch + persistent:false — avoids chokidar polling handles that kept Windows folders "in use".
@@ -2167,52 +2884,7 @@ async function startLocalWatching(srv) {
  * files fail on each poll. Retries with short backoff usually clear it.
  */
 async function safeDownload(client, remotePath, localTmp, localFinal, options = {}) {
-    const maxAttempts = Math.max(1, parseInt(options.maxAttempts, 10) || 1);
-    const retryDelayMs = Math.max(0, parseInt(options.retryDelayMs, 10) || 300);
-    let lastErr = '';
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-        try {
-            try {
-                await fs.promises.unlink(localTmp);
-            } catch (e) {
-                if (e && e.code !== 'ENOENT') {
-                    /* ignore transient unlink issues like old behavior */
-                }
-            }
-            await client.downloadTo(localTmp, remotePath);
-            let size = 0;
-            try {
-                size = (await fs.promises.stat(localTmp)).size;
-            } catch (e) {
-                lastErr = e && e.message ? String(e.message) : String(e);
-                if (attempt < maxAttempts) {
-                    await new Promise((r) => setTimeout(r, retryDelayMs * attempt));
-                }
-                continue;
-            }
-            if (size > 0) {
-                try {
-                    await fs.promises.unlink(localFinal);
-                } catch (e) {
-                    if (e && e.code !== 'ENOENT') {
-                        /* ignore */
-                    }
-                }
-                await fs.promises.rename(localTmp, localFinal);
-                return true;
-            }
-            lastErr = 'empty or zero-byte after download';
-        } catch (e) {
-            lastErr = e && e.message ? String(e.message) : String(e);
-        }
-        if (attempt < maxAttempts) {
-            await new Promise((r) => setTimeout(r, retryDelayMs * attempt));
-        }
-    }
-    if (maxAttempts > 1 && lastErr && options.logFailures) {
-        console.warn(`[FTP] ${path.basename(localFinal)}: failed after ${maxAttempts} tries — ${lastErr.slice(0, 120)}`);
-    }
-    return false;
+    return fileCommit.downloadAndCommit(client, remotePath, localTmp, localFinal, options);
 }
 
 /** FTP FileInfo.type — Directory (skip when syncing files). */
@@ -2223,14 +2895,16 @@ const FTP_FILE_TYPE_DIRECTORY = 2;
  * Only re-downloads when remote size differs from cached file (large herds = multi‑MiB files).
  */
 /** @returns {Promise<number>} number of detail files newly downloaded or updated */
-async function syncFtpDetailsCache(client, srv, slotRemote, userDataPath) {
+async function syncFtpDetailsCache(client, srv, slotRemote, userDataPath, options = {}) {
     const remoteDir = `${slotRemote}/details`.replace(/\\/g, '/');
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(String(srv.id))) return 0;
     const localRoot = path.join(userDataPath, 'ftpDetailsCache', String(srv.id));
     const st = serverStates[srv.id];
     const folderName =
         (st && st.lastSaveSlot) ||
         srv.localSubFolder ||
         'savegame1';
+    if (!safeFsIdentity.SAVE_SLOT_RE.test(String(folderName))) return 0;
     const localDir = path.join(localRoot, folderName, 'details');
     try {
         await fs.promises.mkdir(localDir, { recursive: true });
@@ -2244,11 +2918,12 @@ async function syncFtpDetailsCache(client, srv, slotRemote, userDataPath) {
         return 0;
     }
     let pulled = 0;
-    const dlOpts = { maxAttempts: 2, retryDelayMs: 400 };
+    const dlOpts = { maxAttempts: 2, retryDelayMs: 400, canCommit: options.canCommit };
     for (const ent of list) {
         if (!ent || !ent.name || ent.type === FTP_FILE_TYPE_DIRECTORY) continue;
         const name = ent.name;
-        if (!name.startsWith('animals_') || !name.endsWith('.json')) continue;
+        if (typeof name !== 'string' || !/^animals_[A-Za-z0-9_-]+\.json$/.test(name)) continue;
+        if (options.canCommit && !options.canCommit()) break;
         const remotePath = `${remoteDir}/${name}`;
         const localFinal = path.join(localDir, name);
         const tmpPath = `${localFinal}.tmp`;
@@ -2258,7 +2933,11 @@ async function syncFtpDetailsCache(client, srv, slotRemote, userDataPath) {
                 const localSize = (await fs.promises.stat(localFinal)).size;
                 const remSize = Number(ent.size);
                 if (Number.isFinite(remSize) && remSize > 0 && localSize === remSize) {
-                    need = false;
+                    const remMod = ent.modifiedAt instanceof Date ? ent.modifiedAt.getTime() : 0;
+                    const locMod = (await fs.promises.stat(localFinal)).mtimeMs;
+                    if (remMod && locMod >= remMod - 2000) {
+                        need = false;
+                    }
                 }
             } catch (_) {
                 /* re-fetch */
@@ -2276,14 +2955,15 @@ async function syncFtpDetailsCache(client, srv, slotRemote, userDataPath) {
 }
 
 async function pollFtp(srv) {
+    if (ftpPollInFlight.has(srv.id)) return;
+    const pollToken = {};
+    ftpPollInFlight.set(srv.id, pollToken);
+    const gen = (ftpPollGenerations[srv.id] = (ftpPollGenerations[srv.id] || 0) + 1);
     const client = new ftp.Client(120000);
     client.ftp.verbose = false;
     const userDataPath = app.getPath('userData');
     try {
-        await client.access({
-            host: srv.ftpHost, port: parseInt(srv.ftpPort) || 21,
-            user: srv.ftpUser, password: srv.ftpPass, secure: false
-        });
+        await client.access(ftpAccessOptions(srv));
 
         const basePath = srv.ftpBasePath || 'profile';
         const st = serverStates[srv.id];
@@ -2294,12 +2974,15 @@ async function pollFtp(srv) {
         let slotRemote = `${basePath}/modSettings/FS25_FarmDashboard/${folderName}`;
         const remotePath = `${slotRemote}/data.json`;
 
-        const tmpPath   = path.join(userDataPath, `data_${srv.id}.json.tmp`);
+        const tmpPath   = path.join(userDataPath, `data_${srv.id}_${gen}.json.tmp`);
         const finalPath = path.join(userDataPath, `data_${srv.id}.json`);
 
-        if (await safeDownload(client, remotePath, tmpPath, finalPath, { maxAttempts: 4, retryDelayMs: 350 })) {
+        if (ftpPollGenerations[srv.id] !== gen) return;
+
+        if (await safeDownload(client, remotePath, tmpPath, finalPath, { maxAttempts: 4, retryDelayMs: 350, canCommit: () => ftpPollGenerations[srv.id] === gen })) {
+            if (ftpPollGenerations[srv.id] !== gen) return;
             const luaRaw = await readFileUtf8WithRetryAsync(finalPath, { maxAttempts: 3 });
-            if (luaRaw != null) {
+            if (luaRaw != null && ftpPollGenerations[srv.id] === gen) {
                 processLuaData(srv.id, stripUtf8Bom(luaRaw));
             }
         } else {
@@ -2323,7 +3006,7 @@ async function pollFtp(srv) {
             const dirtyRemote = `${slotRemote}/dirtyPens.json`;
             const dirtyTmp = path.join(userDataPath, `livestock_dirtyPens_${srv.id}.json.tmp`);
             const dirtyFinal = path.join(userDataPath, `livestock_dirtyPens_${srv.id}.json`);
-            const ok = await safeDownload(client, dirtyRemote, dirtyTmp, dirtyFinal, { maxAttempts: 1 });
+            const ok = await safeDownload(client, dirtyRemote, dirtyTmp, dirtyFinal, { maxAttempts: 1, canCommit: () => ftpPollGenerations[srv.id] === gen });
             if (!ok && srv && srv.id != null) {
                 // Don't spam: dirtyPens.json may not exist yet on a fresh save.
                 if (!serverStates[srv.id] || !serverStates[srv.id]._dirtyMissingLogged) {
@@ -2336,9 +3019,9 @@ async function pollFtp(srv) {
         }
 
         try {
-            const detailPulls = await syncFtpDetailsCache(client, srv, slotRemote, userDataPath);
-            if (detailPulls > 0) {
-                rebuildMerged(srv.id);
+            const detailPulls = await syncFtpDetailsCache(client, srv, slotRemote, userDataPath, { canCommit: () => ftpPollGenerations[srv.id] === gen });
+            if (detailPulls > 0 && ftpPollGenerations[srv.id] === gen) {
+                await rebuildMerged(srv.id);
             }
         } catch (e) {
             console.warn(`[FTP] [${srv.id}] details folder sync: ${e && e.message}`);
@@ -2347,6 +3030,8 @@ async function pollFtp(srv) {
         console.warn(`[FTP] [${srv.id}] ${srv.name}: ${err.message}`);
     } finally {
         client.close();
+        if (ftpActiveClients.get(srv.id) === client) ftpActiveClients.delete(srv.id);
+        if (ftpPollInFlight.get(srv.id) === pollToken) ftpPollInFlight.delete(srv.id);
     }
 }
 
@@ -2365,6 +3050,8 @@ function getFtpPollingOptions(config) {
 }
 
 function clearFtpPollingTimers() {
+    for (const id of Object.keys(ftpPollGenerations)) ftpPollGenerations[id] += 1;
+    for (const client of ftpActiveClients.values()) { try { client.close(); } catch (_) {} }
     for (const t of ftpPollingTimers) {
         clearTimeout(t);
         clearInterval(t);
@@ -2488,7 +3175,193 @@ function shouldLoadDashboardUrl() {
     }
 }
 
-async function bootServer(config) {
+function isTrustedDashboardIpcSender(event) {
+    try {
+        const wc = event && event.sender;
+        if (!mainWindow || mainWindow.isDestroyed() || !wc || wc.isDestroyed()) return false;
+        if (wc !== mainWindow.webContents || !event.senderFrame || event.senderFrame !== wc.mainFrame) return false;
+        const options = { port: PORT, appDirectory: __dirname };
+        return editionPolicy.isTrustedDashboardIpcUrl(wc.getURL(), options)
+            && editionPolicy.isTrustedDashboardIpcUrl(event.senderFrame.url, options);
+    } catch (_) { return false; }
+}
+
+let launchDashboardInFlight = null;
+let dashboardNavigationInFlight = null;
+
+function waitForDashboardNavigation(dest, timeoutMs) {
+    const targetWindow = mainWindow;
+    if (!targetWindow || targetWindow.isDestroyed()) return Promise.reject(new Error('no_window'));
+    const destination = new URL(dest).href;
+    const pending = dashboardNavigationInFlight;
+    if (pending && pending.window === targetWindow && pending.destination === destination) {
+        return pending.promise;
+    }
+    const wc = targetWindow.webContents;
+    if (wc.getURL() === destination && !wc.isLoadingMainFrame()) return Promise.resolve();
+    // Setup IPC and deferred backend boot can arrive in either order. Only one
+    // loadURL may own the hand-off, otherwise Electron aborts the first request.
+    const navigation = { window: targetWindow, destination, promise: null };
+    const work = new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = (err) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            wc.removeListener('did-finish-load', onOk);
+            wc.removeListener('did-fail-load', onFail);
+            wc.removeListener('destroyed', onDestroyed);
+            if (err) reject(err);
+            else resolve();
+        };
+        const timer = setTimeout(() => finish(new Error('navigation_timeout')), timeoutMs);
+        const onOk = () => {
+            if (wc.getURL() === destination) finish(null);
+        };
+        const onFail = (_e, _code, desc, _url, isMainFrame) => {
+            if (isMainFrame !== false) finish(new Error(desc || 'did-fail-load'));
+        };
+        const onDestroyed = () => finish(new Error('no_window'));
+        wc.on('did-finish-load', onOk);
+        wc.on('did-fail-load', onFail);
+        wc.once('destroyed', onDestroyed);
+        try {
+            targetWindow.loadURL(destination).catch((err) => finish(err));
+        } catch (err) {
+            finish(err);
+        }
+    });
+    navigation.promise = work.finally(() => {
+        if (dashboardNavigationInFlight === navigation) dashboardNavigationInFlight = null;
+    });
+    dashboardNavigationInFlight = navigation;
+    return navigation.promise;
+}
+
+async function launchDashboardFromIpc(event) {
+    if (!isTrustedDashboardIpcSender(event)) {
+        return { ok: false, error: 'untrusted_sender', stage: 'idle' };
+    }
+    if (launchDashboardInFlight) return launchDashboardInFlight;
+    const work = (async () => {
+        const config = store.get('config');
+        if (!config || !config.isConfigured) {
+            return { ok: false, error: 'not_configured', stage: 'persisted' };
+        }
+        if (!server || !server.listening) {
+            await bootServer(config, { deferHydrate: true });
+        }
+        if (!server || !server.listening) {
+            return { ok: false, error: 'backend_not_listening', stage: 'activating' };
+        }
+        const dest = `http://127.0.0.1:${PORT}/`;
+        try {
+            await waitForDashboardNavigation(dest, 15000);
+            return { ok: true, stage: 'ready' };
+        } catch (e) {
+            return {
+                ok: false,
+                error: String(e && e.message ? e.message : e),
+                stage: 'navigating',
+            };
+        }
+    })();
+    launchDashboardInFlight = work;
+    try {
+        return await work;
+    } finally {
+        if (launchDashboardInFlight === work) launchDashboardInFlight = null;
+    }
+}
+
+function probeLoopbackStatus(port, timeoutMs) {
+    return new Promise((resolve) => {
+        try {
+            const req = http.get(
+                { host: '127.0.0.1', port, path: '/api/status', timeout: timeoutMs },
+                (res) => {
+                    let body = '';
+                    res.on('data', (chunk) => {
+                        body += chunk;
+                        if (body.length > 4096) res.destroy();
+                    });
+                    res.on('end', () => {
+                        try {
+                            resolve(JSON.parse(body));
+                        } catch (_) {
+                            resolve(null);
+                        }
+                    });
+                }
+            );
+            req.on('error', () => resolve(null));
+            req.on('timeout', () => {
+                req.destroy();
+                resolve(null);
+            });
+        } catch (_) {
+            resolve(null);
+        }
+    });
+}
+
+async function peerEditionIsRunning() {
+    const port = editionPolicy.otherEditionPort(PRODUCT_LINE);
+    const st = await probeLoopbackStatus(port, 250);
+    if (!st || typeof st !== 'object') return false;
+    const line = String(st.productLine || '').trim().toLowerCase();
+    if (line && editionPolicy.isV5ProductLine(line) !== editionPolicy.isV5ProductLine(PRODUCT_LINE)) return true;
+    return st.status === 'online';
+}
+
+async function assertGameWritesAllowed() {
+    if (await peerEditionIsRunning()) {
+        return {
+            ok: false,
+            error:
+                'The other Farm Dashboard (V4 or V5) is open. Close it before changing in-game mod settings.',
+        };
+    }
+    return { ok: true };
+}
+
+async function maybeOfferClassicConfigImport() {
+    if (!editionPolicy.isV5ProductLine(PRODUCT_LINE)) return;
+    if (store.get('classicConfigImportedV1')) return;
+    const cfg = store.get('config');
+    if (cfg && cfg.isConfigured && Array.isArray(cfg.servers) && cfg.servers.length) {
+        store.set('classicConfigImportedV1', true);
+        return;
+    }
+    const classicStore = path.join(editionPolicy.siblingClassicUserDataDir(), 'config.json');
+    const classicCfg = editionPolicy.readElectronStoreConfig(classicStore);
+    const sanitized = editionPolicy.sanitizeClassicConfigForRf(classicCfg);
+    if (!sanitized) {
+        store.set('classicConfigImportedV1', true);
+        return;
+    }
+    let response = 1;
+    try {
+        const box = await dialog.showMessageBox({
+            type: 'question',
+            buttons: ['Import saves', 'Start fresh'],
+            defaultId: 0,
+            cancelId: 1,
+            title: 'Farm Dashboard V5',
+            message: 'Import saves from Farm Dashboard V4?',
+            detail:
+                'Copies save names and folders only. Passwords, feed codes, and LAN access stay in V4. V5 uses its own profile and port 8768.',
+        });
+        response = box.response;
+    } catch (_) {
+        response = 1;
+    }
+    store.set('classicConfigImportedV1', true);
+    if (response === 0) store.set('config', sanitized);
+}
+
+async function bootServer(config, options) {
+    const deferHydrate = !!(options && options.deferHydrate);
     await stopAllWatchers();
 
     const servers = config.servers || (config.mode ? [{
@@ -2563,14 +3436,15 @@ async function bootServer(config) {
             console.error('[bootServer] hydrate', srv.id, e);
         }
     });
-    // Prefer the latest on-disk Lua export per configured server/save over older persisted merged cache.
-    for (const srv of servers) {
-        try {
-            await hydrateLuaSnapshotFromDiskAtBoot(srv);
-        } catch (e) {
-            console.error('[bootServer] hydrate lua snapshot', srv.id, e);
+    const hydrateLua = async () => {
+        for (const srv of servers) {
+            try {
+                await hydrateLuaSnapshotFromDiskAtBoot(srv);
+            } catch (e) {
+                console.error('[bootServer] hydrate lua snapshot', srv.id, e);
+            }
         }
-    }
+    };
 
     const runDeferredBootWork = () => {
         try {
@@ -2582,6 +3456,7 @@ async function bootServer(config) {
                 }
             });
             startFtpPollingCoordinator(config, ftpServers);
+            startVanillaFillTypeHudWarmup();
         } catch (e) {
             console.error('[bootServer] deferred work failed:', e);
         }
@@ -2591,11 +3466,25 @@ async function bootServer(config) {
         // Reloading http://127.0.0.1:8766 on every save-settings tears down the renderer (Settings modal open)
         // and often shows a blank/blue window until load completes — skip when already on this URL.
         if (shouldLoadDashboardUrl() && mainWindow) {
-            mainWindow.loadURL(`http://127.0.0.1:${PORT}`);
+            void waitForDashboardNavigation(`http://127.0.0.1:${PORT}/`, 15000)
+                .catch((e) => console.error('[bootServer] navigation', e));
         }
         setImmediate(runDeferredBootWork);
     };
 
+    if (deferHydrate) {
+        setImmediate(() => {
+            void hydrateLua().catch((e) => console.error('[bootServer] deferred lua', e));
+        });
+        if (!server || !server.listening) {
+            listenFarmdashHttp(getLanBindAddress(), loadDashboardThenDeferHeavyWork);
+        } else {
+            loadDashboardThenDeferHeavyWork();
+        }
+        return;
+    }
+
+    await hydrateLua();
     if (!server || !server.listening) {
         listenFarmdashHttp(getLanBindAddress(), loadDashboardThenDeferHeavyWork);
     } else {
@@ -2606,17 +3495,26 @@ async function bootServer(config) {
 /** Same persistence + boot as ipcMain save-settings — used by POST /api/setup-config (tablet / browser on LAN). */
 async function applyFarmdashSetupConfig(newConfig) {
     const prev = store.get('config') || {};
-    const mergedServers = mergeServersPreserveSecrets(prev.servers, newConfig.servers);
+    const resolved = resolveServersForSave(prev.servers, newConfig.servers);
+    if (resolved.keptExisting) {
+        console.warn('[save-settings] ignored empty servers list; kept existing saves');
+    }
     const merged = {
         ...prev,
         ...newConfig,
-        servers: mergedServers,
+        servers: resolved.servers,
     };
     if (newConfig.ftpPolling) {
         merged.ftpPolling = { ...(prev.ftpPolling || {}), ...newConfig.ftpPolling };
     }
     store.set('config', merged);
-    await bootServer(merged);
+    if (!configNeedsServerReboot(prev, merged)) {
+        return { rebooted: false, keptExisting: resolved.keptExisting };
+    }
+    // Persist already happened. Do not await Lua hydrate of every save on the IPC thread —
+    // that hung Settings Save, and pairing it with a LAN HTTP restart deadlocked keep-alive.
+    void bootServer(merged, { deferHydrate: true }).catch((e) => console.error('[bootServer]', e));
+    return { rebooted: true, keptExisting: resolved.keptExisting };
 }
 
 // ── Electron window ───────────────────────────────────────────────────────────
@@ -2696,8 +3594,23 @@ function createWindow() {
     if (config?.isConfigured) {
         void bootServer(config).catch((e) => console.error('[bootServer]', e));
     } else {
-        // Show setup immediately (do not wait for HTTP — blank window felt like a hang on cold start).
+        // Vite's root-relative assets require HTTP; loadFile leaves a fresh V5 window blank.
         const opts = getSetupLoadOptions();
+        if (shouldServeNewUi()) {
+            const newUiSetup = path.join(resolveNewUiDistDir(), 'setup.html');
+            if (fs.existsSync(newUiSetup)) {
+                const showNewUiSetup = () => {
+                    if (mainWindow && !mainWindow.isDestroyed()) loadSetupWindow();
+                };
+                if (!server || !server.listening) {
+                    listenFarmdashHttp(getLanBindAddress(), showNewUiSetup);
+                } else {
+                    showNewUiSetup();
+                }
+                return;
+            }
+        }
+        // Classic setup can still open immediately from disk.
         mainWindow.loadFile(path.join(__dirname, 'setup.html'), opts);
         // Still bring up HTTP + WS for LAN setup and dashboard after save.
         if (!server || !server.listening) {
@@ -2736,7 +3649,7 @@ let gotSingleInstanceLock = true;
 if (FARMDASH_DEV) {
     console.log('[dev] FARMDASH_DEV=1 — running alongside installed app (port ' + PORT + ')');
 } else {
-    gotSingleInstanceLock = app.requestSingleInstanceLock();
+    gotSingleInstanceLock = app.requestSingleInstanceLock({ productLine: PRODUCT_LINE });
     if (!gotSingleInstanceLock) {
         app.quit();
     } else {
@@ -2756,7 +3669,23 @@ if (gotSingleInstanceLock) {
             console.log('[dev] Open http://127.0.0.1:' + PORT + '/ (installed demo can stay on 8766)');
         }
         await consumeInstallLocaleFile();
+        await maybeOfferClassicConfigImport();
         ensureEditApplicationMenu();
+        app.on('web-contents-created', (_event, contents) => {
+            contents.on('will-navigate', (event, navUrl) => {
+                try {
+                    const u = new URL(navUrl);
+                    const ok = editionPolicy.isTrustedDashboardIpcUrl(u.href, { port: PORT, appDirectory: __dirname });
+                    if (!ok) event.preventDefault();
+                } catch (_) {
+                    event.preventDefault();
+                }
+            });
+            contents.on('will-redirect', (event, navUrl) => {
+                if (!editionPolicy.isTrustedDashboardIpcUrl(navUrl, { port: PORT, appDirectory: __dirname })) event.preventDefault();
+            });
+            contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+        });
         createWindow();
         initAppUpdater(
             () => mainWindow,
@@ -2786,20 +3715,30 @@ app.on('window-all-closed', () => {
 
 // ── IPC ───────────────────────────────────────────────────────────────────────
 
-ipcMain.handle('save-settings', async (_event, newConfig) => {
+registerTrustedHandle('save-settings', async (_event, newConfig) => {
     try {
-        await applyFarmdashSetupConfig(newConfig);
-        return { ok: true };
+        const result = await applyFarmdashSetupConfig(newConfig);
+        pushUxEvent(ERROR_CODES.E_NETWORK, 'Setup config saved', 'setup');
+        return { ok: true, saveState: 'saved', ...result };
     } catch (e) {
         console.error('[save-settings]', e);
         return { ok: false, error: String(e && e.message ? e.message : e) };
     }
 });
 
-ipcMain.handle('get-current-config', () => store.get('config'));
+registerTrustedHandle('launch-dashboard', async (event) => {
+    try {
+        return await launchDashboardFromIpc(event);
+    } catch (e) {
+        console.error('[launch-dashboard]', e);
+        return { ok: false, error: String(e && e.message ? e.message : e), stage: 'failed' };
+    }
+});
+
+registerTrustedHandle('get-current-config', () => store.get('config'));
 
 /** Fallback when HTTP `/api/status` is unreachable — read default local `data.json` (same path logic as former `fs` in renderer). */
-ipcMain.handle('read-local-farmdash-data-json', async () => {
+registerTrustedHandle('read-local-farmdash-data-json', async () => {
     try {
         const bases = collectFarmDashboardModSettingsRoots(getElectronDocumentsPath);
         for (const base of bases) {
@@ -2842,7 +3781,7 @@ ipcMain.handle('read-local-farmdash-data-json', async () => {
 });
 
 /** Renderer fallback: load per-server merged snapshot persisted in userData/serverLiveCache. */
-ipcMain.handle('read-server-live-cache', (_event, serverId) => {
+registerTrustedHandle('read-server-live-cache', (_event, serverId) => {
     try {
         if (serverId == null || serverId === '') {
             return { ok: false, error: 'server_id_required' };
@@ -2869,9 +3808,9 @@ ipcMain.handle('read-server-live-cache', (_event, serverId) => {
     }
 });
 
-ipcMain.handle('get-lan-access-settings', () => ({ ...getLanSecurityFromStore() }));
+registerTrustedHandle('get-lan-access-settings', () => ({ ...getLanSecurityFromStore() }));
 
-ipcMain.handle('save-lan-access-settings', (_e, payload) => {
+registerTrustedHandle('save-lan-access-settings', (_e, payload) => {
     // v3.9 hardening: when LAN access is being enabled, refuse weak/default
     // credentials before persisting them. This prevents an inadvertent
     // "admin/farmhub" listener on `0.0.0.0:8766` and gives the renderer a
@@ -2884,33 +3823,89 @@ ipcMain.handle('save-lan-access-settings', (_e, payload) => {
             field: validation.field,
         });
     }
+    const prevBind = getLanBindAddress();
+    store.set('lanAccessPrevious', { ...getLanSecurityFromStore() });
     store.set('lanAccessEnabled', !!payload?.lanAccessEnabled);
     store.set('lanUsername', String(payload?.lanUsername ?? LAN_ACCESS_DEFAULTS.lanUsername));
     store.set('lanPassword', String(payload?.lanPassword ?? LAN_ACCESS_DEFAULTS.lanPassword));
     store.set('lanAllowedIPs', String(payload?.lanAllowedIPs ?? '').trim());
     store.set('lanAuthOptional', !!payload?.lanAuthOptional);
     refreshLanSecurityCache();
+    rotateLanWsSecret('lan_credentials_changed');
+    const enabled = !!payload?.lanAccessEnabled;
+    const nextBind = getLanBindAddress();
+    pushUxEvent(
+        enabled ? 'LAN_EXPOSED' : 'LAN_LOCAL',
+        enabled ? 'LAN access enabled (HTTP rebound)' : 'LAN access off (localhost only)',
+        'lan'
+    );
+    if (prevBind === nextBind) {
+        return Promise.resolve({
+            ok: true,
+            bind: nextBind,
+            saveState: 'synced',
+            restarted: false,
+        });
+    }
     return new Promise((resolve) => {
         restartHttpServer(() => {
             resolve({
                 ok: true,
                 bind: getLanBindAddress(),
+                saveState: 'synced',
+                restarted: true,
             });
         });
     });
 });
 
-ipcMain.handle('get-desktop-app-version', () => app.getVersion());
+registerTrustedHandle('get-setup-status', () => buildRuntimeSetupStatus({ setupTokenValid: true }));
 
-ipcMain.handle('check-desktop-app-updates', () => checkForUpdatesNow());
+registerTrustedHandle('run-setup-handshake', async () => runSetupHandshake(true));
+
+registerTrustedHandle('restore-lan-defaults', () => {
+    const prev = store.get('lanAccessPrevious');
+    const target = prev && typeof prev === 'object'
+        ? {
+            lanAccessEnabled: false,
+            lanUsername: String(prev.lanUsername || LAN_ACCESS_DEFAULTS.lanUsername),
+            lanPassword: String(prev.lanPassword || store.get('lanPassword') || LAN_ACCESS_DEFAULTS.lanPassword),
+            lanAllowedIPs: String(prev.lanAllowedIPs || ''),
+            lanAuthOptional: false,
+        }
+        : {
+            lanAccessEnabled: false,
+            lanUsername: LAN_ACCESS_DEFAULTS.lanUsername,
+            lanPassword: store.get('lanPassword') || LAN_ACCESS_DEFAULTS.lanPassword,
+            lanAllowedIPs: '',
+            lanAuthOptional: false,
+        };
+    store.set('lanAccessEnabled', false);
+    store.set('lanUsername', target.lanUsername);
+    store.set('lanPassword', target.lanPassword);
+    store.set('lanAllowedIPs', target.lanAllowedIPs);
+    store.set('lanAuthOptional', false);
+    refreshLanSecurityCache();
+    rotateLanWsSecret('lan_restored_defaults');
+    pushUxEvent('LAN_LOCAL', 'LAN restored to local-only default', 'lan');
+    return new Promise((resolve) => {
+        restartHttpServer(() => {
+            resolve({ ok: true, bind: getLanBindAddress(), lan: { ...getLanSecurityFromStore() } });
+        });
+    });
+});
+
+registerTrustedHandle('get-desktop-app-version', () => app.getVersion());
+
+registerTrustedHandle('check-desktop-app-updates', () => checkForUpdatesNow());
 
 
-ipcMain.handle('get-stored-locale', () => {
+registerTrustedHandle('get-stored-locale', () => {
     const l = store.get('locale');
     return l && typeof l === 'string' ? l : 'en';
 });
 
-ipcMain.handle('get-translations-json', async () => {
+registerTrustedHandle('get-translations-json', async () => {
     const p = path.join(__dirname, 'web', 'locales', 'translations.json');
     try {
         await fs.promises.access(p);
@@ -2926,19 +3921,19 @@ ipcMain.handle('get-translations-json', async () => {
     }
 });
 
-ipcMain.on('set-stored-locale', (_e, code) => {
+registerTrustedEvent('set-stored-locale', (_e, code) => {
     if (typeof code === 'string' && VALID_LOCALE_RE.test(code.substring(0, 2))) {
         store.set('locale', code.substring(0, 2).toLowerCase());
     }
 });
 
-ipcMain.on('reset-settings', () => {
+registerTrustedEvent('reset-settings', () => {
     store.delete('config');
     app.relaunch();
     app.exit();
 });
 
-ipcMain.on('open-setup', () => {
+registerTrustedEvent('open-setup', () => {
     if (mainWindow) loadSetupWindow();
 });
 
@@ -2950,10 +3945,15 @@ const DEFAULT_UI_PREFS = {
         fields: true,
         economy: true,
         pastures: true,
-        productions: true
+        productions: true,
+        storage: true
     },
     excludedFarmlandIdsByServer: {},
     fieldClusterPrefsByServer: {},
+    /** Opt-in only on V4. V5 ignores this and always serves NEW APP. */
+    useNewUi: false,
+    /** overview | last | section id — NEW APP open preference */
+    defaultSection: 'last',
     simHubView: {
         enabled: false,
         view: 'fields',
@@ -3004,18 +4004,25 @@ function normalizeSimHubView(raw) {
     };
 }
 
-ipcMain.handle('get-ui-preferences', () => {
+registerTrustedHandle('get-ui-preferences', () => {
     const u = store.get('uiPreferences') || {};
+    const rf = isRfProductLine();
     return {
         sections: { ...DEFAULT_UI_PREFS.sections, ...(u.sections || {}) },
         excludedFarmlandIdsByServer: normalizeExcludedFarmlandIdsMap(u.excludedFarmlandIdsByServer),
         fieldClusterPrefsByServer: normalizeFieldClusterPrefs(u.fieldClusterPrefsByServer),
         simHubView: normalizeSimHubView(u.simHubView),
+        useNewUi: rf ? true : (u.useNewUi !== undefined ? u.useNewUi === true : DEFAULT_UI_PREFS.useNewUi === true),
+        newUiLocked: rf,
+        productLine: readPackagedProductLine(),
+        defaultSection: typeof u.defaultSection === 'string' && u.defaultSection
+            ? String(u.defaultSection)
+            : DEFAULT_UI_PREFS.defaultSection,
     };
 });
 
 
-ipcMain.handle('save-ui-preferences', (_e, prefs) => {
+registerTrustedHandle('save-ui-preferences', (_e, prefs) => {
     const prev = store.get('uiPreferences') || {};
     const prevEx = normalizeExcludedFarmlandIdsMap(prev.excludedFarmlandIdsByServer);
     const formEx = normalizeExcludedFarmlandIdsMap(prefs?.excludedFarmlandIdsByServer);
@@ -3026,17 +4033,32 @@ ipcMain.handle('save-ui-preferences', (_e, prefs) => {
     const prevSh = normalizeSimHubView(prev.simHubView);
     const formSh = normalizeSimHubView(prefs?.simHubView);
     const mergedSh = prefs?.simHubView !== undefined ? formSh : prevSh;
+    const rfLine = isRfProductLine();
+    const useNewUi = rfLine
+        ? true
+        : (prefs?.useNewUi !== undefined
+            ? prefs.useNewUi === true
+            : (prev.useNewUi !== undefined ? prev.useNewUi === true : DEFAULT_UI_PREFS.useNewUi === true));
+    const defaultSection =
+        prefs?.defaultSection !== undefined
+            ? String(prefs.defaultSection || 'last')
+            : (typeof prev.defaultSection === 'string' && prev.defaultSection
+                ? String(prev.defaultSection)
+                : DEFAULT_UI_PREFS.defaultSection);
     const merged = {
         sections: { ...DEFAULT_UI_PREFS.sections, ...(prefs?.sections || {}) },
         excludedFarmlandIdsByServer: mergedEx,
         fieldClusterPrefsByServer: mergedCl,
         simHubView: mergedSh,
+        useNewUi,
+        defaultSection,
     };
     store.set('uiPreferences', merged);
-    return { ok: true };
+    const restartRequired = !rfLine && prefs?.useNewUi !== undefined && prefs.useNewUi !== (prev.useNewUi === true);
+    return { ok: true, useNewUi, restartRequired };
 });
 
-ipcMain.handle('set-simhub-live-context', (_e, payload) => {
+registerTrustedHandle('set-simhub-live-context', (_e, payload) => {
     try {
         const context = applySimHubLiveContextPatch(payload || {});
         return { ok: true, context };
@@ -3047,7 +4069,7 @@ ipcMain.handle('set-simhub-live-context', (_e, payload) => {
 });
 
 /** For Dashboard Settings: list owned fields only (same farm as the dashboard farm selector). */
-ipcMain.handle('get-field-exclusion-options', (_e, payload) => {
+registerTrustedHandle('get-field-exclusion-options', (_e, payload) => {
     const activeFarmId = Number(payload?.activeFarmId ?? 1);
     const prefs = store.get('uiPreferences') || {};
     const excluded = normalizeExcludedFarmlandIdsMap(prefs.excludedFarmlandIdsByServer);
@@ -3093,7 +4115,7 @@ function getModConfigPath() {
 
 const { parseModConfigXml, buildModConfigXml } = require('./modConfigXml');
 
-ipcMain.handle('get-mod-config', async () => {
+registerTrustedHandle('get-mod-config', async () => {
     const p = getModConfigPath();
     try {
         if (!(await pathExists(p))) {
@@ -3109,7 +4131,9 @@ ipcMain.handle('get-mod-config', async () => {
     }
 });
 
-ipcMain.handle('save-mod-config', async (_e, cfg) => {
+registerTrustedHandle('save-mod-config', async (_e, cfg) => {
+    const blocked = await assertGameWritesAllowed();
+    if (!blocked.ok) return blocked;
     const p = getModConfigPath();
     try {
         await fs.promises.mkdir(getModConfigDir(), { recursive: true });
@@ -3126,7 +4150,7 @@ ipcMain.handle('save-mod-config', async (_e, cfg) => {
     }
 });
 
-ipcMain.handle('scan-local-saves', async () => {
+registerTrustedHandle('scan-local-saves', async () => {
     /**
      * FS25 + mod write under .../modSettings/FS25_FarmDashboard/<slot>/data.json
      * Try every plausible Documents root (Electron, homedir, USERPROFILE, OneDrive).

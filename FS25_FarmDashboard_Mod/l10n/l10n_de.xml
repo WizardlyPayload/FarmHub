@@ -29,6 +29,10 @@
         <text name="ui_settings_gameplay_fd_enableBaleInventory_desc" text="Physische Ballen auf der Karte exportieren."/>
         <text name="ui_settings_gameplay_fd_enableRedTape" text="Red-Tape-Sammler"/>
         <text name="ui_settings_gameplay_fd_enableRedTape_desc" text="Red-Tape-Mod-Daten exportieren, wenn installiert."/>
+        <text name="ui_settings_gameplay_fd_enableInvoices" text="Rechnungen-Sammler"/>
+        <text name="ui_settings_gameplay_fd_enableInvoices_desc" text="Invoices-Mod-Daten exportieren, wenn installiert."/>
+        <text name="ui_settings_gameplay_fd_enableHirePurchasing" text="Finanzierungskauf-Sammler"/>
+        <text name="ui_settings_gameplay_fd_enableHirePurchasing_desc" text="Hire-Purchasing-Mod-Daten exportieren, wenn installiert."/>
 
         <text name="ui_settings_gameplay_fd_collectionCycleSec" text="Voller Sammelzyklus (Sek.)"/>
         <text name="ui_settings_gameplay_fd_collectionCycleSec_desc" text="Zeit zwischen vollen Exportzyklen. Höhere Werte reduzieren CPU-Last."/>

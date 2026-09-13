@@ -73,4 +73,25 @@ describe('fs25Paths mods directory resolution', () => {
         const candidates = resolveModsDirectoryCandidatesForRoot(collection);
         expect(candidates).toEqual([path.normalize(collection)]);
     });
+
+    test('empty FSG override does not outrank a populated default mods folder', () => {
+        const root = mkTempDir('fd-empty-ov-');
+        const defaultMods = path.join(root, 'mods');
+        const emptyOverride = mkTempDir('fd-empty-coll-');
+        fs.mkdirSync(defaultMods, { recursive: true });
+        fs.writeFileSync(path.join(defaultMods, 'FS25_Real.zip'), 'fake', 'utf8');
+        fs.writeFileSync(
+            path.join(root, 'gameSettings.xml'),
+            `<gameSettings modsDirectoryOverride="${emptyOverride.replace(/\\/g, '/')}" />`,
+            'utf8'
+        );
+        const emptyScore =
+            scoreModsDirectory(emptyOverride) + (looksLikeModsDirectory(emptyOverride) ? 1000 : 0);
+        const fullScore = scoreModsDirectory(defaultMods);
+        expect(looksLikeModsDirectory(emptyOverride)).toBe(false);
+        expect(looksLikeModsDirectory(defaultMods)).toBe(true);
+        expect(fullScore).toBeGreaterThan(emptyScore);
+        const candidates = resolveModsDirectoryCandidatesForRoot(root);
+        expect(candidates).toContain(path.normalize(defaultMods));
+    });
 });

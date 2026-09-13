@@ -151,7 +151,7 @@ local function _resolveFillTypeName(idx, catalog)
     if not idx then return nil end
     local key = tostring(idx)
     if catalog[key] then return catalog[key] end
-    local ftm = rawget(_G, "g_fillTypeManager")
+    local ftm = _G.g_fillTypeManager
     if ftm and ftm.getFillTypeByIndex then
         local ok, ft = pcall(function() return ftm:getFillTypeByIndex(idx) end)
         if ok and ft and ft.name and tostring(ft.name) ~= "" and not tonumber(ft.name) then
@@ -430,6 +430,7 @@ end
 local COROUTINE_INCREMENTAL_COLLECTORS = {
     economy = true,
     production = true,
+    fields = true,
 }
 
 --- copyFile(src, dst, forceOverwrite: Bool). Never pass Number 1/0 — engine type-checks
@@ -606,31 +607,89 @@ function FarmDashboardDataCollector:_exportMapOverviewForDashboard()
     end
 end
 
+--- Copy fill-type HUD overlays out of the engine VFS so the dashboard can show crop icons.
+--- One file per tick (copyFile of packed dataS can hitch if batched).
+function FarmDashboardDataCollector:_exportFillTypeHudIcons()
+    if self._fillTypeHudExportDone then return end
+    if type(copyFile) ~= "function" then
+        self._fillTypeHudExportDone = true
+        return
+    end
+    local ftm = _G.g_fillTypeManager
+    if not ftm or type(ftm.fillTypes) ~= "table" then return end
+    local destDir = getUserProfileAppPath() .. "modSettings/FS25_FarmDashboard/fillTypeHud/"
+    createFolder(destDir)
+    local i = self._fillTypeHudNext or 1
+    local n = #ftm.fillTypes
+    local didSlot = false
+    while i <= n and not didSlot do
+        local ft = ftm.fillTypes[i]
+        i = i + 1
+        if type(ft) == "table" and ft.name then
+            local name = tostring(ft.name)
+            local src = ft.hudOverlayFilename or ft.hudFilename
+            if type(src) == "string" and src ~= "" then
+                didSlot = true
+                local ext = src:match("%.[^./\\]+$") or ".dds"
+                local dest = destDir .. name .. ext
+                local altExt = (string.lower(ext) == ".png") and ".dds" or ".png"
+                local destAlt = destDir .. name .. altExt
+                if _pathExists(dest) or _pathExists(destAlt) then
+                    self._fillTypeHudCopied = (self._fillTypeHudCopied or 0) + 1
+                else
+                    local ok = _copyFileFs25BestEffort(src, dest)
+                    if not ok then
+                        ok = _copyFileFs25BestEffort(src, destAlt)
+                    end
+                    if ok then
+                        self._fillTypeHudCopied = (self._fillTypeHudCopied or 0) + 1
+                    end
+                end
+            end
+        end
+    end
+    self._fillTypeHudNext = i
+    if i > n then
+        self._fillTypeHudPasses = (self._fillTypeHudPasses or 0) + 1
+        if (self._fillTypeHudCopied or 0) > 0 or self._fillTypeHudPasses >= 2 then
+            self._fillTypeHudExportDone = true
+        else
+            self._fillTypeHudNext = 1
+        end
+    end
+end
+
 --- Cap for read/write fallback when rename/copy fail (atomic write recovery only). Bounds hitch vs huge tmp→final copies.
 local MOVE_FALLBACK_READ_MAX = 2 * 1024 * 1024
 
 --- Replace `src` with `dst` (move). Works when `os` is nil. Returns true on success.
+--- Destination already existing is NOT success — that may be the previous export (MOD-02).
 local function _movePathBestEffort(src, dst)
     if type(src) ~= "string" or type(dst) ~= "string" then return false end
+    if src == dst then return _pathExists(dst) end
     if type(os) == "table" and type(os.rename) == "function" then
-        pcall(function() os.rename(src, dst) end)
-        if _pathExists(dst) then return true end
+        local okCall, renameOk = pcall(os.rename, src, dst)
+        if okCall and renameOk then
+            return true
+        end
     end
     if type(deleteFile) == "function" and _copyFileFs25BestEffort(src, dst) then
         pcall(function() deleteFile(src) end)
-        return true
+        if _pathExists(dst) and not _pathExists(src) then return true end
+        return false
     end
     local body = _readPathLimited(src, MOVE_FALLBACK_READ_MAX)
     if body and type(io) == "table" and type(io.open) == "function" then
-        local o, e = io.open(dst, "w")
+        local o = io.open(dst, "w")
         if o then
-            pcall(function() o:write(body) end)
+            local wrote = pcall(function() o:write(body) end)
             pcall(function() o:close() end)
+            if not wrote then return false end
             if type(deleteFile) == "function" then pcall(function() deleteFile(src) end) end
             if type(os) == "table" and type(os.remove) == "function" then
                 pcall(function() os.remove(src) end)
             end
-            return _pathExists(dst)
+            return _pathExists(dst) and not _pathExists(src)
         end
     end
     return false
@@ -655,6 +714,25 @@ function FarmDashboardDataCollector:init()
         stock          = StockDataCollector,
         baleInventory  = BaleInventoryCollector,
         redTape        = RedTapeDataCollector,
+        invoices       = InvoicesDataCollector,
+        hirePurchasing = HirePurchasingDataCollector,
+        -- Realistic Farming suite (Coordinator registry; domain agents fill stub bodies)
+        rfSoilFertilizer     = RfSoilFertilizerDataCollector,
+        rfCropStress         = RfCropStressDataCollector,
+        rfTax                = RfTaxDataCollector,
+        rfMarketDynamics     = RfMarketDynamicsDataCollector,
+        rfFuelCosts          = RfFuelCostsDataCollector,
+        rfWorkerCosts        = RfWorkerCostsDataCollector,
+        rfIncome             = RfIncomeDataCollector,
+        rfWorkplaceTriggers  = RfWorkplaceTriggersDataCollector,
+        rfDairy              = RfDairyDataCollector,
+        rfNpcFavor           = RfNpcFavorDataCollector,
+        rfWorldEvents        = RfWorldEventsDataCollector,
+        rfProStaff           = RfProStaffDataCollector,
+        rfFertilizerDepot    = RfFertilizerDepotDataCollector,
+        rfWeatherGuard       = RfWeatherGuardDataCollector,
+        rfTimeGuard          = RfTimeGuardDataCollector,
+        rfPresence           = RfPresenceDataCollector,
     }
 
     for name, collector in pairs(self.collectors) do
@@ -983,6 +1061,9 @@ function FarmDashboardDataCollector:runAdaptiveProbeOnce()
         cycleMs = 60000
     end
 
+    local userMs = tonumber(self._userCollectionCycleMs) or tonumber(self.config.collectionCycleMs) or 60000
+    cycleMs = math.max(cycleMs, userMs)
+    cycleMs = math.min(1800000, cycleMs)
     local prev = self.config.collectionCycleMs
     if prev ~= cycleMs then
         self.config.collectionCycleMs = cycleMs
@@ -1096,6 +1177,12 @@ function FarmDashboardDataCollector:resetStaggerState()
     if rawget(_G, "RedTapeDataCollector") then
         RedTapeDataCollector._inc = false
     end
+    if rawget(_G, "InvoicesDataCollector") then
+        InvoicesDataCollector._inc = false
+    end
+    if rawget(_G, "HirePurchasingDataCollector") then
+        HirePurchasingDataCollector._inc = false
+    end
 end
 
 function FarmDashboardDataCollector:loadConfig()
@@ -1112,14 +1199,38 @@ function FarmDashboardDataCollector:loadConfig()
         enableStock         = true,
         enableBaleInventory = true,
         enableRedTape       = true,
+        enableInvoices      = true,
+        enableHirePurchasing = true,
+        enableRfSoilFertilizer = true,
+        enableRfCropStress = true,
+        enableRfTax = true,
+        enableRfMarketDynamics = true,
+        enableRfFuelCosts = true,
+        enableRfWorkerCosts = true,
+        enableRfIncome = true,
+        enableRfWorkplaceTriggers = true,
+        enableRfDairy = true,
+        enableRfNpcFavor = true,
+        enableRfWorldEvents = true,
+        enableRfProStaff = true,
+        enableRfFertilizerDepot = true,
+        enableRfWeatherGuard = true,
+        enableRfTimeGuard = true,
+        enableRfPresence = true,
         stockPlaceablesPerFrame = 3,
         baleWorldEntitiesPerFrame = 8,
         financeVehiclesPerFrame = 4,
         redTapeFarmsPerFrame = 1,
+        invoicesFarmsPerFrame = 1,
+        hirePurchasingFarmsPerFrame = 1,
         --- When true, FieldDataCollector prints a throttled line to log.txt after bale scans (see FieldDataCollector.lua).
         debugBaleScan       = false,
         --- When true, FarmDash periodically logs median/p99 collectStep + serializer timings. Verification only.
         diagnostics         = false,
+        --- MP XML/network compat — ExportMirror always streams to joined clients (these flags are ignored).
+        allowExportMirror   = true,
+        --- Kept for older config.xml / settings sync; does not gate mirroring.
+        mirrorExport        = true,
         --- Intra-module budgets (collectStep); see FieldDataCollector / VehicleDataCollector.
         fieldsPerFrame      = 1,
         baleEntitiesBudget  = 8,
@@ -1177,8 +1288,44 @@ function FarmDashboardDataCollector:loadConfig()
                 stockOn
             )
             self.config.enableRedTape   = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#redTape"),   true)
+            self.config.enableInvoices = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#invoices"), true)
+            self.config.enableHirePurchasing = Utils.getNoNil(
+                getXMLBool(xmlFile, "farmDashboard.modules#hirePurchasing"),
+                true
+            )
+            self.config.enableRfSoilFertilizer = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfSoilFertilizer"), true)
+            self.config.enableRfCropStress = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfCropStress"), true)
+            self.config.enableRfTax = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfTax"), true)
+            self.config.enableRfMarketDynamics = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfMarketDynamics"), true)
+            self.config.enableRfFuelCosts = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfFuelCosts"), true)
+            self.config.enableRfWorkerCosts = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfWorkerCosts"), true)
+            self.config.enableRfIncome = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfIncome"), true)
+            self.config.enableRfWorkplaceTriggers = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfWorkplaceTriggers"), true)
+            self.config.enableRfDairy = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfDairy"), true)
+            self.config.enableRfNpcFavor = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfNpcFavor"), true)
+            self.config.enableRfWorldEvents = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfWorldEvents"), true)
+            self.config.enableRfProStaff = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfProStaff"), true)
+            self.config.enableRfFertilizerDepot = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfFertilizerDepot"), true)
+            self.config.enableRfWeatherGuard = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfWeatherGuard"), true)
+            self.config.enableRfTimeGuard = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfTimeGuard"), true)
+            self.config.enableRfPresence = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfPresence"), true)
             self.config.debugBaleScan = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#debugBaleScan"), false)
             self.config.diagnostics = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#diagnostics"), false)
+            self.config.allowExportMirror = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#allowExportMirror"), true)
+            self.config.mirrorExport = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#mirrorExport"), true)
+            -- 3.4.0.10+: keep legacy mirror flags true for XML compat (ExportMirror ignores them).
+            local mirrorDefaultOnApplied = Utils.getNoNil(
+                getXMLBool(xmlFile, "farmDashboard.settings#mirrorDefaultOnApplied"),
+                false
+            )
+            if mirrorDefaultOnApplied ~= true then
+                self.config.allowExportMirror = true
+                self.config.mirrorExport = true
+                setXMLBool(xmlFile, "farmDashboard.settings#allowExportMirror", true)
+                setXMLBool(xmlFile, "farmDashboard.settings#mirrorExport", true)
+                setXMLBool(xmlFile, "farmDashboard.settings#mirrorDefaultOnApplied", true)
+                saveXMLFile(xmlFile)
+            end
             local arps = getXMLInt(xmlFile, "farmDashboard.settings#animalRowsPerSlice")
             if arps and arps > 0 then self.config.animalRowsPerSlice = arps end
             local sbm = getXMLInt(xmlFile, "farmDashboard.settings#sliceBudgetMs")
@@ -1215,6 +1362,10 @@ function FarmDashboardDataCollector:loadConfig()
             if fvp and fvp > 0 then self.config.financeVehiclesPerFrame = fvp end
             local rtp = getXMLInt(xmlFile, "farmDashboard.settings#redTapeFarmsPerFrame")
             if rtp and rtp > 0 then self.config.redTapeFarmsPerFrame = rtp end
+            local ifp = getXMLInt(xmlFile, "farmDashboard.settings#invoicesFarmsPerFrame")
+            if ifp and ifp > 0 then self.config.invoicesFarmsPerFrame = ifp end
+            local hfp = getXMLInt(xmlFile, "farmDashboard.settings#hirePurchasingFarmsPerFrame")
+            if hfp and hfp > 0 then self.config.hirePurchasingFarmsPerFrame = hfp end
             if not Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV2Applied"), false) then
                 self.config.useStateMachine_economy = false
                 self.config.useStateMachine_fields = false
@@ -1262,6 +1413,47 @@ function FarmDashboardDataCollector:loadConfig()
                 setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV5Applied", true)
                 saveXMLFile(xmlFile)
             end
+            -- Painted / merged field outlines need the fields collector. Older configs
+            -- (and hitch workarounds) left modules#fields=false, so the map fell back
+            -- to static i3d polygons.
+            if not Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV6Applied"), false) then
+                if self.config.enableFields ~= true then
+                    self.config.enableFields = true
+                    Logging.info("[FarmDash] Field export re-enabled (needed for merged / extended map outlines).")
+                end
+                setXMLBool(xmlFile, "farmDashboard.modules#fields", true)
+                setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV6Applied", true)
+                saveXMLFile(xmlFile)
+            end
+            -- Ensure all core + optional module collectors default ON (older installs may have toggled off).
+            if not Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#modulesDefaultOnApplied"), false) then
+                self.config.enableAnimals = true
+                self.config.enableVehicles = true
+                self.config.enableWeather = true
+                self.config.enableFields = true
+                self.config.enableFinance = true
+                self.config.enableEconomy = true
+                self.config.enableProduction = true
+                self.config.enableStock = true
+                self.config.enableBaleInventory = true
+                self.config.enableRedTape = true
+                self.config.enableInvoices = true
+                self.config.enableHirePurchasing = true
+                setXMLBool(xmlFile, "farmDashboard.modules#animals", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#vehicles", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#weather", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#fields", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#finance", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#economy", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#production", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#stock", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#baleInventory", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#redTape", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#invoices", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#hirePurchasing", true)
+                setXMLBool(xmlFile, "farmDashboard.settings#modulesDefaultOnApplied", true)
+                saveXMLFile(xmlFile)
+            end
             delete(xmlFile)
         end
     else
@@ -1271,6 +1463,9 @@ function FarmDashboardDataCollector:loadConfig()
         setXMLInt(xmlFile, "farmDashboard.settings#collectionCycleMs", self.config.collectionCycleMs)
         setXMLBool(xmlFile, "farmDashboard.settings#debugBaleScan", false)
         setXMLBool(xmlFile, "farmDashboard.settings#diagnostics", false)
+        setXMLBool(xmlFile, "farmDashboard.settings#allowExportMirror", true)
+        setXMLBool(xmlFile, "farmDashboard.settings#mirrorExport", true)
+        setXMLBool(xmlFile, "farmDashboard.settings#mirrorDefaultOnApplied", true)
         setXMLInt(xmlFile, "farmDashboard.settings#animalRowsPerSlice", self.config.animalRowsPerSlice)
         setXMLInt(xmlFile, "farmDashboard.settings#sliceBudgetMs", self.config.sliceBudgetMs)
         setXMLInt(xmlFile, "farmDashboard.settings#detailMaxAgeSec", self.config.detailMaxAgeSec)
@@ -1284,10 +1479,14 @@ function FarmDashboardDataCollector:loadConfig()
         setXMLBool(xmlFile, "farmDashboard.modules#production", true)
         setXMLBool(xmlFile, "farmDashboard.modules#stock", true)
         setXMLBool(xmlFile, "farmDashboard.modules#redTape", true)
+        setXMLBool(xmlFile, "farmDashboard.modules#invoices", true)
+        setXMLBool(xmlFile, "farmDashboard.modules#hirePurchasing", true)
         setXMLInt(xmlFile, "farmDashboard.settings#stockPlaceablesPerFrame", self.config.stockPlaceablesPerFrame)
         setXMLInt(xmlFile, "farmDashboard.settings#baleWorldEntitiesPerFrame", self.config.baleWorldEntitiesPerFrame)
         setXMLInt(xmlFile, "farmDashboard.settings#financeVehiclesPerFrame", self.config.financeVehiclesPerFrame)
         setXMLInt(xmlFile, "farmDashboard.settings#redTapeFarmsPerFrame", self.config.redTapeFarmsPerFrame)
+        setXMLInt(xmlFile, "farmDashboard.settings#invoicesFarmsPerFrame", self.config.invoicesFarmsPerFrame)
+        setXMLInt(xmlFile, "farmDashboard.settings#hirePurchasingFarmsPerFrame", self.config.hirePurchasingFarmsPerFrame)
         setXMLInt(xmlFile, "farmDashboard.settings#fieldsPerFrame", self.config.fieldsPerFrame)
         setXMLInt(xmlFile, "farmDashboard.settings#baleEntitiesBudget", self.config.baleEntitiesBudget)
         setXMLInt(xmlFile, "farmDashboard.settings#vehiclesPerFrame", self.config.vehiclesPerFrame)
@@ -1303,6 +1502,7 @@ function FarmDashboardDataCollector:loadConfig()
         setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV3Applied", true)
         setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV4Applied", true)
         setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV5Applied", true)
+        setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV6Applied", true)
         setXMLInt(xmlFile, "farmDashboard.settings#economyRowsPerSlice", self.config.economyRowsPerSlice)
         saveXMLFile(xmlFile)
         delete(xmlFile)
@@ -1310,6 +1510,7 @@ function FarmDashboardDataCollector:loadConfig()
 
     -- Keep staggered collection on a slow cadence by default: never faster than 60s per full pass.
     self.config.collectionCycleMs = math.max(60000, math.min(1800000, self.config.collectionCycleMs or 60000))
+    self._userCollectionCycleMs = self.config.collectionCycleMs
     self.config.fieldsPerFrame = math.max(1, math.min(12, self.config.fieldsPerFrame or 1))
     self.config.baleEntitiesBudget = math.max(4, math.min(128, self.config.baleEntitiesBudget or 8))
     self.config.vehiclesPerFrame = math.max(1, math.min(16, self.config.vehiclesPerFrame or 2))
@@ -1328,6 +1529,8 @@ function FarmDashboardDataCollector:loadConfig()
     self.config.baleWorldEntitiesPerFrame = math.max(4, math.min(64, self.config.baleWorldEntitiesPerFrame or 8))
     self.config.financeVehiclesPerFrame = math.max(1, math.min(16, self.config.financeVehiclesPerFrame or 4))
     self.config.redTapeFarmsPerFrame = math.max(1, math.min(8, self.config.redTapeFarmsPerFrame or 1))
+    self.config.invoicesFarmsPerFrame = math.max(1, math.min(8, self.config.invoicesFarmsPerFrame or 1))
+    self.config.hirePurchasingFarmsPerFrame = math.max(1, math.min(8, self.config.hirePurchasingFarmsPerFrame or 1))
     self.config.postLoadCollectionGraceSec = math.max(0, math.min(300, self.config.postLoadCollectionGraceSec or POST_LOAD_COLLECTION_GRACE_SEC))
     FarmDashboard.UPDATE_INTERVAL = self.config.collectionCycleMs
 end
@@ -1369,6 +1572,9 @@ function FarmDashboardDataCollector:saveConfig()
     setXMLInt(xmlFile, "farmDashboard.settings#collectionCycleMs", cfg.collectionCycleMs or 60000)
     setXMLBool(xmlFile, "farmDashboard.settings#debugBaleScan", Utils.getNoNil(cfg.debugBaleScan, false))
     setXMLBool(xmlFile, "farmDashboard.settings#diagnostics", Utils.getNoNil(cfg.diagnostics, false))
+    setXMLBool(xmlFile, "farmDashboard.settings#allowExportMirror", Utils.getNoNil(cfg.allowExportMirror, true))
+    setXMLBool(xmlFile, "farmDashboard.settings#mirrorExport", Utils.getNoNil(cfg.mirrorExport, true))
+    setXMLBool(xmlFile, "farmDashboard.settings#mirrorDefaultOnApplied", true)
     setXMLInt(xmlFile, "farmDashboard.settings#animalRowsPerSlice", cfg.animalRowsPerSlice or 256)
     setXMLInt(xmlFile, "farmDashboard.settings#sliceBudgetMs", cfg.sliceBudgetMs or 4)
     setXMLInt(xmlFile, "farmDashboard.settings#detailMaxAgeSec", cfg.detailMaxAgeSec or 60)
@@ -1383,11 +1589,14 @@ function FarmDashboardDataCollector:saveConfig()
     setXMLInt(xmlFile, "farmDashboard.settings#baleWorldEntitiesPerFrame", cfg.baleWorldEntitiesPerFrame or 8)
     setXMLInt(xmlFile, "farmDashboard.settings#financeVehiclesPerFrame", cfg.financeVehiclesPerFrame or 4)
     setXMLInt(xmlFile, "farmDashboard.settings#redTapeFarmsPerFrame", cfg.redTapeFarmsPerFrame or 1)
+    setXMLInt(xmlFile, "farmDashboard.settings#invoicesFarmsPerFrame", cfg.invoicesFarmsPerFrame or 1)
+    setXMLInt(xmlFile, "farmDashboard.settings#hirePurchasingFarmsPerFrame", cfg.hirePurchasingFarmsPerFrame or 1)
     setXMLInt(xmlFile, "farmDashboard.settings#postLoadCollectionGraceSec", cfg.postLoadCollectionGraceSec or POST_LOAD_COLLECTION_GRACE_SEC)
     setXMLInt(xmlFile, "farmDashboard.settings#economyRowsPerSlice", cfg.economyRowsPerSlice or 64)
     setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_economy", Utils.getNoNil(cfg.useStateMachine_economy, false))
     setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_fields", Utils.getNoNil(cfg.useStateMachine_fields, false))
     setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_production", Utils.getNoNil(cfg.useStateMachine_production, false))
+    setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV6Applied", true)
 
     setXMLBool(xmlFile, "farmDashboard.modules#animals", Utils.getNoNil(cfg.enableAnimals, true))
     setXMLBool(xmlFile, "farmDashboard.modules#vehicles", Utils.getNoNil(cfg.enableVehicles, true))
@@ -1399,6 +1608,24 @@ function FarmDashboardDataCollector:saveConfig()
     setXMLBool(xmlFile, "farmDashboard.modules#stock", Utils.getNoNil(cfg.enableStock, true))
     setXMLBool(xmlFile, "farmDashboard.modules#baleInventory", Utils.getNoNil(cfg.enableBaleInventory, true))
     setXMLBool(xmlFile, "farmDashboard.modules#redTape", Utils.getNoNil(cfg.enableRedTape, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#invoices", Utils.getNoNil(cfg.enableInvoices, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#hirePurchasing", Utils.getNoNil(cfg.enableHirePurchasing, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfSoilFertilizer", Utils.getNoNil(cfg.enableRfSoilFertilizer, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfCropStress", Utils.getNoNil(cfg.enableRfCropStress, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfTax", Utils.getNoNil(cfg.enableRfTax, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfMarketDynamics", Utils.getNoNil(cfg.enableRfMarketDynamics, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfFuelCosts", Utils.getNoNil(cfg.enableRfFuelCosts, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfWorkerCosts", Utils.getNoNil(cfg.enableRfWorkerCosts, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfIncome", Utils.getNoNil(cfg.enableRfIncome, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfWorkplaceTriggers", Utils.getNoNil(cfg.enableRfWorkplaceTriggers, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfDairy", Utils.getNoNil(cfg.enableRfDairy, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfNpcFavor", Utils.getNoNil(cfg.enableRfNpcFavor, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfWorldEvents", Utils.getNoNil(cfg.enableRfWorldEvents, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfProStaff", Utils.getNoNil(cfg.enableRfProStaff, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfFertilizerDepot", Utils.getNoNil(cfg.enableRfFertilizerDepot, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfWeatherGuard", Utils.getNoNil(cfg.enableRfWeatherGuard, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfTimeGuard", Utils.getNoNil(cfg.enableRfTimeGuard, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfPresence", Utils.getNoNil(cfg.enableRfPresence, true))
 
     saveXMLFile(xmlFile)
     delete(xmlFile)
@@ -1660,7 +1887,7 @@ function FarmDashboardDataCollector:_isServerExportHost()
     end
     local md = _G.g_currentMission and _G.g_currentMission.missionDynamicInfo
     if md and md.isMultiplayer == true then return true end
-    if rawget(_G, "g_dedicatedServer") ~= nil then return true end
+    if _G.g_dedicatedServer ~= nil then return true end
     if _G.g_server ~= nil and type(_G.g_server.getIsServer) == "function" then
         local ok, isSrv = pcall(function() return _G.g_server:getIsServer() end)
         if ok and isSrv then return true end
@@ -1685,7 +1912,7 @@ function FarmDashboardDataCollector:_vehicleSpawnGraceDurationMs()
     return VEHICLE_SPAWN_GRACE_SERVER_MS
 end
 
---- True while shop spawn grace is active — pauses ALL export on authority (not only fleet slices).
+--- True while shop spawn grace is active — fleet scans pause; other collectors keep running.
 function FarmDashboardDataCollector:isExportPausedForVehicleSpawn()
     if not (FarmDashboard and FarmDashboard.isAuthority and FarmDashboard:isAuthority()) then
         return false
@@ -1721,17 +1948,19 @@ function FarmDashboardDataCollector:_beginVehicleSpawnGrace(reason, tailMs)
     self._vehicleSpawnGraceUntilMs = untilMs
 
     if FarmDashboard and FarmDashboard.isAuthority and FarmDashboard:isAuthority() then
-        self:_abortActiveIncrementalWork()
-        self._jsonWriteJob = nil
-        self._jsonPendingDisk = nil
-        self._cycleTailJob = nil
+        -- Abort only fleet walks. Cancelling JSON / fields here left the Fields page
+        -- on a stale snapshot until the next full cycle (and Courseplay can extend grace).
+        local name = self._incActiveModule
+        if name == "vehicles" or name == "finance" then
+            self:_abortActiveIncrementalWork()
+        end
     end
 
     local nowS = self:_missionNowSec()
     if (nowS - (self._vehicleSpawnGraceLogAt or 0)) >= 2 then
         self._vehicleSpawnGraceLogAt = nowS
         Logging.info(
-            "[FarmDash] Shop spawn freeze %ds (%s) — server export paused during vehicle spawn",
+            "[FarmDash] Shop spawn freeze %ds (%s) — fleet scan paused; fields keep exporting",
             math.floor(graceMs / 1000),
             tostring(reason or "shop")
         )
@@ -1865,7 +2094,8 @@ end
 function FarmDashboardDataCollector:shouldDeferCollectionWork(dt)
     if not _G.g_currentMission then return true end
 
-    if self:_isServerShopFreeze() then return true end
+    -- Shop/Courseplay spawn freeze is fleet-only (shouldDeferVehicleFleetWork).
+    -- Pausing the whole stagger here made Fields go blank after a shop buy.
 
     local nowS = self:_missionNowSec()
     if type(self._postLoadCollectionGraceUntil) == "number" and nowS < self._postLoadCollectionGraceUntil then
@@ -1973,6 +2203,8 @@ function FarmDashboardDataCollector:onMissionLoaded()
     self._courseplayLoaded = nil
     self._cpAllowFleetScanAfterGTime = nil
     self._polledPendingLoadsActive = nil
+    self._wroteRichExport = false
+    self._latchedTerrainHalf = nil
 
     local D = rawget(_G, "FarmDashDiagnostics")
     local nowS = (D and D.nowSec and D.nowSec()) or 0
@@ -1998,10 +2230,16 @@ function FarmDashboardDataCollector:onMissionLoaded()
     if FarmDashboardCourseplayCompat and FarmDashboardCourseplayCompat.install then
         FarmDashboardCourseplayCompat.install()
     end
+
+    -- Companion mods present → keep matching collectors on (and persist if we flipped flags).
+    self:ensureModLinkedCollectorsEnabled(true)
 end
 
 --- Stable order must match slice spacing (one module per slot over collectionCycleMs).
+--- Optional third-party collectors stay in the rotation whenever their mod is loaded,
+--- even if an older config.xml left the module flag off.
 function FarmDashboardDataCollector:getEnabledCollectorOrder()
+    self:ensureModLinkedCollectorsEnabled(false)
     local order = {}
     local seq = {
         { "animals",    "enableAnimals" },
@@ -2014,6 +2252,24 @@ function FarmDashboardDataCollector:getEnabledCollectorOrder()
         { "stock",          "enableStock" },
         { "baleInventory",  "enableBaleInventory" },
         { "redTape",        "enableRedTape" },
+        { "invoices",       "enableInvoices" },
+        { "hirePurchasing", "enableHirePurchasing" },
+        { "rfSoilFertilizer",    "enableRfSoilFertilizer" },
+        { "rfCropStress",        "enableRfCropStress" },
+        { "rfTax",               "enableRfTax" },
+        { "rfMarketDynamics",    "enableRfMarketDynamics" },
+        { "rfFuelCosts",         "enableRfFuelCosts" },
+        { "rfWorkerCosts",       "enableRfWorkerCosts" },
+        { "rfIncome",            "enableRfIncome" },
+        { "rfWorkplaceTriggers", "enableRfWorkplaceTriggers" },
+        { "rfDairy",             "enableRfDairy" },
+        { "rfNpcFavor",          "enableRfNpcFavor" },
+        { "rfWorldEvents",       "enableRfWorldEvents" },
+        { "rfProStaff",          "enableRfProStaff" },
+        { "rfFertilizerDepot",   "enableRfFertilizerDepot" },
+        { "rfWeatherGuard",      "enableRfWeatherGuard" },
+        { "rfTimeGuard",         "enableRfTimeGuard" },
+        { "rfPresence",          "enableRfPresence" },
     }
     for _, row in ipairs(seq) do
         local name, flag = row[1], row[2]
@@ -2022,6 +2278,116 @@ function FarmDashboardDataCollector:getEnabledCollectorOrder()
         end
     end
     return order
+end
+
+--- When a companion mod is active, keep the matching collector enabled (default-on path).
+--- persist=true writes config.xml so older default-off saves flip permanently.
+function FarmDashboardDataCollector:ensureModLinkedCollectorsEnabled(persist)
+    if type(self.config) ~= "table" then
+        return false
+    end
+    local changed = false
+
+    local function forceOn(flag)
+        if self.config[flag] ~= true then
+            self.config[flag] = true
+            changed = true
+        end
+    end
+
+    -- Core exporters — always on unless an admin deliberately turned them off after upgrade.
+    -- (No companion mod.) Left alone here except the one-time modulesDefaultOn migration.
+
+    local inv = rawget(_G, "InvoicesDataCollector")
+    if inv and type(inv.isModLoaded) == "function" and inv.isModLoaded() then
+        forceOn("enableInvoices")
+    end
+    local hp = rawget(_G, "HirePurchasingDataCollector")
+    if hp and type(hp.isModLoaded) == "function" and hp.isModLoaded() then
+        forceOn("enableHirePurchasing")
+    end
+    local rt = rawget(_G, "RedTapeDataCollector")
+    if rt and type(rt.isModLoaded) == "function" and rt.isModLoaded() then
+        forceOn("enableRedTape")
+    end
+
+    -- Realistic Farming collectors — keep slots on when soft-detect says the companion is loaded.
+    local rfForce = {
+        { "RfSoilFertilizerDataCollector", "enableRfSoilFertilizer" },
+        { "RfCropStressDataCollector", "enableRfCropStress" },
+        { "RfTaxDataCollector", "enableRfTax" },
+        { "RfMarketDynamicsDataCollector", "enableRfMarketDynamics" },
+        { "RfFuelCostsDataCollector", "enableRfFuelCosts" },
+        { "RfWorkerCostsDataCollector", "enableRfWorkerCosts" },
+        { "RfIncomeDataCollector", "enableRfIncome" },
+        { "RfWorkplaceTriggersDataCollector", "enableRfWorkplaceTriggers" },
+        { "RfDairyDataCollector", "enableRfDairy" },
+        { "RfNpcFavorDataCollector", "enableRfNpcFavor" },
+        { "RfWorldEventsDataCollector", "enableRfWorldEvents" },
+        { "RfProStaffDataCollector", "enableRfProStaff" },
+        { "RfFertilizerDepotDataCollector", "enableRfFertilizerDepot" },
+        { "RfWeatherGuardDataCollector", "enableRfWeatherGuard" },
+        { "RfTimeGuardDataCollector", "enableRfTimeGuard" },
+        { "RfPresenceDataCollector", "enableRfPresence" },
+    }
+    for _, row in ipairs(rfForce) do
+        local coll = rawget(_G, row[1])
+        if coll and type(coll.isModLoaded) == "function" and coll.isModLoaded() then
+            forceOn(row[2])
+        end
+    end
+
+    -- ADS / Vehicle Years / Mileage nest under the vehicles collector.
+    if self:isAdvancedDamageSystemLoaded() or self:isVehicleYearsLoaded() or self:isVehicleMileageLoaded() then
+        forceOn("enableVehicles")
+    end
+    -- Moisture System samples live on fields + stock paths.
+    if self:isMoistureSystemLoaded() then
+        forceOn("enableFields")
+        forceOn("enableStock")
+        forceOn("enableBaleInventory")
+    end
+    -- Realistic Livestock benefits from animals exporter.
+    if self:isRealisticLivestockLoaded() then
+        forceOn("enableAnimals")
+    end
+
+    if changed and persist and type(self.saveConfig) == "function" then
+        pcall(function() self:saveConfig() end)
+    end
+    return changed
+end
+
+function FarmDashboardDataCollector:isAdvancedDamageSystemLoaded()
+    if _G.g_modIsLoaded and _G.g_modIsLoaded["FS25_AdvancedDamageSystem"] then
+        return true
+    end
+    if _G.g_currentMission and _G.g_currentMission.advancedDamageSystem then
+        return true
+    end
+    return rawget(_G, "AdvancedDamageSystem") ~= nil
+end
+
+function FarmDashboardDataCollector:isVehicleMileageLoaded()
+    if _G.g_modIsLoaded and (_G.g_modIsLoaded["FS25_VehicleMileage"] or _G.g_modIsLoaded["FS25_Vehicle_Mileage"]) then
+        return true
+    end
+    return rawget(_G, "VehicleMileage") ~= nil or rawget(_G, "nxMileage") ~= nil
+end
+
+function FarmDashboardDataCollector:isMoistureSystemLoaded()
+    if _G.g_modIsLoaded and (_G.g_modIsLoaded["FS25_MoistureSystem"] or _G.g_modIsLoaded["FS25_Moisture"]) then
+        return true
+    end
+    local m = _G.g_currentMission
+    return m ~= nil and m.MoistureSystem ~= nil
+end
+
+function FarmDashboardDataCollector:isRealisticLivestockLoaded()
+    if _G.g_modIsLoaded and (_G.g_modIsLoaded["FS25_RealisticLivestock"] or _G.g_modIsLoaded["FS25_RealisticLiveStock"]) then
+        return true
+    end
+    return rawget(_G, "RealisticLivestock") ~= nil
 end
 
 function FarmDashboardDataCollector:_diagEnabled()
@@ -2058,6 +2424,100 @@ function FarmDashboardDataCollector:_cycleFreshCount(order)
         if self._cycleFresh and self._cycleFresh[name] then n = n + 1 end
     end
     return n
+end
+
+--- Merge RF soil/cropStress caches onto fields[] rows (Coordinator-owned; Land fills caches).
+function FarmDashboardDataCollector:_mergeRfFieldEnrichment(fields, mc)
+    if type(fields) ~= "table" then
+        return fields or {}
+    end
+    local soil = mc and mc.rfSoilFertilizer
+    local stress = mc and mc.rfCropStress
+    local soilBy = (type(soil) == "table" and type(soil.byField) == "table") and soil.byField or nil
+    local stressBy = (type(stress) == "table" and type(stress.byField) == "table") and stress.byField or nil
+    if not soilBy and not stressBy then
+        return fields
+    end
+    local out = {}
+    for i, row in ipairs(fields) do
+        if type(row) == "table" then
+            local copy = {}
+            for k, v in pairs(row) do
+                copy[k] = v
+            end
+            local fid = tonumber(row.farmlandId or row.id or row.fieldId)
+            if fid and soilBy then
+                local soilRow = soilBy[fid] or soilBy[tostring(fid)]
+                if type(soilRow) == "table" then
+                    copy.soilFertilizer = {}
+                    for sk, sv in pairs(soilRow) do
+                        copy.soilFertilizer[sk] = sv
+                    end
+                    if copy.soilFertilizer.enabled == nil and soil.enabled ~= nil then
+                        copy.soilFertilizer.enabled = soil.enabled
+                    end
+                end
+            end
+            if fid and stressBy then
+                local stressRow = stressBy[fid] or stressBy[tostring(fid)]
+                if type(stressRow) == "table" then
+                    copy.cropStress = {}
+                    for sk, sv in pairs(stressRow) do
+                        copy.cropStress[sk] = sv
+                    end
+                    if copy.cropStress.enabled == nil and stress.enabled ~= nil then
+                        copy.cropStress.enabled = stress.enabled
+                    end
+                end
+            end
+            out[i] = copy
+        else
+            out[i] = row
+        end
+    end
+    return out
+end
+
+--- Nest RF collector caches under top-level realisticFarming (see docs/rf-suite/SCHEMAS.md).
+function FarmDashboardDataCollector:_assembleRealisticFarming(mc)
+    mc = mc or {}
+    local soil = mc.rfSoilFertilizer or { enabled = false }
+    local stress = mc.rfCropStress or { enabled = false }
+    local soilSummary = {
+        enabled = soil.enabled == true,
+        pfConflict = soil.pfConflict,
+        fieldCount = soil.fieldCount,
+        -- Why SF produced no field rows (nil when enabled) so the dashboard can say
+        -- so instead of silently falling back to base-game fertiliser bars.
+        reason = soil.reason,
+        modLoaded = soil.modLoaded,
+        managerPresent = soil.managerPresent,
+        systemPresent = soil.systemPresent,
+        settingsEnabled = soil.settingsEnabled,
+    }
+    local stressSummary = {
+        enabled = stress.enabled == true,
+        fieldCount = stress.fieldCount,
+        alertHint = stress.alertHint,
+    }
+    return {
+        soilFertilizer = soilSummary,
+        cropStress = stressSummary,
+        tax = mc.rfTax or { enabled = false },
+        marketDynamics = mc.rfMarketDynamics or { enabled = false },
+        fuelCosts = mc.rfFuelCosts or { enabled = false },
+        workerCosts = mc.rfWorkerCosts or { enabled = false },
+        income = mc.rfIncome or { enabled = false },
+        workplaceTriggers = mc.rfWorkplaceTriggers or { enabled = false },
+        dairy = mc.rfDairy or { enabled = false },
+        npcFavor = mc.rfNpcFavor or { enabled = false },
+        worldEvents = mc.rfWorldEvents or { enabled = false },
+        proStaff = mc.rfProStaff or { enabled = false },
+        fertilizerDepot = mc.rfFertilizerDepot or { enabled = false },
+        weatherGuard = mc.rfWeatherGuard or { enabled = false },
+        timeGuard = mc.rfTimeGuard or { enabled = false },
+        presence = mc.rfPresence or { enabled = false, mods = {} },
+    }
 end
 
 function FarmDashboardDataCollector:assembleDataFromModuleCache()
@@ -2101,12 +2561,17 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
         production = mc.production or {},
         finance    = mc.finance or {},
         weather    = mc.weather or {},
-        economy    = mc.economy or {},
+        economy    = self:_stripEconomyDebugForExport(mc.economy),
         stock      = mc.stock or { enabled = false, byFarm = {} },
         redTape    = mc.redTape or { enabled = false, byFarm = {} },
+        invoices   = mc.invoices or { enabled = false },
+        hirePurchasing = mc.hirePurchasing or { enabled = false },
         --- Physical bales by fill + placement (BaleInventoryCollector / InventoryScan).
         baleInventory = baleInv or { farmId = nil, byFarm = {}, onField = {}, offField = {} }
     }
+
+    data.fields = self:_mergeRfFieldEnrichment(data.fields, mc)
+    data.realisticFarming = self:_assembleRealisticFarming(mc)
 
     _finalizeFillTypeNames(data)
 
@@ -2120,6 +2585,7 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
 
     data.adsSummary = self:buildAdsSummary(mc.vehicles)
     data.vehicleYearsSummary = self:buildVehicleYearsSummary(mc.vehicles, data.gameTime)
+    data.mileageSummary = self:buildMileageSummary(mc.vehicles)
 
     data.collectorModules = {
         animals = self.config.enableAnimals ~= false,
@@ -2131,10 +2597,49 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
         production = self.config.enableProduction ~= false,
         stock = self.config.enableStock ~= false,
         redTape = self.config.enableRedTape ~= false,
+        invoices = self.config.enableInvoices ~= false,
+        hirePurchasing = self.config.enableHirePurchasing ~= false,
+        rfSoilFertilizer = self.config.enableRfSoilFertilizer ~= false,
+        rfCropStress = self.config.enableRfCropStress ~= false,
+        rfTax = self.config.enableRfTax ~= false,
+        rfMarketDynamics = self.config.enableRfMarketDynamics ~= false,
+        rfFuelCosts = self.config.enableRfFuelCosts ~= false,
+        rfWorkerCosts = self.config.enableRfWorkerCosts ~= false,
+        rfIncome = self.config.enableRfIncome ~= false,
+        rfWorkplaceTriggers = self.config.enableRfWorkplaceTriggers ~= false,
+        rfDairy = self.config.enableRfDairy ~= false,
+        rfNpcFavor = self.config.enableRfNpcFavor ~= false,
+        rfWorldEvents = self.config.enableRfWorldEvents ~= false,
+        rfProStaff = self.config.enableRfProStaff ~= false,
+        rfFertilizerDepot = self.config.enableRfFertilizerDepot ~= false,
+        rfWeatherGuard = self.config.enableRfWeatherGuard ~= false,
+        rfTimeGuard = self.config.enableRfTimeGuard ~= false,
+        rfPresence = self.config.enableRfPresence ~= false,
     }
 
     self.data = data
     return data
+end
+
+--- Remove economy debug scaffolding from export payloads (keeps moduleCache debug intact).
+function FarmDashboardDataCollector:_stripEconomyDebugForExport(econ)
+    if type(econ) ~= "table" then return {} end
+    local out = {}
+    for k, v in pairs(econ) do
+        if k ~= "debug" then
+            out[k] = v
+        end
+    end
+    if type(out.marketPrices) == "table" and out.marketPrices.debug ~= nil then
+        local mp = {}
+        for mk, mv in pairs(out.marketPrices) do
+            if mk ~= "debug" then
+                mp[mk] = mv
+            end
+        end
+        out.marketPrices = mp
+    end
+    return out
 end
 
 --- Fleet aggregates when FS25_AdvancedDamageSystem vehicles are present in moduleCache.
@@ -2238,6 +2743,30 @@ function FarmDashboardDataCollector:buildVehicleYearsSummary(vehicles, gameTime)
     return summary
 end
 
+--- Fleet aggregates when FS25_VehicleMileage data is present on exported vehicles.
+function FarmDashboardDataCollector:buildMileageSummary(vehicles)
+    if type(vehicles) ~= "table" then return nil end
+    local summary = {
+        enabled = false,
+        vehicleCount = 0,
+        totalOdoKm = 0,
+        totalTripKm = 0,
+    }
+    for _, v in ipairs(vehicles) do
+        local mileage = v and v.mileage
+        if mileage and mileage.enabled then
+            summary.enabled = true
+            summary.vehicleCount = summary.vehicleCount + 1
+            summary.totalOdoKm = summary.totalOdoKm + (tonumber(mileage.odoKm) or 0)
+            summary.totalTripKm = summary.totalTripKm + (tonumber(mileage.tripKm) or 0)
+        end
+    end
+    if not summary.enabled then return nil end
+    summary.totalOdoKm = math.floor(summary.totalOdoKm * 1000 + 0.5) / 1000
+    summary.totalTripKm = math.floor(summary.totalTripKm * 1000 + 0.5) / 1000
+    return summary
+end
+
 --- @return boolean hasIncrementalCollector
 function FarmDashboardDataCollector:collectorSupportsIncremental(name)
     if not self.coroutinesAvailable and COROUTINE_INCREMENTAL_COLLECTORS[name] then
@@ -2283,14 +2812,16 @@ function FarmDashboardDataCollector:refreshAssembledInMemory()
 end
 
 --- When a module slice completes (full collect or incremental done), advance schedule and maybe flush JSON.
-function FarmDashboardDataCollector:finishModuleSlice(name, order, usedIncremental)
+function FarmDashboardDataCollector:finishModuleSlice(name, order, usedIncremental, failed)
     self._incActiveModule = nil
     local n = #order
     if n > 0 then
         self.nextSliceIdx = (self.nextSliceIdx or 1) % n + 1
     end
 
-    self._cycleFresh[name] = true
+    if not failed then
+        self._cycleFresh[name] = true
+    end
     self:_diagTrace(
         "module done %s incremental=%s cycleProgress=%d/%d nextIdx=%d",
         name, usedIncremental and "yes" or "no", self:_cycleFreshCount(order), n, self.nextSliceIdx or 1
@@ -2538,6 +3069,9 @@ function FarmDashboardDataCollector:runIncrementalActiveStep(order)
         vehicleBatch = self.config.vehiclesPerFrame or 2,
         financeVehiclesPerFrame = self.config.financeVehiclesPerFrame or 4,
         redTapeFarmsPerFrame = self.config.redTapeFarmsPerFrame or 1,
+        invoicesFarmsPerFrame = self.config.invoicesFarmsPerFrame or 1,
+        hirePurchasingFarmsPerFrame = self.config.hirePurchasingFarmsPerFrame or 1,
+        rfLandFieldsPerFrame = self.config.rfLandFieldsPerFrame or 8,
         economyYieldStride = self.config.economyYieldStride or 20,
         productionChainsPerYield = self.config.productionChainsPerYield or 1,
         productionPlaceablesPerYield = self.config.productionPlaceablesPerYield or 4,
@@ -2561,8 +3095,9 @@ function FarmDashboardDataCollector:runIncrementalActiveStep(order)
         if not ok then
             if collectTok and D then D:stop(collectTok) end
             FarmDashLog.devWarn("collectStep failed for %s: %s", tostring(name), _farmDashFormatError(stepErr))
-            self.moduleCache[name] = {}
-            self:finishModuleSlice(name, order, true)
+            -- Keep the last good cache. Publishing {} wiped Fields on the dashboard.
+            -- Do not mark the module fresh: reused data is stale (MOD-09).
+            self:finishModuleSlice(name, order, true, true)
             return
         end
     end
@@ -2588,7 +3123,11 @@ function FarmDashboardDataCollector:runIncrementalActiveStep(order)
             self:finishModuleSlice("production", order, true)
         end
     elseif name ~= "production" then
-        self.moduleCache[name] = payload or {}
+        -- Partial steps often return nil payload; do not wipe a prior complete cache
+        -- (RF land collectors take many frames — wiping caused soilFertilizer.enabled=false).
+        if done or payload ~= nil then
+            self.moduleCache[name] = payload or {}
+        end
     end
 
     --- Partial incremental steps skip refreshAssembledInMemory (full assemble every frame hitched while driving).
@@ -2657,7 +3196,7 @@ function FarmDashboardDataCollector:update(dt)
     if type(dt) ~= "number" then return end
     local diagEarly = rawget(_G, "FarmDashDiagnostics")
     if diagEarly and dt > 0 then
-        diagEarly.lastUpdateDtMs = dt * 1000
+        diagEarly.lastUpdateDtMs = dt
     end
     if not _G.g_currentMission then return end
 
@@ -2680,17 +3219,18 @@ end
 
 function FarmDashboardDataCollector:_updateBody(dt)
     self:_pollShopPendingLoads()
-    if self:_isServerShopFreeze() then
-        self:_updateCollectionPauseLatch(true)
-        return
+    pcall(function() self:_exportFillTypeHudIcons() end)
+
+    -- Always tick export-mirror first so shop-freeze / early returns cannot stall an in-flight stream.
+    local mirrorEarly = rawget(_G, "FarmDashboardExportMirror")
+    if mirrorEarly and mirrorEarly.update and mirrorEarly._job then
+        pcall(function() mirrorEarly:update(dt) end)
     end
+
     if not self:_isServerExportHost() then
         self:_updateVehicleSpawnGrace()
-        if self:_isServerShopFreeze() then
-            self:_updateCollectionPauseLatch(true)
-            return
-        end
     end
+    -- Fleet slices skip themselves during spawn grace; fields/soil must keep writing.
     -- Phase 5: re-detect animal mode until stable (cheap call: returns early once husbandry has data).
     if self._animalMode == nil or self._animalMode == "unknown" then
         self:detectAnimalModeOnce()
@@ -2950,6 +3490,11 @@ function FarmDashboardDataCollector:beginDeferredJsonWrite(data)
     if _G.FarmDashboard and _G.FarmDashboard.VERSION then
         data.serverInfo.modVersion = _G.FarmDashboard.VERSION
     end
+    pcall(function()
+        if _G.FarmDashboard and FarmDashboard.buildExportDiagnostics then
+            data.diagnostics = FarmDashboard:buildExportDiagnostics()
+        end
+    end)
     if self:isAdvancedDamageSystemLoaded() or (data.adsSummary and data.adsSummary.enabled) then
         data.serverInfo.adsEnabled = true
     end
@@ -2965,6 +3510,7 @@ function FarmDashboardDataCollector:beginDeferredJsonWrite(data)
         end
     end
     pcall(function() self:_exportMapOverviewForDashboard() end)
+    pcall(function() self:_exportFillTypeHudIcons() end)
     -- Plan v5 Phase 0: schemaVersion + serverTimeSec.
     data.schemaVersion = DATA_SCHEMA_VERSION
     if data.serverTimeSec == nil then
@@ -3075,12 +3621,7 @@ function FarmDashboardDataCollector:_writeJsonStringToDisk(jsonData, savegameDir
     local written = false
 
     if type(io) == "table" and type(io.open) == "function" then
-        local file = io.open(normPath, "w") or io.open(filePath, "w")
-        if file then
-            file:write(jsonData)
-            file:close()
-            written = true
-        end
+        written = self:_writeFileAtomic(normPath, jsonData)
     elseif not self._ioNilLogged then
         self._ioNilLogged = true
         FarmDashLog.devWarn("Lua io.open is not available; cannot write data.json.")
@@ -3102,6 +3643,12 @@ function FarmDashboardDataCollector:_writeJsonStringToDisk(jsonData, savegameDir
         end
         self._writeFailLogged = nil
         self._writeFailCount = 0
+        local mirror = rawget(_G, "FarmDashboardExportMirror")
+        if mirror and mirror.onAuthorityDataWritten then
+            pcall(function()
+                mirror:onAuthorityDataWritten(jsonData, savegameDir)
+            end)
+        end
     else
         self._writeFailCount = (self._writeFailCount or 0) + 1
         if not self._writeFailLogged or self._writeFailCount % 40 == 0 then
@@ -3160,11 +3707,13 @@ function FarmDashboardDataCollector:getGameTime()
 end
 
 --- World bounds for dashboard fleet map (terrain half-extent in metres).
+--- UV must match IngameMapElement:worldToLocalPos (getTerrainSize). Do not enlarge
+--- because a rim field sits at ~±1020 m on a 2048 m map — that doubled Riverbend to 4 km.
 function FarmDashboardDataCollector:refineMapBoundsFromWorldActivity(data, bounds)
     if not bounds or type(bounds) ~= "table" then
         return bounds
     end
-    local half = tonumber(bounds.halfSize) or 1024
+    local engineHalf = tonumber(bounds.halfSize) or 1024
     local maxAbs = 0
     local function consider(x, z)
         x = tonumber(x)
@@ -3180,15 +3729,31 @@ function FarmDashboardDataCollector:refineMapBoundsFromWorldActivity(data, bound
             end
         end
     end
-    if maxAbs <= half * 0.98 then
+    if data and data.fields then
+        for _, f in pairs(data.fields) do
+            if type(f) == "table" then
+                local pos = f.position
+                consider(f.posX or (pos and pos.x), f.posZ or (pos and pos.z))
+            end
+        end
+    end
+    -- Keep engine square unless activity is clearly outside it (4 km map reported as 2 km).
+    if maxAbs <= engineHalf * 1.02 then
+        bounds.halfSize = engineHalf
+        bounds.terrainSize = engineHalf * 2
+        bounds.minX = -engineHalf
+        bounds.maxX = engineHalf
+        bounds.minZ = -engineHalf
+        bounds.maxZ = engineHalf
+        self._latchedTerrainHalf = engineHalf
         return bounds
     end
     local newHalf = 1024
     while newHalf < maxAbs and newHalf < 8192 do
         newHalf = newHalf * 2
     end
-    if newHalf <= half then
-        return bounds
+    if newHalf < engineHalf then
+        newHalf = engineHalf
     end
     bounds.halfSize = newHalf
     bounds.terrainSize = newHalf * 2
@@ -3196,6 +3761,7 @@ function FarmDashboardDataCollector:refineMapBoundsFromWorldActivity(data, bound
     bounds.maxX = newHalf
     bounds.minZ = -newHalf
     bounds.maxZ = newHalf
+    self._latchedTerrainHalf = newHalf
     return bounds
 end
 
@@ -3219,13 +3785,16 @@ function FarmDashboardDataCollector:getMapBounds()
     if ok and ts and ts >= 64 then
         half = ts
     end
+    local mission = _G.g_currentMission
     return {
         minX = -half,
         maxX = half,
         minZ = -half,
         maxZ = half,
         halfSize = half,
-        terrainSize = half * 2
+        terrainSize = half * 2,
+        mapWidth = mission and tonumber(mission.mapWidth) or nil,
+        mapHeight = mission and tonumber(mission.mapHeight) or nil,
     }
 end
 
@@ -3258,10 +3827,12 @@ function FarmDashboardDataCollector:getFarmInfo()
                 if not farmData.isPlayer and farmName ~= "" then
                     farmData.isPlayer = true
                 end
-                -- Dedicated MP: only farms with assigned players (excludes 0, 100, empty NPC slots).
+                -- Dedicated / MP: export every named player farm on the save (matches
+                -- InventoryScan.collectPlayerFarmIds). Requiring online players hid farms
+                -- the client wasn't currently joined to, and the app then pruned their data.
                 if farmId == 0 or farmId == 100 then
                     -- skip contractor pool / unassigned
-                elseif #farmData.players > 0 then
+                elseif farmData.isPlayer then
                     table.insert(farms, farmData)
                 end
             end
@@ -3290,7 +3861,30 @@ function FarmDashboardDataCollector:getDataOutputDir()
     return dataPath
 end
 
+function FarmDashboardDataCollector:_exportHasGameplayRows(data)
+    if type(data) ~= "table" then
+        return false
+    end
+    local function hasRows(t)
+        if type(t) ~= "table" then
+            return false
+        end
+        for _ in pairs(t) do
+            return true
+        end
+        return false
+    end
+    if hasRows(data.vehicles) or hasRows(data.fields) or hasRows(data.animals) then
+        return true
+    end
+    return false
+end
+
 function FarmDashboardDataCollector:writeDataToFile(data)
+    -- Keep the last in-game export on disk when FS unloads (empty tables, no fleet/fields).
+    if self._wroteRichExport and not self:_exportHasGameplayRows(data) then
+        return
+    end
     local savegameDir = self:getSavegameDirName()
     local currentMapName = "Unknown Map"
     if _G.g_currentMission and _G.g_currentMission.missionInfo then
@@ -3317,6 +3911,9 @@ function FarmDashboardDataCollector:writeDataToFile(data)
         return
     end
     self:_writeJsonStringToDisk(jsonData, savegameDir)
+    if self:_exportHasGameplayRows(data) then
+        self._wroteRichExport = true
+    end
 end
 
 --- @param depth number|nil nil = compact (legacy); 0+ = pretty-print with 2-space indent
@@ -3340,13 +3937,29 @@ end
 
 --- Append the JSON encoding of `data` to `parts` (1-based array of strings).
 --- `compact==true` skips whitespace; otherwise pretty-prints with 2-space indent at `level`.
-function FarmDashboardDataCollector:_toJSONInto(parts, data, compact, level)
-    if type(data) == "string" and data == "__FD_JSON_NULL__" then
+local JSON_MAX_DEPTH = 32
+
+function FarmDashboardDataCollector:_toJSONInto(parts, data, compact, level, seen)
+    if (level or 0) > JSON_MAX_DEPTH then
         parts[#parts + 1] = "null"
         return
     end
 
     local t = type(data)
+    if t == "table" then
+        seen = seen or {}
+        if seen[data] then
+            parts[#parts + 1] = "null"
+            return
+        end
+        seen[data] = true
+    end
+
+    if type(data) == "string" and data == "__FD_JSON_NULL__" then
+        parts[#parts + 1] = "null"
+        return
+    end
+
     if t == "table" then
         local isArray = true
         local count = 0
@@ -3366,6 +3979,7 @@ function FarmDashboardDataCollector:_toJSONInto(parts, data, compact, level)
                 parts[#parts + 1] = string.rep("  ", level)
                 parts[#parts + 1] = "}"
             end
+            seen[data] = nil
             return
         end
 
@@ -3383,7 +3997,7 @@ function FarmDashboardDataCollector:_toJSONInto(parts, data, compact, level)
                     parts[#parts + 1] = nl
                 end
                 parts[#parts + 1] = ind1
-                self:_toJSONInto(parts, data[i], compact, level + 1)
+                self:_toJSONInto(parts, data[i], compact, level + 1, seen)
             end
             parts[#parts + 1] = nl
             parts[#parts + 1] = ind
@@ -3408,12 +4022,13 @@ function FarmDashboardDataCollector:_toJSONInto(parts, data, compact, level)
                 parts[#parts + 1] = _escapeJsonKey(tostring(k))
                 parts[#parts + 1] = '":'
                 parts[#parts + 1] = sp
-                self:_toJSONInto(parts, data[k], compact, level + 1)
+                self:_toJSONInto(parts, data[k], compact, level + 1, seen)
             end
             parts[#parts + 1] = nl
             parts[#parts + 1] = ind
             parts[#parts + 1] = "}"
         end
+        seen[data] = nil
         return
     end
 
@@ -3798,6 +4413,10 @@ function FarmDashboardDataCollector:processDetailQueueOnce()
 end
 
 function FarmDashboardDataCollector:shutdown()
+    local mirror = rawget(_G, "FarmDashboardExportMirror")
+    if mirror and mirror.cancelJob then
+        pcall(function() mirror:cancelJob() end)
+    end
     if _G.g_messageCenter then
         local mc = _G.g_messageCenter
         if type(mc.unsubscribeAll) == "function" then

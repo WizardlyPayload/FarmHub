@@ -18,9 +18,12 @@
  */
 
 const { assessModVersion } = require('./modVersionPolicy.js');
+const { applyFreshnessMeta } = require('./uxContract.cjs');
 const { pruneMergedDataToPlayerFarms, getPlayerFarmIdSet } = require('./farmScope.cjs');
 const { enrichStockFillTypes, applyFillTypeTitles, enrichStockFillTypesFromPlaceables } = require('./fillTypeResolve.cjs');
 const { enrichStockMoistureFromXml } = require('./stockMoistureFromXml');
+const { resolveFleetMapTerrainBounds } = require('./fleetMapGeo.cjs');
+const { fillCatalogGaps, getVanillaFillTypeCatalog, isWeakFillTypeLabel } = require('./mapFillTypes.cjs');
 
 const BALE_LITER_ESTIMATE = 4000;
 const BALE_INDEX_CATEGORY = {
@@ -310,6 +313,38 @@ function toArr(val) {
 }
 
 /**
+ * Lua empty Red Tape lists arrive as `{}`. Coerce byFarm list fields to arrays
+ * so UI `.map` / merger checks never see object-shaped empties.
+ */
+function normalizeRedTapeLists(redTape) {
+    if (!redTape || typeof redTape !== 'object') {
+        return { enabled: false, byFarm: {} };
+    }
+    const src = redTape.byFarm && typeof redTape.byFarm === 'object' ? redTape.byFarm : {};
+    const byFarm = {};
+    for (const [fid, farm] of Object.entries(src)) {
+        if (!farm || typeof farm !== 'object') {
+            byFarm[fid] = farm;
+            continue;
+        }
+        const tax = farm.tax && typeof farm.tax === 'object'
+            ? { ...farm.tax, statements: toArr(farm.tax.statements) }
+            : farm.tax;
+        byFarm[fid] = {
+            ...farm,
+            policies: toArr(farm.policies),
+            activeSchemes: toArr(farm.activeSchemes),
+            availableSchemes: toArr(farm.availableSchemes),
+            cropRotation: toArr(farm.cropRotation),
+            grants: toArr(farm.grants),
+            events: toArr(farm.events),
+            tax,
+        };
+    }
+    return { ...redTape, byFarm };
+}
+
+/**
  * Lua / JSON: "Straw" | "Grass" | "Hay", or null when empty.
  * Internal Lua→JSON sentinel (if ever re-stringified) is stripped here.
  */
@@ -414,16 +449,83 @@ function buildFieldLiveFingerprints(luaFields, receivedAt) {
                 f.moisture && typeof f.moisture === 'object' && f.moisture.percent != null
                     ? { ...f.moisture }
                     : undefined,
+            outline: Array.isArray(f.outline) && f.outline.length >= 3 ? f.outline : undefined,
+            paintedBlobKey: typeof f.paintedBlobKey === 'string' && f.paintedBlobKey ? f.paintedBlobKey : undefined,
+            mapHectares: Number(f.mapHectares) > 0 ? Number(f.mapHectares) : undefined,
+            fruitMapColor: f.fruitMapColor || undefined,
+            soilFertilizer:
+                f.soilFertilizer && typeof f.soilFertilizer === 'object'
+                    ? { ...f.soilFertilizer }
+                    : undefined,
+            cropStress:
+                f.cropStress && typeof f.cropStress === 'object' ? { ...f.cropStress } : undefined,
         };
     }
     return out;
+}
+
+function worldItemsForMapBounds(fields, vehicles) {
+    const items = [];
+    for (const v of toArr(vehicles)) items.push(v);
+    for (const f of toArr(fields)) {
+        items.push(f);
+        const outline = Array.isArray(f?.outline) ? f.outline : [];
+        for (const p of outline) {
+            if (Array.isArray(p) && p.length >= 2) items.push({ x: p[0], z: p[1] });
+            else if (p && typeof p === 'object') items.push({ x: p.x, z: p.z });
+        }
+    }
+    return items;
+}
+
+/** Never leave a 4 km map on the 2 km default just because Lua reported terrainSize=2048. */
+function applyResolvedMapBounds(merged, worldItems) {
+    if (!merged || typeof merged !== 'object') return merged;
+    const raw = merged.mapBounds || merged.serverInfo?.mapBounds || null;
+    const items = Array.isArray(worldItems)
+        ? worldItems
+        : worldItemsForMapBounds(merged.fields, merged.vehicles);
+    const next = resolveFleetMapTerrainBounds({ mapBounds: raw }, items);
+    const si =
+        merged.serverInfo && typeof merged.serverInfo === 'object'
+            ? { ...merged.serverInfo, mapBounds: next }
+            : { mapBounds: next };
+    return { ...merged, mapBounds: next, serverInfo: si };
+}
+
+/** Infer terrain size from the full world, then drop non-player farms. */
+function pruneAndResolveMapBounds(merged) {
+    if (!merged || typeof merged !== 'object') return merged;
+    const worldItems = worldItemsForMapBounds(merged.fields, merged.vehicles);
+    return applyResolvedMapBounds(pruneMergedDataToPlayerFarms(merged), worldItems);
 }
 
 /**
  * Overlay cached live-only values (area, position, PF soil data) onto an XML row that lacks them.
  * Geometry never regresses; PF values are better stale than blank when the live export drops out.
  */
-function enrichFieldFromLiveCache(base, cache) {
+function liveRfKeyOmitted(field, key) {
+    return !!(field && typeof field === 'object' && !Object.prototype.hasOwnProperty.call(field, key));
+}
+
+function pickFieldOutline(...candidates) {
+    for (const outline of candidates) {
+        if (Array.isArray(outline) && outline.length >= 3) return outline;
+    }
+    return undefined;
+}
+
+function pickLiveRfLandBlock(liveField, xmlField, cacheRow, key) {
+    if (liveField && Object.prototype.hasOwnProperty.call(liveField, key)) {
+        return liveField[key];
+    }
+    if (liveField) {
+        return xmlField?.[key] || { enabled: false };
+    }
+    return xmlField?.[key] || cacheRow?.[key];
+}
+
+function enrichFieldFromLiveCache(base, cache, options = {}) {
     if (!cache) return base;
     const out = { ...base };
     let enriched = false;
@@ -467,6 +569,31 @@ function enrichFieldFromLiveCache(base, cache) {
             ...cacheMoist,
             enabled: cacheMoist.enabled !== false,
         };
+        enriched = true;
+    }
+    if (
+        cache.soilFertilizer &&
+        typeof cache.soilFertilizer === 'object' &&
+        !out.soilFertilizer &&
+        !(options.rfFromLiveExport && liveRfKeyOmitted(base, 'soilFertilizer'))
+    ) {
+        out.soilFertilizer = { ...cache.soilFertilizer };
+        enriched = true;
+    }
+    if (
+        cache.cropStress &&
+        typeof cache.cropStress === 'object' &&
+        !out.cropStress &&
+        !(options.rfFromLiveExport && liveRfKeyOmitted(base, 'cropStress'))
+    ) {
+        out.cropStress = { ...cache.cropStress };
+        enriched = true;
+    }
+    if (Array.isArray(cache.outline) && cache.outline.length >= 3 && !(Array.isArray(out.outline) && out.outline.length >= 3)) {
+        out.outline = cache.outline;
+        if (cache.fruitMapColor && !out.fruitMapColor) out.fruitMapColor = cache.fruitMapColor;
+        if (cache.paintedBlobKey && !out.paintedBlobKey) out.paintedBlobKey = cache.paintedBlobKey;
+        if (Number(cache.hectares) > Number(out.hectares || 0)) out.hectares = cache.hectares;
         enriched = true;
     }
     if (enriched) out._fieldLiveEnrichedFromCache = true;
@@ -577,8 +704,19 @@ function attachDataTimestamps(obj, options) {
             mergeComputedAt,
             liveNewerThanXml,
         },
+        collectionHealth: options.collectionHealth || obj.collectionHealth || null,
     };
-    return attachModVersionCheck(withTimestamps);
+    if (obj && obj.diagnostics) withTimestamps.diagnostics = obj.diagnostics;
+    return attachModVersionCheck(
+        applyFreshnessMeta(withTimestamps, {
+            lastLuaAt,
+            lastXmlAt,
+            nowIso: mergeComputedAt,
+            collectionHealth: options.collectionHealth || obj.collectionHealth || null,
+            cacheUsedDueToFailure: !!options.cacheUsedDueToFailure,
+            source: obj && obj.dataSource,
+        })
+    );
 }
 
 const MAP_CROP_SKIP = new Set(['UNKNOWN', 'EMPTY', 'GRASS', 'MULCHED_STUBBLE']);
@@ -688,7 +826,17 @@ function collectFillTypeTitles(lua) {
     };
 }
 
-function buildFillTypeCatalog(luaData, xmlEconomy) {
+function mergeFillTypeTitles(luaTitles, mapTitles) {
+    const out = { ...(luaTitles || {}) };
+    for (const [key, val] of Object.entries(mapTitles || {})) {
+        if (isWeakFillTypeLabel(val)) continue;
+        const cur = out[key] ?? out[String(key)];
+        if (cur == null || isWeakFillTypeLabel(cur)) out[String(key)] = val;
+    }
+    return out;
+}
+
+function buildFillTypeCatalog(luaData, xmlEconomy, mapFillTypeCatalog) {
     const lua = luaData || {};
     const titles = collectFillTypeTitles(lua);
     const gameCatalog = applyFillTypeTitles({
@@ -709,12 +857,18 @@ function buildFillTypeCatalog(luaData, xmlEconomy) {
         ),
         ...(lua.stock?.fillTypeCatalog || {}),
     }, titles);
-    const withFallbacks = {
-        ...gameCatalog,
-        ...Object.fromEntries(
-            Object.entries(KNOWN_FILL_INDEX_NAMES).map(([idx, name]) => [String(idx), name])
+    const withFallbacks = fillCatalogGaps(
+        fillCatalogGaps(
+            {
+                ...gameCatalog,
+                ...Object.fromEntries(
+                    Object.entries(KNOWN_FILL_INDEX_NAMES).map(([idx, name]) => [String(idx), name])
+                ),
+            },
+            getVanillaFillTypeCatalog()
         ),
-    };
+        mapFillTypeCatalog
+    );
     const catalog = inferCatalogFromStockAndFields(
         lua.stock,
         lua.fields,
@@ -728,6 +882,10 @@ function mergeData(luaData, xmlData, options = {}) {
     const fieldLiveCache = options.fieldLiveCache || {};
     const lastLuaAt = options.lastLuaAt || null;
     const lastXmlAt = options.lastXmlAt || null;
+    const mapFillTypeCatalog = options.mapFillTypeCatalog || null;
+    const collectionHealth = options.collectionHealth || xmlData?.collectionHealth || null;
+    const stampOpts = { lastLuaAt, lastXmlAt, collectionHealth, cacheUsedDueToFailure: !!options.cacheUsedDueToFailure };
+    const mapFillTypeTitles = options.mapFillTypeTitles || null;
 
     if (!luaData && !xmlData) return null;
     if (!luaData) {
@@ -738,26 +896,26 @@ function mergeData(luaData, xmlData, options = {}) {
             lastLuaAt,
             lastXmlAt
         );
-        return pruneMergedDataToPlayerFarms(
-            attachDataTimestamps({ ...base, fields }, { lastLuaAt, lastXmlAt })
+        return pruneAndResolveMapBounds(
+            attachDataTimestamps({ ...base, fields }, stampOpts)
         );
     }
     if (!xmlData) {
-        const base = buildFromLuaOnly(luaData);
+        const base = buildFromLuaOnly(luaData, mapFillTypeCatalog, mapFillTypeTitles);
         if (fieldLiveCache && Object.keys(fieldLiveCache).length > 0) {
             base.fields = toArr(base.fields).map((f) => {
                 const id = Number(f.farmlandId ?? f.id);
                 const cache = fieldLiveCache[id];
-                return cache ? enrichFieldFromLiveCache(f, cache) : f;
+                return cache ? enrichFieldFromLiveCache(f, cache, { rfFromLiveExport: true }) : f;
             });
         }
-        return pruneMergedDataToPlayerFarms(
-            attachDataTimestamps(base, { lastLuaAt, lastXmlAt })
+        return pruneAndResolveMapBounds(
+            attachDataTimestamps(base, stampOpts)
         );
     }
 
-    const fillTypeCatalog = buildFillTypeCatalog(luaData, xmlData.economy);
-    const fillTypeTitles = collectFillTypeTitles(luaData);
+    const fillTypeCatalog = buildFillTypeCatalog(luaData, xmlData.economy, mapFillTypeCatalog);
+    const fillTypeTitles = mergeFillTypeTitles(collectFillTypeTitles(luaData), mapFillTypeTitles);
     const fromPlaceables = enrichStockFillTypesFromPlaceables(
         luaData.stock,
         xmlData.placeables,
@@ -860,10 +1018,19 @@ function mergeData(luaData, xmlData, options = {}) {
             fillTypeCatalog: { ...stockEnriched.catalog },
             fillTypeTitles: { ...fillTypeTitles },
         },
-        redTape: luaData.redTape || { enabled: false, byFarm: {} },
+        redTape: normalizeRedTapeLists(luaData.redTape || { enabled: false, byFarm: {} }),
+
+        // Optional third-party mod sections (must pass through — UI gates on enabled:true)
+        invoices: luaData.invoices || { enabled: false },
+        hirePurchasing: luaData.hirePurchasing || { enabled: false },
+        // Realistic Farming suite (soft-detect aggregates; NEW APP 5.x)
+        realisticFarming: luaData.realisticFarming || { presence: { enabled: false, mods: [] } },
 
         adsSummary         : luaData.adsSummary || null,
         vehicleYearsSummary: luaData.vehicleYearsSummary || null,
+        mileageSummary     : luaData.mileageSummary || null,
+        collectorModules   : luaData.collectorModules || null,
+        diagnostics        : luaData.diagnostics || null,
 
         // Placeables — XML
         placeables   : toArr(xmlData.placeables),
@@ -873,8 +1040,8 @@ function mergeData(luaData, xmlData, options = {}) {
         xmlEconomy   : xmlData.economy        || {},
     };
 
-    return pruneMergedDataToPlayerFarms(
-        attachDataTimestamps(mergedCore, { lastLuaAt, lastXmlAt })
+    return pruneAndResolveMapBounds(
+        attachDataTimestamps(mergedCore, stampOpts)
     );
 }
 
@@ -1238,7 +1405,7 @@ function forecastDayHasTemps(day) {
 
 function normalizeWeatherSlug(typeName) {
     if (typeName == null || typeName === '') return 'unknown';
-    const s = String(typeName).trim().toLowerCase().replace(/^weathertype\./i, '');
+    const s = String(typeName).trim().toLowerCase().replace(/^weathertype\./i, '').replace(/\s+/g, '_');
     const map = {
         sun: 'sun',
         sunny: 'sun',
@@ -1256,100 +1423,142 @@ function normalizeWeatherSlug(typeName) {
         foggy: 'fog',
         hail: 'hail',
     };
-    return map[s] || s;
-}
-
-function synthesizeForecastTemps(currentTemp, dayIndex) {
-    const base = isFiniteWeatherTemp(currentTemp) ? Math.round(currentTemp) : 20;
-    const variation = ((dayIndex * 13 + 7) % 5) - 2;
-    return {
-        minTemperature: base - 5 + variation,
-        maxTemperature: base + 5 + variation,
-    };
+    return map[s] || 'unknown';
 }
 
 /**
- * XML environment forecast has accurate day/type slots but no temperatures.
- * Lua collector provides temps — merge instead of replacing wholesale.
+ * XML environment forecast has day/type slots; Lua may supply temperatures.
+ * Do not invent min/max merely to fill the card. Live Lua forecast, when present,
+ * is not overwritten by older savegame XML types.
  */
-function mergeForecastDays(luaForecast, xmlForecast, currentTemp) {
+function finiteOrUndef(v) {
+    return isFiniteWeatherTemp(v) ? v : undefined;
+}
+
+function luaHasCurrentWeatherType(luaWeather) {
+    if (!luaWeather || typeof luaWeather !== 'object') return false;
+    if (!Object.prototype.hasOwnProperty.call(luaWeather, 'currentWeather')) return false;
+    const raw = luaWeather.currentWeather;
+    return raw != null && String(raw).trim() !== '';
+}
+
+function luaHasCurrentTemperature(luaWeather) {
+    return isFiniteWeatherTemp(luaWeather?.currentTemperature);
+}
+
+function luaWeatherIsLive(luaWeather) {
+    if (!luaWeather || typeof luaWeather !== 'object') return false;
+    if (luaHasCurrentWeatherType(luaWeather)) return true;
+    if (luaHasCurrentTemperature(luaWeather)) return true;
+    if (Array.isArray(luaWeather.forecast) && luaWeather.forecast.length > 0) return true;
+    return false;
+}
+
+function luaForecastIsLive(luaWeather) {
+    return !!(luaWeather && Array.isArray(luaWeather.forecast) && luaWeather.forecast.length > 0);
+}
+
+function mergeForecastDays(luaForecast, xmlForecast, _currentTemp, luaLive) {
     const lua = Array.isArray(luaForecast) ? luaForecast : [];
     const xml = Array.isArray(xmlForecast) ? xmlForecast : [];
 
-    if (xml.length === 0) return lua.slice(0, 7);
+    if (luaLive) {
+        return lua.slice(0, 7).map((day, i) => ({
+            ...day,
+            day: day.day ?? i + 1,
+            weatherType: normalizeWeatherSlug(day.weatherType),
+            minTemperature: finiteOrUndef(day.minTemperature),
+            maxTemperature: finiteOrUndef(day.maxTemperature),
+        }));
+    }
+
+    if (xml.length === 0) {
+        return lua.slice(0, 7).map((day, i) => ({
+            ...day,
+            day: day.day ?? i + 1,
+            weatherType: normalizeWeatherSlug(day.weatherType),
+            minTemperature: finiteOrUndef(day.minTemperature),
+            maxTemperature: finiteOrUndef(day.maxTemperature),
+        }));
+    }
+
     if (!xml.some(forecastDayHasTemps) && lua.some(forecastDayHasTemps)) {
         return lua.slice(0, 7).map((day, i) => {
             const x = xml[i];
-            if (!x) return day;
+            if (!x) {
+                return {
+                    ...day,
+                    weatherType: normalizeWeatherSlug(day.weatherType),
+                    minTemperature: finiteOrUndef(day.minTemperature),
+                    maxTemperature: finiteOrUndef(day.maxTemperature),
+                };
+            }
             return {
                 ...day,
                 day: x.day ?? day.day ?? i + 1,
-                weatherType: normalizeWeatherSlug(x.weatherType || day.weatherType),
+                weatherType: normalizeWeatherSlug(day.weatherType || x.weatherType),
+                minTemperature: finiteOrUndef(day.minTemperature),
+                maxTemperature: finiteOrUndef(day.maxTemperature),
                 precipitationChance:
                     day.precipitationChance ?? x.precipitationChance ?? 0,
             };
         });
     }
 
-    const merged = xml.slice(0, 7).map((xDay, i) => {
+    return xml.slice(0, 7).map((xDay, i) => {
         const lDay = lua[i] || {};
-        let minT = isFiniteWeatherTemp(xDay.minTemperature)
-            ? xDay.minTemperature
-            : lDay.minTemperature;
-        let maxT = isFiniteWeatherTemp(xDay.maxTemperature)
-            ? xDay.maxTemperature
-            : lDay.maxTemperature;
-        if (!isFiniteWeatherTemp(minT) && !isFiniteWeatherTemp(maxT)) {
-            const synth = synthesizeForecastTemps(currentTemp, i + 1);
-            minT = synth.minTemperature;
-            maxT = synth.maxTemperature;
-        } else if (!isFiniteWeatherTemp(minT) && isFiniteWeatherTemp(maxT)) {
-            minT = maxT - 8;
-        } else if (isFiniteWeatherTemp(minT) && !isFiniteWeatherTemp(maxT)) {
-            maxT = minT + 8;
-        }
         return {
             day: xDay.day ?? lDay.day ?? i + 1,
             weatherType: normalizeWeatherSlug(xDay.weatherType || lDay.weatherType),
-            minTemperature: minT,
-            maxTemperature: maxT,
+            minTemperature: finiteOrUndef(
+                isFiniteWeatherTemp(xDay.minTemperature) ? xDay.minTemperature : lDay.minTemperature
+            ),
+            maxTemperature: finiteOrUndef(
+                isFiniteWeatherTemp(xDay.maxTemperature) ? xDay.maxTemperature : lDay.maxTemperature
+            ),
             precipitationChance:
                 xDay.precipitationChance ?? lDay.precipitationChance ?? 0,
             allTypes: xDay.allTypes,
         };
     });
-
-    if (merged.some(forecastDayHasTemps)) return merged;
-    return lua.length > 0 ? lua.slice(0, 7) : merged;
 }
 
 function mergeWeather(luaWeather, xmlEnv) {
-    const base = luaWeather || {};
-    if (!xmlEnv) return base;
+    const luaLive = luaWeatherIsLive(luaWeather);
+    const base = luaWeather && typeof luaWeather === 'object' ? luaWeather : {};
+    if (!xmlEnv) {
+        if (!luaLive) return base;
+        return {
+            ...base,
+            currentWeather: normalizeWeatherSlug(base.currentWeather),
+            forecast: mergeForecastDays(base.forecast, null, base.currentTemperature, true),
+        };
+    }
 
-    const currentTemp = base.currentTemperature;
+    const currentTemp = luaHasCurrentTemperature(base)
+        ? base.currentTemperature
+        : xmlEnv.currentTemperature;
     const forecast = mergeForecastDays(
         base.forecast,
         xmlEnv.forecast,
-        currentTemp
+        currentTemp,
+        luaForecastIsLive(luaWeather)
     );
 
     return {
-        // Lua provides live temperature; XML provides accurate forecast slots
         currentTemperature : currentTemp,
-        currentWeather     : normalizeWeatherSlug(
-            base.currentWeather || xmlEnv.currentWeather
-        ),
-        currentSeason      : xmlEnv.currentSeason    || 'SPRING',
-        windSpeed          : base.windSpeed,
-        cloudCoverage      : base.cloudCoverage,
-        rainLevel          : base.rainLevel,
-        snowLevel          : base.snowLevel,
-        timeSinceLastRain  : base.timeSinceLastRain,
+        currentWeather     : luaHasCurrentWeatherType(base)
+            ? normalizeWeatherSlug(base.currentWeather)
+            : normalizeWeatherSlug(xmlEnv.currentWeather),
+        currentSeason      : xmlEnv.currentSeason    || base.currentSeason,
+        windSpeed          : base.windSpeed ?? xmlEnv.windSpeed,
+        cloudCoverage      : base.cloudCoverage ?? xmlEnv.cloudCoverage,
+        rainLevel          : base.rainLevel ?? xmlEnv.rainLevel,
+        snowLevel          : base.snowLevel ?? xmlEnv.snowLevel,
+        timeSinceLastRain  : base.timeSinceLastRain ?? xmlEnv.timeSinceLastRain,
         forecast,
         rawForecast        : xmlEnv.rawForecast || [],
-        // MoistureSystem block is live-only; never drop when merging with XML environment.
-        moisture           : base.moisture,
+        moisture           : base.moisture ?? xmlEnv.moisture,
     };
 }
 
@@ -1374,7 +1583,7 @@ function fixFieldOwnership(luaFields, farmlandOwnership) {
  *                        limeLevel, sprayLevel, plowLevel, ownerFarmId
  * Lua FieldDataCollector: isPrecisionFarming (soil maps active), nitrogenLevel, targetNitrogen,
  *                          phValue, targetPh, phLimeBarMin, phLimeBarMax, isScanned, nitrogenText, limeText,
- *                          posX, posZ, hectares
+ *                          pfSoilTypeIndex, waterLevel, posX, posZ, hectares
  *
  * Stubble mulch: Lua `mulchLevel` merged with XML `stubbleShredLevel` when both exist.
  * Lua wins for mapped N/pH values (only available from runtime density map reads).
@@ -1385,6 +1594,8 @@ function fixFieldOwnership(luaFields, farmlandOwnership) {
  *
  * Suggestions: computed in-game in FieldDataCollector.lua from live state. When both
  * XML and Lua exist for a field, only Lua’s suggestions are exposed (single source).
+ * RF Soil Fertilizer / Crop Stress objects on the Lua row must be copied through;
+ * XML has no equivalent and the UI otherwise falls back to vanilla 0/2 bars.
  */
 function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
     // Normalise both to arrays — Lua serialises empty tables as {} not []
@@ -1437,6 +1648,7 @@ function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
             isScanned          : !!(luaField.isScanned || xmlField.isScanned),
             nitrogenText       : luaField.nitrogenText       || xmlField.nitrogenText || '',
             limeText           : luaField.limeText           || xmlField.limeText     || '',
+            pfSoilTypeIndex    : Number(luaField.pfSoilTypeIndex ?? xmlField.pfSoilTypeIndex ?? 0) || 0,
             pfStats:
                 luaField.pfStats != null && typeof luaField.pfStats === 'object'
                     ? luaField.pfStats
@@ -1513,7 +1725,8 @@ function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
         };
 
         const cacheKey = Number(luaField.farmlandId ?? luaField.id ?? xmlField.farmlandId ?? xmlField.id);
-        const cacheMoist = fieldLiveCache[cacheKey]?.moisture;
+        const cacheRow = Number.isFinite(cacheKey) && cacheKey > 0 ? fieldLiveCache[cacheKey] : null;
+        const cacheMoist = cacheRow?.moisture;
         const moistureBlock =
             luaField.moisture && typeof luaField.moisture === 'object'
                 ? luaField.moisture
@@ -1569,8 +1782,37 @@ function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
                     ? luaField.stoneLevel
                     : (xmlField.stoneLevel ?? 0)
             ),
+            waterLevel: Number(
+                luaField.waterLevel != null && luaField.waterLevel !== ''
+                    ? luaField.waterLevel
+                    : (xmlField.waterLevel ?? 0)
+            ),
+            // RF land collectors attach these on the Lua row. XML has no equivalent;
+            // dropping them here is why Montana showed vanilla bars while Witcombe
+            // (lua-as-base when XML fields were empty) still showed Soil Fertilizer.
+            soilFertilizer: pickLiveRfLandBlock(luaField, xmlField, cacheRow, 'soilFertilizer'),
+            cropStress: pickLiveRfLandBlock(luaField, xmlField, cacheRow, 'cropStress'),
+            // Compact field polygon (world X/Z). Empty [] must not wipe XML/cache.
+            outline: pickFieldOutline(luaField.outline, xmlField.outline, cacheRow?.outline),
+            paintedBlobKey: luaField.paintedBlobKey || xmlField.paintedBlobKey || cacheRow?.paintedBlobKey,
+            mapHectares: luaField.mapHectares ?? xmlField.mapHectares ?? cacheRow?.mapHectares,
+            fruitMapColor: luaField.fruitMapColor || xmlField.fruitMapColor || cacheRow?.fruitMapColor,
         };
     });
+
+    const seenKeys = new Set();
+    for (const xmlField of xmlArr) {
+        const xKey = Number(xmlField.farmlandId ?? xmlField.id);
+        if (Number.isFinite(xKey) && xKey > 0) seenKeys.add(xKey);
+    }
+    for (const luaField of luaArr) {
+        const fa = Number(luaField.farmlandId);
+        const fi = Number(luaField.id);
+        const key = (Number.isFinite(fa) && fa > 0) ? fa : fi;
+        if (!Number.isFinite(key) || key <= 0 || seenKeys.has(key) || seenKeys.has(fi) || seenKeys.has(fa)) continue;
+        merged.push(normalizeFieldMulch(luaField));
+        seenKeys.add(key);
+    }
 
     return merged;
 }
@@ -1796,9 +2038,16 @@ function pairXmlOnlyWithNearbyLua(merged) {
             name          : best.name && best.name !== 'Unknown' ? best.name : v.name,
             vehicleType   : best.vehicleType || v.vehicleType,
             typeName      : best.typeName || v.typeName,
+            categoryName  : best.categoryName || v.categoryName,
+            headingDeg    : best.headingDeg ?? v.headingDeg,
+            speed         : best.speed ?? v.speed,
+            engineOn      : best.engineOn ?? v.engineOn,
+            position      : best.position || v.position,
             isMotorized   : best.isMotorized ?? v.isMotorized,
             operatingTime : best.operatingTime ?? v.operatingTime,
             ads           : best.ads,
+            vehicleYears  : best.vehicleYears,
+            mileage       : best.mileage,
             source        : 'merged',
         };
     });
@@ -1855,14 +2104,13 @@ function resolveMergedOwnerFarmId(luaV, xmlV) {
     if (luaV?.isUsedEquipmentYardStock === true) {
         return Number(luaV.ownerFarmId ?? luaV.farmId ?? 0);
     }
-    const uid = vehicleUniqueId(luaV) || vehicleUniqueId(xmlV);
-    if (uid && xmlV) {
-        const xmlFarm = Number(xmlV.farmId ?? xmlV.ownerFarmId ?? 0);
-        if (xmlFarm > 0 && !isTransientVehicleFarmId(xmlFarm)) return xmlFarm;
-    }
     const luaFarm = Number(luaV?.ownerFarmId ?? luaV?.farmId ?? 0);
     const xmlFarm = Number(xmlV?.farmId ?? xmlV?.ownerFarmId ?? 0);
     if (luaFarm > 0 && !isTransientVehicleFarmId(luaFarm)) return luaFarm;
+    const uid = vehicleUniqueId(luaV) || vehicleUniqueId(xmlV);
+    if (uid && xmlV) {
+        if (xmlFarm > 0 && !isTransientVehicleFarmId(xmlFarm)) return xmlFarm;
+    }
     if (xmlFarm > 0 && !isTransientVehicleFarmId(xmlFarm)) return xmlFarm;
     return luaFarm || xmlFarm || 0;
 }
@@ -1939,16 +2187,27 @@ function countAdsEnabledOnFarm(vehicles, farmId) {
     }).length;
 }
 
+function xmlIndexHasEntries(xmlIndex) {
+    if (!xmlIndex || typeof xmlIndex !== 'object') return false;
+    if (xmlIndex.poolUniqueIds?.size > 0) return true;
+    if (xmlIndex.playerFarmByUniqueId?.size > 0) return true;
+    if (xmlIndex.poolByConfig?.size > 0) return true;
+    if (xmlIndex.playerFarmByConfig?.size > 0) return true;
+    return false;
+}
+
 /**
  * When vehicles.xml tags a new DS farm fleet as pool 100, pick the player farm that owns
  * land/livestock but has the thinnest live fleet — per savegame row, not bulk reassignment.
+ * Without XML (join-as-client / lua_only), still remap if Lua already filtered dealership demos.
  */
 function inferTransientVehiclePoolFarmId(vehicles, luaData, farmInfo, xmlData = null, xmlIndex = null) {
     const playerIds = playerFarmIdsFromInfo(farmInfo);
     if (playerIds.size === 0) return null;
 
     const index = xmlIndex || buildPoolVehicleXmlIndex(toArr(xmlData?.vehicles));
-    const poolVehicles = toArr(vehicles).filter((v) => isPlayerOwnedPoolLiveVehicle(v, index));
+    const hasXml = xmlIndexHasEntries(index);
+    const poolVehicles = toArr(vehicles).filter((v) => isPlayerOwnedPoolLiveVehicle(v, hasXml ? index : null));
     if (poolVehicles.length === 0) return null;
 
     let bestId = null;
@@ -1958,17 +2217,21 @@ function inferTransientVehiclePoolFarmId(vehicles, luaData, farmInfo, xmlData = 
         const liveFleet = countLiveFleetOnFarm(vehicles, id);
         if (liveFleet > Math.max(3, poolVehicles.length)) continue;
 
-        const heads = livestockHeadCountOnFarm(luaData, id);
         const assignedFleet = countAssignedFleetOnFarm(vehicles, id);
-        let score = heads * 1000 + (liveFleet === 0 ? 500 : 100) + assignedFleet * 150;
+        let score = (liveFleet === 0 ? 50 : 10) + assignedFleet * 15;
         if (farmIdHasLivestock(luaData, id)) score += 250;
-        // ADS bonus only when savegame has pool-100 rows not yet on a player farm (not dealership demos).
-        const unassignedPoolAds = poolVehicles.filter(
-            (v) => v?.ads?.enabled === true
-                && isSavegameBackedPoolVehicle(v, index, id)
-                && !index.playerFarmByUniqueId?.has(vehicleUniqueId(v))
-        ).length;
+        // ADS bonus: savegame-backed when XML present; otherwise trust Lua live ADS on pool rows.
+        const unassignedPoolAds = poolVehicles.filter((v) => {
+            if (v?.ads?.enabled !== true) return false;
+            if (hasXml) {
+                return isSavegameBackedPoolVehicle(v, index, id)
+                    && !index.playerFarmByUniqueId?.has(vehicleUniqueId(v));
+            }
+            return true;
+        }).length;
         if (unassignedPoolAds > 0 && countAdsEnabledOnFarm(vehicles, id) === 0) score += 2000;
+        // Prefer farms with land ownership when several candidates exist (Witcombe-like).
+        if (farmIdHasOwnedFieldsFromSources(luaData, xmlData, id)) score += 100;
         if (score > bestScore) {
             bestScore = score;
             bestId = id;
@@ -1980,18 +2243,24 @@ function inferTransientVehiclePoolFarmId(vehicles, luaData, farmInfo, xmlData = 
 
 /** Drop live pool-100 rows with no player-farm savegame backing (dealership floor stock). */
 function dropUnbackedPoolVehicles(vehicles, xmlIndex, poolTargetFarmId = null) {
+    const hasXml = xmlIndexHasEntries(xmlIndex);
     return toArr(vehicles).filter((v) => {
         if (v?.isUsedEquipmentYardStock === true) return true;
         if (isMapTrafficVehicle(v)) return false;
         const owner = Number(v.ownerFarmId ?? v.farmId ?? 0);
         if (!isVehiclePoolFarmId(owner)) return true;
+        if (!hasXml) {
+            // lua_only / join-as-client: collector already dropped shop demos via needsSaving.
+            return isPlayerOwnedPoolLiveVehicle(v, null);
+        }
         return isSavegameBackedPoolVehicle(v, xmlIndex, poolTargetFarmId);
     });
 }
 
-/** Per-vehicle pool-100 → player farm when savegame confirms ownership. */
+/** Per-vehicle pool-100 → player farm when savegame confirms ownership (or lua_only inference). */
 function resolvePool100Ownership(vehicles, luaData, farmInfo, xmlData, xmlIndex) {
     const index = xmlIndex || buildPoolVehicleXmlIndex(toArr(xmlData?.vehicles));
+    const hasXml = xmlIndexHasEntries(index);
     const transientTarget = inferTransientVehiclePoolFarmId(vehicles, luaData, farmInfo, xmlData, index);
     return toArr(vehicles).map((v) => {
         const owner = Number(v.ownerFarmId ?? v.farmId ?? 0);
@@ -2012,8 +2281,11 @@ function resolvePool100Ownership(vehicles, luaData, farmInfo, xmlData, xmlIndex)
             }
         }
 
-        if (transientTarget != null && isSavegameBackedPoolVehicle(v, index, transientTarget)) {
-            return { ...v, ownerFarmId: transientTarget, farmId: transientTarget };
+        if (transientTarget != null) {
+            if (!hasXml || isSavegameBackedPoolVehicle(v, index, transientTarget)) {
+                if (isDealershipFloorStock(v) || isMapTrafficVehicle(v)) return v;
+                return { ...v, ownerFarmId: transientTarget, farmId: transientTarget };
+            }
         }
 
         return v;
@@ -2111,7 +2383,7 @@ function mergeVehicles(luaVehicles, xmlVehicles) {
                 return xmlV;
             }
             for (const [xuid, xmlV] of xmlByUid.entries()) {
-                if (xuid === idStr || xuid.endsWith(idStr) || idStr.endsWith(xuid)) {
+                if (xuid === idStr) {
                     xmlByUid.delete(xuid);
                     removeFromBuckets(xmlV);
                     return xmlV;
@@ -2144,6 +2416,23 @@ function mergeVehicles(luaVehicles, xmlVehicles) {
                 removeFromBuckets(xmlV);
                 return xmlV;
             }
+        }
+        if (isDealershipFloorStock(luaV)) return null;
+        // A single leftover same-config XML can still be the pool-100 remap
+        // (livestock farm). Several leftovers without uniqueId/positions must
+        // not collapse onto index 0 of the wrong farm.
+        if (eligible.length === 1) {
+            const only = eligible[0];
+            removeFromBuckets(only);
+            return only;
+        }
+        if (!luaV.position) return null;
+        const positioned = eligible.filter((xv) => xv && xv.position);
+        if (positioned.length === 0) return null;
+        const xmlV = takeClosest(positioned, luaV);
+        if (xmlV) {
+            removeFromBuckets(xmlV);
+            return xmlV;
         }
         return null;
     };
@@ -2328,10 +2617,11 @@ function redTapeFarmHasLiveSections(farm) {
 }
 
 function mergeRedTapeCropRotation(luaRedTape, xmlHarvest) {
-    const base =
+    const base = normalizeRedTapeLists(
         luaRedTape && typeof luaRedTape === 'object'
             ? { ...luaRedTape, byFarm: { ...(luaRedTape.byFarm || {}) } }
-            : { enabled: false, byFarm: {} };
+            : { enabled: false, byFarm: {} }
+    );
     const xmlByFarm = xmlHarvest?.byFarm;
     const allRows = Array.isArray(xmlHarvest?.allRows) ? xmlHarvest.allRows : [];
     const hasAssigned = xmlByFarm && Object.values(xmlByFarm).some((rows) => Array.isArray(rows) && rows.length > 0);
@@ -2341,7 +2631,7 @@ function mergeRedTapeCropRotation(luaRedTape, xmlHarvest) {
         if (!redTapeFarmHasLiveSections(existing)) return;
         const luaRows = existing.cropRotation;
         if (Array.isArray(luaRows) && luaRows.length > 0) return;
-        base.byFarm[farmKey] = { ...existing, cropRotation: rows };
+        base.byFarm[farmKey] = { ...existing, cropRotation: toArr(rows) };
     };
 
     if (xmlByFarm && typeof xmlByFarm === 'object') {
@@ -2387,11 +2677,15 @@ function normalizeXmlVehiclesForMerge(vehicles) {
     });
 }
 
-function buildFromLuaOnly(lua) {
-    const fillTypeCatalog = buildFillTypeCatalog(lua);
-    const fillTypeTitles = collectFillTypeTitles(lua);
+function buildFromLuaOnly(lua, mapFillTypeCatalog, mapFillTypeTitles) {
+    const fillTypeCatalog = buildFillTypeCatalog(lua, {}, mapFillTypeCatalog);
+    const fillTypeTitles = mergeFillTypeTitles(collectFillTypeTitles(lua), mapFillTypeTitles);
     const stockEnriched = enrichStockFillTypes(lua.stock, fillTypeCatalog, fillTypeTitles);
     const mapMeta = mapMetaFromLua(lua);
+    const gameplay =
+        (lua.gameSettings && typeof lua.gameSettings === 'object' && lua.gameSettings)
+        || (lua.settings && typeof lua.settings === 'object' && lua.settings)
+        || {};
     return {
         dataSource: 'lua_only', xmlAvailable: false, luaAvailable: true,
         lastUpdated: new Date().toISOString(),
@@ -2399,7 +2693,10 @@ function buildFromLuaOnly(lua) {
         mapTitle: mapMeta.mapTitle,
         mapId: mapMeta.mapId,
         mapBounds: mapMeta.mapBounds,
-        savegameName: '', settings: {}, gameSettings: {}, mods: [],
+        savegameName: lua.serverInfo?.saveSlot || lua.serverInfo?.savegameName || '',
+        settings: gameplay,
+        gameSettings: gameplay,
+        mods: Array.isArray(lua.mods) ? lua.mods : [],
         gameTime: lua.gameTime || {},
         // Lua may serialise an empty table as {} — must be an array for the UI
         farmInfo: buildMergedFarmInfo(lua, null),
@@ -2410,7 +2707,8 @@ function buildFromLuaOnly(lua) {
         animals: lua.animals || [],
         fields: toArr(lua.fields).map(normalizeFieldMulch),
         vehicles: finalizeMergedVehicles(lua, null, toArr(lua.vehicles)),
-        economy: lua.economy   || {},
+        // Apply same crop-history enrichment as XML merge (Lua may already ship priceHistory).
+        economy: mergeEconomy(lua.economy || {}, {}, fillTypeCatalog),
         production: lua.production || {},
         baleInventory: enrichBaleInventoryFromStock(lua, stockEnriched.catalog),
         fillTypeCatalog: stockEnriched.catalog,
@@ -2422,7 +2720,15 @@ function buildFromLuaOnly(lua) {
             fillTypeCatalog: { ...stockEnriched.catalog },
             fillTypeTitles: { ...fillTypeTitles },
         },
-        redTape: lua.redTape || { enabled: false, byFarm: {} },
+        redTape: normalizeRedTapeLists(lua.redTape || { enabled: false, byFarm: {} }),
+        invoices: lua.invoices || { enabled: false },
+        hirePurchasing: lua.hirePurchasing || { enabled: false },
+        realisticFarming: lua.realisticFarming || { presence: { enabled: false, mods: [] } },
+        adsSummary: lua.adsSummary || null,
+        vehicleYearsSummary: lua.vehicleYearsSummary || null,
+        mileageSummary: lua.mileageSummary || null,
+        collectorModules: lua.collectorModules || null,
+        diagnostics: lua.diagnostics || null,
         placeables: [],
     };
 }
@@ -2459,6 +2765,7 @@ function buildFromXmlOnly(xml) {
         placeables: xml.placeables || [],
         xmlFarmlands: xml.farmlandsArray || [],
         xmlEconomy: xml.economy || {},
+        collectionHealth: xml.collectionHealth || null,
     };
 }
 
@@ -2481,4 +2788,10 @@ module.exports = {
     mergeBaleInventory,
     mergeWeather,
     mergeForecastDays,
+    luaWeatherIsLive,
+    luaForecastIsLive,
+    mergeFields,
+    applyResolvedMapBounds,
+    worldItemsForMapBounds,
+    pruneAndResolveMapBounds,
 };

@@ -25,6 +25,7 @@ const path = require('path');
 const os = require('os');
 const { XMLParser } = require('fast-xml-parser');
 const { collectFs25DocumentRoots } = require('./fs25Paths');
+const { isMirrorSaveSlot, sanitizeSaveSlot } = require('./safeFsIdentity.cjs');
 const { readFileUtf8WithRetryAsync } = require('./fileReadRetry');
 const { parseMoistureSystemXml } = require('./stockMoistureFromXml');
 
@@ -140,6 +141,12 @@ const SAVEGAME_XML_FILES = [
     'precisionFarming.xml',
 ];
 
+/** Consumed by collection but optional on disk — must participate in the fingerprint. */
+const OPTIONAL_SAVEGAME_XML_FILES = [
+    'MoistureSystem.xml',
+    'RedTape.xml',
+];
+
 const FTP_SAVEGAME_XML_DOWNLOAD_ORDER = [
     'fields.xml',
     'farms.xml',
@@ -172,7 +179,11 @@ async function fileExists(p) {
 
 /** @deprecated Prefer getSavegamePathAsync — sync exists checks block the main thread. */
 function getSavegamePath(srv, saveSlot) {
-    const slot = saveSlot || srv.localSubFolder || 'savegame1';
+    const slot = sanitizeSaveSlot(saveSlot || srv.localSubFolder, 'savegame1');
+
+    if (isMirrorSaveSlot(slot) || isMirrorSaveSlot(srv.localSubFolder)) {
+        return null;
+    }
 
     if (srv.mode === 'ftp') {
         try {
@@ -184,7 +195,7 @@ function getSavegamePath(srv, saveSlot) {
         }
     }
 
-    const slotLocal = srv.localSubFolder || saveSlot || 'savegame1';
+    const slotLocal = sanitizeSaveSlot(srv.localSubFolder || saveSlot, 'savegame1');
 
     if (srv.localPath) {
         let check = srv.localPath;
@@ -213,7 +224,23 @@ function getSavegamePath(srv, saveSlot) {
 }
 
 async function getSavegamePathAsync(srv, saveSlot) {
-    const slot = saveSlot || srv.localSubFolder || 'savegame1';
+    const slot = sanitizeSaveSlot(saveSlot || srv.localSubFolder, 'savegame1');
+
+    // Giants HTTP feed cache (join-as-client / Local without FTP XMLs).
+    try {
+        const { hasHttpFeed, getHttpXmlCacheDir } = require('./httpFeedXml');
+        if (hasHttpFeed(srv)) {
+            const { app } = require('electron');
+            const cacheDir = getHttpXmlCacheDir(app.getPath('userData'), srv, slot);
+            if (await fileExists(path.join(cacheDir, 'careerSavegame.xml'))
+                || await fileExists(path.join(cacheDir, 'vehicles.xml'))
+                || await fileExists(path.join(cacheDir, 'economy.xml'))) {
+                return cacheDir;
+            }
+        }
+    } catch (_) {
+        /* electron / module optional in unit tests */
+    }
 
     if (srv.mode === 'ftp') {
         try {
@@ -225,7 +252,11 @@ async function getSavegamePathAsync(srv, saveSlot) {
         }
     }
 
-    const slotLocal = srv.localSubFolder || saveSlot || 'savegame1';
+    const slotLocal = sanitizeSaveSlot(srv.localSubFolder || saveSlot, 'savegame1');
+    if (isMirrorSaveSlot(slotLocal) || isMirrorSaveSlot(srv.localSubFolder) || isMirrorSaveSlot(saveSlot)) {
+        console.warn(`[XML] Mirror slot "${slotLocal}" has no associated server XML cache; not using a local SP save`);
+        return null;
+    }
 
     if (srv.localPath) {
         let check = srv.localPath;
@@ -509,12 +540,12 @@ function parseEnvironmentXml(xmlStr) {
 
     const env = unwrapDoc(doc) || doc;
 
-    const dayTime = parseFloat(scalarText(env, 'dayTime', '0') || '0');
+    const dayTimeMinutes = parseFloat(scalarText(env, 'dayTime', '0') || '0');
     const currentDay = parseInt(scalarText(env, 'currentDay', '1') || '1', 10);
 
-    const dayMs = dayTime;
-    const hour = Math.floor(dayMs / 3600000);
-    const minute = Math.floor((dayMs % 3600000) / 60000);
+    const dayMs = dayTimeMinutes * 60 * 1000;
+    const hour = Math.floor(dayTimeMinutes / 60);
+    const minute = Math.floor(dayTimeMinutes % 60);
 
     const forecast = [];
     const instances = collectTagRecursive(env, 'instance', []);
@@ -554,7 +585,8 @@ function parseEnvironmentXml(xmlStr) {
     }));
 
     return {
-        dayTime,
+        dayTime: dayMs,
+        dayTimeMinutes,
         currentDay,
         hour,
         minute,
@@ -685,7 +717,7 @@ function parseVehiclesXml(xmlStr) {
             ownerFarmId: farmId,
             age: parseFloat(String(outerAttrs.age || '0')),
             price: parseFloat(String(outerAttrs.price || '0')),
-            operatingTime: parseFloat(String(outerAttrs.operatingTime || '0')),
+            operatingTime: parseFloat(String(outerAttrs.operatingTime || '0')) * 1000,
             propertyState: String(outerAttrs.propertyState || 'OWNED'),
             damage,
             fillLevels,
@@ -998,6 +1030,7 @@ function parsePrecisionFarmingXml(xmlStr) {
 // ─── main export ─────────────────────────────────────────────────────────────
 
 async function collectXmlData(srv, saveSlot) {
+    const startedMs = Date.now();
     const savegameDir = await getSavegamePathAsync(srv, saveSlot);
     if (!savegameDir) return null;
 
@@ -1038,6 +1071,33 @@ async function collectXmlData(srv, saveSlot) {
         readFileUtf8WithRetryAsync(file('RedTape.xml')),
     ]);
 
+    const parseErrors = [];
+    const coreFiles = [
+        ['farmland.xml', rawFarmland],
+        ['careerSavegame.xml', rawCareer],
+        ['farms.xml', rawFarms],
+        ['fields.xml', rawFields],
+        ['environment.xml', rawEnv],
+        ['vehicles.xml', rawVehicles],
+        ['economy.xml', rawEconomy],
+        ['placeables.xml', rawPlaceables],
+    ];
+    for (const [name, raw] of coreFiles) {
+        if (raw == null || String(raw).trim() === '') {
+            parseErrors.push({ file: name, error: 'missing_or_unreadable' });
+        }
+    }
+
+    let newestMtimeMs = 0;
+    for (const f of SAVEGAME_XML_FILES.concat(OPTIONAL_SAVEGAME_XML_FILES)) {
+        try {
+            const st = await fs.stat(file(f));
+            if (st.mtimeMs > newestMtimeMs) newestMtimeMs = st.mtimeMs;
+        } catch (_) {
+            /* optional */
+        }
+    }
+
     const { ownership: farmlandOwnership, playerFarmlandIds } = parseFarmlandXml(rawFarmland);
 
     const career = parseCareerSavegame(rawCareer);
@@ -1058,6 +1118,7 @@ async function collectXmlData(srv, saveSlot) {
         `[XML] Parsed: farms=${farms.length} fields=${playerFields.length}/${fields.length} vehicles=${vehicles.length} missions=${missions.length} crops=${Object.keys(economy).length}`
     );
 
+    const nowMs = Date.now();
     return {
         career,
         farms,
@@ -1075,16 +1136,50 @@ async function collectXmlData(srv, saveSlot) {
         pfData,
         savegameDir,
         collectedAt: new Date().toISOString(),
+        collectionHealth: buildXmlCollectionHealth({ startedMs, newestMtimeMs, parseErrors, nowMs }),
     };
+}
+
+function buildXmlCollectionHealth({ startedMs, newestMtimeMs, parseErrors, nowMs = Date.now() }) {
+    const start = Number(startedMs) || nowMs;
+    const newest = Number(newestMtimeMs) || 0;
+    return {
+        collectionDurationMs: Math.max(0, nowMs - start),
+        sourceLagSeconds: newest > 0 ? Math.max(0, Math.round((nowMs - newest) / 1000)) : null,
+        parseErrors: Array.isArray(parseErrors) ? parseErrors.slice(0, 20) : [],
+    };
+}
+
+/** Per-file metadata fingerprint (mtime, ctime, size and presence) — skip XML re-parse when savegame files unchanged. */
+async function getSavegameXmlFingerprint(srv, saveSlot) {
+    const savegameDir = await getSavegamePathAsync(srv, saveSlot);
+    if (!savegameDir) return null;
+    const identities = [];
+    let found = false;
+    for (const file of SAVEGAME_XML_FILES.concat(OPTIONAL_SAVEGAME_XML_FILES)) {
+        try {
+            const stat = await fs.stat(path.join(savegameDir, file));
+            found = true;
+            identities.push([file, stat.mtimeMs, stat.ctimeMs || 0, stat.size]);
+        } catch (error) {
+            identities.push([file, error && error.code || 'missing']);
+        }
+    }
+    return found ? JSON.stringify(identities) : null;
 }
 
 module.exports = {
     collectXmlData,
+    getSavegameXmlFingerprint,
     parseEconomyXml,
+    parseCareerSavegame,
+    parseVehiclesXml,
     parseRedTapeHarvestHistoryXml,
     formatRedTapeCropName,
     getSavegamePath,
     getSavegamePathAsync,
     SAVEGAME_XML_FILES,
+    OPTIONAL_SAVEGAME_XML_FILES,
     FTP_SAVEGAME_XML_DOWNLOAD_ORDER,
+    buildXmlCollectionHealth,
 };

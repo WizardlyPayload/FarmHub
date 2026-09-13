@@ -11,6 +11,8 @@ const path = require("path");
 const {
   mapSaveError,
   findMissingFtpFields,
+  classifyError,
+  recoveryActionForCode,
 } = require("../web/assests/js/setup-validation.js");
 
 function readSetupHtml() {
@@ -132,8 +134,17 @@ describe("setup.html: per-field validation wiring", () => {
     expect(html).toMatch(/__farmdashSetupValidation/);
   });
 
-  test("setup-validation.js is loaded by setup.html", () => {
+  test("setup-validation.js is loaded by setup.html after shared classifier", () => {
+    expect(html).toMatch(/ux-classify\.js/);
     expect(html).toMatch(/setup-validation\.js/);
+    expect(html.indexOf("ux-classify.js")).toBeLessThan(html.indexOf("setup-validation.js"));
+  });
+
+  test("setup.html surfaces local-only denial instead of a silent empty catch", () => {
+    expect(html).toMatch(/id="setupLocalOnlyPanel"/);
+    expect(html).toMatch(/showSetupLocalOnly/);
+    expect(html).toMatch(/E_SETUP_LOCAL_ONLY/);
+    expect(html).toMatch(/X-Setup-Token/);
   });
 });
 
@@ -158,5 +169,42 @@ describe("setup.html: i18n keys for new copy exist", () => {
   test.each(REQUIRED)("messages/en.json has key %s", (key) => {
     expect(typeof en[key]).toBe("string");
     expect(en[key].length).toBeGreaterThan(0);
+  });
+});
+
+describe("classifyError + recoveryActionForCode", () => {
+  const classify = require("../web/assests/js/ux-classify.js");
+
+  test("maps token errors to reset_token", () => {
+    expect(classifyError("Invalid setup token")).toBe("E_INVALID_TOKEN");
+    expect(recoveryActionForCode("E_INVALID_TOKEN")).toBe("reset_token");
+  });
+
+  test("maps permission errors to verify_save_slot", () => {
+    expect(classifyError("EACCES permission denied")).toBe("E_PERMISSION_DENIED");
+    expect(recoveryActionForCode("E_PERMISSION_DENIED")).toBe("verify_save_slot");
+  });
+
+  test("stays in lockstep with shared ux-classify", () => {
+    const samples = [
+      "Invalid setup token",
+      "EACCES permission denied",
+      "530 Authentication failed",
+      "connect ETIMEDOUT",
+      "ENOENT: no such file",
+      "lua export stale",
+      "disk full",
+    ];
+    for (const raw of samples) {
+      expect(classifyError(raw)).toBe(classify.classifyRawError(raw));
+    }
+    expect(recoveryActionForCode("E_INVALID_TOKEN")).toBe(classify.nextActionForCode("E_INVALID_TOKEN"));
+    expect(recoveryActionForCode("E_PERMISSION_DENIED")).toBe(classify.nextActionForCode("E_PERMISSION_DENIED"));
+    expect(recoveryActionForCode("E_NETWORK")).toBe(classify.nextActionForCode("E_NETWORK"));
+  });
+
+  test("EACCES save copy uses path text, not auth", () => {
+    expect(mapSaveError("EACCES permission denied")).toMatch(/Save folder not found/i);
+    expect(mapSaveError("EACCES permission denied")).not.toMatch(/rejected by the server/i);
   });
 });

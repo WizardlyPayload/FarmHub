@@ -1,6 +1,22 @@
 // FS25 FarmDashboard | mergedSnapshotHold.js
 // Hold last good merged dashboard when FS25 writes minimal/shutdown data.json.
 
+/** Per-server generation so overlapping rebuildMerged awaits cannot publish an older merge. */
+function createMergeRebuildGate() {
+    const gens = new Map();
+    return {
+        begin(serverId) {
+            const key = String(serverId);
+            const next = (gens.get(key) || 0) + 1;
+            gens.set(key, next);
+            return next;
+        },
+        isCurrent(serverId, gen) {
+            return gens.get(String(serverId)) === gen;
+        },
+    };
+}
+
 function productionLooksEmpty(p) {
     if (!p || typeof p !== 'object') return true;
     const chains = p.chains;
@@ -47,29 +63,65 @@ function fieldHasMoisture(field) {
     return !!(field && field.moisture && field.moisture.percent != null);
 }
 
-/** Keep per-field soil moisture when a new export still has hectares but MoistureSystem stopped. */
+function fieldHasSoil(field) {
+    const s = field && field.soilFertilizer;
+    return !!(s && typeof s === 'object' && s.enabled !== false && (s.organicMatter != null || s.pH != null || s.ppm));
+}
+
+function fieldHasOutline(field) {
+    return Array.isArray(field?.outline) && field.outline.length >= 3;
+}
+
+function fieldHasCropStress(field) {
+    const s = field && field.cropStress;
+    return !!(s && typeof s === 'object' && s.enabled !== false);
+}
+
+/** Keep per-field soil / outlines / moisture when a shutdown export or XML-only merge drops them. */
 function mergeFieldsMoistureForward(prevFields, nextFields) {
     const prevArr = toArr(prevFields);
     const nextArr = toArr(nextFields);
     if (prevArr.length === 0 || nextArr.length === 0) return nextArr;
     const prevById = new Map();
     for (const f of prevArr) {
-        if (!fieldHasMoisture(f)) continue;
         const id = Number(f.farmlandId ?? f.id);
-        if (id > 0) prevById.set(id, f.moisture);
+        if (id > 0) prevById.set(id, f);
     }
     if (prevById.size === 0) return nextArr;
-    return nextArr.map((f) => {
+    let changed = false;
+    const out = nextArr.map((f) => {
         const id = Number(f.farmlandId ?? f.id);
-        const prevMoist = id > 0 ? prevById.get(id) : null;
-        if (prevMoist && !fieldHasMoisture(f)) {
-            return {
-                ...f,
-                moisture: { ...prevMoist, enabled: prevMoist.enabled !== false },
-            };
+        const prev = id > 0 ? prevById.get(id) : null;
+        if (!prev) return f;
+        let next = f;
+        const take = (patch) => {
+            next = next === f ? { ...f, ...patch } : { ...next, ...patch };
+            changed = true;
+        };
+        if (fieldHasMoisture(prev) && !fieldHasMoisture(next)) {
+            take({ moisture: { ...prev.moisture, enabled: prev.moisture.enabled !== false } });
         }
-        return f;
+        if (fieldHasSoil(prev) && !fieldHasSoil(next)) {
+            take({ soilFertilizer: cloneMerged(prev.soilFertilizer) });
+        }
+        if (fieldHasCropStress(prev) && !fieldHasCropStress(next)) {
+            take({ cropStress: cloneMerged(prev.cropStress) });
+        }
+        if (fieldHasOutline(prev) && !fieldHasOutline(next)) {
+            take({ outline: cloneMerged(prev.outline) });
+            if (prev.fruitMapColor && !next.fruitMapColor) {
+                next = { ...next, fruitMapColor: prev.fruitMapColor };
+            }
+        }
+        if (!(Number(next.hectares) > 0) && Number(prev.hectares) > 0) {
+            take({ hectares: prev.hectares });
+        }
+        if (!(Number(next.posX) || Number(next.posZ)) && (Number(prev.posX) || Number(prev.posZ))) {
+            take({ posX: prev.posX, posZ: prev.posZ });
+        }
+        return next;
     });
+    return changed ? out : nextArr;
 }
 
 function weatherMoisturePresent(weather) {
@@ -155,6 +207,77 @@ function redTapeSectionEmpty(redTape) {
     return !redTapeHasData(redTape);
 }
 
+/** Lua soft-detect: `enabled: false` means Red Tape is not active — never hold stale data over it. */
+function redTapeExplicitlyDisabled(redTape) {
+    return !!(redTape && typeof redTape === 'object' && redTape.enabled === false);
+}
+
+function rfBlockActive(block) {
+    return !!(block && typeof block === 'object' && block.enabled === true);
+}
+
+function realisticFarmingHasData(rf) {
+    if (!rf || typeof rf !== 'object') return false;
+    if (rf.presence && rf.presence.enabled === true) return true;
+    return Object.keys(rf).some((key) => rfBlockActive(rf[key]));
+}
+
+/** Keep Soil Fertilizer / Crop Stress (and other RF blocks) when a shutdown stub sets enabled:false. */
+function mergeRealisticFarmingForward(prevRf, nextRf) {
+    const prev = prevRf && typeof prevRf === 'object' ? prevRf : null;
+    if (!prev) return nextRf;
+    const next = nextRf && typeof nextRf === 'object' ? { ...nextRf } : {};
+    let changed = false;
+    for (const key of Object.keys(prev)) {
+        if (rfBlockActive(prev[key]) && !rfBlockActive(next[key])) {
+            next[key] = cloneMerged(prev[key]);
+            changed = true;
+        }
+    }
+    return changed ? next : nextRf;
+}
+
+function mapBoundsHalf(bounds) {
+    const h = Number(bounds?.halfSize);
+    if (Number.isFinite(h) && h > 0) return h;
+    const ts = Number(bounds?.terrainSize);
+    if (Number.isFinite(ts) && ts > 0) return ts * 0.5;
+    return 0;
+}
+
+function mapIdentityKey(snap) {
+    const si = snap?.serverInfo && typeof snap.serverInfo === 'object' ? snap.serverInfo : {};
+    const slot = String(si.saveSlot || snap?.saveSlot || '').trim().toLowerCase();
+    const mapId = String(si.mapId || snap?.mapId || '').trim().toLowerCase();
+    return `${slot}|${mapId}`;
+}
+
+function sameMapIdentity(prev, next) {
+    const a = mapIdentityKey(prev);
+    const b = mapIdentityKey(next);
+    if (a === '|' || b === '|') return true;
+    return a === b;
+}
+
+function mergeMapBoundsForward(prev, next) {
+    if (!prev || !next) return next;
+    if (!sameMapIdentity(prev, next)) return next;
+    const prevHalf = Math.max(mapBoundsHalf(prev.mapBounds), mapBoundsHalf(prev.serverInfo?.mapBounds));
+    const nextHalf = Math.max(mapBoundsHalf(next.mapBounds), mapBoundsHalf(next.serverInfo?.mapBounds));
+    if (!(prevHalf > nextHalf)) return next;
+    const bounds = cloneMerged(prev.mapBounds || prev.serverInfo?.mapBounds);
+    if (!bounds) return next;
+    const si =
+        next.serverInfo && typeof next.serverInfo === 'object'
+            ? { ...next.serverInfo, mapBounds: bounds }
+            : { ...(prev.serverInfo || {}), mapBounds: bounds };
+    return { ...next, mapBounds: bounds, serverInfo: si };
+}
+
+function realisticFarmingSectionEmpty(rf) {
+    return !realisticFarmingHasData(rf);
+}
+
 function pickStockHoldSource(state, snap) {
     const backup = state?.liveSectionBackup?.stock;
     if (stockHasData(backup)) return backup;
@@ -166,6 +289,13 @@ function pickRedTapeHoldSource(state, snap) {
     const backup = state?.liveSectionBackup?.redTape;
     if (redTapeHasData(backup)) return backup;
     if (snap && redTapeHasData(snap.redTape)) return snap.redTape;
+    return null;
+}
+
+function pickRealisticFarmingHoldSource(state, snap) {
+    const backup = state?.liveSectionBackup?.realisticFarming;
+    if (realisticFarmingHasData(backup)) return backup;
+    if (snap && realisticFarmingHasData(snap.realisticFarming)) return snap.realisticFarming;
     return null;
 }
 
@@ -242,12 +372,14 @@ function mergeMoistureSectionsForward(prev, next) {
 /** True when data.json looks like a full in-game export (vs {} / minimal writes on FS exit). */
 function isRichLuaExport(lua) {
     if (!lua || typeof lua !== 'object') return false;
-    if (Object.keys(lua).length >= 10) return true;
-    if (Array.isArray(lua.fields) && lua.fields.length > 0) return true;
-    if (Array.isArray(lua.vehicles) && lua.vehicles.length > 0) return true;
-    if (lua.finance && typeof lua.finance === 'object' && Object.keys(lua.finance).length > 0) return true;
-    if (lua.gameTime && typeof lua.gameTime === 'object' && Object.keys(lua.gameTime).length > 0) return true;
-    if (lua.weather && typeof lua.weather === 'object') return true;
+    // Shutdown stubs still have many empty keys (gameTime, collectorModules, leftover money, …).
+    // Count fleet / field / livestock rows, not key cardinality or finance.
+    if (toArr(lua.vehicles).length > 0) return true;
+    if (toArr(lua.animals).length > 0) return true;
+    const fields = toArr(lua.fields);
+    if (fields.some((f) => f && (Number(f.hectares) > 0 || Number(f.farmlandId || f.id) > 0))) {
+        return true;
+    }
     return false;
 }
 
@@ -338,6 +470,14 @@ function pickProductionHoldSource(state, snap) {
     return null;
 }
 
+/** Lua omitted this cycle (`null` / missing / `{}`). A JSON array (even `[]`) is a successful collect. */
+function luaSectionOmitted(section) {
+    if (section == null) return true;
+    if (Array.isArray(section)) return false;
+    if (typeof section === 'object' && Object.keys(section).length === 0) return true;
+    return false;
+}
+
 /** Remember last non-empty animals/production/fields so staggered writes cannot wipe sections. */
 function updateLiveSectionBackup(state, merged, hydratedLua) {
     if (!state) return;
@@ -384,8 +524,18 @@ function updateLiveSectionBackup(state, merged, hydratedLua) {
         }
     }
     for (const src of sources) {
+        if (redTapeExplicitlyDisabled(src.redTape)) {
+            if (state.liveSectionBackup) state.liveSectionBackup.redTape = undefined;
+            break;
+        }
         if (redTapeHasData(src.redTape)) {
             state.liveSectionBackup.redTape = cloneMerged(src.redTape);
+            break;
+        }
+    }
+    for (const src of sources) {
+        if (realisticFarmingHasData(src.realisticFarming)) {
+            state.liveSectionBackup.realisticFarming = cloneMerged(src.realisticFarming);
             break;
         }
     }
@@ -399,19 +549,12 @@ function applyMergedSnapshotIfStaleExport(merged, luaPayload, state) {
     if (isRichLuaExport(luaPayload)) return merged;
 
     const snap = pickSnapshotSource(state);
-    if (!snap) return merged;
+    if (!snap || !isRenderableMerged(snap)) return merged;
 
-    const mergedScore = mergedContentScore(merged);
-    const snapScore = mergedContentScore(snap);
-    const mergedEmpty = !isRenderableMerged(merged);
-    const snapRich = snapScore > 0;
-    const mergedMuchSmaller = snapScore > 0 && mergedScore < Math.max(5, Math.floor(snapScore * 0.35));
-
-    if (!mergedEmpty && !mergedMuchSmaller) return merged;
-    if (!snapRich) return merged;
-
+    // XML still has field/vehicle rows after quit, so a content-score compare used to
+    // keep the shutdown rebuild (2 km mapBounds, no soil). Always prefer the last in-game snapshot.
     const held = stampHeldSnapshot(snap, state);
-    if (Array.isArray(merged.farmInfo)) {
+    if (Array.isArray(merged.farmInfo) && merged.farmInfo.length > 0) {
         return { ...held, farmInfo: merged.farmInfo };
     }
     return held;
@@ -428,20 +571,16 @@ function applyLiveSectionHold(merged, state, rawLuaData, hydratedLuaData) {
     let out = merged;
     let held = false;
 
-    const luaAnimEmpty =
-        animalsSectionEmpty(rawLuaData && rawLuaData.animals) &&
-        animalsSectionEmpty(hydratedLuaData && hydratedLuaData.animals);
+    const luaAnimOmitted = !rawLuaData || luaSectionOmitted(rawLuaData.animals);
     const holdAnimals = pickAnimalsHoldSource(state, snap);
-    if (animalsSectionEmpty(out.animals) && holdAnimals && luaAnimEmpty) {
+    if (animalsSectionEmpty(out.animals) && holdAnimals && luaAnimOmitted) {
         out = { ...out, animals: cloneMerged(holdAnimals) };
         held = true;
     }
 
-    const luaProdEmpty =
-        (!rawLuaData || productionLooksEmpty(rawLuaData.production)) &&
-        (!hydratedLuaData || productionLooksEmpty(hydratedLuaData.production));
+    const luaProdOmitted = !rawLuaData || luaSectionOmitted(rawLuaData.production);
     const holdProduction = pickProductionHoldSource(state, snap);
-    if (productionLooksEmpty(out.production) && holdProduction && luaProdEmpty) {
+    if (productionLooksEmpty(out.production) && holdProduction && luaProdOmitted) {
         out = { ...out, production: cloneMerged(holdProduction) };
         held = true;
     }
@@ -502,19 +641,51 @@ function applyLiveSectionHold(merged, state, rawLuaData, hydratedLuaData) {
         held = true;
     }
 
-    const luaRedTapeEmpty =
-        redTapeSectionEmpty(rawLuaData && rawLuaData.redTape) &&
-        redTapeSectionEmpty(hydratedLuaData && hydratedLuaData.redTape);
-    const holdRedTape = pickRedTapeHoldSource(state, snap);
-    if (redTapeSectionEmpty(out.redTape) && holdRedTape && luaRedTapeEmpty) {
-        out = { ...out, redTape: cloneMerged(holdRedTape) };
+    const luaRedTapeDisabled =
+        redTapeExplicitlyDisabled(rawLuaData && rawLuaData.redTape) ||
+        redTapeExplicitlyDisabled(hydratedLuaData && hydratedLuaData.redTape);
+    if (luaRedTapeDisabled) {
+        // Soft-detect off: drop stale hold so nav/section cannot false-positive.
+        if (state.liveSectionBackup) state.liveSectionBackup.redTape = undefined;
+    } else {
+        const luaRedTapeEmpty =
+            redTapeSectionEmpty(rawLuaData && rawLuaData.redTape) &&
+            redTapeSectionEmpty(hydratedLuaData && hydratedLuaData.redTape);
+        const holdRedTape = pickRedTapeHoldSource(state, snap);
+        if (redTapeSectionEmpty(out.redTape) && holdRedTape && luaRedTapeEmpty) {
+            out = { ...out, redTape: cloneMerged(holdRedTape) };
+            held = true;
+        }
+    }
+
+    const luaRfEmpty =
+        realisticFarmingSectionEmpty(rawLuaData && rawLuaData.realisticFarming) &&
+        realisticFarmingSectionEmpty(hydratedLuaData && hydratedLuaData.realisticFarming);
+    const holdRf = pickRealisticFarmingHoldSource(state, snap);
+    if (realisticFarmingSectionEmpty(out.realisticFarming) && holdRf && luaRfEmpty) {
+        out = { ...out, realisticFarming: cloneMerged(holdRf) };
         held = true;
+    } else if (holdRf) {
+        const mergedRf = mergeRealisticFarmingForward(holdRf, out.realisticFarming);
+        if (mergedRf !== out.realisticFarming) {
+            out = { ...out, realisticFarming: mergedRf };
+            held = true;
+        }
     }
 
     if (Array.isArray(out.fields) && holdFields) {
         const mergedMoist = mergeFieldsMoistureForward(holdFields, out.fields);
         if (mergedMoist !== out.fields) {
             out = { ...out, fields: mergedMoist };
+            held = true;
+        }
+    }
+
+    const boundSrc = snap || (state.liveSectionBackup && state.liveSectionBackup.mapBounds ? state.liveSectionBackup : null);
+    if (boundSrc) {
+        const withBounds = mergeMapBoundsForward(boundSrc, out);
+        if (withBounds !== out) {
+            out = withBounds;
             held = true;
         }
     }
@@ -551,9 +722,20 @@ function mergeSnapshotSectionsForward(prev, next) {
     if (stockSectionEmpty(out.stock) && stockHasData(prev.stock)) {
         out = { ...out, stock: cloneMerged(prev.stock) };
     }
-    if (redTapeSectionEmpty(out.redTape) && redTapeHasData(prev.redTape)) {
+    if (
+        !redTapeExplicitlyDisabled(out.redTape) &&
+        redTapeSectionEmpty(out.redTape) &&
+        redTapeHasData(prev.redTape)
+    ) {
         out = { ...out, redTape: cloneMerged(prev.redTape) };
     }
+    if (realisticFarmingSectionEmpty(out.realisticFarming) && realisticFarmingHasData(prev.realisticFarming)) {
+        out = { ...out, realisticFarming: cloneMerged(prev.realisticFarming) };
+    } else if (prev.realisticFarming) {
+        const mergedRf = mergeRealisticFarmingForward(prev.realisticFarming, out.realisticFarming);
+        if (mergedRf !== out.realisticFarming) out = { ...out, realisticFarming: mergedRf };
+    }
+    out = mergeMapBoundsForward(prev, out);
     return out;
 }
 
@@ -586,7 +768,7 @@ function buildHeldPayloadFromState(state) {
         const holdStock = pickStockHoldSource(state, snap);
         if (holdStock) out = { ...out, stock: cloneMerged(holdStock) };
     }
-    if (redTapeSectionEmpty(out.redTape)) {
+    if (!redTapeExplicitlyDisabled(out.redTape) && redTapeSectionEmpty(out.redTape)) {
         const holdRedTape = pickRedTapeHoldSource(state, snap);
         if (holdRedTape) out = { ...out, redTape: cloneMerged(holdRedTape) };
     }
@@ -614,7 +796,9 @@ module.exports = {
     stockHasData,
     redTapeSectionEmpty,
     redTapeHasData,
+    redTapeExplicitlyDisabled,
     updateLiveSectionBackup,
     updateLastGoodMergedSnapshot,
     buildHeldPayloadFromState,
+    createMergeRebuildGate,
 };

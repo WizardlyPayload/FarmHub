@@ -117,6 +117,40 @@ local function _scaleRlSampledBuckets(st)
             b.markedCount = ri(b.markedCount or 0)
         end
     end
+    local target = tonumber(st.rlTotalAnimals) or (#(st.clusterKeys or {}))
+    if target and target > 0 then
+        local sum = 0
+        for _, key in ipairs(st.bucketKeys) do
+            local b = st.buckets[key]
+            if b then sum = sum + (tonumber(b.count) or 0) end
+        end
+        if sum ~= target and sum > 0 then
+            local remain = target - sum
+            if remain > 0 then
+                for _, key in ipairs(st.bucketKeys) do
+                    if remain <= 0 then break end
+                    local b = st.buckets[key]
+                    if b then
+                        b.count = (b.count or 0) + 1
+                        remain = remain - 1
+                    end
+                end
+            elseif remain < 0 then
+                for i = #st.bucketKeys, 1, -1 do
+                    if remain >= 0 then break end
+                    local b = st.buckets[st.bucketKeys[i]]
+                    if b and (b.count or 0) > 0 then
+                        local take = math.min(b.count, -remain)
+                        b.count = b.count - take
+                        remain = remain + take
+                    end
+                end
+            end
+        elseif sum <= 0 and st.bucketKeys[1] then
+            local b = st.buckets[st.bucketKeys[1]]
+            if b then b.count = target end
+        end
+    end
 end
 
 --- Full pass over RL individuals (age only) to fix min/max after sampling distorted within-bucket extrema.
@@ -538,6 +572,7 @@ function AnimalDataCollector:_walkRL(animals, st, rowsLeft)
         st.clusterIdx = 1
         st.rlAnimals = animals
         local nTotal = #st.clusterKeys
+        st.rlTotalAnimals = nTotal
         st.rlStride = 1
         st.rlScale = 1
         if nTotal >= RL_SAMPLE_THRESHOLD then
@@ -796,24 +831,18 @@ function AnimalDataCollector:collectPenDetail(placeable)
     local clOk, clusters = pcall(function() return placeable:getClusters() end)
     if not clOk or type(clusters) ~= "table" then return out end
 
-    local nextId = 1
+    -- Stable row ids: husbandryId:uniqueId|x:indexInPen (RL ear tags collide across animals).
+    local indexInPen = 0
+    local husbandryKey = tostring(out.id or 0)
     for _, c in pairs(clusters) do
         if c then
             if c.isIndividual == true then
-                local finalId
-                if c.uniqueId then
-                    if type(c.uniqueId) == "string" and tonumber(c.uniqueId) then
-                        finalId = tonumber(c.uniqueId)
-                    elseif type(c.uniqueId) == "number" then
-                        finalId = c.uniqueId
-                    else
-                        finalId = tostring(c.uniqueId)
-                    end
+                local uidPart = "x"
+                if c.uniqueId ~= nil and c.uniqueId ~= "" then
+                    uidPart = tostring(c.uniqueId)
                 end
-                if finalId == nil then
-                    finalId = (out.id or 0) * 1000000 + nextId
-                    nextId = nextId + 1
-                end
+                local finalId = husbandryKey .. ":" .. uidPart .. ":" .. tostring(indexInPen)
+                indexInPen = indexInPen + 1
 
                 local healthValue = c.health or 1
                 if type(healthValue) == "number" and healthValue <= 2 then
@@ -866,8 +895,10 @@ function AnimalDataCollector:collectPenDetail(placeable)
                     if type(healthValue) == "number" and healthValue <= 2 then
                         healthValue = healthValue * 100
                     end
+                    local finalId = husbandryKey .. ":x:" .. tostring(indexInPen)
+                    indexInPen = indexInPen + 1
                     out.animals[#out.animals + 1] = {
-                        id          = (out.id or 0) * 1000 + nextId,
+                        id          = finalId,
                         name        = (subType ~= "UNKNOWN") and subType or tostring(c.fillType or "Cluster"),
                         subType     = subType,
                         subTypeIndex = c.subTypeIndex,
@@ -880,7 +911,6 @@ function AnimalDataCollector:collectPenDetail(placeable)
                         isPregnant  = c.isPregnant or false,
                         isLactating = c.isLactating or false,
                     }
-                    nextId = nextId + 1
                 end
             end
         end

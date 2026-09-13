@@ -31,6 +31,20 @@ describe("validateLanCredentials: LAN access disabled", () => {
 });
 
 describe("validateLanCredentials: LAN access enabled", () => {
+  test.each([" ".repeat(10), " ".repeat(20), "\t".repeat(10), "\u00a0".repeat(10)])(
+    "rejects whitespace-only passwords without accepting the length alone",
+    (lanPassword) => {
+      expect(validateLanCredentials({ lanAccessEnabled: true, lanUsername: "qa", lanPassword }))
+        .toEqual({ ok: false, error: "weak_password", field: "lanPassword" });
+    }
+  );
+
+  test("does not trim or mutate a meaningful password", () => {
+    const payload = { lanAccessEnabled: true, lanUsername: "qa", lanPassword: "  Tractor!Sunset!29  " };
+    expect(validateLanCredentials(payload)).toEqual({ ok: true });
+    expect(payload.lanPassword).toBe("  Tractor!Sunset!29  ");
+  });
+
   test("rejects the documented default pair (admin/farmhub)", () => {
     const res = validateLanCredentials({
       lanAccessEnabled: true,

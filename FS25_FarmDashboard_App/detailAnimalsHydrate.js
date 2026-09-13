@@ -8,6 +8,9 @@ const path = require('path');
 
 const fileCache = new Map(); // absPath -> { mtimeMs, size, animals, ownerFarmId, placeableId, penId }
 
+/** RL unique-id files may be a bit short of the cluster sum (scaled buckets). Still hydrate. */
+const UNIQUE_CAPTURE_RATIO = 0.8;
+
 function toArr(val) {
     if (!val) return [];
     if (Array.isArray(val)) return val;
@@ -15,10 +18,189 @@ function toArr(val) {
     return [];
 }
 
+function parseDetailAnimals(doc) {
+    const list = toArr(doc && doc.animals).filter((a) => a && typeof a === 'object');
+    return list.length ? list : null;
+}
+
+function countCapturedHeads(animals) {
+    let sum = 0;
+    for (const a of animals) {
+        const c = Number(a && a.clusterCount);
+        if (a && a.__lodClusterAggregate && Number.isFinite(c) && c > 0) {
+            sum += Math.floor(c);
+        } else {
+            sum += 1;
+        }
+    }
+    return sum;
+}
+
+function hasUniqueIndividuals(animals) {
+    if (!Array.isArray(animals)) return false;
+    for (const a of animals) {
+        if (a && a.uniqueId != null && String(a.uniqueId).trim() !== '') return true;
+    }
+    return false;
+}
+
+function rememberDetailEntry(map, entry) {
+    const pid = entry.placeableId;
+    if (pid == null || !Number.isFinite(pid)) return;
+    const farm = Number(entry.ownerFarmId) || 0;
+    const key = `${pid}|${farm}`;
+    const prev = map.get(key);
+    if (!prev) {
+        map.set(key, entry);
+        return;
+    }
+    const prevN = countCapturedHeads(prev.animals);
+    const nextN = countCapturedHeads(entry.animals);
+    const prevU = hasUniqueIndividuals(prev.animals);
+    const nextU = hasUniqueIndividuals(entry.animals);
+    if (nextU && !prevU) {
+        map.set(key, entry);
+        return;
+    }
+    const prevAt = Number(prev.generatedAt) || 0;
+    const nextAt = Number(entry.generatedAt) || 0;
+    if (nextAt > 0 && prevAt > 0 && nextAt !== prevAt) {
+        if (nextAt >= prevAt) {
+            // A newer incomplete / non-unique file must not hide a richer unique-id capture.
+            if (prevU && !nextU) return;
+            if (prevU && nextU && nextN < prevN) return;
+            map.set(key, entry);
+        }
+        return;
+    }
+    // Same (or missing) timestamps: keep the richer unique-id capture. A later
+    // incomplete animals_*.json must not hide animals already written for this pen.
+    if (nextU === prevU && nextN > prevN) map.set(key, entry);
+}
+
+function lookupDetailEntry(map, hid, hf) {
+    const farm = Number(hf) || 0;
+    const exact = map.get(`${hid}|${farm}`);
+    if (exact) return exact;
+    if (farm !== 0) {
+        const unscoped = map.get(`${hid}|0`);
+        if (unscoped) return unscoped;
+    }
+    return null;
+}
+
+function husbandryAggregateHeadCount(h) {
+    const reported = Number(h.numOfAnimalsReported);
+    const prevCount = Number(h.animalCount);
+    let clusterSum = 0;
+    if (Array.isArray(h.clusters)) {
+        for (const c of h.clusters) {
+            const cc = Number(c && c.count);
+            if (Number.isFinite(cc) && cc > 0) clusterSum += cc;
+        }
+    }
+    return Math.max(
+        Number.isFinite(reported) && reported > 0 ? reported : 0,
+        Number.isFinite(prevCount) && prevCount > 0 ? prevCount : 0,
+        clusterSum
+    );
+}
+
+function shouldSkipIncompleteDetail(capturedHeads, aggregate, animals) {
+    if (!(aggregate > 0 && capturedHeads < aggregate)) return false;
+    // Cloned cluster averages are worse than a slightly short unique-id list.
+    if (hasUniqueIndividuals(animals) && capturedHeads / aggregate >= UNIQUE_CAPTURE_RATIO) {
+        return false;
+    }
+    return true;
+}
+
+function applyDetailBlockToHusbandry(h, block) {
+    const rawReported = h.numOfAnimalsReported != null && h.numOfAnimalsReported !== ''
+        ? h.numOfAnimalsReported : h.animalCount;
+    if (rawReported != null && rawReported !== '' && Number(rawReported) === 0) {
+        return {
+            husbandry: { ...h, animals: [], clusters: [], animalCount: 0, numOfAnimalsReported: 0,
+                __detailHydrated: false, __detailCapturedHeads: 0 },
+            hydrated: false, heads: 0,
+        };
+    }
+    const hf = Number(h.ownerFarmId ?? h.farmId ?? 0);
+    if (block.ownerFarmId && hf && block.ownerFarmId !== hf) {
+        return { husbandry: h, hydrated: false, heads: 0 };
+    }
+
+    const resolvedFarm = hf > 0 ? hf : block.ownerFarmId > 0 ? block.ownerFarmId : hf;
+    const ownerFarmId = resolvedFarm > 0 ? resolvedFarm : block.ownerFarmId || hf;
+    const animals = block.animals.map((a) => {
+        const row = {
+            ...a,
+            ownerFarmId: a.ownerFarmId ?? a.farmId ?? ownerFarmId,
+            farmId: a.farmId ?? a.ownerFarmId ?? ownerFarmId,
+        };
+        const grp = Number(a.count);
+        if (Number.isFinite(grp) && grp > 1) {
+            row.__lodClusterAggregate = true;
+            row.clusterCount = grp;
+        }
+        return row;
+    });
+
+    const capturedHeads = countCapturedHeads(animals);
+    const aggregate = husbandryAggregateHeadCount(h);
+
+    if (shouldSkipIncompleteDetail(capturedHeads, aggregate, animals)) {
+        return { husbandry: h, hydrated: false, heads: 0 };
+    }
+
+    return {
+        husbandry: {
+            ...h,
+            ownerFarmId,
+            farmId: ownerFarmId,
+            animals,
+            lod: 'full',
+            animalCount: Math.max(aggregate, capturedHeads),
+            numOfAnimalsReported: Math.max(aggregate, capturedHeads),
+            __detailHydrated: true,
+            __detailCapturedHeads: capturedHeads,
+        },
+        hydrated: true,
+        heads: capturedHeads,
+    };
+}
+
+function hydrateHusbandryArray(arr, byKey, detailsDir) {
+    let hydratedPens = 0;
+    let totalHeads = 0;
+    const out = arr.map((h) => {
+        if (!h || typeof h !== 'object') return h;
+        const hid = Number(h.id);
+        if (!Number.isFinite(hid)) return h;
+        const hf = Number(h.ownerFarmId ?? h.farmId ?? 0);
+        const block = lookupDetailEntry(byKey, hid, hf);
+        if (!block) return h;
+        const applied = applyDetailBlockToHusbandry(h, block);
+        if (applied.hydrated) {
+            hydratedPens += 1;
+            totalHeads += applied.heads;
+        }
+        return applied.husbandry;
+    });
+    if (hydratedPens > 0) {
+        console.log(
+            `[DetailHydrate] +${totalHeads} animals across ${hydratedPens} pens from ${detailsDir}`
+        );
+    }
+    return out;
+}
+
 function getLocalDetailsDirForServer(srv, getLocalLuaJsonPath) {
     if (typeof getLocalLuaJsonPath !== 'function' || !srv) return null;
     const jsonPath = getLocalLuaJsonPath(srv);
     if (!jsonPath) return null;
+    // Never walk a sibling save slot. A missing primary details/ must stay
+    // missing — slot switch / empty save must not hydrate another farm's animals.
     return path.join(path.dirname(jsonPath), 'details');
 }
 
@@ -35,12 +217,24 @@ function getFtpCachedDetailsDir(srv, userDataPath, serverState) {
 function getDetailsDirForHydration(srv, getLocalLuaJsonPath, options = {}) {
     const mode = String(srv.mode || '').toLowerCase();
     if (mode === 'local') {
-        return getLocalDetailsDirForServer(srv, getLocalLuaJsonPath);
+        return getLocalDetailsDirForServer(srv, getLocalLuaJsonPath, options);
     }
     if (mode === 'ftp') {
         return getFtpCachedDetailsDir(srv, options.userDataPath, options.serverState);
     }
     return null;
+}
+
+function makeCacheEntry(st, doc, animals) {
+    return {
+        mtimeMs: st.mtimeMs,
+        size: st.size,
+        animals,
+        placeableId: doc.placeableId != null ? Number(doc.placeableId) : null,
+        ownerFarmId: doc.ownerFarmId != null ? Number(doc.ownerFarmId) : 0,
+        penId: doc.penId,
+        generatedAt: doc.generatedAt,
+    };
 }
 
 /**
@@ -69,18 +263,9 @@ function readDetailFileCached(absPath) {
     } catch (_) {
         return null;
     }
-    const animals = Array.isArray(doc.animals) ? doc.animals : null;
-    if (!animals || animals.length === 0) {
-        return null;
-    }
-    const entry = {
-        mtimeMs: st.mtimeMs,
-        size: st.size,
-        animals,
-        placeableId: doc.placeableId != null ? Number(doc.placeableId) : null,
-        ownerFarmId: doc.ownerFarmId != null ? Number(doc.ownerFarmId) : 0,
-        penId: doc.penId,
-    };
+    const animals = parseDetailAnimals(doc);
+    if (!animals) return null;
+    const entry = makeCacheEntry(st, doc, animals);
     fileCache.set(absPath, entry);
     return entry;
 }
@@ -104,118 +289,96 @@ function hydrateLuaDataAnimalsFromDetails(luaData, srv, getLocalLuaJsonPath, opt
         return luaData;
     }
 
-    const byPlaceable = new Map();
+    const byKey = new Map();
     for (const fname of names) {
         if (!fname.startsWith('animals_') || !fname.endsWith('.json')) continue;
         const full = path.join(detailsDir, fname);
         const entry = readDetailFileCached(full);
         if (!entry || !entry.animals) continue;
-        const pid = entry.placeableId;
-        if (pid == null || !Number.isFinite(pid)) continue;
-        byPlaceable.set(pid, entry);
+        rememberDetailEntry(byKey, entry);
     }
 
-    if (byPlaceable.size === 0) return luaData;
+    if (byKey.size === 0) return luaData;
 
-    const arr = toArr(luaData.animals);
-    let hydratedPens = 0;
-    let totalHeads = 0;
+    const out = hydrateHusbandryArray(toArr(luaData.animals), byKey, detailsDir);
+    return { ...luaData, animals: out };
+}
 
-    const out = arr.map((h) => {
-        if (!h || typeof h !== 'object') return h;
-        const hid = Number(h.id);
-        if (!Number.isFinite(hid)) return h;
-        const block = byPlaceable.get(hid);
-        if (!block) return h;
+async function readDetailFileCachedAsync(absPath) {
+    let st;
+    try {
+        st = await fs.promises.stat(absPath);
+    } catch (_) {
+        return null;
+    }
+    const prev = fileCache.get(absPath);
+    if (prev && prev.mtimeMs === st.mtimeMs && prev.size === st.size) {
+        return prev;
+    }
+    let raw;
+    try {
+        raw = await fs.promises.readFile(absPath, 'utf8');
+    } catch (_) {
+        return null;
+    }
+    let doc;
+    try {
+        doc = JSON.parse(raw);
+    } catch (_) {
+        return null;
+    }
+    const animals = parseDetailAnimals(doc);
+    if (!animals) return null;
+    const entry = makeCacheEntry(st, doc, animals);
+    fileCache.set(absPath, entry);
+    return entry;
+}
 
-        const hf = Number(h.ownerFarmId ?? h.farmId ?? 0);
-        const resolvedFarm =
-            hf > 0 ? hf : (block.ownerFarmId > 0 ? block.ownerFarmId : hf);
-        if (block.ownerFarmId && hf && block.ownerFarmId !== hf) return h;
+/**
+ * Async variant — non-blocking detail hydration for merge hot path.
+ */
+async function hydrateLuaDataAnimalsFromDetailsAsync(luaData, srv, getLocalLuaJsonPath, options = {}) {
+    if (!luaData || typeof luaData !== 'object' || !srv) return luaData;
+    const mode = String(srv.mode || '').toLowerCase();
+    if (mode !== 'local' && mode !== 'ftp') return luaData;
 
-        const ownerFarmId = resolvedFarm > 0 ? resolvedFarm : block.ownerFarmId || hf;
-        const animals = block.animals.map((a) => {
-            const row = {
-                ...a,
-                ownerFarmId: a.ownerFarmId ?? a.farmId ?? ownerFarmId,
-                farmId: a.farmId ?? a.ownerFarmId ?? ownerFarmId,
-            };
-            // Base-game detail rows describe a whole cluster via `count`; tag them so the
-            // renderer's head-counting (which keys off __lodClusterAggregate/clusterCount)
-            // counts every head, not one per group row.
-            const grp = Number(a.count);
-            if (Number.isFinite(grp) && grp > 1) {
-                row.__lodClusterAggregate = true;
-                row.clusterCount = grp;
-            }
-            return row;
-        });
-
-        // Heads actually captured in the detail file (cluster rows count their members).
-        const capturedHeads = animals.reduce((sum, a) => {
-            const c = Number(a.clusterCount);
-            return sum + (a.__lodClusterAggregate && Number.isFinite(c) && c > 0 ? c : 1);
-        }, 0);
-
-        // What the aggregate (lod=agg) export already knows the pen holds: the engine's
-        // getNumOfAnimals() (numOfAnimalsReported), the aggregate animalCount, and the
-        // cluster bucket sum.
-        const reported = Number(h.numOfAnimalsReported);
-        const prevCount = Number(h.animalCount);
-        let clusterSum = 0;
-        if (Array.isArray(h.clusters)) {
-            for (const c of h.clusters) {
-                const cc = Number(c && c.count);
-                if (Number.isFinite(cc) && cc > 0) clusterSum += cc;
-            }
-        }
-        const aggregate = Math.max(
-            Number.isFinite(reported) && reported > 0 ? reported : 0,
-            Number.isFinite(prevCount) && prevCount > 0 ? prevCount : 0,
-            clusterSum
-        );
-
-        // Guard: if the detail file holds FEWER heads than the aggregate already reports,
-        // it is incomplete or cross-matched (RL multi-component barns can share a husbandry
-        // id with a different component's detail file). Replacing the aggregate with it would
-        // hide the rest of the herd, leaving the summary total > the rows shown. Keep the
-        // aggregate so the connector fans the clusters out to the full pen instead.
-        if (aggregate > 0 && capturedHeads < aggregate) {
-            return h;
-        }
-
-        hydratedPens += 1;
-        totalHeads += capturedHeads;
-
-        return {
-            ...h,
-            ownerFarmId,
-            farmId: ownerFarmId,
-            animals,
-            lod: 'full',
-            animalCount: Math.max(
-                capturedHeads,
-                Number.isFinite(prevCount) && prevCount > 0 ? prevCount : 0
-            ),
-            numOfAnimalsReported:
-                Number.isFinite(reported) && reported > 0 ? reported : capturedHeads,
-            __detailHydrated: true,
-            __detailCapturedHeads: capturedHeads,
-        };
-    });
-
-    if (hydratedPens > 0) {
-        console.log(
-            `[DetailHydrate] +${totalHeads} animals across ${hydratedPens} pens from ${detailsDir}`
-        );
+    const detailsDir = getDetailsDirForHydration(srv, getLocalLuaJsonPath, options);
+    if (!detailsDir) return luaData;
+    try {
+        await fs.promises.access(detailsDir);
+    } catch (_) {
+        return luaData;
     }
 
+    let names;
+    try {
+        names = await fs.promises.readdir(detailsDir);
+    } catch (_) {
+        return luaData;
+    }
+
+    const byKey = new Map();
+    for (const fname of names) {
+        if (!fname.startsWith('animals_') || !fname.endsWith('.json')) continue;
+        const full = path.join(detailsDir, fname);
+        const entry = await readDetailFileCachedAsync(full);
+        if (!entry || !entry.animals) continue;
+        rememberDetailEntry(byKey, entry);
+    }
+
+    if (byKey.size === 0) return luaData;
+
+    const out = hydrateHusbandryArray(toArr(luaData.animals), byKey, detailsDir);
     return { ...luaData, animals: out };
 }
 
 module.exports = {
     hydrateLuaDataAnimalsFromDetails,
+    hydrateLuaDataAnimalsFromDetailsAsync,
     getLocalDetailsDirForServer,
     getFtpCachedDetailsDir,
     getDetailsDirForHydration,
+    rememberDetailEntry,
+    countCapturedHeads,
+    hasUniqueIndividuals,
 };

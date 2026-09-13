@@ -473,6 +473,29 @@ function VehicleDataCollector:_decadeFromModelYear(year)
     return "2030s", "2030+"
 end
 
+--- Optional FS25_VehicleMileage (vehicle.nxMileage meters → km).
+function VehicleDataCollector:_serializeMileageData(vehicle)
+    local ok, mileage = pcall(function()
+        local target = vehicle
+        local nx = target and target.nxMileage
+        -- Prefer root (implements/mounted tools may not carry the nest).
+        if type(nx) ~= "table" and target and target.rootVehicle then
+            nx = target.rootVehicle.nxMileage
+        end
+        if type(nx) ~= "table" then
+            return nil
+        end
+        local odoM = tonumber(nx.odoMeter) or 0
+        local tripM = tonumber(nx.tripMeter) or 0
+        return {
+            enabled = true,
+            odoKm = self:_round3(odoM / 1000),
+            tripKm = self:_round3(tripM / 1000),
+        }
+    end)
+    return ok and mileage or nil
+end
+
 --- Optional FS25_Vehicle_Years (storeItem.specs.year). Works with or without Advanced Damage System.
 function VehicleDataCollector:_serializeVehicleYearsData(vehicle)
     if not self:isVehicleYearsLoaded() then
@@ -722,7 +745,19 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
     vData.id = vehicle.id or vehicleCount
     vData.typeName = self:cleanupTypeName(vehicle.typeName or "Unknown")
     vData.brand = vehicle.brand or "Unknown"
-    vData.price = vehicle.price or 0
+    -- Prefer getPrice() (same as ADS purchaseValue); vehicle.price is often 0/unset on live fleet.
+    vData.price = 0
+    local okBuy, buyPrice = pcall(function()
+        if vehicle.getPrice then
+            return math.floor(tonumber(vehicle:getPrice()) or 0)
+        end
+        return nil
+    end)
+    if okBuy and buyPrice ~= nil then
+        vData.price = buyPrice
+    else
+        vData.price = math.floor(tonumber(vehicle.price) or 0)
+    end
     vData.age = vehicle.age or 0
     vData.operatingTime = vehicle.operatingTime or 0
 
@@ -769,6 +804,22 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
         local success, x, y, z = pcall(getWorldTranslation, vehicle.rootNode)
         if success and x and y and z then
             vData.position = { x = x, y = y, z = z }
+        end
+        -- LiveMap uses the same forward vector. Export CSS degrees for an up-pointing icon (0 = north).
+        local okDir, dx, _, dz = pcall(localDirectionToWorld, vehicle.rootNode, 0, 0, 1)
+        if okDir and dx ~= nil and dz ~= nil then
+            local yaw = math.atan2(dx, dz)
+            if MathUtil ~= nil and MathUtil.getYRotationFromDirection ~= nil then
+                local okY, yrot = pcall(MathUtil.getYRotationFromDirection, dx, dz)
+                if okY and yrot ~= nil then
+                    yaw = yrot
+                end
+            end
+            local deg = (-math.deg(yaw) + 180) % 360
+            if deg < 0 then
+                deg = deg + 360
+            end
+            vData.headingDeg = deg
         end
     end
 
@@ -856,12 +907,13 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
 
     vData.vehicleType = "unknown"
     local okType, vehicleType = pcall(function()
-        if vehicle.spec_motorized then
-            return "motorized"
+        -- Combines are motorized; classify harvest machines before the generic bucket.
+        if vehicle.spec_combine or vehicle.spec_harvester then
+            return "harvester"
         elseif vehicle.spec_trailer then
             return "trailer"
-        elseif vehicle.spec_harvester then
-            return "harvester"
+        elseif vehicle.spec_motorized then
+            return "motorized"
         elseif vehicle.spec_sprayer then
             return "sprayer"
         elseif vehicle.spec_spreader then
@@ -894,9 +946,34 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
         vData.vehicleYears = vy
     end
 
+    local mileage = self:_serializeMileageData(vehicle)
+    if mileage then
+        vData.mileage = mileage
+    end
+
     local storeItem = self:_resolveStoreItem(vehicle)
     if storeItem and storeItem.name then
         vData.storeName = storeItem.name
+    end
+    if storeItem and storeItem.categoryName then
+        vData.categoryName = tostring(storeItem.categoryName)
+    end
+    -- LiveMap uses VehicleHotspot.TYPE. We only refine the coarse motorized/unknown buckets.
+    if vData.vehicleType == "motorized" or vData.vehicleType == "unknown" then
+        local blob = string.lower(tostring(vData.categoryName or "") .. " " .. tostring(vData.typeName or ""))
+        if blob:find("harvester", 1, true) or blob:find("combine", 1, true) then
+            vData.vehicleType = "harvester"
+        elseif blob:find("tractor", 1, true) then
+            vData.vehicleType = "tractor"
+        elseif blob:find("truck", 1, true) or blob:find("lorry", 1, true) then
+            vData.vehicleType = "truck"
+        elseif blob:find("car", 1, true) or blob:find("pickup", 1, true) then
+            vData.vehicleType = "car"
+        elseif blob:find("loader", 1, true) or blob:find("telehandler", 1, true) then
+            vData.vehicleType = "loader"
+        elseif blob:find("trailer", 1, true) or blob:find("wagon", 1, true) then
+            vData.vehicleType = "trailer"
+        end
     end
     -- Authoritative store icon key: the game's own store image basename (e.g. ".../store_t7.dds"
     -- -> "store_t7"). The desktop app keys its shipped image library by exactly this token, so

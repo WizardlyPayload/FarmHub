@@ -16,7 +16,7 @@ Classic V4 manuals stay in [`../`](../). Do **not** treat those screenshots as V
 | [CHANGELOG.md](./CHANGELOG.md) | V5 5.0.x history |
 | [GITHUB_RELEASE_v5.0.3.md](./GITHUB_RELEASE_v5.0.3.md) | Paste into a GitHub Release (V5 channel only) |
 
-**Versions for this pack:** desktop app **5.0.3** · in-game mod **5.0.0.3**.
+**Versions for this pack:** desktop app **5.0.4** (working tree; GitHub Latest is **5.0.3**) · in-game mod **5.0.0.3**.
 
 **Dashboard URL (installed V5):** [http://localhost:8768](http://localhost:8768)  
 **Repo `npm run dev:new-ui`:** [http://127.0.0.1:8767](http://127.0.0.1:8767) (used for the screenshots in this folder)  

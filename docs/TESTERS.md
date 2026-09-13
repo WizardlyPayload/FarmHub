@@ -20,7 +20,7 @@ This is **Farm Dashboard**, the out-of-game Windows companion. It is **not** Rea
 
 The Farming Simulator **mod works with both apps**. Point both at the same `data.json` if you want to compare.
 
-This drop’s Start Menu shortcut and installer are labelled **Farm Dashboard V5** / version **5.0.3** (in-game mod **5.0.0.3**). That is the side-by-side rebuild, not a Realistic Farming product. (Older local 5.0.x builds may still say “RF” on disk; treat those as V5 too.)
+This drop’s Start Menu shortcut and installer are labelled **Farm Dashboard V5** / version **5.0.5** (in-game mod **5.0.0.4**). GitHub Latest is still **5.0.3** until the next public publish. That is the side-by-side rebuild, not a Realistic Farming product. (Older local 5.0.x builds may still say “RF” on disk; treat those as V5 too.)
 
 ---
 

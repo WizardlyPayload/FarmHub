@@ -219,3 +219,12 @@ Live cross-agent board for **Farm Dashboard** RF work. Append-only status rows; 
 **Why:** Wizard asked for these five NEW APP polish items.
 **Over to you:** Restart Electron / reload the UI. Reload the in-game mod for depot settings in the new tab. Do not publish onto classic `latest.yml`.
 
+### [2026-09-13] Dash - Done: Restore field/production export + dairy barn names
+**Re:** Collectors, ESC settings inject, DairyCore panel
+**What:**
+- Guarded `FarmDashboard:loadMap` so a missing DataCollector cannot throw inside `loadSharedI3DFileFinished`.
+- collectionSafetyV7 re-enables fields / economy / production; ESC clone setState no longer persists Off.
+- Dairy rows now include optional `name` from `placeable:getName()`; Pastures panel shows that name.
+**Why:** Riverbend savegame2 lost merged fields, RF map overlays, productions; Dairy Core still showed uniqueIds; map-load threw a Lua error.
+**Over to you:** Restart the save so mod **5.0.0.4** loads. Do not publish onto classic `latest.yml`.
+

@@ -7,7 +7,7 @@ Butler lives at `%USERPROFILE%\tools\butler\butler.exe` (login saved locally).
 
 ## Channels
 
-Same bytes as GitHub `v5.0.3` / `Documents\FarmDash Release\`.
+Live itch/GitHub public is **5.0.3**. `Documents\FarmDash Release\` is the working-tree drop (**5.0.4**) until Wizard publishes.
 
 | Channel | Version | Public download name (itch wraps butler builds) |
 |---------|---------|--------------------------------------------------|

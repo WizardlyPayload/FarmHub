@@ -33,24 +33,28 @@ Tester checklist: [`TESTERS.md`](./TESTERS.md).
 **Classic public hotfix 4.2.1 / mod 3.4.0.7 (2026-07-28)** — FS 1.21 `copyFile` Bool fix for classic GitHub/itch.  
 **V5 5.0.0 cut (2026-07-26)** (then labelled “RF edition” on disk); local V5 mod zip may be **5.0.0.2** (hall depot stock + Realistic Farming collectors).  
 **V5 5.0.2 tester drop (2026-09-08)** — matching zip + Setup in `Documents/FarmDash Release`; not pushed onto V4 `latest.yml`.  
-**V5 5.0.3 (2026-09-10)** — current-tree rebuild; GitHub Latest. Replaces the 8 September 5.0.2 upload.
+**V5 5.0.3 (2026-09-10)** — GitHub Latest / itch `windows-v5`. Replaces the 8 September 5.0.2 upload.  
+**V5 5.0.4 (2026-09-13)** — working-tree DEV bump (not on GitHub yet). V5 installer locked to new screens only.  
+**V5 5.0.5 (2026-09-13)** — working-tree DEV: fields/economy/production collectors restored; Dairy Core barn names; loadMap init guard.
 
 V4 and V5 share `FS25_FarmDashboard_App/package.json` (`version: 4.2.2` in tree). The V5 build never
-edits that field: `electron-builder.rf.yml` sets `extraMetadata.version: 5.0.3`, which
-electron-builder merges into the packaged metadata only for V5. Result: the V5
-Setup filename, `latest-rf.yml`, and `app.getVersion()` (About) report **5.x**, while the V4
-`build:app` / `build:all` line keeps reporting **4.x**.
+edits that field: `electron-builder.rf.yml` sets `extraMetadata.version` (**5.0.5** working tree;
+last GitHub public **5.0.3**). Scheme: **MAJOR.PUBLIC.DEV** — PUBLIC bumps on each GitHub release
+and DEV resets to 0; DEV bumps on every local app change after that. electron-builder merges the
+stamp into the packaged metadata only for V5. Result: the V5 Setup filename, `latest-rf.yml`, and
+`app.getVersion()` (About) report **5.x**, while the V4 `build:app` / `build:all` line keeps
+reporting **4.x**.
 
 V4 mod zips are stamped at pack time with `npm run package:mod:classic`
-(`-VersionOverride 3.4.0.8`) so the working-tree `modDesc` can remain on the V5 line (**5.0.0.3**)
+(`-VersionOverride 3.4.0.8`) so the working-tree `modDesc` can remain on the V5 line (**5.0.0.4**)
 for GPortal / local dedicated without confusing V4 players into installing a 5.x mod stamp.
 
 | Artifact | V4 track | V5 track |
 |----------|----------|----------|
-| Desktop app version source | `package.json` 4.2.2 (V4 builds) | 5.0.3 via `electron-builder.rf.yml` `extraMetadata.version` (package.json untouched) |
-| Installer filename | `FS25-Farm-Dashboard-Setup-4.2.2.exe` | `FS25-Farm-Dashboard-V5-Setup-5.0.3.exe` (older local 5.0.x used `…-RF-Setup-…`) |
+| Desktop app version source | `package.json` 4.2.2 (V4 builds) | **5.0.5** working tree (`electron-builder.rf.yml`); GitHub Latest still **5.0.3** until the next public publish |
+| Installer filename | `FS25-Farm-Dashboard-Setup-4.2.2.exe` | `FS25-Farm-Dashboard-V5-Setup-5.0.5.exe` (GitHub Latest still `…-5.0.3.exe`) |
 | Update YAML | `latest.yml` | `latest-rf.yml` only (reports 5.x) |
-| FarmDashboard mod zip | **3.4.0.8** via `package:mod:classic` | Working tree / `package:mod` → **5.0.0.3** (suite collectors; inert without those mods) |
+| FarmDashboard mod zip | **3.4.0.8** via `package:mod:classic` | Working tree / `package:mod` → **5.0.0.4** (suite collectors; inert without those mods) |
 | In-app About | App + mod versions | App 5.x + mod 5.0.0.x + detected Realistic Farming mods, tested pins, ✓ / “newer than tested” |
 
 ### App ↔ mod version matrix
@@ -58,7 +62,8 @@ for GPortal / local dedicated without confusing V4 players into installing a 5.x
 | Line | App version | FarmDashboard mod | Update feed |
 |------|-------------|-------------------|-------------|
 | **V4 (public classic)** | **4.2.1** | **3.4.0.7** | `latest.yml` |
-| **V5** | **5.0.3** | **5.0.0.3** | `latest-rf.yml` |
+| **V5 (GitHub Latest)** | **5.0.3** | **5.0.0.3** | `latest-rf.yml` |
+| **V5 (working tree)** | **5.0.5** | **5.0.0.4** | `latest-rf.yml` (local drop only until publish) |
 
 In-app About copy must not imply the dashboard *is* Realistic Farming or Farm Tablet.  
 Wording: Farm Dashboard is an out-of-game companion. This installer is **V5** (new screens); it is not pushed over **V4**. One in-game mod works with both. Realistic Farming suite panels are optional.

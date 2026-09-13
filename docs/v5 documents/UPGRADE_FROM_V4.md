@@ -19,7 +19,7 @@ Older public 2.0.0 → 4.x steps remain in [`../UPGRADE_FROM_FS25-Farm-Dashboard
 ## What you add
 
 1. Close V4 if you like (not required).
-2. Install **`FS25-Farm-Dashboard-V5-Setup-5.0.3.exe`**.
+2. Install **`FS25-Farm-Dashboard-V5-Setup-5.0.4.exe`**.
 3. Launch **Farm Dashboard V5**.
 4. Run Setup (Auto-detect can point at the **same** `data.json` folders V4 already uses).
 5. Confirm the window is the **sidebar** UI, URL **8768**.

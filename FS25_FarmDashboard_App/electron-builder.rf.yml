@@ -11,9 +11,9 @@ extraMetadata:
   # Distinct product-line identity in About / updater metadata without bumping classic package.json.
   # Older 5.0.x packages stamped productLine: rf; runtime treats rf and v5 as the same V5 line.
   productLine: v5
-  # V5 version override. Classic package.json stays 4.x; only the V5 artifact,
-  # latest-rf.yml, and app.getVersion() (About) report 5.x via this build-time metadata merge.
-  version: 5.0.3
+  # MAJOR.PUBLIC.DEV (Wizard): GitHub public last shipped 5.0.3; this working tree is a DEV bump.
+  # Next GitHub publish bumps PUBLIC and resets DEV (5.1.0). Classic package.json stays 4.x.
+  version: 5.0.5
 directories:
   output: electron-pack-out-rf
 files:
@@ -47,6 +47,7 @@ files:
   - lanHttpPath.cjs
   - safeFsIdentity.cjs
   - ftpAccess.cjs
+  - uiServePolicy.cjs
   - package.json
   - detailAnimalsHydrate.js
   - livestockDetail.js
@@ -54,9 +55,10 @@ files:
   - mergedSnapshotHold.js
   - liveExportFreshness.js
   - stockMoistureFromXml.js
-  - setup.html
   - icon.ico
   - web/**/*
+  - "!web/index.html"
+  - "!web/simhub.html"
   - ui-v2/**/*
   - node_modules/**/*
 extraResources:

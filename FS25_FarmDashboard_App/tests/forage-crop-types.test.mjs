@@ -25,6 +25,9 @@ test("alfalfa and clover are mowable forage crops", () => {
   assert.equal(isMowableForageFruitType("MEADOW"), true);
   assert.equal(isMowableForageFruitType("WHEAT"), false);
   assert.equal(isMowableForageFruitType("ALFALFA_WINDROW"), false);
+  assert.equal(isMowableForageFruitType("CLOVER_WINDROW"), false);
+  assert.equal(isMowableForageFruitType("MEADOW_WINDROW"), false);
+  assert.equal(isMowableForageFruitType("CLOVER_BALE"), false);
   assert.equal(isMowableForageCrop({ fruitType: "alfalfa" }), true);
 });
 

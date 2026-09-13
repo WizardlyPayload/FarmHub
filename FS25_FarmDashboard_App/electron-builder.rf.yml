@@ -1,0 +1,93 @@
+# Farm Dashboard V5 — electron-builder overlay
+# Invoked by tools/app/run-electron-builder.mjs when packing V5 (--v5 / --rf / FARMDASH_PRODUCT_LINE=v5).
+#
+# HARD RULE: publish.channel must remain "latest-rf" so the update feed is latest-rf.yml.
+# Never point V4 clients (latest.yml) at V5 installers.
+# appId stays com.farmdashboard.rf so existing 5.0.x installs upgrade in place.
+
+appId: com.farmdashboard.rf
+productName: FS25 Farm Dashboard V5
+extraMetadata:
+  # Distinct product-line identity in About / updater metadata without bumping classic package.json.
+  # Older 5.0.x packages stamped productLine: rf; runtime treats rf and v5 as the same V5 line.
+  productLine: v5
+  # V5 version override. Classic package.json stays 4.x; only the V5 artifact,
+  # latest-rf.yml, and app.getVersion() (About) report 5.x via this build-time metadata merge.
+  version: 5.0.3
+directories:
+  output: electron-pack-out-rf
+files:
+  - main.js
+  - lanCredentialPolicy.js
+  - modVersionPolicy.js
+  - app-updater.js
+  - preload.js
+  - xmlCollector.js
+  - fs25Paths.js
+  - fileReadRetry.js
+  - dataMerger.js
+  - corsPolicy.js
+  - editionPolicy.cjs
+  - modConfigXml.js
+  - fillTypeResolve.cjs
+  - farmScope.cjs
+  - mapOverviewResolver.js
+  - mapOverviewTerrainInset.cjs
+  - mapOverviewInsets.cjs
+  - package.json
+  - detailAnimalsHydrate.js
+  - livestockDetail.js
+  - serverDataCache.js
+  - mergedSnapshotHold.js
+  - liveExportFreshness.js
+  - stockMoistureFromXml.js
+  - setup.html
+  - icon.ico
+  - web/**/*
+  - ui-v2/**/*
+  - node_modules/**/*
+extraResources:
+  - from: ../tools/Export-ModStoreImages.ps1
+    to: tools/Export-ModStoreImages.ps1
+  - from: build/install-imagemagick.ps1
+    to: install-imagemagick.ps1
+  - from: build/uninstall-user-data.ps1
+    to: uninstall-user-data.ps1
+  - from: build/uninstall-dependencies.ps1
+    to: uninstall-dependencies.ps1
+  - from: build/imagemagick-common.ps1
+    to: imagemagick-common.ps1
+  - from: build/windows-install-state.ps1
+    to: windows-install-state.ps1
+  - from: resources/imagemagick
+    to: imagemagick
+    filter:
+      - "**/*"
+  - from: resources/texconv
+    to: texconv
+    filter:
+      - "**/*"
+win:
+  target: nsis
+  icon: icon.ico
+  artifactName: FS25-Farm-Dashboard-V5-Setup-${version}.${ext}
+  signExts:
+    - ".dll"
+  signtoolOptions:
+    publisherName: JoshWalki / WizardlyPayload
+    rfc3161TimeStampServer: http://timestamp.digicert.com
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Farm Dashboard V5
+  warningsAsErrors: false
+  include: build/installer.nsh
+publish:
+  provider: github
+  owner: WizardlyPayload
+  repo: FarmHub
+  releaseType: release
+  # Produces latest-rf.yml — V4 clients must keep using latest.yml
+  channel: latest-rf

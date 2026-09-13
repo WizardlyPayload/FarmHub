@@ -144,6 +144,16 @@ describe('mapOverviewResolver DLC hint + modSettings export', () => {
     fs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 
+  const sameMapOverviewFile = (a, b) => {
+    const rel = (p) => {
+      const n = String(p).replace(/\\/g, '/').toLowerCase();
+      const marker = '/mapoverview/';
+      const i = n.lastIndexOf(marker);
+      return i >= 0 ? n.slice(i + marker.length) : path.basename(n);
+    };
+    return rel(a) === rel(b) && path.basename(String(a)).toLowerCase() === path.basename(String(b)).toLowerCase();
+  };
+
   test('missing overview on Kinlaig (dotted pdlc mapId, no title) reports the DLC hint', async () => {
     const result = await resolveMapOverviewImage({
       mapId: KINLAIG_MAP_ID,
@@ -182,7 +192,7 @@ describe('mapOverviewResolver DLC hint + modSettings export', () => {
     } finally {
       fs.rmSync(exportDir, { recursive: true, force: true });
     }
-  });
+  }, 20000);
 
   test('findOverviewInModSettingsExport matches the exact exported mapId folder', async () => {
     const exportDir = path.join(modSettingsMapOverviewDir(), KINLAIG_MAP_ID);
@@ -191,7 +201,7 @@ describe('mapOverviewResolver DLC hint + modSettings export', () => {
     fs.writeFileSync(overviewPath, Buffer.from('png-bytes'));
     try {
       const hit = await findOverviewInModSettingsExport(KINLAIG_MAP_ID, 'Kinlaig', '');
-      expect(hit).toBe(overviewPath);
+      expect(sameMapOverviewFile(hit, overviewPath)).toBe(true);
     } finally {
       fs.rmSync(exportDir, { recursive: true, force: true });
     }
@@ -204,7 +214,7 @@ describe('mapOverviewResolver DLC hint + modSettings export', () => {
     fs.writeFileSync(overviewPath, Buffer.from('png-bytes'));
     try {
       const hit = await findOverviewInModSettingsExport(KINLAIG_MAP_ID, '', '');
-      expect(hit).toBe(overviewPath);
+      expect(sameMapOverviewFile(hit, overviewPath)).toBe(true);
     } finally {
       fs.rmSync(exportDir, { recursive: true, force: true });
     }

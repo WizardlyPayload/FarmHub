@@ -1,6 +1,6 @@
 {
   "name": "fs25-farm-dashboard",
-  "version": "4.2.1",
+  "version": "4.2.2",
   "license": "SEE LICENSE IN LICENSE",
   "description": "Real-time Farm Management Dashboard for FS25",
   "author": "JoshWalki / Wizardlypayload & WizardlyPayload",
@@ -20,12 +20,14 @@
     "start:dev:sync": "node ../tools/app/start-dev-electron.mjs --sync-config",
     "start:new-ui": "node ../tools/app/start-dev-electron.mjs --sync-config",
     "pack": "node ../tools/app/run-electron-builder.mjs pack",
-    "pack:rf": "node ../tools/app/run-electron-builder.mjs pack --rf",
+    "pack:rf": "node ../tools/app/run-electron-builder.mjs pack --v5",
+    "pack:v5": "node ../tools/app/run-electron-builder.mjs pack --v5",
     "pack:in-repo": "electron-builder --dir",
     "pack:fresh": "node ../tools/app/electron-builder-fresh-output.mjs pack",
     "pack:alt": "electron-builder --dir --config.directories.output=electron-pack-out-alt",
     "dist": "node ../tools/app/run-electron-builder.mjs dist",
-    "dist:rf": "node ../tools/app/run-electron-builder.mjs dist --rf",
+    "dist:rf": "node ../tools/app/run-electron-builder.mjs dist --v5",
+    "dist:v5": "node ../tools/app/run-electron-builder.mjs dist --v5",
     "dist:in-repo": "electron-builder --win",
     "dist:fresh": "node ../tools/app/electron-builder-fresh-output.mjs dist",
     "dist:alt": "electron-builder --win --config.directories.output=electron-pack-out-alt",
@@ -45,7 +47,7 @@
   },
   "build": {
     "appId": "com.farmdashboard.app",
-    "productName": "FS25 Farm Dashboard",
+    "productName": "FS25 Farm Dashboard V4",
     "directories": {
       "output": "electron-pack-out"
     },
@@ -60,12 +62,14 @@
       "fileReadRetry.js",
       "dataMerger.js",
       "corsPolicy.js",
+      "editionPolicy.cjs",
       "modConfigXml.js",
       "fillTypeResolve.cjs",
       "farmScope.cjs",
       "mapOverviewResolver.js",
       "mapOverviewTerrainInset.cjs",
       "mapOverviewInsets.cjs",
+      "package.json",
       "detailAnimalsHydrate.js",
       "livestockDetail.js",
       "serverDataCache.js",
@@ -96,6 +100,14 @@
         "to": "uninstall-dependencies.ps1"
       },
       {
+        "from": "build/imagemagick-common.ps1",
+        "to": "imagemagick-common.ps1"
+      },
+      {
+        "from": "build/windows-install-state.ps1",
+        "to": "windows-install-state.ps1"
+      },
+      {
         "from": "resources/imagemagick",
         "to": "imagemagick",
         "filter": [
@@ -114,16 +126,20 @@
       "target": "nsis",
       "icon": "icon.ico",
       "artifactName": "FS25-Farm-Dashboard-Setup-${version}.${ext}",
-      "publisherName": "JoshWalki / WizardlyPayload",
-      "signDlls": true,
-      "rfc3161TimeStampServer": "http://timestamp.digicert.com"
+      "signExts": [
+        ".dll"
+      ],
+      "signtoolOptions": {
+        "publisherName": "JoshWalki / WizardlyPayload",
+        "rfc3161TimeStampServer": "http://timestamp.digicert.com"
+      }
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Farm Dashboard",
+      "shortcutName": "Farm Dashboard V4",
       "warningsAsErrors": false,
       "include": "build/installer.nsh"
     },
@@ -138,19 +154,24 @@
     "basic-ftp": "^5.0.5",
     "cors": "^2.8.5",
     "electron-store": "^8.2.0",
-    "electron-updater": "^6.6.2",
+    "electron-updater": "^6.8.9",
     "express": "^4.22.2",
     "fast-xml-parser": "^5.7.3",
     "ws": "^8.21.0",
     "yauzl": "^2.10.0"
   },
   "devDependencies": {
-    "electron": "^29.1.0",
-    "electron-builder": "^24.13.3",
-    "jest": "^29.7.0"
+    "electron": "^43.6.0",
+    "electron-builder": "^26.15.3",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "29.7.0",
+    "luaparse": "0.3.1"
   },
   "overrides": {
-    "js-yaml": "4.2.0"
+    "js-yaml": "4.3.2",
+    "fast-uri": "3.1.7",
+    "qs": "6.16.0",
+    "body-parser": "1.20.6"
   },
   "jest": {
     "testEnvironment": "node",

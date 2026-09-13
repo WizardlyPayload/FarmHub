@@ -13,13 +13,14 @@ Visitors get a **read-only** view: Settings, server manager, and local-only tool
 | **FS25** with **Farm Dashboard mod** on the save you want to show | Writes `data.json` every export cycle (~60s default) |
 | **Farm Dashboard Windows app** on a PC that can reach that data | Merges JSON + serves the UI on port **8766** |
 | **Public HTTPS URL** (recommended: `demo.farmdashboard.co.uk`) | So the marketing site can link without mixed-content errors |
-| **Optional: FTP server** in the app | Only if the live save is on a **dedicated** host you do not play on locally |
+| **Optional: Local (join-as-client)** | Dedicated host: join with the mod, mirror to local `data.json`, app **Local** mode — no FTP |
+| **Optional: FTP server** in the app | Headless dedicated / rented host when nobody can stay joined |
 
 **While you are playing on the same PC as the app:** add a **Local** server pointing at  
 `Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\<savegame>\`  
 and keep the app open — file watch picks up changes quickly.
 
-**Dedicated / rented server:** add **FTP** in Settings, poll every **2–5 minutes** for a snappier demo.
+**Dedicated / rented server:** prefer **join as client** + Local watch ([INSTALL.md](./INSTALL.md#dedicated-server-join-as-client-or-ftp)). Or add **FTP** in Settings and poll every **2–5 minutes** when nobody can stay joined.
 
 ---
 
@@ -29,7 +30,7 @@ Best fit when the domain is already on **Cloudflare** (`farmdashboard.co.uk`).
 
 ### 1. App on your gaming PC
 
-1. Install mod + app; configure the save (local path or FTP).
+1. Install mod + app; configure the save (local path, join-as-client Local, or FTP).
 2. **Settings → Remote / LAN access**
    - Enable LAN access (binds `0.0.0.0:8766`).
    - Set a **strong password** (not `admin` / `farmhub` — the app rejects weak defaults).
@@ -93,14 +94,14 @@ Optional subtitle on the page:
 ## Making it feel “live” while you play
 
 - Stay on the save with the mod enabled; export cycle drives freshness.
-- **Local server:** updates within seconds of each `data.json` write.
+- **Local server** (SP or join-as-client): updates within seconds of each `data.json` write.
 - **FTP server:** lower **Poll every** in Settings (minimum 1 minute).
 - Show **game time** and **last updated** on the landing hero so visitors see movement.
 
 When you are **offline**, either:
 
 - Turn off the tunnel / show “Demo offline” on the site, or  
-- Keep FTP polling a dedicated server that runs 24/7.
+- Keep a dedicated demo source online 24/7: either a joined client with mirror + Local watch, or FTP polling.
 
 ---
 
@@ -115,7 +116,7 @@ When you are **offline**, either:
 ## Checklist before going public
 
 - [ ] Mod enabled on the save shown in the demo  
-- [ ] App running with correct Local or FTP server selected  
+- [ ] App running with correct Local (incl. join-as-client) or FTP server selected  
 - [ ] LAN access on + strong password (or Cloudflare Access in front)  
 - [ ] Tunnel `demo.farmdashboard.co.uk` → `127.0.0.1:8766` healthy  
 - [ ] Test from phone on **mobile data** (not home Wi‑Fi) to confirm public access  

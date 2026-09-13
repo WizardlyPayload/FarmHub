@@ -6,7 +6,9 @@ import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# WIP inbox (gitignored). After rename, copy fd-* into docs/doc-screenshots/.
 SHOT = ROOT / "docs" / "screenshots"
+PUBLISHED = ROOT / "docs" / "doc-screenshots"
 
 # source filename -> manifest filename (first wins if target exists)
 RENAMES: dict[str, str] = {
@@ -43,6 +45,7 @@ COPIES: dict[str, list[str]] = {
 
 
 def main() -> None:
+    PUBLISHED.mkdir(parents=True, exist_ok=True)
     done: list[str] = []
     for src_name, dest_name in RENAMES.items():
         src = SHOT / src_name
@@ -57,7 +60,8 @@ def main() -> None:
             src.unlink()
         else:
             src.rename(dest)
-        done.append(f"{src_name} -> {dest_name}")
+        shutil.copy2(dest, PUBLISHED / dest_name)
+        done.append(f"{src_name} -> {dest_name} (+ published)")
 
     for src_name, dest_names in COPIES.items():
         primary = RENAMES.get(src_name, "")
@@ -71,7 +75,8 @@ def main() -> None:
                 print(f"skip copy exists: {dest_name}")
                 continue
             shutil.copy2(src, dest)
-            done.append(f"copy -> {dest_name}")
+            shutil.copy2(dest, PUBLISHED / dest_name)
+            done.append(f"copy -> {dest_name} (+ published)")
 
     print("\n".join(done) or "(nothing renamed)")
 

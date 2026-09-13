@@ -8,7 +8,7 @@ Welcome to the **FS25 Farm Dashboard** (FarmHub) wiki. This project is a **Windo
 |------|-----|
 | **[Installation Guide](Installation-Guide)** | First-time setup (mod → app, in order) |
 | **[User Manual](User-Manual)** | Every screen, setting, and section |
-| **[Troubleshooting](Troubleshooting)** | “Waiting for data”, FTP, LAN, port 8766 |
+| **[Troubleshooting](Troubleshooting)** | “Waiting for data”, join-as-client, FTP, LAN, port 8766 |
 | **[Security & Network](Security-and-Network)** | LAN access, passwords, tablets |
 | **[Developer Guide](Developer-Guide)** | Architecture, build, contribute |
 | **[Releases & Upgrades](Releases-and-Upgrades)** | 4.2.0 notes, upgrade path |
@@ -48,7 +48,7 @@ Download both from **[GitHub Releases](https://github.com/WizardlyPayload/FarmHu
 - **Pastures** — Distribution, birth / stock warnings
 - **Productions** — Chains, slots, fill levels
 - **Weather** — Current + forecast (merged XML)
-- **Multi-server** — Local saves + **FTP** for dedicated hosts
+- **Multi-server** — Local saves, dedicated **join-as-client** (Local watch, no FTP), or **FTP** (Advanced) for headless hosts
 - **LAN tablets** — Optional `0.0.0.0` bind with strong HTTP Basic auth
 - **SimHub page** — Read-only overlay for streaming (`simhub.html`)
 - **Themes & backgrounds** — Per-section **crossfade backgrounds** + color themes in Settings
@@ -66,18 +66,20 @@ The app **does not** read FS25 memory. It reads **`data.json`** written by the m
 
 No file → dashboard shows **“waiting for data”**.
 
-### Local vs FTP
+### Local vs join-as-client vs FTP
 
 | Mode | How data arrives |
 |------|------------------|
-| **Local** | App watches `data.json` on this PC |
-| **FTP** | App polls a remote server folder (dedicated / GPortal-style) |
+| **Local** | App watches `data.json` on this PC (SP / listen-host, **or** dedicated **join-as-client** mirror) |
+| **FTP** | App polls a remote server folder (dedicated / GPortal-style) — **Advanced**; still supported for headless-only |
 
-**3.9:** Local servers can **restore last merged data** on app restart; **FTP always pulls fresh** data.
+**Join as client (dedicated, no FTP):** same mod on an opted-in joined client receives a mirrored export from the dedicated authority and writes the usual local `modSettings\FS25_FarmDashboard\<slot>\data.json`. Point the app at that folder in **Local** mode. Needs at least one connected client; empty server = no mirror. Works for app **4.2.1** and **v5**. Details: [Installation Guide](Installation-Guide#dedicated-servers-join-as-client-or-ftp).
+
+**3.9+:** Local servers can **restore last merged data** on app restart; **FTP always pulls fresh** data.
 
 ### Authority (multiplayer)
 
-The mod exports on **single-player** and **MP host / dedicated** only (`isAuthority()`). MP **clients** do not write full exports.
+The mod **collects** on **single-player** and **MP host / dedicated** only (`isAuthority()`). Opted-in **clients** do not re-scan the world; with **export mirror** they write a **local copy** of the authority’s `data.json` so the desktop app can use Local watch without FTP. Giants **:8080** is not a `data.json` substitute.
 
 ## Repository layout
 
@@ -92,8 +94,8 @@ FarmHub/
 
 ## Support
 
-- **Bugs:** [GitHub Issues](https://github.com/WizardlyPayload/FarmHub/issues) — include app version, mod version, local vs FTP
-- **Community:** [Discord](https://discord.gg/D4sEHM59) — chat, screenshots, quick help
+- **Bugs:** [GitHub Issues](https://github.com/WizardlyPayload/FarmHub/issues) — include app version, mod version, local / join-as-client / FTP
+- **Community:** [Discord](https://discord.gg/qsSTRwG2) — chat, screenshots, quick help
 - **Security:** See [Security & Network](Security-and-Network) — do not post exploits publicly
 - **Authors:** [JoshWalki](https://github.com/JoshWalki) & **WizardlyPayload** · optional [Ko-fi](https://ko-fi.com/wizarlypayload)
 

@@ -43,9 +43,13 @@
 5. Express serves **`/api/data`**, **`/api/fields`**, etc.; SPA polls.
 6. **`rules-engine.js`** derives field-card hints from merged JSON.
 
-### 3.2 FTP / dedicated server
+### 3.2 Dedicated server (join-as-client or FTP)
 
-Same merge, but XML and/or JSON may be **pulled on a schedule** (`sync` vs `staggered` multi-server polling in `main.js` / setup store).
+**Join as client (preferred when someone can stay connected):** authority mirrors `data.json` to an opted-in joined client; desktop app uses **Local** `fs.watch` on that PC’s `modSettings\…\data.json` — no FTP. Same for app **4.2.1** and **v5**.
+
+**FTP (Advanced):** same merge, but XML and/or JSON may be **pulled on a schedule** (`sync` vs `staggered` multi-server polling in `main.js` / setup store). Headless-only / empty server path.
+
+Giants **:8080** HTTP feed is optional merge enrichment — not a `data.json` substitute.
 
 ### 3.3 LAN exposure
 

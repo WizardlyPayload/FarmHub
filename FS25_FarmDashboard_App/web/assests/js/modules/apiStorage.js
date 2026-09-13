@@ -17,6 +17,7 @@ import {
 } from './farmScope.js';
 import { t } from '../i18n/i18n.js';
 import { isFarmDashLocalConfigHost } from './viewer-mode.js';
+import { nextRetryDelayMs } from './ux-retry.js';
 
 /** Persist active server + farm for SimHub (`GET /api/simhub-session`) — desktop app only. */
 function pushSimHubLiveContext(dashboard) {
@@ -470,14 +471,14 @@ function notifyRemoteShellReady() {
 }
 
 /** Remote/demo: `/api/servers` may 401 until LAN Basic is stored — retry briefly. */
-async function retryLoadServersForRemote(dashboard, attempts = 4) {
+async function retryLoadServersForRemote(dashboard, attempts = 3) {
   if (isFarmDashLocalConfigHost()) return !!(dashboard?.availableServers?.length);
   for (let i = 0; i < attempts; i += 1) {
     if (Array.isArray(dashboard?.availableServers) && dashboard.availableServers.length > 0) {
       return true;
     }
     if (i > 0) {
-      await new Promise((resolve) => setTimeout(resolve, i === 1 ? 500 : 1200));
+      await new Promise((resolve) => setTimeout(resolve, nextRetryDelayMs(i - 1)));
     }
     await dashboard.loadServersAndTabs();
   }
@@ -845,7 +846,12 @@ export function applyApiMergedDataPayload(dashboard, data) {
       dashboard.fields = filterFieldsForFarmView(dashboard.allFields, dashboard.activeFarmId);
       if (typeof dashboard.renderFarmDropdown === "function") dashboard.renderFarmDropdown();
     }
-  } else if (husbandryBuildings.length > 0) {
+  } else if (
+    dashboard.fields.length === 0 &&
+    husbandryBuildings.length > 0
+  ) {
+    // Only infer from livestock when the preferred farm also has no fields —
+    // arable farms must not snap to dairy on every refresh.
     const ownsLivestock = husbandryBuildings.some(
       (h) => entityOwnerFarmId(h) === Number(dashboard.activeFarmId ?? 1)
     );

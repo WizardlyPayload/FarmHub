@@ -108,7 +108,9 @@ export function resetFleetMapOverviewCache() {
 }
 
 function applyTerrainInsetFromOverview(data) {
-  const inset = data?.terrainInset;
+  // Legacy clips the image — prefer left-padded clipTerrainInset so chrome hides
+  // without shifting remapped pins (NEW APP uses terrainInset / raw UV instead).
+  const inset = data?.clipTerrainInset || data?.terrainInset;
   if (inset && Number(inset.width) > 0 && Number(inset.height) > 0) {
     _terrainInset = {
       left: Number(inset.left) || 0,

@@ -7,6 +7,7 @@ import {
 } from "./farm-dashboard-bg.js";
 import { stopFieldsRefresh } from "./fields.js";
 import { countLivestockHeads } from "./livestock.js";
+import { isStorageItem, isUsedEquipmentYardStock } from "./vehicles.js";
 
 function _safe(value) {
   const ns =
@@ -273,6 +274,27 @@ export function updateNavbar() {
   } else {
     gameTimeElement.classList.add("d-none");
   }
+  refreshUxHelperStrip(this);
+}
+
+function refreshUxHelperStrip(dashboard) {
+  let el = document.getElementById("fd-ux-helper");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "fd-ux-helper";
+    el.className = "fd-helper d-none";
+    el.setAttribute("role", "status");
+    document.getElementById("main-navbar")?.after(el);
+  }
+  const ts = dashboard?.dataTimestamps || {};
+  const stale = ts.isStale === true || ts.cacheUsedDueToFailure === true;
+  if (!stale) {
+    el.classList.add("d-none");
+    el.innerHTML = "";
+    return;
+  }
+  el.classList.remove("d-none");
+  el.innerHTML = `<strong>${t("ux.helper.title")}</strong> ${t("ux.freshness.staleHint")}`;
 }
 
 export function getCurrentSection() {
@@ -419,11 +441,17 @@ export function updateLandingPageCounts() {
     gameTimeElement.innerHTML = `<i class="bi bi-clock me-1"></i>${this.getGameTimeDisplay()}`;
   }
 
-  // Update vehicle count
-  const vehicleCountFiltered = Array.isArray(this.vehicles) ? this.vehicles.length : 0;
-  const vehicleCountAll = Array.isArray(this._allVehiclesMerged)
-    ? this._allVehiclesMerged.length
-    : vehicleCountFiltered;
+  // Update vehicle count (fleet only — pallets live on Storage)
+  const vehicleRows = Array.isArray(this.vehicles) ? this.vehicles : [];
+  const vehicleCountFiltered = vehicleRows.filter(
+    (v) => !isStorageItem(v) && !isUsedEquipmentYardStock(v)
+  ).length;
+  const vehicleCountAllSrc = Array.isArray(this._allVehiclesMerged)
+    ? this._allVehiclesMerged
+    : vehicleRows;
+  const vehicleCountAll = vehicleCountAllSrc.filter(
+    (v) => !isStorageItem(v) && !isUsedEquipmentYardStock(v)
+  ).length;
   const vehicleCount = pickLandingFarmCount(
     vehicleCountFiltered,
     vehicleCountAll,

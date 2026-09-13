@@ -6,7 +6,9 @@ import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+# WIP inbox (gitignored). After rename, copy fd-* into docs/doc-screenshots/.
 SHOT = ROOT / "docs" / "screenshots"
+PUBLISHED = ROOT / "docs" / "doc-screenshots"
 
 # Screenshot filename -> canonical manifest name (overwrites existing fd-*)
 RENAMES: dict[str, str] = {
@@ -89,6 +91,7 @@ EXTRA_FILES = [
 
 
 def main() -> None:
+    PUBLISHED.mkdir(parents=True, exist_ok=True)
     done: list[str] = []
     for src_name, dest_name in RENAMES.items():
         src = SHOT / src_name
@@ -100,7 +103,8 @@ def main() -> None:
             dest.unlink()
         if src.resolve() != dest.resolve():
             src.rename(dest)
-        done.append(f"{src_name} -> {dest_name}")
+        shutil.copy2(dest, PUBLISHED / dest_name)
+        done.append(f"{src_name} -> {dest_name} (+ published)")
 
     for src_name, dest_names in COPIES.items():
         src = SHOT / src_name
@@ -112,12 +116,13 @@ def main() -> None:
             if dest.is_file():
                 dest.unlink()
             shutil.copy2(src, dest)
-            done.append(f"copy {src_name} -> {dest_name}")
+            shutil.copy2(dest, PUBLISHED / dest_name)
+            done.append(f"copy {src_name} -> {dest_name} (+ published)")
 
     remaining = sorted(p.name for p in SHOT.glob("Screenshot*.png"))
     print("\n".join(done) or "(no renames)")
     if remaining:
-        print("\nUnmapped Screenshot*.png (extras):")
+        print("\nUnmapped Screenshot*.png (extras in inbox):")
         for name in remaining:
             print(f"  {name}")
 

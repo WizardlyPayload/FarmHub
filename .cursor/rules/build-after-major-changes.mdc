@@ -30,22 +30,24 @@ Equivalent: `npm run package:mod` then `npm run build:app`.
 
 ## Output location
 
-Artifacts go to **`%USERPROFILE%\Documents\FarmDash Final Output`** (override: env `FARMDASH_BUILD_OUTPUT`).
+- **V5** zip + Setup.exe go **flat** in `%USERPROFILE%\Documents\FarmDash Release\` (no nested `V5\` folder, no dated candidate folders). That is the drop Wizard opens.
+- **V4** public feed stays in `%USERPROFILE%\Documents\FarmDash Final Output\` (`latest.yml`). Do not overwrite live 4.2.1 unless Wizard asks.
+- Override either path with env `FARMDASH_BUILD_OUTPUT`.
 
-Expect after a successful dist:
+Expect after a successful **V5** dist in FarmDash Release:
 
-| File | Required for release |
-|------|----------------------|
+| File | Required |
+|------|----------|
 | `FS25_FarmDashboard.zip` | Yes (mod) |
-| `FS25-Farm-Dashboard-Setup-<version>.exe` | Yes (app) |
-| `latest.yml` | Yes (auto-update) |
+| `FS25-Farm-Dashboard-V5-Setup-<version>.exe` | Yes (app) |
+| `latest-rf.yml` | Yes (V5 auto-update only) |
 
 ## Agent workflow
 
 When completing a major change set:
 
 1. Run `npm run build:all` (allow several minutes on Windows).
-2. Verify the three files above exist in FarmDash Final Output.
+2. Verify the zip and Setup.exe exist in `Documents\FarmDash Release` (V5) or FarmDash Final Output (V4).
 3. Tell the user the output path and filenames; do not commit installers to git.
 
 If the build fails, fix the blocker before marking the task done.

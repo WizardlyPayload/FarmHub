@@ -21,7 +21,7 @@ import {
 import { buildToolGuidanceLines } from "../field-suggestion-tools.js";
 import { buildFieldDisplayClusters, syntheticFieldFromCluster } from "../field-clusters.js";
 import { t } from "../i18n/i18n.js";
-import { renderUiStateHtml } from "./uiState.js";
+import { bindUiStateRetry, renderUiStateHtml } from "./uiState.js";
 import { formatMoisturePercent, moistureGradeLabel } from "./moisture.js";
 import { isMowableForageCrop } from "../forage-crop-types.js";
 
@@ -1243,6 +1243,10 @@ function showFieldsApiError() {
         title: t("fields.apiErrorTitle"),
         body: t("fields.apiErrorBody"),
         showRetry: true,
+    });
+    bindUiStateRetry(el, () => {
+        lastFieldsPayloadKey = null;
+        loadFieldsData();
     });
 }
 

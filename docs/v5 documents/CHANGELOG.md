@@ -2,11 +2,24 @@
 
 Player-facing history for the **V5 / new screens** line. Classic 4.x notes stay in [`../CHANGELOG.md`](../CHANGELOG.md).
 
-**App 5.0.3** · **Mod 5.0.0.3** · Update feed **`latest-rf.yml` only**.
+**App 5.0.4** (working tree) · last GitHub public **5.0.3** · **Mod 5.0.0.3** · Update feed **`latest-rf.yml` only**.
 
 ---
 
-## 5.0.3 — current tree (2026-09-10)
+## 5.0.4 — working tree (2026-09-13, not on GitHub yet)
+
+DEV bump after GitHub **5.0.3**. Next GitHub public release is **5.1.0** (PUBLIC +1, DEV reset).
+
+- V5 always opens the **new screens**. Classic `web/index.html` / root `setup.html` are not packed and are not a fallback.
+- If the new UI files are missing, V5 shows a reinstall message instead of the old layout.
+
+### Product
+- App **5.0.4** · installer `FS25-Farm-Dashboard-V5-Setup-5.0.4.exe`
+- Mod **5.0.0.3** (no Lua change in this stamp)
+
+---
+
+## 5.0.3 — GitHub Latest (2026-09-10)
 
 Replaces the **v5.0.2** GitHub/itch files, which were the **8 September** tester drop, not this working tree. Same V5 screens line; bump exists so already-installed 5.0.2 apps can auto-update.
 
@@ -52,7 +65,7 @@ Replaces the **v5.0.2** GitHub/itch files, which were the **8 September** tester
 ## Honest leftovers (do not hide)
 
 - Some Settings LAN strings may still mention **:8766**. Installed V5 listens on **8768**.
-- Appearance may still show classic “Use new dashboard UI” copy on a V5 process — you are already on the new screens. Use the **V4 app** if you want classic.
+- From **5.0.4**, V5 does not offer a classic-UI toggle. Use the **V4 app** if you want the old screens.
 - V5 installer welcome / Finished PNGs in this folder are still **[manual]**.
 
 Full classic history and audit remediation: [`../CHANGELOG.md`](../CHANGELOG.md).

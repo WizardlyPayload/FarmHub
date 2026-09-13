@@ -23,7 +23,7 @@ Cold-start bank for the **Dash** FarmHub product seat. Skimmable bullets only. D
 | Lua mod | `FS25_FarmDashboard_Mod/` | Authority-only export → `data.json`; staggered collectors; settings; RF soft-detect collectors under `src/collectors/rf/` |
 | Electron app | `FS25_FarmDashboard_App/` | Merge, FTP/local watch, Express `:8766`, classic `web/`, packaging, i18n catalogs |
 | NEW APP | `NEW APP/` → packaged `ui-v2/` | **Primary** dashboard UI (Preact/TS/Vite) |
-| Classic web | `FS25_FarmDashboard_App/web/` | Default shipping UI until `useNewUi` / `FARMDASH_UI_V2=1`; leave alone unless Wizard asks |
+| Classic web | `FS25_FarmDashboard_App/web/` | **V4 only.** V5 ships NEW APP (`ui-v2`) and must not fall back to classic HTML shells. Leave classic modules alone unless Wizard asks |
 | Docs | `docs/` | Manuals, releases, security; Realistic Farming *suite* kit in `docs/rf-suite/` (FarmHub-only) |
 | Tools | `tools/` | Mod zip, ui-v2 copy, GPortal upload, electron-builder helpers, assert RF channel |
 
@@ -36,14 +36,27 @@ Cold-start bank for the **Dash** FarmHub product seat. Skimmable bullets only. D
 | Line | App / mod | Auto-update | Output |
 |------|-----------|-------------|--------|
 | **V4** (classic 4.x) | `package.json` **4.2.2**; classic screens; Start Menu **Farm Dashboard V4** | **`latest.yml` only** | Private candidates under `Documents/FarmDash Release Candidates\`; do not treat `FarmDash Final Output` 4.2.1 as this rebuild |
-| **V5** (rebuild 5.x) | App **5.0.3** via `electron-builder.rf.yml` `extraMetadata` (package.json stays 4.2.2); shortcut **Farm Dashboard V5**; same in-game mod zip works with both | **`latest-rf.yml` only** — never V4 | **`Documents/FarmDash Release/`** (flat zip + V5 Setup.exe) |
+| **V5** (rebuild 5.x) | App **5.0.4** (working tree) via `electron-builder.rf.yml` `extraMetadata` (package.json stays 4.2.2); last GitHub public **5.0.3**; shortcut **Farm Dashboard V5**; same in-game mod zip works with both | **`latest-rf.yml` only** — never V4 | **`Documents/FarmDash Release/`** (flat zip + V5 Setup.exe) |
 
 Never put the V5 Setup.exe on V4 `latest.yml`. Guard: `tools/app/assert-rf-update-channel.mjs`. Story: [`COMPATIBILITY.md`](./COMPATIBILITY.md). Tester checklist: [`TESTERS.md`](./TESTERS.md). Do **not** call V5 “RF edition” in product-facing names.
 
+**Version numbers (Wizard, 2026-09-13)** — app is `MAJOR.PUBLIC.DEV` (`electron-builder.rf.yml` `extraMetadata.version`):
+
+| Part | Meaning | When it changes |
+|------|---------|-----------------|
+| **MAJOR** | Product generation (5 = V5 rebuild) | Rare; new product line |
+| **PUBLIC** | GitHub (and matching itch) release | Every time a new version is published on GitHub |
+| **DEV** | Local / tester working-tree stamp | Every app change after the last GitHub release; **reset to 0** on the next GitHub publish |
+
+Last GitHub public: **5.0.3**. This working tree: **5.0.4**. Next GitHub publish: **5.1.0**. Mod zip is four-part (`5.0.0.x` in `modDesc.xml`); bump its last number only when the Lua zip actually changes. Do not stamp a working-tree installer with the same three-part version as GitHub Latest.
+
 **Ports / demos:** installed V4 `:8766` (`%APPDATA%\fs25-farm-dashboard`); installed V5 `:8768` (`%APPDATA%\fs25-farm-dashboard-rf`); repo NEW UI `:8767` (`%LOCALAPPDATA%\fs25-farm-dashboard-dev`) via `npm run dev:new-ui`. Do not proxy Vite at `:5173` to installed `:8766` when testing new merge/collectors.
 
+#### 2026-09-13 — V5 5.0.4 DEV (not GitHub yet)
+- App **5.0.4** after GitHub **5.0.3**. V5 no longer packs or serves classic `web/index.html` / root `setup.html`. New screens only. Mod zip still **5.0.0.3** (no Lua change). Drop: `Documents/FarmDash Release\FS25-Farm-Dashboard-V5-Setup-5.0.4.exe`.
+
 #### 2026-09-10 — Rebuild V5 5.0.3 (replace 8 Sep 5.0.2 upload)
-- GitHub **Latest** is **v5.0.3**: current-tree Setup + zip + `latest-rf.yml`. Classic `latest.yml` (4.2.1) stays on that release so V4 auto-update is **not** offered V5. Tag `v4.2.1` remains for classic download. Tag **v5.0.2** was the 8 September tester drop; those binaries were removed from the tag. Setup SHA256 `C01D9AEF…DBFA59`.
+- GitHub **Latest** is still **v5.0.3** until the next public publish. Classic `latest.yml` (4.2.1) stays on that release so V4 auto-update is **not** offered V5. Tag `v4.2.1` remains for classic download. Tag **v5.0.2** was the 8 September tester drop; those binaries were removed from the tag. Published Setup SHA256 `C01D9AEF…DBFA59`.
 - itch files: butler channels `windows-v5` (5.0.3) and `mod-v5` (5.0.0.3). Public description uses **img.itch.zone** URLs — itch strips off-site `<img>` (farmdashboard.co.uk shots show as source text). Copy lives in `docs/_internal/itch-io-*.html`.
 - Site map page: `map.html` with `v5-section-fleet-map-010.png` + layers dropdown `v5-section-fleet-map-020-layers-dropdown.png`. Nav label **Map**.
 - Site Discord (2026-09-10): header is **Home / Try now / Screens / Install / Discord / Download**. On `screens.html` and each screen page the bar switches to **Home + Fields / Pastures / Vehicles / Storage / Map / Economy**. Invite: `https://discord.gg/qsSTRwG2`.
@@ -154,7 +167,7 @@ Classic web/  OR  NEW APP (ui-v2) when flagged
 ## 7. Open / watch items
 
 - **Classic 4.2 GitHub/itch hotfix** for `copyFile` / map-overview latch still **owed** on public V4 feed (local/GPortal mod may already be 5.0.0.1; V4 app line is separate).
-- **V5 publish:** current V5 Setup + zip live in `Documents/FarmDash Release\` (`FS25-Farm-Dashboard-V5-Setup-5.0.3.exe`); Authenticode signing still open; **do not** publish onto V4 Latest. User-facing name is Farm Dashboard V5 (not “RF edition”).
+- **V5 publish:** GitHub Latest remains **5.0.3** until Wizard asks to publish. Working-tree drop is **5.0.4** in `Documents/FarmDash Release\` (`FS25-Farm-Dashboard-V5-Setup-5.0.4.exe`). Authenticode signing still open; **do not** publish onto V4 Latest. User-facing name is Farm Dashboard V5 (not “RF edition”).
 - **In-game SP/MP smoke** for RF soil/treatmentPlan after dedicated restart (often pending after GPortal upload).
 - **NEW APP parity:** live QA; some P0/P1 rows still open (`NEW APP/PARITY.md`, `PARITY_GAPS.md`) — Fields cluster prefs, nav icons, etc.
 - **Website demo** on `:8766` classic stays separate from repo `:8767` NEW UI.

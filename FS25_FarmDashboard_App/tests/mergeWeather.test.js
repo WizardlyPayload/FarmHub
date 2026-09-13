@@ -154,4 +154,21 @@ describe("mergeWeather", () => {
     expect(merged.currentWeather).toBe("cloudy");
     expect(merged.currentTemperature).toBe(11);
   });
+
+  test("stale Lua weather falls back to XML timeSinceLastRain", () => {
+    const merged = mergeWeather(
+      { snowLevel: 0 },
+      { currentWeather: "RAIN", timeSinceLastRain: 42, snowLevel: 3 }
+    );
+    expect(merged.timeSinceLastRain).toBe(42);
+    expect(merged.snowLevel).toBe(0);
+  });
+
+  test("live Lua weather does not fill timeSinceLastRain from XML", () => {
+    const merged = mergeWeather(
+      { currentWeather: "sun", currentTemperature: 18 },
+      { timeSinceLastRain: 99 }
+    );
+    expect(merged.timeSinceLastRain).toBeUndefined();
+  });
 });

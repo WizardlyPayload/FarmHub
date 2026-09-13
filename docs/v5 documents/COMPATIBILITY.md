@@ -26,12 +26,12 @@ Tester checklist: [`TESTERS.md`](./TESTERS.md). Full engine/API gap table (RF co
 
 | Artifact | V4 | V5 |
 |----------|----|----|
-| App | **4.2.1** public classic | **5.0.3** |
+| App | **4.2.1** public classic | **5.0.4** working tree (GitHub Latest **5.0.3**) |
 | Mod zip | **3.4.0.7** classic stamp | Working tree **5.0.0.3** |
-| Installer | `FS25-Farm-Dashboard-Setup-4.x.exe` | `FS25-Farm-Dashboard-V5-Setup-5.0.3.exe` |
+| Installer | `FS25-Farm-Dashboard-Setup-4.x.exe` | `FS25-Farm-Dashboard-V5-Setup-5.0.4.exe` |
 | Update YAML | `latest.yml` | `latest-rf.yml` |
 
-V4 and V5 share tree `package.json` for classic builds. V5 injects `extraMetadata.version: 5.0.3` at pack time so About reports **5.x**.
+V4 and V5 share tree `package.json` for classic builds. V5 injects `extraMetadata.version: 5.0.4` at pack time so About reports **5.x**.
 
 ## What V5 UI must honour
 

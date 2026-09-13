@@ -4,7 +4,7 @@
 
 | | |
 | --- | --- |
-| **App** | **5.0.3** — installer `FS25-Farm-Dashboard-V5-Setup-5.0.3.exe` (Start Menu: **Farm Dashboard V5**) |
+| **App** | **5.0.4** — installer `FS25-Farm-Dashboard-V5-Setup-5.0.4.exe` (Start Menu: **Farm Dashboard V5**) |
 | **Mod** | **5.0.0.3** (`FS25_FarmDashboard.zip` — **same zip** as classic V4) |
 | **Dashboard URL** | Installed V5: [http://localhost:8768](http://localhost:8768) after setup |
 | **Update feed** | `latest-rf.yml` only — **never** V4 `latest.yml` |
@@ -40,7 +40,7 @@ On a **dedicated / rented server**, the mod must be active on that server. You c
 
 3. Start **Farming Simulator 25** once so the game registers the mod.
 
-![File Explorer showing **`FS25_FarmDashboard`** (`.zip` or folder) under **`mods\`**](../doc-screenshots/fd-install-010-mod-folder.png)
+![File Explorer showing **`FS25_FarmDashboard`** (`.zip` or folder) under **`mods\`**](doc-screenshots/fd-install-010-mod-folder.png)
 
 *Figure: File Explorer showing **`FS25_FarmDashboard`** (`.zip` or folder) under **`mods\`**. Shared with classic — the zip is one product.*
 
@@ -54,7 +54,7 @@ Repeat for **each savegame** (and each dedicated-server save) that should use th
 2. Enable **Farm Dashboard** / **FS25 Farm Dashboard**.
 3. **Load the save and enter the world** (main menu alone is not enough).
 
-![Mod ticked in the save’s mod list](../doc-screenshots/fd-install-020-fs25-mod-enabled.png)
+![Mod ticked in the save’s mod list](doc-screenshots/fd-install-020-fs25-mod-enabled.png)
 
 *Figure: Mod ticked in the save’s mod list.*
 
@@ -70,7 +70,7 @@ After about one minute in-game, check:
 
 The file should exist and its **Modified** time should advance while you play.
 
-![File Explorer on that folder with a recent `data.json` timestamp](../doc-screenshots/fd-install-030-datajson-explorer.png)
+![File Explorer on that folder with a recent `data.json` timestamp](doc-screenshots/fd-install-030-datajson-explorer.png)
 
 *Figure: File Explorer on that folder with a recent `data.json` timestamp.*
 
@@ -83,7 +83,7 @@ The file should exist and its **Modified** time should advance while you play.
 
 ## Stage D — Install the Windows **V5** app
 
-1. Download **`FS25-Farm-Dashboard-V5-Setup-5.0.3.exe`**. Older local 5.0.x builds may still say `…-RF-Setup-…` on disk — treat those as V5 too.
+1. Download **`FS25-Farm-Dashboard-V5-Setup-5.0.4.exe`**. Older local 5.0.x builds may still say `…-RF-Setup-…` on disk — treat those as V5 too.
 2. Run the installer. Choose language on the welcome page.
 3. Finish setup and launch **Farm Dashboard V5** from the Start menu.
 

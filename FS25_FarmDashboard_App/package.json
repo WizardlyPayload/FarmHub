@@ -82,6 +82,7 @@
       "lanHttpPath.cjs",
       "safeFsIdentity.cjs",
       "ftpAccess.cjs",
+      "uiServePolicy.cjs",
       "package.json",
       "detailAnimalsHydrate.js",
       "livestockDetail.js",

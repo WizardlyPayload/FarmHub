@@ -1,6 +1,6 @@
 # Farm Dashboard V5 — User manual
 
-**Farm Dashboard V5** is the Windows desktop app that reads live farm data from **Farming Simulator 25** (via the in-game **FS25 Farm Dashboard** mod) and shows the **new screens** (sidebar + Save overview). **App 5.0.3** · **mod 5.0.0.3**.
+**Farm Dashboard V5** is the Windows desktop app that reads live farm data from **Farming Simulator 25** (via the in-game **FS25 Farm Dashboard** mod) and shows the **new screens** (sidebar + Save overview). **App 5.0.4** · **mod 5.0.0.3**.
 
 This is the **same product** as classic Farm Dashboard, rebuilt. It is **not** Realistic Farming and **not** Farm Tablet. Optional suite panels appear in the sidebar only when those mods export data.
 
@@ -44,7 +44,7 @@ This manual walks every setting, every section, and every modal, with **inline s
 | ---- | ------- |
 | **Farming Simulator 25** | Game must run with the mod for live data |
 | **FS25 Farm Dashboard mod** | **`FS25_FarmDashboard.zip`** in your FS25 `mods` folder (same zip as V4) |
-| **Farm Dashboard V5 (Windows)** | `FS25-Farm-Dashboard-V5-Setup-5.0.3.exe` — Start Menu **Farm Dashboard V5** |
+| **Farm Dashboard V5 (Windows)** | `FS25-Farm-Dashboard-V5-Setup-5.0.4.exe` — Start Menu **Farm Dashboard V5** |
 | **Browser (optional)** | Edge / Chrome / Firefox can open the same localhost URL the app serves |
 | **(Optional) Dedicated join-as-client** | Same mod on a PC that joins the dedicated server — Local watch, **no FTP** |
 | **(Optional) FTP credentials** | Advanced: empty / headless dedicated |
@@ -63,7 +63,7 @@ Do these **in order**. Skipping a stage is the most common reason the dashboard 
 1. Copy **`FS25_FarmDashboard.zip`** into **`Documents\My Games\FarmingSimulator2025\mods\`**, **or** extract to **`mods\FS25_FarmDashboard\`** with **`modDesc.xml`** at that folder root.
 2. Start FS25 once so it sees the mod.
 
-![**`FS25_FarmDashboard`** under FS25 **`mods\`**](../doc-screenshots/fd-install-010-mod-folder.png)
+![**`FS25_FarmDashboard`** under FS25 **`mods\`**](doc-screenshots/fd-install-010-mod-folder.png)
 
 *Figure: **`FS25_FarmDashboard`** under FS25 **`mods\`** (folder or `.zip`).*
 
@@ -72,7 +72,7 @@ Do these **in order**. Skipping a stage is the most common reason the dashboard 
 1. Enable **FS25 Farm Dashboard** in the save's mod list.
 2. Load the save and **enter the world**.
 
-![Mod ticked in the save's mod list](../doc-screenshots/fd-install-020-fs25-mod-enabled.png)
+![Mod ticked in the save's mod list](doc-screenshots/fd-install-020-fs25-mod-enabled.png)
 
 *Figure: Mod ticked in the save's mod list.*
 
@@ -84,13 +84,13 @@ Do these **in order**. Skipping a stage is the most common reason the dashboard 
 
 `data.json` should have a recent **modified** timestamp.
 
-![`data.json` in File Explorer](../doc-screenshots/fd-install-030-datajson-explorer.png)
+![`data.json` in File Explorer](doc-screenshots/fd-install-030-datajson-explorer.png)
 
 *Figure: `data.json` with a fresh timestamp.*
 
 ### Stage D — Install the V5 Windows app
 
-1. Run **`FS25-Farm-Dashboard-V5-Setup-5.0.3.exe`**.
+1. Run **`FS25-Farm-Dashboard-V5-Setup-5.0.4.exe`**.
 2. Pick installer language; complete the installer.
 3. Launch **Farm Dashboard V5** from the Start menu.
 
@@ -467,7 +467,7 @@ On first open after a map change, overview cache may rebuild (`map_overviews` un
 
 In-game PDA (reference only):
 
-![In-game PDA map](../doc-screenshots/fd-reference-pda-map.png)
+![In-game PDA map](doc-screenshots/fd-reference-pda-map.png)
 
 *Figure: In-game PDA — not the dashboard UI.*
 
@@ -624,11 +624,11 @@ Settings → **FS25 mod** edits this file. Example shape:
 | `modules.redTape` | Compliance export when Red Tape is present |
 | `debugBaleScan` | Hand-edit only |
 
-![`config.xml` in Explorer](../doc-screenshots/fd-mod-010-config-xml-explorer.png)
+![`config.xml` in Explorer](doc-screenshots/fd-mod-010-config-xml-explorer.png)
 
 *Figure: `config.xml` on disk.*
 
-![`config.xml` in an editor](../doc-screenshots/fd-mod-020-config-xml-editor.png)
+![`config.xml` in an editor](doc-screenshots/fd-mod-020-config-xml-editor.png)
 
 *Figure: `config.xml` open in a text editor.*
 
@@ -664,4 +664,4 @@ There is **no** Giants console command for collectors. Reload the save after edi
 
 Full recipe table: [`SCREENSHOTS.md`](./SCREENSHOTS.md). All images: [`doc-screenshots/`](./doc-screenshots/).
 
-**Document version:** app **5.0.3** · mod **5.0.0.3** · V5 screens captured 2026-09-09. **Authors:** [`../AUTHORS.md`](../AUTHORS.md).
+**Document version:** app **5.0.4** · mod **5.0.0.3** · V5 screens captured 2026-09-09. **Authors:** [`../AUTHORS.md`](../AUTHORS.md).

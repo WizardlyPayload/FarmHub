@@ -1555,7 +1555,7 @@ function mergeWeather(luaWeather, xmlEnv) {
         cloudCoverage      : base.cloudCoverage ?? xmlEnv.cloudCoverage,
         rainLevel          : base.rainLevel ?? xmlEnv.rainLevel,
         snowLevel          : base.snowLevel ?? xmlEnv.snowLevel,
-        timeSinceLastRain  : base.timeSinceLastRain ?? xmlEnv.timeSinceLastRain,
+        timeSinceLastRain  : luaLive ? base.timeSinceLastRain : (base.timeSinceLastRain ?? xmlEnv.timeSinceLastRain),
         forecast,
         rawForecast        : xmlEnv.rawForecast || [],
         moisture           : base.moisture ?? xmlEnv.moisture,

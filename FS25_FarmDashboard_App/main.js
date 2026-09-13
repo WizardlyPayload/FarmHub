@@ -24,6 +24,7 @@ const FARMDASH_DEV =
     process.env.FARMDASH_DEV === 'yes';
 
 const editionPolicy = require('./editionPolicy.cjs');
+const uiServePolicy = require('./uiServePolicy.cjs');
 const PRODUCT_LINE = editionPolicy.resolveProductLine();
 editionPolicy.applySessionPaths(app, { productLine: PRODUCT_LINE, isDev: FARMDASH_DEV });
 
@@ -234,9 +235,11 @@ function loadSetupWindow() {
         : '';
     if (server.listening) {
         mainWindow.loadURL(`http://127.0.0.1:${PORT}/setup.html${q}`);
-    } else {
-        mainWindow.loadFile(path.join(__dirname, 'setup.html'), opts);
+        return;
     }
+    // V5 never opens classic setup.html from disk (Vite assets need HTTP).
+    if (isRfProductLine() || shouldServeNewUi()) return;
+    mainWindow.loadFile(path.join(__dirname, 'setup.html'), opts);
 }
 
 /** PowerShell 5.1 `Set-Content -Encoding utf8` writes UTF-8 BOM; JSON.parse rejects it. */
@@ -990,16 +993,43 @@ function isRfProductLine() {
 }
 
 function shouldServeNewUi() {
-    if (process.env.FARMDASH_UI_V2 === '0' || process.env.FARMDASH_UI_V2 === 'false') return false;
-    if (isRfProductLine()) return true;
-    if (process.env.FARMDASH_UI_V2 === '1' || process.env.FARMDASH_UI_V2 === 'true') return true;
+    let useNewUiPref;
     try {
         const prefs = store.get('uiPreferences') || {};
-        if (prefs.useNewUi !== undefined) return prefs.useNewUi === true;
-        return false;
-    } catch (_) {
-        return false;
+        if (prefs.useNewUi !== undefined) useNewUiPref = prefs.useNewUi === true;
+    } catch (_) { /* store not ready */ }
+    return uiServePolicy.shouldServeNewUi({
+        productLine: readPackagedProductLine(),
+        env: process.env,
+        useNewUiPref,
+    });
+}
+
+function newUiPagePath(fileName) {
+    return path.join(resolveNewUiDistDir(), fileName);
+}
+
+function newUiPageExists(fileName) {
+    return fs.existsSync(newUiPagePath(fileName));
+}
+
+function sendMissingNewUiPage(res) {
+    res.status(500);
+    res.setHeader('Cache-Control', 'no-store');
+    res.type('html').send(uiServePolicy.missingNewUiPageHtml());
+}
+
+function sendDashboardHtml(res, fileName, classicRel) {
+    if (newUiPageExists(fileName)) {
+        return res.sendFile(newUiPagePath(fileName));
     }
+    if (isRfProductLine()) {
+        return sendMissingNewUiPage(res);
+    }
+    if (classicRel) {
+        return res.sendFile(path.join(__dirname, classicRel));
+    }
+    return res.status(404).end();
 }
 
 expressApp.use(cors({ origin: corsOriginAllowed }));
@@ -1104,11 +1134,12 @@ expressApp.get('/api/map-field-outlines', async (req, res) => {
     }
 });
 const newUiDistDir = resolveNewUiDistDir();
-const newUiEnabled = shouldServeNewUi() && fs.existsSync(path.join(newUiDistDir, 'index.html'));
+const newUiBuildReady = newUiPageExists('index.html');
+const v5LocksNewUi = isRfProductLine();
 
 /**
  * Setup must inject __FARMDASH_SETUP_TOKEN before static middleware.
- * When FARMDASH_UI_V2 / useNewUi is on, serve NEW APP dist/setup.html (not legacy App/setup.html).
+ * V5 always uses ui-v2/setup.html. V4 uses NEW APP when opted in, otherwise classic setup.html.
  */
 expressApp.get('/setup.html', async (req, res) => {
     try {
@@ -1116,11 +1147,15 @@ expressApp.get('/setup.html', async (req, res) => {
         if (!access.ok) return denySetupAccess(req, res, access);
         ensureSetupWriteToken();
         const token = String(store.get('farmdashSetupWriteToken') || '');
-        const newUiSetup = path.join(newUiDistDir, 'setup.html');
-        const p =
-            newUiEnabled && fs.existsSync(newUiSetup)
-                ? newUiSetup
-                : path.join(__dirname, 'setup.html');
+        const newUiSetup = newUiPagePath('setup.html');
+        let p;
+        if (shouldServeNewUi() && fs.existsSync(newUiSetup)) {
+            p = newUiSetup;
+        } else if (v5LocksNewUi) {
+            return sendMissingNewUiPage(res);
+        } else {
+            p = path.join(__dirname, 'setup.html');
+        }
         let html = await fs.promises.readFile(p, 'utf8');
         const inj = `<script>window.__FARMDASH_SETUP_TOKEN=${JSON.stringify(token)};</script>`;
         const i = html.indexOf('</head>');
@@ -1137,13 +1172,39 @@ expressApp.get('/setup.html', async (req, res) => {
     }
 });
 
-if (newUiEnabled) {
+/** Register dashboard HTML before static(web) so classic index.html cannot win on V5. */
+expressApp.get(['/', '/index.html'], (_req, res) => {
+    sendDashboardHtml(res, 'index.html', v5LocksNewUi ? null : path.join('web', 'index.html'));
+});
+expressApp.get('/simhub.html', (_req, res) => {
+    sendDashboardHtml(res, 'simhub.html', v5LocksNewUi ? null : path.join('web', 'simhub.html'));
+});
+
+if (newUiBuildReady) {
     expressApp.use(express.static(newUiDistDir));
     console.log('[UI] Serving NEW APP from', newUiDistDir);
+} else if (v5LocksNewUi) {
+    console.error('[UI] V5 is missing ui-v2/index.html ? classic dashboard will not be served.');
 }
-expressApp.use(express.static(path.join(__dirname, 'web')));
+
+const webRoot = path.join(__dirname, 'web');
+const webStatic = express.static(webRoot, { index: v5LocksNewUi ? false : 'index.html' });
+expressApp.use((req, res, next) => {
+    if (v5LocksNewUi && uiServePolicy.isClassicDashboardShellPath(req.path)) {
+        return next();
+    }
+    return webStatic(req, res, next);
+});
 /** setup.html uses src="web/assests/..." — same paths work over http://host:8766/… and file:// */
-expressApp.use('/web', express.static(path.join(__dirname, 'web')));
+expressApp.use('/web', (req, res, next) => {
+    if (v5LocksNewUi) {
+        const leaf = String(req.path || '').replace(/^/+/, '').toLowerCase();
+        if (leaf === 'index.html' || leaf === 'simhub.html') {
+            return res.redirect(302, leaf === 'simhub.html' ? '/simhub.html' : '/');
+        }
+    }
+    next();
+}, express.static(webRoot));
 /** Same icon as the Windows desktop app (electron-builder `icon.ico`) — splash screen in web/index.html */
 expressApp.get('/app-brand-icon.ico', async (req, res) => {
     const icoPath = path.join(__dirname, 'icon.ico');
@@ -1163,14 +1224,6 @@ expressApp.get('/app-brand-icon.ico', async (req, res) => {
         res.status(404).end();
     }
 });
-expressApp.get('/', (req, res) => {
-    const newUiIndex = path.join(newUiDistDir, 'index.html');
-    if (newUiEnabled && fs.existsSync(newUiIndex)) {
-        return res.sendFile(newUiIndex);
-    }
-    return res.sendFile(path.join(__dirname, 'web', 'index.html'));
-});
-
 /** Setup wizard JSON — FTP / feed secrets never included (use ftpPassSet / httpFeedCodeSet). Electron uses IPC for full config. Local-first: not for LAN tablets. */
 expressApp.get('/api/setup-config', (req, res) => {
     try {
@@ -3596,21 +3649,18 @@ function createWindow() {
     } else {
         // Vite's root-relative assets require HTTP; loadFile leaves a fresh V5 window blank.
         const opts = getSetupLoadOptions();
-        if (shouldServeNewUi()) {
-            const newUiSetup = path.join(resolveNewUiDistDir(), 'setup.html');
-            if (fs.existsSync(newUiSetup)) {
-                const showNewUiSetup = () => {
-                    if (mainWindow && !mainWindow.isDestroyed()) loadSetupWindow();
-                };
-                if (!server || !server.listening) {
-                    listenFarmdashHttp(getLanBindAddress(), showNewUiSetup);
-                } else {
-                    showNewUiSetup();
-                }
-                return;
+        if (shouldServeNewUi() || isRfProductLine()) {
+            const showNewUiSetup = () => {
+                if (mainWindow && !mainWindow.isDestroyed()) loadSetupWindow();
+            };
+            if (!server || !server.listening) {
+                listenFarmdashHttp(getLanBindAddress(), showNewUiSetup);
+            } else {
+                showNewUiSetup();
             }
+            return;
         }
-        // Classic setup can still open immediately from disk.
+        // Classic V4 setup can still open immediately from disk.
         mainWindow.loadFile(path.join(__dirname, 'setup.html'), opts);
         // Still bring up HTTP + WS for LAN setup and dashboard after save.
         if (!server || !server.listening) {

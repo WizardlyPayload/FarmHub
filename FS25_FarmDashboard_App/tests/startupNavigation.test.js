@@ -25,6 +25,8 @@ const startupFunctions = [
 
 function start(options = {}) {
     const appDirectory = path.resolve('startup-fixture');
+    const productLine = options.productLine || 'v5';
+    const isV5 = productLine === 'v5' || productLine === 'rf';
     const win = {
         loadFile: jest.fn().mockResolvedValue(undefined),
         loadURL: jest.fn().mockResolvedValue(undefined),
@@ -39,7 +41,7 @@ function start(options = {}) {
         BrowserWindow: jest.fn().mockImplementation(() => win),
         ensureSetupWriteToken: jest.fn(),
         editionPolicy: { windowTitle: () => 'Farm Dashboard V5' },
-        PRODUCT_LINE: 'v5',
+        PRODUCT_LINE: productLine,
         FARMDASH_DEV: false,
         PORT: 8768,
         __dirname: appDirectory,
@@ -53,7 +55,8 @@ function start(options = {}) {
                 : key === 'farmdashSetupWriteToken' ? 'test-only-token' : undefined,
         },
         bootServer: jest.fn().mockResolvedValue(undefined),
-        shouldServeNewUi: () => options.newUi !== false,
+        isRfProductLine: () => isV5,
+        shouldServeNewUi: () => (options.newUi !== undefined ? options.newUi !== false : isV5),
         resolveNewUiDistDir: () => path.join(appDirectory, 'ui-v2'),
         getSetupLoadOptions: () => options.locale ? { query: { lang: options.locale } } : {},
         server: options.noServer ? null : { listening: !!options.listening },
@@ -115,13 +118,15 @@ test('closing the window before HTTP readiness does not navigate a destroyed win
 });
 
 test('Classic retains its immediate local-file first-run setup', () => {
-    const { win, appDirectory } = start({ newUi: false, locale: 'en' });
+    const { win, appDirectory } = start({ productLine: 'classic', newUi: false, locale: 'en' });
     expect(win.loadFile).toHaveBeenCalledWith(path.join(appDirectory, 'setup.html'), { query: { lang: 'en' } });
 });
 
-test('a missing new-UI build retains the legacy setup fallback', () => {
-    const { win, appDirectory } = start({ hasNewUi: false });
-    expect(win.loadFile).toHaveBeenCalledWith(path.join(appDirectory, 'setup.html'), {});
+test('V5 does not open classic setup.html when ui-v2 is missing', () => {
+    const { win, ready } = start({ hasNewUi: false });
+    expect(win.loadFile).not.toHaveBeenCalled();
+    ready();
+    expect(win.loadURL).toHaveBeenCalledWith('http://127.0.0.1:8768/setup.html');
 });
 
 test('configured profiles still launch the existing dashboard boot path', () => {

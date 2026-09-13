@@ -1,0 +1,1964 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Farm Tablet — Overview Vision Prototype</title>
+  <!--
+    VISION PROTOTYPE — not live game UI.
+    Open this file in Chrome/Edge. No build step.
+    FarmHub Overview composition inside Farm Tablet chrome (FT.C tokens).
+    Share screenshots / this file with Arissani & Tyson for feedback.
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      /* Farm Tablet FT.C mapped to CSS */
+      --bg-deep: #0a0d12;
+      --bg-panel: #12171f;
+      --bg-card: #171c26;
+      --bg-nav: #0d1017;
+      --brand: #29c261;
+      --brand-dim: #1a7038;
+      --brand-glow: rgba(41, 194, 97, 0.18);
+      --positive: #38e075;
+      --negative: #f24747;
+      --warning: #ffb81a;
+      --info: #4da6ff;
+      --muted: #6b707f;
+      --text-bright: #f5f7fa;
+      --text-normal: #c7ccd6;
+      --text-dim: #a8adb8;
+      --border: rgba(41, 194, 97, 0.22);
+      --border-bright: rgba(41, 194, 97, 0.55);
+      --rule: rgba(51, 56, 71, 0.8);
+      --btn-neutral: #2e333f;
+      --farm-surface: rgba(23, 28, 38, 0.92);
+      --farm-border: rgba(255, 255, 255, 0.1);
+      --farm-accent: var(--brand);
+      --farm-text: var(--text-bright);
+      --farm-text-muted: var(--text-dim);
+      --farm-glass-blur: 12px;
+      --bezel: #1a1e28;
+      --bezel-edge: #2a3140;
+      --screen-w: 900px;
+      --screen-h: 600px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+      background:
+        radial-gradient(ellipse at 30% 20%, #14201a 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, #101828 0%, transparent 45%),
+        #06080c;
+      color: var(--text-bright);
+    }
+
+    .stage {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      gap: 1rem;
+    }
+
+    .stage__note {
+      max-width: 960px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 0.85rem;
+      line-height: 1.45;
+    }
+    .stage__note strong { color: var(--warning); font-weight: 600; }
+
+    /* ── Tablet shell ─────────────────────────────────────── */
+    .tablet {
+      width: calc(var(--screen-w) + 80px);
+      max-width: 100%;
+      border-radius: 28px;
+      padding: 18px;
+      background:
+        linear-gradient(145deg, #2a3140 0%, #151922 40%, #0e1218 100%);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.06),
+        0 28px 60px rgba(0,0,0,0.55),
+        inset 0 1px 0 rgba(255,255,255,0.08);
+      position: relative;
+    }
+
+    .tablet__cam {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #0a0c10;
+      box-shadow: inset 0 0 0 1px #333;
+    }
+
+    .tablet__screen {
+      width: 100%;
+      aspect-ratio: 900 / 600;
+      max-height: min(70vh, 600px);
+      background: var(--bg-deep);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid rgba(0,0,0,0.5);
+      box-shadow: inset 0 0 40px rgba(0,0,0,0.35);
+      position: relative;
+    }
+
+    .tablet__screen::after {
+      content: "";
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.04), transparent 18%);
+      z-index: 5;
+    }
+
+    /* Status bar */
+    .status {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.35rem 0.75rem;
+      background: var(--bg-nav);
+      border-bottom: 1px solid var(--rule);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      flex-shrink: 0;
+      z-index: 2;
+    }
+    .status__left { display: flex; gap: 0.5rem; align-items: center; }
+    .status__dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--brand);
+      box-shadow: 0 0 6px var(--brand);
+    }
+
+    /* App bar */
+    .appbar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.65rem;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      z-index: 2;
+    }
+    .appbar__btn {
+      appearance: none;
+      border: 1px solid var(--farm-border);
+      background: var(--btn-neutral);
+      color: var(--text-normal);
+      border-radius: 8px;
+      padding: 0.28rem 0.55rem;
+      font: inherit;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .appbar__btn:hover { border-color: var(--border-bright); color: var(--text-bright); }
+    .appbar__btn:disabled {
+      opacity: 0.35;
+      cursor: default;
+    }
+    .appbar__title {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      padding-left: 0.25rem;
+    }
+    .appbar__title strong {
+      font-size: 0.92rem;
+      letter-spacing: 0.01em;
+    }
+    .appbar__title span {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+    }
+    .appbar__accent {
+      width: 3px;
+      align-self: stretch;
+      border-radius: 2px;
+      background: var(--brand);
+      margin-right: 0.15rem;
+    }
+
+    /* Scrollable content */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0.75rem 0.85rem 1rem;
+      z-index: 1;
+      scrollbar-width: thin;
+      scrollbar-color: var(--brand-dim) transparent;
+    }
+
+    .banner {
+      margin: 0 0 0.75rem;
+      padding: 0.45rem 0.65rem;
+      border-radius: 8px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-transform: uppercase;
+      color: var(--warning);
+      background: rgba(255, 184, 26, 0.12);
+      border: 1px solid rgba(255, 184, 26, 0.35);
+    }
+
+    /* Overview header */
+    .ov-header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.75rem;
+    }
+    .ov-header h1 {
+      margin: 0 0 0.2rem;
+      font-size: 1.15rem;
+    }
+    .ov-header p {
+      margin: 0;
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      max-width: 28rem;
+    }
+    .ov-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.18rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.68rem;
+      font-weight: 600;
+      border: 1px solid var(--farm-border);
+      background: rgba(255,255,255,0.05);
+      color: var(--text-normal);
+    }
+    .badge--accent {
+      border-color: var(--border-bright);
+      background: var(--brand-glow);
+      color: var(--positive);
+    }
+    .weather-pill {
+      appearance: none;
+      display: inline-flex;
+      gap: 0.35rem;
+      align-items: center;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--farm-border);
+      color: var(--farm-text);
+      border-radius: 999px;
+      padding: 0.22rem 0.6rem;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.72rem;
+    }
+    .weather-pill:hover { border-color: var(--farm-accent); }
+
+    /* Mod chips */
+    .mods { margin: 0 0 0.75rem; }
+    .mods h2 {
+      margin: 0 0 0.4rem;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-dim);
+    }
+    .mods__row { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+
+    /* Balance hero (Tablet Dashboard pattern) */
+    .hero {
+      position: relative;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 0.75rem 0.9rem 0.85rem;
+      margin-bottom: 0.75rem;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset;
+    }
+    .hero__label {
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 0.15rem;
+    }
+    .hero__row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 0.75rem;
+    }
+    .hero__bal {
+      font-size: 1.65rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--positive);
+      line-height: 1.1;
+    }
+    .hero__loan {
+      text-align: right;
+    }
+    .hero__loan small {
+      display: block;
+      font-size: 0.65rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+    .hero__loan strong {
+      font-size: 0.95rem;
+      color: var(--warning);
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Alerts */
+    .alerts {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      margin-bottom: 0.75rem;
+    }
+    .alert {
+      appearance: none;
+      width: 100%;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.65rem;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 184, 26, 0.35);
+      background: rgba(255, 184, 26, 0.08);
+      color: var(--text-bright);
+      font: inherit;
+      font-size: 0.78rem;
+      cursor: pointer;
+    }
+    .alert:hover { border-color: var(--warning); }
+    .alert__mark {
+      color: var(--warning);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* Tile grid */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.55rem;
+      margin-bottom: 0.85rem;
+    }
+    @media (min-width: 700px) {
+      .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+
+    .tile {
+      appearance: none;
+      background: var(--farm-surface);
+      border: 1px solid var(--farm-border);
+      border-radius: 12px;
+      padding: 0.7rem 0.75rem;
+      color: inherit;
+      text-align: left;
+      cursor: pointer;
+      font-family: inherit;
+      backdrop-filter: blur(var(--farm-glass-blur));
+      -webkit-backdrop-filter: blur(var(--farm-glass-blur));
+      box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset;
+      transition: border-color 0.12s ease;
+    }
+    .tile:hover { border-color: var(--farm-accent); }
+    .tile h3 {
+      margin: 0 0 0.45rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-normal);
+    }
+    .tile__stat {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      margin: 0;
+    }
+    .tile__stat strong {
+      font-size: 1.35rem;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      line-height: 1.1;
+    }
+    .tile__stat span {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+    .tile__line {
+      margin: 0.4rem 0 0;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+      line-height: 1.3;
+    }
+    .tile__finance {
+      display: grid;
+      gap: 0.3rem;
+    }
+    .tile__finance div {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+    }
+    .tile__finance span { color: var(--text-dim); }
+    .tile__finance strong {
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+    }
+    .tile__warn { color: var(--warning) !important; }
+
+    /* Farms */
+    .farms { margin-bottom: 0.85rem; }
+    .farms h2 {
+      margin: 0 0 0.45rem;
+      font-size: 0.85rem;
+    }
+    .farm-card {
+      background: var(--farm-surface);
+      border: 1px solid var(--farm-border);
+      border-radius: 12px;
+      padding: 0.65rem 0.75rem;
+      margin-bottom: 0.45rem;
+      backdrop-filter: blur(var(--farm-glass-blur));
+      box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset;
+    }
+    .farm-card--active {
+      border-color: var(--farm-accent);
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--farm-accent) 45%, transparent);
+    }
+    .farm-card__top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem 0.55rem;
+      margin-bottom: 0.45rem;
+    }
+    .farm-card__top h3 { margin: 0; font-size: 0.88rem; }
+    .farm-card__money {
+      margin-left: auto;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: var(--positive);
+    }
+    .farm-stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.4rem;
+    }
+    .farm-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 0.05rem;
+      min-width: 0;
+    }
+    .farm-stat small {
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-dim);
+    }
+    .farm-stat strong {
+      font-size: 0.95rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .farm-stat span {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      line-height: 1.25;
+    }
+
+    /* Receipt activity */
+    .receipt {
+      max-width: 22rem;
+      margin: 0 0 0.5rem;
+      background: linear-gradient(180deg, #f4f1e8 0%, #ebe6d8 100%);
+      color: #1a1a1a;
+      border: 1px solid #c9c2b0;
+      border-radius: 2px;
+      padding: 0.75rem 0.85rem 0.65rem;
+      font-family: "Courier New", Courier, ui-monospace, monospace;
+      font-size: 0.72rem;
+      box-shadow: 2px 3px 0 rgba(0,0,0,0.18);
+    }
+    .receipt h2 {
+      margin: 0 0 0.25rem;
+      font-size: 0.82rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      text-align: center;
+    }
+    .receipt__rule {
+      display: block;
+      border-top: 1px dashed #8a8476;
+      margin: 0.3rem 0;
+    }
+    .receipt__line {
+      appearance: none;
+      display: grid;
+      grid-template-columns: 1.25rem 1fr;
+      gap: 0.4rem;
+      width: 100%;
+      padding: 0.35rem 0;
+      border: 0;
+      border-bottom: 1px dotted #b7b09e;
+      background: transparent;
+      color: inherit;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+    }
+    .receipt__line:hover { text-decoration: underline; }
+    .receipt__mark { color: #5c574c; font-weight: 700; }
+    .receipt__foot {
+      text-align: center;
+      color: #5c574c;
+      letter-spacing: 0.2em;
+      margin-top: 0.25rem;
+    }
+
+    /* Stub pages + dense data layouts */
+    .stub-head {
+      margin: 0 0 0.65rem;
+    }
+    .stub-head h1 {
+      margin: 0 0 0.25rem;
+      font-size: 1.1rem;
+    }
+    .stub-head p {
+      margin: 0;
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      line-height: 1.35;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0.7rem;
+      margin-bottom: 0.35rem;
+      background: var(--bg-card);
+      border: 1px solid var(--farm-border);
+      border-radius: 10px;
+      font-size: 0.8rem;
+    }
+    .row span { color: var(--text-dim); }
+    .row strong { font-variant-numeric: tabular-nums; }
+    .row--warn strong { color: var(--warning); }
+    .row--pos strong { color: var(--positive); }
+    .row--neg strong { color: var(--negative); }
+    .row--info strong { color: var(--info); }
+
+    .section-label {
+      margin: 0.75rem 0 0.4rem;
+      font-size: 0.68rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--brand);
+      font-weight: 600;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0.4rem;
+      margin-bottom: 0.35rem;
+    }
+    .metric {
+      background: var(--bg-card);
+      border: 1px solid var(--farm-border);
+      border-radius: 10px;
+      padding: 0.45rem 0.5rem;
+      min-width: 0;
+    }
+    .metric small {
+      display: block;
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-dim);
+      margin-bottom: 0.15rem;
+    }
+    .metric strong {
+      display: block;
+      font-size: 0.92rem;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.15;
+    }
+    .metric span {
+      display: block;
+      margin-top: 0.15rem;
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      line-height: 1.25;
+    }
+    .metric--warn strong { color: var(--warning); }
+    .metric--pos strong { color: var(--positive); }
+    .metric--neg strong { color: var(--negative); }
+    .metric--info strong { color: var(--info); }
+
+    .detail {
+      background: var(--bg-card);
+      border: 1px solid var(--farm-border);
+      border-radius: 10px;
+      padding: 0.55rem 0.65rem;
+      margin-bottom: 0.4rem;
+    }
+    .detail__top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.5rem;
+      margin-bottom: 0.3rem;
+    }
+    .detail__top h4 {
+      margin: 0;
+      font-size: 0.82rem;
+      font-weight: 600;
+    }
+    .detail__status {
+      flex-shrink: 0;
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 0.12rem 0.4rem;
+      border-radius: 999px;
+      border: 1px solid var(--farm-border);
+      color: var(--text-normal);
+    }
+    .detail__status--warn {
+      color: var(--warning);
+      border-color: color-mix(in srgb, var(--warning) 45%, var(--farm-border));
+    }
+    .detail__status--pos {
+      color: var(--positive);
+      border-color: color-mix(in srgb, var(--positive) 45%, var(--farm-border));
+    }
+    .detail__status--neg {
+      color: var(--negative);
+      border-color: color-mix(in srgb, var(--negative) 45%, var(--farm-border));
+    }
+    .detail__meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.2rem 0.65rem;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      line-height: 1.35;
+    }
+    .detail__meta b {
+      color: var(--text-normal);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .detail__note {
+      margin: 0.35rem 0 0;
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      line-height: 1.3;
+    }
+    .bar {
+      margin-top: 0.4rem;
+      height: 5px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+    .bar > i {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--brand);
+    }
+    .bar--warn > i { background: var(--warning); }
+    .bar--neg > i { background: var(--negative); }
+    .bar--info > i { background: var(--info); }
+
+    .kv {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.35rem;
+      margin-bottom: 0.35rem;
+    }
+    .kv__item {
+      background: var(--bg-card);
+      border: 1px solid var(--farm-border);
+      border-radius: 10px;
+      padding: 0.45rem 0.55rem;
+    }
+    .kv__item small {
+      display: block;
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-dim);
+    }
+    .kv__item strong {
+      display: block;
+      margin-top: 0.15rem;
+      font-size: 0.8rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .forecast {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 0.35rem;
+      margin-bottom: 0.4rem;
+    }
+    .forecast__day {
+      background: var(--bg-card);
+      border: 1px solid var(--farm-border);
+      border-radius: 10px;
+      padding: 0.4rem 0.35rem;
+      text-align: center;
+    }
+    .forecast__day small {
+      display: block;
+      font-size: 0.6rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+    .forecast__day strong {
+      display: block;
+      margin: 0.2rem 0;
+      font-size: 0.78rem;
+    }
+    .forecast__day span {
+      display: block;
+      font-size: 0.62rem;
+      color: var(--text-dim);
+    }
+
+    .hero__extra {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.45rem;
+      margin-top: 0.65rem;
+      padding-top: 0.55rem;
+      border-top: 1px solid var(--rule);
+    }
+    .hero__extra small {
+      display: block;
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-dim);
+    }
+    .hero__extra strong {
+      font-size: 0.85rem;
+      font-variant-numeric: tabular-nums;
+    }
+    .hero__extra .pos { color: var(--positive); }
+    .hero__extra .neg { color: var(--negative); }
+    .hero__extra .warn { color: var(--warning); }
+
+    .mini-board {
+      margin: 0 0 0.85rem;
+    }
+    .mini-board h2 {
+      margin: 0 0 0.4rem;
+      font-size: 0.85rem;
+    }
+    .mini-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.4rem;
+    }
+    .mini-card {
+      appearance: none;
+      width: 100%;
+      text-align: left;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--farm-border);
+      border-radius: 10px;
+      padding: 0.45rem 0.55rem 0.55rem;
+      color: inherit;
+      font: inherit;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+    }
+    .mini-card:hover { border-color: var(--farm-accent); }
+    .mini-card__kicker {
+      font-size: 0.62rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .mini-card__title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin: 0.15rem 0;
+    }
+    .mini-card__meta {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      line-height: 1.3;
+    }
+
+    .alert__body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.1rem;
+      min-width: 0;
+    }
+    .alert__body small {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+    }
+
+    .foot-note {
+      margin: 0.85rem 0 0;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+    }
+
+    .hidden { display: none !important; }
+
+    @media (max-width: 720px) {
+      .tablet { padding: 12px; border-radius: 20px; }
+      .farm-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid { grid-template-columns: 1fr 1fr; }
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .forecast { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .detail__meta { grid-template-columns: 1fr; }
+      .kv { grid-template-columns: 1fr; }
+      .mini-grid { grid-template-columns: 1fr; }
+      .hero__extra { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <p class="stage__note">
+      <strong>VISION PROTOTYPE</strong> — FarmHub Overview density inside Farm Tablet chrome.
+      Not live game UI. Open in browser; tap tiles to preview section stubs.
+    </p>
+
+    <div class="tablet" aria-label="Farm Tablet prototype">
+      <div class="tablet__cam" aria-hidden="true"></div>
+      <div class="tablet__screen">
+        <div class="status">
+          <div class="status__left">
+            <span class="status__dot" aria-hidden="true"></span>
+            <span>Farm Tablet</span>
+            <span>·</span>
+            <span>Witcombe Farm</span>
+          </div>
+          <div>Day 112 · Spring · 09:42</div>
+        </div>
+
+        <div class="appbar">
+          <div class="appbar__accent" aria-hidden="true"></div>
+          <button type="button" class="appbar__btn" id="btnBack" disabled>Back</button>
+          <button type="button" class="appbar__btn" id="btnHome">Home</button>
+          <div class="appbar__title">
+            <strong id="appTitle">Dashboard</strong>
+            <span id="appSub">My Farm</span>
+          </div>
+        </div>
+
+        <div class="content" id="content"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const DATA = {
+      farmName: "My Farm",
+      mapTitle: "Witcombe Farm",
+      season: "Spring",
+      period: "March",
+      daysPerPeriod: 1,
+      gameTime: "Day 112 · 09:42",
+      timeGuard: "1d / period · hour tick OK",
+      weather: {
+        temp: "14°C",
+        label: "Partly cloudy",
+        humidity: "62%",
+        wind: "12 km/h SW",
+        rainChance: "20%",
+        soilTemp: "9°C",
+      },
+      forecast: [
+        { day: "Today", temp: "14°", note: "Cloud" },
+        { day: "Tue", temp: "12°", note: "Showers" },
+        { day: "Wed", temp: "11°", note: "Rain" },
+        { day: "Thu", temp: "13°", note: "Clear" },
+        { day: "Fri", temp: "15°", note: "Sun" },
+      ],
+      balance: 248650,
+      loan: 85000,
+      netWorth: 612400,
+      incomeSession: 38420,
+      expensesSession: 25940,
+      runwayMonths: 4.2,
+      mods: [
+        { title: "Soil Fertilizer", version: "2.4.7" },
+        { title: "Seasonal Crop Stress", version: "1.2" },
+        { title: "WeatherGuard", version: "1.0" },
+        { title: "TimeGuard", version: "1.0" },
+        { title: "DairyCore", version: "1.0" },
+        { title: "Market Dynamics", version: "1.2" },
+        { title: "NPC Favor", version: "1.2" },
+        { title: "Worker Costs", version: "2.2" },
+        { title: "ProStaff Co-Op", version: "1.0" },
+        { title: "Random World Events", version: "2.1" },
+      ],
+      alerts: [
+        { key: "fields", label: "3 fields need work", detail: "F4 fertilizer · F9 weeds · F12 lime", section: "fields" },
+        { key: "fleet", label: "2 vehicles low fuel", detail: "Fendt 942 18% · JD S790 22%", section: "fleet" },
+        { key: "soil", label: "Field 7 disease scouted", detail: "Septoria · spray window Thu–Fri", section: "soil" },
+        { key: "npc", label: "1 active NPC favor — Miller", detail: "Haul 8,000 L straw by tomorrow", section: "npc" },
+        { key: "event", label: "World event: Feed price spike", detail: "+18% feed · 2 days remaining", section: "events" },
+        { key: "prod", label: "Dairy processing idle", detail: "Milk input empty — fill silo", section: "productions" },
+      ],
+      tiles: {
+        economy: {
+          money: 248650, loan: 85000, netWorth: 612400,
+          pl: "+€12,480", taxDue: "€6,200 Mar", runway: "4.2 mo",
+        },
+        fields: {
+          count: 18, ha: 214.6, needsWork: 3, harvest: 2,
+          growing: 11, fallow: 2, owned: 18,
+        },
+        livestock: {
+          heads: 42, dairy: 28, sheep: 14, warnings: 1,
+          milkGrade: "Premium", milkFresh: "2,180 L",
+        },
+        fleet: {
+          count: 14, motorized: 9, implements: 5, lowFuel: 2,
+          inUse: 3, wearWarn: 1, hoursToday: 6.4,
+        },
+        productions: {
+          owned: 4, running: 2, idle: 1, issues: 1,
+          cyclesToday: 7,
+        },
+        storage: {
+          fieldBales: 12, yardBales: 48, pallets: 6,
+          siloL: 186420, capacityPct: 61, wetBales: 3,
+        },
+        soil: {
+          tracked: 18, lowN: 4, lowPH: 2, disease: 1,
+          omAvg: 3.8, scouted: 6,
+        },
+        map: {
+          online: 6, workers: 2, pins: 3, contracts: 2,
+        },
+      },
+      farms: [
+        {
+          id: 1, name: "My Farm", active: true,
+          money: 248650, loan: 85000, players: 1,
+          fields: 18, needsWork: 3, harvest: 2, ha: 214.6,
+          livestock: 42, pastureWarn: 1,
+          fleet: 14, motorized: 9,
+          storage: "186k L", bales: "48 yard",
+          productions: 4, prodIssues: 1,
+        },
+        {
+          id: 2, name: "North Ridge Co-op", active: false,
+          money: 91400, loan: 0, players: 0,
+          fields: 7, needsWork: 1, harvest: 0, ha: 62.0,
+          livestock: 0, pastureWarn: 0,
+          fleet: 5, motorized: 3,
+          storage: "42k L", bales: "9 yard",
+          productions: 1, prodIssues: 0,
+        },
+      ],
+      attention: [
+        { kicker: "Field 4", title: "Winter wheat", meta: "Needs N · growth 62% · 12.4 ha", section: "fields", pct: 62 },
+        { kicker: "Field 9", title: "Corn", meta: "Weeds medium · spray today", section: "fields", pct: 48 },
+        { kicker: "Fendt 942", title: "Low fuel", meta: "18% · parked at farmyard", section: "fleet", pct: 18, warn: true },
+        { kicker: "Dairy plant", title: "Idle", meta: "Milk input 0 L · Premium held", section: "productions", pct: 0, warn: true },
+      ],
+      activity: [
+        { mark: "*", text: "3 fields need work", section: "fields" },
+        { mark: "*", text: "World event: Feed price spike (+18%)", section: "events" },
+        { mark: "2h", text: "Milk collection · Premium · 2,180 L", section: "livestock" },
+        { mark: "3h", text: "Worker wage settle · €1,240", section: "economy" },
+        { mark: "5h", text: "Soil scout Field 7 · Septoria named", section: "soil" },
+        { mark: "8h", text: "Favor accepted · Miller haul straw", section: "npc" },
+        { mark: "1d", text: "ProStaff rebate · fertilizer −8%", section: "economy" },
+      ],
+      markets: [
+        { crop: "Wheat", price: "€412 / t", delta: "+3%", tone: "pos" },
+        { crop: "Corn", price: "€298 / t", delta: "−1%", tone: "neg" },
+        { crop: "Barley", price: "€341 / t", delta: "+2%", tone: "pos" },
+        { crop: "Canola", price: "€518 / t", delta: "+5%", tone: "pos" },
+        { crop: "Milk", price: "€0.42 / L", delta: "flat", tone: "" },
+        { crop: "Diesel", price: "€1.84 / L", delta: "+6%", tone: "warn" },
+      ],
+    };
+
+    const STUBS = {
+      economy: {
+        title: "Economy",
+        lead: "Cash, loan, session P/L, tax runway, and live market desk.",
+        metrics: [
+          { label: "Cash", value: "€248,650", tone: "pos" },
+          { label: "Loan", value: "€85,000", tone: "warn", hint: "12% of net" },
+          { label: "Net worth", value: "€612,400", tone: "pos" },
+          { label: "Runway", value: "4.2 mo", hint: "at current burn" },
+        ],
+        sections: [
+          {
+            label: "Session ledger",
+            kind: "kv",
+            items: [
+              { label: "Income", value: "€38,420" },
+              { label: "Expenses", value: "€25,940" },
+              { label: "Net P/L", value: "+€12,480" },
+              { label: "Wages paid", value: "€4,860" },
+              { label: "Fuel spent", value: "€2,140" },
+              { label: "Fertilizer", value: "€3,920" },
+              { label: "Tax accruals", value: "€1,180" },
+              { label: "Contracts paid", value: "€6,500" },
+            ],
+          },
+          {
+            label: "Tax & obligations",
+            kind: "rows",
+            items: [
+              { label: "Annual tax due (March)", value: "€6,200", tone: "warn" },
+              { label: "Monthly tax heads-up", value: "On · Dec warning" },
+              { label: "Loan interest / period", value: "€420" },
+              { label: "ProStaff co-op fee", value: "€150 / mo" },
+              { label: "Minimum balance guard", value: "€15,000" },
+            ],
+          },
+          {
+            label: "Market desk (today)",
+            kind: "rows",
+            items: [
+              { label: "Wheat", value: "€412 / t · +3%", tone: "pos" },
+              { label: "Corn", value: "€298 / t · −1%", tone: "neg" },
+              { label: "Canola", value: "€518 / t · +5%", tone: "pos" },
+              { label: "Milk", value: "€0.42 / L · flat" },
+              { label: "Diesel", value: "€1.84 / L · +6%", tone: "warn" },
+              { label: "Feed (event)", value: "+18% for 2 days", tone: "warn" },
+            ],
+          },
+          {
+            label: "Futures & contracts",
+            kind: "cards",
+            items: [
+              {
+                title: "Wheat futures · Sep",
+                status: "Open", statusTone: "pos",
+                meta: [["Locked", "€405 / t"], ["Volume", "40 t"], ["Margin", "€1,200"], ["P/L mark", "+€280"]],
+              },
+              {
+                title: "Dairy premium contract",
+                status: "On track", statusTone: "pos",
+                meta: [["Target", "8,000 L / wk"], ["Delivered", "6,240 L"], ["Grade", "Premium"], ["Bonus", "+€0.04 / L"]],
+                note: "Needs collection every 48h or milk ages toward At Risk.",
+              },
+            ],
+          },
+        ],
+      },
+      fields: {
+        title: "Fields",
+        lead: "Owned land, crop stage, work queue, and harvest windows.",
+        metrics: [
+          { label: "Owned", value: "18", hint: "214.6 ha" },
+          { label: "Need work", value: "3", tone: "warn" },
+          { label: "Harvest", value: "2", tone: "pos" },
+          { label: "Growing", value: "11" },
+        ],
+        sections: [
+          {
+            label: "Needs attention",
+            kind: "cards",
+            items: [
+              {
+                title: "Field 4 · Winter wheat",
+                status: "Fertilize", statusTone: "warn",
+                meta: [["Area", "12.4 ha"], ["Growth", "62%"], ["N", "38 low"], ["Weeds", "Clean"]],
+                note: "Apply solid N before Wednesday rain.",
+                bar: 62, barTone: "warn",
+              },
+              {
+                title: "Field 9 · Corn",
+                status: "Spray weeds", statusTone: "warn",
+                meta: [["Area", "18.0 ha"], ["Growth", "48%"], ["Weeds", "Medium"], ["Moisture", "OK"]],
+                note: "Spray window today · calm wind until 14:00.",
+                bar: 48,
+              },
+              {
+                title: "Field 12 · Barley",
+                status: "Lime", statusTone: "warn",
+                meta: [["Area", "9.6 ha"], ["Growth", "55%"], ["pH", "5.8"], ["OM", "3.2"]],
+                note: "pH below crop target · lime before next N pass.",
+                bar: 55, barTone: "warn",
+              },
+            ],
+          },
+          {
+            label: "Harvest ready",
+            kind: "cards",
+            items: [
+              {
+                title: "Field 2 · Canola",
+                status: "Ready", statusTone: "pos",
+                meta: [["Area", "14.2 ha"], ["Yield est.", "3.8 t/ha"], ["Moisture", "11%"], ["Disease", "None"]],
+                bar: 100, barTone: "pos",
+              },
+              {
+                title: "Field 15 · Grass",
+                status: "Ready", statusTone: "pos",
+                meta: [["Area", "6.1 ha"], ["Cut", "2nd"], ["Bale plan", "Yard"], ["Wet risk", "Low"]],
+                bar: 100, barTone: "pos",
+              },
+            ],
+          },
+          {
+            label: "Growing / OK",
+            kind: "cards",
+            items: [
+              {
+                title: "Field 1 · Wheat",
+                status: "OK",
+                meta: [["Area", "16.0 ha"], ["Growth", "71%"], ["N/P/K", "OK"], ["Scout", "Day 108"]],
+                bar: 71,
+              },
+              {
+                title: "Field 6 · Potato",
+                status: "OK",
+                meta: [["Area", "8.4 ha"], ["Growth", "44%"], ["Irrigation", "Pivot on"], ["Moisture", "68%"]],
+                bar: 44, barTone: "info",
+              },
+              {
+                title: "Field 11 · Soybean",
+                status: "OK",
+                meta: [["Area", "11.2 ha"], ["Growth", "39%"], ["Rotation", "After wheat"], ["OM", "4.1"]],
+                bar: 39,
+              },
+            ],
+          },
+          {
+            label: "Fallow / meadow",
+            kind: "rows",
+            items: [
+              { label: "Field 8 · Fallow", value: "Recovering OM +0.1 / mo" },
+              { label: "Field 17 · Meadow (Sentry)", value: "Sim slept · decorative" },
+            ],
+          },
+        ],
+      },
+      livestock: {
+        title: "Pastures / Livestock",
+        lead: "Herd health, milk clock, feed provenance, and pasture warnings.",
+        metrics: [
+          { label: "Heads", value: "42", hint: "28 dairy · 14 sheep" },
+          { label: "Milk grade", value: "Premium", tone: "pos" },
+          { label: "Fresh milk", value: "2,180 L", tone: "info" },
+          { label: "Warnings", value: "1", tone: "warn" },
+        ],
+        sections: [
+          {
+            label: "DairyCore",
+            kind: "cards",
+            items: [
+              {
+                title: "Main dairy barn",
+                status: "Healthy", statusTone: "pos",
+                meta: [["Cows", "28"], ["Health", "86%"], ["Mode", "Standard+SF"], ["Feed fields", "F3, F10"]],
+                note: "Feed OM 4.2 · disease fraction low · organic share 12%.",
+              },
+              {
+                title: "Milk batch · Tank A",
+                status: "Fresh", statusTone: "pos",
+                meta: [["Volume", "2,180 L"], ["Age", "14 h"], ["Next stage", "Ageing @ 48 h"], ["Contract", "Premium"]],
+                bar: 30, barTone: "pos",
+              },
+            ],
+          },
+          {
+            label: "Pastures",
+            kind: "cards",
+            items: [
+              {
+                title: "North pasture",
+                status: "Water low", statusTone: "warn",
+                meta: [["Sheep", "14"], ["Food", "78%"], ["Water", "22%"], ["Clean", "OK"]],
+                note: "Refill trough before evening — WorkerCosts premium if night shift.",
+                bar: 22, barTone: "warn",
+              },
+              {
+                title: "South paddock",
+                status: "OK", statusTone: "pos",
+                meta: [["Use", "Dry cows"], ["Food", "91%"], ["Water", "84%"], ["Fence", "OK"]],
+              },
+            ],
+          },
+          {
+            label: "Feed & collection",
+            kind: "rows",
+            items: [
+              { label: "TMR mix in mixer", value: "1,420 L ready" },
+              { label: "Diseased feed fraction", value: "2% · diluting", tone: "warn" },
+              { label: "Organic feed share", value: "12%" },
+              { label: "Next collection window", value: "Today 16:00 · skill Adept" },
+              { label: "Last collection", value: "2h ago · Premium · no loss", tone: "pos" },
+              { label: "Condemned risk", value: "None if collected < 36 h", tone: "pos" },
+            ],
+          },
+        ],
+      },
+      fleet: {
+        title: "Fleet",
+        lead: "Motorized units, implements, fuel, wear, and who's working.",
+        metrics: [
+          { label: "Owned", value: "14", hint: "9 motor · 5 impl." },
+          { label: "In use", value: "3", tone: "info" },
+          { label: "Low fuel", value: "2", tone: "warn" },
+          { label: "Hours today", value: "6.4" },
+        ],
+        sections: [
+          {
+            label: "Needs fuel",
+            kind: "cards",
+            items: [
+              {
+                title: "Fendt 942 Vario",
+                status: "18% fuel", statusTone: "warn",
+                meta: [["Wear", "12%"], ["Hours", "1,842"], ["Location", "Farmyard"], ["Attach", "None"]],
+                bar: 18, barTone: "neg",
+              },
+              {
+                title: "John Deere S790",
+                status: "22% fuel", statusTone: "warn",
+                meta: [["Wear", "28%"], ["Hours", "960"], ["Location", "Field 2"], ["Attach", "Header 12m"]],
+                note: "In harvest queue — refuel before Field 15.",
+                bar: 22, barTone: "warn",
+              },
+            ],
+          },
+          {
+            label: "Active now",
+            kind: "cards",
+            items: [
+              {
+                title: "Claas Axion 960",
+                status: "Working", statusTone: "pos",
+                meta: [["Fuel", "71%"], ["Task", "Spray F9"], ["Operator", "You"], ["Speed", "11 km/h"]],
+                bar: 71,
+              },
+              {
+                title: "New Holland T7",
+                status: "Worker AI", statusTone: "info",
+                meta: [["Fuel", "54%"], ["Task", "Plow F8"], ["Worker", "Adept"], ["Wage", "€42 / h"]],
+                bar: 54, barTone: "info",
+              },
+            ],
+          },
+          {
+            label: "Yard / idle",
+            kind: "rows",
+            items: [
+              { label: "Case IH Magnum 340", value: "Fuel 88% · Wear 9%" },
+              { label: "Kubota M7", value: "Fuel 65% · Wear 21%" },
+              { label: "Manitou loader", value: "Fuel 40% · Wear 33%", tone: "warn" },
+              { label: "Horsch Pronto 6 DC", value: "Implement · wear 15%" },
+              { label: "Amazone UX 5201", value: "Sprayer · wear 18%" },
+              { label: "Krone Big X", value: "Forage · wear 41%", tone: "warn" },
+            ],
+          },
+          {
+            label: "Costs today",
+            kind: "kv",
+            items: [
+              { label: "Diesel used", value: "186 L" },
+              { label: "Fuel cost", value: "€342" },
+              { label: "Repair estimate", value: "€180" },
+              { label: "Worker machine hours", value: "3.1 h" },
+            ],
+          },
+        ],
+      },
+      productions: {
+        title: "Productions",
+        lead: "Owned chains, input/output buffers, and blocked slots.",
+        metrics: [
+          { label: "Owned", value: "4" },
+          { label: "Running", value: "2", tone: "pos" },
+          { label: "Idle", value: "1", tone: "warn" },
+          { label: "Cycles today", value: "7" },
+        ],
+        sections: [
+          {
+            label: "Issues first",
+            kind: "cards",
+            items: [
+              {
+                title: "Dairy processing",
+                status: "Idle", statusTone: "warn",
+                meta: [["Input milk", "0 L"], ["Butter", "420 L"], ["Cheese", "180 L"], ["Active", "No"]],
+                note: "Fill milk silo from Tank A — Premium contract waiting.",
+                bar: 0, barTone: "neg",
+              },
+            ],
+          },
+          {
+            label: "Running",
+            kind: "cards",
+            items: [
+              {
+                title: "Grain mill",
+                status: "Running", statusTone: "pos",
+                meta: [["Wheat in", "12,400 L"], ["Flour out", "8,100 L"], ["Cycles", "3 today"], ["Workers", "1"]],
+                bar: 72,
+              },
+              {
+                title: "Biogas plant",
+                status: "Running", statusTone: "pos",
+                meta: [["Slurry", "64%"], ["Silage", "41%"], ["Methane", "OK"], ["Power sell", "€1,840 / d"]],
+                bar: 64, barTone: "info",
+              },
+            ],
+          },
+          {
+            label: "Standby",
+            kind: "rows",
+            items: [
+              { label: "Spinnery", value: "Owned · no input · off" },
+              { label: "Production recipes unlocked", value: "11 / 14" },
+              { label: "Auto-start on fill", value: "Enabled (mill, biogas)" },
+            ],
+          },
+        ],
+      },
+      storage: {
+        title: "Storage",
+        lead: "Silos, bales, pallets, moisture risk, and depot fill types.",
+        metrics: [
+          { label: "Silo fill", value: "61%", hint: "186.4k / 305k L" },
+          { label: "Yard bales", value: "48" },
+          { label: "Field bales", value: "12", tone: "warn" },
+          { label: "Wet / rot risk", value: "3", tone: "warn" },
+        ],
+        sections: [
+          {
+            label: "Silo contents",
+            kind: "rows",
+            items: [
+              { label: "Wheat", value: "62,400 L" },
+              { label: "Barley", value: "28,100 L" },
+              { label: "Corn", value: "41,200 L" },
+              { label: "Canola", value: "18,600 L" },
+              { label: "Silage", value: "22,800 L" },
+              { label: "Total / capacity", value: "186,420 / 305,000 L" },
+            ],
+          },
+          {
+            label: "Bales & moisture",
+            kind: "cards",
+            items: [
+              {
+                title: "Yard stack",
+                status: "Dry", statusTone: "pos",
+                meta: [["Count", "48"], ["Straw", "22"], ["Hay", "16"], ["Silage", "10"]],
+              },
+              {
+                title: "Field 15 leftovers",
+                status: "Getting wet", statusTone: "warn",
+                meta: [["Count", "12"], ["Wetting", "3"], ["Rotting", "0"], ["Rain", "Wed"]],
+                note: "Collect before Wednesday showers.",
+                bar: 40, barTone: "warn",
+              },
+            ],
+          },
+          {
+            label: "Pallets & depot",
+            kind: "rows",
+            items: [
+              { label: "Seed pallets", value: "2 · wheat, corn" },
+              { label: "Fertilizer pallets", value: "3 · NPK, lime" },
+              { label: "Herbicide pallets", value: "1" },
+              { label: "Fertilizer Depot stock", value: "8 fill types available", tone: "info" },
+              { label: "Depot seasonal price", value: "Spring +4% vs winter" },
+            ],
+          },
+        ],
+      },
+      soil: {
+        title: "Soil",
+        lead: "Soil Fertilizer status — nutrients, pH, OM, disease, scouting.",
+        metrics: [
+          { label: "Tracked", value: "18" },
+          { label: "Low N", value: "4", tone: "warn" },
+          { label: "Disease", value: "1", tone: "warn" },
+          { label: "OM avg", value: "3.8", hint: "0–10 scale" },
+        ],
+        sections: [
+          {
+            label: "Farm averages",
+            kind: "kv",
+            items: [
+              { label: "Nitrogen", value: "54 / 100" },
+              { label: "Phosphorus", value: "61 / 100" },
+              { label: "Potassium", value: "58 / 100" },
+              { label: "pH", value: "6.4" },
+              { label: "Organic matter", value: "3.8 / 10" },
+              { label: "Fields scouted", value: "6 / 18" },
+            ],
+          },
+          {
+            label: "Priority fields",
+            kind: "cards",
+            items: [
+              {
+                title: "Field 7 · Wheat",
+                status: "Septoria", statusTone: "warn",
+                meta: [["Pressure", "42"], ["Scouted", "Day 112"], ["Fungicide", "Azoxystrobin"], ["Coverage", "0%"]],
+                note: "Spray Thu–Fri dry window · rotate MoA next year.",
+                bar: 42, barTone: "warn",
+              },
+              {
+                title: "Field 4 · Winter wheat",
+                status: "Low N", statusTone: "warn",
+                meta: [["N", "38"], ["P", "55"], ["K", "60"], ["pH", "6.5"]],
+                bar: 38, barTone: "warn",
+              },
+              {
+                title: "Field 12 · Barley",
+                status: "Low pH", statusTone: "warn",
+                meta: [["pH", "5.8"], ["OM", "3.2"], ["Lime need", "1.2 t/ha"], ["N", "52"]],
+                bar: 45, barTone: "warn",
+              },
+            ],
+          },
+          {
+            label: "Treatments & rotation",
+            kind: "rows",
+            items: [
+              { label: "Last lime pass", value: "Field 3 · Day 88" },
+              { label: "Fungicide MoA used YTD", value: "Azoxy ×1 · Prop ×0" },
+              { label: "Rotation planner", value: "3 fields fatigued", tone: "warn" },
+              { label: "No-till OM trend", value: "F1, F6 climbing +0.2 / yr", tone: "pos" },
+              { label: "FieldSentry slept", value: "F17 meadow · F19 deco" },
+            ],
+          },
+        ],
+      },
+      npc: {
+        title: "NPC Favor",
+        lead: "Neighbor standing, active favors, and unlocked perks.",
+        metrics: [
+          { label: "Neighbors", value: "6" },
+          { label: "Active favors", value: "1", tone: "warn" },
+          { label: "Friendly+", value: "2", tone: "pos" },
+          { label: "Perks unlocked", value: "3" },
+        ],
+        sections: [
+          {
+            label: "Active favor",
+            kind: "cards",
+            items: [
+              {
+                title: "Miller — haul straw",
+                status: "Due tomorrow", statusTone: "warn",
+                meta: [["Reward", "Standing + favor returned"], ["Qty", "8,000 L"], ["From", "His yard"], ["To", "Biogas"]],
+                note: "Accept already done · delivery not started.",
+                bar: 15, barTone: "warn",
+              },
+            ],
+          },
+          {
+            label: "Standing board",
+            kind: "rows",
+            items: [
+              { label: "Miller", value: "Friendly · 72", tone: "pos" },
+              { label: "Brooks", value: "Neutral · 48" },
+              { label: "Hoffmann", value: "Friendly · 68", tone: "pos" },
+              { label: "Patel", value: "Wary · 31", tone: "warn" },
+              { label: "Santos", value: "Neutral · 50" },
+              { label: "Nguyen", value: "Ally · 81", tone: "pos" },
+            ],
+          },
+          {
+            label: "Perks from standing",
+            kind: "rows",
+            items: [
+              { label: "Shared weather tip", value: "Unlocked (Nguyen)" },
+              { label: "Borrow trailer once / season", value: "Unlocked (Miller)" },
+              { label: "Hire intro · Adept worker", value: "Unlocked (Hoffmann)" },
+              { label: "Seed discount 5%", value: "Locked · need Ally ×2" },
+            ],
+          },
+        ],
+      },
+      events: {
+        title: "World Events",
+        lead: "Active and recent Random World Events with market / field impact.",
+        metrics: [
+          { label: "Active", value: "1", tone: "warn" },
+          { label: "Days left", value: "2" },
+          { label: "Feed impact", value: "+18%", tone: "warn" },
+          { label: "This season", value: "4 events" },
+        ],
+        sections: [
+          {
+            label: "Active now",
+            kind: "cards",
+            items: [
+              {
+                title: "Feed price spike",
+                status: "Active", statusTone: "warn",
+                meta: [["Started", "Day 110"], ["Ends", "Day 114"], ["Feed", "+18%"], ["Milk demand", "+4%"]],
+                note: "Consider locking feed futures or using on-farm silage.",
+                bar: 50, barTone: "warn",
+              },
+            ],
+          },
+          {
+            label: "Recent history",
+            kind: "rows",
+            items: [
+              { label: "Day 104 · Storm warning", value: "Cleared · no crop loss", tone: "pos" },
+              { label: "Day 97 · Subsidy window", value: "+€8,000 equipment", tone: "pos" },
+              { label: "Day 91 · Contamination scare", value: "Milk −6% for 3d", tone: "neg" },
+              { label: "Day 82 · Trade deal rumor", value: "Canola +9% briefly", tone: "pos" },
+            ],
+          },
+          {
+            label: "Vehicle physics (RWE)",
+            kind: "rows",
+            items: [
+              { label: "Steering pull intensity", value: "Medium · on" },
+              { label: "Last pull event", value: "Yesterday · Axion on F9" },
+              { label: "Difficulty dial", value: "Normal" },
+            ],
+          },
+        ],
+      },
+      map: {
+        title: "Map & weather",
+        lead: "Fleet pins, workers, contracts on map, and forecast strip.",
+        metrics: [
+          { label: "Vehicles live", value: "6", tone: "info" },
+          { label: "Workers", value: "2" },
+          { label: "Pins", value: "3" },
+          { label: "Contracts", value: "2" },
+        ],
+        forecast: true,
+        sections: [
+          {
+            label: "Now",
+            kind: "kv",
+            items: [
+              { label: "Condition", value: "Partly cloudy" },
+              { label: "Air temp", value: "14°C" },
+              { label: "Soil temp", value: "9°C" },
+              { label: "Humidity", value: "62%" },
+              { label: "Wind", value: "12 km/h SW" },
+              { label: "Rain chance", value: "20% today" },
+            ],
+          },
+          {
+            label: "On the map",
+            kind: "cards",
+            items: [
+              {
+                title: "Fleet online",
+                status: "6 units", statusTone: "info",
+                meta: [["You", "Axion · F9"], ["AI", "T7 · F8"], ["Harvester", "S790 · F2"], ["Idle yard", "3"]],
+              },
+              {
+                title: "Custom pins",
+                status: "3",
+                meta: [["Lime dump", "F12 gate"], ["Straw pile", "Miller"], ["Contract silo", "North"]],
+              },
+            ],
+          },
+          {
+            label: "Contracts on map",
+            kind: "rows",
+            items: [
+              { label: "Harvest help · Field 22", value: "62% · €4,200 left" },
+              { label: "Bale transport", value: "Not started · €1,100" },
+            ],
+          },
+          {
+            label: "WeatherGuard",
+            kind: "rows",
+            items: [
+              { label: "Mode", value: "Realistic · shared suite" },
+              { label: "Forecast horizon", value: "9 days (RW present)" },
+              { label: "Drill advisory", value: "F4 OK · F12 wait for dry", tone: "warn" },
+            ],
+          },
+        ],
+      },
+    };
+
+    const money = (n) => "€" + Math.round(n).toLocaleString("en-GB");
+
+    let view = "overview";
+
+    function setChrome() {
+      const back = document.getElementById("btnBack");
+      const title = document.getElementById("appTitle");
+      const sub = document.getElementById("appSub");
+      if (view === "overview") {
+        back.disabled = true;
+        title.textContent = "Dashboard";
+        sub.textContent = DATA.farmName + " · " + DATA.mapTitle;
+      } else {
+        back.disabled = false;
+        const stub = STUBS[view];
+        title.textContent = stub ? stub.title : "App";
+        sub.textContent = "Overview → " + (stub ? stub.title : view);
+      }
+    }
+
+    function renderMetrics(metrics) {
+      if (!metrics || !metrics.length) return "";
+      return `<div class="metrics">${metrics.map((m) => `
+        <div class="metric${m.tone ? " metric--" + m.tone : ""}">
+          <small>${m.label}</small>
+          <strong>${m.value}</strong>
+          ${m.hint ? `<span>${m.hint}</span>` : ""}
+        </div>`).join("")}</div>`;
+    }
+
+    function renderRows(items) {
+      return items.map((r) => `
+        <div class="row${r.tone ? " row--" + r.tone : ""}">
+          <span>${r.label}</span>
+          <strong>${r.value}</strong>
+        </div>`).join("");
+    }
+
+    function renderKv(items) {
+      return `<div class="kv">${items.map((r) => `
+        <div class="kv__item">
+          <small>${r.label}</small>
+          <strong>${r.value}</strong>
+        </div>`).join("")}</div>`;
+    }
+
+    function renderCards(items) {
+      return items.map((c) => `
+        <article class="detail">
+          <div class="detail__top">
+            <h4>${c.title}</h4>
+            ${c.status ? `<span class="detail__status${c.statusTone ? " detail__status--" + c.statusTone : ""}">${c.status}</span>` : ""}
+          </div>
+          ${c.meta ? `<div class="detail__meta">${c.meta.map(([k, v]) =>
+            `<span>${k}: <b>${v}</b></span>`).join("")}</div>` : ""}
+          ${c.note ? `<p class="detail__note">${c.note}</p>` : ""}
+          ${c.bar != null ? `<div class="bar${c.barTone ? " bar--" + c.barTone : ""}"><i style="width:${c.bar}%"></i></div>` : ""}
+        </article>`).join("");
+    }
+
+    function renderForecast() {
+      return `<div class="forecast">${DATA.forecast.map((d) => `
+        <div class="forecast__day">
+          <small>${d.day}</small>
+          <strong>${d.temp}</strong>
+          <span>${d.note}</span>
+        </div>`).join("")}</div>`;
+    }
+
+    function renderOverview() {
+      const t = DATA.tiles;
+      const pl = DATA.incomeSession - DATA.expensesSession;
+      return `
+        <div class="banner">Vision prototype — not live game UI</div>
+
+        <header class="ov-header">
+          <div>
+            <h1>Save overview</h1>
+            <p>${DATA.mapTitle} · ${DATA.season} ${DATA.period} · ${DATA.daysPerPeriod} day/period — jump to what needs attention.</p>
+          </div>
+          <div class="ov-meta">
+            <span class="badge badge--accent">${DATA.gameTime}</span>
+            <span class="badge">${DATA.timeGuard}</span>
+            <span class="badge">${DATA.mapTitle}</span>
+            <button type="button" class="weather-pill" data-go="map" title="Weather">
+              <span>${DATA.weather.temp}</span>
+              <span>${DATA.weather.label}</span>
+              <span>· ${DATA.weather.rainChance}</span>
+            </button>
+          </div>
+        </header>
+
+        <section class="mods" aria-label="Active mods">
+          <h2>Active mods · ${DATA.mods.length}</h2>
+          <div class="mods__row">
+            ${DATA.mods.map((m) =>
+              `<span class="badge badge--accent">${m.title}${m.version ? " " + m.version : ""}</span>`
+            ).join("")}
+          </div>
+        </section>
+
+        <section class="hero" aria-label="Current balance">
+          <div class="hero__label">Current balance</div>
+          <div class="hero__row">
+            <div class="hero__bal">${money(DATA.balance)}</div>
+            <div class="hero__loan">
+              <small>Loan</small>
+              <strong>${money(DATA.loan)}</strong>
+            </div>
+          </div>
+          <div class="hero__extra">
+            <div>
+              <small>Session P/L</small>
+              <strong class="${pl >= 0 ? "pos" : "neg"}">${pl >= 0 ? "+" : ""}${money(pl)}</strong>
+            </div>
+            <div>
+              <small>Net worth</small>
+              <strong class="pos">${money(DATA.netWorth)}</strong>
+            </div>
+            <div>
+              <small>Runway</small>
+              <strong class="warn">${DATA.runwayMonths} months</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="alerts" aria-label="Needs attention">
+          ${DATA.alerts.map((a) => `
+            <button type="button" class="alert" data-go="${a.section}">
+              <span class="alert__mark">!</span>
+              <span class="alert__body">
+                <span>${a.label}</span>
+                ${a.detail ? `<small>${a.detail}</small>` : ""}
+              </span>
+            </button>
+          `).join("")}
+        </section>
+
+        <section class="grid" aria-label="Overview tiles">
+          <button type="button" class="tile" data-go="economy">
+            <h3>Economy</h3>
+            <div class="tile__finance">
+              <div><span>Cash</span><strong>${money(t.economy.money)}</strong></div>
+              <div><span>Loan</span><strong>${money(t.economy.loan)}</strong></div>
+              <div><span>Net worth</span><strong>${money(t.economy.netWorth)}</strong></div>
+              <div><span>Session P/L</span><strong>${t.economy.pl}</strong></div>
+              <div><span>Tax (Mar)</span><strong>${t.economy.taxDue}</strong></div>
+            </div>
+          </button>
+
+          <button type="button" class="tile" data-go="fields">
+            <h3>Fields</h3>
+            <p class="tile__stat"><strong>${t.fields.count}</strong><span>${t.fields.ha} ha owned</span></p>
+            <p class="tile__line">${t.fields.needsWork} need work · ${t.fields.harvest} harvest · ${t.fields.growing} growing</p>
+            <p class="tile__line">${t.fields.fallow} fallow / meadow</p>
+          </button>
+
+          <button type="button" class="tile" data-go="livestock">
+            <h3>Pastures</h3>
+            <p class="tile__stat"><strong>${t.livestock.heads}</strong><span>${t.livestock.dairy} dairy · ${t.livestock.sheep} sheep</span></p>
+            <p class="tile__line">${t.livestock.milkGrade} · ${t.livestock.milkFresh} fresh</p>
+            <p class="tile__line tile__warn">${t.livestock.warnings} pasture warning</p>
+          </button>
+
+          <button type="button" class="tile" data-go="fleet">
+            <h3>Vehicles</h3>
+            <p class="tile__stat"><strong>${t.fleet.count}</strong><span>${t.fleet.motorized} motor · ${t.fleet.implements} impl.</span></p>
+            <p class="tile__line">${t.fleet.inUse} in use · ${t.fleet.hoursToday} h today</p>
+            <p class="tile__line tile__warn">${t.fleet.lowFuel} low fuel · ${t.fleet.wearWarn} wear watch</p>
+          </button>
+
+          <button type="button" class="tile" data-go="productions">
+            <h3>Productions</h3>
+            <p class="tile__stat"><strong>${t.productions.owned}</strong><span>chains owned</span></p>
+            <p class="tile__line">${t.productions.running} running · ${t.productions.idle} idle · ${t.productions.cyclesToday} cycles</p>
+            <p class="tile__line tile__warn">${t.productions.issues} issue</p>
+          </button>
+
+          <button type="button" class="tile" data-go="storage">
+            <h3>Storage</h3>
+            <p class="tile__stat"><strong>${t.storage.capacityPct}%</strong><span>${(t.storage.siloL/1000).toFixed(1)}k L in silo</span></p>
+            <p class="tile__line">${t.storage.fieldBales} field · ${t.storage.yardBales} yard · ${t.storage.pallets} pallets</p>
+            <p class="tile__line tile__warn">${t.storage.wetBales} bales getting wet</p>
+          </button>
+
+          <button type="button" class="tile" data-go="soil">
+            <h3>Soil</h3>
+            <p class="tile__stat"><strong>${t.soil.tracked}</strong><span>tracked · OM ${t.soil.omAvg}</span></p>
+            <p class="tile__line tile__warn">${t.soil.lowN} low N · ${t.soil.lowPH} low pH · ${t.soil.disease} disease</p>
+            <p class="tile__line">${t.soil.scouted} fields scouted</p>
+          </button>
+
+          <button type="button" class="tile" data-go="map">
+            <h3>Map &amp; weather</h3>
+            <p class="tile__stat"><strong>${t.map.online}</strong><span>vehicles live</span></p>
+            <p class="tile__line">${t.map.workers} workers · ${t.map.pins} pins · ${t.map.contracts} contracts</p>
+            <p class="tile__line">${DATA.weather.temp} · rain ${DATA.weather.rainChance}</p>
+          </button>
+        </section>
+
+        <section class="mini-board" aria-label="Priority board">
+          <h2>Priority board</h2>
+          <div class="mini-grid">
+            ${DATA.attention.map((a) => `
+              <button type="button" class="mini-card" data-go="${a.section}">
+                <div class="mini-card__kicker">${a.kicker}</div>
+                <div class="mini-card__title">${a.title}</div>
+                <div class="mini-card__meta">${a.meta}</div>
+                <div class="bar${a.warn ? " bar--warn" : ""}" style="margin-top:0.45rem"><i style="width:${a.pct}%"></i></div>
+              </button>
+            `).join("")}
+          </div>
+        </section>
+
+        <section class="farms" aria-label="Your farms">
+          <h2>Your farms</h2>
+          ${DATA.farms.map((f) => `
+            <article class="farm-card${f.active ? " farm-card--active" : ""}">
+              <div class="farm-card__top">
+                <h3>${f.name}</h3>
+                ${f.active ? '<span class="badge badge--accent">Active</span>' : ""}
+                ${f.players ? `<span class="badge">${f.players} online</span>` : '<span class="badge">Offline</span>'}
+                <strong class="farm-card__money">${money(f.money)}</strong>
+              </div>
+              <div class="farm-stats">
+                <div class="farm-stat">
+                  <small>Fields</small>
+                  <strong>${f.fields}</strong>
+                  <span>${f.ha} ha · ${f.needsWork} work · ${f.harvest} harvest</span>
+                </div>
+                <div class="farm-stat">
+                  <small>Livestock</small>
+                  <strong>${f.livestock}</strong>
+                  <span>${f.pastureWarn ? f.pastureWarn + " pasture warn" : "no warnings"}</span>
+                </div>
+                <div class="farm-stat">
+                  <small>Fleet</small>
+                  <strong>${f.fleet}</strong>
+                  <span>${f.motorized} motorized</span>
+                </div>
+                <div class="farm-stat">
+                  <small>Storage</small>
+                  <strong>${f.storage}</strong>
+                  <span>${f.bales} · ${f.productions} prod${f.prodIssues ? " · " + f.prodIssues + " issue" : ""}</span>
+                </div>
+              </div>
+              ${f.loan > 0 ? `<p class="detail__note">Loan ${money(f.loan)}</p>` : `<p class="detail__note">No loan</p>`}
+            </article>
+          `).join("")}
+        </section>
+
+        <section class="section-label" style="margin-top:0">Market snapshot</section>
+        <div class="kv" style="margin-bottom:0.85rem">
+          ${DATA.markets.map((m) => `
+            <div class="kv__item">
+              <small>${m.crop}</small>
+              <strong class="${m.tone === "pos" ? "" : ""}">${m.price} <span style="color:${
+                m.tone === "pos" ? "var(--positive)" :
+                m.tone === "neg" ? "var(--negative)" :
+                m.tone === "warn" ? "var(--warning)" : "var(--text-dim)"
+              };font-size:0.72rem">${m.delta}</span></strong>
+            </div>`).join("")}
+        </div>
+
+        <section class="receipt" aria-label="Activity">
+          <h2>Activity</h2>
+          <span class="receipt__rule" aria-hidden="true"></span>
+          ${DATA.activity.map((a) => `
+            <button type="button" class="receipt__line"${a.section ? ` data-go="${a.section}"` : ""}>
+              <span class="receipt__mark">${a.mark}</span>
+              <span>${a.text}</span>
+            </button>
+          `).join("")}
+          <div class="receipt__foot" aria-hidden="true">
+            <span class="receipt__rule"></span>
+            <span>· · ·</span>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderStub(id) {
+      const stub = STUBS[id];
+      if (!stub) {
+        return `<p class="ov-header"><span style="color:var(--text-dim)">Unknown section.</span></p>`;
+      }
+      const body = (stub.sections || []).map((sec) => {
+        let inner = "";
+        if (sec.kind === "rows") inner = renderRows(sec.items);
+        else if (sec.kind === "kv") inner = renderKv(sec.items);
+        else if (sec.kind === "cards") inner = renderCards(sec.items);
+        return `<div class="section-label">${sec.label}</div>${inner}`;
+      }).join("");
+
+      return `
+        <div class="banner">Vision prototype — stub screen</div>
+        <header class="stub-head">
+          <h1>${stub.title}</h1>
+          <p>${stub.lead}</p>
+        </header>
+        ${renderMetrics(stub.metrics)}
+        ${stub.forecast ? `<div class="section-label">5-day outlook</div>${renderForecast()}` : ""}
+        ${body}
+        <p class="foot-note">Stub only — real FarmHub / Farm Tablet wiring comes after design sign-off.</p>
+      `;
+    }
+
+    function render() {
+      const el = document.getElementById("content");
+      el.innerHTML = view === "overview" ? renderOverview() : renderStub(view);
+      setChrome();
+      el.scrollTop = 0;
+    }
+
+    function go(section) {
+      if (!section || section === "overview") view = "overview";
+      else if (STUBS[section]) view = section;
+      else view = "overview";
+      render();
+    }
+
+    document.getElementById("content").addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-go]");
+      if (!btn) return;
+      go(btn.getAttribute("data-go"));
+    });
+
+    document.getElementById("btnBack").addEventListener("click", () => go("overview"));
+    document.getElementById("btnHome").addEventListener("click", () => go("overview"));
+
+    render();
+  </script>
+</body>
+</html>

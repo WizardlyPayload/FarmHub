@@ -1,0 +1,1 @@
+export { NpcFavorSection } from "./NpcFavorSection";

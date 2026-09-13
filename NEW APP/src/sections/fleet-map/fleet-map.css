@@ -1,0 +1,538 @@
+.fd-fleet-map__header {
+  text-align: center;
+  margin-bottom: 0.4rem;
+  flex-shrink: 0;
+  padding-inline: 0.75rem;
+}
+
+.fd-fleet-map__header h2 {
+  margin: 0 0 0.35rem;
+  color: var(--farm-accent);
+}
+
+.fd-fleet-map__map-title {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+}
+
+.fd-fleet-map__toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.45rem;
+  flex-shrink: 0;
+  padding-inline: 0.75rem;
+}
+
+.fd-fleet-map__overlay {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--farm-text-muted);
+}
+
+.fd-fleet-map__overlay select,
+.fd-fleet-map__search {
+  background: rgba(15, 23, 42, 0.72);
+  color: var(--farm-text);
+  border: 1px solid var(--farm-border);
+  border-radius: 8px;
+  padding: 0.28rem 0.5rem;
+  font-size: 0.82rem;
+}
+
+.fd-fleet-map__search {
+  min-width: 10rem;
+  flex: 1 1 10rem;
+  max-width: 16rem;
+}
+
+.fd-fleet-map__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.45rem;
+  flex-shrink: 0;
+  padding-inline: 0.75rem;
+}
+
+.fd-fleet-map__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  border: 1px solid var(--farm-border);
+  background: rgba(15, 23, 42, 0.55);
+  color: var(--farm-text-muted);
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.fd-fleet-map__chip .farm-fleet-map-hotspot {
+  width: 16px;
+  height: 16px;
+}
+
+.fd-fleet-map__chip--on {
+  border-color: var(--farm-accent);
+  color: var(--farm-text);
+  background: color-mix(in srgb, var(--farm-accent) 22%, rgba(15, 23, 42, 0.8));
+}
+
+.fd-fleet-map__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--farm-text-muted);
+}
+
+.fd-fleet-map {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 0;
+}
+
+.fd-fleet-map-body {
+  display: flex;
+  flex-direction: row;
+  flex: 0 0 auto;
+  width: 100%;
+  min-height: 0;
+  gap: 0.85rem;
+  align-items: flex-start;
+  padding-right: 0.75rem;
+}
+
+.fd-fleet-map-shell {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+  border: none;
+  border-top: 1px solid var(--farm-border);
+  background: rgba(15, 23, 42, 0.72);
+  padding: 0.45rem 0 0;
+}
+
+.fd-fleet-map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-bottom: 0.45rem;
+  flex-shrink: 0;
+  padding-inline: 0.75rem;
+}
+
+.farm-fleet-map-stage-slot {
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: block;
+}
+
+.farm-fleet-map-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  height: auto;
+  max-width: 100%;
+  max-height: none;
+  min-height: 0;
+  border-radius: 0;
+  overflow: hidden;
+  background: #0c100e;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.farm-fleet-map-viewport {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.farm-fleet-map-viewport--dragging {
+  cursor: grabbing;
+}
+
+.farm-fleet-map-viewport--dragging .farm-fleet-map-field-poly {
+  cursor: grabbing;
+}
+
+.farm-fleet-map-transform {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.farm-fleet-map-canvas {
+  position: relative;
+  display: block;
+}
+
+.farm-fleet-map-layer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Overview.dds is the full photo. Playable world is Giants' centre 50% (mapExtension). */
+.farm-fleet-map-terrain-clip {
+  position: relative;
+  overflow: visible;
+}
+
+.farm-fleet-map-terrain-clip--hide-border {
+  overflow: hidden;
+}
+
+.farm-fleet-map-overview {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  max-width: none;
+  pointer-events: none;
+  user-select: none;
+  filter: contrast(1.14) saturate(1.08);
+}
+
+.farm-fleet-map-stage--has-overview .farm-fleet-map-grid {
+  opacity: 0;
+}
+
+.farm-fleet-map-blobs,
+.farm-fleet-map-places,
+.farm-fleet-map-markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.farm-fleet-map-blobs {
+  z-index: 1;
+}
+
+.farm-fleet-map-overlay-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.farm-fleet-map-field-poly {
+  pointer-events: auto;
+  cursor: grab;
+  vector-effect: non-scaling-stroke;
+  stroke: rgba(255, 255, 255, 0.95);
+  stroke-width: 1.8px;
+  stroke-linejoin: round;
+  paint-order: stroke fill;
+  filter: drop-shadow(0 0 0.7px rgba(8, 12, 10, 0.9));
+  fill-opacity: 0.62;
+}
+
+.farm-fleet-map-field-poly:hover {
+  filter: brightness(1.12);
+}
+
+.farm-fleet-map-places {
+  z-index: 2;
+}
+
+.farm-fleet-map-markers {
+  z-index: 3;
+}
+
+.farm-fleet-map-blob,
+.farm-fleet-map-places .farm-fleet-map-place,
+.farm-fleet-map-markers .farm-fleet-map-pin {
+  pointer-events: auto;
+}
+
+.farm-fleet-map-blob {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border: none;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.45),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
+  filter: saturate(1.2);
+}
+
+.farm-fleet-map-grid {
+  position: absolute;
+  inset: 0;
+  opacity: 0.35;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 8.333% 8.333%;
+  pointer-events: none;
+}
+
+.farm-fleet-map-compass {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  z-index: 6;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+}
+
+.farm-fleet-map-stage--has-overview {
+  background: #1a1f1c;
+}
+
+.farm-fleet-map-pin {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: auto;
+  height: auto;
+  min-width: 1.65rem;
+  min-height: 1.65rem;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.farm-fleet-map-pin__icon {
+  display: flex;
+  color: #fff;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.85));
+  transform-origin: 50% 50%;
+}
+
+.farm-fleet-map-hotspot {
+  display: block;
+  width: 30px;
+  height: 30px;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+.farm-fleet-map-pin .farm-fleet-map-hotspot {
+  background-color: #fff;
+}
+
+.farm-fleet-map-place-glyph {
+  display: block;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.farm-fleet-map-pin__label {
+  display: none;
+  margin-top: 0.12rem;
+  max-width: 7.5rem;
+  padding: 0.05rem 0.28rem;
+  border-radius: 0.25rem;
+  background: rgba(8, 12, 10, 0.78);
+  color: #f8fafc;
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none;
+}
+
+.farm-fleet-map-stage--allow-names .farm-fleet-map-pin:hover .farm-fleet-map-pin__label,
+.farm-fleet-map-stage--allow-names .farm-fleet-map-pin:focus-visible .farm-fleet-map-pin__label {
+  display: block;
+  position: relative;
+  z-index: 6;
+}
+
+.farm-fleet-map-pin:hover,
+.farm-fleet-map-pin:focus-visible {
+  transform: translate(-50%, -50%) scale(1.18);
+  z-index: 5;
+}
+
+.farm-fleet-map-tooltip {
+  position: absolute;
+  z-index: 6;
+  transform: translate(-50%, calc(-100% - 12px));
+  max-width: min(240px, 80vw);
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.45rem;
+  background: rgba(15, 20, 18, 0.94);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  pointer-events: none;
+  text-align: center;
+}
+
+/* Tooltip lives in the same transformed markers layer as pins. */
+.farm-fleet-map-tooltip--layer {
+  z-index: 8;
+}
+
+.fd-fleet-map__hint {
+  margin: 0.65rem 0 0;
+  font-size: 0.85rem;
+}
+
+.farm-fleet-map-pin--focus {
+  z-index: 3;
+  transform: translate(-50%, -50%) scale(1.28);
+}
+
+.farm-fleet-map-pin--focus .farm-fleet-map-pin__icon {
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 8px rgba(34, 197, 94, 0.75));
+}
+
+.fd-fleet-map__empty {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  text-align: center;
+  border-radius: 10px;
+  border: 1px solid var(--farm-border);
+  color: var(--farm-text-muted);
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.fd-fleet-map__empty--warn {
+  border-color: rgba(234, 179, 8, 0.45);
+  color: #facc15;
+}
+
+.fd-fleet-map-legend-wrap {
+  flex: 0 0 18rem;
+  width: 18rem;
+  min-width: 13rem;
+  max-width: 20rem;
+  margin-top: 0;
+  padding: 0.45rem 0 0.75rem;
+  overflow: visible;
+  min-height: 0;
+}
+
+.fd-fleet-map-legend-wrap h6 {
+  margin: 0.65rem 0 0.5rem;
+  color: var(--farm-accent);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fd-fleet-map-legend-wrap .fd-fleet-map__hint:first-child {
+  margin-top: 0;
+}
+
+.farm-fleet-map-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+}
+
+.farm-fleet-map-legend-swatch {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.farm-fleet-map-legend-item {
+  font-size: 0.85rem;
+  color: var(--farm-text-muted);
+}
+
+.fd-muted {
+  color: var(--farm-text-muted);
+}
+
+.fd-fleet-map__scale {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.55rem;
+  font-size: 0.78rem;
+  color: var(--farm-text-muted);
+}
+
+.fd-fleet-map__scale-bar {
+  flex: 1 1 auto;
+  height: 8px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, hsl(8, 64%, 40%), hsl(125, 64%, 40%));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.fd-fleet-map__scale--invert .fd-fleet-map__scale-bar {
+  background: linear-gradient(90deg, hsl(125, 64%, 40%), hsl(8, 64%, 40%));
+}
+
+.fd-fleet-map-legend-wrap .farm-fleet-map-legend {
+  flex-direction: column;
+}
+
+.farm-fleet-map-legend--overlay {
+  max-height: 14rem;
+  overflow-y: auto;
+  padding-right: 0.2rem;
+}
+
+@media (max-width: 56rem) {
+  .fd-fleet-map-body {
+    flex-direction: column;
+    padding-right: 0;
+  }
+
+  .fd-fleet-map-legend-wrap {
+    width: auto;
+    max-width: none;
+    flex: 0 0 auto;
+    padding-inline: 0.75rem;
+  }
+
+  .fd-fleet-map-legend-wrap .farm-fleet-map-legend {
+    flex-direction: row;
+  }
+}

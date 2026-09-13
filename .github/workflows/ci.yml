@@ -19,11 +19,19 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-          cache-dependency-path: FS25_FarmDashboard_App/package-lock.json
-      - name: Install dependencies
+          cache-dependency-path: |
+            FS25_FarmDashboard_App/package-lock.json
+            NEW APP/package-lock.json
+      - name: Install app dependencies
+        run: npm ci
+      - name: Install NEW APP dependencies
+        working-directory: NEW APP
         run: npm ci
       - name: Run tests
         run: npm run test:all
+      - name: Build NEW APP UI
+        working-directory: NEW APP
+        run: npm run build
       - name: Electron pack files (main require closure vs build.files)
         run: npm run verify:electron-pack
       - name: i18n verify (all locales match en + placeholders)

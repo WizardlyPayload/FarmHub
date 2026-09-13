@@ -16,6 +16,16 @@ const mode = process.argv[2] === 'pack' ? 'pack' : 'dist';
 const outDir = path.join(os.tmpdir(), `farmdash-electron-out-${Date.now()}`);
 fs.mkdirSync(outDir, { recursive: true });
 
+const copyUi = spawnSync(process.execPath, [path.join(__dirname, 'copy-ui-v2.mjs')], {
+    cwd: projectDir,
+    stdio: 'inherit',
+    env: process.env,
+});
+if (copyUi.status !== 0) {
+    console.error('[FarmDash] ui-v2 copy failed — build NEW APP first: npm run build:ui');
+    process.exit(copyUi.status === null ? 1 : copyUi.status);
+}
+
 // stderr so it stays visible even when piping
 console.error('');
 console.error(`[FarmDash] Build output directory (unique each run):`);

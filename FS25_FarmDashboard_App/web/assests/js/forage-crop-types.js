@@ -22,10 +22,9 @@ const PREPARED_SEEDBED_NAMES = new Set([
 export function isMowableForageFruitType(fruitTypeUpper) {
   const ft = String(fruitTypeUpper || "").toUpperCase();
   if (!ft) return false;
+  if (ft.includes("WINDROW") || ft.includes("BALE")) return false;
   if (MOWABLE_FORAGE_EXACT.has(ft)) return true;
-  if (ft.includes("CLOVER")) return true;
-  if (ft.includes("MEADOW")) return true;
-  if (ft.includes("ALFALFA") && !ft.includes("WINDROW") && !ft.includes("BALE")) return true;
+  if (ft.includes("CLOVER") || ft.includes("MEADOW") || ft.includes("ALFALFA")) return true;
   return false;
 }
 

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   probeRemoteDashboardBootstrap,
   interpretLanVerifyResult,
+  shouldClearStoredLanCredentials,
   farmdashWaitForLanHttpBasicIfNeeded,
 } from "../web/assests/js/lan-http-auth.js";
 
@@ -42,9 +43,36 @@ test("interpretLanVerifyResult treats 401/403 as auth and other failures as netw
   assert.equal(interpretLanVerifyResult(204), "ok");
   assert.equal(interpretLanVerifyResult(401), "auth");
   assert.equal(interpretLanVerifyResult(403), "auth");
+  assert.equal(interpretLanVerifyResult(404), "network");
   assert.equal(interpretLanVerifyResult(500), "network");
   assert.equal(interpretLanVerifyResult(0), "network");
   assert.equal(interpretLanVerifyResult(200, true), "network");
+});
+
+test("stored LAN credentials are cleared only on 401/403 auth rejection", () => {
+  assert.equal(shouldClearStoredLanCredentials("auth"), true);
+  assert.equal(shouldClearStoredLanCredentials("network"), false);
+  assert.equal(shouldClearStoredLanCredentials("ok"), false);
+  assert.equal(
+    shouldClearStoredLanCredentials(interpretLanVerifyResult(401)),
+    true
+  );
+  assert.equal(
+    shouldClearStoredLanCredentials(interpretLanVerifyResult(403)),
+    true
+  );
+  assert.equal(
+    shouldClearStoredLanCredentials(interpretLanVerifyResult(404)),
+    false
+  );
+  assert.equal(
+    shouldClearStoredLanCredentials(interpretLanVerifyResult(500)),
+    false
+  );
+  assert.equal(
+    shouldClearStoredLanCredentials(interpretLanVerifyResult(0, true)),
+    false
+  );
 });
 
 test("farmdashWaitForLanHttpBasicIfNeeded times out for remote viewers", async () => {

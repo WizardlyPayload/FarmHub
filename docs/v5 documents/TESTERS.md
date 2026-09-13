@@ -13,14 +13,14 @@ This is **Farm Dashboard**, the out-of-game Windows companion. It is **not** Rea
 | | Farm Dashboard V4 | Farm Dashboard V5 (this pack) |
 | --- | --- | --- |
 | Screens | Classic landing cards | Sidebar + Save overview |
-| Installer | `FS25-Farm-Dashboard-Setup-4.x.exe` | `FS25-Farm-Dashboard-V5-Setup-5.0.4.exe` |
+| Installer | `FS25-Farm-Dashboard-Setup-4.x.exe` | `FS25-Farm-Dashboard-V5-Setup-5.0.5.exe` |
 | Auto-update | `latest.yml` | `latest-rf.yml` only — **never** V4 |
 | HTTP port | **8766** | **8768** (installed) |
 | In-game mod | Same `FS25_FarmDashboard.zip` | Same zip |
 
 **Keep V4 if you prefer it.** Installing V5 is not “replace everyone via Check for updates.”
 
-This drop: Start Menu **Farm Dashboard V5** · app **5.0.4** · mod **5.0.0.3**. GitHub Latest is still **5.0.3**. Older 5.0.x disks may still say “RF” — treat as V5. Do **not** call it RF edition in reports.
+This drop: Start Menu **Farm Dashboard V5** · app **5.0.5** · mod **5.0.0.4**. GitHub Latest is still **5.0.3**. Older 5.0.x disks may still say “RF” — treat as V5. Do **not** call it RF edition in reports.
 
 ---
 

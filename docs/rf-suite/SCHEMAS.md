@@ -175,7 +175,7 @@ The Fields section surfaces `reason` as a one-line "Soil Fertilizer is installed
 | `enabled` | boolean |
 | `byFarm` | `{ [farmId]: { barns: DairyBarnRow[] } }` |
 
-`DairyBarnRow`: `barnId`, `herdHealthScore?`, `milkQualityTier?`, `spoilageStatus?`, `lastCollectionDay?`, `feedDiseaseFlag?`, `contractSummary?` (string \| null). Cap barns.
+`DairyBarnRow`: `barnId`, `name?` (placeable `getName()`), `herdHealthScore?`, `milkQualityTier?`, `spoilageStatus?`, `lastCollectionDay?`, `feedDiseaseFlag?`, `contractSummary?` (string \| null). Cap barns.
 
 ### Life — `npcFavor`
 

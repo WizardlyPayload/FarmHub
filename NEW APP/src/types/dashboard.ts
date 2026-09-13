@@ -208,6 +208,7 @@ export interface RealisticFarmingPayload {
       {
         barns: {
           barnId: string;
+          name?: string;
           herdHealthScore?: number;
           milkQualityTier?: string;
           spoilageStatus?: string;

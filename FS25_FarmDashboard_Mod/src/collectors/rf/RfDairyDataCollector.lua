@@ -117,6 +117,27 @@ local function displaySpoilage(status)
     return status
 end
 
+--- Placeable:getName() — same path AnimalDataCollector uses. barnId is uniqueId.
+local function barnPlaceableName(barn)
+    if type(barn) ~= "table" then return nil end
+    local placeable = barn._placeable
+    if type(placeable) ~= "table" then return nil end
+    local name = nil
+    pcall(function()
+        if type(placeable.getName) == "function" then
+            name = placeable:getName()
+        end
+    end)
+    if (name == nil or name == "") and type(placeable.name) == "string" then
+        name = placeable.name
+    end
+    if type(name) == "string" then
+        name = name:match("^%s*(.-)%s*$")
+        if name ~= "" then return name end
+    end
+    return nil
+end
+
 local function barnRowFromRecord(mgr, barnId, barn)
     local health = tonumber(barn.herdHealthScore)
     local tier = barn.milkQualityTier
@@ -133,6 +154,7 @@ local function barnRowFromRecord(mgr, barnId, barn)
     local lastDay = tonumber(barn.lastCollectionDay)
     return {
         barnId = tostring(barnId),
+        name = barnPlaceableName(barn),
         herdHealthScore = health and math.floor(health) or nil,
         milkQualityTier = displayQuality(tier),
         spoilageStatus = displaySpoilage(barn.spoilageStatus ~= nil and tostring(barn.spoilageStatus) or nil),
@@ -189,6 +211,7 @@ local function barnRowFromContract(mgr, crow)
     end
     return {
         barnId = tostring(barnId),
+        name = barnPlaceableName(barn),
         herdHealthScore = health and math.floor(health) or nil,
         milkQualityTier = tier,
         spoilageStatus = spoilage,

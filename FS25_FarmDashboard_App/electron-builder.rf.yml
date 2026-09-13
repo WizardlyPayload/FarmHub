@@ -13,7 +13,7 @@ extraMetadata:
   productLine: v5
   # MAJOR.PUBLIC.DEV (Wizard): GitHub public last shipped 5.0.3; this working tree is a DEV bump.
   # Next GitHub publish bumps PUBLIC and resets DEV (5.1.0). Classic package.json stays 4.x.
-  version: 5.0.4
+  version: 5.0.5
 directories:
   output: electron-pack-out-rf
 files:

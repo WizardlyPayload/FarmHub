@@ -1,12 +1,12 @@
 import { t } from "@/i18n/i18n";
 import { Badge, Card } from "@/components/ui";
 import {
+  barnDisplayName,
   dairyBarnsForFarm,
   dairyHealthTone,
   dairyQualityTone,
   dairySpoilageTone,
   isDairyCoreActive,
-  shortBarnLabel,
   type RfDairyBarn,
 } from "@/lib/realisticFarming/dairy";
 import type { RealisticFarmingPayload } from "@/types/dashboard";
@@ -15,11 +15,7 @@ function BarnCard({ barn }: { barn: RfDairyBarn }) {
   return (
     <div class="fd-rf-dairy__barn">
       <div class="fd-rf-dairy__barn-head">
-        <strong>
-          {t("pastures.rfDairy.barnTitle", {
-            id: shortBarnLabel(barn.barnId),
-          })}
-        </strong>
+        <strong>{barnDisplayName(barn)}</strong>
         {barn.feedDiseaseFlag ? (
           <Badge tone="danger">{t("pastures.rfDairy.feedRisk")}</Badge>
         ) : null}

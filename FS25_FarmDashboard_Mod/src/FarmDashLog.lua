@@ -27,6 +27,26 @@ function FarmDashLog.devWarn(fmt, ...)
     end
 end
 
+--- Always visible (diagnostics off). Identical messages are suppressed for 60s of g_time.
+FarmDashLog._errLast = FarmDashLog._errLast or {}
+
+function FarmDashLog.error(fmt, ...)
+    local msg
+    if select("#", ...) > 0 and type(fmt) == "string" then
+        local ok, formatted = pcall(string.format, fmt, ...)
+        msg = ok and formatted or tostring(fmt)
+    else
+        msg = tostring(fmt)
+    end
+    local now = (type(_G.g_time) == "number") and _G.g_time or 0
+    local prev = FarmDashLog._errLast[msg]
+    if type(prev) == "number" and (now - prev) < 60000 and now >= prev then
+        return
+    end
+    FarmDashLog._errLast[msg] = now
+    Logging.warning("[FarmDash] " .. msg)
+end
+
 --- Per-frame collector / cycle trace (diagnostics only). Prefix [trace] for log filtering.
 function FarmDashLog.trace(fmt, ...)
     if not FarmDashLog.isVerbose() then return end

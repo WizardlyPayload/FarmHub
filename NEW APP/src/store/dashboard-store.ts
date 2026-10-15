@@ -6,10 +6,13 @@ import type {
   SectionParams,
 } from "@/types/dashboard";
 import { normalizeSectionId } from "@/types/dashboard";
+import { demoWritesAreLocked } from "@/platform/demo-source";
+import { recordedLastUpdated } from "@/platform/recorded-publication";
+import { setLocale as applyLocale, getLocale } from "@/i18n/i18n";
+import { ACTIVE_SERVER_KEY } from "@/lib/active-server-selection";
 
 const LAST_SECTION_KEY = "farmdash_last_section";
 const DEFAULT_SECTION_PREF_KEY = "farmdash_default_section";
-const ACTIVE_SERVER_KEY = "farmdash_active_server_v1";
 
 export function readStoredServerId(): string | null {
   try {
@@ -44,6 +47,8 @@ export interface DashboardState {
   connection: "connecting" | "ws" | "http" | "error";
   lastUpdated: string | null;
   locale: string;
+  /** Manual litres/british/imperial choice. Ignored while a provider export owns units. */
+  viewerFillUnitMode: "litres" | "british" | "imperial" | null;
 
   setPayload: (payload: DashboardPayload | null) => void;
   setServers: (servers: FarmDashServer[]) => void;
@@ -55,6 +60,7 @@ export interface DashboardState {
   setEnabledSections: (sections: Partial<Record<string, boolean>>) => void;
   setConnection: (connection: DashboardState["connection"]) => void;
   setLocale: (locale: string) => void;
+  setViewerFillUnitMode: (mode: DashboardState["viewerFillUnitMode"]) => boolean;
 }
 
 function writeHash(section: SectionId, params: SectionParams) {
@@ -78,6 +84,16 @@ function rememberSection(section: SectionId) {
   } catch {
     /* ignore */
   }
+}
+
+function readViewerFillUnitMode(): DashboardState["viewerFillUnitMode"] {
+  try {
+    const stored = localStorage.getItem("farmdash_viewer_fill_unit");
+    if (stored === "litres" || stored === "british" || stored === "imperial") return stored;
+  } catch {
+    /* ignore */
+  }
+  return null;
 }
 
 export function readLastSection(): SectionId | null {
@@ -180,14 +196,28 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   enabledSections: {},
   connection: "connecting",
   lastUpdated: null,
-  locale: localStorage.getItem("farmdash_locale") || "en",
+  locale: typeof window !== "undefined" && new URLSearchParams(window.location.search).has("demo")
+    ? "en" : localStorage.getItem("farmdash_locale") || "en",
+  viewerFillUnitMode: readViewerFillUnitMode(),
 
   setPayload: (payload) =>
-    set((state) => ({
-      payload,
-      lastUpdated: payload?.lastUpdated ?? new Date().toISOString(),
-      connection: payload?.error ? "error" : state.connection === "error" ? "http" : state.connection,
-    })),
+    set((state) => {
+      if (demoWritesAreLocked() && payload?.dataSource !== "recorded-demo") {
+        return { connection: "http" };
+      }
+      if (payload?.dataSource === "recorded-demo") {
+        return {
+          payload,
+          lastUpdated: recordedLastUpdated(payload, state.lastUpdated),
+          connection: "http",
+        };
+      }
+      return {
+        payload,
+        lastUpdated: payload?.lastUpdated ?? new Date().toISOString(),
+        connection: payload?.error ? "error" : state.connection === "error" ? "http" : state.connection,
+      };
+    }),
   setServers: (servers) => set({ servers }),
   setActiveServerId: (activeServerId) => {
     writeStoredServerId(activeServerId);
@@ -213,18 +243,51 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   setEnabledSections: (enabledSections) => set({ enabledSections }),
   setConnection: (connection) => set({ connection }),
   setLocale: (locale) => {
-    localStorage.setItem("farmdash_locale", locale);
-    set({ locale });
-    // Keep i18n catalog locale in sync (dynamic import avoids circular deps at module init).
-    void import("@/i18n/i18n").then((m) => m.setLocale(locale));
+    applyLocale(locale);
+    set({ locale: getLocale() });
+  },
+  setViewerFillUnitMode: (viewerFillUnitMode) => {
+    try {
+      if (viewerFillUnitMode) localStorage.setItem("farmdash_viewer_fill_unit", viewerFillUnitMode);
+      else localStorage.removeItem("farmdash_viewer_fill_unit");
+    } catch {
+      return false;
+    }
+    set({ viewerFillUnitMode });
+    return true;
   },
 }));
 
 export function applyPayloadToStore(payload: DashboardPayload) {
-  useDashboardStore.getState().setPayload(payload);
-  if (!payload.error) {
-    useDashboardStore.getState().setConnection("ws");
+  const store = useDashboardStore.getState();
+  if (payload?.dataSource === "recorded-demo" || demoWritesAreLocked()) {
+    if (payload?.dataSource === "recorded-demo") {
+      store.setPayload(payload);
+      store.setConnection("http");
+    }
+    return;
   }
+  store.setPayload(payload);
+  if (!payload.error) {
+    store.setConnection("ws");
+  }
+  const sid = store.activeServerId;
+  if (!sid || payload.error) return;
+  const savegameNameRaw = String(payload.savegameName || "").trim();
+  const savegameName = /^savegame\d+$/i.test(savegameNameRaw) ? "" : savegameNameRaw;
+  const mapTitle = String(
+    payload.mapTitle || payload.serverInfo?.mapName || "",
+  ).trim();
+  if (!savegameName && !mapTitle) return;
+  const next = store.servers.map((srv) => {
+    if (String(srv.id) !== String(sid)) return srv;
+    return {
+      ...srv,
+      ...(savegameName ? { savegameName } : {}),
+      ...(mapTitle ? { mapTitle } : {}),
+    };
+  });
+  store.setServers(next);
 }
 
 export function farmStorageKey(serverId: string | null | undefined): string {

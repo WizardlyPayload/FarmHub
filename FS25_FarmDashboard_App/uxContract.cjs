@@ -182,6 +182,151 @@ function buildModuleUiState(partial = {}) {
     };
 }
 
+function statusServerEntry(servers, id) {
+    for (const server of servers) {
+        if (server && server.id != null && String(server.id) === id) return server;
+    }
+    return null;
+}
+
+function statusSourceEligible(state, server) {
+    if (!state || state.active === false) return false;
+    if (server && server.enabled === false) return false;
+    return true;
+}
+
+function selectStatusSource(input = {}) {
+    const states = input.states && typeof input.states === "object" ? input.states : {};
+    const servers = Array.isArray(input.servers) ? input.servers : [];
+    const selected = input.selectedId != null ? String(input.selectedId).trim() : "";
+    if (selected) {
+        const state = Object.prototype.hasOwnProperty.call(states, selected) ? states[selected] : null;
+        const eligible = statusSourceEligible(state, statusServerEntry(servers, selected));
+        return {
+            id: selected,
+            state: eligible ? state : null,
+            explicit: true,
+            unavailable: !eligible || !state.mergedData,
+        };
+    }
+    const excluded = new Set();
+    for (const server of servers) {
+        if (!server || server.id == null) continue;
+        const id = String(server.id);
+        const state = Object.prototype.hasOwnProperty.call(states, id) ? states[id] : null;
+        if (!statusSourceEligible(state, server)) {
+            excluded.add(id);
+            continue;
+        }
+        return { id, state, explicit: false, unavailable: !state.mergedData };
+    }
+    const keys = Object.keys(states);
+    for (const id of keys) {
+        if (excluded.has(id)) continue;
+        const state = states[id];
+        if (!statusSourceEligible(state, null)) continue;
+        return { id, state, explicit: false, unavailable: !state.mergedData };
+    }
+    return { id: "", state: null, explicit: false, unavailable: true };
+}
+
+function sourceSetupEvidence(state, options = {}) {
+    const current = state || {};
+    const merged = current.mergedData || null;
+    const now = options.nowMs || Date.now();
+    const staleMs = Number(options.staleMs) || LUA_EXPORT_STALE_MS;
+    const luaAt = current.lastLuaReceivedAt || null;
+    const warning = merged && merged.serverInfo && merged.serverInfo.configWarning;
+    const generation = merged && Object.prototype.hasOwnProperty.call(merged, "exportGeneration")
+        ? merged.exportGeneration
+        : null;
+    const fields = merged && Array.isArray(merged.fields) ? merged.fields : [];
+    const vehicles = merged && Array.isArray(merged.vehicles) ? merged.vehicles : [];
+    return {
+        hasMergedData: !!merged,
+        luaFresh: !!(luaAt && !isLuaExportStale(luaAt, now, staleMs)),
+        xmlAvailable: !!(current.xmlData || current.lastXmlReceivedAt || (merged && merged.xmlAvailable)),
+        modVersionCheck: (merged && merged.modVersionCheck) || {},
+        pathDenied: !!(warning && /denied|eacces|permission/i.test(String(warning))),
+        identityProvision: current.identityProvision || null,
+        exportGeneration: generation,
+        emptyCommitted: !!(
+            merged
+            && fields.length === 0
+            && vehicles.length === 0
+            && (merged.luaAvailable || merged.xmlAvailable)
+            && Number(generation) > 0
+        ),
+        startupOnly: generation === 0 || generation === "0",
+    };
+}
+
+function publicStatusForSource(base, resolved, project) {
+    const payload = {
+        status: base && base.status ? base.status : "online",
+        service: base && base.service,
+        productLine: base && base.productLine,
+        port: base && base.port,
+        appVersion: base && base.appVersion,
+    };
+    const state = resolved && resolved.state;
+    const merged = state && state.mergedData;
+    if (merged) {
+        const fields = Array.isArray(merged.fields) ? merged.fields : (Array.isArray(merged.allFields) ? merged.allFields : []);
+        const vehicles = Array.isArray(merged.vehicles) ? merged.vehicles : [];
+        payload.mapTitle = merged.mapTitle || (merged.serverInfo && merged.serverInfo.mapName) || null;
+        payload.mapId = merged.mapId || (merged.serverInfo && merged.serverInfo.mapId) || null;
+        payload.lastUpdated = merged.lastUpdated || null;
+        payload.fieldCount = fields.length;
+        payload.vehicleCount = vehicles.length;
+        payload.hasData = fields.length > 0 || vehicles.length > 0 || !!merged.luaAvailable || !!merged.xmlAvailable;
+    } else if (resolved && resolved.id) {
+        payload.hasData = false;
+    }
+    const ident = state && state.exportIdentity;
+    if (ident && typeof project === "function") {
+        const tracker = state.exportIngress && state.exportIngress.tracker;
+        const projected = project(ident, tracker) || {};
+        payload.careerId = projected.careerId;
+        payload.publicationSequence = projected.publicationSequence;
+        payload.exportGeneration = projected.exportGeneration;
+        payload.freshness = projected.freshness || null;
+        payload.persistence = projected.persistence;
+        payload.replica = projected.replica;
+        payload.authoritative = projected.authoritative;
+        payload.readiness = projected.readiness;
+    }
+    return payload;
+}
+
+function provisionNextStep(provision) {
+    if (provision === "provisioning-required") {
+        return {
+            status: "incomplete",
+            lastErrorCode: "E_PROVISION_REQUIRED",
+            nextAction: "open_setup",
+            nextStep: "This source has no remote identity yet. Automatic FTP creation is not available, so another ready source does not configure it. Add the identity on a source that can create it, then select this source again.",
+        };
+    }
+    if (provision === "waiting" || provision === "proposal-failed") {
+        return {
+            status: "incomplete",
+            lastErrorCode: "E_IDENTITY_WAITING",
+            nextAction: "open_setup",
+            nextStep: "Waiting for a dashboard identity proposal. Export stays off until a proposal is present for this source.",
+        };
+    }
+    if (provision === "recovery-needed") {
+        return {
+            status: "degraded",
+            lastErrorCode: "E_IDENTITY_RECOVERY",
+            nextAction: "open_setup",
+            nextStep: "This source's identity files need recovery. They were left unchanged, and export stays off until they can be read.",
+        };
+    }
+    return null;
+}
+
 function buildSetupStatus(input = {}) {
     const config = input.config || {};
     const completeness = configCompleteness(config);
@@ -225,29 +370,72 @@ function buildSetupStatus(input = {}) {
         },
     ];
 
-    let lastErrorCode = null;
-    if (!configured) lastErrorCode = ERROR_CODES.E_CONFIG_INCOMPLETE;
-    else if (!tokenOk) lastErrorCode = ERROR_CODES.E_INVALID_TOKEN;
-    else if (pathDenied) lastErrorCode = ERROR_CODES.E_PATH_DENIED;
-    else if (!httpUp) lastErrorCode = ERROR_CODES.E_SERVER_OFFLINE;
-    else if (modCheck.status === "outdated") lastErrorCode = ERROR_CODES.E_MOD_OUTDATED;
-    else if (configured && !hasMerged) lastErrorCode = ERROR_CODES.E_LUA_STALE;
-    else if (hasMerged && !luaFresh) lastErrorCode = ERROR_CODES.E_LUA_STALE;
+    const primaryCode = !configured
+        ? ERROR_CODES.E_CONFIG_INCOMPLETE
+        : !tokenOk
+          ? ERROR_CODES.E_INVALID_TOKEN
+          : pathDenied
+            ? ERROR_CODES.E_PATH_DENIED
+            : !httpUp
+              ? ERROR_CODES.E_SERVER_OFFLINE
+              : modCheck.status === "outdated"
+                ? ERROR_CODES.E_MOD_OUTDATED
+                : null;
+
+    let lastErrorCode = primaryCode;
+    if (!lastErrorCode) {
+        if (configured && !hasMerged) lastErrorCode = ERROR_CODES.E_LUA_STALE;
+        else if (hasMerged && !luaFresh) lastErrorCode = ERROR_CODES.E_LUA_STALE;
+    }
 
     let status = "ready";
     if (!configured) status = completeness > 0 ? "incomplete" : "needs-setup";
     else if (lastErrorCode && lastErrorCode !== ERROR_CODES.E_LUA_STALE) status = "degraded";
     else if (lastErrorCode === ERROR_CODES.E_LUA_STALE) status = hasMerged ? "degraded" : "incomplete";
 
-    if (configured && hasMerged && tokenOk && httpUp && !pathDenied && modCheck.status !== "outdated") {
+    if (!primaryCode && configured && hasMerged && tokenOk && httpUp && !pathDenied && modCheck.status !== "outdated") {
         status = luaFresh ? "ready" : "degraded";
         if (luaFresh) lastErrorCode = null;
+    }
+
+    const provision = provisionNextStep(input.identityProvision);
+    const startupBlocks = input.startupOnly === true;
+    let nextStep = null;
+    let nextAction = lastErrorCode ? nextActionForCode(lastErrorCode) : "none";
+    if (!primaryCode && provision) {
+        status = provision.status;
+        lastErrorCode = provision.lastErrorCode;
+        nextAction = provision.nextAction;
+        nextStep = provision.nextStep;
+    } else if (!primaryCode && startupBlocks && status === "ready") {
+        status = "incomplete";
+        lastErrorCode = ERROR_CODES.E_LUA_STALE;
+        nextAction = nextActionForCode(lastErrorCode);
+        nextStep = "This source has a startup export only. Gameplay data is not committed yet.";
+    }
+
+    if (pathDenied) {
+        steps[3].state = normalizeSetupStepState("error");
+        steps[3].errorCode = ERROR_CODES.E_PATH_DENIED;
+    } else if (modCheck.status === "outdated") {
+        steps[3].state = normalizeSetupStepState("error");
+        steps[3].errorCode = ERROR_CODES.E_MOD_OUTDATED;
+    } else if (provision && provision.lastErrorCode === "E_IDENTITY_RECOVERY") {
+        steps[3].state = normalizeSetupStepState("error");
+        steps[3].errorCode = provision.lastErrorCode;
+    } else if (provision || startupBlocks) {
+        if (steps[3].state === "success") steps[3].state = normalizeSetupStepState("pending");
+        steps[3].errorCode = provision ? provision.lastErrorCode : ERROR_CODES.E_LUA_STALE;
     }
 
     return {
         status,
         lastErrorCode,
-        nextAction: lastErrorCode ? nextActionForCode(lastErrorCode) : "none",
+        nextAction,
+        nextStep,
+        sourceId: input.sourceId != null ? String(input.sourceId) : "",
+        identityProvision: input.identityProvision || null,
+        emptyCommitted: input.emptyCommitted === true,
         configCompleteness: completeness,
         requiresRestart: !!input.requiresRestart,
         lanRisk: lanRiskProfile(lan),
@@ -277,4 +465,7 @@ module.exports = {
     buildModuleUiState,
     normalizeSetupStepState,
     buildSetupStatus,
+    selectStatusSource,
+    sourceSetupEvidence,
+    publicStatusForSource,
 };

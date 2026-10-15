@@ -11,16 +11,32 @@
  *   --rf remains an alias for V5 so older scripts keep working.
  *
  * HARD RULE: V5 builds must never publish as classic latest.yml.
+ * V5 also refuses to build without the pinned resources/texconv/texconv.exe (verify-v5-bundled-texconv.mjs).
+ * Every build fails if win-unpacked (app.asar names or resources) holds private env / credential files
+ * (privatePackageGuard.cjs); verify-electron-pack-files.mjs checks the file selection before packing.
  */
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { getFarmDashBuildOutputDir, getFarmDashV5BuildOutputDir } from './farmdash-build-output.mjs';
+import { farmDashReleaseDir, getFarmDashBuildOutputDir, getFarmDashV5BuildOutputDir } from './farmdash-build-output.mjs';
+import { formatTexconvReport, inspectBundledTexconv } from './verify-v5-bundled-texconv.mjs';
+import { buildFreshV5Ui, verifyV5UiAsar, assertDistinctV5Installer, assertUiSourceStillCurrent } from './v5-ui-package-proof.mjs';
+import { createV5ReleaseStage, cleanupV5ReleaseStage, promoteV5Artifacts } from './v5-release-stage.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 /** Electron app root (`FS25_FarmDashboard_App/`). Script lives in `tools/app/`. */
 const projectDir = path.join(__dirname, '..', '..', 'FS25_FarmDashboard_App');
+const repoRoot = path.join(__dirname, '..', '..');
+const v5UiDir = path.join(repoRoot, 'NEW APP');
+
+function v5UiBuildInvocation(npmCli, stageDir) {
+    return {
+        command: process.execPath,
+        args: [npmCli, 'run', 'build', '--prefix', v5UiDir, '--', '--outDir', stageDir, '--emptyOutDir'],
+        cwd: repoRoot,
+    };
+}
 
 const mode = process.argv[2] === 'dist' ? 'dist' : 'pack';
 const argvHasV5 =
@@ -35,25 +51,109 @@ const isV5 =
     productLine === 'rf' ||
     productLine === 'realistic-farming';
 
-const outDir = isV5 ? getFarmDashV5BuildOutputDir() : getFarmDashBuildOutputDir();
-fs.mkdirSync(outDir, { recursive: true });
+if (process.argv.includes('--inspect-v5-ui-build-command')) {
+    const stageFlag = process.argv.indexOf('--stage');
+    if (!isV5 || stageFlag < 0 || !process.argv[stageFlag + 1] || !process.env.npm_execpath) {
+        console.error('[FarmDash V5] Inspection requires --v5, --stage <isolated path>, and npm_execpath');
+        process.exit(1);
+    }
+    console.log(JSON.stringify(v5UiBuildInvocation(process.env.npm_execpath, process.argv[stageFlag + 1])));
+    process.exit(0);
+}
 
+const outDir = isV5 ? getFarmDashV5BuildOutputDir() : getFarmDashBuildOutputDir();
 if (isV5) {
-    // Stale channel name from older configs. Never delete a sibling V4 latest.yml.
-    const staleRf = path.join(outDir, 'rf.yml');
-    if (fs.existsSync(staleRf)) {
-        fs.unlinkSync(staleRf);
-        console.error('[FarmDash V5] Removed stale rf.yml from output before build.');
+    const expected = path.resolve(farmDashReleaseDir());
+    const resolved = path.resolve(outDir);
+    if (resolved.toLowerCase() !== expected.toLowerCase()) {
+        console.error(`[FarmDash V5] Output ${resolved} is not the flat FarmDash Release directory ${expected}.`);
+        process.exit(1);
+    }
+    if (fs.existsSync(resolved)) {
+        const outStat = fs.lstatSync(resolved);
+        if (outStat.isSymbolicLink()) {
+            console.error(`[FarmDash V5] Refusing to build through a junction or symlink: ${resolved}`);
+            process.exit(1);
+        }
+    }
+    // Checked before anything touches the output folder or ui-v2.
+    const texconv = inspectBundledTexconv(projectDir);
+    if (!texconv.ok) {
+        console.error(formatTexconvReport(texconv));
+        console.error('[FarmDash V5] Stopped before electron-builder; no installer was built.');
+        process.exit(1);
+    }
+    console.error(formatTexconvReport(texconv));
+}
+if (!isV5) fs.mkdirSync(outDir, { recursive: true });
+
+let v5UiProof = null;
+let v5Version = null;
+if (isV5) {
+    const rfConfig = path.join(projectDir, 'electron-builder.rf.yml');
+    if (!fs.existsSync(rfConfig)) {
+        console.error('[FarmDash V5] Missing electron-builder.rf.yml');
+        process.exit(1);
+    }
+    try {
+        v5Version = assertDistinctV5Installer(rfConfig, outDir);
+        const npmCli = process.env.npm_execpath;
+        if (!npmCli || !fs.existsSync(npmCli)) {
+            throw new Error('[FarmDash V5] Run through npm run dist:v5 or npm run pack:v5; npm CLI unavailable');
+        }
+        v5UiProof = buildFreshV5Ui({
+            uiDir: v5UiDir,
+            destination: path.join(projectDir, 'ui-v2'),
+            runBuild: (stageDir) => {
+                const invocation = v5UiBuildInvocation(npmCli, stageDir);
+                const build = spawnSync(invocation.command, invocation.args, {
+                        cwd: invocation.cwd,
+                        stdio: 'inherit',
+                        env: { ...process.env, FARMDASH_V5_STAGING_UI_BUILD: '1' },
+                    });
+                return build.status === null ? 1 : build.status;
+            },
+        });
+        console.error(`[FarmDash V5] Fresh NEW APP source digest: ${v5UiProof.sourceDigest}`);
+    } catch (error) {
+        console.error(error.message);
+        console.error('[FarmDash V5] Stopped before electron-builder; stale ui-v2 was not packed.');
+        process.exit(1);
+    }
+} else {
+    const copyUi = spawnSync(process.execPath, [path.join(__dirname, 'copy-ui-v2.mjs')], {
+        cwd: projectDir,
+        stdio: 'inherit',
+        env: process.env,
+    });
+    if (copyUi.status !== 0) {
+        console.error('[FarmDash] ui-v2 copy failed — build NEW APP first: npm run build:ui');
+        process.exit(copyUi.status === null ? 1 : copyUi.status);
     }
 }
-const copyUi = spawnSync(process.execPath, [path.join(__dirname, 'copy-ui-v2.mjs')], {
+const packGuard = spawnSync(process.execPath, [path.join(__dirname, 'verify-electron-pack-files.mjs')], {
     cwd: projectDir,
     stdio: 'inherit',
     env: process.env,
 });
-if (copyUi.status !== 0) {
-    console.error('[FarmDash] ui-v2 copy failed — build NEW APP first: npm run build:ui');
-    process.exit(copyUi.status === null ? 1 : copyUi.status);
+if (packGuard.status !== 0) {
+    console.error('[FarmDash] package file selection failed before electron-builder');
+    process.exit(packGuard.status === null ? 1 : packGuard.status);
+}
+
+let v5OutputStage = null;
+if (isV5) {
+    try {
+        assertUiSourceStillCurrent(v5UiDir, v5UiProof);
+        v5OutputStage = createV5ReleaseStage(outDir);
+        process.on('exit', () => {
+            try { cleanupV5ReleaseStage(v5OutputStage, outDir); }
+            catch (error) { console.error(`[FarmDash V5] Private stage cleanup failed: ${error.message}`); }
+        });
+    } catch (error) {
+        console.error(`[FarmDash V5] Stopped before electron-builder: ${error.message}`);
+        process.exit(1);
+    }
 }
 
 console.error('');
@@ -71,10 +171,11 @@ if (!fs.existsSync(cli)) {
     process.exit(1);
 }
 
+const builderOutDir = isV5 ? v5OutputStage : outDir;
 const args =
     mode === 'pack'
-        ? [cli, '--dir', `--config.directories.output=${outDir}`]
-        : [cli, '--win', `--config.directories.output=${outDir}`];
+        ? [cli, '--dir', '--publish', 'never', `--config.directories.output=${builderOutDir}`]
+        : [cli, '--win', '--publish', 'never', `--config.directories.output=${builderOutDir}`];
 
 if (isV5) {
     const rfConfig = path.join(projectDir, 'electron-builder.rf.yml');
@@ -109,20 +210,51 @@ if (mode === 'dist') {
 
 let code = result.status === null ? 1 : result.status;
 
+if (code === 0) {
+    const privateGuard = spawnSync(
+        process.execPath,
+        [path.join(__dirname, 'privatePackageGuard.cjs'), '--built', path.join(builderOutDir, 'win-unpacked')],
+        { cwd: projectDir, stdio: 'inherit', env: process.env },
+    );
+    if (privateGuard.status !== 0) {
+        console.error('[FarmDash] Built package contains private env / credential files — treat every artifact from this run as unsafe.');
+        process.exit(1);
+    }
+}
+
+if (code === 0 && isV5) {
+    try {
+        const asarPath = path.join(builderOutDir, 'win-unpacked', 'resources', 'app.asar');
+        verifyV5UiAsar(asarPath, v5UiProof, projectDir);
+        assertUiSourceStillCurrent(v5UiDir, v5UiProof);
+        console.error('[FarmDash V5] app.asar UI entry and assets match the fresh NEW APP source/build manifest.');
+    } catch (error) {
+        console.error(`[FarmDash V5] Packaged UI proof failed: ${error.message}`);
+        console.error('[FarmDash V5] Treat every artifact from this run as unsafe; do not publish or install.');
+        code = 1;
+    }
+}
+
 if (code === 0 && isV5) {
     const guard = spawnSync(
         process.execPath,
-        [path.join(__dirname, 'assert-rf-update-channel.mjs'), outDir],
+        [path.join(__dirname, 'assert-rf-update-channel.mjs'), builderOutDir],
         { cwd: projectDir, stdio: 'inherit', env: process.env },
     );
     code = guard.status === null ? 1 : guard.status;
 }
 
-if (code === 0 && isV5 && mode === 'dist') {
-    const unpacked = path.join(outDir, 'win-unpacked');
-    if (fs.existsSync(unpacked)) {
-        fs.rmSync(unpacked, { recursive: true, force: true });
-        console.error('[FarmDash V5] Removed win-unpacked from the drop folder.');
+if (code === 0 && isV5) {
+    try {
+        const promotion = promoteV5Artifacts({ stageDir: v5OutputStage, releaseDir: outDir, mode, version: v5Version });
+        console.error(`[FarmDash V5] Verified artifacts promoted flat: ${promotion.promoted.join(', ')}`);
+        if (mode === 'dist' && !promotion.updateMetadataPromoted) {
+            console.error('[FarmDash V5] Existing latest-rf.yml preserved; candidate packaging did not change the live update feed.');
+        }
+    } catch (error) {
+        console.error(`[FarmDash V5] Promotion failed: ${error.message}`);
+        console.error('[FarmDash V5] Private staged output will be discarded; existing release artifacts are preserved.');
+        code = 1;
     }
 }
 

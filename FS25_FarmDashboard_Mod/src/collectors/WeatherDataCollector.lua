@@ -4,6 +4,8 @@ WeatherDataCollector = {}
 
 function WeatherDataCollector:init()
     WeatherDataCollector._incWx = false
+    WeatherDataCollector._unknownWeatherCount = 0
+    WeatherDataCollector._unknownWeatherLogged = false
 end
 
 function WeatherDataCollector:collectBegin()
@@ -88,32 +90,32 @@ function WeatherDataCollector:collect()
     local weatherType = nil
     local weatherSource = "missing"
     
-    if weather.currentWeatherType ~= nil then
-        weatherType = weather.currentWeatherType
-        weatherSource = "weather.currentWeatherType"
-    elseif weather.weatherType ~= nil then
-        weatherType = weather.weatherType
-        weatherSource = "weather.weatherType"
-    elseif weather.weatherTypeId ~= nil then
-        weatherType = weather.weatherTypeId
-        weatherSource = "weather.weatherTypeId"
-    elseif weather.weatherTypeIndex ~= nil then
-        weatherType = weather.weatherTypeIndex
-        weatherSource = "weather.weatherTypeIndex"
-    -- Try state-based weather properties
-    elseif weather.actualWeatherType ~= nil then
-        weatherType = weather.actualWeatherType
-        weatherSource = "weather.actualWeatherType"
-    elseif weather.realTimeWeatherType ~= nil then
-        weatherType = weather.realTimeWeatherType
-        weatherSource = "weather.realTimeWeatherType"
-    -- Check if there's a getCurrentWeatherType function
-    elseif weather.getCurrentWeatherType and type(weather.getCurrentWeatherType) == "function" then
+    if weather.getCurrentWeatherType and type(weather.getCurrentWeatherType) == "function" then
         local success, wType = pcall(function() return weather:getCurrentWeatherType() end)
-        if success and wType then
+        if success and wType ~= nil then
             weatherType = wType
             weatherSource = "weather:getCurrentWeatherType()"
         end
+    end
+    if weatherType == nil and weather.currentWeatherType ~= nil then
+        weatherType = weather.currentWeatherType
+        weatherSource = "weather.currentWeatherType"
+    elseif weatherType == nil and weather.weatherType ~= nil then
+        weatherType = weather.weatherType
+        weatherSource = "weather.weatherType"
+    elseif weatherType == nil and weather.weatherTypeId ~= nil then
+        weatherType = weather.weatherTypeId
+        weatherSource = "weather.weatherTypeId"
+    elseif weatherType == nil and weather.weatherTypeIndex ~= nil then
+        weatherType = weather.weatherTypeIndex
+        weatherSource = "weather.weatherTypeIndex"
+    -- Try state-based weather properties
+    elseif weatherType == nil and weather.actualWeatherType ~= nil then
+        weatherType = weather.actualWeatherType
+        weatherSource = "weather.actualWeatherType"
+    elseif weatherType == nil and weather.realTimeWeatherType ~= nil then
+        weatherType = weather.realTimeWeatherType
+        weatherSource = "weather.realTimeWeatherType"
     end
     
     -- Get wind data
@@ -175,6 +177,21 @@ function WeatherDataCollector:collect()
         forecast = self:collectForecast(weather)
     }
 
+    if weatherData.currentWeather == "unknown" then
+        WeatherDataCollector._unknownWeatherCount = (WeatherDataCollector._unknownWeatherCount or 0) + 1
+        if WeatherDataCollector._unknownWeatherCount >= 3 and not WeatherDataCollector._unknownWeatherLogged then
+            WeatherDataCollector._unknownWeatherLogged = true
+            if Logging and type(Logging.warning) == "function" then
+                local rawValue = (type(weatherType) == "number" or type(weatherType) == "string")
+                    and tostring(weatherType) or "unavailable"
+                Logging.warning("[FarmDashboard] Weather unresolved after three collections: source=%s rawType=%s rawValue=%s enum=%s",
+                    weatherSource, type(weatherType), rawValue, type(_G.WeatherType))
+            end
+        end
+    else
+        WeatherDataCollector._unknownWeatherCount = 0
+    end
+
     local mission = _G.g_currentMission
     local ms = mission and mission.MoistureSystem
     if ms then
@@ -226,15 +243,15 @@ function WeatherDataCollector:getWeatherTypeName(weatherType)
         }
         return names[s] or "unknown"
     end
-    local weatherTypes = {
-        [0] = "sun",
-        [1] = "rain",
-        [2] = "cloudy",
-        [3] = "snow",
-        [4] = "fog",
-        [5] = "hail"
-    }
-    return weatherTypes[weatherType] or "unknown"
+    -- WeatherType.lua defines these one-based numeric values in FS25. The
+    -- getter returns that number, but the enum table is not guaranteed to be
+    -- present in a mod's _G on a dedicated server.
+    if weatherType == 1 then return "sun" end
+    if weatherType == 2 or weatherType == 3 then return "cloudy" end
+    if weatherType == 4 or weatherType == 8 then return "rain" end
+    if weatherType == 5 then return "snow" end
+    if weatherType == 6 then return "hail" end
+    return "unknown"
 end
 
 function WeatherDataCollector:collectForecast(weather)

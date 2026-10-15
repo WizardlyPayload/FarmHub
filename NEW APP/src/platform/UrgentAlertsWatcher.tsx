@@ -8,9 +8,9 @@ import {
   type UrgentScanDashboard,
 } from "@/platform/urgent-alerts";
 import {
-  diffMajorDeltas,
+  advanceMajorDeltaTracker,
   takeMajorDeltaSnapshot,
-  type MajorDeltaSnapshot,
+  type MajorDeltaTrackerState,
 } from "@/platform/major-deltas";
 import { showToast } from "@/platform/ChangesModal";
 
@@ -24,8 +24,7 @@ export function UrgentAlertsWatcher() {
   const activeServerId = useDashboardStore((s) => s.activeServerId);
   const dashRef = useRef<UrgentScanDashboard>({});
   const scopeRef = useRef<string>("");
-  const deltaSnapRef = useRef<MajorDeltaSnapshot | null>(null);
-  const deltaScopeRef = useRef<string>("");
+  const deltaStateRef = useRef<MajorDeltaTrackerState | null>(null);
 
   useEffect(() => {
     if (!payload || payload.error) return;
@@ -47,6 +46,9 @@ export function UrgentAlertsWatcher() {
       : [];
     dashRef.current.vehicles = payload.vehicles as UrgentScanDashboard["vehicles"];
     dashRef.current.fields = fields as Array<Record<string, unknown>>;
+    dashRef.current.sectionOutcomes = (payload as {
+      sectionOutcomes?: UrgentScanDashboard["sectionOutcomes"];
+    }).sectionOutcomes;
     dashRef.current.showAlert = (message, type) => showToast(message, type);
     dashRef.current.addNotificationToHistory = (n) => addNotificationToHistory(n);
 
@@ -67,18 +69,16 @@ export function UrgentAlertsWatcher() {
       stock: payload.stock,
       baleInventory: payload.baleInventory,
       vehicles: payload.vehicles,
+      sectionOutcomes: (payload as { sectionOutcomes?: unknown }).sectionOutcomes,
     });
-
-    if (deltaScopeRef.current !== scopeKey) {
-      deltaScopeRef.current = scopeKey;
-      deltaSnapRef.current = nextSnap;
-      return;
-    }
-
-    const events = diffMajorDeltas(deltaSnapRef.current, nextSnap);
-    deltaSnapRef.current = nextSnap;
-
-    for (const ev of events.slice(0, 4)) {
+    const result = advanceMajorDeltaTracker(
+      deltaStateRef.current,
+      scopeKey,
+      (payload as { sourceBinding?: unknown }).sourceBinding,
+      nextSnap,
+    );
+    deltaStateRef.current = result.state;
+    for (const ev of result.events.slice(0, 4)) {
       showToast(ev.message, ev.type);
       addNotificationToHistory({
         type: ev.type,

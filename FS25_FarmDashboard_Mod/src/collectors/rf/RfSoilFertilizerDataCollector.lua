@@ -108,6 +108,28 @@ local function copyCropTargets(ct)
     return out
 end
 
+local CURRENT_PH_STATUS = { FIELD_REPORT = true, LOCAL = true, APPROXIMATE = true }
+
+-- Only a current reading may drive treatment advice. A last-known value is
+-- retained separately for display; it is never promoted into the current pH.
+local function readPH(info)
+    local status = type(info.pHStatus) == "string" and string.upper(info.pHStatus) or nil
+    if status == "" then status = nil end
+    local lastKnown = tonumber(info.pHLastKnown)
+    if lastKnown ~= nil and (lastKnown ~= lastKnown or lastKnown < 0 or lastKnown > 14) then
+        lastKnown = nil
+    end
+    if info.pHReportValid == false then return nil, "WITHHELD", lastKnown end
+    if status ~= nil and not CURRENT_PH_STATUS[status] then
+        return nil, status, lastKnown
+    end
+    local value = tonumber(info.pH)
+    if value == nil or value ~= value or value < 0 or value > 14 then
+        return nil, "UNKNOWN", lastKnown
+    end
+    return value, status, lastKnown
+end
+
 --- "PRODUCT 220 kg/ha (1056 kg)" — mirrors SoilTreatmentDialog._rateString / FarmTablet.
 local function rateString(SC, profileKey, nutrientKey, deficit, rrMult, fieldArea, useImperial)
     if deficit <= 0 or type(SC) ~= "table" then return nil end
@@ -155,13 +177,13 @@ local function nutrientActionText(SC, currentVal, targetVal, rrMult, fieldArea, 
 end
 
 --- Build treatment rows mirroring FarmTablet SoilNutrientApp._buildTreatments.
-local function buildTreatmentPlan(info, SC, settings)
+local function buildTreatmentPlan(info, SC, settings, currentPH, phStatus)
     local rows = {}
     if type(info) ~= "table" then
         return { { key = "none", label = "—", text = "No soil data", priority = "info", hasRates = false } }
     end
 
-    local function add(key, label, text, priority, hasRates)
+    local function add(key, label, text, priority, hasRates, direction)
         if #rows >= MAX_TREATMENT_ROWS then return end
         rows[#rows + 1] = {
             key = key,
@@ -169,6 +191,7 @@ local function buildTreatmentPlan(info, SC, settings)
             text = text,
             priority = priority,
             hasRates = hasRates == true,
+            direction = direction,
         }
     end
 
@@ -188,11 +211,18 @@ local function buildTreatmentPlan(info, SC, settings)
     local targetP = (ct and ct.P and ct.P.opt) or (pT.fair or 40)
     local targetK = (ct and ct.K and ct.K.opt) or (kT.fair or 40)
 
-    local ph = math.floor(((tonumber(info.pH) or 7.0) * 10) + 0.5) / 10
-    if ph < 6.5 then
-        add("ph", "pH", "Apply LIME or LIQUID LIME to raise pH.", "urgent", false)
-    elseif ph > 7.5 then
-        add("ph", "pH", "Apply GYPSUM to lower pH / improve structure.", "watch", false)
+    if currentPH == nil then
+        local text = phStatus == "STALE"
+            and "pH report is stale; check a fresh reading before treating."
+            or "pH reading unavailable; no lime or gypsum advice until measured."
+        add("ph", "pH", text, "info", false)
+    else
+        local ph = math.floor((currentPH * 10) + 0.5) / 10
+        if ph < 6.5 then
+            add("ph", "pH", "Apply LIME or LIQUID LIME to raise pH.", "urgent", false)
+        elseif ph > 7.5 then
+            add("ph", "pH", "Apply GYPSUM to lower pH / improve structure.", "watch", false)
+        end
     end
 
     local om = tonumber(info.organicMatter) or 3.5
@@ -206,35 +236,35 @@ local function buildTreatmentPlan(info, SC, settings)
     if nVal < targetN * 0.60 then
         local text, hasRates = nutrientActionText(SC, nVal, targetN, rrMult, fieldArea,
             { { "UREA", "N" }, { "UAN32", "N" } }, "Apply UREA or UAN32", useImperial)
-        add("n", "N", text, "urgent", hasRates)
+        add("n", "N", text, "urgent", hasRates, "below")
     elseif nVal < targetN then
         local text, hasRates = nutrientActionText(SC, nVal, targetN, rrMult, fieldArea,
             { { "AMS", "N" }, { "AN", "N" } }, "Apply AMS or AN", useImperial)
-        add("n", "N", text, "watch", hasRates)
+        add("n", "N", text, "watch", hasRates, "below")
     end
 
     local pVal = info.phosphorus and tonumber(info.phosphorus.value) or 0
     if pVal < targetP * 0.60 then
         local text, hasRates = nutrientActionText(SC, pVal, targetP, rrMult, fieldArea,
             { { "MAP", "P" }, { "DAP", "P" } }, "Apply MAP or DAP", useImperial)
-        add("p", "P", text, "urgent", hasRates)
+        add("p", "P", text, "urgent", hasRates, "below")
     elseif pVal < targetP then
         local text, hasRates = nutrientActionText(SC, pVal, targetP, rrMult, fieldArea,
             { { "LIQUID_MAP", "P" }, { "LIQUID_DAP", "P" } }, "Top-up with Liquid MAP / DAP", useImperial)
-        add("p", "P", text, "watch", hasRates)
+        add("p", "P", text, "watch", hasRates, "below")
     elseif pVal > targetP * 1.15 then
-        add("p", "P", "Above target - skip P product this pass.", "watch", false)
+        add("p", "P", "Above target - skip P product this pass.", "watch", false, "above")
     end
 
     local kVal = info.potassium and tonumber(info.potassium.value) or 0
     if kVal < targetK * 0.60 then
         local text, hasRates = nutrientActionText(SC, kVal, targetK, rrMult, fieldArea,
             { { "POTASH", "K" }, { "LIQUID_POTASH", "K" } }, "Apply POTASH", useImperial)
-        add("k", "K", text, "urgent", hasRates)
+        add("k", "K", text, "urgent", hasRates, "below")
     elseif kVal < targetK then
         local text, hasRates = nutrientActionText(SC, kVal, targetK, rrMult, fieldArea,
             { { "POTASH", "K" }, { "LIQUID_POTASH", "K" } }, "Top-up with POTASH", useImperial)
-        add("k", "K", text, "watch", hasRates)
+        add("k", "K", text, "watch", hasRates, "below")
     end
 
     if (tonumber(info.weedPressure) or 0) >= PRESSURE_ACTION_THRESH then
@@ -303,7 +333,8 @@ local function readField(soilSystem, fieldId, manager, SC)
     local kFair = (thresh.potassium and thresh.potassium.fair) or 40
     local phOpt = (SC and SC.PH_OPTIMAL) or 6.5
 
-    local treatmentPlan = buildTreatmentPlan(info, SC, settings)
+    local currentPH, phStatus, phLastKnown = readPH(info)
+    local treatmentPlan = buildTreatmentPlan(info, SC, settings, currentPH, phStatus)
 
     -- Soil-test ppm, resolved here so the dashboard never has to mirror SF constants.
     local ppm = ppmFactors(SC)
@@ -324,7 +355,9 @@ local function readField(soilSystem, fieldId, manager, SC)
         nitrogen = copyNutrient(info.nitrogen),
         phosphorus = copyNutrient(info.phosphorus),
         potassium = copyNutrient(info.potassium),
-        pH = tonumber(info.pH),
+        pH = currentPH,
+        pHStatus = phStatus,
+        pHLastKnown = phLastKnown,
         organicMatter = tonumber(info.organicMatter), -- RF contract: 0-10 scalar
         weedPressure = tonumber(info.weedPressure) or 0,
         pestPressure = tonumber(info.pestPressure) or 0,

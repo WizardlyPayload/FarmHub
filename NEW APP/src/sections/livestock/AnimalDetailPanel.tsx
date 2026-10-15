@@ -12,7 +12,15 @@ import {
 } from "@/lib/livestock-format";
 import { formatGeneticsPercent } from "@/lib/genetics-overview";
 import { calculateAnimalValue, getGeneticsDescriptionKey } from "@/lib/livestock-value";
+import { formatCurrency } from "@/lib/economy";
+import { useUnitDisplay } from "@/lib/fill-unit-mode";
+import { saveProfileFromUnitDisplay } from "@/lib/profile-display";
 import type { LivestockAnimal } from "@/lib/livestock-types";
+
+export function EstimatedAnimalMoney({ amount }: { amount: number }) {
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
+  return <>{formatCurrency(amount, profile)}</>;
+}
 
 interface Props {
   animal: LivestockAnimal;
@@ -66,7 +74,7 @@ export function AnimalDetailPanel({ animal, onFullDetails, onOpenPen, onClose }:
         </div>
         <div>
           <span class="fd-livestock__status">{t("livestock.colValue")}</span>
-          <strong>${valueInfo.value.toLocaleString()}</strong>
+          <strong><EstimatedAnimalMoney amount={valueInfo.value} /></strong>
         </div>
         <div>
           <span class="fd-livestock__status">{t("livestock.colAge")}</span>

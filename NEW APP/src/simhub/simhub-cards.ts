@@ -49,7 +49,7 @@ export function simHubFieldCards(
     const fruit = String(f.fruitType || "—");
     const lines: string[] = [];
     if (f.needsWork) lines.push(tOr("simhub.needsWork", "Needs work"));
-    if (f.harvestReady) lines.push(tOr("simhub.harvestReady", "Harvest ready"));
+    if (f.harvestReady && !f.isHarvested) lines.push(tOr("simhub.harvestReady", "Harvest ready"));
     return {
       title: String(f.name || `Field ${f.farmlandId ?? f.id}`),
       badge: f._displayClusterId ? String(f._displayClusterId) : undefined,

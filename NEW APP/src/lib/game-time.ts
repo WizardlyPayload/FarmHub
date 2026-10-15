@@ -1,12 +1,11 @@
 /** Format in-game clock for landing / nav — mirrors legacy environment.getGameTimeDisplay. */
+import { formatProfileClock, type SaveProfileDisplay } from "@/lib/profile-display";
 
-export function formatGameTimeMinutes(dayTimeMinutes: number): string {
-  const hours = Math.floor(dayTimeMinutes / 60);
-  const minutes = Math.floor(dayTimeMinutes % 60);
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+export function formatGameTimeMinutes(dayTimeMinutes: number, profile?: SaveProfileDisplay | null): string {
+  return formatProfileClock(dayTimeMinutes, profile);
 }
 
-export function formatGameTimeDisplay(gameTime: unknown): string | null {
+export function formatGameTimeDisplay(gameTime: unknown, profile?: SaveProfileDisplay | null): string | null {
   if (gameTime == null) return null;
   if (typeof gameTime === "string") {
     const s = gameTime.trim();
@@ -21,7 +20,7 @@ export function formatGameTimeDisplay(gameTime: unknown): string | null {
   ) {
     const hour = parseInt(String(gt.hour ?? 0), 10) || 0;
     const minute = parseInt(String(gt.minute ?? 0), 10) || 0;
-    return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+    return formatProfileClock(hour * 60 + minute, profile);
   }
 
   if (gt.dayTime !== undefined && (gt.currentDay !== undefined || gt.day !== undefined)) {
@@ -29,7 +28,7 @@ export function formatGameTimeDisplay(gameTime: unknown): string | null {
     if (dayTimeMinutes > 1440) {
       dayTimeMinutes = Math.floor(dayTimeMinutes / 1000 / 60);
     }
-    return formatGameTimeMinutes(dayTimeMinutes);
+    return formatGameTimeMinutes(dayTimeMinutes, profile);
   }
 
   return null;

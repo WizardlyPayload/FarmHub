@@ -53,6 +53,38 @@ function RfDairyDataCollector.isModLoaded()
     return modLoaded()
 end
 
+local function dairyModActive(name)
+    local reg = rawget(_G, "FarmDashboardMissionRegistry")
+    if type(reg) == "table" and type(reg.isActive) == "function" then
+        local active = reg.isActive(name)
+        return active == true
+    end
+    local loaded = _G.g_modIsLoaded
+    return type(loaded) == "table" and loaded[name] == true
+end
+
+-- DairyConstants is sourced into the DairyCore mod environment (_G[modName]), not the engine table.
+-- A same-named table on this dashboard's environment is a shadow and is ignored.
+local function dairyConstants()
+    local mt = getmetatable(_G)
+    local parent = type(mt) == "table" and mt.__index or nil
+    for _, name in ipairs(MOD_NAMES) do
+        if dairyModActive(name) then
+            local env = type(parent) == "table" and parent[name] or nil
+            if type(env) ~= "table" then
+                env = rawget(_G, name)
+            end
+            if type(env) == "table" and env ~= _G then
+                local constants = rawget(env, "DairyConstants")
+                if type(constants) == "table" then
+                    return constants
+                end
+            end
+        end
+    end
+    return nil
+end
+
 function RfDairyDataCollector:init()
     RfDairyDataCollector._inc = nil
 end
@@ -77,8 +109,9 @@ local function contractSummary(mgr, barn)
     local typeKey = tostring(c.type or "contract")
     local name = typeKey
     pcall(function()
-        if _G.DairyConstants and DairyConstants.CONTRACTS and DairyConstants.CONTRACTS.TYPES then
-            local ct = DairyConstants.CONTRACTS.TYPES[typeKey]
+        local constants = dairyConstants()
+        if constants and constants.CONTRACTS and constants.CONTRACTS.TYPES then
+            local ct = constants.CONTRACTS.TYPES[typeKey]
             if ct and ct.name then
                 name = tostring(ct.name)
             end

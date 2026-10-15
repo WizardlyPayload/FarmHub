@@ -1,27 +1,27 @@
-# Farm Dashboard V5 — documentation
+# Farm Dashboard V5: player help
 
-This folder is the **V5 (new screens)** paperwork set. It mirrors the classic V4 manuals in `docs/` but describes the **NEW APP** UI (`NEW APP/` → packaged `FS25_FarmDashboard_App/ui-v2/`), not the classic landing cards.
+This is the help pack for the **V5 Windows dashboard**. Start with [installation](INSTALL.md), then use the [manual](USER_MANUAL.md) while exploring the screens. The [optional-mod guide](COMPANION_MODS.md) explains each supported or catalogued mod without pretending every mod provides live data.
 
-Classic V4 manuals stay in [`../`](../). Do **not** treat those screenshots as V5.
+## Which version?
 
-| Document | When to use it |
-| -------- | -------------- |
-| [INSTALL.md](./INSTALL.md) | Install the in-game mod, then **Farm Dashboard V5**, then first-run Setup |
-| [USER_MANUAL.md](./USER_MANUAL.md) | Every V5 screen, Settings tab, section, and modal |
-| [SCREENSHOTS.md](./SCREENSHOTS.md) | Filename manifest + capture recipes |
-| [TESTERS.md](./TESTERS.md) | End-to-end tester checklist (V5 beside V4) |
-| [SECURITY.md](./SECURITY.md) | LAN, passwords, firewall — **V5 listen port** |
-| [COMPATIBILITY.md](./COMPATIBILITY.md) | V4 vs V5, one mod, update feeds |
-| [UPGRADE_FROM_V4.md](./UPGRADE_FROM_V4.md) | Keep classic, add V5 side by side |
-| [CHANGELOG.md](./CHANGELOG.md) | V5 5.0.x history |
-| [GITHUB_RELEASE_v5.0.3.md](./GITHUB_RELEASE_v5.0.3.md) | Paste into a GitHub Release (V5 channel only) |
+- **Documentation candidate:** Windows app **5.0.57** with the canonical `FS25_FarmDashboard.zip` mod **5.0.0.31**. This combination passed local installation and two-client dedicated multiplayer testing on 14 October 2026. It is **not automatically the public download**.
+- **Public website:** still describes its existing V5 5.0.3 download until Graham approves a new release. Use the version displayed on the actual download page if installing from the website.
+- **Classic V4:** a separate product line. Its public 4.2.1 story and update feed have not been changed. This V5 pass was **not** a new V4 test.
 
-**Versions for this pack:** desktop app **5.0.4** (working tree; GitHub Latest is **5.0.3**) · in-game mod **5.0.0.3**.
+## Find the answer you need
 
-**Dashboard URL (installed V5):** [http://localhost:8768](http://localhost:8768)  
-**Repo `npm run dev:new-ui`:** [http://127.0.0.1:8767](http://127.0.0.1:8767) (used for the screenshots in this folder)  
-**Classic V4 stays on 8766** so both apps can run together.
+- [Install and first launch](INSTALL.md): mod ZIP, Windows installer, single-player, dedicated linking, FTP, and removal.
+- [Using the dashboard](USER_MANUAL.md): live versus held, every core section, settings, and alerts.
+- [Optional mods, one by one](COMPANION_MODS.md): 64 catalogued companions and the RF suite, including detection-only limits.
+- [Compatibility](COMPATIBILITY.md): independent combinations and Precision Farming versus Soil Fertilizer.
+- [Screenshots](SCREENSHOTS.md): current-build captures, older illustrations, and images still needing a manual capture.
+- [Troubleshooting](TROUBLESHOOTING.md): short symptom-first help.
+- [Security and LAN](SECURITY.md), [V4 side-by-side](UPGRADE_FROM_V4.md), and [tester checklist](TESTERS.md).
 
-Screenshots live in [`doc-screenshots/`](./doc-screenshots/). Open Markdown Preview (`Ctrl+Shift+V`) to see images.
+The dashboard **reads** game and companion data. It does not plant, buy, repair, or change another mod's settings. The Farm Dashboard mod works without the optional suite.
 
-Product identity: this is **Farm Dashboard V5** (new screens). It is **not** Realistic Farming or Farm Tablet. Optional suite panels appear only when those mods are on the save.
+![V5 overview from the base-game demo save](doc-screenshots/current-5057/base-overview.png)
+
+*Current-build V5 screen from a held demo save. Held means a saved picture, not live gameplay.*
+
+Screenshots in this pack must not expose FTP passwords, pairing secrets, or private player details.

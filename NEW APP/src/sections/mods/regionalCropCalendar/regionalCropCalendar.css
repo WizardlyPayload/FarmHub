@@ -1,0 +1,105 @@
+.fd-cp-rcc__scroll {
+  max-height: 28rem;
+  overflow: auto;
+  border: 1px solid var(--farm-border);
+  border-radius: 12px;
+  margin-top: 0.35rem;
+}
+
+.fd-cp-rcc__table {
+  min-width: 36rem;
+}
+
+.fd-cp-rcc__table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--farm-panel);
+}
+
+.fd-cp-rcc__table th,
+.fd-cp-rcc__table td {
+  padding: 0.35rem 0.4rem;
+}
+
+.fd-cp-rcc__table tbody th {
+  font-weight: 600;
+  color: var(--farm-text);
+  white-space: nowrap;
+  text-align: left;
+}
+
+.fd-cp-rcc__table th.is-current {
+  color: var(--farm-accent);
+}
+
+.fd-cp-rcc__cell {
+  text-align: center;
+  min-width: 1.9rem;
+}
+
+.fd-cp-rcc__cell.is-current,
+.fd-cp-rcc__table th.is-current {
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.fd-cp-rcc__mark,
+.fd-cp-rcc__swatch {
+  display: inline-block;
+  width: 1.1rem;
+  height: 0.7rem;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.is-plant > .fd-cp-rcc__mark,
+.fd-cp-rcc__swatch.is-plant {
+  background: #22c55e;
+}
+
+.is-harvest > .fd-cp-rcc__mark,
+.fd-cp-rcc__swatch.is-harvest {
+  background: #f59e0b;
+}
+
+.is-both > .fd-cp-rcc__mark,
+.fd-cp-rcc__swatch.is-both {
+  background: linear-gradient(90deg, #22c55e 50%, #f59e0b 50%);
+}
+
+.fd-cp-rcc__swatch.is-current {
+  background: rgba(34, 197, 94, 0.25);
+  border: 1px solid var(--farm-accent);
+}
+
+.fd-cp-rcc__tag {
+  margin-left: 0.35rem;
+  padding: 0 0.3rem;
+  border: 1px solid var(--farm-border);
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--farm-text-muted);
+}
+
+.fd-cp-rcc__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+}
+
+.fd-cp-rcc__legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.fd-cp-rcc__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.35rem 0 0.6rem;
+}

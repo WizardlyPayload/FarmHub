@@ -22,6 +22,7 @@ import {
   type FieldRecord,
   type GameSettings,
 } from "@/lib/rules-engine";
+import { xmlGrowthLooksHarvested } from "@/lib/field-harvest-state";
 import type {
   FieldFilterType,
   FieldStatus,
@@ -187,6 +188,7 @@ export function fieldIsAlreadyHarvested(field: FieldRecord): boolean {
   if (spinach === "ready" || spinach === "ready_second") return false;
   if (field.isHarvested === true) return true;
   if (field.growthLabel === "harvested") return true;
+  if (xmlGrowthLooksHarvested(field)) return true;
   const gt = String(field.groundType || "").toUpperCase();
   return gt.includes("HARVESTED");
 }
@@ -248,21 +250,23 @@ export function formatCropName(name: unknown): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function formatFieldHectares(field: FieldRecord): string {
+export function formatFieldHectares(field: FieldRecord, profile?: { effective?: { acre?: boolean } } | null): string {
   const ha = Number(field?.hectares);
-  if (Number.isFinite(ha) && ha > 0.001) return `${ha.toFixed(2)} ha`;
-  return "—";
+  if (!(Number.isFinite(ha) && ha > 0.001)) return "—";
+  if (profile?.effective?.acre === true) return `${(ha * 2.471053814671653).toFixed(2)} ac`;
+  return `${ha.toFixed(2)} ha`;
 }
 
 export function computeFieldStats(fields: FieldRecord[]) {
-  const totalArea = fields.reduce((s, f) => s + (f.hectares || 0), 0);
-  const needsWork = fields.filter(
+  const list = Array.isArray(fields) ? fields : [];
+  const totalArea = list.reduce((s, f) => s + (f.hectares || 0), 0);
+  const needsWork = list.filter(
     (f) => f.needsWork || f.needsRolling || fieldShowsWithered(f),
   ).length;
-  const harvestReady = fields.filter((f) => effectiveHarvestReady(f)).length;
-  const haKnown = fields.some((f) => Number(f.hectares) > 0.001);
+  const harvestReady = list.filter((f) => effectiveHarvestReady(f)).length;
+  const haKnown = list.some((f) => Number(f.hectares) > 0.001);
   return {
-    count: fields.length,
+    count: list.length,
     totalArea: haKnown ? totalArea.toFixed(1) : "—",
     needsWork,
     harvestReady,
@@ -492,30 +496,155 @@ export function buildProgressBar(field: FieldRecord): ProgressBarModel {
   return { pct, bg, label: tail, textColour: contrastForBg(bg) };
 }
 
+export type SoilFact = {
+  provider: "precision-farming" | "vanilla" | "unknown";
+  scan: "scanned" | "unscanned" | "unknown";
+  current: number | null;
+  target: number | null;
+  sampledAt: number | null;
+  reason: "measured" | "measured-zero" | "awaiting-live" | "needs-scan" | "unknown" | "vanilla" | "held";
+};
+
+function finiteSoil(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Shared current/target/scan/sample-age selection for card, overview, and map. */
+export function resolveSoilReading(field: FieldRecord): { nitrogen: SoilFact; ph: SoilFact } {
+  if (!field || typeof field !== "object") {
+    const unknown: SoilFact = {
+      provider: "unknown",
+      scan: "unknown",
+      current: null,
+      target: null,
+      sampledAt: null,
+      reason: "unknown",
+    };
+    return { nitrogen: unknown, ph: unknown };
+  }
+  const held = field.soilReadState === "failed" || field.soilReadState === "held";
+  if (field.isPrecisionFarming === true) {
+    const scan: SoilFact["scan"] =
+      field.isScanned === true ? "scanned" : field.isScanned === false ? "unscanned" : "unknown";
+    const metricHeld = (state: unknown) => state === "failed" || state === "held";
+    const reasonFor = (current: number | null, metricState: unknown): SoilFact["reason"] => {
+      if (metricState === "pending" || metricState === "unavailable" || metricState === "unknown" || metricState === "partial") {
+        return "unknown";
+      }
+      if (held || metricHeld(metricState)) return "held";
+      if (scan === "unscanned") return "needs-scan";
+      if (scan !== "scanned" || current == null) return scan === "scanned" ? "awaiting-live" : "unknown";
+      return current === 0 ? "measured-zero" : "measured";
+    };
+    const metricTime = (metricAt: unknown, metricState: unknown) => {
+      const own = finiteSoil(metricAt);
+      if (own != null) return own;
+      if (metricHeld(metricState)) return null;
+      return finiteSoil(field.soilSampledAt);
+    };
+    const blank = (reason: SoilFact["reason"]): SoilFact => ({
+      provider: "precision-farming",
+      scan,
+      current: null,
+      target: null,
+        sampledAt: finiteSoil(field.soilSampledAt),
+        reason,
+    });
+    if (scan === "unscanned") {
+      const reason = held ? "held" : "needs-scan";
+      return { nitrogen: blank(reason), ph: blank(reason) };
+    }
+    const nCurrent = finiteSoil(field.nitrogenLevel);
+    const phCurrent = finiteSoil(field.phValue);
+    return {
+      nitrogen: {
+        provider: "precision-farming",
+        scan,
+        current: nCurrent,
+        target: finiteSoil(field.targetNitrogen),
+        sampledAt: metricTime(field.nitrogenSampledAt, field.nitrogenReadState),
+        reason: reasonFor(nCurrent, field.nitrogenReadState),
+      },
+      ph: {
+        provider: "precision-farming",
+        scan,
+        current: phCurrent,
+        target: finiteSoil(field.targetPh),
+        sampledAt: metricTime(field.phSampledAt, field.phReadState),
+        reason: reasonFor(phCurrent, field.phReadState),
+      },
+    };
+  }
+  const level = finiteSoil(field.fertilizationLevel);
+  return {
+    nitrogen: {
+      provider: "vanilla",
+      scan: "unknown",
+      current: level,
+      target: null,
+      sampledAt: finiteSoil(field.soilSampledAt),
+      reason: held ? "held" : level == null ? "unknown" : "vanilla",
+    },
+    ph: {
+      provider: "vanilla",
+      scan: "unknown",
+      current: null,
+      target: null,
+      sampledAt: finiteSoil(field.soilSampledAt),
+      reason: held ? "held" : field.needsLime === true || field.needsLime === false ? "vanilla" : "unknown",
+    },
+  };
+}
+
+export function overviewSoilLine(field: FieldRecord): string | null {
+  const n = resolveSoilReading(field).nitrogen;
+  if (n.reason === "needs-scan") return t("fields.needsScan");
+  if (n.reason === "awaiting-live" || (n.reason === "held" && n.current == null) || n.reason === "unknown") {
+    return n.provider === "precision-farming" ? tOr("fields.pfAwaitingLive", "Awaiting live soil map…") : null;
+  }
+  if ((n.reason === "measured" || n.reason === "measured-zero") && n.current != null && n.target != null) {
+    return t("fields.pfNitrogenLevels", { current: Math.round(n.current), target: Math.round(n.target) });
+  }
+  if (n.reason === "held" && n.current != null && n.target != null) {
+    return t("fields.soilLastKnown", {
+      detail: t("fields.pfNitrogenLevels", { current: Math.round(n.current), target: Math.round(n.target) }),
+    });
+  }
+  return null;
+}
+
 export function buildSoilBars(field: FieldRecord): { nitrogen: SoilBarModel; ph: SoilBarModel } {
+  const reading = resolveSoilReading(field);
   const isPF = field.isPrecisionFarming;
-  const scanned = field.isScanned;
 
   let nProgress = 0;
   let nColour = "#6c757d";
-  let nLabel = field.nitrogenText || "0/2";
+  let nLabel = field.nitrogenText || "";
 
   if (isPF) {
-    if (!scanned) {
+    if (reading.nitrogen.reason === "needs-scan") {
       nLabel = t("fields.needsScan");
       nColour = "#dc3545";
       nProgress = 0;
     } else {
       const tn = nitrogenTargetForDisplay(field);
-      const ratio = tn > 0 ? field.nitrogenLevel / tn : 0;
-      nProgress = Math.min(100, ratio * 100);
-      if (ratio < 0.25) nColour = "#dc3545";
-      else if (ratio < 0.6) nColour = "#fd7e14";
-      else if (ratio < 0.9) nColour = "#ffc107";
-      else if (ratio <= 1.1) nColour = "#198754";
-      else nColour = "#0dcaf0";
-      const nl = Number(field.nitrogenLevel ?? 0);
-      if (tn > 0) {
+      const nl = reading.nitrogen.current;
+      const nlOk = nl != null;
+      if (!nlOk || !(tn > 0)) {
+        // XML PF flags without live Lua N — do not show fertilizer steps as "0/2".
+        nLabel = tOr("fields.pfAwaitingLive", "Awaiting live soil map…");
+        nColour = "#6c757d";
+        nProgress = 0;
+      } else {
+        const ratio = nl / tn;
+        nProgress = Math.min(100, ratio * 100);
+        if (ratio < 0.25) nColour = "#dc3545";
+        else if (ratio < 0.6) nColour = "#fd7e14";
+        else if (ratio < 0.9) nColour = "#ffc107";
+        else if (ratio <= 1.1) nColour = "#198754";
+        else nColour = "#0dcaf0";
         const gap = Math.max(0, tn - nl);
         const gapPct = gap / tn;
         nLabel =
@@ -532,10 +661,16 @@ export function buildSoilBars(field: FieldRecord): { nitrogen: SoilBarModel; ph:
       }
     }
   } else {
-    const fl = Number(field.fertilizationLevel ?? 0);
+    const fl = reading.nitrogen.current;
+    if (fl == null) {
+      nLabel = field.nitrogenText || t("fields.badgeEmpty");
+      nColour = "#6c757d";
+      nProgress = 0;
+    } else {
     nProgress = (fl / 2) * 100;
     nColour = fl === 0 ? "#dc3545" : fl === 1 ? "#ffc107" : "#198754";
     nLabel = t("fields.fertilizationLevel", { cur: fl });
+    }
   }
 
   let phProgress = 0;
@@ -543,14 +678,19 @@ export function buildSoilBars(field: FieldRecord): { nitrogen: SoilBarModel; ph:
   let phLabel = field.limeText || (field.needsLime ? t("fields.phNeeded") : t("fields.phDone"));
 
   if (isPF) {
-    if (!scanned) {
+    if (reading.ph.reason === "needs-scan") {
       phLabel = t("fields.needsScan");
       phColour = "#dc3545";
       phProgress = 0;
     } else {
-      const pv = Number(field.phValue);
-      const pvOk = Number.isFinite(pv) ? pv : 0;
+      const pv = reading.ph.current;
       const tgt = Number(field.targetPh);
+      const pvOk = pv != null && Number.isFinite(pv) ? pv : null;
+      if (pvOk == null) {
+        phLabel = tOr("fields.pfAwaitingLive", "Awaiting live soil map…");
+        phColour = "#6c757d";
+        phProgress = 0;
+      } else {
       const barMax =
         Number.isFinite(tgt) && tgt > 0
           ? tgt
@@ -595,11 +735,21 @@ export function buildSoilBars(field: FieldRecord): { nitrogen: SoilBarModel; ph:
                 target: tgt.toFixed(1),
               });
       }
+      } // hasLivePh
     }
   } else {
     phProgress = field.needsLime ? 0 : 100;
     phColour = field.needsLime ? "#dc3545" : "#198754";
     phLabel = field.needsLime ? t("fields.limeNeededSoil") : t("fields.limeOk");
+  }
+
+  if (reading.nitrogen.reason === "held") {
+    nColour = "#6c757d";
+    nLabel = t("fields.soilLastKnown", { detail: nLabel });
+  }
+  if (reading.ph.reason === "held") {
+    phColour = "#6c757d";
+    phLabel = t("fields.soilLastKnown", { detail: phLabel });
   }
 
   return {
@@ -829,7 +979,7 @@ function sanitizeSuggestionCopy(str: unknown): string {
 }
 
 function pickApiFallbackSuggestion(field: FieldRecord) {
-  if (!field.suggestions || field.suggestions.length === 0) return null;
+  if (!Array.isArray(field.suggestions) || field.suggestions.length === 0) return null;
   let sorted = [...field.suggestions].sort(
     (a: { priority?: number }, b: { priority?: number }) =>
       (a.priority || 9) - (b.priority || 9),

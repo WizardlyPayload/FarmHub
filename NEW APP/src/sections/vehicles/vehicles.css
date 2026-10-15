@@ -700,3 +700,78 @@ button.fd-vehicles-summary-card {
   margin: 0;
   color: var(--farm-accent);
 }
+
+/* Companion mod readings folded into the fleet page (Courseplay, Vehicle Mileage, Out Of Fuel). */
+.fd-vehicle-card__stats {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.fd-vehicle-card__stats .fd-vehicle-card__stat:last-child:not(:first-child) {
+  text-align: right;
+}
+
+.fd-vehicles__cp {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.fd-vehicles__cp small {
+  line-height: 1.25;
+}
+
+.fd-vehicles__fuel-note,
+.fd-vehicles__trip {
+  display: block;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.fd-vehicles__mod-flags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.2rem;
+}
+
+.fd-vehicles__mod-note {
+  margin: -0.35rem 0 0.75rem;
+  color: var(--farm-text-muted);
+  font-size: 0.85rem;
+}
+
+.fd-vehicles__mod-details {
+  margin: 0 0 1rem;
+  border: 1px solid var(--farm-border);
+  border-radius: 10px;
+  padding: 0.5rem 0.75rem;
+}
+
+.fd-vehicles__mod-details > summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--farm-accent);
+}
+
+.fd-vehicles__mod-kv {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 0.5rem 1rem;
+  margin: 0.6rem 0 0.2rem;
+}
+
+.fd-vehicles__mod-kv dt {
+  color: var(--farm-text-muted);
+  font-size: 0.72rem;
+}
+
+.fd-vehicles__mod-kv dd {
+  margin: 0.1rem 0 0;
+  font-weight: 600;
+}

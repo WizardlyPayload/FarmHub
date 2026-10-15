@@ -111,4 +111,4 @@ Install mod on the **host**, restart server, load save once. For FTP: confirm `d
 
 **Issues:** FS25 version, SP vs dedicated, **app 4.2.0**, **mod 3.4.0.6**, local vs FTP — [Open an issue](https://github.com/WizardlyPayload/FarmHub/issues).
 
-**Community:** [Discord](https://discord.gg/D4sEHM59)
+**Community:** [Discord](https://discord.gg/ZCG9C7h7aT)

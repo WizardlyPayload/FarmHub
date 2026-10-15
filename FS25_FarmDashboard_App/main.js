@@ -26,7 +26,7 @@ const FARMDASH_DEV =
 const editionPolicy = require('./editionPolicy.cjs');
 const uiServePolicy = require('./uiServePolicy.cjs');
 const PRODUCT_LINE = editionPolicy.resolveProductLine();
-editionPolicy.applySessionPaths(app, { productLine: PRODUCT_LINE, isDev: FARMDASH_DEV });
+const SESSION_USER_DATA_DIR = editionPolicy.applySessionPaths(app, { productLine: PRODUCT_LINE, isDev: FARMDASH_DEV }) || app.getPath("userData");
 
 function resolveFarmdashPort() {
     return editionPolicy.resolvePort({ isDev: FARMDASH_DEV, productLine: PRODUCT_LINE });
@@ -59,6 +59,7 @@ const LAN_ACCESS_DEFAULTS = {
 const {
     collectXmlData,
     getSavegameXmlFingerprint,
+    isExplicitReplicaXmlSource,
     SAVEGAME_XML_FILES,
     FTP_SAVEGAME_XML_DOWNLOAD_ORDER,
 } = require('./xmlCollector');
@@ -67,8 +68,16 @@ const {
     downloadHttpFeedSavegameXml,
 } = require('./httpFeedXml');
 const { mergeData, buildFieldLiveFingerprints, supplementRedTapeCropRotation, applyResolvedMapBounds } = require('./dataMerger');
+const exportIngress = require('./exportIngress');
+const ingressOrchestration = require('./ingressOrchestration');
+const { createBoundSourcePublication, ownsOrigin, statusForPayload } = require('./boundSourcePublication.cjs');
+const localIngressController = require('./localIngressController');
+const replicaRegistration = require('./replicaRegistration');
+const pendingReplicaSession = require('./pendingReplicaSession.cjs');
+const { ensureIdentityProposal, publishIdentityProposalFtp } = require('./identityProvision');
 const { isCorsOriginAllowed: corsOriginAllowedPure, isLocalServerHost: isLocalServerHostPure } = require('./corsPolicy');
 const lanHttpPath = require('./lanHttpPath.cjs');
+const publicDemoHost = require('./publicDemoHostPolicy.cjs');
 const safeFsIdentity = require('./safeFsIdentity.cjs');
 const fileCommit = require('./fileCommit.cjs');
 const { ftpAccessOptions } = require('./ftpAccess.cjs');
@@ -77,6 +86,7 @@ const {
     resolveServersForSave,
     configNeedsServerReboot,
 } = require('./setupConfigMerge.cjs');
+const runtimeActivation = require('./runtimeActivation');
 const { hydrateLuaDataAnimalsFromDetails, hydrateLuaDataAnimalsFromDetailsAsync } = require('./detailAnimalsHydrate');
 const { loadServerCache, saveServerCache, appendFieldHistory } = require('./serverDataCache');
 const { initAppUpdater, checkForUpdatesNow } = require('./app-updater');
@@ -95,6 +105,7 @@ const {
     updateLiveSectionBackup,
     updateLastGoodMergedSnapshot,
     buildHeldPayloadFromState,
+    liftSectionOutcomes,
 } = require('./mergedSnapshotHold');
 const { isLuaExportStale, resolveLuaExportStaleMs } = require('./liveExportFreshness');
 const livestockDetailModule = require('./livestockDetail.js');
@@ -104,9 +115,12 @@ const {
     createUxEventLog,
     applyFreshnessMeta,
     ERROR_CODES,
+    selectStatusSource,
+    sourceSetupEvidence,
+    publicStatusForSource,
 } = require('./uxContract.cjs');
 
-const store = new Store({ defaults: { ...LAN_ACCESS_DEFAULTS } });
+const store = new Store({ cwd: SESSION_USER_DATA_DIR, defaults: { ...LAN_ACCESS_DEFAULTS } });
 
 /** In-memory LAN prefs snapshot — refreshed at startup and whenever LAN settings are saved (avoid hot-path store.get churn). */
 let lanSecurityCache = {
@@ -200,7 +214,7 @@ const VALID_LOCALE_RE = /^[a-z]{2}$/;
 
 /** Written by the NSIS installer (first page); consumed on first app launch. */
 async function consumeInstallLocaleFile() {
-    const p = path.join(app.getPath('userData'), 'install-locale.txt');
+    const p = path.join(SESSION_USER_DATA_DIR, 'install-locale.txt');
     let raw;
     try {
         raw = await fs.promises.readFile(p, 'utf8');
@@ -268,6 +282,10 @@ function registerTrustedEvent(channel, handler) {
     });
 }
 let serverStates = {};   // id → { luaData, xmlData, mergedData, watcher, intervals[] }
+const boundSources = createBoundSourcePublication({
+    // The private restart comparison may inspect credentials, but no signature leaves this process.
+    sameBinding: (before, after) => !configNeedsServerReboot({ servers: [before] }, { servers: [after] }),
+});
 const uxEventLog = createUxEventLog();
 let uxRequiresRestart = false;
 
@@ -323,7 +341,7 @@ async function resolveModExportScriptPath() {
  */
 function resolveModStoreImagesOutputDir() {
     if (app.isPackaged) {
-        return path.join(app.getPath('userData'), 'items_mod_extract');
+        return path.join(SESSION_USER_DATA_DIR, 'items_mod_extract');
     }
     return path.join(__dirname, 'web', 'assests', 'img', 'items_mod_extract');
 }
@@ -695,7 +713,16 @@ function getCachedLocalInterfaceIps() {
     return set;
 }
 
+/**
+ * The website demo tunnel connects from loopback with a public demo Host. Such a request is the public,
+ * not this PC: it never inherits loopback or same-machine trust.
+ */
+function isPublicDemoRequest(req) {
+    return publicDemoHost.isPublicDemoHost(req && req.headers && req.headers.host);
+}
+
 function isRequestFromThisMachine(req) {
+    if (isPublicDemoRequest(req)) return false;
     const raw = requestRemoteAddress(req);
     if (isLoopbackIp(raw)) return true;
     const nip = normalizeSocketIp(raw);
@@ -780,7 +807,11 @@ function logWindowsSocketsForFarmdashPort() {
     );
 }
 
-function redactConfigForHttpGet(config) {
+/**
+ * Config as it may leave the main process (renderer IPC, setup HTTP GET): no FTP password, feed code or replica
+ * session pairing; only *Set flags. Saves restore the stored values via mergeServersPreserveSecrets.
+ */
+function redactConfigSecrets(config) {
     const c = config && typeof config === 'object' ? JSON.parse(JSON.stringify(config)) : {};
     if (!Array.isArray(c.servers)) return c;
     c.servers = c.servers.map((s) => {
@@ -794,6 +825,13 @@ function redactConfigForHttpGet(config) {
             copy.httpFeedCodeSet = true;
         } else {
             copy.httpFeedCodeSet = false;
+        }
+        if (copy.replicaRegistration && typeof copy.replicaRegistration === 'object' && !Array.isArray(copy.replicaRegistration)) {
+            const registration = { ...copy.replicaRegistration };
+            const hadPairing = registration.sessionPairing != null && String(registration.sessionPairing).length > 0;
+            delete registration.sessionPairing;
+            registration.sessionPairingSet = hadPairing;
+            copy.replicaRegistration = registration;
         }
         return copy;
     });
@@ -818,6 +856,121 @@ function isLocalServerHost(hostname) {
     return isLocalServerHostPure(hostname, getCachedLocalInterfaceIps());
 }
 
+/** Strict Host header parse: `name[:port]` or `[ipv6][:port]`. Anything else is malformed (null). */
+function parseHostHeader(raw) {
+    const s = typeof raw === 'string' ? raw : '';
+    if (!s || s.length > 255) return null;
+    const m = /^\[([0-9a-f:.]+)\](?::(\d{1,5}))?$/i.exec(s)
+        || /^([a-z0-9](?:[a-z0-9.-]*[a-z0-9])?)(?::(\d{1,5}))?$/i.exec(s);
+    if (!m) return null;
+    return { hostname: m[1].toLowerCase(), port: m[2] === undefined ? null : Number(m[2]) };
+}
+
+/**
+ * Names this listener legitimately answers to: this PC's NIC IPs, its machine name, and the address the
+ * socket was accepted on (loopback names are added by isLocalServerHostPure). Never read from Host or
+ * X-Forwarded-* / Forwarded — trust proxy stays false.
+ */
+function listenerHostNames(req) {
+    const names = new Set(getCachedLocalInterfaceIps());
+    const local = normalizeSocketIp(req && req.socket && req.socket.localAddress);
+    if (local && local !== '0.0.0.0' && local !== '::') names.add(local);
+    const machine = String(os.hostname() || '').trim().toLowerCase();
+    if (machine) {
+        names.add(machine);
+        names.add(machine + '.local');
+    }
+    return names;
+}
+
+/**
+ * DNS-rebinding guard: the Host header must name this listener on the port the socket was accepted on.
+ * Runs before the loopback bypass, so a rebound attacker name on 127.0.0.1 is still refused.
+ */
+function requestHostAllowed(req) {
+    const host = parseHostHeader(req && req.headers && req.headers.host);
+    const listenPort = Number(req && req.socket && req.socket.localPort);
+    if (!host || !Number.isInteger(listenPort) || listenPort <= 0) return false;
+    if ((host.port == null ? 80 : host.port) !== listenPort) return false;
+    return isLocalServerHostPure(host.hostname, listenerHostNames(req));
+}
+
+function isHostGatedPath(normalizedPath) {
+    return lanHttpPath.isApiPath(normalizedPath) || normalizedPath === '/setup.html';
+}
+
+function hostGateMiddleware(req, res, next) {
+    const pathOnly = lanHttpPath.normalizeHttpPath(req.path || (req.url && String(req.url).split('?')[0]) || '');
+    if (isPublicDemoRequest(req)) {
+        if (publicDemoHost.demoRequestAllowed(req.method, pathOnly)) return next();
+        res.setHeader('Cache-Control', 'no-store');
+        return res.status(403).json({ ok: false, error: 'Read-only demo', errorCode: publicDemoHost.ERROR_DEMO_READ_ONLY });
+    }
+    if (!isHostGatedPath(pathOnly) || requestHostAllowed(req)) return next();
+    res.setHeader('Cache-Control', 'no-store');
+    // Setup keeps its own denial contract (JSON for the API at any path casing, redirect for the page).
+    if (pathOnly === '/setup.html') return denySetupAccess(req, res, { status: 403 });
+    if (pathOnly === '/api/setup-config') {
+        return res.status(403).json({
+            ok: false,
+            error: setupAccessPolicy.LOCAL_ONLY_MESSAGE,
+            errorCode: setupAccessPolicy.ERROR_SETUP_LOCAL_ONLY,
+        });
+    }
+    return res.status(403).json({ ok: false, error: 'Host not allowed', errorCode: 'E_HOST_NOT_ALLOWED' });
+}
+
+/** Electron resolves `*.asar` path segments as archives; never let a request path reach that. */
+function denyArchivePathMiddleware(req, res, next) {
+    const segments = lanHttpPath.normalizeHttpPath(req.path || '').split('/');
+    if (!segments.some((seg) => seg.endsWith('.asar') || seg.endsWith('.asar.unpacked'))) return next();
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(404).type('text/plain').send('Not Found');
+}
+
+const FS_NOT_FOUND_CODES = new Set(['ENOENT', 'ENOTDIR', 'ENAMETOOLONG']);
+
+function httpErrorStatus(err) {
+    const s = Number(err && (err.status || err.statusCode));
+    if (Number.isInteger(s) && s >= 400 && s < 600) return s;
+    if (err && FS_NOT_FOUND_CODES.has(err.code)) return 404;
+    return 500;
+}
+
+/** Same body shape as the route catches used, minus the raw exception text. */
+function apiInternalErrorBody(extra) {
+    return { ...(extra || {}), error: 'internal_error', errorCode: 'E_INTERNAL' };
+}
+
+/** Last-stage handler: status + stable code only; no exception text, stack, file path or token reaches the client. */
+function farmdashHttpErrorHandler(err, req, res, _next) {
+    const status = httpErrorStatus(err);
+    const pathOnly = String(req.path || '').slice(0, 120);
+    const detail = err && err.message ? err.message : String(err);
+    console.error('[http] error', status, req.method, pathOnly, err && err.code ? err.code : '', String(detail).slice(0, 200));
+    if (res.headersSent) {
+        if (req.socket) req.socket.destroy();
+        return;
+    }
+    const errorCode = status === 404 ? 'E_NOT_FOUND' : status >= 500 ? 'E_INTERNAL' : 'E_BAD_REQUEST';
+    res.statusCode = status;
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (lanHttpPath.isApiPath(pathOnly)) {
+        const error = status === 404 ? 'not_found' : status >= 500 ? 'internal_error' : 'bad_request';
+        return res.json({ ok: false, error, errorCode });
+    }
+    return res.type('text/plain').send(http.STATUS_CODES[status] || 'Error');
+}
+
+let httpErrorHandlerInstalled = false;
+
+function ensureHttpErrorHandler() {
+    if (httpErrorHandlerInstalled) return;
+    httpErrorHandlerInstalled = true;
+    expressApp.use(farmdashHttpErrorHandler);
+}
+
 function corsOriginAllowed(origin, callback) {
     const allowed = corsOriginAllowedPure(origin, {
         port: PORT,
@@ -834,7 +987,16 @@ function corsOriginAllowed(origin, callback) {
 function checkLanAccessForRequest(req) {
     const rawIp = requestRemoteAddress(req);
     const expressIp = req.ip ? String(req.ip) : '';
-    if (isLoopbackIp(expressIp) || isLoopbackIp(rawIp)) {
+    const demo = isPublicDemoRequest(req);
+    if (demo) {
+        const method = String(req.method || 'GET').toUpperCase();
+        const pathOnly = lanHttpPath.normalizeHttpPath(req.path || (req.url && String(req.url).split('?')[0]) || '');
+        if (!publicDemoHost.demoRequestAllowed(method, pathOnly)) {
+            return { ok: false, code: 403, message: 'Forbidden' };
+        }
+        // Only the tunnel on this PC serves the public demo; a LAN client naming the demo Host gets no shortcut.
+        if (isLoopbackIp(rawIp)) return { ok: true };
+    } else if (isLoopbackIp(expressIp) || isLoopbackIp(rawIp)) {
         return { ok: true };
     }
     // Same PC often opens http://THIS-PC-LAN-IP:8766 — trust like loopback without Basic churn.
@@ -916,6 +1078,7 @@ function lanAccessHttpMiddleware(req, res, next) {
 
 /** TCP client is loopback — used to block LAN from triggering heavy/sensitive HTTP actions. */
 function isLocalhostSocket(req) {
+    if (isPublicDemoRequest(req)) return false;
     return isLoopbackIp(requestRemoteAddress(req));
 }
 
@@ -1030,6 +1193,9 @@ function sendDashboardHtml(res, fileName, classicRel) {
     return res.status(404).end();
 }
 
+// Host is checked before CORS and before the LAN loopback bypass; Origin/CORS stay as a separate layer.
+expressApp.use(hostGateMiddleware);
+expressApp.use(denyArchivePathMiddleware);
 expressApp.use(cors({ origin: corsOriginAllowed }));
 // Explicit cap (config saves are small JSON). Per-route parsers may set tighter limits (e.g. livestock 8kb).
 expressApp.use(express.json({ limit: '256kb' }));
@@ -1107,11 +1273,11 @@ expressApp.get('/api/map-overview-image', async (req, res) => {
         if (!result.ok) {
             result.modsFoldersChecked = modsRoots;
         }
-        return res.json(result);
+        return res.json(isPublicDemoRequest(req) ? publicDemoHost.redactMapResultForDemo(result) : result);
     } catch (e) {
         const msg = e && e.message ? e.message : String(e);
         console.warn('[map-overview]', msg);
-        return res.status(500).json({ ok: false, error: msg });
+        return res.status(500).json(apiInternalErrorBody({ ok: false }));
     }
 });
 expressApp.get('/api/map-field-outlines', async (req, res) => {
@@ -1124,11 +1290,11 @@ expressApp.get('/api/map-field-outlines', async (req, res) => {
         const modsRoots = collectFs25ModsDirectories(getElectronDocumentsPath);
         const modsRoot = modsRoots[0] || path.join(getFs25DocumentsRoot(), 'mods');
         const result = await resolveMapFieldOutlines({ mapId, mapTitle, modsRoot, modsRoots });
-        return res.json(result);
+        return res.json(isPublicDemoRequest(req) ? publicDemoHost.redactMapResultForDemo(result) : result);
     } catch (e) {
         const msg = e && e.message ? e.message : String(e);
         console.warn('[map-field-outlines]', msg);
-        return res.status(500).json({ ok: false, error: msg, fields: [] });
+        return res.status(500).json(apiInternalErrorBody({ ok: false, fields: [] }));
     }
 });
 const newUiDistDir = resolveNewUiDistDir();
@@ -1223,16 +1389,16 @@ expressApp.get('/app-brand-icon.ico', async (req, res) => {
     }
 });
 
-/** Setup wizard JSON — FTP / feed secrets never included (use ftpPassSet / httpFeedCodeSet). Electron uses IPC for full config. Local-first: not for LAN tablets. */
+/** Setup wizard JSON — FTP / feed / replica pairing secrets never included (only *Set flags), same as IPC. Local-first: not for LAN tablets. */
 expressApp.get('/api/setup-config', (req, res) => {
     try {
         const access = evaluateSetupAccess(req, false);
         if (!access.ok) return denySetupAccess(req, res, access);
         res.setHeader('Cache-Control', 'no-store');
-        res.json(redactConfigForHttpGet(store.get('config') || {}));
+        res.json(redactConfigSecrets(store.get('config') || {}));
     } catch (e) {
         console.error('[api/setup-config GET]', e);
-        res.status(500).json({ error: String(e.message || e) });
+        res.status(500).json(apiInternalErrorBody());
     }
 });
 
@@ -1252,41 +1418,169 @@ expressApp.post('/api/setup-config', async (req, res) => {
         if (!Array.isArray(body.servers)) {
             return res.status(400).json({ ok: false, error: 'servers array required' });
         }
-        await applyFarmdashSetupConfig(body);
+        const saved = await applyFarmdashSetupConfig(body);
+        if (saved && saved.ok === false) {
+            return res.status(500).json({ ok: false, error: saved.error || "recovery-required", recoveryPending: true });
+        }
         res.setHeader('Cache-Control', 'no-store');
-        res.json({ ok: true });
+        res.json({ ok: true, recoveryPending: !!(saved && saved.recoveryPending), saveState: saved && saved.saveState });
     } catch (e) {
         console.error('[api/setup-config POST]', e);
-        res.status(500).json({ ok: false, error: String(e.message || e) });
+        res.status(500).json(apiInternalErrorBody({ ok: false }));
     }
 });
 
-expressApp.get('/api/servers', (req, res) => {
-    const config = store.get('config');
-    if (!config?.servers) return res.json([]);
-    res.json(config.servers.map(s => ({
-        id: s.id,
-        name: s.name,
-        mode: s.mode || 'local',
-        localSubFolder: s.localSubFolder || null,
-        // Plan v5 A5: surface a configuration warning so the UI can render a dismissible banner.
-        configWarning: (serverStates[s.id] && serverStates[s.id].configWarning) || null,
-    })));
-});
-
-function getDataForServer(req) {
-    const serverId = req.query.serverId;
-    const state = serverId
-        ? serverStates[serverId]
-        : serverStates[Object.keys(serverStates)[0]];
-    return state?.mergedData || null;
+function looksLikeSaveSlotId(value) {
+    return /^savegame\d+$/i.test(String(value || '').trim());
 }
 
-/** Resolve config server id for field-exclusion prefs (query or first active server). */
+/** Read player-facing save + map names from careerSavegame.xml for a Local slot. */
+function peekCareerSaveLabels(localSubFolder) {
+    const slot = safeFsIdentity.sanitizeSaveSlot(localSubFolder, '');
+    if (!slot) return { savegameName: null, mapTitle: null };
+    try {
+        const careerPath = path.join(getFs25DocumentsRoot(), slot, 'careerSavegame.xml');
+        if (!fs.existsSync(careerPath)) return { savegameName: null, mapTitle: null };
+        const raw = fs.readFileSync(careerPath, 'utf8');
+        const sn = raw.match(/<savegameName>([^<]*)<\/savegameName>/i);
+        const mt = raw.match(/<mapTitle>([^<]*)<\/mapTitle>/i);
+        return {
+            savegameName: sn && sn[1].trim() ? sn[1].trim() : null,
+            mapTitle: mt && mt[1].trim() ? mt[1].trim() : null,
+        };
+    } catch (_) {
+        return { savegameName: null, mapTitle: null };
+    }
+}
+
+function sameResolvedDirectory(left, right) {
+    if (!left || !right) return false;
+    const a = path.resolve(String(left)).replace(/[\\/]+$/, '').toLowerCase();
+    const b = path.resolve(String(right)).replace(/[\\/]+$/, '').toLowerCase();
+    return a === b;
+}
+
+function usesDefaultCareerProfile(server, state) {
+    if (!server || typeof server !== 'object') return false;
+    if (server.mode === 'ftp') return false;
+    if (isExplicitReplicaXmlSource(server, state?.ingressKind)) return false;
+    if (server.mode && server.mode !== 'local') return false;
+    const raw = server.localPath || server.path;
+    if (typeof raw !== 'string' || !raw.trim()) return true;
+    let root = '';
+    try { root = getFs25DocumentsRoot(); } catch (_) { return false; }
+    if (!root) return false;
+    const dashboard = path.join(root, 'modSettings', 'FS25_FarmDashboard');
+    const resolved = path.resolve(raw.trim());
+    if (sameResolvedDirectory(resolved, dashboard)) return true;
+    if (/^savegame\d+$/i.test(path.basename(resolved)) && sameResolvedDirectory(path.dirname(resolved), dashboard)) return true;
+    return false;
+}
+
+function labelText(value) {
+    const text = String(value || '').trim();
+    return text || null;
+}
+
+function projectConfiguredServerRow(server, state) {
+    const sourceId = server && server.id != null ? String(server.id) : '';
+    const publication = sourceId ? boundSources.snapshot(sourceId) : null;
+    const merged = publication ? publication.payload : (state && state.mergedData) || null;
+    const career = publication ? null : (state && state.xmlData && state.xmlData.career) || null;
+    let savegameName = labelText(merged && merged.savegameName) || labelText(career && career.savegameName);
+    let mapTitle = labelText(merged && merged.mapTitle)
+        || labelText(merged && merged.serverInfo && merged.serverInfo.mapName)
+        || labelText(career && career.mapTitle);
+    const saveMissing = !savegameName || looksLikeSaveSlotId(savegameName);
+    const mapMissing = !mapTitle;
+    if (!publication && (saveMissing || mapMissing) && usesDefaultCareerProfile(server, state)) {
+        const peeked = peekCareerSaveLabels(server && server.localSubFolder);
+        if (saveMissing) savegameName = peeked.savegameName || null;
+        if (mapMissing) mapTitle = peeked.mapTitle || null;
+    } else if (looksLikeSaveSlotId(savegameName)) {
+        savegameName = null;
+    }
+    return {
+        id: server && server.id,
+        name: server && server.name,
+        mode: (server && server.mode) || 'local',
+        localSubFolder: (server && server.localSubFolder) || null,
+        savegameName: savegameName || null,
+        mapTitle: mapTitle || null,
+        configWarning: publication ? publication.configWarning : (state && state.configWarning) || null,
+        sourceBinding: publication ? publication.sourceBinding : null,
+    };
+}
+
+function configuredServerList() {
+    const config = store.get('config');
+    if (!config || !Array.isArray(config.servers)) return [];
+    return config.servers.map((server) => {
+        const id = server && server.id != null ? String(server.id) : '';
+        const state = id && serverStates && Object.prototype.hasOwnProperty.call(serverStates, id) ? serverStates[id] : null;
+        return projectConfiguredServerRow(server, state);
+    });
+}
+
+expressApp.get('/api/servers', (_req, res) => {
+    res.json(configuredServerList());
+});
+
+function explicitRequestServerId(req) {
+    const query = req && req.query;
+    if (!query || !Object.prototype.hasOwnProperty.call(query, 'serverId')) return { explicit: false, id: '' };
+    const raw = query.serverId;
+    if (typeof raw !== 'string') return { explicit: true, id: '' };
+    return { explicit: true, id: raw.trim() };
+}
+
+function requestSourceEligible(id, servers, states) {
+    if (!id) return false;
+    const state = states && Object.prototype.hasOwnProperty.call(states, id) ? states[id] : null;
+    if (!state && !boundSources.snapshot(id)) return false;
+    if (state && state.active === false) return false;
+    const listed = Array.isArray(servers) && servers.some((server) => server && server.id != null);
+    if (!listed) return true;
+    let match = null;
+    for (const server of servers) {
+        if (server && server.id != null && String(server.id) === String(id)) {
+            match = server;
+            break;
+        }
+    }
+    if (!match || match.enabled === false) return false;
+    return true;
+}
+
+function getDataForServer(req) {
+    const serverId = resolveServerIdForRequest(req);
+    if (serverId == null || !Object.prototype.hasOwnProperty.call(serverStates, serverId)) return null;
+    return serverStates[serverId]?.mergedData || null;
+}
+
+/** Resolve a request to one eligible source. An explicit unknown id does not fall back. */
 function resolveServerIdForRequest(req) {
-    const q = req.query?.serverId;
-    if (q !== undefined && q !== '' && serverStates[q] != null) return q;
-    return Object.keys(serverStates)[0];
+    const servers = typeof getServersFromStore === 'function' ? getServersFromStore() : [];
+    const states = serverStates && typeof serverStates === 'object' ? serverStates : {};
+    const query = explicitRequestServerId(req);
+    if (query.explicit) return requestSourceEligible(query.id, servers, states) ? query.id : null;
+    const excluded = new Set();
+    if (Array.isArray(servers)) {
+        for (const server of servers) {
+            if (!server || server.id == null) continue;
+            const id = String(server.id);
+            if (!requestSourceEligible(id, servers, states)) {
+                excluded.add(id);
+                continue;
+            }
+            return id;
+        }
+    }
+    for (const id of Object.keys(states)) {
+        if (excluded.has(id) || !requestSourceEligible(id, servers, states)) continue;
+        return id;
+    }
+    return null;
 }
 
 /** SimHub read-only clients: follow the server + farm last selected in the desktop dashboard. */
@@ -1384,6 +1678,8 @@ function outlineMemoKeyFromMerged(merged) {
 function warmupMapFieldOutlines(serverId, merged) {
     const key = outlineMemoKeyFromMerged(merged);
     if (!key || mapFieldOutlineMemo.has(key) || mapFieldOutlineWarmup.has(key)) return;
+    const originState = serverId ? serverStates[serverId] : null;
+    const originGeneration = originState && originState.activationGeneration;
     mapFieldOutlineWarmup.add(key);
     const mapId = String(merged.mapId || (merged.serverInfo && merged.serverInfo.mapId) || '').trim();
     const mapTitle = String(merged.mapTitle || (merged.serverInfo && merged.serverInfo.mapName) || '').trim();
@@ -1391,10 +1687,11 @@ function warmupMapFieldOutlines(serverId, merged) {
     const modsRoot = modsRoots[0] || path.join(getFs25DocumentsRoot(), 'mods');
     resolveMapFieldOutlines({ mapId, mapTitle, modsRoot, modsRoots })
         .then((result) => {
+            if (!ownsOrigin(serverStates[serverId], originState, originGeneration)
+                || !boundSources.owns(serverId, originState, originGeneration)) return;
             if (result && result.ok && Array.isArray(result.fields) && result.fields.length > 0) {
                 mapFieldOutlineMemo.set(key, result.fields);
-                const state = serverId ? serverStates[serverId] : null;
-                if (state && state.mergedData) broadcast(serverId, state.mergedData);
+                if (originState.mergedData) broadcast(serverId, originState.mergedData, originState);
             }
         })
         .catch((e) => {
@@ -1445,7 +1742,7 @@ function stampFillTypeHudEpochOnServers(epoch) {
         if (!st || !st.mergedData) continue;
         st.mergedData.fillTypeHudEpoch = epoch;
         try {
-            broadcast(sid, st.mergedData);
+            broadcast(sid, st.mergedData, st);
         } catch {
             /* ignore */
         }
@@ -1469,19 +1766,25 @@ function startVanillaFillTypeHudWarmup() {
 
 function warmupFillTypeHudIcons(serverId, result) {
     if (!result || result.hudPrefetchStarted) return;
+    const originState = serverId ? serverStates[serverId] : null;
+    const originGeneration = originState && originState.activationGeneration;
     result.hudPrefetchStarted = true;
     prefetchFillTypeHudCache(result.hudByName || {})
         .then(() => {
+            if (!ownsOrigin(serverStates[serverId], originState, originGeneration)
+                || !boundSources.owns(serverId, originState, originGeneration)) return;
             result.hudPrefetched = true;
             result.hudEpoch = Date.now();
             vanillaFillTypeHudEpoch = result.hudEpoch;
-            if (serverId && serverStates[serverId]) rebuildMerged(serverId);
+            if (serverId) rebuildMerged(serverId);
         })
         .catch((e) => {
+            if (!ownsOrigin(serverStates[serverId], originState, originGeneration)
+                || !boundSources.owns(serverId, originState, originGeneration)) return;
             console.warn('[fill-type-hud] prefetch', e && e.message ? e.message : e);
             result.hudEpoch = Date.now();
             vanillaFillTypeHudEpoch = result.hudEpoch;
-            if (serverId && serverStates[serverId]) rebuildMerged(serverId);
+            if (serverId) rebuildMerged(serverId);
         });
 }
 
@@ -1493,6 +1796,8 @@ function warmupMapFillTypes(serverId, merged) {
         return;
     }
     if (mapFillTypeWarmup.has(key)) return;
+    const originState = serverId ? serverStates[serverId] : null;
+    const originGeneration = originState && originState.activationGeneration;
     mapFillTypeWarmup.add(key);
     const mapId = String(merged.mapId || (merged.serverInfo && merged.serverInfo.mapId) || '').trim();
     const mapTitle = String(merged.mapTitle || (merged.serverInfo && merged.serverInfo.mapName) || '').trim();
@@ -1500,10 +1805,12 @@ function warmupMapFillTypes(serverId, merged) {
     const modsRoot = modsRoots[0] || path.join(getFs25DocumentsRoot(), 'mods');
     resolveMapFillTypeCatalog({ mapId, mapTitle, modsRoot, modsRoots })
         .then((result) => {
+            if (!ownsOrigin(serverStates[serverId], originState, originGeneration)
+                || !boundSources.owns(serverId, originState, originGeneration)) return;
             if (result && result.catalog && Object.keys(result.catalog).length > 1) {
                 mapFillTypeMemo.set(key, result);
                 warmupFillTypeHudIcons(serverId, result);
-                if (serverId && serverStates[serverId]) rebuildMerged(serverId);
+                if (serverId) rebuildMerged(serverId);
             }
         })
         .catch((e) => {
@@ -1530,13 +1837,15 @@ function cloneMergedDataWithFieldExclusions(mergedData, serverId) {
 
 expressApp.get('/api/data',       (req, res) => {
     try {
-        const d = getDataForServer(req);
         const sid = resolveServerIdForRequest(req);
-        const payload = d ? cloneMergedDataWithFieldExclusions(d, sid) : null;
-        res.json(payload ? { ...payload, timestamp: new Date().toISOString() } : { error: 'Waiting for data...' });
+        const published = sid ? boundSources.snapshot(sid) : null;
+        const stamp = new Date().toISOString();
+        res.json(published && published.payload
+            ? { ...published.payload, sourceBinding: published.sourceBinding, timestamp: stamp }
+            : { error: 'Waiting for data...', sourceBinding: published?.sourceBinding || null, timestamp: stamp });
     } catch (e) {
         console.error('[api/data]', e && e.stack ? e.stack : e);
-        res.json({ error: 'Waiting for data...', timestamp: new Date().toISOString() });
+        res.json({ error: 'Waiting for data...', sourceBinding: null, timestamp: new Date().toISOString() });
     }
 });
 expressApp.get('/api/animals',    (req, res) => res.json(getDataForServer(req)?.animals    || []));
@@ -1636,7 +1945,7 @@ expressApp.get('/api/livestock/:id', async (req, res) => {
             return res.status(400).json({ error: 'invalid id' });
         }
         console.error('[api/livestock/:id]', e && e.stack ? e.stack : e);
-        res.status(500).json({ error: String(e.message || e) });
+        res.status(500).json(apiInternalErrorBody());
     }
 });
 
@@ -1654,14 +1963,14 @@ expressApp.post('/api/livestock/:id/request', express.json({ limit: '8kb' }), as
         return res.status(429).json({ ok: false, error: 'rate limit' });
     }
     try {
-        const ok = await requestLivestockDetail(req);
-        res.json({ ok: !!ok });
+        const handled = await handleLivestockPenRequest(req);
+        res.status(handled.status).json(handled.body);
     } catch (e) {
         if (e && e.code === 'INVALID_ID') {
             return res.status(400).json({ ok: false, error: 'invalid id' });
         }
         console.error('[api/livestock/:id/request]', e && e.stack ? e.stack : e);
-        res.status(500).json({ ok: false, error: String(e.message || e) });
+        res.status(500).json(apiInternalErrorBody({ ok: false }));
     }
 });
 
@@ -1687,6 +1996,13 @@ function requestLivestockDetail(req) {
         getFs25DocumentsRoot,
     });
 }
+async function handleLivestockPenRequest(req) {
+    const idCheck = livestockDetailModule.validatePenId(req && req.params && req.params.id);
+    if (idCheck == null) return { status: 400, body: { ok: false, error: 'invalid id' } };
+    if (resolveServerIdForRequest(req) == null) return { status: 200, body: { ok: false } };
+    const ok = await requestLivestockDetail(req);
+    return { status: 200, body: { ok: !!ok } };
+}
 expressApp.get('/api/vehicles', (req, res) => {
     const raw = getDataForServer(req)?.vehicles;
     if (Array.isArray(raw)) return res.json(raw);
@@ -1704,95 +2020,89 @@ expressApp.get('/api/finance',    (req, res) => res.json(getDataForServer(req)?.
 expressApp.get('/api/weather',    (req, res) => res.json(getDataForServer(req)?.weather    || {}));
 expressApp.get('/api/economy',    (req, res) => res.json(getDataForServer(req)?.economy    || {}));
 expressApp.get('/api/farmlands',  (req, res) => res.json(getDataForServer(req)?.xmlFarmlands || []));
-function getActiveMergedDataForStatus() {
+function statusSourceSelection(requestedSourceId = '') {
+    const config = store.get('config') || {};
     const ctx = store.get('simHubLiveContext');
-    if (ctx && ctx.serverId != null && String(ctx.serverId).trim() !== '') {
-        const sid = String(ctx.serverId).trim();
-        if (serverStates[sid]?.mergedData) return serverStates[sid].mergedData;
-    }
-    const keys = Object.keys(serverStates);
-    if (!keys.length) return null;
-    return serverStates[keys[0]]?.mergedData || null;
+    const requested = typeof requestedSourceId === 'string' ? requestedSourceId.trim() : '';
+    const selectedId = requested || (ctx && ctx.serverId != null ? String(ctx.serverId).trim() : '');
+    return selectStatusSource({
+        selectedId,
+        servers: Array.isArray(config.servers) ? config.servers : [],
+        states: serverStates,
+    });
+}
+
+function getActiveMergedDataForStatus() {
+    const resolved = statusSourceSelection();
+    return (resolved.state && resolved.state.mergedData) || null;
 }
 
 function buildPublicStatusPayload() {
-    const m = getActiveMergedDataForStatus();
-    const payload = {
+    const resolved = statusSourceSelection();
+    const published = resolved.id ? boundSources.snapshot(resolved.id) : null;
+    const publicResolved = published?.sourceBinding?.stateStatus === 'blocked'
+        ? { ...resolved, state: null, unavailable: true }
+        : resolved;
+    // savegameName, paths, and credentials stay off this payload. /api/status is reachable
+    // unauthenticated on LAN. Map counts and projected identity come from the same source.
+    return publicStatusForSource({
         status: 'online',
         service: editionPolicy.isV5ProductLine(PRODUCT_LINE) ? 'fs25-farm-dashboard-rf' : 'fs25-farm-dashboard',
         productLine: PRODUCT_LINE,
         port: PORT,
         appVersion: app.getVersion(),
-    };
-    if (!m) return payload;
-    const fields = Array.isArray(m.fields) ? m.fields : (Array.isArray(m.allFields) ? m.allFields : []);
-    const vehicles = Array.isArray(m.vehicles) ? m.vehicles : [];
-    payload.mapTitle = m.mapTitle || m.serverInfo?.mapName || null;
-    payload.mapId = m.mapId || m.serverInfo?.mapId || null;
-    // savegameName intentionally omitted: it can be a user-chosen string and /api/status is reachable
-    // unauthenticated on LAN. Keep the public payload to non-PII map/count metadata only.
-    payload.lastUpdated = m.lastUpdated || null;
-    payload.fieldCount = fields.length;
-    payload.vehicleCount = vehicles.length;
-    payload.hasData = fields.length > 0 || vehicles.length > 0 || !!m.luaAvailable || !!m.xmlAvailable;
-    return payload;
+    }, publicResolved, (ident, tracker) => ingressOrchestration.projectStatus(ident, tracker));
 }
 
 expressApp.get('/api/status', (req, res) => res.json(buildPublicStatusPayload()));
-
-function anyServerMerged() {
-    return Object.values(serverStates || {}).some((s) => s && s.mergedData);
-}
-
-function anyServerLuaFresh() {
-    const now = Date.now();
-    const staleMs = getLuaExportStaleMs();
-    return Object.values(serverStates || {}).some(
-        (s) => s && s.lastLuaReceivedAt && !isLuaExportStale(s.lastLuaReceivedAt, now, staleMs)
-    );
-}
-
-function anyServerXml() {
-    return Object.values(serverStates || {}).some((s) => s && (s.xmlData || s.lastXmlReceivedAt));
-}
-
-function anyServerPathDenied() {
-    return Object.values(serverStates || {}).some((s) => {
-        const w = s && s.mergedData && s.mergedData.serverInfo && s.mergedData.serverInfo.configWarning;
-        return w && /denied|eacces|permission/i.test(String(w));
-    });
-}
-
-function firstMergedModCheck() {
-    for (const s of Object.values(serverStates || {})) {
-        if (s && s.mergedData && s.mergedData.modVersionCheck) return s.mergedData.modVersionCheck;
-    }
-    return {};
-}
 
 function buildRuntimeSetupStatus(opts) {
     const tokenOk = opts && Object.prototype.hasOwnProperty.call(opts, 'setupTokenValid')
         ? !!opts.setupTokenValid
         : true;
-    return buildSetupStatus({
-        config: store.get('config') || {},
+    const config = store.get('config') || {};
+    const resolved = statusSourceSelection(opts && opts.sourceId);
+    const evidence = sourceSetupEvidence(resolved.state, { staleMs: getLuaExportStaleMs() });
+    const status = buildSetupStatus({
+        config,
         httpListening: !!(server && server.listening),
-        hasMergedData: anyServerMerged(),
-        luaFresh: anyServerLuaFresh(),
-        xmlAvailable: anyServerXml(),
+        hasMergedData: evidence.hasMergedData,
+        luaFresh: evidence.luaFresh,
+        xmlAvailable: evidence.xmlAvailable,
         setupTokenValid: tokenOk,
         lan: getLanSecurityFromStore(),
-        modVersionCheck: firstMergedModCheck(),
-        pathDenied: anyServerPathDenied(),
+        modVersionCheck: evidence.modVersionCheck,
+        pathDenied: evidence.pathDenied,
         requiresRestart: uxRequiresRestart,
         recentEvents: uxEventLog.list(),
+        identityProvision: evidence.identityProvision,
+        exportGeneration: evidence.exportGeneration,
+        startupOnly: evidence.startupOnly,
+        emptyCommitted: evidence.emptyCommitted,
+        sourceId: resolved.id,
     });
+    const servers = Array.isArray(config.servers) ? config.servers : [];
+    const enabled = servers.filter((srv) => srv && srv.enabled !== false);
+    const selected = enabled.find((srv) => srv.id != null && String(srv.id) === String(resolved.id || ''));
+    const localOnly = selected
+        ? selected.mode !== 'ftp'
+        : enabled.length > 0 && enabled.every((srv) => srv.mode !== 'ftp');
+    // A saved local source with no committed export yet is waiting on the game, not failing transport.
+    if (status.status === 'incomplete'
+        && status.lastErrorCode === ERROR_CODES.E_LUA_STALE
+        && !status.nextStep
+        && !evidence.hasMergedData
+        && localOnly) {
+        status.waitingFor = 'first-export';
+        status.nextAction = 'start_game';
+        status.nextStep = 'Setup is saved. This save has no dashboard export yet. Load it in Farming Simulator 25 with the Farm Dashboard mod enabled; the dashboard fills in after the mod writes its first export.';
+    }
+    return status;
 }
 
-async function runSetupHandshake(tokenValid) {
+async function runSetupHandshake(tokenValid, sourceId = '') {
     const config = store.get('config') || {};
     const servers = Array.isArray(config.servers) ? config.servers : [];
-    pushUxEvent(ERROR_CODES.E_NETWORK, 'Setup handshake started', 'setup');
     for (const srv of servers) {
         if (!srv || srv.mode === 'ftp') continue;
         try {
@@ -1812,29 +2122,31 @@ async function runSetupHandshake(tokenValid) {
             /* ignore per-server probe */
         }
     }
-    const status = buildRuntimeSetupStatus({ setupTokenValid: tokenValid !== false });
-    pushUxEvent(status.lastErrorCode || ERROR_CODES.E_NETWORK, `Handshake ${status.status}`, 'setup');
+    const status = buildRuntimeSetupStatus({ setupTokenValid: tokenValid !== false, sourceId });
+    if (status.lastErrorCode) pushUxEvent(status.lastErrorCode, `Handshake ${status.status}`, 'setup');
     return status;
 }
 
 expressApp.get('/api/setup-status', (req, res) => {
     try {
         const tokenOk = isLocalhostSocket(req) || setupTokenMatches(req);
-        res.json(buildRuntimeSetupStatus({ setupTokenValid: tokenOk || !getLanSecurityFromStore().lanAccessEnabled }));
+        const sourceId = req.query && typeof req.query.serverId === 'string' ? req.query.serverId : '';
+        res.json(buildRuntimeSetupStatus({ setupTokenValid: tokenOk || !getLanSecurityFromStore().lanAccessEnabled, sourceId }));
     } catch (e) {
         console.error('[api/setup-status]', e);
-        res.status(500).json({ error: String(e.message || e) });
+        res.status(500).json(apiInternalErrorBody());
     }
 });
 
 expressApp.post('/api/setup-handshake', async (req, res) => {
     try {
         const tokenOk = isLocalhostSocket(req) || setupTokenMatches(req);
-        const status = await runSetupHandshake(tokenOk || !getLanSecurityFromStore().lanAccessEnabled);
+        const sourceId = req.query && typeof req.query.serverId === 'string' ? req.query.serverId : '';
+        const status = await runSetupHandshake(tokenOk || !getLanSecurityFromStore().lanAccessEnabled, sourceId);
         res.json(status);
     } catch (e) {
         console.error('[api/setup-handshake]', e);
-        res.status(500).json({ error: String(e.message || e) });
+        res.status(500).json(apiInternalErrorBody());
     }
 });
 
@@ -1852,7 +2164,7 @@ expressApp.get('/api/simhub-view-config', (req, res) => {
         });
     } catch (e) {
         console.error('[api/simhub-view-config]', e);
-        res.status(500).json({ error: String(e.message || e) });
+        res.status(500).json(apiInternalErrorBody());
     }
 });
 
@@ -1862,7 +2174,7 @@ expressApp.get('/api/simhub-session', (_req, res) => {
         res.json(ctx);
     } catch (e) {
         console.error('[api/simhub-session]', e);
-        res.status(500).json({ serverId: '', farmId: 1, error: String(e.message || e) });
+        res.status(500).json(apiInternalErrorBody({ serverId: '', farmId: 1 }));
     }
 });
 
@@ -1889,7 +2201,7 @@ expressApp.get('/api/item-image-filenames', async (req, res) => {
         res.json({ items, modExtract });
     } catch (e) {
         console.error('[api/item-image-filenames]', e);
-        res.status(500).json({ items: [], modExtract: [], error: String(e.message || e) });
+        res.status(500).json(apiInternalErrorBody({ items: [], modExtract: [] }));
     }
 });
 
@@ -1913,7 +2225,7 @@ expressApp.post('/api/export-mod-store-images', async (req, res) => {
         res.json(result);
     } catch (e) {
         console.error('[export-mod-store-images] HTTP:', e);
-        res.status(500).json({ ok: false, error: e && e.message ? e.message : String(e) });
+        res.status(500).json(apiInternalErrorBody({ ok: false }));
     }
 });
 
@@ -1932,6 +2244,12 @@ function webSocketOriginAllowed(req) {
 
 function checkWebSocketLanAccess(info) {
     const req = info.req;
+    if (isPublicDemoRequest(req)) {
+        // The socket only pushes the same data as GET /api/data. Demo pages get it from the tunnel alone,
+        // without the LAN WebSocket token, which is never handed to a demo visitor.
+        return isLoopbackIp(requestRemoteAddress(req)) && publicDemoHost.isPublicDemoOrigin(getRequestOrigin(req));
+    }
+    if (!requestHostAllowed(req)) return false;
     if (!webSocketOriginAllowed(req)) return false;
     const rawIp = requestRemoteAddress(req);
     const expressIp = req.ip ? String(req.ip) : '';
@@ -1998,6 +2316,7 @@ function listenFarmdashHttp(bindHost, onListening) {
                 const doListen = () => {
                     try {
                         clients.clear();
+                        ensureHttpErrorHandler();
                         server = http.createServer(expressApp);
                         attachWebSocketServer(server);
                         let settled = false;
@@ -2110,13 +2429,26 @@ function restartHttpServer(done) {
 
 const lastBroadcastHashByServer = {};
 
-function broadcast(serverId, data) {
-    if (data == null) return;
+function broadcastSourceState(event) {
+    const message = JSON.stringify(event);
+    clients.forEach((client) => {
+        if (client.readyState === WebSocket.OPEN) client.send(message);
+    });
+}
+
+function broadcast(serverId, data, ownerState) {
+    if (data == null || !ownerState
+        || !boundSources.owns(serverId, ownerState, ownerState.activationGeneration)) return;
     const payload = cloneMergedDataWithFieldExclusions(data, serverId) || data;
-    const body = { type: 'data', serverId, data: payload };
-    const hash = crypto.createHash('sha256').update(JSON.stringify(body)).digest('hex');
-    if (lastBroadcastHashByServer[serverId] === hash) return;
-    lastBroadcastHashByServer[serverId] = hash;
+    const published = boundSources.publish(serverId, ownerState, ownerState.activationGeneration,
+        payload, statusForPayload(ownerState, payload));
+    if (!published || !published.changed) return;
+    const body = { type: 'data', serverId,
+        data: { ...published.payload, sourceBinding: published.sourceBinding },
+        sourceBinding: published.sourceBinding };
+    const publicationKey = `${published.sourceBinding.bindingId}:${published.sourceBinding.stateRevision}`;
+    if (lastBroadcastHashByServer[serverId] === publicationKey) return;
+    lastBroadcastHashByServer[serverId] = publicationKey;
     const msg = JSON.stringify({ ...body, timestamp: new Date().toISOString() });
     const maxBuffered = 2 * 1024 * 1024;
     clients.forEach((c) => {
@@ -2132,20 +2464,70 @@ function broadcast(serverId, data) {
 // ── Data processing ───────────────────────────────────────────────────────────
 
 
+/** Persist only a proved local authority identity with a merged snapshot. */
+function localCacheSourceProof(serverId, state) {
+    const srv = getServersFromStore().find((s) => String(s.id) === String(serverId));
+    const identity = state && state.exportIdentity;
+    if (!srv || srv.mode === 'ftp' || isExplicitReplicaXmlSource(srv, state?.ingressKind)
+        || !identity || identity.replica === true || identity.legacy === true
+        || String(identity.sourceId || '') !== String(serverId)
+        || !identity.careerId || !identity.sessionId || !identity.configuredSlot) return null;
+    return {
+        kind: 'authority',
+        sourceId: String(serverId),
+        careerId: identity.careerId,
+        sessionId: identity.sessionId,
+        configuredSlot: identity.configuredSlot,
+    };
+}
+
+/** Never render a local merged cache until its source is proven again. */
+function localCacheSourceEligible(srv, state, record) {
+    if (!srv || srv.mode === 'ftp' || isExplicitReplicaXmlSource(srv, state?.ingressKind)
+        || state?.exportIdentity?.replica === true) return false;
+    const proof = record && record.sourceProof;
+    if (!proof || proof.kind !== 'authority' || proof.sourceId !== String(srv.id)
+        || !proof.careerId || !proof.sessionId || !proof.configuredSlot) return false;
+
+    const matches = (identity) => !!(identity && identity.replica !== true
+        && identity.legacy !== true
+        && String(identity.sourceId || '') === proof.sourceId
+        && identity.careerId === proof.careerId
+        && identity.sessionId === proof.sessionId
+        && identity.configuredSlot === proof.configuredSlot);
+    try {
+        const parts = resolveLocalWatchParts(srv);
+        const selected = localIngressController.selectIngress(srv, parts, fs.existsSync);
+        if (selected.kind !== 'authority' || !selected.dir) return false;
+        const ingress = exportIngress.ingestWatchedSlot(selected.dir, {
+            sourceId: String(srv.id),
+            configuredSlot: selected.configuredSlot,
+            trustedLocalClock: true,
+            explicitLegacy: srv.legacyJson === true,
+        });
+        return !!(ingress && ingress.status === 'valid' && ingress.replica !== true
+            && matches(ingress.identity));
+    } catch (_) {
+        return false;
+    }
+}
+
 function schedulePersistServerCache(serverId) {
     clearTimeout(serverCacheSaveTimers[serverId]);
     serverCacheSaveTimers[serverId] = setTimeout(() => {
         const state = serverStates[serverId];
         if (!state || !state.mergedData) return;
         try {
-            const userData = app.getPath('userData');
+            const userData = SESSION_USER_DATA_DIR;
             saveServerCache(userData, serverId, {
                 mergedSnapshot: state.mergedData,
+                sourceProof: localCacheSourceProof(serverId, state),
                 lastKnownSaveSlot: state.lastSaveSlot || null,
                 fieldLiveByFarmlandId: state.fieldLiveCache || {},
                 fieldHistory: state.fieldHistory || {},
                 lastLuaAt: state.lastLuaReceivedAt || null,
                 lastXmlAt: state.lastXmlReceivedAt || null,
+                sectionAge: state.sectionAge || null,
                 savedAt: new Date().toISOString(),
             });
         } catch (e) {
@@ -2155,18 +2537,20 @@ function schedulePersistServerCache(serverId) {
 }
 
 function persistAllServerCaches(reason) {
-    const userData = app.getPath('userData');
+    const userData = SESSION_USER_DATA_DIR;
     const states = Object.entries(serverStates || {});
     for (const [serverId, state] of states) {
         if (!state || !state.mergedData) continue;
         try {
             saveServerCache(userData, serverId, {
                 mergedSnapshot: state.mergedData,
+                sourceProof: localCacheSourceProof(serverId, state),
                 lastKnownSaveSlot: state.lastSaveSlot || null,
                 fieldLiveByFarmlandId: state.fieldLiveCache || {},
                 fieldHistory: state.fieldHistory || {},
                 lastLuaAt: state.lastLuaReceivedAt || null,
                 lastXmlAt: state.lastXmlReceivedAt || null,
+                sectionAge: state.sectionAge || null,
                 savedAt: new Date().toISOString(),
                 savedReason: reason || 'flush',
             });
@@ -2177,19 +2561,22 @@ function persistAllServerCaches(reason) {
 }
 
 function hydrateServerCacheFromDisk(serverId) {
+    const srv = getServersFromStore().find((s) => String(s.id) === String(serverId));
+    if (isExplicitReplicaXmlSource(srv, serverStates[serverId]?.ingressKind)) return;
     let disk;
     try {
-        disk = loadServerCache(app.getPath('userData'), serverId);
+        disk = loadServerCache(SESSION_USER_DATA_DIR, serverId);
     } catch (_) {
         disk = null;
     }
-    if (!disk || !disk.mergedSnapshot) return;
+    if (!disk || !disk.mergedSnapshot || !localCacheSourceEligible(srv, serverStates[serverId], disk)) return;
     const state = serverStates[serverId];
     if (!state) return;
     state.fieldLiveCache = disk.fieldLiveByFarmlandId || {};
     state.fieldHistory = disk.fieldHistory || {};
     state.lastLuaReceivedAt = disk.lastLuaAt || null;
     state.lastXmlReceivedAt = disk.lastXmlAt || null;
+    state.sectionAge = disk.sectionAge || 'last-known';
     state.mergedData = applyResolvedMapBounds(
         applyFreshnessMeta(JSON.parse(JSON.stringify(disk.mergedSnapshot)), {
             lastLuaAt: disk.lastLuaAt || null,
@@ -2220,20 +2607,82 @@ function hydrateServerCacheFromDisk(serverId) {
     }
     updateLiveSectionBackup(state, state.mergedData, null);
     updateLastGoodMergedSnapshot(state, state.mergedData, null);
-    broadcast(serverId, state.mergedData);
+    broadcast(serverId, state.mergedData, state);
     console.log(`[Cache] [${serverId}] Restored last merged snapshot from disk (use until live Lua/XML return)`);
 }
 
 function getLocalLuaJsonPathForServer(srv) {
-    let basePath = srv.localPath;
+    const { basePath, folderName } = resolveLocalWatchParts(srv);
+    if (!folderName) return null;
+    return path.join(basePath, folderName, 'data.json');
+}
+
+/** Resolve Local-mode path: prefer localPath, accept legacy `path`. */
+function resolveServerLocalPath(srv) {
+    if (!srv || typeof srv !== 'object') return null;
+    const raw = srv.localPath || srv.path;
+    if (typeof raw === 'string' && raw.trim()) return raw.trim();
+    return null;
+}
+
+/** True when this server should use the Local file watcher / disk hydrate. */
+function isLocalModeServer(srv) {
+    if (!srv || typeof srv !== 'object') return false;
+    if (srv.mode === 'ftp') return false;
+    if (srv.mode === 'local') return true;
+    // Mis-saved configs (type/path instead of mode/localPath) still count as local.
+    return !!(resolveServerLocalPath(srv) || srv.localSubFolder);
+}
+
+/**
+ * localPath should be the FS25_FarmDashboard parent; localSubFolder the save slot.
+ * If someone saved the slot folder as localPath, peel savegameN into localSubFolder.
+ */
+function resolveLocalWatchParts(srv) {
+    let basePath = resolveServerLocalPath(srv);
     if (!basePath) {
         basePath = path.join(getFs25DocumentsRoot(), 'modSettings', 'FS25_FarmDashboard');
     }
-    const folderName =
-        srv.localSubFolder ||
-        String(srv.name || '').replace(/[<>:"/\\|?*]/g, '').trim();
-    if (!folderName) return null;
-    return path.join(basePath, folderName, 'data.json');
+    let folderName =
+        (typeof srv.localSubFolder === 'string' && srv.localSubFolder.trim()) ||
+        String(srv.name || '')
+            .replace(/[<>:"/\\|?*]/g, '')
+            .trim();
+    const baseNorm = String(basePath).replace(/[\\/]+$/, '');
+    const leaf = path.basename(baseNorm);
+    if (/^savegame\d+$/i.test(leaf) && !(typeof srv.localSubFolder === 'string' && srv.localSubFolder.trim())) {
+        folderName = leaf;
+        basePath = path.dirname(baseNorm);
+    }
+    return { basePath, folderName };
+}
+
+/** A boot-time missing-folder warning expires only with this source's committed authority export. */
+function clearRecoveredLocalFolderWarning(srv, state, selected, ingress, ownsSource) {
+    if (!srv || !state || !isLocalModeServer(srv) || srv.replicaRegistration || srv.replicaRemoteSlot
+        || typeof ownsSource !== 'function' || !ownsSource()
+        || state.configWarning?.code !== 'localSubFolderMissing') return false;
+    const { basePath, folderName } = resolveLocalWatchParts(srv);
+    if (!folderName) return false;
+    const expected = path.resolve(basePath, folderName);
+    const identity = ingress?.identity;
+    if (path.resolve(state.configWarning.expected || '') !== expected
+        || selected?.kind !== 'authority' || path.resolve(selected.dir || '') !== expected
+        || ingress?.status !== 'valid' || !ingress.payload || ingress.replica === true
+        || identity?.legacy !== false || identity.sourceId !== String(srv.id)
+        || identity.configuredSlot !== folderName
+        || !Number.isSafeInteger(identity.exportGeneration) || identity.exportGeneration < 1) return false;
+    const applied = state.exportIdentity;
+    if (!applied || applied.sourceId !== identity.sourceId
+        || applied.configuredSlot !== identity.configuredSlot
+        || applied.careerId !== identity.careerId || applied.sessionId !== identity.sessionId
+        || applied.publicationSequence !== identity.publicationSequence
+        || applied.exportGeneration !== identity.exportGeneration) return false;
+    const current = getServersFromStore().find((row) => String(row.id) === String(srv.id));
+    if (!current || JSON.stringify(current) !== JSON.stringify(srv)
+        || !boundSources.owns(srv.id, state, state.activationGeneration)) return false;
+    state.configWarning = null;
+    return true;
 }
 
 /**
@@ -2243,22 +2692,48 @@ function getLocalLuaJsonPathForServer(srv) {
 async function hydrateLuaSnapshotFromDiskAtBoot(srv) {
     try {
         const state = serverStates[srv.id];
-        if (!state) return;
+        if (!state || state.active === false) return;
+        const bootGeneration = state.ingressGeneration;
+        const bootOwned = () => serverStates[srv.id] === state && state.active !== false && state.ingressGeneration === bootGeneration;
         let luaJsonPath = null;
-        if (srv.mode === 'local') {
+        if (isLocalModeServer(srv)) {
             luaJsonPath = getLocalLuaJsonPathForServer(srv);
         } else if (srv.mode === 'ftp') {
-            luaJsonPath = path.join(app.getPath('userData'), `data_${srv.id}.json`);
+            luaJsonPath = path.join(SESSION_USER_DATA_DIR, `data_${srv.id}.json`);
+        }
+        if (isLocalModeServer(srv)) {
+            const parts = resolveLocalWatchParts(srv);
+            const selected = localIngressController.selectIngress(srv, parts, (target) => fs.existsSync(target));
+            if (selected.dir) {
+                const ingress = exportIngress.ingestWatchedSlot(selected.dir, {
+                    sourceId: String(srv.id),
+                    configuredSlot: selected.configuredSlot,
+                    trustedLocalClock: selected.kind === 'authority',
+                    explicitLegacy: srv.legacyJson === true,
+                    previous: state.exportIngress,
+                    tracker: state.exportIngress && state.exportIngress.tracker,
+                });
+                if (!bootOwned()) return;
+                if (localIngressController.applyWatchedIngress(state, srv, ingress, processLuaData)) {
+                    console.log(`[Boot] [${srv.id}] Hydrated ${selected.kind} from ${selected.dir}`);
+                    return;
+                }
+                if (ingress && (ingress.reason === "replica-rejected" || ingress.status === "unavailable")) return;
+            }
+            if (selected.reason === "configuration-required") return;
+            if (!localIngressController.allowRawLegacy(srv, selected)) return;
         }
         if (!luaJsonPath || !(await pathExists(luaJsonPath))) return;
+        if (!bootOwned()) return;
         const raw = await readFileUtf8WithRetryAsync(luaJsonPath);
-        if (raw == null) return;
+        if (!bootOwned() || raw == null) return;
         let parsed;
         try {
             parsed = JSON.parse(stripUtf8Bom(raw));
         } catch (_) {
             return;
         }
+        if (!bootOwned()) return;
         if (shouldIgnoreMinimalLuaExport(parsed, state)) {
             console.log(
                 `[Boot] [${srv.id}] Skipped minimal/shutdown Lua snapshot on disk; using cached merged snapshot`
@@ -2272,14 +2747,17 @@ async function hydrateLuaSnapshotFromDiskAtBoot(srv) {
     }
 }
 
-function getLuaExportStaleMs() {
+function getLuaExportStaleMs(state, srv) {
     const cfg = store.get('config') || {};
-    return resolveLuaExportStaleMs(getFtpPollingOptions(cfg).intervalMinutes);
+    return resolveLuaExportStaleMs(getFtpPollingOptions(cfg).intervalMinutes, {
+        mode: srv?.mode,
+        replica: state?.exportIdentity?.replica === true || state?.ingressKind === 'replica',
+    });
 }
 
-function stampLuaExportFreshness(merged, state) {
+function stampLuaExportFreshness(merged, state, srv) {
     if (!merged || !state) return merged;
-    const staleMs = getLuaExportStaleMs();
+    const staleMs = getLuaExportStaleMs(state, srv);
     const ts = { ...(merged.dataTimestamps || {}), luaExportStaleMs: staleMs };
     let next = merged;
     if (state.luaData) {
@@ -2318,14 +2796,22 @@ async function rebuildMerged(serverId) {
     if (!state) return;
     let luaPayload = state.luaData;
     const srv = getServersFromStore().find((s) => String(s.id) === String(serverId));
-    if (srv && state.luaData && (srv.mode === 'local' || srv.mode === 'ftp')) {
+    const activationGeneration = state.activationGeneration;
+    const sourceSignature = srv ? JSON.stringify(srv) : null;
+    const ownsSource = () => {
+        const current = getServersFromStore().find((s) => String(s.id) === String(serverId));
+        return serverStates[serverId] === state && state.active !== false
+            && state.activationGeneration === activationGeneration
+            && (current ? JSON.stringify(current) : null) === sourceSignature;
+    };
+    if (srv && state.luaData && (isLocalModeServer(srv) || srv.mode === 'ftp')) {
         try {
             luaPayload = await hydrateLuaDataAnimalsFromDetailsAsync(
                 state.luaData,
                 srv,
                 getLocalLuaJsonPathForServer,
                 {
-                    userDataPath: app.getPath('userData'),
+                    userDataPath: SESSION_USER_DATA_DIR,
                     serverState: state,
                 }
             );
@@ -2334,6 +2820,7 @@ async function rebuildMerged(serverId) {
             luaPayload = state.luaData;
         }
     }
+    if (!ownsSource()) return;
     let merged;
     try {
         const mapHint = {
@@ -2357,8 +2844,10 @@ async function rebuildMerged(serverId) {
         console.warn('[rebuildMerged] merge threw', serverId, e && e.message ? e.message : e);
         merged = null;
     }
+    if (!ownsSource()) return;
     if (!merged) {
         if (state.mergedData) {
+            if (!ownsSource()) return;
             state.mergedData = applyFreshnessMeta(
                 {
                     ...state.mergedData,
@@ -2371,7 +2860,7 @@ async function rebuildMerged(serverId) {
                     lastLuaAt: state.lastLuaReceivedAt || null,
                     lastXmlAt: state.lastXmlReceivedAt || null,
                     cacheUsedDueToFailure: true,
-                    staleMs: getLuaExportStaleMs(),
+                    staleMs: getLuaExportStaleMs(state, srv),
                     collectionHealth: state.xmlData && state.xmlData.collectionHealth,
                 }
             );
@@ -2384,7 +2873,8 @@ async function rebuildMerged(serverId) {
             if (cw) si.configWarning = cw;
             else delete si.configWarning;
             state.mergedData.serverInfo = si;
-            broadcast(serverId, state.mergedData);
+            if (!ownsSource()) return;
+            broadcast(serverId, state.mergedData, state);
             schedulePersistServerCache(serverId);
             console.warn(
                 `[rebuildMerged] [${serverId}] merge unavailable; keeping last merged snapshot (live export may have stopped)`
@@ -2409,11 +2899,27 @@ async function rebuildMerged(serverId) {
             `[rebuildMerged] [${serverId}] Serving last good merged snapshot (live export looks minimal or shutdown)`
         );
     }
-    merged = stampLuaExportFreshness(merged, state);
+    merged = stampLuaExportFreshness(merged, state, srv);
     const fillHit = mapFillResultForMerged(merged);
     merged.fillTypeHudEpoch =
         (fillHit && fillHit.hudEpoch) || vanillaFillTypeHudEpoch || merged.fillTypeHudEpoch;
+    if (!ownsSource()) return;
     state.mergedData = merged;
+    const recovery = state.pendingLocalFolderRecovery;
+    if (recovery && recovery.ingress === state.exportIngress
+        && recovery.activationGeneration === state.activationGeneration
+        && recovery.ingressGeneration === state.ingressGeneration
+        && srv && merged.luaAvailable === true
+        && !merged.dataTimestamps?.heldFromSnapshotAt
+        && !merged.dataTimestamps?.mergeHeldStaleAt
+        && !merged.dataTimestamps?.liveExportStaleAt) {
+        const selected = localIngressController.selectIngress(srv, resolveLocalWatchParts(srv),
+            (target) => fs.existsSync(target));
+        if (clearRecoveredLocalFolderWarning(srv, state, selected, recovery.ingress,
+            () => ownsSource() && runtimeActivation.matches(activationGeneration))) {
+            state.pendingLocalFolderRecovery = null;
+        }
+    }
     warmupMapFieldOutlines(serverId, merged);
     warmupMapFillTypes(serverId, merged);
     if (state.mergedData && state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
@@ -2428,7 +2934,8 @@ async function rebuildMerged(serverId) {
     }
     updateLiveSectionBackup(state, state.mergedData, luaPayload);
     updateLastGoodMergedSnapshot(state, state.mergedData, luaPayload);
-    broadcast(serverId, state.mergedData);
+    if (!ownsSource()) return;
+    broadcast(serverId, state.mergedData, state);
     schedulePersistServerCache(serverId);
 }
 
@@ -2483,7 +2990,7 @@ async function readLocalLuaJsonReady(luaJsonPath, serverId) {
     return null;
 }
 
-function processLuaData(serverId, raw) {
+function processLuaData(serverId, raw, transport) {
     try {
         const parsed = parseLuaJsonObject(typeof raw === 'string' ? stripUtf8Bom(raw) : raw);
         if (!parsed.ok) {
@@ -2503,7 +3010,52 @@ function processLuaData(serverId, raw) {
         const state = serverStates[serverId];
         if (!state) return;
 
-        if (shouldIgnoreMinimalLuaExport(data, state)) {
+        const previousIdentity = state.exportIdentity;
+        const careerChanged = !!(
+            transport && previousIdentity && transport.careerId && previousIdentity.careerId
+            && (previousIdentity.careerId !== transport.careerId || previousIdentity.sourceId !== transport.sourceId)
+        );
+        if (careerChanged) {
+            state.lastGoodMergedSnapshot = null;
+            state.liveSectionBackup = null;
+            state.fieldHistory = {};
+            state.fieldLiveCache = null;
+            state.mergedData = null;
+            const cleared = boundSources.clearOwned(state);
+            if (cleared?.changed) broadcastSourceState({ type: 'source-state', serverId,
+                sourceBinding: cleared.sourceBinding });
+            state.luaData = null;
+        }
+
+        const source = getServersFromStore().find((srv) => String(srv.id) === String(serverId));
+        if (isExplicitReplicaXmlSource(source, transport?.replica === true ? 'replica' : state.ingressKind)) {
+            clearUnprovenReplicaXml(state);
+        }
+
+        if (transport) {
+            const sessionChanged = !!(
+                previousIdentity && transport.sessionId && previousIdentity.sessionId
+                && previousIdentity.sessionId !== transport.sessionId
+            );
+            if (sessionChanged) {
+                state.sectionAge = 'last-known';
+            }
+        }
+        liftSectionOutcomes(data);
+        if (data.sectionOutcomes) {
+            data.sectionOutcomes.sessionId = transport && transport.sessionId ? transport.sessionId : null;
+            data.sectionOutcomes.careerId = transport && exportIngress.safeId(transport.careerId) ? transport.careerId : null;
+        }
+        const declaresTerminal = data.sectionOutcomes && ['animals', 'fields', 'production', 'stock'].some((name) => {
+            const rec = data.sectionOutcomes[name];
+            return rec && (rec.outcome === 'empty' || rec.outcome === 'zero' || rec.outcome === 'disabled');
+        });
+        if (declaresTerminal) {
+            applyLiveSectionHold(data, state, data, null);
+        }
+
+        if (shouldIgnoreMinimalLuaExport(data, state, transport)) {
+            if (careerChanged) return;
             console.warn(
                 `[processLuaData] [${serverId}] ignored minimal/shutdown Lua export; keeping last good snapshot`
             );
@@ -2518,29 +3070,32 @@ function processLuaData(serverId, raw) {
                 if (state.fieldHistory && Object.keys(state.fieldHistory).length > 0) {
                     state.mergedData.fieldStatusHistory = state.fieldHistory;
                 }
-                broadcast(serverId, state.mergedData);
+                broadcast(serverId, state.mergedData, state);
                 schedulePersistServerCache(serverId);
             }
             return;
         }
 
-        state.luaData = data;
-
+        if (!(transport && transport.sessionId && state.sectionAge === 'last-known' && previousIdentity
+            && previousIdentity.sessionId && previousIdentity.sessionId !== transport.sessionId)) {
+            state.sectionAge = 'current';
+        }
         const nowIso = new Date().toISOString();
-        state.lastLuaReceiptAt = nowIso;
-        const producedAt = data.collectedAt || data.serverInfo?.collectedAt || data.exportGeneratedAt || null;
-        const contentHash = crypto.createHash('sha256').update(JSON.stringify({
-            collectedAt: producedAt,
-            animals: data.animals,
-            vehicles: data.vehicles,
-            fields: data.fields,
-            production: data.production,
-            stock: data.stock,
-            finance: data.finance,
-        })).digest('hex');
-        if (state.lastLuaContentHash !== contentHash) {
-            state.lastLuaContentHash = contentHash;
-            state.lastLuaReceivedAt = producedAt || nowIso;
+        ingressOrchestration.recordIngress(state, data, transport, nowIso);
+        const selectedIdentity = state.exportIngress?.identity;
+        if (state.configWarning?.code === 'localSubFolderMissing'
+            && state.exportIngress?.status === 'valid' && transport
+            && selectedIdentity?.sourceId === String(serverId)
+            && selectedIdentity.configuredSlot === transport.configuredSlot
+            && selectedIdentity.careerId === transport.careerId
+            && selectedIdentity.sessionId === transport.sessionId
+            && selectedIdentity.publicationSequence === transport.publicationSequence
+            && selectedIdentity.exportGeneration === transport.exportGeneration) {
+            state.pendingLocalFolderRecovery = {
+                ingress: state.exportIngress,
+                activationGeneration: state.activationGeneration,
+                ingressGeneration: state.ingressGeneration,
+            };
         }
         try {
             const fps = buildFieldLiveFingerprints(data.fields || [], nowIso);
@@ -2572,7 +3127,7 @@ function processLuaData(serverId, raw) {
 /** Pull savegame XML from FTP (e.g. GPortal: profile/savegameN/…) into userData/ftpXmlCache. */
 async function downloadFtpSavegameXml(srv, saveSlot) {
     const slot = safeFsIdentity.sanitizeSaveSlot(saveSlot || srv.localSubFolder, 'savegame1');
-    const cacheRoot = path.join(app.getPath('userData'), 'ftpXmlCache', String(srv.id));
+    const cacheRoot = path.join(SESSION_USER_DATA_DIR, 'ftpXmlCache', String(srv.id));
     const localDir = safeFsIdentity.joinContained(cacheRoot, slot);
     await fs.promises.mkdir(localDir, { recursive: true });
 
@@ -2724,6 +3279,25 @@ async function downloadFtpSavegameXml(srv, saveSlot) {
     }
 }
 
+/** Drop XML-derived holds once a local row is identified as a remote replica. */
+function clearUnprovenReplicaXml(state) {
+    if (!state || (state.replicaXmlIsolated && state.xmlData == null
+        && state.lastXmlReceivedAt == null && state.lastXmlFingerprint == null)) return false;
+    state.xmlData = null;
+    state.lastXmlReceivedAt = null;
+    state.lastXmlFingerprint = null;
+    state.mergedData = null;
+    const cleared = boundSources.clearOwned(state);
+    if (cleared?.changed) broadcastSourceState({ type: 'source-state', serverId: cleared.serverId,
+        sourceBinding: cleared.sourceBinding });
+    state.lastGoodMergedSnapshot = null;
+    state.liveSectionBackup = null;
+    state.fieldLiveCache = {};
+    state.fieldHistory = {};
+    state.replicaXmlIsolated = true;
+    return true;
+}
+
 async function triggerXmlPoll(serverId) {
     const config = store.get('config');
     const srv    = config?.servers?.find(s => String(s.id) === String(serverId));
@@ -2732,13 +3306,29 @@ async function triggerXmlPoll(serverId) {
     const state    = serverStates[serverId];
     const saveSlot = state?.lastSaveSlot;
     const effectiveSlot = saveSlot || srv.localSubFolder || 'savegame1';
+    const activationGeneration = state?.activationGeneration;
+    const sourceSignature = JSON.stringify(srv);
+    const ownsSource = () => {
+        const current = store.get('config')?.servers?.find(s => String(s.id) === String(serverId));
+        return serverStates[serverId] === state && state?.active !== false
+            && state?.activationGeneration === activationGeneration
+            && !!current && JSON.stringify(current) === sourceSignature;
+    };
+    if (!ownsSource()) return;
+
+    if (isExplicitReplicaXmlSource(srv, state?.ingressKind)) {
+        if (clearUnprovenReplicaXml(state) && state?.luaData) await rebuildMerged(serverId);
+        return;
+    }
 
     try {
         if (srv.mode === 'ftp') {
             await downloadFtpSavegameXml(srv, saveSlot);
+            if (!ownsSource()) return;
         }
         if (hasHttpFeed(srv)) {
-            const result = await downloadHttpFeedSavegameXml(srv, saveSlot, app.getPath('userData'));
+            const result = await downloadHttpFeedSavegameXml(srv, saveSlot, SESSION_USER_DATA_DIR);
+            if (!ownsSource()) return;
             if (result.ok) {
                 console.log(
                     `[HTTP-Feed] [${serverId}] saved ${result.saved.join(', ')}` +
@@ -2748,7 +3338,12 @@ async function triggerXmlPoll(serverId) {
                 console.warn(`[HTTP-Feed] [${serverId}] download issues:`, result.failed);
             }
         }
-        const fingerprint = await getSavegameXmlFingerprint(srv, effectiveSlot);
+        const fingerprint = await getSavegameXmlFingerprint(srv, effectiveSlot, state?.ingressKind);
+        if (!ownsSource()) return;
+        if (isExplicitReplicaXmlSource(srv, state?.ingressKind)) {
+            if (clearUnprovenReplicaXml(state) && state?.luaData) await rebuildMerged(serverId);
+            return;
+        }
         if (
             fingerprint &&
             state?.xmlData &&
@@ -2756,7 +3351,12 @@ async function triggerXmlPoll(serverId) {
         ) {
             return;
         }
-        const xmlData = await collectXmlData(srv, saveSlot);
+        const xmlData = await collectXmlData(srv, saveSlot, state?.ingressKind);
+        if (!ownsSource()) return;
+        if (isExplicitReplicaXmlSource(srv, state?.ingressKind)) {
+            if (clearUnprovenReplicaXml(state) && state?.luaData) await rebuildMerged(serverId);
+            return;
+        }
         if (xmlData) {
             serverStates[serverId].xmlData = xmlData;
             serverStates[serverId].lastXmlReceivedAt = new Date().toISOString();
@@ -2779,41 +3379,182 @@ async function triggerXmlPoll(serverId) {
     }
 }
 
+function releaseWatcherHandles(state) {
+    if (!state) return;
+    if (state.readDebounceTimer) {
+        clearTimeout(state.readDebounceTimer);
+        state.readDebounceTimer = null;
+    }
+    if (state.watcher) {
+        try { state.watcher.close(); } catch (_) { /* already closed */ }
+        state.watcher = null;
+    }
+    if (state.dirtyPensWatcher) {
+        try { state.dirtyPensWatcher.close(); } catch (_) { /* already closed */ }
+        state.dirtyPensWatcher = null;
+    }
+    for (const timer of (state.intervals || [])) {
+        clearTimeout(timer);
+        clearInterval(timer);
+    }
+    state.intervals = [];
+}
+
+function disposeLocalWatcherState(state) {
+    if (!state) return;
+    state.active = false;
+    if (state.retryTimer) {
+        clearTimeout(state.retryTimer);
+        state.retryTimer = null;
+    }
+    releaseWatcherHandles(state);
+}
+
 // ── Local file watcher ────────────────────────────────────────────────────────
 
 async function startLocalWatching(srv) {
     const state = serverStates[srv.id];
-
-    let basePath = srv.localPath;
-    if (!basePath) {
-        basePath = path.join(getFs25DocumentsRoot(), 'modSettings', 'FS25_FarmDashboard');
-    }
-
-    const folderName = srv.localSubFolder ||
-                       srv.name.replace(/[<>:"/\\|?*]/g, '').trim();
-    const luaJsonPath = path.join(basePath, folderName, 'data.json');
-
-    if (!(await pathExists(luaJsonPath))) {
-        console.log(`[Local] Waiting for: ${luaJsonPath}`);
-        const t = setTimeout(() => {
-            startLocalWatching(srv).catch((err) => {
+    if (!state || state.active === false) return { status: "superseded" };
+    const attempt = (state.watcherAttempt || 0) + 1;
+    state.watcherAttempt = attempt;
+    state.ingressGeneration = (state.ingressGeneration || 0) + 1;
+    const ingressGeneration = state.ingressGeneration;
+    releaseWatcherHandles(state);
+    state.active = true;
+    const stillOwned = () => serverStates[srv.id] === state && state.active === true && state.ingressGeneration === ingressGeneration;
+    const generationCurrent = () => state.activationGeneration == null || runtimeActivation.matches(state.activationGeneration);
+    const ownedNow = () => stillOwned() && generationCurrent() && state.watcherAttempt === attempt;
+    const watcherWarningCodes = { "watcher-start-failed": true, "watcher-runtime-error": true };
+    const reportReadiness = (status) => {
+        if (state.activationGeneration == null) return;
+        runtimeActivation.noteSource(state.activationGeneration, String(srv.id), attempt, status);
+    };
+    const noteWatcherProblem = (code, message) => {
+        if (!ownedNow()) return;
+        state.watchReadiness = "retrying";
+        state.watcherWarning = { code, message, attempt, generation: state.activationGeneration };
+        if (!state.configWarning || watcherWarningCodes[state.configWarning.code]) {
+            state.configWarning = {
+                code,
+                at: new Date().toISOString(),
+                message,
+                owner: "watcher",
+                attempt,
+                generation: state.activationGeneration,
+            };
+        }
+        reportReadiness("retrying");
+    };
+    const noteWatcherArmed = () => {
+        if (!ownedNow()) return;
+        state.watchReadiness = "armed";
+        const warningIsCurrent = (warning) => warning && warning.generation === state.activationGeneration && !(warning.attempt > attempt);
+        if (warningIsCurrent(state.watcherWarning)) state.watcherWarning = null;
+        if (warningIsCurrent(state.configWarning) && state.configWarning.owner === "watcher" && watcherWarningCodes[state.configWarning.code]) {
+            state.configWarning = null;
+        }
+        reportReadiness("armed");
+    };
+    const scheduleOwnedRetry = (delayMs) => {
+        if (state.retryTimer || !ownedNow()) return false;
+        const timer = setTimeout(() => {
+            state.retryTimer = null;
+            if (!ownedNow()) return;
+            const token = state.activationGeneration;
+            startLocalWatching(srv).then(() => {
+                const sameState = serverStates[srv.id] === state;
+                const sameGeneration = token == null || runtimeActivation.matches(token);
+                if (!sameState || !sameGeneration) {
+                    if (!sameState) disposeLocalWatcherState(state);
+                }
+            }).catch((err) => {
                 console.error(`[Local] startLocalWatching retry failed [${srv.id}]:`, err && err.message ? err.message : err);
             });
-        }, 5000);
-        state.intervals.push(t);
-        return;
+        }, delayMs);
+        state.retryTimer = timer;
+        state.intervals.push(timer);
+        return true;
+    };
+
+    const { basePath, folderName } = resolveLocalWatchParts(srv);
+    try {
+        state.identityProvision = ensureIdentityProposal(basePath).status;
+    } catch (provisionError) {
+        state.identityProvision = "proposal-failed";
+    }
+    const luaJsonPath = path.join(basePath, folderName, 'data.json');
+
+    const routeWatchPath = path.join(path.dirname(luaJsonPath), "active.xml");
+    const replicaDirEarly = path.join(basePath, "replicas", String(srv.id));
+    let replicaReadyEarly = false;
+    try {
+        replicaReadyEarly = (await pathExists(path.join(replicaDirEarly, "slot-a.xml")))
+            || (await pathExists(path.join(replicaDirEarly, "selection-a.xml")))
+            || (await pathExists(path.join(replicaDirEarly, "slot-b.xml")))
+            || (await pathExists(path.join(replicaDirEarly, "selection-b.xml")))
+            || (await pathExists(path.join(replicaDirEarly, "selected.xml")));
+    } catch (replicaGateError) {
+        replicaReadyEarly = false;
+    }
+    if (!ownedNow()) return { status: "superseded" };
+    if (!replicaReadyEarly && !(await pathExists(luaJsonPath)) && !(await pathExists(routeWatchPath))) {
+        if (!ownedNow()) return { status: "superseded" };
+        console.log(`[Local] Waiting for: ${luaJsonPath}`);
+        state.watchReadiness = "waiting";
+        scheduleOwnedRetry(5000);
+        reportReadiness("waiting");
+        return { status: "waiting", attempt };
     }
 
     console.log(`[Local] Watching: ${luaJsonPath}`);
 
     let lastMtimeMs = 0;
-    let readDebounceTimer = null;
     const updateMtime = (mtimeMs) => {
         if (Number.isFinite(mtimeMs) && mtimeMs > 0) lastMtimeMs = mtimeMs;
     };
     const readFileNow = (knownMtimeMs) => {
+        if (!ownedNow()) return;
+        let ingress = null;
+        let selected = null;
+        try {
+            selected = localIngressController.selectIngress(srv, { basePath, folderName }, (target) => fs.existsSync(target));
+            if (!selected.dir) {
+                ingress = selected.reason ? { status: "unavailable", reason: selected.reason, payload: null } : null;
+            } else {
+                ingress = exportIngress.ingestWatchedSlot(selected.dir, {
+                    sourceId: String(srv.id),
+                    configuredSlot: selected.configuredSlot,
+                    trustedLocalClock: selected.kind === 'authority',
+                    explicitLegacy: srv.legacyJson === true,
+                    previous: state.exportIngress,
+                    tracker: state.exportIngress && state.exportIngress.tracker,
+                });
+            }
+        } catch (ingressError) {
+            ingress = null;
+        }
+        if (ingress && ingress.payload && (ingress.status === "valid" || ingress.status === "identity-unconfirmed" || ingress.status === "last-known" || ingress.status === "replica")) {
+            state.exportIngress = ingress;
+            const transport = {
+                ...(ingress.identity || {}),
+                freshness: ingress.freshness,
+                ingressStatus: ingress.status,
+                sourceId: String(srv.id),
+                replica: (ingress.identity && ingress.identity.replica === true) || ingress.replica === true,
+                authoritative: ((ingress.identity && ingress.identity.replica === true) || ingress.replica === true) ? false : ingress.authoritative,
+            };
+            if (!ownedNow()) return;
+            processLuaData(srv.id, JSON.stringify(ingress.payload), transport);
+            return;
+        }
+        if (ingress && (ingress.reason === "replica-rejected" || ingress.reason === "configuration-required")) return;
+        let routePresent = false;
+        try { routePresent = fs.existsSync(routeWatchPath); } catch (_) { return; }
+        if (routePresent) return;
+        if (srv.legacyJson !== true) return;
         readLocalLuaJsonReady(luaJsonPath, srv.id)
             .then((raw) => {
+                if (!ownedNow()) return;
                 if (raw != null) processLuaData(srv.id, raw);
                 if (Number.isFinite(knownMtimeMs)) {
                     updateMtime(knownMtimeMs);
@@ -2829,9 +3570,11 @@ async function startLocalWatching(srv) {
     };
     // Debounce: join-as-client mirror truncates then streams ~800KB; many watch events mid-write.
     const readFile = (knownMtimeMs) => {
-        if (readDebounceTimer) clearTimeout(readDebounceTimer);
-        readDebounceTimer = setTimeout(() => {
-            readDebounceTimer = null;
+        if (!ownedNow()) return;
+        if (state.readDebounceTimer) clearTimeout(state.readDebounceTimer);
+        state.readDebounceTimer = setTimeout(() => {
+            state.readDebounceTimer = null;
+            if (!ownedNow()) return;
             readFileNow(knownMtimeMs);
         }, 350);
     };
@@ -2839,27 +3582,33 @@ async function startLocalWatching(srv) {
     // fs.watch + persistent:false — avoids chokidar polling handles that kept Windows folders "in use".
     let fw;
     try {
-        fw = fs.watch(luaJsonPath, { persistent: false }, () => readFile());
+        const selectedWatch = localIngressController.selectIngress(srv, { basePath, folderName }, (target) => fs.existsSync(target));
+        const watchTarget = selectedWatch.kind === "authority"
+            ? routeWatchPath
+            : ((selectedWatch.kind === "replica" && selectedWatch.dir && fs.existsSync(selectedWatch.dir))
+                ? selectedWatch.dir
+                : ((await pathExists(routeWatchPath)) ? routeWatchPath : luaJsonPath));
+        if (!ownedNow()) return { status: "superseded" };
+        fw = fs.watch(watchTarget, { persistent: false }, () => readFile());
+        if (!ownedNow()) {
+            try { fw.close(); } catch (_) { /* stale setup releases only the handle it just opened */ }
+            return { status: "superseded" };
+        }
         fw.on('error', (err) => {
             console.warn(`[Local] watch error [${srv.id}]:`, err && err.message ? err.message : err);
-            try {
-                fw.close();
-            } catch (_) { /* ignore */ }
+            try { fw.close(); } catch (_) { /* ignore */ }
+            if (!ownedNow()) return;
             state.watcher = null;
-            state.intervals.push(setTimeout(() => {
-                startLocalWatching(srv).catch((err) => {
-                    console.error(`[Local] watch restart failed [${srv.id}]:`, err && err.message ? err.message : err);
-                });
-            }, 5000));
+            noteWatcherProblem("watcher-runtime-error", err && err.message ? err.message : "watcher-runtime-error");
+            scheduleOwnedRetry(5000);
         });
     } catch (e) {
         console.warn(`[Local] fs.watch failed [${srv.id}]:`, e.message);
-        state.intervals.push(setTimeout(() => {
-            startLocalWatching(srv).catch((err) => {
-                console.error(`[Local] fs.watch restart failed [${srv.id}]:`, err && err.message ? err.message : err);
-            });
-        }, 5000));
-        return;
+        if (!ownedNow()) return { status: "superseded" };
+        state.watcher = null;
+        noteWatcherProblem("watcher-start-failed", e && e.message ? e.message : "watcher-start-failed");
+        scheduleOwnedRetry(5000);
+        return { status: "retrying", error: e && e.message ? e.message : "watcher-start-failed", attempt };
     }
     state.watcher = fw;
     readFile();
@@ -2868,55 +3617,137 @@ async function startLocalWatching(srv) {
     const pollIntervalMs = 10000;
     const pollTimer = setInterval(async () => {
         try {
-            const stat = await fs.promises.stat(luaJsonPath);
-            const mtimeMs = Number(stat.mtimeMs) || 0;
-            if (mtimeMs > lastMtimeMs + 1) {
-                readFile(mtimeMs);
+            if (!stillOwned()) return;
+            const selected = localIngressController.selectIngress(srv, { basePath, folderName }, (target) => fs.existsSync(target));
+            if (selected.reason === "configuration-required") return;
+            let mtimeMs = 0;
+            if (selected.kind === "replica" && selected.dir) {
+                for (const name of ["selected.xml", "slot-a.xml", "slot-b.xml", "selection-a.xml", "selection-b.xml"]) {
+                    try {
+                        const candidate = path.join(selected.dir, name);
+                        if (!fs.existsSync(candidate)) continue;
+                        const candidateStat = await fs.promises.stat(candidate);
+                        mtimeMs = Math.max(mtimeMs, Number(candidateStat.mtimeMs) || 0);
+                    } catch (_) { /* keep polling the files that are present */ }
+                }
+            } else if (selected.kind === "authority") {
+                const stat = await fs.promises.stat(routeWatchPath);
+                mtimeMs = Number(stat.mtimeMs) || 0;
+            } else if (srv.legacyJson === true && luaJsonPath) {
+                const stat = await fs.promises.stat(luaJsonPath);
+                mtimeMs = Number(stat.mtimeMs) || 0;
+            } else return;
+            if (typeof livestockDetailModule.reconcileDirtyWatch === 'function' && ownedNow()) {
+                const nextDirty = typeof livestockDetailModule.dirtyIndexWatchPath === 'function'
+                    ? livestockDetailModule.dirtyIndexWatchPath(path.dirname(luaJsonPath), srv, serverStates[srv.id])
+                    : null;
+                await livestockDetailModule.reconcileDirtyWatch({
+                    state,
+                    desired: nextDirty,
+                    fsImpl: fs,
+                    pathExists,
+                    ownedNow,
+                    onEvent: () => {
+                        try { livestockDetailModule.bustDirtyIndexCache(srv.id); } catch (_) { /* ignore */ }
+                    },
+                });
             }
+            if (!stillOwned()) return;
+            if (mtimeMs > lastMtimeMs + 1) readFile(mtimeMs);
         } catch (_) {
             /* ignore */
         }
     }, pollIntervalMs);
     state.intervals.push(pollTimer);
 
-    const dirtyPensPath = path.join(path.dirname(luaJsonPath), 'dirtyPens.json');
+    const dirtySlotDir = path.dirname(luaJsonPath);
+    const dirtyPensPath = typeof livestockDetailModule.dirtyIndexWatchPath === 'function'
+        ? livestockDetailModule.dirtyIndexWatchPath(dirtySlotDir, srv, serverStates[srv.id])
+        : path.join(dirtySlotDir, 'dirtyPens.json');
+    const closeIfStale = (handle) => {
+        if (!handle) return;
+        try { handle.close(); } catch (_) { /* stale setup releases only the handle it just opened */ }
+    };
     try {
         const bustDirty = () => {
+            if (!ownedNow()) return;
             try {
                 livestockDetailModule.bustDirtyIndexCache(srv.id);
             } catch (_) { /* ignore */ }
         };
         let fwDirty = null;
-        if (await pathExists(dirtyPensPath)) {
+        if (typeof livestockDetailModule.reconcileDirtyWatch === 'function') {
+            await livestockDetailModule.reconcileDirtyWatch({
+                state,
+                desired: dirtyPensPath,
+                fsImpl: fs,
+                pathExists,
+                ownedNow,
+                onEvent: bustDirty,
+            });
+        } else if (!dirtyPensPath) {
+            fwDirty = null;
+        } else {
+        const dirtyFileExists = await pathExists(dirtyPensPath);
+        if (!ownedNow()) return { status: "superseded" };
+        if (dirtyFileExists) {
             fwDirty = fs.watch(dirtyPensPath, { persistent: false }, bustDirty);
+            if (!ownedNow()) {
+                closeIfStale(fwDirty);
+                return { status: "superseded" };
+            }
             fwDirty.on('error', (err) => {
                 console.warn(`[Local] dirtyPens watch error [${srv.id}]:`, err && err.message ? err.message : err);
                 try { fwDirty.close(); } catch (_) { /* ignore */ }
-                state.dirtyPensWatcher = null;
+                if (ownedNow() && state.dirtyPensWatcher === fwDirty) state.dirtyPensWatcher = null;
             });
         } else {
             const dirOfDirty = path.dirname(dirtyPensPath);
             const baseName = path.basename(dirtyPensPath);
-            if (await pathExists(dirOfDirty)) {
+            const dirtyDirExists = await pathExists(dirOfDirty);
+            if (!ownedNow()) return { status: "superseded" };
+            if (dirtyDirExists) {
                 fwDirty = fs.watch(dirOfDirty, { persistent: false }, (_evt, fname) => {
+                    if (!ownedNow()) return;
                     if (fname === baseName) bustDirty();
                 });
+                if (!ownedNow()) {
+                    closeIfStale(fwDirty);
+                    return { status: "superseded" };
+                }
                 fwDirty.on('error', (err) => {
                     console.warn(`[Local] slot-dir watch error [${srv.id}]:`, err && err.message ? err.message : err);
                     try { fwDirty.close(); } catch (_) { /* ignore */ }
-                    state.dirtyPensWatcher = null;
+                    if (ownedNow() && state.dirtyPensWatcher === fwDirty) state.dirtyPensWatcher = null;
                 });
             }
         }
+        if (!ownedNow()) {
+            closeIfStale(fwDirty);
+            return { status: "superseded" };
+        }
         state.dirtyPensWatcher = fwDirty;
+        }
     } catch (e) {
         console.warn(`[Local] dirtyPens watch setup failed [${srv.id}]:`, e.message);
+        if (!ownedNow()) return { status: "superseded" };
     }
 
+    if (!ownedNow()) return { status: "superseded" };
     // XML poll immediately then every 60s (XML changes on save, not every 10s)
     triggerXmlPoll(srv.id);
-    const xmlInterval = setInterval(() => triggerXmlPoll(srv.id), 60000);
+    if (!ownedNow()) return { status: "superseded" };
+    const xmlInterval = setInterval(() => {
+        if (!ownedNow()) return;
+        triggerXmlPoll(srv.id);
+    }, 60000);
+    if (!ownedNow()) {
+        clearInterval(xmlInterval);
+        return { status: "superseded" };
+    }
     state.intervals.push(xmlInterval);
+    noteWatcherArmed();
+    return { status: "armed", attempt };
 }
 
 // ── FTP polling ───────────────────────────────────────────────────────────────
@@ -3004,7 +3835,7 @@ async function pollFtp(srv) {
     const gen = (ftpPollGenerations[srv.id] = (ftpPollGenerations[srv.id] || 0) + 1);
     const client = new ftp.Client(120000);
     client.ftp.verbose = false;
-    const userDataPath = app.getPath('userData');
+    const userDataPath = SESSION_USER_DATA_DIR;
     try {
         await client.access(ftpAccessOptions(srv));
 
@@ -3021,14 +3852,52 @@ async function pollFtp(srv) {
         const finalPath = path.join(userDataPath, `data_${srv.id}.json`);
 
         if (ftpPollGenerations[srv.id] !== gen) return;
+        if (st) {
+            try {
+                const proposal = await publishIdentityProposalFtp(client, `${basePath}/modSettings/FS25_FarmDashboard`);
+                st.identityProvision = proposal.status;
+            } catch (proposalError) {
+                st.identityProvision = "remote-unknown";
+            }
+        }
 
-        if (await safeDownload(client, remotePath, tmpPath, finalPath, { maxAttempts: 4, retryDelayMs: 350, canCommit: () => ftpPollGenerations[srv.id] === gen })) {
+        const routeTmp = path.join(userDataPath, `route_${srv.id}_${gen}.xml.tmp`);
+        const routeFinal = path.join(userDataPath, `route_${srv.id}.xml`);
+        let envelopeDelivered = false;
+        let routeAttempted = false;
+        if (await safeDownload(client, `${slotRemote}/active.xml`, routeTmp, routeFinal, { maxAttempts: 2, canCommit: () => ftpPollGenerations[srv.id] === gen })) {
+            routeAttempted = true;
+            const routeXml = await readFileUtf8WithRetryAsync(routeFinal, { maxAttempts: 2 });
+            const route = exportIngress.parseRoute(routeXml);
+            if (route && exportIngress.safeId(route.careerId)) {
+                const slotTmp = path.join(userDataPath, `slot_${srv.id}_${gen}.xml.tmp`);
+                const slotFinal = path.join(userDataPath, `slot_${srv.id}.xml`);
+                const slotRemoteFile = `${slotRemote}/${route.careerId}/${exportIngress.slotFileName(route.slot)}`;
+                if (await safeDownload(client, slotRemoteFile, slotTmp, slotFinal, { maxAttempts: 2, canCommit: () => ftpPollGenerations[srv.id] === gen })) {
+                    const slotXml = await readFileUtf8WithRetryAsync(slotFinal, { maxAttempts: 2 });
+                    const ingested = exportIngress.readExportBuffers({
+                        routeXml,
+                        slotXml,
+                        sourceId: String(srv.id),
+                        configuredSlot: folderName,
+                        previous: st && st.exportIngress,
+                    });
+                    if (ingested && ingested.payload && ftpPollGenerations[srv.id] === gen) {
+                        if (st) st.exportIngress = ingested;
+                        processLuaData(srv.id, JSON.stringify(ingested.payload), { ...(ingested.identity || {}), freshness: ingested.freshness, sourceId: String(srv.id) });
+                        envelopeDelivered = true;
+                    }
+                }
+            }
+        }
+
+        if (!envelopeDelivered && srv.legacyJson === true && await safeDownload(client, remotePath, tmpPath, finalPath, { maxAttempts: 4, retryDelayMs: 350, canCommit: () => ftpPollGenerations[srv.id] === gen })) {
             if (ftpPollGenerations[srv.id] !== gen) return;
             const luaRaw = await readFileUtf8WithRetryAsync(finalPath, { maxAttempts: 3 });
             if (luaRaw != null && ftpPollGenerations[srv.id] === gen) {
                 processLuaData(srv.id, stripUtf8Bom(luaRaw));
             }
-        } else {
+        } else if (!envelopeDelivered && srv.legacyJson === true) {
             console.warn(
                 `[FTP] [${srv.id}] Could not download live Lua data.json from:\n  ${remotePath}\n` +
                 '  Fix: game running on host, FS25_FarmDashboard mod enabled, and this server\'s ' +
@@ -3043,9 +3912,17 @@ async function pollFtp(srv) {
             'savegame1';
         slotRemote = `${basePath}/modSettings/FS25_FarmDashboard/${folderAfter}`;
 
-        // Plan v5 A1: piggy-back the small dirtyPens.json index download on the same FTP session.
-        // No extra connect; failures are non-fatal so data.json polling is never disrupted.
+        // Modern sources refresh both resource slots. Explicit legacy keeps dirtyPens.json.
         try {
+            if (srv.legacyJson !== true) {
+                await livestockDetailModule.ftpRefreshDirtyIndex(srv, {
+                    userDataPath,
+                    serverStates,
+                    slotRemote,
+                    client,
+                    canCommit: () => ftpPollGenerations[srv.id] === gen,
+                });
+            } else {
             const dirtyRemote = `${slotRemote}/dirtyPens.json`;
             const dirtyTmp = path.join(userDataPath, `livestock_dirtyPens_${srv.id}.json.tmp`);
             const dirtyFinal = path.join(userDataPath, `livestock_dirtyPens_${srv.id}.json`);
@@ -3057,10 +3934,12 @@ async function pollFtp(srv) {
                     console.log(`[FTP] [${srv.id}] dirtyPens.json not yet available on host; live detail fetches will refetch on each click until index exists.`);
                 }
             }
+            }
         } catch (e) {
             console.warn(`[FTP] [${srv.id}] dirtyPens piggy-back failed: ${e && e.message}`);
         }
 
+        if (srv.legacyJson === true) {
         try {
             const detailPulls = await syncFtpDetailsCache(client, srv, slotRemote, userDataPath, { canCommit: () => ftpPollGenerations[srv.id] === gen });
             if (detailPulls > 0 && ftpPollGenerations[srv.id] === gen) {
@@ -3068,6 +3947,7 @@ async function pollFtp(srv) {
             }
         } catch (e) {
             console.warn(`[FTP] [${srv.id}] details folder sync: ${e && e.message}`);
+        }
         }
     } catch (err) {
         console.warn(`[FTP] [${srv.id}] ${srv.name}: ${err.message}`);
@@ -3170,22 +4050,8 @@ async function stopAllWatchers() {
     });
     const states = Object.values(serverStates);
     for (const state of states) {
-        if (state.watcher) {
-            try {
-                state.watcher.close();
-            } catch (_) { /* ignore */ }
-            state.watcher = null;
-        }
-        if (state.dirtyPensWatcher) {
-            try {
-                state.dirtyPensWatcher.close();
-            } catch (_) { /* ignore */ }
-            state.dirtyPensWatcher = null;
-        }
-        for (const t of (state.intervals || [])) {
-            clearTimeout(t);
-            clearInterval(t);
-        }
+        state.ingressGeneration = (state.ingressGeneration || 0) + 1;
+        disposeLocalWatcherState(state);
     }
     serverStates = {};
 }
@@ -3281,6 +4147,24 @@ function waitForDashboardNavigation(dest, timeoutMs) {
     return navigation.promise;
 }
 
+// Older approved links could be saved before the setup flag was set. Recover only
+// rows with the app-side pairing for this FS25 profile; bootServer and ingress
+// still enforce registration and the committed replica's slot/career identity.
+function hasRecoverablePersistedReplica(config) {
+    if (!config || !Array.isArray(config.servers) || config.servers.length === 0) return false;
+    const profile = getFs25DocumentsRoot();
+    if (!profile) return false;
+    const expectedRoot = path.resolve(profile, 'modSettings', 'FS25_FarmDashboard').toLowerCase();
+    if (!config.servers.every((row) => row && row.mode === 'local' &&
+        row.replicaRegistration && row.replicaRemoteSlot &&
+        row.localSubFolder === row.replicaRemoteSlot &&
+        row.replicaRegistration.remoteSlot === row.replicaRemoteSlot &&
+        typeof row.localPath === 'string' &&
+        path.resolve(row.localPath).toLowerCase() === expectedRoot)) return false;
+    const checked = replicaRegistration.validateSnapshot(config.servers);
+    return checked.ok === true && checked.rows.length === config.servers.length;
+}
+
 async function launchDashboardFromIpc(event) {
     if (!isTrustedDashboardIpcSender(event)) {
         return { ok: false, error: 'untrusted_sender', stage: 'idle' };
@@ -3288,11 +4172,16 @@ async function launchDashboardFromIpc(event) {
     if (launchDashboardInFlight) return launchDashboardInFlight;
     const work = (async () => {
         const config = store.get('config');
-        if (!config || !config.isConfigured) {
+        if (!config || (!config.isConfigured && !hasRecoverablePersistedReplica(config))) {
             return { ok: false, error: 'not_configured', stage: 'persisted' };
         }
-        if (!server || !server.listening) {
-            await bootServer(config, { deferHydrate: true });
+        const idleWithSources = Array.isArray(config.servers) && config.servers.length > 0 &&
+            runtimeActivation.snapshot().phase === 'idle';
+        if (!server || !server.listening || idleWithSources) {
+            const boot = await bootServer(config, { deferHydrate: true });
+            if (boot && (boot.failed || boot.blocked)) {
+                return { ok: false, error: 'source_activation_failed', stage: 'activating' };
+            }
         }
         if (!server || !server.listening) {
             return { ok: false, error: 'backend_not_listening', stage: 'activating' };
@@ -3405,13 +4294,61 @@ async function maybeOfferClassicConfigImport() {
 
 async function bootServer(config, options) {
     const deferHydrate = !!(options && options.deferHydrate);
-    await stopAllWatchers();
-
+    const claim = runtimeActivation.begin(config);
+    if (claim.action !== "start") {
+        return {
+            registrationReady: claim.action === "noop",
+            applied: claim.action === "noop",
+            shared: claim.action === "share",
+            scheduled: claim.action === "share",
+            ownsCompletion: true,
+            generation: claim.generation,
+        };
+    }
+    const activationToken = claim.generation;
     const servers = config.servers || (config.mode ? [{
         id: 'srv_legacy', name: 'My Server', ...config
     }] : []);
+    // Publish pending/removed bindings synchronously before old watchers are stopped.
+    boundSources.beginActivation(servers, activationToken).forEach(broadcastSourceState);
+    try {
+    const activationOwns = () => runtimeActivation.owns(activationToken);
+    await stopAllWatchers();
+    if (!activationOwns()) {
+        return { registrationReady: false, applied: false, superseded: true, ownsCompletion: true, generation: activationToken };
+    }
 
     const ftpServers = servers.filter(s => s.mode === 'ftp');
+    let registrationReady = false;
+    let registrationWarning = {
+        code: "configuration-required",
+        at: new Date().toISOString(),
+        message: "The FS25 profile could not be resolved. Replica registration will not be applied until the profile is available.",
+    };
+    try {
+        const recoveryProfile = getFs25DocumentsRoot();
+        if (!recoveryProfile) {
+            console.warn("[Boot] replica registration profile is unavailable");
+        } else {
+            const recovered = replicaRegistration.reconcileRegistrationTransaction(recoveryProfile, servers);
+            registrationReady = !!(recovered && recovered.ok);
+            registrationWarning = registrationReady ? null : {
+                code: "registration-recovery-required",
+                at: new Date().toISOString(),
+                message: "Replica registration recovery is unfinished. The dashboard will not apply that pending registration.",
+            };
+            if (!registrationReady) console.warn("[Boot] replica registration recovery required");
+        }
+    } catch (recoveryError) {
+        registrationReady = false;
+        registrationWarning = {
+            code: "registration-recovery-required",
+            at: new Date().toISOString(),
+            message: "Replica registration recovery is unfinished. The dashboard will not apply that pending registration.",
+        };
+        console.warn("[Boot] replica registration recovery failed:", recoveryError && recoveryError.message ? recoveryError.message : recoveryError);
+    }
+    const replicaBlocked = (srv) => !!(srv && srv.replicaRegistration && !registrationReady);
 
     servers.forEach(srv => {
         serverStates[srv.id] = {
@@ -3428,21 +4365,44 @@ async function bootServer(config, options) {
             fieldHistory: {},
             lastGoodMergedSnapshot: null,
             liveSectionBackup: null,
-            configWarning: null,
+            configWarning: replicaBlocked(srv) ? registrationWarning : null,
+            active: true,
+            ingressGeneration: 0,
+            readDebounceTimer: null,
+            activationGeneration: activationToken,
         };
+        if (boundSources.attach(srv.id, serverStates[srv.id], activationToken)) {
+            const published = boundSources.snapshot(srv.id);
+            broadcastSourceState({ type: 'source-state', serverId: String(srv.id),
+                sourceBinding: published.sourceBinding });
+        }
     });
+    if (!activationOwns()) {
+        return { registrationReady: false, applied: false, superseded: true, ownsCompletion: true, generation: activationToken };
+    }
 
     // Plan v5 A5: surface localSubFolder mismatches as a one-time WARN + serverInfo.configWarning.
     // Only meaningful for local mode (FTP folder name is resolved later from save-slot probing).
     for (const srv of servers) {
-        if (!srv || srv.mode !== 'local') continue;
-        try {
-            let basePath = srv.localPath;
-            if (!basePath) {
-                basePath = path.join(getFs25DocumentsRoot(), 'modSettings', 'FS25_FarmDashboard');
+        if (!srv || !isLocalModeServer(srv)) continue;
+        if (srv.replicaRemoteSlot && !srv.replicaRegistration) {
+            const unverified = serverStates[srv.id];
+            if (unverified) {
+                unverified.configWarning = {
+                    code: 'registration-recovery-required',
+                    at: new Date().toISOString(),
+                    message: 'This replica has no app-side pairing. Recover it with a fresh game challenge before using its data.',
+                };
+                boundSources.clearOwned(unverified, 'blocked');
             }
-            const folderName = srv.localSubFolder ||
-                String(srv.name || '').replace(/[<>:"/\\|?*]/g, '').trim();
+            continue;
+        }
+        if (serverStates[srv.id] && serverStates[srv.id].configWarning && (serverStates[srv.id].configWarning.code === "registration-recovery-required" || serverStates[srv.id].configWarning.code === "configuration-required")) continue;
+        // A paired replica is read from its registered replica directory, not
+        // from the local authority save slot. Do not warn when that slot is absent.
+        if (srv.replicaRegistration) continue;
+        try {
+            const { basePath, folderName } = resolveLocalWatchParts(srv);
             if (!folderName) {
                 serverStates[srv.id].configWarning = {
                     code: 'localSubFolderMissing',
@@ -3450,22 +4410,38 @@ async function bootServer(config, options) {
                     at: new Date().toISOString(),
                     message: 'Server has no localSubFolder configured. Set it to your savegame folder (e.g. savegame1).',
                 };
+                const blocked = boundSources.clearOwned(serverStates[srv.id], 'blocked');
+                if (blocked?.changed) broadcastSourceState({ type: 'source-state', serverId: String(srv.id),
+                    sourceBinding: blocked.sourceBinding });
                 console.warn(`[livestock] folder mismatch serverId=${srv.id} expected: a folder under ${basePath}`);
                 continue;
             }
             const slotPath = path.join(basePath, folderName);
+            const ownedState = serverStates[srv.id];
             if (!(await pathExists(slotPath))) {
-                serverStates[srv.id].configWarning = {
+                if (!activationOwns() || serverStates[srv.id] !== ownedState) {
+                    return { registrationReady: false, applied: false, superseded: true, ownsCompletion: true, generation: activationToken };
+                }
+                ownedState.configWarning = {
                     code: 'localSubFolderMissing',
                     expected: slotPath,
                     at: new Date().toISOString(),
                     message: `Configured local folder does not exist: ${slotPath}. Open the game once with the FarmDashboard mod to create it, or update the server's "Local folder" in settings.`,
                 };
+                const blocked = boundSources.clearOwned(ownedState, 'blocked');
+                if (blocked?.changed) broadcastSourceState({ type: 'source-state', serverId: String(srv.id),
+                    sourceBinding: blocked.sourceBinding });
                 console.warn(`[livestock] folder mismatch serverId=${srv.id} expected=${slotPath}`);
             }
         } catch (e) {
             console.warn('[livestock] configWarning probe failed', srv && srv.id, e && e.message);
         }
+        if (!activationOwns()) {
+            return { registrationReady: false, applied: false, superseded: true, ownsCompletion: true, generation: activationToken };
+        }
+    }
+    if (!activationOwns()) {
+        return { registrationReady: false, applied: false, superseded: true, ownsCompletion: true, generation: activationToken };
     }
 
     // Restore last merged JSON from disk **before** HTTP accepts traffic so the first `/api/data` after
@@ -3473,6 +4449,8 @@ async function bootServer(config, options) {
     // add a short delay before the port opens; that is preferable to an empty dashboard flash.
     servers.forEach((srv) => {
         if (srv && srv.mode === 'ftp') return;
+        if (replicaBlocked(srv)) return;
+        if (!activationOwns() || !serverStates[srv.id] || serverStates[srv.id].activationGeneration !== activationToken) return;
         try {
             hydrateServerCacheFromDisk(srv.id);
         } catch (e) {
@@ -3481,6 +4459,8 @@ async function bootServer(config, options) {
     });
     const hydrateLua = async () => {
         for (const srv of servers) {
+            if (replicaBlocked(srv)) continue;
+            if (!activationOwns() || !serverStates[srv.id] || serverStates[srv.id].activationGeneration !== activationToken) return;
             try {
                 await hydrateLuaSnapshotFromDiskAtBoot(srv);
             } catch (e) {
@@ -3489,54 +4469,182 @@ async function bootServer(config, options) {
         }
     };
 
-    const runDeferredBootWork = () => {
-        try {
-            servers.forEach((srv) => {
-                if (srv.mode === 'local') {
-                    startLocalWatching(srv).catch((err) => {
-                        console.error('[bootServer] startLocalWatching', srv.id, err && err.message ? err.message : err);
-                    });
+    const armRequiredWatchers = async () => {
+        if (!activationOwns()) return { ok: false, superseded: true };
+        const starts = [];
+        for (const srv of servers) {
+            if (!activationOwns() || !serverStates[srv.id] || serverStates[srv.id].activationGeneration !== activationToken) {
+                return { ok: false, superseded: true };
+            }
+            if (replicaBlocked(srv) || !isLocalModeServer(srv)) continue;
+            const ownedState = serverStates[srv.id];
+            starts.push(Promise.resolve(startLocalWatching(srv)).then((outcome) => {
+                const reported = outcome && outcome.status ? outcome : { status: "armed" };
+                const current = runtimeActivation.matches(activationToken) && serverStates[srv.id] === ownedState && ownedState.active !== false;
+                if (!current) {
+                    disposeLocalWatcherState(ownedState);
+                    return { status: "superseded" };
                 }
-            });
-            startFtpPollingCoordinator(config, ftpServers);
-            startVanillaFillTypeHudWarmup();
-        } catch (e) {
-            console.error('[bootServer] deferred work failed:', e);
+                if (reported.status !== "superseded") {
+                    runtimeActivation.noteSource(activationToken, String(srv.id), reported.attempt, reported.status);
+                }
+                return reported;
+            }));
         }
+        try {
+            await Promise.all(starts);
+        } catch (error) {
+            if (!activationOwns()) return { ok: false, superseded: true };
+            console.error("[bootServer] startLocalWatching", error && error.message ? error.message : error);
+            return { ok: false, error: error && error.message ? error.message : "watcher-start-failed" };
+        }
+        if (!activationOwns()) return { ok: false, superseded: true };
+        const statuses = starts.length ? await Promise.all(starts) : [];
+        if (statuses.some((item) => item && item.status === "superseded") || !activationOwns()) {
+            return { ok: false, superseded: true };
+        }
+        const retrying = statuses.find((item) => item && item.status === "retrying");
+        if (retrying) return { ok: false, retrying: true, error: retrying.error || "watcher-start-failed" };
+        const waiting = statuses.find((item) => item && item.status === "waiting");
+        if (waiting) return { ok: false, waiting: true };
+        return { ok: true };
     };
 
-    const loadDashboardThenDeferHeavyWork = () => {
+    const publishActivation = (watcherResult) => {
+        if (!watcherResult || watcherResult.superseded || !runtimeActivation.matches(activationToken)) {
+            return { registrationReady, applied: false, superseded: true, ownsCompletion: true, generation: activationToken };
+        }
+        if (watcherResult.retrying || watcherResult.waiting) {
+            const waitingBlocked = servers.some((srv) => srv && srv.replicaRegistration) && !registrationReady;
+            if (waitingBlocked) runtimeActivation.block(activationToken);
+            const waitingView = runtimeActivation.syncAggregate(activationToken);
+            return {
+                registrationReady: registrationReady && !waitingBlocked,
+                applied: waitingView.applied === true,
+                retrying: !!watcherResult.retrying,
+                waiting: !!watcherResult.waiting,
+                blocked: waitingView.phase === "blocked",
+                error: watcherResult.error || null,
+                completionPending: waitingView.applied !== true,
+                ownsCompletion: true,
+                generation: activationToken,
+            };
+        }
+        if (!watcherResult.ok && !watcherResult.retrying && !watcherResult.waiting) {
+            if (activationOwns()) runtimeActivation.fail(activationToken, watcherResult.error || "watcher-start-failed");
+            return { registrationReady, applied: false, failed: true, ownsCompletion: true, generation: activationToken };
+        }
+        const replicaBlockedConfig = servers.some((srv) => srv && srv.replicaRegistration) && !registrationReady;
+        if (replicaBlockedConfig) runtimeActivation.block(activationToken);
+        const view = runtimeActivation.syncAggregate(activationToken);
+        return {
+            registrationReady: registrationReady && !replicaBlockedConfig,
+            applied: view.applied === true,
+            retrying: !!watcherResult.retrying,
+            waiting: !!watcherResult.waiting,
+            blocked: view.phase === "blocked",
+            error: watcherResult.error || null,
+            completionPending: view.applied !== true,
+            ownsCompletion: true,
+            generation: activationToken,
+        };
+    };
+
+    const openDashboard = () => {
         // Reloading http://127.0.0.1:8766 on every save-settings tears down the renderer (Settings modal open)
         // and often shows a blank/blue window until load completes — skip when already on this URL.
         if (shouldLoadDashboardUrl() && mainWindow) {
             void waitForDashboardNavigation(`http://127.0.0.1:${PORT}/`, 15000)
                 .catch((e) => console.error('[bootServer] navigation', e));
         }
-        setImmediate(runDeferredBootWork);
     };
 
-    if (deferHydrate) {
-        setImmediate(() => {
-            void hydrateLua().catch((e) => console.error('[bootServer] deferred lua', e));
-        });
-        if (!server || !server.listening) {
-            listenFarmdashHttp(getLanBindAddress(), loadDashboardThenDeferHeavyWork);
-        } else {
-            loadDashboardThenDeferHeavyWork();
+    let remoteScheduled = false;
+    const scheduleRemoteMonitoring = () => {
+        if (!runtimeActivation.matches(activationToken) || remoteScheduled) return;
+        remoteScheduled = true;
+        try {
+            startFtpPollingCoordinator(config, ftpServers);
+            ftpServers.forEach((srv) => {
+                runtimeActivation.noteSource(activationToken, String(srv.id), 1, "armed");
+            });
+        } catch (remoteError) {
+            console.error("[bootServer] ftp coordinator failed:", remoteError && remoteError.message ? remoteError.message : remoteError);
+            ftpServers.forEach((srv) => {
+                runtimeActivation.noteSource(activationToken, String(srv.id), 1, "failed");
+            });
         }
-        return;
+    };
+
+    const runOwnedStartup = async () => {
+        if (!activationOwns()) return { ok: false, superseded: true };
+        scheduleRemoteMonitoring();
+        if (!activationOwns()) return { ok: false, superseded: true };
+        await hydrateLua();
+        if (!activationOwns()) return { ok: false, superseded: true };
+        const watchers = await armRequiredWatchers();
+        if (runtimeActivation.matches(activationToken)) runtimeActivation.settleStartup(activationToken);
+        return watchers;
+    };
+
+    if (!server || !server.listening) {
+        listenFarmdashHttp(getLanBindAddress(), openDashboard);
+    } else {
+        openDashboard();
     }
 
-    await hydrateLua();
-    if (!server || !server.listening) {
-        listenFarmdashHttp(getLanBindAddress(), loadDashboardThenDeferHeavyWork);
-    } else {
-        loadDashboardThenDeferHeavyWork();
+    runtimeActivation.setReadyContinuation(activationToken, () => {
+        try {
+            startVanillaFillTypeHudWarmup();
+        } catch (warmupError) {
+            console.error("[bootServer] optional warmup failed:", warmupError);
+        }
+    });
+    const requiredRows = [];
+    servers.forEach((srv) => {
+        if (!srv || srv.id == null) return;
+        if (srv.mode === "ftp") {
+            requiredRows.push({ id: String(srv.id), status: "pending" });
+            return;
+        }
+        if (isLocalModeServer(srv)) {
+            requiredRows.push({ id: String(srv.id), status: replicaBlocked(srv) ? "blocked" : "pending" });
+        }
+    });
+    runtimeActivation.bindSources(activationToken, requiredRows);
+
+    if (deferHydrate) {
+        setImmediate(() => runOwnedStartup().then(publishActivation).catch((error) => {
+            if (activationOwns()) runtimeActivation.fail(activationToken, error);
+            console.error("[bootServer] deferred startup failed:", error && error.message ? error.message : error);
+        }));
+        return {
+            registrationReady,
+            applied: false,
+            scheduled: true,
+            completionPending: true,
+            ownsCompletion: true,
+            generation: activationToken,
+        };
+    }
+
+    return publishActivation(await runOwnedStartup());
+    } catch (bootError) {
+        if (runtimeActivation.owns(activationToken)) runtimeActivation.fail(activationToken, bootError);
+        console.error("[bootServer]", bootError);
+        return {
+            registrationReady: false,
+            applied: false,
+            failed: true,
+            ownsCompletion: true,
+            generation: activationToken,
+        };
     }
 }
 
 /** Same persistence + boot as ipcMain save-settings — used by POST /api/setup-config (tablet / browser on LAN). */
-async function applyFarmdashSetupConfig(newConfig) {
+async function applyFarmdashSetupConfig(newConfig, options) {
+    const adoption = options && options.adoption;
     const prev = store.get('config') || {};
     const resolved = resolveServersForSave(prev.servers, newConfig.servers);
     if (resolved.keptExisting) {
@@ -3547,17 +4655,125 @@ async function applyFarmdashSetupConfig(newConfig) {
         ...newConfig,
         servers: resolved.servers,
     };
+    const previousTrusted = new Map((Array.isArray(prev.servers) ? prev.servers : [])
+        .filter((row) => row && row.replicaRegistration)
+        .map((row) => [String(row.id), row]));
+    const changedReplicaRows = merged.servers.filter((row) => {
+        if (!row || (!row.replicaRemoteSlot && !row.replicaRegistration)) return false;
+        const before = previousTrusted.get(String(row.id));
+        return !before;
+    });
+    if (changedReplicaRows.length && !adoption) {
+        const approved = options && options.approvedPendingReplica;
+        if (changedReplicaRows.length !== 1 || !approved ||
+            String(changedReplicaRows[0].id) !== String(approved.id) ||
+            String(changedReplicaRows[0].replicaRemoteSlot || '') !== String(approved.replicaRemoteSlot || '') ||
+            JSON.stringify(changedReplicaRows[0].replicaRegistration) !== JSON.stringify(approved.replicaRegistration)) {
+            throw new Error('replica-proof-required');
+        }
+    }
     if (newConfig.ftpPolling) {
         merged.ftpPolling = { ...(prev.ftpPolling || {}), ...newConfig.ftpPolling };
     }
-    store.set('config', merged);
-    if (!configNeedsServerReboot(prev, merged)) {
-        return { rebooted: false, keptExisting: resolved.keptExisting };
+    const profile = getFs25DocumentsRoot();
+    if (profile && !adoption) {
+        const reconciled = replicaRegistration.reconcileRegistrationTransaction(profile, prev.servers);
+        if (!reconciled || reconciled.ok !== true) {
+            const pending = new Error("recovery-required");
+            pending.restoreError = reconciled && reconciled.restoreError;
+            throw pending;
+        }
+    }
+    const nextRegistration = replicaRegistration.validateSnapshot(merged.servers);
+    if (!nextRegistration.ok) {
+        throw new Error(nextRegistration.error || "invalid-registration");
+    }
+    const registrationUnchanged = replicaRegistration.sameRegistration(prev.servers, merged.servers);
+    if (adoption && (!profile || adoption.profileDir !== profile || registrationUnchanged ||
+        JSON.stringify(nextRegistration.rows) !== JSON.stringify(adoption.rows))) {
+        throw new Error("changed");
+    }
+    let published = adoption || null;
+    if (!registrationUnchanged && !adoption) {
+        if (!profile) throw new Error("registration-profile-missing");
+        try {
+            published = replicaRegistration.publishReplicaRegistration(profile, merged.servers);
+        } catch (registrationError) {
+            throw new Error(registrationError && registrationError.message ? registrationError.message : "registration-failed");
+        }
+        if (!published || published.ok !== true) {
+            throw new Error((published && published.error) || "registration-failed");
+        }
+    }
+    try {
+        store.set('config', merged);
+    } catch (storeError) {
+        if (published) {
+            const restored = replicaRegistration.restoreRegistrationPublication(published);
+            if (!restored || restored.ok !== true) {
+                const recovery = new Error(`recovery-required: ${storeError && storeError.message ? storeError.message : "store-failed"}; ${restored && restored.error ? restored.error : "rollback-failed"}`);
+                recovery.storeError = storeError && storeError.message ? storeError.message : "store-failed";
+                recovery.restoreError = restored && restored.error;
+                throw recovery;
+            }
+        }
+        throw storeError;
+    }
+    if (published) {
+        const committed = replicaRegistration.commitRegistrationPublication(published);
+        if (!committed || committed.ok !== true) {
+            if (committed && committed.error === "cleanup-pending") {
+                runtimeActivation.markUnapplied(merged);
+                return {
+                    ok: true,
+                    rebooted: false,
+                    recoveryPending: true,
+                    saveState: "saved-with-recovery-pending",
+                    keptExisting: resolved.keptExisting,
+                };
+            }
+            return {
+                ok: false,
+                error: (committed && committed.error) || "recovery-required",
+                recoveryPending: true,
+                rebooted: false,
+                keptExisting: resolved.keptExisting,
+            };
+        }
+    }
+    const activationPreview = runtimeActivation.preview(merged);
+    const restart = configNeedsServerReboot(prev, merged);
+    if (activationPreview.action === "share") {
+        return { ok: true, rebooted: true, scheduled: true, shared: true, keptExisting: resolved.keptExisting };
+    }
+    if (activationPreview.action === "noop" || (!restart && activationPreview.phase === "idle")) {
+        return { ok: true, rebooted: false, keptExisting: resolved.keptExisting };
     }
     // Persist already happened. Do not await Lua hydrate of every save on the IPC thread —
     // that hung Settings Save, and pairing it with a LAN HTTP restart deadlocked keep-alive.
-    void bootServer(merged, { deferHydrate: true }).catch((e) => console.error('[bootServer]', e));
-    return { rebooted: true, keptExisting: resolved.keptExisting };
+    try {
+        const bootResult = bootServer(merged, { deferHydrate: true });
+        if (bootResult && typeof bootResult.then === "function") {
+            bootResult.then(() => {}, (error) => {
+                console.error("[bootServer]", error);
+            });
+            return { ok: true, rebooted: true, scheduled: true, applied: false, keptExisting: resolved.keptExisting };
+        }
+        const claim = runtimeActivation.begin(merged);
+        if (claim.action === "start") runtimeActivation.complete(claim.generation);
+        return { ok: true, rebooted: true, keptExisting: resolved.keptExisting };
+    } catch (bootError) {
+        console.error("[bootServer]", bootError);
+        const claim = runtimeActivation.begin(merged);
+        if (claim.action === "start") runtimeActivation.fail(claim.generation, bootError);
+        return {
+            ok: true,
+            rebooted: false,
+            recoveryPending: true,
+            saveState: "saved-with-activation-pending",
+            keptExisting: resolved.keptExisting,
+        };
+    }
 }
 
 // ── Electron window ───────────────────────────────────────────────────────────
@@ -3634,7 +4850,35 @@ function createWindow() {
     });
 
     const config = store.get('config');
-    if (config?.isConfigured) {
+    if (isRfProductLine() && !config?.isConfigured) {
+        try {
+            const expectedProfile = path.join(os.homedir(), 'AppData', 'Roaming',
+                editionPolicy.profileDirName(PRODUCT_LINE, FARMDASH_DEV));
+            const expectedConfig = path.join(expectedProfile, 'config.json');
+            if (fs.existsSync(expectedConfig)) {
+                const report = {
+                    productLine: PRODUCT_LINE,
+                    appVersion: app.getVersion(),
+                    pid: process.pid,
+                    storePath: store.path,
+                    sessionUserDataDir: SESSION_USER_DATA_DIR,
+                    appUserDataDir: app.getPath('userData'),
+                    appDataEnv: process.env.APPDATA || null,
+                    hasUserDataSwitch: !!app.commandLine?.hasSwitch('user-data-dir'),
+                    explicitUserDataArg: process.argv.some((arg) => /^--user-data-dir(?:=|$)/i.test(arg)),
+                    expectedConfig,
+                    expectedConfigBytes: fs.statSync(expectedConfig).size,
+                };
+                fs.writeFileSync(path.join(os.tmpdir(), `FarmDashProfileDiagnostic-${process.pid}.json`),
+                    JSON.stringify(report, null, 2), { encoding: 'utf8', mode: 0o600 });
+            }
+        } catch (error) {
+            console.warn('[ProfileDiagnostic] unable to record path evidence', error?.message || error);
+        }
+    }
+    const recoverLinked = !config?.isConfigured && Array.isArray(config?.servers) &&
+        config.servers.length > 0 && hasRecoverablePersistedReplica(config);
+    if (config?.isConfigured || recoverLinked) {
         void bootServer(config).catch((e) => console.error('[bootServer]', e));
     } else {
         // Vite's root-relative assets require HTTP; loadFile leaves a fresh V5 window blank.
@@ -3695,8 +4939,9 @@ if (FARMDASH_DEV) {
     } else {
         app.on('second-instance', () => {
             if (mainWindow) {
-                if (mainWindow.isMinimized()) mainWindow.restore();
-                mainWindow.focus();
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.show();
+        mainWindow.focus();
             }
         });
     }
@@ -3705,7 +4950,7 @@ if (FARMDASH_DEV) {
 if (gotSingleInstanceLock) {
     app.whenReady().then(async () => {
         if (FARMDASH_DEV) {
-            console.log('[dev] userData:', app.getPath('userData'));
+            console.log('[dev] userData:', SESSION_USER_DATA_DIR);
             console.log('[dev] Open http://127.0.0.1:' + PORT + '/ (installed demo can stay on 8766)');
         }
         await consumeInstallLocaleFile();
@@ -3755,14 +5000,186 @@ app.on('window-all-closed', () => {
 
 // ── IPC ───────────────────────────────────────────────────────────────────────
 
+function setupSaveOutcome(result) {
+    if (result && result.ok === false) {
+        return { ok: false, error: result.error || "recovery-required", recoveryPending: true };
+    }
+    const saveState = result && result.recoveryPending ? "saved-with-recovery-pending" : "saved";
+    // Events describe the configuration that was just replaced. A successful save is not an error code.
+    if (saveState === "saved") uxEventLog.clear();
+    return { ok: true, saveState, ...result };
+}
+
 registerTrustedHandle('save-settings', async (_event, newConfig) => {
     try {
-        const result = await applyFarmdashSetupConfig(newConfig);
-        pushUxEvent(ERROR_CODES.E_NETWORK, 'Setup config saved', 'setup');
-        return { ok: true, saveState: 'saved', ...result };
+        return setupSaveOutcome(await applyFarmdashSetupConfig(newConfig));
     } catch (e) {
         console.error('[save-settings]', e);
         return { ok: false, error: String(e && e.message ? e.message : e) };
+    }
+});
+
+// "Link this server?" — the joined game writes one pending record; approval publishes a replica source row.
+const declinedPendingIds = new Set();
+
+async function pendingReplicaState() {
+    const profile = getFs25DocumentsRoot();
+    const read = await pendingReplicaSession.readPendingSession(profile);
+    if (read.state !== 'pending') return { read, view: { state: read.state, error: read.error || null } };
+    if (declinedPendingIds.has(read.session.pendingId)) return { read, view: { state: 'declined' } };
+    const servers = (store.get('config') || {}).servers || [];
+    const linked = servers.find((s) => s && s.replicaRegistration && s.replicaRegistration.sessionPairing === read.session.serverKey);
+    if (linked) return { read, view: { state: 'linked', sourceId: String(linked.id), session: pendingReplicaSession.publicView(read.session) } };
+    return { read, view: { state: 'pending', session: pendingReplicaSession.publicView(read.session) } };
+}
+
+registerTrustedHandle('get-pending-replica-session', async () => {
+    try {
+        return (await pendingReplicaState()).view;
+    } catch (_e) {
+        return { state: 'unavailable' };
+    }
+});
+
+registerTrustedHandle('approve-pending-replica-session', async (_event, pendingId) => {
+    try {
+        const { read, view } = await pendingReplicaState();
+        if (view.state !== 'pending' || read.session.pendingId !== pendingId) {
+            return { ok: false, error: view.state === 'pending' ? 'changed' : view.state };
+        }
+        const prev = store.get('config') || {};
+        const built = pendingReplicaSession.approvedServerRow(read.session, getFs25DocumentsRoot(), prev.servers);
+        if (!built.ok) return { ok: false, error: built.error };
+        const servers = Array.isArray(prev.servers) ? prev.servers.slice() : [];
+        servers.push(built.row);
+        const outcome = setupSaveOutcome(await applyFarmdashSetupConfig({ servers, isConfigured: true }, { approvedPendingReplica: built.row }));
+        if (!outcome || outcome.ok !== true) return { ok: false, error: (outcome && outcome.error) || 'save-failed' };
+        return { ok: true, sourceId: built.row.id, name: built.row.name };
+    } catch (e) {
+        const message = String(e && e.message ? e.message : e);
+        return { ok: false, error: message.startsWith('recovery-required') ? 'recovery-required' : message };
+    }
+});
+
+registerTrustedHandle('decline-pending-replica-session', async (_event, pendingId) => {
+    if (typeof pendingId === 'string' && /^[0-9a-f]{16}$/.test(pendingId)) declinedPendingIds.add(pendingId);
+    return { ok: true };
+});
+
+// Retained registration/trust can offer recovery, but only the currently loaded game can
+// answer a fresh key-bound challenge. The renderer never receives the trust key or token.
+const orphanOfferState = { offer: null };
+async function orphanReplicaState() {
+    const profile = getFs25DocumentsRoot();
+    const pending = await pendingReplicaSession.readPendingSession(profile);
+    if (pending.state !== 'none') {
+        if (orphanOfferState.offer && orphanOfferState.offer.challenge) {
+            replicaRegistration.retireRecoveryChallenge(profile, orphanOfferState.offer.challenge);
+        }
+        orphanOfferState.offer = null;
+        return { view: { state: 'none' } };
+    }
+    const servers = (store.get('config') || {}).servers || [];
+    const candidate = replicaRegistration.detectOrphanLinkedSource(profile, servers);
+    if (!candidate.ok) {
+        if (orphanOfferState.offer && orphanOfferState.offer.challenge) {
+            replicaRegistration.retireRecoveryChallenge(profile, orphanOfferState.offer.challenge);
+        }
+        orphanOfferState.offer = null;
+        return { view: { state: 'none' } };
+    }
+    const fingerprint = `${candidate.revision}:${candidate.digest}:${candidate.sourceId}:${candidate.remoteSlot}`;
+    if (!orphanOfferState.offer || orphanOfferState.offer.fingerprint !== fingerprint) {
+        if (orphanOfferState.offer && orphanOfferState.offer.challenge) {
+            replicaRegistration.retireRecoveryChallenge(profile, orphanOfferState.offer.challenge);
+        }
+        orphanOfferState.offer = { id: crypto.randomBytes(16).toString('hex'), fingerprint, challenge: null, challengeId: null };
+    }
+    let state = 'offer';
+    let error = null;
+    if (orphanOfferState.offer.challenge) {
+        const proof = replicaRegistration.verifyRecoveryChallenge(profile, candidate, orphanOfferState.offer.challenge);
+        if (proof.ok) state = 'verified';
+        else if (proof.error === 'waiting') state = 'waiting';
+        else {
+            error = proof.error;
+            replicaRegistration.retireRecoveryChallenge(profile, orphanOfferState.offer.challenge);
+            orphanOfferState.offer.challenge = null;
+            orphanOfferState.offer.challengeId = null;
+        }
+    }
+    return {
+        candidate,
+        view: {
+            state,
+            ...(error ? { error } : {}),
+            ...(orphanOfferState.offer.challengeId ? { challengeId: orphanOfferState.offer.challengeId } : {}),
+            offer: { offerId: orphanOfferState.offer.id, sourceId: candidate.sourceId, sourceSlot: candidate.remoteSlot },
+        },
+    };
+}
+
+registerTrustedHandle('get-orphan-replica-recovery', async () => {
+    try { return (await orphanReplicaState()).view; }
+    catch (_) { return { state: 'none' }; }
+});
+
+registerTrustedHandle('start-orphan-replica-challenge', async (_event, offerId) => {
+    try {
+        const state = await orphanReplicaState();
+        if (!state.candidate || !orphanOfferState.offer || orphanOfferState.offer.id !== offerId) {
+            return { ok: false, error: 'changed' };
+        }
+        if (orphanOfferState.offer.challenge) {
+            replicaRegistration.retireRecoveryChallenge(getFs25DocumentsRoot(), orphanOfferState.offer.challenge);
+            orphanOfferState.offer.challenge = null;
+            orphanOfferState.offer.challengeId = null;
+        }
+        const started = replicaRegistration.startRecoveryChallenge(getFs25DocumentsRoot(), state.candidate);
+        if (!started.ok) return { ok: false, error: started.error };
+        orphanOfferState.offer.challenge = started.challenge;
+        orphanOfferState.offer.challengeId = crypto.randomBytes(16).toString('hex');
+        return { ok: true, challengeId: orphanOfferState.offer.challengeId };
+    } catch (_) { return { ok: false, error: 'unavailable' }; }
+});
+
+registerTrustedHandle('cancel-orphan-replica-challenge', async (_event, offerId, challengeId) => {
+    if (orphanOfferState.offer && orphanOfferState.offer.id === offerId) {
+        if (orphanOfferState.offer.challenge) {
+            if (challengeId !== orphanOfferState.offer.challengeId) return { ok: false, error: 'changed' };
+            replicaRegistration.retireRecoveryChallenge(getFs25DocumentsRoot(), orphanOfferState.offer.challenge);
+        }
+        orphanOfferState.offer.challenge = null;
+        orphanOfferState.offer.challengeId = null;
+    }
+    return { ok: true };
+});
+
+registerTrustedHandle('restore-orphan-replica', async (_event, offerId, challengeId) => {
+    try {
+        if (typeof offerId !== 'string' || !/^[a-f0-9]{32}$/.test(offerId)) return { ok: false, error: 'changed' };
+        const state = await orphanReplicaState();
+        if (!state.candidate || !orphanOfferState.offer || orphanOfferState.offer.id !== offerId) {
+            return { ok: false, error: 'changed' };
+        }
+        if (challengeId !== orphanOfferState.offer.challengeId) return { ok: false, error: 'changed' };
+        if (state.view.state !== 'verified' || !orphanOfferState.offer.challenge) {
+            return { ok: false, error: 'proof-required' };
+        }
+        const profile = getFs25DocumentsRoot();
+        const prev = store.get('config') || {};
+        const adoption = replicaRegistration.beginOrphanAdoption(profile, prev.servers || [], state.candidate, orphanOfferState.offer.challenge);
+        if (!adoption.ok) return { ok: false, error: adoption.error || 'recovery-required' };
+        replicaRegistration.retireRecoveryChallenge(profile, orphanOfferState.offer.challenge);
+        orphanOfferState.offer = null;
+        const servers = [...(prev.servers || []), adoption.row];
+        const outcome = setupSaveOutcome(await applyFarmdashSetupConfig({ servers, isConfigured: true }, { adoption }));
+        if (!outcome || outcome.ok !== true) return { ok: false, error: (outcome && outcome.error) || 'save-failed' };
+        orphanOfferState.offer = null;
+        return { ok: true, sourceId: adoption.row.id };
+    } catch (e) {
+        const message = String(e && e.message ? e.message : e);
+        return { ok: false, error: message.startsWith('recovery-required') ? 'recovery-required' : 'save-failed' };
     }
 });
 
@@ -3775,7 +5192,12 @@ registerTrustedHandle('launch-dashboard', async (event) => {
     }
 });
 
-registerTrustedHandle('get-current-config', () => store.get('config'));
+function currentConfigForRenderer() {
+    const config = store.get('config');
+    return config && typeof config === 'object' ? redactConfigSecrets(config) : config;
+}
+
+registerTrustedHandle('get-current-config', () => currentConfigForRenderer());
 
 /** Fallback when HTTP `/api/status` is unreachable — read default local `data.json` (same path logic as former `fs` in renderer). */
 registerTrustedHandle('read-local-farmdash-data-json', async () => {
@@ -3820,8 +5242,8 @@ registerTrustedHandle('read-local-farmdash-data-json', async () => {
     }
 });
 
-/** Renderer fallback: load per-server merged snapshot persisted in userData/serverLiveCache. */
-registerTrustedHandle('read-server-live-cache', (_event, serverId) => {
+/** Renderer fallback obeys the same pre-ingress identity gate as boot hydration. */
+function readServerLiveCacheForRenderer(serverId) {
     try {
         if (serverId == null || serverId === '') {
             return { ok: false, error: 'server_id_required' };
@@ -3831,9 +5253,15 @@ registerTrustedHandle('read-server-live-cache', (_event, serverId) => {
         if (srv && srv.mode === 'ftp') {
             return { ok: false, error: 'ftp_requires_fresh', serverId: sid };
         }
-        const record = loadServerCache(app.getPath('userData'), sid);
+        if (isExplicitReplicaXmlSource(srv, serverStates[sid]?.ingressKind)) {
+            return { ok: false, error: 'replica_requires_fresh_lua', serverId: sid };
+        }
+        const record = loadServerCache(SESSION_USER_DATA_DIR, sid);
         if (!record || !record.mergedSnapshot || typeof record.mergedSnapshot !== 'object') {
             return { ok: false, error: 'not_found', serverId: sid };
+        }
+        if (!localCacheSourceEligible(srv, serverStates[sid], record)) {
+            return { ok: false, error: 'source_unconfirmed', serverId: sid };
         }
         return {
             ok: true,
@@ -3846,7 +5274,8 @@ registerTrustedHandle('read-server-live-cache', (_event, serverId) => {
     } catch (e) {
         return { ok: false, error: String(e && e.message ? e.message : e) };
     }
-});
+}
+registerTrustedHandle('read-server-live-cache', (_event, serverId) => readServerLiveCacheForRenderer(serverId));
 
 registerTrustedHandle('get-lan-access-settings', () => ({ ...getLanSecurityFromStore() }));
 
@@ -4094,6 +5523,11 @@ registerTrustedHandle('save-ui-preferences', (_e, prefs) => {
         defaultSection,
     };
     store.set('uiPreferences', merged);
+    if (JSON.stringify(prevEx) !== JSON.stringify(mergedEx)) {
+        for (const [sid, state] of Object.entries(serverStates)) {
+            if (state?.mergedData) broadcast(sid, state.mergedData, state);
+        }
+    }
     const restartRequired = !rfLine && prefs?.useNewUi !== undefined && prefs.useNewUi !== (prev.useNewUi === true);
     return { ok: true, useNewUi, restartRequired };
 });
@@ -4153,53 +5587,54 @@ function getModConfigPath() {
     return path.join(getModConfigDir(), 'config.xml');
 }
 
-const { parseModConfigXml, buildModConfigXml } = require('./modConfigXml');
+const { handleGetModConfig, handleSaveModConfig } = require('./modConfigXml');
 
 registerTrustedHandle('get-mod-config', async () => {
-    const p = getModConfigPath();
-    try {
-        if (!(await pathExists(p))) {
-            return { path: p, exists: false, ...parseModConfigXml('') };
-        }
-        const text = await readFileUtf8WithRetryAsync(p);
-        if (text == null) {
-            return { path: p, exists: false, error: 'unreadable', ...parseModConfigXml('') };
-        }
-        return { path: p, exists: true, ...parseModConfigXml(text) };
-    } catch (e) {
-        return { path: p, exists: false, error: e.message, ...parseModConfigXml('') };
-    }
+    return handleGetModConfig(getModConfigPath(), {
+        pathExists,
+        readFile: readFileUtf8WithRetryAsync,
+    });
 });
 
 registerTrustedHandle('save-mod-config', async (_e, cfg) => {
-    const blocked = await assertGameWritesAllowed();
-    if (!blocked.ok) return blocked;
-    const p = getModConfigPath();
     try {
-        await fs.promises.mkdir(getModConfigDir(), { recursive: true });
-        let existing = null;
-        try {
-            if (await pathExists(p)) existing = await readFileUtf8WithRetryAsync(p);
-        } catch (_) {
-            existing = null;
-        }
-        await fs.promises.writeFile(p, buildModConfigXml(cfg || {}, existing), 'utf8');
-        return { ok: true, path: p };
+        return await handleSaveModConfig(getModConfigPath(), cfg, { assertGameWritesAllowed });
     } catch (e) {
         return { ok: false, error: e.message };
     }
 });
 
-registerTrustedHandle('scan-local-saves', async () => {
+function profileRootForDashboard(basePath) {
+    const listed = typeof collectFs25DocumentRoots === 'function'
+        ? collectFs25DocumentRoots(getElectronDocumentsPath)
+        : [];
+    const roots = Array.isArray(listed) ? listed : [];
+    for (const fs25 of roots) {
+        if (!fs25 || typeof fs25 !== 'string') continue;
+        const expected = path.join(fs25, 'modSettings', 'FS25_FarmDashboard');
+        if (sameResolvedDirectory(basePath, expected)) return fs25;
+    }
+    return null;
+}
+
+function discoveryLabel(value) {
+    const text = String(value || '').trim();
+    return text || null;
+}
+
+async function scanLocalSaves() {
     /**
-     * FS25 + mod write under .../modSettings/FS25_FarmDashboard/<slot>/data.json
-     * Try every plausible Documents root (Electron, homedir, USERPROFILE, OneDrive).
+     * FS25 + mod write under .../modSettings/FS25_FarmDashboard/<slot>/.
+     * Each collected dashboard root stays tied to the document profile that owns it.
      */
     const roots = collectFarmDashboardModSettingsRoots(getElectronDocumentsPath);
     const foundSaves = [];
-    const seenJson = new Set();
+    const seenDirs = new Set();
     const searchedRoots = [];
     const missingRoots = [];
+    const keyForRoot = (dir) => path.normalize(dir).replace(/[\\/]+/g, '/').replace(/\/+$/g, '').toLowerCase();
+    const rootsWithSources = new Set();
+    const blockedRoots = new Set();
 
     for (const basePath of roots) {
         searchedRoots.push(basePath);
@@ -4213,32 +5648,270 @@ registerTrustedHandle('scan-local-saves', async () => {
             folders = await fs.promises.readdir(basePath, { withFileTypes: true });
         } catch (e) {
             console.warn('[scan-local-saves] readdir', basePath, e.message);
+            blockedRoots.add(keyForRoot(basePath));
             continue;
         }
+        let registeredSlots = null;
+        let registrationBlocked = false;
+        const registrationPath = path.join(basePath, 'replicaSources.xml');
+        try {
+            const registrationText = await fs.promises.readFile(registrationPath, 'utf8');
+            const parsedRegistration = replicaRegistration.parseRegistrationDocument(registrationText);
+            if (parsedRegistration && parsedRegistration.ok && Array.isArray(parsedRegistration.rows)) {
+                registeredSlots = new Map(parsedRegistration.rows.map((row) => [row.sourceId, row.remoteSlot]));
+            } else {
+                registrationBlocked = true;
+            }
+        } catch (error) {
+            if (!error || error.code !== 'ENOENT') {
+                registrationBlocked = true;
+                console.warn('[scan-local-saves] registration unreadable', error && error.code ? error.code : 'failed');
+            }
+        }
+        const rootKey = keyForRoot(basePath);
+        const candidates = [];
         for (const dirent of folders) {
-            if (!dirent.isDirectory()) continue;
-            const jsonPath = path.join(basePath, dirent.name, 'data.json');
-            const dedupeKey = path.normalize(jsonPath).toLowerCase();
-            if (seenJson.has(dedupeKey)) continue;
-            if (!(await pathExists(jsonPath))) continue;
-            seenJson.add(dedupeKey);
+            if (!dirent.isDirectory() || dirent.name === 'replicas') continue;
+            candidates.push({ dirPath: path.join(basePath, dirent.name), folderName: dirent.name, kind: 'slot' });
+        }
+        const replicaRoot = path.join(basePath, 'replicas');
+        if (await pathExists(replicaRoot)) {
+            let replicaFolders = [];
             try {
-                const raw = await readFileUtf8WithRetryAsync(jsonPath);
-                if (raw == null) continue;
-                const parsed = JSON.parse(stripUtf8Bom(raw));
-                const mapName = parsed.serverInfo?.mapName || 'Unknown Map';
-                foundSaves.push({
-                    id: 'srv_' + Date.now() + Math.floor(Math.random() * 1000),
-                    name: `${mapName} (${dirent.name})`,
+                replicaFolders = await fs.promises.readdir(replicaRoot, { withFileTypes: true });
+            } catch (e) {
+                console.warn('[scan-local-saves] readdir replicas', replicaRoot, e.message);
+            }
+            for (const dirent of replicaFolders) {
+                if (!dirent.isDirectory() || !exportIngress.safeId(dirent.name)) continue;
+                const dirPath = ingressOrchestration.replicaDirFor(basePath, dirent.name);
+                if (!dirPath) continue;
+                candidates.push({ dirPath, folderName: dirent.name, kind: 'replica' });
+            }
+        }
+        for (const candidate of candidates) {
+            const dedupeKey = path.normalize(candidate.dirPath).toLowerCase();
+            if (seenDirs.has(dedupeKey)) continue;
+            seenDirs.add(dedupeKey);
+            try {
+                const replicaLayout = candidate.kind === 'replica';
+                const opts = replicaLayout
+                    ? { sourceId: candidate.folderName }
+                    : { sourceId: candidate.folderName, configuredSlot: candidate.folderName };
+                let ingested = exportIngress.ingestWatchedSlot(candidate.dirPath, opts);
+                const routePresent = await pathExists(path.join(candidate.dirPath, 'active.xml'));
+                if (!replicaLayout && !routePresent && ingested && ingested.status === 'unavailable' && ingested.reason === 'route-unavailable' && ingested.replica !== true) {
+                    ingested = exportIngress.readExportDirectorySync(candidate.dirPath, { ...opts, explicitLegacy: true });
+                }
+                if (!ingested || ingested.payload == null) continue;
+                const replica = ingested.replica === true || ingested.status === 'replica';
+                if (replica && !replicaLayout) continue;
+                if (replicaLayout && (ingested.status !== 'replica' || ingested.identity == null || ingested.identity.sourceId !== candidate.folderName)) continue;
+                const legacy = !replica && (!!(ingested.identity && ingested.identity.legacy === true) || ingested.legacy === true);
+                const modern = !replica && !legacy && (
+                    ingested.status === 'valid'
+                    || ingested.status === 'last-known'
+                    || ingested.status === 'identity-unconfirmed'
+                );
+                const accepted = replica
+                    ? ingested.status === 'replica'
+                    : (legacy ? ingested.status === 'identity-unconfirmed' : modern);
+                if (!accepted) continue;
+                const remoteSlot = replica && ingested.identity
+                    ? String(ingested.identity.sourceSlot || '')
+                    : '';
+                if (replica && !exportIngress.safeId(remoteSlot)) continue;
+                const parsed = ingested.payload;
+                let savegameName = discoveryLabel(parsed.savegameName);
+                let mapTitle = discoveryLabel(parsed.mapTitle) || discoveryLabel(parsed.serverInfo && parsed.serverInfo.mapName);
+                const saveMissing = !savegameName || looksLikeSaveSlotId(savegameName);
+                const mapMissing = !mapTitle;
+                if (!replica && (saveMissing || mapMissing)) {
+                    const profile = profileRootForDashboard(basePath);
+                    const labelFolder = candidate.folderName;
+                    if (profile && exportIngress.safeId(labelFolder)) {
+                        try {
+                            const careerPath = path.join(profile, labelFolder, 'careerSavegame.xml');
+                            if (await pathExists(careerPath)) {
+                                const careerRaw = await readFileUtf8WithRetryAsync(careerPath);
+                                if (careerRaw) {
+                                    const sn = careerRaw.match(/<savegameName>([^<]*)<\/savegameName>/i);
+                                    const mt = careerRaw.match(/<mapTitle>([^<]*)<\/mapTitle>/i);
+                                    if (saveMissing && sn && sn[1].trim()) savegameName = sn[1].trim();
+                                    if (mapMissing && mt && mt[1].trim()) mapTitle = mt[1].trim();
+                                }
+                            }
+                        } catch (_) { /* optional matching profile only */ }
+                    }
+                }
+                const displayName = savegameName && mapTitle && savegameName.toLowerCase() !== mapTitle.toLowerCase()
+                    ? `${savegameName} — ${mapTitle}`
+                    : (savegameName || mapTitle || 'Unknown Map');
+                const row = {
+                    id: replica ? candidate.folderName : ('srv_' + Date.now() + Math.floor(Math.random() * 1000)),
+                    name: displayName,
                     mode: 'local',
                     localPath: basePath,
-                    localSubFolder: dirent.name,
+                    localSubFolder: replica ? remoteSlot : candidate.folderName,
+                    savegameName: savegameName || null,
+                    mapTitle: mapTitle || null,
+                };
+                if (replica) {
+                    row.replicaRemoteSlot = remoteSlot;
+                    row.sourceKey = `replica:${rootKey}:${candidate.folderName}`;
+                    if (registrationBlocked) {
+                        row.bindingStatus = 'registration-recovery';
+                    } else if (registeredSlots && registeredSlots.has(candidate.folderName) && registeredSlots.get(candidate.folderName) !== remoteSlot) {
+                        row.bindingStatus = 'registration-mismatch';
+                    }
+                } else if (legacy) {
+                    row.legacyJson = true;
+                    row.sourceKey = `local:${rootKey}:${String(candidate.folderName).toLowerCase()}`;
+                } else {
+                    row.sourceKey = `local:${rootKey}:${String(candidate.folderName).toLowerCase()}`;
+                }
+                foundSaves.push(row);
+                rootsWithSources.add(rootKey);
+            } catch (e) {
+                console.warn(`[scan-local-saves] parse ${candidate.dirPath}:`, e.message);
+            }
+        }
+    }
+
+    // First run: a profile whose dashboard root holds no readable source yet can still name its real
+    // careers. Each row needs the profile's own careerSavegame.xml and an absent or empty dashboard slot.
+    // Profiles that already export are left alone so unexported careers never mix with completed sources.
+    const pendingProfiles = new Set();
+    const noEntry = (error) => (error && error.code === 'ENOENT' ? null : false);
+    // The profile itself may be a redirected Documents folder. modSettings and FS25_FarmDashboard below it
+    // must be real directories that physically resolve inside that profile, or a missing part of that chain.
+    const dashboardStaysInProfile = async (profile) => {
+        let expected;
+        try {
+            if (!(await fs.promises.stat(profile)).isDirectory()) return false;
+            expected = await fs.promises.realpath(profile);
+        } catch (_) {
+            return false;
+        }
+        let nearest = profile;
+        for (const part of ['modSettings', 'FS25_FarmDashboard']) {
+            const next = path.join(nearest, part);
+            const stat = await fs.promises.lstat(next).catch(noEntry);
+            if (stat === false) return false;
+            if (!stat) break;
+            if (!stat.isDirectory() || stat.isSymbolicLink()) return false;
+            nearest = next;
+            expected = path.join(expected, part);
+        }
+        try {
+            return keyForRoot(await fs.promises.realpath(nearest)) === keyForRoot(expected);
+        } catch (_) {
+            return false;
+        }
+    };
+    // Only a complete, well-formed careerSavegame document may name a pending career. Loaded here because
+    // scanLocalSaves is also evaluated on its own, without main.js module scope, by the discovery regressions.
+    const { XMLParser, XMLValidator } = require('fast-xml-parser');
+    const careerParser = new XMLParser({
+        ignoreAttributes: true,
+        processEntities: false,
+        parseTagValue: false,
+        trimValues: true,
+    });
+    const careerLabels = (raw) => {
+        if (typeof raw !== 'string') return null;
+        const xml = raw.replace(/^\uFEFF/, '');
+        if (/<!DOCTYPE|<!ENTITY/i.test(xml)) return null;
+        if (XMLValidator.validate(xml, { allowBooleanAttributes: false }) !== true) return null;
+        let doc;
+        try {
+            doc = careerParser.parse(xml);
+        } catch (_) {
+            return null;
+        }
+        const rootNames = Object.keys(doc || {}).filter((name) => name !== '?xml');
+        if (rootNames.length !== 1 || rootNames[0] !== 'careerSavegame') return null;
+        const career = doc.careerSavegame;
+        if (!career || typeof career !== 'object') return null;
+        const text = (value) => (typeof value === 'string' ? discoveryLabel(value) : null);
+        const settings = career.settings && typeof career.settings === 'object' && !Array.isArray(career.settings)
+            ? career.settings
+            : {};
+        return {
+            savegameName: text(settings.savegameName) || text(career.savegameName),
+            mapTitle: text(settings.mapTitle) || text(career.mapTitle),
+        };
+    };
+    for (const basePath of roots) {
+        const rootKey = keyForRoot(basePath);
+        if (rootsWithSources.has(rootKey) || blockedRoots.has(rootKey)) continue;
+        const profile = profileRootForDashboard(basePath);
+        if (!profile) continue;
+        const profileKey = keyForRoot(path.resolve(profile));
+        if (pendingProfiles.has(profileKey)) continue;
+        pendingProfiles.add(profileKey);
+        if (!(await dashboardStaysInProfile(profile))) {
+            console.warn('[scan-local-saves] dashboard root leaves its profile', basePath);
+            continue;
+        }
+        let entries;
+        try {
+            entries = await fs.promises.readdir(profile, { withFileTypes: true });
+        } catch (e) {
+            console.warn('[scan-local-saves] readdir profile', profile, e && e.code ? e.code : 'failed');
+            continue;
+        }
+        const slots = entries
+            .filter((dirent) => dirent.isDirectory() && !dirent.isSymbolicLink() && looksLikeSaveSlotId(dirent.name))
+            .map((dirent) => dirent.name)
+            .sort((a, b) => Number(a.replace(/\D+/g, '')) - Number(b.replace(/\D+/g, '')));
+        for (const slot of slots) {
+            try {
+                const careerDir = path.join(profile, slot);
+                const dirStat = await fs.promises.lstat(careerDir);
+                if (!dirStat.isDirectory() || dirStat.isSymbolicLink()) continue;
+                const careerPath = path.join(careerDir, 'careerSavegame.xml');
+                const fileStat = await fs.promises.lstat(careerPath).catch(noEntry);
+                if (!fileStat || !fileStat.isFile() || fileStat.size <= 0 || fileStat.size > 4 * 1024 * 1024) continue;
+                const slotDir = path.join(basePath, slot);
+                const slotStat = await fs.promises.lstat(slotDir).catch(noEntry);
+                if (slotStat === false) continue;
+                if (slotStat) {
+                    if (!slotStat.isDirectory() || slotStat.isSymbolicLink()) continue;
+                    if ((await fs.promises.readdir(slotDir)).length) continue;
+                }
+                const careerRaw = await readFileUtf8WithRetryAsync(careerPath);
+                if (!careerRaw || careerRaw.length > 4 * 1024 * 1024) continue;
+                const labels = careerLabels(careerRaw);
+                if (!labels) continue;
+                const { savegameName, mapTitle } = labels;
+                if (!savegameName && !mapTitle) continue;
+                const displayName = savegameName && mapTitle && savegameName.toLowerCase() !== mapTitle.toLowerCase()
+                    ? `${savegameName} — ${mapTitle}`
+                    : (savegameName || mapTitle);
+                foundSaves.push({
+                    id: 'srv_' + Date.now() + Math.floor(Math.random() * 1000),
+                    name: displayName,
+                    mode: 'local',
+                    localPath: basePath,
+                    localSubFolder: slot,
+                    savegameName,
+                    mapTitle,
+                    sourceKey: `local:${rootKey}:${slot.toLowerCase()}`,
+                    awaitingFirstExport: true,
                 });
             } catch (e) {
-                console.warn(`[scan-local-saves] parse ${jsonPath}:`, e.message);
+                console.warn(`[scan-local-saves] career ${slot}:`, e && e.code ? e.code : (e && e.message));
             }
         }
     }
     console.log('[scan-local-saves] found', foundSaves.length, 'save profile(s) under FS25_FarmDashboard');
-    return { saves: foundSaves, searchedRoots, missingRoots };
-});
+    let defaultDashboardRoot = null;
+    try {
+        const documentsRoot = typeof getFs25DocumentsRoot === 'function' ? getFs25DocumentsRoot() : null;
+        if (documentsRoot) defaultDashboardRoot = path.join(documentsRoot, 'modSettings', 'FS25_FarmDashboard');
+    } catch (_) { /* an unresolved default root stays null */ }
+    return { saves: foundSaves, searchedRoots, missingRoots, defaultDashboardRoot };
+}
+
+registerTrustedHandle('scan-local-saves', scanLocalSaves);

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { Badge, Button, Card } from "@/components/ui";
 import { t, tOr } from "@/i18n/i18n";
+import { CompanionModsEmbed } from "@/sections/companions";
+import { FLEET_NOTES_IDS, FleetMaintenanceNotes } from "@/sections/companions/AssetCompanionNotes";
 import { summarizeAdsFleet } from "@/lib/vehicleAds";
 import {
   getDecadeFilterLabel,
@@ -23,6 +25,7 @@ import {
 import { useDashboardStore } from "@/store/dashboard-store";
 import { VehicleCard } from "@/sections/vehicles/VehicleCard";
 import { VehicleTable } from "@/sections/vehicles/VehicleTable";
+import { BushelPlusNote, CourseplaySettings, OutOfFuelNote, useVehicleCompanions } from "@/sections/vehicles/vehicleCompanions";
 import "@/sections/vehicles/vehicles.css";
 
 const EMPTY_FILTERS: VehicleFilterState = { type: "", fuel: "", status: "", decade: "" };
@@ -111,6 +114,8 @@ export function VehiclesSection() {
   const summary = useMemo(() => summarizeFleetCards(fleet), [fleet]);
   const adsFleet = useMemo(() => summarizeAdsFleet(fleet), [fleet]);
   const vyFleet = useMemo(() => summarizeVehicleYearsFleet(fleet), [fleet]);
+  const companions = useVehicleCompanions();
+  const years = companions.years;
 
   const filtered = useMemo(
     () => filterFleetVehicles(fleet, filters, summaryFilter === "all" ? null : summaryFilter),
@@ -182,6 +187,13 @@ export function VehiclesSection() {
         <p class="fd-muted">{t("vehicles.subtitle")}</p>
       </header>
 
+      <CompanionModsEmbed
+        categories={["fleet"]}
+        title={tOr("companions.embedFleet", "Fleet companion mods")}
+        exclude={FLEET_NOTES_IDS}
+      />
+      <FleetMaintenanceNotes />
+
       <div class="fd-vehicles__summary">
         <SummaryCard
           title={t("vehicles.summaryTotal")}
@@ -219,7 +231,55 @@ export function VehiclesSection() {
             onClick={() => onSummaryClick("needs-repair")}
           />
         ) : null}
+        {years.detected && years.average != null ? (
+          <SummaryCard
+            fold="vehicleYears"
+            title={tOr("companionPage.vehicleYears.statAverage", "Average model year")}
+            hint={tOr("vehicles.fold.yearRange", "Oldest {{oldest}} · newest {{newest}}", {
+              oldest: years.oldest ?? "—",
+              newest: years.newest ?? "—",
+            })}
+            value={years.average}
+          />
+        ) : null}
+        {companions.maintenance.detected ? (
+          <SummaryCard
+            fold="advancedMaintenance"
+            title={tOr("vehicles.fold.maintenanceTitle", "Worn machines")}
+            hint={tOr("vehicles.fold.maintenanceHint", "{{locked}} will not start · {{risk}} may stall", {
+              locked: companions.maintenance.locked ?? 0,
+              risk: companions.maintenance.risk ?? 0,
+            })}
+            value={(companions.maintenance.locked ?? 0) + (companions.maintenance.risk ?? 0)}
+            tone={(companions.maintenance.locked ?? 0) > 0 ? "danger" : (companions.maintenance.risk ?? 0) > 0 ? "warn" : undefined}
+          />
+        ) : null}
+        {companions.collision.detected && companions.collision.sessionTracking ? (
+          <SummaryCard
+            fold="collisionDamage"
+            title={tOr("companionPage.collisionDamage.statHits", "Hit this session")}
+            hint={tOr("vehicles.fold.collisionHint", "Collision Damage hits since the game started")}
+            value={companions.collision.hits ?? 0}
+            tone={(companions.collision.hits ?? 0) > 0 ? "warn" : undefined}
+          />
+        ) : null}
+        {companions.tyres.detected ? (
+          <SummaryCard
+            fold="puncturedTires"
+            title={tOr("vehicles.fold.tyresTitle", "Tyre problems")}
+            hint={tOr("vehicles.fold.tyresHint", "{{punctured}} punctured · {{armed}} nail picked up", {
+              punctured: companions.tyres.punctured ?? 0,
+              armed: companions.tyres.armed ?? 0,
+            })}
+            value={(companions.tyres.punctured ?? 0) + (companions.tyres.armed ?? 0)}
+            tone={(companions.tyres.punctured ?? 0) > 0 ? "danger" : (companions.tyres.armed ?? 0) > 0 ? "warn" : undefined}
+          />
+        ) : null}
       </div>
+
+      <OutOfFuelNote fuel={companions.fuel} />
+      <BushelPlusNote bushel={companions.bushel} />
+      {companions.courseplay.detected ? <CourseplaySettings settings={companions.courseplay.settings} /> : null}
 
       <div class="fd-section-toolbar fd-vehicles__filters-bar">
         <div class="fd-vehicles__view-toggle" role="group" aria-label={t("vehicles.title")}>
@@ -342,6 +402,7 @@ export function VehiclesSection() {
             {viewMode === "table" ? (
               <VehicleTable
                 vehicles={visible}
+                companions={companions}
                 focusedId={selectedId}
                 onFocus={(v) => selectVehicle(v)}
               />
@@ -351,6 +412,7 @@ export function VehiclesSection() {
                   <VehicleCard
                     key={vehicleRowKey(v)}
                     vehicle={v}
+                    companions={companions}
                     focused={Boolean(selectedId && vehicleRowKey(v) === selectedId)}
                     onSelect={() => selectVehicle(v)}
                     onShowOnMap={() =>
@@ -375,6 +437,7 @@ function SummaryCard({
   tone,
   active,
   onClick,
+  fold,
 }: {
   title: string;
   hint: string;
@@ -383,6 +446,7 @@ function SummaryCard({
   tone?: "warn" | "danger";
   active?: boolean;
   onClick?: () => void;
+  fold?: string;
 }) {
   const shown = displayValue ?? String(value);
   if (onClick) {
@@ -399,7 +463,7 @@ function SummaryCard({
     );
   }
   return (
-    <div class={`fd-vehicles-summary-card${tone ? ` is-${tone}` : ""}`}>
+    <div class={`fd-vehicles-summary-card${tone ? ` is-${tone}` : ""}`} data-fold={fold}>
       <span class="fd-vehicles-summary-card__title">{title}</span>
       <strong class="fd-vehicles-summary-card__value">{shown}</strong>
       <small class="fd-muted">{hint}</small>

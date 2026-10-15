@@ -13,6 +13,8 @@
 | [UPGRADE_FROM_FS25-Farm-Dashboard.md](./UPGRADE_FROM_FS25-Farm-Dashboard.md) | Upgrading from the public 2.0.0 line |
 | [CHANGELOG.md](./CHANGELOG.md) | Version history |
 | [SCREENSHOTS.md](./SCREENSHOTS.md) | Screenshot filenames + capture checklist (maintainers) |
+| [DEMO_COMPANION_MOD_LISTS.md](./DEMO_COMPANION_MOD_LISTS.md) | **Site demo:** two non-overlapping companion mod packs (`savegame19` / `savegame18`) |
+| [LIVE_DEMO_WEBSITE.md](./LIVE_DEMO_WEBSITE.md) | Cloudflare tunnel → Try now on farmdashboard.co.uk |
 
 **Publishing a release:** [GITHUB_RELEASE_v4.2.0.md](./GITHUB_RELEASE_v4.2.0.md) (paste into GitHub) · [RELEASE_v4.2.0.md](./RELEASE_v4.2.0.md) (publish checklist) · [GITHUB_RELEASE_v4.1.5.md](./GITHUB_RELEASE_v4.1.5.md) (prior tester drop).
 

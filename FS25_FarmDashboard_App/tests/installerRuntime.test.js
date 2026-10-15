@@ -11,7 +11,7 @@ windows('Windows installer runtime regressions', () => {
   beforeAll(() => {
     const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'farmdash-installer-runtime-'));
     const exe = process.env.FARMDASH_QA_POWERSHELL || 'powershell.exe';
-    const run = cp.spawnSync(exe, ['-NoProfile', '-NonInteractive', '-File',
+    const run = cp.spawnSync(exe, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'RemoteSigned', '-File',
       path.join(__dirname, 'helpers/installer-runtime.ps1'), '-BuildRoot', path.join(root, 'build'),
       '-FixtureRoot', fixture], { windowsHide: true, encoding: 'utf8', timeout: 60000 });
     const output = String(run.stdout || '') + String(run.stderr || '');

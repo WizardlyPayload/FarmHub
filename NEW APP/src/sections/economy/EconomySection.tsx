@@ -31,7 +31,12 @@ import {
   type HirePurchasingPayload,
 } from "@/lib/hirePurchasing";
 import { isInvoicesModActive, type InvoicesPayload } from "@/lib/invoices";
+import { formatFillPrice } from "@/lib/fill-units";
+import { useFillPhysics, useFillUnitMode, useUnitDisplay } from "@/lib/fill-unit-mode";
+import { formatProfileUnitPrice, saveProfileFromUnitDisplay } from "@/lib/profile-display";
 import { RfEconomyPanels } from "@/sections/economy/RfEconomyPanels";
+import { CompanionModsEmbed } from "@/sections/companions";
+import { ECONOMY_SURFACE_IDS } from "@/lib/companionMods/fieldEconomyCards";
 import "@/sections/economy/economy.css";
 
 type EconomyTab = "market" | "purchases";
@@ -43,21 +48,21 @@ function asRecord(v: unknown): Record<string, unknown> {
 }
 
 function FinanceSummary({ payload, farmId }: { payload: DashboardPayload; farmId: number }) {
-  const { equipment } = splitVehiclesAndConsumables(payload.vehicles);
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
   const summary = computeFinancialSummary({
     farmInfo: Array.isArray(payload.farmInfo) ? (payload.farmInfo as Array<{ id?: number; money?: number; loan?: number }>) : null,
     money: payload.money,
     loan: Number(asRecord(payload).loan) || 0,
     finance: payload.finance as { buildings?: { totalValue?: number }; animals?: { totalValue?: number }; land?: { totalValue?: number } },
-    vehicles: equipment,
+    vehicles: payload.vehicles as Parameters<typeof computeFinancialSummary>[0]["vehicles"],
     activeFarmId: farmId,
   });
 
   const cards = [
-    { title: t("economy.currentMoney"), value: formatCurrency(summary.money), hint: t("economy.availableFunds") },
-    { title: t("economy.totalPurchases"), value: formatCurrency(summary.totalPurchases), hint: t("economy.equipmentValue") },
-    { title: t("economy.outstandingLoan"), value: formatCurrency(summary.loan), hint: t("economy.currentDebt") },
-    { title: t("economy.netWorth"), value: formatCurrency(summary.netWorth), hint: t("economy.assetsMinusDebt") },
+    { title: t("economy.currentMoney"), value: formatCurrency(summary.money, profile), hint: t("economy.availableFunds") },
+    { title: tOr("economy.trackedAssetValue", "Tracked asset value"), value: formatCurrency(summary.totalPurchases, profile), hint: tOr("economy.trackedAssetHint", "Vehicles, buildings, land and animals") },
+    { title: t("economy.outstandingLoan"), value: formatCurrency(summary.loan, profile), hint: t("economy.currentDebt") },
+    { title: t("economy.netWorth"), value: formatCurrency(summary.netWorth, profile), hint: t("economy.assetsMinusDebt") },
   ];
 
   return (
@@ -79,6 +84,7 @@ function PurchasesTab({
   equipment: VehicleLike[];
   farmId: number;
 }) {
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
   const [filter, setFilter] = useState<PurchaseFilter>("all");
   const [sortBy, setSortBy] = useState<PurchaseSort>("price");
 
@@ -156,7 +162,7 @@ function PurchasesTab({
               >
                 <div class="fd-economy__meta-row">
                   <span class="fd-economy__meta-label">{t("economy.purchasePrice")}</span>
-                  <strong>{formatCurrency(vehicle.price || 0)}</strong>
+                  <strong>{formatCurrency(vehicle.price || 0, profile)}</strong>
                 </div>
                 <div class="fd-economy__meta-row">
                   <span class="fd-economy__meta-label">{t("economy.purchaseType")}</span>
@@ -190,6 +196,26 @@ function PurchasesTab({
 }
 
 function MarketTab({ economy }: { economy: Record<string, unknown> | null | undefined }) {
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
+  const fillMode = useFillUnitMode();
+  const fillPhysics = useFillPhysics();
+  const unitDisplay = useUnitDisplay();
+  const quote = (fillKey: unknown, pricePer1000: unknown) => {
+    const price = Number(pricePer1000);
+    if (!Number.isFinite(price)) return "—";
+    if (price <= 0) return `${formatProfileUnitPrice(0, profile)} / 1,000 L`;
+    const text = formatFillPrice(
+      price,
+      fillKey,
+      fillMode,
+      fillPhysics,
+      (amount) => formatProfileUnitPrice(amount, profile),
+      unitDisplay,
+    );
+    if (text === "—") return text;
+    if (fillMode !== "british" && fillMode !== "imperial") return `${text} / 1,000 L`;
+    return text;
+  };
   const [view, setView] = useState<MarketView>("crop");
   const [search, setSearch] = useState("");
   const [openSell, setOpenSell] = useState<number | null>(0);
@@ -339,7 +365,7 @@ function MarketTab({ economy }: { economy: Record<string, unknown> | null | unde
                                     loc.name || "—"
                                   )}
                                 </span>
-                                <span>${Number(loc.price || 0).toFixed(0)}</span>
+                                <span>{quote(item.name, loc.price)}</span>
                               </div>
                             ))
                           )}
@@ -353,7 +379,7 @@ function MarketTab({ economy }: { economy: Record<string, unknown> | null | unde
                         {locs.length > 1 ? (
                           <div class="fd-economy__meta-row" style={{ marginTop: "0.5rem" }}>
                             <span class="fd-economy__meta-label">{t("economy.avgPrice")}</span>
-                            <strong>${Number(item.data.avgPrice || 0).toFixed(0)}</strong>
+                            <strong>{quote(item.name, item.data.avgPrice)}</strong>
                           </div>
                         ) : null}
                       </Card>
@@ -403,7 +429,7 @@ function MarketTab({ economy }: { economy: Record<string, unknown> | null | unde
                         <thead>
                           <tr>
                             <th>{t("economy.colCrop")}</th>
-                            <th class="text-end">{t("economy.colPriceTon")}</th>
+                            <th class="text-end">{t("economy.colPrice")}</th>
                             <th class="text-end">{t("economy.colMultiplier")}</th>
                             <th class="text-center">{t("economy.colStatus")}</th>
                           </tr>
@@ -420,7 +446,7 @@ function MarketTab({ economy }: { economy: Record<string, unknown> | null | unde
                             return (
                               <tr key={cropName}>
                                 <td>{label}</td>
-                                <td class="text-end">${price.toFixed(0)}</td>
+                                <td class="text-end">{quote(cropName, price)}</td>
                                 <td class="text-end">
                                   <Badge
                                     tone={mult > 1.1 ? "accent" : mult < 0.9 ? "danger" : "default"}
@@ -507,7 +533,6 @@ export function EconomySection() {
   const invoicesActive = isInvoicesModActive(
     payload.invoices as InvoicesPayload | null | undefined,
   );
-
   const tabs: Array<{ id: EconomyTab; label: string }> = [
     { id: "market", label: t("economy.tabMarket") },
     { id: "purchases", label: t("economy.tabPurchases") },
@@ -550,6 +575,7 @@ export function EconomySection() {
       <FinanceSummary payload={payload} farmId={farmId} />
 
       <RfEconomyPanels rf={payload.realisticFarming} farmId={farmId} />
+      <CompanionModsEmbed categories={["finance", "economy", "contracts", "units"]} ids={ECONOMY_SURFACE_IDS} />
 
       <div class="fd-economy__tabs" role="tablist">
         {tabs.map((tb) => (

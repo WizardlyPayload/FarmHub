@@ -8,11 +8,12 @@ import { computeFieldStats } from "@/sections/fields/field-helpers";
 import { clusterFieldsForDisplay, type FieldRecord } from "@/lib/rules-engine";
 import { getOwnedChainsForFarm } from "@/lib/productions";
 import {
-  SECTION_NAV_META,
   detectModPresence,
   modSectionActive,
+  sectionNavMeta,
   sectionVisible,
 } from "@/app/section-meta";
+import { modPageSection, visibleCompanionPages } from "@/sections/mods/registry";
 import { summarizeAdsFleet } from "@/lib/vehicleAds";
 import { getDisplayFleet } from "@/lib/vehicles";
 import { getRedTapeForActiveFarm, type RedTapePayload } from "@/lib/redTape";
@@ -86,12 +87,20 @@ export function SectionSidebar() {
   }, [payload, farmId, presence]);
 
   const coreItems = NAV_SECTIONS.filter((id) => sectionVisible(id, enabledSections));
-  const modItems = MOD_NAV_SECTIONS.filter(
-    (id) => sectionVisible(id, enabledSections) && modSectionActive(id, presence),
+  const companionPageItems = useMemo(
+    () => visibleCompanionPages(payload).map((entry) => modPageSection(entry.key)),
+    [payload],
   );
+  const modItems: SectionId[] = [
+    ...MOD_NAV_SECTIONS.filter(
+      (id) => sectionVisible(id, enabledSections) && modSectionActive(id, presence),
+    ),
+    ...companionPageItems,
+  ];
 
   const renderItem = (id: SectionId) => {
-    const meta = SECTION_NAV_META[id];
+    const meta = sectionNavMeta(id);
+    const label = meta.labelFallback ? tOr(meta.labelKey, meta.labelFallback) : t(meta.labelKey);
     const active = section === id;
     const hasAlert = !!alerts[id];
     return (
@@ -101,7 +110,7 @@ export function SectionSidebar() {
           class={`fd-sidebar__item ${active ? "is-active" : ""}`}
           aria-current={active ? "page" : undefined}
           onClick={() => setSection(id)}
-          title={t(meta.labelKey)}
+          title={label}
         >
           {meta.icon ? (
             <img
@@ -121,7 +130,7 @@ export function SectionSidebar() {
               {meta.glyph}
             </span>
           )}
-          <span class="fd-sidebar__label">{t(meta.labelKey)}</span>
+          <span class="fd-sidebar__label">{label}</span>
           {hasAlert ? <span class="fd-sidebar__dot" aria-hidden="true" /> : null}
         </button>
       </li>

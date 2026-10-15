@@ -163,3 +163,7 @@ html.fd-setup-html body {
     padding-bottom: 1rem;
   }
 }
+
+.fd-setup__awaiting {
+  color: #f9e2af;
+}

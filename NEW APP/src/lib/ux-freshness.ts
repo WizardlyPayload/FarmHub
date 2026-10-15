@@ -22,14 +22,15 @@ function asFlag(value: unknown): boolean {
 
 export function readFreshness(payload: DashboardPayload | null | undefined): FreshnessView {
   const ts = payload?.dataTimestamps || {};
-  const confidence = asConfidence(ts.confidence);
-  const isStale = asFlag(ts.isStale) || confidence !== "live";
+  const cacheUsedDueToFailure = asFlag(ts.cacheUsedDueToFailure);
+  const confidence = cacheUsedDueToFailure ? "cache" : asConfidence(ts.confidence);
+  const isStale = asFlag(ts.isStale) || cacheUsedDueToFailure || confidence !== "live";
   return {
     fetchedAt: ts.fetchedAt ? String(ts.fetchedAt) : payload?.lastUpdated ? String(payload.lastUpdated) : null,
     source: ts.source ? String(ts.source) : String(payload?.dataSource || "unknown"),
     isStale,
     staleReason: ts.staleReason ? String(ts.staleReason) : null,
-    cacheUsedDueToFailure: asFlag(ts.cacheUsedDueToFailure),
+    cacheUsedDueToFailure,
     confidence,
   };
 }

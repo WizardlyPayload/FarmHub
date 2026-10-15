@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { t } from "@/i18n/i18n";
+import { t, tOr } from "@/i18n/i18n";
+import { CompanionModsEmbed } from "@/sections/companions";
+import { FIELD_SURFACE_IDS } from "@/lib/companionMods/fieldEconomyCards";
 import { Badge, Button, Card } from "@/components/ui";
 import { refreshFieldRulesCache } from "@/lib/rules-engine";
 import { useDashboardStore } from "@/store/dashboard-store";
+import { saveProfileFromUnitDisplay } from "@/lib/profile-display";
+import { unitDisplayFromPayload } from "@/lib/fill-units";
 import {
   clusterFieldsForDisplay,
   type FieldRecord,
@@ -26,6 +30,7 @@ import {
 } from "./field-sort";
 import type { FieldFilterType } from "./types";
 import { FieldCard } from "./FieldCard";
+import { SoilWorkBonusCard } from "./SoilWorkBonusCard";
 import { UiStatePanel } from "@/components/ux/UiStatePanel";
 import { FreshnessChip } from "@/components/ux/FreshnessChip";
 import { buildModuleUiState } from "@/lib/ux-state";
@@ -197,6 +202,11 @@ export function FieldsSection() {
   );
 
   const stats = useMemo(() => computeFieldStats(displayRows), [displayRows]);
+  const areaProfile = saveProfileFromUnitDisplay(unitDisplayFromPayload(payload));
+  const areaAcres = areaProfile?.effective?.acre === true;
+  const areaValue = stats.totalArea === "—" || !areaAcres
+    ? stats.totalArea
+    : (Number(stats.totalArea) * 2.471053814671653).toFixed(1);
 
   const ownedCount = useMemo(() => {
     return allFields.filter((f) => Number(f.ownerFarmId ?? f.farmId ?? 0) === farmId).length;
@@ -224,7 +234,8 @@ export function FieldsSection() {
     const rf = payload?.realisticFarming;
     const summary = rf?.soilFertilizer;
     if (!summary || summary.enabled) return null;
-    const installed = (rf?.presence?.mods || []).some(
+    const presenceMods = Array.isArray(rf?.presence?.mods) ? rf.presence.mods : [];
+    const installed = presenceMods.some(
       (mod) => mod.id === "FS25_SoilFertilizer" && mod.detected,
     );
     if (!installed) return null;
@@ -329,13 +340,15 @@ export function FieldsSection() {
         <FreshnessChip payload={payload} onRefresh={() => void refreshDashboard()} />
       </header>
 
+      <SoilWorkBonusCard />
+
       <div class="fd-fields__stats">
         <Card title={t("fields.totalFields")}>
           <p class="fd-fields__stat-value">{stats.count}</p>
         </Card>
         <Card title={t("fields.totalArea")}>
-          <p class="fd-fields__stat-value">{stats.totalArea}</p>
-          <span class="fd-fields__stat-unit">{t("fields.hectares")}</span>
+          <p class="fd-fields__stat-value">{areaValue}</p>
+          <span class="fd-fields__stat-unit">{areaAcres ? "ac" : t("fields.hectares")}</span>
         </Card>
         <Card title={t("fields.needsWork")}>
           <p class="fd-fields__stat-value">{stats.needsWork}</p>
@@ -344,6 +357,8 @@ export function FieldsSection() {
           <p class="fd-fields__stat-value">{stats.harvestReady}</p>
         </Card>
       </div>
+
+      <CompanionModsEmbed categories={["fields"]} ids={FIELD_SURFACE_IDS} title={tOr("companions.embedFields", "Field companion mods")} />
 
       <div class="fd-section-toolbar fd-fields__toolbar">
         <div class="fd-fields__toolbar-start">

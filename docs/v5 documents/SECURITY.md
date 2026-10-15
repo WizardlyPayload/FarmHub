@@ -2,7 +2,7 @@
 
 **Authors:** JoshWalki (Josh) / Wizardlypayload and WizardlyPayload — see [`../AUTHORS.md`](../AUTHORS.md).
 
-This document is the **V5** copy of the classic security notes. Same trust model; **listen port differs**.
+This is the player-facing network guide for the **V5 5.0.57 documentation candidate**. The public download may still be older. The trust model is local-first; do not expose this app to the open internet.
 
 Classic V4: [`../SECURITY.md`](../SECURITY.md) (port **8766**).
 
@@ -95,10 +95,12 @@ V5 packages the **NEW APP** UI (`ui-v2/`). Classic `web/` is the V4 screens.
 
 ## Mod (game) side
 
-The FS25 mod only writes **`data.json`** under the user profile. It does not open a network port.
+The FS25 mod exports farm data under the game profile and can mirror a dedicated server's export to a linked client. It does not require you to open a public network port. Link a multiplayer server only after joining it in-game; if a saved app entry disappears, use a fresh in-game re-pairing challenge rather than accepting a same-name source as proof of identity.
+
+The linked MP replica is private to this PC. Do not share its pairing material, FTP password, unredacted game log, or a screenshot of a linking challenge. A held snapshot is useful, but it is not proof that the server is still online or that a new transfer was authenticated.
 
 ---
 
 ## Reporting
 
-Public security issues: GitHub maintainers (**JoshWalki** & **WizardlyPayload**). Include **Farm Dashboard V5**, app **5.0.2**, platform **Windows**, and whether LAN was on.
+Public security issues: GitHub maintainers (**JoshWalki** & **WizardlyPayload**). Include **Farm Dashboard V5**, the **actual installed app and mod versions**, platform **Windows**, whether LAN was on, and whether the source was Local, linked MP, or FTP. Never include passwords or pairing secrets in a public report.

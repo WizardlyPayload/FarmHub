@@ -34,6 +34,7 @@ import {
   sortLivestockAnimals,
 } from "@/lib/livestock-normalize";
 import { calculateAnimalValue } from "@/lib/livestock-value";
+import { EstimatedAnimalMoney } from "@/sections/livestock/AnimalDetailPanel";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { useHydratedLivestockAnimals } from "@/lib/use-hydrated-livestock";
 import {
@@ -387,7 +388,7 @@ export function LivestockPenPanel(props: LivestockPenPanelProps) {
         columnHelper.accessor((row) => calculateAnimalValue(row).value, {
           id: "value",
           header: () => t("livestock.colValue"),
-          cell: (info) => `$${info.getValue().toLocaleString()}`,
+          cell: (info) => <EstimatedAnimalMoney amount={info.getValue()} />,
         }),
         columnHelper.display({
           id: "status",

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "preact/hooks";
-import { t } from "@/i18n/i18n";
+import { t, tOr } from "@/i18n/i18n";
 import { Badge, Button } from "@/components/ui";
 import { useDashboardStore } from "@/store/dashboard-store";
 import { fetchSetupStatus } from "@/lib/setup-status";
 import type { SetupStatus } from "@/lib/ux-state";
-import { formatFetchedAt, readFreshness } from "@/lib/ux-freshness";
+import { formatFetchedAt } from "@/lib/ux-freshness";
+import { readHealthClock } from "@/lib/health-clock";
 import "@/components/ux/ux.css";
 
 interface Props {
@@ -14,21 +15,31 @@ interface Props {
 
 export function HealthPane({ appVersion, onRestoreLan }: Props) {
   const payload = useDashboardStore((s) => s.payload);
+  const activeServerId = useDashboardStore((s) => s.activeServerId);
   const locale = useDashboardStore((s) => s.locale);
   const [status, setStatus] = useState<SetupStatus | null>(null);
 
   useEffect(() => {
-    void fetchSetupStatus().then(setStatus);
-  }, []);
+    let active = true;
+    setStatus(null);
+    void fetchSetupStatus(activeServerId).then((next) => {
+      if (active) setStatus(next);
+    });
+    return () => { active = false; };
+  }, [activeServerId]);
 
   const diag = (payload as { diagnostics?: Record<string, unknown> } | null)?.diagnostics;
   const ts = payload?.dataTimestamps || {};
   const health = ts.collectionHealth as
     | { collectionDurationMs?: number; sourceLagSeconds?: number; parseErrors?: { file?: string; error?: string }[] }
     | undefined;
-  const freshness = readFreshness(payload);
+  const clock = readHealthClock(payload);
   const parseErrors = Array.isArray(health?.parseErrors) ? health.parseErrors : [];
-  const missing = Array.isArray(diag?.missingDependencies) ? (diag?.missingDependencies as string[]) : [];
+  const missingRaw = diag?.missingDependencies;
+  const missing = Array.isArray(missingRaw) ? missingRaw.map(String)
+    : missingRaw && typeof missingRaw === "object"
+      ? Object.entries(missingRaw).map(([key, value]) => typeof value === "string" ? value : key)
+      : [];
 
   return (
     <>
@@ -45,27 +56,31 @@ export function HealthPane({ appVersion, onRestoreLan }: Props) {
       <p>
         {t("ux.health.lastExport")}:{" "}
         <strong>
-          {formatFetchedAt(ts.lastLuaReceivedAt ? String(ts.lastLuaReceivedAt) : freshness.fetchedAt, locale) || "—"}
+          {formatFetchedAt(clock.lastExportAt, locale) || "—"}
         </strong>
       </p>
       <p>
-        {t("ux.health.lastXml")}:{" "}
-        <strong>{formatFetchedAt(ts.lastXmlReceivedAt ? String(ts.lastXmlReceivedAt) : null, locale) || "—"}</strong>
+        {tOr("ux.health.publishedAt", "Dashboard published")}: <strong>{formatFetchedAt(clock.publishedAt, locale) || "—"}</strong>
+      </p>
+      <p>
+        {tOr("ux.health.xmlCollected", "XML collected")}:{" "}
+        <strong>{formatFetchedAt(clock.xmlCollectedAt, locale) || "—"}</strong>
       </p>
       <p>
         {t("ux.health.compatible")}:{" "}
-        <Badge tone={diag?.compatible === false ? "danger" : "accent"}>
-          {diag?.compatible === false ? t("ux.health.incompatible") : t("ux.health.compatible")}
+        <Badge tone={clock.compatibility === "attention" ? "danger" : clock.compatibility === "compatible" ? "accent" : "default"}>
+          {clock.compatibility === "attention" ? t("ux.health.incompatible")
+            : clock.compatibility === "compatible" ? t("ux.health.compatible") : tOr("ux.health.notChecked", "Not checked")}
         </Badge>
       </p>
       <p>
-        {t("ux.health.missingDeps")}: <strong>{missing.length ? missing.join(", ") : t("ux.health.none")}</strong>
+        {t("ux.health.missingDeps")}: <strong>{missing.length ? missing.join(", ") : diag ? t("ux.health.none") : "—"}</strong>
       </p>
       <p>
         {t("ux.health.collectionMs")}: <strong>{health?.collectionDurationMs ?? "—"}</strong>
       </p>
       <p>
-        {t("ux.health.sourceLag")}: <strong>{health?.sourceLagSeconds ?? "—"}</strong>
+        {tOr("ux.health.xmlAgeAtCollection", "Newest XML file age at collection (seconds)")}: <strong>{health?.sourceLagSeconds ?? "—"}</strong>
       </p>
       {parseErrors.length ? (
         <ul>

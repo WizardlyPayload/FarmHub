@@ -6,6 +6,7 @@ import { entityOwnerFarmId } from "@/lib/farm-scope";
 import {
   buildProgressBar,
   formatCropName,
+  overviewSoilLine,
 } from "@/sections/fields/field-helpers";
 import { clusterFieldsForDisplay, type FieldRecord } from "@/lib/rules-engine";
 import {
@@ -100,6 +101,7 @@ function MiniFields({
     <div class="fd-overview__farm-mini-grid">
       {fields.map((field) => {
         const progress = buildProgressBar(field);
+        const soilLine = overviewSoilLine(field);
         const clustered = Array.isArray(field._clusterFieldIds) && field._clusterFieldIds.length > 1;
         const num = clustered ? field._clusterFieldIds.join(" · ") : fieldNumber(field);
         return (
@@ -118,6 +120,7 @@ function MiniFields({
             </span>
             <strong class="fd-overview__mini-card-title">{formatCropName(field.fruitType)}</strong>
             <span class="fd-overview__mini-card-meta">{progress.label}</span>
+            {soilLine ? <span class="fd-overview__mini-card-meta">{soilLine}</span> : null}
             <span
               class="fd-overview__mini-progress"
               aria-hidden="true"

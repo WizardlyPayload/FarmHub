@@ -20,6 +20,37 @@
   gap: 0.75rem;
 }
 
+.fd-fields__soil-bonus-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+}
+
+.fd-fields__soil-bonus-stats > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.fd-fields__soil-bonus-stats strong {
+  font-size: 1.15rem;
+}
+
+.fd-fields__soil-bonus-tiers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
+.fd-fields__soil-bonus-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+}
+
 .fd-fields__stat-value {
   font-size: 1.75rem;
   font-weight: 700;
@@ -34,6 +65,11 @@
 
 .fd-fields__toolbar {
   align-items: flex-start;
+  background: var(--farm-panel);
+  border: 1px solid var(--farm-border);
+  border-radius: 12px;
+  padding: 0.6rem;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
 }
 
 .fd-fields__toolbar-start,

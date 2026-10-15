@@ -1,0 +1,354 @@
+[
+  {
+    "file": "base-overview.png",
+    "slot": "savegame4",
+    "source": "Demo Riverbend - Base — Riverbend Springs",
+    "route": "overview",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:11:57.157Z"
+  },
+  {
+    "file": "base-fields.png",
+    "slot": "savegame4",
+    "source": "Demo Riverbend - Base — Riverbend Springs",
+    "route": "fields",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:11:58.914Z"
+  },
+  {
+    "file": "base-vehicles.png",
+    "slot": "savegame4",
+    "source": "Demo Riverbend - Base — Riverbend Springs",
+    "route": "vehicles",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:00.737Z"
+  },
+  {
+    "file": "base-pastures.png",
+    "slot": "savegame4",
+    "source": "Demo Riverbend - Base — Riverbend Springs",
+    "route": "pastures",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:02.566Z"
+  },
+  {
+    "file": "base-productions.png",
+    "slot": "savegame4",
+    "source": "Demo Riverbend - Base — Riverbend Springs",
+    "route": "productions",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:04.516Z"
+  },
+  {
+    "file": "base-storage.png",
+    "slot": "savegame4",
+    "source": "Demo Riverbend - Base — Riverbend Springs",
+    "route": "storage",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:06.454Z"
+  },
+  {
+    "file": "base-economy.png",
+    "slot": "savegame4",
+    "source": "Demo Riverbend - Base — Riverbend Springs",
+    "route": "economy",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:08.313Z"
+  },
+  {
+    "file": "base-map.png",
+    "slot": "savegame4",
+    "source": "Demo Riverbend - Base — Riverbend Springs",
+    "route": "map",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:09.918Z"
+  },
+  {
+    "file": "suite-overview.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "overview",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:11.535Z"
+  },
+  {
+    "file": "suite-fields.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "fields",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:13.429Z"
+  },
+  {
+    "file": "suite-vehicles.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "vehicles",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:15.312Z"
+  },
+  {
+    "file": "suite-pastures.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "pastures",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:16.984Z"
+  },
+  {
+    "file": "suite-productions.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "productions",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:18.901Z"
+  },
+  {
+    "file": "suite-storage.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "storage",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:20.718Z"
+  },
+  {
+    "file": "suite-economy.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "economy",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:22.625Z"
+  },
+  {
+    "file": "suite-map.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "map",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:24.415Z"
+  },
+  {
+    "file": "pf-fields.png",
+    "slot": "savegame18",
+    "source": "Demo Montana - PF + companions — Montana Map, Multifruit 4x",
+    "route": "fields",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:26.320Z"
+  },
+  {
+    "file": "suite-redtape.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "redtape",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:28.102Z"
+  },
+  {
+    "file": "suite-hirepurchasing.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "hirepurchasing",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:30.085Z"
+  },
+  {
+    "file": "suite-ads.png",
+    "slot": "savegame19",
+    "source": "Demo Montana - RF + companions — Montana Map, Multifruit 4x",
+    "route": "ads",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:32.015Z"
+  },
+  {
+    "file": "suite-npcfavor.png",
+    "slot": "savegame19",
+    "source": "Demo Montana - RF + companions — Montana Map, Multifruit 4x",
+    "route": "npcfavor",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:33.869Z"
+  },
+  {
+    "file": "suite-worldevents.png",
+    "slot": "savegame19",
+    "source": "Demo Montana - RF + companions — Montana Map, Multifruit 4x",
+    "route": "worldevents",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:35.751Z"
+  },
+  {
+    "file": "suite-prostaff.png",
+    "slot": "savegame19",
+    "source": "Demo Montana - RF + companions — Montana Map, Multifruit 4x",
+    "route": "prostaff",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:37.632Z"
+  },
+  {
+    "file": "suite-fertilizerdepot.png",
+    "slot": "savegame19",
+    "source": "Demo Montana - RF + companions — Montana Map, Multifruit 4x",
+    "route": "fertilizerdepot",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:39.601Z"
+  },
+  {
+    "file": "mod-enhancedLoanSystem.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "mod-enhancedLoanSystem",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:41.491Z"
+  },
+  {
+    "file": "mod-realisticDieselPrice.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "mod-realisticDieselPrice",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:43.368Z"
+  },
+  {
+    "file": "mod-dynamicMarket.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "mod-dynamicMarket",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:45.233Z"
+  },
+  {
+    "file": "mod-betterContracts.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "mod-betterContracts",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:47.150Z"
+  },
+  {
+    "file": "mod-seasonalMilkProduction.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "mod-seasonalMilkProduction",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:49.035Z"
+  },
+  {
+    "file": "mod-seasonalWoolProduction.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "mod-seasonalWoolProduction",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:50.929Z"
+  },
+  {
+    "file": "mod-palletDegradation.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "mod-palletDegradation",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:52.821Z"
+  },
+  {
+    "file": "mod-realSilo.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "mod-realSilo",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:54.778Z"
+  },
+  {
+    "file": "mod-restrictedPeriods.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "mod-restrictedPeriods",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:56.688Z"
+  },
+  {
+    "file": "mod-regionalCropCalendar.png",
+    "slot": "savegame10",
+    "source": "MAIN TESTING SAVE — Witcombe Park Farm",
+    "route": "mod-regionalCropCalendar",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:12:58.568Z"
+  },
+  {
+    "file": "mod-iNeedALoan.png",
+    "slot": "savegame18",
+    "source": "Demo Montana - PF + companions — Montana Map, Multifruit 4x",
+    "route": "mod-iNeedALoan",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:13:00.447Z"
+  },
+  {
+    "file": "mod-automaticLoanRepay.png",
+    "slot": "savegame18",
+    "source": "Demo Montana - PF + companions — Montana Map, Multifruit 4x",
+    "route": "mod-automaticLoanRepay",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:13:02.348Z"
+  },
+  {
+    "file": "mod-realisticAnimalLosses.png",
+    "slot": "savegame18",
+    "source": "Demo Montana - PF + companions — Montana Map, Multifruit 4x",
+    "route": "mod-realisticAnimalLosses",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:13:04.255Z"
+  },
+  {
+    "file": "mod-animalFoodOverview.png",
+    "slot": "savegame18",
+    "source": "Demo Montana - PF + companions — Montana Map, Multifruit 4x",
+    "route": "mod-animalFoodOverview",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:13:06.191Z"
+  },
+  {
+    "file": "mod-animalFoodCalculator.png",
+    "slot": "savegame18",
+    "source": "Demo Montana - PF + companions — Montana Map, Multifruit 4x",
+    "route": "mod-animalFoodCalculator",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:13:08.060Z"
+  },
+  {
+    "file": "mod-factoryProfitCalculator.png",
+    "slot": "savegame18",
+    "source": "Demo Montana - PF + companions — Montana Map, Multifruit 4x",
+    "route": "mod-factoryProfitCalculator",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:13:09.949Z"
+  },
+  {
+    "file": "mod-moistureSystem.png",
+    "slot": "savegame18",
+    "source": "Demo Montana - PF + companions — Montana Map, Multifruit 4x",
+    "route": "mod-moistureSystem",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:13:11.804Z"
+  },
+  {
+    "file": "mod-fieldLeasing.png",
+    "slot": "savegame18",
+    "source": "Demo Montana - PF + companions — Montana Map, Multifruit 4x",
+    "route": "mod-fieldLeasing",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:13:13.694Z"
+  },
+  {
+    "file": "mod-smartCropControl.png",
+    "slot": "savegame18",
+    "source": "Demo Montana - PF + companions — Montana Map, Multifruit 4x",
+    "route": "mod-smartCropControl",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:13:15.585Z"
+  },
+  {
+    "file": "mod-fluctuatingDieselPrice.png",
+    "slot": "savegame3",
+    "source": "Demo Riverbend - PF — Riverbend Springs",
+    "route": "mod-fluctuatingDieselPrice",
+    "sourceState": "held",
+    "capturedAt": "2026-10-15T00:13:17.477Z"
+  }
+]

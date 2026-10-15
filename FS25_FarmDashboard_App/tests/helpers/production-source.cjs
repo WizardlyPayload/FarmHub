@@ -24,14 +24,56 @@ function productionFunctions(relative, names, globals = {}) {
     return module.exports;
 }
 
+let preactRuntimeCache = null;
+function preactRuntime() {
+    if (preactRuntimeCache) return preactRuntimeCache;
+    const preactDir = path.join(root, "NEW APP/node_modules/preact");
+    const preact = require(preactDir);
+    const loaded = { exports: {} };
+    const body = fs.readFileSync(path.join(preactDir, "hooks/dist/hooks.js"), "utf8");
+    new Function("require", "module", "exports", body)((id) => (
+        id === "preact" ? preact : null
+    ), loaded, loaded.exports);
+    preactRuntimeCache = { preact, hooks: loaded.exports };
+    return preactRuntimeCache;
+}
+
 function productionTs(relative, mocks = {}) {
     const file = path.join(root, relative);
     const source = fs.readFileSync(file, 'utf8');
-    const output = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+    const output = ts.transpileModule(source, {
+        compilerOptions: {
+            module: ts.ModuleKind.CommonJS,
+            target: ts.ScriptTarget.ES2022,
+            jsx: ts.JsxEmit.React,
+            jsxFactory: "fdJsx",
+            jsxFragmentFactory: "fdFragment",
+        },
+    }).outputText;
     const module = { exports: {} };
+    const { preact, hooks } = preactRuntime();
+    global.fdJsx = preact.h;
+    global.fdFragment = preact.Fragment;
     const localRequire = id => {
         if (Object.prototype.hasOwnProperty.call(mocks, id)) return mocks[id];
-        if (id === 'preact/hooks') return require('../../../NEW APP/node_modules/preact/hooks');
+        if (id.endsWith(".css")) return {};
+        if (id === "preact") return preact;
+        if (id === "preact/hooks") return hooks;
+        if (id.startsWith("@/")) {
+            const base = path.join(root, "NEW APP/src", id.slice(2));
+            const hit = [base + ".ts", base + ".tsx", base + ".js", path.join(base, "index.ts")]
+                .find((item) => fs.existsSync(item));
+            if (!hit) throw new Error("Missing production alias " + id);
+            if (hit.endsWith(".ts") || hit.endsWith(".tsx")) {
+                return productionTs(path.relative(root, hit), mocks);
+            }
+            return createRequire(file)(hit);
+        }
+        if (id.startsWith(".")) {
+            const base = path.resolve(path.dirname(file), id);
+            const hit = [base, base + ".ts", base + ".tsx"].find((item) => /\.tsx?$/.test(item) && fs.existsSync(item));
+            if (hit) return productionTs(path.relative(root, hit), mocks);
+        }
         return createRequire(file)(id);
     };
     new Function('require', 'module', 'exports', 'document', 'window', output)(
@@ -40,5 +82,5 @@ function productionTs(relative, mocks = {}) {
     return module.exports;
 }
 
-module.exports = { productionFunctions, productionTs };
+module.exports = { productionFunctions, productionTs, preactRuntime };
 

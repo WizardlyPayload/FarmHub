@@ -1,6 +1,7 @@
 /** Economy agent — Tax / Market / Fuel / Workers / Income / Workplace helpers. */
 
 import type { RealisticFarmingPayload } from "@/types/dashboard";
+import { formatProfileMoney, formatProfileMoneyText, formatProfileUnitPrice, type SaveProfileDisplay } from "@/lib/profile-display";
 
 export const ECONOMY_DOMAIN = "economy" as const;
 
@@ -115,16 +116,20 @@ export function getRfWorkplacesForFarm(
   return Array.isArray(list) ? list : [];
 }
 
-export function formatRfMoney(v: unknown): string {
+export function formatRfMoney(v: unknown, profile?: SaveProfileDisplay | null): string {
   const n = Number(v);
   if (!Number.isFinite(n)) return "—";
-  return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  return formatProfileMoney(n, profile);
 }
 
-export function formatRfDieselPrice(v: unknown): string {
+export function formatRfDieselPrice(v: unknown, profile?: SaveProfileDisplay | null): string {
   const n = Number(v);
   if (!Number.isFinite(n)) return "—";
-  return `$${n.toFixed(4)}/L`;
+  return `${formatProfileMoneyText(n.toFixed(4), profile)}/L`;
+}
+
+export function formatRfUnitPrice(v: unknown, profile?: SaveProfileDisplay | null): string {
+  return formatProfileUnitPrice(Number(v), profile);
 }
 
 export function formatRfPct(v: unknown, digits = 1): string {

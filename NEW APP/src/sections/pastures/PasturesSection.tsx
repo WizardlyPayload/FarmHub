@@ -2,8 +2,12 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { t, tOr } from "@/i18n/i18n";
+import { CompanionModsEmbed } from "@/sections/companions";
+import { SeasonalMilkNote } from "@/sections/companions/AssetCompanionNotes";
 import { Badge, Button, Card } from "@/components/ui";
 import { useDashboardStore } from "@/store/dashboard-store";
+import { formatFillQuantity, formatMixedFood } from "@/lib/fill-units";
+import { useFillPhysics, useFillUnitMode, useUnitDisplay } from "@/lib/fill-unit-mode";
 import { isMultiFarmEnabled } from "@/lib/farm-scope";
 import {
   formatPastureHealthPercent,
@@ -62,6 +66,9 @@ function ResourceLine({
   resource: "food" | "water" | "straw";
 }) {
   const fr = pasture.foodReport;
+  const fillMode = useFillUnitMode();
+  const fillPhysics = useFillPhysics();
+  const unitDisplay = useUnitDisplay();
   if (!shouldShowPastureResource(fr, resource, pasture.animalCount)) return null;
 
   const labels = {
@@ -76,6 +83,27 @@ function ResourceLine({
       : resource === "water"
         ? pastureWaterLiters(fr)
         : pastureStrawLiters(fr);
+  const shown =
+    resource === "food"
+      ? formatMixedFood(
+          [
+            { fill: "DRYGRASS_WINDROW", liters: Number(fr?.hay) || 0 },
+            { fill: "SILAGE", liters: Number(fr?.silage) || 0 },
+            { fill: "GRASS_WINDROW", liters: Number(fr?.grass) || 0 },
+            { fill: "FORAGE", liters: Number(fr?.forage) || 0 },
+          ],
+          liters,
+          fillMode,
+          fillPhysics,
+          unitDisplay,
+        )
+      : formatFillQuantity(
+          liters,
+          resource === "water" ? "WATER" : "STRAW",
+          fillMode,
+          fillPhysics,
+          unitDisplay,
+        );
 
   const monitored = pastureResourceMonitored(fr, resource);
 
@@ -84,7 +112,7 @@ function ResourceLine({
       <strong>{labels[resource]}:</strong>{" "}
       {monitored ? (
         <>
-          {liters.toFixed(0)}L
+          {shown}
           <DurationHint foodReport={fr} resource={resource} />
         </>
       ) : (
@@ -239,6 +267,7 @@ function PastureCard({
           <div>
             <strong>{t("pastures.card.production")}:</strong>{" "}
             {pasture.milkProductionData.hourlyProduction.toFixed(1)}L/h
+            <SeasonalMilkNote compact />
           </div>
         ) : null}
       </div>
@@ -265,7 +294,7 @@ function PastureCard({
   );
 }
 
-function DetailsModal({
+export function DetailsModal({
   pasture,
   onClose,
   onViewLivestock,
@@ -276,6 +305,23 @@ function DetailsModal({
 }) {
   const cr = pasture.conditionReport;
   const fr = pasture.foodReport;
+  const fillMode = useFillUnitMode();
+  const fillPhysics = useFillPhysics();
+  const unitDisplay = useUnitDisplay();
+  const qty = (liters: unknown, fill: string) =>
+    formatFillQuantity(Number(liters) || 0, fill, fillMode, fillPhysics, unitDisplay);
+  const foodShown = formatMixedFood(
+    [
+      { fill: "DRYGRASS_WINDROW", liters: Number(fr?.hay) || 0 },
+      { fill: "SILAGE", liters: Number(fr?.silage) || 0 },
+      { fill: "GRASS_WINDROW", liters: Number(fr?.grass) || 0 },
+      { fill: "FORAGE", liters: Number(fr?.forage) || 0 },
+    ],
+    Number(fr?.availableFood || fr?.totalMixedRation || 0),
+    fillMode,
+    fillPhysics,
+    unitDisplay,
+  );
   return (
     <ModalShell
       title={t("pastures.details.title", { name: pasture.name })}
@@ -322,12 +368,12 @@ function DetailsModal({
               {(fr?.SLURRY ?? 0) > 0 ? (
                 <tr>
                   <td>{t("pastures.details.slurryStorage")}</td>
-                  <td>{parseFloat(String(fr.SLURRY)).toFixed(0)}L</td>
+                  <td>{qty(fr.SLURRY, "SLURRY")}</td>
                 </tr>
               ) : (fr?.LIQUIDMANURE ?? 0) > 0 ? (
                 <tr>
                   <td>{t("pastures.details.liquidManureStorage")}</td>
-                  <td>{parseFloat(String(fr.LIQUIDMANURE)).toFixed(0)}L</td>
+                  <td>{qty(fr.LIQUIDMANURE, "LIQUIDMANURE")}</td>
                 </tr>
               ) : null}
               {cr.eggs > 0 ? (
@@ -372,33 +418,33 @@ function DetailsModal({
               <tr>
                 <td>{t("pastures.details.availableFood")}</td>
                 <td>
-                  {parseFloat(String(fr.availableFood || fr.totalMixedRation || 0)).toFixed(0)}L
+                  {foodShown}
                   <DurationHint foodReport={fr} resource="food" />
                 </td>
               </tr>
               {fr.hay > 0 ? (
                 <tr>
                   <td>{t("pastures.details.hay")}</td>
-                  <td>{parseFloat(String(fr.hay)).toFixed(0)}L</td>
+                  <td>{qty(fr.hay, "DRYGRASS_WINDROW")}</td>
                 </tr>
               ) : null}
               {fr.silage > 0 ? (
                 <tr>
                   <td>{t("pastures.details.silage")}</td>
-                  <td>{parseFloat(String(fr.silage)).toFixed(0)}L</td>
+                  <td>{qty(fr.silage, "SILAGE")}</td>
                 </tr>
               ) : null}
               {fr.grass > 0 ? (
                 <tr>
                   <td>{t("pastures.details.grass")}</td>
-                  <td>{parseFloat(String(fr.grass)).toFixed(0)}L</td>
+                  <td>{qty(fr.grass, "GRASS_WINDROW")}</td>
                 </tr>
               ) : null}
               {(fr.straw ?? 0) > 0 ? (
                 <tr>
                   <td>{t("pastures.details.straw")}</td>
                   <td>
-                    {parseFloat(String(fr.straw)).toFixed(0)}L
+                    {qty(fr.straw, "STRAW")}
                     <DurationHint foodReport={fr} resource="straw" />
                   </td>
                 </tr>
@@ -407,7 +453,7 @@ function DetailsModal({
                 <tr>
                   <td>{t("pastures.details.water")}</td>
                   <td>
-                    {parseFloat(String(fr.water)).toFixed(0)}L
+                    {qty(fr.water, "WATER")}
                     <DurationHint foodReport={fr} resource="water" />
                   </td>
                 </tr>
@@ -426,25 +472,25 @@ function DetailsModal({
               {(fr.MANURE ?? 0) > 0 ? (
                 <tr>
                   <td>{t("pastures.details.manure")}</td>
-                  <td>{parseFloat(String(fr.MANURE)).toFixed(0)}L</td>
+                  <td>{qty(fr.MANURE, "MANURE")}</td>
                 </tr>
               ) : null}
               {(fr.SLURRY ?? 0) > 0 ? (
                 <tr>
                   <td>{t("pastures.details.slurry")}</td>
-                  <td>{parseFloat(String(fr.SLURRY)).toFixed(0)}L</td>
+                  <td>{qty(fr.SLURRY, "SLURRY")}</td>
                 </tr>
               ) : null}
               {(fr.LIQUIDMANURE ?? 0) > 0 ? (
                 <tr>
                   <td>{t("pastures.details.liquidManure")}</td>
-                  <td>{parseFloat(String(fr.LIQUIDMANURE)).toFixed(0)}L</td>
+                  <td>{qty(fr.LIQUIDMANURE, "LIQUIDMANURE")}</td>
                 </tr>
               ) : null}
               {(fr.meadow ?? 0) > 0 ? (
                 <tr>
                   <td>{t("pastures.details.meadow")}</td>
-                  <td>{parseFloat(String(fr.meadow)).toFixed(0)}L</td>
+                  <td>{qty(fr.meadow, "GRASS_WINDROW")}</td>
                 </tr>
               ) : null}
             </tbody>
@@ -758,6 +804,8 @@ export function PasturesSection() {
         <h2>{t("pastures.title")}</h2>
         <p class="fd-lead">{t("pastures.subtitle")}</p>
       </header>
+
+      <CompanionModsEmbed categories={["livestock"]} title={tOr("companions.embedLivestock", "Livestock companion mods")} />
 
       <div class="fd-pasture-summary">
         <Card class="fd-pasture-stat">

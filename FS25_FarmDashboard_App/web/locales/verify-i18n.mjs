@@ -53,6 +53,7 @@ function main() {
   for (const lang of ALL_LANGS) {
     const obj = readJson(path.join(MESSAGES_DIR, `${lang}.json`), {});
     let covered = 0;
+    let english = 0;
     let missing = 0;
     let drift = 0;
     const driftKeys = [];
@@ -63,6 +64,7 @@ function main() {
         const locPh = placeholderMultiset(v);
         if (placeholderEqual(enPh, locPh)) {
           covered++;
+          if (v === en[k]) english++;
         } else {
           drift++;
           driftKeys.push(k);
@@ -72,7 +74,7 @@ function main() {
       }
     }
     const pct = total === 0 ? 100 : ((covered / total) * 100).toFixed(1);
-    rows.push({ lang, total, covered, missing, drift, pct });
+    rows.push({ lang, total, covered, english, missing, drift, pct });
     if (drift > 0) {
       driftCount += drift;
       console.warn(`[${lang}] placeholder drift on ${drift} key${drift === 1 ? '' : 's'}: ${driftKeys.slice(0, 5).join(', ')}${drift > 5 ? '…' : ''}`);
@@ -80,10 +82,13 @@ function main() {
     if (covered < total) failed = true;
   }
 
-  console.log('Locale  Coverage  Covered/Total  Missing  Drift');
+  // "English" = covered keys whose value is still the English text (i18n:sync copy or a
+  // translation identical to English). They count as covered by fallback; the build omits
+  // them from translations.json and the runtime resolves them to `en`.
+  console.log('Locale  Coverage  Covered/Total  English  Missing  Drift');
   for (const r of rows) {
     console.log(
-      `${r.lang.padEnd(6)}  ${(r.pct + '%').padEnd(8)}  ${(r.covered + '/' + r.total).padEnd(13)}  ${String(r.missing).padEnd(7)}  ${r.drift}`
+      `${r.lang.padEnd(6)}  ${(r.pct + '%').padEnd(8)}  ${(r.covered + '/' + r.total).padEnd(13)}  ${String(r.english).padEnd(7)}  ${String(r.missing).padEnd(7)}  ${r.drift}`
     );
   }
 

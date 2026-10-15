@@ -60,6 +60,7 @@ local VEHICLE_SPAWN_GRACE_CP_MS = 30000
 local VEHICLE_SPAWN_GRACE_CP_TAIL_MS = 15000
 local COURSEPLAY_FLEET_SETTLE_MS = 30000
 local COURSEPLAY_POST_LOAD_SCAN_DELAY_MS = 45000
+local EXPORT_ORPHAN_RELEASE_MS = 5000
 
 -- Must be declared before `jsonWriteStep` / any method that references them. In Lua, a `local`
 -- below a method definition is not an upvalue of that method — the name resolves to a *global*
@@ -81,6 +82,41 @@ local function _escapeJsonKey(s)
         :gsub('"', '\\"')
 end
 
+--- Emit at most maxOut escaped bytes from s, starting at index. A 2-byte escape is not split.
+--- mode "key" strips every control character. mode "string" uses the JSON string escapes.
+local function _jsonEscapePiece(s, index, maxOut, mode)
+    local n = #s
+    if index > n then return "", index, true, 0 end
+    if maxOut <= 0 then return "", index, false, 0 end
+    local out = {}
+    local used = 0
+    local i = index
+    while i <= n and used < maxOut do
+        local c = string.byte(s, i)
+        local frag
+        if mode == "key" then
+            if c < 32 then frag = ""
+            elseif c == 92 then frag = "\\\\"
+            elseif c == 34 then frag = '\\"'
+            else frag = string.char(c) end
+        else
+            if c == 92 then frag = "\\\\"
+            elseif c == 34 then frag = '\\"'
+            elseif c == 10 then frag = "\\n"
+            elseif c == 13 then frag = "\\r"
+            elseif c == 9 then frag = "\\t"
+            elseif c <= 8 or c == 11 or c == 12 or (c >= 14 and c <= 31) then frag = ""
+            else frag = string.char(c) end
+        end
+        if frag ~= "" and used + #frag > maxOut then break end
+        if frag == "" and used + 1 > maxOut then break end
+        if frag ~= "" then out[#out + 1] = frag end
+        used = used + (frag == "" and 1 or #frag)
+        i = i + 1
+    end
+    return table.concat(out), i, i > n, used
+end
+
 local function _formatNumber(n)
     if n ~= n then return "null" end
     if n == math.huge or n == -math.huge then return "null" end
@@ -88,6 +124,21 @@ local function _formatNumber(n)
         return string.format("%d", n)
     end
     return string.format("%.14g", n)
+end
+
+--- Wall clock in seconds, or nil when the host offers neither source. Same ladder Diagnostics uses.
+--- Must stay above jsonWriteStep. A `local function` below that method is not in scope there;
+--- Lua resolves the name as a global and the call is nil ("attempt to call a nil value").
+local function _jsonWalkNowSec()
+    if type(getTimeSec) == "function" then
+        local ok, v = pcall(getTimeSec)
+        if ok and type(v) == "number" then return v end
+    end
+    if type(os) == "table" and type(os.clock) == "function" then
+        local ok, v = pcall(os.clock)
+        if ok and type(v) == "number" then return v end
+    end
+    return nil
 end
 
 --- Index → name map for all fill types (delegates to FillTypeUtils when loaded).
@@ -209,6 +260,12 @@ local function _finalizeFillTypeNames(data)
     end
     if rawget(_G, "FillTypeUtils") and FillTypeUtils.cropIndexMapForJson then
         data.cropFillTypeIndex = FillTypeUtils.cropIndexMapForJson()
+    end
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.fillTypePhysicsForJson then
+        data.fillTypePhysics = FillTypeUtils.fillTypePhysicsForJson()
+    end
+    if rawget(_G, "FillTypeUtils") and FillTypeUtils.unitDisplayForJson then
+        data.unitDisplay = FillTypeUtils.unitDisplayForJson()
     end
 
     if type(data.stock) == "table" and type(data.stock.byFarm) == "table" then
@@ -456,17 +513,54 @@ local function _parentDir(filePath)
     return filePath:match("^(.+)[/\\][^/\\]+$")
 end
 
---- Overview export retries across collection cycles (~1/min): DLC maps (e.g. Kinlaig in
---- highlandsFishingPack) mount inside proprietary .dlc containers the desktop app cannot open,
---- so this in-game export is the only reliable overview source — don't latch failure on the
---- first miss (HUD map overlay / VFS paths may not be ready during the first cycles).
+--- Overview export retries at most once per MAP_OVERVIEW_EXPORT_RETRY_MS of mission time: DLC maps
+--- (e.g. Kinlaig in highlandsFishingPack) mount inside proprietary .dlc containers the desktop app
+--- cannot open, so this in-game export is the only reliable overview source — don't latch failure on
+--- the first miss (HUD map overlay / VFS paths may not be ready during the first cycles).
 local MAP_OVERVIEW_EXPORT_MAX_ATTEMPTS = 5
+local MAP_OVERVIEW_EXPORT_RETRY_MS = 60000
+local MAP_OVERVIEW_MAX_CANDIDATES = 64
+local MAP_OVERVIEW_LOGGED_SOURCES = 3
 
 --- Folder name under mapOverview/: keep the raw mapId/title readable, but strip characters
 --- Windows cannot use in folder names (meta.json keeps the exact ids for the desktop app).
 local function _sanitizeMapOverviewKey(key)
     local sanitized = tostring(key):gsub('[/\\:%*%?"<>|]', "_")
     return sanitized
+end
+
+local WINDOWS_RESERVED_DEVICE_NAMES = { CON = true, PRN = true, AUX = true, NUL = true }
+for i = 1, 9 do
+    WINDOWS_RESERVED_DEVICE_NAMES["COM" .. i] = true
+    WINDOWS_RESERVED_DEVICE_NAMES["LPT" .. i] = true
+end
+
+--- Directory key for mapOverview/<key>/, or nil when no safe folder exists. Windows drops trailing dots and
+--- spaces from a path segment, so "..", ". ." or "map. " would resolve to the parent or to another name; the
+--- trimmed form is what Windows opens anyway. Empty results and device names (CON, NUL.txt, ...) are rejected.
+local function _mapOverviewDirKey(rawKey)
+    local key = _sanitizeMapOverviewKey(rawKey):gsub("%c", "_")
+    key = key:gsub("[%. ]+$", "")
+    if key == "" then return nil end
+    local stem = (key:match("^[^%.]*") or ""):gsub(" +$", ""):upper()
+    if WINDOWS_RESERVED_DEVICE_NAMES[stem] then return nil end
+    return key
+end
+
+--- Best-effort meta.json write as one guarded unit; returns "written" or the failure stage. Serialises before
+--- opening so a serializer failure leaves the prior file untouched; a failed write after open can still leave it
+--- truncated. An opened handle is always closed.
+local function _writeMapOverviewMeta(metaPath, meta)
+    if type(io) ~= "table" or type(io.open) ~= "function" then return "unavailable" end
+    local okJson, body = pcall(function() return toJSON(meta) end)
+    if not okJson or type(body) ~= "string" then return "serialize-failed" end
+    local okOpen, fh = pcall(io.open, metaPath, "w")
+    if not okOpen or not fh then return "open-failed" end
+    local okWrite, written = pcall(function() return fh:write(body) end)
+    local okClose, closed, closeErr = pcall(function() return fh:close() end)
+    if not okWrite or not written then return "write-failed" end
+    if not okClose or closed == false or (closed == nil and closeErr ~= nil) then return "close-failed" end
+    return "written"
 end
 
 local function _overviewImageExtension(p)
@@ -477,29 +571,150 @@ local function _overviewImageExtension(p)
     return nil
 end
 
+--- Install root for exactly-"data/" references; GIANTS prefixes getAppBasePath() for its own install-file
+--- copies (main.lua copyFile of VERSION).
+local function _overviewAppBase()
+    if type(getAppBasePath) ~= "function" then return nil end
+    local ok, base = pcall(getAppBasePath)
+    if not ok or type(base) ~= "string" or base == "" then return nil end
+    if not base:match("[/\\]$") then base = base .. "/" end
+    return base
+end
+
+--- Utils.getFilename(path, nil) strips "$" and prepends g_gameBasePath (utils/Utils.lua:413). Only called for
+--- exactly-"$data/" references without backslashes, which it would warn about.
+local function _overviewEngineDataPath(p)
+    if type(Utils) ~= "table" or type(Utils.getFilename) ~= "function" or p:find("\\", 1, true) then return nil end
+    local ok, resolved = pcall(Utils.getFilename, p, nil)
+    if ok and type(resolved) == "string" and resolved ~= "" then return resolved end
+    return nil
+end
+
+--- Forms worth probing for one reference, raw first. Only exactly "$data/" goes through Utils.getFilename, and
+--- only an exactly "data/" result gains an install-root alias; absolute drive, UNC, rooted, DLC, VFS, mod and
+--- other token paths (e.g. $moddir$, which belongs to the map's own mod) are probed exactly as given.
+local function _overviewPathForms(p, appBase)
+    local forms = { { path = p, label = p } }
+    local rel = nil
+    if p:sub(1, 6) == "$data/" then
+        local resolved = _overviewEngineDataPath(p)
+        if resolved then
+            forms[#forms + 1] = { path = resolved, label = resolved }
+            if resolved:sub(1, 5) == "data/" then rel = resolved end
+        end
+    elseif p:sub(1, 5) == "data/" then
+        rel = p
+    end
+    if rel and appBase then
+        forms[#forms + 1] = { path = appBase .. rel, label = rel .. " (app root)" }
+    end
+    return forms
+end
+
+--- Maps reference overview.png while the shipped texture is the same-stem .dds beside it.
+local function _overviewDdsSibling(p)
+    local stem = p:match("^(.*)%.[Pp][Nn][Gg]$")
+    return stem and (stem .. ".dds") or nil
+end
+
+--- Retry gate bound to the mission object: only a new mission starts a fresh budget. A mission clock that went
+--- backwards lets the next attempt run now instead of waiting on a stale timestamp, but spends the same budget, and
+--- a finished or exhausted mission stays done. Without a numeric clock every call may attempt (still capped).
+function FarmDashboardDataCollector:_mapOverviewAttemptDue(mission)
+    local state = self._mapOverviewExportState
+    if state == nil or state.mission ~= mission then
+        state = { mission = mission }
+        self._mapOverviewExportState = state
+        self._mapOverviewExportAttempts = 0
+        self._mapOverviewExportDone = false
+        self._mapOverviewExportOutcome = nil
+        self._mapOverviewMetaOutcome = nil
+    end
+    if self._mapOverviewExportDone then return false end
+    -- Not _missionNowMs(): its constant 0 fallback would hold the gate shut after the first attempt.
+    local now = nil
+    if type(_G.g_time) == "number" then
+        now = _G.g_time
+    else
+        local D = rawget(_G, "FarmDashDiagnostics")
+        if D and type(D.nowSec) == "function" then
+            local ok, t = pcall(D.nowSec)
+            if ok and type(t) == "number" then now = t * 1000 end
+        end
+    end
+    local last = state.lastAttemptMs
+    if now ~= nil and last ~= nil and now >= last and now - last < MAP_OVERVIEW_EXPORT_RETRY_MS then
+        return false
+    end
+    state.lastAttemptMs = now
+    return true
+end
+
 --- Cache PDA overview.dds for the desktop fleet map (DLC maps are not in mods/*.zip).
 function FarmDashboardDataCollector:_exportMapOverviewForDashboard()
-    if self._mapOverviewExportDone then return end
-    if not _G.g_currentMission or not _G.g_currentMission.missionInfo then return end
-    local info = _G.g_currentMission.missionInfo
+    local mission = _G.g_currentMission
+    if not mission or not mission.missionInfo then return end
+    local info = mission.missionInfo
     local mapId = (info.mapId and tostring(info.mapId) ~= "") and tostring(info.mapId) or nil
     local mapTitle = (info.mapTitle and tostring(info.mapTitle) ~= "") and tostring(info.mapTitle) or nil
     if not mapId and not mapTitle then return end
+    if not self:_mapOverviewAttemptDue(mission) then return end
 
+    -- Spend the attempt before any optional I/O so no failure path can bypass the cap.
     local attempt = (self._mapOverviewExportAttempts or 0) + 1
+    if attempt > MAP_OVERVIEW_EXPORT_MAX_ATTEMPTS then
+        self._mapOverviewExportDone = true
+        return
+    end
     self._mapOverviewExportAttempts = attempt
 
-    local key = _sanitizeMapOverviewKey(mapId or mapTitle)
-    local destDir = getUserProfileAppPath() .. "modSettings/FS25_FarmDashboard/mapOverview/" .. key .. "/"
-    createFolder(destDir)
-
-    local candidates = {}
-    local candidateSeen = {}
-    local function addCandidate(p)
-        if type(p) == "string" and p ~= "" and not candidateSeen[p] then
-            candidateSeen[p] = true
-            candidates[#candidates + 1] = p
+    local key = _mapOverviewDirKey(mapId or mapTitle)
+    if not key then
+        self._mapOverviewExportDone = true
+        self._mapOverviewExportOutcome = "invalid-destination-key"
+        if type(Logging) == "table" and type(Logging.warning) == "function" then
+            Logging.warning(string.format(
+                "[FarmDash] map overview export skipped: map id %q has no safe folder name; not retrying this session",
+                tostring(mapId or mapTitle)
+            ))
         end
+        return
+    end
+    local okDest, overviewRoot = pcall(function()
+        return getUserProfileAppPath() .. "modSettings/FS25_FarmDashboard/mapOverview/"
+    end)
+    local destDir = nil
+    if okDest and type(overviewRoot) == "string" then
+        destDir = overviewRoot .. key .. "/"
+        -- createFolder makes one level (vanilla SavegameController creates parent then child); a fresh
+        -- dedicated profile has no mapOverview/ yet, so the per-map folder needs its parent first.
+        pcall(createFolder, overviewRoot)
+        pcall(createFolder, destDir)
+    end
+
+    local appBase = _overviewAppBase()
+    local candidates = {}
+    local candidateLabel = {}
+    local function addForms(p)
+        for _, form in ipairs(_overviewPathForms(p, appBase)) do
+            if #candidates < MAP_OVERVIEW_MAX_CANDIDATES and candidateLabel[form.path] == nil then
+                candidateLabel[form.path] = form.label
+                candidates[#candidates + 1] = form.path
+            end
+        end
+    end
+    local function addCandidate(p)
+        if type(p) ~= "string" or p == "" then return end
+        addForms(p)
+        local sibling = _overviewDdsSibling(p)
+        if sibling then addForms(sibling) end
+    end
+
+    -- Engine-resolved map image (mission00.lua: Utils.getFilename(map#imageFilename, baseDirectory)); set when
+    -- the mission loads, so it does not wait for the HUD.
+    local okImage, missionImage = pcall(function() return mission.mapImageFilename end)
+    if okImage and _overviewImageExtension(missionImage) then
+        addCandidate(missionImage)
     end
     local function addDirCandidates(dir)
         if type(dir) ~= "string" or dir == "" then return end
@@ -513,7 +728,7 @@ function FarmDashboardDataCollector:_exportMapOverviewForDashboard()
     -- The texture the in-game PDA map is rendering right now — authoritative even for DLC maps,
     -- but the HUD may not be built during the first collection cycles (hence the retry loop).
     local okOverlay, overlayFile = pcall(function()
-        local hud = _G.g_currentMission.hud
+        local hud = mission.hud
         local ingameMap = hud and hud.ingameMap
         local overlay = ingameMap and ingameMap.mapOverlay
         return overlay and overlay.filename
@@ -540,69 +755,94 @@ function FarmDashboardDataCollector:_exportMapOverviewForDashboard()
         addDirCandidates(base)
         addDirCandidates(base .. "map")
     end
-    addBaseDirCandidates(_G.g_currentMission.baseDirectory)
+    addBaseDirCandidates(mission.baseDirectory)
     if type(info.map) == "table" then
         addBaseDirCandidates(info.map.baseDirectory)
     end
     addBaseDirCandidates(info.baseDirectory)
 
+    local readable, copyFailed = {}, {}
     for i = 1, #candidates do
         local src = candidates[i]
-        if _pathExists(src) then
+        if destDir and _pathExists(src) then
+            readable[#readable + 1] = src
             local ext = _overviewImageExtension(src) or ".dds"
             local dest = destDir .. "overview" .. ext
-            if _copyFileFs25BestEffort(src, dest) then
+            -- The shared helper counts "destination exists" as success and native copyFile has no documented
+            -- return value, so a copy over an existing image cannot be told apart from a silent no-op.
+            local priorImage = _pathExists(dest)
+            if not _copyFileFs25BestEffort(src, dest) then
+                copyFailed[#copyFailed + 1] = src
+            elseif priorImage then
+                self._mapOverviewExportDone = true
+                self._mapOverviewExportOutcome = "retained-unconfirmed"
+                self._mapOverviewMetaOutcome = "kept"
+                FarmDashLog.dev("map overview for %s: existing image kept, fresh copy from %s unconfirmed; metadata unchanged", key, src)
+                return
+            else
+                self._mapOverviewExportDone = true
+                self._mapOverviewExportOutcome = "exported"
                 -- Drop a stale export in the other format so the desktop app never picks it first.
                 local staleExt = (ext == ".dds") and ".png" or ".dds"
                 local stale = destDir .. "overview" .. staleExt
                 if type(deleteFile) == "function" and _pathExists(stale) then
                     pcall(function() deleteFile(stale) end)
                 end
-                local meta = {
+                local metaStatus = _writeMapOverviewMeta(destDir .. "meta.json", {
                     mapId = mapId,
                     mapTitle = mapTitle,
                     sourcePath = src,
                     exportedAt = os and os.time and os.time() or 0,
-                }
-                local metaPath = destDir .. "meta.json"
-                if type(io) == "table" and type(io.open) == "function" then
-                    local okJson, jsonBody = pcall(function() return toJSON(meta) end)
-                    if okJson and jsonBody then
-                        local fh = io.open(metaPath, "w")
-                        if fh then
-                            pcall(function() fh:write(jsonBody) end)
-                            pcall(function() fh:close() end)
-                        end
-                    end
+                })
+                self._mapOverviewMetaOutcome = metaStatus
+                FarmDashLog.dev("exported map overview for fleet map: %s (source: %s; metadata: %s)", key, src, metaStatus)
+                if type(Logging) == "table" and type(Logging.info) == "function" then
+                    Logging.info(string.format("[FarmDash] map overview exported for %s (source: %s; metadata: %s)",
+                        tostring(key), tostring(candidateLabel[src]), metaStatus))
                 end
-                self._mapOverviewExportDone = true
-                FarmDashLog.dev("exported map overview for fleet map: %s (source: %s)", key, src)
                 return
             end
         end
     end
 
+    -- Outcome of this attempt, without the install root or profile path (labels are the engine/raw forms).
+    local outcome, shown
+    if not destDir then
+        outcome, shown = "destination-unavailable", {}
+    elseif #readable == 0 then
+        outcome, shown = "no-readable-candidate", candidates
+    else
+        outcome, shown = "copy-or-destination-failed", copyFailed
+    end
+    local names = {}
+    for i = 1, math.min(#shown, MAP_OVERVIEW_LOGGED_SOURCES) do
+        names[#names + 1] = tostring(candidateLabel[shown[i]])
+    end
+    local detail = string.format("%s; candidates=%d readable=%d copyFailed=%d; sources: %s",
+        outcome, #candidates, #readable, #copyFailed, (#names > 0) and table.concat(names, ", ") or "none")
+    self._mapOverviewExportOutcome = outcome
+
     if attempt < MAP_OVERVIEW_EXPORT_MAX_ATTEMPTS then
-        -- Cheap retry next collection cycle: candidate sources (HUD overlay, DLC VFS mounts)
+        -- Retry after MAP_OVERVIEW_EXPORT_RETRY_MS: candidate sources (HUD overlay, DLC VFS mounts)
         -- can appear after mission load settles. Diagnostics-only line — no log spam.
         FarmDashLog.dev(
-            "map overview export attempt %d/%d found no readable source for %s; retrying next cycle",
-            attempt, MAP_OVERVIEW_EXPORT_MAX_ATTEMPTS, key
+            "map overview export attempt %d/%d for %s: %s; retrying later",
+            attempt, MAP_OVERVIEW_EXPORT_MAX_ATTEMPTS, key, detail
         )
         return
     end
 
     -- Out of attempts: latch so we never retry every export cycle forever. Optional asset.
     self._mapOverviewExportDone = true
-    local previousExport = _pathExists(destDir .. "overview.dds") or _pathExists(destDir .. "overview.png")
+    local previousExport = destDir ~= nil and (_pathExists(destDir .. "overview.dds") or _pathExists(destDir .. "overview.png"))
     if previousExport then
-        FarmDashLog.dev("map overview export found no new source for %s; keeping previous export", key)
+        FarmDashLog.dev("map overview export found no new source for %s (%s); keeping previous export", key, detail)
         return
     end
     if type(Logging) == "table" and type(Logging.warning) == "function" then
         Logging.warning(string.format(
-            "[FarmDash] map overview export failed after %d attempts for %s (fleet map may lack overview image); not retrying this session",
-            MAP_OVERVIEW_EXPORT_MAX_ATTEMPTS, tostring(key)
+            "[FarmDash] map overview export failed after %d attempts for %s (fleet map may lack overview image); not retrying this session (%s)",
+            MAP_OVERVIEW_EXPORT_MAX_ATTEMPTS, tostring(key), detail
         ))
     end
 end
@@ -662,6 +902,51 @@ end
 --- Cap for read/write fallback when rename/copy fail (atomic write recovery only). Bounds hitch vs huge tmp→final copies.
 local MOVE_FALLBACK_READ_MAX = 2 * 1024 * 1024
 
+--- Giants io:write and io:close (extract/decompiled/scripts/io.lua) return no values.
+--- A throw, false, or nil plus an error value is failure. A nil with no error is the
+--- host's normal return and is not success until the closed file matches the payload.
+--- A truthy return is a checked host result and still requires that byte check.
+local function _classifyReturned(first, second)
+    if first == false then
+        return false, "false", second
+    end
+    if first == nil and second ~= nil then
+        return false, "error", second
+    end
+    if first == nil then
+        return true, "void", nil
+    end
+    return true, "checked", nil
+end
+
+local function _handleWriteAndClose(handle, payload)
+    local writeOkCall, wrote, writeErr = pcall(function()
+        return handle:write(payload)
+    end)
+    local writeOk, writeKind, writeDetail
+    if not writeOkCall then
+        writeOk, writeKind, writeDetail = false, "throw", wrote
+    else
+        writeOk, writeKind, writeDetail = _classifyReturned(wrote, writeErr)
+    end
+    local closeOkCall, closed, closeErr = pcall(function()
+        return handle:close()
+    end)
+    local closeOk, closeKind, closeDetail
+    if not closeOkCall then
+        closeOk, closeKind, closeDetail = false, "throw", closed
+    else
+        closeOk, closeKind, closeDetail = _classifyReturned(closed, closeErr)
+    end
+    if not writeOk then
+        return false, "write", writeKind, writeDetail
+    end
+    if not closeOk then
+        return false, "close", closeKind, closeDetail
+    end
+    return true, "closed", writeKind, nil
+end
+
 --- Replace `src` with `dst` (move). Works when `os` is nil. Returns true on success.
 --- Destination already existing is NOT success — that may be the previous export (MOD-02).
 local function _movePathBestEffort(src, dst)
@@ -682,8 +967,7 @@ local function _movePathBestEffort(src, dst)
     if body and type(io) == "table" and type(io.open) == "function" then
         local o = io.open(dst, "w")
         if o then
-            local wrote = pcall(function() o:write(body) end)
-            pcall(function() o:close() end)
+            local wrote = _handleWriteAndClose(o, body)
             if not wrote then return false end
             if type(deleteFile) == "function" then pcall(function() deleteFile(src) end) end
             if type(os) == "table" and type(os.remove) == "function" then
@@ -716,6 +1000,8 @@ function FarmDashboardDataCollector:init()
         redTape        = RedTapeDataCollector,
         invoices       = InvoicesDataCollector,
         hirePurchasing = HirePurchasingDataCollector,
+        companionMods  = CompanionModsDataCollector,
+        companionPages = rawget(_G, "CompanionPagesDataCollector"),
         -- Realistic Farming suite (Coordinator registry; domain agents fill stub bodies)
         rfSoilFertilizer     = RfSoilFertilizerDataCollector,
         rfCropStress         = RfCropStressDataCollector,
@@ -884,8 +1170,9 @@ end
 function FarmDashboardDataCollector:_subscribeToRLEvents()
     if self._rlSubscribed then return end
     if not _G.g_messageCenter or type(_G.g_messageCenter.subscribe) ~= "function" then return end
-    local evt = rawget(_G, "AnimalClusterUpdateEvent")
-    if evt == nil then return end
+    -- Engine class inherited through this mod's _G (mods.lua); rawget only sees this mod's own keys.
+    local evt = _G.AnimalClusterUpdateEvent
+    if type(evt) ~= "table" then return end
     if not (FarmDashboard and FarmDashboard.isAuthority and FarmDashboard:isAuthority()) then return end
 
     local self_ref = self
@@ -946,8 +1233,7 @@ end
 --- Drops oldest entry when count exceeds DIRTY_PENS_HARD_CAP. Honors POST_LOAD_SILENCE_SEC.
 function FarmDashboardDataCollector:_addDirtyPen(placeable)
     if not placeable then return end
-    local D = rawget(_G, "FarmDashDiagnostics")
-    local nowS = (D and D.nowSec and D.nowSec()) or 0
+    local nowS = self:_missionNowSec()
 
     -- Silence window after onStartMission absorbs RL save-load floods.
     if (self._postLoadSilenceUntil or 0) > nowS then return end
@@ -1013,6 +1299,149 @@ function FarmDashboardDataCollector:_penKeyToFilename(penKey)
     s = string.gsub(s, "[^A-Za-z0-9._%-]", "_")
     if #s > 96 then s = string.sub(s, #s - 95) end
     return s
+end
+
+--- Resource ids are a stricter class than JSON filenames. Encoding every
+--- non-alphanumeric byte keeps distinct pen keys from collapsing into one id.
+function FarmDashboardDataCollector:_resourceIdForPen(penKey)
+    if penKey == nil then return nil end
+    local s = tostring(penKey)
+    local out = {}
+    for i = 1, #s do
+        local c = string.sub(s, i, i)
+        if string.match(c, "^[A-Za-z0-9]$") then
+            out[#out + 1] = c
+        else
+            out[#out + 1] = string.format("_%02X", string.byte(c))
+        end
+    end
+    local id = table.concat(out)
+    if id == "" or #id > 64 then return nil end
+    return id
+end
+
+function FarmDashboardDataCollector:noteResourceAdmission(kind, resourceId, version, record)
+    if version == nil then return false end
+    if type(record) == "table" and record.indexRevision ~= nil then
+        self._resourceByVersion = self._resourceByVersion or {}
+        self._resourceByVersion[version] = {
+            kind = "dirtyPens",
+            revision = record.indexRevision,
+            session = self._exportSession,
+            version = version,
+        }
+        return true
+    end
+    local key = tostring(kind) .. ":" .. tostring(resourceId or "index")
+    local source = nil
+    if type(record) == "table" and type(record.ledger) == "table" then
+        source = record
+    else
+        source = self._resourcePending and self._resourcePending[key]
+    end
+    if type(source) ~= "table" or type(source.ledger) ~= "table" then return false end
+    local ledger = {}
+    for name, value in pairs(source.ledger) do ledger[name] = value end
+    self._resourceByVersion = self._resourceByVersion or {}
+    self._resourceByVersion[version] = {
+        penKey = source.penKey,
+        ledger = ledger,
+        version = version,
+        session = self._exportSession,
+    }
+    return true
+end
+
+function FarmDashboardDataCollector:_retainPenRetry(penKey, session)
+    if penKey == nil then return false end
+    if session ~= nil and session ~= self._exportSession then return false end
+    self._dirtyPens = self._dirtyPens or {}
+    self._penRetryAt = self._penRetryAt or {}
+    if self._dirtyPens[penKey] == nil then
+        self._dirtyPensCount = (self._dirtyPensCount or 0) + 1
+    end
+    self._dirtyPens[penKey] = 1
+    if type(_G.g_time) == "number" then
+        self._penRetryAt[penKey] = self:_missionTimeMs() + 1000
+    else
+        self._penRetryAt[penKey] = nil
+        self._penRetrySkips = self._penRetrySkips or {}
+        self._penRetrySkips[penKey] = 2
+    end
+    return true
+end
+
+function FarmDashboardDataCollector:onResourceSettled(kind, resourceId, version, outcome)
+    if version == nil then return false end
+    if outcome == "durable" then
+        return self:onResourceDurable(kind, resourceId, version)
+    end
+    local snap = self._resourceByVersion and self._resourceByVersion[version]
+    local key = tostring(kind) .. ":" .. tostring(resourceId)
+    local pending = self._resourcePending and self._resourcePending[key]
+    local newer = type(pending) == "table" and pending.version ~= nil and pending.version ~= version
+    if self._resourceByVersion then self._resourceByVersion[version] = nil end
+    if type(pending) == "table" and (pending.version == nil or pending.version == version) then
+        self._resourcePending[key] = nil
+    end
+    if outcome == "failed" and not newer and type(snap) == "table" then
+        if snap.kind == "dirtyPens" then
+            local owns = self._indexInFlightAdmission == snap.version
+                and self._indexInFlightRevision == snap.revision
+                and (snap.session == nil or self._indexInFlightSession == snap.session)
+            if owns and (snap.session == nil or snap.session == self._exportSession) then
+                self._indexInFlightRevision = nil
+                self._indexInFlightSession = nil
+                self._indexInFlightAdmission = nil
+                self:_armIndexRetry()
+            end
+        else
+            self:_retainPenRetry(snap.penKey, snap.session)
+        end
+    end
+    return true
+end
+
+function FarmDashboardDataCollector:onResourceDurable(kind, resourceId, version)
+    local pending = nil
+    if version ~= nil and self._resourceByVersion and self._resourceByVersion[version] ~= nil then
+        pending = self._resourceByVersion[version]
+        self._resourceByVersion[version] = nil
+        if type(pending) == "table" and pending.session ~= nil and pending.session ~= self._exportSession then
+            return false
+        end
+        local pendingKey = tostring(kind) .. ":" .. tostring(resourceId)
+        if self._resourcePending and self._resourcePending[pendingKey] ~= nil then
+            local live = self._resourcePending[pendingKey]
+            if type(live) ~= "table" or live.version == nil or live.version == version then
+                self._resourcePending[pendingKey] = nil
+            end
+        end
+    elseif version == nil then
+        pending = self._resourcePending and self._resourcePending[tostring(kind) .. ":" .. tostring(resourceId)]
+        if self._resourcePending then self._resourcePending[tostring(kind) .. ":" .. tostring(resourceId)] = nil end
+    else
+        return false
+    end
+    if type(pending) ~= "table" then return false end
+    if kind == "penDetail" and pending.penKey ~= nil and type(pending.ledger) == "table" then
+        self._detailLedger[pending.penKey] = pending.ledger
+        self._dirtyIndexRevision = (self._dirtyIndexRevision or 0) + 1
+        self._dirtyIndexDue = true
+    elseif pending.kind == "dirtyPens" then
+        if self._indexInFlightAdmission == pending.version
+            and self._indexInFlightRevision == pending.revision
+            and (pending.session == nil or self._indexInFlightSession == pending.session) then
+            self._indexInFlightRevision = nil
+            self._indexInFlightSession = nil
+            self._indexInFlightAdmission = nil
+        end
+        if (self._dirtyIndexRevision or 0) == pending.revision
+            and (pending.session == nil or pending.session == self._exportSession) then
+            self._dirtyIndexDue = false
+        end
+    end
+    return true
 end
 
 --- Phase 5.2: probe entity counts and tune the collection cycle to match scale.
@@ -1128,8 +1557,168 @@ function FarmDashboardDataCollector:calibrateRowCapsAtBoot()
     end
 end
 
-function FarmDashboardDataCollector:resetStaggerState()
+function FarmDashboardDataCollector:_usesXmlTransport()
+    if self._transportProtocol == "json" then return false end
+    if self._transportProtocol == "xml" then return true end
+    if ExportEnvelopePublisher == nil or FarmDashboardExportRoute == nil then return false end
+    local reader = readFile or rawget(_G, "readFile")
+    local renameOk = type(os) == "table" and type(os.rename) == "function"
+    if type(reader) == "function" and renameOk then return false end
+    return true
+end
+
+function FarmDashboardDataCollector:_xmlRecord(jsonText, generation, collectorSession, exportClass)
+    local root = self:getDataOutputDir()
+    return {
+        json = jsonText,
+        generation = generation,
+        collectorSession = collectorSession,
+        exportClass = exportClass,
+        root = root,
+        sourceSlot = self:getSavegameDirName(),
+        simulationTime = self:_missionTimeMs(),
+        authority = true,
+    }
+end
+
+function FarmDashboardDataCollector:onExportTransactionCommitted(info)
+    if type(info) ~= "table" then return false end
+    if info.collectorSession ~= nil and info.collectorSession ~= self._exportSession then
+        return false
+    end
+    local gen = tonumber(info.generation) or 0
+    if gen <= 0 then return false end
+    self._completedGeneration = gen
+    self._activeCandidateGeneration = nil
+    self._xmlInFlight = false
+    self._wroteRichExport = true
+    Logging.info(
+        "[FarmDash] export committed generation=%d sequence=%s slot=%s",
+        gen,
+        tostring(info.sequence),
+        tostring(info.sourceSlot)
+    )
+    return true
+end
+
+function FarmDashboardDataCollector:onExportTransactionFailed(info)
+    if type(info) ~= "table" then return false end
+    if info.collectorSession ~= nil and info.collectorSession ~= self._exportSession then
+        return false
+    end
+    local gen = tonumber(info.generation)
+    if gen ~= nil and self._activeCandidateGeneration ~= nil and gen ~= self._activeCandidateGeneration then
+        return false
+    end
+    self._xmlInFlight = false
+    self._activeCandidateGeneration = nil
+    return true
+end
+
+function FarmDashboardDataCollector:_beginQueuedExport(record)
+    if type(record) ~= "table" or type(record.data) ~= "table" then return false end
+    if record.session ~= nil and record.session ~= self._exportSession then return false end
+    if self._jsonWriteJob or self._jsonPendingDisk or self._xmlInFlight then return false end
+    local className = record.class or "gameplay"
+    if className ~= "gameplay" and self._wroteRichExport and not self:_exportHasGameplayRows(record.data) then
+        return true
+    end
+    if not self:_exportBudgetAllows(3) then return false end
+    if self:_jsonBudgetRemaining() == nil then
+        self:_stampExportGeneration(record.data, className)
+        local okJson, jsonData = pcall(function() return self:toJSON(record.data, 0) end)
+        if not okJson or type(jsonData) ~= "string" then return false end
+        if self:_usesXmlTransport() then
+            local route = rawget(_G, "FarmDashboardExportRoute")
+            if not (route and route.submit) then return false end
+            local queued = route:submit(self:_xmlRecord(jsonData, record.data.exportGeneration, self._exportSession, className))
+            if queued == "queued" or queued == "coalesced" then
+                if className == "gameplay" then self._xmlInFlight = true end
+                return true
+            end
+            return false
+        end
+        return self:_writeJsonStringToDisk(jsonData, self:getSavegameDirName()) == true
+    end
+    self:beginDeferredJsonWrite(record.data, className)
+    return self._jsonWriteJob ~= nil or self._jsonPendingDisk ~= nil
+end
+
+--- An in-flight gameplay commit is released by the route callback. If the route has gone idle
+--- with nothing owed, that callback can never arrive; log it and let the next snapshot proceed.
+function FarmDashboardDataCollector:_checkExportLiveness()
+    if not self._xmlInFlight then
+        self._xmlOrphanSinceMs = nil
+        return false
+    end
+    local route = rawget(_G, "FarmDashboardExportRoute")
+    if not (route and type(route.hasPendingSnapshot) == "function") then return false end
+    local okPending, pending = pcall(function() return route:hasPendingSnapshot() end)
+    if not okPending or pending == true then
+        self._xmlOrphanSinceMs = nil
+        return false
+    end
+    local nowMs = self:_missionTimeMs()
+    if self._xmlOrphanSinceMs == nil then
+        self._xmlOrphanSinceMs = nowMs
+        return false
+    end
+    if (nowMs - self._xmlOrphanSinceMs) < EXPORT_ORPHAN_RELEASE_MS then return false end
+    Logging.warning(
+        "[FarmDash] export route idle without a commit for generation=%s; releasing the collector so the next snapshot can publish",
+        tostring(self._activeCandidateGeneration)
+    )
+    self._xmlOrphanSinceMs = nil
+    self._xmlInFlight = false
+    self._activeCandidateGeneration = nil
+    self._reservedGeneration = nil
+    return true
+end
+
+function FarmDashboardDataCollector:pumpHeldExport()
+    if self._pumpingHeld or self._xmlInFlight then return false end
+    local held = self._heldGameplay
+    if type(held) ~= "table" then return false end
+    local record = type(held.data) == "table" and held or { data = held, class = "gameplay", session = self._exportSession }
+    self._pumpingHeld = true
+    local started = false
+    local ok = pcall(function()
+        started = self:_beginQueuedExport(record) == true
+    end)
+    self._pumpingHeld = false
+    if ok and started then self._heldGameplay = nil end
+    return ok and started
+end
+
+function FarmDashboardDataCollector:resetStaggerState(options)
+    local route = rawget(_G, "FarmDashboardExportRoute")
+    if route and type(route.cancelCurrent) == "function" then
+        pcall(function() route:cancelCurrent() end)
+    end
+    local preserveSession = type(options) == "table" and options.preserveSession == true
+    local ident = rawget(_G, "FarmDashboardCareerIdentity")
+    if not preserveSession and ident and type(ident.status) == "function" and type(ident.rotateSession) == "function" then
+        local live = ident.status()
+        if live.captured == true and live.waitingForIdentity ~= true and live.recoveryNeeded ~= true and live.allocationFailed ~= true then
+            ident.rotateSession()
+        end
+    end
+    self._exportSession = (self._exportSession or 0) + 1
+    self._completedGeneration = 0
+    self._activeCandidateGeneration = nil
+    self._reservedGeneration = nil
+    self._xmlInFlight = false
+    self._xmlOrphanSinceMs = nil
+    self._heldGameplay = nil
+    self._resourcePending = nil
+    self._resourceByVersion = nil
     self.moduleCache = {}
+    self._companionFarmScopeReady = false
+    self._companionFarmInfo = nil
+    self._companionExportFarmId = nil
+    self._sectionOutcomes = {}
+    self._sectionStaging = {}
+    self._productionCandidate = nil
     self.staggerFirstRunDone = false
     self.nextSliceIdx = 1
     self.slotAccumulator = 0
@@ -1142,6 +1731,26 @@ function FarmDashboardDataCollector:resetStaggerState()
     self._jsonWriteJob = nil
     self._jsonWritePending = nil
     self._jsonPendingDisk = nil
+    self._dirtyPens = {}
+    self._dirtyPensCount = 0
+    self._penRetryAt = nil
+    self._penRetrySkips = nil
+    self._penJsonJob = nil
+    self._dirtyIndexDue = nil
+    self._dirtyIndexRevision = nil
+    self._dirtyIndexBuiltRevision = nil
+    self._dirtyIndexRetryAt = nil
+    self._dirtyIndexSkips = nil
+    self._indexJsonJob = nil
+    self._indexInFlightRevision = nil
+    self._indexInFlightSession = nil
+    self._indexInFlightAdmission = nil
+    self._recoveryTxn = nil
+    self._recoveryByTarget = nil
+    self._writeEpisodes = nil
+    self._writeEpisodeOverflow = nil
+    self._writeEpisodeOverflowAt = nil
+    self._wroteRichExport = false
     self._cycleTailJob = nil
     if rawget(_G, "VehicleDataCollector") then
         VehicleDataCollector._inc = nil
@@ -1183,6 +1792,12 @@ function FarmDashboardDataCollector:resetStaggerState()
     if rawget(_G, "HirePurchasingDataCollector") then
         HirePurchasingDataCollector._inc = false
     end
+    if rawget(_G, "CompanionModsDataCollector") then
+        CompanionModsDataCollector._inc = nil
+    end
+    if rawget(_G, "CompanionPagesDataCollector") then
+        CompanionPagesDataCollector._inc = nil
+    end
 end
 
 function FarmDashboardDataCollector:loadConfig()
@@ -1201,22 +1816,26 @@ function FarmDashboardDataCollector:loadConfig()
         enableRedTape       = true,
         enableInvoices      = true,
         enableHirePurchasing = true,
-        enableRfSoilFertilizer = true,
-        enableRfCropStress = true,
-        enableRfTax = true,
-        enableRfMarketDynamics = true,
-        enableRfFuelCosts = true,
-        enableRfWorkerCosts = true,
-        enableRfIncome = true,
-        enableRfWorkplaceTriggers = true,
-        enableRfDairy = true,
-        enableRfNpcFavor = true,
-        enableRfWorldEvents = true,
-        enableRfProStaff = true,
-        enableRfFertilizerDepot = true,
-        enableRfWeatherGuard = true,
-        enableRfTimeGuard = true,
-        enableRfPresence = true,
+        enableCompanionMods = true,
+        -- RF suite collectors: default OFF. ensureModLinkedCollectorsEnabled flips them on
+        -- only when soft-detect finds the companion. Leaving them default-on bloated the
+        -- stagger to ~28 slots on vanilla/PF demos and delayed fields/companions.
+        enableRfSoilFertilizer = false,
+        enableRfCropStress = false,
+        enableRfTax = false,
+        enableRfMarketDynamics = false,
+        enableRfFuelCosts = false,
+        enableRfWorkerCosts = false,
+        enableRfIncome = false,
+        enableRfWorkplaceTriggers = false,
+        enableRfDairy = false,
+        enableRfNpcFavor = false,
+        enableRfWorldEvents = false,
+        enableRfProStaff = false,
+        enableRfFertilizerDepot = false,
+        enableRfWeatherGuard = false,
+        enableRfTimeGuard = false,
+        enableRfPresence = false,
         stockPlaceablesPerFrame = 3,
         baleWorldEntitiesPerFrame = 8,
         financeVehiclesPerFrame = 4,
@@ -1250,6 +1869,11 @@ function FarmDashboardDataCollector:loadConfig()
         detailFileCapBase           = 512,
         --- Phase 5: opportunistic wall-clock budget per slice (ms). Best-effort; row caps are the actual safety net.
         sliceBudgetMs               = 4,
+        -- FH-20260914: market prices move slowly, so the economy module refreshes every
+        -- Nth collection cycle rather than every one. 1 restores the old behaviour.
+        -- Nothing leaves the export when a cycle is skipped: assembleDataFromModuleCache
+        -- serves the module cache, so the last collected prices are still written.
+        economyRefreshEveryNCycles  = 3,
         --- Plan v5 B1/B2/B3: per-collector kill switches.
         --- Default false = spread fields/economy/production across frames (fewer hitches).
         useStateMachine_economy     = false,
@@ -1293,22 +1917,26 @@ function FarmDashboardDataCollector:loadConfig()
                 getXMLBool(xmlFile, "farmDashboard.modules#hirePurchasing"),
                 true
             )
-            self.config.enableRfSoilFertilizer = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfSoilFertilizer"), true)
-            self.config.enableRfCropStress = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfCropStress"), true)
-            self.config.enableRfTax = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfTax"), true)
-            self.config.enableRfMarketDynamics = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfMarketDynamics"), true)
-            self.config.enableRfFuelCosts = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfFuelCosts"), true)
-            self.config.enableRfWorkerCosts = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfWorkerCosts"), true)
-            self.config.enableRfIncome = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfIncome"), true)
-            self.config.enableRfWorkplaceTriggers = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfWorkplaceTriggers"), true)
-            self.config.enableRfDairy = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfDairy"), true)
-            self.config.enableRfNpcFavor = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfNpcFavor"), true)
-            self.config.enableRfWorldEvents = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfWorldEvents"), true)
-            self.config.enableRfProStaff = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfProStaff"), true)
-            self.config.enableRfFertilizerDepot = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfFertilizerDepot"), true)
-            self.config.enableRfWeatherGuard = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfWeatherGuard"), true)
-            self.config.enableRfTimeGuard = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfTimeGuard"), true)
-            self.config.enableRfPresence = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfPresence"), true)
+            self.config.enableCompanionMods = Utils.getNoNil(
+                getXMLBool(xmlFile, "farmDashboard.modules#companionMods"),
+                true
+            )
+            self.config.enableRfSoilFertilizer = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfSoilFertilizer"), false)
+            self.config.enableRfCropStress = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfCropStress"), false)
+            self.config.enableRfTax = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfTax"), false)
+            self.config.enableRfMarketDynamics = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfMarketDynamics"), false)
+            self.config.enableRfFuelCosts = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfFuelCosts"), false)
+            self.config.enableRfWorkerCosts = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfWorkerCosts"), false)
+            self.config.enableRfIncome = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfIncome"), false)
+            self.config.enableRfWorkplaceTriggers = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfWorkplaceTriggers"), false)
+            self.config.enableRfDairy = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfDairy"), false)
+            self.config.enableRfNpcFavor = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfNpcFavor"), false)
+            self.config.enableRfWorldEvents = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfWorldEvents"), false)
+            self.config.enableRfProStaff = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfProStaff"), false)
+            self.config.enableRfFertilizerDepot = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfFertilizerDepot"), false)
+            self.config.enableRfWeatherGuard = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfWeatherGuard"), false)
+            self.config.enableRfTimeGuard = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfTimeGuard"), false)
+            self.config.enableRfPresence = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.modules#rfPresence"), false)
             self.config.debugBaleScan = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#debugBaleScan"), false)
             self.config.diagnostics = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#diagnostics"), false)
             self.config.allowExportMirror = Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#allowExportMirror"), true)
@@ -1330,6 +1958,8 @@ function FarmDashboardDataCollector:loadConfig()
             if arps and arps > 0 then self.config.animalRowsPerSlice = arps end
             local sbm = getXMLInt(xmlFile, "farmDashboard.settings#sliceBudgetMs")
             if sbm and sbm > 0 then self.config.sliceBudgetMs = sbm end
+            local ern = getXMLInt(xmlFile, "farmDashboard.settings#economyRefreshEveryNCycles")
+            if ern and ern > 0 then self.config.economyRefreshEveryNCycles = ern end
             local dms = getXMLInt(xmlFile, "farmDashboard.settings#detailMaxAgeSec")
             if dms and dms > 0 then self.config.detailMaxAgeSec = dms end
             local dfcb = getXMLInt(xmlFile, "farmDashboard.settings#detailFileCapBase")
@@ -1450,6 +2080,86 @@ function FarmDashboardDataCollector:loadConfig()
                     Logging.info("[FarmDash] Re-enabled export modules: %s", table.concat(restored, ", "))
                 end
             end
+            -- V7 already ran on this profile, then hitch workarounds / ESC clone persisted
+            -- fields / economy / production Off again. Restore once more so PF N/pH export.
+            if not Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV8Applied"), false) then
+                local restoredV8 = {}
+                if self.config.enableFields ~= true then
+                    self.config.enableFields = true
+                    restoredV8[#restoredV8 + 1] = "fields"
+                end
+                if self.config.enableEconomy ~= true then
+                    self.config.enableEconomy = true
+                    restoredV8[#restoredV8 + 1] = "economy"
+                end
+                if self.config.enableProduction ~= true then
+                    self.config.enableProduction = true
+                    restoredV8[#restoredV8 + 1] = "production"
+                end
+                setXMLBool(xmlFile, "farmDashboard.modules#fields", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#economy", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#production", true)
+                setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV8Applied", true)
+                saveXMLFile(xmlFile)
+                if #restoredV8 > 0 then
+                    Logging.info("[FarmDash] Re-enabled export modules (V8): %s", table.concat(restoredV8, ", "))
+                end
+            end
+            -- V8 already applied, then Settings / hitch workarounds flipped fields / economy /
+            -- production Off again (empty Fields page with collectorModules.fields=false).
+            if not Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV9Applied"), false) then
+                local restoredV9 = {}
+                if self.config.enableFields ~= true then
+                    self.config.enableFields = true
+                    restoredV9[#restoredV9 + 1] = "fields"
+                end
+                if self.config.enableEconomy ~= true then
+                    self.config.enableEconomy = true
+                    restoredV9[#restoredV9 + 1] = "economy"
+                end
+                if self.config.enableProduction ~= true then
+                    self.config.enableProduction = true
+                    restoredV9[#restoredV9 + 1] = "production"
+                end
+                setXMLBool(xmlFile, "farmDashboard.modules#fields", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#economy", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#production", true)
+                setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV9Applied", true)
+                saveXMLFile(xmlFile)
+                if #restoredV9 > 0 then
+                    Logging.info("[FarmDash] Re-enabled export modules (V9): %s", table.concat(restoredV9, ", "))
+                end
+            end
+            -- Every cold load: never start a session with core exporters Off. One-shot
+            -- migrations get burned, then Settings/ESC can flip them off again and the
+            -- next boot keeps the dead export (no PF N/pH, empty companions/economy).
+            do
+                local forced = {}
+                if self.config.enableFields ~= true then
+                    self.config.enableFields = true
+                    forced[#forced + 1] = "fields"
+                end
+                if self.config.enableEconomy ~= true then
+                    self.config.enableEconomy = true
+                    forced[#forced + 1] = "economy"
+                end
+                if self.config.enableProduction ~= true then
+                    self.config.enableProduction = true
+                    forced[#forced + 1] = "production"
+                end
+                if self.config.enableCompanionMods ~= true then
+                    self.config.enableCompanionMods = true
+                    forced[#forced + 1] = "companionMods"
+                end
+                if #forced > 0 then
+                    setXMLBool(xmlFile, "farmDashboard.modules#fields", true)
+                    setXMLBool(xmlFile, "farmDashboard.modules#economy", true)
+                    setXMLBool(xmlFile, "farmDashboard.modules#production", true)
+                    setXMLBool(xmlFile, "farmDashboard.modules#companionMods", true)
+                    saveXMLFile(xmlFile)
+                    Logging.info("[FarmDash] Core exporters forced on at load: %s", table.concat(forced, ", "))
+                end
+            end
             -- Ensure all core + optional module collectors default ON (older installs may have toggled off).
             if not Utils.getNoNil(getXMLBool(xmlFile, "farmDashboard.settings#modulesDefaultOnApplied"), false) then
                 self.config.enableAnimals = true
@@ -1464,6 +2174,7 @@ function FarmDashboardDataCollector:loadConfig()
                 self.config.enableRedTape = true
                 self.config.enableInvoices = true
                 self.config.enableHirePurchasing = true
+                self.config.enableCompanionMods = true
                 setXMLBool(xmlFile, "farmDashboard.modules#animals", true)
                 setXMLBool(xmlFile, "farmDashboard.modules#vehicles", true)
                 setXMLBool(xmlFile, "farmDashboard.modules#weather", true)
@@ -1476,6 +2187,7 @@ function FarmDashboardDataCollector:loadConfig()
                 setXMLBool(xmlFile, "farmDashboard.modules#redTape", true)
                 setXMLBool(xmlFile, "farmDashboard.modules#invoices", true)
                 setXMLBool(xmlFile, "farmDashboard.modules#hirePurchasing", true)
+                setXMLBool(xmlFile, "farmDashboard.modules#companionMods", true)
                 setXMLBool(xmlFile, "farmDashboard.settings#modulesDefaultOnApplied", true)
                 saveXMLFile(xmlFile)
             end
@@ -1493,6 +2205,7 @@ function FarmDashboardDataCollector:loadConfig()
         setXMLBool(xmlFile, "farmDashboard.settings#mirrorDefaultOnApplied", true)
         setXMLInt(xmlFile, "farmDashboard.settings#animalRowsPerSlice", self.config.animalRowsPerSlice)
         setXMLInt(xmlFile, "farmDashboard.settings#sliceBudgetMs", self.config.sliceBudgetMs)
+        setXMLInt(xmlFile, "farmDashboard.settings#economyRefreshEveryNCycles", self.config.economyRefreshEveryNCycles)
         setXMLInt(xmlFile, "farmDashboard.settings#detailMaxAgeSec", self.config.detailMaxAgeSec)
         setXMLInt(xmlFile, "farmDashboard.settings#detailFileCapBase", self.config.detailFileCapBase)
         setXMLBool(xmlFile, "farmDashboard.modules#animals",    true)
@@ -1506,6 +2219,7 @@ function FarmDashboardDataCollector:loadConfig()
         setXMLBool(xmlFile, "farmDashboard.modules#redTape", true)
         setXMLBool(xmlFile, "farmDashboard.modules#invoices", true)
         setXMLBool(xmlFile, "farmDashboard.modules#hirePurchasing", true)
+        setXMLBool(xmlFile, "farmDashboard.modules#companionMods", true)
         setXMLInt(xmlFile, "farmDashboard.settings#stockPlaceablesPerFrame", self.config.stockPlaceablesPerFrame)
         setXMLInt(xmlFile, "farmDashboard.settings#baleWorldEntitiesPerFrame", self.config.baleWorldEntitiesPerFrame)
         setXMLInt(xmlFile, "farmDashboard.settings#financeVehiclesPerFrame", self.config.financeVehiclesPerFrame)
@@ -1602,6 +2316,7 @@ function FarmDashboardDataCollector:saveConfig()
     setXMLBool(xmlFile, "farmDashboard.settings#mirrorDefaultOnApplied", true)
     setXMLInt(xmlFile, "farmDashboard.settings#animalRowsPerSlice", cfg.animalRowsPerSlice or 256)
     setXMLInt(xmlFile, "farmDashboard.settings#sliceBudgetMs", cfg.sliceBudgetMs or 4)
+    setXMLInt(xmlFile, "farmDashboard.settings#economyRefreshEveryNCycles", cfg.economyRefreshEveryNCycles or 3)
     setXMLInt(xmlFile, "farmDashboard.settings#detailMaxAgeSec", cfg.detailMaxAgeSec or 60)
     setXMLInt(xmlFile, "farmDashboard.settings#detailFileCapBase", cfg.detailFileCapBase or 512)
     setXMLInt(xmlFile, "farmDashboard.settings#fieldsPerFrame", cfg.fieldsPerFrame or 1)
@@ -1623,6 +2338,7 @@ function FarmDashboardDataCollector:saveConfig()
     setXMLBool(xmlFile, "farmDashboard.settings#useStateMachine_production", Utils.getNoNil(cfg.useStateMachine_production, false))
     setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV6Applied", true)
     setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV7Applied", true)
+    setXMLBool(xmlFile, "farmDashboard.settings#collectionSafetyV8Applied", true)
     setXMLBool(xmlFile, "farmDashboard.settings#modulesDefaultOnApplied", true)
 
     setXMLBool(xmlFile, "farmDashboard.modules#animals", Utils.getNoNil(cfg.enableAnimals, true))
@@ -1637,22 +2353,23 @@ function FarmDashboardDataCollector:saveConfig()
     setXMLBool(xmlFile, "farmDashboard.modules#redTape", Utils.getNoNil(cfg.enableRedTape, true))
     setXMLBool(xmlFile, "farmDashboard.modules#invoices", Utils.getNoNil(cfg.enableInvoices, true))
     setXMLBool(xmlFile, "farmDashboard.modules#hirePurchasing", Utils.getNoNil(cfg.enableHirePurchasing, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfSoilFertilizer", Utils.getNoNil(cfg.enableRfSoilFertilizer, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfCropStress", Utils.getNoNil(cfg.enableRfCropStress, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfTax", Utils.getNoNil(cfg.enableRfTax, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfMarketDynamics", Utils.getNoNil(cfg.enableRfMarketDynamics, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfFuelCosts", Utils.getNoNil(cfg.enableRfFuelCosts, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfWorkerCosts", Utils.getNoNil(cfg.enableRfWorkerCosts, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfIncome", Utils.getNoNil(cfg.enableRfIncome, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfWorkplaceTriggers", Utils.getNoNil(cfg.enableRfWorkplaceTriggers, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfDairy", Utils.getNoNil(cfg.enableRfDairy, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfNpcFavor", Utils.getNoNil(cfg.enableRfNpcFavor, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfWorldEvents", Utils.getNoNil(cfg.enableRfWorldEvents, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfProStaff", Utils.getNoNil(cfg.enableRfProStaff, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfFertilizerDepot", Utils.getNoNil(cfg.enableRfFertilizerDepot, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfWeatherGuard", Utils.getNoNil(cfg.enableRfWeatherGuard, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfTimeGuard", Utils.getNoNil(cfg.enableRfTimeGuard, true))
-    setXMLBool(xmlFile, "farmDashboard.modules#rfPresence", Utils.getNoNil(cfg.enableRfPresence, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#companionMods", Utils.getNoNil(cfg.enableCompanionMods, true))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfSoilFertilizer", Utils.getNoNil(cfg.enableRfSoilFertilizer, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfCropStress", Utils.getNoNil(cfg.enableRfCropStress, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfTax", Utils.getNoNil(cfg.enableRfTax, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfMarketDynamics", Utils.getNoNil(cfg.enableRfMarketDynamics, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfFuelCosts", Utils.getNoNil(cfg.enableRfFuelCosts, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfWorkerCosts", Utils.getNoNil(cfg.enableRfWorkerCosts, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfIncome", Utils.getNoNil(cfg.enableRfIncome, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfWorkplaceTriggers", Utils.getNoNil(cfg.enableRfWorkplaceTriggers, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfDairy", Utils.getNoNil(cfg.enableRfDairy, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfNpcFavor", Utils.getNoNil(cfg.enableRfNpcFavor, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfWorldEvents", Utils.getNoNil(cfg.enableRfWorldEvents, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfProStaff", Utils.getNoNil(cfg.enableRfProStaff, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfFertilizerDepot", Utils.getNoNil(cfg.enableRfFertilizerDepot, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfWeatherGuard", Utils.getNoNil(cfg.enableRfWeatherGuard, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfTimeGuard", Utils.getNoNil(cfg.enableRfTimeGuard, false))
+    setXMLBool(xmlFile, "farmDashboard.modules#rfPresence", Utils.getNoNil(cfg.enableRfPresence, false))
 
     saveXMLFile(xmlFile)
     delete(xmlFile)
@@ -1693,8 +2410,8 @@ function FarmDashboardDataCollector:_getMissionVehicleTable()
 end
 
 function FarmDashboardDataCollector:_getCurrentGuiName()
-    local gui = rawget(_G, "g_gui")
-    if not gui then return nil end
+    local gui = _G.g_gui
+    if type(gui) ~= "table" then return nil end
     local ok, name = pcall(function()
         if type(gui.getCurrentGuiName) == "function" then
             return gui:getCurrentGuiName()
@@ -2021,8 +2738,8 @@ function FarmDashboardDataCollector:_subscribeToVehicleFleetEvents()
     }
     local subscribed = 0
     for _, name in ipairs(eventNames) do
-        local evt = rawget(_G, name)
-        if evt ~= nil then
+        local evt = _G[name]
+        if type(evt) == "table" then
             local subOk = pcall(function()
                 _G.g_messageCenter:subscribe(evt, onFleetMutation(name), self_ref)
             end)
@@ -2058,9 +2775,14 @@ function FarmDashboardDataCollector:_updateVehicleSpawnGrace()
 
     local nowS = self:_missionNowSec()
     if type(self._postLoadCollectionGraceUntil) == "number" and nowS < self._postLoadCollectionGraceUntil then
-        self._vehicleCountProbe = total
-        self._vehicleReadyCountProbe = ready
-        return
+        if (self._postLoadCollectionGraceUntil - nowS) > 600 then
+            self._postLoadCollectionGraceUntil = nil
+            self._postLoadSilenceUntil = nil
+        else
+            self._vehicleCountProbe = total
+            self._vehicleReadyCountProbe = ready
+            return
+        end
     end
 
     local prevTotal = self._vehicleCountProbe
@@ -2117,81 +2839,57 @@ function FarmDashboardDataCollector:_skipFleetSliceForSpawnGrace(order, name)
     end
 end
 
---- True when menus, pause, post-load grace, or zero-dt ticks should defer heavy collection.
+--- True when post-load grace should defer starting new collector slots.
+--- Esc/pause/dt<=0 must NOT fully freeze collection (fields stalled as {} historically).
 function FarmDashboardDataCollector:shouldDeferCollectionWork(dt)
     if not _G.g_currentMission then return true end
 
-    -- Shop/Courseplay spawn freeze is fleet-only (shouldDeferVehicleFleetWork).
-    -- Pausing the whole stagger here made Fields go blank after a shop buy.
+    -- Shop / Esc / PDA must not freeze Fields. Pausing the whole stagger (and aborting the
+    -- fields coroutine) left vanilla savegame4 data.json with fields:{} so the dashboard
+    -- only had fields.xml — leftover HARVEST_READY ground after straw was baled.
+    -- Fleet scans still skip via shouldDeferVehicleFleetWork.
 
     local nowS = self:_missionNowSec()
-    if type(self._postLoadCollectionGraceUntil) == "number" and nowS < self._postLoadCollectionGraceUntil then
-        return true
-    end
-
-    if type(dt) == "number" and dt <= 0 then
-        return true
-    end
-
-    local mission = _G.g_currentMission
-    local okPaused, paused = pcall(function()
-        if mission.paused then return mission.paused end
-        if type(mission.isPaused) == "function" then return mission:isPaused() end
-        if type(mission.getIsPaused) == "function" then return mission:getIsPaused() end
-        return false
-    end)
-    if okPaused and paused then return true end
-
-    local gui = rawget(_G, "g_gui")
-    if gui and type(gui.getIsGuiVisible) == "function" then
-        local okVis, visible = pcall(function() return gui:getIsGuiVisible() end)
-        if okVis and visible then
-            local name = self:_getCurrentGuiName()
-            if name then
-                local lower = string.lower(name)
-                if lower:find("shop", 1, true)
-                    or lower:find("sell", 1, true)
-                    or lower:find("courseplay", 1, true)
-                    or lower:find("cpglobal", 1, true)
-                    or lower:find("cpsettings", 1, true)
-                    or lower:find("ingamemenu", 1, true)
-                    or lower:find("pause", 1, true)
-                    or lower:find("construction", 1, true)
-                    or lower:find("vehicle", 1, true)
-                then
-                    return true
-                end
-            end
+    local graceUntil = self._postLoadCollectionGraceUntil
+    if type(graceUntil) == "number" and nowS < graceUntil then
+        -- Belt-and-braces: if grace was armed on a wall-clock epoch (legacy bug), mission
+        -- time can never catch up — drop the latch so collectors run.
+        if (graceUntil - nowS) > 600 then
+            self._postLoadCollectionGraceUntil = nil
+            self._postLoadSilenceUntil = nil
+            Logging.info("[FarmDash] Cleared absurd post-load grace (until=%.0f now=%.1f) — collectors resuming", graceUntil, nowS)
+        else
             return true
         end
     end
 
+    -- Do not treat dt<=0 or mission.paused as a full collection freeze. Esc/PDA often
+    -- reports dt=0 while g_time still advances; slot timing already uses effDt from g_time.
+    -- Fleet still skips via shouldDeferVehicleFleetWork; pause abort only clears fleet coroutines.
+
     return false
 end
 
---- Drop in-flight incremental work when entering pause/menu (avoids stale vehicle refs during shop sell).
+--- Drop in-flight fleet work when entering pause/menu (stale vehicle refs during shop sell).
+--- Leave fields / economy / production coroutines parked — killing them published fields:{}.
 function FarmDashboardDataCollector:_abortActiveIncrementalWork()
     local name = self._incActiveModule
+    if name == "fields" or name == "economy" or name == "production" then
+        return
+    end
     if name == "vehicles" and rawget(_G, "VehicleDataCollector") then
         VehicleDataCollector._inc = nil
     elseif name == "finance" and rawget(_G, "FinanceDataCollector") then
         FinanceDataCollector._inc = nil
-    elseif name == "fields" and rawget(_G, "FieldDataCollector") then
-        FieldDataCollector._fdCo = nil
-        FieldDataCollector._smState = nil
-    elseif name == "economy" and rawget(_G, "EconomyDataCollector") then
-        EconomyDataCollector._ecoCo = nil
-        EconomyDataCollector._smState = nil
-    elseif name == "production" and rawget(_G, "ProductionDataCollector") then
-        ProductionDataCollector._co = nil
-        ProductionDataCollector._smState = nil
     elseif name == "animals" and rawget(_G, "AnimalDataCollector") then
         AnimalDataCollector._iter = nil
         AnimalDataCollector._co = nil
     elseif name == "stock" and rawget(_G, "StockDataCollector") then
         StockDataCollector._inc = nil
     end
-    self._incActiveModule = nil
+    if name == "vehicles" or name == "finance" or name == "animals" or name == "stock" then
+        self._incActiveModule = nil
+    end
     self._husbandryJob = nil
 end
 
@@ -2233,12 +2931,19 @@ function FarmDashboardDataCollector:onMissionLoaded()
     self._wroteRichExport = false
     self._latchedTerrainHalf = nil
 
-    local D = rawget(_G, "FarmDashDiagnostics")
-    local nowS = (D and D.nowSec and D.nowSec()) or 0
+    -- MUST use the same clock as shouldDeferCollectionWork (_missionNowSec → g_time/1000).
+    -- Setting grace from FarmDashDiagnostics.nowSec() (getTimeSec / os.clock) while the
+    -- defer gate reads g_time left collection paused forever after the empty bootstrap
+    -- write — Fields stayed on XML fertilizer steps, companionMods never ran.
+    local nowS = self:_missionNowSec()
     self._postLoadSilenceUntil = nowS + POST_LOAD_SILENCE_SEC
     local graceSec = self.config.postLoadCollectionGraceSec or POST_LOAD_COLLECTION_GRACE_SEC
     self._postLoadCollectionGraceUntil = nowS + graceSec
     self._collectionPausedLatch = false
+    Logging.info(
+        "[FarmDash] Post-load collection grace %ds (mission clock now=%.1fs until=%.1fs)",
+        graceSec, nowS, self._postLoadCollectionGraceUntil
+    )
 
     if self:isCourseplayLoaded() and FarmDashboard and FarmDashboard.isAuthority and FarmDashboard:isAuthority() then
         local gt = _G.g_time
@@ -2269,15 +2974,20 @@ function FarmDashboardDataCollector:getEnabledCollectorOrder()
     self:ensureModLinkedCollectorsEnabled(false)
     local order = {}
     local seq = {
+        -- Fields before animals/vehicles so PF N/pH reaches the dashboard before a long
+        -- husbandry/fleet pass (Montana + Courseplay). Weather is cheap; keep it early too.
+        { "fields",     "enableFields" },
+        { "weather",    "enableWeather" },
         { "animals",    "enableAnimals" },
         { "vehicles",   "enableVehicles" },
-        { "fields",     "enableFields" },
         { "finance",    "enableFinance" },
-        { "weather",    "enableWeather" },
         { "economy",    "enableEconomy" },
         { "production", "enableProduction" },
         { "stock",          "enableStock" },
         { "baleInventory",  "enableBaleInventory" },
+        { "companionMods",  "enableCompanionMods" },
+        -- Dedicated companion pages share the companion-mods switch.
+        { "companionPages", "enableCompanionMods" },
         { "redTape",        "enableRedTape" },
         { "invoices",       "enableInvoices" },
         { "hirePurchasing", "enableHirePurchasing" },
@@ -2333,6 +3043,14 @@ function FarmDashboardDataCollector:ensureModLinkedCollectorsEnabled(persist)
     if hp and type(hp.isModLoaded) == "function" and hp.isModLoaded() then
         forceOn("enableHirePurchasing")
     end
+    local cm = rawget(_G, "CompanionModsDataCollector")
+    if cm and type(cm.isModLoaded) == "function" and cm.isModLoaded() then
+        forceOn("enableCompanionMods")
+    end
+    local cp = rawget(_G, "CompanionPagesDataCollector")
+    if cp and type(cp.isModLoaded) == "function" and cp.isModLoaded() then
+        forceOn("enableCompanionMods")
+    end
     local rt = rawget(_G, "RedTapeDataCollector")
     if rt and type(rt.isModLoaded) == "function" and rt.isModLoaded() then
         forceOn("enableRedTape")
@@ -2371,6 +3089,11 @@ function FarmDashboardDataCollector:ensureModLinkedCollectorsEnabled(persist)
     -- ADS / Vehicle Years / Mileage nest under the vehicles collector.
     if self:isAdvancedDamageSystemLoaded() or self:isVehicleYearsLoaded() or self:isVehicleMileageLoaded() then
         forceOn("enableVehicles")
+    end
+    -- Precision Farming N/pH/soil type live on field rows. Buying soil maps in the PDA
+    -- does not populate the dashboard if this collector is off (export stays fields: {}).
+    if self:isPrecisionFarmingLoaded() then
+        forceOn("enableFields")
     end
     -- Moisture System samples live on fields + stock paths.
     if self:isMoistureSystemLoaded() then
@@ -2412,6 +3135,19 @@ function FarmDashboardDataCollector:isMoistureSystemLoaded()
     end
     local m = _G.g_currentMission
     return m ~= nil and m.MoistureSystem ~= nil
+end
+
+function FarmDashboardDataCollector:isPrecisionFarmingLoaded()
+    if _G.g_modIsLoaded and (_G.g_modIsLoaded["FS25_precisionFarming"] or _G.g_modIsLoaded["FS25_PrecisionFarming"]) then
+        return true
+    end
+    -- The mod namespace is an engine key (mods.lua _G[modName] = modEnv) inherited here, and it exists
+    -- for every available mod, so only a populated g_precisionFarming counts as loaded.
+    local ns = _G.FS25_precisionFarming
+    if type(ns) == "table" and ns ~= _G and rawget(ns, "g_precisionFarming") ~= nil then
+        return true
+    end
+    return rawget(_G, "g_precisionFarming") ~= nil
 end
 
 function FarmDashboardDataCollector:isRealisticLivestockLoaded()
@@ -2551,8 +3287,40 @@ function FarmDashboardDataCollector:_assembleRealisticFarming(mc)
     }
 end
 
+--- FH-20260914: is the economy refresh due this cycle?
+--- Returns true to SKIP. The very first pass always collects, so the export is never missing prices
+--- on a fresh load; only later refreshes are spaced out. A value of 1, or a missing module cache
+--- entry, always collects.
+function FarmDashboardDataCollector:_shouldSkipEconomyThisCycle()
+    local every = tonumber(self.config and self.config.economyRefreshEveryNCycles) or 1
+    if every <= 1 then return false end
+    local mc = self.moduleCache
+    if type(mc) ~= "table" or mc.economy == nil then
+        return false
+    end
+    local seen = (self._economyCycleCount or 0) + 1
+    self._economyCycleCount = seen
+    return (seen % every) ~= 0
+end
+
+-- Freeze the same player-farm list and selected farm for both companion collectors in this cycle.
+function FarmDashboardDataCollector:beginCompanionFarmSnapshot()
+    local farmInfo = self:getFarmInfo()
+    local companion = rawget(_G, "CompanionModsDataCollector")
+    local helpers = type(companion) == "table" and companion.helpers or nil
+    self._companionFarmInfo = farmInfo
+    self._companionExportFarmId = nil
+    if type(helpers) == "table" and type(helpers.resolveExportFarmId) == "function" then
+        self._companionExportFarmId = helpers.resolveExportFarmId(farmInfo)
+    end
+    self._companionFarmScopeReady = true
+end
+
 function FarmDashboardDataCollector:assembleDataFromModuleCache()
     if not _G.g_currentMission then return nil end
+    if not self._companionFarmScopeReady then
+        self:beginCompanionFarmSnapshot()
+    end
 
     local D = rawget(_G, "FarmDashDiagnostics")
     local nowS = (D and D.nowSec and D.nowSec()) or 0
@@ -2585,7 +3353,7 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
         timestamp  = _G.g_time or 0,
         status     = "active",
         gameTime   = self:getGameTime(),
-        farmInfo   = self:getFarmInfo(),
+        farmInfo   = self._companionFarmInfo,
         animals    = mc.animals or {},
         vehicles   = mc.vehicles or {},
         fields     = mc.fields or {},
@@ -2597,6 +3365,8 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
         redTape    = mc.redTape or { enabled = false, byFarm = {} },
         invoices   = mc.invoices or { enabled = false },
         hirePurchasing = mc.hirePurchasing or { enabled = false },
+        companionMods = mc.companionMods or { enabled = false, mods = {} },
+        companionPages = mc.companionPages or { enabled = false, schema = 1, pages = {} },
         --- Physical bales by fill + placement (BaleInventoryCollector / InventoryScan).
         baleInventory = baleInv or { farmId = nil, byFarm = {}, onField = {}, offField = {} }
     }
@@ -2618,6 +3388,46 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
     data.vehicleYearsSummary = self:buildVehicleYearsSummary(mc.vehicles, data.gameTime)
     data.mileageSummary = self:buildMileageSummary(mc.vehicles)
 
+    local clock = _G.g_time
+    if type(clock) ~= "number" then clock = nil end
+    local recorded = type(self._sectionOutcomes) == "table" and self._sectionOutcomes or {}
+    local function exportOutcome(name, enabled)
+        if enabled == false then
+            return {
+                outcome = "disabled",
+                readState = "ok",
+                coverage = "complete",
+                provider = "vanilla",
+                sampledAt = clock,
+                sessionId = nil,
+            }
+        end
+        local prior = recorded[name]
+        if type(prior) == "table" and prior.outcome ~= nil then
+            return prior
+        end
+        return {
+            outcome = "unknown",
+            readState = nil,
+            coverage = "unknown",
+            provider = nil,
+            sampledAt = nil,
+            sessionId = nil,
+        }
+    end
+    local cfg = self.config or {}
+    data.sectionOutcomes = {
+        animals = exportOutcome("animals", cfg.enableAnimals ~= false),
+        vehicles = exportOutcome("vehicles", cfg.enableVehicles ~= false),
+        fields = exportOutcome("fields", cfg.enableFields ~= false),
+        production = exportOutcome("production", cfg.enableProduction ~= false),
+        finance = exportOutcome("finance", cfg.enableFinance ~= false),
+        weather = exportOutcome("weather", cfg.enableWeather ~= false),
+        economy = exportOutcome("economy", cfg.enableEconomy ~= false),
+        stock = exportOutcome("stock", cfg.enableStock ~= false),
+        redTape = exportOutcome("redTape", cfg.enableRedTape ~= false),
+    }
+
     data.collectorModules = {
         animals = self.config.enableAnimals ~= false,
         vehicles = self.config.enableVehicles ~= false,
@@ -2630,6 +3440,8 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
         redTape = self.config.enableRedTape ~= false,
         invoices = self.config.enableInvoices ~= false,
         hirePurchasing = self.config.enableHirePurchasing ~= false,
+        companionMods = self.config.enableCompanionMods ~= false,
+        companionPages = self.config.enableCompanionMods ~= false,
         rfSoilFertilizer = self.config.enableRfSoilFertilizer ~= false,
         rfCropStress = self.config.enableRfCropStress ~= false,
         rfTax = self.config.enableRfTax ~= false,
@@ -2831,6 +3643,7 @@ function FarmDashboardDataCollector:startModuleSlice(name, order)
         end
     end
     self._incActiveModule = name
+    self._sliceSession = self._exportSession or 0
     self:_diagTrace("module active %s (incremental)", name)
 end
 
@@ -2842,14 +3655,225 @@ function FarmDashboardDataCollector:refreshAssembledInMemory()
     end
 end
 
+--- Copy one finished section. The first return is the detached table.
+--- The second return is nil on success, or an error token when the section cannot be admitted.
+--- Empty tables stay empty. A scalar root, metatable, cycle, unsupported key or value,
+--- or a tree past the serializer depth (JSON_MAX_DEPTH is 32) or the node budget fails the whole section.
+function FarmDashboardDataCollector:_admitSection(payload)
+    if type(payload) ~= "table" then
+        return nil, "root"
+    end
+    local maxDepth = 32
+    local maxNodes = 262144
+    local function copyPlain(value, seen, depth, budget)
+        if type(value) ~= "table" then
+            return nil, "value"
+        end
+        if depth > maxDepth then
+            return nil, "depth"
+        end
+        if getmetatable(value) ~= nil then
+            return nil, "metatable"
+        end
+        if seen[value] then
+            return nil, "cycle"
+        end
+        budget.nodes = budget.nodes + 1
+        if budget.nodes > maxNodes then
+            return nil, "resource"
+        end
+        seen[value] = true
+        local copy = {}
+        for key, item in pairs(value) do
+            budget.nodes = budget.nodes + 1
+            if budget.nodes > maxNodes then
+                seen[value] = nil
+                return nil, "resource"
+            end
+            local keyKind = type(key)
+            if keyKind ~= "number" and keyKind ~= "string" then
+                seen[value] = nil
+                return nil, "key"
+            end
+            local itemKind = type(item)
+            if itemKind == "number" or itemKind == "string" or itemKind == "boolean" then
+                copy[key] = item
+            elseif itemKind == "table" then
+                local nested, err = copyPlain(item, seen, depth + 1, budget)
+                if err ~= nil then
+                    seen[value] = nil
+                    return nil, err
+                end
+                copy[key] = nested
+            else
+                seen[value] = nil
+                return nil, "value"
+            end
+        end
+        seen[value] = nil
+        return copy, nil
+    end
+    return copyPlain(payload, {}, 0, { nodes = 0 })
+end
+
+function FarmDashboardDataCollector:_detachData(value, seen, depth)
+    return self:_admitSection(value)
+end
+
+function FarmDashboardDataCollector:_rememberModuleOutcome(name, failed)
+    if type(self._sectionOutcomes) ~= "table" then self._sectionOutcomes = {} end
+    local clock = _G.g_time
+    if type(clock) ~= "number" then clock = nil end
+    if failed then
+        local prev = self._sectionOutcomes[name]
+        self._sectionOutcomes[name] = {
+            outcome = "failed",
+            readState = "failed",
+            coverage = "partial",
+            provider = "vanilla",
+            sampledAt = type(prev) == "table" and prev.sampledAt or nil,
+            sessionId = nil,
+        }
+        return
+    end
+    local section = type(self.moduleCache) == "table" and self.moduleCache[name] or nil
+    local outcome = "ok"
+    local coverage = "complete"
+    local readState = "ok"
+    if name == "animals" then
+        if type(section) ~= "table" then
+            outcome = "unknown"
+            coverage = "unknown"
+            readState = nil
+        elseif next(section) == nil then
+            outcome = "empty"
+        else
+            local counted = false
+            local missingCount = false
+            for _, row in pairs(section) do
+                if type(row) ~= "table" then
+                    missingCount = true
+                else
+                    local heads = row.animalCount
+                    if type(heads) ~= "number" or heads ~= heads or heads == math.huge or heads == -math.huge then
+                        missingCount = true
+                    elseif heads > 0 then
+                        counted = true
+                    end
+                end
+            end
+            if missingCount then
+                outcome = "unknown"
+                coverage = "partial"
+                readState = nil
+            elseif counted then
+                outcome = "ok"
+            else
+                outcome = "empty"
+            end
+        end
+    elseif name == "stock" then
+        if type(section) ~= "table" then
+            outcome = "unknown"
+            coverage = "unknown"
+            readState = nil
+        elseif section.enabled == false then
+            outcome = "disabled"
+        elseif type(section.byFarm) ~= "table" then
+            outcome = "unknown"
+            coverage = "unknown"
+            readState = nil
+        else
+            local nonzero = false
+            local missingNumber = false
+            for _, farm in pairs(section.byFarm) do
+                if type(farm) ~= "table" or type(farm.items) ~= "table" then
+                    missingNumber = true
+                else
+                    for _, item in pairs(farm.items) do
+                        if type(item) ~= "table" then
+                            missingNumber = true
+                        else
+                            local liters = item.totalLiters
+                            if type(liters) ~= "number" or liters ~= liters or liters == math.huge or liters == -math.huge then
+                                missingNumber = true
+                            elseif liters ~= 0 then
+                                nonzero = true
+                            end
+                        end
+                    end
+                end
+            end
+            if missingNumber then
+                outcome = "unknown"
+                coverage = "partial"
+                readState = nil
+            elseif nonzero then
+                outcome = "ok"
+            else
+                outcome = "zero"
+            end
+        end
+    elseif name == "fields" or name == "production" then
+        if type(section) ~= "table" then
+            outcome = "unknown"
+            coverage = "unknown"
+            readState = nil
+        elseif name == "production" then
+            local chains = section.chains
+            if chains == nil and next(section) == nil then
+                outcome = "empty"
+            elseif type(chains) ~= "table" then
+                outcome = "unknown"
+                coverage = "partial"
+                readState = nil
+            else
+                local chainCount = 0
+                local badChain = false
+                for _, chain in pairs(chains) do
+                    chainCount = chainCount + 1
+                    if type(chain) ~= "table" then
+                        badChain = true
+                    end
+                end
+                if badChain then
+                    outcome = "unknown"
+                    coverage = "partial"
+                    readState = nil
+                elseif chainCount == 0 then
+                    outcome = "empty"
+                else
+                    outcome = "ok"
+                end
+            end
+        elseif next(section) == nil then
+            outcome = "empty"
+        end
+    end
+    self._sectionOutcomes[name] = {
+        outcome = outcome,
+        readState = readState,
+        coverage = coverage,
+        provider = "vanilla",
+        sampledAt = clock,
+        sessionId = nil,
+    }
+end
+
 --- When a module slice completes (full collect or incremental done), advance schedule and maybe flush JSON.
 function FarmDashboardDataCollector:finishModuleSlice(name, order, usedIncremental, failed)
+    if self._sliceSession ~= nil and self._sliceSession ~= (self._exportSession or 0) then
+        self._incActiveModule = nil
+        return
+    end
+    if type(self._cycleFresh) ~= "table" then self._cycleFresh = {} end
     self._incActiveModule = nil
     local n = #order
     if n > 0 then
         self.nextSliceIdx = (self.nextSliceIdx or 1) % n + 1
     end
 
+    self:_rememberModuleOutcome(name, failed == true)
     if not failed then
         self._cycleFresh[name] = true
     end
@@ -2867,6 +3891,7 @@ end
 
 --- Track full-cycle completion while still allowing progressive per-slice writes.
 function FarmDashboardDataCollector:tryFlushAfterFullCycle(order)
+    if type(self._cycleFresh) ~= "table" then self._cycleFresh = {} end
     for _, n in ipairs(order) do
         if not self._cycleFresh[n] then return end
     end
@@ -2937,11 +3962,73 @@ end
 function FarmDashboardDataCollector:jsonDiskWriteStep()
     local pending = self._jsonPendingDisk
     if not pending then return true end
+    local session = self._exportSession or 0
+    if pending.session ~= nil and pending.session ~= session then
+        Logging.info(
+            "[FarmDash] dropped stale export session=%s current=%s",
+            tostring(pending.session),
+            tostring(session)
+        )
+        self._jsonPendingDisk = nil
+        local recoveryMap = self._recoveryByTarget
+        if type(recoveryMap) == "table" then
+            for key, txn in pairs(recoveryMap) do
+                if type(txn) ~= "table" or txn.session ~= session then
+                    recoveryMap[key] = nil
+                end
+            end
+        end
+        return true
+    end
+
+    if not self:_diskRetryDue(pending) then
+        return "deferred"
+    end
 
     local t0 = self:_diagNow()
     local bytes = pending.jsonString and #pending.jsonString or 0
-    self:_writeJsonStringToDisk(pending.jsonString, pending.savegameDir)
+    if self:_usesXmlTransport() then
+        if self._xmlInFlight then return "deferred" end
+        local route = rawget(_G, "FarmDashboardExportRoute")
+        local pendingClass = pending.exportClass or "gameplay"
+        local record = self:_xmlRecord(pending.jsonString, pending.generation, pending.session, pendingClass)
+        local queued = (route and route.submit) and route:submit(record) or "refused"
+        if queued == "queued" or queued == "coalesced" then
+            -- Generation 0 never receives a commit callback; only gameplay may hold the collector.
+            if pendingClass == "gameplay" then self._xmlInFlight = true end
+            self._jsonPendingDisk = nil
+            return "queued"
+        end
+        pending.attempts = (pending.attempts or 0) + 1
+        pending.nextRetryAt = self:_missionTimeMs() + 250
+        return false
+    end
+    local written = self:_writeJsonStringToDisk(pending.jsonString, pending.savegameDir)
+    if written ~= true then
+        local attempts = (pending.attempts or 0) + 1
+        pending.attempts = attempts
+        local delay = 5000
+        if attempts == 1 then delay = 250
+        elseif attempts == 2 then delay = 500
+        elseif attempts == 3 then delay = 1000
+        end
+        pending.nextRetryAt = self:_missionTimeMs() + delay
+        if FarmDashLog and FarmDashLog.error then
+            FarmDashLog.error("export write failed slot=%s", tostring(pending.savegameDir))
+        end
+        return false
+    end
     self._jsonPendingDisk = nil
+    local gen = tonumber(pending.generation) or 0
+    if gen > 0 then
+        self._completedGeneration = gen
+        self._activeCandidateGeneration = nil
+        self._wroteRichExport = true
+        if (pending.attempts or 0) > 0 and FarmDashLog and FarmDashLog.error then
+            FarmDashLog.error("export write recovered generation=%d", gen)
+        end
+        Logging.info("[FarmDash] export committed generation=%d bytes=%d slot=%s", gen, bytes, tostring(pending.savegameDir))
+    end
     if t0 and self:_diagEnabled() then
         local ms = (self:_diagNow() - t0) * 1000
         self:_diagTrace("jsonDiskWrite bytes=%d ms=%.2f%s", bytes, ms, self:_diagMarkHitch(ms))
@@ -3062,6 +4149,10 @@ end
 function FarmDashboardDataCollector:runIncrementalActiveStep(order)
     local name = self._incActiveModule
     if not name then return end
+    if self._sliceSession ~= nil and self._sliceSession ~= (self._exportSession or 0) then
+        self._incActiveModule = nil
+        return
+    end
     if (name == "vehicles" or name == "finance") and self:shouldDeferVehicleFleetWork() then
         self:_skipFleetSliceForSpawnGrace(order, name)
         return
@@ -3144,53 +4235,97 @@ function FarmDashboardDataCollector:runIncrementalActiveStep(order)
     end
 
     if name == "production" and done then
-        local prod = payload or {}
-        self.moduleCache.production = prod
-        self:startHusbandryJobAfterProduction(order, true)
-        if self._husbandryJob then
-            self._incActiveModule = nil
+        if payload == nil then
+            self._productionCandidate = nil
+            self:finishModuleSlice("production", order, true, true)
         else
-            self.moduleCache.production.husbandryTotals = {}
-            self:finishModuleSlice("production", order, true)
+            local detached, admitErr = self:_admitSection(payload)
+            if admitErr ~= nil then
+                self._productionCandidate = nil
+                self:finishModuleSlice("production", order, true, true)
+            else
+                self:startHusbandryJobAfterProduction(order, true)
+                if self._husbandryJob then
+                    self._productionCandidate = { session = self._exportSession or 0, data = detached }
+                    self._incActiveModule = nil
+                else
+                    detached.husbandryTotals = {}
+                    self.moduleCache.production = detached
+                    self:finishModuleSlice("production", order, true, false)
+                end
+            end
         end
     elseif name ~= "production" then
-        -- Partial steps often return nil payload; do not wipe a prior complete cache
-        -- (RF land collectors take many frames — wiping caused soilFertilizer.enabled=false).
-        if done or payload ~= nil then
-            self.moduleCache[name] = payload or {}
+        -- A partial payload stays staged. The committed cache keeps the last finished sample.
+        if done and payload ~= nil then
+            local detached, admitErr = self:_admitSection(payload)
+            if admitErr ~= nil then
+                if type(self._sectionStaging) == "table" then
+                    self._sectionStaging[name] = nil
+                end
+                self:finishModuleSlice(name, order, true, true)
+                return
+            end
+            self.moduleCache[name] = detached
+            if type(self._sectionStaging) == "table" then
+                self._sectionStaging[name] = nil
+            end
+        elseif payload ~= nil then
+            if type(self._sectionStaging) ~= "table" then self._sectionStaging = {} end
+            self._sectionStaging[name] = payload
         end
     end
 
     --- Partial incremental steps skip refreshAssembledInMemory (full assemble every frame hitched while driving).
 
     if done and name ~= "production" then
-        self:finishModuleSlice(name, order, true)
+        self:finishModuleSlice(name, order, true, payload == nil)
     end
 end
 
 --- Legacy synchronous collect for one module name.
 function FarmDashboardDataCollector:runLegacyModuleSlice(name, order)
+    self._sliceSession = self._exportSession or 0
     self:_diagTrace("legacy collect start %s", name)
     local t0 = self:_diagNow()
-    local result = self:safeCollect(name)
+    local result, collectFailed = self:safeCollect(name)
     if t0 and self:_diagEnabled() then
         local ms = (self:_diagNow() - t0) * 1000
         self:_diagTrace("legacy collect done %s ms=%.2f%s", name, ms, self:_diagMarkHitch(ms))
     end
     if name == "production" then
-        local prod = result or {}
-        self.moduleCache.production = prod
-        self:startHusbandryJobAfterProduction(order, false)
-        self:refreshAssembledInMemory()
-        if self._husbandryJob then
+        if collectFailed == true then
+            self._productionCandidate = nil
+            self:finishModuleSlice(name, order, false, true)
             return
         end
-        self.moduleCache.production.husbandryTotals = {}
-        self:finishModuleSlice(name, order, false)
+        local detached, admitErr = self:_admitSection(result)
+        if admitErr ~= nil then
+            self._productionCandidate = nil
+            self:finishModuleSlice(name, order, false, true)
+            return
+        end
+        self:startHusbandryJobAfterProduction(order, false)
+        if self._husbandryJob then
+            self._productionCandidate = { session = self._exportSession or 0, data = detached }
+            return
+        end
+        detached.husbandryTotals = {}
+        self.moduleCache.production = detached
+        self:finishModuleSlice(name, order, false, false)
         return
     end
-    self.moduleCache[name] = result or {}
-    self:finishModuleSlice(name, order, false)
+    if collectFailed == true then
+        self:finishModuleSlice(name, order, false, true)
+        return
+    end
+    local detached, admitErr = self:_admitSection(result)
+    if admitErr ~= nil then
+        self:finishModuleSlice(name, order, false, true)
+        return
+    end
+    self.moduleCache[name] = detached
+    self:finishModuleSlice(name, order, false, false)
 end
 
 --- Consume one inter-module slot: start or continue incremental work, or run a full legacy collect.
@@ -3205,11 +4340,21 @@ function FarmDashboardDataCollector:consumeOneModuleSlot(order)
     local slotMs = cycleMs / n
 
     if self:_cycleFreshCount(order) == 0 and not self._incActiveModule then
+        self:beginCompanionFarmSnapshot()
         self._diagSlotCycle = (self._diagSlotCycle or 0) + 1
         self:_diagTrace(
             "=== slot cycle #%d begin modules=%d slotMs=%.0f cycleMs=%d order=%s ===",
             self._diagSlotCycle, n, slotMs, cycleMs, table.concat(order, ",")
         )
+    end
+
+    -- FH-20260914: skip the economy refresh on cycles where it is not due. The module cache still
+    -- supplies the last collected prices to every export, so the file never loses the block; only
+    -- the cost of gathering it is skipped. Any other module is unaffected.
+    if name == "economy" and self:_shouldSkipEconomyThisCycle() then
+        self:_diagTrace("slot #%d/%d skip %s (cadence, cache retained)", idx, n, name)
+        self.nextSliceIdx = idx % n + 1
+        return
     end
 
     if self:collectorSupportsIncremental(name) then
@@ -3249,6 +4394,7 @@ function FarmDashboardDataCollector:update(dt)
 end
 
 function FarmDashboardDataCollector:_updateBody(dt)
+    self._frameExportBytes = 0
     self:_pollShopPendingLoads()
     pcall(function() self:_exportFillTypeHudIcons() end)
 
@@ -3284,30 +4430,54 @@ function FarmDashboardDataCollector:_updateBody(dt)
     self:_updateCollectionPauseLatch(deferHeavy)
 
     --- One engine work unit per frame: JSON serialize, disk write, cycle tail, or collector step.
+    if self:_checkExportLiveness() then
+        self:pumpHeldExport()
+    end
+    self:_promoteQueuedSnapshot()
     local frameWorkDone = false
-
-    if self._jsonWriteJob then
+    local penWaiting = type(self._dirtyPens) == "table" and next(self._dirtyPens) ~= nil
+    if penWaiting and (self._jsonWriteJob or self._jsonPendingDisk) then
+        self._exportFair = (self._exportFair == "pen") and "snapshot" or "pen"
+    end
+    if penWaiting and self._exportFair == "pen" and self:_exportBudgetAllows(1) then
+        self:processDetailQueueOnce()
+        frameWorkDone = true
+    elseif self._jsonWriteJob then
         self:jsonWriteStep()
         frameWorkDone = true
     elseif self._jsonPendingDisk then
-        self:jsonDiskWriteStep()
-        frameWorkDone = true
+        local diskOutcome = self:jsonDiskWriteStep()
+        if diskOutcome ~= "deferred" then
+            frameWorkDone = true
+        end
     elseif self._cycleTailJob then
         self:cycleTailStep()
         frameWorkDone = true
     end
 
-    if not deferHeavy and not frameWorkDone then
+    -- Until fields/vehicles/animals exist, do not let JSON serialization starve collectors.
+    -- Also continue an in-flight core collector during soft defer (dt<=0 / menu): blocking
+    -- collectStep here parked fields forever while Esc was open.
+    local cacheLooksEmpty = not self:_exportHasGameplayRows(self.moduleCache)
+    local incName = self._incActiveModule
+    local coreInc = (incName == "fields" or incName == "economy" or incName == "production"
+        or incName == "companionMods" or incName == "weather")
+
+    if (not deferHeavy or cacheLooksEmpty or coreInc) and (not frameWorkDone or cacheLooksEmpty or coreInc) then
         if self._incActiveModule then
             self:runIncrementalActiveStep(order)
             frameWorkDone = true
-        elseif self._husbandryJob then
+        elseif self._husbandryJob and not deferHeavy then
             self:husbandryTotalsStep()
             frameWorkDone = true
         end
     end
 
-    if self._incActiveModule or self._husbandryJob or self._jsonWriteJob or self._jsonPendingDisk or self._cycleTailJob then
+    if self._incActiveModule or self._husbandryJob then
+        return
+    end
+    local diskBlocking = self._jsonPendingDisk and self:_diskRetryDue(self._jsonPendingDisk)
+    if (self._jsonWriteJob or diskBlocking or self._cycleTailJob) and not cacheLooksEmpty then
         return
     end
 
@@ -3323,7 +4493,7 @@ function FarmDashboardDataCollector:_updateBody(dt)
             self.nextSliceIdx = 1
             self.slotAccumulator = 0
             local assembled = self:assembleDataFromModuleCache()
-            if assembled then self:writeDataToFile(assembled) end
+            if assembled then self:writeDataToFile(assembled, "gameplay") end
             self:_maybeProcessDetailQueueTail()
             return
         end
@@ -3331,7 +4501,7 @@ function FarmDashboardDataCollector:_updateBody(dt)
         while self.slotAccumulator >= cycleMs do
             self.slotAccumulator = self.slotAccumulator - cycleMs
             local assembled = self:assembleDataFromModuleCache()
-            if assembled then self:writeDataToFile(assembled) end
+            if assembled then self:writeDataToFile(assembled, "gameplay") end
         end
         self:_maybeProcessDetailQueueTail()
         return
@@ -3372,12 +4542,40 @@ function FarmDashboardDataCollector:_updateBody(dt)
 end
 
 --- Runs after stagger / slot logic. At most one pen per tick; refreshes index when the queue drains.
+function FarmDashboardDataCollector:_armIndexRetry()
+    if type(_G.g_time) == "number" then
+        self._dirtyIndexRetryAt = self:_missionTimeMs() + 1000
+    else
+        self._dirtyIndexSkips = 2
+    end
+end
+
+function FarmDashboardDataCollector:_indexRetryDue()
+    if type(_G.g_time) == "number" then
+        return self:_missionTimeMs() >= (self._dirtyIndexRetryAt or 0)
+    end
+    local skips = self._dirtyIndexSkips or 0
+    if skips > 0 then
+        self._dirtyIndexSkips = skips - 1
+        return false
+    end
+    return true
+end
+
 function FarmDashboardDataCollector:_maybeProcessDetailQueueTail()
-    if next(self._dirtyPens) == nil then return end
+    local idle = type(self._dirtyPens) ~= "table" or next(self._dirtyPens) == nil
+    if idle and self._dirtyIndexDue and self:_exportBudgetAllows(3) and self:_indexRetryDue() then
+        local wrote = self:_writeDirtyPensIndex()
+        if wrote ~= "queued" and wrote ~= "held" and wrote ~= "deferred" then self:_armIndexRetry() end
+        return
+    end
+    if idle then return end
     local hasMore = self:processDetailQueueOnce()
-    if not hasMore then
-        self:_sweepDetailRotation()
-        self:_writeDirtyPensIndex()
+    if not hasMore and self:_exportBudgetAllows(3) and self._dirtyIndexDue and self:_indexRetryDue() then
+        local wrote = self:_writeDirtyPensIndex()
+        if wrote ~= "queued" and wrote ~= "held" and wrote ~= "deferred" then
+            self:_armIndexRetry()
+        end
     end
 end
 
@@ -3446,8 +4644,8 @@ function FarmDashboardDataCollector:startHusbandryJobAfterProduction(order, incr
     if #list < 1 then
         return
     end
-    self._husbandryJob = { list = list, idx = 1, totalsByFarm = {} }
-    self._slicePendingFinish = { name = "production", order = order, incremental = incrementalFlag }
+    self._husbandryJob = { list = list, idx = 1, totalsByFarm = {}, failed = false, session = self._exportSession or 0 }
+    self._slicePendingFinish = { name = "production", order = order, incremental = incrementalFlag, failed = false }
 end
 
 --- @return boolean true when job finished (or none)
@@ -3464,6 +4662,7 @@ function FarmDashboardDataCollector:husbandryTotalsStep()
             self:accumulateHusbandryTotalsForPlaceable(job.list[i], job.totalsByFarm)
         end)
         if not ok then
+            job.failed = true
             FarmDashLog.devWarn("husbandryTotalsStep placeable: %s", tostring(err))
         end
     end
@@ -3476,17 +4675,23 @@ function FarmDashboardDataCollector:husbandryTotalsStep()
         )
     end
     if job.idx > n then
-        if self.moduleCache.production then
+        local sessionOk = (job.session or 0) == (self._exportSession or 0)
+        local followFailed = job.failed == true
+        local candidate = self._productionCandidate
+        if sessionOk and not followFailed and type(candidate) == "table" and type(candidate.data) == "table" and candidate.session == (self._exportSession or 0) then
             local activeFarmId = self:getActiveFarmId()
-            self.moduleCache.production.husbandryTotals = job.totalsByFarm[activeFarmId] or {}
-            self.moduleCache.production.husbandryTotalsByFarm = job.totalsByFarm
+            candidate.data.husbandryTotals = job.totalsByFarm[activeFarmId] or {}
+            candidate.data.husbandryTotalsByFarm = job.totalsByFarm
+            if type(self.moduleCache) ~= "table" then self.moduleCache = {} end
+            self.moduleCache.production = candidate.data
         end
+        self._productionCandidate = nil
         self._husbandryJob = nil
         self:refreshAssembledInMemory()
         local pending = self._slicePendingFinish
         self._slicePendingFinish = nil
-        if pending then
-            self:finishModuleSlice(pending.name, pending.order, pending.incremental)
+        if pending and sessionOk then
+            self:finishModuleSlice(pending.name, pending.order, pending.incremental, pending.failed == true or followFailed)
         end
         return true
     end
@@ -3499,9 +4704,20 @@ function FarmDashboardDataCollector:getActiveFarmId()
     return 1
 end
 
+--- One successor only. Called from the scheduler, not from the serialize exception handler.
+function FarmDashboardDataCollector:_promoteQueuedSnapshot()
+    if self._jsonWriteJob or self._jsonPendingDisk or self._xmlInFlight then return end
+    local queued = self._jsonWritePending
+    if type(queued) ~= "table" then return end
+    local record = type(queued.data) == "table" and queued or { data = queued, class = "gameplay", session = self._exportSession }
+    if self:_beginQueuedExport(record) then
+        self._jsonWritePending = nil
+    end
+end
+
 --- Spread top-level JSON keys across frames, then write the file once.
 --- Each top-level key's encoded string is held in `parts`; final write does table.concat.
-function FarmDashboardDataCollector:beginDeferredJsonWrite(data)
+function FarmDashboardDataCollector:beginDeferredJsonWrite(data, exportClass)
     if not data or type(data) ~= "table" then return end
     local savegameDir = self:getSavegameDirName()
     local currentMapName = "Unknown Map"
@@ -3544,38 +4760,70 @@ function FarmDashboardDataCollector:beginDeferredJsonWrite(data)
     pcall(function() self:_exportFillTypeHudIcons() end)
     -- Plan v5 Phase 0: schemaVersion + serverTimeSec.
     data.schemaVersion = DATA_SCHEMA_VERSION
+    if self._jsonWriteJob or self._jsonPendingDisk or self._xmlInFlight then
+        self._jsonWritePending = data
+        self:_diagTrace("jsonWrite deferred (job in flight)")
+        return
+    end
+    --- No active job: this submission is newer than any aborted successor still queued.
+    self._jsonWritePending = nil
+    self:_stampExportGeneration(data, exportClass or "gameplay")
     if data.serverTimeSec == nil then
         local D = rawget(_G, "FarmDashDiagnostics")
         data.serverTimeSec = (D and D.nowSec and D.nowSec()) or 0
     end
 
-    -- Do not nuke an in-flight write: clobbering `_jsonWriteJob` mid-serialization can leave
-    -- data.json stuck at the empty bootstrap forever (no key ever reaches disk). Queue the
-    -- latest snapshot and apply it when the current job finishes.
-    if self._jsonWriteJob then
-        self._jsonWritePending = data
-        self:_diagTrace("jsonWrite deferred (job in flight)")
-        return
-    end
-
-    local keys = {}
-    for k in pairs(data) do
-        keys[#keys + 1] = tostring(k)
-    end
-    table.sort(keys, function(a, b) return a < b end)
-
+    local walk = self:_jsonWalkBegin(data, 0)
+    if walk.stack[1] then walk.stack[1].knownObject = true end
     self._jsonWriteJob = {
         data = data,
-        keys = keys,
-        i = 1,
-        parts = { "{\n" },
+        session = self._exportSession or 0,
+        exportClass = data.exportClass,
+        parts = {},
+        walk = walk,
     }
-    self:_diagTrace("jsonWrite begin keys=%d keysPerFrame=%d", #keys, self.config.jsonTopLevelKeysPerFrame or 1)
+    self:_diagTrace("jsonWrite begin root walk")
 end
 
 function FarmDashboardDataCollector:jsonWriteStep()
     local job = self._jsonWriteJob
     if not job then return true end
+    local frame = self._frameBudget
+    if type(frame) == "table" and (tonumber(frame.bytes) or 0) <= 0 then
+        return "deferred"
+    end
+    if job.walk ~= nil or job.concatPending then
+        if job.walk ~= nil then
+            local okWalk, finished = xpcall(function()
+                return self:_jsonWalkStep(job.walk, job.parts, nil)
+            end, _farmDashFormatError)
+            if not okWalk then
+                local abortedGen = job.data and tonumber(job.data.exportGeneration) or nil
+                local diskGen = self._jsonPendingDisk and tonumber(self._jsonPendingDisk.generation) or nil
+                self._jsonWriteJob = nil
+                if abortedGen and abortedGen > 0 and abortedGen ~= diskGen
+                    and self._activeCandidateGeneration == abortedGen then
+                    self._activeCandidateGeneration = nil
+                end
+                return false
+            end
+            if not finished then return false end
+            job.walk = nil
+            job.concatPending = true
+            if self:_jsonBudgetRemaining() == 0 then return false end
+        end
+        local jsonString = table.concat(job.parts or {})
+        self._lastJsonBytes = #jsonString
+        self._jsonPendingDisk = {
+            jsonString = jsonString,
+            savegameDir = self:getSavegameDirName(),
+            generation = job.data and job.data.exportGeneration or 0,
+            session = job.session,
+            exportClass = job.exportClass or (job.data and job.data.exportClass) or "gameplay",
+        }
+        self._jsonWriteJob = nil
+        return true
+    end
 
     local diag = rawget(_G, "FarmDashDiagnostics")
     local tok = (diag and diag:isEnabled()) and diag:start("jsonWriteStep") or nil
@@ -3585,25 +4833,77 @@ function FarmDashboardDataCollector:jsonWriteStep()
     local parts = job.parts
     local stepStart = job.i
     local stepTok = self:_diagNow()
-    for _ = 1, per do
-        if job.i > nk then break end
-        local k = job.keys[job.i]
-        local v = job.data[k]
-        parts[#parts + 1] = '  "'
-        parts[#parts + 1] = _escapeJsonKey(tostring(k))
-        parts[#parts + 1] = '": '
 
-        local okJson, err = xpcall(function()
-            self:_toJSONInto(parts, v, false, 1)
-        end, _farmDashFormatError)
-        if not okJson then
-            FarmDashLog.devWarn("json chunk toJSON failed for key '%s': %s", tostring(k), tostring(err))
-            parts[#parts + 1] = "null"
+    -- FH-20260914: the frame is now bounded by TIME, not by a key count. A single top-level key can
+    -- be 1.4 MB on a real save, so "one key per frame" was never a bound on anything. The walk below
+    -- stops between two JSON tokens when the slice budget is spent and resumes on the next frame,
+    -- which is why a driving frame no longer disappears into economy.
+    local budgetMs = self.config.sliceBudgetMs or 4
+    local startSec = _jsonWalkNowSec()
+    local deadline = (startSec ~= nil) and (startSec + (budgetMs / 1000)) or nil
+    local keysThisFrame = 0
+
+    while job.i <= nk do
+        if job.walk == nil then
+            if keysThisFrame >= per and deadline == nil then break end
+            local k = job.keys[job.i]
+            if job.prefixRest == nil then
+                job.prefixRest = '  "' .. _escapeJsonKey(tostring(k)) .. '": '
+                job.walkKey = k
+            end
+            local left = self:_jsonBudgetRemaining()
+            if left ~= nil and left <= 0 then
+                return "deferred"
+            end
+            if left ~= nil and #job.prefixRest > left then
+                parts[#parts + 1] = string.sub(job.prefixRest, 1, left)
+                self:_chargeExportBytes(left)
+                job.prefixRest = string.sub(job.prefixRest, left + 1)
+                return false
+            end
+            if job.prefixRest ~= "" then
+                parts[#parts + 1] = job.prefixRest
+                if left ~= nil then self:_chargeExportBytes(#job.prefixRest) end
+            end
+            job.prefixRest = nil
+            job.walk = self:_jsonWalkBegin(job.data[job.walkKey], 1)
         end
 
+        local okJson, finished = xpcall(function()
+            return self:_jsonWalkStep(job.walk, parts, deadline)
+        end, _farmDashFormatError)
+        if not okJson then
+            if FarmDashLog and FarmDashLog.error then
+                FarmDashLog.error("json serialize failed key=%s err=%s", tostring(job.walkKey), tostring(finished))
+            end
+            self._jsonWriteJob = nil
+            local abortedGen = job.data and tonumber(job.data.exportGeneration) or nil
+            local diskGen = self._jsonPendingDisk and tonumber(self._jsonPendingDisk.generation) or nil
+            if abortedGen and abortedGen > 0 and abortedGen ~= diskGen
+                and self._activeCandidateGeneration == abortedGen then
+                self._activeCandidateGeneration = nil
+            end
+            return false
+        end
+
+        if not finished then
+            -- Budget spent mid-value. Keep the walk and continue on the next frame.
+            return false
+        end
+
+        job.walk = nil
+        job.walkKey = nil
         if job.i < nk then parts[#parts + 1] = "," end
         parts[#parts + 1] = "\n"
         job.i = job.i + 1
+        keysThisFrame = keysThisFrame + 1
+
+        if deadline ~= nil then
+            local now = _jsonWalkNowSec()
+            if now ~= nil and now >= deadline then break end
+        elseif keysThisFrame >= per then
+            break
+        end
     end
 
     if job.i > nk then
@@ -3611,7 +4911,13 @@ function FarmDashboardDataCollector:jsonWriteStep()
         local jsonString = table.concat(parts)
         self._lastJsonBytes = #jsonString
         local savegameDir = self:getSavegameDirName()
-        self._jsonPendingDisk = { jsonString = jsonString, savegameDir = savegameDir }
+        self._jsonPendingDisk = {
+            jsonString = jsonString,
+            savegameDir = savegameDir,
+            generation = job.data and job.data.exportGeneration or 0,
+        session = job.session,
+            exportClass = job.exportClass or (job.data and job.data.exportClass) or "gameplay",
+        }
         self._jsonWriteJob = nil
         if diag and tok then diag:stop(tok) end
         if stepTok and self:_diagEnabled() then
@@ -3643,13 +4949,14 @@ end
 function FarmDashboardDataCollector:_writeJsonStringToDisk(jsonData, savegameDir)
     if not jsonData or jsonData == "" then
         FarmDashLog.devWarn("skip write: empty JSON string")
-        return
+        return false
     end
     savegameDir = savegameDir or self:getSavegameDirName()
     local dataPath = self:getDataOutputDir()
     local filePath = dataPath .. "data.json"
     local normPath = string.gsub(filePath, "\\", "/")
     local written = false
+    self._exportSafetyRefusal = false
 
     if type(io) == "table" and type(io.open) == "function" then
         written = self:_writeFileAtomic(normPath, jsonData)
@@ -3658,10 +4965,12 @@ function FarmDashboardDataCollector:_writeJsonStringToDisk(jsonData, savegameDir
         FarmDashLog.devWarn("Lua io.open is not available; cannot write data.json.")
     end
 
-    if not written and type(_G.saveFile) == "function" then
+    if not written and self._exportSafetyRefusal ~= true and type(_G.saveFile) == "function" then
+        -- Local extract has no saveFile return contract. A thrown error, false, or a
+        -- void/nil result does not prove the file landed. Only an explicit true commits.
         local rel = "modSettings/FS25_FarmDashboard/" .. savegameDir .. "/data.json"
-        local okSf = pcall(function() _G.saveFile(rel, jsonData) end)
-        if okSf then
+        local okSf, result = pcall(function() return _G.saveFile(rel, jsonData) end)
+        if okSf and result == true then
             written = true
         end
     end
@@ -3687,6 +4996,7 @@ function FarmDashboardDataCollector:_writeJsonStringToDisk(jsonData, savegameDir
             FarmDashLog.devWarn("Could not write data.json (path: %s) [fail #%d]", tostring(normPath), self._writeFailCount)
         end
     end
+    return written == true
 end
 
 --- Aggregate milk/manure/slurry totals across all husbandry buildings.
@@ -3710,16 +5020,17 @@ function FarmDashboardDataCollector:collectHusbandryTotals()
 end
 
 function FarmDashboardDataCollector:safeCollect(collectorName)
+    if type(self.collectors) ~= "table" then return {}, true end
     local collector = self.collectors[collectorName]
-    if not collector or not collector.collect then return {} end
+    if not collector or type(collector.collect) ~= "function" then return {}, true end
 
     local success, result = pcall(function() return collector:collect() end)
     if success then
-        return result or {}
-    else
-        FarmDashLog.devWarn("Failed to collect %s", tostring(collectorName))
-        return {}
+        if result == nil then return {}, true end
+        return result, false
     end
+    FarmDashLog.devWarn("Failed to collect %s", tostring(collectorName))
+    return {}, true
 end
 
 function FarmDashboardDataCollector:getGameTime()
@@ -3892,6 +5203,46 @@ function FarmDashboardDataCollector:getDataOutputDir()
     return dataPath
 end
 
+--- Always store a number. Bootstrap and other empty snapshots record 0.
+--- A missing key is not the same as generation zero, and nonempty rows are not completeness.
+function FarmDashboardDataCollector:_missionTimeMs()
+    if type(_G.g_time) == "number" then return _G.g_time end
+    return 0
+end
+
+function FarmDashboardDataCollector:_diskRetryDue(pending)
+    if type(pending) ~= "table" or pending.nextRetryAt == nil then
+        return true
+    end
+    return self:_missionTimeMs() >= pending.nextRetryAt
+end
+
+--- Bootstrap is an explicit lifecycle class. Gameplay candidates are numbered
+--- here but _completedGeneration advances only after a verified disk commit.
+function FarmDashboardDataCollector:_stampExportGeneration(data, exportClass)
+    if type(data) ~= "table" then
+        return 0
+    end
+    if exportClass == "gameplay" then
+        local candidate = self._activeCandidateGeneration
+        if self._xmlInFlight then
+            local floor = math.max(self._completedGeneration or 0, candidate or 0, self._reservedGeneration or 0)
+            candidate = floor + 1
+            self._reservedGeneration = candidate
+        elseif candidate == nil then
+            candidate = (self._completedGeneration or 0) + 1
+            self._activeCandidateGeneration = candidate
+            self._reservedGeneration = candidate
+        end
+        data.exportGeneration = candidate
+        data.exportClass = "gameplay"
+        return candidate
+    end
+    data.exportGeneration = 0
+    data.exportClass = "bootstrap"
+    return 0
+end
+
 function FarmDashboardDataCollector:_exportHasGameplayRows(data)
     if type(data) ~= "table" then
         return false
@@ -3911,9 +5262,11 @@ function FarmDashboardDataCollector:_exportHasGameplayRows(data)
     return false
 end
 
-function FarmDashboardDataCollector:writeDataToFile(data)
-    -- Keep the last in-game export on disk when FS unloads (empty tables, no fleet/fields).
-    if self._wroteRichExport and not self:_exportHasGameplayRows(data) then
+function FarmDashboardDataCollector:writeDataToFile(data, exportClass)
+    --- Gameplay is an explicit class. Empty fields/vehicles/animals still publish.
+    --- The row guard only blocks a later bootstrap/unload write from replacing a committed gameplay file.
+    local className = exportClass or "bootstrap"
+    if className ~= "gameplay" and self._wroteRichExport and not self:_exportHasGameplayRows(data) then
         return
     end
     local savegameDir = self:getSavegameDirName()
@@ -3936,21 +5289,106 @@ function FarmDashboardDataCollector:writeDataToFile(data)
         end
     end
 
+    if className == "gameplay" and self._xmlInFlight and self:_usesXmlTransport() then
+        self._heldGameplay = { data = data, class = "gameplay", session = self._exportSession }
+        return "queued"
+    end
+    if self:_jsonBudgetRemaining() ~= nil then
+        local record = { data = data, class = className, session = self._exportSession }
+        if className == "gameplay" then
+            self._heldGameplay = record
+        else
+            self._jsonWritePending = record
+        end
+        return "queued"
+    end
+
+    self:_stampExportGeneration(data, className)
+
     local okJson, jsonData = pcall(function() return self:toJSON(data, 0) end)
     if not okJson then
         FarmDashLog.devWarn("toJSON failed: %s", tostring(jsonData))
-        return
+        return false
     end
-    self:_writeJsonStringToDisk(jsonData, savegameDir)
-    if self:_exportHasGameplayRows(data) then
+    if self:_usesXmlTransport() then
+        local route = rawget(_G, "FarmDashboardExportRoute")
+        if route and route.submit then
+            local record = self:_xmlRecord(jsonData, data.exportGeneration, self._exportSession, className)
+            local queued = route:submit(record)
+            if queued == "queued" or queued == "coalesced" then
+                if className == "gameplay" then self._xmlInFlight = true end
+                return "queued"
+            end
+            return false
+        end
+        return false
+    end
+    local written = self:_writeJsonStringToDisk(jsonData, savegameDir)
+    if written and data.exportClass == "gameplay" then
+        self._completedGeneration = tonumber(data.exportGeneration) or 0
+        self._activeCandidateGeneration = nil
+        self._wroteRichExport = true
+    elseif written and self:_exportHasGameplayRows(data) then
         self._wroteRichExport = true
     end
+    return written == true
 end
 
 --- @param depth number|nil nil = compact (legacy); 0+ = pretty-print with 2-space indent
 --- O(N) build via parts table + table.concat. Backwards-compat wrapper around _toJSONInto.
 --- nan / inf serialize as JSON null. Sparse number-keyed tables serialize as objects.
 --- Object keys are sorted lexicographically to keep the byte stream deterministic.
+function FarmDashboardDataCollector:_jsonBudgetRemaining()
+    local frame = self._frameBudget
+    if type(frame) ~= "table" or type(frame.bytes) ~= "number" then return nil end
+    return frame.bytes
+end
+
+function FarmDashboardDataCollector:_exportBudgetAllows(minBytes)
+    local left = self:_jsonBudgetRemaining()
+    if left == nil then return true end
+    return left >= (minBytes or 1)
+end
+
+function FarmDashboardDataCollector:_emitJsonBudget(parts, holder, text)
+    if type(holder) ~= "table" then return true end
+    if type(holder.pendingEmit) == "string" and holder.pendingEmit ~= "" then
+        text = holder.pendingEmit .. (text or "")
+        holder.pendingEmit = nil
+    end
+    if type(text) ~= "string" or text == "" then return true end
+    local left = self:_jsonBudgetRemaining()
+    if left == nil then
+        parts[#parts + 1] = text
+        return true
+    end
+    if left <= 0 then
+        holder.pendingEmit = text
+        return false
+    end
+    if #text <= left then
+        parts[#parts + 1] = text
+        self:_chargeExportBytes(#text)
+        return true
+    end
+    parts[#parts + 1] = string.sub(text, 1, left)
+    self:_chargeExportBytes(left)
+    holder.pendingEmit = string.sub(text, left + 1)
+    return false
+end
+
+function FarmDashboardDataCollector:_chargeExportBytes(count)
+    local n = tonumber(count) or 0
+    if n <= 0 then return 0 end
+    self._frameExportBytes = (self._frameExportBytes or 0) + n
+    local budget = self._frameBudget
+    if type(budget) == "table" and type(budget.bytes) == "number" then
+        budget.bytes = math.max(0, budget.bytes - n)
+        budget.charged = (budget.charged or 0) + n
+    end
+    return n
+end
+
 function FarmDashboardDataCollector:toJSON(data, depth)
     local diag = rawget(_G, "FarmDashDiagnostics")
     local tok = (diag and diag:isEnabled()) and diag:start("toJSON") or nil
@@ -4076,6 +5514,430 @@ function FarmDashboardDataCollector:_toJSONInto(parts, data, compact, level, see
     end
 end
 
+--- FH-20260914: a resumable JSON walker for the top-level export pass.
+---
+--- Why this exists. jsonWriteStep used to hand a whole top-level value to _toJSONInto, which
+--- recurses the entire subtree in one call. On this machine's own export that meant a single frame
+--- serialising economy at 1,446,512 bytes, of which marketPrices is 1,422,184. One frame, 1.4 MB of
+--- string building, on the authority: single player FPS drop, and on a dedicated host a sim-thread
+--- stall for every joined player.
+---
+--- What it guarantees. Byte-identical output to _toJSONInto at compact=false, because it emits the
+--- same tokens in the same order: the same two-space indent ladder, the same sorted object keys,
+--- the same array-versus-object test, the same depth cap, the same cycle guard, the same
+--- __FD_JSON_NULL__ sentinel. It differs only in being able to stop between two tokens and carry on
+--- next frame.
+local JSON_WALK_UNITS_PER_TIME_CHECK = 512
+
+--- Begin a resumable serialisation of one value at the given indent level.
+function FarmDashboardDataCollector:_jsonWalkBegin(value, level)
+    return { stack = { { v = value, level = level or 1, phase = "open" } }, seen = {} }
+end
+
+--- Emit as much of the walk as the deadline allows.
+--- Returns true when this value is complete, false when it must resume on a later frame.
+--- deadline is an absolute wall-clock second value, or nil to run to completion.
+function FarmDashboardDataCollector:_jsonWalkStepBudgeted(walk, parts)
+    local function left()
+        return self:_jsonBudgetRemaining() or 0
+    end
+    local function put(text)
+        return self:_emitJsonBudget(parts, walk, text)
+    end
+    while true do
+        if type(walk.pendingEmit) == "string" and walk.pendingEmit ~= "" then
+            if left() <= 0 then return false end
+            if not put(nil) then return false end
+        end
+        local stack = walk.stack
+        if #stack == 0 then return true end
+        if left() <= 0 then return false end
+        local frame = stack[#stack]
+        local data = frame.v
+        if frame.phase == "open" or frame.phase == nil then
+            if frame.knownObject and not frame.preambleDone then
+                frame.phase = "preamble"
+            elseif (frame.level or 0) > JSON_MAX_DEPTH or (type(data) == "string" and data == "__FD_JSON_NULL__") then
+                frame.phase = "lit"
+                frame.literal = "null"
+            elseif type(data) ~= "table" then
+                frame.phase = "lit"
+                local ty = type(data)
+                if ty == "string" then
+                    frame.phase = "str"
+                    frame.src = data
+                    frame.si = 1
+                    frame.strStage = "openq"
+                elseif ty == "number" then frame.literal = _formatNumber(data)
+                elseif ty == "boolean" then frame.literal = data and "true" or "false"
+                else frame.literal = "null" end
+            else
+                frame.phase = "classify"
+                frame.keys = {}
+                frame.scanK = nil
+            end
+        end
+        if frame.phase == "preamble" then
+            if not frame.preambleHanded then
+                frame.preambleHanded = true
+                if not put("{\n") then return false end
+            end
+            frame.preambleDone = true
+            frame.phase = "classify"
+            frame.keys = frame.keys or {}
+            if left() <= 0 then return false end
+        end
+        if frame.phase == "classify" then
+            local allowance = left()
+            if allowance <= 0 then return false end
+            local steps = 0
+            local seen = walk.seen
+            if seen[data] then
+                frame.phase = "lit"
+                frame.literal = "null"
+            else
+                while steps < allowance do
+                    local k = next(data, frame.scanK)
+                    if k == nil then frame.scanDone = true break end
+                    frame.scanK = k
+                    frame.keys[#frame.keys + 1] = k
+                    steps = steps + 1
+                end
+                if steps > 0 then self:_chargeExportBytes(steps) end
+                if not frame.scanDone then return false end
+                seen[data] = true
+                local n = #frame.keys
+                local isArray = n > 0
+                local count = 0
+                for _, k in ipairs(frame.keys) do
+                    count = count + 1
+                    if type(k) ~= "number" or k ~= count then
+                        isArray = false
+                        break
+                    end
+                end
+                frame.isArray = isArray and not frame.preambleDone
+                frame.count = n
+                frame.i = 1
+                frame.ind = string.rep("  ", frame.level or 0)
+                frame.ind1 = string.rep("  ", (frame.level or 0) + 1)
+                if frame.preambleDone and n == 0 then
+                    frame.phase = "lit"
+                    frame.literal = "}"
+                elseif n > 0 and not frame.isArray then
+                    frame.phase = "order"
+                    frame.orderI = 2
+                    frame.orderJ = nil
+                    frame.afterOrder = frame.preambleDone and "items" or "openTok"
+                    if not frame.preambleDone then frame.openText = "{\n" end
+                else
+                    frame.phase = "openTok"
+                    frame.openText = n == 0 and ("{\n" .. frame.ind .. "}") or ((frame.isArray and "[" or "{") .. "\n")
+                    if n == 0 then frame.empty = true end
+                end
+            end
+        end
+        if frame.phase == "order" then
+            local keys = frame.keys or {}
+            local n = #keys
+            if frame.orderI == nil then frame.orderI = 2 end
+            if n <= 1 or frame.orderI > n then
+                frame.phase = frame.afterOrder or "openTok"
+                frame.i = 1
+                if frame.phase == "openTok" and frame.openText == nil then frame.openText = "{\n" end
+            else
+                if left() <= 0 then return false end
+                if frame.orderJ == nil then frame.orderJ = frame.orderI end
+                local j = frame.orderJ
+                if j > 1 and tostring(keys[j]) < tostring(keys[j - 1]) then
+                    keys[j], keys[j - 1] = keys[j - 1], keys[j]
+                    frame.orderJ = j - 1
+                else
+                    frame.orderI = frame.orderI + 1
+                    frame.orderJ = nil
+                end
+                self:_chargeExportBytes(1)
+                if left() <= 0 then return false end
+            end
+        end
+        if frame.phase == "openTok" then
+            if not frame.openHanded then
+                frame.openHanded = true
+                if not put(frame.openText) then return false end
+            end
+            if frame.empty then
+                walk.seen[data] = nil
+                stack[#stack] = nil
+            else
+                frame.phase = "items"
+            end
+        elseif frame.phase == "lit" then
+            if not frame.litHanded then
+                frame.litHanded = true
+                if not put(frame.literal) then return false end
+            end
+            stack[#stack] = nil
+        elseif frame.phase == "str" then
+            if frame.strStage == "openq" then
+                if not frame.qHanded then
+                    frame.qHanded = true
+                    if not put('"') then return false end
+                end
+                frame.strStage = "body"
+                if left() <= 0 then return false end
+            end
+            if frame.strStage == "body" then
+                local piece, nxt, done, work = _jsonEscapePiece(frame.src, frame.si or 1, left(), "string")
+                local extra = (tonumber(work) or 0) - #piece
+                if extra > 0 then self:_chargeExportBytes(extra) end
+                frame.si = nxt
+                if piece ~= "" and not put(piece) then return false end
+                if not done then return false end
+                frame.strStage = "closeq"
+                frame.qHanded = nil
+                if left() <= 0 then return false end
+            end
+            if frame.strStage == "closeq" then
+                if not frame.qHanded then
+                    frame.qHanded = true
+                    if not put('"') then return false end
+                end
+                stack[#stack] = nil
+            end
+        elseif frame.phase == "items" then
+            if frame.i > frame.count then
+                if not frame.closeHanded then
+                    frame.closeHanded = true
+                    frame.closeText = "\n" .. frame.ind .. (frame.isArray and "]" or "}")
+                    if not put(frame.closeText) then return false end
+                end
+                walk.seen[frame.v] = nil
+                stack[#stack] = nil
+            else
+                if frame.itemStage == nil then frame.itemStage = "sep" end
+                if frame.itemStage == "sep" then
+                    if frame.i > 1 and not frame.sepHanded then
+                        frame.sepHanded = true
+                        if not put(",\n") then return false end
+                    end
+                    frame.itemStage = "indent"
+                    frame.sepHanded = nil
+                    if left() <= 0 then return false end
+                end
+                if frame.itemStage == "indent" then
+                    if not frame.indHanded then
+                        frame.indHanded = true
+                        if not put(frame.ind1) then return false end
+                    end
+                    frame.itemStage = frame.isArray and "child" or "key"
+                    frame.indHanded = nil
+                    if left() <= 0 then return false end
+                end
+                if frame.itemStage == "key" then
+                    local k = frame.keys[frame.i]
+                    if not frame.keyOpen then
+                        frame.keyOpen = true
+                        if not put('"') then return false end
+                        frame.keyAt = 1
+                        if left() <= 0 then return false end
+                    end
+                    local piece, nxt, done, work = _jsonEscapePiece(tostring(k), frame.keyAt or 1, left(), "key")
+                    local extra = (tonumber(work) or 0) - #piece
+                    if extra > 0 then self:_chargeExportBytes(extra) end
+                    frame.keyAt = nxt
+                    if piece ~= "" and not put(piece) then return false end
+                    if not done then return false end
+                    if not frame.keyClose then
+                        frame.keyClose = true
+                        if not put('": ') then return false end
+                    end
+                    frame.itemStage = "child"
+                    if left() <= 0 then return false end
+                end
+                if frame.itemStage == "child" then
+                    local child = frame.isArray and frame.v[frame.i] or frame.v[frame.keys[frame.i]]
+                    frame.i = frame.i + 1
+                    frame.itemStage = nil
+                    frame.keyOpen = nil
+                    frame.keyClose = nil
+                    stack[#stack + 1] = { v = child, level = (frame.level or 0) + 1, phase = "open" }
+                end
+            end
+        end
+    end
+end
+
+function FarmDashboardDataCollector:_jsonWalkStep(walk, parts, deadline)
+    if self:_jsonBudgetRemaining() ~= nil then
+        return self:_jsonWalkStepBudgeted(walk, parts)
+    end
+    local stack = walk.stack
+    local seen = walk.seen
+    local units = 0
+
+    while true do
+        local depth = #stack
+        if depth == 0 then return true end
+
+        units = units + 1
+        if deadline ~= nil and units >= JSON_WALK_UNITS_PER_TIME_CHECK then
+            units = 0
+            local now = _jsonWalkNowSec()
+            if now ~= nil and now >= deadline then return false end
+        end
+
+        local frame = stack[depth]
+        if type(walk.pendingEmit) == "string" and walk.pendingEmit ~= "" then
+            local pendingLeft = self:_jsonBudgetRemaining()
+            if pendingLeft ~= nil and pendingLeft <= 0 then return false end
+            if not self:_emitJsonBudget(parts, walk, nil) then return false end
+        end
+        local leftNow = self:_jsonBudgetRemaining()
+        if leftNow ~= nil and leftNow <= 0 then return false end
+
+        if frame.phase == "str" then
+            local limit = leftNow or (#frame.src + 2)
+            if frame.strStage == nil then frame.strStage = "openq" end
+            if frame.strStage == "openq" then
+                if not self:_emitJsonBudget(parts, walk, '"') then return false end
+                frame.strStage = "body"
+                leftNow = self:_jsonBudgetRemaining()
+                if leftNow ~= nil and leftNow <= 0 then return false end
+                limit = leftNow or limit
+            end
+            if frame.strStage == "body" then
+                local piece, nxt, done = _jsonEscapePiece(frame.src, frame.si or 1, limit, "string")
+                frame.si = nxt
+                if piece ~= "" and not self:_emitJsonBudget(parts, walk, piece) then return false end
+                if not done then return false end
+                frame.strStage = "closeq"
+                leftNow = self:_jsonBudgetRemaining()
+                if leftNow ~= nil and leftNow <= 0 then return false end
+            end
+            if frame.strStage == "closeq" then
+                if not self:_emitJsonBudget(parts, walk, '"') then return false end
+                stack[depth] = nil
+            end
+
+        elseif frame.phase == "open" then
+            local data = frame.v
+            local level = frame.level
+
+            if level > JSON_MAX_DEPTH then
+                parts[#parts + 1] = "null"
+                stack[depth] = nil
+            elseif type(data) == "string" and data == "__FD_JSON_NULL__" then
+                parts[#parts + 1] = "null"
+                stack[depth] = nil
+            elseif type(data) == "table" then
+                if seen[data] then
+                    parts[#parts + 1] = "null"
+                    stack[depth] = nil
+                else
+                    seen[data] = true
+                    local isArray = true
+                    local count = 0
+                    for k in pairs(data) do
+                        count = count + 1
+                        if type(k) ~= "number" or k ~= count then
+                            isArray = false
+                            break
+                        end
+                    end
+
+                    if count == 0 then
+                        parts[#parts + 1] = "{\n"
+                        parts[#parts + 1] = string.rep("  ", level)
+                        parts[#parts + 1] = "}"
+                        seen[data] = nil
+                        stack[depth] = nil
+                    else
+                        frame.isArray = isArray
+                        frame.count = count
+                        frame.i = 1
+                        frame.ind = string.rep("  ", level)
+                        frame.ind1 = string.rep("  ", level + 1)
+                        if not isArray then
+                            local keys = {}
+                            for k in pairs(data) do
+                                keys[#keys + 1] = k
+                            end
+                            table.sort(keys, function(a, b) return tostring(a) < tostring(b) end)
+                            frame.keys = keys
+                            frame.count = #keys
+                        end
+                        parts[#parts + 1] = isArray and "[" or "{"
+                        parts[#parts + 1] = "\n"
+                        frame.phase = "items"
+                    end
+                end
+            else
+                local ty = type(data)
+                local popped = true
+                if ty == "string" then
+                    local budgeted = self:_jsonBudgetRemaining()
+                    if budgeted == nil then
+                        parts[#parts + 1] = '"'
+                        parts[#parts + 1] = _escapeJsonString(data)
+                        parts[#parts + 1] = '"'
+                    else
+                        frame.phase = "str"
+                        frame.src = data
+                        frame.si = 1
+                        frame.strStage = "openq"
+                        popped = false
+                    end
+                elseif ty == "number" then
+                    if not frame.handed then
+                        frame.handed = true
+                        if not self:_emitJsonBudget(parts, walk, _formatNumber(data)) then return false end
+                    end
+                elseif ty == "boolean" then
+                    if not frame.handed then
+                        frame.handed = true
+                        if not self:_emitJsonBudget(parts, walk, data and "true" or "false") then return false end
+                    end
+                else
+                    if not frame.handed then
+                        frame.handed = true
+                        if not self:_emitJsonBudget(parts, walk, "null") then return false end
+                    end
+                end
+                if popped then stack[depth] = nil end
+            end
+
+        else -- "items"
+            if frame.i > frame.count then
+                parts[#parts + 1] = "\n"
+                parts[#parts + 1] = frame.ind
+                parts[#parts + 1] = frame.isArray and "]" or "}"
+                seen[frame.v] = nil
+                stack[depth] = nil
+            else
+                local i = frame.i
+                if i > 1 then
+                    parts[#parts + 1] = ","
+                    parts[#parts + 1] = "\n"
+                end
+                parts[#parts + 1] = frame.ind1
+                local child
+                if frame.isArray then
+                    child = frame.v[i]
+                else
+                    local k = frame.keys[i]
+                    parts[#parts + 1] = '"'
+                    parts[#parts + 1] = _escapeJsonKey(tostring(k))
+                    parts[#parts + 1] = '":'
+                    parts[#parts + 1] = " "
+                    child = frame.v[k]
+                end
+                frame.i = i + 1
+                stack[#stack + 1] = { v = child, level = frame.level + 1, phase = "open" }
+            end
+        end
+    end
+end
+
 function FarmDashboardDataCollector:getCurrentData() return self.data end
 
 --- Phase 7: detail-mode helpers ------------------------------------------
@@ -4121,63 +5983,440 @@ function FarmDashboardDataCollector:_findPlaceableById(penId)
     return nil
 end
 
---- Plan v5 B4: atomic-ish write with retries + throttled error log.
---- Tmp + rename/move. FS25 builds may omit `os.rename`; fall back to copy/delete or direct write.
---- On Windows, target may be briefly held open by another reader; busy-spin under 50 ms then retry.
+--- Auxiliary recovery records. The authority data.json entry is not counted and is never evicted.
+local RECOVERY_AUX_CAP = 8
+
+local function _normRecoveryPath(path)
+    return string.gsub(tostring(path or ""), "\\", "/")
+end
+
+local function _isAuthorityRecoveryPath(path)
+    local norm = _normRecoveryPath(path)
+    return norm == "data.json" or string.sub(norm, -10) == "/data.json"
+end
+
+--- Full-file reader. io.open is write-only in the Giants sandbox, so this does not
+--- try a read mode. readFile is the existing sandbox reader when the host provides it.
+--- An empty string is a complete body. Nil, a throw, or a non-string is not.
+local function _readWholeFile(path)
+    if type(readFile) ~= "function" then
+        return nil, "reader unavailable"
+    end
+    local ok, data, extra = pcall(readFile, path)
+    if not ok then
+        return nil, "read throw"
+    end
+    -- A second result is an explicit read error even when the first result is a partial string.
+    if extra ~= nil then
+        return nil, "read error"
+    end
+    if type(data) ~= "string" then
+        return nil, "read incomplete"
+    end
+    return data, "complete"
+end
+
+local function _captureWholeFile(path)
+    local data, reason = _readWholeFile(path)
+    if reason == "complete" then return data end
+    return nil
+end
+
+--- Presence states: absent (definite no), complete (definite yes plus whole bytes),
+--- unreadable (definite yes, bytes unavailable), unknown (throw, missing API, or ambiguous).
+--- Unknown is never treated as absent. The bounded preview reader is not used here.
+local function _readExportPrevious(path)
+    if type(fileExists) ~= "function" then
+        local data = _captureWholeFile(path)
+        if data ~= nil then return data, "unknown" end
+        return nil, "unknown"
+    end
+    local ok, present = pcall(fileExists, path)
+    if not ok or (present ~= true and present ~= false) then
+        local data = _captureWholeFile(path)
+        if data ~= nil then return data, "unknown" end
+        return nil, "unknown"
+    end
+    if present == false then
+        return nil, "absent"
+    end
+    local data = _captureWholeFile(path)
+    if data == nil then return nil, "unreadable" end
+    return data, "complete"
+end
+
+local function _verifyExportBytes(path, expected)
+    if type(expected) ~= "string" then return false, "expected missing" end
+    local data, reason = _readWholeFile(path)
+    if reason ~= "complete" then return false, reason end
+    if data ~= expected then return false, "byte mismatch" end
+    return true, "match"
+end
+
+--- Stage the recovery copy, then replace path.bak only after the stage verifies.
+--- An already-matching bak is left untouched.
+function FarmDashboardDataCollector:_ensureRecoveryBackup(path, previous)
+    local bakPath = path .. ".bak"
+    if _verifyExportBytes(bakPath, previous) then return true end
+    local stage = bakPath .. ".tmp"
+    local f = io.open(stage, "w")
+    if not f then return false end
+    local staged = _handleWriteAndClose(f, previous)
+    if not staged or not _verifyExportBytes(stage, previous) then return false end
+    if type(os) == "table" and type(os.rename) == "function" then
+        local okCall, renameOk = pcall(os.rename, stage, bakPath)
+        if okCall and renameOk and _verifyExportBytes(bakPath, previous) then
+            return true
+        end
+    end
+    local out = io.open(bakPath, "w")
+    if not out then return false end
+    local wrote = _handleWriteAndClose(out, previous)
+    if not wrote or not _verifyExportBytes(bakPath, previous) then return false end
+    return true
+end
+
+--- One staging write, then one rename or one direct write of the exact payload.
+--- No same-frame busy-spin. Direct destination write is not atomic.
+--- A complete previous body is backed up once per failed transaction and is not
+--- rebuilt from a damaged destination on retry.
 function FarmDashboardDataCollector:_writeFileAtomic(path, contents)
     if type(io) ~= "table" or type(io.open) ~= "function" then return false end
+    if type(self._activeTmpPaths) ~= "table" then self._activeTmpPaths = {} end
     local tmp = path .. ".tmp"
     self._activeTmpPaths[tmp] = true
     local f, openErr = io.open(tmp, "w")
     if not f then
         self._activeTmpPaths[tmp] = nil
-        self:_logWriteFail(string.format("open(%s): %s", tostring(tmp), tostring(openErr)))
+        self:_logWriteFail(path, "open", "failed", openErr)
         return false
     end
-    f:write(contents)
-    f:close()
+    local staged, stageOp, stageKind, stageDetail = _handleWriteAndClose(f, contents)
+    if not staged then
+        self._activeTmpPaths[tmp] = nil
+        self:_logWriteFail(path, stageOp, stageKind, stageDetail)
+        return false
+    end
+    local stagedBytes, verifyReason = _verifyExportBytes(tmp, contents)
+    if not stagedBytes then
+        self._activeTmpPaths[tmp] = nil
+        self:_logWriteFail(path, "verify", verifyReason, nil)
+        return false
+    end
 
-    for attempt = 1, 3 do
-        if _movePathBestEffort(tmp, path) then
-            self._activeTmpPaths[tmp] = nil
-            return true
-        end
-        if attempt == 3 then
-            self:_logWriteFail(string.format("replace(%s -> %s): blocked or no rename API", tostring(tmp), tostring(path)))
-        end
-        local D = rawget(_G, "FarmDashDiagnostics")
-        if D and type(D.nowSec) == "function" then
-            local t0 = D.nowSec()
-            if type(t0) == "number" then
-                local spins = 0
-                while type(D.nowSec()) == "number" and D.nowSec() < t0 + 0.05 and spins < 500000 do
-                    spins = spins + 1
-                end
+    local session = self._exportSession or 0
+    local key = _normRecoveryPath(path)
+    if type(self._recoveryByTarget) ~= "table" then self._recoveryByTarget = {} end
+    local map = self._recoveryByTarget
+    local txn = map[key]
+    if type(txn) == "table" and txn.session ~= session then
+        map[key] = nil
+        txn = nil
+    end
+
+    local function auxCount()
+        local n = 0
+        for entryKey, entry in pairs(map) do
+            if type(entry) == "table" and not _isAuthorityRecoveryPath(entryKey) then
+                n = n + 1
             end
         end
+        return n
     end
-    -- Last resort: write destination from memory (no os.rename / copyFile required).
-    local outf, errDirect = io.open(path, "w")
-    if outf then
-        pcall(function() outf:write(contents) end)
-        pcall(function() outf:close() end)
-        if type(deleteFile) == "function" then pcall(function() deleteFile(tmp) end) end
-        if type(os) == "table" and type(os.remove) == "function" then pcall(function() os.remove(tmp) end) end
+
+    local function refuse(category)
         self._activeTmpPaths[tmp] = nil
+        self._exportSafetyRefusal = true
+        self:_logWriteFail(path, "refuse", category, nil)
+        return false
+    end
+
+    local destinationTouched = type(txn) == "table" and txn.destinationTouched == true
+    local backupVerified = type(txn) == "table" and txn.backupVerified == true
+    local confirmedAbsent = type(txn) == "table" and txn.confirmedAbsent == true
+    local previous = type(txn) == "table" and txn.backup or nil
+    local phase = type(txn) == "table" and txn.phase or "inspect"
+
+    if destinationTouched then
+        --- Recover: the destination may already be damaged. Do not recapture it.
+    elseif phase == "protect" and type(previous) == "string" and not backupVerified then
+        --- Retry on-disk protection. A Lua copy of the old body is not a verified backup.
+    else
+        if map[key] == nil and not _isAuthorityRecoveryPath(key) and auxCount() >= RECOVERY_AUX_CAP then
+            return refuse("recovery registry full")
+        end
+        local body, status = _readExportPrevious(path)
+        if status == "unknown" or status == "unreadable" then
+            map[key] = {
+                path = key,
+                session = session,
+                phase = "inspect",
+                destinationTouched = false,
+                backupVerified = false,
+                confirmedAbsent = false,
+                backup = nil,
+                status = status,
+                untrusted = true,
+            }
+            return refuse(status)
+        end
+        if status == "absent" then
+            previous = nil
+            confirmedAbsent = true
+            backupVerified = true
+            phase = "replace"
+        else
+            previous = body
+            confirmedAbsent = false
+            backupVerified = false
+            phase = "protect"
+        end
+    end
+
+    if not destinationTouched and not confirmedAbsent and not backupVerified then
+        if type(previous) ~= "string" or not self:_ensureRecoveryBackup(path, previous) then
+            map[key] = {
+                path = key,
+                session = session,
+                phase = "protect",
+                destinationTouched = false,
+                backupVerified = false,
+                confirmedAbsent = false,
+                backup = previous,
+                status = "complete",
+                untrusted = true,
+            }
+            return refuse("backup failed")
+        end
+        backupVerified = true
+        phase = "replace"
+    end
+
+    local renamed = false
+    if type(os) == "table" and type(os.rename) == "function" then
+        local okCall, renameOk = pcall(os.rename, tmp, path)
+        renamed = okCall and renameOk and true or false
+    end
+    if renamed then
+        destinationTouched = true
+    end
+    local renamedBytes, renamedReason = false, nil
+    if renamed then
+        renamedBytes, renamedReason = _verifyExportBytes(path, contents)
+    end
+    if renamed and renamedBytes then
+        self._activeTmpPaths[tmp] = nil
+        map[key] = nil
+        self:_noteWriteRecovered(path)
         return true
     end
+    if renamed and renamedReason ~= "byte mismatch" then
+        self._activeTmpPaths[tmp] = nil
+        map[key] = {
+            path = key,
+            session = session,
+            phase = "recover",
+            destinationTouched = true,
+            backupVerified = backupVerified,
+            confirmedAbsent = confirmedAbsent,
+            backup = previous,
+            status = confirmedAbsent and "absent" or "complete",
+            untrusted = true,
+        }
+        self:_logWriteFail(path, "verify", renamedReason, nil)
+        return false
+    end
+
+    local outf, errDirect = io.open(path, "w")
+    destinationTouched = true
+    if not outf then
+        self._activeTmpPaths[tmp] = nil
+        map[key] = {
+            path = key,
+            session = session,
+            phase = "recover",
+            destinationTouched = true,
+            backupVerified = backupVerified,
+            confirmedAbsent = confirmedAbsent,
+            backup = previous,
+            status = confirmedAbsent and "absent" or "complete",
+            untrusted = true,
+        }
+        self:_logWriteFail(path, "open", "fallback", errDirect)
+        return false
+    end
+    local directOk, directOp, directKind, directDetail = _handleWriteAndClose(outf, contents)
+    if type(os) == "table" and type(os.remove) == "function" then pcall(os.remove, tmp) end
     self._activeTmpPaths[tmp] = nil
-    self:_logWriteFail(string.format("open(%s) fallback: %s", tostring(path), tostring(errDirect)))
+    local published, publishReason = _verifyExportBytes(path, contents)
+    if directOk and published then
+        map[key] = nil
+        self:_noteWriteRecovered(path)
+        return true
+    end
+
+    local restored = false
+    if type(previous) == "string" then
+        local restore = io.open(path, "w")
+        if restore then
+            local rok = _handleWriteAndClose(restore, previous)
+            restored = rok and _verifyExportBytes(path, previous) or false
+        end
+    end
+    map[key] = {
+        path = key,
+        session = session,
+        phase = "recover",
+        destinationTouched = true,
+        backupVerified = backupVerified,
+        confirmedAbsent = confirmedAbsent,
+        backup = previous,
+        status = confirmedAbsent and "absent" or "complete",
+        untrusted = true,
+    }
+    if type(previous) == "string" and not restored and FarmDashLog and FarmDashLog.error then
+        FarmDashLog.error("export restore failed path=%s", tostring(path))
+    end
+    if not directOk then
+        self:_logWriteFail(path, directOp, directKind, directDetail)
+    else
+        self:_logWriteFail(path, "verify", publishReason, nil)
+    end
     return false
 end
 
---- Plan v5 B4: throttled write-failure log (1/30s).
-function FarmDashboardDataCollector:_logWriteFail(msg)
-    local D = rawget(_G, "FarmDashDiagnostics")
-    local nowS = (D and D.nowSec and D.nowSec()) or 0
-    if (nowS - (self._writeFailLogAtSec or 0)) >= 30 then
-        self._writeFailLogAtSec = nowS
-        FarmDashLog.devWarn("write failure: %s", tostring(msg))
+--- One open failure episode per target and export session. Every new admission
+--- counts toward 32. One seat stays free for this save's exact data.json
+--- (getDataOutputDir() .. "data.json") until that path is logged. Other paths
+--- that only end in /data.json use the remaining seats. Each episode remembers
+--- up to 8 stage/reason keys. A repeated reason waits 60s even if another
+--- reason was logged in between. Recovery closes only that episode. This does
+--- not touch recovery transactions or FarmDashLog._errLast.
+function FarmDashboardDataCollector:_logWriteFail(path, stage, reason, detail)
+    local session = self._exportSession or 0
+    local target = _normRecoveryPath(path)
+    local reservedTarget = nil
+    if type(self.getDataOutputDir) == "function" then
+        local dirOk, dir = pcall(self.getDataOutputDir, self)
+        if dirOk and type(dir) == "string" and dir ~= "" then
+            local normDir = _normRecoveryPath(dir)
+            if string.sub(normDir, -1) ~= "/" then normDir = normDir .. "/" end
+            reservedTarget = normDir .. "data.json"
+        end
+    end
+    local designated = reservedTarget ~= nil and target == reservedTarget
+    if type(self._writeEpisodes) ~= "table" then self._writeEpisodes = {} end
+    local map = self._writeEpisodes
+    local key = tostring(session) .. "|" .. target
+    local stageText = tostring(stage or "write")
+    local reasonText = tostring(reason or "failed")
+    local now = (type(_G.g_time) == "number") and _G.g_time or 0
+    local entry = map[key]
+    if type(entry) == "table" and entry.session ~= session then
+        map[key] = nil
+        entry = nil
+    end
+    if entry == nil then
+        for oldKey, old in pairs(map) do
+            if type(old) ~= "table" or old.open ~= true or old.session ~= session then
+                map[oldKey] = nil
+            end
+        end
+        local n = 0
+        local reservedPresent = false
+        for _, old in pairs(map) do
+            n = n + 1
+            if type(old) == "table" and reservedTarget ~= nil and old.target == reservedTarget then
+                reservedPresent = true
+            end
+        end
+        local room = n < 32
+        if not designated and reservedTarget ~= nil and not reservedPresent then
+            room = n < 31
+        end
+        if not room then
+            local prev = self._writeEpisodeOverflowAt or -60000
+            self._writeEpisodeOverflow = (self._writeEpisodeOverflow or 0) + 1
+            if not (now >= prev and (now - prev) < 60000) then
+                self._writeEpisodeOverflowAt = now
+                if type(Logging) == "table" and type(Logging.warning) == "function" then
+                    Logging.warning(string.format(
+                        "[FarmDash] write failure overflow: auxiliary targets not logged count=%d",
+                        self._writeEpisodeOverflow
+                    ))
+                end
+            end
+            return
+        end
+        entry = {
+            session = session,
+            target = target,
+            open = true,
+            authority = designated,
+            seen = {},
+        }
+        map[key] = entry
+    elseif entry.open ~= true then
+        entry.open = true
+        entry.seen = {}
+        entry.authority = designated
+    end
+    local seen = entry.seen
+    if type(seen) ~= "table" then
+        seen = {}
+        entry.seen = seen
+    end
+    local reasonKey = stageText .. "|" .. reasonText
+    local prevAt = seen[reasonKey]
+    if type(prevAt) == "number" and now >= prevAt and (now - prevAt) < 60000 then
+        return
+    end
+    if seen[reasonKey] == nil then
+        local reasonCount = 0
+        for _ in pairs(seen) do reasonCount = reasonCount + 1 end
+        if reasonCount >= 8 then
+            local prev = self._writeEpisodeOverflowAt or -60000
+            self._writeEpisodeOverflow = (self._writeEpisodeOverflow or 0) + 1
+            if not (now >= prev and (now - prev) < 60000) then
+                self._writeEpisodeOverflowAt = now
+                if type(Logging) == "table" and type(Logging.warning) == "function" then
+                    Logging.warning(string.format(
+                        "[FarmDash] write failure overflow: auxiliary targets not logged count=%d",
+                        self._writeEpisodeOverflow
+                    ))
+                end
+            end
+            return
+        end
+    end
+    seen[reasonKey] = now
+    entry.stage = stageText
+    entry.reason = reasonText
+    entry.lastAt = now
+    if type(Logging) == "table" and type(Logging.warning) == "function" then
+        Logging.warning(string.format(
+            "[FarmDash] write failure: %s(%s): %s: %s",
+            stageText, target, reasonText, tostring(detail)
+        ))
+    end
+end
+
+function FarmDashboardDataCollector:_noteWriteRecovered(path)
+    local session = self._exportSession or 0
+    local target = _normRecoveryPath(path)
+    local map = self._writeEpisodes
+    if type(map) ~= "table" then return end
+    local entry = map[tostring(session) .. "|" .. target]
+    if type(entry) ~= "table" or entry.open ~= true or entry.session ~= session then
+        return
+    end
+    entry.open = false
+    entry.seen = nil
+    entry.stage = nil
+    entry.reason = nil
+    entry.lastAt = nil
+    if type(Logging) == "table" and type(Logging.warning) == "function" then
+        Logging.warning("[FarmDash] export write recovered: " .. target)
     end
 end
 
@@ -4235,10 +6474,99 @@ function FarmDashboardDataCollector:_ensureDetailsWritable()
     return true
 end
 
+function FarmDashboardDataCollector:_submitBoundedPen(job, jsonStr)
+    local penKey = job.penKey
+    local ledger = job.ledger
+    local route = rawget(_G, "FarmDashboardExportRoute")
+    if not (self:_usesXmlTransport() and route and route.submitResource) then
+        local fname = self:_penKeyToFilename(penKey)
+        local path = self:_detailDirPath() .. "animals_" .. tostring(fname) .. ".json"
+        local wrote = self:_writeFileAtomic(path, jsonStr)
+        if wrote then self._detailLedger[penKey] = ledger end
+        self._penJsonJob = nil
+        return wrote
+    end
+    local record = self:_xmlRecord(jsonStr, 0, self._exportSession, "resource")
+    record.resourceId = self:_resourceIdForPen(penKey)
+    record.penKey = penKey
+    record.ledger = ledger
+    if record.resourceId == nil then
+        self._penJsonJob = nil
+        return false
+    end
+    local outcome = route:submitResource("penDetail", jsonStr, record)
+    if outcome == "queued" or outcome == "held" then
+        self._resourcePending = self._resourcePending or {}
+        self._resourcePending["penDetail:" .. record.resourceId] = {
+            penKey = penKey,
+            ledger = ledger,
+            version = record.admissionVersion,
+        }
+        self._penJsonJob = nil
+        return outcome
+    end
+    return false
+end
+
+function FarmDashboardDataCollector:_writePenDetailBounded(penKey)
+    local job = self._penJsonJob
+    if type(job) == "table" and job.penKey ~= penKey then return "deferred" end
+    if type(job) ~= "table" then
+        if self._detailsDisabled then return false end
+        if not self:_ensureDetailsWritable() then return false end
+        local placeable = self:_findPlaceableByKey(penKey) or self:_findPlaceableById(penKey)
+        if not placeable then return false end
+        local detail
+        local ok, err = xpcall(function()
+            detail = AnimalDataCollector:collectPenDetail(placeable)
+        end, _farmDashFormatError)
+        if not ok or not detail then return false end
+        local D = rawget(_G, "FarmDashDiagnostics")
+        local nowS = (D and D.nowSec and D.nowSec()) or 0
+        detail.schemaVersion = DETAIL_SCHEMA_VERSION
+        detail.idScheme = self._idScheme
+        detail.penId = tostring(penKey)
+        detail.placeableId = tonumber(placeable.id) or 0
+        detail.generatedAt = nowS
+        detail.serverTimeSec = nowS
+        detail.mode = (self._animalMode == "RL") and "RL" or "base"
+        detail.animalMode = self._animalMode
+        detail.lod = "full"
+        job = {
+            penKey = penKey,
+            session = self._exportSession,
+            ledger = {
+                ts = nowS,
+                animalCount = (detail.animals and #detail.animals) or 0,
+                placeableId = tonumber(placeable.id) or 0,
+            },
+            walk = self:_jsonWalkBegin(detail, 0),
+            parts = {},
+        }
+        self._penJsonJob = job
+    end
+    if job.session ~= self._exportSession then
+        self._penJsonJob = nil
+        return false
+    end
+    if type(job.jsonStr) ~= "string" then
+        local finished = self:_jsonWalkStep(job.walk, job.parts, nil)
+        if not finished then return "deferred" end
+        job.jsonStr = table.concat(job.parts)
+        job.walk = nil
+        job.parts = nil
+    end
+    return self:_submitBoundedPen(job, job.jsonStr)
+end
+
 --- Plan v5 B5+B8: build & write a single per-pen detail file (penKey-aware).
 --- Now writes schemaVersion, idScheme, placeableId, generatedAt, mode.
 function FarmDashboardDataCollector:_writePenDetail(penKey)
     if penKey == nil then return false end
+    if not self:_exportBudgetAllows(3) then return "deferred" end
+    if self:_jsonBudgetRemaining() ~= nil then
+        return self:_writePenDetailBounded(penKey)
+    end
     if self._detailsDisabled then return false end
     if not self:_ensureDetailsWritable() then return false end
 
@@ -4272,15 +6600,42 @@ function FarmDashboardDataCollector:_writePenDetail(penKey)
 
     local fname = self:_penKeyToFilename(penKey)
     local path = self:_detailDirPath() .. "animals_" .. tostring(fname) .. ".json"
-    local wrote = self:_writeFileAtomic(path, jsonStr)
+    local wrote = false
+    if self:_usesXmlTransport() then
+        local route = rawget(_G, "FarmDashboardExportRoute")
+        if route and route.submitResource then
+            local ledger = {
+                ts = nowS,
+                animalCount = (detail.animals and #detail.animals) or 0,
+                placeableId = tonumber(placeable.id) or 0,
+            }
+            local record = self:_xmlRecord(jsonStr, 0, self._exportSession, "resource")
+            record.resourceId = self:_resourceIdForPen(penKey)
+            record.penKey = penKey
+            record.ledger = ledger
+            if record.resourceId == nil then return false end
+            local outcome = route:submitResource("penDetail", jsonStr, record)
+            if outcome == "queued" or outcome == "held" then
+                self._resourcePending = self._resourcePending or {}
+                self._resourcePending["penDetail:" .. record.resourceId] = {
+                    penKey = penKey,
+                    ledger = ledger,
+                    version = record.admissionVersion,
+                }
+                self:_chargeExportBytes(#jsonStr)
+                return outcome
+            end
+            return false
+        end
+    else
+        wrote = self:_writeFileAtomic(path, jsonStr)
+    end
     if wrote then
         self._detailLedger[penKey] = {
             ts = nowS,
             animalCount = (detail.animals and #detail.animals) or 0,
             placeableId = tonumber(placeable.id) or 0,
         }
-    else
-        self:_logWriteFail(string.format("pen detail %s", tostring(penKey)))
     end
     return wrote
 end
@@ -4289,6 +6644,33 @@ end
 --- Sets semantics — every entry is a pen with a detail file the App can pull.
 --- App keeps last-seen mtime to dedup; consults the per-pen ts before refetching.
 function FarmDashboardDataCollector:_writeDirtyPensIndex()
+    local revision = self._dirtyIndexRevision or 0
+    if self._indexInFlightRevision == revision and self._indexInFlightSession == self._exportSession then
+        return "queued"
+    end
+    local resume = self._indexJsonJob
+    if type(resume) == "table" and resume.revision == revision and resume.session == self._exportSession then
+        if type(resume.jsonStr) ~= "string" then
+            if not self:_jsonWalkStep(resume.walk, resume.parts, nil) then return "deferred" end
+            resume.jsonStr = table.concat(resume.parts)
+        end
+        self._dirtyIndexBuiltRevision = revision
+        if self:_usesXmlTransport() then
+            local route = rawget(_G, "FarmDashboardExportRoute")
+            if route and route.submitResource then
+                local record = self:_xmlRecord(resume.jsonStr, 0, self._exportSession, "resource")
+                record.indexRevision = revision
+                local outcome = route:submitResource("dirtyPens", resume.jsonStr, record)
+                if outcome == "queued" or outcome == "held" then
+                    self._indexJsonJob = nil
+                    self._indexInFlightRevision = revision
+                    self._indexInFlightSession = self._exportSession
+                    self._indexInFlightAdmission = record.admissionVersion
+                end
+                return outcome
+            end
+        end
+    end
     local entries = {}
     local count = 0
     for penKey, info in pairs(self._detailLedger) do
@@ -4311,10 +6693,40 @@ function FarmDashboardDataCollector:_writeDirtyPensIndex()
         animalMode = self._animalMode,
         pens = entries,
     }
-    local parts = {}
-    self:_toJSONInto(parts, doc, false, 0)
-    local jsonStr = table.concat(parts)
+    self._dirtyIndexBuiltRevision = self._dirtyIndexRevision or 0
+    local jsonStr
+    if self:_jsonBudgetRemaining() ~= nil then
+        local job = self._indexJsonJob
+        if type(job) ~= "table" or job.revision ~= self._dirtyIndexBuiltRevision or job.session ~= self._exportSession then
+            job = { walk = self:_jsonWalkBegin(doc, 0), parts = {}, revision = self._dirtyIndexBuiltRevision, session = self._exportSession }
+            self._indexJsonJob = job
+        end
+        if type(job.jsonStr) ~= "string" then
+            if not self:_jsonWalkStep(job.walk, job.parts, nil) then return "deferred" end
+            job.jsonStr = table.concat(job.parts)
+        end
+        jsonStr = job.jsonStr
+    else
+        local parts = {}
+        self:_toJSONInto(parts, doc, false, 0)
+        jsonStr = table.concat(parts)
+    end
 
+    if self:_usesXmlTransport() then
+        local route = rawget(_G, "FarmDashboardExportRoute")
+        if route and route.submitResource then
+            local record = self:_xmlRecord(jsonStr, 0, self._exportSession, "resource")
+            record.indexRevision = self._dirtyIndexBuiltRevision
+            local outcome = route:submitResource("dirtyPens", jsonStr, record)
+            if outcome == "queued" or outcome == "held" then
+                self._indexJsonJob = nil
+                self._indexInFlightRevision = self._dirtyIndexBuiltRevision
+                self._indexInFlightSession = self._exportSession
+                self._indexInFlightAdmission = record.admissionVersion
+            end
+            return outcome
+        end
+    end
     local base = getUserProfileAppPath() .. "modSettings/FS25_FarmDashboard/" .. self:getSavegameDirName() .. "/"
     self:_writeFileAtomic(base .. "dirtyPens.json", jsonStr)
 end
@@ -4425,16 +6837,34 @@ end
 
 --- Phase 7 + Plan v5 B11: drive detail writes from the dirty set, one pen per call.
 function FarmDashboardDataCollector:processDetailQueueOnce()
-    if next(self._dirtyPens) == nil then return false end
+    if type(self._dirtyPens) ~= "table" or next(self._dirtyPens) == nil then return false end
+    if not self:_exportBudgetAllows(1) then return true end
 
+    local now = self:_missionTimeMs()
     local penKey
-    for k in pairs(self._dirtyPens) do penKey = k; break end
+    for k in pairs(self._dirtyPens) do
+        local skips = self._penRetrySkips and self._penRetrySkips[k]
+        if type(skips) == "number" and skips > 0 then
+            self._penRetrySkips[k] = skips - 1
+        else
+            local retryAt = self._penRetryAt and self._penRetryAt[k]
+            if type(retryAt) ~= "number" or now >= retryAt then
+                penKey = k
+                break
+            end
+        end
+    end
     if penKey == nil then return false end
 
     self._dirtyPens[penKey] = nil
+    if self._penRetryAt then self._penRetryAt[penKey] = nil end
     self._dirtyPensCount = math.max(0, (self._dirtyPensCount or 0) - 1)
     local t0 = self:_diagNow()
-    self:_writePenDetail(penKey)
+    local wrote = self:_writePenDetail(penKey)
+    if wrote ~= true and wrote ~= "queued" and wrote ~= "held" then
+        self._dirtyPens[penKey] = 1
+        self._dirtyPensCount = (self._dirtyPensCount or 0) + 1
+    end
     if t0 and self:_diagEnabled() then
         local ms = (self:_diagNow() - t0) * 1000
         self:_diagTrace("penDetail %s ms=%.2f%s", tostring(penKey), ms, self:_diagMarkHitch(ms))

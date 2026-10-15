@@ -16,6 +16,18 @@ function mergeServersPreserveSecrets(prevServers, incomingServers) {
     }
     const emptyCode = inc.httpFeedCode == null || String(inc.httpFeedCode).trim() === "";
     if (emptyCode && prev && prev.httpFeedCode) out.httpFeedCode = prev.httpFeedCode;
+    const registration = inc.replicaRegistration;
+    if (registration && typeof registration === "object" && !Array.isArray(registration)) {
+      // The renderer never sees the pairing; an empty value on an existing row means "unchanged", not "clear".
+      // Unlinking is done by removing the row.
+      const nextRegistration = { ...registration };
+      delete nextRegistration.sessionPairingSet;
+      const emptyPairing = nextRegistration.sessionPairing == null || String(nextRegistration.sessionPairing).trim() === "";
+      const prevPairing = prev && prev.replicaRegistration && typeof prev.replicaRegistration === "object"
+        ? prev.replicaRegistration.sessionPairing : null;
+      if (emptyPairing && typeof prevPairing === "string" && prevPairing) nextRegistration.sessionPairing = prevPairing;
+      out.replicaRegistration = nextRegistration;
+    }
     return out;
   });
 }
@@ -49,31 +61,46 @@ function secretRevision(v) {
   return `${s.length}:${(h >>> 0).toString(16)}`;
 }
 
+function replicaRuntimeIdentity(server) {
+  if (!server || server.replicaRegistration == null) return null;
+  const registration = server.replicaRegistration;
+  if (typeof registration !== "object" || Array.isArray(registration)) {
+    return { remoteSlot: "", sessionPairing: "" };
+  }
+  return {
+    remoteSlot: typeof registration.remoteSlot === "string" ? registration.remoteSlot.trim() : "",
+    sessionPairing: typeof registration.sessionPairing === "string" ? registration.sessionPairing.trim() : "",
+  };
+}
+
+function serverRuntimeIdentity(server) {
+  if (!server || typeof server !== "object") return null;
+  return {
+    id: server.id,
+    enabled: server.enabled !== false,
+    mode: server.mode,
+    localSubFolder: server.localSubFolder || "",
+    localPath: server.localPath || "",
+    replicaRemoteSlot: server.replicaRemoteSlot || "",
+    ftpSavegameRemoteDir: server.ftpSavegameRemoteDir || "",
+    ftpHost: server.ftpHost || "",
+    ftpPort: server.ftpPort || "",
+    ftpUser: server.ftpUser || "",
+    ftpBasePath: server.ftpBasePath || "",
+    ftpPass: secretRevision(server.ftpPass),
+    ftpSecure: String(server.ftpSecure ?? ""),
+    ftpFtps: String(server.ftpFtps ?? ""),
+    ftpAllowInsecureTls: String(server.ftpAllowInsecureTls ?? ""),
+    httpFeedSecure: String(server.httpFeedSecure ?? ""),
+    httpFeedHost: server.httpFeedHost || "",
+    httpFeedPort: server.httpFeedPort || "",
+    httpFeedCode: secretRevision(server.httpFeedCode),
+    replicaRegistration: replicaRuntimeIdentity(server),
+  };
+}
+
 function serverListSignature(servers) {
-  return (Array.isArray(servers) ? servers : [])
-    .map((s) => {
-      if (!s || typeof s !== "object") return "";
-      return [
-        s.id,
-        s.mode,
-        s.localSubFolder || "",
-        s.localPath || "",
-        s.ftpHost || "",
-        s.ftpPort || "",
-        s.ftpUser || "",
-        s.ftpBasePath || "",
-        secretRevision(s.ftpPass),
-        String(s.ftpSecure ?? ''),
-        String(s.ftpFtps ?? ''),
-        String(s.ftpAllowInsecureTls ?? ''),
-        String(s.httpFeedSecure ?? ''),
-        s.httpFeedHost || "",
-        s.httpFeedPort || "",
-        secretRevision(s.httpFeedCode),
-        s.name || "",
-      ].join("|");
-    })
-    .join(";");
+  return JSON.stringify((Array.isArray(servers) ? servers : []).map(serverRuntimeIdentity));
 }
 
 function ftpPollingEqual(a, b) {
@@ -86,12 +113,25 @@ function ftpPollingEqual(a, b) {
   );
 }
 
+function canonicalFtpPolling(value) {
+  const source = value && typeof value === "object" ? value : {};
+  return {
+    initialDelaySeconds: Number(source.initialDelaySeconds ?? 0),
+    intervalMinutes: Number(source.intervalMinutes ?? 5),
+    scheduleMode: String(source.scheduleMode || "sync"),
+  };
+}
+
+function runtimeRestartSignature(config) {
+  const source = config && typeof config === "object" ? config : {};
+  return JSON.stringify({
+    servers: serverListSignature(source.servers),
+    ftpPolling: canonicalFtpPolling(source.ftpPolling),
+  });
+}
+
 function configNeedsServerReboot(prevConfig, nextConfig) {
-  const prev = prevConfig && typeof prevConfig === "object" ? prevConfig : {};
-  const next = nextConfig && typeof nextConfig === "object" ? nextConfig : {};
-  if (serverListSignature(prev.servers) !== serverListSignature(next.servers)) return true;
-  if (!ftpPollingEqual(prev.ftpPolling, next.ftpPolling)) return true;
-  return false;
+  return runtimeRestartSignature(prevConfig) !== runtimeRestartSignature(nextConfig);
 }
 
 /** Union by id: keep local/dev rows, then append installed-only ids (dev:new-ui --sync-config). */
@@ -121,7 +161,11 @@ function unionServersById(installedServers, localServers) {
 module.exports = {
   mergeServersPreserveSecrets,
   resolveServersForSave,
+  replicaRuntimeIdentity,
+  serverRuntimeIdentity,
   serverListSignature,
+  canonicalFtpPolling,
+  runtimeRestartSignature,
   ftpPollingEqual,
   configNeedsServerReboot,
   unionServersById,

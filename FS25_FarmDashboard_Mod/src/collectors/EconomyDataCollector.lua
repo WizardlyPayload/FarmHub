@@ -141,6 +141,50 @@ function EconomyDataCollector:_collectImpl()
         economyData.debug = economyData.marketPrices.debug
     end
     
+
+    -- FH-20260914: trim the duplicated per-crop locations view before it leaves the
+    -- collector, after every aggregate that reads it has been computed.
+    self:_stripExportedDuplicates(economyData)
+
+    return economyData
+end
+
+--- FH-20260914: drop the one view that is a true duplicate, at the export boundary.
+---
+--- economy.marketPrices carried the same price matrix twice. Measured on the real export, the two
+--- forms hold exactly the same 4,969 crop-and-station pairs, but they are not interchangeable:
+--- sellPoints additionally carries basePrice, fillTypeIndex and isSpecialEvent per price plus each
+--- station's id and position, while crops carries avgXmlPrice, priceHistory, maxPriceMonth and the
+--- best/worst/min/max aggregates that exist nowhere else. So neither could be deleted outright.
+---
+--- What IS redundant is each crop's `locations` array: its three fields, name, price and
+--- multiplier, are all present in sellPoints. On a 4,008,404 byte export that array set is 391,662
+--- bytes, so this is roughly a tenth of everything the authority serialises, the mirror streams to
+--- every joined client, and the desktop app parses.
+---
+--- This runs AFTER the aggregates are computed, so nothing that reads locations during collection
+--- is affected; only the exported copy is trimmed. The desktop app rebuilds the array from
+--- sellPoints while merging, so the By Crop view is unchanged.
+---
+--- Deliberately NOT stripped: the lookup tables. fillTypeTitles and fillTypesByIndex proved
+--- byte-identical to copies held at economy and top level, but nameToIndex did not (598 entries
+--- against 596 in the nearest sibling), so it is not a duplicate at all and dropping the set would
+--- have lost two entries. All three together are about 0.6% of the export, which does not justify
+--- the risk.
+function EconomyDataCollector:_stripExportedDuplicates(economyData)
+    local mp = economyData and economyData.marketPrices
+    if type(mp) ~= "table" then return economyData end
+    local crops = mp.crops
+    if type(crops) ~= "table" then return economyData end
+
+    local trimmed = 0
+    for _, cropData in pairs(crops) do
+        if type(cropData) == "table" and cropData.locations ~= nil then
+            cropData.locations = nil
+            trimmed = trimmed + 1
+        end
+    end
+    mp.locationsOmitted = trimmed > 0 or nil
     return economyData
 end
 
@@ -252,7 +296,7 @@ local function _maxPriceMonthForFillType(fillType)
     if type(factors) ~= "table" and type(history) ~= "table" then return nil end
 
     local bestKey, bestValue = nil, -1
-    local SP = rawget(_G, "SeasonPeriod")
+    local SP = type(_G.SeasonPeriod) == "table" and _G.SeasonPeriod or nil
 
     if SP then
         for i = 1, #_SEASON_PERIOD_KEYS do
@@ -299,7 +343,7 @@ local function _priceHistoryForFillType(fillType)
 
     local out = {}
     local sum, count = 0, 0
-    local SP = rawget(_G, "SeasonPeriod")
+    local SP = type(_G.SeasonPeriod) == "table" and _G.SeasonPeriod or nil
 
     for i = 1, #_SEASON_PERIOD_KEYS do
         local key = _SEASON_PERIOD_KEYS[i]

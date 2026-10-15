@@ -16,6 +16,7 @@ FarmDashboardSettingsApi.BOOL_KEYS = {
     "enableRedTape",
     "enableInvoices",
     "enableHirePurchasing",
+    "enableCompanionMods",
     "diagnostics",
     "debugBaleScan",
     --- XML/network compat only — ExportMirror always streams to joined clients (ignored at runtime).
@@ -51,6 +52,7 @@ local BOOL_DEFAULTS = {
     enableRedTape = true,
     enableInvoices = true,
     enableHirePurchasing = true,
+    enableCompanionMods = true,
     diagnostics = false,
     debugBaleScan = false,
     allowExportMirror = true,
@@ -95,16 +97,27 @@ function FarmDashboardSettingsApi:getCollector()
     return nil
 end
 
+FarmDashboardSettingsApi.AUTHORITY_UNKNOWN = "unknown"
+
 --- Dedicated servers may expose g_server without getIsServer(); use FarmDashboard:isAuthority().
-function FarmDashboardSettingsApi:isAuthorityMachine()
-    local fd = rawget(_G, "FarmDashboard")
-    if fd and type(fd.isAuthority) == "function" then
-        local ok, isAuth = pcall(function() return fd:isAuthority() end)
-        if ok and isAuth then
-            return true
+--- Returns true, false, or AUTHORITY_UNKNOWN. A missing module or method, a throw or a non-boolean answer is
+--- unknown: it is neither a confirmed host nor a confirmed client.
+function FarmDashboardSettingsApi:authorityState()
+    local ok, isAuth = pcall(function()
+        local fd = rawget(_G, "FarmDashboard")
+        if type(fd) ~= "table" or type(fd.isAuthority) ~= "function" then
+            return nil
         end
+        return fd:isAuthority()
+    end)
+    if ok and type(isAuth) == "boolean" then
+        return isAuth
     end
-    return false
+    return FarmDashboardSettingsApi.AUTHORITY_UNKNOWN
+end
+
+function FarmDashboardSettingsApi:isAuthorityMachine()
+    return self:authorityState() == true
 end
 
 function FarmDashboardSettingsApi:connectionIsServer(connection)
@@ -115,9 +128,11 @@ function FarmDashboardSettingsApi:connectionIsServer(connection)
     return ok and isSrv
 end
 
+--- g_server is an engine global inherited through this mod's _G; rawget would never see it, and the
+--- settings event would then skip its admin check for client-sent settings.
 function FarmDashboardSettingsApi:canBroadcastSettings()
-    local srv = rawget(_G, "g_server")
-    return srv ~= nil and type(srv.broadcastEvent) == "function" and self:isAuthorityMachine()
+    local srv = _G.g_server
+    return type(srv) == "table" and type(srv.broadcastEvent) == "function" and self:isAuthorityMachine()
 end
 
 function FarmDashboardSettingsApi:canChangeSettings()
@@ -188,8 +203,8 @@ function FarmDashboardSettingsApi:publishSettings()
         if dc then
             pcall(function() dc:saveConfig() end)
         end
-        if FarmDashboardSettingsEvent then
-            g_server:broadcastEvent(FarmDashboardSettingsEvent.newFromConfig())
+        if FarmDashboardSettingsEvent and type(FarmDashboardSettingsEvent.publishAuthoritative) == "function" then
+            FarmDashboardSettingsEvent.publishAuthoritative("local-publish")
         end
         return
     end

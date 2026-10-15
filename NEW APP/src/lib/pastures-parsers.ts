@@ -81,6 +81,27 @@ export function summarizePastureAnimals(animals: PastureAnimal[] | null | undefi
   };
 }
 
+/** LOD fan-out rows can contain a default health value. Read the source cluster
+ * averages instead, and only when they cover every reported head in the pen. */
+export function measuredClusterHealth(husbandry: HusbandryRow | null | undefined, expectedHeads: number): number | null {
+  const clusters = husbandry?.clusters;
+  if (!Array.isArray(clusters) || clusters.length === 0 || !Number.isInteger(expectedHeads) || expectedHeads <= 0) {
+    return null;
+  }
+  let heads = 0;
+  let weightedHealth = 0;
+  for (const cluster of clusters) {
+    const count = cluster?.count;
+    if (count === 0) continue;
+    if (typeof count !== "number" || !Number.isInteger(count) || count < 0) return null;
+    const health = (cluster as { avgHealth?: unknown }).avgHealth;
+    if (typeof health !== "number" || !Number.isFinite(health) || health < 0 || health > 100) return null;
+    heads += count;
+    weightedHealth += health * count;
+  }
+  return heads === expectedHeads ? Math.round(weightedHealth / heads) : null;
+}
+
 export function formatPastureHealthPercent(
   pasture: Pick<Pasture, "avgHealth" | "avgHealthKnown">
 ): string {
@@ -850,6 +871,10 @@ export function parsePastureData(input: ParsePastureInput): Pasture[] {
       }
 
       const stock = summarizePastureAnimals(stockingAnimals);
+      const animalCount = resolvePastureAnimalCount(stockingAnimals, originalHusbandry);
+      const measuredHealth = stock.avgHealthKnown
+        ? stock.avgHealth
+        : measuredClusterHealth(originalHusbandry, animalCount);
       const conditionReport = calculateConditionReport(stockingAnimals, originalHusbandry);
       const milkProductionData = calculateMilkProduction({ name: group.name }, stockingAnimals);
       const foodReportInput = {
@@ -872,12 +897,12 @@ export function parsePastureData(input: ParsePastureInput): Pasture[] {
         id: group.id,
         name: group.name,
         animals: pastureAnimals,
-        animalCount: resolvePastureAnimalCount(stockingAnimals, originalHusbandry),
+        animalCount,
         maleCount: stock.maleCount,
         femaleCount: stock.femaleCount,
         unknownSexCount: stock.unknownSexCount,
-        avgHealth: stock.avgHealth,
-        avgHealthKnown: stock.avgHealthKnown,
+        avgHealth: measuredHealth ?? 0,
+        avgHealthKnown: measuredHealth != null,
         conditionReport,
         foodReport,
         milkProductionData,

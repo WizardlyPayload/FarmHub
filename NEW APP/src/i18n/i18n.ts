@@ -45,6 +45,37 @@ let locale = FALLBACK;
 let ready: Promise<void> | null = null;
 const listeners = new Set<() => void>();
 
+export type LocalePreferences = {
+  read(): string | null; write(code: string): void;
+  catalogStore?: Pick<Storage, "getItem" | "setItem"> | null;
+};
+let preferences: LocalePreferences | null = null;
+
+/** Bound before initialization by recorded boot; desktop keeps its existing storage. */
+export function configureLocalePreferences(value: LocalePreferences): void {
+  preferences = value;
+}
+
+function preferredLocale(): string | null {
+  try { return preferences ? preferences.read() : localStorage.getItem(STORAGE_KEY); }
+  catch { return null; }
+}
+
+const CATALOG_CACHE_KEY = "farmdash_recorded_catalog";
+const CATALOG_CACHE_LIMIT = 4 * 1024 * 1024;
+function cachedCatalog(): Catalog | null {
+  try {
+    const raw = preferences?.catalogStore?.getItem(CATALOG_CACHE_KEY);
+    if (!raw || raw.length > CATALOG_CACHE_LIMIT || new TextEncoder().encode(raw).byteLength > CATALOG_CACHE_LIMIT) return null;
+    const doc = JSON.parse(raw) as Catalog;
+    if (!doc || !doc.strings || typeof doc.strings !== "object" || Array.isArray(doc.strings)) return null;
+    for (const row of Object.values(doc.strings)) {
+      if (!row || typeof row !== "object" || Array.isArray(row) || Object.values(row).some(value => typeof value !== "string")) return null;
+    }
+    return doc;
+  } catch { return null; }
+}
+
 function normalizeLocale(code: string | null | undefined): string {
   if (!code || typeof code !== "string") return FALLBACK;
   const primary = code.trim().toLowerCase().replace("_", "-").split("-")[0];
@@ -80,7 +111,7 @@ export async function initI18n(preferred?: string): Promise<void> {
   if (ready) return ready;
   ready = (async () => {
     locale = normalizeLocale(
-      preferred || localStorage.getItem(STORAGE_KEY) || navigator.language || FALLBACK
+      preferred || preferredLocale() || navigator.language || FALLBACK
     );
     try {
       const res = await fetch("/locales/translations.json", { cache: "default" });
@@ -88,10 +119,18 @@ export async function initI18n(preferred?: string): Promise<void> {
       const doc = (await res.json()) as Catalog;
       catalog = doc;
       rebuildFlatEn(doc);
+      if (preferences?.catalogStore) {
+        try {
+          const raw = JSON.stringify(doc);
+          if (raw.length <= CATALOG_CACHE_LIMIT && new TextEncoder().encode(raw).byteLength <= CATALOG_CACHE_LIMIT) {
+            preferences.catalogStore.setItem(CATALOG_CACHE_KEY, raw);
+          }
+        } catch { /* language preference still works when the catalog exceeds quota */ }
+      }
     } catch (e) {
       console.warn("[i18n] failed to load translations.json", e);
-      catalog = { strings: {} };
-      flatEn = {};
+      catalog = cachedCatalog() ?? { strings: {} };
+      rebuildFlatEn(catalog);
     }
     notify();
   })();
@@ -105,7 +144,8 @@ export function getLocale(): string {
 export function setLocale(code: string): void {
   locale = normalizeLocale(code);
   try {
-    localStorage.setItem(STORAGE_KEY, locale);
+    if (preferences) preferences.write(locale);
+    else localStorage.setItem(STORAGE_KEY, locale);
   } catch {
     /* ignore */
   }

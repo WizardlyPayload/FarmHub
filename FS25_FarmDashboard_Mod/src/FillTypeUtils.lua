@@ -580,6 +580,437 @@ function FillTypeUtils.cropIndexMapForJson()
     return out
 end
 
+--- kg per litre plus liquid flag. Engine massPerLiter is tonnes/L (XML kg/L × 0.001).
+function FillTypeUtils.fillTypePhysicsForJson()
+    local out = {}
+    local ftm = _ftm()
+    if not ftm or type(ftm.fillTypes) ~= "table" then return out end
+
+    local function inCat(idx, cat)
+        if type(ftm.getIsFillTypeInCategory) ~= "function" then return false end
+        local ok, v = pcall(function() return ftm:getIsFillTypeInCategory(idx, cat) end)
+        return ok and v == true
+    end
+
+    for idx, ft in pairs(ftm.fillTypes) do
+        local n = tonumber(idx)
+        if n and n > 0 and type(ft) == "table" then
+            local raw = tonumber(ft.massPerLiter)
+            local kg = nil
+            if raw and raw > 0 then
+                -- Values under 0.02 are tonnes per litre. Farm materials are not 20 kg/L.
+                if raw < 0.02 then
+                    kg = raw * 1000
+                else
+                    kg = raw
+                end
+            end
+            if kg and kg > 0 then
+                local name = ""
+                if ft.name then name = string.upper(tostring(ft.name)) end
+                local liquid = inCat(n, "LIQUID") or inCat(n, "SPRAYER") or inCat(n, "SLURRYTANK")
+                if not liquid and name ~= "" then
+                    if name == "HONEY" or name == "GRAPEJUICE" or name == "LIQUIDSEEDTREATMENT"
+                        or string.find(name, "MILK", 1, true) or string.find(name, "OIL", 1, true) then
+                        liquid = true
+                    end
+                end
+                local kgOut = math.floor(kg * 1000 + 0.5) / 1000
+                out[tostring(n)] = { kg = kgOut, liquid = liquid }
+                if name ~= "" then
+                    out[name] = { kg = kgOut, liquid = liquid }
+                end
+            end
+        end
+    end
+    return out
+end
+
+--- Soft-read British Fill Units + Imperial System Conversion Settings choices.
+--- Unit Converter (itch) is detected by name only until its settings layout is mapped.
+function FillTypeUtils.unitDisplayForJson()
+    local mods = {}
+    local seen = {}
+    local british = nil
+    local imperialPresent = false
+    local unitConverterPresent = false
+    local activeImperialName = nil
+    local activeBritishName = nil
+    local activeProfileMod = nil
+    local activeConverterName = nil
+
+    local function consider(name)
+        if name == nil then return end
+        local id = tostring(name)
+        if id == "" or seen[id] then return end
+        local low = string.lower(id)
+        local style = nil
+        if string.find(low, "britishfill", 1, true) or string.find(low, "british_fill", 1, true) then
+            style = "british"
+            british = true
+        elseif string.find(low, "imperialsystem", 1, true)
+            or string.find(low, "imperial_system", 1, true)
+            or id == "FS25_ImperialSystem" then
+            style = "imperial"
+            imperialPresent = true
+        elseif string.find(low, "unitconverter", 1, true)
+            or string.find(low, "unit_converter", 1, true)
+            or id == "FS25_UnitConverter" then
+            style = "unitConverter"
+            unitConverterPresent = true
+        elseif string.find(low, "saveunitprofile", 1, true)
+            or string.find(low, "save_unit_profile", 1, true)
+            or id == "FS25_SaveUnitProfiles" then
+            style = "saveUnitProfiles"
+        end
+        if not style then return end
+        seen[id] = true
+        mods[#mods + 1] = { id = id, style = style }
+        if style == "imperial" and activeImperialName == nil then
+            activeImperialName = id
+        elseif style == "british" and activeBritishName == nil then
+            activeBritishName = id
+        elseif style == "saveUnitProfiles" and activeProfileMod == nil then
+            activeProfileMod = id
+        elseif style == "unitConverter" and activeConverterName == nil then
+            activeConverterName = id
+        end
+    end
+
+    if type(_G.g_modIsLoaded) == "table" then
+        for name, on in pairs(_G.g_modIsLoaded) do
+            if on then consider(name) end
+        end
+    end
+    local reg = rawget(_G, "FarmDashboardMissionRegistry")
+    if type(reg) == "table" and type(reg.activeNames) == "function" then
+        local members = reg.activeNames()
+        if type(members) == "table" then
+            for name, on in pairs(members) do
+                if on then consider(name) end
+            end
+        end
+    else
+    local mm = _G.g_modManager
+    if type(mm) == "table" then
+        if type(mm.getActiveMods) == "function" then
+            local ok, list = pcall(function() return mm:getActiveMods() end)
+            if ok and type(list) == "table" then
+                for _, mod in pairs(list) do
+                    if type(mod) == "table" then
+                        consider(mod.modName or mod.name)
+                    elseif type(mod) == "string" then
+                        consider(mod)
+                    end
+                end
+            end
+        end
+        -- mm.mods and nameToMod are the installed inventory. Inactive ZIPs must not
+        -- switch unit mode (F04). Active membership is g_modIsLoaded + getActiveMods.
+    end
+    end
+
+    -- Live + file settings apply only when this mission actually loaded Imperial.
+    -- The owner is that mod's environment (_G[modName]), not a flattened UnitConversionMod
+    -- global and not a leftover unitSettings.xml from an unchecked ZIP.
+    local imperial = nil
+    local function imperialFromManager(s)
+        if type(s) ~= "table" then return nil end
+        local lu = tonumber(s.liquidUnit)
+        local cu = tonumber(s.cropsUnit)
+        local wu = tonumber(s.weightUnit)
+        local ws = tonumber(s.weightScale)
+        local mu = tonumber(s.measureUnit)
+        if lu == nil and cu == nil and wu == nil and ws == nil and mu == nil then
+            return nil
+        end
+        local out = {
+            present = true,
+            settingsAvailable = true,
+            ownsFillUnits = false,
+        }
+        if lu == 0 then out.liquid = "liters" elseif lu == 1 then out.liquid = "gallons" end
+        if cu == 0 then out.crops = "liters" elseif cu == 1 then out.crops = "imperial" end
+        if wu == 0 then out.weight = "metric" elseif wu == 1 then out.weight = "imperial" end
+        if ws == 0 then out.weightScale = "auto" elseif ws == 1 then out.weightScale = "pounds" elseif ws == 2 then out.weightScale = "tons" end
+        if mu == 0 then out.measure = "metric" elseif mu == 1 then out.measure = "imperial" end
+        if out.liquid ~= nil or out.crops ~= nil or out.weight ~= nil then
+            out.ownsFillUnits = true
+        end
+        return out
+    end
+
+    if activeImperialName ~= nil then
+        local env = nil
+        local mt = getmetatable(_G)
+        local parent = type(mt) == "table" and mt.__index or nil
+        if type(parent) == "table" and type(parent[activeImperialName]) == "table" then
+            env = parent[activeImperialName]
+        else
+            env = rawget(_G, activeImperialName)
+        end
+        local ucm = (type(env) == "table") and rawget(env, "UnitConversionMod") or nil
+        if type(ucm) == "table" then
+            -- Resolve foreign settings inside the guard: a provider may use a throwing __index.
+            local okSettings, parsed = pcall(function()
+                return imperialFromManager(ucm.settings)
+            end)
+            if okSettings then imperial = parsed end
+        end
+
+        if imperial == nil then
+            local paths = {}
+            local function addPath(p)
+                if type(p) == "string" and p ~= "" then paths[#paths + 1] = p end
+            end
+            local settingsDir = type(env) == "table" and rawget(env, "g_currentModSettingsDirectory") or nil
+            if type(settingsDir) == "string" and settingsDir ~= "" then
+                addPath(settingsDir:gsub("[/\\]?$", "/") .. "unitSettings.xml")
+            end
+            if type(getUserProfileAppPath) == "function" then
+                local ok, base = pcall(getUserProfileAppPath)
+                if ok and type(base) == "string" then
+                    addPath(base .. "modSettings/" .. activeImperialName .. "/unitSettings.xml")
+                    addPath(base .. "modSettings/FS25_ImperialSystem/unitSettings.xml")
+                end
+            end
+            addPath("modSettings/" .. activeImperialName .. "/unitSettings.xml")
+            addPath("modSettings/FS25_ImperialSystem/unitSettings.xml")
+            local function closeXml(xml)
+                if xml == nil or type(xml.delete) ~= "function" then return end
+                pcall(function() xml:delete() end)
+            end
+            local function readXmlInt(xml, key)
+                if xml == nil or type(xml.getInt) ~= "function" then return nil, false end
+                local ok, value = pcall(function() return xml:getInt(key) end)
+                if not ok then return nil, false end
+                return value, true
+            end
+            for _, path in ipairs(paths) do
+                if XMLFile ~= nil and XMLFile.loadIfExists ~= nil then
+                    local okXml, xml = pcall(function()
+                        return XMLFile.loadIfExists("FdUnitConvSettings", path)
+                    end)
+                    if not okXml then
+                        imperial = nil
+                    elseif xml ~= nil then
+                        local lu, luOk = readXmlInt(xml, "settings.liquidUnit")
+                        local cu, cuOk = readXmlInt(xml, "settings.cropsUnit")
+                        local wu, wuOk = readXmlInt(xml, "settings.weightUnit")
+                        local ws, wsOk = readXmlInt(xml, "settings.weightScale")
+                        local mu, muOk = readXmlInt(xml, "settings.measureUnit")
+                        closeXml(xml)
+                        if luOk and cuOk and wuOk and wsOk then
+                            imperial = imperialFromManager({
+                                liquidUnit = lu,
+                                cropsUnit = cu,
+                                weightUnit = wu,
+                                weightScale = ws,
+                                measureUnit = muOk and mu or nil,
+                            })
+                        end
+                        if imperial ~= nil then break end
+                    end
+                end
+            end
+        end
+    end
+
+    if imperialPresent and imperial == nil then
+        imperial = {
+            present = true,
+            settingsAvailable = false,
+            ownsFillUnits = false,
+        }
+    end
+
+    local unitConverter = nil
+    if unitConverterPresent then
+        -- No source archive for this mod is in the local vault. Name detection is not a settings contract.
+        unitConverter = {
+            present = true,
+            settingsKnown = false,
+            settingsAvailable = false,
+            ownsFillUnits = false,
+        }
+    end
+
+    local function modEnv(name)
+        if type(name) ~= "string" or name == "" then return nil end
+        local mt = getmetatable(_G)
+        local parent = type(mt) == "table" and mt.__index or nil
+        if type(parent) == "table" and type(parent[name]) == "table" and parent[name] ~= _G then
+            return parent[name]
+        end
+        local direct = rawget(_G, name)
+        if type(direct) == "table" and direct ~= _G then
+            return direct
+        end
+        return nil
+    end
+
+    local britishFillUnits = nil
+    if british == true then
+        local version = nil
+        local env = modEnv(activeBritishName)
+        if type(env) == "table" then
+            local bfu = rawget(env, "BFU")
+            if type(bfu) == "table" and type(bfu.Core) == "table" and type(bfu.Core.VERSION) == "string" then
+                version = bfu.Core.VERSION
+            end
+        end
+        britishFillUnits = {
+            present = true,
+            active = true,
+            settingsAvailable = true,
+            ownsFillUnits = true,
+            version = version,
+        }
+    end
+
+    local saveUnitProfiles = nil
+    if activeProfileMod ~= nil then
+        saveUnitProfiles = {
+            present = true,
+            settingsAvailable = false,
+            ownsFillUnits = false,
+        }
+        local env = modEnv(activeProfileMod)
+        local sup = type(env) == "table" and rawget(env, "SaveUnitProfiles") or nil
+        if type(sup) == "table" then
+            -- Publish one complete provider reading, never half a profile if a later lookup fails.
+            local okSettings, parsed = pcall(function()
+                local profileReading = { present = true, settingsAvailable = false, ownsFillUnits = false }
+                local cfg = sup.config
+                local chosen = sup.activeProfileName
+                if (type(chosen) ~= "string" or chosen == "") and type(cfg) == "table" and type(cfg.savegames) == "table" then
+                    local slot = tonumber(sup.activeSlot)
+                    if slot ~= nil then chosen = cfg.savegames[slot] end
+                end
+                local profile = nil
+                if type(chosen) == "string" and type(cfg) == "table" and type(cfg.profiles) == "table" then
+                    profile = cfg.profiles[chosen]
+                end
+                local money = nil
+                local miles = nil
+                local fahrenheit = nil
+                local acre = nil
+                local clock = nil
+                if type(profile) == "table" then
+                    money = tonumber(profile.money)
+                    miles = profile.miles
+                    fahrenheit = profile.fahrenheit
+                    acre = profile.acre
+                    clock = profile.use24HourTime
+                end
+                local flagsOk = (miles == true or miles == false)
+                    and (fahrenheit == true or fahrenheit == false)
+                    and (acre == true or acre == false)
+                    and (clock == true or clock == false)
+                if money ~= nil and flagsOk then
+                    profileReading = {
+                        present = true,
+                        settingsAvailable = true,
+                        ownsFillUnits = false,
+                        profileName = chosen,
+                        money = money,
+                        miles = miles,
+                        fahrenheit = fahrenheit,
+                        acre = acre,
+                        use24HourTime = clock,
+                    }
+                elseif type(chosen) == "string" then
+                    profileReading.profileName = chosen
+                end
+                if sup.lastApplyOk == true or sup.lastApplyOk == false then
+                    profileReading.lastApplyOk = sup.lastApplyOk
+                end
+                if sup.hasApplied == true or sup.hasApplied == false then
+                    profileReading.hasApplied = sup.hasApplied
+                end
+                return profileReading
+            end)
+            if okSettings then saveUnitProfiles = parsed end
+        end
+
+        local function gameSettingsTable()
+            local gs = rawget(_G, "g_gameSettings")
+            if type(gs) == "table" then return gs end
+            local mt = getmetatable(_G)
+            local parent = type(mt) == "table" and mt.__index or nil
+            if type(parent) == "table" and type(parent.g_gameSettings) == "table" then
+                return parent.g_gameSettings
+            end
+            return nil
+        end
+        local function readLive(name)
+            local gs = gameSettingsTable()
+            if gs == nil then return nil, false end
+            if name == "use24HourTime" then
+                local ok, value = pcall(function() return gs.use24HourTime end)
+                if ok and (value == true or value == false) then return value, true end
+                return nil, false
+            end
+            if type(gs.getValue) == "function" then
+                local ok, value = pcall(function() return gs:getValue(name) end)
+                if not ok then return nil, false end
+                if value ~= nil then return value, true end
+            end
+            local okField, value = pcall(function() return gs[name] end)
+            if okField and value ~= nil then return value, true end
+            return nil, false
+        end
+        local effective = {}
+        local moneyLive, moneyOk = readLive("moneyUnit")
+        if moneyOk and tonumber(moneyLive) ~= nil then effective.money = tonumber(moneyLive) end
+        local milesLive, milesOk = readLive("useMiles")
+        if milesOk and (milesLive == true or milesLive == false) then effective.miles = milesLive end
+        local tempLive, tempOk = readLive("useFahrenheit")
+        if tempOk and (tempLive == true or tempLive == false) then effective.fahrenheit = tempLive end
+        local acreLive, acreOk = readLive("useAcre")
+        if acreOk and (acreLive == true or acreLive == false) then effective.acre = acreLive end
+        local clockLive, clockOk = readLive("use24HourTime")
+        if clockOk then effective.use24HourTime = clockLive end
+        local liveCount = 0
+        for _ in pairs(effective) do liveCount = liveCount + 1 end
+        if liveCount > 0 then saveUnitProfiles.effective = effective end
+        local function liveMatches(actual, expected)
+            if type(expected) == "boolean" then return actual == expected end
+            if type(expected) == "number" then return tonumber(actual) == expected end
+            return false
+        end
+        if saveUnitProfiles.settingsAvailable ~= true then
+            saveUnitProfiles.applyState = liveCount > 0 and "partial" or "unavailable"
+        elseif liveCount == 0 then
+            saveUnitProfiles.applyState = "pending"
+        else
+            local matched = 0
+            local seen = 0
+            local keys = { "money", "miles", "fahrenheit", "acre", "use24HourTime" }
+            for _, key in ipairs(keys) do
+                if effective[key] ~= nil then
+                    seen = seen + 1
+                    if liveMatches(effective[key], saveUnitProfiles[key]) then matched = matched + 1 end
+                end
+            end
+            if seen == 5 and matched == 5 then
+                saveUnitProfiles.applyState = "effective"
+            else
+                saveUnitProfiles.applyState = "partial"
+            end
+        end
+    end
+
+    return {
+        british = british,
+        britishFillUnits = britishFillUnits,
+        imperial = imperial,
+        unitConverter = unitConverter,
+        saveUnitProfiles = saveUnitProfiles,
+        mods = mods,
+    }
+end
+
 --- Map-specific / mod crops: resolve names from fields, fruit types, economy, and stock indices.
 function FillTypeUtils.enrichCatalogFromData(data)
     if not _catalog then FillTypeUtils.rebuildCatalog() end

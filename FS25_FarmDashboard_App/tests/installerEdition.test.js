@@ -5,6 +5,7 @@ const path = require('path');
 
 const nsh = fs.readFileSync(path.join(__dirname, '..', 'build', 'installer.nsh'), 'utf8');
 const ps1 = fs.readFileSync(path.join(__dirname, '..', 'build', 'uninstall-user-data.ps1'), 'utf8');
+const v5Builder = fs.readFileSync(path.join(__dirname, '..', 'electron-builder.rf.yml'), 'utf8');
 
 describe('installer / uninstall edition ownership', () => {
     test('language combo defaults to English when nothing was saved', () => {
@@ -33,6 +34,18 @@ describe('installer / uninstall edition ownership', () => {
         const rfLegacy = nsh.split('FarmDash_UnFullLegacyRf:')[1].split('FarmDash_UnFullLegacyClassic:')[0];
         expect(rfLegacy).toMatch(/fs25-farm-dashboard-rf/);
         expect(rfLegacy).not.toMatch(/RMDir \/r "\$APPDATA\\fs25-farm-dashboard"/);
+    });
+
+    test('V5 updater uses a separate cache and legacy cleanup preserves V4 pending updates', () => {
+        const v5Metadata = v5Builder.split('extraMetadata:')[1].split('directories:')[0];
+        expect(v5Metadata).toMatch(/^\s*name: fs25-farm-dashboard-rf\s*$/m);
+        expect(v5Builder).toMatch(/^\s*channel: latest-rf\s*$/m);
+        expect(v5Builder).not.toMatch(/^\s*updaterCacheDirName:/m);
+        expect(ps1).toMatch(/function Remove-LegacyV5UpdaterInstaller/);
+        expect(ps1).toMatch(/Join-Path \$legacyRoot 'installer\.exe'/);
+        expect(ps1).toMatch(/\$identity\.ProductName -cne 'FS25 Farm Dashboard V5'/);
+        expect(ps1).toMatch(/\$identity\.ProductVersion -notmatch '\^5\\\.'/);
+        expect(ps1).not.toMatch(/Remove-Tree \$legacyRoot/);
     });
 
     test('current-user setup still installs ImageMagick via a visible permission prompt', () => {

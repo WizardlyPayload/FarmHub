@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "preact/hooks";
 import { SectionRouter } from "@/sections/SectionRouter";
 import { SettingsModal } from "@/settings/SettingsModal";
 import { PlatformChrome } from "@/platform/PlatformChrome";
+import { LinkServerPrompt } from "@/platform/LinkServerPrompt";
 import { HelperPanel } from "@/components/ux/HelperPanel";
 import { fetchSetupStatus } from "@/lib/setup-status";
 import type { SetupStatus } from "@/lib/ux-state";
@@ -10,7 +11,7 @@ import { ModRequiredBanner } from "@/components/ModRequiredBanner";
 import { SectionSidebar } from "@/app/SectionSidebar";
 import { SectionErrorBoundary } from "@/app/SectionErrorBoundary";
 import { VehicleInspector } from "@/components/VehicleInspector";
-import { SECTION_BACKGROUNDS } from "@/app/section-meta";
+import { sectionBackground } from "@/app/section-meta";
 import { syncSectionFromHash, useDashboardStore, writeDefaultSectionPref } from "@/store/dashboard-store";
 import { normalizeSectionId } from "@/types/dashboard";
 import { getFarmDashApi } from "@/services/electron-bridge";
@@ -31,6 +32,7 @@ export function Shell() {
   const setSectionParams = useDashboardStore((s) => s.setSectionParams);
   const setSection = useDashboardStore((s) => s.setSection);
   const payload = useDashboardStore((s) => s.payload);
+  const activeServerId = useDashboardStore((s) => s.activeServerId);
   const activeFarmId = useDashboardStore((s) => s.activeFarmId);
   const locale = useDashboardStore((s) => s.locale);
   const setEnabledSections = useDashboardStore((s) => s.setEnabledSections);
@@ -42,12 +44,22 @@ export function Shell() {
   }, []);
 
   useEffect(() => {
-    void fetchSetupStatus().then(setSetupStatus);
+    let active = true;
+    setSetupStatus(null);
+    const refresh = () => {
+      void fetchSetupStatus(activeServerId).then((next) => {
+        if (active) setSetupStatus(next);
+      });
+    };
+    refresh();
     const id = window.setInterval(() => {
-      void fetchSetupStatus().then(setSetupStatus);
+      refresh();
     }, 15000);
-    return () => window.clearInterval(id);
-  }, []);
+    return () => {
+      active = false;
+      window.clearInterval(id);
+    };
+  }, [activeServerId]);
 
   useEffect(() => {
     applyThemeForSection(loadThemes(), section === "overview" ? "global" : section);
@@ -80,7 +92,7 @@ export function Shell() {
 
   const showInspector = !!inspectorVehicle && (section === "vehicles" || section === "ads");
 
-  const sectionBg = SECTION_BACKGROUNDS[section];
+  const sectionBg = sectionBackground(section);
 
   return (
     <div class="fd-shell" data-locale={locale}>
@@ -122,6 +134,7 @@ export function Shell() {
         ) : null}
       </div>
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <LinkServerPrompt />
     </div>
   );
 }

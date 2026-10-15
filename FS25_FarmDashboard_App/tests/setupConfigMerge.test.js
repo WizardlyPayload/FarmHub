@@ -49,6 +49,17 @@ describe("setupConfigMerge", () => {
     ).toBe(true);
   });
 
+  test("replica slot, pairing, add, and remove each need a restart", () => {
+    const base = [{ id: "source-a", mode: "local", name: "Display", replicaRegistration: { remoteSlot: "savegame3", sessionPairing: "alpha" } }];
+    const renamed = [{ ...base[0], name: "Renamed" }];
+    expect(configNeedsServerReboot({ servers: base }, { servers: renamed })).toBe(false);
+    expect(configNeedsServerReboot({ servers: base }, { servers: [{ ...base[0], replicaRegistration: { remoteSlot: "savegame4", sessionPairing: "alpha" } }] })).toBe(true);
+    expect(configNeedsServerReboot({ servers: base }, { servers: [{ ...base[0], replicaRegistration: { remoteSlot: "savegame3", sessionPairing: "beta" } }] })).toBe(true);
+    expect(configNeedsServerReboot({ servers: [{ id: "source-a", mode: "local" }] }, { servers: base })).toBe(true);
+    expect(configNeedsServerReboot({ servers: base }, { servers: [{ id: "source-a", mode: "local", name: "Display" }] })).toBe(true);
+    expect(configNeedsServerReboot({ servers: base }, { servers: base })).toBe(false);
+  });
+
   test("configNeedsServerReboot is true when a save is added", () => {
     expect(
       configNeedsServerReboot(

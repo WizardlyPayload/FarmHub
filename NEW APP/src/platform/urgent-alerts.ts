@@ -4,6 +4,7 @@
  */
 
 import { t } from "@/i18n/i18n";
+import { effectiveHarvestReady, fieldShowsWithered } from "@/sections/fields/field-helpers";
 
 const SKIP_FUEL_TYPE_NAMES = new Set(["highPressureWasher", "High Pressure Washer"]);
 const MAX_ALERTS_PER_SCAN = 6;
@@ -22,6 +23,7 @@ export interface UrgentAlert {
 export interface UrgentScanDashboard {
   activeFarmId?: number;
   gameSettings?: Record<string, unknown>;
+  sectionOutcomes?: Record<string, { status?: string } | undefined>;
   pastures?: Array<Record<string, unknown>>;
   vehicles?: Array<Record<string, unknown>> | Record<string, unknown>;
   fields?: Array<Record<string, unknown>>;
@@ -33,6 +35,7 @@ export interface UrgentScanDashboard {
   }) => void;
   _urgentAlertsInitialized?: boolean;
   _urgentAlertKeys?: Set<string>;
+  _urgentVehicleSectionReady?: boolean;
   /** Scope key `${server}::${farm}::${save}` — when it changes, re-baseline silently. */
   _urgentAlertScope?: string;
 }
@@ -110,13 +113,7 @@ function getMajorFieldSuggestion(field: Record<string, unknown>): {
   reason?: string;
   score: number;
 } | null {
-  const withered =
-    field.withered === true ||
-    field.isWithered === true ||
-    String(field.fruitTypeState || field.growthStateName || "")
-      .toLowerCase()
-      .includes("wither");
-  if (withered) {
+  if (fieldShowsWithered(field as never)) {
     return {
       action: "Clear",
       actionKey: "withered",
@@ -124,15 +121,7 @@ function getMajorFieldSuggestion(field: Record<string, unknown>): {
       score: 90,
     };
   }
-  const harvestReady =
-    field.harvestReady === true ||
-    field.isHarvestReady === true ||
-    (field.fruitType != null &&
-      field.growthState != null &&
-      Number(field.growthState) >= 7 &&
-      !field.needsPlowing &&
-      !field.needsCultivating);
-  if (harvestReady) {
+  if (effectiveHarvestReady(field as never)) {
     return {
       action: "Harvest",
       actionKey: "harvest",
@@ -265,6 +254,11 @@ export function processUrgentAlertTransitions(
   const alerts = collectUrgentAlerts(dashboard);
   const currentKeys = new Set(alerts.map((a) => a.key));
   const scope = scopeKey ?? dashboard._urgentAlertScope ?? "";
+  const vehicleOutcome = dashboard.sectionOutcomes?.vehicles;
+  const vehicleOutcomeKnown = vehicleOutcome != null;
+  const vehicleSectionReady = !vehicleOutcomeKnown || vehicleOutcome.status === "complete";
+  const firstCompleteVehicleScan =
+    vehicleOutcomeKnown && vehicleSectionReady && !dashboard._urgentVehicleSectionReady;
 
   const scopeChanged =
     scope && dashboard._urgentAlertScope != null && dashboard._urgentAlertScope !== scope;
@@ -275,13 +269,21 @@ export function processUrgentAlertTransitions(
     dashboard._urgentAlertsInitialized = true;
     dashboard._urgentAlertScope = scope;
     dashboard._urgentAlertKeys = currentKeys;
+    dashboard._urgentVehicleSectionReady = vehicleSectionReady;
     return currentKeys;
   }
 
   if (scope) dashboard._urgentAlertScope = scope;
 
   const prev = previousKeys || dashboard._urgentAlertKeys || new Set();
-  const fresh = alerts.filter((a) => !prev.has(a.key));
+  // A provisional vehicle section can contain no rows or stale rows from the
+  // previous session. Its first complete scan establishes standing conditions;
+  // only later additions are new events worth announcing.
+  const fresh = alerts.filter(
+    (a) =>
+      !prev.has(a.key) &&
+      (a.category !== "vehicle" || (vehicleSectionReady && !firstCompleteVehicleScan)),
+  );
   const toNotify = fresh.slice(0, MAX_ALERTS_PER_SCAN);
 
   for (const alert of toNotify) {
@@ -294,6 +296,7 @@ export function processUrgentAlertTransitions(
   }
 
   dashboard._urgentAlertKeys = currentKeys;
+  dashboard._urgentVehicleSectionReady = vehicleSectionReady;
   return currentKeys;
 }
 

@@ -36,8 +36,74 @@ describe('mergedSnapshotHold', () => {
         ).toBe(false);
     });
 
-    test('isRichLuaExport accepts normal export', () => {
-        expect(isRichLuaExport({ fields: [{ id: 1 }], vehicles: [] })).toBe(true);
+    test('isRichLuaExport rejects field id stubs without hectares', () => {
+        expect(
+            isRichLuaExport({
+                fields: [{ farmlandId: 1, id: 1, fruitType: 'WHEAT', hectares: 0 }],
+                vehicles: {},
+                animals: {},
+            })
+        ).toBe(false);
+        expect(
+            isRichLuaExport({
+                fields: [{ farmlandId: 1, hectares: 3.2 }],
+                vehicles: {},
+            })
+        ).toBe(true);
+    });
+
+    test('applyMergedSnapshotIfStaleExport restores fields when vehicle-rich export lost hectares', () => {
+        const state = {
+            lastGoodMergedSnapshot: {
+                fields: [
+                    {
+                        id: 28,
+                        farmlandId: 28,
+                        hectares: 12,
+                        ownerFarmId: 1,
+                        soilFertilizer: { enabled: true, organicMatter: 3.4 },
+                    },
+                ],
+                vehicles: [{ id: 'v1', position: { x: -1200, z: 1700 } }],
+                dataSource: 'merged',
+            },
+        };
+        const degraded = {
+            fields: [{ id: 28, farmlandId: 28, ownerFarmId: 1, fruitType: 'WHEAT' }],
+            vehicles: [{ id: 'v1' }, { id: 'v2' }],
+            dataSource: 'merged',
+            luaAvailable: true,
+        };
+        const out = applyMergedSnapshotIfStaleExport(
+            degraded,
+            { fields: {}, vehicles: [{ id: 'v1' }], finance: { money: 1 } },
+            state
+        );
+        expect(out.fields[0].hectares).toBe(12);
+        expect(out.fields[0].soilFertilizer.organicMatter).toBe(3.4);
+        expect(out.dataTimestamps.heldFromSnapshotAt).toBeTruthy();
+    });
+
+    test('applyLiveSectionHold restores fields even when lua still lists vehicle-rich export', () => {
+        const state = {
+            lastGoodMergedSnapshot: {
+                fields: [{ farmlandId: 7, hectares: 5.5, ownerFarmId: 1, fruitType: 'BARLEY' }],
+            },
+            liveSectionBackup: {
+                fields: [{ farmlandId: 7, hectares: 5.5, ownerFarmId: 1, fruitType: 'BARLEY' }],
+            },
+        };
+        const merged = {
+            fields: [{ farmlandId: 7, ownerFarmId: 1, fruitType: 'BARLEY' }],
+            vehicles: [{ id: 'still-here' }],
+        };
+        const out = applyLiveSectionHold(
+            merged,
+            state,
+            { fields: {}, vehicles: [{ id: 'still-here' }] },
+            null
+        );
+        expect(out.fields[0].hectares).toBe(5.5);
     });
 
     test('shouldIgnoreMinimalLuaExport when snapshot exists', () => {
@@ -49,7 +115,21 @@ describe('mergedSnapshotHold', () => {
             },
         };
         expect(shouldIgnoreMinimalLuaExport({}, state)).toBe(true);
-        expect(shouldIgnoreMinimalLuaExport({ fields: [{ id: 1 }] }, state)).toBe(false);
+        expect(shouldIgnoreMinimalLuaExport({ fields: [{ id: 1, hectares: 2 }] }, state)).toBe(false);
+        expect(shouldIgnoreMinimalLuaExport({ fields: [{ id: 1 }] }, state)).toBe(true);
+    });
+
+    test('first sparse export waits for measured content or explicit empty outcome', () => {
+        const state = {};
+        const committed = { legacy: false, ingressStatus: 'valid', exportGeneration: 1 };
+        expect(shouldIgnoreMinimalLuaExport({ fields: [], vehicles: [] }, state)).toBe(true);
+        expect(shouldIgnoreMinimalLuaExport({ mapTitle: 'A', fields: [], vehicles: [] }, state, committed)).toBe(true);
+        expect(shouldIgnoreMinimalLuaExport({ fields: [{ id: 1, hectares: 1 }] }, state)).toBe(false);
+        expect(shouldIgnoreMinimalLuaExport({ fields: [], sectionOutcomes: { fields: { outcome: 'empty' } } }, state)).toBe(false);
+        expect(shouldIgnoreMinimalLuaExport({ exportClass: 'gameplay', exportGeneration: 1, fields: [], vehicles: [] }, state, committed)).toBe(false);
+        expect(shouldIgnoreMinimalLuaExport({ mapTitle: 'A', serverInfo: { mapName: 'A' }, fields: [], vehicles: [] }, state, committed)).toBe(false);
+        expect(shouldIgnoreMinimalLuaExport({ mapTitle: 'A', serverInfo: { mapName: 'A' }, fields: [], vehicles: [] }, state,
+            { ...committed, ingressStatus: 'identity-unconfirmed' })).toBe(true);
     });
 
     test('applyMergedSnapshotIfStaleExport restores full snapshot', () => {
@@ -282,19 +362,18 @@ describe('mergedSnapshotHold', () => {
     test('updateLastGoodMergedSnapshot does not wipe animals from prior snapshot', () => {
         const state = {
             lastGoodMergedSnapshot: {
-                fields: [{ id: 1 }],
+                fields: [{ id: 1, hectares: 2 }],
                 animals: [{ id: 10, ownerFarmId: 1, animalCount: 3 }],
             },
         };
         updateLastGoodMergedSnapshot(
             state,
-            { fields: [{ id: 1 }, { id: 2 }], animals: [] },
-            { fields: [{ id: 1 }, { id: 2 }], vehicles: [] }
+            { fields: [{ id: 1, hectares: 2 }, { id: 2, hectares: 3 }], animals: [] },
+            { fields: [{ id: 1, hectares: 2 }, { id: 2, hectares: 3 }], vehicles: [] }
         );
         expect(state.lastGoodMergedSnapshot.fields).toHaveLength(2);
         expect(state.lastGoodMergedSnapshot.animals).toHaveLength(1);
     });
-
     test('animalsSectionEmpty detects cluster-only husbandry rows', () => {
         expect(animalsSectionEmpty([])).toBe(true);
         expect(
@@ -463,8 +542,17 @@ describe('mergedSnapshotHold', () => {
             { stock: { enabled: false, byFarm: {} }, redTape: { enabled: false, byFarm: {} } },
             { stock: {}, redTape: { enabled: false, byFarm: {} } }
         );
-        expect(state.liveSectionBackup.stock.byFarm['1'].items[0].totalLiters).toBe(5000);
+        expect(stockSectionEmpty(state.liveSectionBackup.stock)).toBe(false);
         expect(state.liveSectionBackup.redTape).toBeUndefined();
+        updateLiveSectionBackup(
+            state,
+            {
+                stock: { enabled: false, readState: 'ok', coverage: 'complete', byFarm: {} },
+                redTape: { enabled: false, byFarm: {} },
+            },
+            null
+        );
+        expect(state.liveSectionBackup.stock).toBeNull();
     });
 
     test('buildHeldPayloadFromState does not reinject redTape when payload explicitly disabled', () => {

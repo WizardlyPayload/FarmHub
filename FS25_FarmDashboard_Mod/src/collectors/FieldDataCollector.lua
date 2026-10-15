@@ -2,6 +2,81 @@
 
 FieldDataCollector = {}
 
+local soilSampleHold = {}
+
+--- Mission-monotonic g_time, inherited through the mod environment.
+--- Not environment.dayTime, and not a wall clock. Missing stays nil.
+local function missionClock()
+    local t = _G.g_time
+    if type(t) == "number" then
+        return t
+    end
+    return nil
+end
+
+local function sampleSessionKey()
+    local mission = _G.g_currentMission
+    local info = type(mission) == "table" and mission.missionInfo or nil
+    if type(info) == "table" and info.savegameDirectory ~= nil then
+        return tostring(info.savegameDirectory)
+    end
+    return ""
+end
+
+--- A successful sample is stamped at this collection, even when the numbers match the previous sample.
+function FieldDataCollector.holdSoilSample(fieldId, signature)
+    local key = sampleSessionKey() .. "|" .. tostring(fieldId or "")
+    local now = missionClock()
+    local prev = soilSampleHold[key]
+    if type(prev) ~= "table" then
+        prev = {}
+    end
+    prev.signature = signature
+    prev.at = now
+    prev.nitrogen = now
+    prev.ph = now
+    soilSampleHold[key] = prev
+    return now
+end
+
+--- One metric can succeed while the other stays at its own earlier time.
+function FieldDataCollector.recordSoilMetric(fieldId, metric, succeeded)
+    local key = sampleSessionKey() .. "|" .. tostring(fieldId or "")
+    local prev = soilSampleHold[key]
+    if type(prev) ~= "table" then
+        prev = {}
+    end
+    local slot = tostring(metric or "")
+    if succeeded then
+        prev[slot] = missionClock()
+    end
+    soilSampleHold[key] = prev
+    if succeeded then
+        return prev[slot]
+    end
+    if type(prev[slot]) == "number" then
+        return prev[slot]
+    end
+    if type(prev.at) == "number" then
+        return prev.at
+    end
+    return nil
+end
+
+--- Failed or skipped collection keeps the previous sample's own time. It does not invent a new one.
+function FieldDataCollector.retainHeldSoilSample(fieldId)
+    local key = sampleSessionKey() .. "|" .. tostring(fieldId or "")
+    local prev = soilSampleHold[key]
+    if type(prev) == "table" and type(prev.at) == "number" then
+        return prev.at
+    end
+    return nil
+end
+
+function FieldDataCollector.clearSoilSampleHold()
+    soilSampleHold = {}
+end
+
 --- Serialized as JSON `null` (see `FarmDashboardDataCollector:toJSON` string handling).
 local FD_JSON_NULL_STR = "__FD_JSON_NULL__"
 
@@ -56,7 +131,7 @@ local FD_GROUND_TYPE_NAME = {
 
 local function isPreparedSeedbedGroundValue(gType)
     local g = tonumber(gType) or 0
-    local FGT = rawget(_G, "FieldGroundType")
+    local FGT = _G.FieldGroundType
     local first = (type(FGT) == "table" and tonumber(FGT.STUBBLE_TILLAGE)) or 2
     local last = (type(FGT) == "table" and tonumber(FGT.RIDGE)) or 7
     return g >= first and g <= last
@@ -83,6 +158,30 @@ end
 --- FS25 spinach: two-cut vegetable (harvest → regrow → 2nd harvest → done). Not grass, not one-shot arable.
 local function isSpinachFruitName(name)
     return string.upper(tostring(name or "")) == "SPINACH"
+end
+
+--- Giants FruitTypeDesc: cut foliage (stubble after combine) vs standing harvest-ready.
+local function fruitDescIsCut(ftDesc, gs)
+    if not ftDesc or gs == nil then return false end
+    if type(ftDesc.getIsCut) == "function" then
+        local ok, v = pcall(function() return ftDesc:getIsCut(gs) end)
+        if ok and v == true then return true end
+    end
+    local cutStates = rawget(ftDesc, "cutStates")
+    if type(cutStates) == "table" and cutStates[gs] then return true end
+    local cutState = tonumber(rawget(ftDesc, "cutState")) or 0
+    if cutState > 0 and gs == cutState then return true end
+    return false
+end
+
+local function fruitDescIsHarvestReady(ftDesc, gs)
+    if not ftDesc or gs == nil then return false end
+    if fruitDescIsCut(ftDesc, gs) then return false end
+    if type(ftDesc.getIsHarvestReady) == "function" then
+        local ok, v = pcall(function() return ftDesc:getIsHarvestReady(gs) end)
+        if ok and v == true then return true end
+    end
+    return false
 end
 
 local function _newMoistureFarmRow()
@@ -750,7 +849,7 @@ function FieldDataCollector.readCareerGameplayFlags()
 
     local m = _G.g_currentMission
     local xmlPath = m and farmDashJoinSavePath(m.missionInfo and m.missionInfo.savegameDirectory, "careerSavegame.xml")
-    if xmlPath then
+    if xmlPath and type(fileExists) == "function" and fileExists(xmlPath) then
         local okLoad, fh = pcall(loadXMLFile, "FarmDashCareerGameplay", xmlPath)
         if okLoad and fh and fh ~= 0 then
             out.plowingRequired = farmDashReadBoolFromCareerXml(fh, "plowingRequiredEnabled", true)
@@ -767,7 +866,7 @@ function FieldDataCollector.readCareerGameplayFlags()
     end
 
     local ggs = _G.g_gameSettings
-    local GS = rawget(_G, "GameSettings")
+    local GS = type(_G.GameSettings) == "table" and _G.GameSettings or nil
     if ggs and type(ggs.getValue) == "function" and GS and GS.SETTING then
         for _, name in ipairs({ "PLOWING_REQUIRED", "PERIODIC_PLOWING", "PLOWING" }) do
             local sid = GS.SETTING[name]
@@ -987,12 +1086,27 @@ function FieldDataCollector:collectStep(opts)
         return true, result or {}
     end
 
+    local function keepLastFields(reason)
+        if reason and Logging and Logging.info then
+            Logging.info("[FarmDash] fields collector: %s — keeping last export", tostring(reason))
+        end
+        local dc = rawget(_G, "FarmDashboardDataCollector")
+        local cached = dc and dc.moduleCache and dc.moduleCache.fields
+        if type(cached) == "table" then
+            for _ in pairs(cached) do
+                return cached
+            end
+        end
+        return nil
+    end
+
     if FieldDataCollector._fdCo then
         local ok, a, b = coroutine.resume(FieldDataCollector._fdCo)
         if not ok then
             FieldDataCollector._fdCo = nil
             FieldDataCollector._yieldEvery = nil
-            return true, {}
+            local kept = keepLastFields(a)
+            return true, kept
         end
         if a == "progress" then
             return false, b
@@ -1001,14 +1115,14 @@ function FieldDataCollector:collectStep(opts)
         if stCo == "dead" then
             FieldDataCollector._fdCo = nil
             FieldDataCollector._yieldEvery = nil
-            return true, a or {}
+            return true, a or keepLastFields("empty result")
         end
         return false, b
     end
 
     local st = FieldDataCollector._fieldStep
     if not st then
-        return true, {}
+        return true, keepLastFields(nil)
     end
 
     if not st.preambleDone then
@@ -1232,7 +1346,7 @@ function FieldDataCollector:_collectImpl()
             if rawget(_G, "FillTypeUtils") and FillTypeUtils.rebuildCatalog then
                 FillTypeUtils.rebuildCatalog()
             end
-            local BaleRef = rawget(_G, "Bale")
+            local BaleRef = type(_G.Bale) == "table" and _G.Bale or nil
             local function isPhysicalBale(it)
                 if not it then return false end
                 if BaleRef and type(it.isa) == "function" then
@@ -1592,7 +1706,7 @@ function FieldDataCollector:_collectImpl()
                 end
             end
             --- FS25: world bales also live in the mission slot system limited-object bucket (same source the game uses for bale limits).
-            local SlotSystem = rawget(_G, "SlotSystem")
+            local SlotSystem = type(_G.SlotSystem) == "table" and _G.SlotSystem or nil
             if SlotSystem and mission.slotSystem and mission.slotSystem.objectLimits then
                 local lim = mission.slotSystem.objectLimits[SlotSystem.LIMITED_OBJECT_BALE]
                 if lim and type(lim.objects) == "table" then
@@ -2075,19 +2189,21 @@ function FieldDataCollector:_collectImpl()
                         isPostHarvestState = true
                     end
                 end
+                if not isMowableForageFruitName(ftUpper) and not isSpinachFruitName(ftUpper)
+                    and fruitDescIsCut(ftDesc, gs) then
+                    isPostHarvestState = true
+                end
 
-                --- Arable: the Giants *window* minHarvest..maxHarvest can span several indices. Treating any index
-                --- in that band as "ready" made barley show harvest at 7/8 while the bar is still growing. Align with
-                --- the last harvestable index (maxHarvestingGrowthState) unless the engine names the state harvestReady.
-                --- If the probe reports gs above maxHarvest but still <= numGrowthStates and not withered, canola etc.
-                --- often remain harvestable (previously stayed "growing" at e.g. gs 10 vs maxHarvest 9).
+                --- Arable: prefer FruitTypeDesc:getIsHarvestReady. Do not treat cut/stubble indices
+                --- (gs above maxHarvestingGrowthState, still <= numGrowthStates) as still harvestable —
+                --- wheat cut is gs 10 with leftover HARVEST_READY ground after straw is baled.
                 local numGs = ftDesc.numGrowthStates or fData.maxGrowthState or 0
                 local inHarvestWindow = false
-                if not isMowableForageFruitName(ftUpper) and not isSpinachFruitName(ftUpper) and ftDesc.minHarvestingGrowthState then
-                    if gs >= minHarvest and gs <= maxHarvest then
-                        inHarvestWindow = (gs == maxHarvest)
-                    elseif gs > maxHarvest and numGs > 0 and gs <= numGs and not isWitheredState then
+                if not isMowableForageFruitName(ftUpper) and not isSpinachFruitName(ftUpper) then
+                    if fruitDescIsHarvestReady(ftDesc, gs) then
                         inHarvestWindow = true
+                    elseif ftDesc.minHarvestingGrowthState and gs >= minHarvest and gs <= maxHarvest then
+                        inHarvestWindow = (gs == maxHarvest)
                     end
                 end
                 local isHarvestReadyNamed = (gsName == "harvestReady" or gsName == "harvestReadySecond"
@@ -2246,6 +2362,7 @@ function FieldDataCollector:_collectImpl()
         -- 3. SOIL MAP RADIUS SCAN (N / pH sampling)
         -- ====================================================================
         local nLevel, nTarget, phLevel, phTarget = 0, 0, 0, 0
+        local nitrogenRead, nitrogenTargetRead, phRead = false, false, false
         local isScanned = false
         local sumPhBarMin, validPhBarMin = 0, 0
 
@@ -2329,9 +2446,9 @@ function FieldDataCollector:_collectImpl()
                 end
             end)
 
-            if validN  > 0 then nLevel  = sumN  / validN end
-            if validNTarget > 0 then nTarget = sumNTarget / validNTarget end
-            if validPh > 0 then phLevel = sumPh / validPh; phTarget = sumPhTarget / validPh end
+            if validN  > 0 then nLevel  = sumN  / validN; nitrogenRead = true end
+            if validNTarget > 0 then nTarget = sumNTarget / validNTarget; nitrogenTargetRead = true end
+            if validPh > 0 then phLevel = sumPh / validPh; phTarget = sumPhTarget / validPh; phRead = true end
             fData.pfSoilTypeIndex = soilTypeBest
         end
 
@@ -2341,12 +2458,38 @@ function FieldDataCollector:_collectImpl()
         if phBarMinAvg <= 0 then phBarMinAvg = 5.5 end
 
         fData.isScanned      = isScanned
-        fData.nitrogenLevel  = nLevel
-        fData.targetNitrogen = nTarget
-        fData.phValue        = phLevel
-        fData.targetPh       = phTarget
+        fData.nitrogenLevel  = nitrogenRead and nLevel or "__FD_JSON_NULL__"
+        fData.targetNitrogen = nitrogenTargetRead and nTarget or "__FD_JSON_NULL__"
+        fData.phValue        = phRead and phLevel or "__FD_JSON_NULL__"
+        fData.targetPh       = phRead and phTarget or "__FD_JSON_NULL__"
         fData.phLimeBarMin   = phBarMinAvg
         fData.phLimeBarMax   = phTarget
+        if not isScanned then
+            fData.soilReadState = "unscanned"
+            fData.nitrogenReadState = "unscanned"
+            fData.phReadState = "unscanned"
+            fData.soilSampledAt = nil
+            fData.nitrogenSampledAt = nil
+            fData.phSampledAt = nil
+        else
+            fData.nitrogenReadState = nitrogenRead and "ok" or "held"
+            fData.phReadState = phRead and "ok" or "held"
+            fData.nitrogenSampledAt = FieldDataCollector.recordSoilMetric(fData.id, "nitrogen", nitrogenRead)
+            fData.phSampledAt = FieldDataCollector.recordSoilMetric(fData.id, "ph", phRead)
+            if nitrogenRead and phRead then
+                fData.soilReadState = "ok"
+                fData.soilSampledAt = FieldDataCollector.holdSoilSample(
+                    fData.id,
+                    tostring(fData.nitrogenLevel) .. "|" .. tostring(fData.phValue) .. "|" .. tostring(isScanned)
+                )
+            elseif nitrogenRead or phRead then
+                fData.soilReadState = "partial"
+                fData.soilSampledAt = nil
+            else
+                fData.soilReadState = "failed"
+                fData.soilSampledAt = FieldDataCollector.retainHeldSoilSample(fData.id)
+            end
+        end
 
         -- ====================================================================
         -- 4. STATUS FLAGS AND SUGGESTIONS
@@ -2382,12 +2525,9 @@ function FieldDataCollector:_collectImpl()
                 -- Lime: use soil-map optimal pH for sampled soil types (targetPh); band ~0.2 below target.
                 local limeBand = 0.2
                 if phTarget > 0 then
+                    -- The 0.2 band is the only tolerance; the N 10% rule must not widen it.
                     local idealMin = phTarget - limeBand
-                    local gapBelow = idealMin - phLevel
                     local needLimeByPh = phLevel < idealMin
-                    if needLimeByPh and gapBelow > 0 and gapBelow <= (NUTRIENT_CLOSE_FRAC * math.max(idealMin, 0.01)) then
-                        needLimeByPh = false
-                    end
                     fData.needsLime = needLimeByPh
                     fData.limeLevel = (not needLimeByPh) and 1 or 0
                 else
@@ -2541,9 +2681,9 @@ function FieldDataCollector:_collectImpl()
                 if isPF and isScanned and limeOkGrow then
                     local tgt = phTarget > 0 and string.format("%.1f", phTarget) or "6.5"
                     local band = phTarget > 0 and string.format("%.1f", phTarget - 0.2) or "6.3"
-                    table.insert(fData.suggestions, {priority = PR.grow_lime, type = "maintenance", action = "Apply lime", reason = string.format("Regrowth after cut â€” pH %.1f / target %s (below ~%s).%s", phLevel, tgt, band, TYRE_NOTE_ON_CROP)})
+                    table.insert(fData.suggestions, {priority = PR.grow_lime, type = "maintenance", action = "Apply lime", reason = string.format("Regrowth after cut - pH %.1f / target %s (below ~%s).%s", phLevel, tgt, band, TYRE_NOTE_ON_CROP)})
                 elseif not isPF and limeOkGrow then
-                    table.insert(fData.suggestions, {priority = PR.grow_lime, type = "maintenance", action = "Apply lime", reason = "Regrowth after mowing â€” correct pH if needed." .. TYRE_NOTE_ON_CROP})
+                    table.insert(fData.suggestions, {priority = PR.grow_lime, type = "maintenance", action = "Apply lime", reason = "Regrowth after mowing - correct pH if needed." .. TYRE_NOTE_ON_CROP})
                 end
                 if isPF and isScanned and nTarget > 0 and fData.needsFertilizer then
                     table.insert(fData.suggestions, {
@@ -2559,7 +2699,7 @@ function FieldDataCollector:_collectImpl()
                 elseif not isPF and fData.needsFertilizer then
                     table.insert(fData.suggestions, {
                         priority = PR.grow_fert, type = "maintenance", action = "Apply fertiliser",
-                        reason = "Grass regrowth after cut â€” top up with any fertiliser type as needed." .. TYRE_NOTE_ON_CROP
+                        reason = "Grass regrowth after cut - top up with any fertiliser type as needed." .. TYRE_NOTE_ON_CROP
                     })
                 end
                 do
@@ -2569,7 +2709,7 @@ function FieldDataCollector:_collectImpl()
                             priority = 208,
                             type = "info",
                             action = "Allow regrowth",
-                            reason = "Lime and fertiliser needs are met â€” grass will progress toward the next cut.",
+                            reason = "Lime and fertiliser needs are met - grass will progress toward the next cut.",
                         })
                     end
                 end
@@ -2586,13 +2726,13 @@ function FieldDataCollector:_collectImpl()
                     table.insert(fData.suggestions, {priority = PR.grow_lime, type = "maintenance", action = "Apply lime", reason = "Soil pH needs correction" .. TYRE_NOTE_ON_CROP})
                 end
                 if fData.needsRolling then
-                    table.insert(fData.suggestions, {priority = PR.grow_roll, type = "maintenance", action = "Roll field", reason = "First growth stage after planting â€” roll if needed."})
+                    table.insert(fData.suggestions, {priority = PR.grow_roll, type = "maintenance", action = "Roll field", reason = "First growth stage after planting - roll if needed."})
                 end
                 if weedUseMechanical then
                     local wp = weedPercentForDisplay(fData.weedLevel)
                     table.insert(fData.suggestions, {
                         priority = PR.grow_weed_m, type = "maintenance", action = "Weed with weeder or hoe",
-                        reason = string.format("Weeds ~%.0f%% â€” use weeder or hoe at early growth (about stage 2 or below).", wp)
+                        reason = string.format("Weeds ~%.0f%% - use weeder or hoe at early growth (about stage 2 or below).", wp)
                     })
                 end
                 if isPF and isScanned and nTarget > 0 and fData.needsFertilizer then
@@ -2604,7 +2744,7 @@ function FieldDataCollector:_collectImpl()
                 if isPF and isScanned and fData.needsFertilizer and nTarget > 0 and not deferEarlyN then
                     table.insert(fData.suggestions, {
                         priority = PR.grow_fert, type = "maintenance", action = "Apply fertiliser (solid or liquid)",
-                        reason = string.format("Nitrogen: %.0f / %.0f kg/ha â€” mineral fertiliser after organic if used.%s%s", nLevel, nTarget, FERT_ORGANIC_FIRST, TYRE_NOTE_ON_CROP)
+                        reason = string.format("Nitrogen: %.0f / %.0f kg/ha - mineral fertiliser after organic if used.%s%s", nLevel, nTarget, FERT_ORGANIC_FIRST, TYRE_NOTE_ON_CROP)
                     })
                 elseif not isPF and fData.needsFertilizer then
                     local reason = string.format("Fertilization level: %d/2.%s", fData.fertilizationLevel or 0, FERT_ORGANIC_FIRST)
@@ -2617,7 +2757,7 @@ function FieldDataCollector:_collectImpl()
                     local wp = weedPercentForDisplay(fData.weedLevel)
                     table.insert(fData.suggestions, {
                         priority = PR.grow_herb, type = "maintenance", action = "Apply herbicide",
-                        reason = string.format("Weeds ~%.0f%% â€” past early growth; use herbicide sprayer if mechanical weeding is no longer ideal.%s", wp, TYRE_NOTE_ON_CROP)
+                        reason = string.format("Weeds ~%.0f%% - past early growth; use herbicide sprayer if mechanical weeding is no longer ideal.%s", wp, TYRE_NOTE_ON_CROP)
                     })
                 end
             end
@@ -2752,7 +2892,7 @@ function FieldDataCollector:_collectImpl()
                         if a then return a end
                     end
                 end
-                local mgr = rawget(_G, "g_densityMapHeightManager")
+                local mgr = type(_G.g_densityMapHeightManager) == "table" and _G.g_densityMapHeightManager or nil
                 if mgr then
                     if type(mgr.getDensityMapHeightUtil) == "function" then
                         local ok2, r2 = pcall(function() return mgr:getDensityMapHeightUtil() end)
@@ -2794,7 +2934,7 @@ function FieldDataCollector:_collectImpl()
                     seen[idx] = true
                     table.insert(list, { name = fillDisplayName(idx), index = idx, baleable = true })
                 end
-                local FillTypeT = rawget(_G, "FillType")
+                local FillTypeT = type(_G.FillType) == "table" and _G.FillType or nil
                 if FillTypeT and FillTypeT.STRAW then
                     addIndex(FillTypeT.STRAW)
                 end
@@ -2861,11 +3001,15 @@ function FieldDataCollector:_collectImpl()
             --- lists every fill type registered on the terrain detail height map (straw, windrows, chaff heaps, etc.).
             --- Probing only TEDDER + hardcoded swaths can miss types; merging the manager list matches what the game uses for map / tip visibility.
             do
-                local dmm = rawget(_G, "g_densityMapHeightManager")
-                if dmm and type(dmm.getIsValid) == "function" and dmm:getIsValid() and type(dmm.getDensityMapHeightTypes) == "function" then
+                local dmm = type(_G.g_densityMapHeightManager) == "table" and _G.g_densityMapHeightManager or nil
+                local okValid, isValid = false, false
+                if dmm and type(dmm.getIsValid) == "function" then
+                    okValid, isValid = pcall(function() return dmm:getIsValid() end)
+                end
+                if okValid and isValid and type(dmm.getDensityMapHeightTypes) == "function" then
                     local okList, htypes = pcall(function() return dmm:getDensityMapHeightTypes() end)
                     if okList and type(htypes) == "table" then
-                        local FillTypeT = rawget(_G, "FillType")
+                        local FillTypeT = type(_G.FillType) == "table" and _G.FillType or nil
                         local skipTarp = FillTypeT and FillTypeT.TARP or nil
                         for _, heightType in ipairs(htypes) do
                             if heightType and type(heightType.fillTypeIndex) == "number" and heightType.fillTypeIndex > 0 then
@@ -3043,7 +3187,7 @@ function FieldDataCollector:_collectImpl()
                     priority = 18,
                     type     = "maintenance",
                     action   = act,
-                    reason   = "Physical bale(s) on this farmland â€” clear them before cultivation or drilling.",
+                    reason   = "Physical bale(s) on this farmland - clear them before cultivation or drilling.",
                 })
             end
             --- Loose straw / grass / hay: presence-only (next workflow stage when all false).
@@ -3057,28 +3201,28 @@ function FieldDataCollector:_collectImpl()
                 end
                 if hs and not hg and not hh then
                     ins(PR_FORAGE, "Bale loose straw or pick up with a forage wagon",
-                        "Loose straw on the field â€” bale or collect before tillage or the next pass.")
+                        "Loose straw on the field - bale or collect before tillage or the next pass.")
                 elseif hg and not hs and not hh then
                     ins(PR_FORAGE, "Tedder to make hay, or bale wet and wrap for silage",
-                        "Fresh grass windrow on the field â€” tedder to dry for hay, or bale while wet and wrap bales for silage.")
+                        "Fresh grass windrow on the field - tedder to dry for hay, or bale while wet and wrap bales for silage.")
                 elseif hh and not hs and not hg then
                     ins(PR_FORAGE, "Bale hay windrow or collect dry forage",
-                        "Hay / dry grass windrow on the field â€” bale or load before rain or soil work.")
+                        "Hay / dry grass windrow on the field - bale or load before rain or soil work.")
                 elseif hs and hg and hh then
                     ins(PR_FORAGE, "Clear loose straw, grass, or hay windrows",
-                        "Straw, grass, and hay windrows detected on the ground â€” clear forage before the next field stage.")
+                        "Straw, grass, and hay windrows detected on the ground - clear forage before the next field stage.")
                 elseif hs and hg then
                     ins(PR_FORAGE, "Clear loose straw and grass windrows",
-                        "Straw and grass windrows on the field â€” bale or collect before continuing.")
+                        "Straw and grass windrows on the field - bale or collect before continuing.")
                 elseif hs and hh then
                     ins(PR_FORAGE, "Clear loose straw and hay",
-                        "Straw and hay windrows on the field â€” bale or collect before continuing.")
+                        "Straw and hay windrows on the field - bale or collect before continuing.")
                 elseif hg and hh then
                     ins(PR_FORAGE, "Clear grass and hay windrows",
-                        "Grass and hay windrows on the field â€” finish drying/baling before the next stage.")
+                        "Grass and hay windrows on the field - finish drying/baling before the next stage.")
                 else
                     ins(PR_FORAGE, "Clear loose forage on the field",
-                        "Loose forage material detected â€” bale or collect before the next field stage.")
+                        "Loose forage material detected - bale or collect before the next field stage.")
                 end
             end
             if (n or 0) > 0 or (fData.hasLooseForage == true) then

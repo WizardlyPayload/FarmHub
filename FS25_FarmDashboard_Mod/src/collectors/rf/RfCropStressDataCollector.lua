@@ -132,7 +132,7 @@ end
 
 function RfCropStressDataCollector.isModLoaded()
     if getManager() ~= nil then return true end
-    local loaded = rawget(_G, "g_modIsLoaded")
+    local loaded = _G.g_modIsLoaded
     return type(loaded) == "table" and loaded[MOD_NAME] == true
 end
 

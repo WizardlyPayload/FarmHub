@@ -32,23 +32,25 @@ export function asWeatherSnapshot(raw: unknown): WeatherSnapshot | null {
   return raw as WeatherSnapshot;
 }
 
-export function formatWeatherTemp(celsius: unknown): string {
+export function formatWeatherTemp(celsius: unknown, profile?: { effective?: { fahrenheit?: boolean } } | null): string {
   const n = Number(celsius);
   if (!Number.isFinite(n)) return "—";
+  if (profile?.effective?.fahrenheit === true) return `${Math.round((n * 9) / 5 + 32)}°F`;
   return `${Math.round(n)}°C`;
 }
 
 export function formatForecastTempRange(
   day: WeatherForecastDay | null | undefined,
-  _fallbackCelsius?: unknown
+  _fallbackCelsius?: unknown,
+  profile?: { effective?: { fahrenheit?: boolean } } | null,
 ): string {
   const min = Number(day?.minTemperature);
   const max = Number(day?.maxTemperature);
   if (Number.isFinite(min) && Number.isFinite(max)) {
-    return `${Math.round(min)}° - ${Math.round(max)}°C`;
+    return `${formatWeatherTemp(min, profile).replace("°C", "°").replace("°F", "°")} - ${formatWeatherTemp(max, profile)}`;
   }
-  if (Number.isFinite(min)) return `${Math.round(min)}°C`;
-  if (Number.isFinite(max)) return `${Math.round(max)}°C`;
+  if (Number.isFinite(min)) return formatWeatherTemp(min, profile);
+  if (Number.isFinite(max)) return formatWeatherTemp(max, profile);
   return "—";
 }
 
@@ -57,15 +59,15 @@ export function formatWeatherGuardDayTemp(day: {
   temperature?: number | null;
   minTemperature?: number | null;
   maxTemperature?: number | null;
-} | null | undefined): string {
+} | null | undefined, profile?: { effective?: { fahrenheit?: boolean } } | null): string {
   const min = Number(day?.minTemperature);
   const max = Number(day?.maxTemperature);
   if (Number.isFinite(min) && Number.isFinite(max)) {
-    return `${Math.round(min)}° - ${Math.round(max)}°C`;
+    return `${formatWeatherTemp(min, profile)} - ${formatWeatherTemp(max, profile)}`;
   }
-  if (Number.isFinite(min)) return formatWeatherTemp(min);
-  if (Number.isFinite(max)) return formatWeatherTemp(max);
-  return formatWeatherTemp(day?.temperature);
+  if (Number.isFinite(min)) return formatWeatherTemp(min, profile);
+  if (Number.isFinite(max)) return formatWeatherTemp(max, profile);
+  return formatWeatherTemp(day?.temperature, profile);
 }
 
 export function normalizeWeatherCondition(weatherType: unknown): WeatherConditionKey {

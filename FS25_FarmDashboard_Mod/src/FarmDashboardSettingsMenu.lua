@@ -43,6 +43,7 @@ FarmDashboardSettingsMenu.ITEMS = {
     { id = "enableRedTape", key = "enableRedTape", values = { false, true }, strings = offOnStrings },
     { id = "enableInvoices", key = "enableInvoices", values = { false, true }, strings = offOnStrings },
     { id = "enableHirePurchasing", key = "enableHirePurchasing", values = { false, true }, strings = offOnStrings },
+    { id = "enableCompanionMods", key = "enableCompanionMods", values = { false, true }, strings = offOnStrings },
     { id = "collectionCycleSec", key = "collectionCycleMs", values = rangeValues(60, 1800, 60), toDisplay = function(v) return math.floor((v or 60000) / 1000) end, toStore = function(v) return v * 1000 end },
     { id = "sliceBudgetMs", key = "sliceBudgetMs", values = rangeValues(1, 16, 1) },
     { id = "postLoadGraceSec", key = "postLoadCollectionGraceSec", values = rangeValues(0, 120, 15) },

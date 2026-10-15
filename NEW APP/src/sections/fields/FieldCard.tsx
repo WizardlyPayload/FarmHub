@@ -1,6 +1,8 @@
 import { t } from "@/i18n/i18n";
 import { Badge, Button, Card } from "@/components/ui";
 import { useDashboardStore } from "@/store/dashboard-store";
+import { useUnitDisplay } from "@/lib/fill-unit-mode";
+import { saveProfileFromUnitDisplay } from "@/lib/profile-display";
 import { isRfSoilActive, rfSoilUrgency } from "@/lib/realisticFarming/land";
 import { normalizeFieldOutline } from "@/lib/fleetMapOverlays";
 import {
@@ -72,6 +74,7 @@ export function FieldCard({
 }: FieldCardProps) {
   const displayField = fieldWithPreparedGroundCropCleared(field);
   const setSection = useDashboardStore((s) => s.setSection);
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
   const rfSoilActive = isRfSoilActive(displayField.soilFertilizer);
   const rfCropStressActive = displayField.cropStress?.enabled === true;
   const rfDominant = rfSoilActive || rfCropStressActive;
@@ -157,14 +160,14 @@ export function FieldCard({
         <p class="fd-field-card__subhead">
           {t("fields.rf.soil.cropAndArea", {
             crop: formatCropName(displayField.fruitType),
-            area: formatFieldHectares(displayField),
+            area: formatFieldHectares(displayField, profile),
           })}
         </p>
       ) : (
         <div class="fd-field-card__meta">
           <div>
             <small>{t("fields.cardArea")}</small>
-            <strong>{formatFieldHectares(displayField)}</strong>
+            <strong>{formatFieldHectares(displayField, profile)}</strong>
           </div>
           <div>
             <small>{t("fields.cardCrop")}</small>

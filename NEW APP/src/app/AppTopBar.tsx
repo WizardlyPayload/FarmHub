@@ -5,8 +5,10 @@ import { Badge, Button } from "@/components/ui";
 import { NotificationBell } from "@/platform/PlatformChrome";
 import { isFarmDashLocalConfigHost } from "@/platform/viewer-mode";
 import { getPlayerFarmRecords, isMultiFarmEnabled } from "@/lib/farm-scope";
-import { switchActiveFarm, switchActiveServer } from "@/services/ws-client";
+import { refreshDashboard, switchActiveFarm, switchActiveServer } from "@/services/ws-client";
 import { formatGameTimeDisplay } from "@/lib/game-time";
+import { saveProfileFromUnitDisplay } from "@/lib/profile-display";
+import { unitDisplayFromPayload } from "@/lib/fill-units";
 import {
   asWeatherSnapshot,
   engineWeatherChip,
@@ -25,8 +27,7 @@ import {
   luaStaleRefreshDelayMs,
   resolveNavbarConnectionBadge,
 } from "@/lib/connection-badge";
-
-const SAVE_TABS_MAX = 3;
+import { formatUniqueServerLabels } from "@/lib/server-label";
 
 interface Props {
   onOpenSettings: () => void;
@@ -46,11 +47,13 @@ export function AppTopBar({ onOpenSettings }: Props) {
   const weather = asWeatherSnapshot(payload?.weather);
   const weatherChip = engineWeatherChip(weather);
   const showWeather = weatherChip.show;
-  const gameTimeLabel = formatGameTimeDisplay(payload?.gameTime);
+  const profile = saveProfileFromUnitDisplay(unitDisplayFromPayload(payload));
+  const gameTimeLabel = formatGameTimeDisplay(payload?.gameTime, profile);
   const rf = payload?.realisticFarming;
   const timeGuardBadge = useMemo(() => formatTimeGuardBadge(getTimeGuard(rf)), [rf]);
   const weatherGuard = useMemo(() => getWeatherGuard(rf), [rf]);
   const ts = payload?.dataTimestamps;
+  const sourceStatus = (payload as { sourceBinding?: { stateStatus?: string } } | null)?.sourceBinding?.stateStatus;
   const lastLua =
     typeof ts?.lastLuaReceivedAt === "string" || typeof ts?.lastLuaReceivedAt === "number"
       ? ts.lastLuaReceivedAt
@@ -60,7 +63,10 @@ export function AppTopBar({ onOpenSettings }: Props) {
   useEffect(() => {
     const delay = luaStaleRefreshDelayMs(lastLua, staleMs, Date.now());
     if (delay == null) return;
-    const id = window.setTimeout(() => setNowMs(Date.now()), delay);
+    const id = window.setTimeout(() => {
+      setNowMs(Date.now());
+      void refreshDashboard();
+    }, delay);
     return () => window.clearTimeout(id);
   }, [lastLua, staleMs]);
 
@@ -68,6 +74,7 @@ export function AppTopBar({ onOpenSettings }: Props) {
     () =>
       resolveNavbarConnectionBadge({
         dataSource: payload?.dataSource,
+        stateStatus: sourceStatus,
         luaAvailable: payload?.luaAvailable,
         xmlAvailable: payload?.xmlAvailable,
         apiConnected: connection === "ws" || connection === "http",
@@ -76,6 +83,7 @@ export function AppTopBar({ onOpenSettings }: Props) {
       }),
     [
       payload?.dataSource,
+      sourceStatus,
       payload?.luaAvailable,
       payload?.xmlAvailable,
       connection,
@@ -88,8 +96,12 @@ export function AppTopBar({ onOpenSettings }: Props) {
   const modOutdated = modCheck?.status === "outdated";
   const modUnknown = modCheck?.status === "unknown";
 
-  const useSaveDropdown = servers.length > SAVE_TABS_MAX;
   const savesLabel = tOr("nav.saves", "Saves");
+  const showSaveSelect = servers.length > 0;
+  const serverLabels = useMemo(() => formatUniqueServerLabels(servers), [servers]);
+  const selectedServerId = servers.some((srv) => String(srv.id) === String(activeServerId))
+    ? String(activeServerId) : "";
+  const showConnectionBadge = Boolean(selectedServerId || (payload?.dataSource && payload.dataSource !== "unknown"));
 
   return (
     <>
@@ -97,41 +109,27 @@ export function AppTopBar({ onOpenSettings }: Props) {
         <div class="fd-topbar__left">
           <strong class="fd-topbar__brand">{tOr("nav.brand", "Farm Dashboard")}</strong>
         </div>
-        <div
-          class={`fd-topbar__center${useSaveDropdown ? " fd-topbar__center--dropdown" : ""}`}
-          role={useSaveDropdown ? undefined : "tablist"}
-          aria-label={savesLabel}
-        >
-          {useSaveDropdown ? (
+        <div class="fd-topbar__center fd-topbar__center--dropdown" aria-label={savesLabel}>
+          {showSaveSelect ? (
             <label class="fd-topbar__farm fd-topbar__save">
               <span class="fd-topbar__farm-label">{savesLabel}</span>
               <select
                 class="fd-topbar__farm-select fd-topbar__save-select"
-                value={String(activeServerId ?? servers[0]?.id ?? "")}
+                value={selectedServerId}
                 onChange={(e) => void switchActiveServer((e.target as HTMLSelectElement).value)}
                 aria-label={savesLabel}
               >
-                {servers.map((srv) => (
+                {!selectedServerId ? (
+                  <option value="" disabled>{tOr("nav.dataSource", "Data source")}</option>
+                ) : null}
+                {servers.map((srv, index) => (
                   <option key={srv.id} value={String(srv.id)}>
-                    {srv.name}
+                    {serverLabels[index]}
                   </option>
                 ))}
               </select>
             </label>
-          ) : (
-            servers.map((srv) => (
-              <button
-                key={srv.id}
-                type="button"
-                role="tab"
-                aria-selected={String(srv.id) === String(activeServerId)}
-                class={`fd-topbar__tab ${String(srv.id) === String(activeServerId) ? "is-active" : ""}`}
-                onClick={() => void switchActiveServer(String(srv.id))}
-              >
-                {srv.name}
-              </button>
-            ))
-          )}
+          ) : null}
         </div>
         <div class="fd-topbar__right">
           {showFarmSelect ? (
@@ -164,7 +162,7 @@ export function AppTopBar({ onOpenSettings }: Props) {
               onClick={() => setWeatherOpen(true)}
               title={t("weather.title")}
             >
-              <span>{formatWeatherTemp(weatherChip.temperature)}</span>
+              <span>{formatWeatherTemp(weatherChip.temperature, profile)}</span>
               <span>{t(weatherConditionLabelKey(weatherChip.condition))}</span>
             </button>
           ) : null}
@@ -187,11 +185,13 @@ export function AppTopBar({ onOpenSettings }: Props) {
             <Badge tone="danger" title={tOr("nav.connectionError", "Connection error")}>
               {tOr("nav.connectionError", "Connection error")}
             </Badge>
-          ) : (
-            <Badge tone={sourceBadge.tone} title={t(sourceBadge.titleKey)}>
-              {t(sourceBadge.labelKey)}
+          ) : showConnectionBadge ? (
+            <Badge tone={sourceBadge.tone} title={sourceBadge.fallbackTitle
+              ? tOr(sourceBadge.titleKey, sourceBadge.fallbackTitle) : t(sourceBadge.titleKey)}>
+              {sourceBadge.fallbackLabel
+                ? tOr(sourceBadge.labelKey, sourceBadge.fallbackLabel) : t(sourceBadge.labelKey)}
             </Badge>
-          )}
+          ) : null}
           {modOutdated ? (
             <Badge
               tone="danger"

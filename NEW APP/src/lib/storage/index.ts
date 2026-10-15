@@ -18,6 +18,8 @@ import {
   type StockPayload,
 } from "@/lib/fillTypeResolve";
 import { formatMoisturePercent, moistureGradeLabel } from "@/lib/moisture";
+import { britishLabel, type FillUnitMode } from "@/lib/fill-units";
+import { formatProfileMoney, formatProfileUnitPrice, type SaveProfileDisplay } from "@/lib/profile-display";
 
 const DISPLAY_NAMES: Record<string, string> = {
   WHEAT: "Wheat",
@@ -139,12 +141,16 @@ function stripFillTypeVariant(key: string): string {
   return key.replace(/_?\d+$/, "");
 }
 
-export function formatCommodityLabel(name: unknown): string {
+export function formatCommodityLabel(name: unknown, mode: FillUnitMode = "litres"): string {
   const raw = String(name || "").trim();
   if (!raw) return "";
   if (/^\$l10n_/i.test(raw)) {
     const key = raw.replace(/^\$l10n_/i, "").replace(/^fillType_/i, "").toUpperCase();
-    return formatCommodityLabel(key);
+    return formatCommodityLabel(key, mode);
+  }
+  if (mode === "british") {
+    const renamed = britishLabel(raw);
+    if (renamed) return renamed;
   }
   if (/[a-z]/.test(raw) && /[\s-]/.test(raw)) return raw;
   const key = raw.toUpperCase();
@@ -160,16 +166,16 @@ export function formatLiters(v: unknown): string {
   return `${n.toLocaleString(undefined, { maximumFractionDigits: 0 })} l`;
 }
 
-export function formatMoney(v: unknown): string {
+export function formatMoney(v: unknown, profile?: SaveProfileDisplay | null): string {
   const n = Number(v);
   if (!Number.isFinite(n) || n <= 0) return "—";
-  return `$${Math.round(n).toLocaleString()}`;
+  return formatProfileMoney(n, profile);
 }
 
-export function formatPricePer1000(v: unknown): string {
+export function formatPricePer1000(v: unknown, profile?: SaveProfileDisplay | null): string {
   const n = Number(v);
   if (!Number.isFinite(n) || n <= 0) return "—";
-  return `$${Math.round(n).toLocaleString()}`;
+  return formatProfileUnitPrice(n, profile);
 }
 
 /** Peak season month from XML history or Lua economy export (matches in-game price table). */
@@ -503,7 +509,8 @@ export function displayFillTypeName(
   item: StockItem,
   catalog: FillTypeCatalog | null | undefined,
   economy: EconomyLike | null | undefined,
-  titles: FillTypeTitles | null | undefined
+  titles: FillTypeTitles | null | undefined,
+  mode: FillUnitMode = "litres",
 ): string {
   const idx = Number(item?.fillTypeIndex);
   const cat = catalog && typeof catalog === "object" ? catalog : {};
@@ -511,19 +518,19 @@ export function displayFillTypeName(
   if (idx > 0) {
     const fromTitles = titleForIndex(idx, titleMap);
     if (fromTitles && !/^\$l10n_/i.test(fromTitles) && !/^\d+$/.test(fromTitles.trim())) {
-      return formatCommodityLabel(fromTitles);
+      return formatCommodityLabel(fromTitles, mode);
     }
   }
   if (item?.fillTypeDisplay) {
     const display = String(item.fillTypeDisplay).trim();
     if (display && !/^\d+$/.test(display) && !/^\$l10n_/i.test(display)) {
-      return formatCommodityLabel(display);
+      return formatCommodityLabel(display, mode);
     }
   }
   if (item?.fillTypeTitle) {
     const title = String(item.fillTypeTitle).trim();
     if (title && !/^\d+$/.test(title) && !/^\$l10n_/i.test(title)) {
-      return formatCommodityLabel(title);
+      return formatCommodityLabel(title, mode);
     }
   }
   let rawKey = "";
@@ -537,7 +544,7 @@ export function displayFillTypeName(
   if (!rawKey && item?.fillType && !/^\d+$/.test(String(item.fillType).trim())) {
     rawKey = String(item.fillType).trim();
   }
-  if (rawKey) return formatCommodityLabel(rawKey);
+  if (rawKey) return formatCommodityLabel(rawKey, mode);
   if (idx > 0) return t("storage.fillTypeIndex", { index: idx });
   return t("storage.unknownFill");
 }

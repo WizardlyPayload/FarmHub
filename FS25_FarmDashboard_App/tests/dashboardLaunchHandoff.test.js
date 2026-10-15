@@ -3,6 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { EventEmitter } = require('events');
+const runtimeActivation = require('../runtimeActivation');
+const { createBoundSourcePublication } = require('../boundSourcePublication.cjs');
+const { configNeedsServerReboot } = require('../setupConfigMerge.cjs');
 
 const mainPath = process.env.FARMDASH_NAVIGATION_SOURCE || path.join(__dirname, '..', 'main.js');
 const source = fs.readFileSync(mainPath, 'utf8');
@@ -40,6 +43,7 @@ function harness() {
         server: { listening: true }, serverStates: {},
         store: { get: () => config },
         stopAllWatchers: async () => {},
+        runtimeActivation: runtimeActivation.createScope(),
         hydrateServerCacheFromDisk: jest.fn(),
         hydrateLuaSnapshotFromDiskAtBoot: async () => {},
         startLocalWatching: async () => {},
@@ -50,6 +54,12 @@ function harness() {
         isTrustedDashboardIpcSender: event => event?.trusted === true,
         shouldLoadDashboardUrl: () => wc.url.endsWith('/setup.html'),
     });
+    const sourceStateEvents = [];
+    ctx.boundSources = createBoundSourcePublication({
+        sameBinding: (before, after) => !configNeedsServerReboot({ servers: [before] }, { servers: [after] }),
+    });
+    ctx.broadcastSourceState = (event) => { sourceStateEvents.push(event); };
+    ctx.sourceStateEvents = sourceStateEvents;
     vm.runInContext(navigation + '\n' + boot, ctx, { filename: mainPath });
     const finish = () => {
         const pending = loads.at(-1);

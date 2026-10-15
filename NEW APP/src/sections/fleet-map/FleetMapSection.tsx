@@ -65,7 +65,10 @@ import {
   vehicleRowKey,
   type FleetVehicle,
 } from "@/lib/vehicles";
+import { buildAlertScopeKey, resolveSaveIdFromPayload } from "@/platform/urgent-alerts";
 import { useDashboardStore } from "@/store/dashboard-store";
+import { formatProfileArea, formatProfileSpeed, saveProfileFromUnitDisplay, type SaveProfileDisplay } from "@/lib/profile-display";
+import { unitDisplayFromPayload } from "@/lib/fill-units";
 import "@/sections/fleet-map/fleet-map.css";
 
 const FARM_COLOR_FALLBACK = [
@@ -259,12 +262,36 @@ function overlayFieldHectares(field: Record<string, unknown>): number {
   return Number(field.hectares) || 0;
 }
 
-function overlayFieldBanner(field: Record<string, unknown>): { name: string; farm: string; detail: string } {
+function overlayFieldBanner(
+  field: Record<string, unknown>,
+  profile?: SaveProfileDisplay | null,
+): { name: string; farm: string; detail: string } {
   return {
     name: overlayFieldTitle(field),
     farm: formatCropName(field.fruitType),
-    detail: t("map.fieldHa", { ha: overlayFieldHectares(field).toFixed(1) }),
+    detail: formatProfileArea(overlayFieldHectares(field), profile),
   };
+}
+
+function fieldTipKey(field: Record<string, unknown>): string {
+  return String(field.id ?? field.farmlandId ?? `${field.x ?? ""}-${field.z ?? ""}`);
+}
+
+function placeTipKey(place: { kind: string; id: string; x: number; z: number }): string {
+  return `${place.kind}-${place.id}-${place.x}-${place.z}`;
+}
+
+export function fleetVehicleDetail(
+  vehicle: { typeName?: string; vehicleType?: string; speed?: unknown } | null | undefined,
+  x: number,
+  z: number,
+  kind: string,
+  profile?: SaveProfileDisplay | null,
+): string {
+  const parts = [vehicle?.typeName || vehicle?.vehicleType || kind, `${Math.round(x)}, ${Math.round(z)}`];
+  const speed = Number(vehicle?.speed);
+  if (Number.isFinite(speed) && speed > 0.4) parts.push(formatProfileSpeed(speed, profile));
+  return parts.filter(Boolean).join(" · ");
 }
 
 function overlayLegendLabel(item: OverlayLegendItem): string {
@@ -366,6 +393,22 @@ function placeKindSection(kind: FleetMapPlaceKind): "productions" | "pastures" |
   }
 }
 
+function mapSelectionScope(
+  serverId: string | null | undefined,
+  farmId: number | null | undefined,
+  payload: {
+    serverInfo?: { saveSlot?: string };
+    savegameName?: string;
+    mapId?: string;
+    sectionOutcomes?: { sessionId?: string | null; careerId?: string | null };
+  } | null | undefined,
+): string {
+  const outcomes = payload?.sectionOutcomes;
+  const sessionId = typeof outcomes?.sessionId === "string" ? outcomes.sessionId : "";
+  const careerId = typeof outcomes?.careerId === "string" ? outcomes.careerId : "";
+  return `${buildAlertScopeKey(serverId, farmId, resolveSaveIdFromPayload(payload))}::${careerId}::${sessionId}`;
+}
+
 function normalizeList(raw: unknown): Record<string, unknown>[] {
   if (Array.isArray(raw)) return raw.filter((v) => v && typeof v === "object") as Record<string, unknown>[];
   if (raw && typeof raw === "object") {
@@ -376,8 +419,24 @@ function normalizeList(raw: unknown): Record<string, unknown>[] {
 
 export function FleetMapSection() {
   const payload = useDashboardStore((s) => s.payload);
+  const speedProfile = saveProfileFromUnitDisplay(unitDisplayFromPayload(payload));
   const activeFarmId = useDashboardStore((s) => s.activeFarmId);
+  const activeServerId = useDashboardStore((s) => s.activeServerId);
   const sectionParams = useDashboardStore((s) => s.sectionParams);
+  const rawSelectionScope = mapSelectionScope(activeServerId, activeFarmId, payload);
+  const selectionLinkId = sectionParams.id ? String(sectionParams.id) : null;
+  const selectionLifetime = useRef({ scope: rawSelectionScope, linkId: selectionLinkId, revision: 0 });
+  if (selectionLifetime.current.scope !== rawSelectionScope || selectionLifetime.current.linkId !== selectionLinkId) {
+    selectionLifetime.current = {
+      scope: rawSelectionScope,
+      linkId: selectionLinkId,
+      revision: selectionLifetime.current.revision + 1,
+    };
+  }
+  // A scope/link may return to an earlier string, but its old lifetime cannot return.
+  const selectionScope = `${rawSelectionScope}::selection:${selectionLifetime.current.revision}`;
+  const selectionScopeRef = useRef(selectionScope);
+  selectionScopeRef.current = selectionScope;
   const setSection = useDashboardStore((s) => s.setSection);
 
   const [showAllFarms, setShowAllFarms] = useState(false);
@@ -401,10 +460,12 @@ export function FleetMapSection() {
   const [hasOverview, setHasOverview] = useState(false);
   const [overviewUrl, setOverviewUrl] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<{
+    kind: "vehicle" | "field" | "place";
+    id: string;
+    source: "hover" | "click" | "focus";
     left: number;
     top: number;
-    source?: "hover" | "click" | "focus";
-    html: { name: string; farm: string; detail: string };
+    scope: string;
   } | null>(null);
   const [natSize, setNatSize] = useState({ w: 0, h: 0 });
   const [mapFieldOutlines, setMapFieldOutlines] = useState<MapFieldOutlineRow[]>([]);
@@ -715,6 +776,53 @@ export function FleetMapSection() {
     return map;
   }, [farms]);
 
+  const shownTooltip = useMemo(() => {
+    if (!tooltip || tooltip.scope !== selectionScope) return null;
+    if (tooltip.kind === "vehicle") {
+      const matches = (row: { id?: string | number }) => String(row.id ?? vehicleRowKey(row)) === tooltip.id;
+      const vehicle = tooltip.source === "focus"
+        ? plotted.find(matches) || allVehicles.find(matches)
+        : plotted.find(matches);
+      if (!vehicle) return null;
+      const xz = readWorldXZ(vehicle);
+      if (!xz) return null;
+      const fid = Number(vehicle.ownerFarmId ?? vehicle.farmId ?? 0);
+      const farm = farmsById.get(fid);
+      const farmName = farm?.name || t("map.farmFallback", { id: fid || "?" });
+      const pct = toPct(xz.x, xz.z);
+      if (!pct) return null;
+      return {
+        left: pct.left,
+        top: pct.top,
+        html: {
+          name: resolveVehicleDisplayName(vehicle),
+          farm: tooltip.source === "focus" ? t("map.focusedVehicle") : farmName,
+          detail: fleetVehicleDetail(vehicle, xz.x, xz.z, classifyFleetMapIcon(vehicle), speedProfile),
+        },
+      };
+    }
+    if (tooltip.kind === "field") {
+      const row = fieldOverlays.find((item) => fieldTipKey(item.field) === tooltip.id);
+      if (!row) return null;
+      return {
+        left: row.left,
+        top: row.top,
+        html: overlayFieldBanner(row.field, speedProfile),
+      };
+    }
+    const place = placePins.find((item) => placeTipKey(item) === tooltip.id);
+    if (!place) return null;
+    return {
+      left: place.left,
+      top: place.top,
+      html: {
+        name: place.name,
+        farm: t(placeKindLabelKey(place.kind)),
+        detail: `${Math.round(place.x)}, ${Math.round(place.z)}`,
+      },
+    };
+  }, [tooltip, selectionScope, plotted, allVehicles, fieldOverlays, placePins, farmsById, toPct, speedProfile]);
+
   function applyMissingOverviewHint(data?: OverviewResponse | null) {
     const label = mapTitle || mapId || t("map.unknownMap");
     if (data?.error === "missing_map_id") {
@@ -772,14 +880,17 @@ export function FleetMapSection() {
     });
   }, [imageSize.w, imageSize.h, sectionParams.id, hasOverview]);
 
+  const focusBind = useRef<{ scope: string; linkId: string } | null>(null);
+  if (!sectionParams.id) focusBind.current = null;
+  const staleFocus = Boolean(focusBind.current && focusBind.current.scope !== selectionScope && focusBind.current.linkId === String(sectionParams.id));
   const focusVehicle = useMemo(
     () =>
-      sectionParams.id
+      sectionParams.id && !staleFocus
         ? plotted.find((v) => vehicleMatchesDeepLinkId(v, sectionParams.id)) ||
           allVehicles.find((v) => vehicleMatchesDeepLinkId(v, sectionParams.id)) ||
           null
         : null,
-    [plotted, allVehicles, sectionParams.id]
+    [plotted, allVehicles, sectionParams.id, staleFocus]
   );
 
   const focusPin = useMemo(() => {
@@ -790,24 +901,33 @@ export function FleetMapSection() {
   }, [focusVehicle, toPct]);
 
   useEffect(() => {
-    if (!focusPin) return;
+    const focused = focusVehicle;
+    if (!focusPin || !focused || !sectionParams.id) return;
+    const linkId = String(sectionParams.id);
+    const previous = focusBind.current;
+    if (previous && previous.scope !== selectionScope && previous.linkId === linkId) return;
+    focusBind.current = { scope: selectionScope, linkId };
     const vp = viewportRef.current;
     if (!vp) return;
-    requestAnimationFrame(() => {
+    const scheduledScope = selectionScope;
+    let revoked = false;
+    const frame = requestAnimationFrame(() => {
+      if (revoked || selectionScopeRef.current !== scheduledScope || viewportRef.current !== vp) return;
       vp.fitToPoint(focusPin.left, focusPin.top, 2.8);
     });
-    const name = resolveVehicleDisplayName(focusVehicle);
     setTooltip({
+      kind: "vehicle",
+      id: String(focused.id ?? vehicleRowKey(focused)),
+      source: "focus",
       left: focusPin.left,
       top: focusPin.top,
-      source: "focus",
-      html: {
-        name,
-        farm: t("map.focusedVehicle"),
-        detail: `${focusVehicle?.typeName || focusVehicle?.vehicleType || ""} · ${Math.round(focusPin.x)}, ${Math.round(focusPin.z)}`,
-      },
+      scope: selectionScopeRef.current,
     });
-  }, [focusPin, focusVehicle]);
+    return () => {
+      revoked = true;
+      cancelAnimationFrame(frame);
+    };
+  }, [focusPin, focusVehicle, selectionScope, sectionParams.id, overviewUrl]);
 
   useEffect(() => {
     const extras = [
@@ -1159,7 +1279,7 @@ export function FleetMapSection() {
                         .filter((row) => row.points)
                         .map((blob) => {
                           const field = blob.field;
-                          const banner = overlayFieldBanner(field);
+                          const banner = overlayFieldBanner(field, speedProfile);
                           return (
                             <polygon
                               key={`field-poly-${String(field.id ?? field.farmlandId ?? `${blob.x}-${blob.z}`)}`}
@@ -1169,10 +1289,12 @@ export function FleetMapSection() {
                               aria-label={`${banner.name} ${banner.farm}`}
                               onMouseEnter={() => {
                                 setTooltip({
+                                  kind: "field",
+                                  id: fieldTipKey(field),
+                                  source: "hover",
                                   left: blob.left,
                                   top: blob.top,
-                                  source: "hover",
-                                  html: banner,
+                                  scope: selectionScopeRef.current,
                                 });
                               }}
                               onMouseLeave={() => {
@@ -1182,10 +1304,12 @@ export function FleetMapSection() {
                                 ev.stopPropagation();
                                 if (viewportRef.current?.consumePan()) return;
                                 setTooltip({
+                                  kind: "field",
+                                  id: fieldTipKey(field),
+                                  source: "click",
                                   left: blob.left,
                                   top: blob.top,
-                                  source: "click",
-                                  html: banner,
+                                  scope: selectionScopeRef.current,
                                 });
                                 setSection("fields");
                               }}
@@ -1197,7 +1321,7 @@ export function FleetMapSection() {
                       .filter((row) => !row.points)
                       .map((blob) => {
                       const field = blob.field;
-                      const banner = overlayFieldBanner(field);
+                      const banner = overlayFieldBanner(field, speedProfile);
                       return (
                         <button
                           key={`field-${String(field.id ?? field.farmlandId ?? `${blob.x}-${blob.z}`)}`}
@@ -1213,10 +1337,12 @@ export function FleetMapSection() {
                           aria-label={`${banner.name} ${banner.farm}`}
                           onMouseEnter={() => {
                             setTooltip({
+                              kind: "field",
+                              id: fieldTipKey(field),
+                              source: "hover",
                               left: blob.left,
                               top: blob.top,
-                              source: "hover",
-                              html: banner,
+                              scope: selectionScopeRef.current,
                             });
                           }}
                           onMouseLeave={() => {
@@ -1226,10 +1352,12 @@ export function FleetMapSection() {
                             ev.stopPropagation();
                             if (viewportRef.current?.consumePan()) return;
                             setTooltip({
+                              kind: "field",
+                              id: fieldTipKey(field),
+                              source: "click",
                               left: blob.left,
                               top: blob.top,
-                              source: "click",
-                              html: banner,
+                              scope: selectionScopeRef.current,
                             });
                             setSection("fields");
                           }}
@@ -1251,13 +1379,12 @@ export function FleetMapSection() {
                         onClick={(ev) => {
                           ev.stopPropagation();
                           setTooltip({
+                            kind: "place",
+                            id: placeTipKey(place),
+                            source: "click",
                             left: place.left,
                             top: place.top,
-                            html: {
-                              name: place.name,
-                              farm: t(placeKindLabelKey(place.kind)),
-                              detail: `${Math.round(place.x)}, ${Math.round(place.z)}`,
-                            },
+                            scope: selectionScopeRef.current,
                           });
                           const section = placeKindSection(place.kind);
                           if (place.kind === "sellPoint") {
@@ -1289,14 +1416,6 @@ export function FleetMapSection() {
                       const pinId = String(vehicle.id ?? vehicleRowKey(vehicle));
                       const kind = classifyFleetMapIcon(vehicle);
                       const heading = fleetMapHeadingDeg(vehicle);
-                      const speed = Number(vehicle.speed);
-                      const detailParts = [
-                        vehicle.typeName || vehicle.vehicleType || kind,
-                        `${Math.round(x)}, ${Math.round(z)}`,
-                      ];
-                      if (Number.isFinite(speed) && speed > 0.4) {
-                        detailParts.push(`${Math.round(speed)} km/h`);
-                      }
                       return (
                         <button
                           key={String(vehicle.id ?? `${name}-${x}-${z}`)}
@@ -1310,13 +1429,12 @@ export function FleetMapSection() {
                           onClick={(ev) => {
                             ev.stopPropagation();
                             setTooltip({
+                              kind: "vehicle",
+                              id: pinId,
+                              source: "click",
                               left,
                               top,
-                              html: {
-                                name,
-                                farm: farmName,
-                                detail: detailParts.join(" · "),
-                              },
+                              scope: selectionScopeRef.current,
                             });
                             setSection("vehicles", { id: pinId });
                           }}
@@ -1338,17 +1456,17 @@ export function FleetMapSection() {
                         </button>
                       );
                     })}
-                    {tooltip ? (
+                    {shownTooltip ? (
                       <div
                         class="farm-fleet-map-tooltip farm-fleet-map-tooltip--layer"
-                        style={{ left: `${tooltip.left}%`, top: `${tooltip.top}%` }}
+                        style={{ left: `${shownTooltip.left}%`, top: `${shownTooltip.top}%` }}
                         role="status"
                       >
-                        <strong>{tooltip.html.name}</strong>
+                        <strong>{shownTooltip.html.name}</strong>
                         <br />
-                        <span class="fd-muted">{tooltip.html.farm}</span>
+                        <span class="fd-muted">{shownTooltip.html.farm}</span>
                         <br />
-                        <small>{tooltip.html.detail}</small>
+                        <small>{shownTooltip.html.detail}</small>
                       </div>
                     ) : null}
                   </div>

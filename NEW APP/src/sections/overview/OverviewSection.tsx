@@ -4,6 +4,8 @@ import { Badge, Button } from "@/components/ui";
 import { useDashboardStore } from "@/store/dashboard-store";
 import { WeatherModal } from "@/components/WeatherModal";
 import { formatGameTimeDisplay } from "@/lib/game-time";
+import { formatProfileMoneyText, saveProfileFromUnitDisplay } from "@/lib/profile-display";
+import { unitDisplayFromPayload } from "@/lib/fill-units";
 import {
   asWeatherSnapshot,
   engineWeatherChip,
@@ -14,25 +16,22 @@ import {
   computeFinancialSummary,
   formatCurrency,
   resolveBaleInventoryForFarm,
-  splitVehiclesAndConsumables,
   sumBaleBucket,
   sumBalesOnFarmFields,
 } from "@/lib/economy";
 import {
-  entityOwnerFarmId,
   getPlayerFarmRecords,
   isMultiFarmEnabled,
 } from "@/lib/farm-scope";
 import { switchActiveFarm } from "@/services/ws-client";
-import { computeFieldStats } from "@/sections/fields/field-helpers";
-import { clusterFieldsForDisplay, type FieldRecord } from "@/lib/rules-engine";
+import { type FieldRecord } from "@/lib/rules-engine";
 import { classifyFleetEntities, getDisplayFleet, summarizeFleetCards } from "@/lib/vehicles";
 import { getOwnedChainsForFarm, type ProductionPayload } from "@/lib/productions";
+import { farmFieldStats, farmPastureWarnings, farmProductionIssues } from "./overviewFarmStats";
 import { startModStoreImageExport } from "@/lib/mod-export-progress";
 import { getFarmDashApi } from "@/services/electron-bridge";
 import { isFarmDashLocalConfigHost } from "@/platform/viewer-mode";
 import { showToast } from "@/platform/ChangesModal";
-import { parsePasturesFromPayload } from "@/lib/pastures-parsers";
 import {
   countLivestockHeads,
   normalizeLivestockAnimals,
@@ -55,7 +54,8 @@ import {
   subscribeNotifications,
   type NotificationItem,
 } from "@/platform/notifications";
-import type { DashboardPayload, SectionId, SectionParams } from "@/types/dashboard";
+import type { SectionId, SectionParams } from "@/types/dashboard";
+import { companionPageForCatalogId, modPageSection } from "@/sections/mods/registry";
 import {
   OverviewFarmCardMinis,
   OverviewMiniBoards,
@@ -72,8 +72,52 @@ import {
   getTimeGuard,
   getWeatherGuard,
 } from "@/lib/realisticFarming/cores";
+import {
+  loanFarmView,
+  restrictionAdvice,
+  detectedCompanionMods,
+  formatRestrictedBanReason,
+  type CompanionModsPayload,
+} from "@/lib/companionMods";
 import { fertilizerDepotOrders } from "@/lib/realisticFarming/depot";
 import "./overview.css";
+
+export function companionOverviewAlerts(
+  cm: CompanionModsPayload | null | undefined,
+  farmId: number,
+  profile?: Parameters<typeof formatCurrency>[1],
+): OverviewAlert[] {
+  const items: OverviewAlert[] = [];
+  if (restrictionAdvice(cm?.restrictedPeriods) === "banned") {
+    const liquid = formatRestrictedBanReason(cm?.restrictedPeriods?.liquidBan);
+    const solid = formatRestrictedBanReason(cm?.restrictedPeriods?.solidBan);
+    const detail = [liquid && `liquid (${liquid})`, solid && `solid (${solid})`]
+      .filter(Boolean)
+      .join(" · ");
+    items.push({
+      key: "companion-restricted",
+      label: tOr(
+        "overview.alertRestrictedPeriods",
+        detail
+          ? "Restricted periods active: {{detail}}"
+          : "Restricted periods active (manure/slurry)",
+        { detail: detail || "" },
+      ),
+      section: "fields",
+    });
+  }
+  const loanView = loanFarmView(cm, farmId);
+  if (loanView.status === "ok" && loanView.restAmount > 0) {
+    items.push({
+      key: "companion-loans",
+      label: tOr("overview.alertElsLoans", "Enhanced loans outstanding: {{amount}}", {
+        amount: formatCurrency(loanView.restAmount, profile),
+      }),
+      section: "economy",
+    });
+  }
+  return items;
+}
 
 function asRecord(v: unknown): Record<string, unknown> {
   return v && typeof v === "object" ? (v as Record<string, unknown>) : {};
@@ -114,43 +158,9 @@ function farmPlayersOnline(farm: Record<string, unknown>): number {
   return 0;
 }
 
-function farmFieldStats(fields: FieldRecord[] | undefined, farmId: number) {
-  const scoped = (Array.isArray(fields) ? fields : []).filter((f) => {
-    const oid = entityOwnerFarmId(f);
-    return oid <= 0 || oid === farmId;
-  });
-  return computeFieldStats(
-    clusterFieldsForDisplay(scoped, { autoMerge: false, manualGroups: [] }) as FieldRecord[],
-  );
-}
-
 function farmLivestockHeads(animals: unknown, farmId: number): number {
   const { animals: rows } = normalizeLivestockAnimals(animals, farmId);
   return countLivestockHeads(rows);
-}
-
-function farmPastureWarnings(
-  payload: DashboardPayload | null | undefined,
-  farmId: number
-): number {
-  if (!payload) return 0;
-  return parsePasturesFromPayload(payload, farmId).reduce(
-    (n, p) => n + (Array.isArray(p.allWarnings) ? p.allWarnings.length : 0),
-    0
-  );
-}
-
-function farmProductionIssues(
-  production: ProductionPayload | null | undefined,
-  farmInfo: unknown,
-  farmId: number
-): number {
-  const chains = getOwnedChainsForFarm(production, farmId, farmInfo);
-  return chains.filter((c) => {
-    if (c.isActive === false) return true;
-    const slots = Array.isArray(c.productions) ? c.productions : [];
-    return slots.some((s) => s.status && /idle|empty|blocked|error/i.test(String(s.status)));
-  }).length;
 }
 
 function farmMoney(farmInfo: unknown, farmId: number, fallbackMoney?: number): number {
@@ -194,13 +204,13 @@ export function OverviewSection() {
   const weather = asWeatherSnapshot(payload?.weather);
   const weatherChip = engineWeatherChip(weather);
   const showWeather = weatherChip.show;
-  const gameTimeLabel = formatGameTimeDisplay(payload?.gameTime) ?? t("landing.gameLoading");
+  const profile = saveProfileFromUnitDisplay(unitDisplayFromPayload(payload));
+  const gameTimeLabel = formatGameTimeDisplay(payload?.gameTime, profile) ?? t("landing.gameLoading");
   const localHost = isFarmDashLocalConfigHost();
   const canImportMods = localHost && !!getFarmDashApi()?.exportModStoreImages;
 
   const finance = useMemo(() => {
     if (!payload) return null;
-    const { equipment } = splitVehiclesAndConsumables(payload.vehicles);
     return computeFinancialSummary({
       farmInfo: Array.isArray(payload.farmInfo)
         ? (payload.farmInfo as Array<{ id?: number; money?: number; loan?: number }>)
@@ -212,7 +222,7 @@ export function OverviewSection() {
         animals?: { totalValue?: number };
         land?: { totalValue?: number };
       },
-      vehicles: equipment,
+      vehicles: payload.vehicles as Parameters<typeof computeFinancialSummary>[0]["vehicles"],
       activeFarmId: farmId,
     });
   }, [payload, farmId]);
@@ -256,10 +266,24 @@ export function OverviewSection() {
     [rf],
   );
   const weatherGuard = useMemo(() => getWeatherGuard(rf), [rf]);
-  const presenceMods = useMemo(
-    () => (modPresence.realisticFarming ? detectedPresenceMods(rf) : []),
-    [modPresence.realisticFarming, rf],
-  );
+  const companionModsPayload = payload?.companionMods as CompanionModsPayload | null | undefined;
+  const presenceMods = useMemo(() => {
+    const rfMods = modPresence.realisticFarming ? detectedPresenceMods(rf) : [];
+    const thirdParty = detectedCompanionMods(companionModsPayload).map((m) => ({
+      id: String(m.id || m.title || "mod"),
+      title: String(m.title || m.id || "Mod"),
+      version: m.version ? String(m.version) : undefined,
+      detected: true as const,
+    }));
+    const seen = new Set(rfMods.map((m) => m.id));
+    const merged = [...rfMods];
+    for (const row of thirdParty) {
+      if (seen.has(row.id)) continue;
+      seen.add(row.id);
+      merged.push(row);
+    }
+    return merged;
+  }, [modPresence.realisticFarming, rf, companionModsPayload]);
 
   const farmCards = useMemo((): FarmCardStats[] => {
     if (!multiFarm || !payload) return [];
@@ -487,6 +511,37 @@ export function OverviewSection() {
         });
       }
     }
+    const cm = companionModsPayload;
+    items.push(...companionOverviewAlerts(cm, farmId, profile));
+    if (cm?.diesel?.enabled && cm.diesel.pricePerLiter != null) {
+      const place = [cm.diesel.country, cm.diesel.region].filter(Boolean).join(", ");
+      const origin =
+        cm.diesel.source === "native"
+          ? tOr("companions.live.dieselOriginGame", "Game diesel price")
+          : cm.diesel.source === "rdpPreset"
+            ? tOr("companions.live.dieselOriginPreset", "Country preset, not the live game price")
+            : tOr("companions.live.dieselOriginUnknown", "Price origin not recorded");
+      // tOr returns a missing key's fallback without interpolation, so fallbacks are pre-formatted.
+      const priceText = formatProfileMoneyText(Number(cm.diesel.pricePerLiter).toFixed(2), profile);
+      const price = place
+        ? tOr("overview.alertDieselPrice", `Diesel ${priceText} / L (${place})`, { price: priceText, place })
+        : tOr("overview.alertDieselPriceNoPlace", `Diesel ${priceText} / L`, { price: priceText });
+      items.push({
+        key: "companion-diesel",
+        label: `${price} · ${origin}`,
+        section: "economy",
+      });
+    }
+    if (cm?.cropCalendar?.enabled && cm.cropCalendar.selectedRegion && cm.cropCalendar.selectedRegion !== "vanilla") {
+      items.push({
+        key: "companion-region",
+        label: tOr("overview.alertCropRegion", "Crop calendar region: {{region}}", {
+          region: cm.cropCalendar.selectedRegion,
+        }),
+        section: "fields",
+      });
+    }
+
     return items;
   }, [
     fieldStats,
@@ -498,6 +553,7 @@ export function OverviewSection() {
     payload?.redTape,
     payload?.baleInventory,
     payload?.realisticFarming,
+    companionModsPayload,
     farmId,
   ]);
 
@@ -536,7 +592,7 @@ export function OverviewSection() {
               onClick={() => setWeatherOpen(true)}
               title={t("weather.title")}
             >
-              <span>{formatWeatherTemp(weatherChip.temperature)}</span>
+              <span>{formatWeatherTemp(weatherChip.temperature, profile)}</span>
               <span>{t(weatherConditionLabelKey(weatherChip.condition))}</span>
             </button>
           ) : null}
@@ -550,14 +606,31 @@ export function OverviewSection() {
 
       {presenceMods.length > 0 ? (
         <section class="fd-overview__rf-mods" aria-label={tOr("overview.modsTitle", "Active mods")}>
-          <h2 class="fd-overview__rf-mods-title">{tOr("overview.modsTitle", "Active mods")}</h2>
+          <div class="fd-overview__rf-mods-head">
+            <h2 class="fd-overview__rf-mods-title">{tOr("overview.modsTitle", "Active mods")}</h2>
+          </div>
           <div class="fd-overview__rf-mod-chips">
-            {presenceMods.map((mod) => (
-              <Badge key={mod.id} tone="accent">
-                {mod.title}
-                {mod.version ? ` ${mod.version}` : ""}
-              </Badge>
-            ))}
+            {presenceMods.map((mod) => {
+              const chip = (
+                <Badge tone="accent">
+                  {mod.title}
+                  {mod.version ? ` ${mod.version}` : ""}
+                </Badge>
+              );
+              const page = companionPageForCatalogId(mod.id);
+              if (!page) return <span key={mod.id}>{chip}</span>;
+              return (
+                <button
+                  key={mod.id}
+                  type="button"
+                  class="fd-overview__rf-mod-link"
+                  data-mod-page={page.key}
+                  onClick={() => setSection(modPageSection(page.key))}
+                >
+                  {chip}
+                </button>
+              );
+            })}
           </div>
         </section>
       ) : null}
@@ -594,11 +667,11 @@ export function OverviewSection() {
                           })}
                         </Badge>
                       ) : null}
-                      <strong class="fd-overview__farm-money">{formatCurrency(farm.money)}</strong>
+                      <strong class="fd-overview__farm-money">{formatCurrency(farm.money, profile)}</strong>
                       {farm.loan > 0 ? (
                         <span class="fd-muted fd-overview__farm-loan">
                           {tOr("overview.farmLoan", "Loan {{amount}}", {
-                            amount: formatCurrency(farm.loan),
+                            amount: formatCurrency(farm.loan, profile),
                           })}
                         </span>
                       ) : null}
@@ -702,15 +775,15 @@ export function OverviewSection() {
               <div class="fd-overview__finance">
                 <div>
                   <span class="fd-muted">{t("economy.currentMoney")}</span>
-                  <strong>{finance ? formatCurrency(finance.money) : "—"}</strong>
+                  <strong>{finance ? formatCurrency(finance.money, profile) : "—"}</strong>
                 </div>
                 <div>
                   <span class="fd-muted">{t("economy.outstandingLoan")}</span>
-                  <strong>{finance ? formatCurrency(finance.loan) : "—"}</strong>
+                  <strong>{finance ? formatCurrency(finance.loan, profile) : "—"}</strong>
                 </div>
                 <div>
                   <span class="fd-muted">{t("economy.netWorth")}</span>
-                  <strong>{finance ? formatCurrency(finance.netWorth) : "—"}</strong>
+                  <strong>{finance ? formatCurrency(finance.netWorth, profile) : "—"}</strong>
                 </div>
               </div>
             </button>

@@ -1,6 +1,7 @@
 import { lazy, Suspense } from "preact/compat";
 import { t, tOr } from "@/i18n/i18n";
 import { useDashboardStore } from "@/store/dashboard-store";
+import { isModPageSectionId } from "@/types/dashboard";
 import { OverviewSection } from "@/sections/overview/OverviewSection";
 
 const VehiclesSection = lazy(() =>
@@ -48,6 +49,9 @@ const WorldEventsSection = lazy(() =>
 const ProStaffSection = lazy(() =>
   import("@/sections/prostaff").then((m) => ({ default: m.ProStaffSection })),
 );
+const CompanionPageRoute = lazy(() =>
+  import("@/sections/mods/CompanionPageRoute").then((m) => ({ default: m.CompanionPageRoute })),
+);
 const FertilizerDepotSection = lazy(() =>
   import("@/sections/fertilizerdepot").then((m) => ({ default: m.FertilizerDepotSection })),
 );
@@ -61,6 +65,16 @@ function SectionFallback() {
 }
 
 export function SectionRouter() {
+  const unselectedServers = useDashboardStore((state) => state.servers)
+  const unselectedServerId = useDashboardStore((state) => state.activeServerId)
+  if (unselectedServers.length > 1 && !unselectedServerId) {
+    return (
+      <div className="fd-section-placeholder" role="status">
+        <h2>Choose a data source</h2>
+        <p>Select a save from the menu above to load its dashboard. We won't choose one automatically and risk showing the wrong farm.</p>
+      </div>
+    )
+  }
   const section = useDashboardStore((s) => s.section);
 
   let body = null;
@@ -81,6 +95,7 @@ export function SectionRouter() {
   else if (section === "prostaff") body = <ProStaffSection />;
   else if (section === "fertilizerdepot") body = <FertilizerDepotSection />;
   else if (section === "moisture") body = <MoistureSection />;
+  else if (isModPageSectionId(section)) body = <CompanionPageRoute section={section} />;
   else {
     body = (
       <div class="fd-section-placeholder">

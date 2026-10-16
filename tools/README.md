@@ -11,10 +11,11 @@ From the **repo root**, use **`package.json`** so you do not `cd` into the neste
 | `npm run install:app` | `npm install` in `FS25_FarmDashboard_App/` |
 | `npm run start` | Launch Electron dev (`electron .`) |
 | `npm run test` | Jest |
-| `npm run build:app` | Windows NSIS installer (`dist`) |
-| `npm run pack:app` | Unpacked `--dir` build (`pack`) |
+| `npm run build:app` | V5 Windows NSIS installer (`dist:v5`) |
+| `npm run pack:app` | V5 unpacked `--dir` build (`pack:v5`) |
 | `npm run package:mod` | `tools/Zip-FarmDashboardMod.ps1` → **`FS25_FarmDashboard.zip`** |
-| `npm run build:all` | `package:mod` then `build:app` |
+| `npm run build:all` | V5 canonical mod ZIP, fresh UI, then V5 installer (`build:all:v5`) |
+| `npm run build:all:classic` | Explicit legacy V4 mod ZIP and installer build; never use for a V5 release |
 | `npm run verify` | `verify:electron-pack` + `i18n:verify` (CI parity) |
 
 App-local scripts (`dist:fresh`, `i18n:fill`, …) still exist under `FS25_FarmDashboard_App/package.json` and can be run with `npm run <script> --prefix FS25_FarmDashboard_App` or from that directory.

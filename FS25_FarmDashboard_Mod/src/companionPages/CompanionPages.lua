@@ -279,7 +279,9 @@ end
 
 local function makeContext(entry, modName, cycle)
     local h = sharedHelpers()
-    local mission = rawget(_G, "g_currentMission")
+    -- GIANTS may expose mission globals through the mod environment's __index;
+    -- rawget bypasses that lookup and leaves every page without a mission.
+    local mission = _G.g_currentMission
     local names = { modName }
     for _, name in ipairs(entry.modNames) do
         if name ~= modName then

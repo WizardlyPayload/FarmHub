@@ -1,5 +1,7 @@
 # Farm Dashboard compatibility — classic app vs new rebuild
 
+> Historical two-line compatibility record. The current repository target is V5 app 5.1.0 with mod 5.1.0.0; see the [current V5 guide](./v5%20documents/README.md). Older version tables below describe the earlier V4/V5 transition, not the current release candidate.
+
 **Same product, two Windows installers: V4 and V5.** The new screens are a **rebuild** of Farm Dashboard, not a different game and not Realistic Farming / Farm Tablet.
 
 People who want the **classic screens** keep **Farm Dashboard V4** (4.x). **Farm Dashboard V5** is a **separate download**. It is **not** pushed over V4 via auto-update (`latest.yml`). The **same** `FS25_FarmDashboard.zip` in-game mod works with both apps.
@@ -18,8 +20,8 @@ Do **not** call V5 “RF edition” in product-facing names. The update file is 
 
 Enforcement:
 
-- Default `npm run build:app` / `build:all` = **V4** channel (`latest.yml`).
-- V5 builds use `npm run build:app:v5` / `build:all:v5` (`build:app:rf` is an alias) with `electron-builder.rf.yml` (`publish.channel: latest-rf` → `latest-rf.yml`, distinct `appId` / artifact name so both apps can stay installed).
+- Default root `npm run build:app` / `build:all` = **V5** channel (`latest-rf.yml`).
+- V5 builds use `npm run build:app:v5` / `build:all:v5` (`build:app:rf` is an alias) with `electron-builder.rf.yml` (`publish.channel: latest-rf` → `latest-rf.yml`, distinct `appId` / artifact name so both apps can stay installed). Legacy V4 builds require the explicit root `build:app:classic` / `build:all:classic` commands.
 - V5 zip + Setup.exe go **flat** in `%USERPROFILE%\Documents\FarmDash Release\` (not a nested `V5\` folder). V4 public `latest.yml` stays in `Documents\FarmDash Final Output`.
 - After every V5 dist, `tools/app/assert-rf-update-channel.mjs` **fails the build** if `latest.yml` points at a V5 Setup, if a stray `rf.yml` is left, or if a V5 Setup.exe is present without `latest-rf.yml`.
 - Release checklist: never upload the V5 Setup.exe into a GitHub Release that updates V4 `latest.yml`.

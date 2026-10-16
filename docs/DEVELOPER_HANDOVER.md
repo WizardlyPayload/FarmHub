@@ -462,10 +462,11 @@ From **`FarmHub/`** (repository root), use the root **`package.json`** — no ne
 | `npm run install:app` | `npm install` in the app folder |
 | `npm run start` | `electron .` |
 | `npm run test` | Jest |
-| `npm run build:app` | `npm run dist` (NSIS installer) |
-| `npm run pack:app` | `npm run pack` (unpacked `--dir`) |
+| `npm run build:app` | `npm run dist:v5` (V5 NSIS installer) |
+| `npm run pack:app` | `npm run pack:v5` (V5 unpacked `--dir`) |
 | `npm run package:mod` | `tools/Zip-FarmDashboardMod.ps1` |
-| `npm run build:all` | mod zip, then installer |
+| `npm run build:all` | V5 canonical mod zip, UI, then V5 installer |
+| `npm run build:all:classic` | Explicit legacy V4 mod zip and installer |
 | `npm run verify` | `verify:electron-pack` + `i18n:verify` |
 
 First-time setup: **`npm run install:app`** (or `npm run setup`). Mod packaging requires **PowerShell** (Windows).

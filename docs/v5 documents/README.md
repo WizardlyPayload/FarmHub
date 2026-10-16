@@ -5,7 +5,7 @@ This is the help pack for the **V5 Windows dashboard**. Start with [installation
 ## Which version?
 
 - **Documentation candidate:** Windows app **5.0.57** with the canonical `FS25_FarmDashboard.zip` mod **5.0.0.31**. This combination passed local installation and two-client dedicated multiplayer testing on 14 October 2026. It is **not automatically the public download**.
-- **Public website:** still describes its existing V5 5.0.3 download until Graham approves a new release. Use the version displayed on the actual download page if installing from the website.
+- **Release preparation:** the local V5 pack targets app 5.1.0 / mod 5.1.0.0. The public site may still show 5.0.3 until publication; use matching files from one release.
 - **Classic V4:** a separate product line. Its public 4.2.1 story and update feed have not been changed. This V5 pass was **not** a new V4 test.
 
 ## Find the answer you need

@@ -1,7 +1,5 @@
 # FS25 Farm Dashboard V5 5.1.0
 
-**Draft — fill SHA256 after `npm run build:all:v5`. Do not publish until the execution checklist is done.**
-
 **App 5.1.0** · **Mod 5.1.0.0** · Windows 10/11 · **new screens (V5)**
 
 This is **Farm Dashboard**, rebuilt. It is **not** Realistic Farming and **not** Farm Tablet.
@@ -64,4 +62,6 @@ Join-as-client (Local watch, no FTP) or FTP Advanced. Update the **mod** on the 
 | `FS25_FarmDashboard.zip` | Mod **5.1.0.0** |
 | `latest-rf.yml` | V5 auto-update only — never attach this as V4 `latest.yml` |
 
-Setup SHA256: *(paste after build)*
+Setup SHA256: `690887BEE5AE42AD57607B6031320420BBCB8078FCCC4D908450286F6A7C1256`
+
+Mod ZIP SHA256: `8CA1601AC8AD0385F54845D1A01E69CDE5C9B2671538343F12E1B04748D25C55`

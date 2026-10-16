@@ -28,7 +28,7 @@ A detected mod with an empty block does **not** prove its gameplay failed. The d
 ## Versions and release boundary
 
 - **Tested documentation candidate:** V5 app **5.0.57**, mod **5.0.0.31**, canonical ZIP `FS25_FarmDashboard.zip`.
-- **Public V5 listing:** may still show **5.0.3 / 5.0.0.3** until a new release is approved. Do not advertise the candidate as already downloadable.
+- **Public V5 listing:** may still show **5.0.3 / 5.0.0.3** until the prepared **5.1.0 / 5.1.0.0** release is published. Use the version displayed on the actual download page.
 - **Classic V4:** public **4.2.1** remains separate on **8766** and its own `latest.yml`. V5 uses **8768** and `latest-rf.yml`.
 - V4 was **not retested** against mod 5.0.0.31 during this V5 pass. Do not infer a V4 compatibility result from it.
 

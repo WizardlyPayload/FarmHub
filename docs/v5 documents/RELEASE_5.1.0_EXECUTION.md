@@ -1,5 +1,7 @@
 # V5 5.1.0 — leftover execution plan
 
+> Historical plan: do not follow its old merge-to-main or rebuild instructions for the frozen 5.1.0 candidate. The current release-day order is `C:\Users\Graham\Documents\FarmDash Release\RELEASE-DAY-5.1.0.md`. No public release has been performed by preparing that pack.
+
 Wizard-facing checklist after the 2026-09-13 pre-release pass. Public GitHub/itch stay on **5.0.3** until this list is finished. The 2026-10-15 source candidate is **app 5.1.0 / mod 5.1.0.0**; this stamp alone does not prove that the installer, ZIP, or installed clients have been rebuilt and tested.
 
 Do **not** touch V4 `latest.yml` or `Documents/FarmDash Final Output` 4.2.1.

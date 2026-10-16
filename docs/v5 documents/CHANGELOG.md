@@ -2,7 +2,7 @@
 
 Player-facing history for the **V5 / new screens** line. Classic 4.x notes stay in [`../CHANGELOG.md`](../CHANGELOG.md).
 
-**Documentation candidate:** app **5.0.57**, mod **5.0.0.31**. The website may still offer public **5.0.3 / 5.0.0.3** until Graham approves publication. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
+**Prepared V5 release:** app **5.1.0**, mod **5.1.0.0**. The website may still offer public **5.0.3 / 5.0.0.3** until Graham approves publication. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
 
 ---
 

@@ -2,7 +2,7 @@
 
 You need only **FS25 Farm Dashboard** for the normal dashboard. The following are **optional**. A companion appears only when FS25 loaded it for the selected save; leaving a ZIP in the mods folder is not enough. Each reader is intended to work independently, so one missing or failed mod does not require another to be switched on.
 
-These descriptions refer to the **V5 5.0.57 / game mod 5.0.0.31 documentation candidate**, not a promise that the current public 5.0.3 download contains every page. Screenshots show the installed candidate reading existing **held demo saves**. They illustrate layout and recorded data, not a live gameplay test of every possible mod combination.
+These descriptions target the prepared **V5 5.1.0 / game mod 5.1.0.0** release. Optional panels appear only when their mods are loaded; no companion is required for the base dashboard. Screenshots of held demo saves illustrate layout and recorded data, not a live gameplay test of every possible mod combination.
 
 ## Read the labels first
 

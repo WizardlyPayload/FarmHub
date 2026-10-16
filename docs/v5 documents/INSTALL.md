@@ -19,7 +19,7 @@ The game normally writes under `Documents\My Games\FarmingSimulator2025\modSetti
 
 ## 2. Install the Windows app
 
-Run the V5 installer from the release you chose. The tested local candidate is `FS25-Farm-Dashboard-V5-Setup-5.0.57.exe`; the public installer may still end in 5.0.3. Launch **Farm Dashboard V5** from the Start menu. Installed V5 normally uses `http://127.0.0.1:8768` on this PC.
+Run the V5 installer from the release you chose. The prepared 5.1.0 filename is `FS25-Farm-Dashboard-V5-Setup-5.1.0.exe`; the public page may still offer 5.0.3 until publication. Launch **Farm Dashboard V5** from the Start menu. Installed V5 normally uses `http://127.0.0.1:8768` on this PC.
 
 Mod-image import is optional. If an optional ImageMagick step fails, the dashboard can still show farm data; use its built-in conversion path or return to images later. Do not install ImageMagick just to make first launch work.
 

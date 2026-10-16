@@ -258,6 +258,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "everythingConstructable",
+        title = "Everything Constructable",
+        category = "construction",
+        names = { "FS25_EverythingConstructable" },
+        substrings = { "everythingconstructable", "everything_constructable" },
+        globals = {},
+    },
+    {
         id = "palletDegradation",
         title = "Pallet Degradation",
         category = "storage",

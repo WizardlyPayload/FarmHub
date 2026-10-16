@@ -13,6 +13,7 @@ export type CompanionCategory =
   | "livestock"
   | "production"
   | "storage"
+  | "construction"
   | "fleet"
   | "units";
 
@@ -86,6 +87,7 @@ export const COMPANION_CATEGORY_ORDER: CompanionCategory[] = [
   "livestock",
   "production",
   "storage",
+  "construction",
   "fleet",
   "units",
 ];
@@ -379,6 +381,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     desc: "Splits silo storage into compartments. FarmHub reads this farm's compartment levels and does not change the layout.",
     relatedSection: "storage",
     liveKey: "realSilo",
+  },
+  {
+    id: "everythingConstructable",
+    title: "Everything Constructable",
+    category: "construction",
+    descKey: "companions.desc.everythingConstructable",
+    desc: "Turns instant building placement into construction projects. FarmHub shows this farm's site progress, remaining costs and materials without changing a project.",
+    liveKey: "everythingConstructable",
   },
   {
     id: "advancedMaintenance",

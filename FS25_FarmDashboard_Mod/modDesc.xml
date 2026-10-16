@@ -146,6 +146,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/ProductionWatcherCollector.lua"/>
         <sourceFile filename="src/companionPages/PalletDegradationCollector.lua"/>
         <sourceFile filename="src/companionPages/RealSiloCollector.lua"/>
+        <sourceFile filename="src/companionPages/EverythingConstructableCollector.lua"/>
         <sourceFile filename="src/companionPages/FactoryProfitCalculatorCollector.lua"/>
         <sourceFile filename="src/companionPages/TimeSavingStockCheckCollector.lua"/>
         <sourceFile filename="src/companionPages/RestrictedPeriodsCollector.lua"/>

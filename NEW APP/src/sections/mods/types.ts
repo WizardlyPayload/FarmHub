@@ -1,6 +1,6 @@
 import type { ComponentType } from "preact";
 
-export type CompanionPageGroup = "finance" | "fields" | "livestock" | "storage" | "fleet" | "units";
+export type CompanionPageGroup = "finance" | "fields" | "livestock" | "storage" | "construction" | "fleet" | "units";
 
 export type CompanionPageProps = { entry: CompanionPageEntry };
 

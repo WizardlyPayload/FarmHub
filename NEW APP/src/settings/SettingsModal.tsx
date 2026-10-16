@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { t, tOr, getLocale } from "@/i18n/i18n";
 import { Badge, Button } from "@/components/ui";
+import { fillProviderOwnsUnits, fillUnitOwnerId, unitDisplayFromPayload } from "@/lib/fill-units";
 import { useDashboardStore } from "@/store/dashboard-store";
 import {
   readDefaultSectionPref,
@@ -20,9 +21,16 @@ import {
   type SimHubViewPrefs,
   type UiPreferences,
 } from "@/services/electron-bridge";
+import {
+  displaySaveBody,
+  displaySnapshot,
+  loadModDraft,
+  runSettingsSave,
+} from "@/settings/save-domains";
 import { isFarmDashLocalConfigHost } from "@/platform/viewer-mode";
 import { showToast } from "@/platform/ChangesModal";
 import { startModStoreImageExport } from "@/lib/mod-export-progress";
+import { discoveryContextFromScan, discoveryFeedback, importDiscoveredSaves } from "@/lib/discovered-save";
 import {
   THEME_TABS,
   applyThemeForSection,
@@ -112,6 +120,11 @@ export function SettingsModal({ open, initialTab = "dashboard", onClose }: Props
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const serversTouchedRef = useRef(false);
   const lanBaselineRef = useRef("");
+  const modBaselineRef = useRef("");
+  const modRevisionRef = useRef("");
+  const connectionBaselineRef = useRef("");
+  const displayBaselineRef = useRef("");
+  const viewerBaselineRef = useRef("auto");
 
   const [sections, setSections] = useState<Record<SectionKey, boolean>>(() =>
     Object.fromEntries(SECTION_KEYS.map((k) => [k, true])) as Record<SectionKey, boolean>,
@@ -167,6 +180,10 @@ export function SettingsModal({ open, initialTab = "dashboard", onClose }: Props
   const setLocale = useDashboardStore((s) => s.setLocale);
   const locale = useDashboardStore((s) => s.locale);
   const setEnabledSections = useDashboardStore((s) => s.setEnabledSections);
+  const setViewerFillUnitMode = useDashboardStore((s) => s.setViewerFillUnitMode);
+  const [fillUnitDraft, setFillUnitDraft] = useState<"litres" | "british" | "imperial" | null>(
+    useDashboardStore.getState().viewerFillUnitMode,
+  );
 
   useEffect(() => {
     if (open) setTab(initialTab);
@@ -183,6 +200,7 @@ export function SettingsModal({ open, initialTab = "dashboard", onClose }: Props
     }
     setSettingsHydrated(false);
     serversTouchedRef.current = false;
+    setFillUnitDraft(useDashboardStore.getState().viewerFillUnitMode);
     void loadAll().finally(() => setSettingsHydrated(true));
   }, [open]);
 
@@ -198,6 +216,7 @@ export function SettingsModal({ open, initialTab = "dashboard", onClose }: Props
       mod,
       useNewUi,
       defaultSection,
+      fillUnit: fillUnitDraft ?? "auto",
     });
     if (!baseline) {
       setBaseline(snap);
@@ -219,6 +238,7 @@ export function SettingsModal({ open, initialTab = "dashboard", onClose }: Props
     mod,
     useNewUi,
     defaultSection,
+    fillUnitDraft,
   ]);
 
   useEffect(() => {
@@ -238,29 +258,46 @@ export function SettingsModal({ open, initialTab = "dashboard", onClose }: Props
 
     try {
       const prefs = (await api.getUiPreferences()) as UiPreferences;
-      setSections((prev) => ({ ...prev, ...(prefs.sections || {}) }));
-      setExcluded(prefs.excludedFarmlandIdsByServer || {});
-      setClusterPrefs(prefs.fieldClusterPrefsByServer || {});
-      setUseNewUi(prefs.newUiLocked === true ? true : prefs.useNewUi === true);
-      setNewUiLocked(prefs.newUiLocked === true);
-      if (prefs.defaultSection) {
-        const pref =
-          prefs.defaultSection === "last" || prefs.defaultSection === "overview"
-            ? prefs.defaultSection
-            : normalizeSectionId(prefs.defaultSection);
-        setDefaultSection(pref);
-        writeDefaultSectionPref(pref);
-      } else {
-        setDefaultSection(readDefaultSectionPref());
-      }
-      setEnabledSections(prefs.sections || {});
-      setSimHub({
+      const nextSections = {
+        ...Object.fromEntries(SECTION_KEYS.map((k) => [k, true])),
+        ...(prefs.sections || {}),
+      } as Record<SectionKey, boolean>;
+      const nextExcluded = prefs.excludedFarmlandIdsByServer || {};
+      const nextClusters = prefs.fieldClusterPrefsByServer || {};
+      const nextUseNewUi = prefs.newUiLocked === true ? true : prefs.useNewUi === true;
+      const nextLocked = prefs.newUiLocked === true;
+      const nextDefault = prefs.defaultSection
+        ? prefs.defaultSection === "last" || prefs.defaultSection === "overview"
+          ? prefs.defaultSection
+          : normalizeSectionId(prefs.defaultSection)
+        : readDefaultSectionPref();
+      const nextSimHub = {
         enabled: false,
         view: "fields",
         fieldClusterIds: [],
         pastureIds: [],
         productionKeys: [],
         ...(prefs.simHubView || {}),
+      } as SimHubViewPrefs;
+      setSections(nextSections);
+      setExcluded(nextExcluded);
+      setClusterPrefs(nextClusters);
+      setUseNewUi(nextUseNewUi);
+      setNewUiLocked(nextLocked);
+      setDefaultSection(nextDefault);
+      writeDefaultSectionPref(nextDefault);
+      setEnabledSections(prefs.sections || {});
+      setSimHub(nextSimHub);
+      const fillNow = useDashboardStore.getState().viewerFillUnitMode;
+      viewerBaselineRef.current = fillNow ?? "auto";
+      displayBaselineRef.current = displaySnapshot({
+        sections: nextSections,
+        excluded: nextExcluded,
+        clusterPrefs: nextClusters,
+        simHub: nextSimHub,
+        useNewUi: nextUseNewUi,
+        newUiLocked: nextLocked,
+        defaultSection: nextDefault,
       });
 
       const cfg = await api.getCurrentConfig();
@@ -280,6 +317,12 @@ export function SettingsModal({ open, initialTab = "dashboard", onClose }: Props
       setFtpDelay(Number(cfg?.ftpPolling?.initialDelaySeconds ?? 0));
       setFtpInterval(Number(cfg?.ftpPolling?.intervalMinutes ?? 5));
       setFtpSchedule((cfg?.ftpPolling?.scheduleMode as "sync" | "staggered") || "sync");
+      connectionBaselineRef.current = JSON.stringify({
+        servers: loadedServers,
+        ftpDelay: Number(cfg?.ftpPolling?.initialDelaySeconds ?? 0),
+        ftpInterval: Number(cfg?.ftpPolling?.intervalMinutes ?? 5),
+        ftpSchedule: (cfg?.ftpPolling?.scheduleMode as "sync" | "staggered") || "sync",
+      });
 
       const lanSettings = await api.getLanAccessSettings();
       setLan(lanSettings || {});
@@ -292,14 +335,19 @@ export function SettingsModal({ open, initialTab = "dashboard", onClose }: Props
       });
 
       const modCfg = await api.getModConfig();
-      setMod({
-        updateInterval: modCfg?.updateInterval ?? 10000,
-        collectionCycleMs: modCfg?.collectionCycleMs ?? 60000,
-        modules: {
-          ...Object.fromEntries(MOD_MODULES.map((m) => [m, true])),
-          ...(modCfg?.modules || {}),
-        },
-        configPath: modCfg?.configPath,
+      const loadedMod = loadModDraft(modCfg, MOD_MODULES);
+      const nextMod = {
+        updateInterval: loadedMod.updateInterval,
+        collectionCycleMs: loadedMod.collectionCycleMs,
+        modules: loadedMod.modules,
+        configPath: loadedMod.configPath,
+      };
+      setMod(nextMod);
+      modRevisionRef.current = loadedMod.revision;
+      modBaselineRef.current = JSON.stringify({
+        updateInterval: nextMod.updateInterval,
+        collectionCycleMs: nextMod.collectionCycleMs,
+        modules: nextMod.modules,
       });
 
       try {
@@ -340,83 +388,134 @@ export function SettingsModal({ open, initialTab = "dashboard", onClose }: Props
     setStatus("");
     setSaveLifecycle("pending");
     try {
-      const savePrefsRes = (await api.saveUiPreferences({
+      const displayInput = {
         sections,
-        excludedFarmlandIdsByServer: excluded,
-        fieldClusterPrefsByServer: Object.fromEntries(
-          Object.entries(clusterPrefs).map(([sid, pref]) => [
-            sid,
-            { autoMerge: false, manualGroups: pref.manualGroups || [] },
-          ]),
-        ),
-        simHubView: simHub,
-        useNewUi: newUiLocked ? true : useNewUi,
+        excluded,
+        clusterPrefs,
+        simHub,
+        useNewUi,
+        newUiLocked,
         defaultSection,
-      })) as { ok?: boolean; restartRequired?: boolean } | undefined;
-      writeDefaultSectionPref(defaultSection);
-      setEnabledSections(sections);
-
-      const cfg = config || (await api.getCurrentConfig());
-      if (
-        serversDraft.length === 0 &&
-        Array.isArray(cfg?.servers) &&
-        cfg.servers.length > 0
-      ) {
-        throw new Error("empty-servers");
-      }
-      const saveRes = await api.saveSettings({
-        ...cfg,
-        isConfigured: true,
+      };
+      const displayNow = displaySnapshot(displayInput);
+      const viewerNow = fillUnitDraft ?? "auto";
+      const connectionNow = JSON.stringify({
         servers: serversDraft,
-        ftpPolling: {
-          ...(cfg?.ftpPolling || {}),
-          initialDelaySeconds: ftpDelay,
-          intervalMinutes: ftpInterval,
-          scheduleMode: ftpSchedule,
-        },
+        ftpDelay,
+        ftpInterval,
+        ftpSchedule,
       });
-      if (saveRes && saveRes.ok === false) {
-        throw new Error(saveRes.error || "save-settings failed");
-      }
-      if (saveRes && saveRes.keptExisting) {
-        showToast(t("settings.saveKeptExistingSaves"), "warning");
-      } else {
-        applyServersFromSettingsDraft(serversDraft);
-      }
-      void reloadServersFromApi().catch(() => {
-        /* Top bar already has the draft list; API catch-up is best-effort. */
-      });
-      setSaveLifecycle("validated");
-
-      const modRes = await api.saveModConfig({
+      const modNow = JSON.stringify({
         updateInterval: mod.updateInterval ?? 10000,
         collectionCycleMs: mod.collectionCycleMs ?? 60000,
         modules: mod.modules,
       });
-      if (!modRes?.ok) {
-        showToast((modRes?.error || t("settings.saveFailed")) + " (mod)", "warning");
-        setSaveLifecycle("saved");
-        return;
-      }
-
       const lanNow = JSON.stringify({
         lanAccessEnabled: !!lan.lanAccessEnabled,
         lanUsername: String(lan.lanUsername || "admin").trim(),
         lanAllowedIPs: String(lan.lanAllowedIPs || "").trim(),
         lanAuthOptional: !!lan.lanAuthOptional,
       });
-      const lanChanged = lanPassDraft !== "" || lanNow !== lanBaselineRef.current;
-      if (lanChanged) {
-        const prevLan = await api.getLanAccessSettings();
-        const lanRes = await api.saveLanAccessSettings({
-          lanAccessEnabled: !!lan.lanAccessEnabled,
-          lanUsername: (lan.lanUsername || "admin").trim(),
-          lanPassword: lanPassDraft !== "" ? lanPassDraft : prevLan.lanPassword,
-          lanAllowedIPs: (lan.lanAllowedIPs || "").trim(),
-          lanAuthOptional: !!lan.lanAuthOptional,
-        });
-        if (!lanRes?.ok) {
-          const code = lanRes?.error || "";
+      const cfg = config || (await api.getCurrentConfig());
+      if (
+        connectionNow !== connectionBaselineRef.current &&
+        serversDraft.length === 0 &&
+        Array.isArray(cfg?.servers) &&
+        cfg.servers.length > 0
+      ) {
+        throw new Error("empty-servers");
+      }
+      const outcome = await runSettingsSave(
+        {
+          displayNow,
+          displayBaseline: displayBaselineRef.current,
+          connectionNow,
+          connectionBaseline: connectionBaselineRef.current,
+          modNow,
+          modBaseline: modBaselineRef.current,
+          modRevision: modRevisionRef.current,
+          lanNow,
+          lanBaseline: lanBaselineRef.current,
+          lanSecretPending: lanPassDraft !== "",
+          viewerNow,
+          viewerBaseline: viewerBaselineRef.current,
+        },
+        {
+          saveDisplay: async () => {
+            const res = (await api.saveUiPreferences(displaySaveBody(displayInput) as UiPreferences)) as
+              | { ok?: boolean; restartRequired?: boolean; error?: string }
+              | undefined;
+            if (res && res.ok === false) return res;
+            writeDefaultSectionPref(defaultSection);
+            setEnabledSections(sections);
+            return res ?? { ok: true };
+          },
+          saveViewer: async () => {
+            const stored = setViewerFillUnitMode(fillUnitDraft);
+            if (!stored) return { ok: false, error: "fill-unit-storage" };
+            return { ok: true };
+          },
+          saveConnection: async () => {
+            const saveRes = await api.saveSettings({
+              ...cfg,
+              isConfigured: true,
+              servers: serversDraft,
+              ftpPolling: {
+                ...(cfg?.ftpPolling || {}),
+                initialDelaySeconds: ftpDelay,
+                intervalMinutes: ftpInterval,
+                scheduleMode: ftpSchedule,
+              },
+            });
+            if (saveRes && saveRes.ok === false) return saveRes;
+            if (saveRes && saveRes.keptExisting) {
+              showToast(t("settings.saveKeptExistingSaves"), "warning");
+            } else {
+              applyServersFromSettingsDraft(serversDraft);
+            }
+            void reloadServersFromApi().catch(() => {
+              /* Top bar already has the draft list; API catch-up is best-effort. */
+            });
+            return saveRes ?? { ok: true };
+          },
+          saveMod: async (expectedRevision) =>
+            api.saveModConfig({
+              updateInterval: mod.updateInterval ?? 10000,
+              collectionCycleMs: mod.collectionCycleMs ?? 60000,
+              modules: mod.modules,
+              expectedRevision,
+            }),
+          saveLan: async () => {
+            const prevLan = await api.getLanAccessSettings();
+            return api.saveLanAccessSettings({
+              lanAccessEnabled: !!lan.lanAccessEnabled,
+              lanUsername: (lan.lanUsername || "admin").trim(),
+              lanPassword: lanPassDraft !== "" ? lanPassDraft : prevLan.lanPassword,
+              lanAllowedIPs: (lan.lanAllowedIPs || "").trim(),
+              lanAuthOptional: !!lan.lanAuthOptional,
+            });
+          },
+        },
+      );
+      displayBaselineRef.current = outcome.displayBaseline;
+      viewerBaselineRef.current = outcome.viewerBaseline;
+      connectionBaselineRef.current = outcome.connectionBaseline;
+      modBaselineRef.current = outcome.modBaseline;
+      modRevisionRef.current = outcome.modRevision;
+      lanBaselineRef.current = outcome.lanBaseline;
+      if (outcome.clearLanSecret) setLanPassDraft("");
+      if (outcome.failed) {
+        if (outcome.failed === "mod") {
+          const modErr = outcome.error === "malformed-config" || outcome.error === "duplicate-structure"
+            ? t("settings.modConfigPreserved")
+            : outcome.error === "conflict"
+              ? tOr("settings.modConfigConflict", "The game config changed on disk. Reload settings before saving it again.")
+              : outcome.error === "unreadable"
+                ? tOr("settings.modConfigUnreadable", "The game config could not be read, so it was left unchanged.")
+                : (outcome.error || t("settings.saveFailed"));
+          showToast(modErr, "warning");
+        } else if (outcome.failed === "lan") {
+          const code = outcome.error || "";
           const map: Record<string, string> = {
             default_credentials_rejected: t("settings.lanErrDefaultCreds"),
             password_too_short: t("settings.lanErrPasswordTooShort"),
@@ -424,14 +523,21 @@ export function SettingsModal({ open, initialTab = "dashboard", onClose }: Props
             username_required: t("settings.lanErrUsernameRequired"),
           };
           showToast(map[code] || code || t("settings.saveFailed"), "warning");
-          setSaveLifecycle("failed");
-          return;
+        } else if (outcome.failed === "viewer") {
+          showToast(t("settings.fillUnitsStorageFailed"), "error");
+          if (outcome.committed.length > 0) showToast(t("settings.savePartial"), "warning");
+        } else {
+          showToast(outcome.error || t("settings.saveFailed"), "error");
         }
+        setSaveLifecycle("failed");
+        return;
       }
       setSaveLifecycle("synced");
-      setDirty(false);
-      setBaseline("");
-      if (savePrefsRes?.restartRequired) {
+      if (outcome.dirty.length === 0) {
+        setDirty(false);
+        setBaseline("");
+      }
+      if (outcome.displayResult?.restartRequired) {
         showToast(t("theme.useNewUiRestart"), "info");
       } else {
         showToast(t("settings.saved"), "success");
@@ -555,6 +661,9 @@ export function SettingsModal({ open, initialTab = "dashboard", onClose }: Props
                 setExcluded={setExcluded}
                 clusterPrefs={clusterPrefs}
                 setClusterPrefs={setClusterPrefs}
+                fillUnitDraft={fillUnitDraft}
+                setFillUnitDraft={setFillUnitDraft}
+                unitDisplay={unitDisplayFromPayload(payload)}
               />
             ) : null}
             {tab === "servers" ? (
@@ -685,6 +794,9 @@ function DashboardPane(props: {
   setClusterPrefs: (
     c: Record<string, { autoMerge?: boolean; manualGroups: number[][] }>,
   ) => void;
+  fillUnitDraft: "litres" | "british" | "imperial" | null;
+  setFillUnitDraft: (mode: "litres" | "british" | "imperial" | null) => void;
+  unitDisplay: Parameters<typeof fillProviderOwnsUnits>[0];
 }) {
   const {
     sections,
@@ -698,7 +810,12 @@ function DashboardPane(props: {
     setExcluded,
     clusterPrefs,
     setClusterPrefs,
+    fillUnitDraft,
+    setFillUnitDraft,
+    unitDisplay,
   } = props;
+  const unitOwner = fillUnitOwnerId(unitDisplay);
+  const providerOwns = fillProviderOwnsUnits(unitDisplay);
 
   const serverIds = Array.from(
     new Set(exclusionRows.map((r) => String(r.serverId || "default")).filter(Boolean)),
@@ -749,6 +866,33 @@ function DashboardPane(props: {
           ))}
         </select>
       </label>
+
+      <h3 style={{ marginTop: "1.25rem" }}>{t("settings.fillUnitsTitle")}</h3>
+      <p class="fd-settings__hint">{t("settings.fillUnitsHintManualFirst")}</p>
+      <label class="fd-settings__field">
+        <span>{t("settings.fillUnitsLabel")}</span>
+        <select
+          aria-label={t("settings.fillUnitsLabel")}
+          value={fillUnitDraft ?? "auto"}
+          onChange={(e) => {
+            const value = (e.target as HTMLSelectElement).value;
+            if (value === "litres" || value === "british" || value === "imperial") setFillUnitDraft(value);
+            else setFillUnitDraft(null);
+          }}
+        >
+          <option value="auto">{t("settings.fillUnitsAuto")}</option>
+          <option value="litres">{t("settings.fillUnitsLitres")}</option>
+          <option value="british">{t("settings.fillUnitsBritish")}</option>
+          <option value="imperial">{t("settings.fillUnitsImperial")}</option>
+        </select>
+      </label>
+      {providerOwns ? (
+        <p class="fd-settings__hint" data-fill-unit-owner={fillUnitDraft == null ? "mod" : "viewer"}>
+          {fillUnitDraft == null
+            ? t("settings.fillUnitsFollowingMod", { provider: unitOwner || "" })
+            : t("settings.fillUnitsManualOverMod", { provider: unitOwner || "" })}
+        </p>
+      ) : null}
 
       <h3 style={{ marginTop: "1.25rem" }}>{t("settings.fieldExclusionTitle")}</h3>
       <p class="fd-settings__hint">{t("settings.fieldExclusionHint")}</p>
@@ -958,24 +1102,27 @@ function ServersPane(props: {
         showToast(t("setup.toastNoDataJson", { extra: "" }), "warning");
         return;
       }
-      const existing = new Set(serversDraft.map((s) => s.localSubFolder || s.name));
-      const added: FarmDashConfigServer[] = [];
-      for (const save of saves) {
-        const folder = String(
-          (save as { localSubFolder?: string; folder?: string; name?: string }).localSubFolder ||
-            (save as { folder?: string }).folder ||
-            (save as { name?: string }).name ||
-            "",
-        );
-        if (!folder || existing.has(folder)) continue;
-        added.push({
-          id: `srv_${Date.now()}_${added.length}`,
-          name: String((save as { name?: string }).name || folder),
-          mode: "local",
-          localSubFolder: folder,
-          localPath: String((save as { localPath?: string }).localPath || ""),
-        });
+      const imported = importDiscoveredSaves(
+        serversDraft,
+        saves as Array<Record<string, unknown>>,
+        discoveryContextFromScan(result),
+      );
+      const feedback = discoveryFeedback(imported, saves.length > 0);
+      if (feedback === "recovery") {
+        if (imported.added.length) setServersDraft([...serversDraft, ...imported.added]);
+        showToast(tOr("setup.toastRegistrationRecovery", "Replica registration could not be read. Those replica sources were not added, and the registration file was left unchanged."), "warning");
+        return;
       }
+      if (feedback === "conflict") {
+        if (imported.added.length) setServersDraft([...serversDraft, ...imported.added]);
+        showToast(tOr("setup.toastSourceConflict", "A discovered source conflicts with one already configured. It was not added, and the existing source was left unchanged."), "warning");
+        return;
+      }
+      if (feedback === "unresolved") {
+        showToast(tOr("setup.toastSourceUnresolved", "The default save location could not be resolved, so matching sources were not added."), "warning");
+        return;
+      }
+      const added = imported.added;
       if (!added.length) {
         showToast(t("setup.toastAllDetected"), "info");
         return;
@@ -1208,6 +1355,12 @@ function ServersPane(props: {
                       detail: s.localSubFolder || s.localPath || "—",
                     })}
               </span>
+              {s.mode !== "ftp" && (s.replicaRemoteSlot || s.replicaRegistration) ? (
+                <span class="fd-settings__hint" title={t("replicaLink.badgeHint")}>
+                  {" · "}
+                  {t("replicaLink.badge")}
+                </span>
+              ) : null}
             </span>
             <Button
               variant="ghost"
@@ -1629,7 +1782,7 @@ function AboutPane(props: {
       </p>
       <p class="fd-settings__hint">
         {t("settings.supportKofiHint")}{" "}
-        <a href="https://ko-fi.com" target="_blank" rel="noopener">
+        <a href="https://ko-fi.com/wizarlypayload" target="_blank" rel="noopener">
           Ko-fi
         </a>
       </p>

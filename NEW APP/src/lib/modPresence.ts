@@ -12,7 +12,6 @@ import {
   isHirePurchasingModActive,
   type HirePurchasingPayload,
 } from "@/lib/hirePurchasing";
-
 export interface ModPresence {
   redtape: boolean;
   ads: boolean;
@@ -106,6 +105,7 @@ export function detectModPresence(
     redTape?: unknown;
     invoices?: unknown;
     hirePurchasing?: unknown;
+    companionMods?: unknown;
     realisticFarming?: RealisticFarmingPayload | null;
     weather?: { moisture?: { enabled?: boolean } } | null;
     baleInventory?: unknown;

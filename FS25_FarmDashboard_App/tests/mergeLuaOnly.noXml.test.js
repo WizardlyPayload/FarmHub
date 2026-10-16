@@ -76,7 +76,8 @@ describe('mergeData lua_only without XML (join-as-client)', () => {
         expect(merged.xmlAvailable).toBe(false);
         expect(merged.gameSettings.weedsEnabled).toBe(false);
         expect(merged.settings.plowingRequired).toBe(true);
-        expect(merged.savegameName).toBe('savegame6');
+        expect(merged.savegameName).toBe('');
+        expect(merged.serverInfo.saveSlot).toBe('savegame6');
     });
 
     test('keeps lua crop priceHistory without economy.xml', () => {

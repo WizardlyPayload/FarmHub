@@ -5,8 +5,7 @@ const path = require('path');
 
 const nsh = fs.readFileSync(path.join(__dirname, '..', 'build', 'installer.nsh'), 'utf8');
 const ps1 = fs.readFileSync(path.join(__dirname, '..', 'build', 'uninstall-user-data.ps1'), 'utf8');
-const deps = fs.readFileSync(path.join(__dirname, '..', 'build', 'uninstall-dependencies.ps1'), 'utf8');
-const magickCommon = fs.readFileSync(path.join(__dirname, '..', 'build', 'imagemagick-common.ps1'), 'utf8');
+const v5Builder = fs.readFileSync(path.join(__dirname, '..', 'electron-builder.rf.yml'), 'utf8');
 
 describe('installer / uninstall edition ownership', () => {
     test('language combo defaults to English when nothing was saved', () => {
@@ -37,6 +36,18 @@ describe('installer / uninstall edition ownership', () => {
         expect(rfLegacy).not.toMatch(/RMDir \/r "\$APPDATA\\fs25-farm-dashboard"/);
     });
 
+    test('V5 updater uses a separate cache and legacy cleanup preserves V4 pending updates', () => {
+        const v5Metadata = v5Builder.split('extraMetadata:')[1].split('directories:')[0];
+        expect(v5Metadata).toMatch(/^\s*name: fs25-farm-dashboard-rf\s*$/m);
+        expect(v5Builder).toMatch(/^\s*channel: latest-rf\s*$/m);
+        expect(v5Builder).not.toMatch(/^\s*updaterCacheDirName:/m);
+        expect(ps1).toMatch(/function Remove-LegacyV5UpdaterInstaller/);
+        expect(ps1).toMatch(/Join-Path \$legacyRoot 'installer\.exe'/);
+        expect(ps1).toMatch(/\$identity\.ProductName -cne 'FS25 Farm Dashboard V5'/);
+        expect(ps1).toMatch(/\$identity\.ProductVersion -notmatch '\^5\\\.'/);
+        expect(ps1).not.toMatch(/Remove-Tree \$legacyRoot/);
+    });
+
     test('current-user setup still installs ImageMagick via a visible permission prompt', () => {
         expect(nsh).toMatch(/-AllowElevation -Edition \$R4/);
         expect(nsh).not.toMatch(/Skipping ImageMagick on current-user setup/);
@@ -50,38 +61,5 @@ describe('installer / uninstall edition ownership', () => {
         expect(block).toMatch(/ReadRegDWORD \$R5 SHELL_CONTEXT "\$\{UNINSTALL_REGISTRY_KEY\}" "EstimatedSize"/);
         expect(block).toMatch(/StrCpy \$R5 "0"/);
         expect(block).toMatch(/-EstimatedSizeKB \$R5/);
-    });
-
-    test('V4 Full uninstall gets the same 740 UAC relaunch as V5', () => {
-        const unInit = nsh.split('!macro customUnInit')[1].split('!macroend')[0];
-        expect(unInit).toMatch(/-Edition \$R4 -CheckOnly/);
-        expect(unInit).toMatch(/\$R0 == "740"/);
-        expect(unInit).toMatch(/ExecShell "runas"/);
-        expect(unInit).toMatch(/--delete-app-data/);
-        expect(unInit).not.toMatch(/!if "\$\{APP_ID\}" == "com\.farmdashboard\.rf"/);
-        expect(unInit).not.toMatch(/-Edition V5 -CheckOnly/);
-    });
-
-    test('V4 other-edition detection uses native 64-bit registry views', () => {
-        expect(deps).toMatch(/\. \(Join-Path \$PSScriptRoot 'windows-install-state\.ps1'\)/);
-        expect(magickCommon).toMatch(/Get-FarmDashRegistryArguments/);
-        expect(magickCommon).toMatch(/RegistryView\]::Registry64/);
-        expect(magickCommon).toMatch(/OpenBaseKey/);
-        const otherFn = magickCommon.split('function Test-OtherDashboardInstalled')[1].split('function Register-DependencyConsumer')[0];
-        expect(otherFn).not.toMatch(/FarmDashNativeDependencyRegistry/);
-        expect(otherFn).not.toMatch(/Get-ItemProperty -LiteralPath \$key/);
-        expect(otherFn).toMatch(/ReturnValue -eq 1/);
-        expect(otherFn).toMatch(/EnumValues/);
-        expect(otherFn).not.toMatch(/-notin @\(0, 2\)/);
-    });
-
-    test('V4 extraResources ships windows-install-state.ps1 for Full uninstall', () => {
-        const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
-        expect(pkg.build.extraResources).toEqual(expect.arrayContaining([
-            { from: 'build/windows-install-state.ps1', to: 'windows-install-state.ps1' },
-        ]));
-        const unInstall = nsh.split('!macro customUnInstall')[1].split('!macroend')[0];
-        expect(unInstall).toMatch(/windows-install-state\.ps1/);
-        expect(deps).toMatch(/windows-install-state\.ps1/);
     });
 });

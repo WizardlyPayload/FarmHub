@@ -233,11 +233,6 @@ export function interpretLanVerifyResult(status, networkError) {
   return "network";
 }
 
-/** Keep a still-valid tablet login across 5xx / 404 / thrown fetch. Clear only on 401/403. */
-export function shouldClearStoredLanCredentials(kind) {
-  return kind === "auth";
-}
-
 /**
  * Registers early (same module phase as patch). Listener order must run before app.js DOMContentLoaded.
  */
@@ -282,7 +277,7 @@ export function farmdashBootstrapLanViewerAuth() {
         const result = await verifyLanCredentialsWithFetch();
         const kind = interpretLanVerifyResult(result.status, false);
         if (kind !== "ok") {
-          if (shouldClearStoredLanCredentials(kind)) farmdashClearLanHttpBasic();
+          farmdashClearLanHttpBasic();
           try {
             sessionStorage.setItem(
               "farmdash_last_error_code",
@@ -385,7 +380,7 @@ export function farmdashBootstrapLanViewerAuth() {
             resolveLanGateWaiters();
             return;
           }
-          if (shouldClearStoredLanCredentials(kind)) farmdashClearLanHttpBasic();
+          farmdashClearLanHttpBasic();
           try {
             sessionStorage.setItem(
               "farmdash_last_error_code",
@@ -395,6 +390,7 @@ export function farmdashBootstrapLanViewerAuth() {
           showAuthOverlay(kind);
           return;
         } catch (_) {
+          farmdashClearLanHttpBasic();
           try {
             sessionStorage.setItem("farmdash_last_error_code", "E_NETWORK");
           } catch (_) {}

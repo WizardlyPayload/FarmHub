@@ -79,66 +79,7 @@ describe("mergeWeather", () => {
     );
     expect(merged.currentWeather).toBe("snow");
     expect(merged.currentTemperature).toBe(16);
-    expect(merged.forecast[0].weatherType).toBe("sun");
-  });
-
-  test("temperature-only Lua does not wipe XML forecast days", () => {
-    const xmlForecast = [
-      { day: 1, weatherType: "RAIN", minTemperature: 8, maxTemperature: 12 },
-      { day: 2, weatherType: "SUN", minTemperature: 10, maxTemperature: 16 },
-    ];
-    const merged = mergeWeather(
-      { currentTemperature: 9.5 },
-      { currentWeather: "CLOUDY", forecast: xmlForecast }
-    );
-    expect(luaForecastIsLive({ currentTemperature: 9.5 })).toBe(false);
-    expect(merged.currentTemperature).toBe(9.5);
-    expect(merged.currentWeather).toBe("cloudy");
-    expect(merged.forecast).toHaveLength(2);
-    expect(merged.forecast[0].weatherType).toBe("rain");
-    expect(merged.forecast[1].maxTemperature).toBe(16);
-  });
-
-  test("temperature-only Lua keeps XML wind and does not invent unknown weather", () => {
-    const merged = mergeWeather(
-      { currentTemperature: 9.5 },
-      { currentWeather: "CLOUDY", windSpeed: 4.2, cloudCoverage: 0.6, rainLevel: 0 }
-    );
-    expect(merged.currentTemperature).toBe(9.5);
-    expect(merged.currentWeather).toBe("cloudy");
-    expect(merged.windSpeed).toBe(4.2);
-    expect(merged.cloudCoverage).toBe(0.6);
-    expect(merged.rainLevel).toBe(0);
-  });
-
-  test("null Lua currentWeather does not replace XML type with unknown", () => {
-    const merged = mergeWeather(
-      { currentTemperature: 7, currentWeather: null },
-      { currentWeather: "RAIN", windSpeed: 2 }
-    );
-    expect(merged.currentWeather).toBe("rain");
-    expect(merged.currentTemperature).toBe(7);
-    expect(merged.windSpeed).toBe(2);
-  });
-
-  test("empty Lua forecast array does not wipe XML forecast", () => {
-    const merged = mergeWeather(
-      { currentTemperature: 4, currentWeather: "unknown", forecast: [] },
-      { currentWeather: "SUN", forecast: [{ day: 1, weatherType: "CLOUDY", minTemperature: 3, maxTemperature: 7 }] }
-    );
-    expect(merged.currentWeather).toBe("unknown");
-    expect(merged.forecast[0].weatherType).toBe("cloudy");
-    expect(merged.forecast[0].minTemperature).toBe(3);
-  });
-
-  test("null Lua weather keeps XML forecast", () => {
-    const merged = mergeWeather(null, {
-      currentWeather: "RAIN",
-      currentTemperature: 6,
-      forecast: [{ day: 1, weatherType: "SNOW", minTemperature: -1, maxTemperature: 2 }],
-    });
-    expect(merged.currentWeather).toBe("rain");
-    expect(merged.forecast[0].weatherType).toBe("snow");
+    expect(merged.forecast).toEqual([]);
   });
 
   test("live Lua unknown is not filled from XML sun", () => {

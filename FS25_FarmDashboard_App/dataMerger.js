@@ -17,7 +17,10 @@
  *  match (savegame-only / HTTP path). Never merge two suggestion lists.
  */
 
+const { admitRfState } = require('./rfProviderState.cjs');
+const { normalizeCompanionPages } = require('./companionPagesMerge.cjs');
 const { assessModVersion } = require('./modVersionPolicy.js');
+const { originalSampleTime, fleetMeasuredAt, coverageOf, SECTION_CONTRACT_VERSION } = require('./sectionContract.cjs');
 const { applyFreshnessMeta } = require('./uxContract.cjs');
 const { pruneMergedDataToPlayerFarms, getPlayerFarmIdSet } = require('./farmScope.cjs');
 const { enrichStockFillTypes, applyFillTypeTitles, enrichStockFillTypesFromPlaceables } = require('./fillTypeResolve.cjs');
@@ -313,6 +316,38 @@ function toArr(val) {
 }
 
 /**
+ * Lua empty lists arrive as `{}`. Coerce RF presence.mods (and similar) to arrays
+ * so UI `.some` / `.map` never crash on object-shaped empties.
+ */
+function normalizeRealisticFarming(rf) {
+    if (!rf || typeof rf !== 'object') {
+        return { presence: { enabled: false, mods: [] } };
+    }
+    const out = { ...rf };
+    const presence = out.presence && typeof out.presence === 'object' ? { ...out.presence } : { enabled: false };
+    presence.mods = toArr(presence.mods);
+    if (typeof presence.enabled !== 'boolean') {
+        presence.enabled = presence.mods.some((m) => m && m.detected);
+    }
+    out.presence = presence;
+    return out;
+}
+
+/**
+ * Lua empty companion lists arrive as `{}`. Coerce mods to an array and derive
+ * enabled from detections so the Companions hub / nav gate never see object-shaped empties.
+ */
+function normalizeCompanionMods(cm) {
+    if (!cm || typeof cm !== 'object') {
+        return { enabled: false, mods: [] };
+    }
+    const mods = toArr(cm.mods).filter((m) => m && typeof m === 'object');
+    const enabled =
+        cm.enabled === true || mods.some((m) => m.detected === true);
+    return { ...cm, enabled: !!enabled, mods };
+}
+
+/**
  * Lua empty Red Tape lists arrive as `{}`. Coerce byFarm list fields to arrays
  * so UI `.map` / merger checks never see object-shaped empties.
  */
@@ -436,11 +471,11 @@ function buildFieldLiveFingerprints(luaFields, receivedAt) {
             posZ: Number(f.posZ ?? f.position?.z) || 0,
             isPrecisionFarming: !!f.isPrecisionFarming,
             isScanned: !!f.isScanned,
-            nitrogenLevel: Number(f.nitrogenLevel) || 0,
-            targetNitrogen: Number(f.targetNitrogen) || 0,
-            nitrogenTargetDisplay: Number(f.nitrogenTargetDisplay) || 0,
-            phValue: Number(f.phValue) || 0,
-            targetPh: Number(f.targetPh) || 0,
+            nitrogenLevel: soilSampleOrNull(f.nitrogenLevel),
+            targetNitrogen: soilSampleOrNull(f.targetNitrogen),
+            nitrogenTargetDisplay: soilSampleOrNull(f.nitrogenTargetDisplay),
+            phValue: soilSampleOrNull(f.phValue),
+            targetPh: soilSampleOrNull(f.targetPh),
             phLimeBarMin: Number(f.phLimeBarMin) || 0,
             phLimeBarMax: Number(f.phLimeBarMax) || 0,
             rollerLevel: Number(f.rollerLevel) || 0,
@@ -479,13 +514,13 @@ function worldItemsForMapBounds(fields, vehicles) {
 }
 
 /** Never leave a 4 km map on the 2 km default just because Lua reported terrainSize=2048. */
-function applyResolvedMapBounds(merged, worldItems) {
+function applyResolvedMapBounds(merged) {
     if (!merged || typeof merged !== 'object') return merged;
     const raw = merged.mapBounds || merged.serverInfo?.mapBounds || null;
-    const items = Array.isArray(worldItems)
-        ? worldItems
-        : worldItemsForMapBounds(merged.fields, merged.vehicles);
-    const next = resolveFleetMapTerrainBounds({ mapBounds: raw }, items);
+    const next = resolveFleetMapTerrainBounds(
+        { mapBounds: raw },
+        worldItemsForMapBounds(merged.fields, merged.vehicles)
+    );
     const si =
         merged.serverInfo && typeof merged.serverInfo === 'object'
             ? { ...merged.serverInfo, mapBounds: next }
@@ -493,11 +528,9 @@ function applyResolvedMapBounds(merged, worldItems) {
     return { ...merged, mapBounds: next, serverInfo: si };
 }
 
-/** Infer terrain size from the full world, then drop non-player farms. */
 function pruneAndResolveMapBounds(merged) {
-    if (!merged || typeof merged !== 'object') return merged;
-    const worldItems = worldItemsForMapBounds(merged.fields, merged.vehicles);
-    return applyResolvedMapBounds(pruneMergedDataToPlayerFarms(merged), worldItems);
+    const withWorldBounds = applyResolvedMapBounds(merged);
+    return applyResolvedMapBounds(pruneMergedDataToPlayerFarms(withWorldBounds));
 }
 
 /**
@@ -555,6 +588,7 @@ function enrichFieldFromLiveCache(base, cache, options = {}) {
         out.targetPh = cache.targetPh;
         out.phLimeBarMin = cache.phLimeBarMin;
         out.phLimeBarMax = cache.phLimeBarMax;
+        if (cache.soilSampledAt != null && out.soilSampledAt == null) out.soilSampledAt = cache.soilSampledAt;
         enriched = true;
     }
     const cacheMoist = cache.moisture;
@@ -574,8 +608,7 @@ function enrichFieldFromLiveCache(base, cache, options = {}) {
     if (
         cache.soilFertilizer &&
         typeof cache.soilFertilizer === 'object' &&
-        !out.soilFertilizer &&
-        !(options.rfFromLiveExport && liveRfKeyOmitted(base, 'soilFertilizer'))
+        !out.soilFertilizer
     ) {
         out.soilFertilizer = { ...cache.soilFertilizer };
         enriched = true;
@@ -583,8 +616,7 @@ function enrichFieldFromLiveCache(base, cache, options = {}) {
     if (
         cache.cropStress &&
         typeof cache.cropStress === 'object' &&
-        !out.cropStress &&
-        !(options.rfFromLiveExport && liveRfKeyOmitted(base, 'cropStress'))
+        !out.cropStress
     ) {
         out.cropStress = { ...cache.cropStress };
         enriched = true;
@@ -703,6 +735,8 @@ function attachDataTimestamps(obj, options) {
             lastXmlReceivedAt: lastXmlAt,
             mergeComputedAt,
             liveNewerThanXml,
+            sectionContractVersion: SECTION_CONTRACT_VERSION,
+            sectionCoverage: coverageOf(obj && obj.collectionHealth),
         },
         collectionHealth: options.collectionHealth || obj.collectionHealth || null,
     };
@@ -879,6 +913,14 @@ function buildFillTypeCatalog(luaData, xmlEconomy, mapFillTypeCatalog) {
 }
 
 function mergeData(luaData, xmlData, options = {}) {
+    const merged = mergeDataCore(luaData, xmlData, options);
+    if (merged && luaData?.sectionOutcomes && typeof luaData.sectionOutcomes === 'object') {
+        merged.sectionOutcomes = { ...luaData.sectionOutcomes };
+    }
+    return admitRfState(merged, luaData);
+}
+
+function mergeDataCore(luaData, xmlData, options = {}) {
     const fieldLiveCache = options.fieldLiveCache || {};
     const lastLuaAt = options.lastLuaAt || null;
     const lastXmlAt = options.lastXmlAt || null;
@@ -896,9 +938,7 @@ function mergeData(luaData, xmlData, options = {}) {
             lastLuaAt,
             lastXmlAt
         );
-        return pruneAndResolveMapBounds(
-            attachDataTimestamps({ ...base, fields }, stampOpts)
-        );
+        return pruneAndResolveMapBounds(attachDataTimestamps({ ...base, fields }, stampOpts));
     }
     if (!xmlData) {
         const base = buildFromLuaOnly(luaData, mapFillTypeCatalog, mapFillTypeTitles);
@@ -909,9 +949,7 @@ function mergeData(luaData, xmlData, options = {}) {
                 return cache ? enrichFieldFromLiveCache(f, cache, { rfFromLiveExport: true }) : f;
             });
         }
-        return pruneAndResolveMapBounds(
-            attachDataTimestamps(base, stampOpts)
-        );
+        return pruneAndResolveMapBounds(attachDataTimestamps(base, stampOpts));
     }
 
     const fillTypeCatalog = buildFillTypeCatalog(luaData, xmlData.economy, mapFillTypeCatalog);
@@ -1011,6 +1049,8 @@ function mergeData(luaData, xmlData, options = {}) {
 
         fillTypeCatalog: stockEnriched.catalog,
         fillTypeTitles,
+        fillTypePhysics: luaData.fillTypePhysics || {},
+        unitDisplay: luaData.unitDisplay || { british: false, mods: [] },
         cropFillTypeIndex: luaData.cropFillTypeIndex || {},
         stock: {
             ...stockWithMoisture,
@@ -1023,8 +1063,10 @@ function mergeData(luaData, xmlData, options = {}) {
         // Optional third-party mod sections (must pass through — UI gates on enabled:true)
         invoices: luaData.invoices || { enabled: false },
         hirePurchasing: luaData.hirePurchasing || { enabled: false },
+        companionMods: normalizeCompanionMods(luaData.companionMods),
+        companionPages: normalizeCompanionPages(luaData.companionPages),
         // Realistic Farming suite (soft-detect aggregates; NEW APP 5.x)
-        realisticFarming: luaData.realisticFarming || { presence: { enabled: false, mods: [] } },
+        realisticFarming: normalizeRealisticFarming(luaData.realisticFarming),
 
         adsSummary         : luaData.adsSummary || null,
         vehicleYearsSummary: luaData.vehicleYearsSummary || null,
@@ -1040,9 +1082,7 @@ function mergeData(luaData, xmlData, options = {}) {
         xmlEconomy   : xmlData.economy        || {},
     };
 
-    return pruneAndResolveMapBounds(
-        attachDataTimestamps(mergedCore, stampOpts)
-    );
+    return pruneAndResolveMapBounds(attachDataTimestamps(mergedCore, stampOpts));
 }
 
 // ─── farms ────────────────────────────────────────────────────────────────────
@@ -1435,27 +1475,12 @@ function finiteOrUndef(v) {
     return isFiniteWeatherTemp(v) ? v : undefined;
 }
 
-function luaHasCurrentWeatherType(luaWeather) {
-    if (!luaWeather || typeof luaWeather !== 'object') return false;
-    if (!Object.prototype.hasOwnProperty.call(luaWeather, 'currentWeather')) return false;
-    const raw = luaWeather.currentWeather;
-    return raw != null && String(raw).trim() !== '';
-}
-
-function luaHasCurrentTemperature(luaWeather) {
-    return isFiniteWeatherTemp(luaWeather?.currentTemperature);
-}
-
 function luaWeatherIsLive(luaWeather) {
     if (!luaWeather || typeof luaWeather !== 'object') return false;
-    if (luaHasCurrentWeatherType(luaWeather)) return true;
-    if (luaHasCurrentTemperature(luaWeather)) return true;
+    if (Object.prototype.hasOwnProperty.call(luaWeather, 'currentWeather')) return true;
+    if (Object.prototype.hasOwnProperty.call(luaWeather, 'currentTemperature')) return true;
     if (Array.isArray(luaWeather.forecast) && luaWeather.forecast.length > 0) return true;
     return false;
-}
-
-function luaForecastIsLive(luaWeather) {
-    return !!(luaWeather && Array.isArray(luaWeather.forecast) && luaWeather.forecast.length > 0);
 }
 
 function mergeForecastDays(luaForecast, xmlForecast, _currentTemp, luaLive) {
@@ -1525,7 +1550,7 @@ function mergeForecastDays(luaForecast, xmlForecast, _currentTemp, luaLive) {
 
 function mergeWeather(luaWeather, xmlEnv) {
     const luaLive = luaWeatherIsLive(luaWeather);
-    const base = luaWeather && typeof luaWeather === 'object' ? luaWeather : {};
+    const base = luaLive ? luaWeather : (luaWeather || {});
     if (!xmlEnv) {
         if (!luaLive) return base;
         return {
@@ -1535,30 +1560,28 @@ function mergeWeather(luaWeather, xmlEnv) {
         };
     }
 
-    const currentTemp = luaHasCurrentTemperature(base)
-        ? base.currentTemperature
-        : xmlEnv.currentTemperature;
+    const currentTemp = luaLive ? base.currentTemperature : xmlEnv.currentTemperature;
     const forecast = mergeForecastDays(
         base.forecast,
         xmlEnv.forecast,
         currentTemp,
-        luaForecastIsLive(luaWeather)
+        luaLive
     );
 
     return {
         currentTemperature : currentTemp,
-        currentWeather     : luaHasCurrentWeatherType(base)
+        currentWeather     : luaLive
             ? normalizeWeatherSlug(base.currentWeather)
             : normalizeWeatherSlug(xmlEnv.currentWeather),
         currentSeason      : xmlEnv.currentSeason    || base.currentSeason,
-        windSpeed          : base.windSpeed ?? xmlEnv.windSpeed,
-        cloudCoverage      : base.cloudCoverage ?? xmlEnv.cloudCoverage,
-        rainLevel          : base.rainLevel ?? xmlEnv.rainLevel,
-        snowLevel          : base.snowLevel ?? xmlEnv.snowLevel,
+        windSpeed          : luaLive ? base.windSpeed : (base.windSpeed ?? xmlEnv.windSpeed),
+        cloudCoverage      : luaLive ? base.cloudCoverage : (base.cloudCoverage ?? xmlEnv.cloudCoverage),
+        rainLevel          : luaLive ? base.rainLevel : (base.rainLevel ?? xmlEnv.rainLevel),
+        snowLevel          : luaLive ? base.snowLevel : (base.snowLevel ?? xmlEnv.snowLevel),
         timeSinceLastRain  : luaLive ? base.timeSinceLastRain : (base.timeSinceLastRain ?? xmlEnv.timeSinceLastRain),
         forecast,
         rawForecast        : xmlEnv.rawForecast || [],
-        moisture           : base.moisture ?? xmlEnv.moisture,
+        moisture           : base.moisture,
     };
 }
 
@@ -1597,6 +1620,19 @@ function fixFieldOwnership(luaFields, farmlandOwnership) {
  * RF Soil Fertilizer / Crop Stress objects on the Lua row must be copied through;
  * XML has no equivalent and the UI otherwise falls back to vanilla 0/2 bars.
  */
+function soilSampleOrNull(value) {
+    if (value == null || value === '') return null;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+}
+
+/** Lua null means the sample was not read. Do not replace that with an XML placeholder zero. */
+function pickSoilSample(luaValue, xmlValue) {
+    if (luaValue === null) return null;
+    if (luaValue !== undefined) return soilSampleOrNull(luaValue);
+    return soilSampleOrNull(xmlValue);
+}
+
 function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
     // Normalise both to arrays — Lua serialises empty tables as {} not []
     const xmlArr = Array.isArray(xmlFields) ? xmlFields
@@ -1615,14 +1651,20 @@ function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
     for (const f of luaArr) {
         const fa = Number(f.farmlandId);
         const fi = Number(f.id);
-        if (!Number.isNaN(fa) && fa > 0) luaByFarmlandId.set(fa, f);
+        if (!Number.isNaN(fa) && fa > 0) {
+            const group = luaByFarmlandId.get(fa) || [];
+            group.push(f);
+            luaByFarmlandId.set(fa, group);
+        }
         if (!Number.isNaN(fi) && fi > 0) luaByInternalId.set(fi, f);
     }
 
     const merged = xmlArr.map(xmlField => {
         const xKey = Number(xmlField.farmlandId ?? xmlField.id);
+        const farmlandGroup = !Number.isNaN(xKey) ? (luaByFarmlandId.get(xKey) || []) : [];
         const luaField =
-            (!Number.isNaN(xKey) && luaByFarmlandId.get(xKey))
+            farmlandGroup.find((row) => Number(row.id) === Number(xmlField.id))
+            || (farmlandGroup.length === 1 ? farmlandGroup[0] : null)
             || (!Number.isNaN(xKey) && luaByInternalId.get(xKey))
             || null;
         if (!luaField) return normalizeFieldMulch(xmlField);
@@ -1639,13 +1681,19 @@ function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
 
         const pfOverlay = {
             isPrecisionFarming : luaPf || xmlPf,
-            nitrogenLevel      : luaField.nitrogenLevel      ?? xmlField.nitrogenLevel      ?? 0,
-            targetNitrogen     : luaField.targetNitrogen     ?? xmlField.targetNitrogen     ?? 0,
-            phValue            : luaField.phValue            ?? xmlField.phValue            ?? 0,
-            targetPh           : luaField.targetPh           ?? xmlField.targetPh           ?? 0,
+            nitrogenLevel      : pickSoilSample(luaField.nitrogenLevel, xmlField.nitrogenLevel),
+            targetNitrogen     : pickSoilSample(luaField.targetNitrogen, xmlField.targetNitrogen),
+            phValue            : pickSoilSample(luaField.phValue, xmlField.phValue),
+            targetPh           : pickSoilSample(luaField.targetPh, xmlField.targetPh),
             phLimeBarMin       : luaField.phLimeBarMin       ?? xmlField.phLimeBarMin       ?? 0,
             phLimeBarMax       : luaField.phLimeBarMax       ?? xmlField.phLimeBarMax       ?? 0,
-            isScanned          : !!(luaField.isScanned || xmlField.isScanned),
+            isScanned          : luaField.isScanned === true ? true : (luaField.isScanned === false ? false : !!xmlField.isScanned),
+            soilReadState      : luaField.soilReadState != null ? luaField.soilReadState : (xmlField.soilReadState != null ? xmlField.soilReadState : null),
+            nitrogenReadState  : luaField.nitrogenReadState != null ? luaField.nitrogenReadState : (xmlField.nitrogenReadState != null ? xmlField.nitrogenReadState : null),
+            phReadState        : luaField.phReadState != null ? luaField.phReadState : (xmlField.phReadState != null ? xmlField.phReadState : null),
+            soilSampledAt      : originalSampleTime(luaField) != null ? originalSampleTime(luaField) : originalSampleTime(xmlField),
+            nitrogenSampledAt  : originalSampleTime({ soilSampledAt: luaField.nitrogenSampledAt }) != null ? originalSampleTime({ soilSampledAt: luaField.nitrogenSampledAt }) : originalSampleTime({ soilSampledAt: xmlField.nitrogenSampledAt }),
+            phSampledAt        : originalSampleTime({ soilSampledAt: luaField.phSampledAt }) != null ? originalSampleTime({ soilSampledAt: luaField.phSampledAt }) : originalSampleTime({ soilSampledAt: xmlField.phSampledAt }),
             nitrogenText       : luaField.nitrogenText       || xmlField.nitrogenText || '',
             limeText           : luaField.limeText           || xmlField.limeText     || '',
             pfSoilTypeIndex    : Number(luaField.pfSoilTypeIndex ?? xmlField.pfSoilTypeIndex ?? 0) || 0,
@@ -1790,10 +1838,10 @@ function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
             // RF land collectors attach these on the Lua row. XML has no equivalent;
             // dropping them here is why Montana showed vanilla bars while Witcombe
             // (lua-as-base when XML fields were empty) still showed Soil Fertilizer.
-            soilFertilizer: pickLiveRfLandBlock(luaField, xmlField, cacheRow, 'soilFertilizer'),
-            cropStress: pickLiveRfLandBlock(luaField, xmlField, cacheRow, 'cropStress'),
-            // Compact field polygon (world X/Z). Empty [] must not wipe XML/cache.
-            outline: pickFieldOutline(luaField.outline, xmlField.outline, cacheRow?.outline),
+            soilFertilizer: luaField.soilFertilizer || xmlField.soilFertilizer || cacheRow?.soilFertilizer,
+            cropStress: luaField.cropStress || xmlField.cropStress || cacheRow?.cropStress,
+            // Compact field polygon (world X/Z) + PDA fruit colour — Lua only.
+            outline: luaField.outline || xmlField.outline || cacheRow?.outline,
             paintedBlobKey: luaField.paintedBlobKey || xmlField.paintedBlobKey || cacheRow?.paintedBlobKey,
             mapHectares: luaField.mapHectares ?? xmlField.mapHectares ?? cacheRow?.mapHectares,
             fruitMapColor: luaField.fruitMapColor || xmlField.fruitMapColor || cacheRow?.fruitMapColor,
@@ -2418,18 +2466,8 @@ function mergeVehicles(luaVehicles, xmlVehicles) {
             }
         }
         if (isDealershipFloorStock(luaV)) return null;
-        // A single leftover same-config XML can still be the pool-100 remap
-        // (livestock farm). Several leftovers without uniqueId/positions must
-        // not collapse onto index 0 of the wrong farm.
-        if (eligible.length === 1) {
-            const only = eligible[0];
-            removeFromBuckets(only);
-            return only;
-        }
-        if (!luaV.position) return null;
-        const positioned = eligible.filter((xv) => xv && xv.position);
-        if (positioned.length === 0) return null;
-        const xmlV = takeClosest(positioned, luaV);
+        if (!uid && !luaV?.position && eligible.length !== 1) return null;
+        const xmlV = takeClosest(eligible, luaV);
         if (xmlV) {
             removeFromBuckets(xmlV);
             return xmlV;
@@ -2451,6 +2489,9 @@ function mergeVehicles(luaVehicles, xmlVehicles) {
             propertyState : luaV.propertyState || xmlV?.propertyState || '',
             xmlFillLevels : xmlV?.fillLevels || {},
             source        : xmlV ? 'merged' : 'lua_only',
+            ...(fleetMeasuredAt(luaV) != null || fleetMeasuredAt(xmlV) != null
+                ? { measuredAt: fleetMeasuredAt(luaV) != null ? fleetMeasuredAt(luaV) : fleetMeasuredAt(xmlV) }
+                : {}),
         };
     });
 
@@ -2483,7 +2524,62 @@ function isLikelyPlayerOwnedPoolVehicle(v, xmlIndex = null, poolTargetFarmId = n
 
 // ─── economy ──────────────────────────────────────────────────────────────────
 
+/**
+ * FH-20260914: rebuild economy.marketPrices.crops[].locations from sellPoints.
+ *
+ * The in-game mod stopped exporting that array because it duplicated the sellPoints matrix exactly.
+ * Checked against a real export: both forms carry the same 4,969 crop-and-station pairs, and each
+ * locations entry holds only name, price and multiplier, all three of which sellPoints already has
+ * (along with basePrice, fillTypeIndex and isSpecialEvent that locations never had). Dropping it
+ * removed roughly a tenth of the export, which is a tenth less for the game to serialise on its sim
+ * thread, a tenth less for the multiplayer mirror to stream to every joined client, and a tenth
+ * less for this process to parse.
+ *
+ * Rebuilding it here keeps the merged snapshot identical in shape, so the By Crop view and anything
+ * else reading locations carries on unchanged. A crop that already has the array, which is what an
+ * older mod build exports, is left exactly as it is, so this is safe against either version.
+ */
+function rehydrateCropLocations(luaEconomy) {
+    const mp = luaEconomy?.marketPrices;
+    if (!mp || typeof mp !== 'object') return luaEconomy;
+    const crops = mp.crops;
+    const sellPoints = mp.sellPoints;
+    if (!crops || typeof crops !== 'object') return luaEconomy;
+    if (!sellPoints || typeof sellPoints !== 'object') return luaEconomy;
+
+    const byCrop = new Map();
+    for (const station of Object.values(sellPoints)) {
+        const stationName = station?.name;
+        const prices = station?.prices;
+        if (!stationName || !prices || typeof prices !== 'object') continue;
+        for (const [cropName, priceInfo] of Object.entries(prices)) {
+            if (!priceInfo || typeof priceInfo !== 'object') continue;
+            let list = byCrop.get(cropName);
+            if (!list) {
+                list = [];
+                byCrop.set(cropName, list);
+            }
+            list.push({
+                name: stationName,
+                price: priceInfo.price,
+                multiplier: priceInfo.multiplier,
+            });
+        }
+    }
+    if (byCrop.size === 0) return luaEconomy;
+
+    for (const [cropName, cropData] of Object.entries(crops)) {
+        if (!cropData || typeof cropData !== 'object') continue;
+        if (Array.isArray(cropData.locations) && cropData.locations.length > 0) continue;
+        const rebuilt = byCrop.get(cropName);
+        if (rebuilt && rebuilt.length > 0) cropData.locations = rebuilt;
+    }
+    return luaEconomy;
+}
+
 function mergeEconomy(luaEconomy, xmlEconomy, mergedCatalog = {}) {
+    // Restore the view the mod no longer ships, before anything downstream reads it.
+    rehydrateCropLocations(luaEconomy);
     const result = { ...luaEconomy, xmlPriceHistory: xmlEconomy };
     const catalog = {
         ...(mergedCatalog || {}),
@@ -2693,7 +2789,7 @@ function buildFromLuaOnly(lua, mapFillTypeCatalog, mapFillTypeTitles) {
         mapTitle: mapMeta.mapTitle,
         mapId: mapMeta.mapId,
         mapBounds: mapMeta.mapBounds,
-        savegameName: lua.serverInfo?.saveSlot || lua.serverInfo?.savegameName || '',
+        savegameName: String(lua.serverInfo?.savegameName || '').trim(),
         settings: gameplay,
         gameSettings: gameplay,
         mods: Array.isArray(lua.mods) ? lua.mods : [],
@@ -2713,6 +2809,8 @@ function buildFromLuaOnly(lua, mapFillTypeCatalog, mapFillTypeTitles) {
         baleInventory: enrichBaleInventoryFromStock(lua, stockEnriched.catalog),
         fillTypeCatalog: stockEnriched.catalog,
         fillTypeTitles,
+        fillTypePhysics: lua.fillTypePhysics || {},
+        unitDisplay: lua.unitDisplay || { british: false, mods: [] },
         cropFillTypeIndex: lua.cropFillTypeIndex || {},
         stock: {
             ...stockEnriched.stock,
@@ -2723,7 +2821,9 @@ function buildFromLuaOnly(lua, mapFillTypeCatalog, mapFillTypeTitles) {
         redTape: normalizeRedTapeLists(lua.redTape || { enabled: false, byFarm: {} }),
         invoices: lua.invoices || { enabled: false },
         hirePurchasing: lua.hirePurchasing || { enabled: false },
-        realisticFarming: lua.realisticFarming || { presence: { enabled: false, mods: [] } },
+        companionMods: normalizeCompanionMods(lua.companionMods),
+        companionPages: normalizeCompanionPages(lua.companionPages),
+        realisticFarming: normalizeRealisticFarming(lua.realisticFarming),
         adsSummary: lua.adsSummary || null,
         vehicleYearsSummary: lua.vehicleYearsSummary || null,
         mileageSummary: lua.mileageSummary || null,
@@ -2771,6 +2871,7 @@ function buildFromXmlOnly(xml) {
 
 module.exports = {
     mergeData,
+    mergeFields,
     mergeVehicles,
     inferTransientVehiclePoolFarmId,
     resolveTransientVehicleOwnership,
@@ -2788,10 +2889,6 @@ module.exports = {
     mergeBaleInventory,
     mergeWeather,
     mergeForecastDays,
-    luaWeatherIsLive,
-    luaForecastIsLive,
-    mergeFields,
     applyResolvedMapBounds,
-    worldItemsForMapBounds,
     pruneAndResolveMapBounds,
 };

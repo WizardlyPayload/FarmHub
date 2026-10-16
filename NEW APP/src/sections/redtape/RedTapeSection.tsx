@@ -1,4 +1,6 @@
 import { t } from "@/i18n/i18n";
+import { saveProfileFromUnitDisplay } from "@/lib/profile-display";
+import { useUnitDisplay } from "@/lib/fill-unit-mode";
 import { Badge, Card } from "@/components/ui";
 import { useDashboardStore } from "@/store/dashboard-store";
 import type { DashboardPayload } from "@/types/dashboard";
@@ -20,6 +22,7 @@ import {
 import "@/sections/economy/economy.css";
 
 function RedTapeTab({ payload, farmId }: { payload: DashboardPayload; farmId: number }) {
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
   const redTape = payload.redTape as RedTapePayload | null | undefined;
   if (!isRedTapeModActive(redTape)) {
     return (
@@ -163,8 +166,8 @@ function RedTapeTab({ payload, farmId }: { payload: DashboardPayload; farmId: nu
         <Card title={t("redtape.taxTitle")}>
           <p class="fd-economy__muted">
             {t("redtape.taxCurrentMonth", {
-              income: rtFormatMoney(tax.currentMonthIncome),
-              expenses: rtFormatMoney(tax.currentMonthExpenses),
+              income: rtFormatMoney(tax.currentMonthIncome, profile),
+              expenses: rtFormatMoney(tax.currentMonthExpenses, profile),
             })}
           </p>
           <div class="fd-economy__table-wrap">
@@ -188,8 +191,8 @@ function RedTapeTab({ payload, farmId }: { payload: DashboardPayload; farmId: nu
                   statements.map((s, i) => (
                     <tr key={i}>
                       <td>{s.month ?? "—"}</td>
-                      <td class="text-end">{rtFormatMoney(s.totalTaxableIncome)}</td>
-                      <td class="text-end">{rtFormatMoney(s.totalTax)}</td>
+                      <td class="text-end">{rtFormatMoney(s.totalTaxableIncome, profile)}</td>
+                      <td class="text-end">{rtFormatMoney(s.totalTax, profile)}</td>
                       <td>
                         {s.paid ? (
                           <Badge tone="accent">{t("redtape.paid")}</Badge>
@@ -213,7 +216,7 @@ function RedTapeTab({ payload, farmId }: { payload: DashboardPayload; farmId: nu
               <li key={i}>
                 <span>{g.grantId || g.xmlFilename || "—"}</span>
                 <span>
-                  {g.status || "—"} · {rtFormatMoney(g.approvedAmount ?? g.requestedAmount)}
+                  {g.status || "—"} · {rtFormatMoney(g.approvedAmount ?? g.requestedAmount, profile)}
                 </span>
               </li>
             ))}

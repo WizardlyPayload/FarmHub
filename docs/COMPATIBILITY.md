@@ -34,9 +34,8 @@ Tester checklist: [`TESTERS.md`](./TESTERS.md).
 **V5 5.0.0 cut (2026-07-26)** (then labelled “RF edition” on disk); local V5 mod zip may be **5.0.0.2** (hall depot stock + Realistic Farming collectors).  
 **V5 5.0.2 tester drop (2026-09-08)** — matching zip + Setup in `Documents/FarmDash Release`; not pushed onto V4 `latest.yml`.  
 **V5 5.0.3 (2026-09-10)** — GitHub Latest / itch `windows-v5`. Replaces the 8 September 5.0.2 upload.  
-**V5 5.0.4 (2026-09-13)** — working-tree DEV bump (not on GitHub yet). V5 installer locked to new screens only.
-
-**V5 5.0.5 (2026-09-13)** — working-tree DEV bump (not on GitHub yet). Map-load init guard, collectionSafetyV7 (fields/economy/production), Dairy Core barn names.
+**V5 5.0.4 (2026-09-13)** — working-tree DEV bump (not on GitHub yet). V5 installer locked to new screens only.  
+**V5 5.0.5 (2026-09-13)** — working-tree DEV: fields/economy/production collectors restored; Dairy Core barn names; loadMap init guard.
 
 V4 and V5 share `FS25_FarmDashboard_App/package.json` (`version: 4.2.2` in tree). The V5 build never
 edits that field: `electron-builder.rf.yml` sets `extraMetadata.version` (**5.0.5** working tree;

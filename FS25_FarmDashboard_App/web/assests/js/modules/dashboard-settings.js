@@ -645,6 +645,7 @@ export async function populateDashboardSettingsForm() {
 
   try {
     const mod = await api.getModConfig();
+    this._modConfigRevision = typeof mod.revision === "string" ? mod.revision : "";
     const pathEl = document.getElementById("settings-mod-config-path");
     if (pathEl) pathEl.textContent = mod.path || "—";
 
@@ -821,7 +822,9 @@ export async function saveDashboardSettingsFromModal() {
       updateInterval: Number.isFinite(ui) ? ui : 10000,
       collectionCycleMs: Number.isFinite(cc) ? cc : 60000,
       modules,
+      expectedRevision: this._modConfigRevision || "",
     });
+    if (res?.ok && typeof res.revision === "string") this._modConfigRevision = res.revision;
     modSaveOk = !!res?.ok;
     if (!modSaveOk) {
       this.showAlert?.(

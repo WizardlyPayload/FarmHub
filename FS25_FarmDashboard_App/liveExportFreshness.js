@@ -4,11 +4,16 @@
 const LUA_EXPORT_STALE_MS = 90_000;
 /** Extra slack after one FTP poll interval so dedicated servers are not marked stale between polls. */
 const LUA_EXPORT_STALE_BUFFER_MS = 45_000;
+/** MP mirrors publish full envelopes about every three minutes in a paused world. */
+const REPLICA_EXPORT_STALE_MS = 300_000;
 
-function resolveLuaExportStaleMs(ftpIntervalMinutes = 1) {
+function resolveLuaExportStaleMs(ftpIntervalMinutes = 1, source = {}) {
+    const replica = typeof source === 'boolean' ? source : source?.replica === true;
+    if (source?.mode === 'local' && !replica) return LUA_EXPORT_STALE_MS;
     const mins = Math.min(25, Math.max(1, parseInt(ftpIntervalMinutes, 10) || 1));
     const pollMs = mins * 60_000;
-    return Math.max(LUA_EXPORT_STALE_MS, pollMs + LUA_EXPORT_STALE_BUFFER_MS);
+    return Math.max(LUA_EXPORT_STALE_MS, pollMs + LUA_EXPORT_STALE_BUFFER_MS,
+        replica ? REPLICA_EXPORT_STALE_MS : 0);
 }
 
 function isLuaExportStale(lastLuaReceivedAt, nowMs = Date.now(), staleMs = LUA_EXPORT_STALE_MS) {

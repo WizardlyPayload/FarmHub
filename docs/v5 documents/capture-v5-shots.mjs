@@ -5,9 +5,11 @@
  *   node "docs/v5 documents/capture-v5-shots.mjs"
  *   node "docs/v5 documents/capture-v5-shots.mjs" --pack suite
  *   node "docs/v5 documents/capture-v5-shots.mjs" --pack base
+ *   node "docs/v5 documents/capture-v5-shots.mjs" --pack pf
  *
  * --pack suite  Riverbend / mods-on save. Writes v5-<area>-*-scroll.png (and optional tops).
  * --pack base   Vanilla FS25 + Farm Dashboard only. Writes v5-base-<area>-*.png
+ * --pack pf     Farm Dashboard + Precision Farming only. Writes v5-pf-<area>-*.png
  *
  * Preconditions: FS25 loaded, data.json current, V5 UI up. Viewport 1920x1080.
  */
@@ -28,14 +30,16 @@ const SAVE_ID = process.env.FARMDASH_CAPTURE_SAVE_ID || "srv_1788536326834_2";
 const packArg = process.argv.includes("--pack")
   ? process.argv[process.argv.indexOf("--pack") + 1]
   : "suite";
-const PACK = packArg === "base" ? "base" : "suite";
+const PACK = packArg === "base" || packArg === "pf" ? packArg : "suite";
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function shotName(id) {
-  return PACK === "base" ? `v5-base-${id}.png` : `v5-${id}.png`;
+  if (PACK === "base") return `v5-base-${id}.png`;
+  if (PACK === "pf") return `v5-pf-${id}.png`;
+  return `v5-${id}.png`;
 }
 
 /** Scrolled marketing pack (suite save). Tops already exist as *-010. */
@@ -76,7 +80,7 @@ const BASE_PACK = [
   { hash: "#/map", id: "section-fleet-map-010", ratio: 0 },
 ];
 
-const JOBS = PACK === "base" ? BASE_PACK : SUITE_SCROLL;
+const JOBS = PACK === "suite" ? SUITE_SCROLL : BASE_PACK;
 
 async function waitReady(page) {
   await page.waitForSelector(".fd-main__content", { timeout: 30000 });
@@ -143,6 +147,7 @@ async function main() {
   for (const job of JOBS) {
     if (job.hash !== lastHash) {
       await gotoHash(page, job.hash);
+      await selectSave(page);
       lastHash = job.hash;
     }
     await scrollMain(page, job);

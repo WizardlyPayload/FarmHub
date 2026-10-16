@@ -34,6 +34,7 @@ export interface RfTreatmentPlanRow {
   label: string;
   text: string;
   priority: "urgent" | "watch" | "ok" | "info";
+  direction: "above" | "below" | null;
   hasRates: boolean;
 }
 
@@ -183,12 +184,14 @@ function normalizeTreatmentPlan(raw: RfTreatmentStep[] | undefined): RfTreatment
     .map((row, index) => {
       const label = String(row?.label || "").trim();
       const text = String(row?.text || "").trim();
+      const rawDirection = String(row?.direction || "").toLowerCase();
       if (!label && !text) return null;
       return {
         key: String(row?.key || `step-${index}`),
         label: label || "—",
         text: text || "—",
         priority: normalizePriority(row?.priority),
+        direction: rawDirection === "above" || rawDirection === "below" ? rawDirection : null,
         hasRates: row?.hasRates === true,
       };
     })
@@ -330,17 +333,32 @@ const NUTRIENT_SHORT: Record<string, string> = { n: "N", p: "P", k: "K" };
 function buildPlanSummary(
   rows: RfTreatmentPlanRow[],
   isMeadow: boolean,
+  nutrients: RfNutrientReading[],
 ): RfSoilPlanSummary {
   const actionable = rows.filter((r) => r.priority === "urgent" || r.priority === "watch");
   const urgent = actionable.filter((r) => r.priority === "urgent");
   const watch = actionable.filter((r) => r.priority === "watch");
   const has = (key: string, priority?: RfTreatmentPlanRow["priority"]) =>
     rows.some((r) => r.key === key && (priority == null || r.priority === priority));
+  const nutrientKey: Record<string, RfNutrientKey> = {
+    n: "nitrogen",
+    p: "phosphorus",
+    k: "potassium",
+  };
+  const directionFor = (row: RfTreatmentPlanRow): "above" | "below" | null => {
+    if (row.direction) return row.direction;
+    const key = nutrientKey[row.key];
+    const reading = key ? nutrients.find((n) => n.key === key) : null;
+    if (!reading) return null;
+    if (reading.value > reading.target) return "above";
+    if (reading.value < reading.target) return "below";
+    return null;
+  };
 
   const reasons: RfSoilPhrase[] = [];
 
   const lowNutrients = urgent
-    .filter((r) => r.key === "n" || r.key === "p" || r.key === "k")
+    .filter((r) => (r.key === "n" || r.key === "p" || r.key === "k") && directionFor(r) !== "above")
     .map((r) => NUTRIENT_SHORT[r.key]);
   if (lowNutrients.length > 0) {
     reasons.push({
@@ -350,12 +368,22 @@ function buildPlanSummary(
   }
 
   const softNutrients = watch
-    .filter((r) => r.key === "n" || r.key === "p" || r.key === "k")
+    .filter((r) => (r.key === "n" || r.key === "p" || r.key === "k") && directionFor(r) === "below")
     .map((r) => NUTRIENT_SHORT[r.key]);
   if (softNutrients.length > 0) {
     reasons.push({
       key: "fields.rf.soil.reasonNutrientBelowTarget",
       params: { list: softNutrients.join("/") },
+    });
+  }
+
+  const highNutrients = watch
+    .filter((r) => (r.key === "n" || r.key === "p" || r.key === "k") && directionFor(r) === "above")
+    .map((r) => NUTRIENT_SHORT[r.key]);
+  if (highNutrients.length > 0) {
+    reasons.push({
+      key: "fields.rf.soil.reasonNutrientAboveTarget",
+      params: { list: highNutrients.join("/") },
     });
   }
 
@@ -491,7 +519,7 @@ export function buildRfSoilPanel(
 
   return {
     bars: buildSoilBars(info, nutrients, pressures, pH, pHTarget, organicMatter),
-    plan: buildPlanSummary(treatmentPlan, isMeadow),
+    plan: buildPlanSummary(treatmentPlan, isMeadow, nutrients),
     nutrients,
     pressures,
     pH,

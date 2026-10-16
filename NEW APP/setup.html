@@ -10,9 +10,20 @@
       href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+    <style>
+      html.fd-setup-html body { margin: 0; background: #1e1e2e; color: #cdd6f4; font-family: system-ui, sans-serif; }
+      .fd-setup-static { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; padding: 1rem; text-align: center; }
+      .fd-setup-static__late { visibility: hidden; max-width: 28rem; opacity: 0.85; animation: fd-setup-static-late 0s linear 20s forwards; }
+      @keyframes fd-setup-static-late { to { visibility: visible; } }
+    </style>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <div class="fd-setup-static" role="status" aria-live="polite" aria-busy="true">
+        <p>Loading Server Manager…</p>
+        <p class="fd-setup-static__late">Server Manager did not finish loading. Close Farm Dashboard and open it again.</p>
+      </div>
+    </div>
     <script type="module" src="/src/setup/main.tsx"></script>
   </body>
 </html>

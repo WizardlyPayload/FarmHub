@@ -62,7 +62,7 @@ $uninstaller = Join-Path $fixture 'Uninstall FS25 Farm Dashboard V5.exe'
 $scope = if ($Case -eq 'machine') { 'all' } else { 'CurrentUser' }
 $errorText = $null
 try {
-    Register-FarmDashNativeInstallation $fixture $scope '5.0.3' 1234
+    Register-FarmDashNativeInstallation $fixture $scope '5.0.1' 1234
     if ($Case -in @('missing-optional-value', 'enumeration-access-denied')) {
         $script:optionalValue = Read-FarmDashNativeString $scope 'Uninstall' 'AbsentOptionalValue'
     }
@@ -78,21 +78,6 @@ try {
         if ($Case -eq 'retired-ownership') { Clear-DependencyOwnership }
         $observed = Get-DependencyState
         $script:ownershipResult = @{ flag = $observed.ImageMagickInstalledByFarmDash; executable = $observed.ImageMagickExecutable; recovery = $script:FarmDashDependencyRecoveryPending }
-    }
-    if ($Case -in @('other-edition-missing-install-location', 'other-edition-wrong-install-location-type')) {
-        . (Join-Path $SourceRoot 'build\imagemagick-common.ps1')
-        $otherArgs = Get-FarmDashRegistryArguments 'CurrentUser' 'Install'
-        $otherArgs.sSubKeyName = $otherArgs.sSubKeyName.Replace(
-            '11de34ca-2bb0-58cf-bf02-9951a95a886c',
-            '2079a287-5a88-5a64-b630-f5040f92dd25'
-        )
-        $otherKey = [string]$otherArgs.hDefKey + ':' + $otherArgs.sSubKeyName
-        if ($Case -eq 'other-edition-wrong-install-location-type') {
-            $script:records[$otherKey] = @{ InstallLocation = [uint32]1 }
-        } else {
-            $script:records[$otherKey] = @{ DisplayName = 'FS25 Farm Dashboard V4' }
-        }
-        $script:otherEditionPresent = Test-OtherDashboardInstalled 'V5'
     }
     if ($Case -eq 'preflight-only') {
         $tokens = $null; $parseErrors = $null
@@ -124,7 +109,6 @@ $state = [ordered]@{ case = $Case; error = $errorText; scope = $scope; records =
 if ($Case -eq 'missing-optional-value') { $state.optionalValue = $script:optionalValue }
 if ($script:ownershipResult) { $state.ownership = $script:ownershipResult }
 if ($Case -eq 'preflight-only') { $state.preflightExitCode = $script:preflightResult }
-if ($null -ne $script:otherEditionPresent) { $state.otherEditionPresent = [bool]$script:otherEditionPresent }
 # These are the two inert files just created, never actual installed files.
 foreach ($file in @($exe, $uninstaller)) {
     if (Test-Path -LiteralPath $file) { Remove-Item -LiteralPath $file -Force }

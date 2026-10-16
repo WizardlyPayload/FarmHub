@@ -5,6 +5,7 @@
  */
 
 import { clamp } from "@/lib/fleetMapGeo";
+import { resolveSoilReading } from "@/sections/fields/field-helpers";
 import type { FleetMapIconKind } from "@/lib/fleetMapMarkers";
 
 export const FLEET_MAP_OVERLAY_MODES = [
@@ -93,6 +94,7 @@ const FILL_MULCH = "rgba(123, 31, 162, 0.45)";
 const FILL_WATER = "rgba(41, 128, 185, 0.5)";
 const FILL_STONES = "rgba(161, 136, 127, 0.55)";
 const FILL_UNSCANNED = "rgba(148, 163, 184, 0.28)";
+const FILL_HELD = "rgba(100, 116, 139, 0.45)";
 const FILL_HARVEST = "rgba(249, 168, 37, 0.58)";
 const FILL_WEEDS = "rgba(46, 204, 113, 0.5)";
 const FILL_WORK_FERT = "rgba(155, 89, 182, 0.5)";
@@ -614,14 +616,22 @@ export function overlayNumericValue(
       return soilActive(soil) ? finiteOrNull(soil?.organicMatter) : null;
     case "soilPh":
       if (soilActive(soil)) return finiteOrNull(soil?.pH);
-      if (pfOn && field.isScanned === true) return finiteOrNull(field.phValue);
+      if (pfOn) {
+        const reading = resolveSoilReading(field).ph;
+        if (reading.reason === "needs-scan" || reading.current == null) return null;
+        return reading.current;
+      }
       return null;
     case "soilN": {
       if (soilActive(soil)) {
         const ppm = soil?.ppm && typeof soil.ppm === "object" ? (soil.ppm as Record<string, unknown>) : null;
         return finiteOrNull(ppm?.n) ?? finiteOrNull((soil?.nitrogen as { value?: number } | undefined)?.value);
       }
-      if (pfOn && field.isScanned === true) return finiteOrNull(field.nitrogenLevel);
+      if (pfOn) {
+        const reading = resolveSoilReading(field).nitrogen;
+        if (reading.reason === "needs-scan" || reading.current == null) return null;
+        return reading.current;
+      }
       return null;
     }
     case "soilUrgency":
@@ -677,6 +687,7 @@ export function computeOverlayRange(
 }
 
 function workFill(field: Record<string, unknown>, soil: Record<string, unknown> | null): string {
+  if (field.isHarvested === true) return OVERLAY_IDLE_FILL;
   if (field.harvestReady === true) return FILL_HARVEST;
   if (Number(field.weedLevel) >= 0.45 || field.needsWeeding === true) return FILL_WEEDS;
   if (field.needsLime === true || Number(field.limeLevel) <= 0) return FILL_LIME;
@@ -755,10 +766,11 @@ export function overlayPaintForField(
         return { fill: phFill(ph) };
       }
       if (field.isPrecisionFarming === true) {
-        if (field.isScanned !== true) return { fill: FILL_UNSCANNED };
-        const ph = finiteOrNull(field.phValue);
-        if (ph == null) return idlePaint();
-        return { fill: phFill(ph) };
+        const reading = resolveSoilReading(field).ph;
+        if (reading.reason === "needs-scan") return { fill: FILL_UNSCANNED };
+        if (reading.reason === "held") return { fill: FILL_HELD };
+        if (reading.current == null) return idlePaint();
+        return { fill: phFill(reading.current) };
       }
       return idlePaint();
     }
@@ -774,11 +786,11 @@ export function overlayPaintForField(
         return { fill: nutrientFill(n, target) };
       }
       if (field.isPrecisionFarming === true) {
-        if (field.isScanned !== true) return { fill: FILL_UNSCANNED };
-        const n = finiteOrNull(field.nitrogenLevel);
-        const target = finiteOrNull(field.targetNitrogen) ?? 80;
-        if (n == null) return idlePaint();
-        return { fill: nutrientFill(n, target) };
+        const reading = resolveSoilReading(field).nitrogen;
+        if (reading.reason === "needs-scan") return { fill: FILL_UNSCANNED };
+        if (reading.reason === "held") return { fill: FILL_HELD };
+        if (reading.current == null || reading.target == null || reading.target <= 0) return idlePaint();
+        return { fill: nutrientFill(reading.current, reading.target) };
       }
       return idlePaint();
     }

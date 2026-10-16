@@ -14,7 +14,7 @@ interface Props {
 
 function actionHint(status: SetupStatus): string[] {
   const items: string[] = [];
-  if (status.lastErrorCode) items.push(tOr(errorCopyKey(status.lastErrorCode), status.lastErrorCode));
+  if (status.lastErrorCode && !status.nextStep) items.push(tOr(errorCopyKey(status.lastErrorCode), status.lastErrorCode));
   if (status.nextAction && status.nextAction !== "none") {
     items.push(tOr(actionCopyKey(status.nextAction), status.nextAction));
   }
@@ -34,7 +34,7 @@ export function HelperPanel({ status, onUpdated, onOpenSettings }: Props) {
   const events = current.recentEvents || [];
 
   async function onHandshake() {
-    const next = await runSetupHandshake();
+    const next = await runSetupHandshake(current.sourceId);
     onUpdated?.(next);
     await refreshDashboard();
   }
@@ -57,7 +57,7 @@ export function HelperPanel({ status, onUpdated, onOpenSettings }: Props) {
       <div class="fd-helper__row">
         <div>
           <h3 class="fd-helper__title">{t("ux.helper.title")}</h3>
-          <p class="fd-helper__body">{t("ux.helper.whatToCheck")}</p>
+          <p class="fd-helper__body">{current.nextStep || t("ux.helper.whatToCheck")}</p>
           {hints.length ? (
             <ul class="fd-helper__list">
               {hints.map((h) => (

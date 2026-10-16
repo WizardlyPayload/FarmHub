@@ -1,4 +1,6 @@
 import { t } from "@/i18n/i18n";
+import { useUnitDisplay } from "@/lib/fill-unit-mode";
+import { saveProfileFromUnitDisplay } from "@/lib/profile-display";
 import { Badge, Card } from "@/components/ui";
 import { useDashboardStore } from "@/store/dashboard-store";
 import { normalizeFarmInfoList } from "@/lib/farm-scope";
@@ -84,6 +86,7 @@ function InvoiceTable({
   farmInfo: unknown;
   emptyKey: string;
 }) {
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
   if (items.length === 0) {
     return <p class="fd-economy__muted">{t(emptyKey)}</p>;
   }
@@ -119,7 +122,7 @@ function InvoiceTable({
                   <Badge tone={invoiceStateTone(display)}>{stateLabel(display)}</Badge>
                 </td>
                 <td>{formatInvoiceDate(item)}</td>
-                <td class="text-end">{formatInvoiceMoney(invoiceTotalDue(item))}</td>
+                <td class="text-end">{formatInvoiceMoney(invoiceTotalDue(item), profile)}</td>
               </tr>
             );
           })}
@@ -138,6 +141,7 @@ function InvoicesFarmPanel({
   farmId: number;
   farmInfo: unknown;
 }) {
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
   const { summary, incoming, outgoing } = farm;
 
   return (
@@ -147,19 +151,19 @@ function InvoicesFarmPanel({
         <div>
           <span class="fd-economy__muted">{t("invoices.statIncoming")}</span>
           <strong>
-            {Number(summary.incomingCount) || 0} · {formatInvoiceMoney(summary.incomingTotal)}
+            {Number(summary.incomingCount) || 0} · {formatInvoiceMoney(summary.incomingTotal, profile)}
           </strong>
         </div>
         <div>
           <span class="fd-economy__muted">{t("invoices.statOutgoing")}</span>
           <strong>
-            {Number(summary.outgoingCount) || 0} · {formatInvoiceMoney(summary.outgoingTotal)}
+            {Number(summary.outgoingCount) || 0} · {formatInvoiceMoney(summary.outgoingTotal, profile)}
           </strong>
         </div>
         <div>
           <span class="fd-economy__muted">{t("invoices.statUnpaid")}</span>
           <strong>
-            {Number(summary.unpaidCount) || 0} · {formatInvoiceMoney(summary.unpaidTotal)}
+            {Number(summary.unpaidCount) || 0} · {formatInvoiceMoney(summary.unpaidTotal, profile)}
           </strong>
         </div>
         <div>

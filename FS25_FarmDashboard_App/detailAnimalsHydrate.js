@@ -65,12 +65,7 @@ function rememberDetailEntry(map, entry) {
     const prevAt = Number(prev.generatedAt) || 0;
     const nextAt = Number(entry.generatedAt) || 0;
     if (nextAt > 0 && prevAt > 0 && nextAt !== prevAt) {
-        if (nextAt >= prevAt) {
-            // A newer incomplete / non-unique file must not hide a richer unique-id capture.
-            if (prevU && !nextU) return;
-            if (prevU && nextU && nextN < prevN) return;
-            map.set(key, entry);
-        }
+        if (nextAt >= prevAt) map.set(key, entry);
         return;
     }
     // Same (or missing) timestamps: keep the richer unique-id capture. A later
@@ -147,6 +142,8 @@ function applyDetailBlockToHusbandry(h, block) {
     });
 
     const capturedHeads = countCapturedHeads(animals);
+    const reported = Number(h.numOfAnimalsReported);
+    const prevCount = Number(h.animalCount);
     const aggregate = husbandryAggregateHeadCount(h);
 
     if (shouldSkipIncompleteDetail(capturedHeads, aggregate, animals)) {
@@ -160,8 +157,8 @@ function applyDetailBlockToHusbandry(h, block) {
             farmId: ownerFarmId,
             animals,
             lod: 'full',
-            animalCount: Math.max(aggregate, capturedHeads),
-            numOfAnimalsReported: Math.max(aggregate, capturedHeads),
+            animalCount: Number.isFinite(reported) && reported > 0 ? reported : capturedHeads,
+            numOfAnimalsReported: Number.isFinite(reported) && reported > 0 ? reported : capturedHeads,
             __detailHydrated: true,
             __detailCapturedHeads: capturedHeads,
         },
@@ -195,12 +192,10 @@ function hydrateHusbandryArray(arr, byKey, detailsDir) {
     return out;
 }
 
-function getLocalDetailsDirForServer(srv, getLocalLuaJsonPath) {
+function getLocalDetailsDirForServer(srv, getLocalLuaJsonPath, options = {}) {
     if (typeof getLocalLuaJsonPath !== 'function' || !srv) return null;
     const jsonPath = getLocalLuaJsonPath(srv);
     if (!jsonPath) return null;
-    // Never walk a sibling save slot. A missing primary details/ must stay
-    // missing — slot switch / empty save must not hydrate another farm's animals.
     return path.join(path.dirname(jsonPath), 'details');
 }
 

@@ -1,52 +1,15 @@
-# Upgrade — keep Farm Dashboard V4, add V5
+# Keep classic V4 while trying V5
 
-You do **not** replace classic to try the new screens. V5 is a **second** Windows app.
+**V5 is a second Windows app**, not an automatic replacement for classic V4. Public V4 4.2.1 and its `latest.yml` feed remain separate. V5 normally listens on **8768**; classic uses **8766**.
 
-Older public 2.0.0 → 4.x steps remain in [`../UPGRADE_FROM_FS25-Farm-Dashboard.md`](../UPGRADE_FROM_FS25-Farm-Dashboard.md). This page is **V4 already installed → add V5**.
+1. Keep your V4 installer and settings if you still want classic screens.
+2. Install the **V5** Windows app from the release you choose. The prepared V5 release is 5.1.0; the public website may still offer 5.0.3 until publication.
+3. Launch **Farm Dashboard V5** and choose your save. It should open the sidebar and Save overview, not the classic six-card home.
+4. Use exactly **one** game mod ZIP named `FS25_FarmDashboard.zip`. Do not leave `FS25_FarmDashboard-rf-...zip` beside it. Check the version required by the V5 release and the server before changing a shared mod.
+5. Do **not** use **V4 → Check for updates** to get V5. A V5 installer must never be published to V4's `latest.yml`.
 
----
+![V5 base overview](doc-screenshots/current-5057/base-overview.png)
 
-## What stays
+The October 2026 candidate was tested for **V5**. It was **not** a fresh V4 compatibility test against mod 5.0.0.31, so this guide does not promise that classic has been rebuilt or retested. If you want to return to V4, uninstall V5 through Installed apps while keeping your saves. Do not remove V4 or its settings as part of a V5 test.
 
-| Keep | Notes |
-| ---- | ----- |
-| Farm Dashboard **V4** | Start Menu classic app, port **8766**, `latest.yml` |
-| Your V4 settings | Different app id — V5 does not steal this profile |
-| **`FS25_FarmDashboard.zip`** | One mod for both apps |
-
----
-
-## What you add
-
-1. Close V4 if you like (not required).
-2. Install **`FS25-Farm-Dashboard-V5-Setup-5.0.5.exe`**.
-3. Launch **Farm Dashboard V5**.
-4. Run Setup (Auto-detect can point at the **same** `data.json` folders V4 already uses).
-5. Confirm the window is the **sidebar** UI, URL **8768**.
-
----
-
-## What you must not do
-
-- Do **not** use **V4 → Check for updates** expecting V5. That feed is classic only.
-- Do **not** delete V4 “to make room” unless you decided to leave classic.
-- Do **not** port-forward either dashboard to the internet.
-
-If V4 disappeared after the V5 EXE — that is a **fail**. Report it ([`TESTERS.md`](./TESTERS.md)).
-
----
-
-## Dedicated servers
-
-Replace the **mod zip** on the host once (same zip both apps use). Then:
-
-- **Join as client** + Local watch on V5, or
-- **FTP** as today.
-
-Details: [`INSTALL.md`](./INSTALL.md) · [`USER_MANUAL.md`](./USER_MANUAL.md) §3.4a.
-
----
-
-## Going back to classic
-
-Uninstall V5 (keep user data if you might return). Launch V4. The in-game mod can stay; V4 still reads `data.json`.
+For dedicated servers, use a matching canonical mod on the server and clients, then [link the multiplayer source](INSTALL.md#dedicated-multiplayer-join-as-a-client) or use FTP. Never copy a live server export into an unrelated single-player slot.

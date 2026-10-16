@@ -1,15 +1,18 @@
 /** Live mod export vs held snapshot / savegame XML — mirrors legacy environment.js. */
 
+import type { DashboardPayload } from "@/types/dashboard";
+
 export const LUA_EXPORT_STALE_MS = 90_000;
 
 export type ConnectionBadgeKind = "live" | "snap" | "connecting";
 
 export interface ConnectionBadgeState {
   dataSource?: string;
+  stateStatus?: string;
   luaAvailable?: boolean;
   xmlAvailable?: boolean;
   apiConnected?: boolean;
-  dataTimestamps?: Record<string, string | number | boolean | null | undefined> | null;
+  dataTimestamps?: DashboardPayload["dataTimestamps"] | null;
   nowMs?: number;
 }
 
@@ -18,6 +21,8 @@ export interface ConnectionBadge {
   labelKey: string;
   titleKey: string;
   tone: "accent" | "default" | "warn" | "danger";
+  fallbackLabel?: string;
+  fallbackTitle?: string;
 }
 
 export function isLuaExportStale(
@@ -43,7 +48,13 @@ export function resolveNavbarConnectionBadge(state: ConnectionBadgeState = {}): 
       ? ts.lastLuaReceivedAt
       : undefined;
   const luaStale = isLuaExportStale(lastLuaAt, nowMs, staleMs);
-  const gameLive = !!state.luaAvailable && !luaStale && src !== "xml_only";
+  const heldOrCached =
+    ts.cacheUsedDueToFailure === true ||
+    ts.isStale === true ||
+    ts.confidence === "cache" ||
+    ts.confidence === "held";
+  const gameLive = !!state.luaAvailable && !luaStale && !heldOrCached
+    && (!state.stateStatus || state.stateStatus === "snapshot") && src !== "xml_only";
 
   if (src === "unknown" && !state.luaAvailable && !state.xmlAvailable) {
     return {
@@ -55,10 +66,24 @@ export function resolveNavbarConnectionBadge(state: ConnectionBadgeState = {}): 
   }
 
   if (!gameLive) {
-    const heldSnapshot = !!(ts.liveExportStaleAt || ts.heldFromSnapshotAt || ts.mergeHeldStaleAt);
+    const heldSnapshot = state.stateStatus === "held" || state.stateStatus === "cache" ||
+      ts.cacheUsedDueToFailure === true || ts.confidence === "cache" ||
+      ts.confidence === "held" || !!(ts.heldFromSnapshotAt || ts.mergeHeldStaleAt);
+    if (state.xmlAvailable !== true) {
+      const staleSnapshot = ts.isStale === true || !!ts.liveExportStaleAt || luaStale;
+      return {
+        kind: "snap",
+        labelKey: heldSnapshot ? "ux.freshness.held" : staleSnapshot ? "ux.freshness.stale" : "ux.state.stale",
+        titleKey: "ux.freshness.staleHint",
+        tone: "warn",
+        fallbackLabel: heldSnapshot ? "Held snapshot" : staleSnapshot ? "Stale" : "Showing last known data.",
+        fallbackTitle: "This is last-known data, not a live export. Refresh after the game or dedicated server is writing again.",
+      };
+    }
     return {
       kind: "snap",
-      labelKey: "nav.badgeSnapXml",
+      labelKey: heldSnapshot ? "ux.freshness.held" : luaStale && lastLuaAt !== undefined
+        ? "ux.freshness.stale" : "nav.badgeSnapXml",
       titleKey: heldSnapshot
         ? "nav.badgeSnapXmlHeldTitle"
         : luaStale
@@ -99,6 +124,5 @@ export function luaStaleRefreshDelayMs(
   const parsed = Date.parse(String(lastLuaReceivedAt));
   if (Number.isNaN(parsed)) return null;
   const remaining = parsed + staleMs - nowMs;
-  if (remaining <= 0) return null;
-  return remaining + 250;
+  return Math.max(0, remaining + 250);
 }

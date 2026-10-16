@@ -1,4 +1,6 @@
 import { t, tOr } from "@/i18n/i18n";
+import { useUnitDisplay } from "@/lib/fill-unit-mode";
+import { formatProfileSpeed, saveProfileFromUnitDisplay } from "@/lib/profile-display";
 import { Button } from "@/components/ui";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import {
@@ -19,6 +21,7 @@ interface Props {
 }
 
 export function WeatherModal({ weather, weatherGuard, onClose }: Props) {
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
   const trapRef = useFocusTrap(true, onClose);
   const snap = asWeatherSnapshot(weather);
   const wgSky = weatherGuard?.sky;
@@ -53,7 +56,7 @@ export function WeatherModal({ weather, weatherGuard, onClose }: Props) {
           <section class="fd-weather-modal__current">
             <h3>{t("weather.current")}</h3>
             <div class="fd-weather-modal__current-row">
-              <div class="fd-weather-modal__temp">{formatWeatherTemp(temp)}</div>
+              <div class="fd-weather-modal__temp">{formatWeatherTemp(temp, profile)}</div>
               <div class="fd-weather-modal__meta">
                 <strong>{t(weatherConditionLabelKey(condition))}</strong>
                 {hasGuard ? (
@@ -72,7 +75,7 @@ export function WeatherModal({ weather, weatherGuard, onClose }: Props) {
                 {snap ? (
                   <>
                     <p>
-                      {tOr("weather.wind", "Wind")}: {Math.round(Number(snap.windSpeed) || 0)} km/h
+                      {tOr("weather.wind", "Wind")}: {formatProfileSpeed(Number(snap.windSpeed) || 0, profile)}
                     </p>
                     <p>
                       {tOr("weather.cloud", "Cloud")}:{" "}
@@ -116,7 +119,7 @@ export function WeatherModal({ weather, weatherGuard, onClose }: Props) {
                   return (
                     <div key={day.dayOffset} class="fd-weather-modal__day">
                       <h4>{dayLabel}</h4>
-                      <strong>{formatWeatherGuardDayTemp(day)}</strong>
+                      <strong>{formatWeatherGuardDayTemp(day, profile)}</strong>
                       {dayCond && dayCond !== "unknown" ? (
                         <p>{t(weatherConditionLabelKey(dayCond))}</p>
                       ) : null}
@@ -146,7 +149,7 @@ export function WeatherModal({ weather, weatherGuard, onClose }: Props) {
                     <div key={index} class="fd-weather-modal__day">
                       <h4>{dayLabel}</h4>
                       <strong>{t(weatherConditionLabelKey(dayCond))}</strong>
-                      <p>{formatForecastTempRange(day)}</p>
+                      <p>{formatForecastTempRange(day, undefined, profile)}</p>
                       {Number(day.precipitationChance) > 0 ? (
                         <p class="fd-weather-modal__precip">
                           {Math.round(Number(day.precipitationChance))}%

@@ -185,3 +185,20 @@
 .fd-prod-toggle input {
   margin: 0;
 }
+
+/* Production Watcher alerts on the storage rows they refer to. */
+.fd-prod-storage tr.is-warn td:first-child {
+  box-shadow: inset 3px 0 0 #facc15;
+}
+
+.fd-prod-storage tr.is-danger td:first-child {
+  box-shadow: inset 3px 0 0 #f87171;
+}
+
+.fd-prod-storage tr[data-watch] td:first-child .fd-badge {
+  margin-left: 0.4rem;
+}
+
+.fd-prod-watch-line {
+  cursor: help;
+}

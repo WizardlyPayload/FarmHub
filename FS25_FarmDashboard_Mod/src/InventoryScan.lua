@@ -642,10 +642,10 @@ function InventoryScan.addStockLiters(stockState, farmId, fillTypeIndex, liters,
     table.insert(item.locations, loc)
 end
 
---- Resolve BunkerSilo state constants; fallbacks match FS25 (STATE_FILL=1 … STATE_DRAIN=4).
+--- Resolve BunkerSilo state constants; fallbacks match FS25 objects/BunkerSilo.lua (STATE_FILL=0 … STATE_DRAIN=3).
 function InventoryScan.bunkerStateConstants()
-    local fill, closed, fermented, drain = 1, 2, 3, 4
-    local bs = rawget(_G, "BunkerSilo")
+    local fill, closed, fermented, drain = 0, 1, 2, 3
+    local bs = _G.BunkerSilo
     if type(bs) == "table" then
         if bs.STATE_FILL ~= nil then fill = bs.STATE_FILL end
         if bs.STATE_CLOSED ~= nil then closed = bs.STATE_CLOSED end
@@ -794,7 +794,7 @@ local function _buildLooseBaleScanRuntime(baleState, farmIds)
         return nil
     end
 
-    local BaleRef = rawget(_G, "Bale")
+    local BaleRef = type(_G.Bale) == "table" and _G.Bale or nil
     local function isPhysicalBale(it)
         if not it then return false end
         if BaleRef and type(it.isa) == "function" then
@@ -1021,7 +1021,7 @@ function InventoryScan.scanLooseWorldBalesStep(ctx, baleState, budget)
                         end
                     end
                 elseif src == "slot" then
-                    local SlotSystem = rawget(_G, "SlotSystem")
+                    local SlotSystem = type(_G.SlotSystem) == "table" and _G.SlotSystem or nil
                     if SlotSystem and m.slotSystem and m.slotSystem.objectLimits then
                         local lim = m.slotSystem.objectLimits[SlotSystem.LIMITED_OBJECT_BALE]
                         if lim and type(lim.objects) == "table" then

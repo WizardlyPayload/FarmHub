@@ -636,7 +636,7 @@ function VehicleDataCollector:_propertyStateIsShowroom(vehicle)
     end
     local ps = self:_vehiclePropertyState(vehicle)
     if ps == nil then return false end
-    local vps = rawget(_G, "VehiclePropertyState")
+    local vps = type(_G.VehiclePropertyState) == "table" and _G.VehiclePropertyState or nil
     if vps and vps.SHOP_CONFIG ~= nil and ps == vps.SHOP_CONFIG then return true end
     if type(ps) == "string" and string.upper(tostring(ps)) == "SHOP_CONFIG" then return true end
     return false
@@ -646,7 +646,7 @@ function VehicleDataCollector:_propertyStateIsPlayerOwned(vehicle)
     if self:_propertyStateIsShowroom(vehicle) then return false end
     local ps = self:_vehiclePropertyState(vehicle)
     if ps == nil then return true end
-    local vps = rawget(_G, "VehiclePropertyState")
+    local vps = type(_G.VehiclePropertyState) == "table" and _G.VehiclePropertyState or nil
     if vps then
         if ps == vps.OWNED or ps == vps.LEASED then return true end
         if ps == vps.SHOP_CONFIG or ps == vps.SOLD then return false end
@@ -672,7 +672,7 @@ end
 function VehicleDataCollector:_serializePropertyState(vehicle)
     local ps = self:_vehiclePropertyState(vehicle)
     if ps == nil then return nil end
-    local vps = rawget(_G, "VehiclePropertyState")
+    local vps = type(_G.VehiclePropertyState) == "table" and _G.VehiclePropertyState or nil
     if vps then
         if vps.OWNED ~= nil and ps == vps.OWNED then return "OWNED" end
         if vps.LEASED ~= nil and ps == vps.LEASED then return "LEASED" end
@@ -758,8 +758,18 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
     else
         vData.price = math.floor(tonumber(vehicle.price) or 0)
     end
+    if vehicle.getSellPrice then
+        local okSell, sellPrice = pcall(function() return vehicle:getSellPrice() end)
+        if okSell and type(sellPrice) == "number" and sellPrice == sellPrice and sellPrice ~= math.huge and sellPrice ~= -math.huge then
+            vData.sellValue = sellPrice
+        end
+    end
     vData.age = vehicle.age or 0
     vData.operatingTime = vehicle.operatingTime or 0
+    local measuredAt = _G.g_time
+    if type(measuredAt) == "number" then
+        vData.measuredAt = measuredAt
+    end
 
     vData.name = "Unknown"
     if vehicle.getName then

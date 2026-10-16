@@ -20,8 +20,34 @@ function Test-IsV5Edition([string]$Name) {
     return @('Rf', 'V5') -contains $Name
 }
 
+function Test-HasLinkedAncestor([string]$Path) {
+    if (-not $Path) { return $false }
+    $cursor = $Path
+    while ($cursor) {
+        if (Test-Path -LiteralPath $cursor) {
+            $item = Get-Item -LiteralPath $cursor -Force -ErrorAction SilentlyContinue
+            if ($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+                return $true
+            }
+        }
+        $parent = Split-Path -Path $cursor -Parent
+        if (-not $parent -or $parent -eq $cursor) { break }
+        $cursor = $parent
+    }
+    return $false
+}
+
+function Reject-LinkedPath([string]$Path) {
+    $script:CleanupFailures.Add($Path)
+    Write-Host "[FarmDash uninstall] Refusing a linked profile path: $Path"
+}
+
 function Remove-Tree([string]$Path) {
     if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return }
+    if (Test-HasLinkedAncestor $Path) {
+        Reject-LinkedPath $Path
+        return
+    }
     $resolved = [IO.Path]::GetFullPath($Path)
     $allowed = @($script:AllowedCleanupRoots | Where-Object {
         $resolved.Equals($_, [StringComparison]::OrdinalIgnoreCase) -or
@@ -91,11 +117,68 @@ function Get-ProfileRoots([string]$EditionName) {
     }
 }
 
+function Remove-LegacyV5UpdaterInstaller {
+    if (-not (Test-IsV5Edition $Edition) -or -not $env:LOCALAPPDATA) { return }
+
+    # Older V5 builds used V4's cache name. Never remove that shared tree: its
+    # pending/ directory may contain a genuine V4 update. Only the root-level
+    # installer.exe is a V5 cleanup candidate, and only when its PE identity
+    # proves it belongs to this product line.
+    $legacyRoot = Join-Path $env:LOCALAPPDATA 'fs25-farm-dashboard-updater'
+    $candidate = Join-Path $legacyRoot 'installer.exe'
+    if (-not (Test-Path -LiteralPath $candidate)) { return }
+    if (Test-HasLinkedAncestor $candidate) {
+        Reject-LinkedPath $candidate
+        return
+    }
+
+    $resolvedRoot = [IO.Path]::GetFullPath($legacyRoot).TrimEnd([IO.Path]::DirectorySeparatorChar)
+    $resolvedCandidate = [IO.Path]::GetFullPath($candidate)
+    $expectedCandidate = Join-Path $resolvedRoot 'installer.exe'
+    if (-not $resolvedCandidate.Equals($expectedCandidate, [StringComparison]::OrdinalIgnoreCase)) {
+        $script:CleanupFailures.Add($resolvedCandidate)
+        Write-Host "[FarmDash uninstall] Refusing an out-of-scope updater path: $resolvedCandidate"
+        return
+    }
+
+    try {
+        $item = Get-Item -LiteralPath $resolvedCandidate -Force -ErrorAction Stop
+        if ($item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+            throw 'Linked or non-file updater cache entry requires manual review.'
+        }
+        try {
+            $identity = [Diagnostics.FileVersionInfo]::GetVersionInfo($resolvedCandidate)
+        } catch {
+            Write-Host "[FarmDash uninstall] Retaining updater cache entry with unreadable identity: $resolvedCandidate"
+            return
+        }
+        if ($identity.ProductName -cne 'FS25 Farm Dashboard V5' -or
+            $identity.ProductVersion -notmatch '^5\.') {
+            Write-Host "[FarmDash uninstall] Retaining updater cache entry not proven V5-owned: $resolvedCandidate"
+            return
+        }
+
+        Remove-Item -LiteralPath $resolvedCandidate -Force -ErrorAction Stop
+        if (Test-Path -LiteralPath $resolvedCandidate) { throw 'V5 cached installer remains after removal.' }
+        Write-Host "[FarmDash uninstall] Removed proven V5 installer from legacy shared updater cache."
+        if (@(Get-ChildItem -LiteralPath $resolvedRoot -Force -ErrorAction Stop).Count -eq 0) {
+            Remove-Item -LiteralPath $resolvedRoot -Force -ErrorAction Stop
+        }
+    } catch {
+        $script:CleanupFailures.Add($resolvedCandidate)
+        Write-Host "[FarmDash uninstall] Could not clean proven V5 updater cache entry: $resolvedCandidate ($($_.Exception.Message))"
+    }
+}
+
 $KeepFileNames = @{ 'config.json' = $true }
 $KeepDirNames  = @{ 'serverLiveCache' = $true }
 
 function Prune-ProfileKeepSettings([string]$ProfileDir) {
     if (-not (Test-Path -LiteralPath $ProfileDir)) { return }
+    if (Test-HasLinkedAncestor $ProfileDir) {
+        Reject-LinkedPath $ProfileDir
+        return
+    }
     Get-ChildItem -LiteralPath $ProfileDir -Force | ForEach-Object {
         $n = $_.Name
         if ($KeepFileNames.ContainsKey($n) -or $KeepDirNames.ContainsKey($n)) { return }
@@ -116,6 +199,8 @@ if ($Mode -eq 'Full') {
     foreach ($p in $roots.Local) { Remove-Tree $p }
     foreach ($p in $roots.Roaming) { Prune-ProfileKeepSettings $p }
 }
+
+Remove-LegacyV5UpdaterInstaller
 
 if ($env:TEMP) {
     Remove-Item -LiteralPath (Join-Path $env:TEMP 'farmdash-install-locale.txt') -Force -ErrorAction SilentlyContinue

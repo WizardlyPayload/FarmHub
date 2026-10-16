@@ -11,14 +11,14 @@ Visitors get a **read-only** view: Settings, server manager, and local-only tool
 | Piece | Role |
 | ----- | ---- |
 | **FS25** with **Farm Dashboard mod** on the save you want to show | Writes `data.json` every export cycle (~60s default) |
-| **Farm Dashboard Windows app** on a PC that can reach that data | Merges JSON + serves the UI on port **8766** |
+| **Farm Dashboard Windows app** on a PC that can reach that data | Merges JSON + serves the UI. **V5 (current public demo):** port **8768**. Classic V4: **8766**. |
 | **Public HTTPS URL** (recommended: `demo.farmdashboard.co.uk`) | So the marketing site can link without mixed-content errors |
 | **Optional: Local (join-as-client)** | Dedicated host: join with the mod, mirror to local `data.json`, app **Local** mode — no FTP |
 | **Optional: FTP server** in the app | Headless dedicated / rented host when nobody can stay joined |
 
-**While you are playing on the same PC as the app:** add a **Local** server pointing at  
+**While you are playing on the same PC as the app:** select the matching **Local** demo server (see [DEMO_COMPANION_MOD_LISTS.md](./DEMO_COMPANION_MOD_LISTS.md) — four slots only: Riverbend Base / Riverbend PF / Montana RF+companions / Montana PF+companions) pointing at  
 `Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\<savegame>\`  
-and keep the app open — file watch picks up changes quickly.
+and keep the app open — file watch picks up changes quickly. Do not leave personal careers in the V5 server list while Try-now is public.
 
 **Dedicated / rented server:** prefer **join as client** + Local watch ([INSTALL.md](./INSTALL.md#dedicated-server-join-as-client-or-ftp)). Or add **FTP** in Settings and poll every **2–5 minutes** when nobody can stay joined.
 
@@ -32,11 +32,11 @@ Best fit when the domain is already on **Cloudflare** (`farmdashboard.co.uk`).
 
 1. Install mod + app; configure the save (local path, join-as-client Local, or FTP).
 2. **Settings → Remote / LAN access**
-   - Enable LAN access (binds `0.0.0.0:8766`).
+   - Enable LAN access if tablets on the LAN should connect (V5 binds `0.0.0.0:8768`). The Cloudflare tunnel can stay on loopback (`127.0.0.1`) and does not need LAN access.
    - Set a **strong password** (not `admin` / `farmhub` — the app rejects weak defaults).
 3. Leave the app running while you play (or run it whenever the demo should be live).
 
-### 2. Cloudflare Tunnel to port 8766
+### 2. Cloudflare Tunnel to installed V5 (port 8768)
 
 On the **same PC** as the app:
 
@@ -44,10 +44,12 @@ On the **same PC** as the app:
 2. In Cloudflare Zero Trust / dashboard: **Networks → Tunnels → Create tunnel**.
 3. Add a **Public hostname**:
    - Subdomain: `demo` → `demo.farmdashboard.co.uk`
-   - Service: `http://127.0.0.1:8766`
+   - Service: `http://127.0.0.1:8768` (**Farm Dashboard V5**). Do not point this at classic `:8766` unless you intentionally want the old screens.
 4. Run the tunnel (or install as a Windows service so it starts with the PC).
 
-Result: `https://demo.farmdashboard.co.uk` serves the same UI as `http://localhost:8766`.
+Result: `https://demo.farmdashboard.co.uk` serves the same UI as `http://localhost:8768`.
+
+If the Zero Trust hostname is still on `:8766` and V4 is not running, `tools/demo-v5-tunnel-forward.cjs` TCP-forwards `127.0.0.1:8766` → `:8768` so the existing tunnel keeps working. Prefer retargeting the hostname to `:8768` and then stopping that forwarder (so classic V4 can bind `8766` again).
 
 ### 3. Protect the demo (choose one)
 
@@ -76,7 +78,7 @@ Point the button at the tunnel URL (new tab):
 
 Optional subtitle on the page:
 
-> Live data from our multiplayer server. Updates every minute while we are in-game. Read-only view.
+> Live data from a farm save we are playing. Updates while we are in-game. Read-only view.
 
 ---
 
@@ -107,18 +109,30 @@ When you are **offline**, either:
 
 ## What not to do
 
-- Do **not** embed `http://YOUR-HOME-IP:8766` in the HTTPS marketing site (blocked by browsers).
+- Do **not** embed `http://YOUR-HOME-IP:8768` (or `:8766`) in the HTTPS marketing site (blocked by browsers).
 - Do **not** put FTP credentials in website JavaScript.
-- Do **not** port-forward **8766** to the open internet without TLS and strong auth — use a **tunnel** or reverse proxy instead.
+- Do **not** port-forward **8768** or **8766** to the open internet without TLS and strong auth — use a **tunnel** or reverse proxy instead.
+
+---
+
+## Companion packs (two saves, no overlaps)
+
+Conflicting vault companions (British vs Imperial, Realistic vs Fluctuating diesel, ELS vs No Credit, RF Soil vs PF, etc.) need **separate saves**. Use:
+
+- **Pack A** → `savegame19` (RF + British + ELS + Realistic Diesel…)
+- **Pack B** → `savegame18` (PF + Imperial + alt diesel + fleet maintenance…)
+
+Full enable/disable lists: [`DEMO_COMPANION_MOD_LISTS.md`](./DEMO_COMPANION_MOD_LISTS.md). Public Try-now usually leaves **one** pack loaded (Pack A by default).
 
 ---
 
 ## Checklist before going public
 
 - [ ] Mod enabled on the save shown in the demo  
+- [ ] Demo save follows Pack A or Pack B (no conflict-family overlaps) — see `DEMO_COMPANION_MOD_LISTS.md`  
 - [ ] App running with correct Local (incl. join-as-client) or FTP server selected  
 - [ ] LAN access on + strong password (or Cloudflare Access in front)  
-- [ ] Tunnel `demo.farmdashboard.co.uk` → `127.0.0.1:8766` healthy  
+- [ ] Tunnel `demo.farmdashboard.co.uk` → `127.0.0.1:8768` (V5) healthy — or `:8766` plus `tools/demo-v5-tunnel-forward.cjs` until Zero Trust is retargeted  
 - [ ] Test from phone on **mobile data** (not home Wi‑Fi) to confirm public access  
 - [ ] Deploy updated `Website/` folder to farmdashboard.co.uk (see `Website/README.md`)  
 - [ ] `Website/js/site-config.js` `demoAppUrl` matches your tunnel hostname  

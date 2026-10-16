@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- FS25 FarmDashboard | modDesc.xml | v5.0.0.4 (V5) -->
+<!-- FS25 FarmDashboard | modDesc.xml | v5.0.0.27 (V5) -->
 <modDesc descVersion="109">
     <author>JoshWalki / WizardlyPayload</author>
-    <version>5.0.0.4</version>
+<version>5.1.0.0</version>
     
     <title>
         <en>Farm Dashboard</en>
@@ -97,14 +97,22 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
     <extraSourceFiles>
         <sourceFile filename="src/FarmDashboardSettingsApi.lua"/>
         <sourceFile filename="src/FarmDashboardSettingsEvent.lua"/>
+        <sourceFile filename="src/FarmDashboardExportFinalizer.lua"/>
         <sourceFile filename="src/FarmDashboardExportEvent.lua"/>
+        <sourceFile filename="src/FarmDashboardReplicaConfig.lua"/>
+        <sourceFile filename="src/FarmDashboardReplicaPairing.lua"/>
+        <sourceFile filename="src/FarmDashboardPairingEvent.lua"/>
         <sourceFile filename="src/FarmDashboardExportMirror.lua"/>
         <sourceFile filename="src/FarmDashboardSettingsMenu.lua"/>
         <sourceFile filename="src/FarmDashboardSettingsGui.lua"/>
+        <sourceFile filename="src/FarmDashboardCareerIdentity.lua"/>
+        <sourceFile filename="src/ExportEnvelopePublisher.lua"/>
+        <sourceFile filename="src/FarmDashboardExportRoute.lua"/>
         <sourceFile filename="src/FarmDashboard.lua"/>
         <sourceFile filename="src/FarmDashboardVehicleShopGuard.lua"/>
         <sourceFile filename="src/FarmDashboardCourseplayCompat.lua"/>
         <sourceFile filename="src/FarmDashLog.lua"/>
+        <sourceFile filename="src/MissionActiveRegistry.lua"/>
         <sourceFile filename="src/FillTypeUtils.lua"/>
         <sourceFile filename="src/InventoryScan.lua"/>
         <sourceFile filename="src/Diagnostics.lua"/>
@@ -121,6 +129,42 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/collectors/RedTapeDataCollector.lua"/>
         <sourceFile filename="src/collectors/InvoicesDataCollector.lua"/>
         <sourceFile filename="src/collectors/HirePurchasingDataCollector.lua"/>
+        <sourceFile filename="src/collectors/CompanionModsDataCollector.lua"/>
+        <sourceFile filename="src/companionPages/CompanionPages.lua"/>
+        <sourceFile filename="src/companionPages/EnhancedLoanSystemCollector.lua"/>
+        <sourceFile filename="src/companionPages/INeedALoanCollector.lua"/>
+        <sourceFile filename="src/companionPages/AutomaticLoanRepayCollector.lua"/>
+        <sourceFile filename="src/companionPages/RealisticDieselPriceCollector.lua"/>
+        <sourceFile filename="src/companionPages/FluctuatingDieselPriceCollector.lua"/>
+        <sourceFile filename="src/companionPages/DynamicMarketCollector.lua"/>
+        <sourceFile filename="src/companionPages/BetterContractsCollector.lua"/>
+        <sourceFile filename="src/companionPages/SeasonalMilkProductionCollector.lua"/>
+        <sourceFile filename="src/companionPages/SeasonalWoolProductionCollector.lua"/>
+        <sourceFile filename="src/companionPages/RealisticAnimalLossesCollector.lua"/>
+        <sourceFile filename="src/companionPages/AnimalFoodOverviewCollector.lua"/>
+        <sourceFile filename="src/companionPages/AnimalFoodCalculatorCollector.lua"/>
+        <sourceFile filename="src/companionPages/ProductionWatcherCollector.lua"/>
+        <sourceFile filename="src/companionPages/PalletDegradationCollector.lua"/>
+        <sourceFile filename="src/companionPages/RealSiloCollector.lua"/>
+        <sourceFile filename="src/companionPages/EverythingConstructableCollector.lua"/>
+        <sourceFile filename="src/companionPages/FactoryProfitCalculatorCollector.lua"/>
+        <sourceFile filename="src/companionPages/TimeSavingStockCheckCollector.lua"/>
+        <sourceFile filename="src/companionPages/RestrictedPeriodsCollector.lua"/>
+        <sourceFile filename="src/companionPages/RegionalCropCalendarCollector.lua"/>
+        <sourceFile filename="src/companionPages/MoistureSystemCollector.lua"/>
+        <sourceFile filename="src/companionPages/FieldLeasingCollector.lua"/>
+        <sourceFile filename="src/companionPages/SoilWorkYieldBonusCollector.lua"/>
+        <sourceFile filename="src/companionPages/SmartCropControlCollector.lua"/>
+        <sourceFile filename="src/companionPages/BushelPlusCollector.lua"/>
+        <sourceFile filename="src/companionPages/OutOfFuelCollector.lua"/>
+        <sourceFile filename="src/companionPages/VehicleMileageCollector.lua"/>
+        <sourceFile filename="src/companionPages/VehicleYearsCollector.lua"/>
+        <sourceFile filename="src/companionPages/AdvancedMaintenanceCollector.lua"/>
+        <sourceFile filename="src/companionPages/CollisionDamageCollector.lua"/>
+        <sourceFile filename="src/companionPages/PuncturedTiresCollector.lua"/>
+        <sourceFile filename="src/companionPages/CourseplayCollector.lua"/>
+        <sourceFile filename="src/companionPages/BritishFillUnitsCollector.lua"/>
+        <sourceFile filename="src/companionPages/ImperialSystemCollector.lua"/>
         <sourceFile filename="src/collectors/rf/RfSoilFertilizerDataCollector.lua"/>
         <sourceFile filename="src/collectors/rf/RfCropStressDataCollector.lua"/>
         <sourceFile filename="src/collectors/rf/RfTaxDataCollector.lua"/>

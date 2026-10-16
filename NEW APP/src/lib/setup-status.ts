@@ -1,10 +1,17 @@
 import type { SetupStatus } from "@/lib/ux-state";
 import { getFarmDashApi } from "@/services/electron-bridge";
 import { fetchWithRetry } from "@/lib/ux-retry";
+import { demoWritesAreLocked } from "@/platform/demo-source";
 
-export async function fetchSetupStatus(): Promise<SetupStatus | null> {
+function statusUrl(path: string, serverId?: string | null): string {
+  const selected = typeof serverId === "string" ? serverId.trim() : "";
+  return selected ? `${path}?serverId=${encodeURIComponent(selected)}` : path;
+}
+
+export async function fetchSetupStatus(serverId?: string | null): Promise<SetupStatus | null> {
+  if (demoWritesAreLocked()) return null;
   const api = getFarmDashApi();
-  if (api?.getSetupStatus) {
+  if (!serverId && api?.getSetupStatus) {
     try {
       return (await api.getSetupStatus()) as SetupStatus;
     } catch {
@@ -12,7 +19,7 @@ export async function fetchSetupStatus(): Promise<SetupStatus | null> {
     }
   }
   try {
-    const res = await fetchWithRetry(() => fetch("/api/setup-status", { cache: "no-store" }), {
+    const res = await fetchWithRetry(() => fetch(statusUrl("/api/setup-status", serverId), { cache: "no-store" }), {
       retry: false,
     });
     if (!res.ok) return null;
@@ -27,9 +34,10 @@ export async function fetchUxEvents(): Promise<SetupStatus["recentEvents"]> {
   return status?.recentEvents || [];
 }
 
-export async function runSetupHandshake(): Promise<SetupStatus | null> {
+export async function runSetupHandshake(serverId?: string | null): Promise<SetupStatus | null> {
+  if (demoWritesAreLocked()) return null;
   const api = getFarmDashApi();
-  if (api?.runSetupHandshake) {
+  if (!serverId && api?.runSetupHandshake) {
     try {
       return (await api.runSetupHandshake()) as SetupStatus;
     } catch {
@@ -37,10 +45,10 @@ export async function runSetupHandshake(): Promise<SetupStatus | null> {
     }
   }
   try {
-    const res = await fetch("/api/setup-handshake", { method: "POST", cache: "no-store" });
-    if (!res.ok) return fetchSetupStatus();
+    const res = await fetch(statusUrl("/api/setup-handshake", serverId), { method: "POST", cache: "no-store" });
+    if (!res.ok) return fetchSetupStatus(serverId);
     return (await res.json()) as SetupStatus;
   } catch {
-    return fetchSetupStatus();
+    return fetchSetupStatus(serverId);
   }
 }

@@ -1,0 +1,340 @@
+/* ---- Panel card chrome and live readings ---- */
+
+.fd-companions__card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.fd-companions__desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
+  margin: 0 0 0.65rem;
+  line-height: 1.4;
+  font-size: 0.85rem;
+}
+
+.fd-companions__card-footer {
+  margin-top: auto;
+  padding-top: 0.75rem;
+}
+
+.fd-companions__live {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+/* ---- Stat tiles (same row as Red Tape / NPC Favor, auto-fitting inside cards) ---- */
+
+.fd-companions__stats {
+  grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+  text-align: left;
+  margin-bottom: 0.75rem;
+}
+
+.fd-companions__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--farm-border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.fd-companions__stat strong {
+  font-size: 1.3rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.fd-companions__stat.is-text strong {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.fd-companions__stat.is-ok strong {
+  color: var(--farm-accent);
+}
+
+.fd-companions__stat.is-warn strong {
+  color: #facc15;
+}
+
+.fd-companions__stat.is-danger strong {
+  color: #f87171;
+}
+
+.fd-companions__stat.is-danger {
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+.fd-companions__stat-hint {
+  color: var(--farm-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+
+/* ---- Section embeds ---- */
+
+.fd-companions__embed {
+  margin: 1rem 0 1.25rem;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.fd-companions__embed-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.fd-companions__embed-head h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.fd-companions__panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+}
+
+.fd-companions__panel-wrap {
+  display: flex;
+  min-width: 0;
+  scroll-margin-top: 1rem;
+}
+
+.fd-companions__panel-wrap.is-wide {
+  grid-column: 1 / -1;
+}
+
+.fd-companions__panel {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fd-companions__panel .fd-economy__muted {
+  margin: 0.35rem 0 0;
+}
+
+.fd-companions__also {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+}
+
+.fd-companions__also-label {
+  color: var(--farm-text-muted);
+  font-size: 0.8rem;
+  margin-right: 0.15rem;
+}
+
+.fd-companions__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--farm-border);
+  border-radius: 999px;
+  background: var(--farm-surface);
+  font-size: 0.78rem;
+  scroll-margin-top: 1rem;
+}
+
+.fd-companions__chip strong {
+  color: var(--farm-text);
+  font-weight: 600;
+}
+
+.fd-companions__chip span {
+  color: var(--farm-text-muted);
+}
+
+/* ---- Regional Crop Calendar grid ---- */
+
+.fd-companions__calendar {
+  margin-top: 0.25rem;
+}
+
+.fd-companions__calendar > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  padding: 0.45rem 0;
+  color: var(--farm-text);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.fd-companions__calendar-scroll {
+  max-height: 24rem;
+  overflow: auto;
+  border: 1px solid var(--farm-border);
+  border-radius: 12px;
+  margin-top: 0.35rem;
+}
+
+.fd-companions__calendar-table {
+  min-width: 36rem;
+}
+
+.fd-companions__calendar-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--farm-panel);
+}
+
+.fd-companions__calendar-table th,
+.fd-companions__calendar-table td {
+  padding: 0.35rem 0.4rem;
+}
+
+.fd-companions__calendar-table tbody th {
+  font-weight: 600;
+  color: var(--farm-text);
+  white-space: nowrap;
+  text-align: left;
+}
+
+.fd-companions__calendar-table th.is-current {
+  color: var(--farm-accent);
+}
+
+.fd-companions__cal-cell {
+  text-align: center;
+  min-width: 1.9rem;
+}
+
+.fd-companions__cal-cell.is-current,
+.fd-companions__calendar-table th.is-current {
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.fd-companions__cal-mark,
+.fd-companions__cal-swatch {
+  display: inline-block;
+  width: 1.1rem;
+  height: 0.7rem;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.is-plant > .fd-companions__cal-mark,
+.fd-companions__cal-swatch.is-plant {
+  background: #22c55e;
+}
+
+.is-harvest > .fd-companions__cal-mark,
+.fd-companions__cal-swatch.is-harvest {
+  background: #f59e0b;
+}
+
+.is-both > .fd-companions__cal-mark,
+.fd-companions__cal-swatch.is-both {
+  background: linear-gradient(90deg, #22c55e 50%, #f59e0b 50%);
+}
+
+.fd-companions__cal-swatch.is-current {
+  background: rgba(34, 197, 94, 0.25);
+  border: 1px solid var(--farm-accent);
+}
+
+.fd-companions__cal-tag {
+  margin-left: 0.35rem;
+  padding: 0 0.3rem;
+  border: 1px solid var(--farm-border);
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--farm-text-muted);
+}
+
+.fd-companions__cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1rem;
+  margin-top: 0.6rem;
+  font-size: 0.78rem;
+}
+
+.fd-companions__cal-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* ---- Field / economy row readings ---- */
+
+.fd-companions__field-economy {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.fd-companions__field-row {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.15rem 0.75rem;
+  margin: 0;
+  padding: 0.35rem 0;
+  border-top: 1px solid var(--farm-border);
+}
+
+.fd-companions__field-row > div {
+  display: contents;
+}
+
+.fd-companions__field-row dt {
+  opacity: 0.75;
+}
+
+.fd-companions__field-row dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Storage mods card ---- */
+
+.fd-asset-notes__grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.fd-asset-notes__block {
+  scroll-margin-top: 1rem;
+}
+
+.fd-asset-notes__block h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: var(--farm-text);
+}
+
+.fd-companions__fill-bar {
+  display: block;
+  height: 4px;
+  margin-top: 0.3rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.fd-companions__fill-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--farm-accent);
+}

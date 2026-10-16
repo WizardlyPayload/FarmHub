@@ -1,5 +1,7 @@
 // FS25 FarmDashboard | farmScope.cjs — Node (dataMerger); keep in sync with web/assests/js/modules/farmScope.js
 
+const { pruneCompanionPagesToFarms } = require("./companionPagesMerge.cjs");
+
 function isPlayerFarmRecord(farm) {
   if (!farm || typeof farm !== "object") return false;
   const id = Number(farm.id ?? farm.farmId);
@@ -193,6 +195,9 @@ function pruneMergedDataToPlayerFarms(data) {
       }
     }
     out.hirePurchasing = hirePurchasing;
+  }
+  if (data.companionPages?.pages && typeof data.companionPages.pages === "object") {
+    out.companionPages = pruneCompanionPagesToFarms(data.companionPages, playerIds);
   }
   return out;
 }

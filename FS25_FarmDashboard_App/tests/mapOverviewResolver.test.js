@@ -90,16 +90,41 @@ describe('mapOverviewResolver', () => {
   });
 
   test('findOverviewSourceFile prefers vanilla mapUS over unrelated mod zips', async () => {
-    const modsRoot = `${process.env.USERPROFILE || ''}/Documents/My Games/FarmingSimulator2025/mods`;
-    const result = await findOverviewSourceFile({
-      mapId: 'MapUS',
-      mapTitle: 'Riverbend Springs',
-      modsRoot,
-    });
-    if (!result?.sourcePath) return;
-    const low = result.sourcePath.toLowerCase().replace(/\\/g, '/');
-    expect(low).toContain('/data/maps/mapus/');
-    expect(low).not.toContain('willowriver');
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'farmdash-overview-mapus-'));
+    const savedEnv = {
+      USERPROFILE: process.env.USERPROFILE,
+      APPDATA: process.env.APPDATA,
+      FS25_GAME_PATH: process.env.FS25_GAME_PATH,
+      FARMING_SIMULATOR_2025_PATH: process.env.FARMING_SIMULATOR_2025_PATH,
+    };
+    const originalHomedir = os.homedir;
+    const gameRoot = path.join(root, 'game');
+    const vanilla = path.join(gameRoot, 'data', 'maps', 'mapus', 'textures', 'ui', 'overview.dds');
+    const modsRoot = path.join(root, 'mods');
+    try {
+      fs.mkdirSync(path.dirname(vanilla), { recursive: true });
+      fs.mkdirSync(modsRoot, { recursive: true });
+      fs.writeFileSync(vanilla, Buffer.from('DDS '));
+      fs.writeFileSync(path.join(modsRoot, 'FS25_WillowRiver.zip'), Buffer.from('504b0506' + '00'.repeat(18), 'hex'));
+      process.env.USERPROFILE = root;
+      process.env.APPDATA = path.join(root, 'AppData', 'Roaming');
+      process.env.FS25_GAME_PATH = gameRoot;
+      process.env.FARMING_SIMULATOR_2025_PATH = gameRoot;
+      os.homedir = () => root;
+
+      const result = await findOverviewSourceFile({ mapId: 'MapUS', mapTitle: 'Riverbend Springs', modsRoot });
+      expect(result?.sourcePath).toBe(vanilla);
+      const low = result.sourcePath.toLowerCase().replace(/\\/g, '/');
+      expect(low).toContain('/data/maps/mapus/');
+      expect(low).not.toContain('willowriver');
+    } finally {
+      os.homedir = originalHomedir;
+      for (const [key, value] of Object.entries(savedEnv)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      fs.rmSync(root, { recursive: true, force: true });
+    }
   });
 
   test('scoreOverviewPath ranks vanilla ui path highest', () => {

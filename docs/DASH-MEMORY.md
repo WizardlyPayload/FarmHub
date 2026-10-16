@@ -36,7 +36,7 @@ Cold-start bank for the **Dash** FarmHub product seat. Skimmable bullets only. D
 | Line | App / mod | Auto-update | Output |
 |------|-----------|-------------|--------|
 | **V4** (classic 4.x) | `package.json` **4.2.2**; classic screens; Start Menu **Farm Dashboard V4** | **`latest.yml` only** | Private candidates under `Documents/FarmDash Release Candidates\`; do not treat `FarmDash Final Output` 4.2.1 as this rebuild |
-| **V5** (rebuild 5.x) | App **5.0.5** (working tree) via `electron-builder.rf.yml` `extraMetadata` (package.json stays 4.2.2); last GitHub public **5.0.3**; shortcut **Farm Dashboard V5**; same in-game mod zip works with both | **`latest-rf.yml` only** — never V4 | **`Documents/FarmDash Release/`** (flat zip + V5 Setup.exe) |
+| **V5** (rebuild 5.x) | App **5.0.4** (working tree) via `electron-builder.rf.yml` `extraMetadata` (package.json stays 4.2.2); last GitHub public **5.0.3**; shortcut **Farm Dashboard V5**; same in-game mod zip works with both | **`latest-rf.yml` only** — never V4 | **`Documents/FarmDash Release/`** (flat zip + V5 Setup.exe) |
 
 Never put the V5 Setup.exe on V4 `latest.yml`. Guard: `tools/app/assert-rf-update-channel.mjs`. Story: [`COMPATIBILITY.md`](./COMPATIBILITY.md). Tester checklist: [`TESTERS.md`](./TESTERS.md). Do **not** call V5 “RF edition” in product-facing names.
 
@@ -52,11 +52,34 @@ Last GitHub public: **5.0.3**. This working tree: **5.0.5**. Next GitHub publish
 
 **Ports / demos:** installed V4 `:8766` (`%APPDATA%\fs25-farm-dashboard`); installed V5 `:8768` (`%APPDATA%\fs25-farm-dashboard-rf`); repo NEW UI `:8767` (`%LOCALAPPDATA%\fs25-farm-dashboard-dev`) via `npm run dev:new-ui`. Do not proxy Vite at `:5173` to installed `:8766` when testing new merge/collectors.
 
-#### 2026-09-13 — V5 5.0.5 DEV (Riverbend collectors, not GitHub yet)
-- In-game `loadSharedI3DFileFinished` red text was `FarmDashboard.lua:87` calling `:init()` after extraSourceFiles failed (incomplete unpacked `mods/FS25_FarmDashboard` folder). loadMap is now pcall-guarded.
+#### 2026-09-21 — Companion / units test save = savegame19
+- **Primary local test slot:** `Documents\My Games\FarmingSimulator2025\savegame19` (Montana Map, Multifruit 4x).
+- V5 app (`%APPDATA%\fs25-farm-dashboard-rf\config.json`) has a local server **Montana Map, Multifruit 4x (savegame19) — companion test**, pinned first in the servers list; `uiPreferences.activeServerId` points at it.
+- Mod export folder: `modSettings\FS25_FarmDashboard\savegame19\` (created; `data.json` appears after loading the save in FS25 with Farm Dashboard mod enabled).
+- Use this save for British/Imperial fill units, Companion mods hub, and soft-detect smoke. Enable the vault companion zips on this save’s mod list when testing those cards (ELS, Restricted Periods, Livestock Monitor, diesel, etc.).
+- **Non-overlapping demo packs:** [`DEMO_COMPANION_MOD_LISTS.md`](./DEMO_COMPANION_MOD_LISTS.md) — Pack A = `savegame19` (RF + ELS + Realistic Diesel…); Pack B = `savegame18` (PF + Imperial + Fluctuating Diesel + fleet maintenance…). Career mod lists + V5 Local servers applied 2026-09-22. Drop **British Fill Units** manually for Pack A (itch). Never mix soil/units/diesel/loan/maintenance conflict families on one save.
+
+#### 2026-09-13 — Public Try now is installed V5
+- `demo.farmdashboard.co.uk` Cloudflare hostname was still `http://127.0.0.1:8766` (classic). Installed V5 is `:8768`. Until Zero Trust is retargeted to `:8768`, `tools/demo-v5-tunnel-forward.cjs` TCP-forwards `8766` → `8768`. Logon task: `FarmDash Demo V5 tunnel forward`. Status JSON uses `service: fs25-farm-dashboard-rf` / `productLine: v5`.
+- Public demo copy is a **local farm save**, not multiplayer. Site + `viewer.demoBody` no longer say “multiplayer farm” / Join FarmDashDemo.
+
+#### 2026-09-13 — Pre-5.1.0 site pass
+- farmdashboard.co.uk header **Download** and V5 CTAs point at [itch.io](https://wizardlypayload.itch.io/farm-dashobaord-fs25). GitHub is secondary. Dead Discord invites no longer 404 visitors — header → `community.html`, Join → GitHub Issues until a never-expire URL is in `site-config.js`.
+- Vanilla / PF screenshot packs captured from Riverbend savegame4 (dash only) and savegame3 (PF + dash); home page galleries live.
+
+#### 2026-09-13 — Discord invite live
+- Never-expire invite: https://discord.gg/ZCG9C7h7aT (`expires_at` null). Site, README, wiki, AUTHORS, demo banner, classic about/viewer, setup footer. Old `qsSTRwG2` / `D4sEHM59` stay dead-listed in `site-shell.js`.
+
+#### 2026-09-13 — V5 5.0.5 DEV (Riverbend collectors)
+- In-game `loadSharedI3DFileFinished` red text was `FarmDashboard.lua:87` calling `:init()` after extraSourceFiles failed (incomplete unpacked `mods/FS25_FarmDashboard` folder). loadMap is now pcall-guarded; pack always writes a complete unpacked folder.
 - Live `config.xml` had **fields / economy / production off**, so merged fields, RF map overlays, and productions vanished. ESC settings clone could persist Off; inject no longer writes on setState. One-shot collectionSafetyV7 turns those three back on.
 - Dairy Core cards use placeable `getName()` instead of truncated uniqueId.
-- App **5.0.5**, mod **5.0.0.4**. GitHub stays **5.0.3**. Rescued from closed #7 tip `390db3ae`; ui-v2 lock stayed on main via #14.
+- App **5.0.5**, mod **5.0.0.5**. GitHub stays **5.0.3**.
+
+#### 2026-09-13 — savegame3 PF levels missing
+- Buying Precision Farming soil maps uncovers the cover map and bumps `numSoilSamples`. Live N/pH kg/ha still come only from `FieldDataCollector` sampling `nitrogenMap` / `pHMap`.
+- Riverbend **savegame3** export had `collectorModules.fields: false` and `fields: {}` because V7 had already applied and ESC/hitch left Fields Off again. XML merge can still list parcels, but bars stay vanilla `0/2` with no kg/ha.
+- collectionSafetyV8 restores fields/economy/production once more. Precision Farming loaded → force Fields collector on (same pattern as Moisture / RF soil).
 
 #### 2026-09-13 — V5 5.0.4 DEV (not GitHub yet)
 - App **5.0.4** after GitHub **5.0.3**. V5 no longer packs or serves classic `web/index.html` / root `setup.html`. New screens only. Mod zip still **5.0.0.3** (no Lua change). Drop: `Documents/FarmDash Release\FS25-Farm-Dashboard-V5-Setup-5.0.4.exe`.
@@ -130,6 +153,7 @@ Classic web/  OR  NEW APP (ui-v2) when flagged
 - **Map overview:** optional DDS copy into `modSettings/.../mapOverview/` for fleet map; latch failures so mid-cycle does not retry forever.
 - **ui-v2:** `npm run build:ui` → `FS25_FarmDashboard_App/ui-v2`; Electron resolves ui-v2 then `NEW APP/dist`.
 - **Dedicated data preference:** join-as-client Local watch first; FTP = Advanced / headless.
+- **Dedicated career identity (mod 5.0.0.19):** the dedicated server owns its career identity (`FarmDashboardCareerIdentity.serverReserve`, saved as `careerSavegame.farmDashboard#careerId`) and never reads the desktop `identity-provision` / `allocator` files. The mirror carries it to joined clients over the game connection. SP / MP host still wait for the app proposal. Before 5.0.0.19 the V5 identity gate left dedicated waiting forever and the mirror sent nothing.
 - **Giants:** single-thread Lua; `pcall` density/API; never deep-walk mission graphs into JSON; custom `toJSON` (acyclic plain tables only).
 - **RF soft-detect:** read mission handles with `_G.g_currentMission` (not `rawget(_G, …)` — sandbox nil). Never write RF state from FarmDashboard.
 - **Fertilizer Depot stock (1.0.4.33 hall):** dumped fill is Giants `ProductionPoint` bins (`getFillLevel` / `getCapacity`). `getStorageInfo` is the walk-in 50k shop book only. Dashboard must read the hall.
@@ -173,7 +197,7 @@ Classic web/  OR  NEW APP (ui-v2) when flagged
 ## 7. Open / watch items
 
 - **Classic 4.2 GitHub/itch hotfix** for `copyFile` / map-overview latch still **owed** on public V4 feed (local/GPortal mod may already be 5.0.0.1; V4 app line is separate).
-- **V5 publish:** GitHub Latest remains **5.0.3** until Wizard asks to publish. Working-tree drop is **5.0.5** in `Documents/FarmDash Release\` (`FS25-Farm-Dashboard-V5-Setup-5.0.5.exe`). Authenticode signing still open; **do not** publish onto V4 Latest. User-facing name is Farm Dashboard V5 (not “RF edition”).
+- **V5 publish:** GitHub Latest remains **5.0.3** until Wizard asks to publish. Working-tree drop is **5.0.4** in `Documents/FarmDash Release\` (`FS25-Farm-Dashboard-V5-Setup-5.0.4.exe`). Authenticode signing still open; **do not** publish onto V4 Latest. User-facing name is Farm Dashboard V5 (not “RF edition”).
 - **In-game SP/MP smoke** for RF soil/treatmentPlan after dedicated restart (often pending after GPortal upload).
 - **NEW APP parity:** live QA; some P0/P1 rows still open (`NEW APP/PARITY.md`, `PARITY_GAPS.md`) — Fields cluster prefs, nav icons, etc.
 - **Website demo** on `:8766` classic stays separate from repo `:8767` NEW UI.

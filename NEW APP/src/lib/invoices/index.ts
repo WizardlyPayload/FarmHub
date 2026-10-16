@@ -1,5 +1,7 @@
 /** FS25_Invoices — sale/work invoice helpers for the Mods → Invoices section. */
 
+import { formatProfileMoney, type SaveProfileDisplay } from "@/lib/profile-display";
+
 export const INVOICE_STATE = {
   NEW: 1,
   SENT: 2,
@@ -89,10 +91,10 @@ export function isInvoicesModActive(invoices: InvoicesPayload | null | undefined
   return !!(invoices && invoices.enabled === true);
 }
 
-export function formatInvoiceMoney(v: unknown): string {
+export function formatInvoiceMoney(v: unknown, profile?: SaveProfileDisplay | null): string {
   const n = Number(v);
   if (!Number.isFinite(n)) return "—";
-  return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  return formatProfileMoney(n, profile);
 }
 
 export function invoiceSenderFarmId(item: InvoiceItem | null | undefined): number {

@@ -95,7 +95,7 @@ FarmHub/
 ## Support
 
 - **Bugs:** [GitHub Issues](https://github.com/WizardlyPayload/FarmHub/issues) — include app version, mod version, local / join-as-client / FTP
-- **Community:** [Discord](https://discord.gg/qsSTRwG2) — chat, screenshots, quick help
+- **Community:** [Discord](https://discord.gg/ZCG9C7h7aT) — chat, screenshots, quick help
 - **Security:** See [Security & Network](Security-and-Network) — do not post exploits publicly
 - **Authors:** [JoshWalki](https://github.com/JoshWalki) & **WizardlyPayload** · optional [Ko-fi](https://ko-fi.com/wizarlypayload)
 

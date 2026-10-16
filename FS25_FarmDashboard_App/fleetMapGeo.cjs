@@ -161,12 +161,18 @@ function inferSymmetricalTerrainHalf(reportedHalf, points) {
     const maxClass = sizeClassForAbs(half, maxAbs);
     const secondClass = sizeClassForAbs(half, second);
     const nextClass = STANDARD_TERRAIN_HALVES.find((step) => step > half) || half;
-    // One stray coordinate must not jump past the next standard size class.
-    if (maxClass > secondClass && maxClass > nextClass) {
-      maxAbs = second;
-    }
+    if (maxClass > secondClass && maxClass > nextClass) maxAbs = second;
   }
-  return sizeClassForAbs(half, maxAbs);
+  if (maxAbs <= 0) return half;
+  const need = maxAbs * 1.02;
+  if (need <= half * 1.05) return half;
+  for (const step of STANDARD_TERRAIN_HALVES) {
+    if (step < half) continue;
+    // Rim vertices on a 4 km map sit at ~±2038 m. need is then ~2078, which is
+    // greater than 2048 but still that size class — not an 8 km world.
+    if (maxAbs <= step * 1.02) return step;
+  }
+  return Math.max(half, Math.ceil(maxAbs / 1024) * 1024);
 }
 
 function boundsFromTerrainHalf(half) {

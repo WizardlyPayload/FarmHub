@@ -1,5 +1,7 @@
 /** FS25_HirePurchasing — lease/hire-purchase deal helpers. */
 
+import { formatProfileMoney, type SaveProfileDisplay } from "@/lib/profile-display";
+
 export interface HirePurchasingDeal {
   id?: string;
   farmId?: number;
@@ -50,10 +52,10 @@ export function asArray<T>(x: T[] | unknown): T[] {
   return Array.isArray(x) ? x : [];
 }
 
-export function formatMoney(v: unknown): string {
+export function formatMoney(v: unknown, profile?: SaveProfileDisplay | null): string {
   const n = Number(v);
   if (!Number.isFinite(n)) return "—";
-  return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  return formatProfileMoney(n, profile);
 }
 
 export function isHirePurchasingModActive(

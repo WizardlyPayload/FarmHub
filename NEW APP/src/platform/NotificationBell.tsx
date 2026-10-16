@@ -1,3 +1,4 @@
+import { createPortal } from "preact/compat";
 import { useEffect, useState } from "preact/hooks";
 import { t, tOr } from "@/i18n/i18n";
 import { Badge, Button } from "@/components/ui";
@@ -45,27 +46,27 @@ export function NotificationBell() {
           <span class="fd-bell__count">{count > 99 ? "99+" : String(count)}</span>
         ) : null}
       </button>
-      {open ? (
-        <div class="fd-modal-backdrop" role="presentation" onClick={() => setOpen(false)}>
+      {open && typeof document !== "undefined" ? createPortal(
+        <div class="fd-notification-backdrop" role="presentation" onClick={() => setOpen(false)}>
           <div
-            class="fd-modal fd-modal--narrow"
+            class="fd-notification-dialog"
             ref={trapRef}
             role="dialog"
             aria-modal="true"
             onClick={(e) => e.stopPropagation()}
           >
-            <div class="fd-modal__header">
+            <div class="fd-notification-dialog__header">
               <h2>{t("notif.title")}</h2>
               <Button variant="ghost" onClick={() => setOpen(false)}>
                 {t("common.close")}
               </Button>
             </div>
-            <div class="fd-modal__body">
+            <div class="fd-notification-dialog__body">
               {items.length === 0 ? (
                 <UiStatePanel
                   ui={buildModuleUiState({ state: "empty", source: "unknown" })}
                   title={t("notifications.empty")}
-                  body={t("ux.helper.whatToCheck")}
+                  body={tOr("notifications.emptyHelp", "Farm notifications will appear here when there is something to report.")}
                 />
               ) : (
                 <div class="fd-notif-list">
@@ -84,19 +85,17 @@ export function NotificationBell() {
                 </div>
               )}
             </div>
-            <div class="fd-modal__footer">
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  clearNotificationHistory();
-                }}
-              >
-                {t("notif.clear")}
-              </Button>
+            <div class="fd-notification-dialog__footer">
+              {items.length > 0 ? (
+                <Button variant="ghost" onClick={() => clearNotificationHistory()}>
+                  {t("notif.clear")}
+                </Button>
+              ) : null}
               <Button onClick={() => setOpen(false)}>{tOr("common.close", "Close")}</Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       ) : null}
     </>
   );

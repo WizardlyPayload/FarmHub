@@ -37,8 +37,16 @@
   margin: 0 0 1rem;
 }
 
+.fd-overview__rf-mods-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
 .fd-overview__rf-mods-title {
-  margin: 0 0 0.5rem;
+  margin: 0;
   font-size: 0.95rem;
 }
 
@@ -46,6 +54,20 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
+}
+
+.fd-overview__rf-mod-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fd-overview__rf-mod-link:hover,
+.fd-overview__rf-mod-link:focus-visible {
+  filter: brightness(1.15);
 }
 
 .fd-overview__grid {

@@ -2,20 +2,30 @@
 
 Player-facing history for the **V5 / new screens** line. Classic 4.x notes stay in [`../CHANGELOG.md`](../CHANGELOG.md).
 
-**App 5.0.5** (working tree) · last GitHub public **5.0.3** · **Mod 5.0.0.4** · Update feed **`latest-rf.yml` only**.
+**Prepared V5 release:** app **5.1.0**, mod **5.1.0.0**. The website may still offer public **5.0.3 / 5.0.0.3** until Graham approves publication. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
+
+---
+
+## 5.0.57 / 5.0.0.31 — tested local candidate (2026-10-14, not a publication notice)
+
+- Fresh PC and Ally installation paths, canonical mod ZIP distribution, local exports, and a two-client dedicated-server live phase were exercised. The server committed generations 12-16 with both clients present; both dashboards reached generation 16. The PC reached generation 17 and moved to held after exit.
+- One Ally mirror timeout occurred on entry, but later generations arrived and no repeat was reported. An explicit Ally post-exit held receipt was **not** returned, so that narrow check remains unconfirmed.
+- V5 documentation now separates live, limited, detection-only and direct/folded companion support. New screenshots use held demo snapshots from the installed candidate and must not be described as live tests of every optional mod.
+- The website's public V5 5.0.3 and classic V4 4.2.1 download stories are intentionally unchanged. No installer, feed or website release was published by this documentation work.
 
 ---
 
 ## 5.0.5 — working tree (2026-09-13, not on GitHub yet)
 
-DEV bump after **5.0.4**. GitHub Latest stays **5.0.3**. Next GitHub public release is **5.1.0**.
+Collector restore after a map-load crash, plus Dairy Core barn names. Next GitHub public release is **5.1.0** (PUBLIC +1, DEV reset).
 
-- Map load no longer crashes when `FarmDashboardDataCollector` failed to load (`pcall` around `:init()`).
-- One-shot collectionSafetyV7 turns fields / economy / production collectors back on if Esc settings had persisted them Off.
-- Dairy Core cards show the placeable barn name instead of a truncated uniqueId.
+- `loadMap` init is pcall-guarded so a missing unpacked extras folder cannot take the whole mod down.
+- Pack always writes a complete unpacked `mods/FS25_FarmDashboard` folder (Giants SP prefers the folder over the zip).
+- Fields / economy / production collectors can be turned back on after a bad `config.xml` (collectionSafetyV7). ESC settings clone no longer writes Off on setState.
+- Dairy Core cards use placeable `getName()` instead of a truncated uniqueId.
 
 ### Product
-- App **5.0.5** · installer `FS25-Farm-Dashboard-V5-Setup-5.0.5.exe`
+- App **5.0.5** · installer `FS25-Farm-Dashboard-V5-Setup-5.0.5.exe` (local drop)
 - Mod **5.0.0.4**
 
 ---

@@ -309,7 +309,7 @@ function ProductionDataCollector:_collectImpl()
     local seenPP = {}
     local seenFactoryPlaceable = {}
 
-    local AH = rawget(_G, "AccessHandler")
+    local AH = type(_G.AccessHandler) == "table" and _G.AccessHandler or nil
     local everyone = (AH and AH.EVERYONE) or 0
 
     ProductionDataCollector._lastResult = result

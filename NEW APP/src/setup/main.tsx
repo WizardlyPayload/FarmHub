@@ -1,5 +1,5 @@
 import { render } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { initI18n, t, tOr } from "@/i18n/i18n";
 import { Button } from "@/components/ui";
 import {
@@ -9,12 +9,42 @@ import {
 } from "@/services/electron-bridge";
 import { fetchSetupStatus, runSetupHandshake } from "@/lib/setup-status";
 import { startModStoreImageExport } from "@/lib/mod-export-progress";
+import { discoveryContextFromScan, discoveryFeedback, importDiscoveredSaves } from "@/lib/discovered-save";
+import { SetupStatusNotice } from "@/setup/status-notice";
+import { resolveSetupStatusForDraft } from "@/setup/draft-status";
 import { ModExportProgressModal } from "@/platform/ModExportProgressModal";
-import { actionCopyKey, errorCopyKey, type SetupStatus } from "@/lib/ux-state";
+import { LinkServerPrompt } from "@/platform/LinkServerPrompt";
+import { type SetupStatus } from "@/lib/ux-state";
 import { mapSaveError as classifySaveError } from "@/lib/ux-classify";
 import "@/styles/global.css";
 import "@/platform/platform.css";
 import "@/setup/setup.css";
+
+const I18N_TIMEOUT_MS = 5000;
+const CONFIG_TIMEOUT_MS = 8000;
+const SIDE_READ_TIMEOUT_MS = 4000;
+
+function withTimeout<T>(work: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("E_SETUP_BOOT_TIMEOUT")), ms);
+    work.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
+function tFill(key: string, fallback: string, params: Record<string, string | number>): string {
+  const out = t(key, params);
+  if (out && out !== key) return out;
+  return Object.entries(params).reduce((text, [name, value]) => text.split(`{{${name}}}`).join(String(value)), fallback);
+}
 
 function mapSaveError(raw: string): string {
   return classifySaveError(String(raw || ""), (key, params, fallback) =>
@@ -90,9 +120,30 @@ function SetupApp() {
   const [localOnlyBlock, setLocalOnlyBlock] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [configLoaded, setConfigLoaded] = useState(false);
+  const [awaitingIds, setAwaitingIds] = useState<string[]>([]);
+  const loadAttempt = useRef(0);
 
-  async function hydrateConfig() {
-    const cfg = await loadConfig();
+  async function hydrateConfig(initial: boolean): Promise<void> {
+    const attempt = ++loadAttempt.current;
+    const isCurrent = () => attempt === loadAttempt.current;
+    setConfigLoaded(false);
+    // Only the latest attempt settles the screen. An older read's success, rejection or timeout is dropped,
+    // so it can neither replace newer servers nor hide them behind a load error.
+    let cfg: FarmDashConfig;
+    try {
+      cfg = (await withTimeout(loadConfig(), CONFIG_TIMEOUT_MS)) ?? {};
+    } catch (e) {
+      if (!isCurrent()) return;
+      const msg = String((e as Error)?.message || e);
+      if (initial && /E_SETUP_LOCAL_ONLY|setup is only available/i.test(msg)) {
+        setLocalOnlyBlock(true);
+      } else {
+        setLoadError(msg);
+      }
+      setConfigLoaded(false);
+      return;
+    }
+    if (!isCurrent()) return;
     setServers(Array.isArray(cfg.servers) ? cfg.servers : []);
     setFtpDelay(Number(cfg.ftpPolling?.initialDelaySeconds ?? 0));
     setFtpInterval(Number(cfg.ftpPolling?.intervalMinutes ?? 5));
@@ -101,36 +152,39 @@ function SetupApp() {
     setConfigLoaded(true);
   }
 
+  function retryConfig() {
+    void hydrateConfig(false);
+  }
+
   useEffect(() => {
     void (async () => {
-      await initI18n();
       try {
-        await hydrateConfig();
-      } catch (e) {
-        const msg = String((e as Error)?.message || e);
-        if (/E_SETUP_LOCAL_ONLY|setup is only available/i.test(msg)) {
-          setLocalOnlyBlock(true);
-        } else {
-          setLoadError(msg);
-          setConfigLoaded(false);
-        }
+        await withTimeout(initI18n(), I18N_TIMEOUT_MS);
+      } catch {
+        /* English fallbacks stay readable while the catalog is unavailable. */
       }
+      await hydrateConfig(true);
       const api = getFarmDashApi();
-      if (api?.getStoredLocale) {
+      const localeRead = (async () => {
+        if (api?.getStoredLocale) {
+          try {
+            const code = await withTimeout(Promise.resolve(api.getStoredLocale()), SIDE_READ_TIMEOUT_MS);
+            if (code) setLocale(code);
+          } catch {
+            /* ignore */
+          }
+        } else {
+          setLocale(localStorage.getItem("farmdash_locale") || "en");
+        }
+      })();
+      const statusRead = (async () => {
         try {
-          const code = await api.getStoredLocale();
-          if (code) setLocale(code);
+          setSetupStatus(await withTimeout(fetchSetupStatus(), SIDE_READ_TIMEOUT_MS));
         } catch {
           /* ignore */
         }
-      } else {
-      setLocale(localStorage.getItem("farmdash_locale") || "en");
-      }
-      try {
-        setSetupStatus(await fetchSetupStatus());
-      } catch {
-        /* ignore */
-      }
+      })();
+      await Promise.all([localeRead, statusRead]);
       setReady(true);
     })();
   }, []);
@@ -186,27 +240,56 @@ function SetupApp() {
           ? (result as { saves: Array<Record<string, unknown>> }).saves
           : [];
       if (!saves.length) {
-        flash(t("setup.toastNoDataJson", { extra: "" }));
+        flash(
+          tOr(
+            "setup.toastNoCareerFound",
+            "No Farming Simulator 25 career was found. Save a career in the game with the Farm Dashboard mod enabled, then select Auto-Detect again, or add the save folder below.",
+          ),
+        );
         return;
       }
-      const existing = new Set(servers.map((s) => s.localSubFolder || s.name));
-      const added: FarmDashConfigServer[] = [];
-      for (const save of saves) {
-        const folder = String(
-          (save as { localSubFolder?: string }).localSubFolder ||
-            (save as { folder?: string }).folder ||
-            (save as { name?: string }).name ||
-            "",
-        );
-        if (!folder || existing.has(folder)) continue;
-        added.push({
-          id: `srv_${Date.now()}_${added.length}`,
-          name: String((save as { name?: string }).name || folder),
-          mode: "local",
-          localSubFolder: folder,
-          localPath: String((save as { localPath?: string }).localPath || ""),
-        });
+      const imported = importDiscoveredSaves(
+        servers,
+        saves as Array<Record<string, unknown>>,
+        discoveryContextFromScan(result),
+      );
+      if (imported.awaitingFirstExport.length) {
+        setAwaitingIds([...awaitingIds, ...imported.awaitingFirstExport]);
       }
+      const feedback = discoveryFeedback(imported, saves.length > 0);
+      if (feedback === "added" && imported.awaitingFirstExport.length === imported.added.length) {
+        setServers([...servers, ...imported.added]);
+        const count = imported.added.length;
+        flash(
+          count === 1
+            ? tFill(
+                "setup.toastAwaitingFirstExportOne",
+                "Found {{count}} saved career with no dashboard export yet. Select Launch Dashboard, then load that save in Farming Simulator 25 with the Farm Dashboard mod enabled.",
+                { count },
+              )
+            : tFill(
+                "setup.toastAwaitingFirstExportMany",
+                "Found {{count}} saved careers with no dashboard export yet. Select Launch Dashboard, then load one of them in Farming Simulator 25 with the Farm Dashboard mod enabled.",
+                { count },
+              ),
+        );
+        return;
+      }
+      if (feedback === "recovery") {
+        if (imported.added.length) setServers([...servers, ...imported.added]);
+        flash(tOr("setup.toastRegistrationRecovery", "Replica registration could not be read. Those replica sources were not added, and the registration file was left unchanged."));
+        return;
+      }
+      if (feedback === "conflict") {
+        if (imported.added.length) setServers([...servers, ...imported.added]);
+        flash(tOr("setup.toastSourceConflict", "A discovered source conflicts with one already configured. It was not added, and the existing source was left unchanged."));
+        return;
+      }
+      if (feedback === "unresolved") {
+        flash(tOr("setup.toastSourceUnresolved", "The default save location could not be resolved, so matching sources were not added."));
+        return;
+      }
+      const added = imported.added;
       if (!added.length) {
         flash(t("setup.toastAllDetected"));
         return;
@@ -315,9 +398,9 @@ function SetupApp() {
 
   if (!ready) {
     return (
-      <div class="fd-splash">
+      <div class="fd-splash fd-setup-boot" role="status" aria-live="polite" aria-busy="true">
         <div class="fd-splash__panel">
-          <p>{t("splash.loading")}</p>
+          <p>{tOr("splash.loading", "Loading your farm data…")}</p>
         </div>
       </div>
     );
@@ -326,21 +409,11 @@ function SetupApp() {
   if (loadError) {
     return (
       <div class="fd-setup">
-        <div class="fd-setup__card fd-setup__card--blocked">
+        <div class="fd-setup__card fd-setup__card--blocked" role="alert">
           <h1>{tOr("setup.errLoadFailedTitle", "Could not load your servers")}</h1>
           <p>{tOr("setup.errLoadFailed", "Setup could not read the saved configuration. Retry before adding or launching — saving now could replace your existing servers.")}</p>
           <p>
-            <Button
-              onClick={() => {
-                void (async () => {
-                  try {
-                    await hydrateConfig();
-                  } catch (e) {
-                    setLoadError(String((e as Error)?.message || e));
-                  }
-                })();
-              }}
-            >
+            <Button onClick={() => void retryConfig()}>
               {tOr("setup.retryLoad", "Retry")}
             </Button>
           </p>
@@ -363,8 +436,14 @@ function SetupApp() {
     );
   }
 
+  // Setup status describes the saved backend config. Newly detected draft sources
+  // have not been saved yet, so its previous "add a server" error is no longer
+  // a truthful instruction for the sources currently shown on this screen.
+  const visibleSetupStatus = resolveSetupStatusForDraft(setupStatus, servers.length);
+
   return (
     <>
+    <LinkServerPrompt />
     <div class="fd-setup">
       <div class="fd-setup__card">
         <div class="fd-setup__actions">
@@ -380,7 +459,7 @@ function SetupApp() {
         <div class="fd-setup__left">
           <h1>{t("setup.serverManager")}</h1>
           <ol class="fd-setup__steps" aria-label={t("ux.setup.gatedTitle")}>
-            {(setupStatus?.steps || [
+            {(visibleSetupStatus?.steps || [
               { id: "detect", state: "pending", errorCode: null },
               { id: "connectivity", state: "pending", errorCode: null },
               { id: "auth", state: "pending", errorCode: null },
@@ -397,14 +476,7 @@ function SetupApp() {
               </li>
             ))}
           </ol>
-          {setupStatus?.lastErrorCode ? (
-            <p class="fd-settings__hint" role="status">
-              {tOr(errorCopyKey(setupStatus.lastErrorCode), setupStatus.lastErrorCode)}{" "}
-              {setupStatus.nextAction && setupStatus.nextAction !== "none"
-                ? tOr(actionCopyKey(setupStatus.nextAction), setupStatus.nextAction)
-                : ""}
-            </p>
-          ) : null}
+          <SetupStatusNotice status={visibleSetupStatus} />
           <p>
             <Button
               variant="ghost"
@@ -505,6 +577,17 @@ function SetupApp() {
                             detail: s.localSubFolder || s.localPath || "—",
                           })}
                     </span>
+                    {awaitingIds.includes(s.id) ? (
+                      <>
+                        <br />
+                        <span class="fd-settings__hint fd-setup__awaiting" role="status">
+                          {tOr(
+                            "setup.serverAwaitingFirstExport",
+                            "Waiting for the first export. Launch the dashboard, then load this save in Farming Simulator 25 with the Farm Dashboard mod enabled.",
+                          )}
+                        </span>
+                      </>
+                    ) : null}
                   </span>
                   <Button
                     variant="ghost"

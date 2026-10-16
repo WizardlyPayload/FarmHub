@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui";
-import { t } from "@/i18n/i18n";
+import { t, tOr } from "@/i18n/i18n";
+import { vehicleRowFor } from "@/lib/companionFold";
 import {
   countActiveAdsBreakdowns,
   formatAdsServiceLabel,
@@ -8,12 +9,6 @@ import {
   vehicleHasAds,
   vehicleNeedsAdsWarning,
 } from "@/lib/vehicleAds";
-import {
-  fleetHasMileage,
-  formatMileageKm,
-  getVehicleOdoKm,
-  vehicleHasMileage,
-} from "@/lib/vehicleMileage";
 import {
   deriveStoreImageHint,
   generateVehicleDisplay,
@@ -27,15 +22,28 @@ import {
   vehicleRowKey,
   type FleetVehicle,
 } from "@/lib/vehicles";
+import {
+  CourseplayStatus,
+  FuelTopUpNote,
+  VehicleModFlags,
+  companionModelYear,
+  formatDistance,
+  fuelTopUpLitres,
+  showMileage as fleetShowsMileage,
+  vehicleDistance,
+  type VehicleCompanions,
+} from "@/sections/vehicles/vehicleCompanions";
 
 interface Props {
   vehicles: FleetVehicle[];
+  companions: VehicleCompanions;
   focusedId?: string | null;
   onFocus?: (vehicle: FleetVehicle) => void;
 }
 
-export function VehicleTable({ vehicles, focusedId, onFocus }: Props) {
-  const showMileage = fleetHasMileage(vehicles);
+export function VehicleTable({ vehicles, companions, focusedId, onFocus }: Props) {
+  const showMileage = fleetShowsMileage(companions, vehicles);
+  const showCourseplay = companions.courseplay.detected;
 
   return (
     <div class="fd-vehicles__table-wrap">
@@ -52,6 +60,9 @@ export function VehicleTable({ vehicles, focusedId, onFocus }: Props) {
             <th>{t("vehicles.colDamage")}</th>
             <th>{t("vehicles.colAds")}</th>
             {showMileage ? <th class="fd-vehicles__col-mileage">{t("vehicles.colMileage")}</th> : null}
+            {showCourseplay ? (
+              <th data-fold="courseplay">{tOr("companionPage.courseplay.title", "Courseplay")}</th>
+            ) : null}
             <th>{t("vehicles.colStatus")}</th>
           </tr>
         </thead>
@@ -60,8 +71,10 @@ export function VehicleTable({ vehicles, focusedId, onFocus }: Props) {
             <VehicleTableRow
               key={vehicleRowKey(v)}
               vehicle={v}
+              companions={companions}
               focused={Boolean(focusedId && vehicleRowKey(v) === focusedId)}
               showMileage={showMileage}
+              showCourseplay={showCourseplay}
               onFocus={onFocus}
             />
           ))}
@@ -73,13 +86,17 @@ export function VehicleTable({ vehicles, focusedId, onFocus }: Props) {
 
 function VehicleTableRow({
   vehicle,
+  companions,
   focused,
   showMileage,
+  showCourseplay,
   onFocus,
 }: {
   vehicle: FleetVehicle;
+  companions: VehicleCompanions;
   focused?: boolean;
   showMileage?: boolean;
+  showCourseplay?: boolean;
   onFocus?: (vehicle: FleetVehicle) => void;
 }) {
   const brandName = resolveVehicleBrandLabel(vehicle.brand);
@@ -92,9 +109,13 @@ function VehicleTableRow({
   const showFuel = shouldShowFuel(vehicle);
   const damagePct = Math.round(getVehicleDamageFraction(vehicle) * 100);
   const conditionPct = Math.round(getVehicleConditionFraction(vehicle) * 100);
-  const yearLabel = getVehicleYearLabel(vehicle);
+  const nativeYear = getVehicleYearLabel(vehicle);
+  const modYear = /^\d{4}$/.test(nativeYear) ? null : companionModelYear(companions, vehicle);
+  const yearLabel = modYear != null ? String(modYear) : nativeYear;
   const rowKey = vehicleRowKey(vehicle);
-  const odoKm = showMileage && vehicleHasMileage(vehicle) ? getVehicleOdoKm(vehicle) : null;
+  const distance = showMileage ? vehicleDistance(companions, vehicle) : null;
+  const cpRow = showCourseplay ? vehicleRowFor(companions.courseplay.byId, vehicle) : undefined;
+  const topUp = showFuel ? fuelTopUpLitres(companions, vehicle) : null;
 
   const status =
     vehicle.engineOn || (Number(vehicle.speed) || 0) > 0.5
@@ -142,19 +163,29 @@ function VehicleTableRow({
       <td>
         <strong>{displayName}</strong>
         {focused ? <Badge tone="accent">{t("vehicles.focusHint")}</Badge> : null}
+        <VehicleModFlags c={companions} vehicle={vehicle} />
       </td>
       <td>{brandName || "—"}</td>
       <td>{String(vehicle.typeName || vehicle.vehicleType || "—")}</td>
-      <td>{yearLabel}</td>
-      <td>{showFuel && fuelPct != null ? `${Math.round(fuelPct)}%` : "—"}</td>
+      <td data-fold={modYear != null ? "vehicleYears" : undefined}>{yearLabel}</td>
+      <td>
+        {showFuel && fuelPct != null ? `${Math.round(fuelPct)}%` : "—"}
+        <FuelTopUpNote litres={topUp} />
+      </td>
       <td>{conditionPct}%</td>
       <td class={damagePct > 20 ? "is-warn" : ""}>{damagePct}%</td>
       <td>{adsBits.length > 0 ? adsBits.join(" · ") : "—"}</td>
       {showMileage ? (
-        <td class="fd-vehicles__col-mileage">
-          {odoKm != null ? t("vehicles.mileageKm", { km: formatMileageKm(odoKm) }) : "—"}
+        <td class="fd-vehicles__col-mileage" data-fold="vehicleMileage">
+          {formatDistance(distance?.odoKm, companions.mileage.miles)}
+          {distance?.tripKm != null ? (
+            <small class="fd-muted fd-vehicles__trip">
+              {t("vehicles.mileageTrip")} {formatDistance(distance.tripKm, companions.mileage.miles)}
+            </small>
+          ) : null}
         </td>
       ) : null}
+      {showCourseplay ? <td>{cpRow ? <CourseplayStatus row={cpRow} /> : "—"}</td> : null}
       <td>{status}</td>
     </tr>
   );

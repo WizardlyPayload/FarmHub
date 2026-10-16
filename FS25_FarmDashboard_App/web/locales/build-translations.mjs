@@ -1,9 +1,15 @@
 /**
- * Regenerates translations.json from per-locale JSON files.
+ * Regenerates translations.json (compact JSON) from per-locale JSON files.
  *
  * Source of truth: `messages/en.json` (every key the app can reference).
  * Per-locale overrides live in `messages/<code>.json` (only keys that differ
  * from English need to be listed; missing keys fall back to English).
+ *
+ * Output rows always carry `en`; a non-English locale is written only when its
+ * value differs from English. Every runtime lookup (NEW APP i18n.ts, classic
+ * i18n.js, setup-i18n.js, app-updater.js) resolves a missing locale to `en`, so
+ * the English copies `i18n:sync` writes into messages/<code>.json cost no catalog
+ * bytes until a real translation replaces them.
  *
  * Validation:
  *   - Every key in a non-en locale must exist in en.json (otherwise the key
@@ -33,8 +39,10 @@ function sleepMs(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
+// The runtime catalog is compact JSON: pretty-printing it costs ~600 KB against the 4 MiB
+// catalog limits in NEW APP (i18n.ts cache, recorded publication). messages/*.json stay readable.
 function writeJsonRetry(filePath, obj) {
-  const payload = JSON.stringify(obj, null, 2);
+  const payload = JSON.stringify(obj);
   let lastErr;
   for (let i = 0; i < 10; i++) {
     const tmp = `${filePath}.${process.pid}.${i}.tmp`;
@@ -130,20 +138,29 @@ function main() {
   }
 
   const strings = {};
+  let stored = 0;
+  let fallback = 0;
   for (const key of enKeys) {
     const row = { en: enObj[key] };
     for (const lang of ALL_LANGS) {
       if (lang === 'en') continue;
       const override = allLocales[lang][key];
-      row[lang] = override != null && String(override).trim() !== '' ? override : enObj[key];
+      if (override != null && String(override).trim() !== '' && override !== enObj[key]) {
+        row[lang] = override;
+        stored++;
+      } else {
+        fallback++;
+      }
     }
     strings[key] = row;
   }
 
   const out = { version: 1, strings };
   writeJsonRetry(OUT_PATH, out);
+  const bytes = fs.statSync(OUT_PATH).size;
   console.log(
-    `Wrote translations.json with ${enKeys.length} keys across ${ALL_LANGS.length} locales`
+    `Wrote translations.json with ${enKeys.length} keys across ${ALL_LANGS.length} locales ` +
+      `(${stored} translated entries stored, ${fallback} resolve to English; ${bytes} bytes)`
   );
 }
 

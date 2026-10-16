@@ -62,6 +62,59 @@
   flex: 1;
 }
 
+.fd-notification-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(2, 6, 23, 0.88);
+}
+
+.fd-notification-dialog {
+  width: min(480px, 100%);
+  max-height: min(90vh, 900px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--farm-panel, #1a1a1a);
+  border: 1px solid var(--farm-border, rgba(255, 255, 255, 0.1));
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+}
+
+.fd-notification-dialog__header,
+.fd-notification-dialog__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1.1rem;
+  background: var(--farm-panel, #1a1a1a);
+}
+
+.fd-notification-dialog__header {
+  border-bottom: 1px solid var(--farm-border, rgba(255, 255, 255, 0.1));
+}
+
+.fd-notification-dialog__header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.fd-notification-dialog__body {
+  min-height: 0;
+  padding: 1rem 1.1rem;
+  overflow: auto;
+  flex: 1;
+}
+
+.fd-notification-dialog__footer {
+  justify-content: flex-end;
+  border-top: 1px solid var(--farm-border, rgba(255, 255, 255, 0.1));
+}
+
 .fd-settings {
   display: grid;
   grid-template-columns: 180px 1fr;
@@ -455,4 +508,29 @@
 
 .fd-mod-export__log summary {
   cursor: pointer;
+}
+
+.fd-link-server__facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0.75rem 0;
+}
+
+.fd-link-server__retry {
+  position: fixed;
+  z-index: 25;
+  right: 1rem;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  max-width: calc(100vw - 2rem);
+}
+
+.fd-link-server__facts dt {
+  color: var(--farm-text-muted);
+}
+
+.fd-link-server__facts dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }

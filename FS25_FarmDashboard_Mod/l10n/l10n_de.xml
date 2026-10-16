@@ -33,6 +33,8 @@
         <text name="ui_settings_gameplay_fd_enableInvoices_desc" text="Invoices-Mod-Daten exportieren, wenn installiert."/>
         <text name="ui_settings_gameplay_fd_enableHirePurchasing" text="Finanzierungskauf-Sammler"/>
         <text name="ui_settings_gameplay_fd_enableHirePurchasing_desc" text="Hire-Purchasing-Mod-Daten exportieren, wenn installiert."/>
+        <text name="ui_settings_gameplay_fd_enableCompanionMods" text="Begleit-Mods-Sammler"/>
+        <text name="ui_settings_gameplay_fd_enableCompanionMods_desc" text="Präsenz und sichere Aggregate für hochwertige Drittanbieter-Mods exportieren, wenn installiert."/>
 
         <text name="ui_settings_gameplay_fd_collectionCycleSec" text="Voller Sammelzyklus (Sek.)"/>
         <text name="ui_settings_gameplay_fd_collectionCycleSec_desc" text="Zeit zwischen vollen Exportzyklen. Höhere Werte reduzieren CPU-Last."/>

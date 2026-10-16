@@ -1,6 +1,7 @@
 /** Economy section pure helpers — finance, purchases, consumables, bales, market. */
 
 import { t } from "@/i18n/i18n";
+import { formatProfileMoney, type SaveProfileDisplay } from "@/lib/profile-display";
 import { isStorageItem as isFleetStorageItem } from "@/lib/fleet-classify";
 
 export type BaleCategoryKey = "straw" | "grass" | "hay" | "silage" | "other";
@@ -25,6 +26,8 @@ export interface VehicleLike {
   vehicleType?: string;
   brand?: string | { title?: string; name?: string; label?: string; displayName?: string };
   price?: number;
+  sellValue?: number;
+  sellPrice?: number;
   damage?: number;
   age?: number;
   operatingTime?: number;
@@ -40,6 +43,7 @@ export interface FarmInfoRow {
 }
 
 export interface FinanceLike {
+  farmId?: number;
   buildings?: { totalValue?: number };
   animals?: { totalValue?: number };
   land?: { totalValue?: number };
@@ -317,14 +321,9 @@ export function filterFieldsForFarmView(fields: FieldLike[] | null | undefined, 
   });
 }
 
-export function formatCurrency(amount: unknown): string {
-  const n = Number(amount) || 0;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(n);
+export function formatCurrency(amount: unknown, profile?: SaveProfileDisplay | null): string {
+  const n = Number(amount);
+  return formatProfileMoney(Number.isFinite(n) ? n : 0, profile);
 }
 
 export function calculateCondition(damage: unknown): { text: string; tone: "accent" | "default" | "warn" | "danger" } {
@@ -338,7 +337,7 @@ export function calculateCondition(damage: unknown): { text: string; tone: "acce
 export function calculateTotalPurchases(vehicles: VehicleLike[] | null | undefined, targetFarmId = 1): number {
   return (vehicles || [])
     .filter((v) => vehicleMatchesActiveFarm(v, targetFarmId))
-    .reduce((total, vehicle) => total + (Number(vehicle.price) || 0), 0);
+    .reduce((total, vehicle) => total + (Number(vehicle.sellValue ?? vehicle.sellPrice ?? vehicle.price) || 0), 0);
 }
 
 export function computeFinancialSummary(data: {
@@ -364,7 +363,7 @@ export function computeFinancialSummary(data: {
   }
 
   let totalPurchases = calculateTotalPurchases(data.vehicles || [], activeFarmId);
-  if (data.finance && typeof data.finance === "object") {
+  if (data.finance && typeof data.finance === "object" && Number(data.finance.farmId ?? 1) === activeFarmId) {
     totalPurchases +=
       (Number(data.finance.buildings?.totalValue) || 0) +
       (Number(data.finance.animals?.totalValue) || 0) +

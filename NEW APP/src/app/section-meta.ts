@@ -1,4 +1,8 @@
-import type { SectionId } from "@/types/dashboard";
+import { isModPageSectionId, type ModPageSectionId, type SectionId } from "@/types/dashboard";
+import { companionPageEntry, companionPageKeyFromSection } from "@/sections/mods/registry";
+
+/** Built-in sections; `mod-<key>` pages take their meta from the companion page registry. */
+type FixedSectionId = Exclude<SectionId, ModPageSectionId>;
 
 export {
   detectModPresence,
@@ -10,7 +14,7 @@ export const DASHBOARD_PICTURES_BASE = "/assests/img/Dashboard%20PIctures";
 export const NAV_ICONS_BASE = "/assests/img/nav";
 
 /** Atmospheric backdrop per section. */
-export const SECTION_BACKGROUNDS: Record<SectionId, string | null> = {
+export const SECTION_BACKGROUNDS: Record<FixedSectionId, string | null> = {
   overview: `${DASHBOARD_PICTURES_BASE}/Background.png`,
   livestock: `${DASHBOARD_PICTURES_BASE}/livestock.png`,
   fields: `${DASHBOARD_PICTURES_BASE}/fields.png`,
@@ -34,6 +38,8 @@ export const SECTION_BACKGROUNDS: Record<SectionId, string | null> = {
 
 export interface SectionNavMeta {
   labelKey: string;
+  /** English label used when `labelKey` is not in the catalog yet. */
+  labelFallback?: string;
   /** Fallback glyph when icon asset missing. */
   glyph: string;
   glyphKind: "symbol" | "initial";
@@ -48,7 +54,7 @@ function navIcon(file: string): string {
   return `${NAV_ICONS_BASE}/${file}`;
 }
 
-export const SECTION_NAV_META: Record<SectionId, SectionNavMeta> = {
+export const SECTION_NAV_META: Record<FixedSectionId, SectionNavMeta> = {
   overview: {
     labelKey: "nav.overview",
     glyph: "⌂",
@@ -182,8 +188,34 @@ export const TOPBAR_ICONS = {
   notifications: navIcon("nav-notifications.png"),
 } as const;
 
+const MOD_PAGE_FALLBACK_META: SectionNavMeta = {
+  labelKey: "nav.modsGroup",
+  labelFallback: "Mods",
+  glyph: "M",
+  glyphKind: "initial",
+  modGated: true,
+};
+
+export function sectionNavMeta(id: SectionId): SectionNavMeta {
+  if (!isModPageSectionId(id)) return SECTION_NAV_META[id];
+  const entry = companionPageEntry(companionPageKeyFromSection(id));
+  if (!entry) return MOD_PAGE_FALLBACK_META;
+  return {
+    labelKey: `companionPage.${entry.key}.title`,
+    labelFallback: entry.title,
+    glyph: entry.glyph,
+    glyphKind: "initial",
+    modGated: true,
+  };
+}
+
+export function sectionBackground(id: SectionId): string | null {
+  if (isModPageSectionId(id)) return `${DASHBOARD_PICTURES_BASE}/Background.png`;
+  return SECTION_BACKGROUNDS[id];
+}
+
 export function sectionVisible(id: SectionId, enabled: Partial<Record<string, boolean>>): boolean {
-  const meta = SECTION_NAV_META[id];
+  const meta = sectionNavMeta(id);
   // Mod tabs are payload-gated only (see modSectionActive) — not Settings toggles.
   if (meta.modGated) return true;
   if (!meta.settingsKey) return true;

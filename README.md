@@ -1,138 +1,42 @@
 # FS25 Farm Dashboard
 
-Real-time farm management dashboard for **Farming Simulator 25** — a Windows desktop app plus an in-game mod that streams live fields, livestock, vehicles, economy, and more to your browser.
+Farm Dashboard is a free Windows companion app and in-game mod for Farming Simulator 25. It brings fields, vehicles, livestock, storage, economy, productions, and supported companion-mod data into one dashboard outside the game.
 
----
+## Get started
 
-## Download (start here)
+The repository is preparing **V5 app 5.1.0** and the matching **5.1.0.0** game mod. Source in `main` is not itself a published installer: check [GitHub Releases](https://github.com/WizardlyPayload/FarmHub/releases) for the actual available download and its version before installing. Keep the app and mod from the same release together.
 
-### ➡️ [**Get the latest release — app + mod**](https://github.com/WizardlyPayload/FarmHub/releases)
+1. Download the V5 Windows installer and **`FS25_FarmDashboard.zip`** from the same release.
+2. Put the ZIP, under that exact filename, in `Documents\My Games\FarmingSimulator2025\mods\`. Enable it for the save. Dedicated multiplayer needs the matching mod on the server and clients.
+3. Install and open Farm Dashboard V5, then follow setup to select a local save, link a multiplayer source, or configure a dedicated server.
 
-| Download from Releases | Version |
-|------------------------|---------|
-| **`FS25-Farm-Dashboard-Setup-4.2.1.exe`** | Windows app |
-| **`FS25_FarmDashboard.zip`** | FS25 mod |
+Read the [V5 installation guide](docs/v5%20documents/INSTALL.md) for first launch, upgrades, dedicated servers, and removal. For the screens and features, use the [V5 user manual](docs/v5%20documents/USER_MANUAL.md).
 
-**Current stable line (classic):** App **4.2.1** · Mod **3.4.0.7** — hotfix for Farming Simulator 1.21 copyFile log spam (see [release notes](docs/GITHUB_RELEASE_v4.2.1.md)).
+## Current V5 screens
 
-Install **mod first**, load your save once, then install the app. See **[docs/INSTALL.md](docs/INSTALL.md)** (detailed) or the quick steps below.
+These full-resolution images show the 5.1.0 source UI displaying **held demo-save snapshots**. They illustrate the interface, not a live gameplay or installed-release acceptance test. See the [screenshot notes](docs/v5%20documents/SCREENSHOTS.md) for remaining capture gaps.
 
-Open the dashboard at **[http://localhost:8766](http://localhost:8766)** after setup (same PC only — `localhost` does not work from a phone or tablet).
+![V5 overview on a held base-game save](docs/v5%20documents/doc-screenshots/current-5057/base-overview.png)
 
-**Tablet / LAN on your home Wi‑Fi:** enable **Settings → Remote / LAN access**, open `http://<this-PCs-LAN-IP>:8766`, and use a strong password — see [docs/SECURITY.md](docs/SECURITY.md). You usually **do not** need router port forwarding for devices on the **same** network. If the page never loads, check **Windows Defender Firewall** (or another **host** firewall / antivirus suite) and allow **inbound TCP port 8766** for Farm Dashboard on your **Private** network profile.
+![V5 fields on a held RF and companion-mod save](docs/v5%20documents/doc-screenshots/current-5057/suite-fields.png)
 
----
+## What it covers
 
-## Screenshots
+- Core dashboard: save overview, fields and soil, vehicles and fleet map, pastures, productions, storage, economy, weather, and alerts.
+- Optional integrations: companion pages and extra readings appear only when the corresponding mods are actually loaded. The base dashboard does not require any companion mod. See the [companion-mod guide](docs/v5%20documents/COMPANION_MODS.md) for what each integration can and cannot show.
+- Local and dedicated play: local save watching, in-game multiplayer linking, and FTP where appropriate. See [V5 compatibility](docs/v5%20documents/COMPATIBILITY.md).
+- Privacy: game data stays with the app unless you deliberately enable LAN access. Review [LAN and security guidance](docs/v5%20documents/SECURITY.md) before making the dashboard available to other devices.
 
-| | |
-| --- | --- |
-| **Home** | **Fields** |
-| ![Farm Management Dashboard landing](docs/doc-screenshots/fd-shell-020-landing.png) | ![Fields section with summary and cards](docs/doc-screenshots/fd-section-fields-010-summary.png) |
-| **Livestock** | **Productions** |
-| ![Livestock summary and animals table](docs/doc-screenshots/fd-section-livestock-010-summary.png) | ![Productions storage and chains](docs/doc-screenshots/fd-section-productions-010-list.png) |
+Farm Dashboard reads game and mod data. It does not plant, buy, repair, or change another mod's settings for you.
 
-More UI shots and install screenshots: **[docs/USER_MANUAL.md](docs/USER_MANUAL.md)** · capture checklist: **[docs/SCREENSHOTS.md](docs/SCREENSHOTS.md)**
+## V4 and project history
 
----
+Classic V4 is a separate, older product line with its own update feed and [manuals](docs/README.md). Do not use the V4 installer or screenshots as instructions for V5. The V5 source and documentation do not replace an existing public V4 release or make it a new V4 build.
 
-## Quick install
+This repository continues [Josh Walki's original FarmDashboard](https://github.com/JoshWalki/FarmDashboard). See [authors and credits](docs/AUTHORS.md) and [licence](LICENSE).
 
-1. **Mod** — Put **`FS25_FarmDashboard.zip`** in `Documents\My Games\FarmingSimulator2025\mods\`, enable on your save, **load the save once**.
-2. **App** — Run **`FS25-Farm-Dashboard-Setup-4.2.1.exe`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases).
-3. **Configure** — **Settings → Servers & saves** (local path or FTP for dedicated servers).
+## Building from source
 
-**Full guide:** [docs/USER_MANUAL.md](docs/USER_MANUAL.md) · **Install (detailed):** [docs/INSTALL.md](docs/INSTALL.md) · [GitHub Wiki](https://github.com/WizardlyPayload/FarmHub/wiki)
+The V5 installer and game mod are separate artifacts. From the repository root, `npm run build:all:v5` builds the UI, canonical mod ZIP, and V5 installer. V5 writes `latest-rf.yml`; classic V4 uses `latest.yml`. Do not publish one line's update metadata over the other.
 
----
-
-## About this project (fork & lineage)
-
-This repository (**[FarmHub](https://github.com/WizardlyPayload/FarmHub)**) is **continued development** of Josh Walki’s Farm Dashboard — not a separate product.
-
-| Project | What it is |
-|---------|------------|
-| **[JoshWalki / FarmDashboard](https://github.com/JoshWalki/FarmDashboard)** | Original FS25 mod + web dashboard (**Josh Walki**) |
-| **[WizardlyPayload / FS25-Farm-Dashboard](https://github.com/WizardlyPayload/FS25-Farm-Dashboard/releases)** | Public **2.0.0** release — Electron desktop fork of Josh’s work |
-| **[WizardlyPayload / FarmHub](https://github.com/WizardlyPayload/FarmHub/releases)** *(this repo)* | **4.2.1** classic line — fleet map, storage, FTP/multi-server, rules engine, auto-update |
-
-**Coming from 2.0.0 or Josh’s repo?** See **[docs/UPGRADE_FROM_FS25-Farm-Dashboard.md](docs/UPGRADE_FROM_FS25-Farm-Dashboard.md)** for what changed.
-
-**Authors:** **[JoshWalki](https://github.com/JoshWalki)** (Josh) — original concept & FS25 mod · **WizardlyPayload** — Electron app, maintenance, releases · [docs/AUTHORS.md](docs/AUTHORS.md)
-
----
-
-## What you get in 4.2.1
-
-- **Live dashboard** — livestock, pastures, vehicles, fields, economy, productions, weather (port **8766**).
-- **Fleet map** — live vehicle pins on the save's PDA overview map.
-- **Storage** — silo stock with **moisture & grade**, correct names for mod-map and base-map commodities (incl. **Pig Food** and other sparse fill types); bale categories.
-- **Fleet scope** — dealership showroom demos no longer clutter player farms on dedicated multiplayer saves.
-- **Livestock** — base-game cow pens, food-duration hints, urgent pasture alerts.
-- **Productions** — map-owned factories on base maps; two-column layout.
-- **Accurate equipment pictures** — authoritative store-icon matching (app **4.2.1** + mod **3.4.0.7**).
-- **FS 1.21 copyFile hotfix** — stops repeated map-overview copy errors in the game log after the 1.21 update.
-- **Local + FTP** — single-player / LAN host on disk, or dedicated server over FTP.
-- **Offline field rules** — suggested next steps from merged game data (no cloud service).
-- **Optional integrations** — Precision Farming, Advanced Damage System, Moisture System, Red Tape, Realistic Livestock RM, Vehicle Years; Courseplay and Used Equipment Yards tested alongside — [full mod list](docs/GITHUB_RELEASE_v4.2.0.md#third-party-mods).
-- **27 languages**, themes, unified Settings.
-- **Auto-update** (Windows app) and **mod version badge** when the in-game mod is behind.
-
-**Release notes:** [docs/GITHUB_RELEASE_v4.2.1.md](docs/GITHUB_RELEASE_v4.2.1.md) · **History:** [docs/CHANGELOG.md](docs/CHANGELOG.md)
-
----
-
-## Documentation
-
-| Document | Audience |
-| -------- | -------- |
-| **[Releases / downloads](https://github.com/WizardlyPayload/FarmHub/releases)** | App installer + mod zip |
-| [docs/INSTALL.md](docs/INSTALL.md) | **Installation** (mod → app → setup, with screenshots) |
-| [docs/USER_MANUAL.md](docs/USER_MANUAL.md) | **User manual** — every feature |
-| [docs/DEVELOPER_HANDOVER.md](docs/DEVELOPER_HANDOVER.md) | **Developers** — architecture & code map |
-| [docs/SECURITY.md](docs/SECURITY.md) | LAN access & hardening |
-| [docs/README.md](docs/README.md) | Full index (public vs internal) |
-| **[Wiki](https://github.com/WizardlyPayload/FarmHub/wiki)** | Mirror of key guides |
-
----
-
-## Repository layout (developers)
-
-| Path | Role |
-|------|------|
-| `FS25_FarmDashboard_Mod/` | FS25 mod (Lua) — release as **`FS25_FarmDashboard.zip`** |
-| `FS25_FarmDashboard_App/` | Electron app + web UI + merge/FTP layer |
-| `tools/` | Build scripts — [tools/README.md](tools/README.md) |
-
-**Build the Windows installer** (from repo root — recommended):
-
-```bash
-npm run install:app    # once, or after pulling dependency changes
-npm run build:app      # NSIS installer → %LOCALAPPDATA%\fs25-farm-dashboard-electron-out\
-npm run package:mod    # FS25_FarmDashboard.zip → FS25_FarmDashboard_Mod/
-npm run build:all      # mod zip + installer
-```
-
-Equivalent from the app folder: `cd FS25_FarmDashboard_App && npm install && npm run dist`. See root **`package.json`** for all delegated scripts (`npm run start`, `npm test`, `npm run verify`, i18n, clean, etc.).
-
-CI on `main` runs tests, electron-pack verify, and i18n verify — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
-
----
-
-## Troubleshooting
-
-| Issue | Try |
-|--------|-----|
-| “Waiting for data” | Mod enabled; save loaded once; check path in Settings |
-| Port **8766** in use | Close other apps on that port; restart Farm Dashboard |
-| LAN tablet will not load | Enable LAN in Settings; use the PC’s **LAN IP** (not `localhost`); allow **inbound TCP 8766** in **Windows Defender Firewall** (Private profile) or your host antivirus firewall; strong password — [docs/SECURITY.md](docs/SECURITY.md) |
-| Mod version badge | Update **`FS25_FarmDashboard.zip`** from [Releases](https://github.com/WizardlyPayload/FarmHub/releases) |
-| Questions & community | [Discord](https://discord.gg/qsSTRwG2) — chat, screenshots, quick help |
-
----
-
-## Licence & credits
-
-**FarmHub License** — free for personal and non-commercial use; **commercial use requires permission** from the authors (see [LICENSE](LICENSE)). Copyright **JoshWalki** & **WizardlyPayload** — [docs/AUTHORS.md](docs/AUTHORS.md).
-
-**Community:** [Discord](https://discord.gg/qsSTRwG2) · optional maintenance tips: [Ko-fi](https://ko-fi.com/wizarlypayload) (not required — Farm Dashboard stays free).
+Development and release guidance lives in [docs](docs/README.md) and [tools](tools/README.md). For help, use [GitHub Issues](https://github.com/WizardlyPayload/FarmHub/issues) or [Discord](https://discord.gg/ZCG9C7h7aT).

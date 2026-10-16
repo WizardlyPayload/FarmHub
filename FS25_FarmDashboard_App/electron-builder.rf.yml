@@ -8,12 +8,14 @@
 appId: com.farmdashboard.rf
 productName: FS25 Farm Dashboard V5
 extraMetadata:
+  # electron-builder derives updaterCacheDirName from packaged metadata.name.
+  # Keep V5's updater cache distinct without changing classic package.json.
+  name: fs25-farm-dashboard-rf
   # Distinct product-line identity in About / updater metadata without bumping classic package.json.
   # Older 5.0.x packages stamped productLine: rf; runtime treats rf and v5 as the same V5 line.
   productLine: v5
-  # MAJOR.PUBLIC.DEV (Wizard): GitHub public last shipped 5.0.3; this working tree is a DEV bump.
-  # Next GitHub publish bumps PUBLIC and resets DEV (5.1.0). Classic package.json stays 4.x.
-  version: 5.0.5
+  # V5 release candidate. Classic package.json and V4 update feed stay on 4.x.
+  version: 5.1.0
 directories:
   output: electron-pack-out-rf
 files:
@@ -23,15 +25,19 @@ files:
   - app-updater.js
   - preload.js
   - xmlCollector.js
+  - fieldHarvestState.cjs
   - fs25Paths.js
   - fileReadRetry.js
   - dataMerger.js
+  - sectionContract.cjs
   - corsPolicy.js
   - editionPolicy.cjs
   - fileCommit.cjs
   - modConfigXml.js
   - fillTypeResolve.cjs
   - farmScope.cjs
+  - companionPagesMerge.cjs
+  - companionPages/**/*
   - mapFillTypes.cjs
   - fillTypeHud.cjs
   - mapOverviewResolver.js
@@ -41,10 +47,21 @@ files:
   - httpFeedXml.js
   - setupAccessPolicy.cjs
   - setupConfigMerge.cjs
+  - boundSourcePublication.cjs
+  - exportIngress.js
+  - ingressOrchestration.js
+  - localIngressController.js
+  - replicaRegistration.js
+  - pendingReplicaSession.cjs
+  - identityProvision.js
+  - runtimeActivation.js
+  - exportEnvelope.js
+  - replicaPairContract.cjs
   - uxContract.cjs
   - fleetMapOverlays.cjs
   - fleetMapGeo.cjs
   - lanHttpPath.cjs
+  - publicDemoHostPolicy.cjs
   - safeFsIdentity.cjs
   - ftpAccess.cjs
   - uiServePolicy.cjs
@@ -53,6 +70,7 @@ files:
   - livestockDetail.js
   - serverDataCache.js
   - mergedSnapshotHold.js
+  - rfProviderState.cjs
   - liveExportFreshness.js
   - stockMoistureFromXml.js
   - icon.ico
@@ -61,6 +79,13 @@ files:
   - "!web/simhub.html"
   - ui-v2/**/*
   - node_modules/**/*
+  # Private env / translation-key files. Matching is in order, so these stay after every include.
+  # tools/app/privatePackageGuard.cjs fails the build if any of them is selected or packed anyway.
+  - "!**/.mt-env*"
+  - "!**/.mt-cache*"
+  - "!**/.env"
+  - "!**/.env.*"
+  - "!**/.envrc"
 extraResources:
   - from: ../tools/Export-ModStoreImages.ps1
     to: tools/Export-ModStoreImages.ps1
@@ -93,6 +118,7 @@ win:
     rfc3161TimeStampServer: http://timestamp.digicert.com
 nsis:
   oneClick: false
+  runAfterFinish: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true

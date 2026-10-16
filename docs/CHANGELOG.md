@@ -515,7 +515,7 @@ After pulling, run **`npm install`** under `FS25_FarmDashboard_App` before **`np
 
 Include: FS25 version, single-player vs dedicated, **mod** version (see `modDesc.xml`), **app** version (see `package.json`), local vs FTP, and steps to reproduce.
 
-**Community:** [Discord](https://discord.gg/D4sEHM59)
+**Community:** [Discord](https://discord.gg/ZCG9C7h7aT)
 
 ---
 

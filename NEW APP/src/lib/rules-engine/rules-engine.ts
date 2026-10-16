@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { t } from "@/i18n/i18n";
+import { xmlGrowthLooksHarvested } from "../field-harvest-state";
 import { isMowableForageCrop, isPreparedSeedbedGround } from "./forage-crop-types";
 import { isCoverCrop } from "./cover-crop-types";
 
@@ -91,6 +92,7 @@ function fieldShowsWithered(f) {
 function fieldIsAlreadyHarvested(field) {
   if (field.isHarvested === true) return true;
   if (field.growthLabel === "harvested") return true;
+  if (xmlGrowthLooksHarvested(field)) return true;
   const gt = String(field.groundType || "").toUpperCase();
   return gt.includes("HARVESTED");
 }
@@ -592,8 +594,20 @@ const GRASS_LIME_GAP_TOLERANCE = 0.15;
 export const PF_NUTRIENT_CLOSE_FRAC = 0.10;
 const GRASS_N_GAP_TOLERANCE_PCT = PF_NUTRIENT_CLOSE_FRAC;
 
-/** True when scanned PF nitrogen is within {@link PF_NUTRIENT_CLOSE_FRAC} of the display target. */
+const SOIL_NOT_CURRENT = new Set(["failed", "held", "pending", "partial", "unknown", "unavailable", "unscanned"]);
+
+/** Current only when this metric's own read succeeded. Held nitrogen does not borrow a fresh pH. */
+function soilReadIsFresh(field, metric) {
+  const specific = metric === "ph" ? field?.phReadState : metric === "nitrogen" ? field?.nitrogenReadState : null;
+  const state = specific != null && specific !== "" ? specific : field?.soilReadState;
+  if (state == null || state === "") return true;
+  if (state === "ok") return true;
+  if (SOIL_NOT_CURRENT.has(state)) return false;
+  return false;
+}
+
 export function pfNitrogenWithinTolerance(field, targetOverride) {
+  if (!soilReadIsFresh(field, "nitrogen")) return false;
   if (!field?.isPrecisionFarming || !field?.isScanned) return false;
   const target =
     Number.isFinite(Number(targetOverride)) && Number(targetOverride) > 0
@@ -624,6 +638,7 @@ function grassPfNitrogenGap(field) {
 }
 
 function grassGapActionable(field) {
+  if (!soilReadIsFresh(field, "nitrogen") && !soilReadIsFresh(field, "ph")) return false;
   const limeGap = grassPfLimeGap(field);
   const nGap = grassPfNitrogenGap(field);
   return limeGap > GRASS_LIME_GAP_TOLERANCE || nGap.pct > GRASS_N_GAP_TOLERANCE_PCT;
@@ -641,6 +656,7 @@ function monitorRegrowthSuggestion(field) {
 
 /** Growing crop: use live `needsFertilizer` when present, else spray / mapped N heuristics when scanned. */
 function needsGrowingFertilizer(field) {
+  if (!soilReadIsFresh(field, "nitrogen")) return false;
   if (isLegumeSkipGrowingNFertilizer(field)) return false;
   const gs = field.growthState || 0;
   if (gs <= 0) return false;
@@ -826,6 +842,7 @@ function pickGrowingCropMaintenanceSuggestion(field, ctx) {
 /** Bare field before first crop: mirror base spray steps + mapped N target when soil data is scanned. */
 function needsFallowNutrientPrep(field) {
   if (!hasNoCrop(field)) return false;
+  if (field.isPrecisionFarming && !soilReadIsFresh(field, "nitrogen")) return false;
   if (pfNitrogenWithinTolerance(field)) return false;
   if (typeof field.needsFertilizer === "boolean") return field.needsFertilizer;
   if (field.isPrecisionFarming) {
@@ -899,8 +916,11 @@ function suggestionForNeedsWork(field, ctx, opts = {}) {
       if (field.needsRolling && String(field.growthLabel || "") !== "mown_regrowth") {
         return pickGrowingCropMaintenanceSuggestion(field, g) || monitorRegrowthSuggestion(field);
       }
-      const limeGap = grassPfLimeGap(field);
-      const nGap = grassPfNitrogenGap(field);
+      const nitrogenFresh = soilReadIsFresh(field, "nitrogen");
+      const phFresh = soilReadIsFresh(field, "ph");
+      if (!nitrogenFresh && !phFresh) return monitorRegrowthSuggestion(field);
+      const limeGap = phFresh ? grassPfLimeGap(field) : 0;
+      const nGap = nitrogenFresh ? grassPfNitrogenGap(field) : { gap: 0, pct: 0, target: 0, n: 0 };
       if (g.lime && limeGap > GRASS_LIME_GAP_TOLERANCE) {
         const ph = Number(field.phValue ?? 0);
         const pht = Number(field.targetPh ?? 0);
@@ -940,7 +960,7 @@ function suggestionForNeedsWork(field, ctx, opts = {}) {
     // 2) Inferred PF pH gap (exact-ish amount guidance in reason).
     const ph = Number(field.phValue ?? 0);
     const pht = Number(field.targetPh ?? 0);
-    const pfLimeGap = field.isPrecisionFarming && field.isScanned && pht > 0 ? (pht - ph) : 0;
+    const pfLimeGap = soilReadIsFresh(field, "ph") && field.isPrecisionFarming && field.isScanned && pht > 0 ? (pht - ph) : 0;
     if (g.lime && Number.isFinite(pfLimeGap) && pfLimeGap > 0.05) {
       if (grass) {
         return {

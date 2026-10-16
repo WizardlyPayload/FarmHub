@@ -60,6 +60,9 @@ export interface SetupStatus {
   lanRisk?: { id: string; labelKey: string; tone: string; recommended?: boolean };
   steps: SetupStatusStep[];
   recentEvents: UxEvent[];
+  nextStep?: string | null;
+  sourceId?: string;
+  identityProvision?: string | null;
 }
 
 export function isUiState(value: string | undefined): value is UiStateKind {

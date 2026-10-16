@@ -220,7 +220,7 @@ Live cross-agent board for **Farm Dashboard** RF work. Append-only status rows; 
 **Over to you:** Restart Electron / reload the UI. Reload the in-game mod for depot settings in the new tab. Do not publish onto classic `latest.yml`.
 
 ### [2026-09-13] Dash - Done: Restore field/production export + dairy barn names
-**Re:** Collectors, ESC settings inject, DairyCore panel (rescued from closed #7 tip `390db3ae`)
+**Re:** Collectors, ESC settings inject, DairyCore panel
 **What:**
 - Guarded `FarmDashboard:loadMap` so a missing DataCollector cannot throw inside `loadSharedI3DFileFinished`.
 - collectionSafetyV7 re-enables fields / economy / production; ESC clone setState no longer persists Off.

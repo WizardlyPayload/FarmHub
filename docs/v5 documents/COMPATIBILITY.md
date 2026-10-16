@@ -1,47 +1,35 @@
-# Farm Dashboard V5 — compatibility (classic vs rebuild)
+# V5 compatibility: what works together
 
-**Same product, two Windows installers: V4 and V5.** The new screens are a **rebuild** of Farm Dashboard, not a different game and not Realistic Farming / Farm Tablet.
+Farm Dashboard V5 works with **the Farm Dashboard mod by itself**. Optional companions are additions, not a required pack. A companion contributes data only if it is **loaded for the selected save** and exports a reading the dashboard understands. A ZIP merely sitting in `mods` is not live data.
 
-| Line | Who | UI | Auto-update | Port |
-|------|-----|----|-------------|------|
-| **V4** classic 4.x | People who want the old screens | Classic `web/` | **`latest.yml` only** | **8766** |
-| **V5** rebuild 5.x | Anyone who installs the V5 EXE | NEW APP | **`latest-rf.yml` only** | **8768** |
+![Base save without the RF suite](doc-screenshots/current-5057/base-overview.png)
 
-Do **not** call V5 “RF edition” in product-facing names. The YAML is still `latest-rf.yml` so already-installed 5.0.x apps keep updating.
+## Four support levels
 
-## Hard rule
+- **Live reading:** the dashboard reads a companion value for a page or core section.
+- **Limited reading:** selected settings or summaries, not the whole in-game interface.
+- **Detected/reference:** the loaded mod can be named and explained, but no live statistic is promised.
+- **Not mapped:** the catalog has no data contract. Some older direct integrations, such as Vehicle Mileage and Courseplay, still appear under Vehicles; see [Optional mods](COMPANION_MODS.md).
 
-> V4 auto-update clients poll **`latest.yml`**.  
-> A V5 installer must **never** be the asset that V4 `latest.yml` points at.
+A detected mod with an empty block does **not** prove its gameplay failed. The dashboard is read-only: it cannot change prices, leases, animals, vehicles, or loans.
 
-- V5 zip + Setup.exe go **flat** in `%USERPROFILE%\Documents\FarmDash Release\`.
-- V4 public feed stays in `Documents\FarmDash Final Output`.
-- One in-game zip: **`FS25_FarmDashboard.zip`**.
+## Independent combinations
 
-Plain language: **Keep V4 if you want. Install V5 only if you opt in. Auto-update on V4 will not replace it.**
+- No optional mods: Overview, Fields, Vehicles, Pastures, Productions, Storage, Economy, and Fleet map still work.
+- One optional mod: only its related card/page/readings should appear; it does not require an unrelated companion.
+- Several optional mods: readers are isolated. One failing reader must not erase another's data.
+- **Precision Farming and Soil Fertilizer:** they are alternative soil sources. Do not combine their bars into an invented total. The dashboard selects and labels the source; neither is required for the rest of V5.
+- A companion can have **its own** in-game dependency or conflict. Farm Dashboard cannot remove that game-level requirement.
 
-Tester checklist: [`TESTERS.md`](./TESTERS.md). Full engine/API gap table (RF companions): [`../COMPATIBILITY.md`](../COMPATIBILITY.md) (same facts; this folder is the V5 player-facing copy).
+![Precision Farming field example](doc-screenshots/current-5057/pf-fields.png)
 
-## Version identity
+![RF soil field example](doc-screenshots/current-5057/suite-fields.png)
 
-| Artifact | V4 | V5 |
-|----------|----|----|
-| App | **4.2.1** public classic | **5.0.5** working tree (GitHub Latest **5.0.3**) |
-| Mod zip | **3.4.0.7** classic stamp | Working tree **5.0.0.4** |
-| Installer | `FS25-Farm-Dashboard-Setup-4.x.exe` | `FS25-Farm-Dashboard-V5-Setup-5.0.5.exe` |
-| Update YAML | `latest.yml` | `latest-rf.yml` |
+## Versions and release boundary
 
-V4 and V5 share tree `package.json` for classic builds. V5 injects `extraMetadata.version: 5.0.5` at pack time so About reports **5.x**.
+- **Tested documentation candidate:** V5 app **5.0.57**, mod **5.0.0.31**, canonical ZIP `FS25_FarmDashboard.zip`.
+- **Public V5 listing:** may still show **5.0.3 / 5.0.0.3** until the prepared **5.1.0 / 5.1.0.0** release is published. Use the version displayed on the actual download page.
+- **Classic V4:** public **4.2.1** remains separate on **8766** and its own `latest.yml`. V5 uses **8768** and `latest-rf.yml`.
+- V4 was **not retested** against mod 5.0.0.31 during this V5 pass. Do not infer a V4 compatibility result from it.
 
-## What V5 UI must honour
-
-- Sidebar core: Overview, Fields, Vehicles, Pastures, Productions, Storage, Economy, Fleet map.
-- Livestock is **Pastures**.
-- Field cards: **GPS painted-blob merge** + optional manual groups — not adjacent same-crop auto-merge.
-- Fertilizer Depot stock = **hall bins**, not 50k shop book.
-- Suite / ADS / Red Tape / Hire / NPC / World Events / Pro Staff: **soft-detect**, hidden when absent.
-- About copy: out-of-game companion; not Farm Tablet; not forced over V4.
-
-## RF companions (tested pins)
-
-See the table in [`../COMPATIBILITY.md`](../COMPATIBILITY.md) (Soil Fertilizer, Seasonal Crop Stress, Fertilizer Depot, Tax, Market Dynamics, Fuel, Workers, Income, DairyCore, NPC Favor, World Events, Pro Staff, cores, …). Newer than tested = “untested” in About, not a hard fail. Zero RF mods ⇒ clean NEW APP, no empty RF panels.
+An About-panel pin saying a newer companion is **untested** means its version is newer than the recorded pin, not that the game rejected it. The [mod-by-mod guide](COMPANION_MODS.md) describes the dashboard surface; the [tester guide](TESTERS.md) describes the evidence needed for a compatibility claim.

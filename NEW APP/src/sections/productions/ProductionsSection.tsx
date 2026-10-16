@@ -1,5 +1,6 @@
 import { useMemo, useState } from "preact/hooks";
 import { t, tOr } from "@/i18n/i18n";
+import { CompanionModsEmbed } from "@/sections/companions";
 import { Badge, Card } from "@/components/ui";
 import { useDashboardStore } from "@/store/dashboard-store";
 import type { EconomyLike } from "@/lib/fillTypeResolve";
@@ -16,14 +17,66 @@ import {
   type ProductionChain,
   type ProductionSlot,
 } from "@/lib/productions";
+import { formatFillQuantity, type FillPhysicsMap, type FillUnitMode, type UnitDisplayInfo } from "@/lib/fill-units";
+import { useFillPhysics, useFillUnitMode, useUnitDisplay } from "@/lib/fill-unit-mode";
+import {
+  finite,
+  listOf,
+  useFoldedCompanion,
+  watcherLevelsByFillType,
+  watcherPointForChain,
+  watcherTone,
+  type WatcherLevel,
+  type WatcherPoint,
+} from "@/lib/companionFold";
 import "./productions.css";
+
+function watcherLabel(level: WatcherLevel): string {
+  switch (level) {
+    case "missing":
+      return tOr("companionPage.productionWatcher.alertMissing", "Input missing");
+    case "low":
+      return tOr("companionPage.productionWatcher.alertLow", "Input low");
+    case "full":
+      return tOr("companionPage.productionWatcher.alertFull", "Output full");
+    case "nearlyFull":
+      return tOr("companionPage.productionWatcher.alertNearlyFull", "Output nearly full");
+    default: {
+      const never: never = level;
+      return never;
+    }
+  }
+}
+
+function pointLevels(point: WatcherPoint): WatcherLevel[] {
+  const out: WatcherLevel[] = [];
+  if (point.inputAlert) out.push(point.inputAlert);
+  if (point.outputAlert) out.push(point.outputAlert);
+  return out;
+}
+
+function WatcherBadge({ level }: { level: WatcherLevel }) {
+  return (
+    <Badge tone={watcherTone(level) === "danger" ? "danger" : "warn"}>
+      {watcherLabel(level)}
+    </Badge>
+  );
+}
 
 function FillTable({
   map,
   economy,
+  fillMode,
+  fillPhysics,
+  unitDisplay,
+  alerts,
 }: {
   map: Record<string, number> | undefined;
   economy?: EconomyLike | null;
+  fillMode: FillUnitMode;
+  fillPhysics: FillPhysicsMap;
+  unitDisplay: UnitDisplayInfo;
+  alerts?: Map<string, WatcherLevel>;
 }) {
   const entries = sortedFillEntries(map);
   if (entries.length === 0) {
@@ -38,12 +91,19 @@ function FillTable({
         </tr>
       </thead>
       <tbody>
-        {entries.map(([k, v]) => (
-          <tr key={k}>
-            <td>{formatProductionFillLabel(k, economy)}</td>
-            <td class="fd-text-end fd-mono">{formatFillAmount(v)}</td>
-          </tr>
-        ))}
+        {entries.map(([k, v]) => {
+          const level = alerts?.get(k.toUpperCase());
+          const tone = watcherTone(level);
+          return (
+            <tr key={k} class={tone ? `is-${tone}` : undefined} data-watch={level}>
+              <td>
+                {formatProductionFillLabel(k, economy, fillMode)}
+                {level ? <WatcherBadge level={level} /> : null}
+              </td>
+              <td class="fd-text-end fd-mono">{formatFillAmount(v, k, fillMode, fillPhysics, unitDisplay)}</td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );
@@ -52,9 +112,15 @@ function FillTable({
 function RecipeTable({
   slot,
   economy,
+  fillMode,
+  fillPhysics,
+  unitDisplay,
 }: {
   slot: ProductionSlot;
   economy?: EconomyLike | null;
+  fillMode: FillUnitMode;
+  fillPhysics: FillPhysicsMap;
+  unitDisplay: UnitDisplayInfo;
 }) {
   const ins = Array.isArray(slot.inputs) ? slot.inputs : [];
   const outs = Array.isArray(slot.outputs) ? slot.outputs : [];
@@ -76,9 +142,11 @@ function RecipeTable({
             <td>
               <Badge>{t("productions.badgeIn")}</Badge>
             </td>
-            <td>{formatProductionFillLabel(row.fillType || "?", economy)}</td>
+            <td>{formatProductionFillLabel(row.fillType || "?", economy, fillMode)}</td>
             <td class="fd-text-end fd-muted-sm">
-              {row.recipeAmount != null ? String(row.recipeAmount) : "—"}
+              {row.recipeAmount != null
+                ? formatFillQuantity(Number(row.recipeAmount), row.fillType, fillMode, fillPhysics, unitDisplay)
+                : "—"}
               {t("productions.perCycle")}
             </td>
           </tr>
@@ -88,9 +156,11 @@ function RecipeTable({
             <td>
               <Badge tone="accent">{t("productions.badgeOut")}</Badge>
             </td>
-            <td>{formatProductionFillLabel(row.fillType || "?", economy)}</td>
+            <td>{formatProductionFillLabel(row.fillType || "?", economy, fillMode)}</td>
             <td class="fd-text-end fd-muted-sm">
-              {row.recipeAmount != null ? String(row.recipeAmount) : "—"}
+              {row.recipeAmount != null
+                ? formatFillQuantity(Number(row.recipeAmount), row.fillType, fillMode, fillPhysics, unitDisplay)
+                : "—"}
               {t("productions.perCycle")}
             </td>
           </tr>
@@ -103,10 +173,20 @@ function RecipeTable({
 function ChainCard({
   chain,
   economy,
+  fillMode,
+  fillPhysics,
+  unitDisplay,
+  watch,
 }: {
   chain: ProductionChain;
   economy?: EconomyLike | null;
+  fillMode: FillUnitMode;
+  fillPhysics: FillPhysicsMap;
+  unitDisplay: UnitDisplayInfo;
+  watch?: WatcherPoint;
 }) {
+  const inputAlerts = useMemo(() => (watch ? watcherLevelsByFillType(watch, "input") : undefined), [watch]);
+  const outputAlerts = useMemo(() => (watch ? watcherLevelsByFillType(watch, "output") : undefined), [watch]);
   const name = chain.name || t("productions.defaultChainName");
   const cidRaw = String(chain.id ?? "");
   const farmId = Number(chain.ownerFarmId);
@@ -132,17 +212,24 @@ function ChainCard({
           <Badge tone={chainActive ? "accent" : "default"}>
             {chainActive ? t("productions.chainRunning") : t("productions.chainStopped")}
           </Badge>
+          {watch
+            ? pointLevels(watch).map((level) => (
+                <span key={level} data-fold="productionWatcher">
+                  <WatcherBadge level={level} />
+                </span>
+              ))
+            : null}
         </div>
       </div>
 
       <div class="fd-prod-storage">
         <div>
           <h4 class="fd-prod-subhead">{t("productions.inputStorage")}</h4>
-          <FillTable map={chain.inputFillLevels} economy={economy} />
+          <FillTable map={chain.inputFillLevels} economy={economy} fillMode={fillMode} fillPhysics={fillPhysics} unitDisplay={unitDisplay} alerts={inputAlerts} />
         </div>
         <div>
           <h4 class="fd-prod-subhead">{t("productions.outputStorage")}</h4>
-          <FillTable map={chain.outputFillLevels} economy={economy} />
+          <FillTable map={chain.outputFillLevels} economy={economy} fillMode={fillMode} fillPhysics={fillPhysics} unitDisplay={unitDisplay} alerts={outputAlerts} />
         </div>
       </div>
 
@@ -167,7 +254,7 @@ function ChainCard({
                   ) : null}
                 </span>
               </summary>
-              <RecipeTable slot={p} economy={economy} />
+              <RecipeTable slot={p} economy={economy} fillMode={fillMode} fillPhysics={fillPhysics} unitDisplay={unitDisplay} />
             </details>
           );
         })
@@ -179,6 +266,9 @@ function ChainCard({
 export function ProductionsSection() {
   const payload = useDashboardStore((s) => s.payload);
   const activeFarmId = useDashboardStore((s) => s.activeFarmId);
+  const fillMode = useFillUnitMode();
+  const fillPhysics = useFillPhysics();
+  const unitDisplay = useUnitDisplay();
   const [search, setSearch] = useState("");
   const [includePublic, setIncludePublic] = useState(readIncludePublicPref);
 
@@ -198,6 +288,12 @@ export function ProductionsSection() {
     () => filterChainsBySearch(chains, search),
     [chains, search],
   );
+  const watcher = useFoldedCompanion("productionWatcher");
+  const watchPoints = useMemo(
+    () => listOf<WatcherPoint>(watcher.page?.points).filter((p) => finite(p.farmId) === farmId),
+    [watcher.page, farmId],
+  );
+  const watchCounts = watcher.farmData;
 
   const toggleIncludePublic = () => {
     const next = !includePublic;
@@ -231,7 +327,30 @@ export function ProductionsSection() {
         ) : (
           <p class="fd-muted-sm">{chainSummary}</p>
         )}
+        {watcher.detected && watchCounts ? (
+          <p
+            class="fd-muted-sm fd-prod-watch-line"
+            data-fold="productionWatcher"
+            title={tOr(
+              "productions.fold.watcherRules",
+              "Production Watcher's rules: an input empty or under 5%, an output over 95% (nearly full) or 99.5% (full).",
+            )}
+          >
+            {tOr(
+              "productions.fold.watcherSummary",
+              "Production Watcher: {{missing}} inputs missing · {{low}} low · {{full}} outputs full · {{nearlyFull}} nearly full",
+              {
+                missing: finite(watchCounts.missingInputs) ?? 0,
+                low: finite(watchCounts.lowInputs) ?? 0,
+                full: finite(watchCounts.outputFull) ?? 0,
+                nearlyFull: finite(watchCounts.outputNearlyFull) ?? 0,
+              },
+            )}
+          </p>
+        ) : null}
       </header>
+
+      <CompanionModsEmbed categories={["production"]} title={tOr("companions.embedProduction", "Production companion mods")} />
       <div class="fd-section-toolbar">
         <input
           type="search"
@@ -271,7 +390,15 @@ export function ProductionsSection() {
       ) : (
         <div class="fd-prod-grid">
           {filtered.map((c) => (
-            <ChainCard key={String(c.id ?? c.name)} chain={c} economy={economy} />
+            <ChainCard
+              key={String(c.id ?? c.name)}
+              chain={c}
+              economy={economy}
+              fillMode={fillMode}
+              fillPhysics={fillPhysics}
+              unitDisplay={unitDisplay}
+              watch={watcher.detected ? watcherPointForChain(c, watchPoints) : undefined}
+            />
           ))}
         </div>
       )}

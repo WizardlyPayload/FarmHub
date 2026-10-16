@@ -26,7 +26,7 @@ function isLuaExportStale(lastLuaReceivedAt, nowMs = Date.now(), staleMs = LUA_E
 }
 
 /**
- * Navbar data-source pill: Live API (fresh mod export for this save) vs Snap XML (snapshot / XML).
+ * Navbar data-source pill: live export, held mod snapshot, or available savegame XML.
  * Ignores dashboard API websocket — only the active save's mod export timestamps matter.
  * @param {{ dataSource?: string, luaAvailable?: boolean, xmlAvailable?: boolean, apiConnected?: boolean, dataTimestamps?: object|null, nowMs?: number }} state
  */
@@ -36,7 +36,8 @@ export function resolveNavbarConnectionBadge(state = {}) {
   const nowMs = Number(state.nowMs) || Date.now();
   const staleMs = Number(ts.luaExportStaleMs) || LUA_EXPORT_STALE_MS;
   const luaStale = isLuaExportStale(ts.lastLuaReceivedAt, nowMs, staleMs);
-  const gameLive = !!state.luaAvailable && !luaStale && src !== "xml_only";
+  const heldOrCached = ts.cacheUsedDueToFailure === true || ts.isStale === true || ts.confidence === "cache" || ts.confidence === "held";
+  const gameLive = !!state.luaAvailable && !luaStale && !heldOrCached && src !== "xml_only";
 
   if (src === "unknown" && !state.luaAvailable && !state.xmlAvailable) {
     return {
@@ -47,9 +48,18 @@ export function resolveNavbarConnectionBadge(state = {}) {
   }
 
   if (!gameLive) {
-    const heldSnapshot = !!(
-      ts.liveExportStaleAt || ts.heldFromSnapshotAt || ts.mergeHeldStaleAt
-    );
+    const heldSnapshot = ts.cacheUsedDueToFailure === true || ts.confidence === "cache" ||
+      ts.confidence === "held" || !!(ts.heldFromSnapshotAt || ts.mergeHeldStaleAt);
+    if (state.xmlAvailable !== true) {
+      const staleSnapshot = ts.isStale === true || !!ts.liveExportStaleAt || luaStale;
+      return {
+        labelKey: heldSnapshot ? "ux.freshness.held" : staleSnapshot ? "ux.freshness.stale" : "ux.state.stale",
+        labelFallback: heldSnapshot ? "Held snapshot" : staleSnapshot ? "Stale" : "Showing last known data.",
+        badgeClasses: ["bg-info"],
+        titleKey: "ux.freshness.staleHint",
+        titleFallback: "This is last-known data, not a live export. Refresh after the game or dedicated server is writing again.",
+      };
+    }
     return {
       labelKey: "nav.badgeSnapXml",
       badgeClasses: ["bg-info"],
@@ -146,12 +156,12 @@ export function updateNavbarConnectionStrip() {
     dataTimestamps: this.dataTimestamps,
   });
 
-  dsText.textContent = t(badge.labelKey);
+  dsText.textContent = badge.labelFallback ? tOr(badge.labelKey, badge.labelFallback) : t(badge.labelKey);
   dsBadge.className = "badge text-light ms-2";
   for (const cls of badge.badgeClasses) {
     dsBadge.classList.add(cls);
   }
-  dsBadge.title = t(badge.titleKey);
+  dsBadge.title = badge.titleFallback ? tOr(badge.titleKey, badge.titleFallback) : t(badge.titleKey);
   dsBadge.classList.remove("d-none");
 
   this.updateNavbarModVersionBadge();

@@ -9,6 +9,12 @@ import {
 } from "@/lib/realisticFarming/life";
 import "@/sections/economy/economy.css";
 
+function favorTypeLabel(type: string | null | undefined): string {
+  if (!type?.trim()) return "—";
+  const readable = type.replace(/[_-]+/g, " ").trim();
+  return tOr(`rf.npcfavor.type.${type}`, readable.charAt(0).toUpperCase() + readable.slice(1));
+}
+
 export function NpcFavorSection() {
   const payload = useDashboardStore((s) => s.payload);
   const farmId = useDashboardStore((s) => s.activeFarmId) ?? 1;
@@ -27,6 +33,7 @@ export function NpcFavorSection() {
   const farm = getNpcFavorForFarm(rf, farmId);
   const relationships = farm?.relationships ?? [];
   const favors = farm?.activeFavors ?? [];
+  const npcNames = new Map(relationships.map((r) => [String(r.npcId), r.name]));
 
   return (
     <div>
@@ -65,8 +72,8 @@ export function NpcFavorSection() {
                 {favors.map((f, i) => (
                   <tr key={f.id ?? `${f.npcId ?? "f"}-${i}`}>
                     <td>{f.summary || "—"}</td>
-                    <td>{f.type || "—"}</td>
-                    <td>{f.npcId || "—"}</td>
+                    <td>{favorTypeLabel(f.type)}</td>
+                    <td>{npcNames.get(String(f.npcId)) || (f.npcId != null ? `NPC ${f.npcId}` : "—")}</td>
                   </tr>
                 ))}
               </tbody>

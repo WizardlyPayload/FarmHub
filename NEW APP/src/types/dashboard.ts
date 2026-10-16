@@ -1,5 +1,7 @@
 /** Merged dashboard payload — mirrors dataMerger.js mergedCore (read-only on client). */
 
+import { FOLDED_COMPANIONS, isFoldedCompanion } from "@/lib/foldedCompanions";
+
 export interface ServerInfo {
   mapName?: string;
   saveSlot?: string;
@@ -14,6 +16,7 @@ export interface RfTreatmentStep {
   label?: string;
   text?: string;
   priority?: "urgent" | "watch" | "ok" | "info" | string;
+  direction?: string;
   hasRates?: boolean;
 }
 
@@ -21,6 +24,7 @@ export interface RfTreatmentStep {
 export type RfSoilInactiveReason =
   | "pf-conflict"
   | "mod-absent"
+  | "provider-removed"
   | "manager-missing"
   | "system-missing"
   | "api-missing"
@@ -31,6 +35,8 @@ export type RfSoilInactiveReason =
 /** Soil Fertilizer per-field enrichment (OM is 0–10, never percent). */
 export interface SoilFertilizerFieldInfo {
   enabled?: boolean;
+  /** Authoritative disabled provider marker propagated through merge and retention. */
+  reason?: RfSoilInactiveReason | string | null;
   nitrogen?: { value?: number; status?: string };
   phosphorus?: { value?: number; status?: string };
   potassium?: { value?: number; status?: string };
@@ -348,9 +354,64 @@ export interface DashboardPayload {
   economy?: Record<string, unknown>;
   pastures?: unknown[];
   stock?: Record<string, unknown>;
+  /** kg/L and liquid flag per fill index and name. From the live fill-type manager. */
+  fillTypePhysics?: Record<string, { kg?: number; liquid?: boolean }>;
+  /** Soft-detect unit-display mods and, when possible, their live choices. */
+  unitDisplay?: {
+    british?: boolean;
+    britishFillUnits?: {
+      present?: boolean;
+      active?: boolean;
+      settingsAvailable?: boolean;
+      ownsFillUnits?: boolean;
+      version?: string;
+    } | null;
+    imperial?: {
+      present?: boolean;
+      settingsAvailable?: boolean;
+      ownsFillUnits?: boolean;
+      liquid?: "liters" | "gallons";
+      crops?: "liters" | "imperial";
+      weight?: "metric" | "imperial";
+      weightScale?: "auto" | "pounds" | "tons";
+      measure?: "metric" | "imperial";
+    } | null;
+    unitConverter?: {
+      present?: boolean;
+      settingsKnown?: boolean;
+      settingsAvailable?: boolean;
+      ownsFillUnits?: boolean;
+      settings?: Record<string, unknown>;
+    } | null;
+    saveUnitProfiles?: {
+      present?: boolean;
+      active?: boolean;
+      settingsAvailable?: boolean;
+      ownsFillUnits?: boolean;
+      profileName?: string;
+      money?: number;
+      miles?: boolean;
+      fahrenheit?: boolean;
+      acre?: boolean;
+      use24HourTime?: boolean;
+      lastApplyOk?: boolean;
+      hasApplied?: boolean;
+      applyState?: "effective" | "partial" | "pending" | "unavailable";
+      effective?: {
+        money?: number;
+        miles?: boolean;
+        fahrenheit?: boolean;
+        acre?: boolean;
+        use24HourTime?: boolean;
+      };
+    } | null;
+    mods?: { id?: string; style?: string }[];
+  };
   redTape?: Record<string, unknown>;
   invoices?: Record<string, unknown>;
   hirePurchasing?: Record<string, unknown>;
+  /** High-value third-party companion mods (soft-detect + safe aggregates). */
+  companionMods?: Record<string, unknown>;
   /** Realistic Farming suite aggregates (soft-detect; enabled:false when absent). */
   realisticFarming?: RealisticFarmingPayload | null;
   baleInventory?: Record<string, unknown>;
@@ -364,9 +425,19 @@ export interface DashboardPayload {
     totalTripKm?: number;
   } | null;
   collectorModules?: Record<string, boolean>;
-  dataTimestamps?: Record<string, string | number | boolean | undefined> & {
-    fetchedAt?: string;
-    source?: string;
+  dataTimestamps?: {
+    lastLuaReceivedAt?: string | number | null;
+    lastXmlReceivedAt?: string | number | null;
+    mergeComputedAt?: string | null;
+    liveNewerThanXml?: boolean | null;
+    sectionContractVersion?: number;
+    sectionCoverage?: Record<string, unknown> | null;
+    luaExportStaleMs?: number;
+    heldFromSnapshotAt?: string | null;
+    mergeHeldStaleAt?: string | null;
+    liveExportStaleAt?: string | null;
+    fetchedAt?: string | null;
+    source?: string | null;
     isStale?: boolean;
     staleReason?: string | null;
     cacheUsedDueToFailure?: boolean;
@@ -375,7 +446,7 @@ export interface DashboardPayload {
       collectionDurationMs?: number;
       sourceLagSeconds?: number | null;
       parseErrors?: { file?: string; error?: string }[];
-    };
+    } | null;
   };
   diagnostics?: {
     modVersion?: string | null;
@@ -383,7 +454,7 @@ export interface DashboardPayload {
     isAuthority?: boolean;
     lastExportGameTime?: number | null;
     lastXmlSampleTime?: string | null;
-    missingDependencies?: string[];
+    missingDependencies?: string[] | Record<string, unknown>;
     compatible?: boolean;
   };
   modVersionCheck?: {
@@ -399,6 +470,10 @@ export interface FarmDashServer {
   name: string;
   mode?: string;
   localSubFolder?: string;
+  /** In-game career save name when known (from XML / merged payload). */
+  savegameName?: string | null;
+  /** Map title when known. */
+  mapTitle?: string | null;
   configWarning?: string;
 }
 
@@ -422,7 +497,18 @@ export type SectionId =
   | "npcfavor"
   | "worldevents"
   | "prostaff"
-  | "fertilizerdepot";
+  | "fertilizerdepot"
+  /** Dedicated companion-mod pages (`src/sections/mods/registry.ts`). */
+  | ModPageSectionId;
+
+/** `mod-<modKey>` — one per entry in the companion page registry. */
+export type ModPageSectionId = `mod-${string}`;
+
+const MOD_PAGE_SECTION = /^mod-[A-Za-z][A-Za-z0-9_]{0,63}$/;
+
+export function isModPageSectionId(value: string | null | undefined): value is ModPageSectionId {
+  return typeof value === "string" && MOD_PAGE_SECTION.test(value);
+}
 
 /** Deep-link params for section filters / tabs / entity focus. */
 export interface SectionParams {
@@ -460,16 +546,25 @@ export const MOD_NAV_SECTIONS: SectionId[] = [
 export const ALL_SECTIONS: SectionId[] = [...NAV_SECTIONS, ...MOD_NAV_SECTIONS];
 
 export function isSectionId(value: string): value is SectionId {
-  return (ALL_SECTIONS as string[]).includes(value) || value === "moisture" || value === "livestock";
+  return (
+    (ALL_SECTIONS as string[]).includes(value) ||
+    value === "moisture" ||
+    value === "livestock" ||
+    isModPageSectionId(value)
+  );
 }
 
-/** Normalize legacy hashes / prefs. Livestock → Pastures; Moisture → Fields. */
+/** Normalize legacy hashes / prefs. Livestock → Pastures; Moisture → Fields; removed sections (e.g. the old companions index) → Overview. */
 export function normalizeSectionId(value: string | null | undefined): SectionId {
   if (!value) return "overview";
   if (value === "home" || value === "landing" || value === "dashboard") return "overview";
   if (value === "livestock") return "pastures";
   if (value === "moisture") return "fields";
   if ((ALL_SECTIONS as string[]).includes(value)) return value as SectionId;
+  if (isModPageSectionId(value)) {
+    const key = value.slice(4);
+    return isFoldedCompanion(key) ? FOLDED_COMPANIONS[key] : value;
+  }
   return "overview";
 }
 

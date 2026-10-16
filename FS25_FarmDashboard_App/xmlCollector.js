@@ -28,6 +28,7 @@ const { collectFs25DocumentRoots } = require('./fs25Paths');
 const { isMirrorSaveSlot, sanitizeSaveSlot } = require('./safeFsIdentity.cjs');
 const { readFileUtf8WithRetryAsync } = require('./fileReadRetry');
 const { parseMoistureSystemXml } = require('./stockMoistureFromXml');
+const { classifyXmlFieldHarvest } = require('./fieldHarvestState.cjs');
 
 // Whole-file read + parse only: fast-xml-parser exposes parse(string), not a supported streaming API for arbitrary savegame XML.
 
@@ -177,8 +178,20 @@ async function fileExists(p) {
     }
 }
 
+/** A replica's remote slot is not evidence that the same-numbered PC save belongs to it. */
+function isExplicitReplicaXmlSource(srv, ingressKind) {
+    return ingressKind === 'replica' || !!(
+        srv && srv.mode !== 'ftp' && (
+            srv.replicaRegistration ||
+            (typeof srv.replicaRemoteSlot === 'string' && srv.replicaRemoteSlot.trim()) ||
+            (typeof srv.sourceKey === 'string' && srv.sourceKey.startsWith('replica:'))
+        )
+    );
+}
+
 /** @deprecated Prefer getSavegamePathAsync — sync exists checks block the main thread. */
-function getSavegamePath(srv, saveSlot) {
+function getSavegamePath(srv, saveSlot, ingressKind) {
+    if (isExplicitReplicaXmlSource(srv, ingressKind)) return null;
     const slot = sanitizeSaveSlot(saveSlot || srv.localSubFolder, 'savegame1');
 
     if (isMirrorSaveSlot(slot) || isMirrorSaveSlot(srv.localSubFolder)) {
@@ -223,7 +236,10 @@ function getSavegamePath(srv, saveSlot) {
     return direct;
 }
 
-async function getSavegamePathAsync(srv, saveSlot) {
+async function getSavegamePathAsync(srv, saveSlot, ingressKind) {
+    // Replica payloads do not carry source-proven savegame XML. In particular,
+    // an HTTP cache keyed only by server/slot is not proof of replica identity.
+    if (isExplicitReplicaXmlSource(srv, ingressKind)) return null;
     const slot = sanitizeSaveSlot(saveSlot || srv.localSubFolder, 'savegame1');
 
     // Giants HTTP feed cache (join-as-client / Local without FTP XMLs).
@@ -394,12 +410,14 @@ function parseFieldsXml(xmlStr, farmlandOwnership, scannedFarmlands, farmlandSta
         const isScanned = scannedFarmlands ? scannedFarmlands.has(id) : false;
         const pfStats = farmlandStats ? (farmlandStats[id] || null) : null;
 
-        const isHarvestReady = groundType.includes('HARVEST_READY');
-        const isHarvested = groundType.includes('HARVESTED');
+        const harvestClass = classifyXmlFieldHarvest({ fruitType, growthState, groundType });
+        const isHarvestReady = harvestClass.harvestReady;
+        const isHarvested = harvestClass.isHarvested || groundType.includes('HARVESTED');
         const isWithered =
-            fruitType !== 'GRASS' &&
-            growthState > 0 &&
-            (groundType === 'WITHERED' || (fruitType !== 'UNKNOWN' && growthState > 12));
+            harvestClass.isWithered ||
+            (fruitType !== 'GRASS' &&
+                growthState > 0 &&
+                (groundType === 'WITHERED' || (fruitType !== 'UNKNOWN' && growthState > 12)));
         const isEmpty = fruitType === 'UNKNOWN' || growthState === 0;
         const needsPlowFlag = plowingRequired && plowLevel < 1;
         const needsWork = weedState > 2 || limeLevel < 1 || sprayLevel < 1 || needsPlowFlag;
@@ -417,7 +435,7 @@ function parseFieldsXml(xmlStr, farmlandOwnership, scannedFarmlands, farmlandSta
         } else if (!isEmpty && weedState > 2) {
             suggestions.push({ priority: 3, action: 'Spray or mechanical-weed — weeds are high', type: 'maintenance' });
         }
-        if (limeLevel < 1) suggestions.push({ priority: 4, action: 'Spread lime — pH is low', type: 'maintenance' });
+        if (limeLevel < 1) suggestions.push({ priority: 4, action: 'Spread lime', type: 'maintenance' });
         if (sprayLevel < 1 && !isEmpty) suggestions.push({ priority: 4, action: 'Fertilize — nutrient level is low', type: 'maintenance' });
         if (needsPlowFlag && isEmpty) suggestions.push({ priority: 5, action: 'Plow or disc — primary tillage needed', type: 'preparation' });
         suggestions.sort((a, b) => a.priority - b.priority);
@@ -453,15 +471,17 @@ function parseFieldsXml(xmlStr, farmlandOwnership, scannedFarmlands, farmlandSta
             needsWork,
             suggestions,
             isPrecisionFarming: pfActive,
-            nitrogenLevel: 0,
-            targetNitrogen: 0,
-            phValue: 0,
-            targetPh: 0,
-            isScanned: false,
-            nitrogenText: `${sprayLevel}/2`,
-            limeText: limeLevel >= 1 ? 'OK' : 'Needed',
+            nitrogenLevel: null,
+            targetNitrogen: null,
+            phValue: null,
+            targetPh: null,
+            // Never label XML fertilizer steps as PF nitrogen (e.g. "0/2"). Live N/pH
+            // come from the Lua FieldDataCollector; leave text empty until merge.
+            nitrogenText: '',
+            limeText: '',
             isScanned,
             pfStats,
+            fertilizationLevel: sprayLevel,
         });
     }
     return fields;
@@ -1029,9 +1049,9 @@ function parsePrecisionFarmingXml(xmlStr) {
 
 // ─── main export ─────────────────────────────────────────────────────────────
 
-async function collectXmlData(srv, saveSlot) {
+async function collectXmlData(srv, saveSlot, ingressKind) {
     const startedMs = Date.now();
-    const savegameDir = await getSavegamePathAsync(srv, saveSlot);
+    const savegameDir = await getSavegamePathAsync(srv, saveSlot, ingressKind);
     if (!savegameDir) return null;
 
     const file = (f) => path.join(savegameDir, f);
@@ -1151,8 +1171,8 @@ function buildXmlCollectionHealth({ startedMs, newestMtimeMs, parseErrors, nowMs
 }
 
 /** Per-file metadata fingerprint (mtime, ctime, size and presence) — skip XML re-parse when savegame files unchanged. */
-async function getSavegameXmlFingerprint(srv, saveSlot) {
-    const savegameDir = await getSavegamePathAsync(srv, saveSlot);
+async function getSavegameXmlFingerprint(srv, saveSlot, ingressKind) {
+    const savegameDir = await getSavegamePathAsync(srv, saveSlot, ingressKind);
     if (!savegameDir) return null;
     const identities = [];
     let found = false;
@@ -1171,6 +1191,7 @@ async function getSavegameXmlFingerprint(srv, saveSlot) {
 module.exports = {
     collectXmlData,
     getSavegameXmlFingerprint,
+    isExplicitReplicaXmlSource,
     parseEconomyXml,
     parseCareerSavegame,
     parseVehiclesXml,
@@ -1178,6 +1199,8 @@ module.exports = {
     formatRedTapeCropName,
     getSavegamePath,
     getSavegamePathAsync,
+    classifyXmlFieldHarvest,
+    parseFieldsXml,
     SAVEGAME_XML_FILES,
     OPTIONAL_SAVEGAME_XML_FILES,
     FTP_SAVEGAME_XML_DOWNLOAD_ORDER,

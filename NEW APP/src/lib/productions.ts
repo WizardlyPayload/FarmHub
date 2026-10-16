@@ -4,6 +4,13 @@ import {
   lookupFillTypeNameFromEconomy,
   type EconomyLike,
 } from "@/lib/fillTypeResolve";
+import {
+  britishLabel,
+  formatFillQuantity,
+  type FillPhysicsMap,
+  type FillUnitMode,
+  type UnitDisplayInfo,
+} from "@/lib/fill-units";
 
 const INCLUDE_PUBLIC_STORAGE_KEY = "farmdash_productions_include_public_v1";
 
@@ -117,10 +124,19 @@ export function getChainsForFarmView(
 }
 
 /** Format storage level: FS often uses liters; some buffers use 0–1 fill ratio */
-export function formatFillAmount(v: unknown): string {
+export function formatFillAmount(
+  v: unknown,
+  fillKey?: unknown,
+  mode: FillUnitMode = "litres",
+  physics?: FillPhysicsMap | null,
+  unitDisplay?: UnitDisplayInfo | null,
+): string {
   const n = Number(v);
   if (!Number.isFinite(n)) return "—";
   if (n >= 0 && n <= 1.0001) return `${(n * 100).toFixed(0)}%`;
+  if (mode === "british" || mode === "imperial") {
+    return formatFillQuantity(n, fillKey, mode, physics, unitDisplay);
+  }
   if (Math.abs(n) >= 1000) {
     return `${n.toLocaleString(undefined, { maximumFractionDigits: 0 })} L`;
   }
@@ -145,12 +161,23 @@ function humanizeFillKey(raw: string): string {
 export function formatProductionFillLabel(
   rawKey: string,
   economy?: EconomyLike | null | undefined,
+  mode: FillUnitMode = "litres",
 ): string {
   const raw = String(rawKey || "").trim();
   if (!raw) return "?";
+  if (mode === "british") {
+    const renamed = britishLabel(raw);
+    if (renamed) return renamed;
+  }
   if (/^\d+$/.test(raw) && economy) {
     const fromEcon = lookupFillTypeNameFromEconomy(Number(raw), economy);
-    if (fromEcon) return humanizeFillKey(fromEcon);
+    if (fromEcon) {
+      if (mode === "british") {
+        const renamed = britishLabel(fromEcon);
+        if (renamed) return renamed;
+      }
+      return humanizeFillKey(fromEcon);
+    }
   }
   return humanizeFillKey(raw);
 }

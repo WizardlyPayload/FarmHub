@@ -89,8 +89,9 @@
 }
 
 .fd-topbar__save-select {
-  max-width: min(28rem, 42vw);
-  min-width: 12rem;
+  max-width: min(44rem, 58vw);
+  min-width: 18rem;
+  width: max(18rem, min(44rem, 58vw));
 }
 
 .fd-topbar__weather {
@@ -118,6 +119,43 @@
   object-fit: contain;
   object-position: center;
   flex-shrink: 0;
+}
+
+@media (max-width: 1440px) {
+  .fd-topbar {
+    flex-wrap: wrap;
+    gap: 0.55rem 1rem;
+  }
+
+  .fd-topbar__left {
+    order: 1;
+  }
+
+  .fd-topbar__right {
+    order: 2;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .fd-topbar__center {
+    order: 3;
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .fd-topbar__save {
+    width: min(44rem, 100%);
+    min-width: 0;
+  }
+
+  .fd-topbar__save-select {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
 }
 
 .fd-shell__body {

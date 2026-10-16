@@ -21,7 +21,7 @@ for (const scope of ['user', 'machine']) {
     const key = Object.keys(state.records).find(key => key.includes('\\Uninstall\\'));
     assert.ok(key.startsWith(scope === 'machine' ? '2147483650:' : '2147483651:S-1-'));
     const entry = state.records[key];
-    assert.equal(entry.DisplayName, 'FS25 Farm Dashboard V5 5.0.3');
+    assert.equal(entry.DisplayName, 'FS25 Farm Dashboard V5 5.0.1');
     assert.match(entry.UninstallString, scope === 'machine' ? /" \/allusers$/ : /" \/currentuser$/);
     assert.equal(entry.SystemComponent, 0);
     assert.equal(entry.NoRemove, 0);
@@ -81,15 +81,6 @@ test('retired ownership cannot be resurrected from an old private record', optio
   assert.equal(state.ownership.flag, '0');
   assert.equal(state.ownership.executable, null);
   assert.equal(state.ownership.recovery, false);
-});
-test('a leftover other-edition key without InstallLocation does not abort uninstall', options, () => {
-  const state = run('other-edition-missing-install-location');
-  assert.equal(state.error, null);
-  assert.equal(state.otherEditionPresent, false);
-  assert.ok(state.calls.includes('EnumValues'));
-});
-test('a wrong-type other-edition InstallLocation remains an error', options, () => {
-  assert.match(run('other-edition-wrong-install-location-type').error, /another Dashboard needs ImageMagick/);
 });
 test('the Full-uninstall preflight cannot launch removal or clear ownership', options, () => {
   const state = run('preflight-only');

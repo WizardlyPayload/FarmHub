@@ -24,6 +24,7 @@ const os = require('os');
 const path = require('path');
 
 const livestockDetail = require('../livestockDetail.js');
+const { encodeEnvelope } = require('../exportEnvelope');
 
 function mktmp() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'fdtest-'));
@@ -79,7 +80,7 @@ describe('local-mode read returns rich envelope', () => {
     fs.mkdirSync(path.join(slot, 'details'), { recursive: true });
     fs.writeFileSync(path.join(slot, 'details', 'animals_42.json'),
       JSON.stringify({ schemaVersion: 99, animals: [] }));
-    const srv = { id: 'srv', mode: 'local', localPath: path.dirname(slot), localSubFolder: path.basename(slot) };
+    const srv = { id: 'srv', mode: 'local', legacyJson: true, localPath: path.dirname(slot), localSubFolder: path.basename(slot) };
     const req = { params: { id: '42' } };
     const result = await livestockDetail.read({
       req,
@@ -112,7 +113,7 @@ describe('local-mode read returns rich envelope', () => {
       animalMode: 'RL',
       pens: [{ id: 5, ts: 1234, animalCount: 1 }],
     }));
-    const srv = { id: 'srv', mode: 'local', localPath: path.dirname(slot), localSubFolder: path.basename(slot) };
+    const srv = { id: 'srv', mode: 'local', legacyJson: true, localPath: path.dirname(slot), localSubFolder: path.basename(slot) };
     const req = { params: { id: '5' }, query: {} };
     const result = await livestockDetail.read({
       req,
@@ -150,7 +151,7 @@ describe('local-mode read returns rich envelope', () => {
       animalMode: 'RL',
       pens: [{ id: 'foo.xml:12', ts: 2000, animalCount: 1 }],
     }));
-    const srv = { id: 'srv', mode: 'local', localPath: path.dirname(slot), localSubFolder: path.basename(slot) };
+    const srv = { id: 'srv', mode: 'local', legacyJson: true, localPath: path.dirname(slot), localSubFolder: path.basename(slot) };
     const req = { params: { id: 'foo.xml:12' }, query: {} };
     const result = await livestockDetail.read({
       req,
@@ -185,7 +186,7 @@ describe('local-mode read returns rich envelope', () => {
       animalMode: 'base',
       pens: [{ id: 'sheepPasture.xml:518', ts: 3000, animalCount: 1 }],
     }));
-    const srv = { id: 'srv', mode: 'local', localPath: path.dirname(slot), localSubFolder: path.basename(slot) };
+    const srv = { id: 'srv', mode: 'local', legacyJson: true, localPath: path.dirname(slot), localSubFolder: path.basename(slot) };
     const req = { params: { id: '518' }, query: {} };
     const result = await livestockDetail.read({
       req,
@@ -210,13 +211,18 @@ describe('request() bounds requests.json', () => {
     for (let i = 1; i <= 300; i++) old.pens.push({ id: i, ts: oldTs });
     fs.writeFileSync(reqsPath, JSON.stringify(old));
 
-    const srv = { id: 'srv', mode: 'local', localPath: path.dirname(slot), localSubFolder: path.basename(slot) };
+    const srv = { id: 'srv', mode: 'local', localPath: path.dirname(slot), localSubFolder: path.basename(slot), legacyJson: false };
     const req = { params: { id: '42' } };
     const ok = await livestockDetail.request({
       req,
       resolveServerIdForRequest: () => 'srv',
       servers: [srv],
-      serverStates: { srv: {} },
+      serverStates: {
+        srv: {
+          active: true,
+          exportIdentity: { careerId: 'career-a', sessionId: 'session-a', sourceSlot: path.basename(slot) },
+        },
+      },
       getFs25DocumentsRoot: () => slot,
     });
     expect(ok).toBe(true);
@@ -241,5 +247,46 @@ describe('request() bounds requests.json', () => {
       serverStates: { srv: {} },
       getFs25DocumentsRoot: () => slot,
     })).rejects.toMatchObject({ code: 'INVALID_ID' });
+  });
+});
+
+describe('J11 local livestock reader', () => {
+  test('selects the higher XML sequence and ignores leftover JSON', async () => {
+    const root = mktmp();
+    const slot = path.join(root, 'savegame3');
+    const folder = path.join(slot, 'career-a', 'resources', 'penDetail', '1');
+    fs.mkdirSync(folder, { recursive: true });
+    fs.mkdirSync(path.join(slot, 'details'), { recursive: true });
+    const envelope = (sequence, animalId) => encodeEnvelope(JSON.stringify({
+      schemaVersion: 1,
+      idScheme: 'integer-v1',
+      penId: '1',
+      placeableId: 1,
+      generatedAt: 100,
+      mode: 'base',
+      animals: [{ id: animalId }],
+    }), {
+      careerId: 'career-a',
+      sessionId: 'session-a',
+      publicationSequence: sequence,
+      exportGeneration: 0,
+      simulationTimeMs: 10,
+    });
+    fs.writeFileSync(path.join(folder, 'slot-a.xml'), envelope(1, 101));
+    fs.writeFileSync(path.join(folder, 'slot-b.xml'), envelope(2, 202));
+    fs.writeFileSync(path.join(slot, 'active.xml'), '<farmDashboardRoute schema="1" careerId="career-a" sessionId="session-a" publicationSequence="2" slot="b" persistence="saved" sourceSlot="savegame3"/>');
+    fs.writeFileSync(path.join(slot, 'details', 'animals_1.json'), JSON.stringify({ animals: [{ id: 999 }] }));
+    const result = await livestockDetail.read({
+      req: { params: { id: '1' } },
+      resolveServerIdForRequest: () => 'r2-review',
+      servers: [{ id: 'r2-review', mode: 'local', localPath: root, localSubFolder: 'savegame3' }],
+      serverStates: {
+        'r2-review': {
+          userDataPath: root,
+          exportIdentity: { careerId: 'career-a', sessionId: 'session-a', sourceSlot: 'savegame3' },
+        },
+      },
+    });
+    expect(result.detail.animals[0].id).toBe(202);
   });
 });

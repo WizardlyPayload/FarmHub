@@ -16,6 +16,7 @@ import {
   getGeneticsDescriptionKey,
   getPregnancyEstimate,
 } from "@/lib/livestock-value";
+import { EstimatedAnimalMoney } from "@/sections/livestock/AnimalDetailPanel";
 import type { LivestockAnimal } from "@/lib/livestock-types";
 
 interface Props {
@@ -287,7 +288,7 @@ export function AnimalDetailsModal({ animal, onClose }: Props) {
           <div class="fd-modal__grid">
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: "1.4rem", color: "var(--farm-accent)", fontWeight: 700 }}>
-                ${valueInfo.value.toLocaleString()}
+                <EstimatedAnimalMoney amount={valueInfo.value} />
               </div>
               <small class="fd-livestock__status">
                 {t("livestock.valueEstimatedTitle")}
@@ -301,7 +302,7 @@ export function AnimalDetailsModal({ animal, onClose }: Props) {
                 <tbody>
                   <tr>
                     <td>{t("livestock.valueBaseValue", { type: breakdown.animalType })}</td>
-                    <td>${breakdown.baseValue.toLocaleString()}</td>
+                    <td><EstimatedAnimalMoney amount={breakdown.baseValue} /></td>
                   </tr>
                   <tr>
                     <td>{t("livestock.valueAgeFactor")}</td>
@@ -340,7 +341,7 @@ export function AnimalDetailsModal({ animal, onClose }: Props) {
               </table>
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: "0.5rem" }}>
                 <strong>{t("livestock.valueEstimatedFinal")}</strong>
-                <strong style={{ color: "var(--farm-accent)" }}>${valueInfo.value.toLocaleString()}</strong>
+                <strong style={{ color: "var(--farm-accent)" }}><EstimatedAnimalMoney amount={valueInfo.value} /></strong>
               </div>
             </div>
           </div>

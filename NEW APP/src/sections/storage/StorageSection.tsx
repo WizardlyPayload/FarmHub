@@ -1,8 +1,13 @@
 import { Fragment } from "preact";
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { t } from "@/i18n/i18n";
+import { t, tOr } from "@/i18n/i18n";
+import { CompanionModsEmbed } from "@/sections/companions";
+import { StorageAssetNotes } from "@/sections/companions/AssetCompanionNotes";
 import { Badge, Card } from "@/components/ui";
 import { useDashboardStore } from "@/store/dashboard-store";
+import { formatFillPrice, formatFillQuantity, type FillPhysicsMap, type FillUnitMode, type UnitDisplayInfo } from "@/lib/fill-units";
+import { useFillPhysics, useFillUnitMode, useUnitDisplay } from "@/lib/fill-unit-mode";
+import { saveProfileFromUnitDisplay } from "@/lib/profile-display";
 import type { DashboardPayload } from "@/types/dashboard";
 import {
   aggregateConsumables,
@@ -56,6 +61,7 @@ import {
 } from "@/lib/storage/stock-moisture";
 import type { EconomyLike, PlaceableLike, StockPayload } from "@/lib/fillTypeResolve";
 import { FertilizerDepotPanel } from "@/sections/storage/FertilizerDepotPanel";
+import { StockCheckGuideBadge, StockCheckNote, useStockCheck } from "@/sections/storage/stockCheck";
 import "@/sections/economy/economy.css";
 
 function asRecord(v: unknown): Record<string, unknown> {
@@ -88,34 +94,37 @@ function CommodityIcon({
   mapTitle?: string;
 }) {
   const url = fillTypeHudUrl(item, catalog, hudEpoch, { mapId, mapTitle }, titles);
-  const [failed, setFailed] = useState(!url);
-  const [retry, setRetry] = useState(0);
-  useEffect(() => {
-    setFailed(!url);
-    setRetry(0);
-  }, [url]);
-  if (!url || failed) {
+  if (!url) {
     return (
       <span class="fd-economy__commodity-glyph" aria-hidden="true">
         {glyph}
       </span>
     );
   }
-  const src = retry > 0 ? `${url}${url.includes("?") ? "&" : "?"}r=${retry}` : url;
+  return <CommodityImage key={url} url={url} glyph={glyph} />;
+}
+
+function CommodityImage({ url, glyph }: { url: string; glyph: string }) {
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
   return (
-    <img
-      key={src}
-      class="fd-economy__commodity-icon"
-      src={src}
-      alt=""
-      onError={() => {
-        if (retry < 5) {
-          window.setTimeout(() => setRetry((n) => n + 1), 350 * (retry + 1));
-          return;
-        }
-        setFailed(true);
-      }}
-    />
+    <>
+      {!loaded || failed ? (
+        <span class="fd-economy__commodity-glyph" aria-hidden="true">
+          {glyph}
+        </span>
+      ) : null}
+      {!failed ? (
+        <img
+          class="fd-economy__commodity-icon"
+          src={url}
+          alt=""
+          style={loaded ? undefined : { display: "none" }}
+          onLoad={() => setLoaded(true)}
+          onError={() => setFailed(true)}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -128,6 +137,10 @@ function StorageTab({
   farmId: number;
   consumables: VehicleLike[];
 }) {
+  const fillMode = useFillUnitMode();
+  const fillPhysics = useFillPhysics();
+  const unitDisplay = useUnitDisplay();
+  const profile = saveProfileFromUnitDisplay(unitDisplay);
   const root = asRecord(payload);
   const stockDash: StorageDashboardLike = {
     activeFarmId: farmId,
@@ -201,8 +214,8 @@ function StorageTab({
       : null;
 
   const sorted = [...items].sort((a, b) =>
-    displayFillTypeName(a, catalog, economy, titles).localeCompare(
-      displayFillTypeName(b, catalog, economy, titles)
+    displayFillTypeName(a, catalog, economy, titles, fillMode).localeCompare(
+      displayFillTypeName(b, catalog, economy, titles, fillMode)
     )
   );
   const moistureSummaries = useMemo(
@@ -210,7 +223,9 @@ function StorageTab({
     [items],
   );
   const showCropMoisture = [...moistureSummaries.values()].some(Boolean);
-  const stockColumnCount = showCropMoisture ? 10 : 8;
+  const stockCheck = useStockCheck();
+  const showGuide = stockCheck.items.size > 0;
+  const stockColumnCount = (showCropMoisture ? 10 : 8) + (showGuide ? 1 : 0);
 
   const toggle = (key: string) => {
     setExpanded((prev) => {
@@ -260,7 +275,7 @@ function StorageTab({
               </div>
               <div>
                 <span class="fd-economy__muted">{t("storage.totalValue")}</span>
-                <strong>{stockSummary.totalValue > 0 ? formatMoney(stockSummary.totalValue) : "—"}</strong>
+                <strong>{stockSummary.totalValue > 0 ? formatMoney(stockSummary.totalValue, profile) : "—"}</strong>
               </div>
               {stockSummary.greatDemandCount > 0 ? (
                 <div>
@@ -271,6 +286,7 @@ function StorageTab({
             </div>
           </>
         ) : null}
+        <StockCheckNote reading={stockCheck} />
 
         {stockReason === "disabled" ? (
           <div class="fd-economy__empty">
@@ -301,12 +317,18 @@ function StorageTab({
                   <th class="text-end">{t("storage.colMaxPrice")}</th>
                   <th class="text-end">{t("storage.colMaxValue")}</th>
                   <th class="text-center">{t("storage.colMaxMonth")}</th>
+                  {showGuide ? (
+                    <th data-fold="timeSavingStockCheck">
+                      {tOr("companionPage.timeSavingStockCheck.colGuide", "Sell now?")}
+                    </th>
+                  ) : null}
                 </tr>
               </thead>
               <tbody>
                 {sorted.map((item, idx) => {
                   const key = stockRowKey(item, idx);
-                  const name = displayFillTypeName(item, catalog, economy, titles);
+                  const name = displayFillTypeName(item, catalog, economy, titles, fillMode);
+                  const fillKey = item.fillType || item.fillTypeIndex || name;
                   const glyph = resolveCommodityGlyph(item, name);
                   const liters = Number(item.totalLiters) || 0;
                   const pricePer1000 = item._pricePer1000 ?? resolvePricePer1000(item, item._crop);
@@ -347,7 +369,7 @@ function StorageTab({
                             </>
                           ) : null}
                         </td>
-                        <td>{formatLiters(liters)}</td>
+                        <td>{formatFillQuantity(liters, fillKey, fillMode, fillPhysics, unitDisplay)}</td>
                         {showCropMoisture ? (
                           <>
                             <td>
@@ -359,7 +381,11 @@ function StorageTab({
                           </>
                         ) : null}
                         <td class="text-end">
-                          {pricePer1000 > 0 ? formatPricePer1000(pricePer1000) : "—"}{" "}
+                          {pricePer1000 > 0
+                            ? formatFillPrice(pricePer1000, fillKey, fillMode, fillPhysics, (n) =>
+                                formatPricePer1000(n, profile),
+                              unitDisplay)
+                            : "—"}{" "}
                           <span class={`fd-economy__trend--${trend}`}>
                             {trend === "up" ? "▲" : trend === "down" ? "▼" : "−"}
                           </span>
@@ -367,21 +393,38 @@ function StorageTab({
                         <td
                           class={`text-end ${value > 0 && (item.greatDemand || value >= 10000) ? "fd-economy__value-hi" : ""}`}
                         >
-                          {value > 0 ? formatMoney(value) : "—"}
+                          {value > 0 ? formatMoney(value, profile) : "—"}
                         </td>
                         <td>
                           {station || (
                             <span class="fd-economy__muted">{t("storage.noSellingPoint")}</span>
                           )}
                         </td>
-                        <td class="text-end">{maxPrice > 0 ? formatPricePer1000(maxPrice) : "—"}</td>
-                        <td class="text-end">{maxValue > 0 ? formatMoney(maxValue) : "—"}</td>
+                        <td class="text-end">
+                          {maxPrice > 0
+                            ? formatFillPrice(maxPrice, fillKey, fillMode, fillPhysics, (n) =>
+                                formatPricePer1000(n, profile),
+                              unitDisplay)
+                            : "—"}
+                        </td>
+                        <td class="text-end">{maxValue > 0 ? formatMoney(maxValue, profile) : "—"}</td>
                         <td class="text-center">{maxMonth || "—"}</td>
+                        {showGuide ? (
+                          <td>
+                            <StockCheckGuideBadge item={stockCheck.items.get(String(item.fillType ?? "").toUpperCase())} />
+                          </td>
+                        ) : null}
                       </tr>
                       {open ? (
                         <tr class="fd-economy__detail">
                           <td colSpan={stockColumnCount}>
-                            <LocationDetails item={item} />
+                            <LocationDetails
+                              item={item}
+                              fillKey={fillKey}
+                              fillMode={fillMode}
+                              fillPhysics={fillPhysics}
+                              unitDisplay={unitDisplay}
+                            />
                           </td>
                         </tr>
                       ) : null}
@@ -393,6 +436,8 @@ function StorageTab({
           </div>
         )}
       </Card>
+
+      <StorageAssetNotes catalog={catalog} titles={titles} economy={economy} />
 
       {baleMoist ? (
         <Card title={t("moisture.baleSummaryTitle")} class="fd-economy__bale-moist">
@@ -488,7 +533,7 @@ function StorageTab({
           {groups.map((g) => (
             <Card
               key={`${g.fillType}-${g.containerKind}`}
-              title={formatCommodityLabel(g.fillType)}
+              title={formatCommodityLabel(g.fillType, fillMode)}
             >
               <p class="fd-economy__muted">{consumableContainerLabel(g.containerKind)}</p>
               {g.full > 0 ? (
@@ -517,7 +562,19 @@ function StorageTab({
   );
 }
 
-function LocationDetails({ item }: { item: EnrichedStockItem }) {
+function LocationDetails({
+  item,
+  fillKey,
+  fillMode,
+  fillPhysics,
+  unitDisplay,
+}: {
+  item: EnrichedStockItem;
+  fillKey: unknown;
+  fillMode: FillUnitMode;
+  fillPhysics: FillPhysicsMap;
+  unitDisplay: UnitDisplayInfo;
+}) {
   const locs = item.locations || [];
   if (locs.length === 0) {
     return <p class="fd-economy__muted">{t("storage.noLocations")}</p>;
@@ -528,7 +585,9 @@ function LocationDetails({ item }: { item: EnrichedStockItem }) {
         <tr>
           <th>{t("storage.colLocation")}</th>
           <th>{t("storage.colKind")}</th>
-          <th class="text-end">{t("storage.colLiters")}</th>
+          <th class="text-end">
+            {fillMode === "litres" ? t("storage.colLiters") : tOr("storage.colAmount", "Amount")}
+          </th>
           <th>{t("storage.colMoisture")}</th>
         </tr>
       </thead>
@@ -537,7 +596,9 @@ function LocationDetails({ item }: { item: EnrichedStockItem }) {
           <tr key={i}>
             <td>{loc.name || "—"}</td>
             <td>{locationKindLabel(loc)}</td>
-            <td class="text-end">{formatLiters(loc.liters)}</td>
+            <td class="text-end">
+              {formatFillQuantity(Number(loc.liters) || 0, fillKey, fillMode, fillPhysics, unitDisplay)}
+            </td>
             <td>{locationMoistureLabel(loc)}</td>
           </tr>
         ))}
@@ -557,6 +618,8 @@ export function StorageSection() {
           <h2>{t("nav.section.storage")}</h2>
           <p class="fd-muted-sm">{t("storage.hintEmpty")}</p>
         </header>
+
+      <CompanionModsEmbed categories={["storage"]} title={tOr("companions.embedStorage", "Storage companion mods")} />
       </div>
     );
   }

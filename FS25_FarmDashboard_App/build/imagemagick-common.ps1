@@ -126,61 +126,26 @@ function Invoke-ElevatedDependencyProcess([string]$FilePath, [string[]]$Argument
         return $process.ExitCode
     } finally { $process.Dispose() }
 }
-function Test-OtherDashboardRegistryView([string]$HiveName, [Microsoft.Win32.RegistryView]$View, [string]$Guid) {
-    $base = $null
-    try {
-        $base = [Microsoft.Win32.RegistryKey]::OpenBaseKey([Microsoft.Win32.RegistryHive]::$HiveName, $View)
-    } catch {
-        return $false
-    }
-    try {
-        foreach ($sub in @("Software\$Guid", "Software\Microsoft\Windows\CurrentVersion\Uninstall\$Guid")) {
-            $key = $base.OpenSubKey($sub)
-            if (-not $key) { continue }
-            try {
-                $location = [string]$key.GetValue('InstallLocation')
-                if ($location -and (Test-Path -LiteralPath (Join-Path $location 'resources\app.asar') -PathType Leaf)) {
-                    return $true
-                }
-            } finally { $key.Dispose() }
-        }
-    } finally { $base.Dispose() }
-    return $false
-}
-
 function Test-OtherDashboardInstalled([string]$Edition) {
     $other = if ($Edition -in @('V5', 'Rf')) { '2079a287-5a88-5a64-b630-f5040f92dd25' } else { '11de34ca-2bb0-58cf-bf02-9951a95a886c' }
-    # Native StdRegProv is not WOW64-redirected. Use it whenever the helpers
-    # are loaded so a 32-bit V4 uninstaller can see an all-users V5 install.
-    if (Get-Command Get-FarmDashRegistryArguments -ErrorAction SilentlyContinue) {
+    if ($script:FarmDashNativeDependencyRegistry) {
         foreach ($scope in @('CurrentUser', 'all')) {
             $arguments = Get-FarmDashRegistryArguments $scope 'Install'
             $arguments.sSubKeyName = $arguments.sSubKeyName.Replace('11de34ca-2bb0-58cf-bf02-9951a95a886c', $other)
-            $keyArguments = @{ hDefKey = $arguments.hDefKey; sSubKeyName = $arguments.sSubKeyName }
             $arguments.sValueName = 'InstallLocation'
             $result = Invoke-FarmDashRegistryService 'GetStringValue' $arguments
-            if ($result.ReturnValue -eq 2) { continue }
-            if ($result.ReturnValue -eq 1) {
-                # Same StdRegProv 1 as Read-FarmDashNativeString: key exists but
-                # this string may be absent. A leftover Software\{guid} key must
-                # not abort Full uninstall; wrong types / denied reads still throw.
-                $enumeration = Invoke-FarmDashRegistryService 'EnumValues' $keyArguments
-                if ($enumeration.ReturnValue -eq 2 -or
-                    ($enumeration.ReturnValue -eq 0 -and @($enumeration.sNames) -notcontains 'InstallLocation')) {
-                    continue
-                }
-            }
-            if ($result.ReturnValue -ne 0) { throw 'Cannot determine whether another Dashboard needs ImageMagick.' }
+            if ($result.ReturnValue -notin @(0, 2)) { throw 'Cannot determine whether another Dashboard needs ImageMagick.' }
             if ($result.sValue -and (Test-Path -LiteralPath (Join-Path $result.sValue 'resources\app.asar') -PathType Leaf)) {
                 return $true
             }
         }
     }
-    # Also open both registry views. 32-bit PowerShell HKLM:\Software maps to
-    # Wow6432Node; V5 native registration lives in the 64-bit hive.
-    foreach ($hive in @('CurrentUser', 'LocalMachine')) {
-        foreach ($view in @([Microsoft.Win32.RegistryView]::Registry64, [Microsoft.Win32.RegistryView]::Registry32)) {
-            if (Test-OtherDashboardRegistryView $hive $view $other) { return $true }
+    foreach ($hive in @('HKCU:', 'HKLM:')) {
+        foreach ($key in @("$hive\Software\$other", "$hive\Software\Microsoft\Windows\CurrentVersion\Uninstall\$other")) {
+            $entry = Get-ItemProperty -LiteralPath $key -ErrorAction SilentlyContinue
+            if ($entry.InstallLocation -and (Test-Path -LiteralPath (Join-Path $entry.InstallLocation 'resources\app.asar') -PathType Leaf)) {
+                return $true
+            }
         }
     }
     return $false

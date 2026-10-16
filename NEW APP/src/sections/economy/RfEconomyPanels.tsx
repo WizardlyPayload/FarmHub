@@ -1,10 +1,14 @@
 import type { ComponentChildren } from "preact";
 import { Badge, Card } from "@/components/ui";
 import { t, tOr } from "@/i18n/i18n";
+import { britishLabel, formatFillPrice } from "@/lib/fill-units";
+import { useFillPhysics, useFillUnitMode, useUnitDisplay } from "@/lib/fill-unit-mode";
+import { saveProfileFromUnitDisplay } from "@/lib/profile-display";
 import {
   anyRfEconomyActive,
   formatRfDieselPrice,
   formatRfMoney,
+  formatRfUnitPrice,
   formatRfPct,
   fuelTrendTone,
   getRfIncomeForFarm,
@@ -39,15 +43,16 @@ function TaxPanel({
   rf: RealisticFarmingPayload;
   farmId: number;
 }) {
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
   if (!isRfTaxActive(rf)) return null;
   const row = getRfTaxForFarm(rf, farmId);
   return (
     <Card title={t("economy.rf.tax.title")} class="fd-economy__rf-card">
       <MetaRow label={t("economy.rf.tax.accumulated")}>
-        <strong>{formatRfMoney(row?.accumulatedAnnual)}</strong>
+        <strong>{formatRfMoney(row?.accumulatedAnnual, profile)}</strong>
       </MetaRow>
       <MetaRow label={t("economy.rf.tax.projected")}>
-        <strong>{formatRfMoney(row?.projectedBill)}</strong>
+        <strong>{formatRfMoney(row?.projectedBill, profile)}</strong>
       </MetaRow>
       <MetaRow label={t("economy.rf.tax.rate")}>
         {row?.taxRate != null && Number.isFinite(row.taxRate)
@@ -67,6 +72,7 @@ function TaxPanel({
 }
 
 function FuelPanel({ rf }: { rf: RealisticFarmingPayload }) {
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
   if (!isRfFuelCostsActive(rf)) return null;
   const fuel = rf.fuelCosts;
   const trend = fuel?.trend ?? null;
@@ -81,7 +87,7 @@ function FuelPanel({ rf }: { rf: RealisticFarmingPayload }) {
   return (
     <Card title={t("economy.rf.fuel.title")} class="fd-economy__rf-card">
       <MetaRow label={t("economy.rf.fuel.diesel")}>
-        <strong>{formatRfDieselPrice(fuel?.dieselPrice)}</strong>
+        <strong>{formatRfDieselPrice(fuel?.dieselPrice, profile)}</strong>
       </MetaRow>
       <MetaRow label={t("economy.rf.fuel.trend")}>
         <Badge tone={fuelTrendTone(trend)}>{trendLabel}</Badge>
@@ -100,6 +106,7 @@ function IncomePanel({
   rf: RealisticFarmingPayload;
   farmId: number;
 }) {
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
   if (!isRfIncomeActive(rf)) return null;
   const row = getRfIncomeForFarm(rf, farmId);
   const enabled = row?.settingsEnabled === true;
@@ -112,7 +119,7 @@ function IncomePanel({
       </MetaRow>
       <MetaRow label={t("economy.rf.income.mode")}>{row?.mode || "—"}</MetaRow>
       <MetaRow label={t("economy.rf.income.amount")}>
-        <strong>{formatRfMoney(row?.amount)}</strong>
+        <strong>{formatRfMoney(row?.amount, profile)}</strong>
       </MetaRow>
       <MetaRow label={t("economy.rf.income.next")}>{row?.nextPayoutLabel || "—"}</MetaRow>
     </Card>
@@ -126,6 +133,7 @@ function WorkersPanel({
   rf: RealisticFarmingPayload;
   farmId: number;
 }) {
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
   if (!isRfWorkerCostsActive(rf)) return null;
   const row = getRfWorkerCostsForFarm(rf, farmId);
   return (
@@ -135,11 +143,11 @@ function WorkersPanel({
       </MetaRow>
       <MetaRow label={t("economy.rf.workers.mode")}>{row?.wageMode || "—"}</MetaRow>
       <MetaRow label={t("economy.rf.workers.rate")}>
-        <strong>{formatRfMoney(row?.wageRate)}</strong>
+        <strong>{formatRfMoney(row?.wageRate, profile)}</strong>
       </MetaRow>
       <MetaRow label={t("economy.rf.workers.next")}>{row?.nextPaymentLabel || "—"}</MetaRow>
       <MetaRow label={t("economy.rf.workers.period")}>
-        <strong>{formatRfMoney(row?.periodSpend)}</strong>
+        <strong>{formatRfMoney(row?.periodSpend, profile)}</strong>
       </MetaRow>
     </Card>
   );
@@ -152,6 +160,7 @@ function WorkplacePanel({
   rf: RealisticFarmingPayload;
   farmId: number;
 }) {
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
   if (!isRfWorkplaceTriggersActive(rf)) return null;
   const workplaces = getRfWorkplacesForFarm(rf, farmId);
   return (
@@ -168,7 +177,7 @@ function WorkplacePanel({
                   <Badge tone="warn">{t("economy.rf.workplace.onClock")}</Badge>
                 ) : null}
               </span>
-              <strong>{formatRfMoney(wp.wage)}</strong>
+              <strong>{formatRfMoney(wp.wage, profile)}</strong>
             </div>
           ))}
         </div>
@@ -178,6 +187,10 @@ function WorkplacePanel({
 }
 
 function MarketDynamicsPanel({ rf }: { rf: RealisticFarmingPayload }) {
+  const fillMode = useFillUnitMode();
+  const fillPhysics = useFillPhysics();
+  const unitDisplay = useUnitDisplay();
+  const profile = saveProfileFromUnitDisplay(unitDisplay);
   if (!isRfMarketDynamicsActive(rf)) return null;
   const md = rf.marketDynamics;
   const events = marketActiveEvents(rf);
@@ -233,9 +246,11 @@ function MarketDynamicsPanel({ rf }: { rf: RealisticFarmingPayload }) {
         <div class="fd-economy__rf-list">
           {movers.map((m) => (
             <div class="fd-economy__rf-list-row" key={m.fillType}>
-              <span>{m.fillType}</span>
+              <span>{fillMode === "british" ? britishLabel(m.fillType) || m.fillType : m.fillType}</span>
               <span>
-                {formatRfMoney(m.pricePer1000l)}{" "}
+                {formatFillPrice(Number(m.pricePer1000l) || 0, m.fillType, fillMode, fillPhysics, (n) =>
+                  formatRfUnitPrice(n, profile),
+                unitDisplay)}{" "}
                 <Badge tone={(m.pctFromBase ?? 0) >= 0 ? "accent" : "danger"}>
                   {formatRfPct(m.pctFromBase)}
                 </Badge>

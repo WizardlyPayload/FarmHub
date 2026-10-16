@@ -1,6 +1,7 @@
 /** FS25_RedTape — compliance data helpers for Economy → Compliance tab. */
 
 import { t } from "@/i18n/i18n";
+import { formatProfileMoney, type SaveProfileDisplay } from "@/lib/profile-display";
 
 export interface RedTapePolicy {
   nameKey?: string;
@@ -69,10 +70,10 @@ export interface RedTapePayload {
   [key: string]: unknown;
 }
 
-export function formatMoney(v: unknown): string {
+export function formatMoney(v: unknown, profile?: SaveProfileDisplay | null): string {
   const n = Number(v);
   if (!Number.isFinite(n)) return "—";
-  return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+  return formatProfileMoney(n, profile);
 }
 
 export function rtLabel(nameKey: unknown, fallback?: string): string {

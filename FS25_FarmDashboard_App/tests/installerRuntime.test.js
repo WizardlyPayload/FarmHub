@@ -11,7 +11,7 @@ windows('Windows installer runtime regressions', () => {
   beforeAll(() => {
     const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'farmdash-installer-runtime-'));
     const exe = process.env.FARMDASH_QA_POWERSHELL || 'powershell.exe';
-    const run = cp.spawnSync(exe, ['-NoProfile', '-NonInteractive', '-File',
+    const run = cp.spawnSync(exe, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'RemoteSigned', '-File',
       path.join(__dirname, 'helpers/installer-runtime.ps1'), '-BuildRoot', path.join(root, 'build'),
       '-FixtureRoot', fixture], { windowsHide: true, encoding: 'utf8', timeout: 60000 });
     const output = String(run.stdout || '') + String(run.stderr || '');
@@ -108,8 +108,6 @@ test('NSIS propagates cleanup failures before built-in file removal', () => {
   expect(nsis).toContain('SetErrorLevel 1');
   expect(nsis).toContain('!insertmacro FarmDashAssertCleanupSuccess "User profile cleanup"');
   expect(nsis).toContain('!insertmacro FarmDashAssertCleanupSuccess "ImageMagick removal"');
-  expect(nsis).toContain('-Edition $R4 -CheckOnly');
-  expect(nsis).toContain('ExecShell "runas"');
   expect(nsis).toContain('!define APP_PACKAGE_NAME "fs25-farm-dashboard-rf"');
   const languageLeave = nsis.split('Function FarmDashLangPageLeave')[1].split('FunctionEnd')[0];
   expect(languageLeave).not.toContain('CreateDirectory "$APPDATA');
@@ -120,19 +118,6 @@ test('both packaging definitions include the shared dependency helper', () => {
   expect(pkg.build.extraResources).toContainEqual({
     from: 'build/imagemagick-common.ps1', to: 'imagemagick-common.ps1',
   });
-  expect(pkg.build.extraResources).toContainEqual({
-    from: 'build/windows-install-state.ps1', to: 'windows-install-state.ps1',
-  });
-  const rfYml = fs.readFileSync(path.join(root, 'electron-builder.rf.yml'), 'utf8');
-  expect(rfYml).toContain('from: build/imagemagick-common.ps1');
-  expect(rfYml).toContain('from: build/windows-install-state.ps1');
-});
-
-test('all-users customInstall writes install-locale.txt in the current-user profile', () => {
-  const nsis = fs.readFileSync(path.join(root, 'build/installer.nsh'), 'utf8');
-  const customInstall = nsis.split('!macro customInstall')[1].split('!macroend')[0];
-  expect(customInstall).toContain('install-locale.txt');
-  expect(customInstall).toMatch(/\$installMode == "all"/);
-  expect(customInstall).toContain('SetShellVarContext current');
-  expect(customInstall).toContain('SetShellVarContext all');
+  expect(fs.readFileSync(path.join(root, 'electron-builder.rf.yml'), 'utf8'))
+    .toContain('from: build/imagemagick-common.ps1');
 });

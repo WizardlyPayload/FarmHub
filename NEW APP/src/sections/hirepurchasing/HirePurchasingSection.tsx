@@ -11,6 +11,8 @@ import {
   type HirePurchasingPayload,
 } from "@/lib/hirePurchasing";
 import { useDashboardStore } from "@/store/dashboard-store";
+import { saveProfileFromUnitDisplay } from "@/lib/profile-display";
+import { unitDisplayFromPayload } from "@/lib/fill-units";
 import type { DashboardPayload } from "@/types/dashboard";
 import "@/sections/economy/economy.css";
 
@@ -22,6 +24,7 @@ function HirePurchasingTab({
   farmId: number;
 }) {
   const hirePurchasing = payload.hirePurchasing as HirePurchasingPayload | null | undefined;
+  const profile = saveProfileFromUnitDisplay(unitDisplayFromPayload(payload));
 
   if (!isHirePurchasingModActive(hirePurchasing)) {
     return (
@@ -55,14 +58,14 @@ function HirePurchasingTab({
           {summary.totalMonthly != null ? (
             <Badge>
               {t("hirepurchasing.summaryMonthly", {
-                amount: formatMoney(summary.totalMonthly),
+                amount: formatMoney(summary.totalMonthly, profile),
               })}
             </Badge>
           ) : null}
           {summary.totalRemaining != null ? (
             <Badge tone="warn">
               {t("hirepurchasing.summaryRemaining", {
-                amount: formatMoney(summary.totalRemaining),
+                amount: formatMoney(summary.totalRemaining, profile),
               })}
             </Badge>
           ) : null}
@@ -87,8 +90,8 @@ function HirePurchasingTab({
                 {deals.map((deal, i) => (
                   <tr key={String(deal.id ?? deal.vehicleUniqueId ?? i)}>
                     <td>{dealVehicleLabel(deal)}</td>
-                    <td class="text-end">{formatMoney(deal.monthlyPayment)}</td>
-                    <td class="text-end">{formatMoney(deal.remainingCost)}</td>
+                    <td class="text-end">{formatMoney(deal.monthlyPayment, profile)}</td>
+                    <td class="text-end">{formatMoney(deal.remainingCost, profile)}</td>
                     <td class="text-end">{formatMonthsLeft(deal)}</td>
                   </tr>
                 ))}

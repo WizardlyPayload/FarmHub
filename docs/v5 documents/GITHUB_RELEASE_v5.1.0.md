@@ -36,7 +36,8 @@ Installer is unsigned — Windows SmartScreen may warn. Guide: https://www.farmd
 - Fields / economy / production export restored after a bad in-game `config.xml`.
 - Dairy Core barn names use the placeable name.
 - Pack writes a complete unpacked mod folder so Giants SP does not load a stale folder over the zip.
-- Companion pages follow mods active in the current save. Removing a mod hides its page without deleting its retained dashboard data.
+- Companion pages follow mods active in the current save. Disabling a companion mod hides its page; re-enabling it reads the data that mod kept in the save. Farm Dashboard does not keep a separate hidden copy in its live cache.
+- Everything Constructable adds a read-only construction-site page with each material's required, delivered and remaining amounts. A live Ally test confirmed the page updated after an in-game cement delivery.
 
 ---
 

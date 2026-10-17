@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const { lua, lauxlib, lualib, to_luastring, to_jsstring } = require("fengari");
-const repro = require("../../Pipeline/runs/FARMHUB-20260924-REPLICA-INTEGRATION-REWORK-002-REPRODUCTIONS.json");
+const repro = require("./fixtures/reproductions/replica-002.json");
 
 function runLua(scenario) {
     const state = lauxlib.luaL_newstate();

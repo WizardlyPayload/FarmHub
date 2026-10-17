@@ -10,7 +10,7 @@ const collectorPath = path.resolve(
 );
 const source = fs.readFileSync(collectorPath, "utf8");
 const fixtures = JSON.parse(fs.readFileSync(
-    path.resolve(__dirname, "../../Pipeline/runs/FARMHUB-20260927-SOURCE-COMPLETION-017-CODEX-LUA-FIXTURES.json"),
+    path.resolve(__dirname, "fixtures/reproductions/units-017.json"),
     "utf8",
 ));
 

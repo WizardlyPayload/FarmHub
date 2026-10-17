@@ -8,7 +8,7 @@ const { ingestWatchedSlot, parseReplicaContext, createFreshnessTracker } = requi
 const { writeStrictPair } = require("../replicaPairContract.cjs");
 
 const modSrc = path.resolve(__dirname, "../../FS25_FarmDashboard_Mod/src");
-const repro = require("../../Pipeline/runs/FARMHUB-20260924-REPLICA-INTEGRATION-REWORK-002-REPRODUCTIONS.json");
+const repro = require("./fixtures/reproductions/replica-002.json");
 
 function runLua(chunk) {
     const L = lauxlib.luaL_newstate();

@@ -1,0 +1,56 @@
+{
+  "host": "\nlocal files = {}\nlocal saved = {}\nlocal docs = {}\nlocal nextId = 1\nfunction createXMLFile(name, p, root)\n    local id = nextId\n    nextId = nextId + 1\n    docs[id] = { path = p, root = root, fields = {} }\n    return id\nend\nfunction setXMLString(handle, key, value)\n    local doc = docs[handle]\n    if not doc then return end\n    local name = string.match(key, \"#(.+)$\") or key\n    doc.fields[name] = value\nend\nfunction saveXMLFile(handle)\n    local doc = docs[handle]\n    if not doc then return false end\n    local parts = { \"<\" .. doc.root }\n    local order = {\n        \"schema\", \"careerId\", \"sessionId\", \"publicationSequence\", \"exportGeneration\",\n        \"simulationTimeMs\", \"encoding\", \"bytes\", \"crc\", \"payload\",\n        \"sourceId\", \"sourceSlot\", \"connectionEpoch\", \"replica\",\n    }\n    for i = 1, #order do\n        local name = order[i]\n        if doc.fields[name] ~= nil then\n            parts[#parts + 1] = \" \" .. name .. '=\"' .. doc.fields[name] .. '\"'\n        end\n    end\n    parts[#parts + 1] = \"/>\"\n    local copy = {}\n    for key, value in pairs(doc.fields) do copy[key] = value end\n    saved[doc.path] = copy\n    files[doc.path] = table.concat(parts)\n    return true\nend\nfunction loadXMLFile(name, p)\n    if saved[p] == nil then return 0 end\n    local id = nextId\n    nextId = nextId + 1\n    local copy = {}\n    for key, value in pairs(saved[p]) do copy[key] = value end\n    docs[id] = { path = p, root = \"farmDashboardExport\", fields = copy }\n    return id\nend\nfunction getXMLString(handle, key)\n    local doc = docs[handle]\n    if not doc then return nil end\n    local name = string.match(key, \"#(.+)$\") or key\n    return doc.fields[name]\nend\nfunction delete() end\nlocal q = {}\nlocal readAt = 1\nfunction streamWriteString(id, value) q[#q + 1] = value end\nfunction streamWriteInt32(id, value) q[#q + 1] = value end\nfunction streamReadString(id)\n    local value = q[readAt]\n    readAt = readAt + 1\n    return value\nend\nfunction streamReadInt32(id)\n    local value = q[readAt]\n    readAt = readAt + 1\n    return value\nend\nlocal function resetQueue()\n    q = {}\n    readAt = 1\nend\nlocal conn = { epoch = 1 }\nfunction conn:getIsServer() return true end\nfunction conn:sendEvent(event)\n    resetQueue()\n    event:writeStream(1, self)\n    readAt = 1\n    local incoming = FarmDashboardExportEvent.emptyNew()\n    incoming:readStream(1, self)\nend\nFarmDashboardExportMirror._replicaRoot = \"replica/\"\nFarmDashboardExportMirror:registerReplicaSource(conn, \"source-a\")\nFarmDashboardExportMirror._clients = { [conn] = true }\nlocal function publish(body, sequence, generation, sessionId)\n    local payload = ExportEnvelopePublisher.encodeBase64(body)\n    local crc = ExportEnvelopePublisher.checksum(body)\n    local record = {\n        schema = \"2\", careerId = \"career-a\", sessionId = sessionId or \"session-a\",\n        publicationSequence = tostring(sequence), exportGeneration = tostring(generation),\n        simulationTimeMs = \"10\", encoding = \"base64\", bytes = tostring(#body),\n        crc = crc, payload = payload, sourceSlot = \"savegame3\", persistence = \"saved\",\n        sessionToken = \"token-a\", targetDir = \"virtual/career-a/\", slot = \"a\",\n    }\n    local started = FarmDashboardExportMirror:onCommittedEnvelope(record)\n    for _ = 1, 8 do FarmDashboardExportMirror:update(16) end\n    local selected = files[\"replica/source-a/selected.xml\"]\n    local context = files[\"replica/source-a/replicaContext.xml\"]\n    return started, selected, context, record\nend\n",
+  "cases": [
+    {
+      "id": "M01-unregistered-production-connection",
+      "chunk": "FarmDashboardExportMirror._replicaSources = {} local _,selected=publish('{\"vehicles\":[{\"id\":1}]}',1,1) return tostring(FarmDashboardExportMirror._lastReplicaOutcome)..'|stored='..tostring(selected~=nil)"
+    },
+    {
+      "id": "M02-nonrecursive-fresh-store",
+      "chunk": "local dirs={['profile/modSettings/FS25_FarmDashboard']=true} function getUserProfileAppPath()return 'profile/'end FarmDashboardExportMirror._replicaRoot=nil function createFolder(p) local parent=string.match(p,'^(.*)/[^/]+$') if dirs[parent]then dirs[p]=true end end local nativeCreate=createXMLFile function createXMLFile(n,p,r)if not dirs[string.match(p,'^(.*)/[^/]+$')]then return 0 end return nativeCreate(n,p,r)end publish('{\"vehicles\":[{\"id\":1}]}',1,1) return tostring(FarmDashboardExportMirror._lastReplicaOutcome)..'|replicasRoot='..tostring(dirs['profile/modSettings/FS25_FarmDashboard/replicas']==true)"
+    },
+    {
+      "id": "M03-failed-selected-overwrite-loses-last-good",
+      "chunk": "local _,first=publish('{\"vehicles\":[{\"id\":1}]}',1,1) local nativeSave=saveXMLFile function saveXMLFile(h)local d=docs[h] if d.path=='replica/source-a/selected.xml' and d.fields.publicationSequence=='2'then files[d.path]='<truncated';saved[d.path]=nil;return false end return nativeSave(h)end local _,second=publish('{\"vehicles\":[{\"id\":2}]}',2,2) return tostring(FarmDashboardExportMirror._lastReplicaOutcome)..'|firstValid='..tostring(first~=nil)..'|lastGoodRetained='..tostring(first==second)..'|selected='..tostring(second)"
+    },
+    {
+      "id": "M04-context-failure-pairs-new-envelope-old-origin",
+      "chunk": "local _,first,context,record=publish('{\"vehicles\":[{\"id\":1}]}',1,1) local nativeSave=saveXMLFile function saveXMLFile(h)if docs[h].path=='replica/source-a/replicaContext.xml'then return false end return nativeSave(h)end record.sourceSlot='savegame4';record.publicationSequence='2';record.exportGeneration='2';FarmDashboardExportMirror:onCommittedEnvelope(record) for i=1,8 do FarmDashboardExportMirror:update(16)end return tostring(FarmDashboardExportMirror._lastReplicaOutcome)..'\\n'..tostring(files['replica/source-a/selected.xml'])..'\\n'..tostring(files['replica/source-a/replicaContext.xml'])"
+    },
+    {
+      "id": "M05-mixed-connection-transfer-is-published",
+      "chunk": "local connB={epoch=1}function connB:getIsServer()return true end FarmDashboardExportMirror:registerReplicaSource(connB,'source-b') local send=conn.sendEvent function conn:sendEvent(event) local destination=event.chunkIndex==1 and self or connB send(destination,event) end publish('{\"vehicles\":[],\"pad\":\"'..string.rep('a',1400)..'\"}',1,1) return tostring(FarmDashboardExportMirror._lastReplicaOutcome)..'|sourceA='..tostring(files['replica/source-a/selected.xml']~=nil)..'|sourceB='..tostring(files['replica/source-b/selected.xml']~=nil)"
+    },
+    {
+      "id": "M06-two-incomplete-transfers-never-expire",
+      "chunk": "g_time=0 local send=conn.sendEvent function conn:sendEvent(e)if e.chunkIndex==1 then send(self,e)end end publish('{\"vehicles\":[],\"pad\":\"'..string.rep('a',1400)..'\"}',1,1) g_time=20000 publish('{\"vehicles\":[],\"pad\":\"'..string.rep('b',1400)..'\"}',2,2) g_time=100000000 FarmDashboardExportMirror:update(16) conn.sendEvent=send publish('{\"vehicles\":[{\"id\":3}]}',3,3) local n=0 for _ in pairs(FarmDashboardExportMirror._receiveBufs)do n=n+1 end return 'buffers='..n..'|thirdStored='..tostring(files['replica/source-a/selected.xml']~=nil)"
+    },
+    {
+      "id": "M07-native-release-failure-is-claimed-published",
+      "chunk": "function delete()error('injected native release failure')end publish('{\"vehicles\":[{\"id\":1}]}',1,1) return tostring(FarmDashboardExportMirror._lastReplicaOutcome)"
+    },
+    {
+      "id": "M08-fresh-join-does-not-replay-owned-commit",
+      "chunk": "publish('{\"vehicles\":[{\"id\":1}]}',1,1) local sent=0 local joined={}function joined:sendEvent(e)sent=sent+1 end FarmDashboardExportMirror:onClientJoined(joined) for i=1,8 do FarmDashboardExportMirror:update(16)end return 'joinedTracked='..tostring(FarmDashboardExportMirror._clients[joined]==true)..'|sent='..sent..'|cached='..tostring(FarmDashboardExportMirror._lastJson~=nil)"
+    }
+  ],
+  "nodeCases": [
+    {
+      "id": "M04",
+      "steps": "Split Lua M04 result on newline; write selected.xml and replicaContext.xml lines into one disposable directory; ingestWatchedSlot(dir,{sourceId:source-a,configuredSlot:savegame3}). Sender sourceSlot was savegame4; result must not accept sequence2 under old savegame3."
+    },
+    {
+      "id": "M09",
+      "context": "<farmDashboardReplicaContext sourceId=\"source-a\" sourceSlot=\"savegame3\" connectionEpoch=\"1\" replica=\"true\"/>",
+      "withDeclaration": "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n<farmDashboardReplicaContext sourceId=\"source-a\" sourceSlot=\"savegame3\" connectionEpoch=\"1\" replica=\"true\"/>",
+      "withJunk": "<farmDashboardReplicaContext sourceId=\"source-a\" sourceSlot=\"savegame3\" connectionEpoch=\"1\" JUNK replica=\"true\"/>",
+      "entrypoint": "parseReplicaContext"
+    },
+    {
+      "id": "M10",
+      "selectionXml": "<farmDashboardExport schema=\"2\" careerId=\"career-a\" sessionId=\"session-a\" publicationSequence=\"2\" exportGeneration=\"2\" simulationTimeMs=\"10\" encoding=\"base64\" bytes=\"23\" crc=\"1644365814\" payload=\"eyJ2ZWhpY2xlcyI6W3siaWQiOjF9XX0=\"/>",
+      "contextXml": "<farmDashboardReplicaContext sourceId=\"source-a\" sourceSlot=\"savegame3\" connectionEpoch=\"1\" replica=\"true\"/>",
+      "steps": "Fresh temporary directory and createFreshnessTracker({now:()=>clock.t,staleAfterMs:5000}); write same valid envelope with publicationSequence/exportGeneration 2, then3, then1; each time ingestWatchedSlot with source-a/savegame3, same tracker and previous result; advance clock100ms. Do not alter payload/CRC. Sequence1 must not replace3 or inherit live acceptance."
+    }
+  ]
+}

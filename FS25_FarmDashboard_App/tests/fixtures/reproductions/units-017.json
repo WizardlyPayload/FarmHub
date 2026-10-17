@@ -1,0 +1,70 @@
+{
+  "fixtures": [
+    {
+      "id": "L01",
+      "setup": "getfenv=function() return _G end\ng_currentMission={getFarmId=function() return 1 end}\ng_modIsLoaded={['FS25_356143_Seasonal_Wool_Production']=true}\ng_modManager={getActiveMods=function() return {{modName='FS25_356143_Seasonal_Wool_Production'}} end}\n_G['FS25_356143_Seasonal_Wool_Production']={g_seasonalWoolProduction={isInitialized=true,isShearingMonth=true,woolRates={}}}\n",
+      "expression": "tostring(out.seasonalWool and out.seasonalWool.readState)",
+      "expected": "ok"
+    },
+    {
+      "id": "L02",
+      "setup": "getfenv=function() return _G end\ng_currentMission={getFarmId=function() return 1 end}\ng_modIsLoaded={['FS25_352788_Production_Schedule']=true}\ng_modManager={getActiveMods=function() return {{modName='FS25_352788_Production_Schedule'}} end}\n_G['FS25_352788_Production_Schedule']={ProductionSchedule={data={p1={r1={status=\"aktiv\",months={[1]=true}}}},runtime={p1={ownerFarmId=1}}}}\n",
+      "expression": "tostring(out.productionSchedule and out.productionSchedule.readState)",
+      "expected": "ok"
+    },
+    {
+      "id": "L03",
+      "setup": "getfenv=function() return _G end\ng_currentMission={getFarmId=function() return 1 end}\ng_modIsLoaded={['FS25_367175_Economic_History']=true}\ng_modManager={getActiveMods=function() return {{modName='FS25_367175_Economic_History'}} end}\n_G['FS25_367175_Economic_History']={FinancialLogger={history={},getCurrentFinanceData=function() return {total=5,balance=10,loanBalance=0} end}}\n",
+      "expression": "tostring(out.economicHistory and out.economicHistory.readState)",
+      "expected": "ok"
+    },
+    {
+      "id": "L04",
+      "setup": "getfenv=function() return _G end\ng_currentMission={getFarmId=function() return 1 end}\ng_modIsLoaded={['FS25_368672_Animal_Planner']=true}\ng_modManager={getActiveMods=function() return {{modName='FS25_368672_Animal_Planner'}} end}\n_G['FS25_368672_Animal_Planner']={AnimalPlannerData={getHusbandryData=function() return {name=\"Barn\",numAnimals=3,maxAnimals=10} end}}\ng_currentMission.husbandrySystem={placeables={{ownerFarmId=1}}}",
+      "expression": "tostring(out.animalPlanner and out.animalPlanner.readState)",
+      "expected": "ok"
+    },
+    {
+      "id": "L05",
+      "setup": "getfenv=function() return _G end\ng_currentMission={getFarmId=function() return 1 end}\ng_modIsLoaded={['FS25_310861_VIP_Order_Manager']=true}\ng_modManager={getActiveMods=function() return {{modName='FS25_310861_VIP_Order_Manager'}} end}\n_G['FS25_310861_VIP_Order_Manager']={VIPOrderManager={VIPOrders={{id=1}}}}\n",
+      "expression": "tostring(out.vipOrders and out.vipOrders.readState)",
+      "expected": "ok"
+    },
+    {
+      "id": "L06",
+      "setup": "getfenv=function() return _G end\ng_currentMission={getFarmId=function() return 1 end}\ng_modIsLoaded={['FS25_367175_Economic_History']=true}\ng_modManager={getActiveMods=function() return {{modName='FS25_367175_Economic_History'}} end}\n_G['FS25_367175_Economic_History']={FinancialLogger={history={},getCurrentFinanceData=function() error(\"provider failed\") end}}\nFinancialLogger=_G['FS25_367175_Economic_History'].FinancialLogger\n",
+      "expression": "tostring(out.economicHistory and out.economicHistory.readState)",
+      "expected": "failed"
+    },
+    {
+      "id": "L07",
+      "setup": "getfenv=function() return _G end\ng_currentMission={getFarmId=function() return 1 end}\ng_modIsLoaded={['FS25_368672_Animal_Planner']=true}\ng_modManager={getActiveMods=function() return {{modName='FS25_368672_Animal_Planner'}} end}\n_G['FS25_368672_Animal_Planner']={AnimalPlannerData={getHusbandryData=function() error(\"provider failed\") end}}\nAnimalPlannerData=_G['FS25_368672_Animal_Planner'].AnimalPlannerData\ng_currentMission.husbandrySystem={placeables={{ownerFarmId=1}}}",
+      "expression": "tostring(out.animalPlanner and out.animalPlanner.readState)",
+      "expected": "failed"
+    },
+    {
+      "id": "L08",
+      "setup": "getfenv=function() return _G end\ng_currentMission={getFarmId=function() return 1 end}\ng_modIsLoaded={['FS25_338159_Animal_Food_Calculator']=true}\ng_modManager={getActiveMods=function() return {{modName='FS25_338159_Animal_Food_Calculator'}} end}\n_G['FS25_338159_Animal_Food_Calculator']={AFCConsumptionScaling={enabled=true,getScaleFactor=function() return 1.5 end}}\n",
+      "expression": "tostring(out.animalFoodCalculator and out.animalFoodCalculator.readState)",
+      "expected": "ok"
+    },
+    {
+      "id": "L09",
+      "setup": "getfenv=function() return _G end\ng_currentMission={getFarmId=function() return 1 end}\ng_modIsLoaded={['FS25_338159_Animal_Food_Calculator']=true}\ng_modManager={getActiveMods=function() return {{modName='FS25_338159_Animal_Food_Calculator'}} end}\n_G['FS25_338159_Animal_Food_Calculator']={AFCConsumptionScaling={enabled=true,getScaleFactor=function() error(\"failed\") end}}\nAFCConsumptionScaling=_G['FS25_338159_Animal_Food_Calculator'].AFCConsumptionScaling",
+      "expression": "tostring(out.animalFoodCalculator and out.animalFoodCalculator.readState)",
+      "expected": "failed"
+    },
+    {
+      "id": "L10",
+      "setup": "getfenv=function() return _G end\ng_currentMission={getFarmId=function() return 1 end}\ng_modIsLoaded={FS25_367175_Economic_History=true}\nFinancialLogger={history={}}\nfor i=1,36 do FinancialLogger.history[i]={year=2027+math.floor((i-1)/12),period=((i-1)%12)+1,data={[1]={total=i,balance=i,loanBalance=0}}} end",
+      "expression": "tostring(out.economicHistory.months[1].total)..\"|\"..tostring(out.economicHistory.months[#out.economicHistory.months].total)",
+      "expected": "25|36"
+    },
+    {
+      "id": "L11",
+      "setup": "getfenv=function() return _G end\ng_currentMission={getFarmId=function() return 1 end}\ng_modIsLoaded={FS25_312938_Task_List=true}\ng_currentMission.taskList={activeTasks={a={groupId=\"g1\",id=\"t1\"},b={groupId=\"g2\",id=\"t2\"}},taskGroups={g1={farmId=1,tasks={t1={detail=\"FARM ONE\",priority=1}}},g2={farmId=2,tasks={t2={detail=\"FARM TWO\",priority=1}}}}}",
+      "expression": "out.taskList.readState..\"|\"..tostring(#out.taskList.tasks)..\"|\"..out.taskList.tasks[1].detail",
+      "expected": "ok|1|FARM ONE"
+    }
+  ]
+}

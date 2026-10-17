@@ -1002,7 +1002,7 @@ describe("xml integration rework probes", () => {
 });
 
 describe("rework 005 reproductions", () => {
-    const pack = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../Pipeline/runs/FARMHUB-20260924-XML-INTEGRATION-REWORK-005-REPRODUCTIONS.json"), "utf8"));
+    const pack = JSON.parse(fs.readFileSync(path.resolve(__dirname, "fixtures/reproductions/xml-005.json"), "utf8"));
     const chunk = Object.fromEntries(pack.luaCases.map((item) => [item.id, item.chunk]));
 
     test("production reset without bindings is refused", () => {
@@ -1080,7 +1080,7 @@ describe("rework 005 reproductions", () => {
 });
 
 describe("rework 006 resource and budget", () => {
-    const pack = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../Pipeline/runs/FARMHUB-20260924-XML-INTEGRATION-REWORK-006-REPRODUCTIONS.json"), "utf8"));
+    const pack = JSON.parse(fs.readFileSync(path.resolve(__dirname, "fixtures/reproductions/xml-006.json"), "utf8"));
     const chunk = Object.fromEntries(pack.luaCases.map((item) => [item.id, item.chunk]));
 
     test("M01 the first pen write records its own ledger", () => {
@@ -1105,7 +1105,7 @@ describe("rework 006 resource and budget", () => {
 });
 
 describe("rework 007 terminal resource and budget", () => {
-    const pack = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../Pipeline/runs/FARMHUB-20260924-XML-INTEGRATION-REWORK-007-REPRODUCTIONS.json"), "utf8"));
+    const pack = JSON.parse(fs.readFileSync(path.resolve(__dirname, "fixtures/reproductions/xml-007.json"), "utf8"));
     const chunk = Object.fromEntries(pack.lua.cases.map((item) => [item.id, item.chunk]));
 
     test("N09 toJSON stays a full serializer and does not charge a zero budget", () => {
@@ -1144,7 +1144,7 @@ describe("rework 007 terminal resource and budget", () => {
 });
 
 describe("rework 008 queued export budget", () => {
-    const pack = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../Pipeline/runs/FARMHUB-20260924-XML-INTEGRATION-REWORK-008-REPRODUCTIONS.json"), "utf8"));
+    const pack = JSON.parse(fs.readFileSync(path.resolve(__dirname, "fixtures/reproductions/xml-008.json"), "utf8"));
     const chunk = Object.fromEntries(pack.lua.cases.map((item) => [item.id, item.chunk]));
 
     test("P01 one byte does not emit the rest of a deferred value", () => {
@@ -1274,7 +1274,7 @@ describe("rework 008 queued export budget", () => {
 });
 
 describe("rework 009 queue promotion and fair publication", () => {
-    const pack = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../Pipeline/runs/FARMHUB-20260924-XML-INTEGRATION-REWORK-009-REPRODUCTIONS.json"), "utf8"));
+    const pack = JSON.parse(fs.readFileSync(path.resolve(__dirname, "fixtures/reproductions/xml-009.json"), "utf8"));
     const chunk = Object.fromEntries(pack.lua.cases.map((item) => [item.id, item.chunk]));
 
     test("Q01 a retained gameplay request commits after the budget returns", () => {
@@ -1320,7 +1320,7 @@ describe("rework 009 queue promotion and fair publication", () => {
 });
 
 describe("rework 010 document walker index lifecycle and resource cursor", () => {
-    const pack = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../Pipeline/runs/FARMHUB-20260924-XML-INTEGRATION-REWORK-010-REPRODUCTIONS.json"), "utf8"));
+    const pack = JSON.parse(fs.readFileSync(path.resolve(__dirname, "fixtures/reproductions/xml-010.json"), "utf8"));
     const chunk = Object.fromEntries(pack.lua.cases.map((item) => [item.id, item.chunk]));
 
     test("S01 a one-byte document step does not append unmetered framing", () => {
@@ -1520,7 +1520,7 @@ describe("replica capture at the authoritative commit", () => {
 });
 
 describe("XML integration rework 011", () => {
-    const pack = JSON.parse(fs.readFileSync(path.resolve(__dirname, "../../Pipeline/runs/FARMHUB-20260924-XML-INTEGRATION-REWORK-011-REPRODUCTIONS.json"), "utf8"));
+    const pack = JSON.parse(fs.readFileSync(path.resolve(__dirname, "fixtures/reproductions/xml-011.json"), "utf8"));
     const chunk = Object.fromEntries(pack.lua.cases.map((item) => [item.id, item.chunk]));
 
     test("T02 one ledger scan and the creating session stay on the same index job", () => {

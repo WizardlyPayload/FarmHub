@@ -37,6 +37,18 @@ export function renderUiStateHtml({
     </div>`;
 }
 
+export function bindUiStateRetry(root, onRetry) {
+  if (!root || typeof root.querySelectorAll !== "function" || typeof onRetry !== "function") return;
+  for (const button of root.querySelectorAll(".fd-uistate-retry")) {
+    if (button.dataset.fdUiStateRetryBound === "1") continue;
+    button.dataset.fdUiStateRetryBound = "1";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      onRetry();
+    });
+  }
+}
+
 if (typeof window !== "undefined") {
   window.farmDashUiState = { renderUiStateHtml };
 }

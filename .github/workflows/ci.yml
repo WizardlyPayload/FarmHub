@@ -27,11 +27,11 @@ jobs:
       - name: Install NEW APP dependencies
         working-directory: NEW APP
         run: npm ci
-      - name: Run tests
-        run: npm run test:all
       - name: Build NEW APP UI
         working-directory: NEW APP
         run: npm run build
+      - name: Run tests
+        run: npm run test:all
       - name: Electron pack files (main require closure vs build.files)
         run: npm run verify:electron-pack
       - name: i18n verify (all locales match en + placeholders)

@@ -24,7 +24,7 @@ test('V5 registry transport sees and removes a Windows-visible per-user key', op
       '-File', nativeFixture, '-SourceRoot', root], { encoding: 'utf8', windowsHide: true, timeout: 30000 });
     assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout);
     const state = JSON.parse(result.stdout.trim().split(/\r?\n/).at(-1));
-    assert.equal(state.error, null, `${shell}: ${state.error}`);
+    assert.equal(state.error, null, `${shell}: ${JSON.stringify(state)}`);
     assert.equal(state.readNativeValue, 'native-created');
     assert.equal(state.removedNativeKey, true);
     assert.equal(state.nativeSawHelperWrite, 'helper-created');

@@ -91,6 +91,18 @@ try {
     }
 } catch {
     $state.error = $_.Exception.Message
+    if ($state.error -match 'Local V5 install record belongs') {
+        $record = $registryBase.OpenSubKey($shadowInstallSubKey, $false)
+        try {
+            $recordedDirectory = if ($record) { [string]$record.GetValue('InstallLocation') } else { $null }
+            $state.pathDiagnostic = [ordered]@{
+                requested = $shadowDirectory
+                requestedFull = [IO.Path]::GetFullPath($shadowDirectory).TrimEnd('\', '/')
+                recorded = $recordedDirectory
+                recordedFull = if ($recordedDirectory) { [IO.Path]::GetFullPath($recordedDirectory).TrimEnd('\', '/') } else { $null }
+            }
+        } finally { if ($record) { $record.Dispose() } }
+    }
 } finally {
     $existing = Invoke-CimMethod -Namespace root/default -ClassName StdRegProv -MethodName EnumValues -Arguments $arguments
     if ($existing.ReturnValue -eq 0) {

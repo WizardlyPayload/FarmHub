@@ -2,7 +2,16 @@
 
 Player-facing history for the **V5 / new screens** line. Classic 4.x notes stay in [`../CHANGELOG.md`](../CHANGELOG.md).
 
-**Prepared V5 release:** app **5.1.0**, mod **5.1.0.0**. The website may still offer public **5.0.3 / 5.0.0.3** until Graham approves publication. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
+**Prepared V5 candidate:** app **5.1.17**, mod **5.1.0.9**. Check the public download page for the version actually released. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
+
+---
+
+## 5.1.17 / 5.1.0.9 — prepared candidate (2026-10-26, not a publication notice)
+
+- Restored packaged V5 section photographs and splash logo by using the filenames' exact case. The installed PC app served the corrected images and visibly displayed them on Fields and companion pages.
+- Native Windows Installed apps registration was repaired in the preceding 5.1.15 candidate; PC and Ally Keep/Full lifecycle tests passed there. Exact 5.1.17 Ally and uninstall acceptance is pending.
+- The 5.1.0.9 game mod is byte-identical to the PC, Ally and dedicated-server tested canonical `FS25_FarmDashboard.zip`. Its heavy-save collector pacing and two-client multiplayer stream checks passed before this app-only image update.
+- Current core and companion documentation images were captured at 1920 x 1080 from the installed 5.1.17 app with held demo saves. Older settings illustrations are retained and labelled; browser-only settings screenshots were rejected because they lack the Electron bridge.
 
 ---
 

@@ -4,8 +4,8 @@ This is the help pack for the **V5 Windows dashboard**. Start with [installation
 
 ## Which version?
 
-- **Repository target:** Windows app **5.1.0** with the canonical `FS25_FarmDashboard.zip` mod **5.1.0.0**. Source changes, a packaged installer, an installed app, and a public release are different stages. Check [Releases](https://github.com/WizardlyPayload/FarmHub/releases) for what is actually available, and use matching files from one release.
-- **Earlier tested build:** app **5.0.57** with mod **5.0.0.31** passed local installation and two-client dedicated multiplayer testing on 14 October 2026. That evidence does not automatically certify the 5.1.0 merge.
+- **Repository target:** Windows app **5.1.17** with the canonical `FS25_FarmDashboard.zip` mod **5.1.0.9**. Source changes, a packaged installer, an installed app, and a public release are different stages. Check [Releases](https://github.com/WizardlyPayload/FarmHub/releases) for what is actually available, and use matching files from one release.
+- **Current acceptance:** app 5.1.17 is installed and the packaged backgrounds have been visually checked on the PC. The unchanged 5.1.0.9 mod passed earlier PC, Ally, dedicated multiplayer, and heavy-save checks. Exact 5.1.17 Ally and uninstall checks remain separate release gates.
 - **Classic V4:** a separate product line. Its public 4.2.1 story and update feed have not been changed. This V5 pass was **not** a new V4 test.
 
 ## Find the answer you need
@@ -22,6 +22,6 @@ The dashboard **reads** game and companion data. It does not plant, buy, repair,
 
 ![V5 overview from the base-game demo save](doc-screenshots/current-5057/base-overview.png)
 
-*V5 5.1.0 source UI showing a held demo save. Held means saved data, not live gameplay; this is not proof of an installed 5.1.0 build.*
+*Installed V5 5.1.17 showing a held demo save. Held means saved data, not live gameplay.*
 
 Screenshots in this pack must not expose FTP passwords, pairing secrets, or private player details.

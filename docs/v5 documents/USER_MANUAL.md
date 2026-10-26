@@ -1,6 +1,6 @@
 # Farm Dashboard V5: using your farm screens
 
-This manual describes the **5.0.57 Windows-app / 5.0.0.31 mod documentation candidate**. The public download can still be older. If the dashboard is not installed yet, start with [Install V5](INSTALL.md). Optional mods are described individually in [Optional mods](COMPANION_MODS.md).
+This manual describes the **5.1.17 Windows-app / 5.1.0.9 mod candidate**. The public download can still be older. If the dashboard is not installed yet, start with [Install V5](INSTALL.md). Optional mods are described individually in [Optional mods](COMPANION_MODS.md).
 
 Farm Dashboard is an **out-of-game, read-only companion**. It does not replace FS25's menus or control your farm. The game mod exports data, and the Windows app turns that data into pages you can use on another screen.
 
@@ -104,7 +104,7 @@ The sidebar can add **Red Tape, ADS, Invoices, Hire purchase, NPC Favor, World E
 - **Health:** last completed export, source status, compatibility and errors. This is the first stop for waiting/stale or missing companion data.
 - **About:** app/mod versions and detected companion information. A newer-than-pinned mod marked untested is not automatically broken.
 
-The older V5 Settings illustrations remain useful for where the tabs are, but were captured before 5.0.57:
+The older V5 Settings illustrations remain useful for where the tabs are, but were captured before 5.1.17 and need a fresh installed-app capture:
 
 ![Settings Dashboard tab, older V5 illustration](doc-screenshots/v5-settings-010-dashboard.png)
 

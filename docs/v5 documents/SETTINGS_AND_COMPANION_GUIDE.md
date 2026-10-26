@@ -1,6 +1,6 @@
 # Settings and companion-mod pages (V5)
 
-These pictures were taken from the 5.0.57 candidate in a 1920 x 1080 dashboard window. They show the app, not a game menu. The demo saves are examples; your farm's numbers, visible mods and available sections will differ. Settings pictures hide private names, addresses, paths and typed values. Nothing in this guide requires changing a working save.
+The companion-page pictures were taken from the installed 5.1.17 app at 1920 x 1080. The settings pictures are older installed-V5 illustrations and are labelled as such until a 5.1.17 Electron capture is available. The demo saves are examples; your farm's numbers, visible mods and available sections will differ. Settings pictures hide private names, addresses, paths and typed values. Nothing in this guide requires changing a working save.
 
 ## Find the right data first
 

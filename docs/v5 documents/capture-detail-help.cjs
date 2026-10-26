@@ -4,7 +4,7 @@ const { chromium } = require('playwright');
 
 const base = process.env.FARMDASH_CAPTURE_URL || 'http://127.0.0.1:8768/';
 const chrome = process.env.FARMDASH_CHROME || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
-const out = path.join(__dirname, 'doc-screenshots', 'current-5057');
+const out = process.env.FARMDASH_CAPTURE_OUT || path.join(__dirname, 'doc-screenshots', 'current-5057');
 const groups = {
   savegame10: [
     ['enhancedLoanSystem', 'Enhanced Loan System'],
@@ -85,8 +85,15 @@ async function main() {
     for (const [slot, pages] of Object.entries(groups)) {
       const sourceId = sourceFor(servers, slot);
       for (const [key, title] of pages) {
-        await page.goto(new URL(`#mod-${key}`, base).href, { waitUntil: 'domcontentloaded' });
-        await page.locator('.fd-topbar__save-select').selectOption(sourceId);
+        await page.goto(new URL('#/overview', base).href, { waitUntil: 'domcontentloaded' });
+        const save = page.locator('.fd-topbar__save-select');
+        await save.waitFor({ timeout: 30000 });
+        await save.selectOption(sourceId);
+        await page.waitForTimeout(1500);
+        if (await save.inputValue() !== sourceId) throw new Error(`Wrong source for ${key}`);
+        await page.evaluate((route) => { window.location.hash = `#/${route}`; }, `mod-${key}`);
+        await page.waitForFunction((route) => document.querySelector('.fd-main')?.getAttribute('data-section') === route,
+          `mod-${key}`, { timeout: 15000 });
         await page.waitForFunction(({ expected }) => {
           const root = document.querySelector('.fd-main__content');
           if (!root) return false;
@@ -96,6 +103,15 @@ async function main() {
             text.includes('About this mod') &&
             !text.includes('Not detected in this save');
         }, { expected: title }, { timeout: 15000 });
+        await page.evaluate(async () => {
+          const background = document.querySelector('.fd-main__bg');
+          if (!background) return;
+          const match = getComputedStyle(background).backgroundImage.match(/^url\(["']?(.*?)["']?\)$/);
+          if (!match) throw new Error('Companion background URL is missing');
+          const image = new Image();
+          image.src = match[1];
+          await image.decode();
+        });
         await page.waitForTimeout(400);
         const content = page.locator('.fd-main__content');
         await content.evaluate((element) => { element.scrollTop = 0; });
@@ -114,6 +130,13 @@ async function main() {
     }
 
     await page.goto(base, { waitUntil: 'domcontentloaded' });
+    // A plain browser has no Electron preload bridge. Its settings fall back
+    // to browser-only placeholders and are not valid installed-app help shots.
+    if (!await page.evaluate(() => Boolean(window.farmDashAPI))) {
+      fs.writeFileSync(path.join(out, 'detail-capture-index.json'), JSON.stringify(index, null, 2) + '\n');
+      process.stdout.write('Skipped settings: Electron settings bridge is unavailable in this browser capture.\n');
+      return;
+    }
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     const dialog = page.getByRole('dialog');
     const masks = [dialog.locator('input[type="text"],input[type="password"],textarea')];

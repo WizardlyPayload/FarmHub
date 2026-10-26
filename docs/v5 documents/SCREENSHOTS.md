@@ -1,6 +1,6 @@
 # Screenshots for the V5 documentation
 
-Most PNGs in [`doc-screenshots/current-5057/`](doc-screenshots/current-5057/) have been refreshed from the **V5 5.1.0 source UI** at 1920 x 1080. The directory keeps its historical name so existing links do not break. Captures use existing **held** demo exports, not live gameplay at capture time. They do **not** establish that a 5.1.0 installer was built or installed. Some Appearance examples still depict the earlier installed V5 candidate and need recapture before publication. `capture-index.json` is an older capture index and should not be read as a complete 5.1.0 provenance manifest.
+The 53 indexed core and companion PNGs in [`doc-screenshots/current-5057/`](doc-screenshots/current-5057/) were refreshed from the **installed V5 5.1.17 app** at 1920 x 1080. The directory keeps its historical name so existing links do not break. These pages use **held** demo exports, not live gameplay at capture time. `capture-index.json` records the 44 core/top-page captures; `detail-capture-index.json` records 29 companion top/lower captures, including the 20 top-page replacements. The settings illustrations remain from an older installed V5 candidate and are not evidence of 5.1.17 settings behavior. A browser-only settings capture was rejected because it lacks Electron's settings bridge.
 
 Older PNGs directly under `doc-screenshots/` remain as **older V5 illustrations** only where a current image is not available. A V4 installer image is never presented as V5.
 
@@ -17,8 +17,8 @@ Older PNGs directly under `doc-screenshots/` remain as **older V5 illustrations*
 
 ## Manual images still needed before publication
 
-- Genuine **5.1.0 installer welcome and finished** screens; do not reuse V4 pictures.
-- Settings Appearance variants and any V5 source screen that still shows a classic-install backend message; recapture against an installed matching V5 candidate.
+- Genuine **5.1.17 installer welcome and finished** screens; do not reuse V4 pictures.
+- Settings screens captured through the installed Electron app at 1920 x 1080, especially Appearance and Health. Browser-only screenshots show fallback text and must not be used.
 - A **clean first launch** with no old sources or visible passwords.
 - The **new multiplayer link/re-pair** prompt and selected MP source, with private details redacted.
 - **Tablet LAN** sign-in and portrait dashboard, without a visible password.

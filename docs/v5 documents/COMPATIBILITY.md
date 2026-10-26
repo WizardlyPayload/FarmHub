@@ -27,9 +27,9 @@ A detected mod with an empty block does **not** prove its gameplay failed. The d
 
 ## Versions and release boundary
 
-- **Tested documentation candidate:** V5 app **5.0.57**, mod **5.0.0.31**, canonical ZIP `FS25_FarmDashboard.zip`.
-- **Public V5 listing:** may still show **5.0.3 / 5.0.0.3** until the prepared **5.1.0 / 5.1.0.0** release is published. Use the version displayed on the actual download page.
+- **Prepared candidate:** V5 app **5.1.17**, mod **5.1.0.9**, canonical ZIP `FS25_FarmDashboard.zip`. The 5.1.0.9 mod passed PC/Ally and dedicated multiplayer checks; app 5.1.17 was installed and its packaged backgrounds checked on the PC. Exact 5.1.17 Ally and uninstall acceptance is still pending.
+- **Public V5 listing:** use the versions displayed on the actual download page. A locally prepared candidate is not automatically a public release.
 - **Classic V4:** public **4.2.1** remains separate on **8766** and its own `latest.yml`. V5 uses **8768** and `latest-rf.yml`.
-- V4 was **not retested** against mod 5.0.0.31 during this V5 pass. Do not infer a V4 compatibility result from it.
+- V4 was **not retested** against mod 5.1.0.9 during this V5 pass. Do not infer a V4 compatibility result from it.
 
 An About-panel pin saying a newer companion is **untested** means its version is newer than the recorded pin, not that the game rejected it. The [mod-by-mod guide](COMPANION_MODS.md) describes the dashboard surface; the [tester guide](TESTERS.md) describes the evidence needed for a compatibility claim.

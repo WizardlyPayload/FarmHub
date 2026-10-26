@@ -4,7 +4,7 @@ Farm Dashboard is a free Windows companion app and in-game mod for Farming Simul
 
 ## Get started
 
-The `main` branch contains the **V5 app 5.1.17 release candidate** and the matching **5.1.0.9** game mod. V5 is now the repository's default development and build line. Source in `main` is not itself a published installer: check [GitHub Releases](https://github.com/WizardlyPayload/FarmHub/releases) for the actual available download and its version before installing. Keep the app and mod from the same release together.
+The `main` branch contains the **V5 app 5.1.18 release candidate** and the matching **5.1.0.9** game mod. V5 is now the repository's default development and build line. Source in `main` is not itself a published installer: check [GitHub Releases](https://github.com/WizardlyPayload/FarmHub/releases) for the actual available download and its version before installing. Keep the app and mod from the same release together.
 
 1. Download the V5 Windows installer and **`FS25_FarmDashboard.zip`** from the same release.
 2. Put the ZIP, under that exact filename, in `Documents\My Games\FarmingSimulator2025\mods\`. Enable it for the save. Dedicated multiplayer needs the matching mod on the server and clients.
@@ -14,7 +14,7 @@ Read the [V5 installation guide](docs/v5%20documents/INSTALL.md) for first launc
 
 ## Current V5 screens
 
-These full-resolution images were captured from the installed V5 5.1.17 app displaying **held demo-save snapshots**. They show the packaged background images and interface; they do not claim live gameplay at capture time. See the [screenshot notes](docs/v5%20documents/SCREENSHOTS.md) for provenance and remaining capture gaps.
+These full-resolution images were captured from the installed V5 5.1.17 app displaying **held demo-save snapshots**. The 5.1.18 update changed packaged dependencies; the screens shown here were not recaptured. They do not claim live gameplay at capture time. See the [screenshot notes](docs/v5%20documents/SCREENSHOTS.md) for provenance and remaining capture gaps.
 
 ![V5 overview on a held base-game save](docs/v5%20documents/doc-screenshots/current-5057/base-overview.png)
 
@@ -37,6 +37,6 @@ This repository continues [Josh Walki's original FarmDashboard](https://github.c
 
 ## Building from source
 
-The V5 installer and game mod are separate artifacts. From the repository root, `npm run build:all` (or `npm run build:all:v5`) builds the UI, canonical mod ZIP, and V5 installer. The explicit `build:all:classic` command remains for historical V4 builds. V5 writes `latest-rf.yml`; classic V4 uses `latest.yml`. Do not publish one line's update metadata over the other. The nested app's `package.json` retains classic 4.x metadata; the V5 packaging overlay stamps the current V5 installer as 5.1.17.
+The V5 installer and game mod are separate artifacts. From the repository root, `npm run build:all` (or `npm run build:all:v5`) builds the UI, canonical mod ZIP, and V5 installer. The explicit `build:all:classic` command remains for historical V4 builds. V5 writes `latest-rf.yml`; classic V4 uses `latest.yml`. Do not publish one line's update metadata over the other. The nested app's `package.json` retains classic 4.x metadata; the V5 packaging overlay stamps the current V5 installer as 5.1.18.
 
 Development and release guidance lives in [docs](docs/README.md) and [tools](tools/README.md). For help, use [GitHub Issues](https://github.com/WizardlyPayload/FarmHub/issues) or [Discord](https://discord.gg/ZCG9C7h7aT).

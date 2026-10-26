@@ -1,6 +1,6 @@
 # Screenshots for the V5 documentation
 
-The 53 indexed core and companion PNGs in [`doc-screenshots/current-5057/`](doc-screenshots/current-5057/) were refreshed from the **installed V5 5.1.17 app** at 1920 x 1080. The directory keeps its historical name so existing links do not break. These pages use **held** demo exports, not live gameplay at capture time. `capture-index.json` records the 44 core/top-page captures; `detail-capture-index.json` records 29 companion top/lower captures, including the 20 top-page replacements. Twelve Settings PNGs were captured separately from the installed 5.1.17 Electron app on the Ally, maximized at 1920 x 1080. Sensitive values were redacted before copying into this guide.
+The 53 indexed core and companion PNGs in [`doc-screenshots/current-5057/`](doc-screenshots/current-5057/) were refreshed from the **installed V5 5.1.17 app** at 1920 x 1080. The directory keeps its historical name so existing links do not break. These pages use **held** demo exports, not live gameplay at capture time. `capture-index.json` records the 44 core/top-page captures; `detail-capture-index.json` records 29 companion top/lower captures, including the 20 top-page replacements. Twelve Settings PNGs were captured separately from the installed 5.1.17 Electron app on the Ally, maximized at 1920 x 1080. Sensitive values were redacted before copying into this guide. App 5.1.18 changed packaged dependencies; these screenshots have not been recaptured for that build.
 
 Older PNGs directly under `doc-screenshots/` remain as **older V5 illustrations** only where a current image is not available. A V4 installer image is never presented as V5.
 
@@ -17,7 +17,7 @@ Older PNGs directly under `doc-screenshots/` remain as **older V5 illustrations*
 
 ## Manual images still needed before publication
 
-- Genuine **5.1.17 installer welcome and finished** screens; do not reuse V4 pictures.
+- Genuine **5.1.18 installer welcome and finished** screens; do not reuse V4 pictures.
 - A **clean first launch** with no old sources or visible passwords.
 - The **new multiplayer link/re-pair** prompt and selected MP source, with private details redacted.
 - **Tablet LAN** sign-in and portrait dashboard, without a visible password.

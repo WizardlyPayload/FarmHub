@@ -1,6 +1,6 @@
 # Settings and companion-mod pages (V5)
 
-The pictures were taken from the installed 5.1.17 desktop app at 1920 x 1080. The demo saves are examples; your farm's numbers, visible mods and available sections will differ. Private names, addresses, paths and typed values are hidden in the Settings pictures. Nothing in this guide requires changing a working save.
+The pictures were taken from the installed 5.1.17 desktop app at 1920 x 1080. App 5.1.18 changed packaged dependencies, so these screens were not recaptured. The demo saves are examples; your farm's numbers, visible mods and available sections will differ. Private names, addresses, paths and typed values are hidden in the Settings pictures. Nothing in this guide requires changing a working save.
 
 ## Find the right data first
 

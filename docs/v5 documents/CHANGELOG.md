@@ -2,16 +2,16 @@
 
 Player-facing history for the **V5 / new screens** line. Classic 4.x notes stay in [`../CHANGELOG.md`](../CHANGELOG.md).
 
-**Prepared V5 candidate:** app **5.1.17**, mod **5.1.0.9**. Check the public download page for the version actually released. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
+**Prepared V5 candidate:** app **5.1.18**, mod **5.1.0.9**. Check the public download page for the version actually released. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
 
 ---
 
-## 5.1.17 / 5.1.0.9 — prepared candidate (2026-10-26, not a publication notice)
+## 5.1.18 / 5.1.0.9 — prepared candidate (2026-10-26, not a publication notice)
 
 - Restored packaged V5 section photographs and splash logo by using the filenames' exact case. The installed PC app served the corrected images and visibly displayed them on Fields and companion pages.
-- Native Windows Installed apps registration was repaired in the preceding 5.1.15 candidate. Exact 5.1.17 Ally upgrade and Keep uninstall/reinstall passed with one native Settings row after each install, a working launch, and unchanged game saves and mod settings. PC and Ally Full lifecycle tests passed on 5.1.15.
+- Native Windows Installed apps registration was repaired in the preceding 5.1.15 candidate. The 5.1.17 Ally upgrade and Keep uninstall/reinstall passed with one native Settings row after each install, a working launch, and unchanged game saves and mod settings. PC and Ally Full lifecycle tests passed on 5.1.15. App 5.1.18 was installed and launched on the PC; exact 5.1.18 Ally acceptance is pending.
 - The 5.1.0.9 game mod is byte-identical to the PC, Ally and dedicated-server tested canonical `FS25_FarmDashboard.zip`. Its heavy-save collector pacing and two-client multiplayer stream checks passed before this app-only image update.
-- Current core and companion documentation images were captured at 1920 x 1080 from the installed 5.1.17 app with held demo saves. Settings images were captured from the installed 5.1.17 Electron app on the Ally and private values were redacted.
+- The 5.1.18 app refreshes `body-parser` to 1.20.9 and `fast-uri` to 3.1.9; the packaged dependency versions and zero-vulnerability production audit were checked. Current core and companion documentation images were captured at 1920 x 1080 from the installed 5.1.17 app with held demo saves. Settings images were captured from the installed 5.1.17 Electron app on the Ally and private values were redacted. The 5.1.18 screens have not been recaptured.
 
 ---
 

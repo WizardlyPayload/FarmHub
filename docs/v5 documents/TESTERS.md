@@ -1,6 +1,6 @@
 # V5 tester guide: record what actually happened
 
-This checklist is for the **5.1.17 app / 5.1.0.9 mod candidate**. The public V5 release may differ, and classic V4 is not part of this V5 test unless a separate V4 run is requested. Follow [Install V5](INSTALL.md), then use [the manual](USER_MANUAL.md) and [optional-mod guide](COMPANION_MODS.md).
+This checklist is for the **5.1.18 app / 5.1.0.9 mod candidate**. The public V5 release may differ, and classic V4 is not part of this V5 test unless a separate V4 run is requested. Follow [Install V5](INSTALL.md), then use [the manual](USER_MANUAL.md) and [optional-mod guide](COMPANION_MODS.md).
 
 ## Before you test
 

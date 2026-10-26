@@ -2,7 +2,7 @@
 
 Farm Dashboard has **two parts**: `FS25_FarmDashboard.zip` runs inside Farming Simulator 25 and exports farm data; the V5 Windows app displays it. Install both. Keep the ZIP's exact name so FS25 sees **one** Farm Dashboard mod, not two entries.
 
-> This guide describes the **5.1.17 app / 5.1.0.9 mod candidate**. Check the actual published release before downloading; source code and a locally built installer do not themselves make a public release.
+> This guide describes the **5.1.18 app / 5.1.0.9 mod candidate**. Check the actual published release before downloading; source code and a locally built installer do not themselves make a public release.
 
 ![The canonical Farm Dashboard ZIP in the FS25 mods folder](doc-screenshots/fd-install-010-mod-folder.png)
 
@@ -19,7 +19,7 @@ The game normally writes under `Documents\My Games\FarmingSimulator2025\modSetti
 
 ## 2. Install the Windows app
 
-Run the V5 installer from the release you chose. The prepared candidate filename is `FS25-Farm-Dashboard-V5-Setup-5.1.17.exe`; use the version actually listed on the public release page when it is published. Launch **Farm Dashboard V5** from the Start menu. Installed V5 normally uses `http://127.0.0.1:8768` on this PC.
+Run the V5 installer from the release you chose. The prepared candidate filename is `FS25-Farm-Dashboard-V5-Setup-5.1.18.exe`; use the version actually listed on the public release page when it is published. Launch **Farm Dashboard V5** from the Start menu. Installed V5 normally uses `http://127.0.0.1:8768` on this PC.
 
 Mod-image import is optional. If an optional ImageMagick step fails, the dashboard can still show farm data; use its built-in conversion path or return to images later. Do not install ImageMagick just to make first launch work.
 
@@ -75,4 +75,4 @@ See [Troubleshooting](TROUBLESHOOTING.md) for more.
 
 Use **Windows Settings → Installed apps → Farm Dashboard V5 → Uninstall**. Keep data if you may reinstall; choose full removal only when you want the V5 profile cleared. The game save and separate V4 app must not be deleted by V5 removal. External shared software such as ImageMagick should not be assumed to disappear with the app. If Windows says the uninstaller EXE is missing, use the current V5 installer to repair it before uninstalling; do not delete random registry entries.
 
-The genuine 5.1.17 installer welcome/finish screens still need a manual capture. This guide does not mislabel V4 installer screenshots as V5.
+The genuine 5.1.18 installer welcome/finish screens still need a manual capture. This guide does not mislabel V4 installer screenshots as V5.

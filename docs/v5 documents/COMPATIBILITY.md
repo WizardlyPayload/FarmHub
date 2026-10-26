@@ -27,7 +27,7 @@ A detected mod with an empty block does **not** prove its gameplay failed. The d
 
 ## Versions and release boundary
 
-- **Prepared candidate:** V5 app **5.1.17**, mod **5.1.0.9**, canonical ZIP `FS25_FarmDashboard.zip`. The 5.1.0.9 mod passed PC/Ally and dedicated multiplayer checks. App 5.1.17 was installed on the PC and Ally; packaged backgrounds rendered on both. The Ally Windows Installed apps and Keep uninstall/reinstall lifecycle passed without changing game saves, mod ZIPs or mod settings.
+- **Prepared candidate:** V5 app **5.1.18**, mod **5.1.0.9**, canonical ZIP `FS25_FarmDashboard.zip`. The 5.1.0.9 mod passed PC/Ally and dedicated multiplayer checks. App 5.1.18 was installed and launched on the PC. The earlier 5.1.17 app rendered packaged backgrounds on PC and Ally; the Ally Windows Installed apps and Keep uninstall/reinstall lifecycle passed without changing game saves, mod ZIPs or mod settings. Exact 5.1.18 Ally acceptance remains pending.
 - **Public V5 listing:** use the versions displayed on the actual download page. A locally prepared candidate is not automatically a public release.
 - **Classic V4:** public **4.2.1** remains separate on **8766** and its own `latest.yml`. V5 uses **8768** and `latest-rf.yml`.
 - V4 was **not retested** against mod 5.1.0.9 during this V5 pass. Do not infer a V4 compatibility result from it.

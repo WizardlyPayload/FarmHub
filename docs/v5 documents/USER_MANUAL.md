@@ -1,6 +1,6 @@
 # Farm Dashboard V5: using your farm screens
 
-This manual describes the **5.1.18 Windows-app / 5.1.0.9 mod candidate**. The public download can still be older. If the dashboard is not installed yet, start with [Install V5](INSTALL.md). Optional mods are described individually in [Optional mods](COMPANION_MODS.md).
+This manual describes the **5.2.0 Windows app / 5.1.0.9 game mod**. If the dashboard is not installed yet, start with [Install V5](INSTALL.md). Optional mods are described individually in [Optional mods](COMPANION_MODS.md).
 
 Farm Dashboard is an **out-of-game, read-only companion**. It does not replace FS25's menus or control your farm. The game mod exports data, and the Windows app turns that data into pages you can use on another screen.
 

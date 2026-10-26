@@ -2,14 +2,21 @@
 
 Player-facing history for the **V5 / new screens** line. Classic 4.x notes stay in [`../CHANGELOG.md`](../CHANGELOG.md).
 
-**Prepared V5 candidate:** app **5.1.18**, mod **5.1.0.9**. Check the public download page for the version actually released. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
+**Current V5 release:** app **5.2.0**, mod **5.1.0.9**. Use the two files from the same release. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
+
+---
+
+## 5.2.0 / 5.1.0.9 — public release (2026-10-26)
+
+- Publishes the tested V5 dashboard under app version 5.2.0. The in-game mod remains the byte-tested 5.1.0.9 ZIP; no game collector or multiplayer-stream code changed for this release number.
+- The 5.2.0 Windows installer was rebuilt with the current packaged UI and V5 updater channel. See the [release handoff](RELEASE_DAY_v5.2.0.md) for exact package, installed-app and source evidence.
 
 ---
 
 ## 5.1.18 / 5.1.0.9 — prepared candidate (2026-10-26, not a publication notice)
 
 - Restored packaged V5 section photographs and splash logo by using the filenames' exact case. The installed PC app served the corrected images and visibly displayed them on Fields and companion pages.
-- Native Windows Installed apps registration was repaired in the preceding 5.1.15 candidate. The 5.1.17 Ally upgrade and Keep uninstall/reinstall passed with one native Settings row after each install, a working launch, and unchanged game saves and mod settings. PC and Ally Full lifecycle tests passed on 5.1.15. App 5.1.18 was installed and launched on the PC; exact 5.1.18 Ally acceptance is pending.
+- Native Windows Installed apps registration was repaired in the preceding 5.1.15 candidate. The exact 5.1.18 PC and Ally upgrade and Keep uninstall/reinstall passed with one native Settings row after each install, a working launch, and unchanged game saves and mod settings. PC and Ally Full lifecycle tests passed on 5.1.15.
 - The 5.1.0.9 game mod is byte-identical to the PC, Ally and dedicated-server tested canonical `FS25_FarmDashboard.zip`. Its heavy-save collector pacing and two-client multiplayer stream checks passed before this app-only image update.
 - The 5.1.18 app refreshes `body-parser` to 1.20.9 and `fast-uri` to 3.1.9; the packaged dependency versions and zero-vulnerability production audit were checked. Current core and companion documentation images were captured at 1920 x 1080 from the installed 5.1.17 app with held demo saves. Settings images were captured from the installed 5.1.17 Electron app on the Ally and private values were redacted. The 5.1.18 screens have not been recaptured.
 

@@ -4,8 +4,8 @@ This is the help pack for the **V5 Windows dashboard**. Start with [installation
 
 ## Which version?
 
-- **Repository target:** Windows app **5.1.18** with the canonical `FS25_FarmDashboard.zip` mod **5.1.0.9**. Source changes, a packaged installer, an installed app, and a public release are different stages. Check [Releases](https://github.com/WizardlyPayload/FarmHub/releases) for what is actually available, and use matching files from one release.
-- **Current acceptance:** app 5.1.18 is installed and launched on the PC. The earlier 5.1.17 app rendered packaged backgrounds on PC and Ally; its Ally upgrade, Windows Installed apps registration, Keep uninstall and reinstall passed with saves and mod settings unchanged. Exact 5.1.18 Ally acceptance and final CI remain pending. The unchanged 5.1.0.9 mod passed PC, Ally, dedicated multiplayer, and heavy-save checks. Public release still needs the final publishing decision and matching download pages.
+- **Repository target:** Windows app **5.2.0** with the canonical `FS25_FarmDashboard.zip` mod **5.1.0.9**. The mod is unchanged from the 5.1.18 candidate. Use matching files from one [release](https://github.com/WizardlyPayload/FarmHub/releases).
+- **Acceptance boundary:** exact app 5.1.18 passed PC and Ally launch, background rendering, one Windows Installed apps row, and Keep uninstall/reinstall with saves and mod settings protected. The unchanged 5.1.0.9 mod passed PC, Ally, dedicated multiplayer, and heavy-save checks. App 5.2.0 changes the release version and has its own package verification; see the [release handoff](RELEASE_DAY_v5.2.0.md) for exact installed checks.
 - **Classic V4:** a separate product line. Its public 4.2.1 story and update feed have not been changed. This V5 pass was **not** a new V4 test.
 
 ## Find the answer you need
@@ -22,6 +22,6 @@ The dashboard **reads** game and companion data. It does not plant, buy, repair,
 
 ![V5 overview from the base-game demo save](doc-screenshots/current-5057/base-overview.png)
 
-*Installed V5 5.1.17 showing a held demo save. The 5.1.18 update changed dependencies, not this screen. Held means saved data, not live gameplay.*
+*Installed V5 5.1.17 showing a held demo save. The later dependency and version updates did not change this screen. Held means saved data, not live gameplay.*
 
 Screenshots in this pack must not expose FTP passwords, pairing secrets, or private player details.

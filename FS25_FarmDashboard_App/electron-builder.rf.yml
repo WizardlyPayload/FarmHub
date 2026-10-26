@@ -15,7 +15,7 @@ extraMetadata:
   # Older 5.0.x packages stamped productLine: rf; runtime treats rf and v5 as the same V5 line.
   productLine: v5
   # V5 release candidate. Classic package.json and V4 update feed stay on 4.x.
-  version: 5.1.18
+  version: 5.2.0
 directories:
   output: electron-pack-out-rf
 files:

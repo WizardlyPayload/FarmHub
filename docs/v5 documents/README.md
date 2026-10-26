@@ -5,7 +5,7 @@ This is the help pack for the **V5 Windows dashboard**. Start with [installation
 ## Which version?
 
 - **Repository target:** Windows app **5.1.17** with the canonical `FS25_FarmDashboard.zip` mod **5.1.0.9**. Source changes, a packaged installer, an installed app, and a public release are different stages. Check [Releases](https://github.com/WizardlyPayload/FarmHub/releases) for what is actually available, and use matching files from one release.
-- **Current acceptance:** app 5.1.17 is installed and the packaged backgrounds have been visually checked on the PC. The unchanged 5.1.0.9 mod passed earlier PC, Ally, dedicated multiplayer, and heavy-save checks. Exact 5.1.17 Ally and uninstall checks remain separate release gates.
+- **Current acceptance:** app 5.1.17 is installed on the PC and Ally. Its packaged backgrounds rendered on both; the Ally upgrade, Windows Installed apps registration, Keep uninstall and reinstall passed with saves and mod settings unchanged. The unchanged 5.1.0.9 mod passed PC, Ally, dedicated multiplayer, and heavy-save checks. Public release still needs the final publishing decision and matching download pages.
 - **Classic V4:** a separate product line. Its public 4.2.1 story and update feed have not been changed. This V5 pass was **not** a new V4 test.
 
 ## Find the answer you need

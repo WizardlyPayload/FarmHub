@@ -1,6 +1,6 @@
 # Settings and companion-mod pages (V5)
 
-The companion-page pictures were taken from the installed 5.1.17 app at 1920 x 1080. The settings pictures are older installed-V5 illustrations and are labelled as such until a 5.1.17 Electron capture is available. The demo saves are examples; your farm's numbers, visible mods and available sections will differ. Settings pictures hide private names, addresses, paths and typed values. Nothing in this guide requires changing a working save.
+The pictures were taken from the installed 5.1.17 desktop app at 1920 x 1080. The demo saves are examples; your farm's numbers, visible mods and available sections will differ. Private names, addresses, paths and typed values are hidden in the Settings pictures. Nothing in this guide requires changing a working save.
 
 ## Find the right data first
 
@@ -17,19 +17,17 @@ Open **Settings** in the top bar. The six tabs below share one window. **Save** 
 
 Use **Main menu - show sections** to hide sections you do not need. **Default section on open** chooses where the dashboard starts. **Fill units** affects how quantities are displayed, not the game's stored amounts. The lower part contains field exclusions, merged field cards and the read-only SimHub view. Change these only for a known display preference; they are not companion-mod switches.
 
-![Dashboard settings, upper section](doc-screenshots/current-5057/settings-dashboard-top.png)
-
-![Dashboard settings, lower section](doc-screenshots/current-5057/settings-dashboard-lower.png)
+![Dashboard settings](doc-screenshots/current-5057/settings-dashboard.png)
 
 ### Servers & saves
 
 This tab holds local sources, remote/LAN access, dedicated-server pairing and advanced FTP polling. For a local save, use discovery or the setup window instead of inventing a path. For a dedicated server, use the in-game pairing flow when available; do not mistake a saved server name for a verified live link. FTP is an advanced alternative, not required for a client-joined server. The Server Manager area is lower in the pane. Do not put real credentials into screenshots or support posts.
 
-![Servers and saves, upper section with private values hidden](doc-screenshots/current-5057/settings-servers-top.png)
+![Servers and saves, LAN settings with private values hidden](doc-screenshots/current-5057/settings-servers-lan.png)
 
-![Servers and saves, middle section](doc-screenshots/current-5057/settings-servers-middle.png)
+![Servers and saves, dedicated-server settings with private values hidden](doc-screenshots/current-5057/settings-servers-dedicated.png)
 
-![Servers and saves, lower section](doc-screenshots/current-5057/settings-servers-lower.png)
+![Servers and saves, server list with private values hidden](doc-screenshots/current-5057/settings-servers-list.png)
 
 ### FS25 mod
 
@@ -39,7 +37,7 @@ The **FS25 mod** tab changes the local mod's `config.xml` collection intervals a
 
 ### Appearance
 
-Choose the language, the dashboard UI and the colour theme. The theme selector offers Global Default and separate Vehicles, Fields, Economy and Pastures palettes. **Save Theme** is the theme action; the main **Save** applies other settings. An app UI switch can require a restart. The five pictures show each palette selector, not five different game saves.
+Choose the language and colour theme. V5 uses its own dashboard interface. The theme selector offers Global Default and separate Vehicles, Fields, Economy and Pastures palettes. **Save Theme** is the theme action; the main **Save** applies other settings. The five pictures show each palette selector, not five different game saves.
 
 ![Global appearance](doc-screenshots/current-5057/settings-appearance-global.png)
 
@@ -61,9 +59,7 @@ Start here when data looks missing or old. Check connection health and recent st
 
 This tab shows app and mod versions, RF compatibility information and update links. **Show all pinned companions** expands the compatibility list; it does not install or enable those mods. Compare versions here before reporting that a companion page is absent.
 
-![About settings, upper section](doc-screenshots/current-5057/settings-about-top.png)
-
-![About settings, lower section](doc-screenshots/current-5057/settings-about-lower.png)
+![About settings](doc-screenshots/current-5057/settings-about.png)
 
 ## How the companion pages work
 

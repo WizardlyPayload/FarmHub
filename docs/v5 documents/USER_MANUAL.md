@@ -104,11 +104,11 @@ The sidebar can add **Red Tape, ADS, Invoices, Hire purchase, NPC Favor, World E
 - **Health:** last completed export, source status, compatibility and errors. This is the first stop for waiting/stale or missing companion data.
 - **About:** app/mod versions and detected companion information. A newer-than-pinned mod marked untested is not automatically broken.
 
-The older V5 Settings illustrations remain useful for where the tabs are, but were captured before 5.1.17 and need a fresh installed-app capture:
+These Settings pictures were captured from the installed 5.1.17 desktop app, with private values hidden:
 
-![Settings Dashboard tab, older V5 illustration](doc-screenshots/v5-settings-010-dashboard.png)
+![Settings Dashboard tab](doc-screenshots/current-5057/settings-dashboard.png)
 
-![Settings Health tab, older V5 illustration](doc-screenshots/v5-settings-050-health.png)
+![Settings Health tab](doc-screenshots/current-5057/settings-health.png)
 
 ## Weather, alerts, and images
 

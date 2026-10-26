@@ -3551,6 +3551,7 @@ async function startLocalWatching(srv) {
             };
             if (!ownedNow()) return;
             processLuaData(srv.id, JSON.stringify(ingress.payload), transport);
+            if (Number.isFinite(knownMtimeMs)) updateMtime(knownMtimeMs);
             return;
         }
         if (ingress && (ingress.reason === "replica-rejected" || ingress.reason === "configuration-required")) return;

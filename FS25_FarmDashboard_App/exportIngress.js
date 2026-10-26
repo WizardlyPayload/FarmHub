@@ -16,6 +16,42 @@ const {
 
 const ROUTE_ATTRS = ["schema", "careerId", "sessionId", "publicationSequence", "slot", "persistence", "sourceSlot"];
 const freshnessBySource = new Map();
+const validatedSlots = new Map();
+const MAX_VALIDATED_SLOT_BYTES = 24 * 1024 * 1024;
+const MAX_VALIDATED_SLOTS = 32;
+let validatedSlotBytes = 0;
+
+function decodeSelectedSlot(slotXml, careerId) {
+    if (typeof slotXml !== "string") return decodeEnvelope(slotXml, { careerId });
+    const cached = validatedSlots.get(slotXml);
+    if (cached && cached.careerId === careerId) {
+        validatedSlots.delete(slotXml);
+        validatedSlots.set(slotXml, cached);
+        // Merging may mutate the returned JSON. Never expose the cached copy.
+        return JSON.parse(JSON.stringify(cached.decoded));
+    }
+    const decoded = decodeEnvelope(slotXml, { careerId });
+    if (decoded && decoded.status === "valid" && decoded.gameplay === true && decoded.record && decoded.json) {
+        const bytes = Buffer.byteLength(slotXml, "utf8");
+        if (bytes <= MAX_VALIDATED_SLOT_BYTES && !cached) {
+            const snapshot = JSON.parse(JSON.stringify({
+                status: decoded.status,
+                gameplay: decoded.gameplay,
+                record: decoded.record,
+                json: decoded.json,
+            }));
+            validatedSlots.set(slotXml, { careerId, bytes, decoded: snapshot });
+            validatedSlotBytes += bytes;
+            while (validatedSlots.size > MAX_VALIDATED_SLOTS || validatedSlotBytes > MAX_VALIDATED_SLOT_BYTES) {
+                const oldestKey = validatedSlots.keys().next().value;
+                const oldest = validatedSlots.get(oldestKey);
+                validatedSlots.delete(oldestKey);
+                validatedSlotBytes -= oldest.bytes;
+            }
+        }
+    }
+    return decoded;
+}
 
 function safeId(value) {
     return typeof value === "string" && value.length > 0 && value.length <= 64 && !value.includes("..") && /^[A-Za-z0-9_-]+$/.test(value);
@@ -177,7 +213,7 @@ function readExportBuffers(input) {
         return { ...base, status: "conflict", reason: "source-slot" };
     }
     const slotXml = input.slotXml;
-    const decoded = decodeEnvelope(slotXml, { careerId: route.careerId });
+    const decoded = decodeSelectedSlot(slotXml, route.careerId);
     if (!decoded || decoded.status !== "valid" || !decoded.record || decoded.gameplay !== true) {
         const reason = decoded && decoded.reason ? decoded.reason : "snapshot-unavailable";
         if (previous && previous.identity && previous.identity.careerId === route.careerId && previous.identity.sourceId === sourceId) {
@@ -363,10 +399,14 @@ function readExportDirectorySync(dir, options) {
             }
         }
     }
-    try {
-        legacyJson = fs.readFileSync(path.join(dir, "data.json"), "utf8");
-    } catch (error) {
-        legacyJson = null;
+    // A validated route uses the committed XML slot. Reading the legacy mirror
+    // as well duplicates I/O on every live export without affecting selection.
+    if (!route && opts.explicitLegacy === true) {
+        try {
+            legacyJson = fs.readFileSync(path.join(dir, "data.json"), "utf8");
+        } catch (error) {
+            legacyJson = null;
+        }
     }
     return readExportBuffers({
         routeXml,

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const fixture = path.join(root, 'tests/helpers/windows-install-state-runtime.ps1');
@@ -14,6 +15,25 @@ function run(name) {
   return JSON.parse(result.stdout.trim().split(/\r?\n/).at(-1));
 }
 const options = { skip: process.platform !== 'win32' };
+test('V5 registry transport sees and removes a Windows-visible per-user key', options, () => {
+  const nativeFixture = path.join(root, 'tests/helpers/windows-install-state-native.ps1');
+  const shells = [powershell, path.join(process.env.WINDIR || 'C:\\Windows',
+    'SysWOW64', 'WindowsPowerShell', 'v1.0', 'powershell.exe')];
+  for (const shell of shells.filter((item, index) => index === 0 || existsSync(item))) {
+    const result = spawnSync(shell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'RemoteSigned',
+      '-File', nativeFixture, '-SourceRoot', root], { encoding: 'utf8', windowsHide: true, timeout: 30000 });
+    assert.equal(result.status, 0, result.error?.message || result.stderr || result.stdout);
+    const state = JSON.parse(result.stdout.trim().split(/\r?\n/).at(-1));
+    assert.equal(state.error, null, `${shell}: ${state.error}`);
+    assert.equal(state.readNativeValue, 'native-created');
+    assert.equal(state.removedNativeKey, true);
+    assert.equal(state.nativeSawHelperWrite, 'helper-created');
+    assert.equal(state.removedHelperKey, true);
+    assert.equal(state.localUninstallShadowRemoved, true);
+    assert.equal(state.localInstallShadowRemoved, true);
+    assert.equal(state.mismatchedShadowPreserved, true);
+  }
+});
 for (const scope of ['user', 'machine']) {
   test(`V5 publishes a native ${scope} uninstall entry with the correct command`, options, () => {
     const state = run(scope);
@@ -23,16 +43,47 @@ for (const scope of ['user', 'machine']) {
     const entry = state.records[key];
     assert.equal(entry.DisplayName, 'FS25 Farm Dashboard V5 5.0.1');
     assert.match(entry.UninstallString, scope === 'machine' ? /" \/allusers$/ : /" \/currentuser$/);
-    assert.equal(entry.SystemComponent, 0);
-    assert.equal(entry.NoRemove, 0);
+    assert.equal(entry.SystemComponent, undefined);
+    assert.equal(entry.NoRemove, undefined);
+    assert.equal(entry.InstallDate, undefined);
+    assert.equal(entry.InstallLocation, undefined);
+    assert.equal(entry.EstimatedSize, 1234);
+    assert.equal(state.uninstallWrites, 0, 'a native NSIS entry must be left untouched');
     assert.ok(Object.keys(state.records).every(key => key.endsWith('11de34ca-2bb0-58cf-bf02-9951a95a886c')));
   });
 }
+test('a missing Windows-visible NSIS entry is published through the native provider', options, () => {
+  const state = run('native-missing');
+  assert.equal(state.error, null);
+  const key = Object.keys(state.records).find(key => key.includes('\\Uninstall\\'));
+  assert.equal(state.records[key].DisplayName, 'FS25 Farm Dashboard V5 5.0.1');
+  assert.ok(state.uninstallWrites > 0);
+});
+test('a partial Windows uninstall entry is refused rather than overwritten', options, () => {
+  const state = run('native-partial');
+  assert.match(state.error, /incomplete/);
+  assert.equal(state.uninstallWrites, 0);
+});
+test('a stale native uninstall version is refused rather than overwritten', options, () => {
+  const state = run('native-wrong-version');
+  assert.match(state.error, /wrong version/);
+  assert.equal(state.uninstallWrites, 0);
+});
 test('a successful write invisible to Windows fails setup', options, () => {
   assert.match(run('invisible-write').error, /cannot read back/);
 });
 test('a denied registration write fails setup instead of claiming success', options, () => {
   assert.match(run('denied-write').error, /exit 5/);
+});
+test('registration refuses another application identity before creating a private record', options, () => {
+  const state = run('register-other-name');
+  assert.match(state.error, /different application/);
+  assert.ok(!state.calls.includes('CreateKey'));
+});
+test('registration refuses a different uninstall path before creating a private record', options, () => {
+  const state = run('register-other-command');
+  assert.match(state.error, /different installation/);
+  assert.ok(!state.calls.includes('CreateKey'));
 });
 test('Windows return 1 is accepted only when enumeration proves a value is absent', options, () => {
   const state = run('missing-optional-value');

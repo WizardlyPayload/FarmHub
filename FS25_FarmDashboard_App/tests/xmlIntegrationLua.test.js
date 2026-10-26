@@ -1186,7 +1186,7 @@ describe("rework 008 queued export budget", () => {
         expect(result).not.toContain("outcome=queued");
     });
 
-    test("small budgets finish byte-for-byte with the synchronous serializer", () => {
+    test("small budgets finish byte-for-byte with the compact synchronous serializer", () => {
         const result = run(routeFiles, `
             local C = FarmDashboardDataCollector
             C.config = { jsonTopLevelKeysPerFrame = 1, sliceBudgetMs = 4 }
@@ -1197,7 +1197,8 @@ describe("rework 008 queued export budget", () => {
             C._xmlInFlight = nil
             C:beginDeferredJsonWrite(data)
             C._frameBudget = nil
-            local expected = C:toJSON(data, 0)
+            local expected = C:toJSON(data)
+            local pretty = C:toJSON(data, 0)
             local over = false
             for _ = 1, 400 do
                 C._frameBudget = { bytes = 17, timeMs = 4, charged = 0, timingUnavailable = true }
@@ -1208,10 +1209,11 @@ describe("rework 008 queued export budget", () => {
                 if step == true then break end
             end
             local got = C._jsonPendingDisk and C._jsonPendingDisk.jsonString or ""
-            return "match=" .. tostring(got == expected) .. "|over=" .. tostring(over) .. "|len=" .. #got
+            return "match=" .. tostring(got == expected) .. "|over=" .. tostring(over) .. "|smaller=" .. tostring(#got < #pretty) .. "|len=" .. #got
         `);
         expect(result).toContain("match=true");
         expect(result).toContain("over=false");
+        expect(result).toContain("smaller=true");
     });
 
     test("a failed pen waits for the mission clock before retrying", () => {

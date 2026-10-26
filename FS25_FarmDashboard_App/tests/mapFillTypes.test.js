@@ -117,14 +117,14 @@ describe("mapFillTypes zip maps", () => {
     "mods"
   );
 
-  test("Witcombe maps_fillTypes.xml places LINSEED at 190", async () => {
+  test("Witcombe maps_fillTypes.xml places LINSEED after the vanilla catalog", async () => {
     const zipPath = path.join(modsRoot, "FS25_Witcombe.zip");
     if (!fs.existsSync(zipPath)) return;
     const names = await loadFillTypeNamesFromZip(zipPath);
     const vanilla = Object.values(getVanillaFillTypeCatalog()).filter((n) => n !== "UNKNOWN");
     const { catalog } = buildFillTypeIndexCatalog(vanilla, names);
-    expect(catalog["190"]).toBe("LINSEED");
-    expect(catalog["182"]).toBe("TRITICALE");
+    expect(catalog[String(vanilla.length + 14)]).toBe("LINSEED");
+    expect(catalog[String(vanilla.length + 6)]).toBe("TRITICALE");
     expect(catalog["6"]).toBe("SORGHUM");
   }, 30000);
 
@@ -150,8 +150,8 @@ describe("mapFillTypes zip maps", () => {
       modsRoot,
       modsRoots: [modsRoot],
     });
-    expect(result.catalog["190"]).toBe("LINSEED");
-    expect(result.catalog["190"]).not.toBe("RABBITMEAT");
+    expect(result.catalog[String(result.vanillaCount + 14)]).toBe("LINSEED");
+    expect(result.catalog[String(result.vanillaCount + 14)]).not.toBe("RABBITMEAT");
     expect(result.montanaActive).toBe(false);
     expect(result.montanaCount).toBe(0);
     expect(result.titlesByName.SOYBEAN2).toBeUndefined();
@@ -188,8 +188,8 @@ describe("mapFillTypes zip maps", () => {
     });
     expect(result.montanaActive).toBe(true);
     expect(result.montanaCount).toBeGreaterThan(176);
-    expect(result.catalog["178"]).toBe("ANHYDROUS");
-    expect(result.catalog["190"]).toBe("RABBITMEAT");
+    expect(result.catalog[String(result.vanillaCount + 2)]).toBe("ANHYDROUS");
+    expect(result.catalog[String(result.vanillaCount + 14)]).toBe("RABBITMEAT");
     expect(result.catalog["6"]).toBe("SORGHUM");
     expect(result.titlesByName.SOYBEAN2).toBe("American Soybean");
     expect(result.titlesByName.MAIZE2).toBe("Dry Corn");
@@ -206,7 +206,7 @@ describe("mapFillTypes zip maps", () => {
       modsRoots: [modsRoot],
     });
     expect(result.montanaActive).toBe(true);
-    expect(result.catalog["178"]).toBe("ANHYDROUS");
+    expect(result.catalog[String(result.vanillaCount + 2)]).toBe("ANHYDROUS");
     expect(Object.keys(result.catalog).length).toBeGreaterThan(200);
   }, 60000);
 });

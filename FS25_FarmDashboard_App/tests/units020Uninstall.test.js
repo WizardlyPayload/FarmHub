@@ -8,7 +8,7 @@ const { spawnSync } = require("child_process");
 const helper = path.resolve(__dirname, "../build/uninstall-user-data.ps1");
 const shell = path.join(process.env.SystemRoot || "C:\\Windows", "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
 
-function runCase(dirs, mode) {
+function runCase(dirs, mode, options = {}) {
     const result = spawnSync(shell, [
         "-NoProfile",
         "-NonInteractive",
@@ -16,11 +16,13 @@ function runCase(dirs, mode) {
         "-File", helper,
         "-Mode", mode,
         "-Edition", "V5",
+        ...(options.roamingBase ? ["-RoamingBase", options.roamingBase] : []),
+        ...(options.localBase ? ["-LocalBase", options.localBase] : []),
     ], {
         env: {
             ...process.env,
-            APPDATA: dirs.roaming,
-            LOCALAPPDATA: dirs.local,
+            APPDATA: options.inheritedRoaming || dirs.roaming,
+            LOCALAPPDATA: options.inheritedLocal || dirs.local,
             TEMP: dirs.temp,
         },
         encoding: "utf8",
@@ -138,6 +140,29 @@ describe("uninstall profile links", () => {
         expect(fs.existsSync(seeded.v5Updater)).toBe(false);
         expect(fs.readFileSync(path.join(seeded.sharedUpdater, "installer.exe"), "utf8")).toBe("unknown shared installer");
         expect(fs.readFileSync(path.join(seeded.sharedUpdater, "pending", "update-info.json"), "utf8")).toContain("4.0.0");
+        fs.rmSync(dirs.root, { recursive: true, force: true });
+    });
+
+    test("Full uses explicit shell folders when a packaged parent redirects environment variables", () => {
+        const dirs = disposableRoot();
+        const seeded = seedProfiles(dirs);
+        const virtualRoaming = path.join(dirs.root, "PackagedView", "Roaming");
+        const virtualLocal = path.join(dirs.root, "PackagedView", "Local");
+        fs.mkdirSync(path.join(virtualRoaming, "fs25-farm-dashboard-rf"), { recursive: true });
+        fs.mkdirSync(virtualLocal, { recursive: true });
+        const sentinel = path.join(virtualRoaming, "fs25-farm-dashboard-rf", "other.txt");
+        fs.writeFileSync(sentinel, "keep");
+        const code = runCase(dirs, "Full", {
+            inheritedRoaming: virtualRoaming,
+            inheritedLocal: virtualLocal,
+            roamingBase: dirs.roaming,
+            localBase: dirs.local,
+        });
+        expect(code).toBe(0);
+        expect(fs.existsSync(seeded.v5)).toBe(false);
+        expect(fs.existsSync(seeded.v5Updater)).toBe(false);
+        expect(fs.readFileSync(sentinel, "utf8")).toBe("keep");
+        expect(fs.readFileSync(path.join(seeded.v4, "config.json"), "utf8")).toBe("v4");
         fs.rmSync(dirs.root, { recursive: true, force: true });
     });
 

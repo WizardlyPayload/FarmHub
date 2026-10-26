@@ -127,6 +127,47 @@ describe('mapOverviewResolver', () => {
     }
   });
 
+  test('zero-byte exported MapUS overview falls back to a non-Steam x86 game install', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'farmdash-overview-x86-'));
+    const savedEnv = {
+      USERPROFILE: process.env.USERPROFILE,
+      APPDATA: process.env.APPDATA,
+      FS25_GAME_PATH: process.env.FS25_GAME_PATH,
+      FARMING_SIMULATOR_2025_PATH: process.env.FARMING_SIMULATOR_2025_PATH,
+      ProgramFiles: process.env.ProgramFiles,
+      'ProgramFiles(x86)': process.env['ProgramFiles(x86)'],
+    };
+    const originalHomedir = os.homedir;
+    const gameRoot = path.join(root, 'Program Files (x86)', 'Farming Simulator 2025');
+    const vanilla = path.join(gameRoot, 'data', 'maps', 'mapus', 'textures', 'ui', 'overview.dds');
+    const emptyExport = path.join(root, 'Documents', 'My Games', 'FarmingSimulator2025',
+      'modSettings', 'FS25_FarmDashboard', 'mapOverview', 'MapUS', 'overview.dds');
+    try {
+      fs.mkdirSync(path.dirname(vanilla), { recursive: true });
+      fs.mkdirSync(path.dirname(emptyExport), { recursive: true });
+      fs.writeFileSync(vanilla, Buffer.from('DDS '));
+      fs.writeFileSync(emptyExport, Buffer.alloc(0));
+      process.env.USERPROFILE = root;
+      process.env.APPDATA = path.join(root, 'AppData', 'Roaming');
+      process.env.ProgramFiles = path.join(root, 'Program Files');
+      process.env['ProgramFiles(x86)'] = path.join(root, 'Program Files (x86)');
+      delete process.env.FS25_GAME_PATH;
+      delete process.env.FARMING_SIMULATOR_2025_PATH;
+      os.homedir = () => root;
+
+      expect(await findOverviewInModSettingsExport('MapUS', 'Riverbend Springs', 'mapus')).toBeNull();
+      const result = await findOverviewSourceFile({ mapId: 'MapUS', mapTitle: 'Riverbend Springs', modsRoots: [] });
+      expect(result.sourcePath).toBe(vanilla);
+    } finally {
+      os.homedir = originalHomedir;
+      for (const [key, value] of Object.entries(savedEnv)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test('scoreOverviewPath ranks vanilla ui path highest', () => {
     const vanilla =
       'C:/Game/data/maps/mapus/textures/ui/overview.dds'.replace(/\\/g, '/');

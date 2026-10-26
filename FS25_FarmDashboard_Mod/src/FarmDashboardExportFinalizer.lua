@@ -369,6 +369,7 @@ function FarmDashboardExportFinalizer.admit(mirror, chunkIndex, totalChunks, pay
         job.parts[chunkIndex] = payload
         job.bytes = job.bytes + #payload
         job.received = job.received + 1
+        job.lastAcceptedChunk = chunkIndex
         job.lastProgress = now
         if job.received ~= job.totalChunks or job.bytes ~= meta.declaredBytes then return "receiving" end
         queueComplete(job)
@@ -378,11 +379,20 @@ function FarmDashboardExportFinalizer.admit(mirror, chunkIndex, totalChunks, pay
     local total, owned = unfinishedCount(mirror, connection)
     if total >= FarmDashboardExportFinalizer.MAX_UNFINISHED or owned >= FarmDashboardExportFinalizer.MAX_PER_CONNECTION then
         mirror._lastReplicaOutcome = "capacity"
+        rememberTombstone(mirror, key, lifetime, now)
         return "capacity"
     end
     if mirror._reservedBytes + meta.declaredBytes > FarmDashboardExportFinalizer.MAX_ENCODED_RESERVE then
         mirror._lastReplicaOutcome = "capacity"
+        rememberTombstone(mirror, key, lifetime, now)
         return "capacity"
+    end
+    -- Never reopen a transfer after its first chunk was dropped or refused.
+    -- A late tail would otherwise occupy a receive slot until the idle timeout.
+    if chunkIndex ~= 1 then
+        mirror._lastReplicaOutcome = "missing-start"
+        rememberTombstone(mirror, key, lifetime, now)
+        return "missing-start"
     end
     job = {
         key = key,
@@ -415,6 +425,7 @@ function FarmDashboardExportFinalizer.admit(mirror, chunkIndex, totalChunks, pay
     job.parts[chunkIndex] = payload
     job.bytes = #payload
     job.received = 1
+    job.lastAcceptedChunk = chunkIndex
     if job.received ~= job.totalChunks or job.bytes ~= meta.declaredBytes then return "receiving" end
     queueComplete(job)
     return "queued"
@@ -573,7 +584,15 @@ function FarmDashboardExportFinalizer.sweep(mirror)
     local function noteTimeout(job, reason)
         mirror._lastReplicaOutcome = "timeout"
         if Logging and Logging.warning then
-            Logging.warning("[FarmDash] export mirror: transfer timed out phase=%s reason=%s", tostring(job.phase), reason)
+            local owner = job.owner or {}
+            local header = job.header or {}
+            local last = type(job.lastProgress) == "number" and job.lastProgress or job.firstSeen
+            Logging.warning(
+                "[FarmDash] export mirror: transfer timed out phase=%s reason=%s transferId=%s generation=%s received=%s/%s lastChunk=%s bytes=%s/%s idleMs=%s",
+                tostring(job.phase), reason, tostring(owner.transferId), tostring(header.exportGeneration),
+                tostring(job.received), tostring(job.totalChunks), tostring(job.lastAcceptedChunk),
+                tostring(job.bytes), tostring(header.declaredBytes), tostring(now - (last or now))
+            )
         end
     end
     for key, job in pairs(mirror._receiveBufs) do

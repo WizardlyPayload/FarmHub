@@ -24,12 +24,15 @@ function revisionPayload(payload) {
   if (!comparable || typeof comparable !== "object" || Array.isArray(comparable)) return comparable;
   delete comparable.transportTimestamp;
   delete comparable.responseTimestamp;
+  delete comparable.lastUpdated;
   const ts = comparable.dataTimestamps;
   if (ts && typeof ts === "object" && !Array.isArray(ts)) {
     delete ts.lastCheckedAt;
     delete ts.lastReadAt;
     delete ts.lastPolledAt;
     delete ts.lastMergedAt;
+    delete ts.mergeComputedAt;
+    delete ts.fetchedAt;
   }
   return comparable;
 }
@@ -117,11 +120,11 @@ function createBoundSourcePublication({
       && ownsOrigin(state, row.owner, generation);
   };
   const transition = (row, stateStatus, payload, exportIdentity, warning) => {
-    const visible = freezeVisible(cloneVisible(payload));
     const identity = exportIdentity || null;
-    const configWarning = freezeVisible(cloneVisible(warning));
-    const fingerprint = JSON.stringify([stateStatus, identity, revisionPayload(visible), configWarning]);
+    const fingerprint = JSON.stringify([stateStatus, identity, revisionPayload(payload), warning == null ? null : warning]);
     if (row.fingerprint === fingerprint) return false;
+    const visible = freezeVisible(cloneVisible(payload));
+    const configWarning = freezeVisible(cloneVisible(warning));
     row.stateRevision += 1;
     row.stateStatus = stateStatus;
     row.publishedAt = stamp();

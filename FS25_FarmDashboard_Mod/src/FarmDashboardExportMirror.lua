@@ -26,6 +26,11 @@ FarmDashboardExportMirror = {}
 FarmDashboardExportMirror.CHUNK_BYTES = 1024
 --- Spread a few chunks per update tick to avoid hitching on large exports.
 FarmDashboardExportMirror.CHUNKS_PER_FRAME = 2
+-- Keep the event queue below the sustained gameplay network budget. The prior
+-- sender queued a full heavy-save export in about six seconds, while clients
+-- continued to receive incomplete transfers even after the desktop app closed.
+FarmDashboardExportMirror.SEND_BYTES_PER_SECOND = 24 * 1024
+FarmDashboardExportMirror.SEND_BURST_BYTES = 2 * 1024
 --- Folder prefix under modSettings/FS25_FarmDashboard/ for client-side mirror writes.
 FarmDashboardExportMirror.CLIENT_FOLDER_PREFIX = "mirror_"
 --- Fallback slot when missionInfo is unavailable (common dedicated client case).
@@ -173,11 +178,13 @@ function FarmDashboardExportMirror:init()
     self._lastSlot = nil
     self._joinHooked = false
     self._lastJobStartMs = nil
+    self._lastJobFinishMs = nil
     self._lastClientWriteMs = nil
     self._lastLiveWriteMs = nil
     self._firstWroteLogged = false
     --- Connections that completed sendInitialClientState (Settings-proven path).
     self._clients = {}
+    self._deferredReadyReplay = {}
     self._sendEpoch = 1
     self._receiveBufs = {}
     self._replicaSources = {}
@@ -265,21 +272,51 @@ function FarmDashboardExportMirror:_dispatchChunk(chunkIndex, totalChunks, chunk
 
     local live = {}
     local sentDirect = 0
+    local deferred = 0
     for conn, _ in pairs(self._clients or {}) do
-        if conn ~= nil and type(conn.sendEvent) == "function" then
-            local ok = pcall(function()
-                conn:sendEvent(makeEvent())
-            end)
-            if ok then
-                live[conn] = true
-                sentDirect = sentDirect + 1
+        if conn ~= nil and type(conn.sendEvent) == "function" and conn.isConnected ~= false then
+            live[conn] = true
+            local failedForJob = self._job ~= nil
+                and self._job.failedConnections ~= nil
+                and self._job.failedConnections[conn] == true
+            if conn.isReadyForEvents == false or failedForJob then
+                self._deferredReadyReplay = self._deferredReadyReplay or {}
+                if conn.isReadyForEvents == false and self._deferredReadyReplay[conn] ~= true and Logging and Logging.warning then
+                    Logging.warning("[FarmDash] export mirror: client event stream not ready; replay queued")
+                end
+                self._deferredReadyReplay[conn] = true
+                deferred = deferred + 1
+            else
+                local ok, err = pcall(function()
+                    conn:sendEvent(makeEvent())
+                end)
+                if ok then
+                    sentDirect = sentDirect + 1
+                else
+                    if self._job ~= nil then
+                        self._job.failedConnections = self._job.failedConnections or {}
+                        self._job.failedConnections[conn] = true
+                    end
+                    self._deferredReadyReplay = self._deferredReadyReplay or {}
+                    self._deferredReadyReplay[conn] = true
+                    deferred = deferred + 1
+                    if Logging and Logging.warning then
+                        local detail = string.sub(string.gsub(tostring(err), "[\r\n]", " "), 1, 200)
+                        Logging.warning(
+                            "[FarmDash] export mirror: client event send failed; replay queued transferId=%s chunk=%d/%d reason=%s",
+                            tostring(meta and meta.transferId), chunkIndex, totalChunks, detail
+                        )
+                    end
+                end
             end
+        elseif conn ~= nil and self._deferredReadyReplay then
+            self._deferredReadyReplay[conn] = nil
         end
     end
     self._clients = live
 
     local broadcastOk = false
-    if sentDirect < 1 then
+    if sentDirect < 1 and deferred < 1 then
         local srv = _G.g_server
         if type(srv) == "table" and type(srv.broadcastEvent) == "function" then
             -- Second arg false = do not run locally (AnimalNameEvent / official GIANTS pattern).
@@ -290,7 +327,23 @@ function FarmDashboardExportMirror:_dispatchChunk(chunkIndex, totalChunks, chunk
         end
     end
 
-    return true, sentDirect, broadcastOk
+    return true, sentDirect, broadcastOk, deferred > 0
+end
+
+--- A temporarily unready client missed chunks; replay the latest committed export once ready.
+function FarmDashboardExportMirror:_replayWhenReady()
+    for conn in pairs(self._deferredReadyReplay or {}) do
+        if conn.isConnected == false then
+            self._deferredReadyReplay[conn] = nil
+            if self._clients then self._clients[conn] = nil end
+        elseif conn.isReadyForEvents ~= false then
+            self._deferredReadyReplay[conn] = nil
+            self:onClientJoined(conn)
+            if Logging and Logging.info then
+                Logging.info("[FarmDash] export mirror: client event stream ready; latest export replay queued")
+            end
+        end
+    end
 end
 
 --- Same join path SettingsApi uses — register the connection and push mirror via sendEvent.
@@ -426,15 +479,15 @@ local function copyOwned(record)
 end
 
 function FarmDashboardExportMirror:_beginOwnedJob(owned, force)
-    if force ~= true then
-        local nowMs = _nowMs()
-        local minGap = self.MIN_STREAM_INTERVAL_MS or 15000
-        if nowMs ~= nil and self._lastJobStartMs ~= nil and (nowMs - self._lastJobStartMs) < minGap then
-            self._pendingJob = { owned = owned }
-            return "throttled"
-        end
+    local nowMs = _nowMs()
+    local minGap = self.MIN_STREAM_INTERVAL_MS or 15000
+    if nowMs ~= nil and
+        ((force ~= true and self._lastJobStartMs ~= nil and (nowMs - self._lastJobStartMs) < minGap) or
+         (self._lastJobFinishMs ~= nil and (nowMs - self._lastJobFinishMs) < minGap)) then
+        self._pendingJob = { owned = owned }
+        return "throttled"
     end
-    self._lastJobStartMs = _nowMs()
+    self._lastJobStartMs = nowMs
     local epoch = self._sendEpoch or 1
     self._transferSerial = (self._transferSerial or 0) + 1
     local transferId = tostring(epoch) .. "-" .. tostring(self._transferSerial)
@@ -476,6 +529,14 @@ function FarmDashboardExportMirror:_beginOwnedJob(owned, force)
             sessionToken = owned.sessionToken,
         },
     }
+    if Logging and Logging.info then
+        local clients = 0
+        for _ in pairs(self._clients or {}) do clients = clients + 1 end
+        Logging.info(
+            "[FarmDash] export mirror: stream started transferId=%s generation=%s chunks=%d bytes=%d clients=%d",
+            transferId, tostring(owned.exportGeneration), totalChunks, totalLen, clients
+        )
+    end
     return "started"
 end
 
@@ -516,6 +577,7 @@ function FarmDashboardExportMirror:cancelJob()
     self._joinReplay = nil
     self._latestCommitted = nil
     self._forceNext = nil
+    self._lastJobFinishMs = nil
     local finalizer = rawget(_G, "FarmDashboardExportFinalizer")
     if finalizer and finalizer.retireAll then finalizer.retireAll(self) end
     self._receiveBufs = {}
@@ -523,6 +585,7 @@ function FarmDashboardExportMirror:cancelJob()
     self._lifetimes = {}
     self._replicaSources = {}
     self._clients = {}
+    self._deferredReadyReplay = {}
 end
 
 function FarmDashboardExportMirror:_startPendingJobIfAny()
@@ -543,18 +606,18 @@ function FarmDashboardExportMirror:update(_dt)
     if not _isAuthorityProcess() then
         return
     end
+    self:_replayWhenReady()
 
     local job = self._job
     if not job then
-        -- Idle with a throttled payload queued: start it once the interval has passed.
+        -- The start helper applies both the normal gap and post-stream settling.
         if self._pendingJob ~= nil then
-            local nowMs = _nowMs()
-            local minGap = self.MIN_STREAM_INTERVAL_MS or 15000
-            if self._forceNext or nowMs == nil or self._lastJobStartMs == nil or (nowMs - self._lastJobStartMs) >= minGap then
-                self._forceNext = nil
-                self:_startPendingJobIfAny()
-                job = self._job
-            end
+            local force = self._forceNext == true
+            self._forceNext = nil
+            local pending = self._pendingJob
+            self._pendingJob = nil
+            self:_beginOwnedJob(pending.owned, force)
+            job = self._job
         end
         if not job then
             return
@@ -570,6 +633,22 @@ function FarmDashboardExportMirror:update(_dt)
     end
 
     local perFrame = math.max(1, self.CHUNKS_PER_FRAME or 2)
+    local nowMs = _nowMs()
+    if type(nowMs) == "number" then
+        local burst = math.max(job.chunkBytes, self.SEND_BURST_BYTES or 2048)
+        local rate = math.max(job.chunkBytes, self.SEND_BYTES_PER_SECOND or 24576)
+        if job.lastSendBudgetMs == nil then
+            job.sendBudget = burst
+        else
+            local elapsed = math.max(0, nowMs - job.lastSendBudgetMs)
+            job.sendBudget = math.min(burst, (job.sendBudget or 0) + elapsed * rate / 1000)
+        end
+        job.lastSendBudgetMs = nowMs
+    else
+        -- Preserve the old frame budget if this engine clock is unavailable.
+        job.sendBudget = nil
+        job.lastSendBudgetMs = nil
+    end
 
     for _ = 1, perFrame do
         if job.nextChunk > job.totalChunks then
@@ -577,6 +656,7 @@ function FarmDashboardExportMirror:update(_dt)
                 Logging.info("[FarmDash] export mirror: STREAM DONE chunks=%d", job.totalChunks)
             end
             self._job = nil
+            self._lastJobFinishMs = _nowMs()
             if self._joinReplay ~= nil and self._pendingJob == nil then
                 self._pendingJob = { owned = self._joinReplay }
                 self._joinReplay = nil
@@ -590,8 +670,26 @@ function FarmDashboardExportMirror:update(_dt)
         local startIdx = ((i - 1) * job.chunkBytes) + 1
         local stopIdx = math.min(job.totalLen, startIdx + job.chunkBytes - 1)
         local chunkData = string.sub(job.jsonString, startIdx, stopIdx)
+        if job.sendBudget ~= nil and job.sendBudget < #chunkData then
+            return
+        end
 
-        local ok, sentDirect, broadcastOk = self:_dispatchChunk(i, job.totalChunks, chunkData, job.meta)
+        local ok, sentDirect, broadcastOk, deferred = self:_dispatchChunk(i, job.totalChunks, chunkData, job.meta)
+        if job.sendBudget ~= nil then
+            job.sendBudget = math.max(0, job.sendBudget - #chunkData)
+        end
+
+        local mode = deferred and "deferred"
+            or ((tonumber(sentDirect) or 0) > 0 and "direct")
+            or (broadcastOk and "broadcast") or "none"
+        if Logging and Logging.info and (i == 1 or i == job.totalChunks or mode ~= job.lastDeliveryMode) then
+            Logging.info(
+                "[FarmDash] export mirror: dispatch progress transferId=%s generation=%s chunk=%d/%d mode=%s direct=%d broadcast=%s",
+                tostring(job.transferId), tostring(job.meta.exportGeneration), i, job.totalChunks,
+                mode, tonumber(sentDirect) or 0, tostring(broadcastOk)
+            )
+        end
+        job.lastDeliveryMode = mode
 
         if _fdVerbose() and Logging and Logging.info and (i == 1 or i == job.totalChunks or (i % 25) == 0) then
             Logging.info(
@@ -606,7 +704,7 @@ function FarmDashboardExportMirror:update(_dt)
         end
 
         -- Throttled: a fully broken pipe would otherwise warn once per chunk (~800 lines).
-        if (not ok or ((tonumber(sentDirect) or 0) < 1 and not broadcastOk))
+        if (not deferred and (not ok or ((tonumber(sentDirect) or 0) < 1 and not broadcastOk)))
             and (i == 1 or (i % 100) == 0)
             and Logging and Logging.warning then
             Logging.warning(
@@ -1822,7 +1920,7 @@ function FarmDashboardExportMirror:onChunkReceived(chunkIndex, totalChunks, payl
     self:init()
     local finalizer = rawget(_G, "FarmDashboardExportFinalizer")
     if finalizer == nil or type(finalizer.admit) ~= "function" then return end
-    finalizer.admit(self, chunkIndex, totalChunks, payloadString, meta, connection)
+    return finalizer.admit(self, chunkIndex, totalChunks, payloadString, meta, connection)
 end
 
 --- Client side: received transfers still need sweep/finalize steps to reach the replica store.

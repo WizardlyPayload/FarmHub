@@ -276,6 +276,24 @@ return table.concat(out, ";")
         expect(run({ files: STOCK_FILES, engine: stockEngine, body: stockBody, mode: "own" })).toBe("1:SILAGE:closed:Silage Buyer;2:CHAFF:fill:Silage Buyer");
         expect(run({ files: STOCK_FILES, engine: stockEngine, body: stockPriceBody, mode: "own" })).toBe("1:0.8;2:0.8");
     });
+
+    test("stock collection skips decorative placeables without losing relevant stock", () => {
+        const body = `
+local decorative = { getName = function() error("decorative placeable was scanned") end }
+table.insert(g_currentMission.placeableSystem.placeables, 1, decorative)
+local scan = InventoryScan.scanPlaceable
+local scanned = 0
+InventoryScan.scanPlaceable = function(...)
+    scanned = scanned + 1
+    return scan(...)
+end
+local res = StockDataCollector:collect()
+local a = res.byFarm["1"] or res.byFarm[1] or {}
+local b = res.byFarm["2"] or res.byFarm[2] or {}
+return "scanned=" .. scanned .. "|farm1=" .. #(a.items or {}) .. "|farm2=" .. #(b.items or {})
+`;
+        expect(run({ files: STOCK_FILES, engine: stockEngine, body })).toBe("scanned=2|farm1=1|farm2=1");
+    });
 });
 
 describe("098 prices and season periods under the native mod environment", () => {

@@ -692,7 +692,7 @@ function pickActiveMapFillTypeNames(mapNames, montanaNames, montanaActive) {
  * Extra indices, titles, and HUD paths come only from that map's zip.
  * Montana Multifruit is read only when the save identity is Montana (including
  * Montana 4X falling back to the MF zip when that is the installed map pack).
- * Witcombe 190 stays LINSEED even if Montana is also in mods.
+ * Witcombe's LINSEED stays map-scoped even if Montana is also in mods.
  */
 async function resolveMapFillTypeCatalog({ mapId, mapTitle, modsRoot, modsRoots }) {
   const vanillaNames = getVanillaFillTypeNames();

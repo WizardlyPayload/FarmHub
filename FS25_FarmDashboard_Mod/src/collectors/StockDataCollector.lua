@@ -143,7 +143,15 @@ function StockDataCollector:collectBegin()
     local m = _G.g_currentMission
     if m and m.placeableSystem and m.placeableSystem.placeables then
         for i = 1, #m.placeableSystem.placeables do
-            table.insert(st.placeables, m.placeableSystem.placeables[i])
+            local placeable = m.placeableSystem.placeables[i]
+            -- InventoryScan.scanPlaceableForFarm only reads these specializations.
+            -- Skip decorative/map placeables before the per-frame stock queue.
+            if placeable and (placeable.spec_silo or placeable.spec_siloExtension
+                or placeable.spec_husbandry or placeable.spec_beehivePalletSpawner
+                or placeable.spec_manureHeap or placeable.spec_bunkerSilo
+                or placeable.spec_objectStorageMod or placeable.spec_objectStorage) then
+                st.placeables[#st.placeables + 1] = placeable
+            end
         end
     end
 end

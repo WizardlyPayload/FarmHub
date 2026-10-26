@@ -241,7 +241,8 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     set({ sectionParams: {} });
   },
   setEnabledSections: (enabledSections) => set({ enabledSections }),
-  setConnection: (connection) => set({ connection }),
+  setConnection: (connection) =>
+    set((state) => state.connection === connection ? state : { connection }),
   setLocale: (locale) => {
     applyLocale(locale);
     set({ locale: getLocale() });
@@ -279,15 +280,19 @@ export function applyPayloadToStore(payload: DashboardPayload) {
     payload.mapTitle || payload.serverInfo?.mapName || "",
   ).trim();
   if (!savegameName && !mapTitle) return;
+  let changed = false;
   const next = store.servers.map((srv) => {
     if (String(srv.id) !== String(sid)) return srv;
+    if ((!savegameName || srv.savegameName === savegameName)
+      && (!mapTitle || srv.mapTitle === mapTitle)) return srv;
+    changed = true;
     return {
       ...srv,
       ...(savegameName ? { savegameName } : {}),
       ...(mapTitle ? { mapTitle } : {}),
     };
   });
-  store.setServers(next);
+  if (changed) store.setServers(next);
 }
 
 export function farmStorageKey(serverId: string | null | undefined): string {

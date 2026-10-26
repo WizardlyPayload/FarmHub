@@ -10,11 +10,26 @@ param(
 
     [Parameter(Mandatory = $false)]
     [ValidateSet('Classic', 'Rf', 'V4', 'V5')]
-    [string]$Edition = 'V4'
+    [string]$Edition = 'V4',
+
+    # NSIS gets these from Windows shell folders. A child PowerShell process
+    # launched by a packaged Windows Settings host can inherit redirected
+    # APPDATA/LOCALAPPDATA environment values, silently cleaning the wrong view.
+    [string]$RoamingBase,
+    [string]$LocalBase,
+    [string]$TraceLog
 )
 
 $ErrorActionPreference = 'Stop'
 $script:CleanupFailures = New-Object 'System.Collections.Generic.List[string]'
+
+function Write-CleanupTrace([string]$Message) {
+    $line = '[' + (Get-Date -Format o) + '] ' + $Message
+    Write-Host $line
+    if ($TraceLog) {
+        Add-Content -LiteralPath $TraceLog -Value $line -Encoding UTF8 -ErrorAction SilentlyContinue
+    }
+}
 
 function Test-IsV5Edition([string]$Name) {
     return @('Rf', 'V5') -contains $Name
@@ -43,7 +58,11 @@ function Reject-LinkedPath([string]$Path) {
 }
 
 function Remove-Tree([string]$Path) {
-    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) { return }
+    if (-not $Path -or -not (Test-Path -LiteralPath $Path)) {
+        Write-CleanupTrace "Profile target absent from helper view: $Path"
+        return
+    }
+    Write-CleanupTrace "Removing profile target: $Path"
     if (Test-HasLinkedAncestor $Path) {
         Reject-LinkedPath $Path
         return
@@ -69,6 +88,7 @@ function Remove-Tree([string]$Path) {
             if ($links.Count -gt 0) { throw "Linked profile children require manual review." }
             Remove-Item -LiteralPath $resolved -Recurse -Force -ErrorAction Stop
             if (Test-Path -LiteralPath $resolved) { throw "Path remains after removal." }
+            Write-CleanupTrace "Removed profile target: $resolved"
             return
         } catch {
             if (-not (Test-Path -LiteralPath $resolved)) { return }
@@ -81,7 +101,7 @@ function Remove-Tree([string]$Path) {
     }
 }
 
-function Get-ProfileRoots([string]$EditionName) {
+function Get-ProfileRoots([string]$EditionName, [string]$RoamingDirectory, [string]$LocalDirectory) {
     if (Test-IsV5Edition $EditionName) {
         $names = @('fs25-farm-dashboard-rf')
         $updater = @(
@@ -103,12 +123,12 @@ function Get-ProfileRoots([string]$EditionName) {
     $roaming = @()
     $local = @()
     foreach ($n in $names) {
-        if ($env:APPDATA) { $roaming += Join-Path $env:APPDATA $n }
-        if ($env:LOCALAPPDATA) { $local += Join-Path $env:LOCALAPPDATA $n }
+        if ($RoamingDirectory) { $roaming += Join-Path $RoamingDirectory $n }
+        if ($LocalDirectory) { $local += Join-Path $LocalDirectory $n }
     }
-    if ($env:LOCALAPPDATA) {
+    if ($LocalDirectory) {
         foreach ($u in $updater) {
-            $local += Join-Path $env:LOCALAPPDATA $u
+            $local += Join-Path $LocalDirectory $u
         }
     }
     return @{
@@ -117,14 +137,14 @@ function Get-ProfileRoots([string]$EditionName) {
     }
 }
 
-function Remove-LegacyV5UpdaterInstaller {
-    if (-not (Test-IsV5Edition $Edition) -or -not $env:LOCALAPPDATA) { return }
+function Remove-LegacyV5UpdaterInstaller([string]$LocalDirectory) {
+    if (-not (Test-IsV5Edition $Edition) -or -not $LocalDirectory) { return }
 
     # Older V5 builds used V4's cache name. Never remove that shared tree: its
     # pending/ directory may contain a genuine V4 update. Only the root-level
     # installer.exe is a V5 cleanup candidate, and only when its PE identity
     # proves it belongs to this product line.
-    $legacyRoot = Join-Path $env:LOCALAPPDATA 'fs25-farm-dashboard-updater'
+    $legacyRoot = Join-Path $LocalDirectory 'fs25-farm-dashboard-updater'
     $candidate = Join-Path $legacyRoot 'installer.exe'
     if (-not (Test-Path -LiteralPath $candidate)) { return }
     if (Test-HasLinkedAncestor $candidate) {
@@ -186,7 +206,21 @@ function Prune-ProfileKeepSettings([string]$ProfileDir) {
     }
 }
 
-$roots = Get-ProfileRoots $Edition
+function Resolve-ProfileBase([string]$Explicit, [string]$EnvironmentValue, [string]$Label) {
+    $chosen = if ($Explicit) { $Explicit } else { $EnvironmentValue }
+    if ([string]::IsNullOrWhiteSpace($chosen) -or -not [IO.Path]::IsPathRooted($chosen) -or
+        $chosen -match '["\r\n]') { throw "A valid absolute $Label profile base is required." }
+    $full = [IO.Path]::GetFullPath($chosen).TrimEnd('\', '/')
+    if ($full -eq [IO.Path]::GetPathRoot($full).TrimEnd('\', '/')) {
+        throw "A drive root cannot be the $Label profile base."
+    }
+    return $full
+}
+
+$roamingDirectory = Resolve-ProfileBase $RoamingBase $env:APPDATA 'Roaming'
+$localDirectory = Resolve-ProfileBase $LocalBase $env:LOCALAPPDATA 'Local'
+Write-CleanupTrace "[FarmDash uninstall] $Edition $Mode profile bases: roaming=$roamingDirectory local=$localDirectory; inherited APPDATA=$env:APPDATA LOCALAPPDATA=$env:LOCALAPPDATA; identity=$([Security.Principal.WindowsIdentity]::GetCurrent().Name)"
+$roots = Get-ProfileRoots $Edition $roamingDirectory $localDirectory
 $script:AllowedCleanupRoots = @(@($roots.Roaming) + @($roots.Local) |
     ForEach-Object { [IO.Path]::GetFullPath($_).TrimEnd([IO.Path]::DirectorySeparatorChar) })
 
@@ -200,7 +234,11 @@ if ($Mode -eq 'Full') {
     foreach ($p in $roots.Roaming) { Prune-ProfileKeepSettings $p }
 }
 
-Remove-LegacyV5UpdaterInstaller
+Remove-LegacyV5UpdaterInstaller $localDirectory
+
+foreach ($p in @($roots.Roaming) + @($roots.Local)) {
+    Write-CleanupTrace "Post-cleanup helper view: path=$p exists=$(Test-Path -LiteralPath $p)"
+}
 
 if ($env:TEMP) {
     Remove-Item -LiteralPath (Join-Path $env:TEMP 'farmdash-install-locale.txt') -Force -ErrorAction SilentlyContinue
@@ -210,4 +248,5 @@ if ($script:CleanupFailures.Count -gt 0) {
     Write-Host "[FarmDash uninstall] Cleanup incomplete. Close applications holding these files and retry. The uninstaller must be retained."
     exit 1
 }
+Write-CleanupTrace '[FarmDash uninstall] User profile cleanup helper completed.'
 exit 0

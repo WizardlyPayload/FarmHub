@@ -4,7 +4,7 @@ const { encodeEnvelope } = require("../exportEnvelope");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { parseRoute, readExportBuffers, createFreshnessTracker, readResourcePayloadSync, readReplicaIngress, ingestWatchedSlot } = require("../exportIngress");
+const { parseRoute, readExportBuffers, readExportDirectorySync, createFreshnessTracker, readResourcePayloadSync, readReplicaIngress, ingestWatchedSlot } = require("../exportIngress");
 const { writeStrictPair } = require("../replicaPairContract.cjs");
 
 function routeXml(fields) {
@@ -23,6 +23,56 @@ function slot(sequence, generation, payload, career = "career-a") {
 }
 
 describe("export ingress", () => {
+    test("an unchanged committed slot is isolated while changed bytes still advance", () => {
+        const tracker = createFreshnessTracker({ now: () => 1000, staleAfterMs: 5000 });
+        const route = routeXml({
+            schema: "1", careerId: "career-a", sessionId: "session-a",
+            publicationSequence: "1", slot: "a", persistence: "saved", sourceSlot: "savegame3",
+        });
+        const slotXml = slot(1, 1, JSON.stringify({ vehicles: [{ id: 1 }] }));
+        const input = { routeXml: route, slotXml, sourceId: "cached-local", configuredSlot: "savegame3", tracker };
+        const first = readExportBuffers(input);
+        expect(first.status).toBe("valid");
+        first.payload.vehicles[0].id = 99;
+        const same = readExportBuffers(input);
+        expect(same.payload.vehicles[0].id).toBe(1);
+        expect(same.freshness).toBe("unconfirmed");
+
+        const next = readExportBuffers({
+            ...input,
+            routeXml: route.replace('publicationSequence="1"', 'publicationSequence="2"'),
+            slotXml: slot(2, 2, JSON.stringify({ vehicles: [{ id: 2 }] })),
+        });
+        expect(next.payload.vehicles[0].id).toBe(2);
+        expect(next.freshness).toBe("live");
+    });
+
+    test("modern route reads only its committed slot; explicit legacy remains available", () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "farmdash-ingress-io-"));
+        const route = routeXml({
+            schema: "1", careerId: "career-a", sessionId: "session-a",
+            publicationSequence: "1", slot: "a", persistence: "saved", sourceSlot: "savegame3",
+        });
+        fs.mkdirSync(path.join(dir, "career-a"), { recursive: true });
+        fs.writeFileSync(path.join(dir, "active.xml"), route);
+        fs.writeFileSync(path.join(dir, "career-a", "slot-a.xml"), slot(1, 1, JSON.stringify({ vehicles: [{ id: 3 }] })));
+        fs.writeFileSync(path.join(dir, "data.json"), JSON.stringify({ vehicles: [{ id: 99 }] }));
+        const read = jest.spyOn(fs, "readFileSync");
+        try {
+            const modern = readExportDirectorySync(dir, { sourceId: "local", configuredSlot: "savegame3", explicitLegacy: true });
+            expect(modern.status).toBe("valid");
+            expect(modern.payload.vehicles[0].id).toBe(3);
+            expect(read.mock.calls.some(([file]) => file === path.join(dir, "data.json"))).toBe(false);
+
+            fs.unlinkSync(path.join(dir, "active.xml"));
+            const legacy = readExportDirectorySync(dir, { sourceId: "local", explicitLegacy: true });
+            expect(legacy.status).toBe("identity-unconfirmed");
+            expect(legacy.payload.vehicles[0].id).toBe(99);
+        } finally {
+            read.mockRestore();
+        }
+    });
+
     test("local ftp mirror status and discovery share one validated read", () => {
         const tracker = createFreshnessTracker({ now: () => 1000, staleAfterMs: 5000 });
         const route = routeXml({

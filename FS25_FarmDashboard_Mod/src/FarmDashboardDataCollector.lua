@@ -62,6 +62,12 @@ local COURSEPLAY_FLEET_SETTLE_MS = 30000
 local COURSEPLAY_POST_LOAD_SCAN_DELAY_MS = 45000
 local EXPORT_ORPHAN_RELEASE_MS = 5000
 
+-- These descriptor rows are immutable. Keep one copy rather than rebuilding
+-- the same nested tables on every game update; enable flags and loaded-mod
+-- checks below are still evaluated on every call.
+local _collectorOrderSpec
+local _rfForceSpec
+
 -- Must be declared before `jsonWriteStep` / any method that references them. In Lua, a `local`
 -- below a method definition is not an upvalue of that method — the name resolves to a *global*
 -- and is nil, which matches log: "attempt to call a nil value" on `_escapeJsonKey`.
@@ -508,6 +514,26 @@ local function _copyFileFs25BestEffort(src, dst)
     return false
 end
 
+-- fileExists also accepts an empty placeholder. The destination is in the writable
+-- profile, so confirm at least one byte before treating a map export as usable.
+local function _mapOverviewHasData(path)
+    if not _pathExists(path) then return false end
+    -- Some dedicated runtimes cannot expose profile files through io.open even
+    -- though the engine's fileExists/copyFile APIs work. In that case retain
+    -- the old existence behavior; only reject an empty file we actually read.
+    if type(io) ~= "table" or type(io.open) ~= "function" then return true end
+    local ok, handle = pcall(io.open, path, "rb")
+    if not ok or handle == nil then return true end
+    if type(handle.read) ~= "function" then
+        pcall(function() handle:close() end)
+        return true
+    end
+    local readOk, firstByte = pcall(function() return handle:read(1) end)
+    pcall(function() handle:close() end)
+    if not readOk then return true end
+    return type(firstByte) == "string" and #firstByte > 0
+end
+
 local function _parentDir(filePath)
     if type(filePath) ~= "string" or filePath == "" then return nil end
     return filePath:match("^(.+)[/\\][^/\\]+$")
@@ -770,9 +796,17 @@ function FarmDashboardDataCollector:_exportMapOverviewForDashboard()
             local dest = destDir .. "overview" .. ext
             -- The shared helper counts "destination exists" as success and native copyFile has no documented
             -- return value, so a copy over an existing image cannot be told apart from a silent no-op.
-            local priorImage = _pathExists(dest)
-            if not _copyFileFs25BestEffort(src, dest) then
+            local priorImage = _mapOverviewHasData(dest)
+            if not priorImage and _pathExists(dest) and type(deleteFile) == "function" then
+                pcall(function() deleteFile(dest) end)
+            end
+            local copied = _copyFileFs25BestEffort(src, dest)
+            if not copied or (not priorImage and not _mapOverviewHasData(dest)) then
                 copyFailed[#copyFailed + 1] = src
+                if not priorImage and _pathExists(dest) and not _mapOverviewHasData(dest)
+                    and type(deleteFile) == "function" then
+                    pcall(function() deleteFile(dest) end)
+                end
             elseif priorImage then
                 self._mapOverviewExportDone = true
                 self._mapOverviewExportOutcome = "retained-unconfirmed"
@@ -834,7 +868,8 @@ function FarmDashboardDataCollector:_exportMapOverviewForDashboard()
 
     -- Out of attempts: latch so we never retry every export cycle forever. Optional asset.
     self._mapOverviewExportDone = true
-    local previousExport = destDir ~= nil and (_pathExists(destDir .. "overview.dds") or _pathExists(destDir .. "overview.png"))
+    local previousExport = destDir ~= nil and
+        (_mapOverviewHasData(destDir .. "overview.dds") or _mapOverviewHasData(destDir .. "overview.png"))
     if previousExport then
         FarmDashLog.dev("map overview export found no new source for %s (%s); keeping previous export", key, detail)
         return
@@ -983,7 +1018,7 @@ function FarmDashboardDataCollector:init()
     self.coroutinesAvailable = _probeCoroutinesAvailable()
     if not self.coroutinesAvailable and FarmDashLog and FarmDashLog.devWarn then
         FarmDashLog.devWarn(
-            "Lua coroutines unavailable on this machine — fields/economy/production use sync collect per slot (no frame spread)"
+            "Lua coroutines unavailable on this machine: fields use per-field fallback; economy/production use sync collect per slot"
         )
     end
 
@@ -1306,6 +1341,7 @@ end
 function FarmDashboardDataCollector:_resourceIdForPen(penKey)
     if penKey == nil then return nil end
     local s = tostring(penKey)
+    if s == "" then return nil end
     local out = {}
     for i = 1, #s do
         local c = string.sub(s, i, i)
@@ -1316,7 +1352,32 @@ function FarmDashboardDataCollector:_resourceIdForPen(penKey)
         end
     end
     local id = table.concat(out)
-    if id == "" or #id > 64 then return nil end
+    if #id > 64 then
+        -- A composite pen key can contain an absolute mod path. Refusing its
+        -- resource id makes the same detail rebuild on every game frame. Keep
+        -- short legacy ids unchanged and use a bounded, stable 128-bit digest
+        -- for long keys. Each multiplication stays below 2^53 for exact Lua
+        -- number arithmetic; livestockDetail.js uses the same byte algorithm.
+        local h1, h2, h3, h4 = 2166136261, 2246822519, 3266489917, 668265263
+        for i = 1, #s do
+            local b = string.byte(s, i)
+            h1 = (h1 * 131 + b) % 4294967296
+            h2 = (h2 * 137 + b) % 4294967296
+            h3 = (h3 * 149 + b) % 4294967296
+            h4 = (h4 * 163 + b) % 4294967296
+        end
+        local function hex32(value)
+            local digits = "0123456789ABCDEF"
+            local chars = {}
+            for i = 8, 1, -1 do
+                local nibble = math.floor(value % 16)
+                chars[i] = string.sub(digits, nibble + 1, nibble + 1)
+                value = math.floor(value / 16)
+            end
+            return table.concat(chars)
+        end
+        return "H_" .. hex32(h1) .. hex32(h2) .. hex32(h3) .. hex32(h4)
+    end
     return id
 end
 
@@ -1723,6 +1784,7 @@ function FarmDashboardDataCollector:resetStaggerState(options)
     self.nextSliceIdx = 1
     self.slotAccumulator = 0
     self._lastSliceGTime = nil
+    self._lastModLinkedCheckGTime = nil
     self._firstWriteLogged = nil
     self._incActiveModule = nil
     self._cycleFresh = {}
@@ -2911,6 +2973,7 @@ end
 --- - Clears _detailLedger and _dirtyPens so we don't re-emit stale data from a previous session.
 --- - Sets POST_LOAD_SILENCE_SEC silence window to absorb RL save-load event flood.
 function FarmDashboardDataCollector:onMissionLoaded()
+    self._lastModLinkedCheckGTime = nil
     self._animalMode = "unknown"
     self._animalModeSamples = { last = nil, agree = 0 }
     self._dirtyPens = {}
@@ -2971,9 +3034,19 @@ end
 --- Optional third-party collectors stay in the rotation whenever their mod is loaded,
 --- even if an older config.xml left the module flag off.
 function FarmDashboardDataCollector:getEnabledCollectorOrder()
-    self:ensureModLinkedCollectorsEnabled(false)
+    -- Active mods are stable during a loaded save. Check for late-loaded
+    -- companions once per mission second instead of scanning every mod on
+    -- every frame. Direct config flag changes still affect the order below
+    -- immediately. Missing/restarted game clocks retain the safe scan path.
+    local nowMs = rawget(_G, "g_time")
+    local lastMs = self._lastModLinkedCheckGTime
+    if type(nowMs) ~= "number" or type(lastMs) ~= "number"
+        or nowMs < lastMs or nowMs - lastMs >= 1000 then
+        self:ensureModLinkedCollectorsEnabled(false)
+        self._lastModLinkedCheckGTime = type(nowMs) == "number" and nowMs or nil
+    end
     local order = {}
-    local seq = {
+    if _collectorOrderSpec == nil then _collectorOrderSpec = {
         -- Fields before animals/vehicles so PF N/pH reaches the dashboard before a long
         -- husbandry/fleet pass (Montana + Courseplay). Weather is cheap; keep it early too.
         { "fields",     "enableFields" },
@@ -3007,8 +3080,8 @@ function FarmDashboardDataCollector:getEnabledCollectorOrder()
         { "rfWeatherGuard",      "enableRfWeatherGuard" },
         { "rfTimeGuard",         "enableRfTimeGuard" },
         { "rfPresence",          "enableRfPresence" },
-    }
-    for _, row in ipairs(seq) do
+    } end
+    for _, row in ipairs(_collectorOrderSpec) do
         local name, flag = row[1], row[2]
         if self.config[flag] then
             table.insert(order, name)
@@ -3057,7 +3130,7 @@ function FarmDashboardDataCollector:ensureModLinkedCollectorsEnabled(persist)
     end
 
     -- Realistic Farming collectors — keep slots on when soft-detect says the companion is loaded.
-    local rfForce = {
+    if _rfForceSpec == nil then _rfForceSpec = {
         { "RfSoilFertilizerDataCollector", "enableRfSoilFertilizer" },
         { "RfCropStressDataCollector", "enableRfCropStress" },
         { "RfTaxDataCollector", "enableRfTax" },
@@ -3074,8 +3147,8 @@ function FarmDashboardDataCollector:ensureModLinkedCollectorsEnabled(persist)
         { "RfWeatherGuardDataCollector", "enableRfWeatherGuard" },
         { "RfTimeGuardDataCollector", "enableRfTimeGuard" },
         { "RfPresenceDataCollector", "enableRfPresence" },
-    }
-    for _, row in ipairs(rfForce) do
+    } end
+    for _, row in ipairs(_rfForceSpec) do
         local coll = rawget(_G, row[1])
         if coll and type(coll.isModLoaded) == "function" and coll.isModLoaded() then
             forceOn(row[2])
@@ -3612,7 +3685,9 @@ end
 
 --- @return boolean hasIncrementalCollector
 function FarmDashboardDataCollector:collectorSupportsIncremental(name)
-    if not self.coroutinesAvailable and COROUTINE_INCREMENTAL_COLLECTORS[name] then
+    -- FieldDataCollector has its own per-field collectBegin/collectStep fallback when
+    -- coroutine.create is unavailable. Do not route it through full sync collect().
+    if not self.coroutinesAvailable and COROUTINE_INCREMENTAL_COLLECTORS[name] and name ~= "fields" then
         return false
     end
     local c = self.collectors[name]
@@ -4436,7 +4511,9 @@ function FarmDashboardDataCollector:_updateBody(dt)
     self:_promoteQueuedSnapshot()
     local frameWorkDone = false
     local penWaiting = type(self._dirtyPens) == "table" and next(self._dirtyPens) ~= nil
-    if penWaiting and (self._jsonWriteJob or self._jsonPendingDisk) then
+    -- A persistent dirty pen must share frames with an active collector too.
+    -- Otherwise non-core collectors (notably stock) can be starved after JSON drains.
+    if penWaiting and (self._jsonWriteJob or self._jsonPendingDisk or self._incActiveModule) then
         self._exportFair = (self._exportFair == "pen") and "snapshot" or "pen"
     end
     if penWaiting and self._exportFair == "pen" and self:_exportBudgetAllows(1) then
@@ -4774,6 +4851,9 @@ function FarmDashboardDataCollector:beginDeferredJsonWrite(data, exportClass)
     end
 
     local walk = self:_jsonWalkBegin(data, 0)
+    -- The published snapshot is machine-readable. Avoid paying for pretty
+    -- whitespace in every frame-bounded write and envelope readback.
+    walk.compact = true
     if walk.stack[1] then walk.stack[1].knownObject = true end
     self._jsonWriteJob = {
         data = data,
@@ -5305,7 +5385,7 @@ function FarmDashboardDataCollector:writeDataToFile(data, exportClass)
 
     self:_stampExportGeneration(data, className)
 
-    local okJson, jsonData = pcall(function() return self:toJSON(data, 0) end)
+    local okJson, jsonData = pcall(function() return self:toJSON(data) end)
     if not okJson then
         FarmDashLog.devWarn("toJSON failed: %s", tostring(jsonData))
         return false
@@ -5522,8 +5602,8 @@ end
 --- string building, on the authority: single player FPS drop, and on a dedicated host a sim-thread
 --- stall for every joined player.
 ---
---- What it guarantees. Byte-identical output to _toJSONInto at compact=false, because it emits the
---- same tokens in the same order: the same two-space indent ladder, the same sorted object keys,
+--- What it guarantees. Byte-identical output to _toJSONInto at compact=true, because it emits the
+--- same tokens in the same order: the same sorted object keys,
 --- the same array-versus-object test, the same depth cap, the same cycle guard, the same
 --- __FD_JSON_NULL__ sentinel. It differs only in being able to stop between two tokens and carry on
 --- next frame.
@@ -5538,6 +5618,7 @@ end
 --- Returns true when this value is complete, false when it must resume on a later frame.
 --- deadline is an absolute wall-clock second value, or nil to run to completion.
 function FarmDashboardDataCollector:_jsonWalkStepBudgeted(walk, parts)
+    local compact = walk.compact == true
     local function left()
         return self:_jsonBudgetRemaining() or 0
     end
@@ -5580,7 +5661,7 @@ function FarmDashboardDataCollector:_jsonWalkStepBudgeted(walk, parts)
         if frame.phase == "preamble" then
             if not frame.preambleHanded then
                 frame.preambleHanded = true
-                if not put("{\n") then return false end
+                if not put(compact and "{" or "{\n") then return false end
             end
             frame.preambleDone = true
             frame.phase = "classify"
@@ -5619,8 +5700,8 @@ function FarmDashboardDataCollector:_jsonWalkStepBudgeted(walk, parts)
                 frame.isArray = isArray and not frame.preambleDone
                 frame.count = n
                 frame.i = 1
-                frame.ind = string.rep("  ", frame.level or 0)
-                frame.ind1 = string.rep("  ", (frame.level or 0) + 1)
+                frame.ind = compact and "" or string.rep("  ", frame.level or 0)
+                frame.ind1 = compact and "" or string.rep("  ", (frame.level or 0) + 1)
                 if frame.preambleDone and n == 0 then
                     frame.phase = "lit"
                     frame.literal = "}"
@@ -5629,10 +5710,11 @@ function FarmDashboardDataCollector:_jsonWalkStepBudgeted(walk, parts)
                     frame.orderI = 2
                     frame.orderJ = nil
                     frame.afterOrder = frame.preambleDone and "items" or "openTok"
-                    if not frame.preambleDone then frame.openText = "{\n" end
+                    if not frame.preambleDone then frame.openText = compact and "{" or "{\n" end
                 else
                     frame.phase = "openTok"
-                    frame.openText = n == 0 and ("{\n" .. frame.ind .. "}") or ((frame.isArray and "[" or "{") .. "\n")
+                    frame.openText = n == 0 and (compact and "{}" or ("{\n" .. frame.ind .. "}"))
+                        or ((frame.isArray and "[" or "{") .. (compact and "" or "\n"))
                     if n == 0 then frame.empty = true end
                 end
             end
@@ -5644,7 +5726,7 @@ function FarmDashboardDataCollector:_jsonWalkStepBudgeted(walk, parts)
             if n <= 1 or frame.orderI > n then
                 frame.phase = frame.afterOrder or "openTok"
                 frame.i = 1
-                if frame.phase == "openTok" and frame.openText == nil then frame.openText = "{\n" end
+                if frame.phase == "openTok" and frame.openText == nil then frame.openText = compact and "{" or "{\n" end
             else
                 if left() <= 0 then return false end
                 if frame.orderJ == nil then frame.orderJ = frame.orderI end
@@ -5708,7 +5790,7 @@ function FarmDashboardDataCollector:_jsonWalkStepBudgeted(walk, parts)
             if frame.i > frame.count then
                 if not frame.closeHanded then
                     frame.closeHanded = true
-                    frame.closeText = "\n" .. frame.ind .. (frame.isArray and "]" or "}")
+                    frame.closeText = (compact and "" or "\n") .. frame.ind .. (frame.isArray and "]" or "}")
                     if not put(frame.closeText) then return false end
                 end
                 walk.seen[frame.v] = nil
@@ -5718,7 +5800,7 @@ function FarmDashboardDataCollector:_jsonWalkStepBudgeted(walk, parts)
                 if frame.itemStage == "sep" then
                     if frame.i > 1 and not frame.sepHanded then
                         frame.sepHanded = true
-                        if not put(",\n") then return false end
+                        if not put(compact and "," or ",\n") then return false end
                     end
                     frame.itemStage = "indent"
                     frame.sepHanded = nil
@@ -5749,7 +5831,7 @@ function FarmDashboardDataCollector:_jsonWalkStepBudgeted(walk, parts)
                     if not done then return false end
                     if not frame.keyClose then
                         frame.keyClose = true
-                        if not put('": ') then return false end
+                        if not put(compact and '":' or '": ') then return false end
                     end
                     frame.itemStage = "child"
                     if left() <= 0 then return false end
@@ -5773,6 +5855,7 @@ function FarmDashboardDataCollector:_jsonWalkStep(walk, parts, deadline)
     end
     local stack = walk.stack
     local seen = walk.seen
+    local compact = walk.compact == true
     local units = 0
 
     while true do
@@ -5846,8 +5929,8 @@ function FarmDashboardDataCollector:_jsonWalkStep(walk, parts, deadline)
                     end
 
                     if count == 0 then
-                        parts[#parts + 1] = "{\n"
-                        parts[#parts + 1] = string.rep("  ", level)
+                        parts[#parts + 1] = compact and "{" or "{\n"
+                        if not compact then parts[#parts + 1] = string.rep("  ", level) end
                         parts[#parts + 1] = "}"
                         seen[data] = nil
                         stack[depth] = nil
@@ -5855,8 +5938,8 @@ function FarmDashboardDataCollector:_jsonWalkStep(walk, parts, deadline)
                         frame.isArray = isArray
                         frame.count = count
                         frame.i = 1
-                        frame.ind = string.rep("  ", level)
-                        frame.ind1 = string.rep("  ", level + 1)
+                        frame.ind = compact and "" or string.rep("  ", level)
+                        frame.ind1 = compact and "" or string.rep("  ", level + 1)
                         if not isArray then
                             local keys = {}
                             for k in pairs(data) do
@@ -5867,7 +5950,7 @@ function FarmDashboardDataCollector:_jsonWalkStep(walk, parts, deadline)
                             frame.count = #keys
                         end
                         parts[#parts + 1] = isArray and "[" or "{"
-                        parts[#parts + 1] = "\n"
+                        if not compact then parts[#parts + 1] = "\n" end
                         frame.phase = "items"
                     end
                 end
@@ -5908,7 +5991,7 @@ function FarmDashboardDataCollector:_jsonWalkStep(walk, parts, deadline)
 
         else -- "items"
             if frame.i > frame.count then
-                parts[#parts + 1] = "\n"
+                if not compact then parts[#parts + 1] = "\n" end
                 parts[#parts + 1] = frame.ind
                 parts[#parts + 1] = frame.isArray and "]" or "}"
                 seen[frame.v] = nil
@@ -5917,9 +6000,9 @@ function FarmDashboardDataCollector:_jsonWalkStep(walk, parts, deadline)
                 local i = frame.i
                 if i > 1 then
                     parts[#parts + 1] = ","
-                    parts[#parts + 1] = "\n"
+                    if not compact then parts[#parts + 1] = "\n" end
                 end
-                parts[#parts + 1] = frame.ind1
+                if not compact then parts[#parts + 1] = frame.ind1 end
                 local child
                 if frame.isArray then
                     child = frame.v[i]
@@ -5928,7 +6011,7 @@ function FarmDashboardDataCollector:_jsonWalkStep(walk, parts, deadline)
                     parts[#parts + 1] = '"'
                     parts[#parts + 1] = _escapeJsonKey(tostring(k))
                     parts[#parts + 1] = '":'
-                    parts[#parts + 1] = " "
+                    if not compact then parts[#parts + 1] = " " end
                     child = frame.v[k]
                 end
                 frame.i = i + 1

@@ -122,6 +122,7 @@ const STREAM_THROTTLE = `
 
 const PENDING_UPDATE = `
     E("g_time", 1000)
+M.CHUNKS_PER_FRAME = 1
     M:_beginOwnedJob({ payload = "abc" }, false)
     M._job = nil
     M._pendingJob = { owned = { payload = "abc" } }
@@ -227,6 +228,52 @@ describe("native mod environment: inherited engine runtime", () => {
 
     test("R02 [discriminator] a throttled payload stays pending until the late-changing clock passes the gap", () => {
         expect(run("inherited", PENDING_UPDATE)).toBe("true,false");
+    });
+
+    test("R02b a completed stream gives receivers a settling gap before its pending successor", () => {
+        const result = run("inherited", `
+            E("g_time", 1000)
+            M:_beginOwnedJob({ payload = "abc" }, false)
+            M._pendingJob = { owned = { payload = "def" } }
+            M:update(16)
+            E("g_time", 2000)
+            M:update(16)
+            local held = tostring(M._job == nil and M._pendingJob ~= nil)
+            E("g_time", 15000)
+            M:update(16)
+            local early = tostring(M._job == nil and M._pendingJob ~= nil)
+            E("g_time", 16000)
+            M:update(16)
+            return held .. "," .. early .. "," .. tostring(M._pendingJob == nil and M._lastJobFinishMs == 16000)
+        `);
+        expect(result).toBe("true,true,true");
+    });
+
+    test("R02c a capacity refusal tombstones the transfer instead of admitting its tail", () => {
+        const result = run("inherited", `
+            local m, conn = {}, {}
+            F.ensure(m)
+            m._replicaSources = { [conn] = "source-a" }
+            m._lifetimes[conn] = 1
+            m._bindings[conn] = { sourceId = "source-a", generation = 1, missionGeneration = m._mirrorGeneration }
+            F.MAX_UNFINISHED = 1
+            E("g_time", 1000)
+            local meta = {
+                wireVersion = 2, connectionEpoch = 1, transferId = "1-1",
+                declaredBytes = 4, decodedBytes = 3, crc = "1", careerId = "career-a",
+                sessionId = "session-a", publicationSequence = 1, exportGeneration = 1,
+                sourceSlot = "savegame3", schema = "2", encoding = "base64", simulationTimeMs = "10"
+            }
+            local first = F.admit(m, 1, 2, "ab", meta, conn)
+            meta.transferId = "1-2"
+            local refused = F.admit(m, 1, 2, "ab", meta, conn)
+            F.MAX_UNFINISHED = 2
+            local tail = F.admit(m, 2, 2, "cd", meta, conn)
+            meta.transferId = "1-3"
+            local orphan = F.admit(m, 2, 2, "cd", meta, conn)
+            return first .. "," .. refused .. "," .. tail .. "," .. orphan .. "," .. tostring(m._receiveBufs["1|1-2"] == nil)
+        `);
+        expect(result).toBe("receiving,capacity,duplicate,missing-start,true");
     });
 
     test("R03 [discriminator] the host sees the inherited g_server for remote clients and broadcast fallback", () => {

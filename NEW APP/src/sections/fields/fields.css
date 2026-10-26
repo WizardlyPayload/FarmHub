@@ -171,6 +171,11 @@
   min-height: 0;
 }
 
+.fd-fields__grid > .fd-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 560px;
+}
+
 .fd-fields__empty-hint {
   margin-top: 0.75rem;
   font-size: 0.85rem;

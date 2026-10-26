@@ -5,6 +5,7 @@
 
 import type { ModPageSectionId } from "@/types/dashboard";
 import type { CompanionPageEntry, CompanionPagesPayload } from "./types";
+import { sectionHasFeature } from "@/platform/demo-source";
 
 export type { CompanionPageEntry, CompanionPageGroup, CompanionPageProps } from "./types";
 
@@ -81,6 +82,7 @@ export function companionPageForCatalogId(catalogId: string | null | undefined):
 }
 
 type DetectPayload = {
+  dataSource?: unknown;
   companionMods?: unknown;
   companionPages?: unknown;
 } | null | undefined;
@@ -104,9 +106,14 @@ function hasCurrentCatalog(payload: DetectPayload): boolean {
 }
 
 export function companionPageDetected(entry: CompanionPageEntry, payload: DetectPayload): boolean {
-  if (hasCurrentCatalog(payload)) return detectedCatalogIds(payload).has(entry.catalogId);
   const pages = (payload?.companionPages as CompanionPagesPayload | null | undefined)?.pages;
-  return pages?.[entry.key]?.detected === true;
+  const active = hasCurrentCatalog(payload)
+    ? detectedCatalogIds(payload).has(entry.catalogId)
+    : pages?.[entry.key]?.detected === true;
+  if (payload?.dataSource === "recorded-demo") {
+    return active && sectionHasFeature(payload, modPageSection(entry.key));
+  }
+  return active;
 }
 
 /** Detected pages in sidebar order (group order, then title). */

@@ -17,7 +17,15 @@ function runLua(scenario) {
             "FarmDashboardExportMirror.lua",
         ];
         const bootstrap = `
-Logging = { info = function() end, warning = function() end }
+LOGS = { info = {}, warning = {} }
+local function captureLog(level, fmt, ...)
+    local ok, line = pcall(string.format, tostring(fmt), ...)
+    LOGS[level][#LOGS[level] + 1] = ok and line or tostring(fmt)
+end
+Logging = {
+    info = function(...) captureLog("info", ...) end,
+    warning = function(...) captureLog("warning", ...) end,
+}
 FarmDashLog = { devWarn = function() end, dev = function() end, error = function() end, isVerbose = function() return false end }
 Event = {}
 function Event.new(mt) return setmetatable({}, mt) end
@@ -47,7 +55,7 @@ function createFolder() end
 const setup = `
 local tick = 0
 FarmDashboardExportMirror._clock = function() return tick end
-FarmDashboardExportMirror.CHUNK_BYTES = 64
+FarmDashboardExportMirror.CHUNK_BYTES = 256
 FarmDashboardExportMirror.CHUNKS_PER_FRAME = 1
 local body = '{"x":"' .. string.rep("m", 256) .. '"}'
 local record = {
@@ -60,6 +68,25 @@ FarmDashboardExportMirror:onCommittedEnvelope(record)
 `;
 
 describe("replica transfer progress timeout", () => {
+    test("sender pacing spreads a burst across elapsed time without skipping chunks", () => {
+        const result = runLua(setup + `
+            FarmDashboardExportMirror.CHUNKS_PER_FRAME = 2
+            FarmDashboardExportMirror.SEND_BYTES_PER_SECOND = 256
+            FarmDashboardExportMirror.SEND_BURST_BYTES = 256
+            g_time = tick
+            FarmDashboardExportMirror:update(16)
+            local first = FarmDashboardExportMirror._job.nextChunk
+            FarmDashboardExportMirror:update(16)
+            local withoutTime = FarmDashboardExportMirror._job.nextChunk
+            tick = tick + 1000
+            g_time = tick
+            FarmDashboardExportMirror:update(16)
+            return tostring(first) .. "|" .. tostring(withoutTime) .. "|" .. table.concat(LOGS.info, "\\n")
+        `);
+        expect(result).toMatch(/^2\|2\|/);
+        expect(result).toMatch(/dispatch progress transferId=1-1 generation=1 chunk=2\/2/);
+    });
+
     test("continuous slow chunks can finish after 60 seconds", () => {
         const result = runLua(setup + `
             for _ = 1, 30 do
@@ -85,6 +112,18 @@ describe("replica transfer progress timeout", () => {
         expect(result).toBe("0|0|timeout");
     });
 
+    test("a timeout identifies sender progress and the last accepted client chunk", () => {
+        const result = runLua(setup + `
+            FarmDashboardExportMirror:update(16)
+            tick = FarmDashboardExportFinalizer.RECEIVE_TIMEOUT_MS + 1
+            FarmDashboardExportFinalizer.sweep(FarmDashboardExportMirror)
+            return table.concat(LOGS.info, "\\n") .. "\\n" .. table.concat(LOGS.warning, "\\n")
+        `);
+        expect(result).toMatch(/stream started transferId=1-1 generation=1 chunks=2/);
+        expect(result).toMatch(/dispatch progress transferId=1-1 generation=1 chunk=1\/2 mode=/);
+        expect(result).toMatch(/transfer timed out phase=receiving reason=inactive transferId=1-1 generation=1 received=1\/2 lastChunk=1/);
+    });
+
     test("a continuously fed transfer still has a hard lifetime cap", () => {
         const result = runLua(setup.replace('string.rep("m", 256)', 'string.rep("m", 8192)') + `
             for _ = 1, 21 do
@@ -96,5 +135,41 @@ describe("replica transfer progress timeout", () => {
             return tostring(count) .. "|" .. tostring(FarmDashboardExportMirror._reservedBytes) .. "|" .. tostring(FarmDashboardExportMirror._lastReplicaOutcome)
         `);
         expect(result).toBe("0|0|timeout");
+    });
+
+    test("an interrupted stream replays the latest complete export when the client becomes ready", () => {
+        const result = runLua(setup + `
+            FarmDashboardExportMirror:update(16)
+            conn.isReadyForEvents = false
+            FarmDashboardExportMirror:update(16)
+            FarmDashboardExportMirror:update(16)
+            conn.isReadyForEvents = true
+            for _ = 1, 25 do
+                FarmDashboardExportMirror:update(16)
+            end
+            local selection = saved["replica/source-a/selection-a.xml"]
+            return tostring(selection and selection.publicationSequence)
+        `);
+        expect(result).toBe("1");
+    });
+
+    test("one client send error cannot permanently drop that client while another succeeds", () => {
+        const result = runLua(setup + `
+            FarmDashboardExportMirror:update(16)
+            local originalSend = conn.sendEvent
+            conn.sendEvent = function() error("one transient send failure") end
+            local other = { isConnected = true, isReadyForEvents = true }
+            function other:sendEvent() end
+            FarmDashboardExportMirror._clients[other] = true
+            FarmDashboardExportMirror:update(16)
+            conn.sendEvent = originalSend
+            for _ = 1, 30 do
+                FarmDashboardExportMirror:update(16)
+            end
+            local selection = saved["replica/source-a/selection-a.xml"]
+            return tostring(selection and selection.publicationSequence)
+                .. "|" .. tostring(FarmDashboardExportMirror._clients[conn] == true)
+        `);
+        expect(result).toBe("1|true");
     });
 });

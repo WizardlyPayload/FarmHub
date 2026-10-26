@@ -19,6 +19,7 @@ const { sanitizeMapSlug, joinContained } = require('./safeFsIdentity.cjs');
 
 // v17: never crop overview — IngameMap Overlay 0–1 is map.xml imageFilename (game hotspot UV).
 const OVERVIEW_CACHE_VERSION = 17;
+const BASE_GAME_MAP_SLUGS = new Set(['mapus', 'mapeu', 'mapas']);
 
 /** Official DLC map packs (folder name under `<game>/pdlc/`, without `.dlc`). */
 const MAP_DLC_PACKAGE_HINTS = [
@@ -235,6 +236,9 @@ function getFs25GameInstallRoots() {
   push(path.join(steamCommon, 'Farming Simulator 25'));
   push(path.join(steamCommon, 'Farming Simulator 2025'));
   const pf = process.env.ProgramFiles || 'C:\\Program Files';
+  const pf86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+  push(path.join(pf86, 'Farming Simulator 25'));
+  push(path.join(pf86, 'Farming Simulator 2025'));
   push(path.join(pf, 'Farming Simulator 25'));
   push(path.join(pf, 'Farming Simulator 2025'));
   push(path.join(pf, 'Epic Games', 'FarmingSimulator25'));
@@ -428,7 +432,12 @@ async function pathExists(p) {
 }
 
 async function resolveExistingPath(candidate) {
-  if (!(await pathExists(candidate))) return null;
+  try {
+    const stat = await fs.promises.stat(candidate);
+    if (!stat.isFile() || stat.size === 0) return null;
+  } catch {
+    return null;
+  }
   try {
     return await fs.promises.realpath(candidate);
   } catch {
@@ -445,7 +454,7 @@ async function findModSettingsOverviewFile(dir) {
 
 async function findFirstExisting(paths) {
   for (const p of paths) {
-    if (await pathExists(p)) return p;
+    if (await resolveExistingPath(p)) return p;
   }
   return null;
 }
@@ -1049,7 +1058,7 @@ async function ensureCachedPng(sourceDescriptor, mapSlug, mapId, mapTitle) {
       meta.mtimeMs === stat.mtimeMs &&
       meta.size === stat.size &&
       meta.terrainInset &&
-      (await pathExists(pngPath));
+      (await resolveExistingPath(pngPath));
     if (cacheFresh) {
       return {
         pngPath,
@@ -1118,7 +1127,9 @@ async function resolveMapOverviewImage({ mapId, mapTitle, modsRoot, modsRoots })
   // Resolved before the lookup so even unexpected failures (e.g. a broken DDS conversion)
   // still tell the UI this is a DLC map — never suggest "put FS25_*.zip in mods" for those.
   const dlcPackagesForMap = resolveDlcPackagesForMap(mapId, mapTitle);
-  const hintKindForMap = dlcPackagesForMap.length > 0 ? 'dlc' : 'mod';
+  const hintKindForMap = dlcPackagesForMap.length > 0
+    ? 'dlc'
+    : BASE_GAME_MAP_SLUGS.has(normalizeMapSlug(mapId, mapTitle)) ? 'base-game' : 'mod';
   try {
     const found = await findOverviewSourceFile({ mapId, mapTitle, modsRoot, modsRoots });
     const { sourcePath, mapSlug, sourceKind, zipHit } = found;

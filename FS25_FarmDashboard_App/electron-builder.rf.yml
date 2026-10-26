@@ -15,7 +15,7 @@ extraMetadata:
   # Older 5.0.x packages stamped productLine: rf; runtime treats rf and v5 as the same V5 line.
   productLine: v5
   # V5 release candidate. Classic package.json and V4 update feed stay on 4.x.
-  version: 5.1.0
+  version: 5.1.17
 directories:
   output: electron-pack-out-rf
 files:
@@ -75,6 +75,9 @@ files:
   - stockMoistureFromXml.js
   - icon.ico
   - web/**/*
+  # Runtime-generated mod thumbnails are profile cache, not release assets.
+  # The installed V5 build omits them; including them adds about 607 MB.
+  - "!web/assests/img/items_mod_extract/**/*"
   - "!web/index.html"
   - "!web/simhub.html"
   - ui-v2/**/*

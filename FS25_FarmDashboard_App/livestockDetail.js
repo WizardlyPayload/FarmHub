@@ -61,13 +61,23 @@ function explicitLegacy(srv) {
 
 function resourceIdForPen(penKey) {
     const bytes = Buffer.from(String(penKey ?? ''), 'utf8');
+    if (bytes.length === 0) return null;
     let out = '';
     for (const byte of bytes) {
         const c = String.fromCharCode(byte);
         if (/^[A-Za-z0-9]$/.test(c)) out += c;
         else out += `_${byte.toString(16).toUpperCase().padStart(2, '0')}`;
     }
-    if (!out || out.length > 64) return null;
+    if (out.length > 64) {
+        const h = [2166136261, 2246822519, 3266489917, 668265263];
+        const factors = [131, 137, 149, 163];
+        for (const byte of bytes) {
+            for (let i = 0; i < h.length; i += 1) {
+                h[i] = (h[i] * factors[i] + byte) % 4294967296;
+            }
+        }
+        return `H_${h.map((value) => value.toString(16).toUpperCase().padStart(8, '0')).join('')}`;
+    }
     return out;
 }
 

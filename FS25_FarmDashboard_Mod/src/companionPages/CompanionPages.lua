@@ -279,8 +279,8 @@ end
 
 local function makeContext(entry, modName, cycle)
     local h = sharedHelpers()
-    -- GIANTS may expose mission globals through the mod environment's __index;
-    -- rawget bypasses that lookup and leaves every page without a mission.
+    -- GIANTS supplies engine globals through the mod environment's __index.
+    -- rawget misses an inherited mission even while the companion is active.
     local mission = _G.g_currentMission
     local names = { modName }
     for _, name in ipairs(entry.modNames) do

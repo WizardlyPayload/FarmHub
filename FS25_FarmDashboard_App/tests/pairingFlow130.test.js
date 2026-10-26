@@ -99,6 +99,25 @@ local function logsContain(text)
     return false
 end
 local function settle(c) runUntil(function() return not c.M.FarmDashboardExportMirror:hasReceiveWork() end, 300, 16) end
+-- After pairing, exercise the real mirror sender/receivers without collecting
+-- another gameplay generation that can replace an intentionally injected replay.
+local function mirrorOnlyUntil(pred, maxFrames, dt)
+    for i = 1, maxFrames do
+        ENGINE.g_time = ENGINE.g_time + (dt or 100)
+        SERVER.E.g_time = ENGINE.g_time
+        SERVER.M.FarmDashboardExportMirror:update(dt or 100)
+        for _, s in ipairs(extraServers) do
+            s.E.g_time = ENGINE.g_time
+            s.M.FarmDashboardExportMirror:update(dt or 100)
+        end
+        for _, c in ipairs(clients) do
+            c.E.g_time = ENGINE.g_time
+            c.M.FarmDashboardExportMirror:update(dt or 100)
+        end
+        if pred() then return i end
+    end
+    return nil
+end
 local function linkFirstTime(name, sourceId)
     local c = joinClient(name, nil)
     runUntil(function() return pending(c) ~= nil end, 200, 100)
@@ -392,16 +411,20 @@ leaveClient(a)
 reconnectClient(a, nil, SERVER)
 settle(a)
 local genBeforeSwitch = gen(replicaOf(a, "mp-aaaaaaaaaaaa"))
+local drainedBeforeSwitch = mirrorOnlyUntil(function()
+    return SERVER.M.FarmDashboardExportMirror._job == nil
+        and SERVER.M.FarmDashboardExportMirror._pendingJob == nil
+end, 500, 100)
 local switched = {}
 for k, v in pairs(FarmDashboardExportMirror._latestCommitted) do switched[k] = v end
 switched.careerId = "fd-00000000000000ff-1"
 FarmDashboardExportMirror._latestCommitted = switched
 FarmDashboardExportMirror:onClientJoined(a.toClient)
-local sawMismatch = false
-for i = 1, 200 do
-    frame(16)
-    if a.M.FarmDashboardExportMirror._lastReplicaOutcome == "career-mismatch" then sawMismatch = true end
-end
+-- The paced mirror may wait for an in-flight stream plus its 15 s settle gap.
+-- Observe the actual rejection, with a bounded 50 s simulated-time limit.
+local sawMismatch = mirrorOnlyUntil(function()
+    return a.M.FarmDashboardExportMirror._lastReplicaOutcome == "career-mismatch"
+end, 500, 100) ~= nil
 return enc({
     careerId = careerId,
     genA = genA,
@@ -413,6 +436,7 @@ return enc({
     sawMismatch = sawMismatch,
     careerAfterSwitch = replicaOf(a, "mp-aaaaaaaaaaaa")["farmDashboardExport#careerId"],
     genBeforeSwitch = genBeforeSwitch,
+    drainedBeforeSwitch = drainedBeforeSwitch,
     engineErrors = ENGINE_ERRORS,
 })
 `);
@@ -421,6 +445,7 @@ return enc({
         expect(r.twinCareer).toBe(r.careerId);
         expect(r.trust).toEqual(["mp-aaaaaaaaaaaa", "mp-bbbbbbbbbbbb"]);
         expect(r.reboundA).toBe(1);
+        expect(r.drainedBeforeSwitch).not.toBeNull();
         expect(r.sawMismatch).toBe(true);
         expect(r.careerAfterSwitch).toBe(r.careerId);
         expect(r.engineErrors).toEqual([]);
@@ -436,18 +461,23 @@ local c = linkFirstTime("clientO", "mp-333333333333")
 runUntil(function() return gen(replicaOf(c, "mp-333333333333")) >= 2 end, 400, 100)
 settle(c)
 local before = gen(replicaOf(c, "mp-333333333333"))
+local drainedBeforeReplay = mirrorOnlyUntil(function()
+    return SERVER.M.FarmDashboardExportMirror._job == nil
+        and SERVER.M.FarmDashboardExportMirror._pendingJob == nil
+end, 500, 100)
 FarmDashboardExportMirror._latestCommitted = old
 FarmDashboardExportMirror:onClientJoined(c.toClient)
-local sawRollback, lowest = false, before
-for i = 1, 120 do
-    frame(16)
-    if c.M.FarmDashboardExportMirror._lastReplicaOutcome == "sequence-rollback" then sawRollback = true end
+local lowest = before
+-- Wait for the replay stream to reach the client at the production byte rate.
+local sawRollback = mirrorOnlyUntil(function()
     local g = gen(replicaOf(c, "mp-333333333333"))
     if g < lowest then lowest = g end
-end
-return enc({ before = before, sawRollback = sawRollback, lowest = lowest })
+    return c.M.FarmDashboardExportMirror._lastReplicaOutcome == "sequence-rollback"
+end, 500, 100) ~= nil
+return enc({ before = before, drainedBeforeReplay = drainedBeforeReplay, sawRollback = sawRollback, lowest = lowest })
 `);
         expect(r.before).toBeGreaterThanOrEqual(2);
+        expect(r.drainedBeforeReplay).not.toBeNull();
         expect(r.sawRollback).toBe(true);
         expect(r.lowest).toBe(r.before);
     });

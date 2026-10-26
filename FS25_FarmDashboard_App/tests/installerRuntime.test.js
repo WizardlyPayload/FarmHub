@@ -92,6 +92,13 @@ windows('Windows installer runtime regressions', () => {
     expect(results.successfulRemoval.started).toBe(1);
     expect(results.successfulRemoval.cleared).toBe(true);
   });
+  test('uninstall removes its exact Windows entry even when NSIS omitted InstallLocation', () => {
+    expect(results.registrationMissingLocationRemoved).toBe(true);
+  });
+  test('uninstall refuses a Windows entry pointing at a different uninstaller', () => {
+    expect(results.registrationForeignRefused).toBe(true);
+    expect(results.registrationForeignIntact).toBe(true);
+  });
   test('uninstaller identity changes fail closed', () => {
     expect(results.changedUninstaller.threw).toBe(true);
     expect(results.changedUninstaller.started).toBe(0);

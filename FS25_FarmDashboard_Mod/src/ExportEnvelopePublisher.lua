@@ -7,6 +7,7 @@ ExportEnvelopePublisher = ExportEnvelopePublisher or {}
 ExportEnvelopePublisher.SCHEMA = 2
 ExportEnvelopePublisher.MAX_DECODED = 8 * 1024 * 1024
 ExportEnvelopePublisher.MAX_STEP_BYTES = 4096
+ExportEnvelopePublisher.MAX_CLOCKED_STEP_BYTES = 16384
 ExportEnvelopePublisher.XML_INT_MAX = 2147483647
 ExportEnvelopePublisher.MAX_ID = 64
 
@@ -600,7 +601,7 @@ local function chooseTarget(job)
     return nil, "no-inactive-slot"
 end
 
-local function encodeQuantum(job)
+local function encodeQuantum(job, piece)
     local data = job.payload
     local i = job.offset
     if i > #data then return false end
@@ -620,7 +621,7 @@ local function encodeQuantum(job)
     local c2 = string.sub(ALPHABET, math.floor(triple / 4096) % 64 + 1, math.floor(triple / 4096) % 64 + 1)
     local c3 = (take >= 2) and string.sub(ALPHABET, math.floor(triple / 64) % 64 + 1, math.floor(triple / 64) % 64 + 1) or "="
     local c4 = (take >= 3) and string.sub(ALPHABET, triple % 64 + 1, triple % 64 + 1) or "="
-    job._piece = (job._piece or "") .. c1 .. c2 .. c3 .. c4
+    piece[#piece + 1] = c1 .. c2 .. c3 .. c4
     job.offset = i + take
     return take
 end
@@ -631,7 +632,9 @@ local function codecBudget(budget)
     local timeMs = budget.timeMs
     if type(bytes) ~= "number" or bytes ~= bytes or bytes < 3 or bytes == math.huge then return nil end
     if type(timeMs) ~= "number" or timeMs ~= timeMs or timeMs <= 0 or timeMs == math.huge then return nil end
-    return math.min(bytes, ExportEnvelopePublisher.MAX_STEP_BYTES), timeMs
+    local cap = budget.clocked == true and ExportEnvelopePublisher.MAX_CLOCKED_STEP_BYTES
+        or ExportEnvelopePublisher.MAX_STEP_BYTES
+    return math.min(bytes, cap), timeMs
 end
 
 local function noteBlocks(job, count)
@@ -652,17 +655,17 @@ local function stepEncode(self, job, budget)
     end
     local startClock = clockSample(self)
     local used = 0
+    local piece = {}
     while job.offset <= #job.payload do
         if used > 0 and (used + 3) > maxBytes then break end
         if used > 0 and not timeAllows(self, job, startClock, used, timeMs) then break end
-        local take = encodeQuantum(job)
+        local take = encodeQuantum(job, piece)
         if not take then break end
         used = used + take
     end
     addClock(job, "luaClock", startClock, clockSample(self))
-    if job._piece ~= nil and #job._piece > 0 then
-        job.parts[#job.parts + 1] = job._piece
-        job._piece = ""
+    if #piece > 0 then
+        job.parts[#job.parts + 1] = table.concat(piece)
     end
     job.lastStepWork = used
     if job.metrics then job.metrics.luaBytes = job.metrics.luaBytes + used end
@@ -689,7 +692,6 @@ local function stepDecode(self, job, budget)
         job.decodeOffset = 1
         job.decodeCrcA = 1
         job.decodeCrcB = 0
-        job._decodePiece = ""
     end
     local encoded = job.readerEncoded or ""
     if job.decodeChecked ~= true then
@@ -701,6 +703,7 @@ local function stepDecode(self, job, budget)
     end
     local startClock = clockSample(self)
     local used = 0
+    local piece = {}
     while job.decodeOffset <= #encoded do
         if used > 0 and (used + 3) > maxBytes then break end
         if used > 0 and not timeAllows(self, job, startClock, used, timeMs) then break end
@@ -716,7 +719,7 @@ local function stepDecode(self, job, budget)
             fail(job, "payload")
             return
         end
-        job._decodePiece = job._decodePiece .. decoded
+        piece[#piece + 1] = decoded
         for n = 1, #decoded do
             local byte = string.byte(decoded, n)
             job.decodeCrcA = (job.decodeCrcA + byte) % 65521
@@ -726,9 +729,8 @@ local function stepDecode(self, job, budget)
         used = used + #decoded
     end
     addClock(job, "luaClock", startClock, clockSample(self))
-    if job._decodePiece ~= "" then
-        job.decodeParts[#job.decodeParts + 1] = job._decodePiece
-        job._decodePiece = ""
+    if #piece > 0 then
+        job.decodeParts[#job.decodeParts + 1] = table.concat(piece)
         noteBlocks(job, #job.decodeParts)
     end
     job.lastStepWork = used
@@ -849,7 +851,7 @@ local function stepBoundSlot(self, job, which, budget, revalidate)
             job.phase = (which == "a") and "inspect-b" or "select"
             return true
         end
-        cursor = { raw = raw, observation = observation, offset = 1, parts = {}, crcA = 1, crcB = 0, piece = "" }
+        cursor = { raw = raw, observation = observation, offset = 1, parts = {}, crcA = 1, crcB = 0 }
         job["cursor" .. key] = cursor
     end
     local maxBytes, timeMs = codecBudget(budget)
@@ -860,6 +862,7 @@ local function stepBoundSlot(self, job, which, budget, revalidate)
     local encoded = cursor.raw.fields.payload or ""
     local startClock = clockSample(self)
     local used = 0
+    local piece = {}
     while cursor.offset <= #encoded do
         if used > 0 and (used + 3) > maxBytes then break end
         if used > 0 and not timeAllows(self, job, startClock, used, timeMs) then break end
@@ -879,7 +882,7 @@ local function stepBoundSlot(self, job, which, budget, revalidate)
             job.phase = (which == "a") and "inspect-b" or "select"
             return true
         end
-        cursor.piece = cursor.piece .. decoded
+        piece[#piece + 1] = decoded
         for n = 1, #decoded do
             local byte = string.byte(decoded, n)
             cursor.crcA = (cursor.crcA + byte) % 65521
@@ -888,9 +891,8 @@ local function stepBoundSlot(self, job, which, budget, revalidate)
         cursor.offset = cursor.offset + 4
         used = used + #decoded
     end
-    if #cursor.piece > 0 then
-        cursor.parts[#cursor.parts + 1] = cursor.piece
-        cursor.piece = ""
+    if #piece > 0 then
+        cursor.parts[#cursor.parts + 1] = table.concat(piece)
         noteBlocks(job, #cursor.parts)
     end
     addClock(job, "luaClock", startClock, clockSample(self))

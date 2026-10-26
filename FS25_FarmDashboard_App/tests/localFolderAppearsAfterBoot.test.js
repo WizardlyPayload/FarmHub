@@ -50,7 +50,7 @@ describe("local folder appearing after V5 boot", () => {
         if (root) fs.rmSync(root, { recursive: true, force: true });
     });
 
-    function harness() {
+    function harness(options = {}) {
         root = fs.mkdtempSync(path.join(os.tmpdir(), "farmdash-first-run-"));
         const basePath = path.join(root, "modSettings", "FS25_FarmDashboard");
         const source = { id: "local-one", mode: "local", enabled: true, localPath: basePath, localSubFolder: "savegame1" };
@@ -58,6 +58,15 @@ describe("local folder appearing after V5 boot", () => {
         const memory = { config, simHubLiveContext: { serverId: source.id } };
         const boundSources = createBoundSourcePublication({ sameBinding: (a, b) => JSON.stringify(a) === JSON.stringify(b) });
         let generation = 1;
+        let pollTick = null;
+        let ingressReads = 0;
+        const countedExportIngress = {
+            ...exportIngress,
+            ingestWatchedSlot: (...args) => {
+                ingressReads++;
+                return exportIngress.ingestWatchedSlot(...args);
+            },
+        };
         states = { [source.id]: {
             active: true, activationGeneration: 1, ingressGeneration: 0, intervals: [],
             configWarning: { code: "localSubFolderMissing", expected: path.join(basePath, "savegame1") },
@@ -83,7 +92,7 @@ describe("local folder appearing after V5 boot", () => {
         ], {
             fs, path, serverStates: states, store, boundSources, runtimeActivation,
             mergeRebuildGate: mergedSnapshotHold.createMergeRebuildGate(),
-            exportIngress, localIngressController, ingressOrchestration,
+            exportIngress: countedExportIngress, localIngressController, ingressOrchestration,
             mergeData, buildFieldLiveFingerprints, isExplicitReplicaXmlSource,
             shouldIgnoreMinimalLuaExport: mergedSnapshotHold.shouldIgnoreMinimalLuaExport,
             liftSectionOutcomes: mergedSnapshotHold.liftSectionOutcomes,
@@ -131,9 +140,25 @@ describe("local folder appearing after V5 boot", () => {
             uxRequiresRestart: false, uxEventLog: { list: () => [] },
             ERROR_CODES: ux.ERROR_CODES,
             setTimeout: (fn, ms) => setTimeout(fn, ms === 5000 ? 30 : ms),
-            setInterval, clearInterval,
+            setInterval: options.manualPoll
+                ? (fn, ms) => {
+                    if (ms === 10000) {
+                        pollTick = fn;
+                        return { manualPoll: true };
+                    }
+                    return setInterval(fn, ms);
+                }
+                : setInterval,
+            clearInterval: options.manualPoll
+                ? (id) => { if (!id?.manualPoll) clearInterval(id); }
+                : clearInterval,
         });
-        return { source, basePath, boundSources, events, setGeneration: (value) => { generation = value; } };
+        return {
+            source, basePath, boundSources, events,
+            setGeneration: (value) => { generation = value; },
+            poll: () => { if (!pollTick) throw new Error("poll not armed"); return pollTick(); },
+            ingressReads: () => ingressReads,
+        };
     }
 
     test("a committed export for the exact slot unblocks API data and status without restart", async () => {
@@ -169,6 +194,29 @@ describe("local folder appearing after V5 boot", () => {
         expect(api.getDataForServer({ query: { serverId: source.id } }).mapTitle).toBe("RIGHT SAVE");
         expect(boundSources.snapshot(source.id).payload.mapTitle).toBe("RIGHT SAVE");
         expect(boundSources.snapshot(source.id).sourceBinding.stateRevision).toBeGreaterThan(2);
+    });
+
+    test("unchanged committed route is not re-ingested on repeated fallback polls", async () => {
+        const { source, basePath, boundSources, poll, ingressReads } = harness({ manualPoll: true });
+        const slot = path.join(basePath, "savegame1");
+        writeCommit(slot, "savegame1", 1, "FIRST");
+        expect((await api.startLocalWatching(source)).status).toBe("armed");
+        await until(() => boundSources.snapshot(source.id).payload?.mapTitle === "FIRST", "first commit did not publish");
+
+        writeCommit(slot, "savegame1", 2, "SECOND");
+        const route = path.join(slot, "active.xml");
+        const future = new Date(Date.now() + 5000);
+        fs.utimesSync(route, future, future);
+        await until(() => boundSources.snapshot(source.id).payload?.mapTitle === "SECOND", "new commit did not publish");
+        await new Promise((resolve) => setTimeout(resolve, 450));
+
+        await poll();
+        await new Promise((resolve) => setTimeout(resolve, 450));
+        const afterChangedPoll = ingressReads();
+        await poll();
+        await new Promise((resolve) => setTimeout(resolve, 450));
+        expect(ingressReads()).toBe(afterChangedPoll);
+        expect(boundSources.snapshot(source.id).payload.mapTitle).toBe("SECOND");
     });
 
     test("superseded activation cannot clear warning or publish an old source", async () => {

@@ -64,6 +64,16 @@ function FarmDashboardExportRoute:reset(deps)
         job.phase = "idle"
         return "refused"
     end
+    local nativeClock = FarmDashboardExportRoute._nativeClock
+    if nativeClock == nil then
+        nativeClock = function() return _G.getTimeSec() * 1000 end
+        FarmDashboardExportRoute._nativeClock = nativeClock
+    end
+    job.clockedBudget = type(_G.getTimeSec) == "function"
+        and (type(deps.now) ~= "function" or deps.now == nativeClock)
+    if job.clockedBudget then
+        deps.now = nativeClock
+    end
     job.publisher = ExportEnvelopePublisher.new(deps)
     job.deps = deps
     job.resourceVersion = {}
@@ -105,6 +115,12 @@ function FarmDashboardExportRoute:submit(record)
         job.active = record
         job.callbackSent = false
         job.phase = "snapshot"
+        job.perf = {
+            generation = record.generation,
+            started = type(_G.getTimeSec) == "function" and _G.getTimeSec() or nil,
+            steps = 0,
+            phases = {},
+        }
     else
         job.held = record
     end
@@ -433,18 +449,21 @@ function FarmDashboardExportRoute:writeDescriptor()
     return "routed"
 end
 
-local function exportBudget()
+local function exportBudget(fastSnapshot)
     local frame = job and job.frameBudget
-    local bytes = 4096
+    local clocked = fastSnapshot == true and job and job.clockedBudget == true
+    local cap = clocked and ExportEnvelopePublisher.MAX_CLOCKED_STEP_BYTES
+        or ExportEnvelopePublisher.MAX_STEP_BYTES
+    local bytes = cap
     if type(frame) == "table" and type(frame.bytes) == "number" then
-        bytes = math.max(0, math.min(4096, math.floor(frame.bytes)))
+        bytes = math.max(0, math.min(cap, math.floor(frame.bytes)))
     end
     if bytes < 3 then return nil end
-    return { bytes = bytes, timeMs = 4 }
+    return { bytes = bytes, timeMs = 4, clocked = clocked }
 end
 
 local function reserveBudget()
-    local budget = exportBudget()
+    local budget = exportBudget(true)
     if budget == nil then return nil end
     local frame = job and job.frameBudget
     if type(frame) == "table" and type(frame.bytes) == "number" then
@@ -457,7 +476,38 @@ end
 function FarmDashboardExportRoute:step(budget)
     if job == nil or job.publisher == nil then return "idle" end
     if type(budget) == "table" then job.frameBudget = budget end
+    local perf = job.perf
+    local phase = tostring(job.phase) .. "/" .. tostring(job.publisher:getStatus().phase)
+    if perf ~= nil and type(budget) == "table" and type(budget.bytes) == "number" then
+        perf.maxFrameBytes = math.max(perf.maxFrameBytes or 0, budget.bytes)
+    end
     local result = self:_stepOnce()
+    if perf ~= nil then
+        perf.steps = perf.steps + 1
+        perf.phases[phase] = (perf.phases[phase] or 0) + 1
+        local now = type(_G.getTimeSec) == "function" and _G.getTimeSec() or nil
+        local elapsed = now and perf.started and (now - perf.started) or nil
+        if elapsed and elapsed >= 30 and Logging and Logging.info then
+            if job.phase == "idle" or perf.lastLog == nil or now - perf.lastLog >= 30 then
+                Logging.info("[FarmDash] export route progress generation=%s elapsed=%.1fs route=%s publisher=%s steps=%d",
+                    tostring(perf.generation), elapsed, tostring(job.phase),
+                    tostring(job.publisher:getStatus().phase), perf.steps)
+                perf.lastLog = now
+            end
+        end
+        if job.phase == "idle" then
+            if elapsed and elapsed >= 30 and Logging and Logging.info then
+                local phases = {}
+                for name, count in pairs(perf.phases) do
+                    phases[#phases + 1] = name .. "=" .. tostring(count)
+                end
+                table.sort(phases)
+                Logging.info("[FarmDash] export route phases generation=%s maxFrameBytes=%d %s",
+                    tostring(perf.generation), perf.maxFrameBytes or 0, table.concat(phases, ","))
+            end
+            job.perf = nil
+        end
+    end
     if job and job.phase == "idle" then
         local collector = rawget(_G, "FarmDashboardDataCollector")
         if collector and type(collector.pumpHeldExport) == "function" then

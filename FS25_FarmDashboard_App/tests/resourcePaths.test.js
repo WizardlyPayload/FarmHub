@@ -396,11 +396,15 @@ describe("resource binding rework", () => {
         expect(payload.animals).toEqual([]);
     });
 
-    test("UTF-8 pen keys encode bytes and stop at 64 characters", () => {
+    test("UTF-8 pen keys retain short ids and give long composite paths stable bounded ids", () => {
         expect(livestockDetail.resourceIdForPen("é")).toBe("_C3_A9");
         expect(livestockDetail.resourceIdForPen("\u0001")).toBe("_01");
         expect(livestockDetail.resourceIdForPen("cow.xml:42")).toBe("cow_2Exml_3A42");
-        expect(livestockDetail.resourceIdForPen("x".repeat(65))).toBeNull();
+        expect(livestockDetail.resourceIdForPen("x".repeat(65))).toBe("H_CCD0934742E77627E79456F984491465");
+        expect(livestockDetail.resourceIdForPen("x".repeat(66))).not.toBe(livestockDetail.resourceIdForPen("x".repeat(65)));
+        expect(livestockDetail.resourceIdForPen("C:/Users/Graham/Documents/My Games/FarmingSimulator2025/mods/FS25_cowshedPack/calfShed.xml:517"))
+            .toBe("H_322E8B68FEC6857E76EE745CBBFA04C2");
+        expect(livestockDetail.resourceIdForPen("")).toBeNull();
     });
 
     test("R1-06 a host and slot change does not keep the previous index", async () => {

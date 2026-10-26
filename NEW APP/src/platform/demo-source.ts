@@ -36,7 +36,7 @@ export type Rule =
   | { k: "id" }
   | { k: "nullable"; of: Rule }
   | { k: "oneOf"; of: readonly Rule[] }
-  | { k: "obj"; fields: Record<string, Rule>; drop?: readonly string[]; farmName?: boolean; privateFarm?: boolean; saveScoped?: boolean; mixedFarm?: "wool" | "livestock" }
+  | { k: "obj"; fields: Record<string, Rule>; drop?: readonly string[]; farmName?: boolean; privateFarm?: boolean; requireFarmId?: boolean; saveScoped?: boolean; mixedFarm?: "wool" | "livestock" }
   | { k: "list"; of: Rule; max: number }
   | { k: "enumSet"; values: readonly string[] }
   | { k: "farms"; of: Rule }
@@ -117,7 +117,7 @@ const VEHICLE = obj({
     engineTemp: opt(num),
     lubricationLevel: opt(num),
     maintenanceSpend: opt(num),
-  })),
+  }, ["inspectionNotes"])),
 }, ["filename", "configFileName", "xmlFilename", "storeImage", "uniqueId"]);
 
 const FIELD = obj({
@@ -141,7 +141,9 @@ const FIELD = obj({
   isHarvested: bool,
   isWithered: bool,
   isMulched: opt(bool),
-  groundType: opt(text),
+  // The live FS25 collector exports the ground-type enum as a number; XML
+  // fallback can supply its label as text. Both are public field state.
+  groundType: opt({ k: "oneOf", of: [num, text] }),
   groundTypeName: opt(text),
   plowLevel: num,
   stubbleShredLevel: num,
@@ -468,6 +470,26 @@ const PRODUCTION_CHAIN = obj({ id, name: text, ownerFarmId: int, isActive: bool,
   }), 128),
 }, ["filename", "xmlFilename", "image", "uniqueId"]);
 
+// Dedicated public construction demo: the live collector already limits these
+// rows to the active farm, and the projection enforces that scope again. Other
+// companion pages are deliberately absent until they have their own contract.
+const CONSTRUCTION_MATERIAL = obj({
+  fillType: opt(text), required: opt(num), delivered: opt(num), remaining: opt(num),
+});
+const CONSTRUCTION_PROJECT: Rule = { k: "obj", requireFarmId: true, fields: {
+  id: opt(id), farmId: id, name: opt(text), mode: opt(text),
+  phase: opt(int), phaseCount: opt(int), progress: opt(num),
+  totalPrice: opt(num), totalPaid: opt(num), remainingCost: opt(num),
+  x: opt(num), z: opt(num), materials: list(CONSTRUCTION_MATERIAL, 24),
+} };
+const CONSTRUCTION_PAGE = obj({
+  key: text, detected: bool, readState: text, coverage: opt(text), reason: opt(text),
+  sampledAt: opt(num), byFarm: farms(obj({
+    siteCount: int, pausedCount: int, pendingMaterials: int, remainingCost: num,
+  })),
+  projects: list(CONSTRUCTION_PROJECT, 40),
+});
+
 /** Payload keys a recorded snapshot may carry, each with its public projection. */
 const PAYLOAD_RULES: Record<string, Rule> = {
   activeFarmId: int,
@@ -478,6 +500,7 @@ const PAYLOAD_RULES: Record<string, Rule> = {
   farmInfo: FARM_INFO,
   finance: FINANCE,
   companionMods: COMPANION,
+  companionPages: obj({ pages: obj({ everythingConstructable: CONSTRUCTION_PAGE }) }),
   realisticFarming: RF_STATUS,
   pastures: list(PASTURE, 200),
   animals: list(ANIMAL, 500),
@@ -497,6 +520,7 @@ export const FEATURE_ROUTES: Record<string, string> = {
   pastures: "pastures",
   storage: "stock",
   productions: "production",
+  "mod-everythingConstructable": "companionPages",
 };
 
 export function featureKeyForSection(section: string): string | null {
@@ -664,6 +688,8 @@ function project(rule: Rule, value: unknown, walk: Walk, depth: number): Project
     case "obj": {
       if (!value || typeof value !== "object" || Array.isArray(value)) return { ok: false, error: "invalid-object" };
       let record = value as Record<string, unknown>;
+      if (rule.requireFarmId && (typeof record.farmId !== "number" || !Number.isInteger(record.farmId)
+        || record.farmId < 1 || record.farmId > 16)) return { ok: false, error: "missing-farm" };
       for (const key of Object.keys(record)) {
         if (!Object.prototype.hasOwnProperty.call(rule.fields, key) && PRIVATE_KEY.test(key)
           && (walk.strict || !rule.drop?.includes(key))) return { ok: false, error: "private-field" };
@@ -747,6 +773,14 @@ function hasReading(value: unknown, key: string | null, depth: number): boolean 
 }
 
 export function sectionHasFeature(payload: DemoPayload, section: string): boolean {
+  if (section === "mod-everythingConstructable") {
+    const page = (payload.companionPages as { pages?: { everythingConstructable?: {
+      key?: unknown; detected?: unknown; readState?: unknown; projects?: unknown;
+    } } } | undefined)?.pages?.everythingConstructable;
+    return page?.key === "everythingConstructable" && page.detected === true
+      && (page.readState === "ok" || page.readState === "partial")
+      && Array.isArray(page.projects) && hasReading(page.projects, null, 0);
+  }
   const key = featureKeyForSection(section) ?? (Object.values(FEATURE_ROUTES).includes(section) ? section : null);
   if (!key) return false;
   const data = section === "pastures" && !payload[key] ? payload.animals : payload[key];

@@ -3,6 +3,10 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $SourceRoot 'build\windows-install-state.ps1')
 $script:records = @{}
 $script:calls = @()
+$script:uninstallWrites = 0
+function Remove-FarmDashLocalShadowRecord([string]$Directory, [string]$InstallScope, [string]$Record) {
+    $script:calls += 'LocalShadow:' + $Record
+}
 $script:dropWrites = $Case -eq 'invisible-write'
 $script:denyWrites = $Case -eq 'denied-write'
 function Invoke-FarmDashRegistryService([string]$Method, [hashtable]$Arguments) {
@@ -15,10 +19,12 @@ function Invoke-FarmDashRegistryService([string]$Method, [hashtable]$Arguments) 
             return @{ ReturnValue = 0 }
         }
         'SetStringValue' {
+            if ($key -eq $script:uninstallKey) { $script:uninstallWrites++ }
             if (-not $script:dropWrites) { $script:records[$key][$Arguments.sValueName] = $Arguments.sValue }
             return @{ ReturnValue = 0 }
         }
         'SetDWORDValue' {
+            if ($key -eq $script:uninstallKey) { $script:uninstallWrites++ }
             if (-not $script:dropWrites) { $script:records[$key][$Arguments.sValueName] = $Arguments.uValue }
             return @{ ReturnValue = 0 }
         }
@@ -60,6 +66,38 @@ $uninstaller = Join-Path $fixture 'Uninstall FS25 Farm Dashboard V5.exe'
 [IO.File]::WriteAllText($exe, 'Non-executable fixture; never launched.')
 [IO.File]::WriteAllText($uninstaller, 'Non-executable fixture; never launched.')
 $scope = if ($Case -eq 'machine') { 'all' } else { 'CurrentUser' }
+$uninstallArgs = Get-FarmDashRegistryArguments $scope 'Uninstall'
+$uninstallKey = [string]$uninstallArgs.hDefKey + ':' + $uninstallArgs.sSubKeyName
+$script:uninstallKey = $uninstallKey
+$command = '"' + $uninstaller + '" ' + $(if ($scope -eq 'all') { '/allusers' } else { '/currentuser' })
+# The NSIS built-in section runs before our custom registration hook.
+$script:records[$uninstallKey] = @{
+    DisplayName = 'FS25 Farm Dashboard V5 5.0.1'
+    UninstallString = $command
+    QuietUninstallString = $command + ' /S'
+    DisplayVersion = '5.0.1'
+    DisplayIcon = $exe + ',0'
+    Publisher = 'JoshWalki / Wizardlypayload & WizardlyPayload'
+    Comments = 'Real-time Farm Management Dashboard for FS25'
+    NoModify = [uint32]1
+    NoRepair = [uint32]1
+    EstimatedSize = [uint32]1234
+}
+if ($Case -eq 'register-other-name') {
+    $script:records[$uninstallKey].DisplayName = 'Another application'
+}
+if ($Case -eq 'register-other-command') {
+    $script:records[$uninstallKey].UninstallString = '"C:\other-app\uninstall.exe" /currentuser'
+}
+if ($Case -eq 'native-missing') {
+    $script:records.Remove($uninstallKey)
+}
+if ($Case -eq 'native-partial') {
+    $script:records[$uninstallKey].Remove('UninstallString')
+}
+if ($Case -eq 'native-wrong-version') {
+    $script:records[$uninstallKey].DisplayVersion = '5.0.0'
+}
 $errorText = $null
 try {
     Register-FarmDashNativeInstallation $fixture $scope '5.0.1' 1234
@@ -105,7 +143,7 @@ try {
         Remove-FarmDashNativeRegistration $fixture $scope
     }
 } catch { $errorText = $_.Exception.Message }
-$state = [ordered]@{ case = $Case; error = $errorText; scope = $scope; records = $script:records; calls = $script:calls }
+$state = [ordered]@{ case = $Case; error = $errorText; scope = $scope; records = $script:records; calls = $script:calls; uninstallWrites = $script:uninstallWrites }
 if ($Case -eq 'missing-optional-value') { $state.optionalValue = $script:optionalValue }
 if ($script:ownershipResult) { $state.ownership = $script:ownershipResult }
 if ($Case -eq 'preflight-only') { $state.preflightExitCode = $script:preflightResult }

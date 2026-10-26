@@ -32,6 +32,51 @@ function runProduction(files, chunk) {
 }
 
 describe("production export lifecycle", () => {
+    test("long composite pen key has the same bounded resource id in game and app", () => {
+        const penKey = "C:/Users/Graham/Documents/My Games/FarmingSimulator2025/mods/FS25_cowshedPack/calfShed.xml:517";
+        const expected = require("../livestockDetail").resourceIdForPen(penKey);
+        const result = runProduction(["FarmDashboardDataCollector.lua"], `
+            local C = FarmDashboardDataCollector
+            C._exportSession = 1
+            C._usesXmlTransport = function() return true end
+            C._xmlRecord = function() return {} end
+            FarmDashboardExportRoute = { submitResource = function(_, kind, json, record)
+                record.admissionVersion = 7
+                return "queued"
+            end }
+            local key = "${penKey}"
+            local outcome = C:_submitBoundedPen({ penKey = key, ledger = { ts = 1 } }, "{}")
+            return C:_resourceIdForPen(key) .. "|" .. tostring(outcome)
+        `);
+        expect(result).toBe(`${expected}|queued`);
+    });
+
+    test("compact frame-bounded snapshot matches the compact serializer", () => {
+        const result = runProduction(["FarmDashboardDataCollector.lua"], `
+            local C = FarmDashboardDataCollector
+            local data = { title = "spaces stay inside strings", prices = {}, nested = { empty = {}, items = { "a b", "c d" } } }
+            for i = 1, 30 do data.prices[i] = { name = "price " .. i, value = i } end
+            local walk = C:_jsonWalkBegin(data, 0)
+            walk.compact = true
+            walk.stack[1].knownObject = true
+            local parts = {}
+            local steps = 0
+            local done = false
+            repeat
+                C._frameBudget = { bytes = 32, charged = 0 }
+                done = C:_jsonWalkStep(walk, parts)
+                steps = steps + 1
+                if steps > 5000 then return "stuck" end
+            until done
+            local compact = table.concat(parts)
+            C._frameBudget = nil
+            local expected = C:toJSON(data)
+            local pretty = C:toJSON(data, 0)
+            return tostring(compact == expected) .. "|" .. tostring(#compact < #pretty) .. "|" .. tostring(steps > 1)
+        `);
+        expect(result).toBe("true|true|true");
+    });
+
     test("jsonWriteStep can call _jsonWalkNowSec", () => {
         const result = runProduction(["FarmDashboardDataCollector.lua"], `
             FarmDashboardDataCollector.config = { sliceBudgetMs = 4, jsonTopLevelKeysPerFrame = 8 }
@@ -680,8 +725,8 @@ describe("production complete-byte recovery", () => {
             io = { open = function() end }
             FarmDashboardDataCollector._writeJsonStringToDisk = function(_, raw)
                 writes = writes + 1
-                if string.find(raw, '"exportClass": "gameplay"', 1, true) then lastClass = "gameplay" end
-                if string.find(raw, '"exportClass": "bootstrap"', 1, true) then lastClass = "bootstrap" end
+                if string.find(raw, '"exportClass"%s*:%s*"gameplay"') then lastClass = "gameplay" end
+                if string.find(raw, '"exportClass"%s*:%s*"bootstrap"') then lastClass = "bootstrap" end
                 return true
             end
             local empty = { fields = {}, vehicles = {}, animals = {}, weather = { temperature = 20 } }
@@ -720,7 +765,8 @@ describe("production complete-byte recovery", () => {
             end
             FarmDashboardDataCollector._writeJsonStringToDisk = function(_, raw)
                 writes = writes + 1
-                if string.find(raw, '"exportClass": "gameplay"', 1, true) then seenClass = "gameplay" end
+                if string.find(raw, '"exportClass": "gameplay"', 1, true)
+                    or string.find(raw, '"exportClass":"gameplay"', 1, true) then seenClass = "gameplay" end
                 return true
             end
             FarmDashboardDataCollector:_updateBody(16)
@@ -760,7 +806,8 @@ describe("production complete-byte recovery", () => {
             io = { open = function() end }
             FarmDashboardDataCollector._writeJsonStringToDisk = function(_, raw)
                 for _, marker in ipairs({ "A", "B", "C" }) do
-                    if string.find(raw, '"marker": "' .. marker .. '"', 1, true) then
+                    if string.find(raw, '"marker": "' .. marker .. '"', 1, true)
+                        or string.find(raw, '"marker":"' .. marker .. '"', 1, true) then
                         commits[#commits + 1] = marker
                     end
                 end
@@ -805,7 +852,8 @@ describe("production complete-byte recovery", () => {
             FarmDashboardDataCollector._updateCollectionPauseLatch = function() end
             io = { open = function() end }
             FarmDashboardDataCollector._writeJsonStringToDisk = function(_, raw)
-                if string.find(raw, '"marker": "B"', 1, true) then commits[#commits + 1] = "B" end
+                if string.find(raw, '"marker": "B"', 1, true)
+                    or string.find(raw, '"marker":"B"', 1, true) then commits[#commits + 1] = "B" end
                 return true
             end
             local walker = FarmDashboardDataCollector._jsonWalkStep
@@ -856,8 +904,10 @@ describe("production complete-byte recovery", () => {
             end
             local queuedMarker = "none"
             local raw = FarmDashboardDataCollector._jsonPendingDisk and FarmDashboardDataCollector._jsonPendingDisk.jsonString or ""
-            if string.find(raw, '"marker": "C"', 1, true) then queuedMarker = "C" end
-            if string.find(raw, '"marker": "B"', 1, true) then queuedMarker = "B" end
+            if string.find(raw, '"marker": "C"', 1, true)
+                or string.find(raw, '"marker":"C"', 1, true) then queuedMarker = "C" end
+            if string.find(raw, '"marker": "B"', 1, true)
+                or string.find(raw, '"marker":"B"', 1, true) then queuedMarker = "B" end
             return table.concat(commits, ",") .. "|" .. queuedMarker
         `);
         expect(result).toBe("DISK|C");

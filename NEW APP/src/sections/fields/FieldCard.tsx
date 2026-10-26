@@ -26,6 +26,7 @@ import { RfLandPanels } from "./RfLandPanels";
 
 interface FieldCardProps {
   field: FieldRecord;
+  soilPending?: boolean;
   gameSettings?: GameSettings;
   vehicles?: unknown;
   farmId?: number;
@@ -66,6 +67,7 @@ function FieldShapeThumb({ field }: { field: FieldRecord }) {
 
 export function FieldCard({
   field,
+  soilPending = false,
   gameSettings,
   vehicles,
   farmId,
@@ -89,7 +91,7 @@ export function FieldCard({
   const weed = buildWeedBadge(displayField);
   const forage = buildForageBadges(displayField);
   const windrowVol = buildWindrowVolumeBadge(displayField);
-  const suggestion = buildSuggestionModel(displayField, {
+  const suggestion = soilPending ? null : buildSuggestionModel(displayField, {
     gameSettings,
     vehicles,
     farmId,
@@ -232,7 +234,7 @@ export function FieldCard({
           </span>
         </div>
 
-        {!rfSoilActive ? (
+        {!rfSoilActive && !soilPending ? (
           <div class="fd-field-soil">
             <div>
               <small>{t("fields.soilNitrogen")}</small>
@@ -255,6 +257,12 @@ export function FieldCard({
               </div>
             </div>
           </div>
+        ) : null}
+
+        {soilPending ? (
+          <p class="fd-field-suggestion__reason">
+            {t("fields.rf.soil.pendingCard")}
+          </p>
         ) : null}
 
         {suggestion ? (

@@ -12,15 +12,17 @@ interface Props {
 
 export function FreshnessChip({ payload, locale = "en", onRefresh }: Props) {
   const view = readFreshness(payload);
-  if (!view.fetchedAt && !view.isStale) return null;
-  const tone = view.confidence === "live" ? "accent" : view.confidence === "cache" ? "danger" : "warn";
+  if (!view.sourceAt && !view.isStale) return null;
+  const tone = !view.isStale ? "accent" : view.confidence === "cache" ? "danger" : "warn";
   const label =
-    view.confidence === "live"
+    !view.isStale
       ? t("ux.freshness.live")
       : view.confidence === "cache"
         ? t("ux.freshness.cache")
-        : t("ux.freshness.stale");
-  const when = formatFetchedAt(view.fetchedAt, locale);
+        : view.confidence === "held"
+          ? t("ux.freshness.held")
+          : t("ux.freshness.stale");
+  const when = formatFetchedAt(view.sourceAt, locale);
   const title = view.isStale
     ? tOr("ux.freshness.staleHint", "Showing last known data. Refresh when the game export is live.")
     : t("ux.freshness.updated", { when });

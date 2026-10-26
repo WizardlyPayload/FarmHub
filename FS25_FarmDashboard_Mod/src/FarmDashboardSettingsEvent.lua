@@ -358,10 +358,6 @@ function FarmDashboardSettingsEvent:run(connection)
         return
     end
 
-    if direction ~= "server" then
-        rejectRequest("server-sync-from-non-server")
-        return
-    end
     api:applySyncedSettings(self.boolValues, self.intValues, false)
 
     if FarmDashboardSettingsMenu and FarmDashboardSettingsMenu.syncAllControls then

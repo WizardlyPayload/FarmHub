@@ -10,6 +10,21 @@ local function _fdVerbose()
     local L = rawget(_G, "FarmDashLog")
     return L ~= nil and type(L.isVerbose) == "function" and L.isVerbose() == true
 end
+
+local function noteDiscard(reason, chunkIndex, totalChunks, meta)
+    local counts = FarmDashboardExportEvent._discardCounts or {}
+    FarmDashboardExportEvent._discardCounts = counts
+    reason = tostring(reason or "unknown")
+    local count = (counts[reason] or 0) + 1
+    counts[reason] = count
+    if (count == 1 or count % 256 == 0) and Logging and Logging.warning then
+        Logging.warning(
+            "[FarmDash] export mirror: client chunk discarded reason=%s count=%d transferId=%s generation=%s chunk=%s/%s",
+            reason, count, tostring(meta and meta.transferId),
+            tostring(meta and meta.exportGeneration), tostring(chunkIndex), tostring(totalChunks)
+        )
+    end
+end
 FarmDashboardExportEvent_mt = Class(FarmDashboardExportEvent, Event)
 
 InitEventClass(FarmDashboardExportEvent, "FarmDashboardExportEvent")
@@ -192,13 +207,18 @@ function FarmDashboardExportEvent:run(connection)
     end
 
     local mirror = rawget(_G, "FarmDashboardExportMirror")
-    if self.rejected ~= nil then return end
+    if self.rejected ~= nil then
+        noteDiscard(self.rejected, idx, total, self.meta)
+        return
+    end
     if mirror and mirror.onChunkReceived then
-        local ok, err = pcall(function()
-            mirror:onChunkReceived(idx, total, self.payloadString, self.meta, connection)
+        local ok, outcome = pcall(function()
+            return mirror:onChunkReceived(idx, total, self.payloadString, self.meta, connection)
         end)
         if not ok and Logging and Logging.warning then
-            Logging.warning("[FarmDash] export mirror: onChunkReceived failed: %s", tostring(err))
+            Logging.warning("[FarmDash] export mirror: onChunkReceived failed: %s", tostring(outcome))
+        elseif ok and outcome ~= nil and outcome ~= "receiving" and outcome ~= "queued" and outcome ~= "duplicate" then
+            noteDiscard(outcome, idx, total, self.meta)
         end
     elseif Logging and Logging.warning then
         Logging.warning("[FarmDash] export mirror: ExportEvent arrived but ExportMirror missing")

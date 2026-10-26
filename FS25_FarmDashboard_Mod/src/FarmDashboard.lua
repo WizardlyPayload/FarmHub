@@ -4,7 +4,7 @@
 FarmDashboard = {}
 FarmDashboard.MOD_NAME = "FS25_FarmDashboard"
 FarmDashboard.MOD_DIR = _G.g_currentModDirectory
-FarmDashboard.VERSION = "5.1.0.0"
+FarmDashboard.VERSION = "5.1.0.9"
 FarmDashboard.UPDATE_INTERVAL = 10000
 FarmDashboard.PORT = 8766
 FarmDashboard.readyAt = nil
@@ -467,13 +467,8 @@ function FarmDashboard:update(dt)
         )
     end
 
-    -- Keep export-mirror streaming alive even while shop spawn pause blocks fleet scans.
-    -- Without this, a started job stalls for the whole grace window (and GPortal joins
-    -- during that window never receive chunks).
-    -- _pendingJob: payloads queued by the stream-interval throttle also need the pump.
-    local mirror = rawget(_G, "FarmDashboardExportMirror")
-    if mirror and mirror.update and (mirror._job or mirror._pendingJob) then
-        pcall(function() mirror:update(dt) end)
+    if FarmDashboardCourseplayCompat and FarmDashboardCourseplayCompat.tick then
+        pcall(function() FarmDashboardCourseplayCompat.tick() end)
     end
 
     if not FarmDashboard.readyAt or not _G.g_time then return end
@@ -553,7 +548,17 @@ function FarmDashboard:update(dt)
 
     local exportRoute = rawget(_G, "FarmDashboardExportRoute")
     if exportRoute and type(exportRoute.step) == "function" then
-        local routeOk, routeErr = pcall(function() exportRoute:step(exportBudget) end)
+        local routeBudget = exportBudget
+        if type(_G.getTimeSec) == "function" then
+            -- Keep JSON serialization at 4 KiB. The clocked publisher can use
+            -- the rest of a separate 16 KiB total allowance with its 4 ms cap.
+            routeBudget = {
+                bytes = math.max(0, 16384 - (exportBudget.charged or 0)),
+                timeMs = 4,
+                charged = 0,
+            }
+        end
+        local routeOk, routeErr = pcall(function() exportRoute:step(routeBudget) end)
         if not routeOk and Logging and Logging.warning then
             FarmDashboard._routeWarnSkips = (FarmDashboard._routeWarnSkips or 0) + 1
             if FarmDashboard._routeWarnSkips == 1 or FarmDashboard._routeWarnSkips % 300 == 0 then
@@ -569,30 +574,6 @@ function FarmDashboard:update(dt)
             Logging.warning("[FarmDash] Update error: %s", tostring(err))
         end
     end
-end
-
-function FarmDashboard:buildExportDiagnostics()
-    local gameVersion = nil
-    pcall(function()
-        if type(_G.getAppVersion) == "function" then
-            gameVersion = tostring(_G.getAppVersion())
-        elseif type(getAppVersion) == "function" then
-            gameVersion = tostring(getAppVersion())
-        end
-    end)
-    local missing = {}
-    if not FarmDashboardDataCollector then
-        missing[#missing + 1] = "FarmDashboardDataCollector"
-    end
-    return {
-        modVersion = self.VERSION,
-        gameVersion = gameVersion,
-        isAuthority = self:isAuthority() == true,
-        lastExportGameTime = (type(_G.g_time) == "number") and _G.g_time or 0,
-        lastXmlSampleTime = nil,
-        missingDependencies = missing,
-        compatible = #missing == 0,
-    }
 end
 
 function FarmDashboard:buildExportDiagnostics()

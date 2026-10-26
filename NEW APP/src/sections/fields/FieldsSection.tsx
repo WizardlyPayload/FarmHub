@@ -35,6 +35,7 @@ import { UiStatePanel } from "@/components/ux/UiStatePanel";
 import { FreshnessChip } from "@/components/ux/FreshnessChip";
 import { buildModuleUiState } from "@/lib/ux-state";
 import { refreshDashboard } from "@/services/ws-client";
+import { isSoilCollectionPending } from "./soil-collection-state";
 import "./fields.css";
 
 const FILTERS: { id: FieldFilterType; labelKey: string }[] = [
@@ -226,11 +227,12 @@ export function FieldsSection() {
   const vehicles = vehiclesList(payload?.vehicles);
   const currentSeason = (payload?.weather as { currentSeason?: unknown } | undefined)
     ?.currentSeason;
+  const soilPending = isSoilCollectionPending(payload);
 
   // Soil Fertilizer installed but returning nothing is invisible otherwise: the cards
   // just fall back to base-game bars and look like the mod was never there.
   const soilStandDown = useMemo(() => {
-    if (soilTriage.active) return null;
+    if (soilTriage.active || soilPending) return null;
     const rf = payload?.realisticFarming;
     const summary = rf?.soilFertilizer;
     if (!summary || summary.enabled) return null;
@@ -241,7 +243,7 @@ export function FieldsSection() {
     if (!installed) return null;
     const key = SOIL_STAND_DOWN_KEYS[String(summary.reason || "")];
     return t(key || "fields.rf.soil.standDownUnknown");
-  }, [payload?.realisticFarming, soilTriage.active]);
+  }, [payload?.realisticFarming, soilTriage.active, soilPending]);
 
   const waiting = !payload || (connection === "connecting" && allFields.length === 0);
   const errored = connection === "error" && allFields.length === 0;
@@ -336,7 +338,6 @@ export function FieldsSection() {
     <div class="fd-fields">
       <header class="fd-fields__header">
         <h2>{t("fields.title")}</h2>
-        <p>{t("fields.subtitle")}</p>
         <FreshnessChip payload={payload} onRefresh={() => void refreshDashboard()} />
       </header>
 
@@ -421,6 +422,12 @@ export function FieldsSection() {
           <strong>{t("fields.rf.soil.standDownTitle")}</strong> {soilStandDown}
         </p>
       ) : null}
+      {soilPending ? (
+        <p class="fd-fields__stand-down">
+          <strong>{t("fields.rf.soil.pendingTitle")}</strong>{" "}
+          {t("fields.rf.soil.pendingBody")}
+        </p>
+      ) : null}
 
       {!emptyBody && soilTriage.active ? (
         <div class="fd-fields__triage">
@@ -457,6 +464,7 @@ export function FieldsSection() {
               <FieldCard
                 key={id}
                 field={field}
+                soilPending={soilPending}
                 gameSettings={gameSettings}
                 vehicles={vehicles}
                 farmId={farmId}

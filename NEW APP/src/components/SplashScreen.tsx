@@ -3,7 +3,7 @@ import { t, tOr } from "@/i18n/i18n";
 import { isPublicDemoHost } from "@/platform/viewer-mode";
 
 const SPLASH_BG = "/assests/img/Dashboard%20PIctures/Background.png";
-const SPLASH_LOGO = "/assests/img/Dashboard%20PIctures/logo.png";
+const SPLASH_LOGO = "/assests/img/logo.png";
 
 interface Props {
   /** True once first /api/data (or error) bootstrap finished. */

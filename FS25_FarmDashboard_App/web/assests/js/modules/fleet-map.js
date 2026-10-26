@@ -289,6 +289,8 @@ async function applyMapOverviewBackground(dashboard) {
         // Known DLC map (e.g. Kinlaig): never suggest a mods-folder zip — DLC packs ship
         // as proprietary .dlc containers; the in-game mod caches the overview instead.
         hint.textContent = t("map.hintNoImageDlc", { map: label });
+      } else if (data?.hintKind === "base-game") {
+        hint.textContent = t("map.hintNoImage");
       } else if (data?.error === "missing_map_id") {
         hint.textContent = t("map.hintNoImage");
       } else if (label && label !== t("map.unknownMap")) {

@@ -179,4 +179,44 @@ foreach ($name in @('existingInstall', 'existingOwnedInstall', 'noAdminInstall',
         ownershipWrites = $script:policy.ownershipWrites; cleared = $script:policy.cleared
     }
 }
+. (Join-Path $BuildRoot 'windows-install-state.ps1') -Action Library
+# This fixture substitutes only the Windows-visible registration records below.
+# Local shadow cleanup is exercised with temporary keys by
+# windows-install-state-native.ps1; never let this synthetic uninstall inspect
+# or remove the machine's real V5 registration.
+function Remove-FarmDashLocalShadowRecord([string]$Directory, [string]$InstallScope, [string]$Record) { }
+$nativeFixture = Join-Path $fixture 'native-registration'
+New-Item -ItemType Directory -Path $nativeFixture -Force | Out-Null
+$expectedUninstaller = Join-Path $nativeFixture 'Uninstall FS25 Farm Dashboard V5.exe'
+$expectedCommand = '"' + $expectedUninstaller + '" /currentuser'
+function Invoke-FarmDashRegistryService([string]$Method, [hashtable]$Arguments) {
+    $record = if ($Arguments.sSubKeyName -match '\\Uninstall\\') { 'Uninstall' } else { 'Install' }
+    $values = $script:RegistrationRecords[$record]
+    if ($Method -eq 'GetStringValue') {
+        if ($values -and $values.ContainsKey($Arguments.sValueName)) {
+            return [pscustomobject]@{ ReturnValue = 0; sValue = $values[$Arguments.sValueName] }
+        }
+        return [pscustomobject]@{ ReturnValue = 2 }
+    }
+    if ($Method -eq 'DeleteKey') {
+        $null = $script:RegistrationRecords.Remove($record)
+        return [pscustomobject]@{ ReturnValue = 0 }
+    }
+    throw "Unexpected synthetic registry method: $Method"
+}
+$script:RegistrationRecords = @{
+    Install = @{ InstallLocation = $nativeFixture }
+    Uninstall = @{ DisplayName = 'FS25 Farm Dashboard V5 5.1.3'; UninstallString = $expectedCommand }
+}
+Remove-FarmDashNativeRegistration $nativeFixture 'CurrentUser'
+$results.registrationMissingLocationRemoved = $script:RegistrationRecords.Count -eq 0
+$script:RegistrationRecords = @{
+    Install = @{ InstallLocation = $nativeFixture }
+    Uninstall = @{ DisplayName = 'FS25 Farm Dashboard V5 5.1.3'; UninstallString = '"C:\Other\Uninstall.exe" /currentuser' }
+}
+$results.registrationForeignRefused = $false
+try { Remove-FarmDashNativeRegistration $nativeFixture 'CurrentUser' }
+catch { $results.registrationForeignRefused = $true }
+$results.registrationForeignIntact = $script:RegistrationRecords.Count -eq 2
+
 Write-Output ('RESULT_JSON=' + ($results | ConvertTo-Json -Depth 6 -Compress))

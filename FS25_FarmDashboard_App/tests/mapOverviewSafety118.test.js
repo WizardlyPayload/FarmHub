@@ -43,6 +43,10 @@ toJSON = function(t)
     return '{"sourcePath":"' .. tostring(t.sourcePath) .. '","mapId":"' .. tostring(t.mapId) .. '"}'
 end
 io = { open = function(p, mode)
+    if mode == "rb" then
+        if H.files[p] ~= true then return nil, "Not found" end
+        return { read = function() return "D" end, close = function() return true end }
+    end
     mutate("open", p)
     if H.ioMode == "throwOpen" then error("open denied") end
     if H.ioMode == "nilOpen" then return nil, "Permission denied" end

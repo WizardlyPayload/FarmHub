@@ -231,4 +231,32 @@ describe("join stream symmetry (server write == client read)", () => {
             expect(result).toMatch(outcome);
         });
     }
+
+    test("mirror does not count silent disconnected or not-ready sends", () => {
+        const result = runLua(`
+            AUTH = true
+            local mirror = FarmDashboardExportMirror
+            mirror:init()
+            local dead = clientConn()
+            dead.isConnected = false
+            mirror:_registerClient(dead)
+            local _, deadSent = mirror:_dispatchChunk(1, 1, "AAAA", exportMeta())
+            local deadPruned = mirror._clients[dead] == nil
+
+            local waiting = clientConn()
+            waiting.isConnected = true
+            waiting.isReadyForEvents = false
+            mirror:_registerClient(waiting)
+            local _, waitingSent = mirror:_dispatchChunk(1, 1, "AAAA", exportMeta())
+            local queued = mirror._deferredReadyReplay[waiting] == true
+            mirror.onClientJoined = function(self, conn) self._testReplayed = conn end
+            waiting.isReadyForEvents = true
+            mirror:_replayWhenReady()
+            return table.concat({
+                tostring(deadSent), tostring(deadPruned), tostring(waitingSent),
+                tostring(queued), tostring(#waiting.sent), tostring(mirror._testReplayed == waiting)
+            }, ":")
+        `);
+        expect(result).toBe("0:true:0:true:0:true");
+    });
 });

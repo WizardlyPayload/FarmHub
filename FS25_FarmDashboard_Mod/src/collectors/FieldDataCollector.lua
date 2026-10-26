@@ -1037,18 +1037,27 @@ function FieldDataCollector:collectBegin()
 
     FieldDataCollector._smState = nil
     FieldDataCollector._fieldStep = nil
-    local okCo, co = pcall(coroutine.create, function()
-        FieldDataCollector._yieldEvery = 8
-        FieldDataCollector._baleYieldStride = 24
-        FieldDataCollector._yieldBaleCounter = 0
-        local r = FieldDataCollector:_collectImpl()
-        FieldDataCollector._yieldEvery = nil
-        FieldDataCollector._baleYieldStride = nil
-        return r
-    end)
-    if okCo and co then
-        FieldDataCollector._fdCo = co
-        return
+    -- FS25 can omit the coroutine library from a mod's Lua environment. Resolve
+    -- the API before indexing it so that the per-field stepper below remains the
+    -- incremental path; a collectBegin error would instead trigger a full sync
+    -- Fields pass in FarmDashboardDataCollector:startModuleSlice.
+    local coApi = rawget(_G, "coroutine")
+    if type(coApi) == "table" and type(coApi.create) == "function"
+        and type(coApi.resume) == "function" and type(coApi.status) == "function"
+        and type(coApi.yield) == "function" then
+        local okCo, co = pcall(coApi.create, function()
+            FieldDataCollector._yieldEvery = 8
+            FieldDataCollector._baleYieldStride = 24
+            FieldDataCollector._yieldBaleCounter = 0
+            local r = FieldDataCollector:_collectImpl()
+            FieldDataCollector._yieldEvery = nil
+            FieldDataCollector._baleYieldStride = nil
+            return r
+        end)
+        if okCo and co then
+            FieldDataCollector._fdCo = co
+            return
+        end
     end
 
     FieldDataCollector._fdCo = nil
@@ -1123,6 +1132,14 @@ function FieldDataCollector:collectStep(opts)
     local st = FieldDataCollector._fieldStep
     if not st then
         return true, keepLastFields(nil)
+    end
+
+    -- The game can enter a collection cycle before the field manager exists.
+    -- Without coroutines the preamble would otherwise return before setting
+    -- preambleDone on every frame, leaving the whole export cycle stuck here.
+    if not _G.g_currentMission or not _G.g_fieldManager or not _G.g_fieldManager.fields then
+        FieldDataCollector._fieldStep = nil
+        return true, keepLastFields("field manager unavailable")
     end
 
     if not st.preambleDone then
@@ -1922,6 +1939,44 @@ function FieldDataCollector:_collectImpl()
         local myFarmlandId = field.farmland and field.farmland.id or nil
         local sampleRadius = _fieldSampleRadiusM(fData.fieldAreaInSqm)
 
+        -- FieldState:update reads the fruit and every ground channel at one point.
+        -- Keep point snapshots only for this field: later metric passes must see the
+        -- earlier point's values, not the mutable state object's last position.
+        -- A failed update is not cached, so a later pass can still retry it.
+        local stateSamples = {}
+        local function sampleState(state, sx, sz)
+            local byX = stateSamples[state]
+            if not byX then
+                byX = {}
+                stateSamples[state] = byX
+            end
+            local byZ = byX[sx]
+            if not byZ then
+                byZ = {}
+                byX[sx] = byZ
+            end
+            local sample = byZ[sz]
+            if sample then return sample end
+            local ok = pcall(function() state:update(sx, sz) end)
+            sample = {
+                fruitTypeIndex = state.fruitTypeIndex,
+                growthState = state.growthState,
+                sprayLevel = state.sprayLevel,
+                plowLevel = state.plowLevel,
+                limeLevel = state.limeLevel,
+                weedState = state.weedState,
+                stubbleShredLevel = state.stubbleShredLevel,
+                groundType = state.groundType,
+                rollerLevel = state.rollerLevel,
+                rollLevel = state.rollLevel,
+                rollingLevel = state.rollingLevel,
+                stoneLevel = state.stoneLevel,
+                waterLevel = state.waterLevel,
+            }
+            if ok then byZ[sz] = sample end
+            return sample
+        end
+
         -- ====================================================================
         -- 1. THE HYBRID PROBE (shared 15-point farmland-guarded ring)
         -- ====================================================================
@@ -1931,27 +1986,27 @@ function FieldDataCollector:_collectImpl()
                 local foundCrop = false
                 _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz)
                     if foundCrop then return end
-                    pcall(function() probeState:update(sx, sz) end)
-                    if probeState.fruitTypeIndex and probeState.fruitTypeIndex > 0 then
-                        fData.fruitTypeIndex     = probeState.fruitTypeIndex
-                        fData.growthState        = probeState.growthState or 0
-                        fData.fertilizationLevel = probeState.sprayLevel or 0
-                        fData.plowLevel          = probeState.plowLevel or 0
-                        fData.limeLevel          = probeState.limeLevel or 0
-                        fData.weedLevel          = probeState.weedState or 0
-                        fData.mulchLevel         = probeState.stubbleShredLevel or 0
-                        fData.groundType         = probeState.groundType or 0
+                    local sampled = sampleState(probeState, sx, sz)
+                    if sampled.fruitTypeIndex and sampled.fruitTypeIndex > 0 then
+                        fData.fruitTypeIndex     = sampled.fruitTypeIndex
+                        fData.growthState        = sampled.growthState or 0
+                        fData.fertilizationLevel = sampled.sprayLevel or 0
+                        fData.plowLevel          = sampled.plowLevel or 0
+                        fData.limeLevel          = sampled.limeLevel or 0
+                        fData.weedLevel          = sampled.weedState or 0
+                        fData.mulchLevel         = sampled.stubbleShredLevel or 0
+                        fData.groundType         = sampled.groundType or 0
                         foundCrop = true
                     end
                 end)
                 if not foundCrop then
-                    pcall(function() probeState:update(cx, cz) end)
-                    fData.fertilizationLevel = probeState.sprayLevel or 0
-                    fData.plowLevel          = probeState.plowLevel or 0
-                    fData.limeLevel          = probeState.limeLevel or 0
-                    fData.weedLevel          = probeState.weedState or 0
-                    fData.mulchLevel         = probeState.stubbleShredLevel or 0
-                    fData.groundType         = probeState.groundType or 0
+                    local sampled = sampleState(probeState, cx, cz)
+                    fData.fertilizationLevel = sampled.sprayLevel or 0
+                    fData.plowLevel          = sampled.plowLevel or 0
+                    fData.limeLevel          = sampled.limeLevel or 0
+                    fData.weedLevel          = sampled.weedState or 0
+                    fData.mulchLevel         = sampled.stubbleShredLevel or 0
+                    fData.groundType         = sampled.groundType or 0
                 end
             end
         else
@@ -1961,48 +2016,47 @@ function FieldDataCollector:_collectImpl()
             if probeState and type(probeState.update) == "function" then
                 local maxWeed = 0
                 _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz, isCenter)
-                    pcall(function() probeState:update(sx, sz) end)
-                    if probeState.fruitTypeIndex and probeState.fruitTypeIndex > 0 then
+                    local sampled = sampleState(probeState, sx, sz)
+                    if sampled.fruitTypeIndex and sampled.fruitTypeIndex > 0 then
                         if isCenter then
-                            fData.fruitTypeIndex     = probeState.fruitTypeIndex
-                            fData.growthState        = probeState.growthState or 0
-                            fData.fertilizationLevel = probeState.sprayLevel or 0
-                            fData.plowLevel          = probeState.plowLevel or 0
-                            fData.limeLevel          = probeState.limeLevel or 0
-                            fData.mulchLevel         = probeState.stubbleShredLevel or 0
-                            fData.groundType         = probeState.groundType or 0
+                            fData.fruitTypeIndex     = sampled.fruitTypeIndex
+                            fData.growthState        = sampled.growthState or 0
+                            fData.fertilizationLevel = sampled.sprayLevel or 0
+                            fData.plowLevel          = sampled.plowLevel or 0
+                            fData.limeLevel          = sampled.limeLevel or 0
+                            fData.mulchLevel         = sampled.stubbleShredLevel or 0
+                            fData.groundType         = sampled.groundType or 0
                             foundCrop = true
                         elseif not foundCrop then
-                            fData.fruitTypeIndex     = probeState.fruitTypeIndex
-                            fData.growthState        = probeState.growthState or 0
-                            fData.fertilizationLevel = probeState.sprayLevel or 0
-                            fData.plowLevel          = probeState.plowLevel or 0
-                            fData.limeLevel          = probeState.limeLevel or 0
-                            fData.mulchLevel         = probeState.stubbleShredLevel or 0
-                            fData.groundType         = probeState.groundType or 0
+                            fData.fruitTypeIndex     = sampled.fruitTypeIndex
+                            fData.growthState        = sampled.growthState or 0
+                            fData.fertilizationLevel = sampled.sprayLevel or 0
+                            fData.plowLevel          = sampled.plowLevel or 0
+                            fData.limeLevel          = sampled.limeLevel or 0
+                            fData.mulchLevel         = sampled.stubbleShredLevel or 0
+                            fData.groundType         = sampled.groundType or 0
                             foundCrop = true
                         end
-                        local w = tonumber(probeState.weedState) or 0
+                        local w = tonumber(sampled.weedState) or 0
                         if w > maxWeed then maxWeed = w end
                     end
                 end)
                 if foundCrop then
                     fData.weedLevel = maxWeed
                 else
-                    pcall(function() probeState:update(cx, cz) end)
-                    fData.fertilizationLevel = probeState.sprayLevel or 0
-                    fData.plowLevel          = probeState.plowLevel or 0
-                    fData.limeLevel          = probeState.limeLevel or 0
-                    fData.weedLevel          = probeState.weedState or 0
-                    fData.mulchLevel         = probeState.stubbleShredLevel or 0
-                    fData.groundType         = probeState.groundType or 0
+                    local sampled = sampleState(probeState, cx, cz)
+                    fData.fertilizationLevel = sampled.sprayLevel or 0
+                    fData.plowLevel          = sampled.plowLevel or 0
+                    fData.limeLevel          = sampled.limeLevel or 0
+                    fData.weedLevel          = sampled.weedState or 0
+                    fData.mulchLevel         = sampled.stubbleShredLevel or 0
+                    fData.groundType         = sampled.groundType or 0
                 end
             end
 
             -- Per-field FieldState (engine-owned) as a second opinion when probeState missed crop
             if field.fieldState and type(field.fieldState.update) == "function" then
-                pcall(function() field.fieldState:update(cx, cz) end)
-                local fs = field.fieldState
+                local fs = sampleState(field.fieldState, cx, cz)
                 if (not foundCrop or (fData.fruitTypeIndex or 0) == 0) and fs.fruitTypeIndex and fs.fruitTypeIndex > 0 then
                     fData.fruitTypeIndex     = fs.fruitTypeIndex
                     fData.growthState        = fs.growthState or 0
@@ -2038,9 +2092,9 @@ function FieldDataCollector:_collectImpl()
                 if ftd and isMowableForageFruitName(ftd.name) then
                     local centerGs, localMin, localMax = nil, nil, nil
                     _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz, isCenter)
-                        pcall(function() probeState:update(sx, sz) end)
-                        local g = probeState.growthState
-                        if g ~= nil and probeState.fruitTypeIndex == fi then
+                        local sampled = sampleState(probeState, sx, sz)
+                        local g = sampled.growthState
+                        if g ~= nil and sampled.fruitTypeIndex == fi then
                             if isCenter then centerGs = g end
                             if localMin == nil or g < localMin then localMin = g end
                             if localMax == nil or g > localMax then localMax = g end
@@ -2066,16 +2120,15 @@ function FieldDataCollector:_collectImpl()
             local maxMulch = mulchBefore1b
             if probeState and type(probeState.update) == "function" then
                 _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz)
-                    pcall(function() probeState:update(sx, sz) end)
-                    local m = probeState.stubbleShredLevel or 0
+                    local sampled = sampleState(probeState, sx, sz)
+                    local m = sampled.stubbleShredLevel or 0
                     if m > maxMulch then maxMulch = m end
                 end)
             end
             if field.fieldState and type(field.fieldState.update) == "function" then
                 _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz)
-                    pcall(function() field.fieldState:update(sx, sz) end)
-                    local fs = field.fieldState
-                    local m = fs and fs.stubbleShredLevel or 0
+                    local sampled = sampleState(field.fieldState, sx, sz)
+                    local m = sampled.stubbleShredLevel or 0
                     if m > maxMulch then maxMulch = m end
                 end)
             end
@@ -2088,11 +2141,9 @@ function FieldDataCollector:_collectImpl()
             local function sampleRollerAt(px, pz)
                 local raw = 0
                 if field.fieldState and type(field.fieldState.update) == "function" then
-                    pcall(function() field.fieldState:update(px, pz) end)
-                    raw = readRollerFromState(field.fieldState)
+                    raw = readRollerFromState(sampleState(field.fieldState, px, pz))
                 elseif probeState and type(probeState.update) == "function" then
-                    pcall(function() probeState:update(px, pz) end)
-                    raw = readRollerFromState(probeState)
+                    raw = readRollerFromState(sampleState(probeState, px, pz))
                 end
                 local rolled = rollerLevelAsRolledFraction(raw)
                 if rolled < minRolled then minRolled = rolled end
@@ -2115,18 +2166,18 @@ function FieldDataCollector:_collectImpl()
             end
             if probeState and type(probeState.update) == "function" then
                 _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz)
-                    pcall(function() probeState:update(sx, sz) end)
-                    local sl = readStoneFromState(probeState)
+                    local sampled = sampleState(probeState, sx, sz)
+                    local sl = readStoneFromState(sampled)
                     if sl > maxStone then maxStone = sl end
-                    takeWater(probeState)
+                    takeWater(sampled)
                 end)
             end
             if field.fieldState and type(field.fieldState.update) == "function" then
                 _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz)
-                    pcall(function() field.fieldState:update(sx, sz) end)
-                    local sl = readStoneFromState(field.fieldState)
+                    local sampled = sampleState(field.fieldState, sx, sz)
+                    local sl = readStoneFromState(sampled)
                     if sl > maxStone then maxStone = sl end
-                    takeWater(field.fieldState)
+                    takeWater(sampled)
                 end)
             end
             fData.stoneLevel = maxStone
@@ -2850,6 +2901,21 @@ function FieldDataCollector:_collectImpl()
             return 0
         end
 
+        --- FS25's getValueAtArea reads the height channel without a fill-type filter.
+        --- Zero means that every registered fill type has zero litres in this exact
+        --- rectangle. Do not cache it across collections: windrows can change at
+        --- any moment. Missing/failed/non-numeric probes keep the full type scan.
+        local function heightRectMayContainMaterial(dmhu, cx, cz, half)
+            if not dmhu or type(dmhu.getValueAtArea) ~= "function" then return true end
+            local sx, sz = cx - half, cz - half
+            local wx, wz = cx + half, cz - half
+            local hx, hz = cx - half, cz + half
+            local ok, density = pcall(function()
+                return dmhu.getValueAtArea(sx, sz, wx, wz, hx, hz, false)
+            end)
+            return not (ok and type(density) == "number" and density == density and density == 0)
+        end
+
         --- Same entry point as stock / Moisture System (`DensityMapHeightUtil.getFillLevelAtArea`).
         --- Try several bindings: global can be absent from `rawget(_G,â€¦)` in some loads; mission may expose an instance.
         local function resolveDensityMapHeightUtil()
@@ -3031,10 +3097,17 @@ function FieldDataCollector:_collectImpl()
 
             fData.windrowUtilAvailable = true
             fData.windrowFillTypesRegistered = #windEntries
+            -- Keep the established output contract: registered material names
+            -- appear with zero litres even when every rectangle is empty.
+            for _, ent in ipairs(windEntries) do
+                fData.windrowByFillName[ent.name] = 0
+            end
             do
                 local ctot = 0
-                for _, ent in ipairs(windEntries) do
-                    ctot = ctot + fillLevelSumAtRect(dmhu, ent.index, cx, cz, 12.0)
+                if heightRectMayContainMaterial(dmhu, cx, cz, 12.0) then
+                    for _, ent in ipairs(windEntries) do
+                        ctot = ctot + fillLevelSumAtRect(dmhu, ent.index, cx, cz, 12.0)
+                    end
                 end
                 --- One large sample at field centre across STRAW / windrows / swaths â€” matches what balers read from the same height-map channels.
                 fData.windrowCenterProbeTotalL = ctot
@@ -3058,12 +3131,14 @@ function FieldDataCollector:_collectImpl()
             local baleVol = 0
             local function addProbeCell(sx, sz)
                 local cellSum = 0
-                for _, ent in ipairs(windEntries) do
-                    local v = fillLevelSumAtRect(dmhu, ent.index, sx, sz, halfM)
-                    cellSum = cellSum + v
-                    fData.windrowByFillName[ent.name] = (fData.windrowByFillName[ent.name] or 0) + v
-                    if ent.baleable then
-                        baleVol = baleVol + v
+                if heightRectMayContainMaterial(dmhu, sx, sz, halfM) then
+                    for _, ent in ipairs(windEntries) do
+                        local v = fillLevelSumAtRect(dmhu, ent.index, sx, sz, halfM)
+                        cellSum = cellSum + v
+                        fData.windrowByFillName[ent.name] = (fData.windrowByFillName[ent.name] or 0) + v
+                        if ent.baleable then
+                            baleVol = baleVol + v
+                        end
                     end
                 end
                 totalVol = totalVol + cellSum

@@ -46,6 +46,7 @@ const RECORDED_SECTIONS: Record<string, SectionId> = {
   pastures: "pastures",
   storage: "storage",
   productions: "productions",
+  "mod-everythingConstructable": "mod-everythingConstructable",
 };
 
 let localeBound = false;

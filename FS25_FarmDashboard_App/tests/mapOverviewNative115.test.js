@@ -15,17 +15,17 @@ const DEST = "PROFILE/modSettings/FS25_FarmDashboard/mapOverview/mapUS/";
 const MAPUS_UI = "maps/mapUS/textures/ui/";
 
 const HARNESS = `
-H = { files = {}, probes = {}, copies = {}, copyArgTypes = {}, folders = {}, deleted = {}, warnings = {},
+H = { files = {}, sizes = {}, probes = {}, copies = {}, copyArgTypes = {}, folders = {}, deleted = {}, warnings = {},
       infos = {}, devs = {}, writes = {}, getFilenameCalls = {} }
 fileExists = function(p) H.probes[#H.probes + 1] = p; return H.files[p] == true end
 copyFile = function(src, dst, force)
     H.copies[#H.copies + 1] = src
     H.copyArgTypes[#H.copyArgTypes + 1] = type(force)
     if H.copyFails then error("copy denied") end
-    if not H.copySilent then H.files[dst] = true end
+    if not H.copySilent then H.files[dst] = true; H.sizes[dst] = H.sizes[src] or 1 end
 end
 createFolder = function(p) H.folders[#H.folders + 1] = p end
-deleteFile = function(p) H.deleted[#H.deleted + 1] = p; H.files[p] = nil end
+deleteFile = function(p) H.deleted[#H.deleted + 1] = p; H.files[p] = nil; H.sizes[p] = nil end
 getUserProfileAppPath = function() return "PROFILE/" end
 getAppBasePath = function() return "${APP}" end
 g_gameBasePath = ""
@@ -35,7 +35,12 @@ Utils = { getFilename = function(f, base)
     return (base or "") .. f
 end }
 toJSON = function(t) return '{"sourcePath":"' .. tostring(t.sourcePath) .. '","mapId":"' .. tostring(t.mapId) .. '"}' end
-io = { open = function(p)
+io = { open = function(p, mode)
+    if mode == "rb" then
+        if H.files[p] ~= true then return nil end
+        return { read = function() return (H.sizes[p] or 1) > 0 and "x" or nil end,
+                 close = function() end }
+    end
     local h = { buf = {} }
     function h:write(s) self.buf[#self.buf + 1] = s end
     function h:close() H.writes[p] = table.concat(self.buf) end
@@ -82,6 +87,7 @@ function report(extra)
         '"getFilenameCalls":' .. jsonList(H.getFilenameCalls),
         '"meta":' .. string.format("%q", tostring(H.writes["${DEST}meta.json"])),
         '"destDds":' .. tostring(H.files["${DEST}overview.dds"] == true),
+        '"destDdsBytes":' .. tostring(H.sizes["${DEST}overview.dds"] or 0),
         '"destPng":' .. tostring(H.files["${DEST}overview.png"] == true),
     }
     for k, v in pairs(extra or {}) do fields[#fields + 1] = string.format("%q", k) .. ":" .. tostring(v) end
@@ -321,6 +327,38 @@ describe("map overview export (115)", () => {
         expect(r.deleted).toEqual([]);
         expect(r.destDds).toBe(true);
         expect(r.devs.some((d) => d.includes("keeping previous export"))).toBe(true);
+    });
+
+    test("a zero-byte prior overview is replaced by a nonempty base-game source", () => {
+        const dds = `${APP}data/${MAPUS_UI}overview.dds`;
+        const r = run(`
+            H.files["${DEST}overview.dds"] = true
+            H.sizes["${DEST}overview.dds"] = 0
+            H.files["${dds}"] = true
+            H.sizes["${dds}"] = 8388736
+            newMission({ mapImageFilename = "${APP}data/${MAPUS_UI}overview.png" })
+            exportAt(1000)
+            return report()
+        `);
+        expect(r.deleted).toContain(`${DEST}overview.dds`);
+        expect(r.copies).toEqual([dds]);
+        expect(r.destDdsBytes).toBe(8388736);
+        expect(r.outcome).toBe("exported");
+        expect(r.infos).toHaveLength(1);
+    });
+
+    test("a zero-byte copy is rejected and cannot suppress the bounded warning", () => {
+        const dds = `${APP}data/${MAPUS_UI}overview.dds`;
+        const r = run(`
+            H.files["${dds}"] = true
+            H.sizes["${dds}"] = 0
+            newMission({ mapImageFilename = "${APP}data/${MAPUS_UI}overview.png" })
+            for i = 0, 4 do exportAt(i * 60000) end
+            return report()
+        `);
+        expect(r.destDds).toBe(false);
+        expect(r.outcome).toBe("copy-or-destination-failed");
+        expect(r.warnings).toHaveLength(1);
     });
 
     test("a new mission or a clock reset starts a fresh budget", () => {

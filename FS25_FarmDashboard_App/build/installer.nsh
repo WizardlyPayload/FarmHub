@@ -260,7 +260,7 @@ Var FarmDashWipeUserData
 !macro FarmDashAssertCleanupSuccess Phase
   ${If} $R0 != "0"
     DetailPrint "${Phase} incomplete (exit $R0). Application and uninstaller retained for retry."
-    MessageBox MB_OK|MB_ICONEXCLAMATION "${Phase} did not finish (exit $R0).$\r$\n$\r$\nThe application and uninstaller have been kept so you can retry.$\r$\nClose applications holding Dashboard files. For exit 740, run this uninstaller as administrator to remove Dashboard-owned ImageMagick.$\r$\n$\r$\nSee FarmDashImageMagickUninstall.log in your temporary folder for dependency details." /SD IDOK
+    MessageBox MB_OK|MB_ICONEXCLAMATION "${Phase} did not finish (exit $R0).$\r$\n$\r$\nThe application and uninstaller have been kept so you can retry.$\r$\nClose applications holding Dashboard files. For exit 740, run this uninstaller as administrator to remove Dashboard-owned ImageMagick.$\r$\n$\r$\nSee FarmDashUserDataUninstall.log or FarmDashImageMagickUninstall.log in your temporary folder for details." /SD IDOK
     SetErrorLevel 1
     Abort "${Phase} incomplete"
   ${EndIf}
@@ -633,7 +633,7 @@ FarmDashUnEdReady:
     DetailPrint "Removing this edition's Farm Dashboard user data..."
     IfFileExists "$INSTDIR\resources\uninstall-user-data.ps1" FarmDash_UnFullScript FarmDash_UnFullLegacy
     FarmDash_UnFullScript:
-      nsExec::ExecToLog `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\uninstall-user-data.ps1" -Mode Full -Edition $R4`
+      nsExec::ExecToLog `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\uninstall-user-data.ps1" -Mode Full -Edition $R4 -RoamingBase "$APPDATA" -LocalBase "$LOCALAPPDATA" -TraceLog "$TEMP\FarmDashUserDataUninstall.log"`
       Pop $R0
       !insertmacro FarmDashAssertCleanupSuccess "User profile cleanup"
       Goto FarmDash_UnFullDone
@@ -657,6 +657,20 @@ FarmDashUnEdReady:
     FarmDash_UnFullLegacyTemp:
       Delete "$TEMP\farmdash-install-locale.txt"
     FarmDash_UnFullDone:
+    !if "${APP_ID}" == "com.farmdashboard.rf"
+      ; The helper can see a redirected AppData view and return success after
+      ; cleaning nothing. NSIS must verify its own real shell-folder view before
+      ; electron-builder removes the app and its repairable uninstaller.
+      IfFileExists "$APPDATA\fs25-farm-dashboard-rf" FarmDash_UnFullProfileRemains
+      IfFileExists "$LOCALAPPDATA\fs25-farm-dashboard-rf" FarmDash_UnFullProfileRemains
+      IfFileExists "$LOCALAPPDATA\fs25-farm-dashboard-rf-updater" FarmDash_UnFullProfileRemains
+      IfFileExists "$LOCALAPPDATA\com.farmdashboard.rf-updater" FarmDash_UnFullProfileRemains
+      Goto FarmDash_UnFullProfileChecked
+    FarmDash_UnFullProfileRemains:
+      StrCpy $R0 "profile-remains"
+      !insertmacro FarmDashAssertCleanupSuccess "User profile cleanup"
+    FarmDash_UnFullProfileChecked:
+    !endif
     DetailPrint "Removing optional dependencies installed by setup (ImageMagick)..."
     IfFileExists "$INSTDIR\resources\uninstall-dependencies.ps1" FarmDash_UnDeps FarmDash_UnDepsDone
     FarmDash_UnDeps:
@@ -682,7 +696,7 @@ FarmDashUnEdReady:
     DetailPrint "Keeping settings and offline snapshots; removing caches and temporary data..."
     IfFileExists "$INSTDIR\resources\uninstall-user-data.ps1" FarmDash_UnKeepScript FarmDash_UnKeepLegacy
     FarmDash_UnKeepScript:
-      nsExec::ExecToLog `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\uninstall-user-data.ps1" -Mode Keep -Edition $R4`
+      nsExec::ExecToLog `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "$INSTDIR\resources\uninstall-user-data.ps1" -Mode Keep -Edition $R4 -RoamingBase "$APPDATA" -LocalBase "$LOCALAPPDATA" -TraceLog "$TEMP\FarmDashUserDataUninstall.log"`
       Pop $R0
       !insertmacro FarmDashAssertCleanupSuccess "User profile cleanup"
       Goto FarmDash_UnKeepDone
@@ -698,6 +712,16 @@ FarmDashUnEdReady:
       RMDir /r "$LOCALAPPDATA\fs25-farm-dashboard"
       RMDir /r "$LOCALAPPDATA\fs25-farm-dashboard-updater"
     FarmDash_UnKeepDone:
+    !if "${APP_ID}" == "com.farmdashboard.rf"
+      IfFileExists "$LOCALAPPDATA\fs25-farm-dashboard-rf" FarmDash_UnKeepCacheRemains
+      IfFileExists "$LOCALAPPDATA\fs25-farm-dashboard-rf-updater" FarmDash_UnKeepCacheRemains
+      IfFileExists "$LOCALAPPDATA\com.farmdashboard.rf-updater" FarmDash_UnKeepCacheRemains
+      Goto FarmDash_UnKeepCacheChecked
+    FarmDash_UnKeepCacheRemains:
+      StrCpy $R0 "cache-remains"
+      !insertmacro FarmDashAssertCleanupSuccess "User profile cleanup"
+    FarmDash_UnKeepCacheChecked:
+    !endif
   ${EndIf}
 
   ${if} $installMode == "all"
@@ -709,6 +733,9 @@ FarmDashUnEdReady:
 !macro customUnInstallSection
   !if "${APP_ID}" == "com.farmdashboard.rf"
     Section "un.-FarmDash Windows registration"
+      ; Keep this cleanup mandatory like electron-builder's built-in uninstall
+      ; section. Otherwise the components page can leave an orphaned ARP entry.
+      SectionIn RO
       nsExec::ExecToLog 'powershell.exe -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "$PLUGINSDIR\farmdash-windows-install-state.ps1" -Action Remove -InstallDirectory "$INSTDIR" -Scope "$installMode"'
       Pop $R0
       ${If} $R0 != "0"

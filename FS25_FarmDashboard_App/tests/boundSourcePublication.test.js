@@ -134,9 +134,12 @@ describe('bound source publication', () => {
     boundSources.attach('farm-a', liveState, 1);
     const base = {
       value: 1,
+      lastUpdated: '2026-10-09T12:00:00.000Z',
       transportTimestamp: '2026-10-09T12:00:00.000Z',
       responseTimestamp: '2026-10-09T12:00:00.000Z',
       dataTimestamps: {
+        mergeComputedAt: '2026-10-09T12:00:00.000Z',
+        fetchedAt: '2026-10-09T12:00:00.000Z',
         lastPolledAt: '2026-10-09T12:00:00.000Z',
         lastReadAt: '2026-10-09T12:00:00.000Z',
         lastCheckedAt: '2026-10-09T12:00:00.000Z',
@@ -147,10 +150,13 @@ describe('bound source publication', () => {
     const first = boundSources.publish('farm-a', liveState, 1, base);
     const clockOnly = boundSources.publish('farm-a', liveState, 1, {
       ...base,
+      lastUpdated: '2026-10-09T12:00:01.000Z',
       transportTimestamp: '2026-10-09T12:00:01.000Z',
       responseTimestamp: '2026-10-09T12:00:01.000Z',
       dataTimestamps: {
         ...base.dataTimestamps,
+        mergeComputedAt: '2026-10-09T12:00:01.000Z',
+        fetchedAt: '2026-10-09T12:00:01.000Z',
         lastPolledAt: '2026-10-09T12:00:01.000Z',
         lastReadAt: '2026-10-09T12:00:01.000Z',
         lastCheckedAt: '2026-10-09T12:00:01.000Z',

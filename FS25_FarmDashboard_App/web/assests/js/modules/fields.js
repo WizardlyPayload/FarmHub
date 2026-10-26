@@ -1258,7 +1258,6 @@ function buildFieldsHTML() {
                 <h2 class="text-farm-accent">
                     <i class="bi bi-geo-alt me-2"></i>${escapeFieldHtml(t("fields.title"))}
                 </h2>
-                <p class="lead text-muted">${escapeFieldHtml(t("fields.subtitle"))}</p>
             </div>
         </div>
 

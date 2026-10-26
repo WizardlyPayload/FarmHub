@@ -8,9 +8,9 @@
 
 <p>The desktop app does <em>not</em> run inside FS25. It reads <code>data.json</code>, which the in-game mod creates while you play (or while a dedicated server runs with the mod). Until you load a save with the mod enabled, the dashboard shows <strong>“waiting for data”</strong>.</p>
 
-<p><strong>V5 (recommended):</strong> App <strong>5.1.0</strong> · Mod <strong>5.1.0.0</strong> · dashboard <strong>http://localhost:8768</strong> · Start Menu <strong>Farm Dashboard V5</strong></p>
+<p><strong>V5 (recommended):</strong> App <strong>5.2.0</strong> · Mod <strong>5.1.0.9</strong> · dashboard <strong>http://localhost:8768</strong> · Start Menu <strong>Farm Dashboard V5</strong></p>
 
-<p><strong>Classic V4 (optional):</strong> App <strong>4.2.1</strong> · Mod <strong>3.4.0.7</strong> · <strong>http://localhost:8766</strong>. Keep V4 if you want the old home cards. You do <strong>not</strong> have to update to V5. One mod zip works with both apps.</p>
+<p><strong>Classic V4 (optional):</strong> App <strong>4.2.1</strong> · Mod <strong>3.4.0.7</strong> · <strong>http://localhost:8766</strong>. Keep V4 if you want the old home cards. You do <strong>not</strong> have to update to V5. Use the matching mod from your chosen release; this V5 mod was not retested with V4.</p>
 
 <p><strong>Updating the mod:</strong> close Farm Dashboard and Farming Simulator → replace <code>FS25_FarmDashboard.zip</code> in <code>Documents\My Games\FarmingSimulator2025\mods\</code> (delete any old unpacked folder) → load the save → start the app. Dedicated: replace the mod on the server, restart, then update joined clients.</p>
 
@@ -19,7 +19,7 @@
 <h2>Stage A â€” Install the mod</h2>
 
 <ol>
-  <li>Download <strong>FS25_FarmDashboard.zip</strong> from this page (primary) or <a href="https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.1.0">GitHub V5 5.1.0</a>.</li>
+  <li>Download <strong>FS25_FarmDashboard.zip</strong> from this page (primary) or <a href="https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.2.0">GitHub V5 5.2.0</a>.</li>
   <li>Copy the zip into <code>Documents\My Games\FarmingSimulator2025\mods\</code></li>
   <li>Start <strong>Farming Simulator 25</strong> once so the game registers the mod.</li>
 </ol>
@@ -58,7 +58,7 @@
 
 <p><code>Documents\My Games\FarmingSimulator2025\modSettings\FS25_FarmDashboard\&lt;savegame&gt;\data.json</code></p>
 
-<p>The file should exist and its <strong>Modified</strong> time should advance while you play.</p>
+<p>The file should exist and its <strong>Modified</strong> time should advance while you play. In the dashboard, Settings → Health should also show a recent <strong>completed export generation</strong>; file growth alone is not proof of complete data.</p>
 
 <figure>
   <img
@@ -73,7 +73,7 @@
 <h2>Stage D â€” Install the Windows app</h2>
 
 <ol>
-  <li><strong>V5:</strong> run <strong>FS25-Farm-Dashboard-V5-Setup-5.1.0.exe</strong> (the filename includes <strong>V5</strong>). Start Menu: <strong>Farm Dashboard V5</strong>.</li>
+  <li><strong>V5:</strong> run <strong>FS25-Farm-Dashboard-V5-Setup-5.2.0.exe</strong> (the filename includes <strong>V5</strong>). Start Menu: <strong>Farm Dashboard V5</strong>.</li>
   <li><strong>V4 (optional):</strong> run <strong>FS25-Farm-Dashboard-Setup-4.2.1.exe</strong> if you want the classic screens. You can keep both installed.</li>
   <li>Installer is unsigned — Windows SmartScreen may warn. Choose your language and finish the installer.</li>
 </ol>
@@ -93,7 +93,7 @@
 <ol>
   <li>Pick your language.</li>
   <li>Click <strong>Auto-detect saves</strong> (or add Local / FTP manually).</li>
-  <li>Dedicated: prefer <strong>Local</strong> after join-as-client. Headless-only: <strong>FTP</strong>.</li>
+  <li>Dedicated: after joining the server, use the in-game linking prompt and select that linked source in the dashboard. Headless-only: <strong>FTP</strong>.</li>
   <li>Click <strong>Launch Dashboard</strong> → V5 opens <strong>http://localhost:8768</strong>.</li>
 </ol>
 
@@ -104,8 +104,8 @@
 <ol>
   <li>Install the zip on the <strong>dedicated server</strong> (Stages A–B).</li>
   <li>On the PC that runs the app, install the <strong>same</strong> mod and <strong>join as a client</strong>.</li>
-  <li>Mirroring starts when you join.</li>
-  <li>In Setup, add a <strong>Local</strong> server for that folder — <strong>no FTP</strong>.</li>
+  <li>Mirroring starts when you join and the in-game pair is accepted.</li>
+  <li>Select the linked multiplayer source from the dashboard's Saves list — <strong>no FTP</strong>. Do not point a Local source at a guessed mirror folder.</li>
 </ol>
 
 <p><strong>Limits:</strong> needs at least one connected client; empty server does not mirror until someone joins; use FTP for headless-only.</p>
@@ -144,7 +144,7 @@
 <p>
   <a href="https://www.farmdashboard.co.uk/install.html"><strong>Website install guide</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.1.0"><strong>GitHub V5 (fallback)</strong></a>
+  <a href="https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.2.0"><strong>GitHub V5 (fallback)</strong></a>
   &nbsp;·&nbsp;
   <a href="https://github.com/WizardlyPayload/FarmHub/releases/tag/v4.2.1"><strong>GitHub classic V4</strong></a>
 </p>

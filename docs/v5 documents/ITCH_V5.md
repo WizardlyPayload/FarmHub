@@ -1,4 +1,4 @@
-# itch.io — V5 5.1.0
+# itch.io — V5 5.2.0
 
 Project: https://wizardlypayload.itch.io/farm-dashobaord-fs25  
 Game id: `4754779` · Edit: https://itch.io/game/edit/4754779
@@ -7,20 +7,20 @@ Butler lives at `%USERPROFILE%\tools\butler\butler.exe` (login saved locally).
 
 ## Channels
 
-This is a staged 5.1.0 upload recipe. Public itch/GitHub may still show 5.0.3 until Graham publishes. Use the flat `Documents\FarmDash Release\` drop.
+This is the 5.2.0 publication recipe. Use the flat `Documents\FarmDash Release\` drop, then verify both public channel downloads and update the page copy.
 
 | Channel | Version | Public download name (itch wraps butler builds) |
 |---------|---------|--------------------------------------------------|
-| `windows-v5` | 5.1.0 | `farm-dashobaord-fs25-windows-v5.zip` (contains the V5 Setup exe) |
-| `mod-v5` | 5.1.0.0 | `farm-dashobaord-fs25-mod-v5.zip` (`modDesc.xml` at zip root — drop in `mods`) |
+| `windows-v5` | 5.2.0 | `farm-dashobaord-fs25-windows-v5.zip` (contains the V5 Setup exe) |
+| `mod-v5` | 5.1.0.9 | `farm-dashobaord-fs25-mod-v5.zip` (contains the canonical `FS25_FarmDashboard.zip`; extract that file into `mods`) |
 
 Keep the existing **classic V4 Setup**. Do not make it the default.
 
 Re-push:
 
 ```
-butler push --userversion 5.1.0 --assume-yes "%TEMP%\farmdash-itch-v5\windows-v5" wizardlypayload/farm-dashobaord-fs25:windows-v5
-butler push --userversion 5.1.0.0 --assume-yes "%TEMP%\farmdash-itch-v5\mod-v5" wizardlypayload/farm-dashobaord-fs25:mod-v5
+butler push --userversion 5.2.0 --assume-yes "%TEMP%\farmdash-itch-v5-520\windows-v5" wizardlypayload/farm-dashobaord-fs25:windows-v5
+butler push --userversion 5.1.0.9 --assume-yes "%TEMP%\farmdash-itch-v5-520\mod-v5" wizardlypayload/farm-dashobaord-fs25:mod-v5
 ```
 
 itch.io **strips off-site `<img>`** on the public page. Description shots must use `img.itch.zone` URLs from **Add image**.

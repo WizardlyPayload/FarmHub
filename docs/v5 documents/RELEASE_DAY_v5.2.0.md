@@ -31,3 +31,10 @@ The flat drop is `C:\Users\Graham\Documents\FarmDash Release\`.
 5. Check the public website, download links and V5 update feed as a visitor. Publish community posts only after those links work.
 
 The app is unsigned. Windows may show an Unknown publisher or SmartScreen warning. Do not ask users to disable Windows security.
+
+## Publication evidence — 26 October 2026
+
+- `main` reached `debea62ccd8b80f0118f5a135bb5b58c3cff3025`; both release-day GitHub Actions runs completed successfully. Public GitHub Release [v5.2.0](https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.2.0) is non-draft and marked latest. GitHub's asset digests match the Setup and mod SHA-256 values above, and `latest-rf.yml` is attached.
+- The itch page [Farm Dashboard FS25](https://wizardlypayload.itch.io/farm-dashobaord-fs25) now shows App 5.2.0 and Mod 5.1.0.9, with `windows-v5` 5.2.0 and `mod-v5` 5.1.0.9 downloads. A Butler fetch of each live channel yielded the exact Setup and canonical inner `FS25_FarmDashboard.zip` SHA-256 hashes above. The itch mod channel includes a short `INSTALL-MOD.txt` alongside the unchanged inner ZIP; install the inner ZIP without unpacking it. Legacy V4 downloads remain separate.
+- The public website package is staged and Sarah has been notified under `SARAH-20261026-006`; public website deployment and its post-deploy checks are **pending Sarah's RESULT**. The previous site version must not be represented as a completed 5.2.0 deployment until then.
+- The itch gallery still contains older V5 screenshots. The current screenshots are in the website package and V5 documentation. The browser's extension denied the required file chooser upload permission during this release, so no gallery update was claimed.

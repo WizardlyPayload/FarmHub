@@ -9,7 +9,9 @@ $shadowSubKey = $sid + '\Software\Microsoft\Windows\CurrentVersion\Uninstall\Far
 $shadowInstallSubKey = $sid + '\Software\FarmDashShadowInstallTest-' + [Guid]::NewGuid().ToString('n')
 $shadowArgs = @{ hDefKey = [uint32]2147483651; sSubKeyName = $shadowSubKey }
 $shadowInstallArgs = @{ hDefKey = [uint32]2147483651; sSubKeyName = $shadowInstallSubKey }
-$shadowDirectory = Join-Path $env:TEMP ('FarmDashShadowTest-' + [Guid]::NewGuid().ToString('n'))
+# Match the path passed by the real uninstall flow. A GitHub runner may expose
+# TEMP through an 8.3 alias (RUNNER~1), which GetFullPath expands.
+$shadowDirectory = Get-FarmDashInstallDirectory (Join-Path $env:TEMP ('FarmDashShadowTest-' + [Guid]::NewGuid().ToString('n')))
 $registryBase = [Microsoft.Win32.RegistryKey]::OpenBaseKey(
     [Microsoft.Win32.RegistryHive]::Users, [Microsoft.Win32.RegistryView]::Default)
 $state = [ordered]@{
@@ -91,18 +93,6 @@ try {
     }
 } catch {
     $state.error = $_.Exception.Message
-    if ($state.error -match 'Local V5 install record belongs') {
-        $record = $registryBase.OpenSubKey($shadowInstallSubKey, $false)
-        try {
-            $recordedDirectory = if ($record) { [string]$record.GetValue('InstallLocation') } else { $null }
-            $state.pathDiagnostic = [ordered]@{
-                requested = $shadowDirectory
-                requestedFull = [IO.Path]::GetFullPath($shadowDirectory).TrimEnd('\', '/')
-                recorded = $recordedDirectory
-                recordedFull = if ($recordedDirectory) { [IO.Path]::GetFullPath($recordedDirectory).TrimEnd('\', '/') } else { $null }
-            }
-        } finally { if ($record) { $record.Dispose() } }
-    }
 } finally {
     $existing = Invoke-CimMethod -Namespace root/default -ClassName StdRegProv -MethodName EnumValues -Arguments $arguments
     if ($existing.ReturnValue -eq 0) {

@@ -28,12 +28,17 @@ function numberOrDash(value: number | null | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? Math.round(value).toLocaleString() : "—";
 }
 
-function OrchardCard({ row }: { row: Orchard }) {
+function OrchardCard({ row, farmId }: { row: Orchard; farmId: number }) {
+  const partlyOwned = row.landOwnershipComplete === true
+    && Number(row.farmId) === 0
+    && row.landOwnerFarmIds?.includes(farmId);
   return (
     <article class="fd-orchard-card">
       <header>
         <h3>{cropName(row.fruitType)}</h3>
-        <span>{Number(row.farmId) === 0 ? tOr("orchards.mapOwned", "Map orchard") : tOr("orchards.farmOwned", "Your farm")}</span>
+        <span>{partlyOwned ? tOr("orchards.partlyOwned", "Partly on your farm")
+          : Number(row.farmId) === farmId ? tOr("orchards.farmOwned", "Your farm")
+          : tOr("orchards.mapOwned", "Map orchard")}</span>
       </header>
       <dl>
         <dt>{tOr("orchards.rows", "Rows")}</dt><dd>{numberOrDash(row.rows)}</dd>
@@ -66,8 +71,10 @@ export function OrchardsSection() {
   const { owned, map } = useMemo(() => {
     const all = Array.isArray(orchardState?.rows) ? orchardState.rows : [];
     return {
-      owned: all.filter((row) => Number(row.farmId) === farmId),
-      map: all.filter((row) => Number(row.farmId) === 0),
+      owned: all.filter((row) => Number(row.farmId) === farmId
+        || (row.landOwnershipComplete === true && row.landOwnerFarmIds?.includes(farmId))),
+      map: all.filter((row) => Number(row.farmId) === 0
+        && !(row.landOwnershipComplete === true && row.landOwnerFarmIds?.includes(farmId))),
     };
   }, [orchardState, farmId]);
   const dlc = payload?.beansAndAlpacas;
@@ -102,7 +109,7 @@ export function OrchardsSection() {
       ) : null}
       <section aria-label={tOr("orchards.yourOrchards", "Your orchards")}>
         <h2>{tOr("orchards.yourOrchards", "Your orchards")}</h2>
-        {owned.length ? <div class="fd-orchards__grid">{owned.map((row) => <OrchardCard key={row.id} row={row} />)}</div> : (
+        {owned.length ? <div class="fd-orchards__grid">{owned.map((row) => <OrchardCard key={row.id} row={row} farmId={farmId} />)}</div> : (
           <p class="fd-orchards__message">{tOr("orchards.noneOwned", "No orchards are owned by the selected farm.")}</p>
         )}
       </section>
@@ -110,7 +117,7 @@ export function OrchardsSection() {
         <section aria-label={tOr("orchards.mapOrchards", "Map orchards")}>
           <h2>{tOr("orchards.mapOrchards", "Map orchards")}</h2>
           <p class="fd-orchard-note">{tOr("orchards.mapNote", "These orchards exist on the map but are not owned by your farm. Their rows are shown for reference.")}</p>
-          <div class="fd-orchards__grid">{map.map((row) => <OrchardCard key={row.id} row={row} />)}</div>
+          <div class="fd-orchards__grid">{map.map((row) => <OrchardCard key={row.id} row={row} farmId={farmId} />)}</div>
         </section>
       ) : null}
       {dlc?.enabled ? (

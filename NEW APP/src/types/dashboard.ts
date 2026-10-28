@@ -418,6 +418,8 @@ export interface DashboardPayload {
     rows?: {
       id: string;
       farmId: number;
+      landOwnerFarmIds?: number[];
+      landOwnershipComplete?: boolean;
       fruitType: string;
       rows?: number | null;
       rowLengthMeters?: number | null;

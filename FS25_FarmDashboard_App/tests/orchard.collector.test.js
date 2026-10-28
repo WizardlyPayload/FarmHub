@@ -47,6 +47,27 @@ assert(byFruit.OLIVE.rows == 1 and byFruit.OLIVE.readyRows == 0)
 assert(byFruit.BANANA.farmId == 0 and not byFruit.BANANA.growthMeasured and byFruit.BANANA.readyRows == nil)
 assert(byFruit.COFFEECHERRIES.growthMeasured and byFruit.COFFEECHERRIES.readyRows == 1)
 assert(byFruit.COFFEECHERRIES.diseaseMeasured and byFruit.COFFEECHERRIES.sickRows == 1, "curable coffee sickness")
+-- Buying the land does not necessarily change a map-created placeable's owner.
+host.g_farmlandManager = {getOwnerIdAtWorldPosition=function(_, x, z)
+  return z >= 4 and 1 or 0
+end}
+local afterPurchase = env.OrchardDataCollector.collect(mission)
+local afterByFruit = {}
+for _, row in ipairs(afterPurchase.rows) do afterByFruit[row.fruitType] = row end
+assert(afterByFruit.COFFEECHERRIES.farmId == 1 and afterByFruit.COFFEECHERRIES.landOwnershipComplete,
+  "coffee map orchard follows the bought farmland")
+assert(afterByFruit.BANANA.farmId == 0, "unbought banana land stays unowned")
+local split = {id=106,getVineFruitTypeIndex=function() return 4 end,
+ getOwnerFarmId=function() return 0 end,
+ getFence=function() return {segments={
+   {startPosX=0,startPosZ=0,endPosX=0,endPosZ=2},
+   {startPosX=0,startPosZ=6,endPosX=0,endPosZ=8},
+ }} end}
+local splitRow = env.OrchardDataCollector.collect({placeableSystem={placeables={split}}}).rows[1]
+assert(splitRow.farmId == 0 and splitRow.landOwnershipComplete
+  and splitRow.landOwnerFarmIds[1] == 0 and splitRow.landOwnerFarmIds[2] == 1,
+  "mixed parcels must not be presented as wholly owned")
+host.g_farmlandManager = nil
 mission.vineSystem.dirtyNodes[999] = true
 local unrelated = env.OrchardDataCollector.collect(mission)
 for _, row in ipairs(unrelated.rows) do
@@ -80,11 +101,18 @@ for i=1,208 do
     getHasTargetGrowthState=function() return false end}
 end
 local largeCoffee = {id=105,getVineFruitTypeIndex=function() return 4 end,
- getOwnerFarmId=function() return 1 end,
+ getOwnerFarmId=function() return 0 end,
  getFence=function() return {segments=manySegments} end,
  getHasSegmentTargetGrowthState=function() return false end}
 local largeMission = {placeableSystem={placeables={largeCoffee}},vineSystem={}}
+host.g_farmlandManager = {getOwnerIdAtWorldPosition=function()
+  return 1
+end}
 local partial = env.OrchardDataCollector.collect(largeMission)
+assert(partial.rows[1].farmId == 1 and partial.rows[1].landOwnershipComplete
+  and #partial.rows[1].landOwnerFarmIds == 1,
+  "all 208 rows of a map-spanning orchard follow their purchased land")
+host.g_farmlandManager = nil
 assert(partial.rows[1].diseaseScanning and not partial.rows[1].diseaseMeasured,
   "large coffee orchard progresses without a dirtyNodes table")
 host.g_time = 60101

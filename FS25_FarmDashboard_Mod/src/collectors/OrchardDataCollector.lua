@@ -18,6 +18,36 @@ local function finite(value)
     return n
 end
 
+-- Map-created orchards can keep placeable owner 0 after their land is bought.
+-- Resolve each vine row against the live farmland map, since one map placeable
+-- may cover several separately purchasable parcels.
+local function landOwners(fence, mission)
+    local segments = fence and fence.segments
+    local farmlandManager = mission and mission.farmlandManager
+    if type(farmlandManager) ~= "table" or type(farmlandManager.getOwnerIdAtWorldPosition) ~= "function" then
+        farmlandManager = g_farmlandManager
+    end
+    if type(segments) ~= "table" or #segments == 0 or #segments > 512
+        or type(farmlandManager) ~= "table"
+        or type(farmlandManager.getOwnerIdAtWorldPosition) ~= "function" then
+        return nil, false
+    end
+    local owners, seen = {}, {}
+    for _, segment in ipairs(segments) do
+        local x1, x2 = finite(segment.x1 or segment.startPosX), finite(segment.x2 or segment.endPosX)
+        local z1, z2 = finite(segment.z1 or segment.startPosZ), finite(segment.z2 or segment.endPosZ)
+        if not (x1 and x2 and z1 and z2) then return nil, false end
+        local owner = finite(call(farmlandManager, "getOwnerIdAtWorldPosition", (x1 + x2) / 2, (z1 + z2) / 2))
+        if owner == nil then return nil, false end
+        if not seen[owner] then
+            seen[owner] = true
+            owners[#owners + 1] = owner
+        end
+    end
+    table.sort(owners)
+    return owners, true
+end
+
 local function readRows(placeable, fruitIndex, fence, now)
     local segments = fence and fence.segments
     if type(segments) ~= "table" then return nil, nil, nil, nil, false end
@@ -157,6 +187,13 @@ function OrchardDataCollector.collect(mission)
             else
                 local owner = finite(call(placeable, "getOwnerFarmId")) or 0
                 local fence = call(placeable, "getFence") or placeable.spec_fence
+                local landOwnerFarmIds, landOwnershipComplete
+                if owner == 0 then
+                    landOwnerFarmIds, landOwnershipComplete = landOwners(fence, mission)
+                    if landOwnershipComplete and #landOwnerFarmIds == 1 then
+                        owner = landOwnerFarmIds[1]
+                    end
+                end
                 local rowCount, rowLength, ready, withered, measured = readRows(placeable, index, fence, now)
                 local sick, diseaseMeasured, diseaseScanning = nil, false, false
                 if fruitName == "COFFEECHERRIES" then
@@ -165,6 +202,8 @@ function OrchardDataCollector.collect(mission)
                 rows[#rows + 1] = {
                     id = tostring(placeable.uniqueId or placeable.id or #rows + 1),
                     farmId = owner,
+                    landOwnerFarmIds = landOwnerFarmIds,
+                    landOwnershipComplete = landOwnershipComplete,
                     fruitType = fruitName,
                     rows = rowCount,
                     rowLengthMeters = rowLength and math.floor(rowLength + 0.5) or nil,

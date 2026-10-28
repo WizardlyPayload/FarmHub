@@ -58,6 +58,9 @@ FS25_*/
 # Built mod zip — produce via tools/Zip-FarmDashboardMod.ps1
 FS25_FarmDashboard_Mod/FS25_FarmDashboard.zip
 
+# Rust build output for the small local DLC overview reader
+tools/map-overview-extract/target/
+
 # Built mod zip — produce via tools/Zip-FarmDashboardMod.ps1
 FS25_FarmDashboard_Mod/FS25_FarmDashboard.zip
 

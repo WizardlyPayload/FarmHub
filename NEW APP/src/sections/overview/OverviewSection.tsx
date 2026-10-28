@@ -61,6 +61,9 @@ import {
   OverviewMiniBoards,
 } from "@/sections/overview/OverviewMiniBoards";
 import { BeansAlpacasPanel } from "@/sections/overview/BeansAlpacasPanel";
+import { HighlandsFishingPanel } from "@/sections/overview/HighlandsFishingPanel";
+import { PumpsAndHosesPanel } from "@/sections/overview/PumpsAndHosesPanel";
+import { EmergencyPackPanel } from "@/sections/overview/EmergencyPackPanel";
 import {
   getNpcFavorForFarm,
   getProStaffForFarm,
@@ -934,6 +937,9 @@ export function OverviewSection() {
           ) : null}
           </div>
           <BeansAlpacasPanel state={payload?.beansAndAlpacas} farmId={farmId} />
+          <HighlandsFishingPanel state={payload?.highlandsFishing} farmId={farmId} />
+          <PumpsAndHosesPanel state={payload?.pumpsAndHoses} farmId={farmId} />
+          <EmergencyPackPanel state={payload?.emergencyPack} farmId={farmId} />
         </>
       )}
 

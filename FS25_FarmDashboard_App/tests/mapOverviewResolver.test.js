@@ -231,12 +231,15 @@ describe('mapOverviewResolver', () => {
     expect(resolveDlcPackagesForMap('MapUS', 'Riverbend Springs')).toEqual([]);
     expect(resolveDlcPackagesForMap('mapWitcombeValley', 'Witcombe Valley')).toEqual([]);
     expect(resolveDlcPackagesForMap('FS25_LakesideFishing.map01', 'Lakeside Fishing Village')).toEqual([]);
+    // Plains & Prairies is a machinery pack, not a map pack.
+    expect(resolveDlcPackagesForMap('FS25_PrairieValley.map01', 'Prairie Valley')).toEqual([]);
   });
 });
 
 describe('mapOverviewResolver DLC hint + modSettings export', () => {
   let tmpRoot;
   let savedEnv;
+  let originalExistsSync;
   const KINLAIG_MAP_ID = 'pdlc_highlandsFishingPack.mapKinlaig';
 
   const modSettingsMapOverviewDir = () =>
@@ -251,6 +254,12 @@ describe('mapOverviewResolver DLC hint + modSettings export', () => {
     );
 
   beforeAll(() => {
+    // Keep this fallback fixture independent of the host's installed DLCs.
+    originalExistsSync = fs.existsSync;
+    jest.spyOn(fs, 'existsSync').mockImplementation((candidate) =>
+      String(candidate).endsWith('farmdash-map-overview-extract.exe')
+        ? false : originalExistsSync(candidate)
+    );
     savedEnv = {
       USERPROFILE: process.env.USERPROFILE,
       APPDATA: process.env.APPDATA,
@@ -265,6 +274,7 @@ describe('mapOverviewResolver DLC hint + modSettings export', () => {
   });
 
   afterAll(() => {
+    fs.existsSync.mockRestore();
     for (const [k, v] of Object.entries(savedEnv)) {
       if (v === undefined) delete process.env[k];
       else process.env[k] = v;

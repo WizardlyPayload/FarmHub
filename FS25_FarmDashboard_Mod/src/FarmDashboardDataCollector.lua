@@ -540,8 +540,8 @@ local function _parentDir(filePath)
 end
 
 --- Overview export retries at most once per MAP_OVERVIEW_EXPORT_RETRY_MS of mission time: DLC maps
---- (e.g. Kinlaig in highlandsFishingPack) mount inside proprietary .dlc containers the desktop app
---- cannot open, so this in-game export is the only reliable overview source — don't latch failure on
+--- (e.g. Kinlaig in highlandsFishingPack) mount inside proprietary .dlc containers. Keep the
+--- in-game export as a fallback for installations where the desktop archive reader is unavailable; don't latch failure on
 --- the first miss (HUD map overlay / VFS paths may not be ready during the first cycles).
 local MAP_OVERVIEW_EXPORT_MAX_ATTEMPTS = 5
 local MAP_OVERVIEW_EXPORT_RETRY_MS = 60000
@@ -3454,6 +3454,21 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
         local ok, result = pcall(BeansAlpacasDataCollector.collect,
             _G.g_currentMission, self._companionFarmInfo)
         data.beansAndAlpacas = ok and result or { enabled = false }
+    end
+    if rawget(_G, "HighlandsFishingDataCollector") and type(HighlandsFishingDataCollector.collect) == "function" then
+        local ok, result = pcall(HighlandsFishingDataCollector.collect,
+            _G.g_currentMission, self._companionFarmInfo)
+        data.highlandsFishing = ok and result or { enabled = false }
+    end
+    if rawget(_G, "PumpsAndHosesDataCollector") and type(PumpsAndHosesDataCollector.collect) == "function" then
+        local ok, result = pcall(PumpsAndHosesDataCollector.collect,
+            _G.g_currentMission, self._companionFarmInfo)
+        data.pumpsAndHoses = ok and result or { enabled = false }
+    end
+    if rawget(_G, "EmergencyPackDataCollector") and type(EmergencyPackDataCollector.collect) == "function" then
+        local ok, result = pcall(EmergencyPackDataCollector.collect,
+            _G.g_currentMission, self._companionFarmInfo)
+        data.emergencyPack = ok and result or { enabled = false }
     end
 
     _finalizeFillTypeNames(data)

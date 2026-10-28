@@ -379,6 +379,38 @@ export interface DashboardPayload {
     }>;
     collectibles?: { total?: number; found?: number; uncovered?: number };
   };
+  highlandsFishing?: {
+    enabled?: boolean;
+    schema?: number;
+    authoritative?: boolean;
+    farmsTruncated?: boolean;
+    byFarm?: Record<string, {
+      total?: { soldFish?: number; releasedFish?: number; caughtTrashItems?: number };
+      session?: { soldFish?: number; releasedFish?: number; caughtTrashItems?: number };
+    }>;
+  };
+  pumpsAndHoses?: {
+    enabled?: boolean;
+    schema?: number;
+    authoritative?: boolean;
+    vehicleCoverage?: "complete" | "unknown";
+    truncated?: boolean;
+    byFarm?: Record<string, {
+      ownedVehiclePumps?: number;
+      activeVehiclePumps?: number;
+      circulatingVehiclePumps?: number;
+    }>;
+  };
+  emergencyPack?: {
+    enabled?: boolean;
+    schema?: number;
+    authoritative?: boolean;
+    farmId?: number;
+    incident?: {
+      status?: "none" | "pending" | "starting" | "running" | "closing" | "aborting";
+      type?: "fire" | "tree" | "oilSpill";
+    };
+  };
   orchards?: {
     schema?: number;
     available?: boolean;

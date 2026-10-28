@@ -187,6 +187,33 @@ function pruneMergedDataToPlayerFarms(data) {
     }
     out.beansAndAlpacas = dlc;
   }
+  if (data.highlandsFishing && typeof data.highlandsFishing === "object") {
+    const dlc = { ...data.highlandsFishing };
+    if (dlc.byFarm && typeof dlc.byFarm === "object") {
+      dlc.byFarm = Object.fromEntries(
+        Object.entries(dlc.byFarm).filter(([key]) => playerIds.has(Number(key)))
+      );
+    }
+    out.highlandsFishing = dlc;
+  }
+  if (data.pumpsAndHoses && typeof data.pumpsAndHoses === "object") {
+    const dlc = { ...data.pumpsAndHoses };
+    if (dlc.byFarm && typeof dlc.byFarm === "object") {
+      dlc.byFarm = Object.fromEntries(
+        Object.entries(dlc.byFarm).filter(([key]) => playerIds.has(Number(key)))
+      );
+    }
+    out.pumpsAndHoses = dlc;
+  }
+  if (data.emergencyPack && typeof data.emergencyPack === "object") {
+    const dlc = { ...data.emergencyPack };
+    if (!playerIds.has(Number(dlc.farmId))) {
+      delete dlc.farmId;
+      delete dlc.incident;
+      dlc.authoritative = false;
+    }
+    out.emergencyPack = dlc;
+  }
   if (data.orchards && typeof data.orchards === "object") {
     out.orchards = {
       ...data.orchards,

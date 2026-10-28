@@ -69,6 +69,39 @@ describe("farmScope", () => {
     expect(Object.keys(out.beansAndAlpacas.washingCapacityByFarm)).toEqual(["2"]);
   });
 
+  test("Highlands fishing totals do not expose non-player farms", () => {
+    const out = pruneMergedDataToPlayerFarms({
+      farmInfo: witcombeFarmInfo,
+      highlandsFishing: {
+        enabled: true,
+        authoritative: true,
+        byFarm: {
+          "1": { total: { soldFish: 4 } },
+          "14": { total: { soldFish: 99 } },
+        },
+      },
+    });
+    expect(Object.keys(out.highlandsFishing.byFarm)).toEqual(["1"]);
+    expect(out.highlandsFishing.authoritative).toBe(true);
+  });
+
+  test("Pumps N' Hoses and Emergency state stay within player farms", () => {
+    const out = pruneMergedDataToPlayerFarms({
+      farmInfo: witcombeFarmInfo,
+      pumpsAndHoses: {
+        enabled: true,
+        byFarm: { "1": { ownedVehiclePumps: 1 }, "15": { ownedVehiclePumps: 9 } },
+      },
+      emergencyPack: {
+        enabled: true, authoritative: true, farmId: 15,
+        incident: { status: "running", type: "fire" },
+      },
+    });
+    expect(Object.keys(out.pumpsAndHoses.byFarm)).toEqual(["1"]);
+    expect(out.emergencyPack.authoritative).toBe(false);
+    expect(out.emergencyPack.incident).toBeUndefined();
+  });
+
   test("prune drops farm 15 production and animals", () => {
     const raw = {
       farmInfo: witcombeFarmInfo,

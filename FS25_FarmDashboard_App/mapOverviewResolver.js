@@ -42,14 +42,6 @@ const MAP_DLC_PACKAGE_HINTS = [
       return /kinlaig|highlands?[\s_-]*fishing/i.test(title || '');
     },
   },
-  {
-    packages: ['plainsAndPrairiesPack'],
-    match(slug, title, tokens) {
-      if (tokens.includes('prairie') || tokens.includes('prairies')) return true;
-      if (slug && (slug.includes('prairie') || slug.includes('plains'))) return true;
-      return /prairie|plains/i.test(title || '');
-    },
-  },
 ];
 const TERRAIN_INSET_SAMPLE_SIZE = 512;
 
@@ -341,6 +333,106 @@ async function findOverviewInPdlcPackages(pdlcRoots, packages, mapSlug, mapTitle
       // dotted mapIds (pdlc_pack.mapX) never appear literally in the extracted paths.
       const relaxed = await walkForOverview(pkgDir, null, null, titleTokens, 8, 8000);
       if (relaxed) return { sourcePath: relaxed, mapSlug, sourceKind: 'file', dlcPackage: pkg };
+    }
+  }
+  return null;
+}
+
+// Official DLCs are installed as .dlc archives, not unpacked directories.
+// Read only their map overview into the user's own cache; never distribute a
+// GIANTS texture or unpack the whole archive into a profile.
+const pendingDlcOverviewReads = new Map();
+
+function bundledDlcOverviewReader() {
+  const exe = 'farmdash-map-overview-extract.exe';
+  const candidates = [
+    process.resourcesPath && path.join(process.resourcesPath, 'map-overview-extract', exe),
+    path.join(__dirname, 'resources', 'map-overview-extract', exe),
+  ].filter(Boolean);
+  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
+}
+
+async function runDlcOverviewReader(exe, archivePath, outputDir) {
+  await new Promise((resolve, reject) => {
+    const child = spawn(exe, [archivePath, outputDir], { windowsHide: true, stdio: 'ignore' });
+    const timer = setTimeout(() => child.kill(), 30000);
+    child.once('error', (error) => { clearTimeout(timer); reject(error); });
+    child.once('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) resolve();
+      else reject(new Error(`DLC overview reader exited ${code}`));
+    });
+  });
+  for (const ext of ['dds', 'png']) {
+    const candidate = path.join(outputDir, `overview.${ext}`);
+    try {
+      const stat = await fs.promises.stat(candidate);
+      if (stat.isFile() && stat.size > 128 && stat.size <= 64 * 1024 * 1024) {
+        return candidate;
+      }
+    } catch (_) { /* try the other format */ }
+  }
+  return null;
+}
+
+async function findOverviewInDlcArchives(pdlcRoots, packages, mapSlug) {
+  const exe = bundledDlcOverviewReader();
+  if (!exe) return null;
+  for (const root of pdlcRoots || []) {
+    for (const pkg of packages || []) {
+      // pkg comes only from the fixed MAP_DLC_PACKAGE_HINTS table above.
+      const archivePath = path.join(root, `${pkg}.dlc`);
+      let archiveStat;
+      try {
+        archiveStat = await fs.promises.stat(archivePath);
+        if (!archiveStat.isFile()) continue;
+      } catch (_) { continue; }
+      const identity = `${archivePath.toLowerCase()}|${archiveStat.size}|${archiveStat.mtimeMs}`;
+      const key = crypto.createHash('sha256').update(identity).digest('hex').slice(0, 24);
+      const cacheRoot = path.join(getMapOverviewCacheDir(), 'dlc-sources');
+      const finalDir = path.join(cacheRoot, `${pkg}-${key}`);
+      let source = null;
+      for (const ext of ['dds', 'png']) {
+        const candidate = path.join(finalDir, `overview.${ext}`);
+        try {
+          const stat = await fs.promises.stat(candidate);
+          if (stat.isFile() && stat.size > 128 && stat.size <= 64 * 1024 * 1024) {
+            source = candidate;
+            break;
+          }
+        } catch (_) { /* not cached */ }
+      }
+      if (!source) {
+        let pending = pendingDlcOverviewReads.get(identity);
+        if (!pending) {
+          pending = (async () => {
+            await fs.promises.mkdir(cacheRoot, { recursive: true });
+            const stageDir = await fs.promises.mkdtemp(path.join(cacheRoot, 'stage-'));
+            try {
+              const staged = await runDlcOverviewReader(exe, archivePath, stageDir);
+              if (!staged) return null;
+              try {
+                await fs.promises.rename(stageDir, finalDir);
+              } catch (error) {
+                if (!(await pathExists(finalDir))) throw error;
+              }
+              return path.join(finalDir, path.basename(staged));
+            } finally {
+              // mkdtemp created this direct child; never delete a caller path.
+              if (path.dirname(stageDir) === cacheRoot) {
+                try { await fs.promises.rm(stageDir, { recursive: true, force: true }); }
+                catch (_) { /* stale temp is harmless; keep the resolved image */ }
+              }
+            }
+          })();
+          pendingDlcOverviewReads.set(identity, pending);
+          pending.finally(() => pendingDlcOverviewReads.delete(identity)).catch(() => {});
+        }
+        try { source = await pending; } catch (_) { source = null; }
+      }
+      if (source && await pathExists(source)) {
+        return { sourcePath: source, mapSlug, sourceKind: 'file', dlcPackage: pkg };
+      }
     }
   }
   return null;
@@ -751,6 +843,8 @@ async function findOverviewSourceFile({ mapId, mapTitle, modsRoot, modsRoots }) 
       extraSlugs
     );
     if (pdlcHit) return { ...pdlcHit, sourceOrigin: 'pdlc' };
+    const archiveHit = await findOverviewInDlcArchives(getFs25PdlcRoots(), dlcPackages, mapSlug);
+    if (archiveHit) return { ...archiveHit, sourceOrigin: 'pdlc-archive' };
   }
 
   const candidates = [];
@@ -1198,6 +1292,7 @@ module.exports = {
   isLikelyDlcMap,
   findOverviewInModSettingsExport,
   findOverviewInPdlcPackages,
+  findOverviewInDlcArchives,
   pdlcPackageOverviewCandidates,
   findOverviewSourceFile,
   resolveMagickExe,

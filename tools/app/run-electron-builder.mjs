@@ -21,6 +21,7 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { farmDashReleaseDir, getFarmDashBuildOutputDir, getFarmDashV5BuildOutputDir } from './farmdash-build-output.mjs';
 import { formatTexconvReport, inspectBundledTexconv } from './verify-v5-bundled-texconv.mjs';
+import { inspectBundledMapExtractor } from './verify-v5-bundled-map-extractor.mjs';
 import { buildFreshV5Ui, verifyV5UiAsar, assertDistinctV5Installer, assertUiSourceStillCurrent } from './v5-ui-package-proof.mjs';
 import { createV5ReleaseStage, cleanupV5ReleaseStage, promoteV5Artifacts } from './v5-release-stage.mjs';
 
@@ -84,6 +85,13 @@ if (isV5) {
         process.exit(1);
     }
     console.error(formatTexconvReport(texconv));
+    const mapExtractor = inspectBundledMapExtractor(projectDir);
+    if (!mapExtractor.ok) {
+        console.error(`[FarmDash V5] ${mapExtractor.reason}`);
+        console.error('[FarmDash V5] Stopped before electron-builder; no installer was built.');
+        process.exit(1);
+    }
+    console.error(`[FarmDash V5] DLC map reader SHA-256: ${mapExtractor.sha256}`);
 }
 if (!isV5) fs.mkdirSync(outDir, { recursive: true });
 

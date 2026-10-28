@@ -1,0 +1,13 @@
+[package]
+name = "farmdash-map-overview-extract"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+gar-lib = { git = "https://github.com/Paint-a-Farm/gar-lib.git", rev = "7575d5f890aeb2198077646241f88cd73f013ab6" }
+
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1

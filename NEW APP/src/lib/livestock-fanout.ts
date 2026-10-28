@@ -162,6 +162,10 @@ function animalGroupToClusterEntry(animalGroup: LivestockAnimal): LodCluster {
       (animalGroup.avgHealth as number | undefined) != null
         ? (animalGroup.avgHealth as number)
         : animalGroup.health,
+    avgHappiness: animalGroup.avgHappiness ?? animalGroup.happiness,
+    avgFleeceState: animalGroup.avgFleeceState ?? animalGroup.fleeceState,
+    canBeSheared: animalGroup.canBeSheared,
+    fleeceLiters: animalGroup.fleeceLiters,
     avgWeight:
       (animalGroup.avgWeight as number | undefined) != null
         ? (animalGroup.avgWeight as number)
@@ -280,6 +284,10 @@ export function fanOutClustersIndividualRows(
         farmId,
         age: ageMonths,
         health: avgHealth,
+        happiness: nTotal === 1 ? c.avgHappiness : undefined,
+        fleeceState: nTotal === 1 ? c.avgFleeceState : undefined,
+        canBeSheared: nTotal === 1 ? c.canBeSheared : undefined,
+        fleeceLiters: nTotal === 1 ? c.fleeceLiters : undefined,
         weight: avgWeight != null ? avgWeight : 0,
         gender: c.gender || "female",
         subType,

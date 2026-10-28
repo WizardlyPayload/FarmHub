@@ -5,7 +5,7 @@
 
 const MOWABLE_FORAGE_EXACT = new Set(["GRASS", "MEADOW", "ALFALFA", "CLOVER"]);
 
-/** FS25 maps_fieldGround.xml density values 1–6 (prepared / sowable soil, no standing crop). */
+/** FieldState.groundType enum names from the mod export. */
 const PREPARED_SEEDBED_NAMES = new Set([
   "STUBBLE_TILLAGE",
   "CULTIVATED",
@@ -36,16 +36,16 @@ export function isMowableForageCrop(
 
 /**
  * Prepared seedbed / tilled ground (cultivated, plowed, stubble tillage, …).
- * Accepts density value (1–6) or groundTypeName from the mod.
+ * The mod exports FieldGroundType enum ordinals (NONE=1, STUBBLE_TILLAGE=2,
+ * …, RIDGE=7), not map fieldGround density values (1–6). Prefer the exported
+ * name when present so an unknown ordinal can never turn NONE into tillage.
  */
 export function isPreparedSeedbedGround(groundType: unknown, groundTypeName?: unknown): boolean {
-  const n = Number(groundType);
-  if (Number.isFinite(n) && n >= 1 && n <= 6) return true;
-  const name = String(groundTypeName ?? groundType ?? "")
+  const name = String(groundTypeName ?? "")
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-  if (!name) return false;
-  if (PREPARED_SEEDBED_NAMES.has(name)) return true;
-  return [...PREPARED_SEEDBED_NAMES].some((token) => name.includes(token));
+  if (name) return PREPARED_SEEDBED_NAMES.has(name);
+  const n = Number(groundType);
+  return Number.isInteger(n) && n >= 2 && n <= 7;
 }

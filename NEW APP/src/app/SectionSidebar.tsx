@@ -86,7 +86,10 @@ export function SectionSidebar() {
     return out;
   }, [payload, farmId, presence]);
 
-  const coreItems = NAV_SECTIONS.filter((id) => sectionVisible(id, enabledSections));
+  const coreItems = NAV_SECTIONS.filter((id) =>
+    sectionVisible(id, enabledSections) &&
+    (id !== "orchards" || !!payload?.orchards?.rows?.length || !!payload?.beansAndAlpacas?.enabled),
+  );
   const companionPageItems = useMemo(
     () => visibleCompanionPages(payload).map((entry) => modPageSection(entry.key)),
     [payload],

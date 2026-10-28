@@ -368,6 +368,23 @@ local function _compactFieldOutline(field)
     return out
 end
 
+-- Classification probes should use this field's authored polygon when it exists.
+-- A farmland can contain several fields and meadow around their edges.
+local function _pointInFieldOutline(x, z, outline)
+    if type(outline) ~= "table" or #outline < 3 then return true end
+    local inside = false
+    local j = #outline
+    for i = 1, #outline do
+        local xi, zi = outline[i][1], outline[i][2]
+        local xj, zj = outline[j][1], outline[j][2]
+        if ((zi > z) ~= (zj > z)) and (x < (xj - xi) * (z - zi) / (zj - zi) + xi) then
+            inside = not inside
+        end
+        j = i
+    end
+    return inside
+end
+
 --- GPS / worker menu outlines are NOT the map i3d polygon. AISettingsDialog draws
 --- FieldCourseField.fieldRootBoundary after BoundaryDetectionTask walks
 --- `getDensityAtWorldPos(terrainDetailId) ~= 0` (painted ground). Merged and
@@ -2012,11 +2029,27 @@ function FieldDataCollector:_collectImpl()
         else
             -- [OWNED FIELDS]: Prefer center crop; max weed across ring. FieldState:update matches FieldManager / map.
             local foundCrop = false
+            local preparedOverridesForage = false
 
             if probeState and type(probeState.update) == "function" then
                 local maxWeed = 0
+                local authoredOutline = _compactFieldOutline(field)
+                local preparedCount, forageCount = 0, 0
+                local preparedSample, centerPrepared = nil, nil
                 _forEachFieldSampleRing(cx, cz, sampleRadius, myFarmlandId, function(sx, sz, isCenter)
                     local sampled = sampleState(probeState, sx, sz)
+                    if _pointInFieldOutline(sx, sz, authoredOutline) then
+                        if isPreparedSeedbedGroundValue(sampled.groundType) then
+                            preparedCount = preparedCount + 1
+                            preparedSample = preparedSample or sampled
+                            if isCenter then centerPrepared = sampled end
+                        elseif (sampled.fruitTypeIndex or 0) > 0 then
+                            local desc = _G.g_fruitTypeManager and _G.g_fruitTypeManager:getFruitTypeByIndex(sampled.fruitTypeIndex)
+                            if desc and isMowableForageFruitName(desc.name) then
+                                forageCount = forageCount + 1
+                            end
+                        end
+                    end
                     if sampled.fruitTypeIndex and sampled.fruitTypeIndex > 0 then
                         if isCenter then
                             fData.fruitTypeIndex     = sampled.fruitTypeIndex
@@ -2043,6 +2076,24 @@ function FieldDataCollector:_collectImpl()
                 end)
                 if foundCrop then
                     fData.weedLevel = maxWeed
+                    -- A meadow/grass sample on the surrounding farmland can win the
+                    -- first-crop fallback even when most of this field was cultivated.
+                    -- Keep actual forage fields: require prepared ground at the center
+                    -- or a prepared majority within the authored field polygon.
+                    local selected = _G.g_fruitTypeManager and _G.g_fruitTypeManager:getFruitTypeByIndex(fData.fruitTypeIndex)
+                    if selected and isMowableForageFruitName(selected.name)
+                        and (centerPrepared or (preparedCount >= 2 and preparedCount > forageCount)) then
+                        local ground = centerPrepared or preparedSample
+                        fData.groundType = ground.groundType
+                        fData.fertilizationLevel = ground.sprayLevel or 0
+                        fData.plowLevel = ground.plowLevel or 0
+                        fData.limeLevel = ground.limeLevel or 0
+                        fData.mulchLevel = ground.stubbleShredLevel or 0
+                        fData.fruitTypeIndex = 0
+                        fData.growthState = 0
+                        foundCrop = false
+                        preparedOverridesForage = true
+                    end
                 else
                     local sampled = sampleState(probeState, cx, cz)
                     fData.fertilizationLevel = sampled.sprayLevel or 0
@@ -2055,7 +2106,7 @@ function FieldDataCollector:_collectImpl()
             end
 
             -- Per-field FieldState (engine-owned) as a second opinion when probeState missed crop
-            if field.fieldState and type(field.fieldState.update) == "function" then
+            if not preparedOverridesForage and field.fieldState and type(field.fieldState.update) == "function" then
                 local fs = sampleState(field.fieldState, cx, cz)
                 if (not foundCrop or (fData.fruitTypeIndex or 0) == 0) and fs.fruitTypeIndex and fs.fruitTypeIndex > 0 then
                     fData.fruitTypeIndex     = fs.fruitTypeIndex

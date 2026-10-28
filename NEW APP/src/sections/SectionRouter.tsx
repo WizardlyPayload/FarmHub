@@ -22,6 +22,9 @@ const PasturesSection = lazy(() =>
 const FieldsSection = lazy(() =>
   import("@/sections/fields").then((m) => ({ default: m.FieldsSection })),
 );
+const OrchardsSection = lazy(() =>
+  import("@/sections/orchards/OrchardsSection").then((m) => ({ default: m.OrchardsSection })),
+);
 const StorageSection = lazy(() =>
   import("@/sections/storage/StorageSection").then((m) => ({ default: m.StorageSection })),
 );
@@ -84,6 +87,7 @@ export function SectionRouter() {
   else if (section === "map") body = <FleetMapSection />;
   else if (section === "productions") body = <ProductionsSection />;
   else if (section === "fields") body = <FieldsSection />;
+  else if (section === "orchards") body = <OrchardsSection />;
   else if (section === "economy") body = <EconomySection />;
   else if (section === "storage") body = <StorageSection />;
   else if (section === "redtape") body = <RedTapeSection />;

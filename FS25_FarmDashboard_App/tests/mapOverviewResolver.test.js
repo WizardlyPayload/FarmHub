@@ -218,6 +218,14 @@ describe('mapOverviewResolver', () => {
     expect(resolveDlcPackagesForMap('', 'Highlands Fishing')).toEqual(['highlandsFishingPack']);
   });
 
+  test('recognises Catuaí as the Beans & Alpacas DLC map', () => {
+    const { resolveDlcPackagesForMap } = require('../mapOverviewResolver');
+    expect(resolveDlcPackagesForMap('pdlc_beansAndAlpacasPack.beansAndAlpacasMap', 'Catuaí'))
+      .toEqual(['beansAndAlpacasPack']);
+    expect(resolveDlcPackagesForMap('', 'Catuaí')).toEqual(['beansAndAlpacasPack']);
+    expect(resolveDlcPackagesForMap('MapUS', 'Riverbend Springs')).toEqual([]);
+  });
+
   test('resolveDlcPackagesForMap does not flag ordinary mod maps as DLC', () => {
     const { resolveDlcPackagesForMap } = require('../mapOverviewResolver');
     expect(resolveDlcPackagesForMap('MapUS', 'Riverbend Springs')).toEqual([]);

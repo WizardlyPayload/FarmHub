@@ -294,7 +294,7 @@
   "map.hint": "{{map}} — drag to pan, scroll to zoom. Use Fit items to jump to your fleet.",
   "map.hintNoImage": "Could not load the map overview image. The dashboard reads map .zip files from your FS25 mods folder on this PC (e.g. FS25_Witcombe.zip). Use Fit items — pins still work without the background.",
   "map.hintNoImageNamed": "Could not load overview for {{map}}. Confirm FS25_*{{hint}}*.zip is in your mods folder on the PC running Farm Dashboard.",
-  "map.hintNoImageDlc": "Could not load overview for {{map}}. This map is from an official DLC pack (not a mods-folder .zip). Load the save in-game once with the Farm Dashboard mod enabled so the overview is cached, then reopen Fleet map. Pins still work without the background.",
+  "map.hintNoImageDlc": "The overview image for {{map}} is unavailable. Official DLC map artwork may be protected inside the game's archive, so the dashboard cannot always cache it. Vehicle pins and field overlays still work without the image.",
   "map.loadingOverview": "Loading map image…",
   "map.zoomIn": "Zoom in",
   "map.zoomOut": "Zoom out",
@@ -1241,6 +1241,20 @@
   "livestock.colAge": "Age",
   "livestock.colGender": "Gender",
   "livestock.colHealth": "Health",
+  "livestock.alpacaHappiness": "Alpaca happiness",
+  "livestock.alpacaFleece": "Fleece growth",
+  "beansAlpacas.title": "Beans & Alpacas Expansion",
+  "beansAlpacas.standardSections": "Crops, vehicles, products and production chains appear in their normal dashboard sections.",
+  "beansAlpacas.workers": "Banana workers",
+  "beansAlpacas.hired": "Hired",
+  "beansAlpacas.actionsLeft": "Actions left today",
+  "beansAlpacas.washingStations": "Washing stations",
+  "beansAlpacas.gameSettings": "Orchard settings",
+  "beansAlpacas.disease": "Orchard disease",
+  "beansAlpacas.frost": "Frost damage",
+  "beansAlpacas.collectibles": "Catuaí discoveries",
+  "beansAlpacas.found": "Found",
+  "beansAlpacas.uncovered": "Uncovered",
   "livestock.colWeight": "Weight",
   "livestock.colValue": "Value",
   "livestock.colStatus": "Status",
@@ -4117,4 +4131,49 @@
   ,"replicaLink.restoreApprove": "Restore linked source"
   ,"replicaLink.restoring": "Restoring…"
   ,"replicaLink.restored": "Linked source restored. Reloading saves."
+  ,"nav.section.orchards": "Orchards"
+  ,"orchards.title": "Orchards"
+  ,"orchards.intro": "Grapes and olives from the base game, with coffee and banana orchards when the expansion is active."
+  ,"orchards.noLiveData": "Live orchard data is unavailable. Load the save with the current Farm Dashboard mod to see its orchards."
+  ,"orchards.yourOrchards": "Your orchards"
+  ,"orchards.noneOwned": "No orchards are owned by the selected farm."
+  ,"orchards.mapOrchards": "Map orchards"
+  ,"orchards.mapNote": "These orchards exist on the map but are not owned by your farm. Their rows are shown for reference."
+  ,"orchards.mapOwned": "Map orchard"
+  ,"orchards.farmOwned": "Your farm"
+  ,"orchards.rows": "Rows"
+  ,"orchards.length": "Total row length"
+  ,"orchards.readyRows": "Rows with harvestable crop"
+  ,"orchards.witheredRows": "Rows with withered crop"
+  ,"orchards.growthUnavailable": "Growth detail is not available for this orchard."
+  ,"orchards.expansion": "Expansion orchard systems"
+  ,"orchards.bananaWorkers": "Banana workers"
+  ,"orchards.hired": "Hired"
+  ,"orchards.actionsLeft": "Actions left today"
+  ,"orchards.washingStations": "Washing stations"
+  ,"orchards.plants": "Banana plants"
+  ,"orchards.plantsInReach": "Plants in worker reach"
+  ,"orchards.workerUnavailable": "Worker data is not available for the selected farm."
+  ,"orchards.settings": "Orchard settings"
+  ,"orchards.disease": "Disease"
+  ,"orchards.frost": "Frost damage"
+  ,"orchards.grapes": "Grapes"
+  ,"orchards.olives": "Olives"
+  ,"orchards.coffee": "Coffee cherries"
+  ,"orchards.bananas": "Bananas"
+  ,"orchards.truncated": "Only the first 128 orchards are listed. This snapshot is incomplete; more orchards may exist on the map."
+  ,"orchards.workerStaffing": "Staffing and cost"
+  ,"orchards.workerLimit": "Worker limit"
+  ,"orchards.dailyWagePerWorker": "Daily wage per worker"
+  ,"orchards.workerActivity": "Today's actions"
+  ,"orchards.estimatedDailyActions": "Estimated actions needed today"
+  ,"orchards.actionsUsedToday": "Actions used today"
+  ,"orchards.workerCoverage": "Plants and facilities"
+  ,"orchards.availableBananaCapacity": "Available banana capacity after rail reservations"
+  ,"livestock.alpacaCanBeSheared": "Can be sheared"
+  ,"livestock.alpacaFleeceAmount": "Fleece amount"
+  ,"beansAlpacas.frostPending": "Frost warning: these crop types may wither at the next growth period"
+  ,"beansAlpacas.frostPendingMore": "More affected crop types are not listed."
+  ,"orchards.sickCoffeeRows": "Rows with curable sick growth"
+  ,"orchards.measuringDisease": "Measuring…"
 }

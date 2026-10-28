@@ -1,4 +1,4 @@
-import { t } from "@/i18n/i18n";
+import { t, tOr } from "@/i18n/i18n";
 import { Badge, Button } from "@/components/ui";
 import {
   displayAnimalEarTag,
@@ -13,7 +13,8 @@ import {
 import { formatGeneticsPercent } from "@/lib/genetics-overview";
 import { calculateAnimalValue, getGeneticsDescriptionKey } from "@/lib/livestock-value";
 import { formatCurrency } from "@/lib/economy";
-import { useUnitDisplay } from "@/lib/fill-unit-mode";
+import { formatFillQuantity } from "@/lib/fill-units";
+import { useFillPhysics, useFillUnitMode, useUnitDisplay } from "@/lib/fill-unit-mode";
 import { saveProfileFromUnitDisplay } from "@/lib/profile-display";
 import type { LivestockAnimal } from "@/lib/livestock-types";
 
@@ -37,11 +38,22 @@ function formatGender(gender: unknown): string {
 }
 
 export function AnimalDetailPanel({ animal, onFullDetails, onOpenPen, onClose }: Props) {
+  const fillMode = useFillUnitMode();
+  const fillPhysics = useFillPhysics();
+  const unitDisplay = useUnitDisplay();
   const earTag = displayAnimalEarTag(animal);
   const titleName = animal.name || t("livestock.nameFallback", { id: earTag });
   const health = displayAnimalHealth(animal);
   const valueInfo = calculateAnimalValue(animal);
   const g = animal.genetics;
+  const happiness = Number(animal.happiness ?? animal.avgHappiness);
+  const fleece = Number(animal.fleeceState ?? animal.avgFleeceState);
+  const hasHappiness = (animal.happiness != null || animal.avgHappiness != null) && Number.isFinite(happiness);
+  const hasFleece = (animal.fleeceState != null || animal.avgFleeceState != null) && Number.isFinite(fleece);
+  const isAlpaca = String(animal.subType ?? "").toUpperCase().startsWith("ALPACA");
+  const hasShearingStatus = isAlpaca && typeof animal.canBeSheared === "boolean";
+  const fleeceLiters = animal.fleeceLiters;
+  const hasFleeceAmount = isAlpaca && typeof fleeceLiters === "number" && Number.isFinite(fleeceLiters) && fleeceLiters >= 0;
 
   return (
     <aside class="fd-livestock__detail-panel" aria-label={t("livestock.detailPanelTitle")}>
@@ -84,6 +96,30 @@ export function AnimalDetailPanel({ animal, onFullDetails, onOpenPen, onClose }:
           <span class="fd-livestock__status">{t("livestock.colGender")}</span>
           <strong>{formatGender(animal.gender)}</strong>
         </div>
+        {hasHappiness ? (
+          <div>
+            <span class="fd-livestock__status">{t("livestock.alpacaHappiness")}</span>
+            <strong>{Math.round(Math.max(0, Math.min(100, happiness)))}%</strong>
+          </div>
+        ) : null}
+        {hasFleece ? (
+          <div>
+            <span class="fd-livestock__status">{t("livestock.alpacaFleece")}</span>
+            <strong>{Math.round(Math.max(0, Math.min(100, fleece)))}%</strong>
+          </div>
+        ) : null}
+        {hasShearingStatus ? (
+          <div>
+            <span class="fd-livestock__status">{tOr("livestock.alpacaCanBeSheared", "Can be sheared")}</span>
+            <strong>{t(animal.canBeSheared ? "common.yes" : "common.no")}</strong>
+          </div>
+        ) : null}
+        {hasFleeceAmount ? (
+          <div>
+            <span class="fd-livestock__status">{tOr("livestock.alpacaFleeceAmount", "Fleece amount")}</span>
+            <strong>{formatFillQuantity(fleeceLiters, "ALPACAFLEECE", fillMode, fillPhysics, unitDisplay)}</strong>
+          </div>
+        ) : null}
       </div>
 
       <div class="fd-livestock__chips">

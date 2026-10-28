@@ -351,6 +351,52 @@ export interface DashboardPayload {
   })[];
   vehicles?: unknown[] | Record<string, unknown>;
   production?: Record<string, unknown>;
+  beansAndAlpacas?: {
+    enabled?: boolean;
+    schema?: number;
+    catuaiMap?: boolean;
+    orchardDiseaseEnabled?: boolean;
+    frostDamageEnabled?: boolean;
+    frostPendingKnown?: boolean;
+    frostPendingFruitTypes?: string[];
+    frostPendingTruncated?: boolean;
+    workersByFarm?: Record<string, {
+      count?: number;
+      maxCount?: number;
+      actionsUsedToday?: number;
+      actionsRemainingToday?: number;
+      dailyWagePerWorker?: number;
+      washingStations?: number;
+      bananaPlants?: number;
+      plantsInWorkerReach?: number;
+      estimatedDailyActions?: number;
+    }>;
+    washingCapacityByFarm?: Record<string, {
+      stationCount?: number;
+      measuredStations?: number;
+      freeLitres?: number | null;
+      availableLitres?: number | null;
+    }>;
+    collectibles?: { total?: number; found?: number; uncovered?: number };
+  };
+  orchards?: {
+    schema?: number;
+    available?: boolean;
+    truncated?: boolean;
+    rows?: {
+      id: string;
+      farmId: number;
+      fruitType: string;
+      rows?: number | null;
+      rowLengthMeters?: number | null;
+      readyRows?: number | null;
+      witheredRows?: number | null;
+      sickRows?: number | null;
+      diseaseMeasured?: boolean;
+      diseaseScanning?: boolean;
+      growthMeasured?: boolean;
+    }[];
+  };
   economy?: Record<string, unknown>;
   pastures?: unknown[];
   stock?: Record<string, unknown>;
@@ -483,6 +529,7 @@ export type SectionId =
   | "livestock"
   | "vehicles"
   | "fields"
+  | "orchards"
   | "economy"
   | "pastures"
   | "productions"
@@ -523,6 +570,7 @@ export interface SectionParams {
 export const NAV_SECTIONS: SectionId[] = [
   "overview",
   "fields",
+  "orchards",
   "vehicles",
   "pastures",
   "productions",

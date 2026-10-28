@@ -1,0 +1,18 @@
+.fd-orchards { padding: clamp(1rem, 2vw, 2rem); color: var(--farm-text, #f8fafc); }
+.fd-orchards__head { margin-bottom: 1.25rem; }
+.fd-orchards__head h1 { margin: 0 0 .35rem; }
+.fd-orchards__head p, .fd-orchard-note { color: var(--farm-muted, #cbd5e1); }
+.fd-orchards__notice { font-size: .9rem; }
+.fd-orchards section { margin: 1.5rem 0; }
+.fd-orchards section h2 { margin: 0 0 .75rem; font-size: 1.2rem; }
+.fd-orchards__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr)); gap: .9rem; }
+.fd-orchard-card, .fd-orchards__message { padding: 1rem; border: 1px solid var(--farm-border); border-radius: .75rem; background: var(--farm-surface); backdrop-filter: blur(var(--farm-glass-blur, 12px)); }
+.fd-orchard-card header { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; }
+.fd-orchard-card h3 { margin: 0 0 .75rem; font-size: 1.05rem; }
+.fd-orchard-card header span { font-size: .8rem; color: var(--farm-muted, #cbd5e1); }
+.fd-orchard-card dl { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .45rem .8rem; margin: 0; }
+.fd-orchard-card dt { color: var(--farm-muted, #cbd5e1); }
+.fd-orchard-card dd { margin: 0; text-align: right; font-weight: 600; }
+.fd-orchard-card .fd-orchard-note { margin: .8rem 0 0; font-size: .85rem; }
+.fd-orchard-worker-detail__group + .fd-orchard-worker-detail__group { margin-top: .9rem; padding-top: .9rem; border-top: 1px solid var(--farm-border); }
+.fd-orchard-worker-detail__group h4 { margin: 0 0 .6rem; font-size: .9rem; font-weight: 600; }

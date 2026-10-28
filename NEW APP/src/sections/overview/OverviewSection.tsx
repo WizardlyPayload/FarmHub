@@ -60,6 +60,7 @@ import {
   OverviewFarmCardMinis,
   OverviewMiniBoards,
 } from "@/sections/overview/OverviewMiniBoards";
+import { BeansAlpacasPanel } from "@/sections/overview/BeansAlpacasPanel";
 import {
   getNpcFavorForFarm,
   getProStaffForFarm,
@@ -932,6 +933,7 @@ export function OverviewSection() {
             />
           ) : null}
           </div>
+          <BeansAlpacasPanel state={payload?.beansAndAlpacas} farmId={farmId} />
         </>
       )}
 

@@ -18,6 +18,7 @@ export const SECTION_BACKGROUNDS: Record<FixedSectionId, string | null> = {
   overview: `${DASHBOARD_PICTURES_BASE}/Background.png`,
   livestock: `${DASHBOARD_PICTURES_BASE}/Livestock.png`,
   fields: `${DASHBOARD_PICTURES_BASE}/Fields.png`,
+  orchards: `${DASHBOARD_PICTURES_BASE}/Fields.png`,
   vehicles: `${DASHBOARD_PICTURES_BASE}/Vehicles.png`,
   pastures: `${DASHBOARD_PICTURES_BASE}/Pastures.png`,
   productions: `${DASHBOARD_PICTURES_BASE}/Productions.png`,
@@ -75,6 +76,12 @@ export const SECTION_NAV_META: Record<FixedSectionId, SectionNavMeta> = {
     glyphKind: "initial",
     settingsKey: "fields",
     icon: navIcon("nav-fields.png"),
+  },
+  orchards: {
+    labelKey: "nav.section.orchards",
+    labelFallback: "Orchards",
+    glyph: "OR",
+    glyphKind: "initial",
   },
   vehicles: {
     labelKey: "nav.section.vehicles",

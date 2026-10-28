@@ -87,6 +87,29 @@ local function _resolveClusterSubType(c)
     return "UNKNOWN"
 end
 
+-- The DLC's getCanBeSheared checks the age visual; getFleeceAmount returns the
+-- ALPACAFLEECE fill quantity later passed to addPendingLiters. Read only owned
+-- single-alpaca clusters during collection, never from the per-frame update.
+local function _readAlpacaShearing(c, ownerFarmId, subType)
+    if type(ownerFarmId) ~= "number" or ownerFarmId <= 0
+        or type(subType) ~= "string" or not subType:upper():match("^ALPACA")
+        or c.numAnimals ~= 1 then return nil end
+
+    local result = {}
+    if type(c.getCanBeSheared) == "function" then
+        local ok, can = pcall(c.getCanBeSheared, c)
+        if ok and type(can) == "boolean" then result.canBeSheared = can end
+    end
+    if type(c.getFleeceAmount) == "function" then
+        local ok, amount = pcall(c.getFleeceAmount, c)
+        if ok and type(amount) == "number" and amount >= 0 and amount < math.huge then
+            result.fleeceLiters = amount
+        end
+    end
+    if result.canBeSheared == nil and result.fleeceLiters == nil then return nil end
+    return result
+end
+
 local function _avgFromSum(sum, count)
     if type(count) ~= "number" or count <= 0 then return nil end
     if type(sum) ~= "number" or sum <= 0 then return nil end
@@ -539,6 +562,14 @@ function AnimalDataCollector:_walkBase(clusters, st, rowsLeft)
                     count = 0,
                     sumWeight = 0,
                     sumHealth = 0,
+                    sumHappiness = 0,
+                    happinessCount = 0,
+                    sumFleeceState = 0,
+                    fleeceCount = 0,
+                    shearableCount = 0,
+                    shearingCheckedCount = 0,
+                    sumFleeceLiters = 0,
+                    fleeceAmountCount = 0,
                 }
                 st.buckets[key] = b
                 st.bucketKeys[#st.bucketKeys + 1] = key
@@ -550,6 +581,27 @@ function AnimalDataCollector:_walkBase(clusters, st, rowsLeft)
             if type(h) == "number" then
                 if h <= 2 then h = h * 100 end
                 b.sumHealth = b.sumHealth + h * n2
+            end
+            -- Beans & Alpacas clusters are one animal each. Keep these DLC
+            -- readings optional so ordinary animals have no invented values.
+            if type(c.happiness) == "number" then
+                b.sumHappiness = b.sumHappiness + c.happiness * n2
+                b.happinessCount = b.happinessCount + n2
+            end
+            if type(c.fleeceState) == "number" then
+                b.sumFleeceState = b.sumFleeceState + c.fleeceState * n2
+                b.fleeceCount = b.fleeceCount + n2
+            end
+            local shearing = _readAlpacaShearing(c, st.row and st.row.ownerFarmId, subType)
+            if shearing then
+                if shearing.canBeSheared ~= nil then
+                    b.shearingCheckedCount = b.shearingCheckedCount + 1
+                    if shearing.canBeSheared then b.shearableCount = b.shearableCount + 1 end
+                end
+                if shearing.fleeceLiters ~= nil then
+                    b.sumFleeceLiters = b.sumFleeceLiters + shearing.fleeceLiters
+                    b.fleeceAmountCount = b.fleeceAmountCount + 1
+                end
             end
         end
         st.clusterIdx = st.clusterIdx + 1
@@ -696,6 +748,16 @@ function AnimalDataCollector:_finalizePen(placeable, st)
             local avgH = _avgFromSum(b.sumHealth, b.count)
             if avgW ~= nil then entry.avgWeight = avgW end
             if avgH ~= nil then entry.avgHealth = avgH end
+            if (b.happinessCount or 0) > 0 then entry.avgHappiness = b.sumHappiness / b.happinessCount end
+            if (b.fleeceCount or 0) > 0 then entry.avgFleeceState = b.sumFleeceState / b.fleeceCount end
+            if (b.shearingCheckedCount or 0) > 0 then
+                entry.shearableCount = b.shearableCount
+                if b.count == 1 then entry.canBeSheared = b.shearableCount == 1 end
+            end
+            if (b.fleeceAmountCount or 0) > 0 then
+                entry.totalFleeceLiters = b.sumFleeceLiters
+                if b.count == 1 then entry.fleeceLiters = b.sumFleeceLiters end
+            end
             if b.sumGenFert ~= nil then
                 entry.avgGenFert       = (b.count > 0) and (b.sumGenFert       / b.count) or 0
                 entry.avgGenProd       = (b.count > 0) and (b.sumGenProd       / b.count) or 0
@@ -852,7 +914,7 @@ function AnimalDataCollector:collectPenDetail(placeable)
                 local entry = {
                     id          = finalId,
                     uniqueId    = c.uniqueId,
-                    name        = c.subType or "Unknown",
+                    name        = (type(c.name) == "string" and c.name ~= "" and c.name) or c.subType or "Unknown",
                     subType     = c.subType,
                     subTypeIndex = c.subTypeIndex,
                     age         = c.age or 0,
@@ -872,6 +934,8 @@ function AnimalDataCollector:collectPenDetail(placeable)
                     fatherId    = c.fatherId,
                     birthday    = c.birthday,
                     breed       = c.breed,
+                    happiness   = type(c.happiness) == "number" and c.happiness or nil,
+                    fleeceState = type(c.fleeceState) == "number" and c.fleeceState or nil,
                 }
                 local g = c.genetics
                 if type(g) == "table" then
@@ -891,15 +955,16 @@ function AnimalDataCollector:collectPenDetail(placeable)
                 local n = (type(c.numAnimals) == "number") and c.numAnimals or 0
                 if n > 0 then
                     local subType = _resolveClusterSubType(c)
+                    local shearing = _readAlpacaShearing(c, out.ownerFarmId, subType)
                     local healthValue = c.health
                     if type(healthValue) == "number" and healthValue <= 2 then
                         healthValue = healthValue * 100
                     end
                     local finalId = husbandryKey .. ":x:" .. tostring(indexInPen)
                     indexInPen = indexInPen + 1
-                    out.animals[#out.animals + 1] = {
+                    local entry = {
                         id          = finalId,
-                        name        = (subType ~= "UNKNOWN") and subType or tostring(c.fillType or "Cluster"),
+                        name        = (type(c.name) == "string" and c.name ~= "" and c.name) or ((subType ~= "UNKNOWN") and subType or tostring(c.fillType or "Cluster")),
                         subType     = subType,
                         subTypeIndex = c.subTypeIndex,
                         age         = c.age or 0,
@@ -910,7 +975,14 @@ function AnimalDataCollector:collectPenDetail(placeable)
                         count       = n,
                         isPregnant  = c.isPregnant or false,
                         isLactating = c.isLactating or false,
+                        happiness   = type(c.happiness) == "number" and c.happiness or nil,
+                        fleeceState = type(c.fleeceState) == "number" and c.fleeceState or nil,
                     }
+                    if shearing then
+                        entry.canBeSheared = shearing.canBeSheared
+                        entry.fleeceLiters = shearing.fleeceLiters
+                    end
+                    out.animals[#out.animals + 1] = entry
                 end
             end
         end

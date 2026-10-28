@@ -24,6 +24,14 @@ const BASE_GAME_MAP_SLUGS = new Set(['mapus', 'mapeu', 'mapas']);
 /** Official DLC map packs (folder name under `<game>/pdlc/`, without `.dlc`). */
 const MAP_DLC_PACKAGE_HINTS = [
   {
+    packages: ['beansAndAlpacasPack'],
+    match(slug, title, tokens) {
+      if (tokens.includes('catuaí') || tokens.includes('catuai')) return true;
+      if (slug && (slug.includes('catuai') || slug.includes('beansandalpacas'))) return true;
+      return /catu[aá][ií]|beans\s*(?:&|and)\s*alpacas/i.test(title || '');
+    },
+  },
+  {
     packages: ['highlandsFishingPack'],
     match(slug, title, tokens) {
       if (tokens.includes('kinlaig') || tokens.includes('highland') || tokens.includes('highlands')) {

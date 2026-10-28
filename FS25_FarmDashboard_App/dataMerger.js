@@ -423,6 +423,12 @@ function xmlFieldIndicatesHarvested(xmlField) {
 function mergeFieldFruitType(luaField, xmlField) {
     const lua = (luaField.fruitType || '').toUpperCase();
     const xml = (xmlField.fruitType || '').toUpperCase();
+    const groundName = String(luaField.groundTypeName || '').toUpperCase();
+    const livePrepared = /^(STUBBLE_TILLAGE|CULTIVATED|SEEDBED|PLOWED|ROLLED_SEEDBED|RIDGE)$/.test(groundName);
+    if (livePrepared && lua === 'EMPTY' && Number(luaField.fruitTypeIndex || 0) === 0
+        && Number(luaField.growthState || 0) === 0 && luaField.harvestReady !== true) {
+        return luaField.fruitType;
+    }
     const luaWeak = !luaField.fruitType || lua === 'UNKNOWN' || lua === 'EMPTY' || lua === 'MULCHED_STUBBLE';
     const xmlKnown = xml && xml !== 'UNKNOWN';
     if (luaWeak && xmlKnown) return xmlField.fruitType;
@@ -1067,6 +1073,8 @@ function mergeDataCore(luaData, xmlData, options = {}) {
         companionPages: normalizeCompanionPages(luaData.companionPages),
         // Realistic Farming suite (soft-detect aggregates; NEW APP 5.x)
         realisticFarming: normalizeRealisticFarming(luaData.realisticFarming),
+        beansAndAlpacas: luaData.beansAndAlpacas || { enabled: false },
+        orchards: luaData.orchards || { schema: 1, available: false, rows: [] },
 
         adsSummary         : luaData.adsSummary || null,
         vehicleYearsSummary: luaData.vehicleYearsSummary || null,
@@ -1807,9 +1815,15 @@ function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
                 : !!(luaField.isWithered ?? xmlField.isWithered),
             // Lua live crop + stage counts (XML uses flat maxGrowthState=8 for all crops)
             fruitType             : mergedFruitType,
-            fruitTypeIndex        : (Number(luaField.fruitTypeIndex) > 0)
+            fruitTypeIndex        : (String(mergedFruitType || '').toUpperCase() === 'EMPTY'
+                && String(luaField.fruitType || '').toUpperCase() === 'EMPTY') ? 0
+                : (Number(luaField.fruitTypeIndex) > 0)
                 ? luaField.fruitTypeIndex
                 : xmlField.fruitTypeIndex,
+            // The save XML is a prior snapshot. Live ground wins when a parcel is
+            // cultivated after loading, including when XML still calls it meadow.
+            groundType            : luaField.groundTypeName || luaField.groundType || xmlField.groundType,
+            groundTypeName        : luaField.groundTypeName || xmlField.groundTypeName,
             growthState           : Number.isFinite(luaGs) ? luaGs : xmlField.growthState,
             maxGrowthState        : (Number.isFinite(luaMaxGs) && luaMaxGs > 0) ? luaMaxGs : xmlField.maxGrowthState,
             growthStatePercentage : (luaPct != null && luaPct !== '') ? luaPct : xmlField.growthStatePercentage,
@@ -2824,6 +2838,8 @@ function buildFromLuaOnly(lua, mapFillTypeCatalog, mapFillTypeTitles) {
         companionMods: normalizeCompanionMods(lua.companionMods),
         companionPages: normalizeCompanionPages(lua.companionPages),
         realisticFarming: normalizeRealisticFarming(lua.realisticFarming),
+        beansAndAlpacas: lua.beansAndAlpacas || { enabled: false },
+        orchards: lua.orchards || { schema: 1, available: false, rows: [] },
         adsSummary: lua.adsSummary || null,
         vehicleYearsSummary: lua.vehicleYearsSummary || null,
         mileageSummary: lua.mileageSummary || null,
@@ -2862,6 +2878,8 @@ function buildFromXmlOnly(xml) {
         vehicles: finalizeMergedVehicles(null, xml, normalizeXmlVehiclesForMerge(xml.vehicles)),
         economy: { xmlPriceHistory: xml.economy || {} },
         production: {},
+        beansAndAlpacas: { enabled: false },
+        orchards: { schema: 1, available: false, rows: [] },
         placeables: xml.placeables || [],
         xmlFarmlands: xml.farmlandsArray || [],
         xmlEconomy: xml.economy || {},

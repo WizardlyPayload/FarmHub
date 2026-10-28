@@ -3446,6 +3446,15 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
 
     data.fields = self:_mergeRfFieldEnrichment(data.fields, mc)
     data.realisticFarming = self:_assembleRealisticFarming(mc)
+    if rawget(_G, "OrchardDataCollector") and type(OrchardDataCollector.collect) == "function" then
+        local ok, result = pcall(OrchardDataCollector.collect, _G.g_currentMission)
+        data.orchards = ok and result or { schema = 1, available = false, rows = {} }
+    end
+    if rawget(_G, "BeansAlpacasDataCollector") and type(BeansAlpacasDataCollector.collect) == "function" then
+        local ok, result = pcall(BeansAlpacasDataCollector.collect,
+            _G.g_currentMission, self._companionFarmInfo)
+        data.beansAndAlpacas = ok and result or { enabled = false }
+    end
 
     _finalizeFillTypeNames(data)
 

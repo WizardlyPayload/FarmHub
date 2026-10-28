@@ -44,6 +44,31 @@ describe("farmScope", () => {
     expect(out.vehicles.map((v) => v.ownerFarmId)).toEqual([1]);
   });
 
+  test("orchard rows retain map orchards and player farms, but not other farms", () => {
+    const out = pruneMergedDataToPlayerFarms({
+      farmInfo: witcombeFarmInfo,
+      orchards: { available: true, rows: [
+        { id: "map", farmId: 0, fruitType: "BANANA" },
+        { id: "own", farmId: 1, fruitType: "GRAPE" },
+        { id: "other", farmId: 14, fruitType: "OLIVE" },
+      ] },
+    });
+    expect(out.orchards.rows.map((row) => row.id)).toEqual(["map", "own"]);
+  });
+
+  test("DLC washing capacity remains scoped to player farms", () => {
+    const out = pruneMergedDataToPlayerFarms({
+      farmInfo: witcombeFarmInfo,
+      beansAndAlpacas: {
+        enabled: true,
+        workersByFarm: { "1": { count: 1 }, "14": { count: 9 } },
+        washingCapacityByFarm: { "2": { availableLitres: 500 }, "14": { availableLitres: 9000 } },
+      },
+    });
+    expect(Object.keys(out.beansAndAlpacas.workersByFarm)).toEqual(["1"]);
+    expect(Object.keys(out.beansAndAlpacas.washingCapacityByFarm)).toEqual(["2"]);
+  });
+
   test("prune drops farm 15 production and animals", () => {
     const raw = {
       farmInfo: witcombeFarmInfo,
@@ -86,6 +111,26 @@ describe("farmScope", () => {
     expect(out.invoices.byFarm["15"]).toBeUndefined();
     expect(out.hirePurchasing.byFarm["2"]).toBeTruthy();
     expect(out.hirePurchasing.byFarm["15"]).toBeUndefined();
+  });
+
+  test("DLC worker counts stay within the selected player's farms", () => {
+    const out = pruneMergedDataToPlayerFarms({
+      farmInfo: witcombeFarmInfo,
+      beansAndAlpacas: {
+        enabled: true,
+        catuaiMap: true,
+        workersByFarm: {
+          "1": { activeWorkers: 2 },
+          "2": { activeWorkers: 3 },
+          "15": { activeWorkers: 9 },
+        },
+      },
+    });
+    expect(out.beansAndAlpacas.workersByFarm).toEqual({
+      "1": { activeWorkers: 2 },
+      "2": { activeWorkers: 3 },
+    });
+    expect(out.beansAndAlpacas.catuaiMap).toBe(true);
   });
 
   test("prune keeps hydrated husbandry when pen row lacks ownerFarmId", () => {

@@ -18,6 +18,14 @@ export interface LivestockAnimal {
   farmId?: number;
   age?: number;
   health?: number;
+  happiness?: number;
+  fleeceState?: number;
+  /** DLC visual permits shearing; does not mean the fleece is full. */
+  canBeSheared?: boolean;
+  /** ALPACAFLEECE pending fill amount returned by the DLC, in litres. */
+  fleeceLiters?: number;
+  avgHappiness?: number;
+  avgFleeceState?: number;
   weight?: number;
   gender?: string;
   subType?: string;
@@ -87,6 +95,12 @@ export interface LodCluster {
   animalType?: string;
   gender?: string;
   avgHealth?: number;
+  avgHappiness?: number;
+  avgFleeceState?: number;
+  shearableCount?: number;
+  canBeSheared?: boolean;
+  totalFleeceLiters?: number;
+  fleeceLiters?: number;
   avgWeight?: number;
   avgAgeMonths?: number;
   ageMonths?: number;

@@ -1,4 +1,6 @@
-import { t } from "@/i18n/i18n";
+import { t, tOr } from "@/i18n/i18n";
+import { formatFillQuantity } from "@/lib/fill-units";
+import { useFillPhysics, useFillUnitMode, useUnitDisplay } from "@/lib/fill-unit-mode";
 import { useFocusTrap } from "@/lib/use-focus-trap";
 import { Badge, Button } from "@/components/ui";
 import {
@@ -55,6 +57,9 @@ function reproductionDescription(animal: LivestockAnimal): string {
 }
 
 export function AnimalDetailsModal({ animal, onClose }: Props) {
+  const fillMode = useFillUnitMode();
+  const fillPhysics = useFillPhysics();
+  const unitDisplay = useUnitDisplay();
   const trapRef = useFocusTrap(true, onClose);
   const earTag = displayAnimalEarTag(animal);
   const titleName = animal.name || t("livestock.nameFallback", { id: earTag });
@@ -62,6 +67,14 @@ export function AnimalDetailsModal({ animal, onClose }: Props) {
   const valueInfo = calculateAnimalValue(animal);
   const breakdown = valueInfo.breakdown;
   const pregnancy = animal.isPregnant ? getPregnancyEstimate(animal) : null;
+  const happiness = Number(animal.happiness ?? animal.avgHappiness);
+  const fleece = Number(animal.fleeceState ?? animal.avgFleeceState);
+  const hasHappiness = (animal.happiness != null || animal.avgHappiness != null) && Number.isFinite(happiness);
+  const hasFleece = (animal.fleeceState != null || animal.avgFleeceState != null) && Number.isFinite(fleece);
+  const isAlpaca = String(animal.subType ?? "").toUpperCase().startsWith("ALPACA");
+  const hasShearingStatus = isAlpaca && typeof animal.canBeSheared === "boolean";
+  const fleeceLiters = animal.fleeceLiters;
+  const hasFleeceAmount = isAlpaca && typeof fleeceLiters === "number" && Number.isFinite(fleeceLiters) && fleeceLiters >= 0;
 
   return (
     <div class="fd-modal-backdrop" role="presentation" onClick={onClose}>
@@ -154,6 +167,30 @@ export function AnimalDetailsModal({ animal, onClose }: Props) {
                   <td>{t("livestock.labelWeight")}</td>
                   <td>{formatWeight(animal, 0)}</td>
                 </tr>
+                {hasHappiness ? (
+                  <tr>
+                    <td>{t("livestock.alpacaHappiness")}</td>
+                    <td>{Math.round(Math.max(0, Math.min(100, happiness)))}%</td>
+                  </tr>
+                ) : null}
+                {hasFleece ? (
+                  <tr>
+                    <td>{t("livestock.alpacaFleece")}</td>
+                    <td>{Math.round(Math.max(0, Math.min(100, fleece)))}%</td>
+                  </tr>
+                ) : null}
+                {hasShearingStatus ? (
+                  <tr>
+                    <td>{tOr("livestock.alpacaCanBeSheared", "Can be sheared")}</td>
+                    <td>{yesNo(animal.canBeSheared === true)}</td>
+                  </tr>
+                ) : null}
+                {hasFleeceAmount ? (
+                  <tr>
+                    <td>{tOr("livestock.alpacaFleeceAmount", "Fleece amount")}</td>
+                    <td>{formatFillQuantity(fleeceLiters, "ALPACAFLEECE", fillMode, fillPhysics, unitDisplay)}</td>
+                  </tr>
+                ) : null}
                 <tr>
                   <td>{t("livestock.labelReproduction")}</td>
                   <td>{rate.toFixed(2)}x</td>

@@ -33,6 +33,7 @@ g_currentMission = { getFarmId=function() return 1 end, missionInfo={ savegameDi
 local fruits = {
     [2]={ index=2, name="WHEAT", title="Wheat", numGrowthStates=5 },
     [3]={ index=3, name="GRASS", title="Grass", numGrowthStates=5 },
+    [4]={ index=4, name="MEADOW", title="Meadow", numGrowthStates=5 },
 }
 g_fruitTypeManager = { getFruitTypeByIndex=function(_, i) return fruits[i] end }
 local calls = { probe=0, field=0 }
@@ -45,13 +46,17 @@ local function point(kind, x, z)
     local empty = scenario == "empty"
     local delayedCrop = scenario == "unowned"
     local splitCrop = scenario == "center"
+    local cultivatedMeadow = scenario == "cultivatedMeadow"
+    local outsidePrepared = scenario == "outsidePrepared"
+    local innerPrepared = cultivatedMeadow and not center and math.abs(x - 100) < 23 and math.abs(z - 100) < 23
+    local otherFieldPrepared = outsidePrepared and (math.abs(x - 100) > 20 or math.abs(z - 100) > 20)
     return {
-        fruitTypeIndex = empty and 0 or (delayedCrop and (x > 120 and 3 or 0) or (splitCrop and (center and 2 or 3) or (grass and 3 or 2))),
+        fruitTypeIndex = empty and 0 or ((cultivatedMeadow or outsidePrepared) and ((innerPrepared or otherFieldPrepared) and 0 or 4) or (delayedCrop and (x > 120 and 3 or 0) or (splitCrop and (center and 2 or 3) or (grass and 3 or 2)))),
         growthState = grass and (center and 4 or (x < 80 and 2 or 5)) or (empty and 0 or 3),
         sprayLevel = 2, plowLevel=1, limeLevel=1,
         weedState = x < 80 and 4 or (kind == "field" and 2 or 1),
-        stubbleShredLevel = x < 80 and (kind == "field" and 5 or 3) or 1,
-        groundType=empty and 3 or 8,
+        stubbleShredLevel = (cultivatedMeadow or outsidePrepared) and 0 or (x < 80 and (kind == "field" and 5 or 3) or 1),
+        groundType=(cultivatedMeadow or outsidePrepared) and ((innerPrepared or otherFieldPrepared) and 3 or 1) or (empty and 3 or 8),
         rollerLevel = kind == "field" and (z > 130 and 1 or 0.2) or 0.3,
         stoneLevel = kind == "field" and (x < 80 and 9 or 1) or (x < 80 and 6 or 2),
         waterLevel = kind == "field" and (x < 80 and 0.9 or 0.1) or (x < 80 and 0.7 or 0.2),
@@ -132,6 +137,29 @@ eq(grass.fruitTypeIndex, 3, "center grass")
 eq(grass.growthState, 2, "mixed grass minimum")
 uniqueOnce("probe", 14)
 uniqueOnce("field", 14)
+`)).toBe("ok");
+});
+
+test("owned cultivated field is not labelled meadow from surrounding forage", () => {
+    expect(run(`
+scenario = "cultivatedMeadow"
+local f = modEnv.FieldDataCollector:collect()[1]
+eq(f.fruitTypeIndex, 0, "prepared field crop")
+eq(f.fruitType, "empty", "prepared field fruit")
+eq(f.groundType, 3, "cultivated ground")
+eq(f.groundTypeName, "CULTIVATED", "ground label")
+eq(f.stateName, "Cultivated", "field status")
+`)).toBe("ok");
+});
+
+test("prepared ground outside this field's polygon does not clear a real meadow", () => {
+    expect(run(`
+scenario = "outsidePrepared"
+field.densityMapPolygon = { pointsX={90, 110, 110, 90}, pointsZ={90, 90, 110, 110} }
+local f = modEnv.FieldDataCollector:collect()[1]
+eq(f.fruitTypeIndex, 4, "meadow crop stays")
+eq(f.fruitType, "MEADOW", "meadow label stays")
+eq(f.groundType, 1, "meadow ground")
 `)).toBe("ok");
 });
 

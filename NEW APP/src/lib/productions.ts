@@ -123,7 +123,7 @@ export function getChainsForFarmView(
   return merged;
 }
 
-/** Format storage level: FS often uses liters; some buffers use 0–1 fill ratio */
+/** Production storage getFillLevels() values are litres, including values below 1 L. */
 export function formatFillAmount(
   v: unknown,
   fillKey?: unknown,
@@ -133,7 +133,6 @@ export function formatFillAmount(
 ): string {
   const n = Number(v);
   if (!Number.isFinite(n)) return "—";
-  if (n >= 0 && n <= 1.0001) return `${(n * 100).toFixed(0)}%`;
   if (mode === "british" || mode === "imperial") {
     return formatFillQuantity(n, fillKey, mode, physics, unitDisplay);
   }
@@ -157,6 +156,33 @@ function humanizeFillKey(raw: string): string {
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+const productionTitlesByEconomy = new WeakMap<EconomyLike, Map<string, string>>();
+
+function productionFillTitle(raw: string, economy: EconomyLike | null | undefined): string | null {
+  if (!economy) return null;
+  const catalog = economy.fillTypeCatalog || economy.marketPrices?.fillTypesByIndex;
+  const titles = economy.fillTypeTitles || economy.marketPrices?.fillTypeTitles;
+  if (!catalog || !titles) return null;
+
+  if (/^\d+$/.test(raw)) {
+    const direct = titles[raw];
+    return typeof direct === "string" && direct.trim() ? direct.trim() : null;
+  }
+
+  let byCode = productionTitlesByEconomy.get(economy);
+  if (!byCode) {
+    byCode = new Map<string, string>();
+    for (const [index, code] of Object.entries(catalog)) {
+      const title = titles[index];
+      if (typeof code === "string" && typeof title === "string" && title.trim()) {
+        byCode.set(code.toUpperCase(), title.trim());
+      }
+    }
+    productionTitlesByEconomy.set(economy, byCode);
+  }
+  return byCode.get(raw.toUpperCase()) || null;
+}
+
 /** Resolve sparse fill-type keys (index or enum name) to a readable label. */
 export function formatProductionFillLabel(
   rawKey: string,
@@ -168,6 +194,14 @@ export function formatProductionFillLabel(
   if (mode === "british") {
     const renamed = britishLabel(raw);
     if (renamed) return renamed;
+  }
+  const title = productionFillTitle(raw, economy);
+  if (title) {
+    if (mode === "british") {
+      const renamed = britishLabel(title);
+      if (renamed) return renamed;
+    }
+    return title;
   }
   if (/^\d+$/.test(raw) && economy) {
     const fromEcon = lookupFillTypeNameFromEconomy(Number(raw), economy);

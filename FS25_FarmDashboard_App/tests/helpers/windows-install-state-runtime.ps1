@@ -98,6 +98,10 @@ if ($Case -eq 'native-partial') {
 if ($Case -eq 'native-wrong-version') {
     $script:records[$uninstallKey].DisplayVersion = '5.0.0'
 }
+if ($Case -eq 'native-previous-version') {
+    $script:records[$uninstallKey].DisplayName = 'FS25 Farm Dashboard V5 5.0.0'
+    $script:records[$uninstallKey].DisplayVersion = '5.0.0'
+}
 $errorText = $null
 try {
     Register-FarmDashNativeInstallation $fixture $scope '5.0.1' 1234

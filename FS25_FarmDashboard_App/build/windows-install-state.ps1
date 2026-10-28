@@ -155,9 +155,15 @@ function Register-FarmDashNativeInstallation([string]$Directory, [string]$Instal
         if ($null -eq $existingName -or $null -eq $existingCommand) {
             throw 'The existing V5 Windows uninstall entry is incomplete.'
         }
+        # During an in-place upgrade the previous Windows-visible entry can
+        # survive until after customInstall. NSIS may update only its own
+        # private registry view. The exact uninstall command proves this is
+        # the same installation; update just the two version labels through
+        # the native provider, leaving the key and uninstall command intact.
         if ($existingName -ne $display -or
             (Read-FarmDashNativeString $InstallScope 'Uninstall' 'DisplayVersion') -ne $AppVersion) {
-            throw 'The V5 native uninstall entry has the wrong version.'
+            Write-FarmDashNativeValue $InstallScope 'Uninstall' 'DisplayVersion' $AppVersion
+            Write-FarmDashNativeValue $InstallScope 'Uninstall' 'DisplayName' $display
         }
     }
     Write-FarmDashNativeValue $InstallScope 'Install' 'InstallLocation' $full
@@ -184,6 +190,7 @@ function Register-FarmDashNativeInstallation([string]$Directory, [string]$Instal
         Write-FarmDashNativeValue $InstallScope 'Uninstall' 'DisplayName' $display
     }
     if ((Read-FarmDashNativeString $InstallScope 'Uninstall' 'DisplayName') -ne $display -or
+        (Read-FarmDashNativeString $InstallScope 'Uninstall' 'DisplayVersion') -ne $AppVersion -or
         (Read-FarmDashNativeString $InstallScope 'Uninstall' 'UninstallString') -ne $command -or
         (Read-FarmDashNativeString $InstallScope 'Install' 'InstallLocation') -ne $full) {
         throw 'Windows cannot read back the V5 installation registration. Setup must not report success.'

@@ -66,10 +66,20 @@ test('a partial Windows uninstall entry is refused rather than overwritten', opt
   assert.match(state.error, /incomplete/);
   assert.equal(state.uninstallWrites, 0);
 });
-test('a stale native uninstall version is refused rather than overwritten', options, () => {
+test('a prior V5 version at the same uninstall path upgrades its visible labels', options, () => {
+  const state = run('native-previous-version');
+  assert.equal(state.error, null);
+  const key = Object.keys(state.records).find(key => key.includes('\\Uninstall\\'));
+  assert.equal(state.records[key].DisplayName, 'FS25 Farm Dashboard V5 5.0.1');
+  assert.equal(state.records[key].DisplayVersion, '5.0.1');
+  assert.equal(state.uninstallWrites, 2);
+});
+test('a mismatched version label is repaired on the same verified installation', options, () => {
   const state = run('native-wrong-version');
-  assert.match(state.error, /wrong version/);
-  assert.equal(state.uninstallWrites, 0);
+  assert.equal(state.error, null);
+  const key = Object.keys(state.records).find(key => key.includes('\\Uninstall\\'));
+  assert.equal(state.records[key].DisplayVersion, '5.0.1');
+  assert.equal(state.uninstallWrites, 2);
 });
 test('a successful write invisible to Windows fails setup', options, () => {
   assert.match(run('invisible-write').error, /cannot read back/);

@@ -1,6 +1,6 @@
 # Farm Dashboard V5 5.2.7 — release handoff
 
-**Status:** accepted local 5.2.7 candidate, not yet published. Public GitHub, itch and website remain at 5.2.0 until the publication sequence is completed. App 5.2.7 is a dependency-only successor to the 5.2.6 functional candidate. The exact 5.2.7 installer passed PC and Ally install/launch plus Ally Keep-data uninstall/reinstall; the bounded DLC gameplay proof is on 5.2.6 with the same byte-identical game mod. Do not describe this file as proof that public downloads have changed.
+**Status (29 October 2026):** V5 5.2.7 is published on GitHub and itch.io. The website deployment is with Sarah under `SARAH-20261029-005`; do not call the website updated until she reports a successful public readback. App 5.2.7 is a dependency-only successor to the 5.2.6 functional candidate. The exact 5.2.7 installer passed PC and Ally install/launch plus Ally Keep-data uninstall/reinstall; the bounded DLC gameplay proof is on 5.2.6 with the same byte-identical game mod.
 
 ## Exact candidate
 
@@ -12,7 +12,7 @@ Flat local drop: `C:\Users\Graham\Documents\FarmDash Release\`.
 | `FS25_FarmDashboard.zip` | 470,369 bytes | `9D51ACA937BE74D42427923A8A3FE78F44DF2FE34D6B3C5770B1ABD2779A1064` |
 | `farmdashboard-website-5.2.7-upload.zip` | 311,635,063 bytes | `751B6E0972A7467D95D51CE0D490C4B0D7A529EE9E6491EF2E0458F4CF0BA5BC` |
 
-The installer SHA-512 for the V5 update feed is `t1mW36q2WjRTTkdx+LJ5+xxsLStxK/Mb5xOYuj9B/TDClIi5JtuQ7Lda7i+KzNqtFNVNzCtMNfWGc3kDwO+j6w==`. A separate `latest-rf-5.2.7.yml` is staged locally. The public/local `latest-rf.yml` remains at 5.2.0 until publication. Never substitute the V4 `latest.yml`.
+The installer SHA-512 for the V5 update feed is `t1mW36q2WjRTTkdx+LJ5+xxsLStxK/Mb5xOYuj9B/TDClIi5JtuQ7Lda7i+KzNqtFNVNzCtMNfWGc3kDwO+j6w==`. The public GitHub `releases/latest/download/latest-rf.yml` was fetched back on 29 October and matched the staged 5.2.7 feed SHA-256 `2E94AFFBA3A09A2824C634693543C0E54447CE1E2A81B917C90BC5E539468631`. Never substitute the V4 `latest.yml`.
 
 The website package is a local successor to the verified 5.2.0 public package. It has 183 entries, passes ZIP CRC, contains no tester `/t/` paths or installers, and every referenced screenshot resolves. It includes the 5.2.6 core/companion screenshots and four new Catuaí 5.2.7 captures. Existing scroll/detail shots remain where there is no equivalent new capture; do not claim an exhaustive 5.2.7 website image recapture. Sarah must independently back up and validate the target before deployment.
 
@@ -36,3 +36,11 @@ Detailed observations and source limits: [DLC coverage audit](../DLC-COVERAGE-AU
 5. Verify public website, download links, update feed, version labels and images as a visitor. Publish community posts after those links work.
 
 Record the actual commit, CI runs, public URLs, asset hashes, itch fetches, Sarah's acknowledgement/result, and website readback **after** each action. Do not pre-fill success.
+
+## Publication record — 29 October 2026
+
+- Source and release notes were pushed to `main` at `289f43860ba2af8eced9060a54a93de676e57536`. [CI run 40878968143](https://github.com/WizardlyPayload/FarmHub/actions/runs/40878968143) passed on that exact commit.
+- [GitHub v5.2.7](https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.2.7) was published as latest at 13:17 UTC. The tag targets the same commit. All four assets were downloaded from the release and their SHA-256 hashes matched the local installer, blockmap, canonical mod ZIP and V5 update feed.
+- itch.io `windows-v5` build `2243560` reports app 5.2.7; `mod-v5` build `2243621` reports mod 5.1.0.12. Both channels were fetched back with Butler. The installer readback was 384,055,994 bytes with SHA-256 `B204BAF48DA9F24B16D52FCF564A569CAC7447E27E5C910B655B7DFEB8996884`; the inner `FS25_FarmDashboard.zip` was 470,369 bytes with SHA-256 `9D51ACA937BE74D42427923A8A3FE78F44DF2FE34D6B3C5770B1ABD2779A1064`. The mod channel also contains `INSTALL.txt` so Butler preserves the canonical inner ZIP instead of unpacking it.
+- The [public itch page](https://wizardlypayload.itch.io/farm-dashobaord-fs25) and installation instructions were read back with app 5.2.7, mod 5.1.0.12 and the versioned GitHub link. Its existing embedded screenshots still show earlier V5 screens. The current 5.2.7 Catuaí screenshots are in the website package; itch image upload remains pending because the connected Chrome extension does not allow local file uploads. Do not call itch screenshot refresh complete.
+- Sarah acknowledged the read-only website preflight under `SARAH-20261029-002/003` at 10:18 GMT and independently verified the exact 311,635,063-byte package SHA-256 `751B6E0972A7467D95D51CE0D490C4B0D7A529EE9E6491EF2E0458F4CF0BA5BC`, 183-entry CRC, free space and protected tester path. After Graham's final release go-ahead, `SARAH-20261029-005` requested the bounded public deployment. An inbox entry is not an ACK or completion; record Sarah's RESULT and public website readback below when received.

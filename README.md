@@ -1,10 +1,10 @@
 # FS25 Farm Dashboard
 
-Farm Dashboard is a free Windows companion app and in-game mod for Farming Simulator 25. It brings fields, vehicles, livestock, storage, economy, productions, and supported companion-mod data into one dashboard outside the game.
+Farm Dashboard is a free Windows companion app and in-game mod for Farming Simulator 25. It brings fields, orchards, vehicles, livestock, storage, economy, productions, and supported DLC and companion-mod data into one dashboard outside the game.
 
 ## Get started
 
-The `main` branch contains the **V5 app 5.2.0** and the matching, unchanged **5.1.0.9** game mod. V5 is now the repository's default development and build line. Check [GitHub Releases](https://github.com/WizardlyPayload/FarmHub/releases) for the available download and its version before installing. Keep the app and mod from the same release together.
+The `main` branch contains the **V5 app 5.2.7** and matching **5.1.0.12** game mod. V5 is the repository's default development and build line. Download the matching files from [GitHub v5.2.7](https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.2.7) or the [itch.io V5 page](https://wizardlypayload.itch.io/farm-dashobaord-fs25). Keep the app and mod from the same release together.
 
 1. Download the V5 Windows installer and **`FS25_FarmDashboard.zip`** from the same release.
 2. Put the ZIP, under that exact filename, in `Documents\My Games\FarmingSimulator2025\mods\`. Enable it for the save. Dedicated multiplayer needs the matching mod on the server and clients.
@@ -14,11 +14,11 @@ Read the [V5 installation guide](docs/v5%20documents/INSTALL.md) for first launc
 
 ## Current V5 screens
 
-These full-resolution images were captured from the installed V5 5.1.17 app displaying **held demo-save snapshots**. The later 5.1.18 update changed packaged dependencies, and 5.2.0 changes the release version; the screens shown here were not recaptured. They do not claim live gameplay at capture time. See the [screenshot notes](docs/v5%20documents/SCREENSHOTS.md) for provenance and remaining capture gaps.
+These full-resolution Catuaí images were captured from the installed V5 5.2.7 app at 1920 × 1080. They show the dashboard source state; the game was not operated for the captures. Other manual screenshots have their own version and data provenance in the [screenshot notes](docs/v5%20documents/SCREENSHOTS.md).
 
-![V5 overview on a held base-game save](docs/v5%20documents/doc-screenshots/current-5057/base-overview.png)
+![V5 5.2.7 Catuaí save overview](docs/v5%20documents/doc-screenshots/current-527/catua-overview.png)
 
-![V5 fields on a held RF and companion-mod save](docs/v5%20documents/doc-screenshots/current-5057/suite-fields.png)
+![V5 5.2.7 Catuaí Orchards page](docs/v5%20documents/doc-screenshots/current-527/catua-orchards.png)
 
 ## What it covers
 
@@ -37,6 +37,6 @@ This repository continues [Josh Walki's original FarmDashboard](https://github.c
 
 ## Building from source
 
-The V5 installer and game mod are separate artifacts. From the repository root, `npm run build:all` (or `npm run build:all:v5`) builds the UI, canonical mod ZIP, and V5 installer. The explicit `build:all:classic` command remains for historical V4 builds. V5 writes `latest-rf.yml`; classic V4 uses `latest.yml`. Do not publish one line's update metadata over the other. The nested app's `package.json` retains classic 4.x metadata; the V5 packaging overlay stamps the current V5 installer as 5.2.0.
+The V5 installer and game mod are separate artifacts. From the repository root, `npm run build:all` (or `npm run build:all:v5`) builds the UI, canonical mod ZIP, and V5 installer. The explicit `build:all:classic` command remains for historical V4 builds. V5 writes `latest-rf.yml`; classic V4 uses `latest.yml`. Do not publish one line's update metadata over the other. The nested app's `package.json` retains classic 4.x metadata; the V5 packaging overlay stamps the current V5 installer as 5.2.7.
 
 Development and release guidance lives in [docs](docs/README.md) and [tools](tools/README.md). For help, use [GitHub Issues](https://github.com/WizardlyPayload/FarmHub/issues) or [Discord](https://discord.gg/ZCG9C7h7aT).

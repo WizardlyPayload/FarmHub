@@ -7,7 +7,7 @@ Butler lives at `%USERPROFILE%\tools\butler\butler.exe` (login saved locally).
 
 ## Channels
 
-This is the 5.2.7 publication recipe. Use the flat `Documents\FarmDash Release\` drop, then verify both public channel downloads and update the page copy.
+5.2.7 is live on both V5 channels. The public page copy and install instructions were updated and read back on 29 October 2026. The classic V4 files remain separate.
 
 | Channel | Version | Public download name (itch wraps butler builds) |
 |---------|---------|--------------------------------------------------|
@@ -16,18 +16,20 @@ This is the 5.2.7 publication recipe. Use the flat `Documents\FarmDash Release\`
 
 Keep the existing **classic V4 Setup**. Do not make it the default.
 
-Re-push:
+For a future re-push, stage the exact installer in `windows-v5` and stage the canonical `FS25_FarmDashboard.zip` **alongside `INSTALL.txt`** in `mod-v5`. Butler treats a directory containing only one ZIP as a container and unpacks its contents; the second file makes Butler preserve the inner game ZIP. This was verified by fetching build `2243621` and hashing its inner ZIP.
+
+Example (only after verifying the staged hashes):
 
 ```
-butler push --userversion 5.2.7 --assume-yes "%TEMP%\farmdash-itch-v5-527\windows-v5" wizardlypayload/farm-dashobaord-fs25:windows-v5
-butler push --userversion 5.1.0.12 --assume-yes "%TEMP%\farmdash-itch-v5-527\mod-v5" wizardlypayload/farm-dashobaord-fs25:mod-v5
+butler push --userversion 5.2.7 --assume-yes "%TEMP%\farmdash-publish-527\windows-v5" wizardlypayload/farm-dashobaord-fs25:windows-v5
+butler push --userversion 5.1.0.12 --assume-yes "%TEMP%\farmdash-publish-527\mod-v5" wizardlypayload/farm-dashobaord-fs25:mod-v5
 ```
 
-itch.io **strips off-site `<img>`** on the public page. Upload fresh `doc-screenshots/current-526/base-overview.png`, `suite-fields.png` and `suite-map.png` with **Add image**, then replace the older fixed `img.itch.zone` image URLs in the candidate description before saving it. Check the public gallery in a logged-out browser; a local file or website-hosted URL is not proof that itch will render the new image.
+itch.io **strips off-site `<img>`** on the public page. The description still embeds earlier V5 screenshots; current 5.2.7 Catuaí screenshots are in the website package. The Chrome extension's file-upload control refused local files until its separate local-file permission is enabled, so this image refresh remains pending. Upload the four `doc-screenshots/current-527/catua-*.png` images through **Add image**, replace the older `img.itch.zone` URLs, then check the public gallery in a logged-out browser. Do not claim this step is complete until the public images render.
 
-## Text still to paste in the itch editor
+## Published page copy
 
-1. **Description** → `<>` HTML mode → paste `docs/_internal/itch-io-page-description-5.2.7.html` (from the first `<p>` through the footer), after replacing its older image URLs with new hosted ones.
-2. **Installation instructions** → `<>` HTML mode → paste `docs/_internal/itch-io-install-instructions-5.2.7.html`.
-3. Short description: `FS25 Farm Dashboard V5 — new screens. Classic V4 still available — you do not have to switch.`
-4. Uploads: mark `windows-v5` the **default Windows** download.
+1. **Description:** prepared 5.2.7 HTML was saved in the itch editor and verified on the public page. Its screenshot URLs remain the earlier V5 images, as above.
+2. **Installation instructions:** prepared 5.2.7 HTML was saved and read back. The public text links to GitHub v5.2.7 and names the exact setup and mod versions.
+3. **Short description:** `FS25 Farm Dashboard V5 5.2.7 — live fields, orchards, fleet, animals and supported DLC and companion mod data.`
+4. **Uploads:** `windows-v5` build `2243560` is app 5.2.7 and `mod-v5` build `2243621` is mod 5.1.0.12. Butler readback hashes matched the local installer and canonical inner mod ZIP. The public page displays the V5 Windows download first. The older V4 files were not changed.

@@ -13,14 +13,14 @@ Older PNGs directly under `doc-screenshots/` remain as **older V5 illustrations*
 - `pf-fields.png`: Montana Precision Farming field example.
 - `mod-<id>.png`: all 20 dedicated third-party companion pages for which a demo source exists. The [optional-mod guide](COMPANION_MODS.md) links the relevant image next to the mod.
 
-![Current base overview](doc-screenshots/current-526/base-overview.png)
+![Installed 5.2.7 Catuaí overview](doc-screenshots/current-527/catua-overview.png)
 
 `capture-current-help.cjs` uses a headless browser against port 8768. It does **not** launch FS25, change saves, expose credentials, or take over the visible PC screen. The chosen slots are `savegame4` (base), `savegame10` (RF plus companions), `savegame18` (PF plus companions), `savegame19` (RF plus ADS), and `savegame3` (fluctuating diesel). If a required source is absent, the script stops instead of substituting another save.
 
-## Manual images still needed before publication
+## Manual images still needed
 
 - Genuine **5.2.6 installer welcome and finished** screens suitable for public use; the private Ally acceptance evidence includes the installer flow, but those desktop captures have not been added to this guide.
-- Full-screen **Orchards and new DLC cards** on a suitable loaded save. The private PC/Ally acceptance evidence verifies their function, but the public demo sources used by this capture set do not expose all of them.
+- The full-screen **Orchards** page is captured in [`current-527/catua-orchards.png`](doc-screenshots/current-527/catua-orchards.png). Full-screen **Highlands Fishing, Pumps N' Hoses and Emergency Pack** cards on a suitably loaded save remain to be captured for the public manual.
 - A **clean first launch** with no old sources or visible passwords.
 - The **new multiplayer link/re-pair** prompt and selected MP source, with private details redacted.
 - **Tablet LAN** sign-in and portrait dashboard, without a visible password.

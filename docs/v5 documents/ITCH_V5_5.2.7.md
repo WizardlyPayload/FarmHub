@@ -25,11 +25,11 @@ butler push --userversion 5.2.7 --assume-yes "%TEMP%\farmdash-publish-527\window
 butler push --userversion 5.1.0.12 --assume-yes "%TEMP%\farmdash-publish-527\mod-v5" wizardlypayload/farm-dashobaord-fs25:mod-v5
 ```
 
-itch.io **strips off-site `<img>`** on the public page. The description still embeds earlier V5 screenshots; current 5.2.7 Catuaí screenshots are in the website package. The Chrome extension's file-upload control refused local files until its separate local-file permission is enabled, so this image refresh remains pending. Upload the four `doc-screenshots/current-527/catua-*.png` images through **Add image**, replace the older `img.itch.zone` URLs, then check the public gallery in a logged-out browser. Do not claim this step is complete until the public images render.
+The public screenshot gallery now contains four current full-screen 5.2.7 Catuaí captures from `doc-screenshots/current-527`: Save overview, Orchards, Productions, and Fleet map, in that order. The public page was read back after saving and showed four gallery image links. The old embedded V5 figures had malformed markup in itch's rich-text editor, so the description was replaced from the clean `docs/_internal/itch-io-page-description-5.2.7.html` source and saved while HTML mode remained open. It now describes the gallery and links to the current README and manual without embedding older images. The pre-repair public HTML is backed up in the flat release folder as `ITCH-DESCRIPTION-BEFORE-GALLERY-5.2.7.html`; the public proof screenshot is `ITCH-GALLERY-PUBLIC-5.2.7.png`.
 
 ## Published page copy
 
-1. **Description:** prepared 5.2.7 HTML was saved in the itch editor and verified on the public page. Its screenshot URLs remain the earlier V5 images, as above.
+1. **Description:** prepared 5.2.7 HTML was saved in the itch editor and verified on the public page. Its current screenshot gallery and text match the 5.2.7 release; the earlier embedded image blocks were removed.
 2. **Installation instructions:** prepared 5.2.7 HTML was saved and read back. The public text links to GitHub v5.2.7 and names the exact setup and mod versions.
 3. **Short description:** `FS25 Farm Dashboard V5 5.2.7 — live fields, orchards, fleet, animals and supported DLC and companion mod data.`
 4. **Uploads:** `windows-v5` build `2243560` is app 5.2.7 and `mod-v5` build `2243621` is mod 5.1.0.12. Butler readback hashes matched the local installer and canonical inner mod ZIP. The public page displays the V5 Windows download first. The older V4 files were not changed.

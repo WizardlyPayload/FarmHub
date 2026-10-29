@@ -30,7 +30,7 @@ One warning as a client enters the world can recover. Watch for **later committe
 
 Check whether the save loaded **Precision Farming** or **Soil Fertilizer**. They are alternative soil sources, not additive passes. Organic matter is a 0-10 reading. A genuinely unavailable value should say unavailable, not zero. Record field number, map, crop, source mod and a same-moment game/dashboard screenshot. A held snapshot may simply predate the last fieldwork.
 
-![RF field example](doc-screenshots/current-5057/suite-fields.png)
+![RF field example](doc-screenshots/current-526/suite-fields.png)
 
 ## Companion mods are missing
 

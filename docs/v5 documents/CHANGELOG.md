@@ -6,6 +6,16 @@ Player-facing history for the **V5 / new screens** line. Classic 4.x notes stay 
 
 ---
 
+## 5.2.6 / 5.1.0.12 — accepted candidate (2026-10-28, not yet public)
+
+- Added read-only Orchards support for base-game grapes and olives and Beans & Alpacas banana and coffee orchards. Coffee rows on Catuaí now follow the ownership of their farmland, including parcels 88, 89, 90, 91, 92 and 105; the exact installed pair passed the saved PC Catuaí check.
+- Added bounded Highlands Fishing, Pumps N' Hoses and Emergency Pack overview cards. A card appears only when its DLC is loaded for that save; zero or unknown state is labelled rather than invented. The Ally checked the visible and hidden states, Kinlaig map image and committed exports. Nonzero DLC mechanics and every possible mod combination remain outside that acceptance.
+- Corrected DLC production fill names and small-volume units, resolved Catuaí and Kinlaig map images without loading their full archives, and fixed native Windows registration during a V5 upgrade. The exact 5.2.6 installer passed Ally Keep-data uninstall/reinstall, with one Windows row after installation and linked sources retained.
+- Refreshed the core and companion help images at 1920 x 1080 from the installed 5.2.6 app. They show held demo exports. Settings images remain from 5.1.17 until a clean 5.2.6 Electron capture is available.
+- A newly saved local game currently needs **Settings > Servers & saves > Auto-Detect Local Saves**, then **Save**, before it appears in the dashboard. This is documented in the installation guide.
+
+---
+
 ## 5.2.0 / 5.1.0.9 — public release (2026-10-26)
 
 - Publishes the tested V5 dashboard under app version 5.2.0. The in-game mod remains the byte-tested 5.1.0.9 ZIP; no game collector or multiplayer-stream code changed for this release number.

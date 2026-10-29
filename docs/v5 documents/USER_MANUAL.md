@@ -1,10 +1,10 @@
 # Farm Dashboard V5: using your farm screens
 
-This manual describes the **5.2.0 Windows app / 5.1.0.9 game mod**. If the dashboard is not installed yet, start with [Install V5](INSTALL.md). Optional mods are described individually in [Optional mods](COMPANION_MODS.md).
+This manual describes the **5.2.6 Windows app / 5.1.0.12 game mod candidate**. If the dashboard is not installed yet, start with [Install V5](INSTALL.md). Optional mods are described individually in [Optional mods](COMPANION_MODS.md).
 
 Farm Dashboard is an **out-of-game, read-only companion**. It does not replace FS25's menus or control your farm. The game mod exports data, and the Windows app turns that data into pages you can use on another screen.
 
-![Current V5 base overview](doc-screenshots/current-5057/base-overview.png)
+![Current V5 base overview](doc-screenshots/current-526/base-overview.png)
 
 *Current installed V5 UI using a held Riverbend demo snapshot. A held picture is not live gameplay.*
 
@@ -35,7 +35,7 @@ The main sidebar always has **Save overview, Fields, Vehicles, Pastures, Product
 
 Use this for a quick farm check: money, fields needing work, harvest-ready land, animals, fleet warnings, storage, production and optional-mod signals. Click a block to go deeper. A missing optional chip can simply mean that mod is not loaded on this save.
 
-![RF and companion overview](doc-screenshots/current-5057/suite-overview.png)
+![RF and companion overview](doc-screenshots/current-526/suite-overview.png)
 
 ### Fields
 
@@ -43,62 +43,64 @@ Filter to **All, Harvest ready, Needs work, Growing, or Empty**. Search and sort
 
 Nitrogen, pH/lime, moisture and other soil bars need careful reading. Precision Farming and Soil Fertilizer are **alternative** sources; the dashboard should not add them together. Organic matter from Soil Fertilizer is a **0-10 reading**, not a percentage. If a soil value is missing, the app should say unavailable instead of inventing a zero. Field merges follow the same GPS-painted field, plus any groups you deliberately create; two neighbours with the same crop are not automatically one card.
 
-![Base fields](doc-screenshots/current-5057/base-fields.png)
+![Base fields](doc-screenshots/current-526/base-fields.png)
 
-![Precision Farming fields](doc-screenshots/current-5057/pf-fields.png)
+![Precision Farming fields](doc-screenshots/current-526/pf-fields.png)
 
-![RF fields](doc-screenshots/current-5057/suite-fields.png)
+![RF fields](doc-screenshots/current-526/suite-fields.png)
 
 ### Vehicles
 
 Use the fleet filters for type, fuel, condition, or attention. A vehicle can show hours, damage, fuel and position when exported. Shop images are optional; a missing picture does not mean the machine is missing. Courseplay, mileage, model years, punctures, collision damage and other companions can add readings **only when present**. The ADS workshop is a separate mod-gated page.
 
-![Vehicles on the RF demo](doc-screenshots/current-5057/suite-vehicles.png)
+![Vehicles on the RF demo](doc-screenshots/current-526/suite-vehicles.png)
 
 ### Pastures and animals
 
 Pastures is the V5 home for animal pens and livestock. Choose a pen for head count, feed, water, condition and animal details. Dairy Core adds dairy readings only when loaded. A count in a pasture summary can differ from a vehicle or store row count because these are different game objects, not duplicates.
 
-![Pastures on the RF demo](doc-screenshots/current-5057/suite-pastures.png)
+![Pastures on the RF demo](doc-screenshots/current-526/suite-pastures.png)
 
 ### Productions
 
 See your owned production chains, their running state, inputs and outputs. Optional Production Watcher warnings or profit estimates are read-only. A production list can be empty because you own none, a collector is off, or the last export is incomplete; Health helps distinguish these cases.
 
-![Productions on the demo save](doc-screenshots/current-5057/suite-productions.png)
+![Productions on the demo save](doc-screenshots/current-526/suite-productions.png)
 
 ### Storage
 
 Find silo and bunker amounts, bales, pallets and big bags. The **Fertilizer Depot** reading is its production-hall stock, not the small walk-in shop book. Companion readings such as RealSilo compartments or pallet wear appear only with those mods. Litres, weights and prices can follow a loaded unit mod; do not compare two screenshots until their units match.
 
-![Storage on the RF demo](doc-screenshots/current-5057/suite-storage.png)
+![Storage on the RF demo](doc-screenshots/current-526/suite-storage.png)
 
 ### Economy
 
 See money, loans, prices, purchases and optional RF money blocks. Some RF tax, income, worker or NPC readings are shared/global in the underlying mod; the dashboard cannot turn them into a genuinely farm-specific total. Optional loan and market cards are information only: buying, borrowing and price changes happen in FS25.
 
-![Economy on the RF demo](doc-screenshots/current-5057/suite-economy.png)
+![Economy on the RF demo](doc-screenshots/current-526/suite-economy.png)
 
 ### Fleet map
 
 Use the map to find exported vehicles and places against the save's overview image. Filters and layers help with crops, growth, ownership and soil where the source supplies them. If pins appear on the wrong map, check the selected save first; never reuse another map's cached image as proof of your current farm.
 
-![Current fleet map example](doc-screenshots/current-5057/suite-map.png)
+![Current fleet map example](doc-screenshots/current-526/suite-map.png)
 
 ## Optional mod pages
 
 The sidebar can add **Red Tape, ADS, Invoices, Hire purchase, NPC Favor, World Events, Pro Staff, Fertilizer Depot**, and dedicated third-party companion pages. It should not show dead tabs for unloaded mods. Some information is folded into Fields, Vehicles, Pastures, Productions, Storage, or Economy instead of getting its own tab.
 
-![ADS page](doc-screenshots/current-5057/suite-ads.png)
+The **Orchards** page brings grapes and olives together with supported expansion crops such as coffee and bananas when those orchards are present. It groups rows by farm ownership; an orchard crossing land owned by different farms is marked as partly owned rather than claimed entirely. Highlands Fishing, Pumps N' Hoses and Emergency Pack add small cards to Save overview only when their DLC is loaded in the selected save. The cards show the measurements the game exposes; a zero or unavailable value is not a claim that work was completed. See [Optional mods](COMPANION_MODS.md) for each card's limits.
 
-![NPC Favor page](doc-screenshots/current-5057/suite-npcfavor.png)
+![ADS page](doc-screenshots/current-526/suite-ads.png)
+
+![NPC Favor page](doc-screenshots/current-526/suite-npcfavor.png)
 
 [Optional mods](COMPANION_MODS.md) gives the exact level of support for every catalogued mod and screenshots of all dedicated companion pages available in the demo saves. Do not assume that a detected mod has a complete live panel.
 
 ## Settings, in plain English
 
 - **Dashboard:** hide/show core sections, choose the first page, and set field exclusions or deliberate field groups. These are display choices, not edits to a game save.
-- **Servers & saves:** add/remove Local or FTP sources; manage LAN access; use Auto-detect or open Server Manager. A dedicated join-as-client source is linked by the game/app flow, not by guessing a `mirror_<slot>` folder.
+- **Servers & saves:** add/remove Local or FTP sources; manage LAN access; use Auto-detect or open Server Manager. After creating a new local save, run **Auto-Detect Local Saves** and **Save** to add it to the Saves list. A dedicated join-as-client source is linked by the game/app flow, not by guessing a `mirror_<slot>` folder.
 - **FS25 mod:** collector timing and data modules. Changes to game-mod collection can require a save reload; changing display settings should not silently rewrite the game mod's `config.xml`.
 - **Appearance:** language and theme. V5 already uses the new interface; classic V4 is a separate Windows installation.
 - **Health:** last completed export, source status, compatibility and errors. This is the first stop for waiting/stale or missing companion data.

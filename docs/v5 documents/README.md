@@ -4,8 +4,8 @@ This is the help pack for the **V5 Windows dashboard**. Start with [installation
 
 ## Which version?
 
-- **Repository target:** Windows app **5.2.0** with the canonical `FS25_FarmDashboard.zip` mod **5.1.0.9**. The mod is unchanged from the 5.1.18 candidate. Use matching files from one [release](https://github.com/WizardlyPayload/FarmHub/releases).
-- **Acceptance boundary:** exact app 5.1.18 passed PC and Ally launch, background rendering, one Windows Installed apps row, and Keep uninstall/reinstall with saves and mod settings protected. The unchanged 5.1.0.9 mod passed PC, Ally, dedicated multiplayer, and heavy-save checks. App 5.2.0 changes the release version and has its own package verification; see the [release handoff](RELEASE_DAY_v5.2.0.md) for exact installed checks.
+- **Repository target:** Windows app **5.2.6** with the canonical `FS25_FarmDashboard.zip` mod **5.1.0.12**. Use matching files from one [release](https://github.com/WizardlyPayload/FarmHub/releases); the public 5.2.0 release remains available while this candidate is prepared.
+- **Acceptance boundary:** the exact 5.2.6/5.1.0.12 pair passed the PC Catuaí orchard check and bounded Ally installation, DLC, map, image, and Keep uninstall/reinstall checks. See the [DLC acceptance record](../DLC-COVERAGE-AUDIT-2026-10-28.md) for what was observed and what was not.
 - **Classic V4:** a separate product line. Its public 4.2.1 story and update feed have not been changed. This V5 pass was **not** a new V4 test.
 
 ## Find the answer you need
@@ -20,8 +20,8 @@ This is the help pack for the **V5 Windows dashboard**. Start with [installation
 
 The dashboard **reads** game and companion data. It does not plant, buy, repair, or change another mod's settings. The Farm Dashboard mod works without the optional suite.
 
-![V5 overview from the base-game demo save](doc-screenshots/current-5057/base-overview.png)
+![V5 overview from the base-game demo save](doc-screenshots/current-526/base-overview.png)
 
-*Installed V5 5.1.17 showing a held demo save. The later dependency and version updates did not change this screen. Held means saved data, not live gameplay.*
+*Installed V5 5.2.6 showing a held Riverbend demo save at 1920 × 1080. Held means saved data, not live gameplay.*
 
 Screenshots in this pack must not expose FTP passwords, pairing secrets, or private player details.

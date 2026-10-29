@@ -1,6 +1,6 @@
 # Settings and companion-mod pages (V5)
 
-The pictures were taken from the installed 5.1.17 desktop app at 1920 x 1080. App 5.1.18 changed packaged dependencies and 5.2.0 changed the release version, so these screens were not recaptured. The demo saves are examples; your farm's numbers, visible mods and available sections will differ. Private names, addresses, paths and typed values are hidden in the Settings pictures. Nothing in this guide requires changing a working save.
+The core and companion-page pictures were refreshed from the installed 5.2.6 app in a headless 1920 × 1080 browser viewport. The **Settings** pictures remain from the installed 5.1.17 desktop app, so labels and layout may differ. The demo saves are examples; your farm's numbers, visible mods and available sections will differ. Private names, addresses, paths and typed values are hidden in the Settings pictures. Nothing in this guide requires changing a working save.
 
 ## Find the right data first
 
@@ -69,89 +69,89 @@ The dashboard has **20 dedicated companion pages**. They appear under **MODS** w
 
 **Enhanced Loan System:** Open the page to see open loans, outstanding debt, monthly payments, lending room and bank settings. Use it to understand the loans already in the save, not to apply for a loan. Example: demo save 10.
 
-![Enhanced Loan System](doc-screenshots/current-5057/mod-enhancedLoanSystem.png)
+![Enhanced Loan System](doc-screenshots/current-526/mod-enhancedLoanSystem.png)
 
 **I Need A Loan:** Read the credit line used, available offers, where the mod is active and its settings. If no offer is shown, check the mod in-game rather than assuming the dashboard can create one. Example: demo save 18.
 
-![I Need A Loan](doc-screenshots/current-5057/mod-iNeedALoan.png)
+![I Need A Loan](doc-screenshots/current-526/mod-iNeedALoan.png)
 
 **Automatic Loan Repay:** Check the next repayment run and configured rules. This is a status view, not a manual repayment button. Example: demo save 18.
 
-![Automatic Loan Repay](doc-screenshots/current-5057/mod-automaticLoanRepay.png)
+![Automatic Loan Repay](doc-screenshots/current-526/mod-automaticLoanRepay.png)
 
 **Realistic Diesel Price:** Compare the displayed regional presets and current region information. It is a read-only price explanation; game purchases still happen in FS25. Example: demo save 10.
 
-![Realistic Diesel Price](doc-screenshots/current-5057/mod-realisticDieselPrice.png)
+![Realistic Diesel Price](doc-screenshots/current-526/mod-realisticDieselPrice.png)
 
 **Fluctuating Diesel Price:** Read the current price, its range when known and prices observed during this dashboard session. This mod does not provide a durable price history, so an empty or short history is not necessarily a fault. Example: demo save 3.
 
-![Fluctuating Diesel Price](doc-screenshots/current-5057/mod-fluctuatingDieselPrice.png)
+![Fluctuating Diesel Price](doc-screenshots/current-526/mod-fluctuatingDieselPrice.png)
 
 **Dynamic Market:** Compare market groups, seasonal price curves, station sell pressure and favourite products. A price trend is advice for planning, not a guaranteed sale price. Example: demo save 10.
 
-![Dynamic Market](doc-screenshots/current-5057/mod-dynamicMarket.png)
+![Dynamic Market](doc-screenshots/current-526/mod-dynamicMarket.png)
 
 **Better Contracts:** Read active contracts, higher-paying offers, offer types and NPC standing. Take and complete contracts in the game; the dashboard does not accept them for you. Example: demo save 10.
 
-![Better Contracts](doc-screenshots/current-5057/mod-betterContracts.png)
+![Better Contracts](doc-screenshots/current-526/mod-betterContracts.png)
 
 ### Animals
 
 **Seasonal Milk Production:** Check the yearly output pattern, milking pens and mod settings to plan around seasonal changes. Example: demo save 10.
 
-![Seasonal Milk Production](doc-screenshots/current-5057/mod-seasonalMilkProduction.png)
+![Seasonal Milk Production](doc-screenshots/current-526/mod-seasonalMilkProduction.png)
 
 **Seasonal Wool Production:** Check the shearing schedule, sheep pens and mod settings. The schedule describes the mod's rules; it does not shear animals from the dashboard. Example: demo save 10.
 
-![Seasonal Wool Production](doc-screenshots/current-5057/mod-seasonalWoolProduction.png)
+![Seasonal Wool Production](doc-screenshots/current-526/mod-seasonalWoolProduction.png)
 
 **Realistic Animal Losses:** Review pen risk, loss rules and the old-age threshold. Treat this as a warning/overview, not a prediction that a particular animal will die. Example: demo save 18.
 
-![Realistic Animal Losses](doc-screenshots/current-5057/mod-realisticAnimalLosses.png)
+![Realistic Animal Losses](doc-screenshots/current-526/mod-realisticAnimalLosses.png)
 
 **Animal Food Overview:** Compare feed by animal type. Use the game to load or buy feed; this page does not move inventory. Example: demo save 18.
 
-![Animal Food Overview](doc-screenshots/current-5057/mod-animalFoodOverview.png)
+![Animal Food Overview](doc-screenshots/current-526/mod-animalFoodOverview.png)
 
 **Animal Food Calculator:** Review pens, settings and game values the mod adjusts. This is different from Animal Food Overview: it explains calculated needs and adjustments rather than only listing feed. Example: demo save 18.
 
-![Animal Food Calculator](doc-screenshots/current-5057/mod-animalFoodCalculator.png)
+![Animal Food Calculator](doc-screenshots/current-526/mod-animalFoodCalculator.png)
 
 ### Production and storage
 
 **Factory Profit Calculator:** Review estimated monthly profit by production line. Check actual prices, inputs and running status in-game before treating an estimate as guaranteed income. Example: demo save 18.
 
-![Factory Profit Calculator](doc-screenshots/current-5057/mod-factoryProfitCalculator.png)
+![Factory Profit Calculator](doc-screenshots/current-526/mod-factoryProfitCalculator.png)
 
 **Pallet Degradation:** See pallets by condition and by contents. This helps identify goods at risk but does not protect or move pallets. Example: demo save 10.
 
-![Pallet Degradation](doc-screenshots/current-5057/mod-palletDegradation.png)
+![Pallet Degradation](doc-screenshots/current-526/mod-palletDegradation.png)
 
 **RealSilo:** See the detected silo and its mod-specific information. Check the in-game silo for any physical fill or operation changes. Example: demo save 10.
 
-![RealSilo](doc-screenshots/current-5057/mod-realSilo.png)
+![RealSilo](doc-screenshots/current-526/mod-realSilo.png)
 
 ### Fields and crops
 
 **Restricted Periods:** Read closed periods by fertiliser and the spreaders loaded in your fleet. Check the date and rules before scheduling application. Example: demo save 10.
 
-![Restricted Periods](doc-screenshots/current-5057/mod-restrictedPeriods.png)
+![Restricted Periods](doc-screenshots/current-526/mod-restrictedPeriods.png)
 
 **Regional Crop Calendar:** Check planting and harvest windows, region profile and rain/drought balance. The map and active mods decide what really grows in your save. Example: demo save 10.
 
-![Regional Crop Calendar](doc-screenshots/current-5057/mod-regionalCropCalendar.png)
+![Regional Crop Calendar](doc-screenshots/current-526/mod-regionalCropCalendar.png)
 
 **Moisture System:** Review harvest moisture, stored crops, weather-exposed bales, irrigation contractors and forecast. Scroll down: this is one of the longest pages. Example: demo save 18.
 
-![Moisture System](doc-screenshots/current-5057/mod-moistureSystem.png)
+![Moisture System](doc-screenshots/current-526/mod-moistureSystem.png)
 
 **Field Leasing:** Review current leases, charges and lease settings. Buy, lease or end land arrangements in-game rather than expecting this page to perform the transaction. Example: demo save 18.
 
-![Field Leasing](doc-screenshots/current-5057/mod-fieldLeasing.png)
+![Field Leasing](doc-screenshots/current-526/mod-fieldLeasing.png)
 
 **Smart Crop Control:** Read crop keep chances, controlled crop groups and NPC field summaries. Scroll down for the full groups and field list. These are mod rules and observations, not a promise of a crop on any one field. Example: demo save 18.
 
-![Smart Crop Control](doc-screenshots/current-5057/mod-smartCropControl.png)
+![Smart Crop Control](doc-screenshots/current-526/mod-smartCropControl.png)
 
 ## Companions without a dedicated page
 

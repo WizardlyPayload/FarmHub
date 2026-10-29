@@ -1,0 +1,42 @@
+[
+  {
+    "file": "catua-overview.png",
+    "slot": "savegame17",
+    "source": "My game save — Catuaí",
+    "route": "overview",
+    "width": 1920,
+    "height": 1080,
+    "sourceState": "snapshot",
+    "capturedAt": "2026-10-29T02:18:20.073Z"
+  },
+  {
+    "file": "catua-orchards.png",
+    "slot": "savegame17",
+    "source": "My game save — Catuaí",
+    "route": "orchards",
+    "width": 1920,
+    "height": 1080,
+    "sourceState": "snapshot",
+    "capturedAt": "2026-10-29T02:18:22.377Z"
+  },
+  {
+    "file": "catua-productions.png",
+    "slot": "savegame17",
+    "source": "My game save — Catuaí",
+    "route": "productions",
+    "width": 1920,
+    "height": 1080,
+    "sourceState": "snapshot",
+    "capturedAt": "2026-10-29T02:18:24.744Z"
+  },
+  {
+    "file": "catua-map.png",
+    "slot": "savegame17",
+    "source": "My game save — Catuaí",
+    "route": "map",
+    "width": 1920,
+    "height": 1080,
+    "sourceState": "snapshot",
+    "capturedAt": "2026-10-29T02:18:27.817Z"
+  }
+]

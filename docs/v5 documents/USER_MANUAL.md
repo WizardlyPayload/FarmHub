@@ -1,6 +1,6 @@
 # Farm Dashboard V5: using your farm screens
 
-This manual describes the **5.2.6 Windows app / 5.1.0.12 game mod candidate**. If the dashboard is not installed yet, start with [Install V5](INSTALL.md). Optional mods are described individually in [Optional mods](COMPANION_MODS.md).
+This manual describes the **5.2.7 Windows app / 5.1.0.12 game mod candidate**. If the dashboard is not installed yet, start with [Install V5](INSTALL.md). Optional mods are described individually in [Optional mods](COMPANION_MODS.md).
 
 Farm Dashboard is an **out-of-game, read-only companion**. It does not replace FS25's menus or control your farm. The game mod exports data, and the Windows app turns that data into pages you can use on another screen.
 
@@ -90,6 +90,12 @@ Use the map to find exported vehicles and places against the save's overview ima
 The sidebar can add **Red Tape, ADS, Invoices, Hire purchase, NPC Favor, World Events, Pro Staff, Fertilizer Depot**, and dedicated third-party companion pages. It should not show dead tabs for unloaded mods. Some information is folded into Fields, Vehicles, Pastures, Productions, Storage, or Economy instead of getting its own tab.
 
 The **Orchards** page brings grapes and olives together with supported expansion crops such as coffee and bananas when those orchards are present. It groups rows by farm ownership; an orchard crossing land owned by different farms is marked as partly owned rather than claimed entirely. Highlands Fishing, Pumps N' Hoses and Emergency Pack add small cards to Save overview only when their DLC is loaded in the selected save. The cards show the measurements the game exposes; a zero or unavailable value is not a claim that work was completed. See [Optional mods](COMPANION_MODS.md) for each card's limits.
+
+![Owned coffee and banana orchards on Catuaí](doc-screenshots/current-527/catua-orchards.png)
+
+*Installed 5.2.7 app, Catuaí save, 1920 × 1080. This shows the recorded orchard state at capture time; it does not change or inspect the save in-game.*
+
+![Catuaí fleet map image](doc-screenshots/current-527/catua-map.png)
 
 ![ADS page](doc-screenshots/current-526/suite-ads.png)
 

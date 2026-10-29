@@ -2,7 +2,7 @@
 
 Farm Dashboard has **two parts**: `FS25_FarmDashboard.zip` runs inside Farming Simulator 25 and exports farm data; the V5 Windows app displays it. Install both. Keep the ZIP's exact name so FS25 sees **one** Farm Dashboard mod, not two entries.
 
-> This guide describes the **5.2.6 app / 5.1.0.12 mod candidate**. Download both matching files from the same release when 5.2.6 is published; until then the public 5.2.0 download remains the current release.
+> This guide describes the **5.2.7 app / 5.1.0.12 mod candidate**. Download both matching files from the same release when 5.2.7 is published; until then the public 5.2.0 download remains the current release.
 
 ![The canonical Farm Dashboard ZIP in the FS25 mods folder](doc-screenshots/fd-install-010-mod-folder.png)
 
@@ -19,7 +19,7 @@ The game normally writes under `Documents\My Games\FarmingSimulator2025\modSetti
 
 ## 2. Install the Windows app
 
-Run `FS25-Farm-Dashboard-V5-Setup-5.2.6.exe` from the matching V5 release, then launch **Farm Dashboard V5** from the Start menu. Installed V5 normally uses `http://127.0.0.1:8768` on this PC.
+Run `FS25-Farm-Dashboard-V5-Setup-5.2.7.exe` from the matching V5 release, then launch **Farm Dashboard V5** from the Start menu. Installed V5 normally uses `http://127.0.0.1:8768` on this PC.
 
 Mod-image import is optional. If an optional ImageMagick step fails, the dashboard can still show farm data; use its built-in conversion path or return to images later. Do not install ImageMagick just to make first launch work.
 

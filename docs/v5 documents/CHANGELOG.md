@@ -6,6 +6,14 @@ Player-facing history for the **V5 / new screens** line. Classic 4.x notes stay 
 
 ---
 
+## 5.2.7 / 5.1.0.12 — prepared candidate (2026-10-29, not yet public)
+
+- Updated the packaged `qs` dependency to 6.16.1 after the GitHub security advisory for 6.16.0. This is an app-only packaging change; the canonical game-mod ZIP remains 5.1.0.12 with the same SHA-256.
+- Installed the exact 5.2.7 candidate on the PC: one native V5 Windows entry, retained profile hash, app launch and live local API version. Captured Catuaí overview, Orchards, Productions and Fleet map images at 1920 × 1080 from this installed app without operating the game.
+- The complete Ally install, DLC card, map and Keep-data uninstall/reinstall acceptance was on exact app 5.2.6 and the same mod ZIP. No exact 5.2.7 Ally lifecycle result is claimed here.
+
+---
+
 ## 5.2.6 / 5.1.0.12 — accepted candidate (2026-10-28, not yet public)
 
 - Added read-only Orchards support for base-game grapes and olives and Beans & Alpacas banana and coffee orchards. Coffee rows on Catuaí now follow the ownership of their farmland, including parcels 88, 89, 90, 91, 92 and 105; the exact installed pair passed the saved PC Catuaí check.

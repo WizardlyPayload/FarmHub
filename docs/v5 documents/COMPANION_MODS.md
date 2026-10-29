@@ -2,7 +2,7 @@
 
 You need only **FS25 Farm Dashboard** for the normal dashboard. The following are **optional**. A companion appears only when FS25 loaded it for the selected save; leaving a ZIP in the mods folder is not enough. Each reader is intended to work independently, so one missing or failed mod does not require another to be switched on.
 
-These descriptions target **V5 app 5.2.6 / game mod 5.1.0.12**. Optional panels appear only when their mods are loaded; no companion is required for the base dashboard. Screenshots of held demo saves illustrate layout and recorded data, not a live gameplay test of every possible mod combination.
+These descriptions target **V5 app 5.2.7 / game mod 5.1.0.12**. Optional panels appear only when their mods are loaded; no companion is required for the base dashboard. Screenshots of held demo saves illustrate layout and recorded data, not a live gameplay test of every possible mod combination.
 
 ## Read the labels first
 
@@ -29,6 +29,10 @@ The dashboard never buys, sells, repairs, borrows, leases, alters production, or
 - **Pumps N' Hoses — limited live card:** shows owned vehicle pumps, how many are switched on and how many are circulating. These counts do **not** measure delivered slurry or prove a hose connection. The card hides when the pack is unchecked; its data is independent of Emergency Pack.
 - **Emergency Pack — limited live card:** shows the current incident state when the pack is loaded. “No incident” is the observed empty state; the dashboard does not start or resolve incidents. The card hides when the pack is unchecked.
 - **Beans & Alpacas Pack — dedicated and folded views:** Orchards brings coffee and banana rows alongside base-game grapes and olives, including supported worker, washing-capacity, disease and frost information when the game supplies it. Pastures and animal details can show alpaca fleece/shearing data. A fruit-wide pending frost warning is not proof that a particular orchard is damaged. The dashboard does not hire workers or treat sick rows.
+
+![Beans & Alpacas coffee and banana orchards on Catuaí](doc-screenshots/current-527/catua-orchards.png)
+
+*Full-window capture from the installed 5.2.7 app using the Catuaí save's recorded data. The game was not operated for this screenshot.*
 - **Other DLC maps, crops and productions:** the normal Fields, Pastures, Productions, Storage and Fleet map pages can display exported data where the game supplies it. Map images are resolved per save; a map's presence does not imply a dedicated card for every DLC feature. See [the DLC coverage record](../DLC-COVERAGE-AUDIT-2026-10-28.md) for measured coverage and gaps.
 
 The PC Catuaí run confirmed purchased coffee parcels appear under **Your orchards**. The Ally runs confirmed Kinlaig's map image, the Highlands zero card, and independent Pumps N' Hoses and Emergency Pack visibility. These tests do not prove every nonzero DLC mechanic or every possible mod combination.

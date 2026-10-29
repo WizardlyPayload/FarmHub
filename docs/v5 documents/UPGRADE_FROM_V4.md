@@ -10,6 +10,6 @@
 
 ![V5 base overview](doc-screenshots/current-526/base-overview.png)
 
-The October 2026 candidate was tested for **V5**. It was **not** a fresh V4 compatibility test against mod 5.1.0.12, so this guide does not promise that classic has been rebuilt or retested. If you want to return to V4, uninstall V5 through Installed apps while keeping your saves. Do not remove V4 or its settings as part of a V5 test.
+The October 2026 release was tested for **V5**. It was **not** a fresh V4 compatibility test against mod 5.1.0.12, so this guide does not promise that classic has been rebuilt or retested. If you want to return to V4, uninstall V5 through Installed apps while keeping your saves. Do not remove V4 or its settings as part of a V5 test.
 
 For dedicated servers, use a matching canonical mod on the server and clients, then [link the multiplayer source](INSTALL.md#dedicated-multiplayer-join-as-a-client) or use FTP. Never copy a live server export into an unrelated single-player slot.

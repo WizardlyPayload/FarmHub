@@ -27,8 +27,7 @@ A detected mod with an empty block does **not** prove its gameplay failed. The d
 
 ## Versions and release boundary
 
-- **Prepared V5 candidate:** app **5.2.7**, mod **5.1.0.12**, canonical ZIP `FS25_FarmDashboard.zip`. The exact 5.2.6 pair passed bounded PC Catuaí and Ally DLC gameplay checks. The app-only 5.2.7 dependency update passed PC install/launch and an exact-installer Ally install/Keep-data uninstall/reinstall with one native Windows row and retained sources; Tina restored the Ally originals. No new 5.2.7 game load was needed because the mod ZIP is byte-identical. See the [DLC acceptance record](../DLC-COVERAGE-AUDIT-2026-10-28.md) for the observed gameplay results and limits.
-- **Current public V5 release:** app **5.2.0**, mod **5.1.0.9**, until the prepared candidate is published. Download both files from the same public release.
+- **Current V5 release:** app **5.2.7**, mod **5.1.0.12**, canonical ZIP `FS25_FarmDashboard.zip`. The exact 5.2.6 pair passed bounded PC Catuaí and Ally DLC gameplay checks. The app-only 5.2.7 dependency update passed PC install/launch and an exact-installer Ally install/Keep-data uninstall/reinstall with one native Windows row and retained sources; Tina restored the Ally originals. No new 5.2.7 game load was needed because the mod ZIP is byte-identical. Download both files from the same release. See the [DLC acceptance record](../DLC-COVERAGE-AUDIT-2026-10-28.md) for the observed gameplay results and limits.
 - **Public V5 listing:** use the versions displayed on the actual download page.
 - **Classic V4:** public **4.2.1** remains separate on **8766** and its own `latest.yml`. V5 uses **8768** and `latest-rf.yml`.
 - V4 was **not retested** against mod 5.1.0.12 during this V5 pass. Do not infer a V4 compatibility result from it.

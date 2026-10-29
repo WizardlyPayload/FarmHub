@@ -2,11 +2,11 @@
 
 Player-facing history for the **V5 / new screens** line. Classic 4.x notes stay in [`../CHANGELOG.md`](../CHANGELOG.md).
 
-**Current V5 release:** app **5.2.0**, mod **5.1.0.9**. Use the two files from the same release. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
+**Current V5 release:** app **5.2.7**, mod **5.1.0.12**. Use the two files from the same release. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
 
 ---
 
-## 5.2.7 / 5.1.0.12 — prepared candidate (2026-10-29, not yet public)
+## 5.2.7 / 5.1.0.12 — release (2026-10-29)
 
 - Updated the packaged `qs` dependency to 6.16.1 after the GitHub security advisory for 6.16.0. This is an app-only packaging change; the canonical game-mod ZIP remains 5.1.0.12 with the same SHA-256.
 - Installed the exact 5.2.7 candidate on the PC: one native V5 Windows entry, retained profile hash, app launch and live local API version. Captured Catuaí overview, Orchards, Productions and Fleet map images at 1920 × 1080 from this installed app without operating the game.

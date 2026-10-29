@@ -10,7 +10,7 @@ Farm Dashboard shows your save's fields, vehicles, animals, productions, storage
 - **Orchards** shows grapes and olives as well as supported banana and coffee orchards. On Catuaí, coffee rows now reflect ownership of their farmland instead of appearing unowned after purchase.
 - **DLC summaries** add honest, read-only Highlands Fishing, Pumps N' Hoses and Emergency Pack cards when those packs are loaded. A zero-state card does not claim that fishing, slurry delivery or an incident has occurred.
 - **Productions and maps** display DLC fill names and small volumes correctly and load Catuaí and Kinlaig map images without reading their entire DLC archives into memory.
-- **Windows upgrades** correctly refresh the single Installed apps entry. The 5.2.6 Keep-data uninstall and reinstall path was exercised on a second Windows machine, with linked sources retained. The 5.2.7 app also updates its packaged `qs` dependency to 6.16.1 and passed the PC install/launch check.
+- **Windows upgrades** correctly refresh the single Installed apps entry. The exact 5.2.7 installer passed PC and Ally installation, and its native Keep-data uninstall and reinstall retained linked sources on the Ally.
 
 ## Install or upgrade
 

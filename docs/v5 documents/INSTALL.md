@@ -2,7 +2,7 @@
 
 Farm Dashboard has **two parts**: `FS25_FarmDashboard.zip` runs inside Farming Simulator 25 and exports farm data; the V5 Windows app displays it. Install both. Keep the ZIP's exact name so FS25 sees **one** Farm Dashboard mod, not two entries.
 
-> This guide describes the **5.2.7 app / 5.1.0.12 mod candidate**. Download both matching files from the same release when 5.2.7 is published; until then the public 5.2.0 download remains the current release.
+> This guide describes the **5.2.7 app / 5.1.0.12 mod release**. Download both matching files from the same V5 release.
 
 ![The canonical Farm Dashboard ZIP in the FS25 mods folder](doc-screenshots/fd-install-010-mod-folder.png)
 

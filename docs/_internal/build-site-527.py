@@ -19,6 +19,18 @@ IMAGE_NAMES = ("catua-overview.png", "catua-orchards.png", "catua-productions.pn
 
 def update_text(name: str, data: bytes) -> bytes:
     text = data.decode("utf-8").replace("5.2.6", "5.2.7")
+    if name.endswith(".html") and "js/site-shell.js" in text:
+        current = 'js/site-shell.js?v=5.2.7"'
+        prior_cache_key = 'js/site-shell.js?v=5.2.7.1"'
+        if text.count(current) + text.count(prior_cache_key) != 1:
+            raise RuntimeError(f"Cannot locate unique footer script URL: {name}")
+        text = text.replace(prior_cache_key, 'js/site-shell.js?v=5.2.7-footer-1"')
+        text = text.replace(current, 'js/site-shell.js?v=5.2.7-footer-1"')
+    if name == "js/site-shell.js":
+        old = '<a href="${manual}">Classic V4 manual</a>'
+        if text.count(old) != 1:
+            raise RuntimeError("Cannot locate the incorrect footer manual label")
+        text = text.replace(old, '<a href="${manual}">V5 manual</a>')
     if name == "index.html":
         anchor = '    <section class="section section--compact" id="from-v4">'
         if text.count(anchor) != 1:

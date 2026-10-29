@@ -30,13 +30,13 @@ Prefer the classic dashboard? V4 4.2.1 stays separate on GitHub; V5 will not rep
 
 The app is free/pay-what-you-want. The installer is unsigned, so Windows may show a publisher warning; please do not disable Windows security to use it.
 
-Suggested image: `docs/v5 documents/doc-screenshots/current-526/suite-overview.png`.
+Suggested image: `docs/v5 documents/doc-screenshots/current-527/catua-overview.png`.
 
 ## Other FS25 mod Discords: short, permission-conscious
 
 Creator/maintainer post, if announcements are allowed: I have released **FS25 Farm Dashboard V5 5.2.7** (Windows app) with mod **5.1.0.12**. It puts live fields, fleet, animals, storage, economy and a fleet map on a second screen. Vanilla FS25 plus the dashboard mod is enough; optional mod panels appear only when those mods are loaded. It is free/pay-what-you-want, and classic V4 remains available separately. Install both matching V5 files from https://wizardlypayload.itch.io/farm-dashobaord-fs25. Full guide: https://www.farmdashboard.co.uk/install.html. Happy to answer compatibility questions here if that fits this server's rules.
 
-Suggested image: `docs/v5 documents/doc-screenshots/current-526/base-overview.png`.
+Suggested image: `docs/v5 documents/doc-screenshots/current-527/catua-overview.png`.
 
 ## Realistic Farming or companion-mod Discords
 
@@ -48,13 +48,13 @@ Suggested image: `docs/v5 documents/doc-screenshots/current-526/suite-redtape.pn
 
 FS25 server admins: Farm Dashboard V5 5.2.7 can show a dedicated farm outside the game. Install the canonical `FS25_FarmDashboard.zip` mod 5.1.0.12 on the save authority and matching clients. While joined, the dashboard can use join-as-client Local mode; Advanced FTP remains available for unattended/headless setups. A held snapshot is not a live server. The Windows app and mod are separate downloads from https://wizardlypayload.itch.io/farm-dashobaord-fs25. Setup instructions: https://www.farmdashboard.co.uk/install.html. Classic V4 remains separate.
 
-Suggested image: `docs/v5 documents/doc-screenshots/current-526/suite-overview.png`.
+Suggested image: `docs/v5 documents/doc-screenshots/current-527/catua-overview.png`.
 
 ## Streamer or creator Discords
 
 I have a free/pay-what-you-want FS25 companion dashboard for a second screen: Farm Dashboard V5 5.2.7. It shows the current save's fields, machines, animals, storage and economy, with a fleet map and optional panels when supported mods are loaded. It is a local Windows app plus one in-game mod; no cloud account is required for the normal local setup. Download and guide: https://www.farmdashboard.co.uk/install.html. If your community allows creator tools, I would love to hear what information is most useful while streaming.
 
-Suggested image: `docs/v5 documents/doc-screenshots/current-526/suite-overview.png`.
+Suggested image: `docs/v5 documents/doc-screenshots/current-527/catua-overview.png`.
 
 ## itch.io devlog
 
@@ -68,7 +68,7 @@ If you are upgrading, close FS25, replace the previous dashboard mod with the si
 
 Classic V4 remains available separately. This V5 release does not replace your V4 install through its updater. Thank you for the reports and screenshots that helped refine the dashboard. If you spot a problem, include the app/mod versions and the save type so we can reproduce it. The project is free/pay-what-you-want; optional support is appreciated, never required.
 
-Suggested images: `docs/v5 documents/doc-screenshots/current-526/suite-overview.png`, `docs/v5 documents/doc-screenshots/current-526/suite-fields.png`, `docs/v5 documents/doc-screenshots/current-526/suite-map.png`.
+Suggested images: `docs/v5 documents/doc-screenshots/current-527/catua-overview.png`, `docs/v5 documents/doc-screenshots/current-527/catua-orchards.png`, `docs/v5 documents/doc-screenshots/current-527/catua-map.png`.
 
 ## Reddit post, only where self-promotion is allowed
 
@@ -78,19 +78,19 @@ Disclosure: I maintain Farm Dashboard. It is a Windows app plus one FS25 mod tha
 
 The app is free/pay-what-you-want. V5 5.2.7 uses mod 5.1.0.12; classic V4 remains separate. Here is the install guide and screenshots: https://www.farmdashboard.co.uk/install.html. If links are not allowed here, I can put the download in a comment or remove the link. I would welcome feedback on what data is most useful outside the game.
 
-Suggested image: `docs/v5 documents/doc-screenshots/current-526/base-overview.png`.
+Suggested image: `docs/v5 documents/doc-screenshots/current-527/catua-overview.png`.
 
 ## Facebook group post
 
 Farm Dashboard V5 5.2.7 is available for Farming Simulator 25. It is a Windows desktop dashboard plus an in-game mod, showing your live fields, vehicles, animals, storage, economy and fleet map while you play. The base game is enough; optional supported mods add panels when loaded. It is free/pay-what-you-want, and classic V4 stays available separately. Download and setup guide: https://www.farmdashboard.co.uk/install.html. Please check the group's mod-link rules before posting.
 
-Suggested image: `docs/v5 documents/doc-screenshots/current-526/suite-overview.png`.
+Suggested image: `docs/v5 documents/doc-screenshots/current-527/catua-overview.png`.
 
 ## YouTube Community post
 
 Farm Dashboard V5 5.2.7 is out for FS25. Live fields, vehicles, animals, storage, economy and fleet map on a second screen; the base game works without companion mods. The matching mod is 5.1.0.12. Free/pay-what-you-want download and setup: https://www.farmdashboard.co.uk/install.html. Classic V4 remains available separately. What farm info would you want visible while playing?
 
-Suggested image: `docs/v5 documents/doc-screenshots/current-526/base-overview.png`.
+Suggested image: `docs/v5 documents/doc-screenshots/current-527/catua-overview.png`.
 
 ## Short social post (Bluesky/X)
 

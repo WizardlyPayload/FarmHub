@@ -161,6 +161,12 @@ function runWrapper(t, texconvFiles, args, productLine) {
     'v5-release-stage.mjs']) {
     fs.copyFileSync(path.join(toolsAppDir, name), path.join(tools, name));
   }
+  // This fixture isolates texconv gating. The real wrapper also imports the
+  // independently tested DLC map-reader guard, which has no binary in this
+  // throwaway tree. Supply an explicit passing stub so import resolution and
+  // the next build-stage assertions exercise the intended path.
+  fs.writeFileSync(path.join(tools, 'verify-v5-bundled-map-extractor.mjs'),
+    "export function inspectBundledMapExtractor() { return { ok: true }; }\n");
   // This suite isolates the texconv preflight. A valid binary must reach the next
   // V5 build stage, but the throwaway tree intentionally has no real UI sources.
   fs.writeFileSync(path.join(tools, 'v5-ui-package-proof.mjs'),

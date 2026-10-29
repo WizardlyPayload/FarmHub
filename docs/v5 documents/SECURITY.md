@@ -2,7 +2,7 @@
 
 **Authors:** JoshWalki (Josh) / Wizardlypayload and WizardlyPayload — see [`../AUTHORS.md`](../AUTHORS.md).
 
-This is the player-facing network guide for **V5 5.2.6**. The trust model is local-first; do not expose this app to the open internet.
+This is the player-facing network guide for **V5 5.2.7**. The trust model is local-first; do not expose this app to the open internet.
 
 Classic V4: [`../SECURITY.md`](../SECURITY.md) (port **8766**).
 

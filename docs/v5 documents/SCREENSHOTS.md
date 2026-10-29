@@ -2,6 +2,8 @@
 
 The 53 core and companion PNGs in [`doc-screenshots/current-526/`](doc-screenshots/current-526/) were captured from the **installed V5 5.2.6 app** in a headless 1920 × 1080 viewport on 29 October 2026. No desktop chrome is in these screenshots. They show **held** demo exports, not live gameplay at capture time. `capture-index.json` records 44 core/top-page jobs; `detail-capture-index.json` records 29 companion top/lower jobs, including replacement top images. The twelve Settings PNGs remain from the installed 5.1.17 Electron app on the Ally because the browser capture does not expose the Electron settings bridge. Those older Settings images were maximized at 1920 × 1080 and had sensitive values hidden.
 
+Four Catuaí captures in [`doc-screenshots/current-527/`](doc-screenshots/current-527/) show Save overview, Orchards, Productions and Fleet map from the **installed V5 5.2.7 app** at 1920 × 1080. The source is a registered local save with recorded data; the game was left untouched for these browser captures. `dlc-capture-index.json` records their source slot, route and capture time. The Fleet map image decoded successfully before capture.
+
 Older PNGs directly under `doc-screenshots/` remain as **older V5 illustrations** only where a current image is not available. A V4 installer image is never presented as V5.
 
 ## Current image groups

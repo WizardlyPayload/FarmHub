@@ -27,7 +27,7 @@ A detected mod with an empty block does **not** prove its gameplay failed. The d
 
 ## Versions and release boundary
 
-- **Prepared V5 candidate:** app **5.2.7**, mod **5.1.0.12**, canonical ZIP `FS25_FarmDashboard.zip`. The exact 5.2.6 pair passed the bounded PC Catuaí and Ally DLC checks, including one native Windows install row and Keep-data uninstall/reinstall on the Ally. The app-only 5.2.7 dependency update passed PC install and launch checks; exact 5.2.7 Ally lifecycle evidence is pending. See the [DLC acceptance record](../DLC-COVERAGE-AUDIT-2026-10-28.md) for the observed results and limits.
+- **Prepared V5 candidate:** app **5.2.7**, mod **5.1.0.12**, canonical ZIP `FS25_FarmDashboard.zip`. The exact 5.2.6 pair passed bounded PC Catuaí and Ally DLC gameplay checks. The app-only 5.2.7 dependency update passed PC install/launch and an exact-installer Ally install/Keep-data uninstall/reinstall with one native Windows row and retained sources; Tina restored the Ally originals. No new 5.2.7 game load was needed because the mod ZIP is byte-identical. See the [DLC acceptance record](../DLC-COVERAGE-AUDIT-2026-10-28.md) for the observed gameplay results and limits.
 - **Current public V5 release:** app **5.2.0**, mod **5.1.0.9**, until the prepared candidate is published. Download both files from the same public release.
 - **Public V5 listing:** use the versions displayed on the actual download page.
 - **Classic V4:** public **4.2.1** remains separate on **8766** and its own `latest.yml`. V5 uses **8768** and `latest-rf.yml`.

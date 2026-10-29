@@ -5,7 +5,7 @@ This is the help pack for the **V5 Windows dashboard**. Start with [installation
 ## Which version?
 
 - **Repository target:** Windows app **5.2.7** with the canonical `FS25_FarmDashboard.zip` mod **5.1.0.12**. Use matching files from one [release](https://github.com/WizardlyPayload/FarmHub/releases); the public 5.2.0 release remains available while this candidate is prepared.
-- **Acceptance boundary:** the exact 5.2.6/5.1.0.12 pair passed the PC Catuaí orchard check and bounded Ally installation, DLC, map, image, and Keep uninstall/reinstall checks. App 5.2.7 updates a packaged dependency; PC installation and Catuaí pages were checked on 5.2.7, while the Ally lifecycle evidence remains for 5.2.6. See the [DLC acceptance record](../DLC-COVERAGE-AUDIT-2026-10-28.md) for what was observed and what was not.
+- **Acceptance boundary:** the exact 5.2.6/5.1.0.12 pair passed the PC Catuaí orchard check and bounded Ally installation, DLC, map, image, and Keep uninstall/reinstall checks. App 5.2.7 updates a packaged dependency; its PC installation and Catuaí pages passed, and the exact 5.2.7 installer passed an app-only Ally install/Keep/reinstall with restoration. The game was not reloaded for 5.2.7 because the mod ZIP is byte-identical. See the [DLC acceptance record](../DLC-COVERAGE-AUDIT-2026-10-28.md) for gameplay observations and limits.
 - **Classic V4:** a separate product line. Its public 4.2.1 story and update feed have not been changed. This V5 pass was **not** a new V4 test.
 
 ## Find the answer you need

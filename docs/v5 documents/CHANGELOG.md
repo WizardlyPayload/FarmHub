@@ -10,7 +10,7 @@ Player-facing history for the **V5 / new screens** line. Classic 4.x notes stay 
 
 - Updated the packaged `qs` dependency to 6.16.1 after the GitHub security advisory for 6.16.0. This is an app-only packaging change; the canonical game-mod ZIP remains 5.1.0.12 with the same SHA-256.
 - Installed the exact 5.2.7 candidate on the PC: one native V5 Windows entry, retained profile hash, app launch and live local API version. Captured Catuaí overview, Orchards, Productions and Fleet map images at 1920 × 1080 from this installed app without operating the game.
-- The complete Ally install, DLC card, map and Keep-data uninstall/reinstall acceptance was on exact app 5.2.6 and the same mod ZIP. No exact 5.2.7 Ally lifecycle result is claimed here.
+- The exact 5.2.7 installer also passed Ally app-only install, launch, native Keep-data uninstall/reinstall and retained-source checks; the Ally's previous app/profile/game files were hash-restored. The complete Ally DLC card and map gameplay acceptance was on exact app 5.2.6 and the same byte-identical mod ZIP; no new 5.2.7 game load is claimed.
 
 ---
 

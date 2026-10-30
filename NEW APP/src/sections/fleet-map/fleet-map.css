@@ -255,6 +255,11 @@
   filter: brightness(1.12);
 }
 
+.farm-fleet-map-field-poly--orchard {
+  stroke-width: 0.7px;
+  stroke-opacity: 0.65;
+}
+
 .farm-fleet-map-places {
   z-index: 2;
 }
@@ -514,9 +519,18 @@
 }
 
 .farm-fleet-map-legend--overlay {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
   max-height: 14rem;
   overflow-y: auto;
+  overflow-x: hidden;
   padding-right: 0.2rem;
+}
+
+.farm-fleet-map-legend--overlay .farm-fleet-map-legend-item {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 56rem) {

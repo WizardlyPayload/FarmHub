@@ -9,7 +9,7 @@ import { normalizeSectionId } from "@/types/dashboard";
 import { demoWritesAreLocked } from "@/platform/demo-source";
 import { recordedLastUpdated } from "@/platform/recorded-publication";
 import { setLocale as applyLocale, getLocale } from "@/i18n/i18n";
-import { ACTIVE_SERVER_KEY } from "@/lib/active-server-selection";
+import { ACTIVE_CAREER_KEY, ACTIVE_SERVER_KEY, careerIdForServer } from "@/lib/active-server-selection";
 
 const LAST_SECTION_KEY = "farmdash_last_section";
 const DEFAULT_SECTION_PREF_KEY = "farmdash_default_section";
@@ -26,8 +26,16 @@ export function readStoredServerId(): string | null {
 
 export function writeStoredServerId(id: string | null): void {
   try {
-    if (!id) localStorage.removeItem(ACTIVE_SERVER_KEY);
-    else localStorage.setItem(ACTIVE_SERVER_KEY, String(id));
+    if (!id) {
+      localStorage.removeItem(ACTIVE_SERVER_KEY);
+      localStorage.removeItem(ACTIVE_CAREER_KEY);
+    } else {
+      localStorage.setItem(ACTIVE_SERVER_KEY, String(id));
+      const server = useDashboardStore.getState().servers.find((row) => String(row.id) === String(id));
+      const careerId = careerIdForServer(server);
+      if (careerId) localStorage.setItem(ACTIVE_CAREER_KEY, careerId);
+      else localStorage.removeItem(ACTIVE_CAREER_KEY);
+    }
   } catch {
     /* ignore */
   }

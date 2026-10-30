@@ -5,6 +5,7 @@
  */
 
 import { clamp } from "@/lib/fleetMapGeo";
+import { GAME_MAP_COLORS, gameMapColor } from "@/lib/fs25-map-palette";
 import { resolveSoilReading } from "@/sections/fields/field-helpers";
 import type { FleetMapIconKind } from "@/lib/fleetMapMarkers";
 
@@ -87,17 +88,30 @@ const CROP_COLORS: Record<string, string> = {
 };
 
 export const OVERLAY_IDLE_FILL = "rgba(148, 163, 184, 0.22)";
-const FILL_PLOW = "rgba(166, 93, 58, 0.5)";
-const FILL_LIME = "rgba(236, 240, 241, 0.5)";
-const FILL_ROLL = "rgba(93, 173, 226, 0.5)";
-const FILL_MULCH = "rgba(123, 31, 162, 0.45)";
-const FILL_WATER = "rgba(41, 128, 185, 0.5)";
+const FILL_PLOW = gameMapColor(GAME_MAP_COLORS.needsPlowing);
+const FILL_LIME = gameMapColor(GAME_MAP_COLORS.needsLime);
+const FILL_ROLL = gameMapColor(GAME_MAP_COLORS.needsRolling);
+const FILL_MULCH = gameMapColor(GAME_MAP_COLORS.mulched);
+const FILL_WATER = gameMapColor(GAME_MAP_COLORS.watered);
 const FILL_STONES = "rgba(161, 136, 127, 0.55)";
 const FILL_UNSCANNED = "rgba(148, 163, 184, 0.28)";
 const FILL_HELD = "rgba(100, 116, 139, 0.45)";
-const FILL_HARVEST = "rgba(249, 168, 37, 0.58)";
+const FILL_HARVEST = gameMapColor(GAME_MAP_COLORS.harvest);
 const FILL_WEEDS = "rgba(46, 204, 113, 0.5)";
-const FILL_WORK_FERT = "rgba(155, 89, 182, 0.5)";
+
+export type MapOverlayPalette = { weeds?: number[][]; stones?: number[][] };
+
+function systemFill(palette: MapOverlayPalette | null | undefined, kind: "weeds" | "stones", level: number): string {
+  const colors = palette?.[kind];
+  if (Array.isArray(colors) && colors.length) {
+    const index = Math.max(0, Math.min(colors.length - 1, Math.ceil(Math.max(0, level) * colors.length) - 1));
+    const row = colors[index];
+    if (Array.isArray(row) && row.length >= 3 && row.slice(0, 3).every((v) => Number.isFinite(v) && v >= 0 && v <= 1)) {
+      return gameMapColor([row[0], row[1], row[2]]);
+    }
+  }
+  return kind === "weeds" ? FILL_WEEDS : FILL_STONES;
+}
 
 export function isOwnedField(field: Record<string, unknown> | null | undefined): boolean {
   const oid = Number(field?.ownerFarmId ?? field?.farmId ?? 0);
@@ -426,9 +440,14 @@ export function cropOverlayFill(fruitType: string | null | undefined): string {
 
 function growthFill(percent: number): string {
   const p = clamp(percent, 0, 100);
-  if (p >= 88) return "rgba(249, 168, 37, 0.58)";
-  const h = 28 + (p / 88) * 92;
-  return `hsla(${h}, 58%, 38%, 0.5)`;
+  if (p >= 88) return FILL_HARVEST;
+  const index = Math.min(GAME_MAP_COLORS.growing.length - 1, Math.floor(p / 88 * GAME_MAP_COLORS.growing.length));
+  return gameMapColor(GAME_MAP_COLORS.growing[index]);
+}
+
+function baseFertilizerFill(level: number): string {
+  if (level <= 0) return OVERLAY_IDLE_FILL;
+  return gameMapColor(level >= 2 ? GAME_MAP_COLORS.fertilized2 : GAME_MAP_COLORS.fertilized1);
 }
 
 function omFill(om: number): string {
@@ -489,9 +508,6 @@ const RELATIVE_OVERLAY_MODES: ReadonlySet<FleetMapOverlayMode> = new Set([
   "soilN",
   "soilUrgency",
   "moisture",
-  "fertilized",
-  "weeds",
-  "stones",
 ]);
 
 export function isRelativeOverlayMode(mode: FleetMapOverlayMode): boolean {
@@ -499,7 +515,7 @@ export function isRelativeOverlayMode(mode: FleetMapOverlayMode): boolean {
 }
 
 export function overlayScaleInvert(mode: FleetMapOverlayMode): boolean {
-  return mode === "soilUrgency" || mode === "weeds" || mode === "stones";
+  return mode === "soilUrgency";
 }
 
 export function canonicalOverlayRange(mode: FleetMapOverlayMode): OverlayValueRange | null {
@@ -514,12 +530,6 @@ export function canonicalOverlayRange(mode: FleetMapOverlayMode): OverlayValueRa
       return { min: 0, max: 100 };
     case "moisture":
       return { min: 0, max: 100 };
-    case "fertilized":
-      return { min: 0, max: 2 };
-    case "weeds":
-      return { min: 0, max: 100 };
-    case "stones":
-      return { min: 0, max: 1 };
     case "off":
     case "crops":
     case "growth":
@@ -531,6 +541,9 @@ export function canonicalOverlayRange(mode: FleetMapOverlayMode): OverlayValueRa
     case "mulched":
     case "watered":
     case "pfSoilType":
+    case "fertilized":
+    case "weeds":
+    case "stones":
       return null;
     default: {
       const _exhaustive: never = mode;
@@ -686,14 +699,14 @@ export function computeOverlayRange(
   return { min, max };
 }
 
-function workFill(field: Record<string, unknown>, soil: Record<string, unknown> | null): string {
+function workFill(field: Record<string, unknown>, soil: Record<string, unknown> | null, palette?: MapOverlayPalette | null): string {
   if (field.isHarvested === true) return OVERLAY_IDLE_FILL;
   if (field.harvestReady === true) return FILL_HARVEST;
-  if (Number(field.weedLevel) >= 0.45 || field.needsWeeding === true) return FILL_WEEDS;
+  if (Number(field.weedLevel) >= 0.45 || field.needsWeeding === true) return systemFill(palette, "weeds", 1);
   if (field.needsLime === true || Number(field.limeLevel) <= 0) return FILL_LIME;
   if (field.needsPlowing === true || Number(field.plowLevel) <= 0) return FILL_PLOW;
   if (field.needsRolling === true) return FILL_ROLL;
-  if (soil?.needsFertilization === true) return FILL_WORK_FERT;
+  if (soil?.needsFertilization === true) return baseFertilizerFill(1);
   return OVERLAY_IDLE_FILL;
 }
 
@@ -710,6 +723,7 @@ export function overlayPaintForField(
   mode: FleetMapOverlayMode,
   farmCss: string,
   range?: OverlayValueRange | null,
+  palette?: MapOverlayPalette | null,
 ): OverlayPaint | null {
   if (!field || mode === "off") return null;
 
@@ -809,17 +823,19 @@ export function overlayPaintForField(
     }
     case "fertilized": {
       const level = finiteOrNull(field.fertilizationLevel) ?? finiteOrNull(field.sprayLevel) ?? 0;
-      return { fill: nutrientFill(level, 2) };
+      return { fill: baseFertilizerFill(level) };
     }
     case "weeds": {
       const v = overlayNumericValue(field, "weeds");
       if (v == null || v <= 0) return idlePaint();
-      return { fill: urgencyFill(clamp(v, 0, 100)) };
+      return { fill: systemFill(palette, "weeds", clamp(v, 0, 100) / 100) };
     }
     case "stones": {
       const v = finiteOrNull(field.stoneLevel);
       if (v == null || v <= 0) return idlePaint();
-      return { fill: FILL_STONES };
+      const levels = palette?.stones?.length || 3;
+      const fraction = Number.isInteger(v) ? v / levels : v;
+      return { fill: systemFill(palette, "stones", fraction) };
     }
     case "needsPlowing":
       return {
@@ -846,7 +862,7 @@ export function overlayPaintForField(
     case "ownership":
       return { fill: cssColorWithAlpha(farmCss, 0.42) };
     case "work":
-      return { fill: workFill(field, soil) };
+      return { fill: workFill(field, soil, palette) };
     default: {
       const _exhaustive: never = mode;
       return _exhaustive;
@@ -871,11 +887,14 @@ export interface OverlayLegendItem {
   labelKey?: string;
   cropKey?: string;
   soilTypeIndex?: number;
+  paletteLevel?: number;
+  paletteTotal?: number;
 }
 
 export function overlayLegendItems(
   mode: FleetMapOverlayMode,
   fields: Array<Record<string, unknown>> | null | undefined,
+  palette?: MapOverlayPalette | null,
 ): OverlayLegendItem[] {
   const rows = fields || [];
   switch (mode) {
@@ -883,15 +902,19 @@ export function overlayLegendItems(
     case "ownership":
       return [];
     case "crops": {
-      const keys = new Set<string>();
-      for (const f of rows) keys.add(cropKey(f));
-      const ordered = [...keys].sort((a, b) => {
+      const colors = new Map<string, string>();
+      for (const f of rows) {
+        const key = cropKey(f);
+        const gameColor = parseCssWithAlpha(String(f.fruitMapColor || ""), 0.5);
+        if (!colors.has(key) || gameColor) colors.set(key, gameColor || cropOverlayFill(key));
+      }
+      const ordered = [...colors.keys()].sort((a, b) => {
         if (a === "EMPTY") return 1;
         if (b === "EMPTY") return -1;
         return a.localeCompare(b);
       });
       if (!ordered.length) ordered.push("EMPTY");
-      return ordered.map((key) => ({ fill: cropOverlayFill(key), cropKey: key }));
+      return ordered.map((key) => ({ fill: colors.get(key) || cropOverlayFill(key), cropKey: key }));
     }
     case "growth":
       return [
@@ -901,19 +924,23 @@ export function overlayLegendItems(
       ];
     case "fertilized":
       return [
-        { fill: nutrientFill(0, 2), labelKey: "map.legend.fertNone" },
-        { fill: nutrientFill(1, 2), labelKey: "map.legend.fertPartial" },
-        { fill: nutrientFill(2, 2), labelKey: "map.legend.fertFull" },
+        { fill: baseFertilizerFill(0), labelKey: "map.legend.fertNone" },
+        { fill: baseFertilizerFill(1), labelKey: "map.legend.fertPartial" },
+        { fill: baseFertilizerFill(2), labelKey: "map.legend.fertFull" },
       ];
     case "weeds":
       return [
         { fill: OVERLAY_IDLE_FILL, labelKey: "map.legend.noWeeds" },
-        { fill: urgencyFill(100), labelKey: "map.legend.weeds" },
+        ...(palette?.weeds?.length
+          ? palette.weeds.map((_, i) => ({ fill: systemFill(palette, "weeds", (i + 1) / palette.weeds!.length), labelKey: "map.legend.weeds", paletteLevel: i + 1, paletteTotal: palette.weeds!.length }))
+          : [{ fill: systemFill(palette, "weeds", 1), labelKey: "map.legend.weeds" }]),
       ];
     case "stones":
       return [
         { fill: OVERLAY_IDLE_FILL, labelKey: "map.legend.noStones" },
-        { fill: FILL_STONES, labelKey: "map.legend.stones" },
+        ...(palette?.stones?.length
+          ? palette.stones.map((_, i) => ({ fill: systemFill(palette, "stones", (i + 1) / palette.stones!.length), labelKey: "map.legend.stones", paletteLevel: i + 1, paletteTotal: palette.stones!.length }))
+          : [{ fill: systemFill(palette, "stones", 1), labelKey: "map.legend.stones" }]),
       ];
     case "needsPlowing":
       return [
@@ -971,11 +998,11 @@ export function overlayLegendItems(
     case "work":
       return [
         { fill: FILL_HARVEST, labelKey: "map.legend.workHarvest" },
-        { fill: FILL_WEEDS, labelKey: "map.legend.workWeeds" },
+        { fill: systemFill(palette, "weeds", 1), labelKey: "map.legend.workWeeds" },
         { fill: FILL_LIME, labelKey: "map.legend.workLime" },
         { fill: FILL_PLOW, labelKey: "map.legend.workPlow" },
         { fill: FILL_ROLL, labelKey: "map.legend.workRoll" },
-        { fill: FILL_WORK_FERT, labelKey: "map.legend.workFert" },
+        { fill: baseFertilizerFill(1), labelKey: "map.legend.workFert" },
         { fill: OVERLAY_IDLE_FILL, labelKey: "map.legend.workNone" },
       ];
     default: {

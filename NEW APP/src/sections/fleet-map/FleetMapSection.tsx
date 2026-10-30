@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { Button } from "@/components/ui";
-import { t } from "@/i18n/i18n";
+import { t, tOr } from "@/i18n/i18n";
+import { gameFarmColor } from "@/lib/fs25-map-palette";
 import {
   fleetMapPercent,
   INGAME_MAP_WORLD_INSET,
@@ -71,17 +72,6 @@ import { formatProfileArea, formatProfileSpeed, saveProfileFromUnitDisplay, type
 import { unitDisplayFromPayload } from "@/lib/fill-units";
 import "@/sections/fleet-map/fleet-map.css";
 
-const FARM_COLOR_FALLBACK = [
-  "#e74c3c",
-  "#3498db",
-  "#2ecc71",
-  "#f39c12",
-  "#9b59b6",
-  "#1abc9c",
-  "#e67e22",
-  "#95a5a6",
-];
-
 interface FarmRecord {
   id?: number | string;
   farmId?: number | string;
@@ -97,20 +87,8 @@ interface OverviewResponse {
   hintKind?: string;
 }
 
-function farmColorToCss(farmId: number, rawColor: unknown): string {
-  const n = Number(rawColor);
-  if (Number.isFinite(n) && n > 0) {
-    const r = (n >> 16) & 255;
-    const g = (n >> 8) & 255;
-    const b = n & 255;
-    if (r + g + b > 24) return `rgb(${r}, ${g}, ${b})`;
-    const r2 = n & 255;
-    const g2 = (n >> 8) & 255;
-    const b2 = (n >> 16) & 255;
-    if (r2 + g2 + b2 > 24) return `rgb(${r2}, ${g2}, ${b2})`;
-  }
-  const idx = Math.max(0, (Number(farmId) || 1) - 1) % FARM_COLOR_FALLBACK.length;
-  return FARM_COLOR_FALLBACK[idx];
+function farmColorToCss(_farmId: number, rawColor: unknown, multiplayer: boolean): string {
+  return gameFarmColor(rawColor, multiplayer);
 }
 
 function readBoolPref(key: string): boolean {
@@ -266,6 +244,15 @@ function overlayFieldBanner(
   field: Record<string, unknown>,
   profile?: SaveProfileDisplay | null,
 ): { name: string; farm: string; detail: string } {
+  if (field._orchard === true) {
+    return {
+      name: `${formatCropName(field.fruitType)} ${tOr("map.orchard", "Orchard")}`,
+      farm: Number(field.ownerFarmId) > 0
+        ? t("map.farmFallback", { id: Number(field.ownerFarmId) })
+        : tOr("orchards.mapOwned", "Map orchard"),
+      detail: `${Number(field._orchardRows) || 0} ${tOr("orchards.rows", "Rows").toLowerCase()}`,
+    };
+  }
   return {
     name: overlayFieldTitle(field),
     farm: formatCropName(field.fruitType),
@@ -297,6 +284,9 @@ export function fleetVehicleDetail(
 function overlayLegendLabel(item: OverlayLegendItem): string {
   if (item.cropKey) return formatCropName(item.cropKey);
   if (item.soilTypeIndex != null) return t("map.legend.soilType", { id: item.soilTypeIndex });
+  if (item.paletteLevel != null && item.paletteTotal != null && item.labelKey) {
+    return `${t(item.labelKey)} ${item.paletteLevel}/${item.paletteTotal}`;
+  }
   if (item.labelKey) return t(item.labelKey);
   return "";
 }
@@ -479,11 +469,27 @@ export function FleetMapSection() {
   const mapId = String(payload?.mapId || payload?.serverInfo?.mapId || "");
   const mapTitle = String(payload?.mapTitle || payload?.serverInfo?.mapName || "");
   const farms = useMemo(() => parseFarms(payload?.farmInfo), [payload?.farmInfo]);
+  const multiplayer = payload?.serverInfo?.isMultiplayer === true;
 
   const allFields = useMemo(
     () => (Array.isArray(payload?.fields) ? payload!.fields! : []) as Record<string, unknown>[],
     [payload?.fields],
   );
+
+  const orchardFields = useMemo<Record<string, unknown>[]>(() => (payload?.orchards?.rows || [])
+    .flatMap((row) => {
+      const outlines = Array.isArray(row.outlines) && row.outlines.length > 0
+        ? row.outlines : row.outline ? [row.outline] : [];
+      return outlines.flatMap((outline, index) => Array.isArray(outline) && outline.length >= 3 ? [{
+        id: `orchard-${row.id}-${index}`,
+        _orchard: true,
+        _orchardRows: row.rows,
+        fruitType: row.fruitType,
+        fruitMapColor: row.fruitMapColor,
+        ownerFarmId: row.farmId,
+        outline,
+      }] : []);
+    }), [payload?.orchards]);
 
   const overlayChoices = useMemo(() => groupedAvailableOverlayModes(allFields), [allFields]);
   const pfOverlayLabels =
@@ -548,7 +554,7 @@ export function FleetMapSection() {
 
   const overlayFields = useMemo(() => {
     if (overlay === "off") return [];
-    const withGeom = allFields
+    const withGeom = [...allFields, ...orchardFields]
       .filter((f) => isOwnedField(f))
       .map((f) => {
         const outline = pickMapOutlineForField(f, mapFieldOutlines);
@@ -582,7 +588,7 @@ export function FleetMapSection() {
       });
     }
     return painted;
-  }, [allFields, overlay, mapFieldOutlines]);
+  }, [allFields, orchardFields, overlay, mapFieldOutlines]);
 
   const productionPlaces = useMemo(() => {
     if (!showPlaces) return [];
@@ -657,17 +663,18 @@ export function FleetMapSection() {
     const items: unknown[] = [
       ...allVehicles,
       ...allFields,
+      ...orchardFields,
       ...productionPlaces,
       ...husbandryPlaces,
       ...sellPointPlaces,
     ];
-    for (const row of allFields) {
+    for (const row of [...allFields, ...orchardFields]) {
       const outline = normalizeFieldOutline((row as { outline?: unknown }).outline);
       if (!outline) continue;
       for (const pt of outline) items.push({ x: pt[0], z: pt[1] });
     }
     return items;
-  }, [allVehicles, allFields, productionPlaces, husbandryPlaces, sellPointPlaces]);
+  }, [allVehicles, allFields, orchardFields, productionPlaces, husbandryPlaces, sellPointPlaces]);
 
   const bounds = useMemo(
     () =>
@@ -715,8 +722,8 @@ export function FleetMapSection() {
     [overlay, overlayRange],
   );
   const overlayLegend = useMemo(
-    () => overlayLegendItems(overlay, overlayFields),
-    [overlay, overlayFields],
+    () => overlayLegendItems(overlay, overlayFields, payload?.serverInfo?.mapOverlayPalette),
+    [overlay, overlayFields, payload?.serverInfo?.mapOverlayPalette],
   );
 
   const fieldOverlays = useMemo(
@@ -727,7 +734,7 @@ export function FleetMapSection() {
         if (!xz && !outline) return null;
         const fid = Number(field.ownerFarmId ?? field.farmId ?? 0);
         const farm = farms.find((f) => Number(f.id ?? f.farmId) === fid);
-        const paint = overlayPaintForField(field, overlay, farmColorToCss(fid, farm?.color), overlayRange);
+        const paint = overlayPaintForField(field, overlay, farmColorToCss(fid, farm?.color, multiplayer), overlayRange, payload?.serverInfo?.mapOverlayPalette);
         if (!paint) return null;
         let centroid = xz;
         if (outline) {
@@ -755,7 +762,7 @@ export function FleetMapSection() {
           points: points || null,
         };
       }).filter((row): row is NonNullable<typeof row> => row != null),
-    [overlayFields, overlay, overlayRange, bounds, farms, toPct, hideBorder],
+    [overlayFields, overlay, overlayRange, bounds, farms, multiplayer, toPct, hideBorder, payload?.serverInfo?.mapOverlayPalette],
   );
 
   const placePins = useMemo(
@@ -1283,7 +1290,7 @@ export function FleetMapSection() {
                           return (
                             <polygon
                               key={`field-poly-${String(field.id ?? field.farmlandId ?? `${blob.x}-${blob.z}`)}`}
-                              class="farm-fleet-map-field-poly"
+                              class={`farm-fleet-map-field-poly${field._orchard === true ? " farm-fleet-map-field-poly--orchard" : ""}`}
                               points={blob.points!}
                               fill={blob.fill}
                               aria-label={`${banner.name} ${banner.farm}`}
@@ -1311,7 +1318,7 @@ export function FleetMapSection() {
                                   top: blob.top,
                                   scope: selectionScopeRef.current,
                                 });
-                                setSection("fields");
+                                setSection(field._orchard === true ? "orchards" : "fields");
                               }}
                             />
                           );
@@ -1359,7 +1366,7 @@ export function FleetMapSection() {
                               top: blob.top,
                               scope: selectionScopeRef.current,
                             });
-                            setSection("fields");
+                          setSection(field._orchard === true ? "orchards" : "fields");
                           }}
                         />
                       );
@@ -1540,7 +1547,7 @@ export function FleetMapSection() {
                   <span key={id} class="farm-fleet-map-legend-item">
                     <span
                       class="farm-fleet-map-legend-swatch"
-                      style={{ background: farmColorToCss(id, f.color) }}
+                      style={{ background: farmColorToCss(id, f.color, multiplayer) }}
                     />
                     {f.name || `Farm ${id}`}
                   </span>

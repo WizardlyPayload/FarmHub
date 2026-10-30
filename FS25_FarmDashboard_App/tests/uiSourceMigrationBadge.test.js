@@ -43,6 +43,19 @@ describe("NEW APP source selection", () => {
         expect(selection.resolveInitialServerId([{ id: "only" }], storage({ dashboard_active_server: "removed" }))).toBeNull();
     });
 
+    test("a re-detected career keeps its selection only with one matching proved identity", () => {
+        const saved = storage({ farmdash_active_server_v1: "old-id", farmdash_active_career_v1: "career-cat" });
+        const current = [
+            { id: "new-cat", sourceBinding: { exportIdentity: { careerId: "career-cat" } } },
+            { id: "other", sourceBinding: { exportIdentity: { careerId: "career-other" } } },
+        ];
+        expect(selection.resolveInitialServerId(current, saved)).toBe("new-cat");
+        expect(saved.getItem("farmdash_active_server_v1")).toBe("new-cat");
+        expect(selection.resolveInitialServerId([
+            current[0], { id: "duplicate", sourceBinding: { exportIdentity: { careerId: "career-cat" } } },
+        ], storage({ farmdash_active_server_v1: "old-id", farmdash_active_career_v1: "career-cat" }))).toBeNull();
+    });
+
     test("a temporarily absent saved source stays pending without rewriting its key", () => {
         const saved = storage({ farmdash_active_server_v1: "witcombe" });
         const write = jest.spyOn(saved, "setItem");

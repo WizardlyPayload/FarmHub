@@ -918,6 +918,30 @@ function buildFillTypeCatalog(luaData, xmlEconomy, mapFillTypeCatalog) {
     return enrichStockFillTypes(lua.stock, applyFillTypeTitles(catalog, titles), titles).catalog;
 }
 
+function productionWithSavedFallback(live, placeables) {
+    if (Array.isArray(live?.chains) && live.chains.length > 0) return live;
+    if (live?.chains && !Array.isArray(live.chains) && Object.keys(live.chains).length > 0) return live;
+    const chains = [];
+    for (const placeable of toArr(placeables)) {
+        const saved = placeable && placeable.savedProduction;
+        if (!saved) continue;
+        const ownerFarmId = Number(placeable.farmId);
+        if (!Number.isSafeInteger(ownerFarmId) || ownerFarmId <= 0) continue;
+        const uniqueId = String(placeable.uniqueId || '');
+        const preplaced = /^preplaced_(.+?)_[a-f0-9]{12,}$/i.exec(uniqueId);
+        const fallbackName = preplaced ? preplaced[1].replace(/[_-]+/g, ' ') : 'Saved production site';
+        chains.push({
+            id: uniqueId || `saved-production-${chains.length + 1}`,
+            name: placeable.name || placeable.displayName || fallbackName,
+            ownerFarmId,
+            source: 'savegame_xml',
+            productions: saved.productions || [],
+            storageFillLevels: saved.storageFillLevels || {},
+        });
+    }
+    return chains.length ? { chains, source: 'savegame_xml' } : (live || { chains: [] });
+}
+
 function mergeData(luaData, xmlData, options = {}) {
     const merged = mergeDataCore(luaData, xmlData, options);
     if (merged && luaData?.sectionOutcomes && typeof luaData.sectionOutcomes === 'object') {
@@ -1047,8 +1071,9 @@ function mergeDataCore(luaData, xmlData, options = {}) {
         // Economy — XML history + Lua live sell points
         economy      : mergeEconomy(luaData.economy || {}, xmlData.economy || {}, fillTypeCatalog),
 
-        // Production — Lua only
-        production   : luaData.production || { chains: [], husbandryTotals: {} },
+        // A saved career can still show owned sites when a live collector never
+        // completed. Saved XML does not reveal recipes or live throughput.
+        production   : productionWithSavedFallback(luaData.production, xmlData.placeables),
 
         // Physical bales — Lua scan + stock objectStorage fallback when mod export is empty
         baleInventory: enrichBaleInventoryFromStock(luaData, stockEnriched.catalog),
@@ -2883,7 +2908,7 @@ function buildFromXmlOnly(xml) {
         fields: toArr((xml.allFields && xml.allFields.length > 0) ? xml.allFields : (xml.fields || [])).map(normalizeFieldMulch),
         vehicles: finalizeMergedVehicles(null, xml, normalizeXmlVehiclesForMerge(xml.vehicles)),
         economy: { xmlPriceHistory: xml.economy || {} },
-        production: {},
+        production: productionWithSavedFallback(null, xml.placeables),
         beansAndAlpacas: { enabled: false },
         highlandsFishing: { enabled: false },
           pumpsAndHoses: { enabled: false },

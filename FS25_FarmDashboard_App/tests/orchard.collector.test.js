@@ -42,6 +42,10 @@ assert(result.available and #result.rows == 4)
 local byFruit = {}
 for _, row in ipairs(result.rows) do byFruit[row.fruitType]=row end
 assert(byFruit.GRAPE.farmId == 1 and byFruit.GRAPE.rowLengthMeters == 10)
+assert(byFruit.GRAPE.position.x == 0 and byFruit.GRAPE.position.z == 5)
+assert(byFruit.OLIVE.position.x == 5 and byFruit.OLIVE.position.z == 0)
+assert(#byFruit.GRAPE.outlines == 1 and #byFruit.GRAPE.outlines[1] == 4)
+assert(#byFruit.COFFEECHERRIES.outlines == 1)
 assert(byFruit.GRAPE.growthMeasured and byFruit.GRAPE.readyRows == 1)
 assert(byFruit.OLIVE.rows == 1 and byFruit.OLIVE.readyRows == 0)
 assert(byFruit.BANANA.farmId == 0 and not byFruit.BANANA.growthMeasured and byFruit.BANANA.readyRows == nil)
@@ -64,6 +68,8 @@ local split = {id=106,getVineFruitTypeIndex=function() return 4 end,
    {startPosX=0,startPosZ=6,endPosX=0,endPosZ=8},
  }} end}
 local splitRow = env.OrchardDataCollector.collect({placeableSystem={placeables={split}}}).rows[1]
+assert(#splitRow.outlines == 2 and splitRow.outlines[1][2][2] < splitRow.outlines[2][1][2],
+  "separated orchard rows stay separate on the map")
 assert(splitRow.farmId == 0 and splitRow.landOwnershipComplete
   and splitRow.landOwnerFarmIds[1] == 0 and splitRow.landOwnerFarmIds[2] == 1,
   "mixed parcels must not be presented as wholly owned")
@@ -112,6 +118,7 @@ local partial = env.OrchardDataCollector.collect(largeMission)
 assert(partial.rows[1].farmId == 1 and partial.rows[1].landOwnershipComplete
   and #partial.rows[1].landOwnerFarmIds == 1,
   "all 208 rows of a map-spanning orchard follow their purchased land")
+assert(#partial.rows[1].outlines == 208, "large map orchard keeps its individual planted rows")
 host.g_farmlandManager = nil
 assert(partial.rows[1].diseaseScanning and not partial.rows[1].diseaseMeasured,
   "large coffee orchard progresses without a dirtyNodes table")

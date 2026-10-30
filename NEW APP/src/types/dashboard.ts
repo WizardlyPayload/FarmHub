@@ -7,6 +7,8 @@ export interface ServerInfo {
   saveSlot?: string;
   mapId?: string;
   mapBounds?: unknown;
+  isMultiplayer?: boolean;
+  mapOverlayPalette?: { weeds?: number[][]; stones?: number[][] };
   configWarning?: string;
 }
 
@@ -421,6 +423,10 @@ export interface DashboardPayload {
       landOwnerFarmIds?: number[];
       landOwnershipComplete?: boolean;
       fruitType: string;
+      fruitMapColor?: string | null;
+      position?: { x: number; z: number } | null;
+      outline?: [number, number][] | null;
+      outlines?: [number, number][][] | null;
       rows?: number | null;
       rowLengthMeters?: number | null;
       readyRows?: number | null;

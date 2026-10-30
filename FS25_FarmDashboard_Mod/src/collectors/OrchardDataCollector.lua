@@ -2,7 +2,7 @@
 -- PlaceableVine and PlaceableOrchard both provide getVineFruitTypeIndex.
 OrchardDataCollector = {}
 
-local cachedMission, cachedRows = nil, {}
+local cachedMission, cachedRows, cachedGeometry = nil, {}, {}
 local trackedFruits = { GRAPE = true, OLIVE = true, BANANA = true, COFFEECHERRIES = true }
 
 local function call(target, method, ...)
@@ -16,6 +16,21 @@ local function finite(value)
     local n = tonumber(value)
     if n == nil or n ~= n or n == math.huge or n == -math.huge then return nil end
     return n
+end
+
+local function fruitMapColorHex(fruit)
+    local color = fruit and fruit.defaultMapColor
+    if type(color) ~= "table" then return nil end
+    local function channel(value)
+        local c = finite(value)
+        if not c then return nil end
+        c = math.max(0, math.min(1, c))
+        local srgb = c > 0.0031308 and (1.055 * c ^ (1 / 2.4) - 0.055) or (12.92 * c)
+        return math.floor(srgb * 255 + 0.5)
+    end
+    local r, g, b = channel(color.r), channel(color.g), channel(color.b)
+    if not (r and g and b) then return nil end
+    return string.format("#%02X%02X%02X", r, g, b)
 end
 
 -- Map-created orchards can keep placeable owner 0 after their land is bought.
@@ -46,6 +61,50 @@ local function landOwners(fence, mission)
     end
     table.sort(owners)
     return owners, true
+end
+
+-- Keep each planted row separate. A hull around an entire map orchard joins
+-- distant parcels and paints ordinary fields between them.
+local function orchardGeometry(fence)
+    local segments = fence and fence.segments
+    if type(segments) ~= "table" or #segments == 0 then return nil, nil end
+    local xSum, zSum, count, outlines = 0, 0, 0, {}
+    for i = 1, math.min(#segments, 512) do
+        local segment = segments[i]
+        local x1, x2 = finite(segment.x1 or segment.startPosX), finite(segment.x2 or segment.endPosX)
+        local z1, z2 = finite(segment.z1 or segment.startPosZ), finite(segment.z2 or segment.endPosZ)
+        if x1 and x2 and z1 and z2 then
+            xSum, zSum, count = xSum + (x1 + x2) / 2, zSum + (z1 + z2) / 2, count + 1
+            local dx, dz = x2 - x1, z2 - z1
+            local length = math.sqrt(dx * dx + dz * dz)
+            if length > 0.1 then
+                local px, pz = -dz / length, dx / length
+                local function rounded(n) return math.floor(n * 100 + 0.5) / 100 end
+                outlines[#outlines + 1] = {
+                    {rounded(x1 + px), rounded(z1 + pz)},
+                    {rounded(x2 + px), rounded(z2 + pz)},
+                    {rounded(x2 - px), rounded(z2 - pz)},
+                    {rounded(x1 - px), rounded(z1 - pz)},
+                }
+            end
+        end
+    end
+    if count == 0 then return nil, nil end
+    return { x = math.floor(xSum / count * 100 + 0.5) / 100,
+             z = math.floor(zSum / count * 100 + 0.5) / 100 }, #outlines > 0 and outlines or nil
+end
+
+local function geometryFor(placeable, fence, now)
+    local prior = cachedGeometry[placeable]
+    local count = fence and type(fence.segments) == "table" and #fence.segments or 0
+    if prior and prior.fence == fence and prior.count == count
+        and now >= prior.time and now - prior.time < 60000 then
+        return prior.position, prior.outlines
+    end
+    local position, outlines = orchardGeometry(fence)
+    cachedGeometry[placeable] = { fence = fence, count = count, time = now,
+                                  position = position, outlines = outlines }
+    return position, outlines
 end
 
 local function readRows(placeable, fruitIndex, fence, now)
@@ -171,7 +230,7 @@ end
 function OrchardDataCollector.collect(mission)
     local placeables = mission and mission.placeableSystem and mission.placeableSystem.placeables
     if type(placeables) ~= "table" then return { schema = 1, available = false, rows = {} } end
-    if mission ~= cachedMission then cachedMission, cachedRows = mission, {} end
+    if mission ~= cachedMission then cachedMission, cachedRows, cachedGeometry = mission, {}, {} end
     -- GIANTS exposes engine globals through the mod environment's lookup chain.
     -- rawget(_G, ...) skips that chain and returns nil in a live save.
     local now = finite(g_time) or 0
@@ -195,6 +254,7 @@ function OrchardDataCollector.collect(mission)
                     end
                 end
                 local rowCount, rowLength, ready, withered, measured = readRows(placeable, index, fence, now)
+                local position, outlines = geometryFor(placeable, fence, now)
                 local sick, diseaseMeasured, diseaseScanning = nil, false, false
                 if fruitName == "COFFEECHERRIES" then
                     sick, diseaseMeasured, diseaseScanning = readCoffeeDisease(placeable, fruit, fence, mission, now)
@@ -205,6 +265,9 @@ function OrchardDataCollector.collect(mission)
                     landOwnerFarmIds = landOwnerFarmIds,
                     landOwnershipComplete = landOwnershipComplete,
                     fruitType = fruitName,
+                    fruitMapColor = fruitMapColorHex(fruit),
+                    position = position,
+                    outlines = outlines,
                     rows = rowCount,
                     rowLengthMeters = rowLength and math.floor(rowLength + 0.5) or nil,
                     readyRows = ready,

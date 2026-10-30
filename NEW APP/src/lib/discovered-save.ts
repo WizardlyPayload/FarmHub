@@ -27,6 +27,16 @@ function normalizedRoot(value: unknown): string {
     .toLowerCase();
 }
 
+function stableLocalId(root: string, slot: string): string {
+  const key = `${normalizedRoot(root)}|${String(slot).trim().toLowerCase()}`;
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `local_${hash.toString(16).padStart(8, "0")}`;
+}
+
 function remoteSlotOf(server: { replicaRemoteSlot?: unknown; replicaRegistration?: unknown }): string {
   const direct = String(server.replicaRemoteSlot || "").trim().toLowerCase();
   const registration = server.replicaRegistration;
@@ -80,7 +90,7 @@ export function discoveryContextFromScan(result: unknown): DiscoveryContext {
   return { defaultDashboardRoot: typeof value === "string" && value.trim() ? value : null };
 }
 
-export function discoveredServerFromScan(save: Record<string, unknown>, index: number): FarmDashConfigServer | null {
+export function discoveredServerFromScan(save: Record<string, unknown>, _index: number): FarmDashConfigServer | null {
   const folder = String(save.localSubFolder || save.folder || "").trim();
   const localPath = String(save.localPath || "").trim();
   if (!folder || !localPath) return null;
@@ -88,7 +98,7 @@ export function discoveredServerFromScan(save: Record<string, unknown>, index: n
   const stableId = typeof save.id === "string" ? save.id.trim() : "";
   if (remote && !stableId) return null;
   const row: FarmDashConfigServer = {
-    id: remote ? stableId : `srv_${Date.now()}_${index}`,
+    id: remote ? stableId : stableLocalId(localPath, folder),
     name: String(save.name || folder),
     mode: "local",
     localSubFolder: folder,

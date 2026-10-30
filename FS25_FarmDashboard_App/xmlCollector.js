@@ -315,18 +315,21 @@ function parseCareerSavegameDoc(doc) {
 
     const settingsEl = career.settings || {};
 
+    const careerSetting = (key, fallback = null) =>
+        scalarText(settingsEl, key) || scalarText(career, key) || fallback;
+
     return {
-        savegameName: scalarText(career, 'savegameName'),
-        mapId: scalarText(career, 'mapId'),
-        mapTitle: scalarText(career, 'mapTitle'),
-        saveDate: scalarText(career, 'saveDateFormatted') || scalarText(career, 'saveDate'),
-        creationDate: scalarText(career, 'creationDate'),
+        savegameName: careerSetting('savegameName'),
+        mapId: careerSetting('mapId'),
+        mapTitle: careerSetting('mapTitle'),
+        saveDate: careerSetting('saveDateFormatted') || careerSetting('saveDate'),
+        creationDate: careerSetting('creationDate'),
         money: parseFloat(scalarText(career, 'money', '0') || '0'),
         playTime: parseFloat(scalarText(career, 'playTime', '0') || '0'),
-        economicDifficulty: scalarText(career, 'economicDifficulty'),
-        growthMode: scalarText(career, 'growthMode'),
-        timeScale: parseFloat(scalarText(career, 'timeScale', '1') || '1'),
-        plannedDaysPerPeriod: parseInt(scalarText(career, 'plannedDaysPerPeriod', '2') || '2', 10),
+        economicDifficulty: careerSetting('economicDifficulty'),
+        growthMode: careerSetting('growthMode'),
+        timeScale: parseFloat(careerSetting('timeScale', '1')),
+        plannedDaysPerPeriod: parseInt(careerSetting('plannedDaysPerPeriod', '2'), 10),
         settings: {
             weedsEnabled: scalarText(settingsEl, 'weedsEnabled') === 'true',
             limeRequired: scalarText(settingsEl, 'limeRequired') === 'true',
@@ -923,6 +926,31 @@ function parsePlaceablesXml(xmlStr) {
         const siloMeta = collectSiloFillTypesFromPlaceable(pl);
         const xmlName = pa.name != null ? String(pa.name) : '';
         const baseName = placeableFilenameBasename(filename);
+        const productionPoint = ensureArray(pl.productionPoint)[0];
+        let savedProduction = null;
+        if (productionPoint && typeof productionPoint === 'object') {
+            const slots = ensureArray(productionPoint.production).map((entry) => {
+                const row = attrs(entry);
+                const id = row.id != null ? String(row.id).trim() : '';
+                if (!id) return null;
+                return {
+                    name: humanizeBasename(id),
+                    isActive: String(row.isEnabled).toLowerCase() === 'true',
+                };
+            }).filter(Boolean);
+            const levels = {};
+            for (const storage of ensureArray(productionPoint.storage)) {
+                for (const node of ensureArray(storage && storage.node)) {
+                    const row = attrs(node);
+                    const fillType = row.fillType != null ? String(row.fillType).trim() : '';
+                    const amount = Number(row.fillLevel);
+                    if (fillType && Number.isFinite(amount) && amount >= 0) {
+                        levels[fillType] = (levels[fillType] || 0) + amount;
+                    }
+                }
+            }
+            savedProduction = { productions: slots, storageFillLevels: levels };
+        }
         placeables.push({
             uniqueId: pa.uniqueId != null ? String(pa.uniqueId) : '',
             farmId,
@@ -932,6 +960,7 @@ function parsePlaceablesXml(xmlStr) {
             basename: baseName,
             siloFillTypes: siloMeta.types,
             storageFillLevels: siloMeta.levels,
+            savedProduction,
             age: parseFloat(String(pa.age || '0')),
             price: parseFloat(String(pa.price || '0')),
         });
@@ -1201,6 +1230,7 @@ module.exports = {
     getSavegamePathAsync,
     classifyXmlFieldHarvest,
     parseFieldsXml,
+    parsePlaceablesXml,
     SAVEGAME_XML_FILES,
     OPTIONAL_SAVEGAME_XML_FILES,
     FTP_SAVEGAME_XML_DOWNLOAD_ORDER,

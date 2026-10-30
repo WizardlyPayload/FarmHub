@@ -1,8 +1,9 @@
-import { useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useState } from "preact/hooks";
 import { t, tOr } from "@/i18n/i18n";
 import { CompanionModsEmbed } from "@/sections/companions";
 import { Badge, Card } from "@/components/ui";
 import { useDashboardStore } from "@/store/dashboard-store";
+import { isLuaExportStale, LUA_EXPORT_STALE_MS, luaStaleRefreshDelayMs } from "@/lib/connection-badge";
 import type { EconomyLike } from "@/lib/fillTypeResolve";
 import {
   filterChainsBySearch,
@@ -177,6 +178,7 @@ function ChainCard({
   fillPhysics,
   unitDisplay,
   watch,
+  lastReported,
 }: {
   chain: ProductionChain;
   economy?: EconomyLike | null;
@@ -184,6 +186,7 @@ function ChainCard({
   fillPhysics: FillPhysicsMap;
   unitDisplay: UnitDisplayInfo;
   watch?: WatcherPoint;
+  lastReported: boolean;
 }) {
   const inputAlerts = useMemo(() => (watch ? watcherLevelsByFillType(watch, "input") : undefined), [watch]);
   const outputAlerts = useMemo(() => (watch ? watcherLevelsByFillType(watch, "output") : undefined), [watch]);
@@ -192,6 +195,7 @@ function ChainCard({
   const farmId = Number(chain.ownerFarmId);
   const isPublic = isPublicProductionChain(chain);
   const chainActive = chain.isActive === true;
+  const savedOnly = chain.source === "savegame_xml";
   const prods = Array.isArray(chain.productions) ? chain.productions : [];
 
   return (
@@ -209,9 +213,15 @@ function ChainCard({
           {isPublic ? (
             <Badge>{tOr("productions.badgePublic", "Map / public")}</Badge>
           ) : null}
-          <Badge tone={chainActive ? "accent" : "default"}>
-            {chainActive ? t("productions.chainRunning") : t("productions.chainStopped")}
-          </Badge>
+          {savedOnly ? <Badge>{tOr("productions.savedSnapshot", "From last saved game")}</Badge> : (
+            <Badge tone={chainActive ? "accent" : "default"}>
+              {lastReported
+                ? chainActive
+                  ? tOr("productions.lastReportedRunning", "Running at last export")
+                  : tOr("productions.lastReportedStopped", "Stopped at last export")
+                : chainActive ? t("productions.chainRunning") : t("productions.chainStopped")}
+            </Badge>
+          )}
           {watch
             ? pointLevels(watch).map((level) => (
                 <span key={level} data-fold="productionWatcher">
@@ -222,7 +232,14 @@ function ChainCard({
         </div>
       </div>
 
-      <div class="fd-prod-storage">
+      {savedOnly ? (
+        <div class="fd-prod-storage">
+          <div>
+            <h4 class="fd-prod-subhead">{tOr("productions.savedStorage", "Storage at last save")}</h4>
+            <FillTable map={chain.storageFillLevels} economy={economy} fillMode={fillMode} fillPhysics={fillPhysics} unitDisplay={unitDisplay} />
+          </div>
+        </div>
+      ) : <div class="fd-prod-storage">
         <div>
           <h4 class="fd-prod-subhead">{t("productions.inputStorage")}</h4>
           <FillTable map={chain.inputFillLevels} economy={economy} fillMode={fillMode} fillPhysics={fillPhysics} unitDisplay={unitDisplay} alerts={inputAlerts} />
@@ -231,7 +248,7 @@ function ChainCard({
           <h4 class="fd-prod-subhead">{t("productions.outputStorage")}</h4>
           <FillTable map={chain.outputFillLevels} economy={economy} fillMode={fillMode} fillPhysics={fillPhysics} unitDisplay={unitDisplay} alerts={outputAlerts} />
         </div>
-      </div>
+      </div>}
 
       <h4 class="fd-prod-subhead fd-prod-subhead--slots">{t("productions.productionSlots")}</h4>
       {prods.length === 0 ? (
@@ -246,7 +263,15 @@ function ChainCard({
                 <strong>{pname}</strong>
                 <span class="fd-prod-slot__badges">
                   <Badge tone={active ? "accent" : "default"}>
-                    {active ? t("productions.badgeActive") : t("productions.badgeInactive")}
+                    {savedOnly
+                      ? active
+                        ? tOr("productions.enabledAtLastSave", "Enabled at last save")
+                        : tOr("productions.disabledAtLastSave", "Disabled at last save")
+                      : lastReported
+                        ? active
+                          ? tOr("productions.activeAtLastExport", "Active at last export")
+                          : tOr("productions.inactiveAtLastExport", "Inactive at last export")
+                        : active ? t("productions.badgeActive") : t("productions.badgeInactive")}
                   </Badge>
                   <Badge>{String(p.status || "—")}</Badge>
                   {p.cyclesPerHour != null && Number(p.cyclesPerHour) > 0 ? (
@@ -254,7 +279,7 @@ function ChainCard({
                   ) : null}
                 </span>
               </summary>
-              <RecipeTable slot={p} economy={economy} fillMode={fillMode} fillPhysics={fillPhysics} unitDisplay={unitDisplay} />
+              {!savedOnly ? <RecipeTable slot={p} economy={economy} fillMode={fillMode} fillPhysics={fillPhysics} unitDisplay={unitDisplay} /> : null}
             </details>
           );
         })
@@ -265,12 +290,25 @@ function ChainCard({
 
 export function ProductionsSection() {
   const payload = useDashboardStore((s) => s.payload);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const activeFarmId = useDashboardStore((s) => s.activeFarmId);
   const fillMode = useFillUnitMode();
   const fillPhysics = useFillPhysics();
   const unitDisplay = useUnitDisplay();
   const [search, setSearch] = useState("");
   const [includePublic, setIncludePublic] = useState(readIncludePublicPref);
+  const ts = payload?.dataTimestamps;
+  const lastLua = ts?.lastLuaReceivedAt ?? undefined;
+  const staleMs = Number(ts?.luaExportStaleMs) || LUA_EXPORT_STALE_MS;
+  useEffect(() => {
+    const delay = luaStaleRefreshDelayMs(lastLua, staleMs, Date.now());
+    if (delay == null) return;
+    const id = window.setTimeout(() => setNowMs(Date.now()), delay);
+    return () => window.clearTimeout(id);
+  }, [lastLua, staleMs]);
+  const lastReported = payload?.dataSource === "xml_only" || ts?.isStale === true ||
+    ts?.confidence === "held" || ts?.confidence === "cache" ||
+    isLuaExportStale(lastLua, nowMs, staleMs);
 
   const farmId = activeFarmId ?? 1;
   const economy = (payload?.economy || null) as EconomyLike | null;
@@ -398,6 +436,7 @@ export function ProductionsSection() {
               fillPhysics={fillPhysics}
               unitDisplay={unitDisplay}
               watch={watcher.detected ? watcherPointForChain(c, watchPoints) : undefined}
+              lastReported={lastReported}
             />
           ))}
         </div>

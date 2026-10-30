@@ -289,6 +289,7 @@ describe("current XML source discovery", () => {
         expect(legacyRow.legacyJson).toBe(true);
         expect(legacyRow.replicaRemoteSlot).toBeUndefined();
         const authorityRow = discoveredServerFromScan(defaultSave, 2);
+        expect(discoveredServerFromScan(defaultSave, 99).id).toBe(authorityRow.id);
         expect(authorityRow.replicaRemoteSlot).toBeUndefined();
         expect(authorityRow.legacyJson).toBeUndefined();
 

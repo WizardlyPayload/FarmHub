@@ -53,6 +53,8 @@ export interface ProductionChain {
   isOwned?: boolean;
   inputFillLevels?: Record<string, number>;
   outputFillLevels?: Record<string, number>;
+  storageFillLevels?: Record<string, number>;
+  source?: string;
   productions?: ProductionSlot[];
   [key: string]: unknown;
 }

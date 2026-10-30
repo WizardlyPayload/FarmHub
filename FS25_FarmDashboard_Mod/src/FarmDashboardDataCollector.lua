@@ -41,6 +41,30 @@ FarmDashboardDataCollector.data = {}
 FarmDashboardDataCollector.moduleCache = {}
 FarmDashboardDataCollector.slotAccumulator = 0
 
+-- The weed and stone legend colors belong to the loaded map, not to the UI theme.
+local function _mapOverlayPalette(mission)
+    local result = {}
+    for _, kind in ipairs({ "weeds", "stones" }) do
+        local system = mission and (kind == "weeds" and mission.weedSystem or mission.stoneSystem)
+        if kind == "weeds" then system = mission and mission.weedSystem end
+        if system and type(system.getColors) == "function" then
+            local ok, rows = pcall(system.getColors, system)
+            if ok and type(rows) == "table" then
+                local palette = {}
+                for i = 1, math.min(#rows, 8) do
+                    local color = rows[i] and rows[i].color
+                    if type(color) == "table" and type(color[1]) == "number"
+                        and type(color[2]) == "number" and type(color[3]) == "number" then
+                        palette[#palette + 1] = { color[1], color[2], color[3] }
+                    end
+                end
+                if #palette > 0 then result[kind] = palette end
+            end
+        end
+    end
+    return result
+end
+
 -- Plan v5 wire format constants
 local DATA_SCHEMA_VERSION       = 1
 local DIRTY_SCHEMA_VERSION      = 1
@@ -4831,6 +4855,10 @@ function FarmDashboardDataCollector:beginDeferredJsonWrite(data, exportClass)
     data.serverInfo = data.serverInfo or {}
     data.serverInfo.mapName = currentMapName
     data.serverInfo.saveSlot = savegameDir
+    data.serverInfo.isMultiplayer = _G.g_currentMission ~= nil
+        and _G.g_currentMission.missionDynamicInfo ~= nil
+        and _G.g_currentMission.missionDynamicInfo.isMultiplayer == true
+    data.serverInfo.mapOverlayPalette = _mapOverlayPalette(_G.g_currentMission)
     if self._animalMode then
         data.serverInfo.animalMode = self._animalMode
     end
@@ -5384,6 +5412,10 @@ function FarmDashboardDataCollector:writeDataToFile(data, exportClass)
     data.serverInfo = {
         mapName = currentMapName,
         saveSlot = savegameDir,
+        isMultiplayer = _G.g_currentMission ~= nil
+            and _G.g_currentMission.missionDynamicInfo ~= nil
+            and _G.g_currentMission.missionDynamicInfo.isMultiplayer == true,
+        mapOverlayPalette = _mapOverlayPalette(_G.g_currentMission),
         mapBounds = self:refineMapBoundsFromWorldActivity(data, self:getMapBounds()),
     }
     if _G.g_currentMission and _G.g_currentMission.missionInfo then

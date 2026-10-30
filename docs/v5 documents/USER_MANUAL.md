@@ -1,6 +1,6 @@
 # Farm Dashboard V5: using your farm screens
 
-This manual describes the **5.2.7 Windows app / 5.1.0.12 game mod release**. If the dashboard is not installed yet, start with [Install V5](INSTALL.md). Optional mods are described individually in [Optional mods](COMPANION_MODS.md).
+This manual describes the **5.2.12 Windows app / 5.1.0.14 game mod candidate**. If the dashboard is not installed yet, start with [Install V5](INSTALL.md). Optional mods are described individually in [Optional mods](COMPANION_MODS.md).
 
 Farm Dashboard is an **out-of-game, read-only companion**. It does not replace FS25's menus or control your farm. The game mod exports data, and the Windows app turns that data into pages you can use on another screen.
 
@@ -63,7 +63,7 @@ Pastures is the V5 home for animal pens and livestock. Choose a pen for head cou
 
 ### Productions
 
-See your owned production chains, their running state, inputs and outputs. Optional Production Watcher warnings or profit estimates are read-only. A production list can be empty because you own none, a collector is off, or the last export is incomplete; Health helps distinguish these cases.
+See your owned production chains, their running state, inputs and outputs. Optional Production Watcher warnings or profit estimates are read-only. When the game is closed or the live production collector has not completed, the dashboard can show production sites, enabled recipes and stored amounts from the last saved `placeables.xml`. Those cards say **From last saved game** and **Storage at last save**. When a retained live export becomes stale, chain and recipe badges say **at last export** instead of claiming a machine is running now. A production list can be empty because you own none or the saved and live sources do not contain a readable production site; Health helps distinguish an incomplete export.
 
 ![Productions on the demo save](doc-screenshots/current-526/suite-productions.png)
 
@@ -81,9 +81,13 @@ See money, loans, prices, purchases and optional RF money blocks. Some RF tax, i
 
 ### Fleet map
 
-Use the map to find exported vehicles and places against the save's overview image. Filters and layers help with crops, growth, ownership and soil where the source supplies them. If pins appear on the wrong map, check the selected save first; never reuse another map's cached image as proof of your current farm.
+Use the map to find exported vehicles and places against the save's overview image. Filters and layers help with crops, growth, ownership and soil where the source supplies them. Orchard rows (grapes, olives, coffee and bananas) use the same field-shape overlay as other crops when the game exports a row footprint. The crop key takes its color from the loaded map's fruit type; ownership uses the game's farm palette, and fertilizer, weed and stone field colors match their legend keys using the game's palette when available. The weed and stone key lists each available game shade. Soil Fertilizer and Precision Farming layers remain dashboard-specific readings where the game has no equivalent color contract. If pins appear on the wrong map, check the selected save first; never reuse another map's cached image as proof of your current farm.
 
 ![Current fleet map example](doc-screenshots/current-526/suite-map.png)
+
+![Catuaí fleet map with separate banana and coffee orchard rows](doc-screenshots/v5-section-fleet-map-030-catuai-orchards.jpg)
+
+*Installed 5.2.9 map candidate with game mod 5.1.0.14, Catuaí save, maximized dashboard at 1920 pixels wide. The planted rows remain separate on the crop map instead of covering fields between them. The orchard layout remains the same in 5.2.12; the native overlay color correction was added afterward.*
 
 ## Optional mod pages
 

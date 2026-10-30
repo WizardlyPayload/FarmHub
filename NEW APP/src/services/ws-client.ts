@@ -418,7 +418,6 @@ export async function selectApprovedLinkedSource(sourceId: string, intent: numbe
             acceptedBindingId = published.bindingId;
             acceptedRevision = published.stateRevision;
             requiredRevision = published.stateRevision;
-            writeStoredServerId(targetId);
             syncNotificationScopeForContext(targetId, farmId, safePayload);
             useDashboardStore.setState({
               servers,
@@ -428,6 +427,7 @@ export async function selectApprovedLinkedSource(sourceId: string, intent: numbe
               lastUpdated: safePayload.lastUpdated ?? new Date().toISOString(),
               connection: socket?.readyState === WebSocket.OPEN ? "ws" : "http",
             });
+            writeStoredServerId(targetId);
             // Retain the normal label enrichment and farm inference after the atomic paint.
             applyPayloadToStore(safePayload);
             syncActiveFarmForPayload(safePayload);

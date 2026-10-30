@@ -619,7 +619,6 @@ export function StorageSection() {
           <p class="fd-muted-sm">{t("storage.hintEmpty")}</p>
         </header>
 
-      <CompanionModsEmbed categories={["storage"]} title={tOr("companions.embedStorage", "Storage companion mods")} />
       </div>
     );
   }
@@ -632,6 +631,11 @@ export function StorageSection() {
       </header>
       <FertilizerDepotPanel fertilizerDepot={payload.realisticFarming?.fertilizerDepot} />
       <StorageTab payload={payload} farmId={farmId} consumables={consumables} />
+      <CompanionModsEmbed
+        categories={["storage"]}
+        exclude={["realSilo", "palletDegradation"]}
+        title={tOr("companions.embedStorage", "Storage companion mods")}
+      />
     </div>
   );
 }

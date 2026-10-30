@@ -341,7 +341,11 @@ function OperationsLive({ cm, dashboard, farmId }: { cm: CompanionModsPayload; d
       </p>
       {status === "ok" ? (
         <Badge tone="default">{tOr("companions.live.opsFields", "{{count}} field HUD row(s)", { count: rows.length })}</Badge>
-      ) : status === "empty" ? null : (
+      ) : status === "empty" ? (
+        <p class="fd-economy__muted" data-reading="mod-field-rows">
+          {tOr("companions.live.opsNoRows", "Farm Operations Dashboard has no field HUD rows for this farm.")}
+        </p>
+      ) : (
         statusNote(status)
       )}
     </div>

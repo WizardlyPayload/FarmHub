@@ -190,6 +190,16 @@ describe("producer to renderer matrix", () => {
         expect(host.textContent).toContain("Est. Time: 0h 5m");
         expect(host.textContent).toContain("1 field HUD row(s)");
         expect(host.textContent).not.toContain("9000");
+        box.state.payload = {
+            ...box.state.payload,
+            companionMods: {
+                ...box.state.payload.companionMods,
+                farmOperations: { enabled: true, readState: "empty", farmId: 1, fields: [] },
+            },
+        };
+        render(h(sections.CompanionModsEmbed, { categories: companionMods.COMPANION_CATEGORY_ORDER }), host);
+        expect(host.textContent).toContain("Farm Operations Dashboard has no field HUD rows for this farm.");
+        expect(host.textContent).toContain("Counts come from the FarmHub overview for this farm.");
         box.state.activeFarmId = 2;
         render(h(sections.CompanionModsEmbed, { categories: companionMods.COMPANION_CATEGORY_ORDER }), host);
         expect(host.textContent).toContain("These numbers are for another farm.");

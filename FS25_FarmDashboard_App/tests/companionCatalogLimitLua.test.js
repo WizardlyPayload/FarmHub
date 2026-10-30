@@ -51,3 +51,25 @@ test("Everything Constructable's vault filename is detected only when loaded", (
     expect(run(true)).toBe("1|everythingConstructable");
     expect(run(false)).toBe("0|nil");
 });
+
+test("current Statistics Extended ModHub filename is detected only when loaded", () => {
+    const run = (name) => {
+        const L = lauxlib.luaL_newstate();
+        lualib.luaL_openlibs(L);
+        const loaded = name ? `["${name}"]=true` : "";
+        const chunk = [
+            `g_modIsLoaded={${loaded}}`,
+            "FarmDashLog={error=function() end}",
+            source,
+            "local p=CompanionModsDataCollector:collect()",
+            "return tostring(#p.mods)..'|'..tostring(p.mods[1] and p.mods[1].id)",
+        ].join("\n");
+        if (lauxlib.luaL_dostring(L, to_luastring(chunk)) !== lua.LUA_OK) {
+            throw new Error(to_jsstring(lua.lua_tostring(L, -1)));
+        }
+        return to_jsstring(lua.lua_tostring(L, -1));
+    };
+    expect(run("FS25_364343_FS25_statsExtended")).toBe("1|statisticsExtended");
+    expect(run("FS25_statsExtended")).toBe("1|statisticsExtended");
+    expect(run(null)).toBe("0|nil");
+});

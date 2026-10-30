@@ -413,8 +413,8 @@ local CATALOG = {
         id = "statisticsExtended",
         title = "Statistics Extended",
         category = "economy",
-        names = { "FS25_StatisticsExtended", "FS25_364343_Statistics_Extended" },
-        substrings = { "statisticsextended", "statistics_extended" },
+        names = { "FS25_StatisticsExtended", "FS25_364343_Statistics_Extended", "FS25_statsExtended", "FS25_364343_FS25_statsExtended" },
+        substrings = { "statisticsextended", "statistics_extended", "statsextended" },
         globals = {},
     },
     {

@@ -20,6 +20,7 @@ import {
   type RealSiloRow,
 } from "@/lib/companionMods";
 import { companionPanelId } from "@/lib/companionMods/presentation";
+import { finite, listOf, readFoldedCompanion, type FoldedReading } from "@/lib/companionFold";
 import { useDashboardStore } from "@/store/dashboard-store";
 import { StatTiles } from "./StatTiles";
 
@@ -49,7 +50,8 @@ function useAssetContext() {
   const selectedFarmId = useDashboardStore((s) => s.activeFarmId);
   const farmId = typeof selectedFarmId === "number" ? selectedFarmId : Number.NaN;
   const companion = (payload?.companionMods ?? null) as CompanionModsPayload | null;
-  return { companion, farmId };
+  const advanced = readFoldedCompanion(payload, "advancedMaintenance", farmId);
+  return { companion, farmId, advanced };
 }
 
 function monthName(period: number): string {
@@ -123,9 +125,34 @@ function StatusOr({ status, coverage, children }: { status: AssetStatus; coverag
   );
 }
 
-function MaintenanceLines({ companion, farmId }: { companion: CompanionModsPayload; farmId: number }) {
+function MaintenanceLines({ companion, farmId, advanced }: { companion: CompanionModsPayload; farmId: number; advanced?: FoldedReading }) {
   const lines: ComponentChildren[] = [];
-  if (companion.advancedMaintenance) {
+  const advancedState = advanced?.page?.readState;
+  const lockedCount = finite(advanced?.farmData?.lockedCount);
+  if (advanced?.detected && advanced.farmData && lockedCount !== null && (advancedState === "ok" || advancedState === "partial")) {
+    // The dedicated page collector completes a wider fleet scan than the older
+    // companionMods summary. Never let that summary's pending state mask a
+    // complete farm-scoped reading already exported on the same generation.
+    const coverage = advancedState === "partial" || advanced.page?.coverage !== "complete" ? "partial" : "complete";
+    const locked = listOf<{ id?: string; name?: string; zone?: string }>(advanced.farmData.machines)
+      .filter((row) => row.zone === "locked");
+    const note = assetStatusText("ok", coverage);
+    lines.push(
+      <div key="am" data-asset="advancedMaintenance">
+        {lockedCount > 0 ? (
+          <Badge tone="warn">
+            {text("companions.live.maintenanceBlocked", "{{count}} machine(s) cannot start: {{names}}", {
+              count: lockedCount,
+              names: names(locked),
+            })}
+          </Badge>
+        ) : coverage === "complete" ? (
+          <Muted>{text("companions.live.maintenanceClear", "No machine on this farm is blocked from starting.")}</Muted>
+        ) : null}
+        {note ? <Muted>{note}</Muted> : null}
+      </div>,
+    );
+  } else if (companion.advancedMaintenance) {
     const am = readAdvancedMaintenance(companion.advancedMaintenance, farmId);
     lines.push(
       <div key="am" data-asset="advancedMaintenance">
@@ -220,13 +247,13 @@ export const FLEET_NOTES_IDS = ["advancedMaintenance", "extendedVehicleMaintenan
 
 /** Fleet page: maintenance mods read for the selected farm, next to the native damage cards. */
 export function FleetMaintenanceNotes() {
-  const { companion, farmId } = useAssetContext();
-  if (!companion || (!companion.advancedMaintenance && !companion.extendedVehicleMaintenance && !companion.realisticVehicleService)) {
+  const { companion, farmId, advanced } = useAssetContext();
+  if ((!companion || (!companion.advancedMaintenance && !companion.extendedVehicleMaintenance && !companion.realisticVehicleService)) && !advanced.detected) {
     return null;
   }
   return (
     <Card class="fd-asset-notes" title={text("companions.assets.fleetTitle", "Maintenance mods")}>
-      <MaintenanceLines companion={companion} farmId={farmId} />
+      <MaintenanceLines companion={companion ?? {}} farmId={farmId} advanced={advanced} />
     </Card>
   );
 }

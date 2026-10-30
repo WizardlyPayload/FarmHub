@@ -15,7 +15,7 @@ function fill(template, params) {
 }
 
 const companions = productionTs("NEW APP/src/sections/companions/CompanionModsSection.tsx", {
-    "@/components/ui": { Badge: () => null, Button: () => null, Card: () => null },
+    "@/components/ui": { Badge: ({ children }) => children, Button: () => null, Card: () => null },
     "@/i18n/i18n": { t: (key) => key, tOr: (_key, fallback, params) => fill(fallback, params) },
     "@/lib/economy": { formatCurrency: (value) => String(value) },
     "@/lib/profile-display": { saveProfileFromUnitDisplay: () => null },
@@ -100,6 +100,20 @@ const splitLoans = {
 };
 
 describe("companion and overview consumers", () => {
+    test("Save Unit Profiles reports an unverified last apply instead of only showing GBP", () => {
+        const text = live("saveUnitProfiles", {
+            saveUnitProfiles: {
+                enabled: true,
+                readState: "ok",
+                moneyUnitName: "GBP",
+                hasApplied: true,
+                lastApplyOk: false,
+            },
+        }, 1);
+        expect(text).toContain("Money unit: GBP");
+        expect(text).toContain("Profile settings could not be fully verified");
+    });
+
     test("selected farm zero does not inherit the other farm or the aggregate", () => {
         const text = live("loans", splitLoans, 1);
         expect(text).toContain("0 active loan(s)");

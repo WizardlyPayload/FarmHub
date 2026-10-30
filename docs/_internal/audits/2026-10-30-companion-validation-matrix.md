@@ -42,10 +42,10 @@ A = completed Witcombe save 20 on Tina Ally, with game closed before UI inspecti
 | timeSavingStockCheck | unmapped | storage | A | A: settings only; menu unopened |
 | palletDegradation | limited | storage | A | A: export/UI matched |
 | realSilo | limited | storage | B1 | B1: 2 silo structures matched; both empty |
-| everythingConstructable | live | dedicated page | B2 | B2: ZIP installed but checkbox off and no `Load mod` line; active project/delivery untested |
-| advancedMaintenance | limited | vehicles | B1 | B2: 5.2.13 stopped false pending; 16-machine count absent. 5.2.14 candidate adds count and label; Ally confirmation pending |
-| extendedVehicleMaintenance | limited | vehicles | B2 | B2: truncated export; UI generic/unlabelled. 5.2.14 candidate labels it; game comparison pending |
-| realisticVehicleService | limited | vehicles | B2 | B2: truncated export; UI showed normalized 0.99999 condition as 1%. 5.2.14 candidate converts to 100% and labels it; Ally confirmation pending |
+| everythingConstructable | live | dedicated page | B2 | B3: checked/loaded/detected, empty page honest; no active site or material delivery yet |
+| advancedMaintenance | limited | vehicles | B1 | B3: 5.2.14 installed card showed 16 machines from complete page despite older pending summary; passed this reading |
+| extendedVehicleMaintenance | limited | vehicles | B2 | B3: 5.2.14 installed card separately labelled; partial coverage disclosed; live service event unproved |
+| realisticVehicleService | limited | vehicles | B2 | B3: 5.2.14 installed card separately labelled and normalized 0.99999 showed 100%; truncated coverage disclosed |
 | outOfFuel | detection-only | vehicles | A | A: notice only; gameplay unproved |
 | puncturedTires | unmapped | vehicles | R | No data reader claimed; active detection/navigation to check |
 | collisionDamage | unmapped | vehicles | A | A: zero hits; gameplay unproved |
@@ -54,7 +54,7 @@ A = completed Witcombe save 20 on Tina Ally, with game closed before UI inspecti
 | courseplay | unmapped | vehicles | A | A: settings only; no course |
 | implementUsageCounter | unmapped | vehicles | R | No data reader claimed; active detection/navigation to check |
 | ingameTimeOperatingHours | unmapped | vehicles | R | No data reader claimed; active detection/navigation to check |
-| saveUnitProfiles | limited | economy | B1 | B1/B2: GBP export; Economy UI still unchecked |
+| saveUnitProfiles | limited | economy | B1 | B3: Economy showed GBP but omitted `lastApplyOk=false` / partial verification; 5.2.15 candidate adds notice, Ally retest pending |
 | imperialSystem | unmapped | economy | R | No data reader claimed; active detection/navigation to check |
 | britishFillUnits | unmapped | economy | A | A: hooks/samples only; no page |
 | bushelPlus | unmapped | vehicles | A | A: no combine attached; gameplay unproved |
@@ -65,7 +65,7 @@ A = completed Witcombe save 20 on Tina Ally, with game closed before UI inspecti
 | animalPlanner | limited | pastures | B2 | B2: pen counts matched prior game/export and Pastures card |
 | vipOrderManager | limited | economy | B2 | B2: empty orders; UI/game event unproved |
 | fieldProfitabilityLedger | limited | fields | B2 | B2: unavailable, no sale-category data in save |
-| farmReputation | limited | economy | B2 | B2: unavailable; Better Contracts dependency present; uncheck test not run |
+| farmReputation | limited | economy | B2 | B3: hide-on-uncheck passed with Better Contracts still active; reputation values unavailable in save |
 | yieldTracker | limited | fields | B2 | B2: empty rows; UI/game event unproved |
 | moistureSystem | limited | fields | B1 | B1: field values matched; bale/silo states absent |
 | fieldLeasing | limited | fields | A | A: settings only; no lease |
@@ -114,4 +114,6 @@ DLC/export surfaces in this same save: Highlands Fishing enabled, Emergency Pack
 
 Phase B1 evidence: Z:\Graham\agent-comms\ally-fh-companions-b1-evidence\RESULT-B1-text.md. Installer 5.2.12 and mod 5.1.0.15 matched their frozen hashes, three distinct game runs committed multiple generations, one Windows app row appeared, and Tina restored the Ally by hash. The Advanced Maintenance V5 card used an older pending summary although the newer per-farm page was complete; V5 5.2.13 stopped the false pending display but did not show the machine count.
 
-Phase B2 evidence: Z:\Graham\agent-comms\ally-fh-companions-b2-evidence\RESULT-B2-text.md, with selection and UI screenshots and decoded generation 8 export in the same folder. Exact 5.2.13 installer and 5.1.0.15 mod hashes matched the frozen packet, one Windows app row appeared, generations 1–9 committed, no reported Lua errors, and Tina restored all Ally originals by hash. Sixteen B2 readers were exercised on one disposable save: Animal Planner had meaningful matching pen counts; many others were empty or unavailable. Everything Constructable was available in the mod list but its checkbox was off and it had no `Load mod` line, so it was not active. The 5.2.14 candidate corrects the Vehicle Service percent and identifies the three maintenance readers separately. These corrections require installed Ally confirmation. No active construction project or delivery, Farm Reputation hide-on-uncheck, Save Unit Profiles Economy UI, or non-empty B2 event state has yet been verified.
+Phase B2 evidence: Z:\Graham\agent-comms\ally-fh-companions-b2-evidence\RESULT-B2-text.md, with selection and UI screenshots and decoded generation 8 export in the same folder. Exact 5.2.13 installer and 5.1.0.15 mod hashes matched the frozen packet, one Windows app row appeared, generations 1–9 committed, no reported Lua errors, and Tina restored all Ally originals by hash. Sixteen B2 readers were exercised on one disposable save: Animal Planner had meaningful matching pen counts; many others were empty or unavailable. Everything Constructable was available in the mod list but its checkbox was off and it had no `Load mod` line, so it was not active. B2 exposed the Vehicle Service percentage and unlabeled maintenance readings; B3 tested their correction. No active construction project or delivery or non-empty B2 event state has yet been verified.
+
+Phase B3 evidence: Z:\Graham\agent-comms\ally-fh-companions-b3-evidence\RESULT-B3-text.md. Exact 5.2.14 installer and 5.1.0.15 mod hashes matched the frozen packet, one Windows install row appeared, generations 1–10 committed in run 1 and 1–5 in run 2, no reported Lua errors, and Tina restored Ally originals by hash. The installed Vehicles card showed Advanced Maintenance's 16-machine page reading, separate service-mod labels, a 100% normalized condition and partial-coverage notices. Farm Reputation hid when unchecked, while Better Contracts remained. Everything Constructable was checked and loaded but had zero active sites; a site/material gameplay path is still untested. Save Unit Profiles' Economy card showed GBP but not its `lastApplyOk=false` / partial verification state. The 5.2.15 candidate adds an explicit verification notice; installed Ally confirmation remains pending.

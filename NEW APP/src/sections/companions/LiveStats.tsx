@@ -514,6 +514,12 @@ export function LiveStats({
         {payload.saveUnitProfiles.profileName ? (
           <Badge tone="default">{payload.saveUnitProfiles.profileName}</Badge>
         ) : null}
+        {(payload.saveUnitProfiles.hasApplied && payload.saveUnitProfiles.lastApplyOk === false)
+          || moneyProfile?.applyState === "partial" ? (
+          <Badge tone="warn">
+            {tOr("companions.live.supPartial", "Profile settings could not be fully verified")}
+          </Badge>
+        ) : null}
       </div>
     );
   }

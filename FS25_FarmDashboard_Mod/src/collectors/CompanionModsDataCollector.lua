@@ -5,7 +5,6 @@
 CompanionModsDataCollector = {}
 
 local MAX_LOANS_PER_FARM = 24
-local MAX_MODS = 64
 
 --- Catalog: id is stable for UI; names/substrings match ModHub folder variants.
 local CATALOG = {
@@ -3479,9 +3478,6 @@ function CompanionModsDataCollector:collectStep(_opts)
         local any = false
 
         for _, entry in ipairs(CATALOG) do
-            if #mods >= MAX_MODS then
-                break
-            end
             local detected, listedName = false, nil
             local okDetect, d1, d2 = pcall(detectEntry, entry)
             if okDetect then

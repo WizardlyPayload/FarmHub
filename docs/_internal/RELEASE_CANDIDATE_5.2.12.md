@@ -21,6 +21,6 @@
 
 ## Pending publication and operations
 
-Sarah request `SARAH-20261030-001` is in `Z:\OpenClaw\Sarah Office\INBOX.txt` for a targeted website addition with backup, protected tester-tree preservation and public readback. There was no matching Sarah OUTBOX result at handoff time. An inbox entry alone is not approval or completion.
+Sarah reported `RESULT SARAH-20261030-001` in `Z:\OpenClaw\Sarah Office\OUTBOX.txt`: the targeted website addition was deployed, with 15 replaced files backed up, 38 new files, no deleted or protected tester files, all 53 live hashes checked, `nginx -t` passed, and public Cloudflare readback completed. The rollback archive SHA-256 is `74CA34B2B993A0A277099502FE6EDB92551A585778D58D3FF4BC173B0813D9C3`, retained both on the VPS and in Sarah's office. Independent public readback then matched the staged ZIP byte-for-byte for the homepage, supported-mods index, Everything Constructable page, sitemap and cache-keyed shared shell (`CF-Cache-Status: HIT`). The public website still advertises the approved 5.2.7 app release.
 
-Do not upload this app installer to GitHub/itch or change the updater feed until Graham's release go-ahead. Route any VPS work through Sarah. Before publication, reconcile the final source commit and artifact hashes, verify the public website response after Sarah's result, and prepare exact 5.2.12 release notes and manual links.
+Do not upload this app installer to GitHub/itch or change the updater feed until Graham's release go-ahead. Route any further VPS work through Sarah. Before app publication, reconcile the final source commit and artifact hashes and prepare exact 5.2.12 release notes and manual links.

@@ -29,11 +29,23 @@ const mocks = {
         readExtendedMaintenance: assetReadings.readExtendedMaintenance,
         readVehicleService: assetReadings.readVehicleService,
         serviceFaults: assetReadings.serviceFaults,
+        readRealSilo: assetReadings.readRealSilo,
     },
-    "@/lib/companionMods/presentation": {},
-    "./StatTiles": { StatTiles: () => null },
+    "@/lib/companionMods/presentation": { companionPanelId: (id) => id },
+    "@/sections/mods/shared": {
+        useCompanionPage: () => {
+            const page = state.payload?.companionPages?.pages?.realSilo ?? null;
+            return {
+                page,
+                mod: state.payload?.companionMods?.mods?.find((row) => row.id === "realSilo" && row.detected) ?? null,
+                farmData: page?.byFarm?.[String(state.activeFarmId)] ?? null,
+            };
+        },
+        ModPageLink: () => h("button", null, "Open full page"),
+    },
+    "./StatTiles": { StatTiles: ({ tiles }) => h("div", null, tiles.map((tile) => h("span", null, `${tile.label}: ${tile.value}`))) },
 };
-const { FleetMaintenanceNotes } = productionTs("NEW APP/src/sections/companions/AssetCompanionNotes.tsx", mocks);
+const { FleetMaintenanceNotes, StorageAssetNotes } = productionTs("NEW APP/src/sections/companions/AssetCompanionNotes.tsx", mocks);
 
 function paint(payload, farmId = 1) {
     state.payload = payload;
@@ -90,4 +102,26 @@ test("a partial page reading cannot assert that every machine is clear", () => {
     });
     expect(text).toContain("Some items were not ready to read.");
     expect(text).not.toContain("No machine on this farm is blocked from starting.");
+});
+
+test("Storage uses the complete farm-scoped RealSilo page instead of the older unavailable summary", () => {
+    state.payload = {
+        companionMods: {
+            mods: [{ id: "realSilo", detected: true }],
+            realSilo: { enabled: true, farmId: 1, readState: "unavailable", source: "realSilo" },
+        },
+        companionPages: { pages: { realSilo: {
+            detected: true, readState: "ok", coverage: "complete",
+            byFarm: { "1": { siloCount: 2, compartments: 8, usedCompartments: 0, unconfigured: 2 } },
+        } } },
+    };
+    state.activeFarmId = 1;
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    render(h(StorageAssetNotes, { catalog: null, titles: null, economy: null }), host);
+    expect(host.textContent).toContain("Silos: 2");
+    expect(host.textContent).toContain("Compartments in use: 0 / 8");
+    expect(host.textContent).toContain("Silos not set up: 2");
+    expect(host.textContent).toContain("Open full page");
+    expect(host.textContent).not.toContain("This mod's reading is not available in this save.");
 });

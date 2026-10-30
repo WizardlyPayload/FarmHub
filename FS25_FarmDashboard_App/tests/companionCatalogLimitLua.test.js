@@ -31,3 +31,23 @@ test("every active catalogued companion is exported when the whole catalog is lo
     expect(to_jsstring(lua.lua_tostring(L, -1)))
         .toBe(`${names.length}|farmOperationsDashboard`);
 });
+
+test("Everything Constructable's vault filename is detected only when loaded", () => {
+    const run = (loaded) => {
+        const L = lauxlib.luaL_newstate();
+        lualib.luaL_openlibs(L);
+        const chunk = [
+            `g_modIsLoaded={${loaded ? '["KM_78834_Everything_Constructable"]=true' : ""}}`,
+            "FarmDashLog={error=function() end}",
+            source,
+            "local p=CompanionModsDataCollector:collect()",
+            "return tostring(#p.mods)..'|'..tostring(p.mods[1] and p.mods[1].id)",
+        ].join("\n");
+        if (lauxlib.luaL_dostring(L, to_luastring(chunk)) !== lua.LUA_OK) {
+            throw new Error(to_jsstring(lua.lua_tostring(L, -1)));
+        }
+        return to_jsstring(lua.lua_tostring(L, -1));
+    };
+    expect(run(true)).toBe("1|everythingConstructable");
+    expect(run(false)).toBe("0|nil");
+});

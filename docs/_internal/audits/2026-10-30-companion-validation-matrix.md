@@ -23,7 +23,7 @@ A = completed Witcombe save 20 on Tina Ally, with game closed before UI inspecti
 | soilWorkYieldBonus | limited | fields | A | A: empty worked ground; gameplay unproved |
 | smartCropControl | unmapped | fields | A | A: UI seen; values unverified |
 | dynamicFieldPrices | unmapped | fields | R | No data reader claimed; active detection/navigation to check |
-| farmlandMarketplace | limited | fields | B2 | Not yet run |
+| farmlandMarketplace | limited | fields | B2 | B2: loaded, reader unavailable in save 20; gameplay/UI unproved |
 | betterContracts | live | economy | A | A: export/UI matched; active contracts zero |
 | missionsExpanded | unmapped | economy | R | No data reader claimed; active detection/navigation to check |
 | additionalContracts | unmapped | economy | R | No data reader claimed; active detection/navigation to check |
@@ -42,10 +42,10 @@ A = completed Witcombe save 20 on Tina Ally, with game closed before UI inspecti
 | timeSavingStockCheck | unmapped | storage | A | A: settings only; menu unopened |
 | palletDegradation | limited | storage | A | A: export/UI matched |
 | realSilo | limited | storage | B1 | B1: 2 silo structures matched; both empty |
-| everythingConstructable | live | dedicated page | B2 | Not yet run |
-| advancedMaintenance | limited | vehicles | B1 | B1: 5.2.12 card falsely pending; 5.2.13 fix awaiting Ally |
-| extendedVehicleMaintenance | limited | vehicles | B2 | Not yet run |
-| realisticVehicleService | limited | vehicles | B2 | Not yet run |
+| everythingConstructable | live | dedicated page | B2 | B2: ZIP installed but checkbox off and no `Load mod` line; active project/delivery untested |
+| advancedMaintenance | limited | vehicles | B1 | B2: 5.2.13 stopped false pending; 16-machine count absent. 5.2.14 candidate adds count and label; Ally confirmation pending |
+| extendedVehicleMaintenance | limited | vehicles | B2 | B2: truncated export; UI generic/unlabelled. 5.2.14 candidate labels it; game comparison pending |
+| realisticVehicleService | limited | vehicles | B2 | B2: truncated export; UI showed normalized 0.99999 condition as 1%. 5.2.14 candidate converts to 100% and labels it; Ally confirmation pending |
 | outOfFuel | detection-only | vehicles | A | A: notice only; gameplay unproved |
 | puncturedTires | unmapped | vehicles | R | No data reader claimed; active detection/navigation to check |
 | collisionDamage | unmapped | vehicles | A | A: zero hits; gameplay unproved |
@@ -54,31 +54,31 @@ A = completed Witcombe save 20 on Tina Ally, with game closed before UI inspecti
 | courseplay | unmapped | vehicles | A | A: settings only; no course |
 | implementUsageCounter | unmapped | vehicles | R | No data reader claimed; active detection/navigation to check |
 | ingameTimeOperatingHours | unmapped | vehicles | R | No data reader claimed; active detection/navigation to check |
-| saveUnitProfiles | limited | economy | B1 | B1: GBP export only; Economy UI unchecked |
+| saveUnitProfiles | limited | economy | B1 | B1/B2: GBP export; Economy UI still unchecked |
 | imperialSystem | unmapped | economy | R | No data reader claimed; active detection/navigation to check |
 | britishFillUnits | unmapped | economy | A | A: hooks/samples only; no page |
 | bushelPlus | unmapped | vehicles | A | A: no combine attached; gameplay unproved |
 | seasonalWoolProduction | limited | pastures | A | A: schedule matched; no sheep |
-| taskList | limited | economy | B2 | Not yet run |
-| productionSchedule | limited | productions | B2 | Not yet run |
-| economicHistory | limited | economy | B2 | Not yet run |
-| animalPlanner | limited | pastures | B2 | Not yet run |
-| vipOrderManager | limited | economy | B2 | Not yet run |
-| fieldProfitabilityLedger | limited | fields | B2 | Not yet run |
-| farmReputation | limited | economy | B2 | Not yet run |
-| yieldTracker | limited | fields | B2 | Not yet run |
+| taskList | limited | economy | B2 | B2: empty task list; UI/game event unproved |
+| productionSchedule | limited | productions | B2 | B2: empty recipes; Productions card matched empty state |
+| economicHistory | limited | economy | B2 | B2: monthly totals exported; UI not inspected |
+| animalPlanner | limited | pastures | B2 | B2: pen counts matched prior game/export and Pastures card |
+| vipOrderManager | limited | economy | B2 | B2: empty orders; UI/game event unproved |
+| fieldProfitabilityLedger | limited | fields | B2 | B2: unavailable, no sale-category data in save |
+| farmReputation | limited | economy | B2 | B2: unavailable; Better Contracts dependency present; uncheck test not run |
+| yieldTracker | limited | fields | B2 | B2: empty rows; UI/game event unproved |
 | moistureSystem | limited | fields | B1 | B1: field values matched; bale/silo states absent |
 | fieldLeasing | limited | fields | A | A: settings only; no lease |
-| rentYourField | limited | fields | B2 | Not yet run |
-| distributionRedux | limited | productions | B2 | Not yet run |
-| silageCompactionMonitor | limited | storage | B2 | Not yet run |
-| farmOperationsDashboard | limited | overview | B2 | Not yet run |
+| rentYourField | limited | fields | B2 | B2: empty agreements; UI/game event unproved |
+| distributionRedux | limited | productions | B2 | B2: unavailable; Productions card accurately said unavailable |
+| silageCompactionMonitor | limited | storage | B2 | B2: unavailable in save 20; game/UI unproved |
+| farmOperationsDashboard | limited | overview | B2 | B2: empty fields; UI/game event unproved |
 
 Cohort counts: A 22, B1 9, B2 16, R 18. Among all entries, 36 have live or limited data support; 29 are detection-only or unmapped. The A cohort contains 11 data readers and 11 other catalog entries.
 
 Known declared dependencies: Farm Reputation requires Better Contracts; reference-only Enhanced Seasonal Prices requires ZYX Seasonal Prices. Fluctuating Diesel Price and Realistic Diesel Price both write fuel pricing, so their combined behavior must be tested separately.
 
-A functional Lua regression for all 65 active catalog entries found and fixed a 64-entry export cap in source. This source change is not in the currently installed 5.2.12 candidate.
+A functional Lua regression for all 65 active catalog entries found and fixed a 64-entry export cap in source. This source change is in the 5.1.0.15 mod ZIP used for B1 and B2; the PC production mod remains 5.1.0.14.
 
 Phase A evidence: Z:\Graham\agent-comms\ally-fh-companions-a-evidence\RESULT-FARMHUB-ALLY-20261030-COMPANIONS-A-text.md. Exact installer and mod hashes matched the phase A packet; generations 1-13 and then 1-4 committed, 22 then 21 companion pages, one Windows row, and Ally originals restored by hash. Run 2 was still under Courseplay fleet-spawn deferral, so its smaller fleet snapshot is not a separate verified vehicle regression.
 
@@ -112,4 +112,6 @@ The 5.1.0.14 Ally phase A export also contained these RF presence records. Prese
 
 DLC/export surfaces in this same save: Highlands Fishing enabled, Emergency Pack enabled, orchards available, Beans & Alpacas disabled. The previous Catuaí live test proved coffee and banana row ownership and map outlines using 5.1.0.14; no new DLC gameplay test has run with 5.1.0.15.
 
-Phase B1 evidence: Z:\Graham\agent-comms\ally-fh-companions-b1-evidence\RESULT-B1-text.md. Installer 5.2.12 and mod 5.1.0.15 matched their frozen hashes, three distinct game runs committed multiple generations, one Windows app row appeared, and Tina restored the Ally by hash. The Advanced Maintenance V5 card used an older pending summary although the newer per-farm page was complete; fixed in V5 5.2.13 source and regression tested, with installed Ally confirmation pending in B2.
+Phase B1 evidence: Z:\Graham\agent-comms\ally-fh-companions-b1-evidence\RESULT-B1-text.md. Installer 5.2.12 and mod 5.1.0.15 matched their frozen hashes, three distinct game runs committed multiple generations, one Windows app row appeared, and Tina restored the Ally by hash. The Advanced Maintenance V5 card used an older pending summary although the newer per-farm page was complete; V5 5.2.13 stopped the false pending display but did not show the machine count.
+
+Phase B2 evidence: Z:\Graham\agent-comms\ally-fh-companions-b2-evidence\RESULT-B2-text.md, with selection and UI screenshots and decoded generation 8 export in the same folder. Exact 5.2.13 installer and 5.1.0.15 mod hashes matched the frozen packet, one Windows app row appeared, generations 1–9 committed, no reported Lua errors, and Tina restored all Ally originals by hash. Sixteen B2 readers were exercised on one disposable save: Animal Planner had meaningful matching pen counts; many others were empty or unavailable. Everything Constructable was available in the mod list but its checkbox was off and it had no `Load mod` line, so it was not active. The 5.2.14 candidate corrects the Vehicle Service percent and identifies the three maintenance readers separately. These corrections require installed Ally confirmation. No active construction project or delivery, Farm Reputation hide-on-uncheck, Save Unit Profiles Economy UI, or non-empty B2 event state has yet been verified.

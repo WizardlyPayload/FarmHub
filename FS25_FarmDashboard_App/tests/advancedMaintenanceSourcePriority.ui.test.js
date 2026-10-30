@@ -11,6 +11,7 @@ const useDashboardStore = (selector) => selector(state);
 const folded = productionTs("NEW APP/src/lib/companionFold.ts", {
     "@/store/dashboard-store": { useDashboardStore },
 });
+const assetReadings = productionTs("NEW APP/src/lib/companionMods/assetReadings.ts");
 const mocks = {
     "@/store/dashboard-store": { useDashboardStore },
     "@/lib/companionFold": folded,
@@ -25,6 +26,9 @@ const mocks = {
     "@/lib/storage": {},
     "@/lib/companionMods": {
         readAdvancedMaintenance: () => ({ status: "pending", coverage: "truncated", blocked: [] }),
+        readExtendedMaintenance: assetReadings.readExtendedMaintenance,
+        readVehicleService: assetReadings.readVehicleService,
+        serviceFaults: assetReadings.serviceFaults,
     },
     "@/lib/companionMods/presentation": {},
     "./StatTiles": { StatTiles: () => null },
@@ -52,9 +56,28 @@ test("a complete farm-scoped page reading supersedes the older pending fleet sum
         } } },
     };
     const text = paint(payload);
+    expect(text).toContain("Advanced Maintenance");
+    expect(text).toContain("16 modded machines checked");
     expect(text).toContain("No machine on this farm is blocked from starting.");
     expect(text).not.toContain("This reading is not ready yet.");
     expect(paint(payload, 2)).not.toContain("No machine on this farm is blocked from starting.");
+});
+
+test("separate maintenance mods retain labels and display ratio condition as a percentage", () => {
+    const text = paint({ companionMods: {
+        extendedVehicleMaintenance: {
+            enabled: true, readState: "ok", coverage: "truncated", scope: "farm", farmId: 1,
+            machines: [{ id: "a", name: "Pallet Fork", hoursPool: 25, serviceActive: false, failureType: "" }],
+        },
+        realisticVehicleService: {
+            enabled: true, readState: "ok", coverage: "truncated", scope: "farm", farmId: 1,
+            machines: [{ id: "b", name: "Tractor", condition: 0.999988, serviceSoon: false, warmupMs: 0, faults: {} }],
+        },
+    } });
+    expect(text).toContain("Extended Vehicle Maintenance");
+    expect(text).toContain("Realistic Vehicle Service");
+    expect(text).toContain("Lowest condition 100%");
+    expect(text).not.toContain("Lowest condition 1%");
 });
 
 test("a partial page reading cannot assert that every machine is clear", () => {

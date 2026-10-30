@@ -134,11 +134,14 @@ function MaintenanceLines({ companion, farmId, advanced }: { companion: Companio
     // companionMods summary. Never let that summary's pending state mask a
     // complete farm-scoped reading already exported on the same generation.
     const coverage = advancedState === "partial" || advanced.page?.coverage !== "complete" ? "partial" : "complete";
+    const machineCount = finite(advanced.farmData.machineCount);
     const locked = listOf<{ id?: string; name?: string; zone?: string }>(advanced.farmData.machines)
       .filter((row) => row.zone === "locked");
     const note = assetStatusText("ok", coverage);
     lines.push(
       <div key="am" data-asset="advancedMaintenance">
+        <strong>{text("companionPage.advancedMaintenance.title", "Advanced Maintenance")}</strong>
+        {machineCount !== null ? <Muted>{text("companions.assets.machineCount", "{{count}} modded machines checked", { count: machineCount })}</Muted> : null}
         {lockedCount > 0 ? (
           <Badge tone="warn">
             {text("companions.live.maintenanceBlocked", "{{count}} machine(s) cannot start: {{names}}", {
@@ -156,6 +159,7 @@ function MaintenanceLines({ companion, farmId, advanced }: { companion: Companio
     const am = readAdvancedMaintenance(companion.advancedMaintenance, farmId);
     lines.push(
       <div key="am" data-asset="advancedMaintenance">
+        <strong>{text("companionPage.advancedMaintenance.title", "Advanced Maintenance")}</strong>
         <StatusOr status={am.status} coverage={am.coverage}>
           {() =>
             am.blocked.length ? (
@@ -177,6 +181,7 @@ function MaintenanceLines({ companion, farmId, advanced }: { companion: Companio
     const evm = readExtendedMaintenance(companion.extendedVehicleMaintenance, farmId);
     lines.push(
       <div key="evm" data-asset="extendedVehicleMaintenance">
+        <strong>{text("companions.assets.extendedVehicleMaintenance", "Extended Vehicle Maintenance")}</strong>
         <StatusOr status={evm.status} coverage={evm.coverage}>
           {() => (
             <>
@@ -208,6 +213,7 @@ function MaintenanceLines({ companion, farmId, advanced }: { companion: Companio
     const rvs = readVehicleService(companion.realisticVehicleService, farmId);
     lines.push(
       <div key="rvs" data-asset="realisticVehicleService">
+        <strong>{text("companions.assets.realisticVehicleService", "Realistic Vehicle Service")}</strong>
         <StatusOr status={rvs.status} coverage={rvs.coverage}>
           {() => (
             <>
@@ -231,7 +237,7 @@ function MaintenanceLines({ companion, farmId, advanced }: { companion: Companio
                 <Badge>{text("companions.live.rvsWarmup", "{{count}} machine(s) warming up", { count: rvs.warmingUp.length })}</Badge>
               ) : null}
               {rvs.lowestCondition != null ? (
-                <Badge>{text("companions.live.rvsCondition", "Lowest condition {{percent}}%", { percent: Math.round(rvs.lowestCondition) })}</Badge>
+                <Badge>{text("companions.live.rvsCondition", "Lowest condition {{percent}}%", { percent: Math.round(rvs.lowestCondition * 100) })}</Badge>
               ) : null}
             </>
           )}

@@ -73,3 +73,42 @@ test("current Statistics Extended ModHub filename is detected only when loaded",
     expect(run("FS25_statsExtended")).toBe("1|statisticsExtended");
     expect(run(null)).toBe("0|nil");
 });
+
+test("current vault filenames for the reference cohort are detected together", () => {
+    const expected = [
+        ["iNeedALoan", "FS25_365743_I_Need_A_Loan"],
+        ["noCredit", "FS25_339204_No_Credit"],
+        ["dynamicMarket", "FS25_366174_Dynamic_Market"],
+        ["marketPriceHelper", "FS25_362332_Market_Price_Helper"],
+        ["enhancedSeasonalPrices", "FS25_310803_Enhanced_Seasonal_Prices"],
+        ["statisticsExtended", "FS25_364343_FS25_statsExtended"],
+        ["dynamicFieldPrices", "FS25_348187_Dynamic_Field_Prices"],
+        ["missionsExpanded", "FS25_307801_Missions_Expanded"],
+        ["additionalContracts", "FS25_328503_Additional-Contracts"],
+        ["realisticMilkingTimes", "FS25_303654_Realistic_Milking_Times"],
+        ["animalTrader", "FS25_339284_Animal_Trader"],
+        ["stallRental", "FS25_339275_Stall_Rental"],
+        ["productionControl", "FS25_319198_Production_Control"],
+        ["productionsManager", "FS25_346503_Productions_Manager"],
+        ["puncturedTires", "FS25_358517_Punctured_Tires"],
+        ["implementUsageCounter", "FS25_310419_Implement_Usage_Counter"],
+        ["ingameTimeOperatingHours", "FS25_311491_Ingame_Time_Operating_Hours"],
+        ["imperialSystem", "FS25_ImperialSystem"],
+    ];
+    const loaded = expected.map(([, name]) => `["${name}"]=true`).join(",");
+    const L = lauxlib.luaL_newstate();
+    lualib.luaL_openlibs(L);
+    const chunk = [
+        `g_modIsLoaded={${loaded}}`,
+        "FarmDashLog={error=function() end}",
+        source,
+        "local p=CompanionModsDataCollector:collect()",
+        "local ids={} for _,m in ipairs(p.mods) do table.insert(ids,m.id) end",
+        "return table.concat(ids,',')",
+    ].join("\n");
+    if (lauxlib.luaL_dostring(L, to_luastring(chunk)) !== lua.LUA_OK) {
+        throw new Error(to_jsstring(lua.lua_tostring(L, -1)));
+    }
+    const ids = to_jsstring(lua.lua_tostring(L, -1)).split(",");
+    expect(ids.sort()).toEqual(expected.map(([id]) => id).sort());
+});

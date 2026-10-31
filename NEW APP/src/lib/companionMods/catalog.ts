@@ -336,7 +336,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Production Control",
     category: "production",
     descKey: "companions.desc.productionControl",
-    desc: "Adjusts production speed from 50% to 300%, which also changes operating cost. FarmHub does not yet read that speed.",
+    desc: "Adjusts production speed from 50% to 300%, changing cycles and operating cost. FarmHub reads each owned line's chosen speed.",
     relatedSection: "productions",
   },
   {

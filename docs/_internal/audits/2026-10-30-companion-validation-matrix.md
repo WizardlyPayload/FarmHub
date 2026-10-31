@@ -4,6 +4,10 @@
 
 Evidence levels: static source/ZIP checks; fresh in-game committed export; installed dashboard value/page; hide-on-uncheck; clean restoration. A historical export does not count as current acceptance.
 
+## Vault-wide audit reopened 31 October 2026
+
+The separate [vault capability audit](2026-10-31-vault-capability-audit.md) found Lua-bearing ZIPs outside this 65-entry catalog. Its source review and runtime acceptance are in progress. Production Control now has a bounded source collector and page for owned line speeds, but the original R1 row below remains the last **installed** result until a fresh game/export/UI test. The 65-entry cohort and its counts are the historical acceptance scope, not an exhaustive vault count.
+
 A = completed Witcombe save 20 on Tina Ally, with game closed before UI inspection; B1 = nine other data readers; B2 = sixteen vault-only data readers; R = the 29 catalog entries originally classified as reference/detection-only or unmapped. Source review found dedicated page collectors for 15 of those 29, so an R cohort label does not mean the app reads no data. The advertised-support column records the catalog label, while the live-result column records actual page/export coverage. RF dashboard pages and DLC are separate from these 65 companion catalog entries.
 
 ## Scoped acceptance disposition (2026-10-31)

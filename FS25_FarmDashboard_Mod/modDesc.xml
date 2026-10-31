@@ -2,7 +2,7 @@
 <!-- FS25 FarmDashboard V5 mod -->
 <modDesc descVersion="109">
     <author>JoshWalki / WizardlyPayload</author>
-<version>5.1.0.16</version>
+<version>5.1.0.17</version>
     
     <title>
         <en>Farm Dashboard</en>
@@ -149,6 +149,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/AnimalFoodOverviewCollector.lua"/>
         <sourceFile filename="src/companionPages/AnimalFoodCalculatorCollector.lua"/>
         <sourceFile filename="src/companionPages/ProductionWatcherCollector.lua"/>
+        <sourceFile filename="src/companionPages/ProductionControlCollector.lua"/>
         <sourceFile filename="src/companionPages/PalletDegradationCollector.lua"/>
         <sourceFile filename="src/companionPages/RealSiloCollector.lua"/>
         <sourceFile filename="src/companionPages/EverythingConstructableCollector.lua"/>

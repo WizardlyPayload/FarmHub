@@ -64,6 +64,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/puncturedTires").then((m) => m.Page) },
   { key: "vehicleInspectionHU", catalogId: "vehicleInspectionHU", title: "Vehicle Inspection (HU)", glyph: "HU", group: "fleet",
     load: () => import("@/sections/mods/vehicleInspectionHU").then((m) => m.Page) },
+  { key: "implementUsageCounter", catalogId: "implementUsageCounter", title: "Implement Usage Counter", glyph: "UC", group: "fleet",
+    load: () => import("@/sections/mods/implementUsageCounter").then((m) => m.Page) },
   // Units
   { key: "imperialSystem", catalogId: "imperialSystem", title: "Imperial System", glyph: "IS", group: "units",
     load: () => import("@/sections/mods/imperialSystem").then((m) => m.Page) },

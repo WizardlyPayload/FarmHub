@@ -49,7 +49,7 @@ export function Page({ entry }: CompanionPageProps) {
     { key: "punctured", label: tOr("companionPage.puncturedTires.punctured", "Punctured vehicles"), value: count(farmData.puncturedCount), tone: (num(farmData.puncturedCount) ?? 0) > 0 ? "danger" : undefined },
     { key: "armed", label: tOr("companionPage.puncturedTires.armed", "Nail picked up"), value: count(farmData.armedCount), tone: (num(farmData.armedCount) ?? 0) > 0 ? "warn" : undefined },
     { key: "equipped", label: tOr("companionPage.puncturedTires.equipped", "Equipped farm vehicles"), value: count(farmData.equippedCount) },
-    { key: "remaining", label: tOr("companionPage.puncturedTires.remaining", "Remaining this cycle"), value: count(cycle?.remaining), hint: cycle ? tOr("companionPage.puncturedTires.cycleCount", "{{count}} of {{limit}} punctures in this cycle", { count: count(cycle.count), limit: count(cycle.limit) }) : null },
+    { key: "remaining", label: tOr("companionPage.puncturedTires.remaining", "Remaining this cycle"), value: count(cycle?.remaining), hint: cycle ? tOr("companionPage.puncturedTires.cycleCount", `${count(cycle.count)} of ${count(cycle.limit)} punctures in this cycle`, { count: count(cycle.count), limit: count(cycle.limit) }) : null },
   ] : [];
 
   return (

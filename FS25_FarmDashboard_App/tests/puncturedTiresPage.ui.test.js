@@ -9,13 +9,14 @@ const { h, render } = preactRuntime().preact;
 let context = { page: null, farmData: null };
 const { Page } = productionTs("NEW APP/src/sections/mods/puncturedTires/PuncturedTiresPage.tsx", {
     "@/components/ui": { Card: ({ title, children }) => h("section", null, h("h3", null, title), children) },
-    "@/i18n/i18n": { tOr: (_key, fallback, vars) => fallback.replace(/\{\{(\w+)\}\}/g, (_, key) => vars?.[key] ?? "") },
+    // Production tOr returns the fallback unchanged when a key is missing.
+    "@/i18n/i18n": { tOr: (_key, fallback) => fallback },
     "@/sections/mods/shared": {
         ModAbout: () => null,
         ModEmpty: ({ children }) => h("p", null, children),
         ModKeyValues: ({ rows }) => h("dl", null, rows.map((row) => h("div", { "data-kv": row.key }, row.label, ": ", row.value))),
         ModPage: ({ children }) => h("main", null, children),
-        ModStatTiles: ({ tiles }) => h("div", null, tiles.map((tile) => h("span", { "data-stat": tile.key }, tile.label, ": ", tile.value))),
+        ModStatTiles: ({ tiles }) => h("div", null, tiles.map((tile) => h("span", { "data-stat": tile.key }, tile.label, ": ", tile.value, tile.hint))),
         ModTable: ({ rows, empty }) => rows.length ? h("table", null, rows.map((row) => h("tr", { "data-row": row.key }, Object.values(row.cells).map((cell) => h("td", null, cell))))) : h("p", null, empty),
         asList: (rows) => Array.isArray(rows) ? rows : [],
         formatNumber: (value, dp = 0) => Number(value).toFixed(dp),
@@ -40,6 +41,8 @@ test("shows the fresh D1 cycle and sixteen equipped vehicles without inventing a
     const host = paint();
     expect(host.querySelector('[data-stat="equipped"]').textContent).toContain("16");
     expect(host.querySelector('[data-stat="remaining"]').textContent).toContain("2");
+    expect(host.textContent).toContain("0 of 2 punctures in this cycle");
+    expect(host.textContent).not.toContain("{{count}}");
     expect(host.querySelector('[data-kv="danger1"]').textContent).toContain("9");
     expect(host.querySelector('[data-kv="danger2"]').textContent).toContain("4");
     expect(host.querySelectorAll("tr")).toHaveLength(16);

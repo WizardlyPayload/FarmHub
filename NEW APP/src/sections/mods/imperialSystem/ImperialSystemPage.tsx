@@ -66,10 +66,12 @@ export function Page({ entry }: CompanionPageProps) {
   const factors = page?.factors && typeof page.factors === "object" ? page.factors as Record<string, unknown> : null;
   const bushelCrops = asList<string>(page?.bushelCrops);
   const provider = fillUnitOwnerId(unitDisplay);
+  const liquidChoice = settings?.liquid ?? unitDisplay.imperial?.liquid;
+  const cropChoice = settings?.crops ?? unitDisplay.imperial?.crops;
   const modeName = effectiveMode === "british"
     ? tOr(`${K}.modeBritish`, "British (kg and tonnes)")
     : effectiveMode === "imperial"
-      ? tOr(`${K}.modeImperial`, "Imperial (gallons, bushels, pounds)")
+      ? `${liquid(liquidChoice)} / ${crops(cropChoice)}`
       : tOr(`${K}.modeLitres`, "Litres");
   const fillImperialSelected = settings?.liquid === "gallons" || settings?.crops === "imperial" || settings?.weight === "imperial";
 

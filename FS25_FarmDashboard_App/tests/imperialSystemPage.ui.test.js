@@ -70,3 +70,15 @@ test("separates Imperial fill choices from a manual dashboard override", () => {
     expect(host.textContent).toContain("manual fill-unit choice in FarmHub Settings takes priority");
     expect(host.querySelector('[data-stat="display"]').textContent).toContain("Litres");
 });
+
+test("names only the Imperial fill choices that are active", () => {
+    unitDisplay = { british: false, imperial: { present: true, liquid: "gallons", crops: "liters", weight: "metric" } };
+    mode = "imperial";
+    viewerMode = null;
+    context = { page: { readState: "ok", settings: { liquid: "gallons", crops: "liters", weight: "metric", measure: "metric", weightScale: "auto" } } };
+    const host = paint();
+    const display = host.querySelector('[data-stat="display"]').textContent;
+    expect(display).toContain("US gallons / Litres");
+    expect(display).not.toContain("Bushels");
+    expect(display).not.toContain("pounds");
+});

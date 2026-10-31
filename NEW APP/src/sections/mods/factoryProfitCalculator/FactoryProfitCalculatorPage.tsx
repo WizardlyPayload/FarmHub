@@ -92,7 +92,13 @@ function IoTable({ rows, money, kind }: { rows: IoRow[]; money: (n: unknown) => 
 
 export function Page({ entry }: CompanionPageProps) {
   const { page, farmData, farmId } = useCompanionPage(entry.key);
-  const money = useMoney();
+  const formatMoney = useMoney();
+  // FactoryFormatUtils.formatMoney rounds to the nearest whole unit, with halves away from zero.
+  // Keep the factory projection in step with the in-game calculator without changing balance formatting.
+  const money = (value: unknown): string => {
+    const n = num(value);
+    return n == null ? "—" : formatMoney(Math.sign(n) * Math.floor(Math.abs(n) + 0.5));
+  };
   const lines = asList<LineRow>(page?.lines).filter((l) => num(l.farmId) === farmId);
   const overrides = asList<OverrideRow>(page?.overrides);
   const tiles: ModStatTile[] = farmData

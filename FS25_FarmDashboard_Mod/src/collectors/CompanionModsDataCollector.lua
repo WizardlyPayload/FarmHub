@@ -329,6 +329,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "vehicleInspectionHU",
+        title = "Vehicle Inspection (HU)",
+        category = "fleet",
+        names = { "FS25_Vehicle_Inspection_HU", "FS25_373915_Vehicle_Inspection_HU" },
+        substrings = { "vehicle_inspection_hu", "vehicleinspectionhu" },
+        globals = { "g_huManager" },
+    },
+    {
         id = "collisionDamage",
         title = "Collision Damage",
         category = "fleet",

@@ -435,6 +435,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "vehicleInspectionHU",
+    title: "Vehicle Inspection (HU)",
+    category: "fleet",
+    descKey: "companions.desc.vehicleInspectionHU",
+    desc: "Tracks each plated vehicle's inspection deadline and due status. FarmHub reads the inspection register for your current vehicles.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "collisionDamage",
     title: "Collision Damage",
     category: "fleet",

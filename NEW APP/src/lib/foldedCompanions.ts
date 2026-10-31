@@ -11,9 +11,8 @@ export const FOLDED_COMPANIONS = {
   puncturedTires: "vehicles",
   bushelPlus: "vehicles",
   soilWorkYieldBonus: "fields",
-  // Unit mods have no page: they drive fill units everywhere (see `effectiveFillUnitMode`).
+  // British Fill Units drives fill-unit display without a dedicated page.
   britishFillUnits: "economy",
-  imperialSystem: "economy",
 } as const;
 
 export type FoldedCompanionKey = keyof typeof FOLDED_COMPANIONS;

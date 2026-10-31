@@ -60,6 +60,9 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
   // Fleet
   { key: "puncturedTires", catalogId: "puncturedTires", title: "Punctured Tires", glyph: "PT", group: "fleet",
     load: () => import("@/sections/mods/puncturedTires").then((m) => m.Page) },
+  // Units
+  { key: "imperialSystem", catalogId: "imperialSystem", title: "Imperial System", glyph: "IS", group: "units",
+    load: () => import("@/sections/mods/imperialSystem").then((m) => m.Page) },
 ];
 
 const KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;

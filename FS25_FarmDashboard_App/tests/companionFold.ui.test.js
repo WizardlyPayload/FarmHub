@@ -59,7 +59,6 @@ test("each folded mod's catalog row points at the page that now shows its data",
         bushelPlus: "vehicles",
         soilWorkYieldBonus: "fields",
         britishFillUnits: "economy",
-        imperialSystem: "economy",
     });
     for (const [key, section] of Object.entries(FOLDED_COMPANIONS)) {
         expect(COMPANION_CATALOG.find((entry) => entry.id === key)?.relatedSection).toBe(section);

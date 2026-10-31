@@ -496,7 +496,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Imperial System",
     category: "units",
     descKey: "companions.desc.imperialSystem",
-    desc: "Switches liquids to US gallons, grain to bushels, solids and weights to pounds or US tons, and lengths to feet. FarmHub follows its fill-unit choices.",
+    desc: "Can switch liquids to US gallons, grain to bushels, solids and weights to pounds or US tons, and lengths to feet. FarmHub can follow its fill-unit choices in Automatic mode.",
     relatedSection: "economy",
   },
   {

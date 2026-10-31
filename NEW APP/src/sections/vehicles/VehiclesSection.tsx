@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { Badge, Button, Card } from "@/components/ui";
 import { t, tOr } from "@/i18n/i18n";
 import { CompanionModsEmbed } from "@/sections/companions";
+import { ModPageLink } from "@/sections/mods/shared";
 import { FLEET_NOTES_IDS, FleetMaintenanceNotes } from "@/sections/companions/AssetCompanionNotes";
 import { summarizeAdsFleet } from "@/lib/vehicleAds";
 import {
@@ -276,6 +277,7 @@ export function VehiclesSection() {
           />
         ) : null}
       </div>
+      {companions.tyres.detected ? <ModPageLink pageKey="puncturedTires" /> : null}
 
       <OutOfFuelNote fuel={companions.fuel} />
       <BushelPlusNote bushel={companions.bushel} />

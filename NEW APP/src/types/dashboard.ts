@@ -651,6 +651,8 @@ export function normalizeSectionId(value: string | null | undefined): SectionId 
   if ((ALL_SECTIONS as string[]).includes(value)) return value as SectionId;
   if (isModPageSectionId(value)) {
     const key = value.slice(4);
+    // The fleet summary remains folded into Vehicles, but its detailed reading has a page.
+    if (key === "puncturedTires") return value;
     return isFoldedCompanion(key) ? FOLDED_COMPANIONS[key] : value;
   }
   return "overview";

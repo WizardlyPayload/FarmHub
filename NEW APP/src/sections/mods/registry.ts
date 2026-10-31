@@ -57,6 +57,9 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/fieldLeasing").then((m) => m.Page) },
   { key: "smartCropControl", catalogId: "smartCropControl", title: "Smart Crop Control", glyph: "CC", group: "fields",
     load: () => import("@/sections/mods/smartCropControl").then((m) => m.Page) },
+  // Fleet
+  { key: "puncturedTires", catalogId: "puncturedTires", title: "Punctured Tires", glyph: "PT", group: "fleet",
+    load: () => import("@/sections/mods/puncturedTires").then((m) => m.Page) },
 ];
 
 const KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;

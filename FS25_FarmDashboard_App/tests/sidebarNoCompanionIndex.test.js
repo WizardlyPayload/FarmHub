@@ -68,7 +68,7 @@ describe("sidebar without the Companion mods index", () => {
         expect(modLabels).not.toContain("Courseplay");
     });
 
-    test("mods read on Storage, Productions, Vehicles, Fields or as units get no sidebar entry even when detected", () => {
+    test("folded-only mods stay in their sections while Punctured Tires gets its dedicated page", () => {
         const folded = {
             timeSavingStockCheck: ["Time Saving Stock Check", "storage"],
             productionWatcher: ["Production Watcher", "productions"],
@@ -78,7 +78,6 @@ describe("sidebar without the Companion mods index", () => {
             outOfFuel: ["Out Of Fuel", "vehicles"],
             advancedMaintenance: ["Advanced Maintenance", "vehicles"],
             collisionDamage: ["Collision Damage", "vehicles"],
-            puncturedTires: ["Punctured Tires", "vehicles"],
             bushelPlus: ["Bushel Plus", "vehicles"],
             soilWorkYieldBonus: ["Soil Work Yield Bonus", "fields"],
             britishFillUnits: ["British Fill Units", "economy"],
@@ -92,11 +91,13 @@ describe("sidebar without the Companion mods index", () => {
                 mods: [
                     { id: "dynamicMarket", title: "Dynamic Market", category: "economy", detected: true },
                     ...Object.entries(folded).map(([id, [title]]) => ({ id, title, category: "fleet", detected: true })),
+                    { id: "puncturedTires", title: "Punctured Tires", category: "fleet", detected: true },
                 ],
             },
             companionPages: { pages },
         });
-        expect(modLabels).toEqual(["Dynamic Market"]);
+        expect(modLabels).toEqual(["Dynamic Market", "Punctured Tires"]);
+        expect(dashboard.normalizeSectionId("mod-puncturedTires")).toBe("mod-puncturedTires");
         const registryKeys = registry.COMPANION_PAGES.map((entry) => entry.key);
         for (const [key, [title, destination]] of Object.entries(folded)) {
             expect(labels).not.toContain(title);

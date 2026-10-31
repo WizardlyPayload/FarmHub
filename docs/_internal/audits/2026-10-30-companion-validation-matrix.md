@@ -10,34 +10,34 @@ A = completed Witcombe save 20 on Tina Ally, with game closed before UI inspecti
 |---|---|---|---|---|
 | enhancedLoanSystem | live | economy | B1 | B1: live loan game/export/UI matched |
 | automaticLoanRepay | live | economy | A | A: export/UI/HUD matched |
-| iNeedALoan | unmapped | economy | R | No data reader claimed; active detection/navigation to check |
-| noCredit | unmapped | economy | R | No data reader claimed; active detection/navigation to check |
+| iNeedALoan | unmapped | economy | R | R1: loaded/detected, Economy own-page link; no reader or loan gameplay check |
+| noCredit | unmapped | economy | R | R1: loaded/detected, Economy Not read chip; hid on uncheck |
 | realisticDieselPrice | live | economy | A | A: export/UI matched; hid when unchecked |
 | fluctuatingDieselPrice | live | economy | B1 | B1: export/UI matched; game price unverified |
-| dynamicMarket | detection-only | economy | R | No data reader claimed; active detection/navigation to check |
-| marketPriceHelper | unmapped | economy | R | No data reader claimed; active detection/navigation to check |
-| enhancedSeasonalPrices | unmapped | economy | R | No data reader claimed; active detection/navigation to check |
-| statisticsExtended | unmapped | economy | R | No data reader claimed; active detection/navigation to check |
+| dynamicMarket | detection-only | economy | R | R1: loaded/detected, Economy own-page link; market behaviour untested |
+| marketPriceHelper | unmapped | economy | R | R1: loaded/detected, Economy Not read chip |
+| enhancedSeasonalPrices | unmapped | economy | R | R1: loaded with ZYX dependency, detected, Economy Not read chip |
+| statisticsExtended | unmapped | economy | R | R1: current v1.0.0.1 vault ZIP loaded/detected, Economy Not read chip; hid on uncheck |
 | restrictedPeriods | live | fields | A | A: export/UI matched |
 | regionalCropCalendar | live | fields | A | A: export/UI matched; crop counts partial |
 | soilWorkYieldBonus | limited | fields | A | A: empty worked ground; gameplay unproved |
 | smartCropControl | unmapped | fields | A | A: UI seen; values unverified |
-| dynamicFieldPrices | unmapped | fields | R | No data reader claimed; active detection/navigation to check |
+| dynamicFieldPrices | unmapped | fields | R | R1: loaded/detected, Fields Not read chip; hid on uncheck |
 | farmlandMarketplace | limited | fields | B2 | B2: loaded, reader unavailable in save 20; gameplay/UI unproved |
 | betterContracts | live | economy | A | A: export/UI matched; active contracts zero |
-| missionsExpanded | unmapped | economy | R | No data reader claimed; active detection/navigation to check |
-| additionalContracts | unmapped | economy | R | No data reader claimed; active detection/navigation to check |
+| missionsExpanded | unmapped | economy | R | R1: loaded/detected, Economy Not read chip; contract gameplay untested |
+| additionalContracts | unmapped | economy | R | R1: vault ZIP filename rejected by FS25 because of hyphen; valid-name byte-identical R2 retest queued |
 | livestockMonitor | limited | pastures | B1 | B1: Pastures settings card; alerts unproved |
 | animalFoodOverview | unmapped | pastures | A | A: UI seen; values unverified |
 | animalFoodCalculator | limited | pastures | B1 | B1: feed export/UI/game pens matched |
 | realisticAnimalLosses | unmapped | pastures | A | A: UI and in-game notice consistent |
-| realisticMilkingTimes | unmapped | pastures | R | No data reader claimed; active detection/navigation to check |
+| realisticMilkingTimes | unmapped | pastures | R | R1: loaded/detected, Pastures Not read chip; milking gameplay untested |
 | seasonalMilkProduction | limited | pastures | A | A: schedule matched; pen baseline pending |
-| animalTrader | unmapped | pastures | R | No data reader claimed; active detection/navigation to check |
-| stallRental | unmapped | pastures | R | No data reader claimed; active detection/navigation to check |
+| animalTrader | unmapped | pastures | R | R1: loaded/detected, Pastures Not read chip; hid on uncheck |
+| stallRental | unmapped | pastures | R | R1: loaded/detected, Pastures Not read chip |
 | productionWatcher | limited | productions | B1 | B1: counts matched; live alerts unreadable |
-| productionControl | unmapped | productions | R | No data reader claimed; active detection/navigation to check |
-| productionsManager | unmapped | productions | R | No data reader claimed; active detection/navigation to check |
+| productionControl | unmapped | productions | R | R1: loaded/detected, Productions Not read chip; hid on uncheck |
+| productionsManager | unmapped | productions | R | R1: loaded/detected, Productions Not read chip |
 | factoryProfitCalculator | limited | productions | A | A: line count matched; profit unverified |
 | timeSavingStockCheck | unmapped | storage | A | A: settings only; menu unopened |
 | palletDegradation | limited | storage | A | A: export/UI matched |
@@ -47,15 +47,15 @@ A = completed Witcombe save 20 on Tina Ally, with game closed before UI inspecti
 | extendedVehicleMaintenance | limited | vehicles | B2 | B3: 5.2.14 installed card separately labelled; partial coverage disclosed; live service event unproved |
 | realisticVehicleService | limited | vehicles | B2 | B3: 5.2.14 installed card separately labelled and normalized 0.99999 showed 100%; truncated coverage disclosed |
 | outOfFuel | detection-only | vehicles | A | A: notice only; gameplay unproved |
-| puncturedTires | unmapped | vehicles | R | No data reader claimed; active detection/navigation to check |
+| puncturedTires | unmapped | vehicles | R | R1: loaded/detected, Vehicles tyre-problems tile showed zero; puncture event untested |
 | collisionDamage | unmapped | vehicles | A | A: zero hits; gameplay unproved |
 | vehicleMileage | unmapped | vehicles | A | A: UI seen; values unverified |
 | vehicleYears | unmapped | vehicles | A | A: UI seen; values unverified |
 | courseplay | unmapped | vehicles | A | A: settings only; no course |
-| implementUsageCounter | unmapped | vehicles | R | No data reader claimed; active detection/navigation to check |
-| ingameTimeOperatingHours | unmapped | vehicles | R | No data reader claimed; active detection/navigation to check |
+| implementUsageCounter | unmapped | vehicles | R | R1: loaded/detected, Vehicles Not read chip; hid on uncheck |
+| ingameTimeOperatingHours | unmapped | vehicles | R | R1: loaded/detected, Vehicles Not read chip |
 | saveUnitProfiles | limited | economy | B1 | B5: HUD GBP, runtime export GBP and 5.2.15 card GBP with partial-verification notice; Units menu showed EURO/US and mod logged no mapped profile, so menu sync remains a third-party/FS25 issue to diagnose |
-| imperialSystem | unmapped | economy | R | No data reader claimed; active detection/navigation to check |
+| imperialSystem | unmapped | economy | R | R1: loaded/detected, folded unit-display export; disappeared on uncheck; mod unit behaviour untested |
 | britishFillUnits | unmapped | economy | A | A: hooks/samples only; no page |
 | bushelPlus | unmapped | vehicles | A | A: no combine attached; gameplay unproved |
 | seasonalWoolProduction | limited | pastures | A | A: schedule matched; no sheep |
@@ -131,3 +131,5 @@ Phase C3 evidence: Z:\Graham\agent-comms\ally-fh-companions-c3-evidence\RESULT-C
 Phase C4 evidence: Z:\Graham\agent-comms\ally-fh-companions-c4-evidence\RESULT-C4-text.md. Exact 5.2.18 installer, 5.1.0.15 mod, Economic History and Farm Operations Dashboard ZIP hashes matched. Tina recorded one native Windows row, committed generations 1–10, no Farm Dashboard Lua errors and full Ally hash restoration. With game time held at a stable instant, game money 2,295,683, generation 10 Economic History balance 2,295,683.7175 and installed card 2,295,683 matched after display rounding; four recorded months matched. The installed Farm Operations card explicitly said its mod field HUD rows were empty and identified its 16 needing work, 0 ready, 1 production issue and 3 animal warnings as FarmHub overview counts, matching that overview. The mod's own field-event path is still unproved. Generation 9 briefly held different `farmInfo.money` and Economic History balances while game time moved; no wrong card reading was demonstrated, but the export is not an atomic cross-mod finance snapshot. The earlier C1 mismatch was a moving-instant comparison, not a confirmed app defect. A scoped redundant-stage cleanup restored Ally free space from 8.94 GB to 22.94 GB before C4; C4 ended at 21.3 GB with its newest test backup still retained.
 
 Reference cohort R1 preparation: current vault Statistics Extended v1.0.0.1 uses `FS25_364343_FS25_statsExtended.zip`; the former catalog aliases detected only an archived v1.0.0.0 identity. Commit `2c73ac6` adds the current identities and bumps the canonical mod to 5.1.0.16; `d74a1fc` verifies all 18 current vault ZIP basenames together in a Lua regression. The new canonical ZIP SHA-256 is `B833AF6552D78C62B53D9302E2FB8836FC2FA47355116ACA528ACE3E53B32470`. The 18 current reference ZIPs and Enhanced Seasonal Prices' declared ZYX dependency are staged under `Z:\Graham\agent-comms\farmhub-companion-acceptance\reference-mods` with individually verified hashes; manifest SHA-256 `8144873BFA6C7164943A43C366D6891226FF8B2B5F46D9FCC1F9BDA74A0F0E0C`. R1 Ally request `FARMHUB-ALLY-20261031-COMPANIONS-R1` was queued after C4 restoration. Its purpose is loaded detection, honest section chips and hide-on-uncheck, not claims that third-party gameplay features or all combinations pass.
+
+Phase R1 evidence: Z:\Graham\agent-comms\ally-fh-companions-r1-evidence\RESULT-R1-text.md. Exact 5.2.18 installer, canonical mod 5.1.0.16 and all 19 staged ZIP hashes matched; one Windows row appeared; the first full selection committed generations and 17 valid-name reference mods loaded, exported detected/version/category and displayed honest chips or folded unit state. Statistics Extended's current vault identity was detected and its chip vanished on uncheck. A second save load unchecked seven representative mods across sections; their `Load mod` lines, export entries and UI labels disappeared while other selected mods remained. No Farm Dashboard Lua errors were reported, and Ally originals were restored by hash. Additional Contracts failed **before load** because its vault filename `FS25_328503_Additional-Contracts.zip` has a hyphen, disallowed by FS25 mod names. It is not a collector defect. A byte-identical copy with valid name `FS25_AdditionalContracts.zip` was staged with the same SHA-256 `22CD49A132A3FE80BBF09E7EADF8D0D558821F10F3C4A6575EBA9806002DCF55`; R2 is queued after Brian's active RF-1370 Ally run. No R1 reference-only pass proves the third-party mod's gameplay functions. All 18 together remain unproved until R2.

@@ -13,7 +13,13 @@ CompanionPages.register({
             return { readState = "settings-only", reason = "no-farm" }
         end
 
-        local manager = ctx.global("g_huManager")
+        -- HU assigns this in its own mod environment during loadMap. Reading
+        -- the shared engine environment misses the live register in FS25.
+        local manager = ctx.symbol("g_huManager")
+        if type(manager) ~= "table" then
+            local main = ctx.symbol("HUMain")
+            manager = type(main) == "table" and main.manager or nil
+        end
         if type(manager) ~= "table" or manager.initialized ~= true or type(manager.records) ~= "table" then
             return { readState = "settings-only", reason = "no-inspection-register" }
         end

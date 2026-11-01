@@ -96,6 +96,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/puncturedTires").then((m) => m.Page) },
   { key: "vehicleInspectionHU", catalogId: "vehicleInspectionHU", title: "Vehicle Inspection (HU)", glyph: "HU", group: "fleet",
     load: () => import("@/sections/mods/vehicleInspectionHU").then((m) => m.Page) },
+  { key: "vehicleTradeIn", catalogId: "vehicleTradeIn", title: "Vehicle Trade In", glyph: "TI", group: "fleet",
+    load: () => import("@/sections/mods/vehicleTradeIn").then((m) => m.Page) },
   { key: "tuvSystem", catalogId: "tuvSystem", title: "TUV System", glyph: "TV", group: "fleet",
     load: () => import("@/sections/mods/tuvSystem").then((m) => m.Page) },
   { key: "implementUsageCounter", catalogId: "implementUsageCounter", title: "Implement Usage Counter", glyph: "UC", group: "fleet",

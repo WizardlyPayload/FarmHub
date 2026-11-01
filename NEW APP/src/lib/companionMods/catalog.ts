@@ -510,6 +510,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "vehicleTradeIn",
+    title: "Vehicle Trade In",
+    category: "fleet",
+    descKey: "companions.desc.vehicleTradeIn",
+    desc: "Shows this farm's completed Vehicle Trade In dealer transactions and recorded trade credit. Shared used-market offers are excluded.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "tuvSystem",
     title: "TUV System",
     category: "fleet",

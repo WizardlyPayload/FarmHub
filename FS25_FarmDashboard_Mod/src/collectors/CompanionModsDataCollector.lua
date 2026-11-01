@@ -393,6 +393,14 @@ local CATALOG = {
         globals = { "g_huManager" },
     },
     {
+        id = "vehicleTradeIn",
+        title = "Vehicle Trade In",
+        category = "fleet",
+        names = { "FS25_TradeInMenu", "FS25_362333_FS25_TradeInMenu" },
+        substrings = { "tradeinmenu", "trade_in_menu" },
+        globals = { "TradeInMod" },
+    },
+    {
         id = "collisionDamage",
         title = "Collision Damage",
         category = "fleet",

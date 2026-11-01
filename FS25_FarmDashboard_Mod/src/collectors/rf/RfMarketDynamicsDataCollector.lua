@@ -138,28 +138,37 @@ local function collectMovers(mgr)
     return out
 end
 
-local function collectFutures(mgr)
+local function activeExportFarmId()
+    local helpers = CompanionModsDataCollector and CompanionModsDataCollector.helpers
+    if type(helpers) ~= "table" or type(helpers.activeExportFarmId) ~= "function" then
+        return nil
+    end
+    local ok, id = pcall(helpers.activeExportFarmId)
+    id = ok and tonumber(id) or nil
+    if id ~= nil and id > 0 and id % 1 == 0 then return id end
+    return nil
+end
+
+local function collectFutures(mgr, farmId)
     local out = {}
     local fm = mgr.futuresMarket
-    if not fm or type(fm.contracts) ~= "table" then
+    if farmId == nil or not fm or type(fm.contracts) ~= "table" then
         return out
     end
     local list = {}
     for id, contract in pairs(fm.contracts) do
-        if type(contract) == "table" then
-            list[#list + 1] = contract
-            if contract.id == nil then
-                contract.id = id
-            end
+        if type(contract) == "table" and tonumber(contract.farmId) == farmId then
+            list[#list + 1] = { id = contract.id or id, contract = contract }
         end
     end
     table.sort(list, function(a, b)
         return (tonumber(a.id) or 0) < (tonumber(b.id) or 0)
     end)
-    for _, c in ipairs(list) do
+    for _, entry in ipairs(list) do
         if #out >= MAX_FUTURES then
             break
         end
+        local c = entry.contract
         local status = tostring(c.status or "active")
         if status == "active" or status == "fulfilled" or status == "defaulted" then
             local name = tostring(c.fillTypeName or "Contract")
@@ -167,7 +176,7 @@ local function collectFutures(mgr)
             local delivered = tonumber(c.delivered) or 0
             local summary = string.format("%s · %.0f / %.0f L", name, delivered, qty)
             out[#out + 1] = {
-                id = tostring(c.id or (#out + 1)),
+                id = tostring(entry.id),
                 label = name,
                 status = status,
                 summary = summary,
@@ -206,7 +215,7 @@ function RfMarketDynamicsDataCollector:collectStep(_opts)
             volatilityScale = engine and tonumber(engine.volatilityScale) or nil,
             activeEvents = collectActiveEvents(mgr),
             movers = collectMovers(mgr),
-            futures = collectFutures(mgr),
+            futures = collectFutures(mgr, activeExportFarmId()),
         }
     end)
 

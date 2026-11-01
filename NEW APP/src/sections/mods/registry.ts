@@ -46,6 +46,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
   { key: "grassContracts", catalogId: "grassContracts", title: "Grass Contracts", glyph: "GC", group: "finance",
     load: () => import("@/sections/mods/grassContracts").then((m) => m.Page) },
   // Livestock
+  { key: "veterinarian", catalogId: "veterinarian", title: "Veterinarian and Animal Diseases", glyph: "VT", group: "livestock",
+    load: () => import("@/sections/mods/veterinarian").then((m) => m.Page) },
   { key: "seasonalMilkProduction", catalogId: "seasonalMilkProduction", title: "Seasonal Milk Production", glyph: "SM", group: "livestock",
     load: () => import("@/sections/mods/seasonalMilkProduction").then((m) => m.Page) },
   { key: "seasonalWoolProduction", catalogId: "seasonalWoolProduction", title: "Seasonal Wool Production", glyph: "SW", group: "livestock",

@@ -518,6 +518,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "veterinarian",
+    title: "Veterinarian and Animal Diseases",
+    category: "livestock",
+    descKey: "companions.desc.veterinarian",
+    desc: "Shows recorded disease counts for husbandries this farm still owns. Diagnosis and treatment remain in the game.",
+    relatedSection: "pastures",
+  },
+  {
     id: "tuvSystem",
     title: "TUV System",
     category: "fleet",

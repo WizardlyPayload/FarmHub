@@ -401,6 +401,14 @@ local CATALOG = {
         globals = { "TradeInMod" },
     },
     {
+        id = "veterinarian",
+        title = "Veterinarian and Animal Diseases",
+        category = "livestock",
+        names = { "FS25_Veterinarian", "GH_Cobra-Modding__FS25_Veterinarian_FS25_Veterinarian" },
+        substrings = { "fs25_veterinarian" },
+        globals = { "g_veterinarian" },
+    },
+    {
         id = "collisionDamage",
         title = "Collision Damage",
         category = "fleet",

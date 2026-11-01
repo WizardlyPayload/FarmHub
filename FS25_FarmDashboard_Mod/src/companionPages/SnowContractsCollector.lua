@@ -3,7 +3,7 @@
 
 CompanionPages.register({
     key = "snowContracts",
-    modNames = { "FS25_354811_FS25_SnowContracts" },
+    modNames = { "FS25_354811_FS25_SnowContracts", "KM_76170_Snow_Contracts" },
     substrings = {},
     collect = function(ctx)
         local farmId = ctx.farmId

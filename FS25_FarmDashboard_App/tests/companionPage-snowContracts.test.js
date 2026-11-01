@@ -33,3 +33,10 @@ test("distinguishes zero pending from a missing mod register", () => {
     });
     expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", { farmId: 1 })).toBeUndefined();
 });
+
+test("accepts the byte-identical alternate vault archive name", () => {
+    const alternate = SETUP.replaceAll("FS25_354811_FS25_SnowContracts", "KM_76170_Snow_Contracts");
+    expect(runCompanionPage(FILE, alternate, { farmId: 1 })).toMatchObject({
+        readState: "ok", byFarm: { "1": { pendingAmount: 187.35 } },
+    });
+});

@@ -30,3 +30,10 @@ test("handles zero pending and rejects an unrelated global shadow", () => {
         readState: "settings-only", reason: "no-pending-register",
     });
 });
+
+test("accepts the byte-identical alternate vault archive name", () => {
+    const alternate = SETUP.replaceAll("FS25_377438_Grass_Contracts", "KM_83139_Grass_Contracts");
+    expect(runCompanionPage(FILE, alternate, { farmId: 1 })).toMatchObject({
+        readState: "ok", byFarm: { "1": { pendingAmount: 52.79 } },
+    });
+});

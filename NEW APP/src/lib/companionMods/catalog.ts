@@ -494,6 +494,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "tuvSystem",
+    title: "TUV System",
+    category: "fleet",
+    descKey: "companions.desc.tuvSystem",
+    desc: "Shows this farm's vehicle inspection validity and recorded TUV results. A new validity period does not mean an inspection has been performed.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "collisionDamage",
     title: "Collision Damage",
     category: "fleet",

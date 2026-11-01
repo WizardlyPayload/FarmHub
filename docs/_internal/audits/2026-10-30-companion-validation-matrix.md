@@ -47,7 +47,7 @@ This is not a pass for all 65 catalog entries or all gameplay combinations. Posi
 | stallRental | unmapped | pastures | R | R1: loaded/detected, Pastures Not read chip |
 | productionWatcher | limited | productions | B1 | B1: counts matched; live alerts unreadable |
 | productionControl | unmapped | productions | R | R1: loaded/detected, Productions Not read chip; hid on uncheck |
-| productionsManager | unmapped | productions | R | R1: loaded/detected, Productions Not read chip |
+| productionsManager | limited | productions | R | R1: loaded/detected only. V9 bounded nondefault owned Small Glass Greenhouse/Tomatoes schedule passed game UI → committed export → installed V5 5.2.33 page (March/June/August = periods 1/4/6); profile-wide settings restored to as-found absence. Period rollover, output/income, foreign-farm exclusion and cross-save point identity untested. Older Ally Desktop shortcut byte exception remains open. |
 | factoryProfitCalculator | limited | productions | A | M3: installed 5.2.23 page rounds seven nonempty Small Glass Greenhouse hypothetical monthly projections to the nearest whole currency unit, matching same-generation export and game profit lines; M2 truncation defect closed. Production cycles and realized profit untested |
 | timeSavingStockCheck | unmapped | storage | A | M2: game menu opened, 19 current farm rows, snapshot `lastMenuOpen` and same-generation export matched named amounts/prices/values; installed Storage sell-advice fold matched guides and best total with last-open notice. Hide-on-uncheck and price-change gameplay untested |
 | palletDegradation | limited | storage | A | A: export/UI matched |

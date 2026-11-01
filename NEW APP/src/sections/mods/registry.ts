@@ -53,6 +53,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
   { key: "everythingConstructable", catalogId: "everythingConstructable", title: "Everything Constructable", glyph: "EC", group: "construction",
     load: () => import("@/sections/mods/everythingConstructable").then((m) => m.Page) },
   // Fields
+  { key: "harvestLedger", catalogId: "harvestLedger", title: "Harvest Ledger", glyph: "HL", group: "fields",
+    load: () => import("@/sections/mods/harvestLedger").then((m) => m.Page) },
   { key: "restrictedPeriods", catalogId: "restrictedPeriods", title: "Restricted Periods", glyph: "RP", group: "fields",
     load: () => import("@/sections/mods/restrictedPeriods").then((m) => m.Page) },
   { key: "regionalCropCalendar", catalogId: "regionalCropCalendar", title: "Regional Crop Calendar", glyph: "RC", group: "fields",

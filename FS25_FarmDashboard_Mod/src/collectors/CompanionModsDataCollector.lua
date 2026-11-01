@@ -249,6 +249,14 @@ local CATALOG = {
         globals = { "CropContractsMod" },
     },
     {
+        id = "harvestLedger",
+        title = "Harvest Ledger",
+        category = "fields",
+        names = { "FS25_HarvestLedger", "KM_82914_Harvest_Ledger" },
+        substrings = { "harvestledger", "harvest_ledger" },
+        globals = {},
+    },
+    {
         id = "factoryProfitCalculator",
         title = "Factory Profit Calculator",
         category = "production",

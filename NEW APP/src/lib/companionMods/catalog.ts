@@ -340,6 +340,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "productions",
   },
   {
+    id: "harvestLedger",
+    title: "Harvest Ledger",
+    category: "fields",
+    descKey: "companions.desc.harvestLedger",
+    desc: "Saves measured harvest area and product volume by field and month. FarmHub reads your single-player farm's history; it does not treat harvest as income.",
+    relatedSection: "fields",
+  },
+  {
     id: "productionsManager",
     title: "Productions Manager",
     category: "production",

@@ -36,7 +36,7 @@ function writeState(state) {
 function results(text) {
   const out = [];
   for (const block of text.replace(/^\uFEFF/, '').split(/(?=^## )/m)) {
-    const match = block.match(/^(RESULT|BLOCKED)\s+(FARMHUB-ALLY-\d{8}-VAULT-V\d+)\b/m);
+    const match = block.match(/^(RESULT|BLOCKED)\s+(FARMHUB-ALLY-\d{8}-VAULT-V\d+(?:R\d+)?)\b/m);
     if (match) out.push({ id: match[2], kind: match[1], hash: digest(block.replace(/\r\n/g, '\n').trim()) });
   }
   return out;

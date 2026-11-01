@@ -359,7 +359,7 @@ const COMPANION = obj({
   betterContracts: obj({ enabled: bool, missionCount: int, lazyNPC: bool, hardMode: bool }),
   fieldLeases: obj({ ...READ, farmId: int, leases: list(obj({ farmlandId: opt(int), price: opt(num), duration: opt(num) }), 64) }),
   rentYourField: obj({ ...READ, agreements: list(obj({ farmlandId: opt(int), duration: opt(num) }), 128) }),
-  farmlandMarketplace: obj({ ...READ, rows: list(obj({ kind: text, farmlandId: opt(int), price: opt(num) }), 128) }),
+  farmlandMarketplace: obj({ ...READ, rows: list(obj({ kind: text, farmlandId: opt(int), farmlandIds: opt(list(int, 16)), price: opt(num) }), 128) }),
   fieldProfitabilityLedger: obj({ ...READ, cycles: list(obj({ cycleId: opt(text), farmId: int, land: opt(text), crop: opt(text), state: opt(text),
     area: opt(num), qualityClass: opt(text), totalsRead: text,
     totalsCoverage: text, totalsCount: int, totalsCountExact: bool, totalsScanned: int,

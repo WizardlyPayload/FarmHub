@@ -2653,6 +2653,8 @@
   "companions.field.periodsRented": "Periods rented out",
   "companions.field.offerKind": "Offer",
   "companions.field.askingPrice": "Asking price",
+  "companions.field.bundleAskingPrice": "Total asking price for listed parcels",
+  "companions.field.bundleRatePerPeriod": "Total rate per period for listed parcels",
   "companions.field.ratePerPeriod": "Rate per period",
   "companions.field.land": "Land",
   "companions.field.cycleState": "Cycle",

@@ -250,7 +250,7 @@ export type CompanionModsPayload = {
     enabled?: boolean;
     readState?: string;
     farmId?: number;
-    rows?: Array<{ kind?: string; farmlandId?: number | null; price?: number | null }>;
+    rows?: Array<{ kind?: string; farmlandId?: number | null; farmlandIds?: number[]; price?: number | null }>;
   };
   fieldProfitabilityLedger?: {
     enabled?: boolean;

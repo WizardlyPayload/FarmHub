@@ -160,9 +160,9 @@ describe("owning-mod companion readers", () => {
                 FlaechenVermarktung = {
                     manager = {
                         state = {
-                            saleOffers = { o1 = { farmlandId = 7, sellerFarmId = 1, targetFarmId = 2, price = 1500 } },
+                            saleOffers = { o1 = { farmlandIds = { 7, 47 }, sellerFarmId = 1, buyerFarmId = 2, price = 1500 } },
                             leaseOffers = {},
-                            leases = { c1 = { farmlandId = 8, lessorFarmId = 3, lesseeFarmId = 4, ratePerPeriod = 20 } },
+                            leases = { c1 = { farmlandIds = { 8 }, lessorFarmId = 3, lesseeFarmId = 4, ratePerPeriod = 20 } },
                         },
                         createSaleOffer = function() error('write') end,
                         respondSaleOffer = function() error('write') end,
@@ -170,8 +170,35 @@ describe("owning-mod companion readers", () => {
                     },
                 },
             }
-        `, "out.farmlandMarketplace.readState..'|'..tostring(#out.farmlandMarketplace.rows)..'|'..tostring(out.farmlandMarketplace.rows[1].price)");
-        expect(market).toBe("ok|1|1500");
+        `, "out.farmlandMarketplace.readState..'|'..tostring(#out.farmlandMarketplace.rows)..'|'..tostring(out.farmlandMarketplace.rows[1].farmlandIds[1])..'|'..tostring(out.farmlandMarketplace.rows[1].farmlandIds[2])..'|'..tostring(out.farmlandMarketplace.rows[1].price)");
+        expect(market).toBe("ok|1|7|47|1500");
+
+        const buyer = run(`
+            getfenv = function() return _G end
+            g_currentMission = { getFarmId = function() return 1 end }
+            g_modIsLoaded = { ['FS25_369241_Farmland_Marketplace'] = true }
+            _G['FS25_369241_Farmland_Marketplace'] = {
+                FlaechenVermarktung = { manager = { state = {
+                    saleOffers = { o1 = { farmlandIds = { 12 }, sellerFarmId = 2, buyerFarmId = 1, price = 2100 } },
+                    leaseOffers = {}, leases = {},
+                } } },
+            }
+        `, "out.farmlandMarketplace.readState..'|'..tostring(#out.farmlandMarketplace.rows)..'|'..tostring(out.farmlandMarketplace.rows[1].farmlandId)");
+        expect(buyer).toBe("ok|1|12");
+
+        const lessee = run(`
+            getfenv = function() return _G end
+            g_currentMission = { getFarmId = function() return 1 end }
+            g_modIsLoaded = { ['FS25_369241_Farmland_Marketplace'] = true }
+            _G['FS25_369241_Farmland_Marketplace'] = {
+                FlaechenVermarktung = { manager = { state = {
+                    saleOffers = {}, leaseOffers = {},
+                    leases = { c1 = { farmlandIds = { 8, 9 }, lessorFarmId = 3, lesseeFarmId = 1,
+                        ratePerPeriod = 20 } },
+                } } },
+            }
+        `, "out.farmlandMarketplace.readState..'|'..tostring(#out.farmlandMarketplace.rows)..'|'..tostring(out.farmlandMarketplace.rows[1].farmlandIds[2])..'|'..tostring(out.farmlandMarketplace.rows[1].price)");
+        expect(lessee).toBe("ok|1|9|20");
 
         const distribution = run(`
             getfenv = function() return _G end

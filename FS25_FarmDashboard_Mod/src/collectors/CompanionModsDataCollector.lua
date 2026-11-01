@@ -2818,9 +2818,23 @@ local function marketTouchesFarm(row, farmId)
         return false
     end
     return tonumber(row.sellerFarmId) == farmId
+        or tonumber(row.buyerFarmId) == farmId
         or tonumber(row.targetFarmId) == farmId
         or tonumber(row.lessorFarmId) == farmId
         or tonumber(row.lesseeFarmId) == farmId
+end
+
+local function marketParcels(row)
+    local source = row.farmlandIds
+    if type(source) ~= "table" then source = { row.farmlandId } end -- Legacy single-parcel records.
+    local ids = {}
+    if #source == 0 or #source > 16 then return nil end
+    for _, rawId in ipairs(source) do
+        local id = tonumber(rawId)
+        if id == nil or id <= 0 or id ~= math.floor(id) then return nil end
+        ids[#ids + 1] = id
+    end
+    return ids
 end
 
 local function collectFarmlandMarketplace()
@@ -2836,6 +2850,7 @@ local function collectFarmlandMarketplace()
     end
     local rows = {}
     local truncated = false
+    local invalid = false
     local function take(bucket, kind, priceKey)
         if type(bucket) ~= "table" or truncated then
             return
@@ -2848,11 +2863,18 @@ local function collectFarmlandMarketplace()
                 break
             end
             if marketTouchesFarm(row, farmId) then
-                rows[#rows + 1] = {
-                    kind = kind,
-                    farmlandId = tonumber(row.farmlandId),
-                    price = tonumber(row[priceKey]),
-                }
+                local ids = marketParcels(row)
+                local price = tonumber(row[priceKey])
+                if ids ~= nil and price ~= nil and price >= 0 then
+                    rows[#rows + 1] = {
+                        kind = kind,
+                        farmlandId = #ids == 1 and ids[1] or nil,
+                        farmlandIds = ids,
+                        price = price, -- total bundle price or rate, never per parcel
+                    }
+                else
+                    invalid = true
+                end
             end
         end
     end
@@ -2863,7 +2885,7 @@ local function collectFarmlandMarketplace()
         enabled = true,
         source = "farmlandMarketplace",
         readState = #rows == 0 and "empty" or "ok",
-        coverage = truncated and "truncated" or "complete",
+        coverage = truncated and "truncated" or invalid and "partial" or "complete",
         scope = "farm",
         farmId = farmId,
         rows = rows,

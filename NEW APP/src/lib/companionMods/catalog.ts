@@ -43,6 +43,7 @@ const LIMITED_IDS = new Set([
   "livestockMonitor",
   "saveUnitProfiles",
   "productionWatcher",
+  "productionRevamp",
   "seasonalWoolProduction",
   "taskList",
   "productionSchedule",
@@ -340,6 +341,15 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     descKey: "companions.desc.productionControl",
     desc: "Adjusts production speed from 50% to 300%, changing cycles and operating cost. FarmHub reads each owned line's chosen speed.",
     relatedSection: "productions",
+  },
+  {
+    id: "productionRevamp",
+    title: "Production Revamp",
+    category: "production",
+    descKey: "companions.desc.productionRevamp",
+    desc: "Adds Store output mode and priority or litre limits for deliveries between owned production points. FarmHub reads the saved settings, not completed deliveries.",
+    relatedSection: "productions",
+    liveKey: "productionRevamp",
   },
   {
     id: "productionSupplyManager",

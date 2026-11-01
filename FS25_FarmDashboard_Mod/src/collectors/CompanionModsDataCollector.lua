@@ -313,6 +313,14 @@ local CATALOG = {
         globals = { "ContractManagerRegistry" },
     },
     {
+        id = "mowingContractsPlus",
+        title = "Mowing Contracts Plus",
+        category = "economy",
+        names = { "FS25_MowingContractsPlus", "KM_82704_Mowing_Contracts_Plus" },
+        substrings = { "mowingcontractsplus", "mowing_contracts_plus" },
+        globals = { "MowingContractsPlus" },
+    },
+    {
         id = "factoryProfitCalculator",
         title = "Factory Profit Calculator",
         category = "production",

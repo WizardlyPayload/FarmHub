@@ -182,6 +182,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/NetWorthTrackerCollector.lua"/>
         <sourceFile filename="src/companionPages/RealLandFinanceCollector.lua"/>
         <sourceFile filename="src/companionPages/ContractManagerCollector.lua"/>
+        <sourceFile filename="src/companionPages/MowingContractsPlusCollector.lua"/>
         <sourceFile filename="src/companionPages/FinanceYourFleetCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticFarmFinanceLoansCollector.lua"/>
         <sourceFile filename="src/companionPages/InvoicesProductionSalesOffersCollector.lua"/>

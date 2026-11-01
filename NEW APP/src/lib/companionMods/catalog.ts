@@ -410,6 +410,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "mowingContractsPlus",
+    title: "Mowing Contracts Plus",
+    category: "contracts",
+    descKey: "companions.desc.mowingContractsPlus",
+    desc: "Shows saved grass-access offer decisions for this farm's assigned mowing contracts in single-player. A reward reduction is not a recorded payout.",
+    relatedSection: "economy",
+  },
+  {
     id: "snowContracts",
     title: "Snow Contracts",
     category: "economy",

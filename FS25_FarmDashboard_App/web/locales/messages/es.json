@@ -471,7 +471,7 @@
   "fields.formatCropEmpty": "Vacío",
   "fields.formatCropUnknown": "Cultivo desconocido",
   "fields.formatCropMulchedStubble": "rastrojo triturado",
-  "fields.formatCropBeetroot": "Remolacha azucarera",
+  "fields.formatCropBeetroot": "Remolacha",
   "fields.soilNitrogen": "Nitrógeno",
   "fields.soilPhLime": "pH / Cal",
   "fields.needsScan": "Necesita escaneo",

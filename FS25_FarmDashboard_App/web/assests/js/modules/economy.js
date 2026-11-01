@@ -936,7 +936,7 @@ export function updateMarketPrices(economyData) {
     if ([
       "WHEAT", "BARLEY", "OAT", "CANOLA", "SORGHUM", "CORN", "MAIZE", "SUGAR_BEET", "SUGARBEET", "POTATO", "POTATOES",
       "GRASS", "COTTON", "SUNFLOWER", "SUGARCANE", "OLIVES", "OLIVE", "GRAPES", "GRAPE", "CARROTS", "CARROT", "PARSNIPS", "PARSNIP",
-      "RED_BEET", "PEAS", "PEA", "SPINACH", "GREEN_BEANS", "SOYBEANS", "SOYBEAN", "LONG_GRAIN_RICE", "RICE"
+      "RED_BEET", "BEETROOT", "REDBEET", "PEAS", "PEA", "SPINACH", "GREEN_BEANS", "SOYBEANS", "SOYBEAN", "LONG_GRAIN_RICE", "RICE"
     ].includes(nameUpper)) {
       crops[name] = priceInfo;
     } else if ([
@@ -1104,7 +1104,7 @@ export function displayMarketPrices(marketData) {
     if ([
       "WHEAT", "BARLEY", "OAT", "CANOLA", "SORGHUM", "CORN", "MAIZE", "SUGAR_BEET", "SUGARBEET", "POTATO", "POTATOES",
       "COTTON", "SUNFLOWER", "SUGARCANE", "OLIVES", "OLIVE", "GRAPES", "GRAPE", "CARROTS", "CARROT", "PARSNIPS", "PARSNIP",
-      "RED_BEET", "PEAS", "PEA", "SPINACH", "GREEN_BEANS", "SOYBEANS", "SOYBEAN", "LONG_GRAIN_RICE", "RICE"
+      "RED_BEET", "BEETROOT", "REDBEET", "PEAS", "PEA", "SPINACH", "GREEN_BEANS", "SOYBEANS", "SOYBEAN", "LONG_GRAIN_RICE", "RICE"
     ].includes(nameUpper)) {
       categories.crops.items[cropName] = cropData;
     } else if ([
@@ -1351,6 +1351,9 @@ export function formatCropName(name) {
     'SUGARCANE': 'Sugar Cane',
     'SUGAR_BEET': 'Sugar Beet',
     'SUGARBEET': 'Sugar Beet',
+    'BEETROOT': 'Red Beet',
+    'REDBEET': 'Red Beet',
+    'RED_BEET': 'Red Beet',
     'POTATO': 'Potato',
     'POTATOES': 'Potatoes',
     'OAT': 'Oat',

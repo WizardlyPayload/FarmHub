@@ -578,6 +578,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "dynamicDealership",
+    title: "Dynamic Dealership",
+    category: "fleet",
+    descKey: "companions.desc.dynamicDealership",
+    desc: "Shows pending vehicle orders for this farm. Dealer stock is shared and delivered vehicles are shown elsewhere.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "veterinarian",
     title: "Veterinarian and Animal Diseases",
     category: "livestock",

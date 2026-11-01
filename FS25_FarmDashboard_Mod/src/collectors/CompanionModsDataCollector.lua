@@ -458,6 +458,14 @@ local CATALOG = {
         globals = { "TradeInMod" },
     },
     {
+        id = "dynamicDealership",
+        title = "Dynamic Dealership",
+        category = "fleet",
+        names = { "FS25_DynamicDealership", "FS25_369544_Dynamic_Dealership", "KM_80444_Dynamic_Dealership" },
+        substrings = { "dynamicdealership", "dynamic_dealership" },
+        globals = {},
+    },
+    {
         id = "veterinarian",
         title = "Veterinarian and Animal Diseases",
         category = "livestock",

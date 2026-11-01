@@ -358,6 +358,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "snowContracts",
+    title: "Snow Contracts",
+    category: "economy",
+    descKey: "companions.desc.snowContracts",
+    desc: "Pays a farm for eligible snow cleared on another owner's land. FarmHub reads only this farm's unpaid amount, not a completed contract or credited income.",
+    relatedSection: "economy",
+  },
+  {
     id: "productionsManager",
     title: "Productions Manager",
     category: "production",

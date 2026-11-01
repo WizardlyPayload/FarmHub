@@ -382,6 +382,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "contractManager",
+    title: "Contract Manager",
+    category: "contracts",
+    descKey: "companions.desc.contractManager",
+    desc: "Reads this farm's Contract Manager active ledger, saved outcomes and payout totals from the server. Offered rewards are not payments.",
+    relatedSection: "economy",
+  },
+  {
     id: "snowContracts",
     title: "Snow Contracts",
     category: "economy",

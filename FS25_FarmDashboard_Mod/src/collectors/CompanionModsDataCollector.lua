@@ -281,6 +281,14 @@ local CATALOG = {
         globals = { "g_ftrManager" },
     },
     {
+        id = "contractManager",
+        title = "Contract Manager",
+        category = "economy",
+        names = { "FS25_ContractManager", "GH_Dostlar-Studio__FS25_ContractManager_FS25_ContractManager" },
+        substrings = { "fs25_contractmanager" },
+        globals = { "ContractManagerRegistry" },
+    },
+    {
         id = "factoryProfitCalculator",
         title = "Factory Profit Calculator",
         category = "production",

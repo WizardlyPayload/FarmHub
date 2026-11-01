@@ -89,6 +89,7 @@ test("current vault filenames for the reference cohort are detected together", (
         ["animalTrader", "FS25_339284_Animal_Trader"],
         ["stallRental", "FS25_339275_Stall_Rental"],
         ["productionControl", "FS25_319198_Production_Control"],
+        ["contractManager", "FS25_ContractManager"],
         ["productionsManager", "FS25_346503_Productions_Manager"],
         ["puncturedTires", "FS25_358517_Punctured_Tires"],
         ["implementUsageCounter", "FS25_310419_Implement_Usage_Counter"],

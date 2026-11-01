@@ -526,6 +526,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "futuresMarketPositions",
+    title: "Futures Market",
+    category: "finance",
+    descKey: "companions.desc.futuresMarketPositions",
+    desc: "Shows this farm's open commodity contracts, entry terms, posted margin and expiry period. Open positions are not realized profit.",
+    relatedSection: "economy",
+  },
+  {
     id: "collisionDamage",
     title: "Collision Damage",
     category: "fleet",

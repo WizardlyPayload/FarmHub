@@ -94,7 +94,9 @@ CompanionPages.register({
         local hasFarmState = activeCount > 0 or historyCount > 0 or stats ~= nil
         return {
             readState = invalid and "partial" or (hasFarmState and "ok" or "settings-only"),
-            reason = hasFarmState and nil or "no-farm-record",
+            -- `hasFarmState and nil or X` always evaluates to X in Lua.
+            -- Clear the empty-state reason once this farm has a record.
+            reason = not hasFarmState and "no-farm-record" or nil,
             coverage = truncated and "truncated" or invalid and "partial" or "complete",
             byFarm = { [tostring(farmId)] = {
                 activeCount = activeCount,

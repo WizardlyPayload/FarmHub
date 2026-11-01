@@ -233,6 +233,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "productionRevamp",
+        title = "Production Revamp",
+        category = "production",
+        names = { "FS25_378044_Production_Revamp", "FS25_ProductionRevamp" },
+        substrings = { "production_revamp", "productionrevamp" },
+        globals = { "Revamp" },
+    },
+    {
         id = "productionsManager",
         title = "Productions Manager",
         category = "production",

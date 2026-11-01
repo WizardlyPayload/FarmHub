@@ -4572,4 +4572,10 @@
   ,"companionPage.productionPalletManager.empty": "No explicit override for a source your farm currently owns."
   ,"companionPage.productionPalletManager.truncated": "Only part of the owned source list is shown."
   ,"companionPage.productionPalletManager.partial": "Some saved settings could not be matched safely to current owned sources."
+  ,"companionPage.productionRevamp.getterStoreCount": "Server getter: Store"
+  ,"companionPage.productionRevamp.keep": "Keep"
+  ,"companionPage.productionRevamp.selling": "Selling"
+  ,"companionPage.productionRevamp.distributing": "Distributing"
+  ,"companionPage.productionRevamp.unknown": "Unknown"
+  ,"companionPage.productionRevamp.modeMismatch": "A saved Store flag disagrees with the server getter. Check the in-game menu and selected mods before relying on this setting."
 }

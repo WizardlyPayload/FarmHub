@@ -348,7 +348,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Production Revamp",
     category: "production",
     descKey: "companions.desc.productionRevamp",
-    desc: "Adds Store output mode and priority or litre limits for deliveries between owned production points. FarmHub reads the saved settings, not completed deliveries.",
+    desc: "Adds Store output mode and priority or litre limits for deliveries between owned production points. FarmHub separates saved flags from the server getter; the game menu and delivery need separate verification.",
     relatedSection: "productions",
     liveKey: "productionRevamp",
   },

@@ -24,6 +24,12 @@ const SETUP = `
     outputFillTypeIds = { [1] = true, [2] = true },
     outputFillTypeIdsStorage = { [1] = true },
     outputFillTypeIdsAutoDeliver = { [2] = true },
+    getOutputDistributionMode = function(_, fillTypeId)
+      if fillTypeId == 1 then
+        return _G.FS25_378044_Production_Revamp.Revamp.settings.storageActive and 3 or 0
+      end
+      return 2
+    end,
     distributionTargets = {
       [2] = { ["owned-target"] = { level = "PRIMARY", limit = 1200 } }
     },
@@ -49,13 +55,15 @@ const SETUP = `
 test("reads owned Store and target settings without claiming a delivery or changing the mod", () => {
   const page = runCompanionPage(FILE, SETUP, { farmId: 1 });
   expect(page).toMatchObject({ readState: "ok", coverage: "complete",
-    byFarm: { "1": { productionCount: 2, storeCount: 1, targetCount: 1 } } });
+    byFarm: { "1": { productionCount: 2, storeCount: 1,
+      getterStoreCount: 1, targetCount: 1 } } });
   expect(page.rows).toEqual(expect.arrayContaining([
     expect.objectContaining({ source: "Greenhouse", product: "TOMATO",
-      kind: "STORE", active: true }),
+      kind: "STORE", serverMode: "STORE", storageEnabled: true }),
     expect.objectContaining({ source: "Greenhouse", product: "LETTUCE",
-      kind: "TARGET", destination: "Food Plant", level: "PRIMARY",
-      limitLitres: 1200, active: true }),
+      kind: "TARGET", serverMode: "AUTO_DELIVER",
+      destination: "Food Plant", level: "PRIMARY",
+      limitLitres: 1200, distributionEnabled: true, autoDeliverFlag: true }),
   ]));
   expect(JSON.stringify(page)).not.toContain("Foreign Plant");
   expect(JSON.stringify(page)).not.toContain("owned-target");
@@ -85,5 +93,20 @@ test("withholds client state and unresolved target; distinguishes saved inactive
     "storageActive = false, distributionActive = false");
   const page = runCompanionPage(FILE, off, { farmId: 1 });
   expect(page.rows).toHaveLength(2);
-  expect(page.rows.every((row) => row.active === false)).toBe(true);
+  expect(page.rows.every((row) => row.kind === "STORE"
+    ? row.storageEnabled === false : row.distributionEnabled === false)).toBe(true);
+  expect(page).toMatchObject({ byFarm: { "1": { storeCount: 1,
+    getterStoreCount: 0 } } });
+});
+
+test("marks a saved Store flag as partial when the server getter disagrees", () => {
+  const mismatched = SETUP.replace("and 3 or 0", "and 0 or 0");
+  const page = runCompanionPage(FILE, mismatched, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "partial",
+    reason: "store-mode-mismatch",
+    byFarm: { "1": { storeCount: 1, getterStoreCount: 0 } } });
+  expect(page.rows).toEqual(expect.arrayContaining([
+    expect.objectContaining({ kind: "STORE", product: "TOMATO",
+      serverMode: "KEEP", storageEnabled: true }),
+  ]));
 });

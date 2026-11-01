@@ -7,6 +7,11 @@ local MAX_OUTPUTS_PER_POINT = 50
 local MAX_TARGETS_PER_OUTPUT = 40
 local MAX_ROWS = 100
 local LEVEL = { PRIMARY = true, SECONDARY = true, REST = true, NEVER = true }
+-- Exact Production Revamp 1.0.0.0 adds STORE=3 to the vanilla modes 0..2.
+-- Its saved flag can disagree with the effective getter when another mod
+-- replaces a ProductionPoint hook; report both rather than claiming activity.
+local OUTPUT_MODE = { [0] = "KEEP", [1] = "DIRECT_SELL",
+    [2] = "AUTO_DELIVER", [3] = "STORE" }
 
 CompanionPages.register({
     key = "productionRevamp",
@@ -53,8 +58,9 @@ CompanionPages.register({
             end
         end
 
-        local rows, storeCount, targetCount = {}, 0, 0
+        local rows, storeCount, getterStoreCount, targetCount = {}, 0, 0, 0
         local incomplete = false
+        local modeMismatch = false
         for _, point in ipairs(owned) do
             local sourceName = ctx.clip(ctx.call(point, "getName")
                 or ctx.call(point.owningPlaceable, "getName"), 64)
@@ -75,13 +81,25 @@ CompanionPages.register({
                 if type(fillName) ~= "string" or fillName == "" then
                     incomplete = true
                 else
+                    local serverMode = OUTPUT_MODE[ctx.num(ctx.call(point,
+                        "getOutputDistributionMode", fillTypeId))]
+                    if serverMode == nil then incomplete = true end
                     if store and store[fillTypeId] then
                         storeCount = storeCount + 1
+                        if serverMode == "STORE" and settings.storageActive == true then
+                            getterStoreCount = getterStoreCount + 1
+                        elseif settings.storageActive == true then
+                            -- The mod's saved flag does not match its server
+                            -- getter. Do not call this a live Store setting.
+                            modeMismatch = true
+                            incomplete = true
+                        end
                         if #rows < MAX_ROWS then
                             rows[#rows + 1] = {
                                 farmId = farmId, source = sourceName,
                                 product = ctx.clip(fillName, 48), kind = "STORE",
-                                active = settings.storageActive == true,
+                                serverMode = serverMode,
+                                storageEnabled = settings.storageActive == true,
                             }
                         else truncated = true end
                     end
@@ -104,11 +122,12 @@ CompanionPages.register({
                                         farmId = farmId, source = sourceName,
                                         product = ctx.clip(fillName, 48),
                                         kind = "TARGET", level = level,
+                                        serverMode = serverMode,
+                                        distributionEnabled = settings.distributionActive == true,
                                         destination = ctx.clip(ctx.call(destination, "getName")
                                             or ctx.call(destination.owningPlaceable, "getName"), 64),
                                         limitLitres = limit,
-                                        active = settings.distributionActive == true
-                                            and autoDeliver[fillTypeId] ~= nil,
+                                        autoDeliverFlag = autoDeliver[fillTypeId] ~= nil,
                                     }
                                 else truncated = true end
                             end
@@ -126,10 +145,12 @@ CompanionPages.register({
         end)
         return {
             readState = incomplete and "partial" or (#rows > 0 and "ok" or "settings-only"),
-            reason = #rows == 0 and "no-owned-revamp-settings" or nil,
+            reason = modeMismatch and "store-mode-mismatch"
+                or #rows == 0 and "no-owned-revamp-settings" or nil,
             coverage = truncated and "truncated" or incomplete and "partial" or "complete",
             byFarm = { [tostring(farmId)] = {
-                productionCount = #owned, storeCount = storeCount, targetCount = targetCount,
+                productionCount = #owned, storeCount = storeCount,
+                getterStoreCount = getterStoreCount, targetCount = targetCount,
                 storageActive = settings.storageActive == true,
                 distributionActive = settings.distributionActive == true,
             } },

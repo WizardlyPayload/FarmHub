@@ -75,7 +75,7 @@ This is not a pass for all 65 catalog entries or all gameplay combinations. Posi
 | animalPlanner | limited | pastures | B2 | B2: pen counts matched prior game/export and Pastures card |
 | vipOrderManager | limited | economy | B2 | B2: empty orders; UI/game event unproved |
 | fieldProfitabilityLedger | limited | fields | B2 | B2: unavailable, no sale-category data in save |
-| farmReputation | limited | economy | B2 | B3: hide-on-uncheck passed. V7R1 bounded game Contractor page/export/installed V5 5.2.33 page matched Noah with zero jobs and default farm score/rank/limit; corrected Jobs `0` passed. Nonzero score, completed mission, cancellation penalty and rank enforcement unproved. Ally Desktop shortcut was not restored byte-for-byte; see vault audit. |
+| farmReputation | limited | economy | B2 | B3: hide-on-uncheck passed. V7R1 bounded game Contractor page/export/installed V5 5.2.33 page matched Noah with zero jobs and default farm score/rank/limit; corrected Jobs `0` passed. Nonzero score, completed mission, cancellation penalty and rank enforcement unproved. Ally Desktop shortcut was not restored byte-for-byte; V7R2 search found no exact original in retained backups. See vault audit. |
 | yieldTracker | limited | fields | B2 | B2: empty rows; UI/game event unproved |
 | moistureSystem | limited | fields | B1 | B1: field values matched; bale/silo states absent |
 | fieldLeasing | limited | fields | A | A: settings only; no lease |

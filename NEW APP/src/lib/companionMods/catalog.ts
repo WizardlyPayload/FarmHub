@@ -418,6 +418,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "cryptoFarm",
+    title: "Crypto Farm",
+    category: "economy",
+    descKey: "companions.desc.cryptoFarm",
+    desc: "Shows this farm's separate Crypto Farm coin balance and current shared quote in single-player. Coins are not cash or realized profit.",
+    relatedSection: "economy",
+  },
+  {
     id: "snowContracts",
     title: "Snow Contracts",
     category: "economy",

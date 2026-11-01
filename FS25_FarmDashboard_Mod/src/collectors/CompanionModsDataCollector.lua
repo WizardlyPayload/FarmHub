@@ -321,6 +321,14 @@ local CATALOG = {
         globals = { "MowingContractsPlus" },
     },
     {
+        id = "cryptoFarm",
+        title = "Crypto Farm",
+        category = "economy",
+        names = { "FS25_CryptoFarm", "GH_AnJo888__FS25_CryptoFarm_FS25_CryptoFarm", "KM_82419_Crypto_Farm_ATM" },
+        substrings = { "fs25_cryptofarm", "crypto_farm_atm" },
+        globals = { "g_cryptoFarm" },
+    },
+    {
         id = "factoryProfitCalculator",
         title = "Factory Profit Calculator",
         category = "production",

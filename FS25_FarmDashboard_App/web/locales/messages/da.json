@@ -4604,4 +4604,9 @@
   ,"companionPage.mowingContractsPlus.empty": "No saved grass-access offer for a mowing contract assigned to this farm."
   ,"companionPage.mowingContractsPlus.truncated": "Only some assigned decisions are listed."
   ,"companionPage.mowingContractsPlus.partial": "Some assigned decisions could not be read."
+  ,"companions.desc.cryptoFarm": "Shows this farm's separate Crypto Farm coin balance and current shared quote in single-player. Coins are not cash or realized profit."
+  ,"companionPage.cryptoFarm.title": "Crypto Farm"
+  ,"companionPage.cryptoFarm.lead": "This farm's Crypto Farm coin holding is separate from its game-money balance. The quoted exchange rate is shared and can change; it does not record a sale, withdrawal or realized profit. Buy and sell fees apply in the mod."
+  ,"companionPage.cryptoFarm.balance": "Coin balance"
+  ,"companionPage.cryptoFarm.rate": "Current quote per CFC"
 }

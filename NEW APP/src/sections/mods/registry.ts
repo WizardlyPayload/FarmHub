@@ -31,6 +31,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/contractManager").then((m) => m.Page) },
   { key: "mowingContractsPlus", catalogId: "mowingContractsPlus", title: "Mowing Contracts Plus", glyph: "MC", group: "finance",
     load: () => import("@/sections/mods/mowingContractsPlus").then((m) => m.Page) },
+  { key: "cryptoFarm", catalogId: "cryptoFarm", title: "Crypto Farm", glyph: "CF", group: "finance",
+    load: () => import("@/sections/mods/cryptoFarm").then((m) => m.Page) },
   { key: "netWorthTracker", catalogId: "netWorthTracker", title: "Net Worth Tracker", glyph: "NW", group: "finance",
     load: () => import("@/sections/mods/netWorthTracker").then((m) => m.Page) },
   { key: "realLandFinance", catalogId: "realLandFinance", title: "Real Land Finance", glyph: "LF", group: "finance",

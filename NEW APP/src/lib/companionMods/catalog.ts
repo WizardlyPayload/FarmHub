@@ -426,6 +426,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "autoSellSilo",
+    title: "Auto Sell Silo",
+    category: "economy",
+    descKey: "companions.desc.autoSellSilo",
+    desc: "Tracks this farm's unpaid deferred Auto Sell Silo payments and their remaining months; it does not retain sale details or paid history.",
+    relatedSection: "economy",
+  },
+  {
     id: "productionsManager",
     title: "Productions Manager",
     category: "production",

@@ -65,6 +65,14 @@ local CATALOG = {
         globals = { "DynamicMarket", "g_DynamicMarket" },
     },
     {
+        id = "autoSellSilo",
+        title = "Auto Sell Silo",
+        category = "economy",
+        names = { "KM_83453_Auto_Sell_Silo", "FS25_AutoSellSilo" },
+        substrings = { "autosellsilo", "auto_sell_silo" },
+        globals = {},
+    },
+    {
         id = "marketPriceHelper",
         title = "Market Price Helper",
         category = "economy",

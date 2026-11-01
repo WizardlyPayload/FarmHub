@@ -273,6 +273,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "realLandFinance",
+        title = "Real Land Finance",
+        category = "economy",
+        names = { "KM_83258_Real_Land_Finances" },
+        substrings = { "real_land_finances" },
+        globals = { "g_ftrManager" },
+    },
+    {
         id = "factoryProfitCalculator",
         title = "Factory Profit Calculator",
         category = "production",

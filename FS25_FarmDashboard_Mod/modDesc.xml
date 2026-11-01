@@ -175,6 +175,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/CropContractsCollector.lua"/>
         <sourceFile filename="src/companionPages/HarvestLedgerCollector.lua"/>
         <sourceFile filename="src/companionPages/NetWorthTrackerCollector.lua"/>
+        <sourceFile filename="src/companionPages/RealLandFinanceCollector.lua"/>
         <sourceFile filename="src/companionPages/FarmReputationCollector.lua"/>
         <sourceFile filename="src/companionPages/SnowContractsCollector.lua"/>
         <sourceFile filename="src/companionPages/GrassContractsCollector.lua"/>

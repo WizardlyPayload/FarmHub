@@ -29,6 +29,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/cropContracts").then((m) => m.Page) },
   { key: "netWorthTracker", catalogId: "netWorthTracker", title: "Net Worth Tracker", glyph: "NW", group: "finance",
     load: () => import("@/sections/mods/netWorthTracker").then((m) => m.Page) },
+  { key: "realLandFinance", catalogId: "realLandFinance", title: "Real Land Finance", glyph: "LF", group: "finance",
+    load: () => import("@/sections/mods/realLandFinance").then((m) => m.Page) },
   { key: "farmReputation", catalogId: "farmReputation", title: "Farm Reputation", glyph: "FR", group: "finance",
     load: () => import("@/sections/mods/farmReputation").then((m) => m.Page) },
   { key: "snowContracts", catalogId: "snowContracts", title: "Snow Contracts", glyph: "SC", group: "finance",

@@ -366,6 +366,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "realLandFinance",
+    title: "Real Land Finance",
+    category: "economy",
+    descKey: "companions.desc.realLandFinance",
+    desc: "Reads this farm's land purchase finance, leases and land let out from the mod's current contract register.",
+    relatedSection: "economy",
+  },
+  {
     id: "snowContracts",
     title: "Snow Contracts",
     category: "economy",

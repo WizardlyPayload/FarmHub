@@ -502,6 +502,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "financeYourFleet",
+    title: "Finance Your Fleet",
+    category: "finance",
+    descKey: "companions.desc.financeYourFleet",
+    desc: "Shows active equipment finance agreements linked to vehicles your farm still owns, including payment progress and the mod's next due amount.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "collisionDamage",
     title: "Collision Damage",
     category: "fleet",

@@ -257,6 +257,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "netWorthTracker",
+        title = "Net Worth Tracker",
+        category = "economy",
+        names = { "FS25_339475_FS25_netWorthTracker", "KM_72515_Net_Worth_Tracker", "GH_EvanKirsch__fs25-nwt_FS25_NetWorthTracker_update" },
+        substrings = { "networthtracker_update", "net_worth_tracker", "fs25_networthtracker" },
+        globals = {},
+    },
+    {
         id = "factoryProfitCalculator",
         title = "Factory Profit Calculator",
         category = "production",

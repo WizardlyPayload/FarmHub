@@ -348,6 +348,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "fields",
   },
   {
+    id: "netWorthTracker",
+    title: "Net Worth Tracker",
+    category: "economy",
+    descKey: "companions.desc.netWorthTracker",
+    desc: "Saves daily net-worth samples for the local player's farm. FarmHub reads the dated history separately from its own current estimate.",
+    relatedSection: "economy",
+  },
+  {
     id: "productionsManager",
     title: "Productions Manager",
     category: "production",

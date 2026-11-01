@@ -33,6 +33,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/realLandFinance").then((m) => m.Page) },
   { key: "financeYourFleet", catalogId: "financeYourFleet", title: "Finance Your Fleet", glyph: "FY", group: "finance",
     load: () => import("@/sections/mods/financeYourFleet").then((m) => m.Page) },
+  { key: "realisticFarmFinanceLoans", catalogId: "realisticFarmFinanceLoans", title: "Realistic Farm Finance loans", glyph: "RL", group: "finance",
+    load: () => import("@/sections/mods/realisticFarmFinanceLoans").then((m) => m.Page) },
   { key: "farmReputation", catalogId: "farmReputation", title: "Farm Reputation", glyph: "FR", group: "finance",
     load: () => import("@/sections/mods/farmReputation").then((m) => m.Page) },
   { key: "snowContracts", catalogId: "snowContracts", title: "Snow Contracts", glyph: "SC", group: "finance",

@@ -510,6 +510,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "realisticFarmFinanceLoans",
+    title: "Realistic Farm Finance loans",
+    category: "finance",
+    descKey: "companions.desc.realisticFarmFinanceLoans",
+    desc: "Shows this farm's active term, mortgage and bullet loan balances and arrears from Realistic Farm Finance. Other finance products need separate readings.",
+    relatedSection: "economy",
+  },
+  {
     id: "collisionDamage",
     title: "Collision Damage",
     category: "fleet",

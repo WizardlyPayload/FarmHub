@@ -1,4 +1,5 @@
-// Wake this FarmHub chat only for a new substantive Ally vault result.
+// Wake this FarmHub chat for a substantive vault result, or the specific RF
+// release currently gating the next FarmHub packet.
 // Local file events and a filesystem-only fallback; no idle model calls.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,7 +37,7 @@ function writeState(state) {
 function results(text) {
   const out = [];
   for (const block of text.replace(/^\uFEFF/, '').split(/(?=^## )/m)) {
-    const match = block.match(/^(RESULT|BLOCKED)\s+(FARMHUB-ALLY-\d{8}-VAULT-V\d+(?:R\d+)?)\b/m);
+    const match = block.match(/^(RESULT|BLOCKED)\s+(FARMHUB-ALLY-\d{8}-VAULT-V\d+(?:R\d+)?|RF-20261101-TINA-SAVE20-1451)\b/m);
     if (match) out.push({ id: match[2], kind: match[1], hash: digest(block.replace(/\r\n/g, '\n').trim()) });
   }
   return out;
@@ -102,13 +103,16 @@ async function deliver() {
     for (const event of queued) event.status = 'inflight';
     writeState(state);
     const labels = queued.map(event => `${event.kind} ${event.id}`).join(', ');
-    const prompt = `FarmHub Ally file watcher detected new substantive return: ${labels}. ` +
-      'Read Z:\\Graham\\agent-comms\\to-wizard-pc.md and the exact RESULT/BLOCKED evidence. ' +
-      'Check for a newer RF owner before any FarmHub request. Independently verify exact artifact hashes, ' +
-      'game/export/installed page values, committed generations, log and full Ally restoration; record bounded results in the vault audit. ' +
-      'Continue source triage and meaningful farm-owned integrations without claiming vault-wide acceptance. ' +
-      'Give RF-owned Ally sessions priority and keep Graham PC UI free. ' +
-      'The five-minute automation remains paused. Notify Graham only for a meaningful blocker or completed scoped acceptance.';
+    const rfRelease = queued.some(event => event.id === 'RF-20261101-TINA-SAVE20-1451');
+    const prompt = rfRelease
+      ? `FarmHub Ally file watcher saw substantive ${labels}. Read Z:\\Graham\\agent-comms\\to-wizard-pc.md; verify RF-1451 has finished and fully restored Ally and check for any newer RF owner. If free, review/freeze/hash TEST-PACKET-V8-DRAFT.md as TEST-PACKET-V8.md and append exact FARMHUB-ALLY-20261101-VAULT-V8 request to append-only to-tina.md. ACK is receipt only. Do not touch Ally or Graham PC UI. The five-minute automation remains paused; stay quiet on unchanged state.`
+      : `FarmHub Ally file watcher detected new substantive return: ${labels}. ` +
+        'Read Z:\\Graham\\agent-comms\\to-wizard-pc.md and the exact RESULT/BLOCKED evidence. ' +
+        'Check for a newer RF owner before any FarmHub request. Independently verify exact artifact hashes, ' +
+        'game/export/installed page values, committed generations, log and full Ally restoration; record bounded results in the vault audit. ' +
+        'Continue source triage and meaningful farm-owned integrations without claiming vault-wide acceptance. ' +
+        'Give RF-owned Ally sessions priority and keep Graham PC UI free. ' +
+        'The five-minute automation remains paused. Notify Graham only for a meaningful blocker or completed scoped acceptance.';
     const result = await adapter.sendBrianWake({ prompt, timeoutMs: 60000 });
     if (!result.delivered || result.threadId !== threadId) throw Error('WAKE_UNCONFIRMED');
     for (const event of queued) event.status = 'delivered';

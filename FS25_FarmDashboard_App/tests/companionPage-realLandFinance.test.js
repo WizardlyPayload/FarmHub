@@ -44,3 +44,22 @@ test("does not accept a shared shadow as the mod's contract register", () => {
     });
     expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", { farmId: 1 })).toBeUndefined();
 });
+
+test("uses the mod's calendar due date rather than a yearly lease's raw counter", () => {
+    const setup = `
+      _G.g_modIsLoaded = { KM_83258_Real_Land_Finances = true }
+      _G.KM_83258_Real_Land_Finances = { g_ftrManager = {
+        contracts = { [1] = { id = 1, type = "LEASE", farmlandId = 76,
+          farmId = 1, unit = "MONEY", rentPerYear = 656.758,
+          leaseKind = "YEARLY", monthsToNext = 12 } },
+        getNextDue = function(self, contract)
+          if contract.leaseKind == "YEARLY" then return 7, 656.758 end
+          return contract.monthsToNext, 656.758
+        end,
+      } }
+    `;
+    const page = runCompanionPage(FILE, setup, { farmId: 1 });
+    expect(page.rows).toEqual([expect.objectContaining({
+        farmlandId: 76, monthsToNext: 7, rentPerYear: 656.758,
+    })]);
+});

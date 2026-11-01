@@ -62,7 +62,10 @@ CompanionPages.register({
                                 installment = PURCHASE[kind] and ctx.num(contract.installment) or nil,
                                 rentPerYear = not PURCHASE[kind] and ctx.num(contract.rentPerYear) or nil,
                                 arrearsCount = ctx.num(contract.arrearsCount),
-                                monthsToNext = ctx.num(contract.monthsToNext),
+                                -- Yearly leases use the calendar period, not the raw
+                                -- counter saved on the contract. Use the same read-only
+                                -- calculation as the mod's Contracts screen.
+                                monthsToNext = ctx.num(ctx.call(manager, "getNextDue", contract)),
                             }
                         else
                             truncated = true

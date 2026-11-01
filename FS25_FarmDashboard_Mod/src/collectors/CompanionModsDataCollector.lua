@@ -121,6 +121,15 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "cropControlOverride",
+        title = "Crop Control Override",
+        category = "fields",
+        names = { "FS25_CropControlOverride", "FS25_365010_FS25_CropControlOverride",
+            "KM_78768_Crop_Control_Override", "GH_SimGamerJen__FS25_CropControlOverride_FS25_CropControlOverride" },
+        substrings = { "cropcontroloverride", "crop_control_override" },
+        globals = { "CropControlOverride" },
+    },
+    {
         id = "dynamicFieldPrices",
         title = "Dynamic Field Prices",
         category = "fields",

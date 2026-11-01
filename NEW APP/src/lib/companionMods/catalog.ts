@@ -218,6 +218,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "fields",
   },
   {
+    id: "cropControlOverride",
+    title: "Crop Control Override",
+    category: "fields",
+    descKey: "companions.desc.cropControlOverride",
+    desc: "Shows nondefault crop rules shared by the entire save, including player availability and NPC limits. It does not record a farm's planted or harvested crops.",
+    relatedSection: "fields",
+  },
+  {
     id: "dynamicFieldPrices",
     title: "Dynamic Field Prices",
     category: "fields",

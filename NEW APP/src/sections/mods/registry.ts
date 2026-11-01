@@ -33,6 +33,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/farmReputation").then((m) => m.Page) },
   { key: "snowContracts", catalogId: "snowContracts", title: "Snow Contracts", glyph: "SC", group: "finance",
     load: () => import("@/sections/mods/snowContracts").then((m) => m.Page) },
+  { key: "grassContracts", catalogId: "grassContracts", title: "Grass Contracts", glyph: "GC", group: "finance",
+    load: () => import("@/sections/mods/grassContracts").then((m) => m.Page) },
   // Livestock
   { key: "seasonalMilkProduction", catalogId: "seasonalMilkProduction", title: "Seasonal Milk Production", glyph: "SM", group: "livestock",
     load: () => import("@/sections/mods/seasonalMilkProduction").then((m) => m.Page) },

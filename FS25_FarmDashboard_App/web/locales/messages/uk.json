@@ -4334,4 +4334,8 @@
   ,"companionPage.snowContracts.title": "Snow Contracts"
   ,"companionPage.snowContracts.lead": "Snow Contracts credits this farm for eligible snow cleared on other owners' land. This is the mod's current unpaid amount; a payout is credited to the farm on a later game day. It is not contract income already received."
   ,"companionPage.snowContracts.pending": "Unpaid snow clearing"
+  ,"companions.desc.grassContracts": "Pays a farm for eligible grass mown on another owner's land. FarmHub reads only this farm's unpaid amount, not a completed contract or credited income."
+  ,"companionPage.grassContracts.title": "Grass Contracts"
+  ,"companionPage.grassContracts.lead": "Grass Contracts credits this farm for eligible grass mown on other owners' land. This is the mod's current unpaid amount; a payout is credited to the farm on a later game day. It is not contract income already received."
+  ,"companionPage.grassContracts.pending": "Unpaid grass mowing"
 }

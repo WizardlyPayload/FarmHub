@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "Очікує на розгляд",
   "invoices.state.overdue": "Прострочено",
   "invoices.state.cancelled": "Скасовано",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Надіслано",
   "invoices.state.unknown": "Невідомо",
   "fields.rf.soil.barN": "Пн.",

@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "Függőben levő",
   "invoices.state.overdue": "Lejárt",
   "invoices.state.cancelled": "Lemondva",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Küldött",
   "invoices.state.unknown": "Ismeretlen",
   "fields.rf.soil.barN": "É",

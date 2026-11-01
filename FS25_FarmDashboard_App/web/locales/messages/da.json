@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "Indtil",
   "invoices.state.overdue": "Forsinket",
   "invoices.state.cancelled": "Annulleret",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Sendt",
   "invoices.state.unknown": "Ukendt",
   "fields.rf.soil.barN": "N",

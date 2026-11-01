@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "Odottaa",
   "invoices.state.overdue": "Myöhässä",
   "invoices.state.cancelled": "Peruutettu",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Lähetetty",
   "invoices.state.unknown": "Tuntematon",
   "fields.rf.soil.barN": "N",

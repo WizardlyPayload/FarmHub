@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "Pendiente",
   "invoices.state.overdue": "Atrasado",
   "invoices.state.cancelled": "Cancelado",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Enviado",
   "invoices.state.unknown": "Desconocido",
   "fields.rf.soil.barN": "norte",

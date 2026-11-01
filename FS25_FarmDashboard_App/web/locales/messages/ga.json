@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "Ar feitheamh",
   "invoices.state.overdue": "Thar téarma",
   "invoices.state.cancelled": "Cealaithe",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Seolta",
   "invoices.state.unknown": "Anaithnid",
   "fields.rf.soil.barN": "N",

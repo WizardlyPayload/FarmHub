@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "Pendenti",
   "invoices.state.overdue": "Skadenza",
   "invoices.state.cancelled": "Ikkanċellat",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Mibgħut",
   "invoices.state.unknown": "Mhux magħruf",
   "fields.rf.soil.barN": "N",

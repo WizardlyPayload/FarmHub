@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "Εκκρεμής",
   "invoices.state.overdue": "Εκπρόθεσμος",
   "invoices.state.cancelled": "Ακυρώθηκε",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Απεστάλη",
   "invoices.state.unknown": "Αγνωστος",
   "fields.rf.soil.barN": "Β",

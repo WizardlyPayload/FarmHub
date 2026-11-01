@@ -12,6 +12,7 @@ local STATE_NAMES = {
     [2] = "sent",
     [3] = "paid",
     [4] = "cancelled",
+    [5] = "proposed",
 }
 
 --- Soft detect third-party mod (g_modIsLoaded / modManager / known globals).
@@ -128,16 +129,9 @@ local function invLinePreview(invoice)
     return title, #items
 end
 
-local function invSerializeItem(invoice, farmId)
+local function invSerializeItem(invoice, direction)
     local state = tonumber(invoice.state) or 1
     local preview, lineCount = invLinePreview(invoice)
-    local direction = "other"
-    if tonumber(invoice.recipientFarmId) == farmId then
-        direction = "incoming"
-    elseif tonumber(invoice.senderFarmId) == farmId then
-        direction = "outgoing"
-    end
-
     local createdAt = nil
     if type(invoice.createdAt) == "table" then
         createdAt = {
@@ -194,7 +188,7 @@ local function invSerializeFarm(manager, farmId)
     local items = {}
     local seen = {}
 
-    local function appendInvoice(invoice)
+    local function appendInvoice(invoice, direction)
         if not invoice then return end
         local id = tonumber(invoice.id)
         if id and seen[id] then return end
@@ -203,8 +197,10 @@ local function invSerializeFarm(manager, farmId)
         local state = tonumber(invoice.state) or 1
         local amount = math.floor(tonumber(invoice.totalAmount) or 0)
         local penalty = math.floor(tonumber(invoice.penaltyAmount) or 0)
-        local isIncoming = tonumber(invoice.recipientFarmId) == farmId
-        local isOutgoing = tonumber(invoice.senderFarmId) == farmId
+        -- The mod intentionally reverses the proposal view: an unapproved
+        -- proposal is incoming to its issuer and outgoing from its requester.
+        local isIncoming = direction == "incoming"
+        local isOutgoing = direction == "outgoing"
 
         if isIncoming then
             summary.incomingCount = summary.incomingCount + 1
@@ -229,17 +225,17 @@ local function invSerializeFarm(manager, farmId)
             end
         end
 
-        local ok, row = pcall(function() return invSerializeItem(invoice, farmId) end)
+        local ok, row = pcall(function() return invSerializeItem(invoice, direction) end)
         if ok and row then
             table.insert(items, row)
         end
     end
 
     for _, invoice in ipairs(incoming) do
-        appendInvoice(invoice)
+        appendInvoice(invoice, "incoming")
     end
     for _, invoice in ipairs(outgoing) do
-        appendInvoice(invoice)
+        appendInvoice(invoice, "outgoing")
     end
 
     table.sort(items, function(a, b)

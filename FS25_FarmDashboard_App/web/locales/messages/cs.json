@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "Čeká na vyřízení",
   "invoices.state.overdue": "Po splatnosti",
   "invoices.state.cancelled": "Zrušeno",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Odesláno",
   "invoices.state.unknown": "Neznámý",
   "fields.rf.soil.barN": "N",

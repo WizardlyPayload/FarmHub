@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "V teku",
   "invoices.state.overdue": "Zamujeno",
   "invoices.state.cancelled": "Preklicano",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Poslano",
   "invoices.state.unknown": "Neznano",
   "fields.rf.soil.barN": "S",

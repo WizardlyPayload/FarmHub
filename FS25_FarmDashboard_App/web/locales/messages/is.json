@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "Í bið",
   "invoices.state.overdue": "Of seint",
   "invoices.state.cancelled": "Aflýst",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Sent",
   "invoices.state.unknown": "Óþekkt",
   "fields.rf.soil.barN": "N",

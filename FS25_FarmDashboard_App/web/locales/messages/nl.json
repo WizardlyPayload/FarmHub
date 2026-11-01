@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "In behandeling",
   "invoices.state.overdue": "Verlopen",
   "invoices.state.cancelled": "Geannuleerd",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Verstuurd",
   "invoices.state.unknown": "Onbekend",
   "fields.rf.soil.barN": "N",

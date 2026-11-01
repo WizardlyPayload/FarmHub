@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "В очакване",
   "invoices.state.overdue": "Просрочено",
   "invoices.state.cancelled": "Отменено",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Изпратено",
   "invoices.state.unknown": "Неизвестен",
   "fields.rf.soil.barN": "Н",

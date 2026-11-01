@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "Laukiama",
   "invoices.state.overdue": "Vėluoja",
   "invoices.state.cancelled": "Atšaukta",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Išsiųsta",
   "invoices.state.unknown": "Nežinoma",
   "fields.rf.soil.barN": "N",

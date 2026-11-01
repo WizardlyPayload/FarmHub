@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "Na čekanju",
   "invoices.state.overdue": "Dospjelo",
   "invoices.state.cancelled": "Otkazano",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Poslano",
   "invoices.state.unknown": "Nepoznato",
   "fields.rf.soil.barN": "S",

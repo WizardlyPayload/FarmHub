@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "Ootel",
   "invoices.state.overdue": "Tähtaja ületanud",
   "invoices.state.cancelled": "Tühistatud",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Saadetud",
   "invoices.state.unknown": "Tundmatu",
   "fields.rf.soil.barN": "N",

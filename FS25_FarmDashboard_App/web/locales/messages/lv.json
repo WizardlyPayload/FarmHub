@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "Gaida apstiprinājumu",
   "invoices.state.overdue": "Nokavēts",
   "invoices.state.cancelled": "Atcelts",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Nosūtīts",
   "invoices.state.unknown": "Nezināms",
   "fields.rf.soil.barN": "N",

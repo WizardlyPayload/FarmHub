@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "În așteptare",
   "invoices.state.overdue": "Restanțat",
   "invoices.state.cancelled": "Anulat",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Trimis",
   "invoices.state.unknown": "Necunoscut",
   "fields.rf.soil.barN": "N",

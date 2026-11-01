@@ -2189,6 +2189,7 @@
   "invoices.state.unpaid": "En attente",
   "invoices.state.overdue": "En retard",
   "invoices.state.cancelled": "Annulé",
+  "invoices.state.proposed": "Proposed",
   "invoices.state.sent": "Envoyé",
   "invoices.state.unknown": "Inconnu",
   "fields.rf.soil.barN": "N",

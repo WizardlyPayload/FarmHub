@@ -241,6 +241,14 @@ local CATALOG = {
         globals = { "Revamp" },
     },
     {
+        id = "productionPalletManager",
+        title = "Production Pallet Manager",
+        category = "production",
+        names = { "FS25_376956_Production_Pallet_Manager", "FS25_ProductionPalletManager" },
+        substrings = { "production_pallet_manager", "productionpalletmanager" },
+        globals = { "PalletManager" },
+    },
+    {
         id = "productionsManager",
         title = "Productions Manager",
         category = "production",

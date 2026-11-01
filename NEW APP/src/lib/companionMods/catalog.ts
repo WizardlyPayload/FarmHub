@@ -44,6 +44,7 @@ const LIMITED_IDS = new Set([
   "saveUnitProfiles",
   "productionWatcher",
   "productionRevamp",
+  "productionPalletManager",
   "seasonalWoolProduction",
   "taskList",
   "productionSchedule",
@@ -350,6 +351,15 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     desc: "Adds Store output mode and priority or litre limits for deliveries between owned production points. FarmHub reads the saved settings, not completed deliveries.",
     relatedSection: "productions",
     liveKey: "productionRevamp",
+  },
+  {
+    id: "productionPalletManager",
+    title: "Production Pallet Manager",
+    category: "production",
+    descKey: "companions.desc.productionPalletManager",
+    desc: "Sets pallet capacity defaults and per-output overrides. FarmHub reads only settings for sources your farm still owns.",
+    relatedSection: "productions",
+    liveKey: "productionPalletManager",
   },
   {
     id: "productionSupplyManager",

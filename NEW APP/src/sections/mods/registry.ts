@@ -65,6 +65,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/productionControl").then((m) => m.Page) },
   { key: "productionRevamp", catalogId: "productionRevamp", title: "Production Revamp", glyph: "PR", group: "storage",
     load: () => import("@/sections/mods/productionRevamp").then((m) => m.Page) },
+  { key: "productionPalletManager", catalogId: "productionPalletManager", title: "Production Pallet Manager", glyph: "PP", group: "storage",
+    load: () => import("@/sections/mods/productionPalletManager").then((m) => m.Page) },
   { key: "productionSupplyManager", catalogId: "productionSupplyManager", title: "Production Supply Manager", glyph: "PS", group: "storage",
     load: () => import("@/sections/mods/productionSupplyManager").then((m) => m.Page) },
   { key: "invoicesProductionSalesOffers", catalogId: "invoicesProductionSalesOffers", title: "Invoices - Production Sales", glyph: "IS", group: "storage",

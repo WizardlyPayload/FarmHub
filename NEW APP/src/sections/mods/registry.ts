@@ -47,6 +47,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/factoryProfitCalculator").then((m) => m.Page) },
   { key: "productionControl", catalogId: "productionControl", title: "Production Control", glyph: "PC", group: "storage",
     load: () => import("@/sections/mods/productionControl").then((m) => m.Page) },
+  { key: "productionsManager", catalogId: "productionsManager", title: "Productions Manager", glyph: "PM", group: "storage",
+    load: () => import("@/sections/mods/productionsManager").then((m) => m.Page) },
   { key: "palletDegradation", catalogId: "palletDegradation", title: "Pallet Degradation", glyph: "PD", group: "storage",
     load: () => import("@/sections/mods/palletDegradation").then((m) => m.Page) },
   { key: "realSilo", catalogId: "realSilo", title: "RealSilo", glyph: "RS", group: "storage",

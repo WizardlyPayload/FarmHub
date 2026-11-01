@@ -46,6 +46,7 @@ const LIMITED_IDS = new Set([
   "seasonalWoolProduction",
   "taskList",
   "productionSchedule",
+  "productionsManager",
   "economicHistory",
   "animalFoodCalculator",
   "animalPlanner",
@@ -363,6 +364,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     descKey: "companions.desc.productionsManager",
     desc: "Manager UI for surveying recipes, fill levels, and status across all owned productions.",
     relatedSection: "productions",
+    liveKey: "productionsManager",
   },
   {
     id: "factoryProfitCalculator",

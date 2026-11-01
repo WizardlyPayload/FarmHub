@@ -350,6 +350,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "productions",
   },
   {
+    id: "invoicesProductionSalesOffers",
+    title: "Invoices - Production Sales",
+    category: "production",
+    descKey: "companions.desc.invoicesProductionSalesOffers",
+    desc: "Shows posted product offers for productions your farm still owns, including the asking price and remaining quantity. A posted offer is not a completed sale.",
+    relatedSection: "productions",
+  },
+  {
     id: "harvestLedger",
     title: "Harvest Ledger",
     category: "fields",

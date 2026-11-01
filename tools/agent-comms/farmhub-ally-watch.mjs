@@ -36,7 +36,7 @@ function writeState(state) {
 function results(text) {
   const out = [];
   for (const block of text.replace(/^\uFEFF/, '').split(/(?=^## )/m)) {
-    const match = block.match(/^(RESULT|BLOCKED)\s+(FARMHUB-ALLY-\d{8}-VAULT-V\d+(?:R\d+)?|RF-\d{8}-TINA-SAVE20-\d+)\b/m);
+    const match = block.match(/^(RESULT|BLOCKED)\s+(FARMHUB-ALLY-\d{8}-VAULT-V\d+(?:R\d+)?)\b/m);
     if (match) out.push({ id: match[2], kind: match[1], hash: digest(block.replace(/\r\n/g, '\n').trim()) });
   }
   return out;
@@ -104,7 +104,7 @@ async function deliver() {
     const labels = queued.map(event => `${event.kind} ${event.id}`).join(', ');
     const prompt = `FarmHub Ally file watcher detected new substantive return: ${labels}. ` +
       'Read Z:\\Graham\\agent-comms\\to-wizard-pc.md and the exact RESULT/BLOCKED evidence. ' +
-      'Check for a newer RF owner before any FarmHub request. For a FarmHub result, independently verify exact artifact hashes, ' +
+      'Check for a newer RF owner before any FarmHub request. Independently verify exact artifact hashes, ' +
       'game/export/installed page values, committed generations, log and full Ally restoration; record bounded results in the vault audit. ' +
       'Continue source triage and meaningful farm-owned integrations without claiming vault-wide acceptance. ' +
       'Give RF-owned Ally sessions priority and keep Graham PC UI free. ' +

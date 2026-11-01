@@ -150,6 +150,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/AnimalFoodCalculatorCollector.lua"/>
         <sourceFile filename="src/companionPages/ProductionWatcherCollector.lua"/>
         <sourceFile filename="src/companionPages/ProductionControlCollector.lua"/>
+        <sourceFile filename="src/companionPages/ProductionBoosterSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/ProductionRevampCollector.lua"/>
         <sourceFile filename="src/companionPages/ProductionPalletManagerCollector.lua"/>
         <sourceFile filename="src/companionPages/ProductionsManagerCollector.lua"/>

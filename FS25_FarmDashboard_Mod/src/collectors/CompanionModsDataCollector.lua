@@ -250,6 +250,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "productionBoosterSystem",
+        title = "Production Booster System",
+        category = "production",
+        names = { "FS25_ProductionBoosterSystem", "KM_82331_Production_Booster_System" },
+        substrings = { "productionboostersystem", "production_booster_system" },
+        globals = {},
+    },
+    {
         id = "productionRevamp",
         title = "Production Revamp",
         category = "production",

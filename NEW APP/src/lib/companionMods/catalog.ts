@@ -352,6 +352,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "productions",
   },
   {
+    id: "productionBoosterSystem",
+    title: "Production Booster System",
+    category: "production",
+    descKey: "companions.desc.productionBoosterSystem",
+    desc: "Shows this farm's recorded cumulative production output, including extra output tracked by the booster mod. It does not show realized sales or profit.",
+    relatedSection: "productions",
+  },
+  {
     id: "productionRevamp",
     title: "Production Revamp",
     category: "production",

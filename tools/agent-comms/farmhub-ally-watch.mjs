@@ -36,7 +36,7 @@ function writeState(state) {
 function results(text) {
   const out = [];
   for (const block of text.replace(/^\uFEFF/, '').split(/(?=^## )/m)) {
-    const match = block.match(/^(RESULT|BLOCKED)\s+(FARMHUB-ALLY-\d{8}-VAULT-V\d+(?:R\d+)?)\b/m);
+    const match = block.match(/^(RESULT|BLOCKED)\s+(FARMHUB-ALLY-\d{8}-VAULT-V\d+(?:R\d+)?|RF-20261101-TINA-SAVE20-1437)\b/m);
     if (match) out.push({ id: match[2], kind: match[1], hash: digest(block.replace(/\r\n/g, '\n').trim()) });
   }
   return out;
@@ -104,8 +104,10 @@ async function deliver() {
     const labels = queued.map(event => `${event.kind} ${event.id}`).join(', ');
     const prompt = `FarmHub Ally file watcher detected new substantive return: ${labels}. ` +
       'Read Z:\\Graham\\agent-comms\\to-wizard-pc.md and the exact RESULT/BLOCKED evidence. ' +
-      'Continue the vault audit in this chat, independently verify hashes/game/export/installed page/log/restoration, ' +
-      'give any RF-owned Ally session priority, and keep Graham PC UI free. ' +
+      'If RF-1437 has returned, verify full Ally restoration and check for a newer RF owner; only when Ally is free, ' +
+      'review and freeze TEST-PACKET-V3-DRAFT.md, then dispatch the exact hashed FarmHub V3 request through append-only to-tina.md. ' +
+      'For a FarmHub result, independently verify hashes/game/export/installed page/log/restoration and continue the vault audit. ' +
+      'Give RF-owned Ally sessions priority and keep Graham PC UI free. ' +
       'The five-minute automation remains paused. Notify Graham only for a meaningful blocker or completed scoped acceptance.';
     const result = await adapter.sendBrianWake({ prompt, timeoutMs: 60000 });
     if (!result.delivered || result.threadId !== threadId) throw Error('WAKE_UNCONFIRMED');

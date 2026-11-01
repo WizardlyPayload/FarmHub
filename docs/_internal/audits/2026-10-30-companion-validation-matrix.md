@@ -75,7 +75,7 @@ This is not a pass for all 65 catalog entries or all gameplay combinations. Posi
 | animalPlanner | limited | pastures | B2 | B2: pen counts matched prior game/export and Pastures card |
 | vipOrderManager | limited | economy | B2 | B2: empty orders; UI/game event unproved |
 | fieldProfitabilityLedger | limited | fields | B2 | B2: unavailable, no sale-category data in save |
-| farmReputation | limited | economy | B2 | B3: hide-on-uncheck passed with Better Contracts still active; reputation values unavailable in save |
+| farmReputation | limited | economy | B2 | B3: hide-on-uncheck passed; V7 PARTIAL: same-farm default score/rank/limit matched game/export/page, one accepted contract yielded an Oxy row in export/page; game Contractor page, nonzero score and cancel penalty unproved. Jobs blank-at-zero correction awaits installed retest. |
 | yieldTracker | limited | fields | B2 | B2: empty rows; UI/game event unproved |
 | moistureSystem | limited | fields | B1 | B1: field values matched; bale/silo states absent |
 | fieldLeasing | limited | fields | A | A: settings only; no lease |

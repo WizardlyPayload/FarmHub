@@ -45,3 +45,12 @@ test("does not read a shared global shadow or substitute farm 1 for a missing fa
     });
     expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", { farmId: 1 })).toBeUndefined();
 });
+
+test("new contractor record shows zero jobs until the mod records a completed job", () => {
+    const accepted = SETUP.replace("[1] = { Alex = 5 }", "[1] = {}")
+        .replace("reputation = 75, completed = 4, cancelled = 1", "reputation = 0, completed = 0, cancelled = 0");
+    const page = runCompanionPage(FILE, accepted, { farmId: 1 });
+    expect(page.contractors).toEqual([expect.objectContaining({
+        contractor: "Alex", jobs: 0, reputation: 0, completed: 0, cancelled: 0,
+    })]);
+});

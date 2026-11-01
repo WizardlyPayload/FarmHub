@@ -61,7 +61,9 @@ CompanionPages.register({
             rows[#rows + 1] = {
                 farmId = farmId,
                 contractor = ctx.clip(name, 70),
-                jobs = ctx.num(type(jobsByName) == "table" and jobsByName[name] or nil),
+                -- The mod's getContractorJobs returns zero for a named contractor
+                -- absent from contractorStatsByFarm (e.g. just accepted, no result).
+                jobs = ctx.num(type(jobsByName) == "table" and jobsByName[name] or nil) or 0,
                 reputation = ctx.num(type(record) == "table" and record.reputation or nil),
                 completed = ctx.num(type(record) == "table" and record.completed or nil),
                 cancelled = ctx.num(type(record) == "table" and record.cancelled or nil),

@@ -241,6 +241,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "cropContracts",
+        title = "Crop Contracts",
+        category = "economy",
+        names = { "FS25_CropContracts", "ITCH_4385334_FS25_CropContracts", "ITCH_4066559_FS25_CropContracts" },
+        substrings = { "cropcontracts" },
+        globals = { "CropContractsMod" },
+    },
+    {
         id = "factoryProfitCalculator",
         title = "Factory Profit Calculator",
         category = "production",

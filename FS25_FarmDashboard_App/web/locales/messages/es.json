@@ -4243,5 +4243,22 @@
   "companionPage.baleBatchTracker.state.ready": "Ready",
   "companionPage.baleBatchTracker.state.other": "Other",
   "companionPage.baleBatchTracker.empty": "No tracked bales for this farm yet.",
-  "companionPage.baleBatchTracker.truncated": "Only the first bale groups are listed."
+  "companionPage.baleBatchTracker.truncated": "Only the first bale groups are listed.",
+  "companionPage.cropContracts.lead": "See the forward crop contracts held by your farm. The locked bid and delivery target are contract terms, not realized income.",
+  "companionPage.cropContracts.active": "Active",
+  "companionPage.cropContracts.completed": "Completed",
+  "companionPage.cropContracts.expired": "Expired",
+  "companionPage.cropContracts.tableTitle": "Forward crop contracts",
+  "companionPage.cropContracts.crop": "Crop",
+  "companionPage.cropContracts.station": "Sell point",
+  "companionPage.cropContracts.status": "Status",
+  "companionPage.cropContracts.delivery": "Delivered / target",
+  "companionPage.cropContracts.bid": "Locked bid / 1,000 L",
+  "companionPage.cropContracts.due": "Due",
+  "companionPage.cropContracts.status.ACTIVE": "Active",
+  "companionPage.cropContracts.status.COMPLETED": "Completed",
+  "companionPage.cropContracts.status.EXPIRED": "Expired",
+  "companionPage.cropContracts.period": "Y{{year}} / P{{period}}",
+  "companionPage.cropContracts.empty": "No forward crop contracts for this farm yet.",
+  "companionPage.cropContracts.truncated": "Only the first contracts are listed."
 }

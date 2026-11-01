@@ -60,6 +60,7 @@ const LIMITED_IDS = new Set([
   "extendedVehicleMaintenance",
   "realisticVehicleService",
   "farmReputation",
+  "realisticCropRotation",
   "moistureSystem",
   "rentYourField",
   "farmlandMarketplace",
@@ -610,6 +611,15 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     desc: "Stores contract reputation per farm. FarmHub reads this farm's score and rank limits and does not add or remove reputation.",
     liveKey: "farmReputation",
     relatedSection: "economy",
+  },
+  {
+    id: "realisticCropRotation",
+    title: "Realistic Crop Rotation",
+    category: "fields",
+    descKey: "companions.desc.realisticCropRotation",
+    desc: "Saves four-step crop and cover-crop plans plus recent crop history by farmland. FarmHub shows only the land currently owned by this farm; plans are not completed harvests.",
+    relatedSection: "fields",
+    liveKey: "realisticCropRotation",
   },
   {
     id: "yieldTracker",

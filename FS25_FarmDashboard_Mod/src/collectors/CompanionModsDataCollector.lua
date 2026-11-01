@@ -522,6 +522,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "realisticCropRotation",
+        title = "Realistic Crop Rotation",
+        category = "fields",
+        names = { "FS25_370461_Realistic_Crop_Rotation", "KM_83006_Realistic_Crop_Rotation" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "yieldTracker",
         title = "Yield Tracker",
         category = "fields",

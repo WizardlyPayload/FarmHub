@@ -517,7 +517,7 @@ local CATALOG = {
         id = "farmReputation",
         title = "Farm Reputation",
         category = "contracts",
-        names = { "FS25_FarmReputation", "FS25_367320_Farm_Reputation" },
+        names = { "FS25_FarmReputation", "FS25_367320_Farm_Reputation", "FS25_367320_FS25_FarmReputation" },
         substrings = { "farmreputation", "farm_reputation" },
         globals = {},
     },
@@ -918,7 +918,7 @@ local PALLET_MODS = {
     "FS25_PalletDegradation",
     "FS25_360720_Storage_Overhaul_Pallet_Degradation_System",
 }
-local REPUTATION_MODS = { "FS25_FarmReputation", "FS25_367320_Farm_Reputation" }
+local REPUTATION_MODS = { "FS25_FarmReputation", "FS25_367320_Farm_Reputation", "FS25_367320_FS25_FarmReputation" }
 local MOISTURE_MODS = { "FS25_MoistureSystem", "FS25_354130_Moisture_System" }
 local RENT_MODS = { "FS25_RentYourField", "FS25_356641_Rent_Your_Field" }
 local MARKET_MODS = { "FS25_FarmlandMarketplace", "FS25_369241_Farmland_Marketplace" }

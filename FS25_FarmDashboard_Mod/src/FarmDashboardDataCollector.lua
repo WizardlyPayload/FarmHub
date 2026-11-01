@@ -3248,7 +3248,10 @@ function FarmDashboardDataCollector:isPrecisionFarmingLoaded()
 end
 
 function FarmDashboardDataCollector:isRealisticLivestockLoaded()
-    if _G.g_modIsLoaded and (_G.g_modIsLoaded["FS25_RealisticLivestock"] or _G.g_modIsLoaded["FS25_RealisticLiveStock"]) then
+    if _G.g_modIsLoaded and (_G.g_modIsLoaded["FS25_RealisticLivestock"]
+        or _G.g_modIsLoaded["FS25_RealisticLiveStock"]
+        or _G.g_modIsLoaded["FS25_RealisticLivestockRM"]
+        or _G.g_modIsLoaded["GH_rittermod__FS25_RealisticLivestockRM_FS25_RealisticLivestockRM"]) then
         return true
     end
     return rawget(_G, "RealisticLivestock") ~= nil

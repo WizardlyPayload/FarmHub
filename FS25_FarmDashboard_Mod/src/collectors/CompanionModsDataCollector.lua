@@ -289,6 +289,14 @@ local CATALOG = {
         globals = { "realSiloManager" },
     },
     {
+        id = "baleBatchTracker",
+        title = "Bale Batch Tracker",
+        category = "storage",
+        names = { "FS25_Bale_Batch_Tracker", "FS25_374533_Bale_Batch_Tracker" },
+        substrings = { "balebatchtracker", "bale_batch_tracker" },
+        globals = { "BaleBatchTracker" },
+    },
+    {
         id = "advancedMaintenance",
         title = "Advanced Maintenance",
         category = "fleet",

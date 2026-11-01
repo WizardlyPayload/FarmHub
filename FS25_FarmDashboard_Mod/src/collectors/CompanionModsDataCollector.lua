@@ -241,6 +241,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "productionSupplyManager",
+        title = "Production Supply Manager",
+        category = "production",
+        names = { "KM_82199_Production_Supply_Manager", "FS25_ProductionSupplyManager" },
+        substrings = { "production_supply_manager", "productionsupplymanager" },
+        globals = { "g_productionSupplyManager" },
+    },
+    {
         id = "cropContracts",
         title = "Crop Contracts",
         category = "economy",

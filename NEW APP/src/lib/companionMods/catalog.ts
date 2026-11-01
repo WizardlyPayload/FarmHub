@@ -342,6 +342,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "productions",
   },
   {
+    id: "productionSupplyManager",
+    title: "Production Supply Manager",
+    category: "production",
+    descKey: "companions.desc.productionSupplyManager",
+    desc: "Reads this farm's recorded automatic input purchases, including destination, product, litres and cost.",
+    relatedSection: "productions",
+  },
+  {
     id: "harvestLedger",
     title: "Harvest Ledger",
     category: "fields",

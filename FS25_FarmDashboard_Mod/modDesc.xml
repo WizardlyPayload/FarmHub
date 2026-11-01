@@ -179,6 +179,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/SnowContractsCollector.lua"/>
         <sourceFile filename="src/companionPages/GrassContractsCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticCropRotationCollector.lua"/>
+        <sourceFile filename="src/companionPages/ProductionSupplyManagerCollector.lua"/>
         <sourceFile filename="src/companionPages/CourseplayCollector.lua"/>
         <sourceFile filename="src/companionPages/BritishFillUnitsCollector.lua"/>
         <sourceFile filename="src/companionPages/ImperialSystemCollector.lua"/>

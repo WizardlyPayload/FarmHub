@@ -4,10 +4,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
+import { parseSubstantiveReturns } from './farmhub-ally-events.mjs';
 
 const threadId = process.env.CODEX_THREAD_ID;
 if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(threadId ?? '')) {
@@ -19,7 +19,6 @@ const statePath = path.join(dir, 'state.json');
 const stopPath = path.join(dir, 'STOP');
 const adapterPath = 'C:\\Users\\Graham\\Documents\\Realistic-Farming\\tools\\motherbarn-brian\\codex-app.mjs';
 const refreshPath = 'C:\\Users\\Graham\\Documents\\Realistic-Farming\\tools\\pipeline-notify\\start-brian-cover-from-app.ps1';
-const digest = value => createHash('sha256').update(value).digest('hex');
 const execFileAsync = promisify(execFile);
 fs.mkdirSync(dir, { recursive: true });
 
@@ -34,14 +33,7 @@ function writeState(state) {
   fs.writeFileSync(temp, JSON.stringify(state, null, 2));
   fs.renameSync(temp, statePath);
 }
-function results(text) {
-  const out = [];
-  for (const block of text.replace(/^\uFEFF/, '').split(/(?=^## )/m)) {
-    const match = block.match(/^(RESULT|BLOCKED)\s+(FARMHUB-ALLY-\d{8}-VAULT-V\d+(?:R\d+)?|RF-20261101-TINA-SAVE20-1454)\b/m);
-    if (match) out.push({ id: match[2], kind: match[1], hash: digest(block.replace(/\r\n/g, '\n').trim()) });
-  }
-  return out;
-}
+const results = parseSubstantiveReturns;
 function alive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try { process.kill(pid, 0); return true; } catch { return false; }
@@ -51,7 +43,7 @@ if (process.argv.includes('--status')) {
   console.log(JSON.stringify(state ? {
     running: alive(state.pid), pid: state.pid, threadMatches: state.threadId === threadId,
     baselineCount: state.baselineCount, events: state.events.map(({ id, kind, status }) => ({ id, kind, status })),
-    lastScan: state.lastScan, lastWake: state.lastWake, lastError: state.lastError,
+    watchMode: state.watchMode, lastScan: state.lastScan, lastWake: state.lastWake, lastError: state.lastError,
   } : { running: false, state: 'missing' }, null, 2));
   process.exit(0);
 }
@@ -103,16 +95,13 @@ async function deliver() {
     for (const event of queued) event.status = 'inflight';
     writeState(state);
     const labels = queued.map(event => `${event.kind} ${event.id}`).join(', ');
-    const rfRelease = queued.some(event => event.id === 'RF-20261101-TINA-SAVE20-1454');
-    const prompt = rfRelease
-      ? `FarmHub Ally file watcher saw substantive ${labels}. Read Z:\\Graham\\agent-comms\\to-wizard-pc.md; verify RF-1454 has finished and fully restored Ally and check for any newer RF owner. V8 has already returned a bounded plan-reading PASS. If free, review/freeze/hash TEST-PACKET-V7R1-DRAFT.md as TEST-PACKET-V7R1.md and append exact FARMHUB-ALLY-20261101-VAULT-V7R1 request to append-only to-tina.md. ACK is receipt only. Do not touch Ally or Graham PC UI. The five-minute automation remains paused; stay quiet on unchanged state.`
-      : `FarmHub Ally file watcher detected new substantive return: ${labels}. ` +
-        'Read Z:\\Graham\\agent-comms\\to-wizard-pc.md and the exact RESULT/BLOCKED evidence. ' +
-        'Check for a newer RF owner before any FarmHub request. Independently verify exact artifact hashes, ' +
-        'game/export/installed page values, committed generations, log and full Ally restoration; record bounded results in the vault audit. ' +
-        'Continue source triage and meaningful farm-owned integrations without claiming vault-wide acceptance. ' +
-        'Give RF-owned Ally sessions priority and keep Graham PC UI free. ' +
-        'The five-minute automation remains paused. Notify Graham only for a meaningful blocker or completed scoped acceptance.';
+    const prompt = `FarmHub file watcher detected substantive return: ${labels}. ` +
+      'Read Z:\\Graham\\agent-comms\\to-wizard-pc.md and the exact evidence. ' +
+      'Check the latest RF ownership and full Ally restoration before any FarmHub request. ' +
+      'Review pending frozen/draft packets and append-only to-tina.md before sending a request; never duplicate an existing ID. ' +
+      'Independently verify hashes, game/export/installed values, generations, log, one Windows row and restoration. ' +
+      'Continue meaningful vault source work when RF owns Ally; keep Graham PC UI free. ' +
+      'The five-minute automation remains paused. Notify Graham only for a meaningful blocker or completed scoped acceptance.';
     const result = await adapter.sendBrianWake({ prompt, timeoutMs: 60000 });
     if (!result.delivered || result.threadId !== threadId) throw Error('WAKE_UNCONFIRMED');
     for (const event of queued) event.status = 'delivered';
@@ -146,12 +135,20 @@ function scan() {
 }
 function schedule() { clearTimeout(debounce); debounce = setTimeout(scan, 700); }
 let watcher;
-try { watcher = fs.watch(path.dirname(inbox), (_, name) => { if (!name || String(name).toLowerCase() === 'to-wizard-pc.md') schedule(); }); }
-catch (error) { state.lastError = { at: new Date().toISOString(), code: 'FS_WATCH_UNAVAILABLE' }; writeState(state); }
+try {
+  watcher = fs.watch(path.dirname(inbox), (_, name) => {
+    if (!name || String(name).toLowerCase() === 'to-wizard-pc.md') schedule();
+  });
+  state.watchMode = 'event-plus-30s-fallback';
+  writeState(state);
+} catch {
+  state.watchMode = '30s-file-check';
+  writeState(state);
+}
 watcher?.on('error', () => {
   watcher.close();
   watcher = null;
-  state.lastError = { at: new Date().toISOString(), code: 'FS_WATCH_UNAVAILABLE_USING_FILE_CHECK' };
+  state.watchMode = '30s-file-check';
   writeState(state);
 });
 const fallback = setInterval(scan, 30000); // filesystem check only; no idle model request

@@ -149,3 +149,13 @@ base and 14 installed DLC archive scans. Focused JS tests passed 16/16.
 These are local source/runtime checks only. I6 still needs an installed Ally
 Storage-table retest after RF releases the machine; no Catuaí nonempty page
 claim follows from sampled DLC URLs.
+
+Private V5 5.2.46 packaged with the new helper passed the bundled binary pin,
+UI source match, private-artifact and update-channel guards. Its staged
+installer is `Z:\Graham\agent-comms\farmhub-companion-acceptance\storage-icons-candidate-5.2.46\FS25-Farm-Dashboard-V5-Setup-5.2.46.exe`,
+SHA-256 `FB66D8C77A9E9F7ECCB3964C2D258C267EC43645E7F2A81DEB76C6112AFC05D3`.
+The exporter ZIP remains SHA-256
+`F3551845457935AB9B9B2ECECC6772CD0E432656121DD4D6EE05052FC89FC98F`.
+The bundled seek-based helper is SHA-256
+`2575753CD23FEE5AA3E587B703A58AFD54687D4A99A6E3C767A6CD3AAC44FEEE`.
+An I6 packet is draft only while RF owns the next Ally window.

@@ -575,12 +575,14 @@ export function fillTypeHudKey(
   const idx = Number(item?.fillTypeIndex);
   const cat = catalog && typeof catalog === "object" ? catalog : {};
   const titleMap = titles && typeof titles === "object" ? titles : {};
+  // The stock collector reports the live fill type. A fallback index catalog
+  // can be stale or map-specific, so it must not select another item's icon.
+  const fromItem = fillTypeIdent(item?.fillType);
+  if (fromItem) return fromItem;
   if (idx > 0) {
     const mapped = fillTypeIdent(cat[String(idx)] || cat[idx as unknown as string]);
     if (mapped) return mapped;
   }
-  const fromItem = fillTypeIdent(item?.fillType);
-  if (fromItem) return fromItem;
 
   const titleNeedle = String(
     (idx > 0 && (titleMap[String(idx)] || titleMap[idx as unknown as string])) ||

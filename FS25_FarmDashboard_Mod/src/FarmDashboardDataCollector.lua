@@ -940,6 +940,13 @@ function FarmDashboardDataCollector:_exportFillTypeHudIcons()
                     if not ok then
                         ok = _copyFileFs25BestEffort(src, destAlt)
                     end
+                    -- Giants XML can name a .png HUD while the mounted VFS
+                    -- contains its .dds sibling (including official DLCs).
+                    -- Retry the source extension as well as the destination.
+                    if not ok and (string.lower(ext) == ".png" or string.lower(ext) == ".dds") then
+                        local altSrc = string.sub(src, 1, #src - #ext) .. altExt
+                        ok = _copyFileFs25BestEffort(altSrc, destAlt)
+                    end
                     if ok then
                         self._fillTypeHudCopied = (self._fillTypeHudCopied or 0) + 1
                     end

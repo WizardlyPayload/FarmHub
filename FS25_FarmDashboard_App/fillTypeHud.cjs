@@ -58,6 +58,11 @@ function fillTypeNameAliases(name) {
   if (n === "SOYBEAN" || stripped === "SOYBEAN") out.push("SOYBEANS");
   if (n === "MAIZE" || stripped === "MAIZE") out.push("CORN");
   if (n === "CORN") out.push("MAIZE");
+  if (n === "CARROTS") out.push("CARROT");
+  if (n === "HAY" || n === "DRYGRASS") {
+    if (n === "HAY") out.push("DRYGRASS");
+    out.push("DRYGRASS_WINDROW");
+  }
   const dry = n.replace(/_DRY$/, "");
   if (dry && dry !== n) {
     out.push(dry);
@@ -114,6 +119,18 @@ function extractHudRoots() {
     push(path.join(docs, rel));
     // Env may already point at extract/ or fillTypes/
     push(path.join(docs, "dataS", "menu", "hud", "fillTypes"));
+    // Official DLCs are packed in the game install. A local FS25 source extract
+    // keeps each DLC in extract-pdlc-*/menu/hud/fillTypes instead of dataS/.
+    const sourceRoot = path.join(docs, "FS25 Game Files");
+    try {
+      for (const entry of fs.readdirSync(sourceRoot, { withFileTypes: true })) {
+        if (entry.isDirectory() && /^extract-pdlc-/i.test(entry.name)) {
+          push(path.join(sourceRoot, entry.name, "menu", "hud", "fillTypes"));
+        }
+      }
+    } catch {
+      /* no local DLC extract */
+    }
   }
   const envExtract = String(process.env.FS25_EXTRACT_ROOT || "").trim();
   if (envExtract) {
@@ -123,6 +140,15 @@ function extractHudRoots() {
   }
   for (const root of getFs25GameInstallRoots()) {
     push(path.join(root, "dataS", "menu", "hud", "fillTypes"));
+    try {
+      for (const entry of fs.readdirSync(path.join(root, "pdlc"), { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          push(path.join(root, "pdlc", entry.name, "menu", "hud", "fillTypes"));
+        }
+      }
+    } catch {
+      /* packaged DLC, exported by the game when active */
+    }
   }
   return [...new Set(roots)];
 }

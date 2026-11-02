@@ -206,3 +206,33 @@ the source/asset-resolution gap for that exact export; the Catuaí installed
 Storage table was not opened in I6, so a direct Catuaí UI observation is
 still untested. Do not convert this local check into an installed Catuaí
 gameplay claim.
+
+## Isolated Catuaí page check and Graham PC install limit
+
+An isolated V5 source instance on localhost port 8769 read only the current
+Catuaí savegame17 export (generation 338) through a sanitized one-save
+configuration. Its Storage table rendered all **20/20** owned commodity rows
+with one complete PNG image (`naturalWidth` 256) and zero emoji fallbacks.
+The 12 names in Graham's screenshot were checked individually in the DOM:
+Canola, Carrots, Coffee Bags, Coffee Capsules, Coffee Packed, Copper Ore,
+Furniture, Grass, Hay, Iron Ore, Oat and Pigments. The observed image URLs
+carried the Catuaí map ID, and the five coffee/ore/pigment DLC keys resolved
+to their exact fill-type names. A viewport screenshot showed the first six
+rows with their images. The isolated instance used a fresh temporary cache
+generated from Graham's locally installed archives; it did not change the
+save or installed profile. It was stopped after the check, and port 8769 is
+closed. This is a direct local source UI check, distinct from I6's installed
+Ally test.
+
+Graham's PC has one registered V5 **5.2.12** install. Before attempting to
+update it, the 91-file installed app, V5 roaming profile (596 files), both
+shortcuts and uninstall registration were backed up under
+`C:\Users\Graham\.codex\backups\farmhub-storage-icons-20261102-1112`.
+The 5.2.46 installer matched its pinned SHA-256, but executing it from the
+NAS was denied, and the identical local copy exited 1 in silent mode.
+Readback after the attempt still showed V5 5.2.12, one Windows row, the same
+installed `app.asar` hash (`242E6A49E1117439FD7652FB63D452756172E2C39D018F6380D12DE4B3CA885B`),
+the same V5 config hash, and zero content differences across the 596-file
+roaming profile. No new version was installed on Graham's PC. The installer
+did not emit a reason for the silent exit, so the cause is **undetermined**;
+do not describe the private fix as already installed on Graham's PC.

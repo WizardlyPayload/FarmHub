@@ -21,6 +21,12 @@ const SETUP = `
   local source = {
     ownerFarmId = 1, owningPlaceable = placeable("owned-source", "Greenhouse"),
     getName = function() return "Greenhouse" end,
+    productions = {
+      { id = "tomatoMix", name = "Tomato mix", hasMixChoice = true,
+        mixMode = "MOST", hasBoostChoice = true, boostMode = "DESC" },
+      { id = "plain", name = "Plain tomato", hasMixChoice = false,
+        mixMode = "ASC", hasBoostChoice = false, boostMode = "ASC" },
+    },
     outputFillTypeIds = { [1] = true, [2] = true },
     outputFillTypeIdsStorage = { [1] = true },
     outputFillTypeIdsAutoDeliver = { [2] = true },
@@ -37,11 +43,13 @@ const SETUP = `
   local destination = {
     ownerFarmId = 1, owningPlaceable = placeable("owned-target", "Food Plant"),
     getName = function() return "Food Plant" end,
+    productions = {},
     outputFillTypeIds = {}, outputFillTypeIdsStorage = {},
   }
   local foreign = {
     ownerFarmId = 2, owningPlaceable = placeable("foreign", "Foreign Plant"),
     getName = function() return "Foreign Plant" end,
+    productions = { { id = "foreign", hasMixChoice = true, mixMode = "LEAST" } },
     outputFillTypeIds = { [1] = true }, outputFillTypeIdsStorage = { [1] = true },
   }
   _G.g_currentMission = {
@@ -65,18 +73,32 @@ test("reads owned Store and target settings without claiming a delivery or chang
       destination: "Food Plant", level: "PRIMARY",
       limitLitres: 1200, distributionEnabled: true, autoDeliverFlag: true }),
   ]));
+  expect(page.recipeRows).toEqual([{ farmId: 1, source: "Greenhouse",
+    recipe: "Tomato mix", mixMode: "MOST", boostMode: "DESC" }]);
+  expect(page.byFarm["1"].recipeChoiceCount).toBe(1);
   expect(JSON.stringify(page)).not.toContain("Foreign Plant");
   expect(JSON.stringify(page)).not.toContain("owned-target");
   expect(normalizeCompanionPages({ pages: { productionRevamp: page } },
     { modules: loadModules() }).pages.productionRevamp.rows).toHaveLength(2);
+  expect(normalizeCompanionPages({ pages: { productionRevamp: page } },
+    { modules: loadModules() }).pages.productionRevamp.recipeRows).toHaveLength(1);
   const result = runCompanionLua([FILE], SETUP, `
     local before = source.distributionTargets[2]["owned-target"].limit
+    local beforeMix = source.productions[1].mixMode
     local page = CompanionPages.collectEntry(CompanionPages.entries.productionRevamp, 1)
     return __fdEncode({ unchanged = before ==
-      source.distributionTargets[2]["owned-target"].limit,
+      source.distributionTargets[2]["owned-target"].limit and
+      beforeMix == source.productions[1].mixMode,
       count = #page.rows })
   `, { farmId: 1 });
   expect(result).toMatchObject({ unchanged: true, count: 2 });
+});
+
+test("withholds an invalid recipe mode rather than reporting a false choice", () => {
+  const page = runCompanionPage(FILE,
+    SETUP.replace('mixMode = "MOST"', 'mixMode = "INVALID"'), { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "partial",
+    byFarm: { "1": { recipeChoiceCount: 0 } }, recipeRows: {} });
 });
 
 test("withholds client state and unresolved target; distinguishes saved inactive settings", () => {

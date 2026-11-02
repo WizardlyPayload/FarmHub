@@ -6,7 +6,9 @@ local MAX_POINTS = 80
 local MAX_OUTPUTS_PER_POINT = 50
 local MAX_TARGETS_PER_OUTPUT = 40
 local MAX_ROWS = 100
+local MAX_RECIPE_ROWS = 100
 local LEVEL = { PRIMARY = true, SECONDARY = true, REST = true, NEVER = true }
+local SELECTION_MODE = { ASC = true, DESC = true, MOST = true, LEAST = true }
 -- Exact Production Revamp 1.0.0.0 adds STORE=3 to the vanilla modes 0..2.
 -- Its saved flag can disagree with the effective getter when another mod
 -- replaces a ProductionPoint hook; report both rather than claiming activity.
@@ -58,12 +60,37 @@ CompanionPages.register({
             end
         end
 
-        local rows, storeCount, getterStoreCount, targetCount = {}, 0, 0, 0
+        local rows, recipeRows, storeCount, getterStoreCount, targetCount = {}, {}, 0, 0, 0
         local incomplete = false
         local modeMismatch = false
         for _, point in ipairs(owned) do
             local sourceName = ctx.clip(ctx.call(point, "getName")
                 or ctx.call(point.owningPlaceable, "getName"), 64)
+            local recipes = type(point.productions) == "table" and point.productions or nil
+            if recipes == nil then incomplete = true end
+            local recipeCount = 0
+            for _, recipe in pairs(recipes or {}) do
+                recipeCount = recipeCount + 1
+                if recipeCount > MAX_OUTPUTS_PER_POINT then truncated = true; break end
+                if type(recipe) == "table" and (recipe.hasMixChoice == true or recipe.hasBoostChoice == true) then
+                    local recipeId = ctx.clip(recipe.id, 64)
+                    local recipeName = ctx.clip(recipe.name or recipe.id, 64)
+                    local mix = recipe.hasMixChoice == true and recipe.mixMode or nil
+                    local boost = recipe.hasBoostChoice == true and recipe.boostMode or nil
+                    if recipeId == nil or recipeId == "" or recipeName == nil or recipeName == ""
+                        or (mix ~= nil and not SELECTION_MODE[mix])
+                        or (boost ~= nil and not SELECTION_MODE[boost])
+                        or (recipe.hasMixChoice == true and mix == nil)
+                        or (recipe.hasBoostChoice == true and boost == nil) then
+                        incomplete = true
+                    elseif #recipeRows < MAX_RECIPE_ROWS then
+                        recipeRows[#recipeRows + 1] = {
+                            farmId = farmId, source = sourceName, recipe = recipeName,
+                            mixMode = mix, boostMode = boost,
+                        }
+                    else truncated = true end
+                end
+            end
             local outputs = type(point.outputFillTypeIds) == "table"
                 and point.outputFillTypeIds or {}
             local store = type(point.outputFillTypeIdsStorage) == "table"
@@ -143,18 +170,25 @@ CompanionPages.register({
                 b.destination or "" }, "|")
             return ka < kb
         end)
+        table.sort(recipeRows, function(a, b)
+            return table.concat({ a.source or "", a.recipe or "" }, "|")
+                < table.concat({ b.source or "", b.recipe or "" }, "|")
+        end)
         return {
-            readState = incomplete and "partial" or (#rows > 0 and "ok" or "settings-only"),
+            readState = incomplete and "partial" or (#rows > 0 or #recipeRows > 0)
+                and "ok" or "settings-only",
             reason = modeMismatch and "store-mode-mismatch"
-                or #rows == 0 and "no-owned-revamp-settings" or nil,
+                or (#rows == 0 and #recipeRows == 0) and "no-owned-revamp-settings" or nil,
             coverage = truncated and "truncated" or incomplete and "partial" or "complete",
             byFarm = { [tostring(farmId)] = {
                 productionCount = #owned, storeCount = storeCount,
                 getterStoreCount = getterStoreCount, targetCount = targetCount,
+                recipeChoiceCount = #recipeRows,
                 storageActive = settings.storageActive == true,
                 distributionActive = settings.distributionActive == true,
             } },
             rows = rows,
+            recipeRows = recipeRows,
         }
     end,
 })

@@ -458,6 +458,22 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "cropContracts",
+    title: "Crop Contracts",
+    category: "contracts",
+    descKey: "companions.desc.cropContracts",
+    desc: "Shows this farm's recorded forward crop contracts and obligations. Quoted value is not a completed sale or payout.",
+    relatedSection: "economy",
+  },
+  {
+    id: "baleBatchTracker",
+    title: "Bale Batch Tracker",
+    category: "storage",
+    descKey: "companions.desc.baleBatchTracker",
+    desc: "Shows this farm's tracked physical and stored bales by fill type and fermentation state.",
+    relatedSection: "storage",
+  },
+  {
     id: "autoSellSilo",
     title: "Auto Sell Silo",
     category: "economy",

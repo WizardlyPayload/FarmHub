@@ -4657,4 +4657,13 @@
   ,"companionPage.dynamicDealership.empty": "No pending customer vehicle order recorded for this farm."
   ,"companionPage.dynamicDealership.truncated": "Only some current orders are listed."
   ,"companionPage.dynamicDealership.partial": "Some current orders could not be read."
+  ,"companions.desc.cropContracts": "Shows this farm's recorded forward crop contracts and obligations. Quoted value is not a completed sale or payout."
+  ,"companions.desc.baleBatchTracker": "Shows this farm's tracked physical and stored bales by fill type and fermentation state."
+  ,"companionPage.productionRevamp.recipeChoiceCount": "Recipe choices"
+  ,"companionPage.productionRevamp.recipeTitle": "Recipe choices"
+  ,"companionPage.productionRevamp.recipe": "Recipe"
+  ,"companionPage.productionRevamp.mixMode": "Ingredient choice"
+  ,"companionPage.productionRevamp.boostMode": "Booster choice"
+  ,"companionPage.productionRevamp.recipeEmpty": "No owned production has a recipe with a selectable ingredient or booster mode."
+  ,"companionPage.productionRevamp.recipeNote": "ASC picks the first eligible option; DESC the last. MOST and LEAST use available stock for ingredients and boost factor for boosters. These selections do not prove consumption or production."
 }

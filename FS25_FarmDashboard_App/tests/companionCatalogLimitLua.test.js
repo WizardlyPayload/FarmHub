@@ -9,6 +9,38 @@ const source = fs.readFileSync(path.resolve(
     "../../FS25_FarmDashboard_Mod/src/collectors/CompanionModsDataCollector.lua",
 ), "utf8");
 
+test("every dedicated page has both a detector and a UI catalog entry", () => {
+    const registry = fs.readFileSync(path.resolve(__dirname,
+        "../../NEW APP/src/sections/mods/registry.ts"), "utf8");
+    const uiCatalog = fs.readFileSync(path.resolve(__dirname,
+        "../../NEW APP/src/lib/companionMods/catalog.ts"), "utf8");
+    const pageIds = [...registry.matchAll(/\bkey: "([A-Za-z0-9_]+)", catalogId:/g)]
+        .map((match) => match[1]);
+    const detectorIds = new Set([...source.matchAll(/\bid = "([A-Za-z0-9_]+)"/g)]
+        .map((match) => match[1]));
+    const uiIds = new Set([...uiCatalog.matchAll(/\bid: "([A-Za-z0-9_]+)"/g)]
+        .map((match) => match[1]));
+    expect(pageIds.length).toBeGreaterThan(50);
+    expect(pageIds.filter((id) => !detectorIds.has(id))).toEqual([]);
+    expect(pageIds.filter((id) => !uiIds.has(id))).toEqual([]);
+});
+
+test("TUV vault filename is detected as its dedicated page catalog ID", () => {
+    const L = lauxlib.luaL_newstate();
+    lualib.luaL_openlibs(L);
+    const chunk = [
+        'g_modIsLoaded={ ["KM_81230_T_V_HU_System"]=true }',
+        "FarmDashLog={error=function() end}",
+        source,
+        "local p=CompanionModsDataCollector:collect()",
+        "return tostring(#p.mods)..'|'..tostring(p.mods[1] and p.mods[1].id)",
+    ].join("\n");
+    if (lauxlib.luaL_dostring(L, to_luastring(chunk)) !== lua.LUA_OK) {
+        throw new Error(to_jsstring(lua.lua_tostring(L, -1)));
+    }
+    expect(to_jsstring(lua.lua_tostring(L, -1))).toBe("1|tuvSystem");
+});
+
 test("every active catalogued companion is exported when the whole catalog is loaded", () => {
     const catalog = source.slice(source.indexOf("local CATALOG = {"), source.indexOf("\nlocal function envGet"));
     const names = [...catalog.matchAll(/\bid = "[^"]+"[\s\S]*?names = \{\s*"([^"]+)"/g)]

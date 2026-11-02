@@ -12,6 +12,8 @@ test('wakes for substantive FarmHub and any RF release, including direct PARTIAL
     '## [time] from Tina\r\nRESULT RF-20261101-TINA-SAVE20-1458: BLOCKED at load gate',
     '## [time] from Tina\r\nPARTIAL RF-20261101-TINA-SAVE20-1459: cap gate',
     '## [time] from Tina\r\nCOMPLETE RF-20261101-TINA-PNH-1460 | restored',
+    '## [time] from Tina\r\nPASS RF-20261102-TINA-LOCAL-LOAD-1479 | restored',
+    '## [time] from Tina\r\nFAIL RF-20261102-TINA-MP-JOIN-PROBE-1482: gate',
   ].join('\r\n\r\n');
   assert.deepEqual(parseSubstantiveReturns(text).map(({ id, kind }) => [id, kind]), [
     ['FARMHUB-ALLY-20261101-VAULT-V8', 'RESULT'],
@@ -20,6 +22,8 @@ test('wakes for substantive FarmHub and any RF release, including direct PARTIAL
     ['RF-20261101-TINA-SAVE20-1458', 'RESULT'],
     ['RF-20261101-TINA-SAVE20-1459', 'PARTIAL'],
     ['RF-20261101-TINA-PNH-1460', 'COMPLETE'],
+    ['RF-20261102-TINA-LOCAL-LOAD-1479', 'PASS'],
+    ['RF-20261102-TINA-MP-JOIN-PROBE-1482', 'FAIL'],
   ]);
 });
 

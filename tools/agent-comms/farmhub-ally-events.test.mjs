@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSubstantiveReturns, shouldWakeFarmHub } from './farmhub-ally-events.mjs';
+import { parseSubstantiveReturns, shouldWakeFarmHub, firstRfRequestAfterHandoff } from './farmhub-ally-events.mjs';
 
 test('parses substantive FarmHub and RF returns, including direct PARTIAL', () => {
   const text = [
@@ -43,4 +43,17 @@ test('unrelated RF returns stay silent unless an exact release gate is armed', (
   assert.deepEqual(events.map(event => shouldWakeFarmHub(event)), [true, false]);
   assert.deepEqual(events.map(event => shouldWakeFarmHub(event, 'RF-20261102-TINA-VEHICLE-IDENTITY-1486')), [true, true]);
   assert.equal(shouldWakeFarmHub(events[1], 'RF-20261102-TINA-VEHICLE-IDENTITY-1484'), false);
+});
+
+test('resolves only the first RF request after an explicit Ally handoff', () => {
+  const ledger = [
+    '## RF-20261102-TINA-OLD-1494 — old request',
+    '## FARMHUB-V18-ALLY-HANDOFF | FarmHub | 2026-11-02',
+    'RF may take the next window.',
+    '## RF-20261102-TINA-NEXT-1495 — queued',
+    '## RF-20261102-TINA-LATER-1496 — queued',
+  ].join('\n');
+  assert.equal(firstRfRequestAfterHandoff(ledger, 'FARMHUB-V18-ALLY-HANDOFF'),
+    'RF-20261102-TINA-NEXT-1495');
+  assert.equal(firstRfRequestAfterHandoff(ledger, 'MISSING-HANDOFF'), '');
 });

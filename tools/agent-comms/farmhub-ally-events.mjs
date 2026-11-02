@@ -24,3 +24,11 @@ export function shouldWakeFarmHub(event, rfGateId = '') {
   if (event.id.startsWith('FARMHUB-ALLY-')) return true;
   return /^RF-\d{8}-TINA-[A-Z0-9-]+$/.test(rfGateId) && event.id === rfGateId;
 }
+
+export function firstRfRequestAfterHandoff(text, heading) {
+  const marker = `## ${heading}`;
+  const start = text.lastIndexOf(marker);
+  if (start < 0) return '';
+  const match = text.slice(start + marker.length).match(/^##\s+(RF-\d{8}-TINA-[A-Z0-9-]+)(?=\s|$)/m);
+  return match?.[1] ?? '';
+}

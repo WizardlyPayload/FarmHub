@@ -7,13 +7,14 @@ import os from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { parseSubstantiveReturns, shouldWakeFarmHub } from './farmhub-ally-events.mjs';
+import { parseSubstantiveReturns, shouldWakeFarmHub, firstRfRequestAfterHandoff } from './farmhub-ally-events.mjs';
 
 const threadId = process.env.CODEX_THREAD_ID;
 if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(threadId ?? '')) {
   throw Error('CODEX_THREAD_ID_REQUIRED');
 }
 const inbox = 'Z:\\Graham\\agent-comms\\to-wizard-pc.md';
+const outbox = 'Z:\\Graham\\agent-comms\\to-tina.md';
 const dir = path.join(os.homedir(), '.codex', 'watchers', 'farmhub-ally');
 const statePath = path.join(dir, 'state.json');
 const stopPath = path.join(dir, 'STOP');
@@ -41,6 +42,9 @@ function armedRfGateId() {
   try {
     const gate = JSON.parse(fs.readFileSync(rfGatePath, 'utf8'));
     if (!/^FARMHUB-ALLY-\d{8}-[A-Z0-9-]+$/.test(gate.farmhubId ?? '')) return '';
+    if (/^FARMHUB-[A-Z0-9-]+$/.test(gate.rfAfterHeading ?? '')) {
+      return firstRfRequestAfterHandoff(fs.readFileSync(outbox, 'utf8'), gate.rfAfterHeading);
+    }
     return /^RF-\d{8}-TINA-[A-Z0-9-]+$/.test(gate.rfId ?? '') ? gate.rfId : '';
   } catch { return ''; }
 }

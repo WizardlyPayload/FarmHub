@@ -6,7 +6,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseSubstantiveReturns } from './farmhub-ally-events.mjs';
 
 const threadId = process.env.CODEX_THREAD_ID;
@@ -18,7 +18,7 @@ const dir = path.join(os.homedir(), '.codex', 'watchers', 'farmhub-ally');
 const statePath = path.join(dir, 'state.json');
 const stopPath = path.join(dir, 'STOP');
 const adapterPath = 'C:\\Users\\Graham\\Documents\\Realistic-Farming\\tools\\motherbarn-brian\\codex-app.mjs';
-const refreshPath = 'C:\\Users\\Graham\\Documents\\Realistic-Farming\\tools\\pipeline-notify\\start-brian-cover-from-app.ps1';
+const refreshPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'farmhub-app-pipe.ps1');
 const execFileAsync = promisify(execFile);
 fs.mkdirSync(dir, { recursive: true });
 

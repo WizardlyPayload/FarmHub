@@ -106,3 +106,13 @@ texture count and elapsed time. It also waits for DLC prefetch before the HUD
 cache epoch is marked complete so the page can retry initially missing images.
 The focused HUD tests passed 16/16 including profile DLC discovery. This is a
 source correction; installed Storage icon acceptance remains pending I5.
+
+The private 5.2.45 installer is staged at
+`Z:\Graham\agent-comms\farmhub-companion-acceptance\storage-icons-candidate-5.2.45\FS25-Farm-Dashboard-V5-Setup-5.2.45.exe`,
+SHA-256 `77A34319183035AF5CD30F6C446651A3454938879281AA00A39BD37D2AB426B8`.
+The unchanged exporter 5.1.0.35 ZIP beside it is SHA-256
+`F3551845457935AB9B9B2ECECC6772CD0E432656121DD4D6EE05052FC89FC98F`.
+Private V5 packaging, bundled helper pin, UI match and artifact guards passed;
+the live update feed was untouched. The frozen I5 packet SHA-256 is
+`3189F30C777B7238D6123808E6C594914DFCF09C19895F888D1D8AAC6FD3BA4C`;
+the exact I5 request was appended to Tina's ledger with RF priority.

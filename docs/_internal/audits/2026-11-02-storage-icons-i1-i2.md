@@ -164,3 +164,45 @@ at 10:41:58 UTC, I6 was frozen as
 SHA-256 `5B3B16342C8D07FACD0BB46802829073CB70679FB944E27B369FF4DA34530D36`,
 and the exact request was appended to Tina's ledger with RF priority. ACK
 will be receipt only; installed Storage icon acceptance remains pending.
+
+## I6 installed result (Ally, 2026-11-02)
+
+I6 **passed the bounded base-game Storage icon retest** on a disposable
+Witcombe save20. In installed V5 5.2.46, all 18 nonempty owned Storage rows
+used loaded images (`naturalWidth` 256), including the 14 base keys that
+failed I1/I3/I5. All 14 URLs returned 200 `image/png`; there were zero emoji
+fallbacks. The Beans and Alpacas DLC's five sampled keys (COFFEEBAGS,
+COFFEECAPSULES, COFFEEPACKED, COPPERORE and PIGMENTS) also returned 200 PNG.
+Tina did not load Catuaí, so those URL checks do not prove the nonempty
+Catuaí table or every commodity in Graham's screenshot. Evidence:
+`Z:\Graham\agent-comms\ally-fh-storage-icons-i6-evidence\RESULT-STORAGE-ICONS-I6-text.md`
+and `ui\si6-v5-07.png`.
+
+The helper completed while FS25 was in the world: 181 `dataS.gar` HUD files
+in 1,593 ms and 26 Beans and Alpacas DLC files in 1,430 ms. Its cache ended
+with 223 HUD DDS files and no partial files; V5 stayed responsive. The exact
+packet (`5B3B16342C8D07FACD0BB46802829073CB70679FB944E27B369FF4DA34530D36`),
+installer (`FB66D8C77A9E9F7ECCB3964C2D258C267EC43645E7F2A81DEB76C6112AFC05D3`)
+and exporter (`F3551845457935AB9B9B2ECECC6772CD0E432656121DD4D6EE05052FC89FC98F`)
+hashes were independently rechecked. One Windows install row, committed slot
+generations 5/6, no FarmDash Lua stack, and full Ally hash restoration were
+reported. The game log contained separate texture, console-command and
+harvest-mission errors. This is a private candidate, not a public release.
+
+## Catuaí exact owned-stock check (Graham PC, read-only save/export)
+
+The current `savegame17` FarmDashboard export, committed generation 338,
+contains 20 nonempty farm 1 Storage keys. With a fresh temporary icon cache,
+the I6 source resolved **20/20** exact keys to PNG using locally installed
+game/DLC archives and mod sources: STRAW, POTATO, DRYGRASS_WINDROW,
+BEETROOT, GRASS_WINDROW, SORGHUM, CARROT, OAT, SPINACH, PIGMENTS,
+FURNITURE, WOODBEAM, CANOLA, WHEAT, COFFEEBAGS, SOYBEAN, IRONORE,
+COPPERORE, COFFEECAPSULES and COFFEEPACKED. The cache was isolated in
+`%LOCALAPPDATA%\Temp\farmhub-i6-catuai-check-20261102`; no save, installed
+app or user profile was changed. FURNITURE, IRONORE, COFFEEBAGS and
+GRASS_WINDROW PNGs were visually inspected and depict the named commodity.
+The 12 keys in Graham's screenshot are included in those 20. This closes
+the source/asset-resolution gap for that exact export; the Catuaí installed
+Storage table was not opened in I6, so a direct Catuaí UI observation is
+still untested. Do not convert this local check into an installed Catuaí
+gameplay claim.

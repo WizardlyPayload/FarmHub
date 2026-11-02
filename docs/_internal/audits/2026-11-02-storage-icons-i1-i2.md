@@ -158,4 +158,9 @@ The exporter ZIP remains SHA-256
 `F3551845457935AB9B9B2ECECC6772CD0E432656121DD4D6EE05052FC89FC98F`.
 The bundled seek-based helper is SHA-256
 `2575753CD23FEE5AA3E587B703A58AFD54687D4A99A6E3C767A6CD3AAC44FEEE`.
-An I6 packet is draft only while RF owns the next Ally window.
+After RF-1484 returned BLOCKED and Tina reported full Ally hash restoration
+at 10:41:58 UTC, I6 was frozen as
+`Z:\Graham\agent-comms\farmhub-companion-acceptance\TEST-PACKET-STORAGE-ICONS-I6.md`,
+SHA-256 `5B3B16342C8D07FACD0BB46802829073CB70679FB944E27B369FF4DA34530D36`,
+and the exact request was appended to Tina's ledger with RF priority. ACK
+will be receipt only; installed Storage icon acceptance remains pending.

@@ -39,7 +39,7 @@ SHA-256 `0EB11FC9CA0A7EB541FF7EDD71776112E1B23B7BB7A798F908E176B3EC54DF6A`.
 The exporter remains 5.1.0.35, SHA-256
 `F3551845457935AB9B9B2ECECC6772CD0E432656121DD4D6EE05052FC89FC98F`.
 
-I2 was queued, then a cancellation was requested before a substantive result after an isolated
+I2 was queued, then cancelled before a substantive result after an isolated
 profile test found that a DLC request made during archive extraction did not
 retry its disk lookup. The extracted DLC textures existed, yet the initial
 request returned 404. A follow-up source change retries the lookup after
@@ -48,6 +48,13 @@ all 14 I1 failures plus COFFEEBAGS, COFFEECAPSULES, COFFEEPACKED,
 COPPERORE and PIGMENTS from locally installed archives to PNG files (19/19).
 This is V5 5.2.44 source proof;
 its installed retest is still pending.
+
+Tina had installed 5.2.43 when the cancel arrived; she ran no game or icon
+test, and reported full Ally hash restoration at 02:14:56 UTC. I3 was frozen
+as `TEST-PACKET-STORAGE-ICONS-I3.md` SHA-256
+`060D63ED49ED542B91386D42070EE23CED64D5788990694A2398B7C1EFC13899`
+and queued behind RF-1478. Its ACK is receipt only; no installed I3 result
+exists yet.
 
 Private V5 5.2.44 candidate installer SHA-256
 `5AE7185E798A41260F98F9DDBBEAC99393235BB4DD69FA9B0881BDC9DD36045D`

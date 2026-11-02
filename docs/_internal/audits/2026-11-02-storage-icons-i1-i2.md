@@ -1,4 +1,4 @@
-# Storage fill-type HUD icons — I1 failure and I2 candidate
+# Storage fill-type HUD icons — I1 failure and private retest candidates
 
 ## I1 installed result (Ally, 2026-11-02)
 
@@ -39,7 +39,21 @@ SHA-256 `0EB11FC9CA0A7EB541FF7EDD71776112E1B23B7BB7A798F908E176B3EC54DF6A`.
 The exporter remains 5.1.0.35, SHA-256
 `F3551845457935AB9B9B2ECECC6772CD0E432656121DD4D6EE05052FC89FC98F`.
 
-I2 must repeat the installed same-generation Storage table check on Ally:
+I2 was queued, then a cancellation was requested before a substantive result after an isolated
+profile test found that a DLC request made during archive extraction did not
+retry its disk lookup. The extracted DLC textures existed, yet the initial
+request returned 404. A follow-up source change retries the lookup after
+prefetch; a second isolated profile with no loose game extract resolved
+all 14 I1 failures plus COFFEEBAGS, COFFEECAPSULES, COFFEEPACKED,
+COPPERORE and PIGMENTS from locally installed archives to PNG files (19/19).
+This is V5 5.2.44 source proof;
+its installed retest is still pending.
+
+Private V5 5.2.44 candidate installer SHA-256
+`5AE7185E798A41260F98F9DDBBEAC99393235BB4DD69FA9B0881BDC9DD36045D`
+is staged in `storage-icons-candidate-5.2.44` beside the unchanged exporter.
+
+The replacement packet must repeat the installed same-generation Storage table check on Ally:
 18 owned rows, each game image loaded and URL 200 `image/png`; check game
 archive discovery, one Windows row, committed export generations, logs and
 full restoration. Official DLC/Catuaí proof is separate and remains open.

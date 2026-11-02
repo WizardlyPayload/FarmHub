@@ -777,6 +777,9 @@ async function ensureFillTypeHudPngUncached(name, hudByName) {
     /* fallback */
   }
 
+  // A DLC may have finished extracting while this request awaited prefetch.
+  if (await materializeFileOrDisk(exact.source, exact.alias, dest)) return dest;
+
   if (await materializeZipSource(exact.source, exact.alias, dest)) return dest;
 
   for (const alias of aliases.slice(1)) {

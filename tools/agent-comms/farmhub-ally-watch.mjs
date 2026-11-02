@@ -53,12 +53,18 @@ if (prior && alive(prior.pid)) throw Error('WATCH_ALREADY_RUNNING');
 const adapter = await import(pathToFileURL(adapterPath).href);
 if (adapter.BRIAN_THREAD_ID !== threadId) throw Error('ADAPTER_THREAD_MISMATCH');
 const initial = results(fs.readFileSync(inbox, 'utf8'));
-// V1 was fully reviewed before this watcher was armed. Queue any V2+ result
-// already appended, including one that arrives between the final check and launch.
-const reviewed = initial.filter(event => event.id === 'FARMHUB-ALLY-20261031-VAULT-V1');
+// These returns were reviewed before the Storage ID matcher was added. Keep
+// them out of the first post-upgrade wake; still queue any later result that
+// arrived while the watcher was stopped.
+const reviewedIds = new Set([
+  'FARMHUB-ALLY-20261031-VAULT-V1',
+  ...[1, 2, 3, 4, 5].map(n => `FARMHUB-ALLY-20261102-STORAGE-ICONS-I${n}`),
+]);
+const reviewed = initial.filter(event => reviewedIds.has(event.id));
 const state = prior ?? {
   threadId, seen: reviewed.map(event => event.hash), baselineCount: reviewed.length, events: [],
 };
+state.seen = [...new Set([...state.seen, ...reviewed.map(event => event.hash)])];
 state.pid = process.pid;
 state.lastError = null;
 const seen = new Set(state.seen);

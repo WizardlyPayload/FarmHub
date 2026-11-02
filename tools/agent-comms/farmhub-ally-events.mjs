@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 // Tina's substantive replies use both RESULT/BLOCKED and direct PARTIAL/COMPLETE.
 // Match any RF session so a newer owner cannot silently outgrow a hard-coded ID.
-const RETURN = /^(RESULT|BLOCKED|PARTIAL|COMPLETE)\s+(FARMHUB-ALLY-\d{8}-VAULT-V\d+(?:R\d+)?|RF-\d{8}-TINA-[A-Z0-9-]+)(?=\s|[|:])/m;
+const RETURN = /^(RESULT|BLOCKED|PARTIAL|COMPLETE)\s+(FARMHUB-ALLY-\d{8}-[A-Z0-9-]+|RF-\d{8}-TINA-[A-Z0-9-]+)(?=\s|[|:])/m;
 
 export function parseSubstantiveReturns(text) {
   const out = [];

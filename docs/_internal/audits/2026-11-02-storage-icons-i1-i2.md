@@ -84,3 +84,25 @@ The eventual replacement must repeat the installed same-generation Storage table
 18 owned rows, each game image loaded and URL 200 `image/png`; check game
 archive discovery, one Windows row, committed export generations, logs and
 full restoration. Official DLC/Catuaí proof is separate and remains open.
+
+## I4 archive diagnostic and I5 source correction
+
+Tina ran the exact bundled HUD helper directly on Ally's installed archives
+after RF-1479 released Ally. The game-root `dataS.gar` yielded 181 HUD DDS
+files, including all 14 base-game I1/I3 misses; it took 46.8 seconds on the
+measured repeat. The official Beans and Alpacas DLC in the player's
+`Documents/My Games/FarmingSimulator2025/pdlc` yielded 26 HUD DDS files,
+including all five sampled DLC keys, in 111.5 and 140.6 seconds. Both commands
+exited 0 with empty stderr. I4 did not install V5, open FS25 or copy game art
+to NAS evidence. Ally was hash-restored at 03:00:11 UTC. See
+`Z:\Graham\agent-comms\ally-fh-storage-icons-i4-evidence\RESULT-STORAGE-ICONS-I4-text.md`.
+
+The V5 5.2.44 caller imposed a 45-second helper limit, shorter than Ally's
+measured base run, and searched only the game folder for `.dlc` files. This
+explains the empty I3 archive cache. Candidate 5.2.45 allows 180 seconds for
+`.gar` and 300 seconds for `.dlc`, scans `pdlc` under game and discovered
+FS25 profile roots, and writes a private archive status file with outcome,
+texture count and elapsed time. It also waits for DLC prefetch before the HUD
+cache epoch is marked complete so the page can retry initially missing images.
+The focused HUD tests passed 16/16 including profile DLC discovery. This is a
+source correction; installed Storage icon acceptance remains pending I5.

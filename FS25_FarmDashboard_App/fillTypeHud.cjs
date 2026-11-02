@@ -12,7 +12,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { spawn } = require("child_process");
 const { convertDdsToPng, getFs25GameInstallRoots } = require("./mapOverviewResolver");
-const { collectFarmDashboardModSettingsRoots } = require("./fs25Paths");
+const { collectFarmDashboardModSettingsRoots, collectFs25DocumentRoots } = require("./fs25Paths");
 
 const inflightByZip = new Map();
 const inflightByCacheName = new Map();
@@ -185,10 +185,7 @@ function bundledArchiveReader() {
 
 function installedHudArchives() {
   const archives = [];
-  for (const root of getFs25GameInstallRoots()) {
-    const base = path.join(root, "dataS.gar");
-    if (fs.existsSync(base)) archives.push(base);
-    const pdlc = path.join(root, "pdlc");
+  const addDlcFiles = (pdlc) => {
     try {
       for (const entry of fs.readdirSync(pdlc, { withFileTypes: true })) {
         if (entry.isFile() && entry.name.toLowerCase().endsWith(".dlc")) {
@@ -196,24 +193,39 @@ function installedHudArchives() {
         }
       }
     } catch {
-      /* no installed DLC */
+      /* no installed DLC here */
     }
+  };
+  for (const root of getFs25GameInstallRoots()) {
+    const base = path.join(root, "dataS.gar");
+    if (fs.existsSync(base)) archives.push(base);
+    addDlcFiles(path.join(root, "pdlc"));
+  }
+  for (const profile of collectFs25DocumentRoots()) {
+    addDlcFiles(path.join(profile, "pdlc"));
   }
   return [...new Set(archives)];
 }
 
 async function runArchiveReader(exe, archive, outputDir) {
-  await new Promise((resolve, reject) => {
+  const timeoutMs = archive.toLowerCase().endsWith(".dlc") ? 300000 : 180000;
+  return new Promise((resolve, reject) => {
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
     const child = spawn(exe, ["--hud", archive, outputDir], {
       windowsHide: true,
-      stdio: "ignore",
+      stdio: ["ignore", "pipe", "pipe"],
     });
-    const timer = setTimeout(() => child.kill(), 45000);
+    child.stdout.on("data", (chunk) => { stdout = (stdout + chunk).slice(-2048); });
+    child.stderr.on("data", (chunk) => { stderr = (stderr + chunk).slice(-2048); });
+    const timer = setTimeout(() => { timedOut = true; child.kill(); }, timeoutMs);
     child.once("error", (error) => { clearTimeout(timer); reject(error); });
     child.once("close", (code) => {
       clearTimeout(timer);
-      if (code === 0) resolve();
-      else reject(new Error(`HUD archive reader exited ${code}`));
+      if (timedOut) reject(new Error(`HUD archive reader timed out after ${timeoutMs} ms`));
+      else if (code === 0) resolve(Number(stdout.match(/HUD textures extracted: (\d+)/)?.[1]) || 0);
+      else reject(new Error(`HUD archive reader exited ${code}: ${stderr.trim()}`));
     });
   });
 }
@@ -224,6 +236,12 @@ async function prefetchArchiveSources(dlcOnly = false) {
   if (!exe) return 0;
   const outputDir = archiveHudSourceDir();
   await fs.promises.mkdir(outputDir, { recursive: true });
+  const statusPath = path.join(outputDir, "_archive_status.json");
+  let statuses = {};
+  try {
+    const saved = JSON.parse(await fs.promises.readFile(statusPath, "utf8"));
+    if (saved && typeof saved === "object" && !Array.isArray(saved)) statuses = saved;
+  } catch { /* first run */ }
   let processed = 0;
   for (const archive of installedHudArchives().filter((item) => item.toLowerCase().endsWith(dlcOnly ? ".dlc" : ".gar"))) {
     try {
@@ -233,12 +251,16 @@ async function prefetchArchiveSources(dlcOnly = false) {
         .digest("hex").slice(0, 24);
       const marker = path.join(outputDir, `_${identity}.complete`);
       if (fs.existsSync(marker)) continue;
-      await runArchiveReader(exe, archive, outputDir);
+      const started = Date.now();
+      const extracted = await runArchiveReader(exe, archive, outputDir);
       await fs.promises.writeFile(marker, path.basename(archive), "utf8");
+      statuses[path.basename(archive)] = { outcome: "ok", extracted, elapsedMs: Date.now() - started };
       processed += 1;
     } catch (error) {
+      statuses[path.basename(archive)] = { outcome: "error", error: String(error && error.message ? error.message : error).slice(0, 240) };
       console.warn("[fill-type-hud] archive", path.basename(archive), error && error.message ? error.message : error);
     }
+    await fs.promises.writeFile(statusPath, JSON.stringify(statuses, null, 2), "utf8");
   }
   return processed;
 }
@@ -662,7 +684,7 @@ function prefetchFillTypeHudCache(hudByName) {
       return 0;
     });
   }
-  const jobs = [inflightDiskPrefetch];
+  const jobs = [inflightDiskPrefetch, inflightDlcPrefetch];
   if (hudByName && Object.keys(hudByName).length > 0) {
     jobs.push(
       prefetchFromDisk(hudByName).catch((e) => {
@@ -818,6 +840,7 @@ module.exports = {
   ensureFillTypeHudPng,
   lookupHudSource,
   extractHudRoots,
+  installedHudArchives,
   isLikelyHudEntry,
   bufferLooksLikePng,
   bufferLooksLikeDds,

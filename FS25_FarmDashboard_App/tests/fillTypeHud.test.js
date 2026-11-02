@@ -49,6 +49,11 @@ describe("fillTypeHud", () => {
     );
   });
 
+  test("fillTypeNameAliases resolves vanilla milk producer HUD names", () => {
+    expect(fillTypeNameAliases("MILK")).toContain("MILKCOW");
+    expect(candidateBasenames("MILKCOW", "")).toContain("hud_fill_milkcow.dds");
+  });
+
   test("lookupHudSource tries map-variant aliases", () => {
     const hit = lookupHudSource("SOYBEAN2", {
       SOYBEAN: { kind: "file", path: "hud_fill_soyBean.dds" },

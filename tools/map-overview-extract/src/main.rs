@@ -1,7 +1,7 @@
 //! Read one locally installed DLC overview without loading the multi-gigabyte archive.
 //! The file table and selected image are the only archive bytes held in memory.
 
-use gar_lib::{GarCipher, ALL_KEYS};
+use gar_lib::{GarArchive, GarCipher, ALL_KEYS};
 use std::env;
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom};
@@ -101,15 +101,57 @@ fn run(archive_path: &Path, output_dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
+// Unpack only the locally installed game's fill-type HUD textures. The app
+// converts these DDS files to PNG in its own cache; game artwork is never
+// shipped in the installer.
+fn run_hud(archive_path: &Path, output_dir: &Path) -> Result<(), String> {
+    if !archive_path.extension().is_some_and(|e| e.eq_ignore_ascii_case("gar") || e.eq_ignore_ascii_case("dlc")) {
+        return Err("HUD input must be a .gar or .dlc archive".into());
+    }
+    let archive = GarArchive::open(archive_path).map_err(|e| format!("open HUD archive: {e}"))?;
+    fs::create_dir_all(output_dir).map_err(|e| format!("create HUD output directory: {e}"))?;
+    let mut count = 0usize;
+    for file_name in archive.files() {
+        let normalized = file_name.replace('\\', "/");
+        let lower = normalized.to_ascii_lowercase();
+        let basename = if let Some((_, name)) = lower.rsplit_once("/menu/hud/filltypes/") {
+            name
+        } else if let Some(name) = lower.strip_prefix("menu/hud/filltypes/") {
+            name
+        } else {
+            continue;
+        };
+        if basename.contains('/') || basename.is_empty() { continue; }
+        if !basename.ends_with(".dds") && !basename.ends_with(".png") { continue; }
+        let original_base = normalized.rsplit('/').next().unwrap_or("");
+        if original_base.is_empty() || original_base == "." || original_base == ".." { continue; }
+        let output = output_dir.join(original_base);
+        if output.exists() { continue; }
+        let bytes = archive.read_file(file_name).map_err(|e| format!("read HUD {file_name}: {e}"))?;
+        if bytes.is_empty() || bytes.len() > MAX_IMAGE_BYTES as usize { continue; }
+        let partial = output.with_extension("partial");
+        fs::write(&partial, bytes).map_err(|e| format!("write HUD {original_base}: {e}"))?;
+        fs::rename(&partial, &output).map_err(|e| format!("finish HUD {original_base}: {e}"))?;
+        count += 1;
+    }
+    println!("HUD textures extracted: {count}");
+    Ok(())
+}
+
 fn main() {
     let mut args = env::args_os().skip(1);
-    let archive_path = args.next().map(PathBuf::from);
+    let first = args.next();
+    let hud_mode = first.as_deref() == Some(std::ffi::OsStr::new("--hud"));
+    let archive_path = if hud_mode { args.next() } else { first }.map(PathBuf::from);
     let output_dir = args.next().map(PathBuf::from);
     if args.next().is_some() || archive_path.is_none() || output_dir.is_none() {
-        eprintln!("usage: farmdash-map-overview-extract <local .dlc> <output directory>");
+        eprintln!("usage: farmdash-map-overview-extract [--hud] <local .dlc/.gar> <output directory>");
         std::process::exit(2);
     }
-    if let Err(error) = run(&archive_path.unwrap(), &output_dir.unwrap()) {
+    let archive_path = archive_path.unwrap();
+    let output_dir = output_dir.unwrap();
+    let result = if hud_mode { run_hud(&archive_path, &output_dir) } else { run(&archive_path, &output_dir) };
+    if let Err(error) = result {
         eprintln!("{error}");
         std::process::exit(1);
     }

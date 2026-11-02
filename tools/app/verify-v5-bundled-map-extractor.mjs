@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-const EXPECTED_SHA256 = '843068ea664c76244a7dfe1a385faf40e86527cf3b1c0bd3cb0abddf6fd33733';
+const EXPECTED_SHA256 = '083f8b2519a4d323082b142157062cce94e4ef73ddf8974af771767d7369ac89';
 
 export function inspectBundledMapExtractor(projectDir) {
   const root = path.join(projectDir, 'resources', 'map-overview-extract');

@@ -116,3 +116,36 @@ Private V5 packaging, bundled helper pin, UI match and artifact guards passed;
 the live update feed was untouched. The frozen I5 packet SHA-256 is
 `3189F30C777B7238D6123808E6C594914DFCF09C19895F888D1D8AAC6FD3BA4C`;
 the exact I5 request was appended to Tina's ledger with RF priority.
+
+## I5 installed failure and I6 streaming correction
+
+I5's first Ally attempt stopped when Tina's agent session ended; she resumed,
+restored that attempt, and ran again from a clean baseline. The second run
+**failed** despite exact packet, installer, exporter and helper hashes, one
+Windows row, committed generations and no FarmDash Lua stack. OAT and LIME
+were real images, while the other 12 base-game rows were still emoji/404.
+Two of five sampled DLC URLs passed (COPPERORE and PIGMENTS); the three coffee
+URLs returned 404. The app's status recorded `dataS.gar` timed out at 180
+seconds and Beans and Alpacas plus Highlands Fishing DLCs at 300 seconds.
+Only 17 HUD DDS files were extracted before those stops. Tina reported full
+Ally hash restoration at 09:21:14 UTC; she did not save the disposable game.
+Evidence: `Z:\Graham\agent-comms\ally-fh-storage-icons-i5-evidence\RESULT-STORAGE-ICONS-I5-text.md`.
+The earlier I4 helper had completed in seconds to minutes with FS25 closed;
+the I5 helper ran while the game was in the world. The exact `--hud` source
+called `GarArchive::open`, which reads the entire multi-gigabyte archive into
+memory, then selects textures. This is a concrete inefficiency that makes the
+timeout and unresponsive app plausible under concurrent game disk load; I5
+did not measure disk or independently isolate every cause of UI delay.
+
+The I6 helper source now reads only the archive header, encrypted file table
+and selected HUD entries using the same bounded, seek-based approach already
+used for its overview mode. On Graham's local archives it extracted all 181
+base HUD files in 0.51 seconds and all 26 Beans and Alpacas files in 0.10
+seconds. WHEAT, MILKCOW and COFFEEBAGS DDS hashes matched trusted local game
+extracts exactly; the unchanged overview mode's result also matched its
+trusted extract. A fresh private app cache resolved all 14 I1/I3 base keys
+and the five DLC keys to PNG (19/19), and its status recorded successful
+base and 14 installed DLC archive scans. Focused JS tests passed 16/16.
+These are local source/runtime checks only. I6 still needs an installed Ally
+Storage-table retest after RF releases the machine; no Catuaí nonempty page
+claim follows from sampled DLC URLs.

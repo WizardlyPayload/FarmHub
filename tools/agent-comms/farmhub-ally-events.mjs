@@ -2,7 +2,8 @@ import { createHash } from 'node:crypto';
 
 // Tina's substantive replies use RESULT/BLOCKED, direct PARTIAL/COMPLETE,
 // and RF's direct PASS/FAIL outcomes. ACK and STATUS are receipt only.
-// Match any RF session so a newer owner cannot silently outgrow a hard-coded ID.
+// Parse RF returns for exact, explicitly armed release gates; an unrelated RF
+// result must not spend a FarmHub model turn.
 const RETURN = /^(RESULT|BLOCKED|PARTIAL|COMPLETE|PASS|FAIL)\s+(FARMHUB-ALLY-\d{8}-[A-Z0-9-]+|RF-\d{8}-TINA-[A-Z0-9-]+)(?=\s|[|:])/m;
 
 export function parseSubstantiveReturns(text) {
@@ -17,4 +18,9 @@ export function parseSubstantiveReturns(text) {
     });
   }
   return out;
+}
+
+export function shouldWakeFarmHub(event, rfGateId = '') {
+  if (event.id.startsWith('FARMHUB-ALLY-')) return true;
+  return /^RF-\d{8}-TINA-[A-Z0-9-]+$/.test(rfGateId) && event.id === rfGateId;
 }

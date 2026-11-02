@@ -7,7 +7,7 @@ import os from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { parseSubstantiveReturns } from './farmhub-ally-events.mjs';
+import { parseSubstantiveReturns, shouldWakeFarmHub } from './farmhub-ally-events.mjs';
 
 const threadId = process.env.CODEX_THREAD_ID;
 if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(threadId ?? '')) {
@@ -17,6 +17,9 @@ const inbox = 'Z:\\Graham\\agent-comms\\to-wizard-pc.md';
 const dir = path.join(os.homedir(), '.codex', 'watchers', 'farmhub-ally');
 const statePath = path.join(dir, 'state.json');
 const stopPath = path.join(dir, 'STOP');
+// Written only when a specific RF result gates an already prepared FarmHub
+// packet. Without this file, unrelated RF results are marked seen, not sent.
+const rfGatePath = path.join(dir, 'rf-gate.json');
 const adapterPath = 'C:\\Users\\Graham\\Documents\\Realistic-Farming\\tools\\motherbarn-brian\\codex-app.mjs';
 const refreshPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'farmhub-app-pipe.ps1');
 const execFileAsync = promisify(execFile);
@@ -34,6 +37,13 @@ function writeState(state) {
   fs.renameSync(temp, statePath);
 }
 const results = parseSubstantiveReturns;
+function armedRfGateId() {
+  try {
+    const gate = JSON.parse(fs.readFileSync(rfGatePath, 'utf8'));
+    if (!/^FARMHUB-ALLY-\d{8}-[A-Z0-9-]+$/.test(gate.farmhubId ?? '')) return '';
+    return /^RF-\d{8}-TINA-[A-Z0-9-]+$/.test(gate.rfId ?? '') ? gate.rfId : '';
+  } catch { return ''; }
+}
 function alive(pid) {
   if (!Number.isInteger(pid) || pid <= 0) return false;
   try { process.kill(pid, 0); return true; } catch { return false; }
@@ -126,9 +136,11 @@ async function deliver() {
 function scan() {
   if (stopped) return;
   try {
+    const rfGateId = armedRfGateId();
     for (const event of results(fs.readFileSync(inbox, 'utf8'))) {
       if (seen.has(event.hash)) continue;
       seen.add(event.hash);
+      if (!shouldWakeFarmHub(event, rfGateId)) continue;
       state.events.push({ ...event, status: 'queued', at: new Date().toISOString() });
     }
     state.seen = [...seen];

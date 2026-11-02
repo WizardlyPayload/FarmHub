@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSubstantiveReturns } from './farmhub-ally-events.mjs';
+import { parseSubstantiveReturns, shouldWakeFarmHub } from './farmhub-ally-events.mjs';
 
-test('wakes for substantive FarmHub and any RF release, including direct PARTIAL', () => {
+test('parses substantive FarmHub and RF returns, including direct PARTIAL', () => {
   const text = [
     '## [time] from Tina\r\nACK RF-20261101-TINA-SAVE20-1459 | receipt only',
     '## [time] from Tina\r\nRESULT FARMHUB-ALLY-20261101-VAULT-V8 | PASS',
@@ -31,4 +31,14 @@ test('normalizing line endings keeps an event hash stable', () => {
   const block = '## [time] from Tina\nRESULT FARMHUB-ALLY-20261101-VAULT-V7R1 | PASS\n';
   assert.equal(parseSubstantiveReturns(block)[0].hash,
     parseSubstantiveReturns(block.replace(/\n/g, '\r\n'))[0].hash);
+});
+
+test('unrelated RF returns stay silent unless an exact release gate is armed', () => {
+  const events = parseSubstantiveReturns([
+    '## [time] from Tina\nRESULT FARMHUB-ALLY-20261102-STORAGE-ICONS-I6 | pass',
+    '## [time] from Tina\nBLOCKED RF-20261102-TINA-VEHICLE-IDENTITY-1486 | restored',
+  ].join('\n'));
+  assert.deepEqual(events.map(event => shouldWakeFarmHub(event)), [true, false]);
+  assert.deepEqual(events.map(event => shouldWakeFarmHub(event, 'RF-20261102-TINA-VEHICLE-IDENTITY-1486')), [true, true]);
+  assert.equal(shouldWakeFarmHub(events[1], 'RF-20261102-TINA-VEHICLE-IDENTITY-1484'), false);
 });

@@ -570,6 +570,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "dieselFuelSystem",
+    title: "Diesel Fuel System",
+    category: "fleet",
+    descKey: "companions.desc.dieselFuelSystem",
+    desc: "Reads fuel age, filter blockage and trapped water from diesel vehicles owned by this farm. Condition and service remain controlled by the game mod.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "vehicleTradeIn",
     title: "Vehicle Trade In",
     category: "fleet",

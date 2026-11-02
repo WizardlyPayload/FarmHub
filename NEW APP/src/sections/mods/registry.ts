@@ -112,6 +112,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/puncturedTires").then((m) => m.Page) },
   { key: "vehicleInspectionHU", catalogId: "vehicleInspectionHU", title: "Vehicle Inspection (HU)", glyph: "HU", group: "fleet",
     load: () => import("@/sections/mods/vehicleInspectionHU").then((m) => m.Page) },
+  { key: "dieselFuelSystem", catalogId: "dieselFuelSystem", title: "Diesel Fuel System", glyph: "DF", group: "fleet",
+    load: () => import("@/sections/mods/dieselFuelSystem").then((m) => m.Page) },
   { key: "vehicleTradeIn", catalogId: "vehicleTradeIn", title: "Vehicle Trade In", glyph: "TI", group: "fleet",
     load: () => import("@/sections/mods/vehicleTradeIn").then((m) => m.Page) },
   { key: "dynamicDealership", catalogId: "dynamicDealership", title: "Dynamic Dealership", glyph: "DD", group: "fleet",

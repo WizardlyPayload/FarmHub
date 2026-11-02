@@ -450,6 +450,14 @@ local CATALOG = {
         globals = { "g_huManager" },
     },
     {
+        id = "dieselFuelSystem",
+        title = "Diesel Fuel System",
+        category = "fleet",
+        names = { "FS25_GNRealism_FuelSystem", "FS25_DieselFuelSystem", "KM_82984_Diesel_Fuel_System" },
+        substrings = { "gnrealism_fuelsystem", "dieselfuelsystem", "diesel_fuel_system" },
+        globals = {},
+    },
+    {
         id = "vehicleTradeIn",
         title = "Vehicle Trade In",
         category = "fleet",

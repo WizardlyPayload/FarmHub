@@ -68,6 +68,7 @@ const initial = results(fs.readFileSync(inbox, 'utf8'));
 // arrived while the watcher was stopped.
 const reviewedIds = new Set([
   'FARMHUB-ALLY-20261031-VAULT-V1',
+  'FARMHUB-ALLY-20261102-VAULT-V18', // reviewed before the BLOCKED RESULT parser upgrade
   'RF-20261102-TINA-LOCAL-LOAD-1479',
   ...[1, 2, 3, 4, 5].map(n => `FARMHUB-ALLY-20261102-STORAGE-ICONS-I${n}`),
 ]);

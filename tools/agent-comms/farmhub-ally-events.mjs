@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 // and RF's direct PASS/FAIL outcomes. ACK and STATUS are receipt only.
 // Parse RF returns for exact, explicitly armed release gates; an unrelated RF
 // result must not spend a FarmHub model turn.
-const RETURN = /^(RESULT|BLOCKED|PARTIAL|COMPLETE|PASS|FAIL)\s+(FARMHUB-ALLY-\d{8}-[A-Z0-9-]+|RF-\d{8}-TINA-[A-Z0-9-]+)(?=\s|[|:])/m;
+const RETURN = /^(RESULT|BLOCKED|PARTIAL|COMPLETE|PASS|FAIL)\s+(?:RESULT\s+)?(FARMHUB-ALLY-\d{8}-[A-Z0-9-]+|RF-\d{8}-TINA-[A-Z0-9-]+)(?=\s|[|:])/m;
 
 export function parseSubstantiveReturns(text) {
   const out = [];

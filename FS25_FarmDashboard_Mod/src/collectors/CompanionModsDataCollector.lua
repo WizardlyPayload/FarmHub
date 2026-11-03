@@ -482,6 +482,14 @@ local CATALOG = {
         globals = { "g_vehicleControlAddon" },
     },
     {
+        id = "advancedVehicleFunctions",
+        title = "Advanced Vehicle Functions",
+        category = "fleet",
+        names = { "FS25_AdvancedVehicleFunctions", "KM_82760_Advanced_Vehicle_Functions" },
+        substrings = { "advancedvehiclefunctions", "advanced_vehicle_functions" },
+        globals = {},
+    },
+    {
         id = "vehicleTradeIn",
         title = "Vehicle Trade In",
         category = "fleet",

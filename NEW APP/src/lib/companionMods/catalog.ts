@@ -618,6 +618,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "advancedVehicleFunctions",
+    title: "Advanced Vehicle Functions",
+    category: "fleet",
+    descKey: "companions.desc.advancedVehicleFunctions",
+    desc: "Shows this farm's current ABS, traction, stability and drivetrain switches on owned vehicles. It does not record driving or accidents.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "vehicleTradeIn",
     title: "Vehicle Trade In",
     category: "fleet",

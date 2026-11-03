@@ -41,6 +41,22 @@ test("TUV vault filename is detected as its dedicated page catalog ID", () => {
     expect(to_jsstring(lua.lua_tostring(L, -1))).toBe("1|tuvSystem");
 });
 
+test("Advanced Vehicle Functions vault identity exposes its fleet page", () => {
+    const L = lauxlib.luaL_newstate();
+    lualib.luaL_openlibs(L);
+    const chunk = [
+        'g_modIsLoaded={ ["KM_82760_Advanced_Vehicle_Functions"]=true }',
+        "FarmDashLog={error=function() end}",
+        source,
+        "local p=CompanionModsDataCollector:collect()",
+        "return tostring(#p.mods)..'|'..tostring(p.mods[1] and p.mods[1].id)",
+    ].join("\n");
+    if (lauxlib.luaL_dostring(L, to_luastring(chunk)) !== lua.LUA_OK) {
+        throw new Error(to_jsstring(lua.lua_tostring(L, -1)));
+    }
+    expect(to_jsstring(lua.lua_tostring(L, -1))).toBe("1|advancedVehicleFunctions");
+});
+
 test("every active catalogued companion is exported when the whole catalog is loaded", () => {
     const catalog = source.slice(source.indexOf("local CATALOG = {"), source.indexOf("\nlocal function envGet"));
     const names = [...catalog.matchAll(/\bid = "[^"]+"[\s\S]*?names = \{\s*"([^"]+)"/g)]

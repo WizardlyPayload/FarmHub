@@ -4710,5 +4710,8 @@
   "companionPage.vehicleControlAddon.on": "On",
   "companionPage.vehicleControlAddon.off": "Off",
   "companionPage.vehicleControlAddon.empty": "No owned vehicle has a readable Vehicle Control Addon state yet.",
-  "companionPage.vehicleControlAddon.truncated": "Only the first owned vehicles are listed."
+  "companionPage.vehicleControlAddon.truncated": "Only the first owned vehicles are listed.",
+  "companions.live.distributionMonthTitle": "Rolling 24 completed hourly cycles for this farm",
+  "companions.live.distributionMonthAsset": "{{asset}} - {{fillType}}: produced {{produced}}, consumed {{consumed}}, distributed {{dist}}, sold {{sold}}",
+  "companions.live.distributionMonthEmpty": "No owned-asset flows were recorded in the rolling 24-cycle window."
 }

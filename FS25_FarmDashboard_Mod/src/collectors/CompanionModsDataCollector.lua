@@ -2495,13 +2495,13 @@ local function ownedUniqueIds(farmId)
     if farmId == nil or type(list) ~= "table" then
         return nil, false
     end
-    local owned, known = {}, {}
+    local owned, known, names = {}, {}, {}
     local uncertain = false
     local seen = 0
     for _, placeable in pairs(list) do
         seen = seen + 1
         if seen > OWNED_PLACEABLE_SCAN then
-            return owned, true, known
+            return owned, true, known, names
         end
         if type(placeable) == "table" and placeable.uniqueId ~= nil then
             local owner = nil
@@ -2514,10 +2514,16 @@ local function ownedUniqueIds(farmId)
             if owner ~= nil and owner > 0 and owner % 1 == 0 then known[tostring(placeable.uniqueId)] = true else uncertain = true end
             if owner == farmId then
                 owned[tostring(placeable.uniqueId)] = true
+                local name = placeable.name
+                if type(placeable.getName) == "function" then
+                    local ok, value = pcall(placeable.getName, placeable)
+                    if ok and type(value) == "string" then name = value end
+                end
+                if type(name) == "string" and name ~= "" then names[tostring(placeable.uniqueId)] = name end
             end
         end
     end
-    return owned, uncertain, known
+    return owned, uncertain, known, names
 end
 
 local function fillTypeNameOf(index)
@@ -2645,6 +2651,10 @@ local DIST_MODE_KEYS = {
 local DIST_ASSET_SCAN = 80
 local DIST_FILL_SCAN = 40
 local DIST_ROW_LIMIT = 24
+local DIST_MONTH_FIELDS = {
+    received = "receivedLiters", produced = "producedLiters", consumed = "consumedLiters",
+    dist = "distributedLiters", stored = "storedLiters", sold = "soldLiters",
+}
 
 -- SmartDistribution.settings = S (SmartDistribution.lua 79). S.global is save-wide; S.assets[uid][ft] = mode
 -- and S.lastCycle[uid][ft] = { dist, sold, stored, received } are per placeable and stay farm-private.
@@ -2676,7 +2686,7 @@ local function collectDistributionRedux()
     if type(settings.master) == "boolean" then out.masterEnabled = settings.master end
     if type(global.sellEnabled) == "boolean" then out.sellEnabled = global.sellEnabled end
     local farmId = activeExportFarmId()
-    local owned, ownedTruncated = ownedUniqueIds(farmId)
+    local owned, ownedTruncated, _, ownedNames = ownedUniqueIds(farmId)
     if owned == nil then
         out.farmAssets = { readState = "unavailable", reason = farmId == nil and "no-farm" or "no-placeables" }
         return out
@@ -2738,11 +2748,79 @@ local function collectDistributionRedux()
     end
     history.window = "last-completed-cycle"
     history.retained = activity ~= "active"
+    -- DistributionStats exposes the same rolling 24-cycle ledgers used by its Overview's Month tab.
+    -- Read the ledgers directly so an export never calls overviewRows (which refreshes menu memos),
+    -- and join every UID to a placeable owned by this export farm before copying a value.
+    local month = { scope = "farm", farmId = farmId, window = "rolling-24-cycles", coverage = ownedTruncated and "truncated" or "complete", rows = {} }
+    if isClient then
+        month.readState = "unavailable"
+        month.reason = "server-history"
+    elseif type(dist.windowLedgers) ~= "function" then
+        month.readState = "unavailable"
+        month.reason = "window-api-missing"
+    else
+        local ok, ledgers = pcall(dist.windowLedgers, "month")
+        if not ok or type(ledgers) ~= "table" then
+            month.readState = "failed"
+            month.coverage = "truncated"
+        else
+            local accumulated, scanned, malformed = {}, 0, false
+            for _, ledger in ipairs(ledgers) do
+                if type(ledger) ~= "table" then
+                    malformed = true
+                else
+                    for uid, byFill in pairs(ledger) do
+                        scanned = scanned + 1
+                        if scanned > DIST_ASSET_SCAN * 24 then month.coverage = "truncated" break end
+                        if owned[tostring(uid)] then
+                            if type(byFill) ~= "table" then malformed = true else
+                                local seenFill = 0
+                                for ft, value in pairs(byFill) do
+                                    seenFill = seenFill + 1
+                                    if seenFill > DIST_FILL_SCAN then month.coverage = "truncated" break end
+                                    local index = tonumber(ft)
+                                    local name = index and index > 0 and index % 1 == 0 and fillTypeNameOf(index) or nil
+                                    if name == nil or type(value) ~= "table" then malformed = true else
+                                        local key = tostring(uid) .. "|" .. name
+                                        local row = accumulated[key]
+                                        if row == nil then
+                                            row = { uniqueId = tostring(uid), assetName = ownedNames[tostring(uid)], fillType = name,
+                                                receivedLiters = 0, producedLiters = 0, consumedLiters = 0,
+                                                distributedLiters = 0, storedLiters = 0, soldLiters = 0 }
+                                            accumulated[key] = row
+                                        end
+                                        for source, target in pairs(DIST_MONTH_FIELDS) do
+                                            local amount = observedNumber(value[source] or 0)
+                                            if amount == nil then malformed = true else row[target] = row[target] + amount end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+                if scanned > DIST_ASSET_SCAN * 24 then break end
+            end
+            for _, row in pairs(accumulated) do
+                if row.receivedLiters > 0 or row.producedLiters > 0 or row.consumedLiters > 0
+                    or row.distributedLiters > 0 or row.storedLiters > 0 or row.soldLiters > 0 then
+                    month.rows[#month.rows + 1] = row
+                end
+            end
+            table.sort(month.rows, function(a, b)
+                if a.uniqueId ~= b.uniqueId then return a.uniqueId < b.uniqueId end
+                return a.fillType < b.fillType
+            end)
+            while #month.rows > DIST_ROW_LIMIT do table.remove(month.rows) month.coverage = "truncated" end
+            if malformed then month.coverage = "truncated" month.reason = "malformed-rows" end
+            month.readState = #month.rows > 0 and "ok" or (malformed and "failed" or "empty")
+        end
+    end
     out.farmAssets = {
         readState = "ok", scope = "farm", farmId = farmId,
         coverage = overrides.coverage == "complete" and history.coverage == "complete" and "complete" or "truncated",
         overrides = overrides.rows, lastCycle = history.rows,
-        overridesReading = overrides, history = history,
+        overridesReading = overrides, history = history, month = month,
     }
     return out
 end

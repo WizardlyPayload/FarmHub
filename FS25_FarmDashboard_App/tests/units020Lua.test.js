@@ -214,6 +214,31 @@ describe("owning-mod companion readers", () => {
         `, "out.distributionRedux.readState..'|'..tostring(out.distributionRedux.mode)..'|'..tostring(out.distributionRedux.radius)");
         expect(distribution).toBe("ok|2|50");
 
+        const monthlyDistribution = run(`
+            getfenv = function() return _G end
+            g_currentMission = { getFarmId = function() return 1 end,
+                placeableSystem = { placeables = {
+                    { uniqueId = 'owned', ownerFarmId = 1, name = 'Farm bakery' },
+                    { uniqueId = 'foreign', ownerFarmId = 2, name = 'Other bakery' },
+                } } }
+            g_fillTypeManager = { getFillTypeNameByIndex = function(_, index)
+                return index == 1 and 'BREAD' or nil end }
+            g_modIsLoaded = { FS25_DistributionRedux = true }
+            _G.FS25_DistributionRedux = { SmartDistribution = {
+                settings = { master = true, global = { mode = 2, participation = 1 } },
+                windowLedgers = function(window)
+                    if window ~= 'month' then error('wrong window') end
+                    return {
+                        { owned = { [1] = { produced = 10, sold = 4 } },
+                          foreign = { [1] = { produced = 900, sold = 900 } } },
+                        { owned = { [1] = { produced = 5, sold = 2 } } },
+                    }
+                end,
+                overviewRows = function() error('menu mutation') end,
+            } }
+        `, "out.distributionRedux.farmAssets.month.readState..'|'..tostring(#out.distributionRedux.farmAssets.month.rows)..'|'..out.distributionRedux.farmAssets.month.rows[1].assetName..'|'..tostring(out.distributionRedux.farmAssets.month.rows[1].producedLiters)..'|'..tostring(out.distributionRedux.farmAssets.month.rows[1].soldLiters)");
+        expect(monthlyDistribution).toBe("ok|1|Farm bakery|15|6");
+
         const silage = run(`
             getfenv = function() return _G end
             g_currentMission = { getFarmId = function() return 1 end, missionDynamicInfo = { isMultiplayer = false } }

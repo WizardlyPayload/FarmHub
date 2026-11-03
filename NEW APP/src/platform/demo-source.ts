@@ -259,8 +259,8 @@ const FACTORY_IO = obj({
 });
 const MACHINE = { id, name: text, ownerFarmId: opt(int) };
 const DISTRIBUTION_OVERRIDE = obj({ uniqueId: id, fillType: opt(text), mode: opt(int), modeKey: opt(text) });
-const DISTRIBUTION_MOVEMENT = obj({ uniqueId: id, fillType: opt(text), distributedLiters: opt(num),
-  soldLiters: opt(num), storedLiters: opt(num), receivedLiters: opt(num) });
+const DISTRIBUTION_MOVEMENT = obj({ uniqueId: id, assetName: opt(text), fillType: opt(text), distributedLiters: opt(num),
+  soldLiters: opt(num), storedLiters: opt(num), receivedLiters: opt(num), producedLiters: opt(num), consumedLiters: opt(num) });
 const RESTRICTED_WINDOW = obj({ currentAllowed: bool, nextCalendarPeriod: int,
   nextUnconditionalPeriod: int, temperatureConditional: bool, reason: text });
 const COMPANION = obj({
@@ -323,6 +323,7 @@ const COMPANION = obj({
       overrides: list(DISTRIBUTION_OVERRIDE, 256), lastCycle: list(DISTRIBUTION_MOVEMENT, 256),
       overridesReading: obj({ ...READ, rows: list(DISTRIBUTION_OVERRIDE, 256) }),
       history: obj({ ...READ, window: text, retained: bool, rows: list(DISTRIBUTION_MOVEMENT, 256) }),
+      month: obj({ ...READ, window: text, rows: list(DISTRIBUTION_MOVEMENT, 256) }),
     }),
   }),
   silageCompaction: obj({ ...READ, context: text, status: text, estimate: opt(text), line: text }),
@@ -388,7 +389,7 @@ if (COMPANION.k === "obj") {
   if (distribution.k === "obj" && distribution.fields.farmAssets.k === "obj") {
     const assets = distribution.fields.farmAssets;
     assets.privateFarm = true;
-    for (const key of ["overridesReading", "history"]) {
+    for (const key of ["overridesReading", "history", "month"]) {
       const rule = assets.fields[key];
       if (rule.k === "obj") rule.privateFarm = true;
     }

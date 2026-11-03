@@ -29,6 +29,6 @@ export function firstRfRequestAfterHandoff(text, heading) {
   const marker = `## ${heading}`;
   const start = text.lastIndexOf(marker);
   if (start < 0) return '';
-  const match = text.slice(start + marker.length).match(/^##\s+(RF-\d{8}-TINA-[A-Z0-9-]+)(?=\s|$)/m);
+  const match = text.slice(start + marker.length).match(/^##[^\r\n]*?\b(RF-\d{8}-TINA-[A-Z0-9-]+)(?=\s|$)/m);
   return match?.[1] ?? '';
 }

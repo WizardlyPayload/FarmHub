@@ -52,7 +52,7 @@ test('resolves only the first RF request after an explicit Ally handoff', () => 
     '## RF-20261102-TINA-OLD-1494 — old request',
     '## FARMHUB-V18-ALLY-HANDOFF | FarmHub | 2026-11-02',
     'RF may take the next window.',
-    '## RF-20261102-TINA-NEXT-1495 — queued',
+    '## [2026-11-02 15:34:50 UTC] SERVER READY RF-20261102-TINA-NEXT-1495 — queued',
     '## RF-20261102-TINA-LATER-1496 — queued',
   ].join('\n');
   assert.equal(firstRfRequestAfterHandoff(ledger, 'FARMHUB-V18-ALLY-HANDOFF'),

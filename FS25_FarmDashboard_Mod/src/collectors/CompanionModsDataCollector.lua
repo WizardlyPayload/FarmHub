@@ -498,6 +498,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "enhancedVehicle",
+        title = "EnhancedVehicle",
+        category = "fleet",
+        names = { "FS25_EnhancedVehicle", "KM_58808_Enhanced_Vehicle" },
+        substrings = { "enhancedvehicle", "enhanced_vehicle" },
+        globals = {},
+    },
+    {
         id = "vehicleYears",
         title = "Vehicle Years",
         category = "fleet",

@@ -168,6 +168,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/BushelPlusCollector.lua"/>
         <sourceFile filename="src/companionPages/OutOfFuelCollector.lua"/>
         <sourceFile filename="src/companionPages/VehicleMileageCollector.lua"/>
+        <sourceFile filename="src/companionPages/EnhancedVehicleCollector.lua"/>
         <sourceFile filename="src/companionPages/VehicleYearsCollector.lua"/>
         <sourceFile filename="src/companionPages/AdvancedMaintenanceCollector.lua"/>
         <sourceFile filename="src/companionPages/CollisionDamageCollector.lua"/>

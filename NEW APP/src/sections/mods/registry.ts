@@ -108,6 +108,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
   { key: "cropControlOverride", catalogId: "cropControlOverride", title: "Crop Control Override", glyph: "CO", group: "fields",
     load: () => import("@/sections/mods/cropControlOverride").then((m) => m.Page) },
   // Fleet
+  { key: "enhancedVehicle", catalogId: "enhancedVehicle", title: "EnhancedVehicle", glyph: "EV", group: "fleet",
+    load: () => import("@/sections/mods/enhancedVehicle").then((m) => m.Page) },
   { key: "puncturedTires", catalogId: "puncturedTires", title: "Punctured Tires", glyph: "PT", group: "fleet",
     load: () => import("@/sections/mods/puncturedTires").then((m) => m.Page) },
   { key: "vehicleInspectionHU", catalogId: "vehicleInspectionHU", title: "Vehicle Inspection (HU)", glyph: "HU", group: "fleet",

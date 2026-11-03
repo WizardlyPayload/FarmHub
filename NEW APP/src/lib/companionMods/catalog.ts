@@ -666,6 +666,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "enhancedVehicle",
+    title: "EnhancedVehicle",
+    category: "fleet",
+    descKey: "companions.desc.enhancedVehicle",
+    desc: "Shows EnhancedVehicle's own odometer and trip readings for this farm's vehicles, separately from Vehicle Mileage.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "vehicleYears",
     title: "Vehicle Years",
     category: "fleet",

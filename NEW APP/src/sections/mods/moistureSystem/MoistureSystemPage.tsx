@@ -182,18 +182,20 @@ export function Page({ entry }: CompanionPageProps) {
       hint: weather.profileName,
     });
   }
-  if (farm && num(farm.siloCount) != null) {
+  // A zero tracked-silo count means the mod has no stored-crop records to assess.
+  // Native stock may still be present, so zero is not a measured grade/drying result.
+  if (farm && (num(farm.siloCount) ?? 0) > 0) {
     tiles.push(
       {
         key: "needsDrying",
-        label: tOr("companionPage.moistureSystem.statNeedsDrying", "Stored crops above ideal"),
+        label: tOr("companionPage.moistureSystem.statNeedsDrying", "Tracked stored crops above ideal"),
         value: formatNumber(farm.needsDryingCount ?? 0),
         tone: (farm.needsDryingCount ?? 0) > 0 ? "warn" : "ok",
         hint: tOr("companionPage.moistureSystem.statNeedsDryingHint", "{{count}} silo(s) drying", { count: formatNumber(farm.dryingCount ?? 0) }),
       },
       {
         key: "lowGrade",
-        label: tOr("companionPage.moistureSystem.statLowGrade", "Stocks at grade C or D"),
+        label: tOr("companionPage.moistureSystem.statLowGrade", "Tracked stocks at grade C or D"),
         value: formatNumber(farm.lowGradeCount ?? 0),
         tone: (farm.lowGradeCount ?? 0) > 0 ? "danger" : undefined,
       },
@@ -268,13 +270,16 @@ export function Page({ entry }: CompanionPageProps) {
       entry={entry}
       lead={tOr(
         "companionPage.moistureSystem.lead",
-        "Moisture System gives every field, pile, bale and silo a moisture level. Harvest moisture sets yield and quality, wet stock loses quality until it is dried, and the mod drives the weather from a regional profile.",
+        "Moisture System models field moisture and can track crop moisture and quality once it has recorded the stock. Harvest moisture affects yield and quality; wet stored crops may lose quality until dried.",
       )}
     >
       {pending ? (
         <ModEmpty>{tOr("companionPage.moistureSystem.pending", "The mod is still starting up in this save. Readings appear once the mission has started.")}</ModEmpty>
       ) : null}
       <ModStatTiles tiles={tiles} />
+      {farm && num(farm.siloCount) === 0 ? (
+        <ModEmpty>{tOr("companionPage.moistureSystem.noSilos", "No stored-crop moisture records have been captured for this farm yet. Existing stock may still be present.")}</ModEmpty>
+      ) : null}
 
       <Card title={tOr("companionPage.moistureSystem.cropsTitle", "Harvest now at the map's base moisture")}>
         <ModTable
@@ -328,7 +333,7 @@ export function Page({ entry }: CompanionPageProps) {
             rows={siloRows}
             empty={
               farm && num(farm.siloCount) != null
-                ? tOr("companionPage.moistureSystem.noSilos", "None of your silos hold a crop the mod tracks.")
+                ? tOr("companionPage.moistureSystem.noSilos", "No stored-crop moisture records have been captured for this farm yet. Existing stock may still be present.")
                 : !page
                   ? tOr("companionPage.moistureSystem.waitingSilos", "Your silos appear after the next export.")
                   : !farmReadable

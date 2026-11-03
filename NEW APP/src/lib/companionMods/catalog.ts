@@ -466,6 +466,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "grainTickets",
+    title: "Grain Tickets",
+    category: "contracts",
+    descKey: "companions.desc.grainTickets",
+    desc: "Shows this farm's completed grain delivery tickets for the current crop year, with quantity, grade and deductions. The history is bounded and resets each crop year.",
+    relatedSection: "economy",
+  },
+  {
     id: "baleBatchTracker",
     title: "Bale Batch Tracker",
     category: "storage",

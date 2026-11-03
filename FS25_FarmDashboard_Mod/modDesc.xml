@@ -2,7 +2,7 @@
 <!-- FS25 FarmDashboard V5 mod -->
 <modDesc descVersion="109">
     <author>JoshWalki / WizardlyPayload</author>
-<version>5.1.0.43</version>
+<version>5.1.0.44</version>
     
     <title>
         <en>Farm Dashboard</en>
@@ -184,6 +184,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/ImplementUsageCounterCollector.lua"/>
         <sourceFile filename="src/companionPages/BaleBatchTrackerCollector.lua"/>
         <sourceFile filename="src/companionPages/CropContractsCollector.lua"/>
+        <sourceFile filename="src/companionPages/GrainTicketsCollector.lua"/>
         <sourceFile filename="src/companionPages/HarvestLedgerCollector.lua"/>
         <sourceFile filename="src/companionPages/NetWorthTrackerCollector.lua"/>
         <sourceFile filename="src/companionPages/RealLandFinanceCollector.lua"/>

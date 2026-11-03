@@ -4713,5 +4713,22 @@
   "companionPage.vehicleControlAddon.truncated": "Only the first owned vehicles are listed.",
   "companions.live.distributionMonthTitle": "Rolling 24 completed hourly cycles for this farm",
   "companions.live.distributionMonthAsset": "{{asset}} - {{fillType}}: produced {{produced}}, consumed {{consumed}}, distributed {{dist}}, sold {{sold}}",
-  "companions.live.distributionMonthEmpty": "No owned-asset flows were recorded in the rolling 24-cycle window."
+  "companions.live.distributionMonthEmpty": "No owned-asset flows were recorded in the rolling 24-cycle window.",
+  "companions.desc.grainTickets": "Shows this farm's completed grain delivery tickets for the current crop year, with quantity, grade and deductions. The history is bounded and resets each crop year.",
+  "companionPage.grainTickets.title": "Grain Tickets",
+  "companionPage.grainTickets.lead": "Completed delivery tickets recorded for this farm in the current crop year. The mod keeps a bounded history and clears it at the next crop year; these figures are not a full sales ledger.",
+  "companionPage.grainTickets.count": "Tickets",
+  "companionPage.grainTickets.gross": "Recorded gross",
+  "companionPage.grainTickets.deductions": "Recorded deductions",
+  "companionPage.grainTickets.net": "Recorded net",
+  "companionPage.grainTickets.tableTitle": "Grain delivery tickets",
+  "companionPage.grainTickets.crop": "Crop",
+  "companionPage.grainTickets.station": "Sell point",
+  "companionPage.grainTickets.date": "Date",
+  "companionPage.grainTickets.liters": "Quantity",
+  "companionPage.grainTickets.grade": "Grade",
+  "companionPage.grainTickets.deduction": "Deduction",
+  "companionPage.grainTickets.dateValue": "Y{{year}} / P{{period}} / D{{day}}",
+  "companionPage.grainTickets.empty": "No grain delivery tickets recorded for this farm in the current crop year.",
+  "companionPage.grainTickets.truncated": "Only the latest available tickets are listed."
 }

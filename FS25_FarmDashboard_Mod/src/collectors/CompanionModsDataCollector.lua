@@ -298,6 +298,14 @@ local CATALOG = {
         globals = { "CropContractsMod" },
     },
     {
+        id = "grainTickets",
+        title = "Grain Tickets",
+        category = "economy",
+        names = { "FS25_DownCropsAndTickets" },
+        substrings = { "downcropsandtickets" },
+        globals = { "HighWindCropDamage" },
+    },
+    {
         id = "harvestLedger",
         title = "Harvest Ledger",
         category = "fields",

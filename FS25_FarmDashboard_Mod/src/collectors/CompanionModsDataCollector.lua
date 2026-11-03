@@ -474,6 +474,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "baleCapacityMultiplier",
+        title = "Bale Capacity Multiplier",
+        category = "fleet",
+        names = { "FS25_BaleCapacityMultiplier", "KM_78197_Bale_Capacity_Multiplier" },
+        substrings = { "balecapacitymultiplier", "bale_capacity_multiplier" },
+        globals = {},
+    },
+    {
         id = "vehicleControlAddon",
         title = "Vehicle Control Addon",
         category = "fleet",

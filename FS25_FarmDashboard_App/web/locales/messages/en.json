@@ -4746,5 +4746,17 @@
   "companionPage.grainTickets.deduction": "Deduction",
   "companionPage.grainTickets.dateValue": "Y{{year}} / P{{period}} / D{{day}}",
   "companionPage.grainTickets.empty": "No grain delivery tickets recorded for this farm in the current crop year.",
-  "companionPage.grainTickets.truncated": "Only the latest available tickets are listed."
+  "companionPage.grainTickets.truncated": "Only the latest available tickets are listed.",
+  "companions.desc.baleCapacityMultiplier": "Shows the selected capacity multiplier on this farm's balers. It does not count bales produced.",
+  "companionPage.baleCapacityMultiplier.lead": "Current selected bale capacity on balers owned by this farm. This is a setting, not bales produced or stored.",
+  "companionPage.baleCapacityMultiplier.balers": "Owned balers",
+  "companionPage.baleCapacityMultiplier.modified": "Changed from 1x",
+  "companionPage.baleCapacityMultiplier.tableTitle": "Owned baler capacity settings",
+  "companionPage.baleCapacityMultiplier.vehicle": "Baler",
+  "companionPage.baleCapacityMultiplier.multiplier": "Selected multiplier",
+  "companionPage.baleCapacityMultiplier.base": "Base capacity",
+  "companionPage.baleCapacityMultiplier.selected": "Selected capacity",
+  "companionPage.baleCapacityMultiplier.actual": "Current fill-unit capacity",
+  "companionPage.baleCapacityMultiplier.empty": "No owned baler has a readable capacity multiplier yet.",
+  "companionPage.baleCapacityMultiplier.truncated": "Only the first owned balers are listed."
 }

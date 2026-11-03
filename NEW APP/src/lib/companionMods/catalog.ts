@@ -610,6 +610,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "baleCapacityMultiplier",
+    title: "Bale Capacity Multiplier",
+    category: "fleet",
+    descKey: "companions.desc.baleCapacityMultiplier",
+    desc: "Shows the selected capacity multiplier on this farm's balers. It does not count bales produced.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "vehicleControlAddon",
     title: "Vehicle Control Addon",
     category: "fleet",

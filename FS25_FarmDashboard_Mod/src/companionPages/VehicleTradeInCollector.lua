@@ -61,9 +61,11 @@ CompanionPages.register({
                 end
             end
         end
+        local reason = nil
+        if count == 0 then reason = "no-farm-trades" end
         return {
             readState = invalid and "partial" or (count > 0 and "ok" or "settings-only"),
-            reason = count > 0 and nil or "no-farm-trades",
+            reason = reason,
             coverage = truncated and "truncated" or invalid and "partial" or "complete",
             byFarm = { [tostring(farmId)] = { tradeCount = count, totalCredit = totalCredit } },
             rows = rows,

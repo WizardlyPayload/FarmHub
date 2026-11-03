@@ -24,6 +24,7 @@ test("reads only exact-farm completed trade credit without mutating the mod", ()
   const page = runCompanionPage(FILE, SETUP, { farmId: 1 });
   expect(page).toMatchObject({ readState: "ok", coverage: "complete",
     byFarm: { "1": { tradeCount: 2, totalCredit: 60000 } } });
+  expect(page.reason).toBeUndefined();
   expect(page.rows.map((row) => row.vehicle)).toEqual(["Claas Arion", "MF 8570"]);
   expect(page.rows[0]).toMatchObject({ tradeCredit: 18000, baseAppraisal: 20000 });
   expect(JSON.stringify(page)).not.toContain("Foreign tractor");

@@ -4694,5 +4694,20 @@
   "companionPage.roundBalerExtension.off": "Off",
   "companionPage.roundBalerExtension.empty": "No compatible owned baler wrapper has mod state yet.",
   "companionPage.roundBalerExtension.truncated": "Only the first compatible balers are listed.",
-  "companionPage.dieselFuelSystem.oxidation": "Oxidation {{value}}%"
+  "companionPage.dieselFuelSystem.oxidation": "Oxidation {{value}}%",
+  "companions.desc.vehicleControlAddon": "Shows current guidance, spacing, speed limiter and differential choices on vehicles owned by this farm. It does not record driving history.",
+  "companionPage.vehicleControlAddon.lead": "Current Vehicle Control Addon settings on vehicles owned by this farm. These switches and guidance spacing are not driving or fieldwork history.",
+  "companionPage.vehicleControlAddon.vehicles": "Owned VCA vehicles",
+  "companionPage.vehicleControlAddon.guidanceCount": "Guidance on",
+  "companionPage.vehicleControlAddon.limiterCount": "Limiters on",
+  "companionPage.vehicleControlAddon.tableTitle": "Owned vehicle controls",
+  "companionPage.vehicleControlAddon.vehicle": "Vehicle",
+  "companionPage.vehicleControlAddon.guidance": "Guidance",
+  "companionPage.vehicleControlAddon.spacing": "Guidance spacing",
+  "companionPage.vehicleControlAddon.limiter": "Speed limiter",
+  "companionPage.vehicleControlAddon.differential": "Manual differential",
+  "companionPage.vehicleControlAddon.on": "On",
+  "companionPage.vehicleControlAddon.off": "Off",
+  "companionPage.vehicleControlAddon.empty": "No owned vehicle has a readable Vehicle Control Addon state yet.",
+  "companionPage.vehicleControlAddon.truncated": "Only the first owned vehicles are listed."
 }

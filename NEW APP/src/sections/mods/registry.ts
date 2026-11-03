@@ -118,6 +118,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/dieselFuelSystem").then((m) => m.Page) },
   { key: "roundBalerExtension", catalogId: "roundBalerExtension", title: "Round Baler Extension", glyph: "RB", group: "fleet",
     load: () => import("@/sections/mods/roundBalerExtension").then((m) => m.Page) },
+  { key: "vehicleControlAddon", catalogId: "vehicleControlAddon", title: "Vehicle Control Addon", glyph: "VC", group: "fleet",
+    load: () => import("@/sections/mods/vehicleControlAddon").then((m) => m.Page) },
   { key: "vehicleTradeIn", catalogId: "vehicleTradeIn", title: "Vehicle Trade In", glyph: "TI", group: "fleet",
     load: () => import("@/sections/mods/vehicleTradeIn").then((m) => m.Page) },
   { key: "dynamicDealership", catalogId: "dynamicDealership", title: "Dynamic Dealership", glyph: "DD", group: "fleet",

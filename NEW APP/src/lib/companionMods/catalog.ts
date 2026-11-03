@@ -602,6 +602,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "vehicleControlAddon",
+    title: "Vehicle Control Addon",
+    category: "fleet",
+    descKey: "companions.desc.vehicleControlAddon",
+    desc: "Shows current guidance, spacing, speed limiter and differential choices on vehicles owned by this farm. It does not record driving history.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "vehicleTradeIn",
     title: "Vehicle Trade In",
     category: "fleet",

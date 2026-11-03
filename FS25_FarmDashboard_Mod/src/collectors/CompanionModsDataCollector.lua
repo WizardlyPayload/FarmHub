@@ -466,6 +466,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "vehicleControlAddon",
+        title = "Vehicle Control Addon",
+        category = "fleet",
+        names = { "FS25_vehicleControlAddon", "vehicleControlAddon", "KM_82841_Vehicle_Control_Addon_VCA_" },
+        substrings = { "vehiclecontroladdon", "vehicle_control_addon" },
+        globals = { "g_vehicleControlAddon" },
+    },
+    {
         id = "vehicleTradeIn",
         title = "Vehicle Trade In",
         category = "fleet",

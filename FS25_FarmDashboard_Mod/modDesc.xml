@@ -176,6 +176,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/VehicleInspectionHUCollector.lua"/>
         <sourceFile filename="src/companionPages/DieselFuelSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/RoundBalerExtensionCollector.lua"/>
+        <sourceFile filename="src/companionPages/VehicleControlAddonCollector.lua"/>
         <sourceFile filename="src/companionPages/VehicleTradeInCollector.lua"/>
         <sourceFile filename="src/companionPages/DynamicDealershipCollector.lua"/>
         <sourceFile filename="src/companionPages/VeterinarianCollector.lua"/>

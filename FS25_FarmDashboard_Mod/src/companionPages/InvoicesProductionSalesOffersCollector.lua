@@ -69,8 +69,7 @@ CompanionPages.register({
             return tostring(a.product or "") < tostring(b.product or "")
         end)
         return {
-            readState = withheld > 0 and "partial" or posted > 0 and "ok" or "settings-only",
-            reason = posted == 0 and "no-current-owned-offers" or nil,
+            readState = withheld > 0 and "partial" or "ok",
             coverage = truncated and "truncated" or withheld > 0 and "partial" or "complete",
             byFarm = { [tostring(farmId)] = { postedCount = posted, withheldCount = withheld } },
             offers = rows,

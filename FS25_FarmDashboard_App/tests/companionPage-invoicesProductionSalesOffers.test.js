@@ -46,3 +46,23 @@ test("withholds client-side and unavailable invoice registers", () => {
     expect(runCompanionPage(FILE, GAME.replace("return true end, invoicesProductionSalesManager", "return false end, invoicesProductionSalesManager"), { farmId: 1 }).offers).toBeUndefined();
     expect(runCompanionPage(FILE, GAME.replace("integrationAvailable = true", "integrationAvailable = false"), { farmId: 1 }).offers).toBeUndefined();
 });
+
+test("an available empty offer register remains a live reading", () => {
+    const game = `
+        _G.g_modIsLoaded = { FS25_InvoicesProductionSales = true }
+        _G.g_currentMission = {
+            getFarmId = function() return 1 end,
+            getIsServer = function() return true end,
+            invoicesProductionSalesManager = {
+                integrationAvailable = true, offers = {}, productionByUniqueId = {},
+            },
+        }
+    `;
+    const page = runCompanionPage(FILE, game, { farmId: 1 });
+    expect(page).toMatchObject({
+        readState: "ok", coverage: "complete",
+        byFarm: { "1": { postedCount: 0, withheldCount: 0 } },
+    });
+    expect(page.reason).toBeUndefined();
+    expect(page.offers).toEqual({});
+});

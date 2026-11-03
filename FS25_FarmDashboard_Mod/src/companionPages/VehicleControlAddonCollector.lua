@@ -35,12 +35,17 @@ CompanionPages.register({
                     if spec.snapIsOn then guidanceOn = guidanceOn + 1 end
                     if spec.speedLimiter then limiterOn = limiterOn + 1 end
                     if #rows < MAX_ROWS then
+                        local quarterTurnGuidanceOn = nil
+                        if type(spec.snapEvery90) == "boolean" then
+                            quarterTurnGuidanceOn = spec.snapEvery90
+                        end
                         rows[#rows + 1] = {
                             farmId = farmId,
                             vehicleId = ctx.clip(vehicle.uniqueId or vehicle.id, 64),
                             vehicle = ctx.clip(ctx.call(vehicle, "getFullName") or ctx.call(vehicle, "getName"), 70),
                             guidanceOn = spec.snapIsOn,
                             guidanceSpacingM = spacing >= 0.25 and spacing or nil,
+                            quarterTurnGuidanceOn = quarterTurnGuidanceOn,
                             speedLimiterOn = spec.speedLimiter,
                             manualDifferential = spec.diffManual,
                         }

@@ -4704,6 +4704,7 @@
   "companionPage.vehicleControlAddon.vehicle": "Vehicle",
   "companionPage.vehicleControlAddon.guidance": "Guidance",
   "companionPage.vehicleControlAddon.spacing": "Guidance spacing",
+  "companionPage.vehicleControlAddon.quarterTurn": "90° lane turns",
   "companionPage.vehicleControlAddon.limiter": "Speed limiter",
   "companionPage.vehicleControlAddon.differential": "Manual differential",
   "companionPage.vehicleControlAddon.on": "On",

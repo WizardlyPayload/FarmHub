@@ -11,6 +11,7 @@ type VehicleRow = {
   vehicle?: string;
   guidanceOn?: boolean;
   guidanceSpacingM?: number;
+  quarterTurnGuidanceOn?: boolean;
   speedLimiterOn?: boolean;
   manualDifferential?: boolean;
 };
@@ -34,6 +35,7 @@ export function Page({ entry }: CompanionPageProps) {
             { key: "vehicle", label: tOr("companionPage.vehicleControlAddon.vehicle", "Vehicle") },
             { key: "guidance", label: tOr("companionPage.vehicleControlAddon.guidance", "Guidance") },
             { key: "spacing", label: tOr("companionPage.vehicleControlAddon.spacing", "Guidance spacing"), align: "end" },
+            { key: "quarterTurn", label: tOr("companionPage.vehicleControlAddon.quarterTurn", "90° lane turns") },
             { key: "limiter", label: tOr("companionPage.vehicleControlAddon.limiter", "Speed limiter") },
             { key: "differential", label: tOr("companionPage.vehicleControlAddon.differential", "Manual differential") },
           ]}
@@ -43,6 +45,7 @@ export function Page({ entry }: CompanionPageProps) {
               vehicle: row.vehicle || "—",
               guidance: row.guidanceOn === true ? yes : no,
               spacing: num(row.guidanceSpacingM) === null ? "—" : `${formatNumber(row.guidanceSpacingM, 2)} m`,
+              quarterTurn: typeof row.quarterTurnGuidanceOn === "boolean" ? (row.quarterTurnGuidanceOn ? yes : no) : "—",
               limiter: row.speedLimiterOn === true ? yes : no,
               differential: row.manualDifferential === true ? yes : no,
             },

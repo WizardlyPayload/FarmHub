@@ -9,10 +9,10 @@ const SETUP = `
   _G.g_currentMission = { getIsServer = function() return true end,
     vehicleSystem = { vehicles = {
       { ownerFarmId = 1, uniqueId = "owned-on", getFullName = function() return "Owned tractor" end,
-        spec_vca = { isInitialized = true, snapIsOn = true, snapDistance = 6.2,
+        spec_vca = { isInitialized = true, snapIsOn = true, snapDistance = 6.2, snapEvery90 = true,
           speedLimiter = true, diffManual = false, keepSpeed = 42 } },
       { ownerFarmId = 1, uniqueId = "owned-off", getFullName = function() return "Owned combine" end,
-        spec_vca = { isInitialized = true, snapIsOn = false, snapDistance = 0,
+        spec_vca = { isInitialized = true, snapIsOn = false, snapDistance = 0, snapEvery90 = false,
           speedLimiter = false, diffManual = true } },
       { ownerFarmId = 2, uniqueId = "foreign", spec_vca = { isInitialized = true,
         snapIsOn = true, snapDistance = 9, speedLimiter = true, diffManual = true } },
@@ -27,10 +27,10 @@ test("reads current VCA choices only for ready owned vehicles", () => {
     byFarm: { "1": { vehicleCount: 2, guidanceOnCount: 1, speedLimiterOnCount: 1 } } });
   expect(page.rows).toHaveLength(2);
   expect(page.rows.find((row) => row.vehicleId === "owned-on"))
-    .toMatchObject({ guidanceOn: true, guidanceSpacingM: 6.2,
+    .toMatchObject({ guidanceOn: true, guidanceSpacingM: 6.2, quarterTurnGuidanceOn: true,
       speedLimiterOn: true, manualDifferential: false });
   expect(page.rows.find((row) => row.vehicleId === "owned-off"))
-    .toMatchObject({ guidanceOn: false, speedLimiterOn: false, manualDifferential: true });
+    .toMatchObject({ guidanceOn: false, quarterTurnGuidanceOn: false, speedLimiterOn: false, manualDifferential: true });
   expect(JSON.stringify(page)).not.toMatch(/foreign|unready|keepSpeed|guidanceSpacingM":0/);
   const merged = normalizeCompanionPages({ pages: { vehicleControlAddon: page } }, { modules: loadModules() });
   expect(merged.pages.vehicleControlAddon.rows).toHaveLength(2);

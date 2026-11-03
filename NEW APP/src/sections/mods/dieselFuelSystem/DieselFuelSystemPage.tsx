@@ -55,7 +55,7 @@ export function Page({ entry }: CompanionPageProps) {
                 ? tOr("companionPage.dieselFuelSystem.noFilter", "Filter missing")
                 : row.airInLine
                   ? tOr("companionPage.dieselFuelSystem.airPresent", "Air in line")
-                  : num(row.oxidationPct) === null ? "—" : tOr("companionPage.dieselFuelSystem.oxidation", "Oxidation {{value}}%", { value: formatNumber(row.oxidationPct, 1) }),
+                  : num(row.oxidationPct) === null ? "—" : tOr("companionPage.dieselFuelSystem.oxidation", "Oxidation {{value}}%", { value: formatNumber(row.oxidationPct, 2) }),
             },
           }))}
           empty={tOr("companionPage.dieselFuelSystem.empty", "No applicable owned diesel vehicle has mod fuel state yet.")}

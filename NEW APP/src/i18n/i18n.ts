@@ -152,18 +152,21 @@ export function setLocale(code: string): void {
   notify();
 }
 
-export function t(key: string, params?: Record<string, string | number>): string {
-  if (!catalog?.strings) return flatEn[key] ?? key;
-  const row = catalog.strings[key];
-  if (!row || typeof row !== "object") return flatEn[key] ?? key;
-  let text = row[locale] ?? row[FALLBACK] ?? flatEn[key] ?? key;
-  if (text == null || text === "") text = flatEn[key] ?? key;
-  if (params && typeof text === "string") {
-    for (const [k, v] of Object.entries(params)) {
-      text = text.split(`{{${k}}}`).join(String(v));
-    }
+function interpolate(text: string, params?: Record<string, string | number>): string {
+  if (!params) return text;
+  for (const [key, value] of Object.entries(params)) {
+    text = text.split(`{{${key}}}`).join(String(value));
   }
   return text;
+}
+
+export function t(key: string, params?: Record<string, string | number>): string {
+  if (!catalog?.strings) return interpolate(flatEn[key] ?? key, params);
+  const row = catalog.strings[key];
+  if (!row || typeof row !== "object") return interpolate(flatEn[key] ?? key, params);
+  let text = row[locale] ?? row[FALLBACK] ?? flatEn[key] ?? key;
+  if (text == null || text === "") text = flatEn[key] ?? key;
+  return interpolate(text, params);
 }
 
 export function tOr(
@@ -172,7 +175,7 @@ export function tOr(
   params?: Record<string, string | number>
 ): string {
   const out = t(key, params);
-  if (out === key || out == null || out === "") return fallback;
+  if (out === key || out == null || out === "") return interpolate(fallback, params);
   return out;
 }
 

@@ -4693,5 +4693,6 @@
   "companionPage.roundBalerExtension.on": "On",
   "companionPage.roundBalerExtension.off": "Off",
   "companionPage.roundBalerExtension.empty": "No compatible owned baler wrapper has mod state yet.",
-  "companionPage.roundBalerExtension.truncated": "Only the first compatible balers are listed."
+  "companionPage.roundBalerExtension.truncated": "Only the first compatible balers are listed.",
+  "companionPage.dieselFuelSystem.oxidation": "Oxidation {{value}}%"
 }

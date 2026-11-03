@@ -4665,5 +4665,17 @@
   ,"companionPage.productionRevamp.mixMode": "Ingredient choice"
   ,"companionPage.productionRevamp.boostMode": "Booster choice"
   ,"companionPage.productionRevamp.recipeEmpty": "No owned production has a recipe with a selectable ingredient or booster mode."
-  ,"companionPage.productionRevamp.recipeNote": "ASC picks the first eligible option; DESC the last. MOST and LEAST use available stock for ingredients and boost factor for boosters. These selections do not prove consumption or production."
+  ,"companionPage.productionRevamp.recipeNote": "ASC picks the first eligible option; DESC the last. MOST and LEAST use available stock for ingredients and boost factor for boosters. These selections do not prove consumption or production.",
+  "companions.desc.enhancedVehicle": "Shows EnhancedVehicle's own odometer and trip readings for this farm's vehicles, separately from Vehicle Mileage.",
+  "companionPage.enhancedVehicle.title": "EnhancedVehicle",
+  "companionPage.enhancedVehicle.lead": "EnhancedVehicle's own saved odometer and trip readings for vehicles this farm currently owns. They are separate from Vehicle Mileage and cannot be added to it.",
+  "companionPage.enhancedVehicle.tracked": "Vehicles tracked",
+  "companionPage.enhancedVehicle.tableTitle": "EnhancedVehicle distance register",
+  "companionPage.enhancedVehicle.vehicle": "Vehicle",
+  "companionPage.enhancedVehicle.odo": "Odometer",
+  "companionPage.enhancedVehicle.trip": "Trip",
+  "companionPage.enhancedVehicle.hud": "HUD selection",
+  "companionPage.enhancedVehicle.km": "{{value}} km",
+  "companionPage.enhancedVehicle.empty": "No EnhancedVehicle odometer is readable for this farm yet.",
+  "companionPage.enhancedVehicle.truncated": "Only the first tracked vehicles are listed."
 }

@@ -4677,5 +4677,21 @@
   "companionPage.enhancedVehicle.hud": "HUD selection",
   "companionPage.enhancedVehicle.km": "{{value}} km",
   "companionPage.enhancedVehicle.empty": "No EnhancedVehicle odometer is readable for this farm yet.",
-  "companionPage.enhancedVehicle.truncated": "Only the first tracked vehicles are listed."
+  "companionPage.enhancedVehicle.truncated": "Only the first tracked vehicles are listed.",
+  "companions.desc.roundBalerExtension": "Shows the current drop mode and wrapper state of compatible balers owned by this farm. It does not count bales made.",
+  "companionPage.roundBalerExtension.lead": "Current drop mode and wrapper switch on compatible balers owned by this farm. Collect mode is an operating choice, not a lifetime bale count.",
+  "companionPage.roundBalerExtension.wrappers": "Owned wrappers",
+  "companionPage.roundBalerExtension.collectCount": "In collect mode",
+  "companionPage.roundBalerExtension.inactiveCount": "Wrappers off",
+  "companionPage.roundBalerExtension.tableTitle": "Owned baler wrappers",
+  "companionPage.roundBalerExtension.vehicle": "Baler",
+  "companionPage.roundBalerExtension.mode": "Drop mode",
+  "companionPage.roundBalerExtension.active": "Wrapper",
+  "companionPage.roundBalerExtension.manual": "Manual",
+  "companionPage.roundBalerExtension.automatic": "Automatic",
+  "companionPage.roundBalerExtension.collect": "Collect",
+  "companionPage.roundBalerExtension.on": "On",
+  "companionPage.roundBalerExtension.off": "Off",
+  "companionPage.roundBalerExtension.empty": "No compatible owned baler wrapper has mod state yet.",
+  "companionPage.roundBalerExtension.truncated": "Only the first compatible balers are listed."
 }

@@ -594,6 +594,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "roundBalerExtension",
+    title: "Round Baler Extension",
+    category: "fleet",
+    descKey: "companions.desc.roundBalerExtension",
+    desc: "Shows the current drop mode and wrapper state of compatible balers owned by this farm. It does not count bales made.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "vehicleTradeIn",
     title: "Vehicle Trade In",
     category: "fleet",

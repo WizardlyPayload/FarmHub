@@ -458,6 +458,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "roundBalerExtension",
+        title = "Round Baler Extension",
+        category = "fleet",
+        names = { "FS25_roundBalerExtension", "FS25_303389_FS25_roundBalerExtension", "KM_57692_Round_Baler_Extension" },
+        substrings = { "roundbalerextension", "round_baler_extension" },
+        globals = {},
+    },
+    {
         id = "vehicleTradeIn",
         title = "Vehicle Trade In",
         category = "fleet",

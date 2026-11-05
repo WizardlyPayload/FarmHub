@@ -618,6 +618,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "forageWagonCompression",
+    title: "Forage Wagon Compression",
+    category: "fleet",
+    descKey: "companions.desc.forageWagonCompression",
+    desc: "Shows current compression settings and capacities on this farm's forage wagons, not harvested volume.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "vehicleControlAddon",
     title: "Vehicle Control Addon",
     category: "fleet",

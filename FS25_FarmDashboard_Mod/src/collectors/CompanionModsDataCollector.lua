@@ -482,6 +482,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "forageWagonCompression",
+        title = "Forage Wagon Compression",
+        category = "fleet",
+        names = { "FS25_ForageWagonCompression", "FS25_375007_Forage_Wagon_Compression", "KM_82574_Forage_Wagon_Compression" },
+        substrings = { "foragewagoncompression", "forage_wagon_compression" },
+        globals = {},
+    },
+    {
         id = "vehicleControlAddon",
         title = "Vehicle Control Addon",
         category = "fleet",

@@ -4758,5 +4758,20 @@
   "companionPage.baleCapacityMultiplier.selected": "Selected capacity",
   "companionPage.baleCapacityMultiplier.actual": "Current fill-unit capacity",
   "companionPage.baleCapacityMultiplier.empty": "No owned baler has a readable capacity multiplier yet.",
-  "companionPage.baleCapacityMultiplier.truncated": "Only the first owned balers are listed."
+  "companionPage.baleCapacityMultiplier.truncated": "Only the first owned balers are listed.",
+  "companions.desc.forageWagonCompression": "Shows current compression settings and capacities on this farm's forage wagons, not harvested volume.",
+  "companionPage.forageWagonCompression.lead": "Current compression setting and capacity on forage wagons owned by this farm. These are capacities, not harvested volume.",
+  "companionPage.forageWagonCompression.wagons": "Owned wagons",
+  "companionPage.forageWagonCompression.active": "Compression on",
+  "companionPage.forageWagonCompression.tableTitle": "Owned forage wagons",
+  "companionPage.forageWagonCompression.vehicle": "Wagon",
+  "companionPage.forageWagonCompression.state": "Compression",
+  "companionPage.forageWagonCompression.base": "Base capacity",
+  "companionPage.forageWagonCompression.compressed": "Expanded capacity",
+  "companionPage.forageWagonCompression.current": "Current capacity",
+  "companionPage.forageWagonCompression.fill": "Current load",
+  "companionPage.forageWagonCompression.on": "On",
+  "companionPage.forageWagonCompression.off": "Off",
+  "companionPage.forageWagonCompression.empty": "No owned forage wagon has readable compression state yet.",
+  "companionPage.forageWagonCompression.truncated": "Only the first owned wagons are listed."
 }

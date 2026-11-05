@@ -4860,4 +4860,14 @@
   "companionPage.mobileButcherMeatPickup.tableTitle": "Meat Pickup queue",
   "companionPage.mobileButcherMeatPickup.truncated": "Only the first queued meat types are listed.",
   "companionPage.mobileButcherMeatPickup.types": "Meat types awaiting pickup"
+  ,"companionPage.economicHistory.title": "Economic History"
+  ,"companionPage.economicHistory.lead": "Completed monthly finance records saved by Economic History for this farm. Finance total is the mod's sum of finance categories, not a profit figure. The latest balance and loan balance are recorded snapshots."
+  ,"companionPage.economicHistory.months": "Recorded months"
+  ,"companionPage.economicHistory.tableTitle": "Recorded monthly finances"
+  ,"companionPage.economicHistory.period": "Year / period"
+  ,"companionPage.economicHistory.total": "Finance total"
+  ,"companionPage.economicHistory.balance": "Closing balance"
+  ,"companionPage.economicHistory.loan": "Loan balance"
+  ,"companionPage.economicHistory.empty": "No completed month has been recorded for this farm yet."
+  ,"companionPage.economicHistory.truncated": "Only the latest recorded months are listed."
 }

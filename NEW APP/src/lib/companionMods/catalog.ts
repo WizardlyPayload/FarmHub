@@ -602,6 +602,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "hireAWorker",
+    title: "Hire A Worker",
+    category: "fields",
+    descKey: "companions.desc.hireAWorker",
+    desc: "Tracks farm-owned contractor field jobs and recent job history. FarmHub reads the register without starting, stopping or charging jobs.",
+    relatedSection: "fields",
+  },
+  {
     id: "dieselFuelSystem",
     title: "Diesel Fuel System",
     category: "fleet",

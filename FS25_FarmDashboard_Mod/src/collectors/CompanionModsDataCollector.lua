@@ -474,6 +474,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "hireAWorker",
+        title = "Hire A Worker",
+        category = "fields",
+        names = { "KM_82196_Hire_A_Worker", "FS25_Hire_A_Worker", "FS25_HireAWorker" },
+        substrings = { "hire_a_worker", "hireaworker" },
+        globals = { "g_hireAWorker" },
+    },
+    {
         id = "dieselFuelSystem",
         title = "Diesel Fuel System",
         category = "fleet",

@@ -173,6 +173,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/VehicleYearsCollector.lua"/>
         <sourceFile filename="src/companionPages/AdvancedMaintenanceCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticMechanicalSystemsCollector.lua"/>
+        <sourceFile filename="src/companionPages/HireAWorkerCollector.lua"/>
         <sourceFile filename="src/companionPages/CollisionDamageCollector.lua"/>
         <sourceFile filename="src/companionPages/PuncturedTiresCollector.lua"/>
         <sourceFile filename="src/companionPages/VehicleInspectionHUCollector.lua"/>

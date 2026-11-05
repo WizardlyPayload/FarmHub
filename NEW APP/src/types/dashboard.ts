@@ -239,6 +239,11 @@ export interface RealisticFarmingPayload {
   };
   worldEvents?: {
     enabled: boolean;
+    pendingReadState?: "ok" | "unavailable";
+    pendingByFarm?: Record<string, {
+      lines: { event?: string; amount: number; queuedDay: number }[];
+      truncated?: boolean;
+    }>;
     frequency?: number | null;
     intensity?: number | null;
     eventTypeCount?: number | null;

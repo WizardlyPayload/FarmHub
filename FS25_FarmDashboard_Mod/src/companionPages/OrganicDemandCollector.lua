@@ -36,8 +36,15 @@ CompanionPages.register({
                     local saved = mod.persistedSelectionsByUniqueId[uniqueId]
                     local selection = type(live) == "table" and live or saved
                     if type(selection) == "table" then
-                        local crop = type(selection.name) == "string" and selection.name or nil
+                        local crop = type(selection.name) == "string" and string.upper(selection.name) or nil
                         if crop == "" then crop = nil end
+                        -- The mod resolves a persisted crop against this map when
+                        -- a device becomes live. Do not present an unavailable
+                        -- saved crop as an active target.
+                        if live == nil and crop ~= nil then
+                            local known = type(mod.fruitByName) == "table" and mod.fruitByName[crop] or nil
+                            if type(known) ~= "table" then crop = nil end
+                        end
                         local mode = selection.adjustMode
                         local value = ctx.num(selection.adjustValue)
                         if mode ~= "TARGET_MINUS" and mode ~= "MAX_APPLICATION" then

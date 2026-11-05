@@ -12,14 +12,17 @@ const GAME = `
       live,
       { ownerFarmId = 1, uniqueId = "own-saved", getFullName = function() return "Manure applicator" end },
       { ownerFarmId = 1, uniqueId = "own-default" },
+      { ownerFarmId = 1, uniqueId = "own-unavailable-crop" },
       { ownerFarmId = 2, uniqueId = "foreign" },
     } } }
   _G.FS25_DemandOrientedOrganicApplication = { PFOrganicCropDemandUnlock = {
+    fruitByName = { WHEAT = { name = "WHEAT", index = 1 } },
     deviceSelections = { [live] = { name = "WHEAT", adjustMode = "TARGET_MINUS", adjustValue = 35 } },
     persistedSelectionsByUniqueId = {
       ["own-live"] = { name = "WHEAT", adjustMode = "TARGET_MINUS", adjustValue = 35 },
       ["own-saved"] = { name = nil, adjustMode = "MAX_APPLICATION", adjustValue = 50 },
       ["own-default"] = { name = nil, adjustMode = "NONE", adjustValue = 0 },
+      ["own-unavailable-crop"] = { name = "NOT_ON_MAP", adjustMode = "NONE", adjustValue = 0 },
       ["foreign"] = { name = "SECRET", adjustMode = "MAX_APPLICATION", adjustValue = 200 },
       ["sold"] = { name = "BARLEY", adjustMode = "TARGET_MINUS", adjustValue = 100 },
     },
@@ -35,7 +38,7 @@ test("reads nondefault choices for currently owned applicators only", () => {
     .toMatchObject({ targetCrop: "WHEAT", adjustMode: "TARGET_MINUS", adjustKgNPerHa: 35, source: "live" });
   expect(page.rows.find((row) => row.vehicleId === "own-saved"))
     .toMatchObject({ adjustMode: "MAX_APPLICATION", adjustKgNPerHa: 50, source: "saved" });
-  expect(JSON.stringify(page)).not.toMatch(/SECRET|BARLEY|own-default|foreign|sold/);
+  expect(JSON.stringify(page)).not.toMatch(/SECRET|BARLEY|NOT_ON_MAP|own-default|foreign|sold/);
   const merged = normalizeCompanionPages({ pages: { organicDemand: page } }, { modules: loadModules() });
   expect(merged.pages.organicDemand.rows).toHaveLength(2);
 });

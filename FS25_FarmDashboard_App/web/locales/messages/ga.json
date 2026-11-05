@@ -4785,5 +4785,20 @@
   "companionPage.powertrainUpgrade.cap": "Speed cap",
   "companionPage.powertrainUpgrade.capped": "160 km/h cap",
   "companionPage.powertrainUpgrade.empty": "No owned motor has readable Powertrain Upgrade settings yet.",
-  "companionPage.powertrainUpgrade.truncated": "Only the first owned motors are listed."
+  "companionPage.powertrainUpgrade.truncated": "Only the first owned motors are listed.",
+  "companions.desc.variableTirePressure": "Shows live tyre mode and pressure on equipped vehicles owned by this farm.",
+  "companionPage.variableTirePressure.lead": "Current tyre-pressure mode and pressure on equipped vehicles owned by this farm. Mixed-axle pressure is an average. This is not a tyre-wear or work-history reading.",
+  "companionPage.variableTirePressure.equipped": "Equipped vehicles",
+  "companionPage.variableTirePressure.fieldOrMixed": "Field or mixed mode",
+  "companionPage.variableTirePressure.tableTitle": "Owned equipped vehicles",
+  "companionPage.variableTirePressure.vehicle": "Vehicle",
+  "companionPage.variableTirePressure.mode": "Mode",
+  "companionPage.variableTirePressure.current": "Current pressure",
+  "companionPage.variableTirePressure.target": "Target pressure",
+  "companionPage.variableTirePressure.road": "Road",
+  "companionPage.variableTirePressure.field": "Field",
+  "companionPage.variableTirePressure.frontRoad": "Front road / rear field",
+  "companionPage.variableTirePressure.frontField": "Front field / rear road",
+  "companionPage.variableTirePressure.empty": "No equipped owned vehicle has readable tyre pressure yet.",
+  "companionPage.variableTirePressure.truncated": "Only the first equipped owned vehicles are listed."
 }

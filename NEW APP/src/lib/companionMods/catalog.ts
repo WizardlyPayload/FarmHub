@@ -634,6 +634,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "variableTirePressure",
+    title: "Variable Tire Pressure",
+    category: "fleet",
+    descKey: "companions.desc.variableTirePressure",
+    desc: "Shows live tyre mode and pressure on equipped vehicles owned by this farm.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "vehicleControlAddon",
     title: "Vehicle Control Addon",
     category: "fleet",

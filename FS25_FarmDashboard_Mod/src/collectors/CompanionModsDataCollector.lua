@@ -498,6 +498,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "variableTirePressure",
+        title = "Variable Tire Pressure",
+        category = "fleet",
+        names = { "FS25_VariableTirePressure", "FS25_347991_FS25_VariableTirePressure" },
+        substrings = { "variabletirepressure", "variable_tire_pressure" },
+        globals = {},
+    },
+    {
         id = "vehicleControlAddon",
         title = "Vehicle Control Addon",
         category = "fleet",

@@ -1,6 +1,6 @@
 # FS25 vault capability audit
 
-Status: **in progress**, 31 October 2026. This audit reopens the question that the 65-entry companion validation matrix could not answer: whether every vault mod with useful, distinct data has an honest Farm Dashboard reading. The completed matrix is evidence for its tested integrations, not a vault-wide pass.
+Status: **in progress**, last updated 5 November 2026. This audit reopens the question that the 65-entry companion validation matrix could not answer: whether every vault mod with useful, distinct data has an honest Farm Dashboard reading. The completed matrix is evidence for its tested integrations, not a vault-wide pass.
 
 ## Inventory boundary
 

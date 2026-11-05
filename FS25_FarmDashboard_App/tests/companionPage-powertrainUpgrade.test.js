@@ -21,15 +21,37 @@ const SETUP = `
     } } }
 `;
 
-test("reports only valid owned selected levels, without implying actual performance", () => {
+test("separates native selected levels from observed mod levels", () => {
   const page = runCompanionPage(FILE, SETUP, { farmId: 1 });
-  expect(page).toMatchObject({ readState: "ok", coverage: "complete",
-    byFarm: { "1": { motorCount: 2, upgradedCount: 1 } } });
+  expect(page).toMatchObject({ readState: "partial", coverage: "complete",
+    byFarm: { "1": { motorCount: 3, upgradedCount: 2 } },
+    diagnostics: { nativeSelectionCount: 3, runtimeBaseCount: 3, unverifiedSelectionCount: 1 } });
   expect(page.rows.find((row) => row.vehicleId === "tuned"))
-    .toMatchObject({ powerLevel: 2, powerFactor: 1.25, speedLevel: 4, speedFactor: 2 });
-  expect(JSON.stringify(page)).not.toMatch(/foreign|mismatch|horsepower|paid/);
+    .toMatchObject({ powerLevel: 2, powerFactor: 1.25, speedLevel: 4, speedFactor: 2, modStateMatched: true });
+  expect(page.rows.find((row) => row.vehicleId === "mismatch"))
+    .toMatchObject({ powerLevel: 7, speedLevel: 7, modStateMatched: false });
+  expect(JSON.stringify(page)).not.toMatch(/foreign|horsepower|paid/);
   const merged = normalizeCompanionPages({ pages: { powertrainUpgrade: page } }, { modules: loadModules() });
-  expect(merged.pages.powertrainUpgrade.rows).toHaveLength(2);
+  expect(merged.pages.powertrainUpgrade.rows).toHaveLength(3);
+});
+
+test("reads one non-stock native key with the other defaulting to Stock", () => {
+  const oneKey = SETUP.replace("ptuPower = 2, ptuSpeed = 4", "ptuPower = 2")
+    .replace("powerLevel = 2, speedLevel = 4", "powerLevel = 2, speedLevel = 1");
+  const page = runCompanionPage(FILE, oneKey, { farmId: 1 });
+  expect(page.rows.find((row) => row.vehicleId === "tuned"))
+    .toMatchObject({ powerLevel: 2, speedLevel: 1, modStateMatched: true });
+});
+
+test("keeps an owned native selection when transient mod state is unavailable", () => {
+  const withoutSpec = SETUP.replace(
+    "spec_ptuUpgrade = { base = {}, powerLevel = 2, speedLevel = 4, speedWasCapped = false }",
+    "spec_ptuUpgrade = nil"
+  );
+  const page = runCompanionPage(FILE, withoutSpec, { farmId: 1 });
+  expect(page.rows.find((row) => row.vehicleId === "tuned"))
+    .toMatchObject({ powerLevel: 2, speedLevel: 4, modStateMatched: false });
+  expect(page.readState).toBe("partial");
 });
 
 test("withholds client state and absent mod", () => {

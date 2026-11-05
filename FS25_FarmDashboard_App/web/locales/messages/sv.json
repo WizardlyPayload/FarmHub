@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Typ",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Relationer",
+  "rf.npcfavor.sharedRelationships": "Relationer i spelvärlden (delas mellan gårdar)",
   "rf.npcfavor.noRels": "Inga NPC:er har dykt upp än.",
   "rf.npcfavor.colName": "Namn",
   "rf.npcfavor.colValue": "Förmån",

@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Τύπος",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Σχέσεις",
+  "rf.npcfavor.sharedRelationships": "Σχέσεις του κόσμου (κοινές για όλες τις φάρμες)",
   "rf.npcfavor.noRels": "Δεν έχουν εμφανιστεί ακόμα NPCs.",
   "rf.npcfavor.colName": "Ονομα",
   "rf.npcfavor.colValue": "Εύνοια",

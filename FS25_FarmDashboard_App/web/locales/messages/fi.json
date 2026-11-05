@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Tyyppi",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Suhteet",
+  "rf.npcfavor.sharedRelationships": "Pelimaailman suhteet (kaikkien tilojen yhteiset)",
   "rf.npcfavor.noRels": "Yhtään NPC:tä ei ole vielä ilmestynyt.",
   "rf.npcfavor.colName": "Nimi",
   "rf.npcfavor.colValue": "Suosikki",

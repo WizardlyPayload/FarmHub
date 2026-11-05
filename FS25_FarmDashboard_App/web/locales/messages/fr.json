@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Taper",
   "rf.npcfavor.colNpc": "PNJ",
   "rf.npcfavor.relTitle": "Relations",
+  "rf.npcfavor.sharedRelationships": "Relations du monde (partagées entre les fermes)",
   "rf.npcfavor.noRels": "Aucun PNJ n'est apparu pour le moment.",
   "rf.npcfavor.colName": "Nom",
   "rf.npcfavor.colValue": "Service",

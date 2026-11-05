@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Tipo",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Relaciones",
+  "rf.npcfavor.sharedRelationships": "Relaciones del mundo (compartidas entre granjas)",
   "rf.npcfavor.noRels": "Aún no han aparecido PNJ.",
   "rf.npcfavor.colName": "Nombre",
   "rf.npcfavor.colValue": "Favor",

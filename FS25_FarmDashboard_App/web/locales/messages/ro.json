@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Tip",
   "rf.npcfavor.colNpc": "NPC-uri",
   "rf.npcfavor.relTitle": "Relații",
+  "rf.npcfavor.sharedRelationships": "Relații din lumea jocului (comune tuturor fermelor)",
   "rf.npcfavor.noRels": "Niciun NPC nu a apărut încă.",
   "rf.npcfavor.colName": "Nume",
   "rf.npcfavor.colValue": "Favoare",

@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Type",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Relationships",
+  "rf.npcfavor.sharedRelationships": "World relationships (shared across farms)",
   "rf.npcfavor.noRels": "No NPCs spawned yet.",
   "rf.npcfavor.colName": "Name",
   "rf.npcfavor.colValue": "Favor",

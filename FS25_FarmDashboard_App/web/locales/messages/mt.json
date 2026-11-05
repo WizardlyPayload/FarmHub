@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Tip",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Relazzjonijiet",
+  "rf.npcfavor.sharedRelationships": "Relazzjonijiet tad-dinja (kondiviżi bejn il-farms)",
   "rf.npcfavor.noRels": "Għadu ma tfaċċa l-ebda NPC.",
   "rf.npcfavor.colName": "Isem",
   "rf.npcfavor.colValue": "Favur",

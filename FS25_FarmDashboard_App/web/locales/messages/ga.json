@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Cineál",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Caidrimh",
+  "rf.npcfavor.sharedRelationships": "Caidrimh an domhain (roinnte idir feirmeacha)",
   "rf.npcfavor.noRels": "Níor tháinig aon NPCanna chun cinn go fóill.",
   "rf.npcfavor.colName": "Ainm",
   "rf.npcfavor.colValue": "Fabhar",

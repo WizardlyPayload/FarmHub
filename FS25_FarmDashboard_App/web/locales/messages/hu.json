@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Típus",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Kapcsolatok",
+  "rf.npcfavor.sharedRelationships": "Világbeli kapcsolatok (a farmok között megosztva)",
   "rf.npcfavor.noRels": "Még nem jelentek meg NPC-k.",
   "rf.npcfavor.colName": "Név",
   "rf.npcfavor.colValue": "Kedv",

@@ -206,11 +206,10 @@ function RfNpcFavorDataCollector:collectStep(_opts)
         local byFarm = {}
         for _, farmId in ipairs(collectFarmIds()) do
             byFarm[tostring(farmId)] = {
-                relationships = relationships,
                 activeFavors = buildActiveFavors(npcSys, farmId),
             }
         end
-        return { enabled = true, byFarm = byFarm }
+        return { enabled = true, worldRelationships = relationships, byFarm = byFarm }
     end)
 
     if ok and type(payload) == "table" then

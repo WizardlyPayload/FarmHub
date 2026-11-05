@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Тип",
   "rf.npcfavor.colNpc": "НПС",
   "rf.npcfavor.relTitle": "Стосунки",
+  "rf.npcfavor.sharedRelationships": "Стосунки у світі гри (спільні для ферм)",
   "rf.npcfavor.noRels": "Ще не з'явилося жодного NPC.",
   "rf.npcfavor.colName": "Ім'я",
   "rf.npcfavor.colValue": "Послуга",

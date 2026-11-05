@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Tipo",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Relacionamentos",
+  "rf.npcfavor.sharedRelationships": "Relações do mundo (partilhadas entre quintas)",
   "rf.npcfavor.noRels": "Nenhum NPC apareceu ainda.",
   "rf.npcfavor.colName": "Nome",
   "rf.npcfavor.colValue": "Favor",

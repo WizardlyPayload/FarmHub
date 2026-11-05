@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Type",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Relasjoner",
+  "rf.npcfavor.sharedRelationships": "Relasjoner i spillverdenen (delt mellom gårder)",
   "rf.npcfavor.noRels": "Ingen NPC-er har dukket opp ennå.",
   "rf.npcfavor.colName": "Navn",
   "rf.npcfavor.colValue": "Favor",

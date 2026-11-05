@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Tüüp",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Suhted",
+  "rf.npcfavor.sharedRelationships": "Mängumaailma suhted (talude vahel jagatud)",
   "rf.npcfavor.noRels": "Ühtegi NPC-d pole veel tekkinud.",
   "rf.npcfavor.colName": "Nimi",
   "rf.npcfavor.colValue": "Teenimine",

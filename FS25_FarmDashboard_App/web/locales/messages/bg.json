@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Тип",
   "rf.npcfavor.colNpc": "НПК",
   "rf.npcfavor.relTitle": "Връзки",
+  "rf.npcfavor.sharedRelationships": "Отношения в игровия свят (общи за фермите)",
   "rf.npcfavor.noRels": "Все още не са се появили NPC-та.",
   "rf.npcfavor.colName": "Име",
   "rf.npcfavor.colValue": "Благосклонност",

@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Typ",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Vztahy",
+  "rf.npcfavor.sharedRelationships": "Vztahy ve světě hry (sdílené mezi farmami)",
   "rf.npcfavor.noRels": "Zatím se neobjevily žádné NPC postavy.",
   "rf.npcfavor.colName": "Jméno",
   "rf.npcfavor.colValue": "Laskavost",

@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Typ",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Vzťahy",
+  "rf.npcfavor.sharedRelationships": "Vzťahy vo svete hry (spoločné pre farmy)",
   "rf.npcfavor.noRels": "Zatiaľ sa neobjavili žiadne NPC postavy.",
   "rf.npcfavor.colName": "Meno",
   "rf.npcfavor.colValue": "Priazeň",

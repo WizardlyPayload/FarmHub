@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Vrsta",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Razmerja",
+  "rf.npcfavor.sharedRelationships": "Odnosi v svetu igre (skupni vsem kmetijam)",
   "rf.npcfavor.noRels": "Še ni nastal noben NPC.",
   "rf.npcfavor.colName": "Ime",
   "rf.npcfavor.colValue": "Usluga",

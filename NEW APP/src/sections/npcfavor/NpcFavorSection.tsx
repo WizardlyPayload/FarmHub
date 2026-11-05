@@ -39,14 +39,11 @@ export function NpcFavorSection() {
     <div>
       <header class="fd-economy__header">
         <h2>{t("nav.mod.npcfavor")}</h2>
-        <p class="fd-economy__muted">
-          {tOr("rf.npcfavor.lead", "Relationships and active favors for the selected farm.")}
-        </p>
       </header>
 
       <div class="fd-economy__stats">
         <div>
-          <span class="fd-economy__muted">{tOr("rf.npcfavor.relCount", "Relationships")}</span>
+          <span class="fd-economy__muted">{tOr("rf.npcfavor.sharedRelationships", "World relationships (shared across farms)")}</span>
           <strong>{relationships.length}</strong>
         </div>
         <div>
@@ -82,7 +79,7 @@ export function NpcFavorSection() {
         )}
       </Card>
 
-      <Card title={tOr("rf.npcfavor.relTitle", "Relationships")}>
+      <Card title={tOr("rf.npcfavor.sharedRelationships", "World relationships (shared across farms)")}>
         {relationships.length === 0 ? (
           <p class="fd-economy__muted">{tOr("rf.npcfavor.noRels", "No NPCs spawned yet.")}</p>
         ) : (

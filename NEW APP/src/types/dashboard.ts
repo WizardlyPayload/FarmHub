@@ -229,10 +229,11 @@ export interface RealisticFarmingPayload {
   };
   npcFavor?: {
     enabled: boolean;
+    worldRelationships?: { npcId: string; name?: string; value?: number }[];
     byFarm?: Record<
       string,
       {
-        relationships: { npcId: string; name?: string; value?: number }[];
+        relationships?: { npcId: string; name?: string; value?: number }[];
         activeFavors: { id?: string; type?: string; npcId?: string; summary?: string }[];
       }
     >;

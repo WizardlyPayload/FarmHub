@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Typ",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Relacje",
+  "rf.npcfavor.sharedRelationships": "Relacje w świecie gry (wspólne dla gospodarstw)",
   "rf.npcfavor.noRels": "Nie pojawiły się jeszcze żadne NPC-e.",
   "rf.npcfavor.colName": "Nazwa",
   "rf.npcfavor.colValue": "Przychylność",

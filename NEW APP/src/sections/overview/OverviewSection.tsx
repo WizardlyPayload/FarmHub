@@ -68,7 +68,6 @@ import {
   getNpcFavorForFarm,
   getProStaffForFarm,
   getWorldEvents,
-  npcFavorHighlights,
 } from "@/lib/realisticFarming/life";
 import {
   detectedPresenceMods,
@@ -472,20 +471,11 @@ export function OverviewSection() {
     if (modPresence.npcfavor) {
       const favorFarm = getNpcFavorForFarm(payload?.realisticFarming, farmId);
       const activeFavorCount = favorFarm?.activeFavors?.length ?? 0;
-      const highlights = npcFavorHighlights(payload?.realisticFarming, farmId, 1);
       if (activeFavorCount > 0) {
         items.push({
           key: "rf-npcfavor",
           label: tOr("overview.alertNpcFavors", "{{count}} active NPC favors", {
             count: activeFavorCount,
-          }),
-          section: "npcfavor",
-        });
-      } else if (highlights[0]) {
-        items.push({
-          key: "rf-npcfavor-friend",
-          label: tOr("overview.alertNpcFriend", "Strong NPC favor: {{name}}", {
-            name: highlights[0].name || highlights[0].npcId,
           }),
           section: "npcfavor",
         });

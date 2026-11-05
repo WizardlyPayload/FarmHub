@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Type",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Relaties",
+  "rf.npcfavor.sharedRelationships": "Relaties in de spelwereld (gedeeld tussen boerderijen)",
   "rf.npcfavor.noRels": "Er zijn nog geen NPC's verschenen.",
   "rf.npcfavor.colName": "Naam",
   "rf.npcfavor.colValue": "gunst",

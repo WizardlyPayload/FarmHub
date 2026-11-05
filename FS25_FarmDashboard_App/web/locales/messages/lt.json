@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Tipas",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Santykiai",
+  "rf.npcfavor.sharedRelationships": "Žaidimo pasaulio santykiai (bendri visiems ūkiams)",
   "rf.npcfavor.noRels": "Dar neatsirado jokių NPC.",
   "rf.npcfavor.colName": "Vardas",
   "rf.npcfavor.colValue": "Palankumas",

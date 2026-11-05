@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Tip",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Odnosi",
+  "rf.npcfavor.sharedRelationships": "Odnosi u svijetu igre (zajednički farmama)",
   "rf.npcfavor.noRels": "Još se nije pojavio nijedan NPC.",
   "rf.npcfavor.colName": "Ime",
   "rf.npcfavor.colValue": "Milost",

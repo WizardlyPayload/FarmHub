@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Tipo",
   "rf.npcfavor.colNpc": "PNG",
   "rf.npcfavor.relTitle": "Relazioni",
+  "rf.npcfavor.sharedRelationships": "Relazioni del mondo (condivise tra le aziende)",
   "rf.npcfavor.noRels": "Non è ancora comparso alcun PNG.",
   "rf.npcfavor.colName": "Nome",
   "rf.npcfavor.colValue": "Favore",

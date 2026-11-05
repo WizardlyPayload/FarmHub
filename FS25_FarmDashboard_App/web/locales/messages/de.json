@@ -73,6 +73,7 @@
   "rf.npcfavor.colType": "Typ",
   "rf.npcfavor.colNpc": "NPC",
   "rf.npcfavor.relTitle": "Beziehungen",
+  "rf.npcfavor.sharedRelationships": "Beziehungen in der Spielwelt (für alle Höfe gemeinsam)",
   "rf.npcfavor.noRels": "Es sind noch keine NPCs erschienen.",
   "rf.npcfavor.colName": "Name",
   "rf.npcfavor.colValue": "Favorisieren",

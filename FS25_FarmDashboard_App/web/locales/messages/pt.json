@@ -4888,4 +4888,11 @@
   ,"companions.desc.adjustableFillLevelAdvanced": "Lets vehicles select a fill capacity multiplier. FarmHub shows non-stock choices for this farm's vehicles and separates selected from observed capacity; it does not claim filled volume or work."
   ,"companions.desc.organicDemand": "Selects a target crop and nitrogen limit for eligible applicators. FarmHub shows this farm's saved or live choices, not nitrogen applied or yield gained."
   ,"companions.desc.mobileButcherMeatPickup": "Keeps meat promised by an unfinished butcher visit or waiting to become pallets at this farm's pickup. FarmHub does not count completed pallets or sales twice."
+  ,"companions.desc.realisticMechanicalSystems": "Shows maintenance condition, active breakdowns and visible log entries for your farm's machines. Log prices are records, not confirmed payments."
+  ,"companionPage.realisticMechanicalSystems.breakdowns": "Machines with breakdowns"
+  ,"companionPage.realisticMechanicalSystems.logs": "Machines with log entries"
+  ,"companionPage.realisticMechanicalSystems.lead": "Read the current maintenance state of your machines. Log prices are records, not proof of payment."
+  ,"companionPage.realisticMechanicalSystems.tableTitle": "Mechanical condition by machine"
+  ,"companionPage.realisticMechanicalSystems.lastLog": "Last log entry"
+  ,"companionPage.realisticMechanicalSystems.empty": "No owned machine has a captured mechanical reading yet."
 }

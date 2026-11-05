@@ -32,7 +32,7 @@ export function Page({ entry }: CompanionPageProps) {
   const profile = saveProfileFromUnitDisplay(useUnitDisplay());
   const rows = asList<MechanicalRow>(page?.rows).filter((row) => num(row.farmId) === farmId);
   const tiles: ModStatTile[] = farmData ? [
-    { key: "vehicles", label: tOr("companionPage.realisticMechanicalSystems.vehicles", "Machines with readings"), value: formatNumber(farmData.vehicleCount, 0) },
+    { key: "vehicles", label: tOr("companionPage.advancedMaintenance.statMachines", "Machines"), value: formatNumber(farmData.vehicleCount, 0) },
     { key: "breakdowns", label: tOr("companionPage.realisticMechanicalSystems.breakdowns", "Machines with breakdowns"), value: formatNumber(farmData.breakdownVehicleCount, 0) },
     { key: "logs", label: tOr("companionPage.realisticMechanicalSystems.logs", "Machines with log entries"), value: formatNumber(farmData.loggedVehicleCount, 0) },
   ] : [];
@@ -43,10 +43,10 @@ export function Page({ entry }: CompanionPageProps) {
       <Card title={tOr("companionPage.realisticMechanicalSystems.tableTitle", "Mechanical condition by machine")}>
         <ModTable
           columns={[
-            { key: "vehicle", label: tOr("companionPage.realisticMechanicalSystems.vehicle", "Machine") },
-            { key: "condition", label: tOr("companionPage.realisticMechanicalSystems.condition", "Condition"), align: "end" },
-            { key: "service", label: tOr("companionPage.realisticMechanicalSystems.service", "Service"), align: "end" },
-            { key: "breakdowns", label: tOr("companionPage.realisticMechanicalSystems.breakdownsShort", "Breakdowns"), align: "end" },
+            { key: "vehicle", label: tOr("companionPage.advancedMaintenance.colMachine", "Machine") },
+            { key: "condition", label: tOr("vehicles.colCondition", "Condition"), align: "end" },
+            { key: "service", label: tOr("vehicles.adsWsService", "Service"), align: "end" },
+            { key: "breakdowns", label: tOr("vehicles.adsBreakdowns", "Active Breakdowns"), align: "end" },
             { key: "log", label: tOr("companionPage.realisticMechanicalSystems.lastLog", "Last log entry") },
           ]}
           rows={rows.map((row, index) => ({
@@ -58,13 +58,13 @@ export function Page({ entry }: CompanionPageProps) {
               service: percent(row.serviceLevel),
               breakdowns: formatNumber(row.breakdownCount, 0),
               log: row.lastLogType
-                ? `${row.lastLogType.replace(/[_-]+/g, " ")} · ${row.lastLogCompleted === true ? tOr("companionPage.realisticMechanicalSystems.completed", "Completed") : row.lastLogCompleted === false ? tOr("companionPage.realisticMechanicalSystems.open", "Open") : "—"} · ${row.lastLogPrice != null ? formatRfMoney(row.lastLogPrice, profile) : "—"}`
+                ? `${row.lastLogType.replace(/[_-]+/g, " ")} · ${row.lastLogCompleted === true ? tOr("companionPage.cropContracts.completed", "Completed") : row.lastLogCompleted === false ? tOr("companions.field.cycleStates.open", "Open") : "—"} · ${row.lastLogPrice != null ? formatRfMoney(row.lastLogPrice, profile) : "—"}`
                 : "—",
             },
           }))}
           empty={tOr("companionPage.realisticMechanicalSystems.empty", "No owned machine has a captured mechanical reading yet.")}
         />
-        {page?.coverage === "truncated" ? <ModEmpty>{tOr("companionPage.realisticMechanicalSystems.truncated", "Only the first machines are listed.")}</ModEmpty> : null}
+        {page?.coverage === "truncated" ? <ModEmpty>{tOr("companionPage.collisionDamage.truncated", "Only the first machines are listed.")}</ModEmpty> : null}
       </Card>
     </ModPage>
   );

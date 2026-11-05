@@ -10,7 +10,10 @@ const GAME = `
     { ownerFarmId = 1, uniqueId = "owned", getFullName = function() return "My tractor" end,
       spec_RealisticMechanicalSystems = { serviceLevel = 0.6, conditionLevel = 0.8,
         activeBreakdowns = { engine = {}, hydraulic = {} },
-        maintenanceLog = { { type = "INSPECTION", price = 75, isCompleted = true } },
+        maintenanceLog = {
+          { type = "INSPECTION", price = 75, isCompleted = true },
+          { type = "HIDDEN_INTERNAL", price = 999, isVisible = "false" },
+        },
       },
       saveToXMLFile = function() error("must not save") end,
       updateThermalSystems = function() error("must not update") end },

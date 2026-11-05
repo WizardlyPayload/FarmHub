@@ -16,6 +16,18 @@ local function countEntries(value)
     return n
 end
 
+-- Match the mod's maintenance dialog: hidden bookkeeping entries are not log rows.
+local function logEntryVisible(entry)
+    if type(entry) ~= "table" then return false end
+    local value = entry.isVisible
+    if value == nil then return true end
+    if type(value) == "string" then
+        local lowered = string.lower(value)
+        return lowered ~= "false" and lowered ~= "0" and lowered ~= "off" and lowered ~= "no"
+    end
+    return value ~= false
+end
+
 CompanionPages.register({
     key = "realisticMechanicalSystems",
     modNames = { "FS25_RealisticMechanicalSystems", "GH_Squallqt__FS25_RealisticMechanicalSystems_FS25_RealisticMechanicalSystems" },
@@ -41,11 +53,16 @@ CompanionPages.register({
                     captured = captured + 1
                     local breakdownCount = countEntries(spec.activeBreakdowns)
                     local log = type(spec.maintenanceLog) == "table" and spec.maintenanceLog or {}
-                    local logCount = #log
+                    local logCount, last = 0, nil
+                    for _, entry in ipairs(log) do
+                        if logEntryVisible(entry) then
+                            logCount = logCount + 1
+                            last = entry
+                        end
+                    end
                     if breakdownCount > 0 then withBreakdowns = withBreakdowns + 1 end
                     if logCount > 0 then withLog = withLog + 1 end
                     if #rows < MAX_ROWS then
-                        local last = log[logCount]
                         local lastCompleted = nil
                         if type(last) == "table" and type(last.isCompleted) == "boolean" then
                             lastCompleted = last.isCompleted

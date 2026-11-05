@@ -122,6 +122,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/puncturedTires").then((m) => m.Page) },
   { key: "vehicleInspectionHU", catalogId: "vehicleInspectionHU", title: "Vehicle Inspection (HU)", glyph: "HU", group: "fleet",
     load: () => import("@/sections/mods/vehicleInspectionHU").then((m) => m.Page) },
+  { key: "realisticMechanicalSystems", catalogId: "realisticMechanicalSystems", title: "Realistic Mechanical Systems", glyph: "MS", group: "fleet",
+    load: () => import("@/sections/mods/realisticMechanicalSystems").then((m) => m.Page) },
   { key: "dieselFuelSystem", catalogId: "dieselFuelSystem", title: "Diesel Fuel System", glyph: "DF", group: "fleet",
     load: () => import("@/sections/mods/dieselFuelSystem").then((m) => m.Page) },
   { key: "roundBalerExtension", catalogId: "roundBalerExtension", title: "Round Baler Extension", glyph: "RB", group: "fleet",

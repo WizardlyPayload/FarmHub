@@ -1,0 +1,40 @@
+"use strict";
+
+const { runCompanionPage } = require("./helpers/companion-page-lua.cjs");
+const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge.cjs");
+
+const FILE = "RealisticMechanicalSystemsCollector.lua";
+const GAME = `
+  _G.g_modIsLoaded = { FS25_RealisticMechanicalSystems = true }
+  _G.g_currentMission = { vehicleSystem = { vehicles = {
+    { ownerFarmId = 1, uniqueId = "owned", getFullName = function() return "My tractor" end,
+      spec_RealisticMechanicalSystems = { serviceLevel = 0.6, conditionLevel = 0.8,
+        activeBreakdowns = { engine = {}, hydraulic = {} },
+        maintenanceLog = { { type = "INSPECTION", price = 75, isCompleted = true } },
+      },
+      saveToXMLFile = function() error("must not save") end,
+      updateThermalSystems = function() error("must not update") end },
+    { ownerFarmId = 2, uniqueId = "foreign", getFullName = function() return "Neighbour" end,
+      spec_RealisticMechanicalSystems = { serviceLevel = 0.1, conditionLevel = 0.1,
+        maintenanceLog = { { type = "REPAIR", price = 500 } } } },
+    { ownerFarmId = 1, uniqueId = "new", spec_RealisticMechanicalSystems = { isNewToRMS = true } },
+  } } }
+`;
+
+test("reads only captured owned machines without updating the mod or treating log price as a payment", () => {
+  const page = runCompanionPage(FILE, GAME, { farmId: 1 });
+  expect(page.readState).toBe("ok");
+  expect(page.byFarm["1"]).toMatchObject({ vehicleCount: 1, breakdownVehicleCount: 1, loggedVehicleCount: 1 });
+  expect(page.rows).toHaveLength(1);
+  expect(page.rows[0]).toMatchObject({
+    vehicleId: "owned", serviceLevel: 0.6, conditionLevel: 0.8,
+    breakdownCount: 2, logCount: 1, lastLogType: "INSPECTION", lastLogPrice: 75,
+    lastLogCompleted: true,
+  });
+  const merged = normalizeCompanionPages({ pages: { realisticMechanicalSystems: page } }, { modules: loadModules() });
+  expect(merged.pages.realisticMechanicalSystems.rows).toHaveLength(1);
+});
+
+test("without the exact mod, no page is emitted", () => {
+  expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", { farmId: 1 })).toBeUndefined();
+});

@@ -466,6 +466,14 @@ local CATALOG = {
         globals = { "g_huManager" },
     },
     {
+        id = "realisticMechanicalSystems",
+        title = "Realistic Mechanical Systems",
+        category = "fleet",
+        names = { "FS25_RealisticMechanicalSystems", "GH_Squallqt__FS25_RealisticMechanicalSystems_FS25_RealisticMechanicalSystems" },
+        substrings = { "realisticmechanicalsystems" },
+        globals = {},
+    },
+    {
         id = "dieselFuelSystem",
         title = "Diesel Fuel System",
         category = "fleet",

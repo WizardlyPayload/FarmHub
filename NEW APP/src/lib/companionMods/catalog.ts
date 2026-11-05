@@ -594,6 +594,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "realisticMechanicalSystems",
+    title: "Realistic Mechanical Systems",
+    category: "fleet",
+    descKey: "companions.desc.realisticMechanicalSystems",
+    desc: "Tracks vehicle systems, service, breakdowns and maintenance records. FarmHub reads only your current machines and does not treat log prices as paid bills.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "dieselFuelSystem",
     title: "Diesel Fuel System",
     category: "fleet",

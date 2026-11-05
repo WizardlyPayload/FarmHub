@@ -39,6 +39,22 @@ test("withholds the client register", () => {
   expect(page).toMatchObject({ readState: "settings-only", reason: "server-only" });
 });
 
+test("switching farms exposes only that farm's jobs and history", () => {
+  const page = runCompanionPage(FILE, GAME, { farmId: 2 });
+  expect(page.byFarm["2"]).toMatchObject({ activeFieldJobCount: 1, historyCount: 1 });
+  expect(page.activeFieldJobs.map((row) => row.farmlandId)).toEqual([40]);
+  expect(page.history.map((row) => row.work)).toEqual(["Secret"]);
+});
+
+test("does not use a manager planted in the shared engine environment", () => {
+  const page = runCompanionPage(FILE, `
+    _G.g_modIsLoaded = { KM_82196_Hire_A_Worker = true }
+    _G.g_server = {}
+    _G.g_hireAWorker = { activeJobsByFarmlandId = { [99] = { farmId = 1 } }, jobHistoryEntries = {} }
+  `, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "settings-only", reason: "no-job-register" });
+});
+
 test("no loaded mod produces no page", () => {
   expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", { farmId: 1 })).toBeUndefined();
 });

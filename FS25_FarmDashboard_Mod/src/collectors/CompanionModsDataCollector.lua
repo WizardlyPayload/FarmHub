@@ -402,6 +402,14 @@ local CATALOG = {
         globals = { "realSiloManager" },
     },
     {
+        id = "mobileButcherMeatPickup",
+        title = "Mobile Butcher Meat Pickup",
+        category = "storage",
+        names = { "FS25_MobileButcher", "KM_81657_Mobile_Butcher_for_quot_Realistic_Livestock_quot_mod_" },
+        substrings = { "mobilebutcher", "mobile_butcher_for_quot_realistic_livestock" },
+        globals = {},
+    },
+    {
         id = "baleBatchTracker",
         title = "Bale Batch Tracker",
         category = "storage",

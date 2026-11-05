@@ -87,6 +87,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/palletDegradation").then((m) => m.Page) },
   { key: "realSilo", catalogId: "realSilo", title: "RealSilo", glyph: "RS", group: "storage",
     load: () => import("@/sections/mods/realSilo").then((m) => m.Page) },
+  { key: "mobileButcherMeatPickup", catalogId: "mobileButcherMeatPickup", title: "Mobile Butcher Meat Pickup", glyph: "MB", group: "storage",
+    load: () => import("@/sections/mods/mobileButcherMeatPickup").then((m) => m.Page) },
   { key: "baleBatchTracker", catalogId: "baleBatchTracker", title: "Bale Batch Tracker", glyph: "BB", group: "storage",
     load: () => import("@/sections/mods/baleBatchTracker").then((m) => m.Page) },
   // Construction

@@ -182,6 +182,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/CapacityUpgradeCollector.lua"/>
         <sourceFile filename="src/companionPages/VariableTirePressureCollector.lua"/>
         <sourceFile filename="src/companionPages/OrganicDemandCollector.lua"/>
+        <sourceFile filename="src/companionPages/AdjustableFillLevelAdvancedCollector.lua"/>
         <sourceFile filename="src/companionPages/VehicleControlAddonCollector.lua"/>
         <sourceFile filename="src/companionPages/AdvancedVehicleFunctionsCollector.lua"/>
         <sourceFile filename="src/companionPages/VehicleTradeInCollector.lua"/>

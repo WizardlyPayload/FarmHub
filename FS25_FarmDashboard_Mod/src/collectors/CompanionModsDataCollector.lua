@@ -514,6 +514,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "adjustableFillLevelAdvanced",
+        title = "Adjustable Fill Level Advanced",
+        category = "fleet",
+        names = { "FS25_adjustableFillLevelAdvanced", "FS25_367048_FS25_adjustableFillLevelAdvanced" },
+        substrings = { "adjustablefillleveladvanced" },
+        globals = {},
+    },
+    {
         id = "organicDemand",
         title = "Demand-Oriented Organic Application",
         category = "fleet",

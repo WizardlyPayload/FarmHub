@@ -132,6 +132,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/variableTirePressure").then((m) => m.Page) },
   { key: "organicDemand", catalogId: "organicDemand", title: "Demand-Oriented Organic Application", glyph: "OD", group: "fleet",
     load: () => import("@/sections/mods/organicDemand").then((m) => m.Page) },
+  { key: "adjustableFillLevelAdvanced", catalogId: "adjustableFillLevelAdvanced", title: "Adjustable Fill Level Advanced", glyph: "AF", group: "fleet",
+    load: () => import("@/sections/mods/adjustableFillLevelAdvanced").then((m) => m.Page) },
   { key: "vehicleControlAddon", catalogId: "vehicleControlAddon", title: "Vehicle Control Addon", glyph: "VC", group: "fleet",
     load: () => import("@/sections/mods/vehicleControlAddon").then((m) => m.Page) },
   { key: "advancedVehicleFunctions", catalogId: "advancedVehicleFunctions", title: "Advanced Vehicle Functions", glyph: "AV", group: "fleet",

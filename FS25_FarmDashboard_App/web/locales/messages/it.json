@@ -4800,5 +4800,21 @@
   "companionPage.variableTirePressure.frontRoad": "Front road / rear field",
   "companionPage.variableTirePressure.frontField": "Front field / rear road",
   "companionPage.variableTirePressure.empty": "No equipped owned vehicle has readable tyre pressure yet.",
-  "companionPage.variableTirePressure.truncated": "Only the first equipped owned vehicles are listed."
+  "companionPage.variableTirePressure.truncated": "Only the first equipped owned vehicles are listed.",
+  "companions.desc.capacityUpgrade": "Shows applied capacity or slower-use upgrades on this farm's vehicles, not purchase or usage history.",
+  "companionPage.capacityUpgrade.lead": "Applied Capacity Upgrade choices on vehicles owned by this farm. Some units gain capacity; others retain their tank size and use supplies more slowly. These are current settings, not a usage or purchase history.",
+  "companionPage.capacityUpgrade.vehicles": "Owned upgraded vehicles",
+  "companionPage.capacityUpgrade.capacityUnits": "Larger fill units",
+  "companionPage.capacityUpgrade.slowedUnits": "Slower-use units",
+  "companionPage.capacityUpgrade.tableTitle": "Applied fill-unit upgrades",
+  "companionPage.capacityUpgrade.vehicle": "Vehicle",
+  "companionPage.capacityUpgrade.unit": "Fill unit",
+  "companionPage.capacityUpgrade.choice": "Selected choice",
+  "companionPage.capacityUpgrade.effect": "Applied effect",
+  "companionPage.capacityUpgrade.stock": "Stock capacity",
+  "companionPage.capacityUpgrade.current": "Current capacity",
+  "companionPage.capacityUpgrade.slowerUse": "Slower use; tank unchanged",
+  "companionPage.capacityUpgrade.largerTank": "Larger capacity",
+  "companionPage.capacityUpgrade.empty": "No applied Capacity Upgrade found on vehicles owned by this farm.",
+  "companionPage.capacityUpgrade.truncated": "Only the first applied fill units are listed."
 }

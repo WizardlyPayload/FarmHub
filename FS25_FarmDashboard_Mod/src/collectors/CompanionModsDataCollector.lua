@@ -498,6 +498,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "capacityUpgrade",
+        title = "Capacity Upgrade",
+        category = "fleet",
+        names = { "FS25_CapacityUpgrade", "FS25_373637_Capacity_Upgrade", "KM_83362_Capacity_Upgrade" },
+        substrings = { "capacityupgrade", "capacity_upgrade" },
+        globals = {},
+    },
+    {
         id = "variableTirePressure",
         title = "Variable Tire Pressure",
         category = "fleet",

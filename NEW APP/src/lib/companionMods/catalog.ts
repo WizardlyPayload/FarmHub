@@ -634,6 +634,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "capacityUpgrade",
+    title: "Capacity Upgrade",
+    category: "fleet",
+    descKey: "companions.desc.capacityUpgrade",
+    desc: "Shows applied capacity or slower-use upgrades on this farm's vehicles, not purchase or usage history.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "variableTirePressure",
     title: "Variable Tire Pressure",
     category: "fleet",

@@ -17,6 +17,7 @@ const inbox = 'Z:\\Graham\\agent-comms\\to-wizard-pc.md';
 const outbox = 'Z:\\Graham\\agent-comms\\to-tina.md';
 const dir = path.join(os.homedir(), '.codex', 'watchers', 'farmhub-ally');
 const statePath = path.join(dir, 'state.json');
+const backupPath = path.join(dir, 'state.backup.json');
 const stopPath = path.join(dir, 'STOP');
 // Written only when a specific RF result gates an already prepared FarmHub
 // packet. Without this file, unrelated RF results are marked seen, not sent.
@@ -28,14 +29,34 @@ fs.mkdirSync(dir, { recursive: true });
 
 function readState() {
   if (!fs.existsSync(statePath)) return null;
-  const value = JSON.parse(fs.readFileSync(statePath, 'utf8'));
-  if (value.threadId !== threadId || !Array.isArray(value.events)) throw Error('WATCH_STATE_MISMATCH');
-  return value;
+  for (const file of [statePath, backupPath]) {
+    try {
+      const value = JSON.parse(fs.readFileSync(file, 'utf8'));
+      if (value.threadId !== threadId || !Array.isArray(value.events) || !Array.isArray(value.seen))
+        throw Error('WATCH_STATE_MISMATCH');
+      if (file === backupPath) value.lastError = { at: new Date().toISOString(), code: 'RECOVERED_FROM_BACKUP' };
+      return value;
+    } catch { /* Try the last valid snapshot after a torn state write. */ }
+  }
+  throw Error('WATCH_STATE_CORRUPT');
+}
+function writeAtomic(file, value) {
+  const temp = file + '.tmp';
+  const fd = fs.openSync(temp, 'w');
+  try {
+    fs.writeFileSync(fd, value);
+    fs.fsyncSync(fd);
+  } finally { fs.closeSync(fd); }
+  fs.renameSync(temp, file);
 }
 function writeState(state) {
-  const temp = statePath + '.tmp';
-  fs.writeFileSync(temp, JSON.stringify(state, null, 2));
-  fs.renameSync(temp, statePath);
+  if (fs.existsSync(statePath)) {
+    const previous = fs.readFileSync(statePath, 'utf8');
+    try {
+      if (JSON.parse(previous).threadId === threadId) writeAtomic(backupPath, previous);
+    } catch { /* Preserve the last valid backup if the main file is damaged. */ }
+  }
+  writeAtomic(statePath, JSON.stringify(state, null, 2));
 }
 const results = parseSubstantiveReturns;
 function armedRfGateId() {
@@ -53,7 +74,12 @@ function alive(pid) {
   try { process.kill(pid, 0); return true; } catch { return false; }
 }
 if (process.argv.includes('--status')) {
-  const state = readState();
+  let state;
+  try { state = readState(); }
+  catch (error) {
+    console.log(JSON.stringify({ running: false, state: error.message }));
+    process.exit(1);
+  }
   console.log(JSON.stringify(state ? {
     running: alive(state.pid), pid: state.pid, threadMatches: state.threadId === threadId,
     baselineCount: state.baselineCount, events: state.events.map(({ id, kind, status }) => ({ id, kind, status })),
@@ -86,6 +112,7 @@ state.seen = [...new Set([...state.seen, ...reviewed.map(event => event.hash)])]
 state.pid = process.pid;
 state.lastError = null;
 const seen = new Set(state.seen);
+let lastScanPersist = Date.now();
 for (const event of state.events) if (event.status === 'inflight') event.status = 'uncertain';
 writeState(state);
 
@@ -144,15 +171,20 @@ function scan() {
   if (stopped) return;
   try {
     const rfGateId = armedRfGateId();
+    let changed = false;
     for (const event of results(fs.readFileSync(inbox, 'utf8'))) {
       if (seen.has(event.hash)) continue;
       seen.add(event.hash);
+      changed = true;
       if (!shouldWakeFarmHub(event, rfGateId)) continue;
       state.events.push({ ...event, status: 'queued', at: new Date().toISOString() });
     }
     state.seen = [...seen];
     state.lastScan = new Date().toISOString();
-    writeState(state);
+    if (changed || Date.now() - lastScanPersist >= 300000) {
+      writeState(state);
+      lastScanPersist = Date.now();
+    }
     void deliver();
   } catch (error) {
     state.lastError = { at: new Date().toISOString(), code: error.code || 'SCAN_FAILED' };

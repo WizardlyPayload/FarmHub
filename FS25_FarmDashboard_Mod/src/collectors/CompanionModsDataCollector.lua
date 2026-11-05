@@ -707,6 +707,14 @@ local CATALOG = {
         globals = { "FinancialLogger" },
     },
     {
+        id = "usedEquipmentYards",
+        title = "Used Equipment Yards",
+        category = "finance",
+        names = { "FS25_UsedEquipmentYards", "FS25_359834_Used_Equipment_Yards" },
+        substrings = { "usedequipmentyards", "used_equipment_yards" },
+        globals = { "YardCredit" },
+    },
+    {
         id = "animalPlanner",
         title = "Animal Planner",
         category = "livestock",

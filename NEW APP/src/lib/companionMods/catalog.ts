@@ -847,6 +847,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     liveKey: "economicHistory",
   },
   {
+    id: "usedEquipmentYards",
+    title: "Used Equipment Yards",
+    category: "finance",
+    descKey: "companions.desc.usedEquipmentYards",
+    desc: "Shows saved credit earned by this farm at used equipment yards. Listings are market stock, not owned fleet equipment.",
+    relatedSection: "economy",
+  },
+  {
     id: "animalPlanner",
     title: "Animal Planner",
     category: "livestock",
@@ -953,6 +961,30 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     desc: "Another overview of fields, animals, and productions. FarmHub shows its own overview counts for this farm next to the mod's cached field HUD rows and does not copy that screen.",
     liveKey: "farmOperations",
     relatedSection: "overview",
+  },
+  {
+    id: "adjustableFillLevelAdvanced",
+    title: "Adjustable Fill Level Advanced",
+    category: "fleet",
+    descKey: "companions.desc.adjustableFillLevelAdvanced",
+    desc: "Lets vehicles select a fill capacity multiplier. FarmHub shows non-stock choices for this farm's vehicles and separates selected from observed capacity; it does not claim filled volume or work.",
+    relatedSection: "vehicles",
+  },
+  {
+    id: "organicDemand",
+    title: "Demand-Oriented Organic Application",
+    category: "fields",
+    descKey: "companions.desc.organicDemand",
+    desc: "Selects a target crop and nitrogen limit for eligible applicators. FarmHub shows this farm's saved or live choices, not nitrogen applied or yield gained.",
+    relatedSection: "fields",
+  },
+  {
+    id: "mobileButcherMeatPickup",
+    title: "Mobile Butcher Meat Pickup",
+    category: "storage",
+    descKey: "companions.desc.mobileButcherMeatPickup",
+    desc: "Keeps meat promised by an unfinished butcher visit or waiting to become pallets at this farm's pickup. FarmHub does not count completed pallets or sales twice.",
+    relatedSection: "storage",
   },
 ];
 

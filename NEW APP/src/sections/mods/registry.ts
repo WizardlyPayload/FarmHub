@@ -39,6 +39,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/netWorthTracker").then((m) => m.Page) },
   { key: "economicHistory", catalogId: "economicHistory", title: "Economic History", glyph: "EH", group: "finance",
     load: () => import("@/sections/mods/economicHistory").then((m) => m.Page) },
+  { key: "usedEquipmentYards", catalogId: "usedEquipmentYards", title: "Used Equipment Yards", glyph: "UY", group: "finance",
+    load: () => import("@/sections/mods/usedEquipmentYards").then((m) => m.Page) },
   { key: "realLandFinance", catalogId: "realLandFinance", title: "Real Land Finance", glyph: "LF", group: "finance",
     load: () => import("@/sections/mods/realLandFinance").then((m) => m.Page) },
   { key: "financeYourFleet", catalogId: "financeYourFleet", title: "Finance Your Fleet", glyph: "FY", group: "finance",

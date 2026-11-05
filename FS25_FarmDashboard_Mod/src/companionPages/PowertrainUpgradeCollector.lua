@@ -23,13 +23,29 @@ CompanionPages.register({
 
         local rows, count, changed, unverified = {}, 0, 0, 0
         local nativeSelectionCount, runtimeBaseCount, rejectedChoiceCount = 0, 0, 0
+        local runtimeSpecCount, motorObjectCount, torqueCurveCount, torqueKeyframesCount = 0, 0, 0, 0
         local truncated = ctx.ownedScanTruncated == true
         for _, vehicle in ipairs(vehicles) do
             local spec = type(vehicle) == "table" and vehicle.spec_ptuUpgrade or nil
             local config = type(vehicle) == "table" and vehicle.configurations or nil
             if type(spec) == "table" and type(spec.base) == "table" then runtimeBaseCount = runtimeBaseCount + 1 end
             local hasNativeChoice = type(config) == "table" and (config.ptuPower ~= nil or config.ptuSpeed ~= nil)
-            if hasNativeChoice then nativeSelectionCount = nativeSelectionCount + 1 end
+            if hasNativeChoice then
+                nativeSelectionCount = nativeSelectionCount + 1
+                if type(spec) == "table" then runtimeSpecCount = runtimeSpecCount + 1 end
+                local motorized = type(vehicle.spec_motorized) == "table" and vehicle.spec_motorized or nil
+                local motor = motorized and motorized.motor or nil
+                if type(motor) == "table" then
+                    motorObjectCount = motorObjectCount + 1
+                    local curve = motor.torqueCurve
+                    if type(curve) == "table" then
+                        torqueCurveCount = torqueCurveCount + 1
+                        if type(curve.keyframes) == "table" and #curve.keyframes > 0 then
+                            torqueKeyframesCount = torqueKeyframesCount + 1
+                        end
+                    end
+                end
+            end
             -- The mod itself treats an absent configuration key as Stock (index 1).
             -- The native selection is useful even if the transient mod state cannot
             -- be observed; never turn that selection into a performance claim.
@@ -67,7 +83,9 @@ CompanionPages.register({
             byFarm = { [tostring(farmId)] = { motorCount = count, upgradedCount = changed } },
             diagnostics = { ownedVehicleCount = #vehicles, nativeSelectionCount = nativeSelectionCount,
                 runtimeBaseCount = runtimeBaseCount, rejectedChoiceCount = rejectedChoiceCount,
-                unverifiedSelectionCount = unverified },
+                unverifiedSelectionCount = unverified, runtimeSpecCount = runtimeSpecCount,
+                motorObjectCount = motorObjectCount, torqueCurveCount = torqueCurveCount,
+                torqueKeyframesCount = torqueKeyframesCount },
             rows = rows,
         }
     end,

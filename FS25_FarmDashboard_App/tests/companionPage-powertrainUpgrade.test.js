@@ -10,6 +10,7 @@ const SETUP = `
     vehicleSystem = { vehicles = {
       { ownerFarmId = 1, uniqueId = "tuned", getFullName = function() return "Owned tractor" end,
         configurations = { ptuPower = 2, ptuSpeed = 4 },
+        spec_motorized = { motor = { torqueCurve = { keyframes = { { time = 1000 } } } } },
         spec_ptuUpgrade = { base = {}, powerLevel = 2, speedLevel = 4, speedWasCapped = false } },
       { ownerFarmId = 1, uniqueId = "stock", getFullName = function() return "Owned stock motor" end,
         configurations = { ptuPower = 1, ptuSpeed = 1 },
@@ -25,7 +26,8 @@ test("separates native selected levels from observed mod levels", () => {
   const page = runCompanionPage(FILE, SETUP, { farmId: 1 });
   expect(page).toMatchObject({ readState: "partial", coverage: "complete",
     byFarm: { "1": { motorCount: 3, upgradedCount: 2 } },
-    diagnostics: { nativeSelectionCount: 3, runtimeBaseCount: 3, unverifiedSelectionCount: 1 } });
+    diagnostics: { nativeSelectionCount: 3, runtimeBaseCount: 3, unverifiedSelectionCount: 1,
+      runtimeSpecCount: 3, motorObjectCount: 1, torqueCurveCount: 1, torqueKeyframesCount: 1 } });
   expect(page.rows.find((row) => row.vehicleId === "tuned"))
     .toMatchObject({ powerLevel: 2, powerFactor: 1.25, speedLevel: 4, speedFactor: 2, modStateMatched: true });
   expect(page.rows.find((row) => row.vehicleId === "mismatch"))

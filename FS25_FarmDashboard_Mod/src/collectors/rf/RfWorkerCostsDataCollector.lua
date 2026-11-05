@@ -65,7 +65,6 @@ end
 
 local function buildSharedRow(mgr)
     local settings = mgr.settings
-    local workerSys = mgr.workerSystem
     local snap = nil
     if type(mgr.getRosterSnapshot) == "function" then
         local ok, s = pcall(function()
@@ -76,21 +75,8 @@ local function buildSharedRow(mgr)
         end
     end
 
-    local activeWorkers = 0
-    if workerSys and type(workerSys.getActiveWorkers) == "function" then
-        local ok, workers = pcall(function()
-            return workerSys:getActiveWorkers()
-        end)
-        if ok and type(workers) == "table" then
-            activeWorkers = #workers
-        end
-    elseif snap and tonumber(snap.count) then
-        activeWorkers = tonumber(snap.count) or 0
-    end
-
     local wageMode = nil
     local wageRate = nil
-    local periodSpend = nil
     local nextPaymentLabel = nil
 
     local fin = snap and snap.finance
@@ -107,7 +93,6 @@ local function buildSharedRow(mgr)
             wageMode = tostring(fin.costModeName) .. " / " .. tostring(fin.wageLevelName)
         end
         wageRate = tonumber(fin.baseRate)
-        periodSpend = tonumber(fin.monthAccrued)
     end
 
     if settings then
@@ -145,21 +130,44 @@ local function buildSharedRow(mgr)
         end
     end
 
-    if periodSpend == nil and workerSys and workerSys.monthlyCosts then
-        local total = 0
-        for _, amt in pairs(workerSys.monthlyCosts) do
-            total = total + (tonumber(amt) or 0)
-        end
-        periodSpend = total
-    end
-
     return {
-        activeWorkers = activeWorkers,
         wageMode = wageMode,
         wageRate = wageRate,
         nextPaymentLabel = nextPaymentLabel,
-        periodSpend = periodSpend,
     }
+end
+
+local function farmPeriodSpend(workerSys, farmId)
+    -- Worker Costs v2.3.0.1 uses one shared roster, but accruals and frozen
+    -- unpaid salary parts carry an explicit farm ID. Its roster snapshot's
+    -- monthAccrued is a sum across farms and cannot be copied to byFarm.
+    if type(workerSys) ~= "table"
+        or type(workerSys.monthlyCosts) ~= "table"
+        or type(workerSys.salaryBills) ~= "table" then
+        return nil
+    end
+    local total = 0
+    local farmBook = workerSys.monthlyCosts[farmId] or workerSys.monthlyCosts[tostring(farmId)]
+    if type(farmBook) == "table" then
+        for _, entry in pairs(farmBook) do
+            if type(entry) == "table" then
+                total = total + (tonumber(entry.amount) or 0)
+            end
+        end
+    end
+    for _, bill in pairs(workerSys.salaryBills) do
+        if type(bill) == "table" and type(bill.parts) == "table" then
+            for _, part in ipairs(bill.parts) do
+                if type(part) == "table"
+                    and tonumber(part.farmId) == farmId
+                    and part.status == "UNPAID"
+                    and (tonumber(part.remaining) or 0) > 0 then
+                    total = total + (tonumber(part.base) or 0)
+                end
+            end
+        end
+    end
+    return total
 end
 
 function RfWorkerCostsDataCollector:init()
@@ -182,13 +190,12 @@ function RfWorkerCostsDataCollector:collectStep(_opts)
         local row = buildSharedRow(mgr)
         local byFarm = {}
         for _, fid in ipairs(collectFarmIds()) do
-            -- WorkerCosts keeps a single shared roster (getWorkersForFarm returns all).
+            -- Global wage settings apply to every farm; spend does not.
             byFarm[tostring(fid)] = {
-                activeWorkers = row.activeWorkers,
                 wageMode = row.wageMode,
                 wageRate = row.wageRate,
                 nextPaymentLabel = row.nextPaymentLabel,
-                periodSpend = row.periodSpend,
+                periodSpend = farmPeriodSpend(mgr.workerSystem, fid),
             }
         end
 

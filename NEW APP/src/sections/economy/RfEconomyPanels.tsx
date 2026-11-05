@@ -138,9 +138,6 @@ function WorkersPanel({
   const row = getRfWorkerCostsForFarm(rf, farmId);
   return (
     <Card title={t("economy.rf.workers.title")} class="fd-economy__rf-card">
-      <MetaRow label={t("economy.rf.workers.active")}>
-        <strong>{row?.activeWorkers ?? 0}</strong>
-      </MetaRow>
       <MetaRow label={t("economy.rf.workers.mode")}>{row?.wageMode || "—"}</MetaRow>
       <MetaRow label={t("economy.rf.workers.rate")}>
         <strong>{formatRfMoney(row?.wageRate, profile)}</strong>

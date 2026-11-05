@@ -490,6 +490,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "powertrainUpgrade",
+        title = "Powertrain Upgrade",
+        category = "fleet",
+        names = { "FS25_PowertrainUpgrade", "FS25_372458_Powertrain_Upgrade" },
+        substrings = { "powertrainupgrade", "powertrain_upgrade" },
+        globals = {},
+    },
+    {
         id = "vehicleControlAddon",
         title = "Vehicle Control Addon",
         category = "fleet",

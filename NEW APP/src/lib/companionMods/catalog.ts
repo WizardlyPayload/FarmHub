@@ -626,6 +626,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "powertrainUpgrade",
+    title: "Powertrain Upgrade",
+    category: "fleet",
+    descKey: "companions.desc.powertrainUpgrade",
+    desc: "Shows the selected power and speed upgrades on owned motors, not measured performance.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "vehicleControlAddon",
     title: "Vehicle Control Addon",
     category: "fleet",

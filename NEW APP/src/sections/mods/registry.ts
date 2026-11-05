@@ -124,6 +124,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/baleCapacityMultiplier").then((m) => m.Page) },
   { key: "forageWagonCompression", catalogId: "forageWagonCompression", title: "Forage Wagon Compression", glyph: "FW", group: "fleet",
     load: () => import("@/sections/mods/forageWagonCompression").then((m) => m.Page) },
+  { key: "powertrainUpgrade", catalogId: "powertrainUpgrade", title: "Powertrain Upgrade", glyph: "PU", group: "fleet",
+    load: () => import("@/sections/mods/powertrainUpgrade").then((m) => m.Page) },
   { key: "vehicleControlAddon", catalogId: "vehicleControlAddon", title: "Vehicle Control Addon", glyph: "VC", group: "fleet",
     load: () => import("@/sections/mods/vehicleControlAddon").then((m) => m.Page) },
   { key: "advancedVehicleFunctions", catalogId: "advancedVehicleFunctions", title: "Advanced Vehicle Functions", glyph: "AV", group: "fleet",

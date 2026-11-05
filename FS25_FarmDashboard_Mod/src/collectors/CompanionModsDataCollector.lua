@@ -514,6 +514,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "organicDemand",
+        title = "Demand-Oriented Organic Application",
+        category = "fleet",
+        names = { "FS25_DemandOrientedOrganicApplication", "FS25_366594_Demand-Oriented_Organic_Application" },
+        substrings = { "demandorientedorganic", "demand-oriented_organic_application" },
+        globals = {},
+    },
+    {
         id = "vehicleControlAddon",
         title = "Vehicle Control Addon",
         category = "fleet",

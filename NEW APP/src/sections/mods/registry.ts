@@ -130,6 +130,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/capacityUpgrade").then((m) => m.Page) },
   { key: "variableTirePressure", catalogId: "variableTirePressure", title: "Variable Tire Pressure", glyph: "TP", group: "fleet",
     load: () => import("@/sections/mods/variableTirePressure").then((m) => m.Page) },
+  { key: "organicDemand", catalogId: "organicDemand", title: "Demand-Oriented Organic Application", glyph: "OD", group: "fleet",
+    load: () => import("@/sections/mods/organicDemand").then((m) => m.Page) },
   { key: "vehicleControlAddon", catalogId: "vehicleControlAddon", title: "Vehicle Control Addon", glyph: "VC", group: "fleet",
     load: () => import("@/sections/mods/vehicleControlAddon").then((m) => m.Page) },
   { key: "advancedVehicleFunctions", catalogId: "advancedVehicleFunctions", title: "Advanced Vehicle Functions", glyph: "AV", group: "fleet",

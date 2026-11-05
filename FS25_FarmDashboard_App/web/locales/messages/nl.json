@@ -4819,5 +4819,21 @@
   "companionPage.capacityUpgrade.slowerUse": "Slower use; tank unchanged",
   "companionPage.capacityUpgrade.largerTank": "Larger capacity",
   "companionPage.capacityUpgrade.empty": "No applied Capacity Upgrade found on vehicles owned by this farm.",
-  "companionPage.capacityUpgrade.truncated": "Only the first applied fill units are listed."
+  "companionPage.capacityUpgrade.truncated": "Only the first applied fill units are listed.",
+  "companionPage.organicDemand.lead": "Target crop and nitrogen adjustment selected on this farm's organic applicators. These are settings, not applied nitrogen or a yield result.",
+  "companionPage.organicDemand.configured": "Owned applicators with choices",
+  "companionPage.organicDemand.savedOnly": "Saved choice only",
+  "companionPage.organicDemand.tableTitle": "Owned applicator choices",
+  "companionPage.organicDemand.vehicle": "Applicator",
+  "companionPage.organicDemand.crop": "Target crop",
+  "companionPage.organicDemand.adjustment": "Nitrogen adjustment",
+  "companionPage.organicDemand.source": "Reading",
+  "companionPage.organicDemand.targetMinus": "Target minus",
+  "companionPage.organicDemand.maxApplication": "Maximum application",
+  "companionPage.organicDemand.normal": "Normal",
+  "companionPage.organicDemand.automatic": "Automatic",
+  "companionPage.organicDemand.live": "Live choice",
+  "companionPage.organicDemand.saved": "Saved choice; live state unverified",
+  "companionPage.organicDemand.empty": "No owned applicator has a nondefault target or nitrogen adjustment yet.",
+  "companionPage.organicDemand.truncated": "Only the first configured applicators are listed."
 }

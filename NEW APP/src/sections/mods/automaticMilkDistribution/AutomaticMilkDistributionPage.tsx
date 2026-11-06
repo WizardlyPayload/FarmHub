@@ -29,13 +29,13 @@ export function Page({ entry }: CompanionPageProps) {
   ] : [];
 
   return (
-    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Current per-barn switch from Automatic Milk Distribution. The mod moves milk only when it runs and finds a suitable production point; this page does not record transfers or costs.")}>
+    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Current per-barn switch from Automatic Milk Distribution. Listed milk types are supported outputs, not current animal production. This page does not record transfers or costs.")}>
       <ModStatTiles tiles={tiles} />
       <Card title={tOr(`${K}.tableTitle`, "Milk barn settings")}>
         <ModTable
           columns={[
             { key: "barn", label: tOr(`${K}.barn`, "Barn") },
-            { key: "milk", label: tOr(`${K}.milk`, "Milk type") },
+            { key: "milk", label: tOr(`${K}.milk`, "Supported milk types") },
             { key: "state", label: tOr(`${K}.state`, "Automatic distribution") },
           ]}
           rows={rows.map((row, index) => ({

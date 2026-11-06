@@ -602,6 +602,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "realFuelConsumption",
+    title: "Real Fuel Consumption",
+    category: "fleet",
+    descKey: "companions.desc.realFuelConsumption",
+    desc: "Shows fuel used and engine time recorded for farm-owned vehicles, without treating those counters as purchases or cash expense.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "hireAWorker",
     title: "Hire A Worker",
     category: "fields",

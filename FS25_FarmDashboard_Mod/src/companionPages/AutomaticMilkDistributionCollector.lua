@@ -7,15 +7,20 @@ local MAX_ROWS = 60
 
 local function milkTypes(ctx, placeable, fillTypeManager)
     local types = {}
+    local milkSpec = type(placeable.spec_husbandryMilk) == "table"
+        and placeable.spec_husbandryMilk or nil
+    if milkSpec == nil or milkSpec.hasMilkProduction ~= true
+        or type(milkSpec.fillTypes) ~= "table" then return types end
     for _, name in ipairs({ "MILK", "BUFFALOMILK" }) do
         local index = ctx.num(ctx.call(fillTypeManager, "getFillTypeIndexByName", name))
         if index ~= nil and index > 0 then
-            local storage = type(placeable.spec_husbandry) == "table"
-                and placeable.spec_husbandry.storage or nil
-            local capacity = ctx.num(ctx.call(storage, "getCapacity", index))
-            local fillUnit = ctx.num(ctx.call(placeable, "getFillUnitIndexFromFillTypeIndex", index))
-            if (capacity ~= nil and capacity > 0) or fillUnit ~= nil
-                or (name == "MILK" and type(placeable.spec_husbandryMilk) == "table") then
+            local declared = false
+            for _, fillType in ipairs(milkSpec.fillTypes) do
+                if ctx.num(fillType) == index then declared = true; break end
+            end
+            -- The native milk specialization uses this same support check before
+            -- producing milk. Generic fill units may exist on non-dairy calf pens.
+            if declared and ctx.call(placeable, "getHusbandryIsFillTypeSupported", index) == true then
                 types[#types + 1] = name
             end
         end

@@ -10,18 +10,24 @@ const GAME = `
     return ({ MILK = 1, BUFFALOMILK = 2 })[name]
   end }
   local function barn(name, owner, active, milkCapacity, buffaloCapacity)
+    local fillTypes = {}
+    if milkCapacity > 0 then fillTypes[#fillTypes + 1] = 1 end
+    if buffaloCapacity > 0 then fillTypes[#fillTypes + 1] = 2 end
     return { autoMilkActive = active, getOwnerFarmId = function() return owner end,
       getName = function() return name end, spec_husbandryAnimals = {},
+      spec_husbandryMilk = { hasMilkProduction = true, fillTypes = fillTypes },
       spec_husbandry = { storage = { getCapacity = function(_, index)
         return index == 1 and milkCapacity or buffaloCapacity end } },
-      getFillUnitIndexFromFillTypeIndex = function() return nil end }
+      getHusbandryIsFillTypeSupported = function(_, index)
+        return (index == 1 and milkCapacity or buffaloCapacity) > 0 end,
+      getFillUnitIndexFromFillTypeIndex = function() return 0 end }
   end
   _G.g_currentMission = { getIsServer = function() return true end,
     placeableSystem = { placeables = {
       barn("Dairy Barn", 1, true, 2000, 0),
       barn("Buffalo Barn", 1, false, 0, 1000),
       barn("Foreign Barn", 2, true, 5000, 0),
-      barn("No Milk", 1, false, 0, 0),
+      barn("Calf Shed Without Milk", 1, false, 0, 0),
       { getOwnerFarmId = function() return 1 end, spec_husbandryAnimals = {} },
     } } }
   _G.AutoMilk = { executeDistribution = function() error("must not move milk") end,
@@ -37,7 +43,7 @@ test("reports only this farm's milk barn switches without moving milk", () => {
     { farmId: 1, barn: "Buffalo Barn", enabled: false, milkTypes: ["BUFFALOMILK"] },
     { farmId: 1, barn: "Dairy Barn", enabled: true, milkTypes: ["MILK"] },
   ]);
-  expect(JSON.stringify(page)).not.toMatch(/Foreign Barn|No Milk/);
+  expect(JSON.stringify(page)).not.toMatch(/Foreign Barn|Calf Shed Without Milk/);
   const merged = normalizeCompanionPages({ pages: { automaticMilkDistribution: page } }, { modules: loadModules() });
   expect(merged.pages.automaticMilkDistribution.rows).toHaveLength(2);
 });

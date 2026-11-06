@@ -37,6 +37,16 @@ CompanionPages.register({
         if farmId == nil or farmId <= 0 then
             return { readState = "settings-only", reason = "no-farm" }
         end
+        -- The exact RMS mod skips specialization registration when ADS is loaded.
+        -- Distinguish that explicit conflict from a vehicle that has not initialized yet.
+        if type(g_modIsLoaded) == "table" and g_modIsLoaded.FS25_AdvancedDamageSystem == true then
+            return {
+                readState = "partial",
+                reason = "advanced-damage-system-conflict",
+                coverage = "unavailable",
+                rows = {},
+            }
+        end
         local vehicles = ctx.ownedVehicles()
         if type(vehicles) ~= "table" then
             return { readState = "settings-only", reason = "no-owned-vehicle-list" }

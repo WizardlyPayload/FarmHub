@@ -120,6 +120,8 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
     case "limited":
       return page?.readState === "detection-only"
         ? tOr("companionPage.shared.noticeDetection", "This mod keeps its numbers to itself, so FarmHub can only confirm it is running.")
+        : key === "realisticMechanicalSystems" && page?.reason === "no-captured-owned-vehicle"
+          ? tOr("companionPage.realisticMechanicalSystems.empty", "No owned machine has a captured mechanical reading yet.")
         : key === "moistureSystem" && page?.readState === "settings-only" && hasMoistureMapCropReading(page)
           ? tOr(
               "companionPage.moistureSystem.noticeMapCropLimited",
@@ -129,6 +131,9 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
     case "failed":
       return tOr("companionPage.shared.noticeFailed", "FarmHub could not read this mod on the last export. The figures below may be missing or out of date.");
     case "partial":
+      if (key === "realisticMechanicalSystems" && page?.reason === "advanced-damage-system-conflict") {
+        return tOr("companionPage.realisticMechanicalSystems.noticeConflict", "Realistic Mechanical Systems stays inactive while Advanced Damage System is loaded. Use only one of these mods in the game.");
+      }
       return tOr("companionPage.shared.noticePartial", "Some of this mod's readings were unavailable on the last export.");
     case "ok":
     case "missing":

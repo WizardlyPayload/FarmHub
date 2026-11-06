@@ -41,3 +41,21 @@ test("reads only captured owned machines without updating the mod or treating lo
 test("without the exact mod, no page is emitted", () => {
   expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", { farmId: 1 })).toBeUndefined();
 });
+
+test("reports the mod's explicit Advanced Damage System conflict instead of an uncaptured machine", () => {
+  const page = runCompanionPage(FILE, `
+    _G.g_modIsLoaded = { FS25_RealisticMechanicalSystems = true, FS25_AdvancedDamageSystem = true }
+    _G.g_currentMission = { vehicleSystem = { vehicles = {
+      { ownerFarmId = 1, uniqueId = "owned", spec_RealisticMechanicalSystems = {
+        serviceLevel = 0.6, conditionLevel = 0.8,
+      } },
+    } } }
+  `, { farmId: 1 });
+  expect(page).toMatchObject({
+    readState: "partial",
+    reason: "advanced-damage-system-conflict",
+    coverage: "unavailable",
+  });
+  expect(Object.keys(page.rows)).toHaveLength(0);
+  expect(page.byFarm).toBeUndefined();
+});

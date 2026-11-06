@@ -4895,6 +4895,7 @@
   ,"companionPage.realisticMechanicalSystems.tableTitle": "Mechanical condition by machine"
   ,"companionPage.realisticMechanicalSystems.lastLog": "Last log entry"
   ,"companionPage.realisticMechanicalSystems.empty": "No owned machine has a captured mechanical reading yet."
+  ,"companionPage.realisticMechanicalSystems.noticeConflict": "Realistic Mechanical Systems stays inactive while Advanced Damage System is loaded. Use only one of these mods in the game."
   ,"companions.desc.hireAWorker": "Tracks farm-owned contractor field jobs and recent job history. FarmHub reads the register without starting, stopping or charging jobs."
   ,"companionPage.hireAWorker.active": "Active field jobs"
   ,"companionPage.hireAWorker.history": "Recorded jobs"

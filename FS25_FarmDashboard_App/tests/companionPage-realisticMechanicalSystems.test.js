@@ -27,6 +27,7 @@ const GAME = `
 test("reads only captured owned machines without updating the mod or treating log price as a payment", () => {
   const page = runCompanionPage(FILE, GAME, { farmId: 1 });
   expect(page.readState).toBe("ok");
+  expect(page.reason).toBeUndefined();
   expect(page.byFarm["1"]).toMatchObject({ vehicleCount: 1, breakdownVehicleCount: 1, loggedVehicleCount: 1 });
   expect(page.rows).toHaveLength(1);
   expect(page.rows[0]).toMatchObject({

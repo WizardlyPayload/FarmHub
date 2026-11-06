@@ -18,12 +18,12 @@ local function record(ctx, source, farmId, active)
         typeName = ctx.clip(source.typeName, 60),
         fieldId = ctx.num(source.fieldId),
         acceptedDay = ctx.num(source.acceptedDay),
-        finishedDay = active and nil or ctx.num(source.finishedDay),
-        finishState = active and nil or ctx.num(source.finishState),
+        finishedDay = not active and ctx.num(source.finishedDay) or nil,
+        finishState = not active and ctx.num(source.finishState) or nil,
         -- Acceptance reward is only an offer. Payout exists only after dismiss.
         offeredReward = active and ctx.num(source.rewardAtAccept) or ctx.num(source.reward),
-        payout = active and nil or ctx.num(source.payout),
-        completion = active and nil or ctx.num(source.completion),
+        payout = not active and ctx.num(source.payout) or nil,
+        completion = not active and ctx.num(source.completion) or nil,
     }
 end
 

@@ -58,7 +58,7 @@ CompanionPages.register({
             readState = "ok",
             coverage = truncated and "truncated" or "complete",
             byFarm = { [tostring(farmId)] = { creditedYards = count,
-                totalCredit = truncated and nil or total } },
+                totalCredit = not truncated and total or nil } },
             rows = rows,
         }
     end,

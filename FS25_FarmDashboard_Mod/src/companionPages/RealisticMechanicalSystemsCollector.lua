@@ -98,7 +98,7 @@ CompanionPages.register({
         end
         return {
             readState = captured > 0 and "ok" or "settings-only",
-            reason = captured > 0 and nil or "no-captured-owned-vehicle",
+            reason = captured == 0 and "no-captured-owned-vehicle" or nil,
             coverage = truncated and "truncated" or "complete",
             byFarm = { [tostring(farmId)] = {
                 vehicleCount = captured,

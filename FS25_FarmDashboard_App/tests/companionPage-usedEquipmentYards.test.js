@@ -46,3 +46,17 @@ test("withholds on clients and ignores an unrelated global shadow", () => {
   expect(runCompanionPage(FILE, shadow, { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "no-yard-credit-state" });
 });
+
+test("withholds total credit when the yard scan stops before all yards", () => {
+  const manyYards = SETUP + `
+    local yards = _G.FS25_359834_Used_Equipment_Yards.UsedEquipmentYards.yardManager.yards
+    local credit = _G.FS25_359834_Used_Equipment_Yards.YardCredit.data
+    for i = 10, 90 do
+      yards[i] = { id = i, name = "Yard " .. tostring(i) }
+      credit["1_" .. tostring(i)] = { balance = 100 }
+    end
+  `;
+  const page = runCompanionPage(FILE, manyYards, { farmId: 1 });
+  expect(page.coverage).toBe("truncated");
+  expect(page.byFarm["1"].totalCredit).toBeUndefined();
+});

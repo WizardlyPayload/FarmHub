@@ -10,7 +10,8 @@ const SETUP = `
   _G.FS25_ContractManager = { ContractManagerRegistry = {
     active = {
       a = { id = "a", farmId = 1, typeName = "harvest", fieldId = 36,
-        rewardAtAccept = 1300, acceptedDay = 22 },
+        rewardAtAccept = 1300, acceptedDay = 22,
+        finishedDay = 23, finishState = 1, payout = 900, completion = 1 },
       b = { id = "b", farmId = 2, typeName = "mow", rewardAtAccept = 3000 },
     },
     history = {
@@ -31,6 +32,10 @@ const SETUP = `
 
 test("reads only this farm's server ledger without treating offers as payouts", () => {
   const page = runCompanionPage(FILE, SETUP, { farmId: 1 });
+  expect(page.active[0]).not.toHaveProperty("payout");
+  expect(page.active[0]).not.toHaveProperty("finishedDay");
+  expect(page.active[0]).not.toHaveProperty("finishState");
+  expect(page.active[0]).not.toHaveProperty("completion");
   expect(page).toMatchObject({ readState: "ok", coverage: "complete",
     byFarm: { "1": { activeCount: 1, historyCount: 2,
       stats: { completed: 1, failed: 1, earned: 450, penalties: 20 } } } });

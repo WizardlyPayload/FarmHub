@@ -482,6 +482,14 @@ local CATALOG = {
         globals = { "g_huManager" },
     },
     {
+        id = "terraFarmMachines",
+        title = "TerraFarm Machines",
+        category = "fleet",
+        names = { "FS25_0_TerraFarm", "KM_66597_TerraFarm" },
+        substrings = { "terrafarm" },
+        globals = { "g_machineManager" },
+    },
+    {
         id = "realisticMechanicalSystems",
         title = "Realistic Mechanical Systems",
         category = "fleet",

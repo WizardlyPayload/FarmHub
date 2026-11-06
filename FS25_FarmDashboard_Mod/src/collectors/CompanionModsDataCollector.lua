@@ -474,6 +474,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "realFuelConsumption",
+        title = "Real Fuel Consumption",
+        category = "fleet",
+        names = { "FS25_RealFuelConsumption", "FS25_realFuelConsumption", "KM_79107_real-fuel-consumption" },
+        substrings = { "realfuelconsumption", "real-fuel-consumption" },
+        globals = {},
+    },
+    {
         id = "hireAWorker",
         title = "Hire A Worker",
         category = "fields",

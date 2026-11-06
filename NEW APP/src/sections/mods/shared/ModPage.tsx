@@ -122,6 +122,8 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
         ? tOr("companionPage.shared.noticeDetection", "This mod keeps its numbers to itself, so FarmHub can only confirm it is running.")
         : key === "realisticMechanicalSystems" && page?.reason === "no-captured-owned-vehicle"
           ? tOr("companionPage.realisticMechanicalSystems.empty", "No owned machine has a captured mechanical reading yet.")
+        : key === "realFuelConsumption" && page?.reason === "no-captured-owned-vehicle"
+          ? tOr("companionPage.realFuelConsumption.empty", "No owned vehicle has recorded engine time yet.")
         : key === "moistureSystem" && page?.readState === "settings-only" && hasMoistureMapCropReading(page)
           ? tOr(
               "companionPage.moistureSystem.noticeMapCropLimited",

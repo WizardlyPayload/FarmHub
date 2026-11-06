@@ -103,6 +103,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
   // Fields
   { key: "hireAWorker", catalogId: "hireAWorker", title: "Hire A Worker", glyph: "HW", group: "fields",
     load: () => import("@/sections/mods/hireAWorker").then((m) => m.Page) },
+  { key: "whiteysFarmStaff", catalogId: "whiteysFarmStaff", title: "Whitey's Farm Staff Manager", glyph: "WS", group: "fields",
+    load: () => import("@/sections/mods/whiteysFarmStaff").then((m) => m.Page) },
   { key: "harvestLedger", catalogId: "harvestLedger", title: "Harvest Ledger", glyph: "HL", group: "fields",
     load: () => import("@/sections/mods/harvestLedger").then((m) => m.Page) },
   { key: "realisticCropRotation", catalogId: "realisticCropRotation", title: "Realistic Crop Rotation", glyph: "CR", group: "fields",

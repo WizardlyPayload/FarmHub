@@ -418,6 +418,14 @@ local CATALOG = {
         globals = { "AutoMilk" },
     },
     {
+        id = "whiteysFarmStaff",
+        title = "Whitey's Farm Staff Manager",
+        category = "fields",
+        names = { "FS25_WhiteysFarmStaff_5_2_3", "FS25_WhiteysFarmStaff" },
+        substrings = { "whiteysfarmstaff" },
+        globals = {},
+    },
+    {
         id = "baleBatchTracker",
         title = "Bale Batch Tracker",
         category = "storage",

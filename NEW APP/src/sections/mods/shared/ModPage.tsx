@@ -126,6 +126,10 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
           ? tOr("companionPage.realFuelConsumption.empty", "No owned vehicle has recorded engine time yet.")
         : key === "automaticMilkDistribution" && page?.reason === "barn-switch-unavailable"
           ? tOr("companionPage.automaticMilkDistribution.unavailable", "An owned milk barn was found, but its automatic distribution switch could not be read.")
+        : key === "whiteysFarmStaff" && page?.reason === "singleplayer-farm-one-only"
+          ? tOr("companionPage.whiteysFarmStaff.singleplayerOnly", "This staff roster is available only for the active single-player farm.")
+        : key === "whiteysFarmStaff" && page?.reason === "staff-menu-manager-unavailable"
+          ? tOr("companionPage.whiteysFarmStaff.menuUnavailable", "The mod's staff menu did not register, so its roster could not be read.")
         : key === "moistureSystem" && page?.readState === "settings-only" && hasMoistureMapCropReading(page)
           ? tOr(
               "companionPage.moistureSystem.noticeMapCropLimited",

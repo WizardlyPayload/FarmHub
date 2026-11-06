@@ -1018,6 +1018,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     desc: "Shows which of this farm's milk barns have automatic distribution enabled. It does not infer milk transferred or transport charges.",
     relatedSection: "pastures",
   },
+  {
+    id: "whiteysFarmStaff",
+    title: "Whitey's Farm Staff Manager",
+    category: "fields",
+    descKey: "companions.desc.whiteysFarmStaff",
+    desc: "Shows the hired staff roster, availability and unpaid wages from this single-player farm. It does not infer work completed or money paid.",
+    relatedSection: "fields",
+  },
 ];
 
 export function catalogEntry(id: string | undefined | null): CompanionCatalogEntry | undefined {

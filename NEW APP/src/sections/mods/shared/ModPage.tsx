@@ -124,6 +124,8 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
           ? tOr("companionPage.realisticMechanicalSystems.empty", "No owned machine has a captured mechanical reading yet.")
         : key === "realFuelConsumption" && page?.reason === "no-captured-owned-vehicle"
           ? tOr("companionPage.realFuelConsumption.empty", "No owned vehicle has recorded engine time yet.")
+        : key === "automaticMilkDistribution" && page?.reason === "barn-switch-unavailable"
+          ? tOr("companionPage.automaticMilkDistribution.unavailable", "An owned milk barn was found, but its automatic distribution switch could not be read.")
         : key === "moistureSystem" && page?.readState === "settings-only" && hasMoistureMapCropReading(page)
           ? tOr(
               "companionPage.moistureSystem.noticeMapCropLimited",

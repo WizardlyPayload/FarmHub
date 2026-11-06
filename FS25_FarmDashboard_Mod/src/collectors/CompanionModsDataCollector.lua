@@ -410,6 +410,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "automaticMilkDistribution",
+        title = "Automatic Milk Distribution",
+        category = "livestock",
+        names = { "FS25_Automatic_Milk_Distribution", "FS25_356022_Automatic_Milk_Distribution" },
+        substrings = { "automatic_milk_distribution", "automaticmilkdistribution" },
+        globals = { "AutoMilk" },
+    },
+    {
         id = "baleBatchTracker",
         title = "Bale Batch Tracker",
         category = "storage",

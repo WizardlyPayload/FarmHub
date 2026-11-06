@@ -70,6 +70,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/animalFoodOverview").then((m) => m.Page) },
   { key: "animalFoodCalculator", catalogId: "animalFoodCalculator", title: "Animal Food Calculator", glyph: "FC", group: "livestock",
     load: () => import("@/sections/mods/animalFoodCalculator").then((m) => m.Page) },
+  { key: "automaticMilkDistribution", catalogId: "automaticMilkDistribution", title: "Automatic Milk Distribution", glyph: "MD", group: "livestock",
+    load: () => import("@/sections/mods/automaticMilkDistribution").then((m) => m.Page) },
   // Storage and production
   { key: "factoryProfitCalculator", catalogId: "factoryProfitCalculator", title: "Factory Profit Calculator", glyph: "FP", group: "storage",
     load: () => import("@/sections/mods/factoryProfitCalculator").then((m) => m.Page) },

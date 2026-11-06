@@ -1010,6 +1010,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     desc: "Keeps meat promised by an unfinished butcher visit or waiting to become pallets at this farm's pickup. FarmHub does not count completed pallets or sales twice.",
     relatedSection: "storage",
   },
+  {
+    id: "automaticMilkDistribution",
+    title: "Automatic Milk Distribution",
+    category: "livestock",
+    descKey: "companions.desc.automaticMilkDistribution",
+    desc: "Shows which of this farm's milk barns have automatic distribution enabled. It does not infer milk transferred or transport charges.",
+    relatedSection: "pastures",
+  },
 ];
 
 export function catalogEntry(id: string | undefined | null): CompanionCatalogEntry | undefined {

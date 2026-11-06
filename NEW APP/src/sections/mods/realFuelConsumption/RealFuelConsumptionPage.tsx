@@ -23,9 +23,13 @@ function liters(value: unknown): string {
   return n === null ? "—" : `${formatNumber(n, 1)} L`;
 }
 
-function hours(value: unknown): string {
+function engineTime(value: unknown): string {
   const n = num(value);
-  return n === null ? "—" : `${formatNumber(n / 3600, 1)} h`;
+  if (n === null) return "—";
+  if (n > 0 && n < 1) return "<1 s";
+  if (n < 60) return `${formatNumber(n, 0)} s`;
+  if (n < 3600) return `${formatNumber(n / 60, 1)} min`;
+  return `${formatNumber(n / 3600, 1)} h`;
 }
 
 export function Page({ entry }: CompanionPageProps) {
@@ -34,7 +38,7 @@ export function Page({ entry }: CompanionPageProps) {
   const tiles: ModStatTile[] = farmData ? [
     { key: "vehicles", label: tOr("companionPage.realFuelConsumption.vehicles", "Vehicles with recorded engine time"), value: formatNumber(farmData.vehicleCount, 0) },
     { key: "fuel", label: tOr("companionPage.realFuelConsumption.totalFuel", "Accumulated fuel used"), value: liters(farmData.totalLiters) },
-    { key: "hours", label: tOr("companionPage.realFuelConsumption.totalHours", "Accumulated engine time"), value: hours(farmData.totalSeconds) },
+    { key: "hours", label: tOr("companionPage.realFuelConsumption.totalHours", "Accumulated engine time"), value: engineTime(farmData.totalSeconds) },
   ] : [];
 
   return (
@@ -56,11 +60,11 @@ export function Page({ entry }: CompanionPageProps) {
             cells: {
               vehicle: row.vehicle || row.vehicleId || "—",
               totalFuel: liters(row.totalLiters),
-              totalHours: hours(row.totalSeconds),
+              totalHours: engineTime(row.totalSeconds),
               sessionFuel: liters(row.sessionLiters),
-              eco: hours(row.secondsEco),
-              normal: hours(row.secondsNormal),
-              power: hours(row.secondsPower),
+              eco: engineTime(row.secondsEco),
+              normal: engineTime(row.secondsNormal),
+              power: engineTime(row.secondsPower),
             },
           }))}
           empty={tOr("companionPage.realFuelConsumption.empty", "No owned vehicle has recorded engine time yet.")}

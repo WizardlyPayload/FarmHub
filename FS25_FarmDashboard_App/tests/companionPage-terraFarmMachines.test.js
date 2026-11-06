@@ -7,7 +7,7 @@ const FILE = "TerraFarmMachinesCollector.lua";
 const GAME = `
   local own = { ownerFarmId = 1, uniqueId = "own", name = "Owned loader", spec_machine = {
     machineTypeId = "shovel", enabled = true, active = false, resourcesEnabled = true,
-    inputMode = 3, outputMode = 2, fillTypeIndex = 9,
+    inputMode = 2, outputMode = 1, fillTypeIndex = 9,
     inputAreaEnabled = true, outputAreaEnabled = false,
   } }
   local foreign = { ownerFarmId = 2, uniqueId = "foreign", name = "Other farm's machine", spec_machine = {
@@ -19,7 +19,8 @@ const GAME = `
   _G.g_modIsLoaded = { KM_66597_TerraFarm = true }
   _G.KM_66597_TerraFarm = {
     g_machineManager = { vehicles = { own, foreign } },
-    Machine = { MODE_NAME = { [1] = "MATERIAL", [2] = "RAISE", [3] = "LOWER" } },
+    Machine = { MODE_NAME = { [1] = "RAISE", [2] = "LOWER", [3] = "SMOOTH",
+        [4] = "FLATTEN", [5] = "PAINT", [6] = "MATERIAL" } },
   }
   _G.g_fillTypeManager = { getFillTypeByIndex = function(_, index)
     if index == 9 then return { title = "Gravel" } end

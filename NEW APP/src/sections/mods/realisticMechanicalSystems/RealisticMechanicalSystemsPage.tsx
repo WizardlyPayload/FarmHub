@@ -27,6 +27,15 @@ function percent(value: number | undefined): string {
   return fraction === null ? "—" : `${formatNumber(fraction * 100, 0)}%`;
 }
 
+function logTypeLabel(value: string): string {
+  switch (value) {
+    case "rms_spec_state_inspection": return tOr("ads_spec_state_inspection", "Inspection");
+    case "rms_spec_state_maintenance": return tOr("ads_spec_state_maintenance", "Maintenance");
+    case "rms_spec_state_repair": return tOr("ads_spec_state_repair", "Repair");
+    default: return value.replace(/^rms_spec_state_/, "").replace(/[_-]+/g, " ");
+  }
+}
+
 export function Page({ entry }: CompanionPageProps) {
   const { page, farmData, farmId } = useCompanionPage(entry.key);
   const profile = saveProfileFromUnitDisplay(useUnitDisplay());
@@ -58,7 +67,7 @@ export function Page({ entry }: CompanionPageProps) {
               service: percent(row.serviceLevel),
               breakdowns: formatNumber(row.breakdownCount, 0),
               log: row.lastLogType
-                ? `${row.lastLogType.replace(/[_-]+/g, " ")} · ${row.lastLogCompleted === true ? tOr("companionPage.cropContracts.completed", "Completed") : row.lastLogCompleted === false ? tOr("companions.field.cycleStates.open", "Open") : "—"} · ${row.lastLogPrice != null ? formatRfMoney(row.lastLogPrice, profile) : "—"}`
+                ? `${logTypeLabel(row.lastLogType)} · ${row.lastLogCompleted === true ? tOr("companionPage.cropContracts.completed", "Completed") : row.lastLogCompleted === false ? tOr("companions.field.cycleStates.open", "Open") : "—"} · ${row.lastLogPrice != null ? formatRfMoney(row.lastLogPrice, profile) : "—"}`
                 : "—",
             },
           }))}

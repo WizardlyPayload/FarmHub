@@ -890,6 +890,14 @@ local CATALOG = {
         globals = { "TaskList" },
     },
     {
+        id = "fieldToDoPlannedCrops",
+        title = "Field To-Do List",
+        category = "fields",
+        names = { "FS25_FieldToDoList", "GH_knoellix__FS25_ToDo_FS25_FieldToDoList" },
+        substrings = { "fieldtodolist", "field_to_do_list" },
+        globals = {},
+    },
+    {
         id = "productionSchedule",
         title = "Production Schedule",
         category = "production",

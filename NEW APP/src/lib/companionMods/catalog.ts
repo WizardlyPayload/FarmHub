@@ -1179,6 +1179,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "storage",
   },
   {
+    id: "fieldToDoPlannedCrops",
+    title: "Field To-Do List",
+    category: "fields",
+    descKey: "companions.desc.fieldToDoPlannedCrops",
+    desc: "Shows saved planned crops for land this farm currently owns. The mod does not record who set a plan; task records are withheld because legacy tasks can be reassigned on load.",
+    relatedSection: "fields",
+  },
+  {
     id: "productionAdvisorAlerts",
     title: "Production Advisor",
     category: "storage",

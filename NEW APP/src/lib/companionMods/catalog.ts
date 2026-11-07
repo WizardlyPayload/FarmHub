@@ -906,6 +906,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "fields",
   },
   {
+    id: "sellToTheBestBidder",
+    title: "Sell To The Best Bidder",
+    category: "fleet",
+    descKey: "companions.desc.sellToTheBestBidder",
+    desc: "Shows current vehicle listings and provisional buyer offers for vehicles this farm still owns. Offers are not completed-sale revenue.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "transportCompany",
     title: "Transport Company",
     category: "finance",

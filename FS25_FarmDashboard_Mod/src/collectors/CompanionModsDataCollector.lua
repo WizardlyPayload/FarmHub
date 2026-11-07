@@ -577,6 +577,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "sellToTheBestBidder",
+        title = "Sell To The Best Bidder",
+        category = "fleet",
+        names = { "FS25_359753_Sell_To_The_Best_Bidder", "FS25_SellToTheBestBidder" },
+        substrings = { "sell_to_the_best_bidder", "selltothebestbidder" },
+        globals = {},
+    },
+    {
         id = "tramlineSystem",
         title = "Tramline System",
         category = "fields",

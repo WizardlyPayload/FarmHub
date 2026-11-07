@@ -220,6 +220,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/swathRouter").then((m) => m.Page) },
   { key: "vehicleTradeIn", catalogId: "vehicleTradeIn", title: "Vehicle Trade In", glyph: "TI", group: "fleet",
     load: () => import("@/sections/mods/vehicleTradeIn").then((m) => m.Page) },
+  { key: "sellToTheBestBidder", catalogId: "sellToTheBestBidder", title: "Sell To The Best Bidder", glyph: "SB", group: "fleet",
+    load: () => import("@/sections/mods/sellToTheBestBidder").then((m) => m.Page) },
   { key: "dynamicDealership", catalogId: "dynamicDealership", title: "Dynamic Dealership", glyph: "DD", group: "fleet",
     load: () => import("@/sections/mods/dynamicDealership").then((m) => m.Page) },
   { key: "tuvSystem", catalogId: "tuvSystem", title: "TUV System", glyph: "TV", group: "fleet",

@@ -57,6 +57,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/agriCreditSolutions").then((m) => m.Page) },
   { key: "villageBank", catalogId: "villageBank", title: "Village Bank", glyph: "VB", group: "finance",
     load: () => import("@/sections/mods/villageBank").then((m) => m.Page) },
+  { key: "investmentSystem", catalogId: "investmentSystem", title: "Investment System", glyph: "IS", group: "finance",
+    load: () => import("@/sections/mods/investmentSystem").then((m) => m.Page) },
   { key: "shopRefund", catalogId: "shopRefund", title: "Shop Refund", glyph: "SR", group: "fleet",
     load: () => import("@/sections/mods/shopRefund").then((m) => m.Page) },
   { key: "rentYourField", catalogId: "rentYourField", title: "Rent Your Field", glyph: "RY", group: "finance",

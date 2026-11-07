@@ -561,6 +561,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "investmentSystem",
+        title = "Investment System",
+        category = "finance",
+        names = { "FS25_352944_Investment_System", "FS25_InvestmentSystem" },
+        substrings = { "investment_system", "investmentsystem" },
+        globals = {},
+    },
+    {
         id = "tramlineSystem",
         title = "Tramline System",
         category = "fields",

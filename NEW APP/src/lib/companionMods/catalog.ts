@@ -874,6 +874,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "investmentSystem",
+    title: "Investment System",
+    category: "finance",
+    descKey: "companions.desc.investmentSystem",
+    desc: "Shows this farm's Investment System deposits, stored annual rates and accrued-interest counters. The interest total is not added to farm cash.",
+    relatedSection: "economy",
+  },
+  {
     id: "shopRefund",
     title: "Shop Refund",
     category: "fleet",

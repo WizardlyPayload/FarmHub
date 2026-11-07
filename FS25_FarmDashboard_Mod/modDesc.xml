@@ -154,6 +154,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/EmployeesCollector.lua"/>
         <sourceFile filename="src/companionPages/PersonnelManagementCollector.lua"/>
         <sourceFile filename="src/companionPages/VillageBankCollector.lua"/>
+        <sourceFile filename="src/companionPages/InvestmentSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/TramlineSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/RitterFreshLossCollector.lua"/>
         <sourceFile filename="src/companionPages/FieldToDoPlannedCropCollector.lua"/>

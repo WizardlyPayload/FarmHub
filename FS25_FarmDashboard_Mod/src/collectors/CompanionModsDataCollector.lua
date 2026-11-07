@@ -298,6 +298,14 @@ local CATALOG = {
         globals = { "CropContractsMod" },
     },
     {
+        id = "cropInsurance",
+        title = "Crop Insurance",
+        category = "economy",
+        names = { "KM_82103_Crop_Insurance", "FS25_CropInsurance" },
+        substrings = { "crop_insurance", "cropinsurance" },
+        globals = { "CropInsurance" },
+    },
+    {
         id = "grainTickets",
         title = "Grain Tickets",
         category = "economy",

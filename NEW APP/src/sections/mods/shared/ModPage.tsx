@@ -130,6 +130,10 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
           ? tOr("companionPage.whiteysFarmStaff.singleplayerOnly", "This staff roster is available only for the active single-player farm.")
         : key === "whiteysFarmStaff" && page?.reason === "staff-menu-manager-unavailable"
           ? tOr("companionPage.whiteysFarmStaff.menuUnavailable", "The mod's staff menu did not register, so its roster could not be read.")
+        : key === "cropInsurance" && page?.reason === "server-policies-only"
+          ? tOr("companionPage.cropInsurance.serverOnly", "Insurance policies can be read only from the game's server state.")
+        : key === "cropInsurance" && page?.reason === "no-policy-register"
+          ? tOr("companionPage.cropInsurance.registerUnavailable", "The insurance policy register is unavailable in this game session.")
         : key === "moistureSystem" && page?.readState === "settings-only" && hasMoistureMapCropReading(page)
           ? tOr(
               "companionPage.moistureSystem.noticeMapCropLimited",

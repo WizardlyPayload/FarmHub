@@ -1084,6 +1084,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "transportCompany",
+        title = "Transport Company",
+        category = "economy",
+        names = { "FS25_TransportCompany", "KM_80292_transport_company" },
+        substrings = { "transportcompany", "transport_company", "transport-company" },
+        globals = {},
+    },
+    {
         id = "snowContracts",
         title = "Snow Contracts",
         category = "fields",

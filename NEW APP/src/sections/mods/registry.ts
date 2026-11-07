@@ -53,6 +53,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/realisticFarmFinanceLoans").then((m) => m.Page) },
   { key: "bankAndCreditLoans", catalogId: "bankAndCreditLoans", title: "Bank And Credit loans", glyph: "BK", group: "finance",
     load: () => import("@/sections/mods/bankAndCreditLoans").then((m) => m.Page) },
+  { key: "transportCompany", catalogId: "transportCompany", title: "Transport Company", glyph: "TC", group: "finance",
+    load: () => import("@/sections/mods/transportCompany").then((m) => m.Page) },
   { key: "futuresMarketPositions", catalogId: "futuresMarketPositions", title: "Futures Market", glyph: "FM", group: "finance",
     load: () => import("@/sections/mods/futuresMarketPositions").then((m) => m.Page) },
   { key: "farmReputation", catalogId: "farmReputation", title: "Farm Reputation", glyph: "FR", group: "finance",

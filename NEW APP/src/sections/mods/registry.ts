@@ -164,6 +164,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/sowingMachineRollerReady").then((m) => m.Page) },
   { key: "advancedSeedingControl", catalogId: "advancedSeedingControl", title: "Advanced Seeding Control", glyph: "AC", group: "fleet",
     load: () => import("@/sections/mods/advancedSeedingControl").then((m) => m.Page) },
+  { key: "flexibleCombiSeeder", catalogId: "flexibleCombiSeeder", title: "Flexible Combi Seeder", glyph: "FC", group: "fleet",
+    load: () => import("@/sections/mods/flexibleCombiSeeder").then((m) => m.Page) },
   { key: "vehicleTradeIn", catalogId: "vehicleTradeIn", title: "Vehicle Trade In", glyph: "TI", group: "fleet",
     load: () => import("@/sections/mods/vehicleTradeIn").then((m) => m.Page) },
   { key: "dynamicDealership", catalogId: "dynamicDealership", title: "Dynamic Dealership", glyph: "DD", group: "fleet",

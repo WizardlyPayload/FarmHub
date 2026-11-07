@@ -706,6 +706,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "flexibleCombiSeeder",
+    title: "Flexible Combi Seeder",
+    category: "fleet",
+    descKey: "companions.desc.flexibleCombiSeeder",
+    desc: "Shows whether eligible owned combi seeders use their second tank for seeds or fertilizer. It does not record field work.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "vehicleTradeIn",
     title: "Vehicle Trade In",
     category: "fleet",

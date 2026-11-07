@@ -140,6 +140,10 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
           ? tOr("companionPage.advancedSeedingControl.noneEligible", "No owned seeder has a readable Advanced Seeding Control setting.")
         : key === "advancedSeedingControl" && page?.reason === "server-vehicles-only"
           ? tOr("companionPage.advancedSeedingControl.serverOnly", "Seeder settings can be read only from the game's server state.")
+        : key === "flexibleCombiSeeder" && page?.reason === "no-eligible-owned-combi-seeder"
+          ? tOr("companionPage.flexibleCombiSeeder.noneEligible", "No eligible combi seeder is currently owned by this farm.")
+        : key === "flexibleCombiSeeder" && page?.reason === "server-vehicles-only"
+          ? tOr("companionPage.flexibleCombiSeeder.serverOnly", "Combi seeder modes can be read only from the game's server state.")
         : key === "whiteysFarmStaff" && page?.reason === "singleplayer-farm-one-only"
           ? tOr("companionPage.whiteysFarmStaff.singleplayerOnly", "This staff roster is available only for the active single-player farm.")
         : key === "whiteysFarmStaff" && page?.reason === "staff-menu-manager-unavailable"

@@ -529,6 +529,34 @@
   font-size: 0.8rem;
 }
 
+.fd-rf-dairy__breeds {
+  border-top: 1px solid var(--farm-border);
+  margin-top: 0.65rem;
+  padding-top: 0.55rem;
+  font-size: 0.8rem;
+}
+
+.fd-rf-dairy__breeds h4 {
+  font-size: 0.82rem;
+  margin: 0.45rem 0 0.3rem;
+}
+
+.fd-rf-dairy__breeds p,
+.fd-rf-dairy__breeds ul {
+  margin: 0.2rem 0 0.45rem;
+}
+
+.fd-rf-dairy__breeds ul {
+  list-style: none;
+  padding: 0;
+}
+
+.fd-rf-dairy__breeds li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .fd-rf-dairy__footnote {
   margin-top: 0.65rem;
 }

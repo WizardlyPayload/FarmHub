@@ -513,6 +513,28 @@ return tostring(p.enabled) .. ":" .. tostring(p.byFarm["1"] == nil) .. ":" .. to
         expect(run({ files: DAIRY_FILES, engine, body })).toBe("true:true:b2");
     });
 
+    test("Dairy Core breed provenance is bounded to its declared farm and preserves unavailable", () => {
+        const engine = `${dairyEngine}
+DAIRY.getBarnRows = function(self)
+    return {
+        { barnId = "b1", farmId = 1, breedSurfaceVersion = 1, breedSurfaceFarmId = 1,
+          herdBreedComposition = { available = true, totalMilkingHeadcount = 3, counts = { HOLSTEIN = 2, ANGUS = 1 } },
+          milkBreedProvenance = { MILK = { available = true, litres = 100, knownLitres = { HOLSTEIN = 60 }, unknownLitres = 40 },
+            MILKGOAT = { available = false, reason = "WAITING_FOR_SERVER" } } },
+        { barnId = "b2", farmId = 2, breedSurfaceVersion = 1, breedSurfaceFarmId = 1,
+          herdBreedComposition = { available = false }, milkBreedProvenance = { MILK = { available = false } } }
+    }
+end
+`;
+        const body = `local _, p = RfDairyDataCollector:collectStep({})
+local a = p.byFarm["1"].barns[1].breedSurface
+local b = p.byFarm["2"].barns[1].breedSurface
+return table.concat({tostring(a.herd.totalMilkingHeadcount), a.herd.breeds[1].name,
+    tostring(a.milk[1].litres), tostring(a.milk[1].unknownLitres),
+    tostring(a.milk[2].available), tostring(a.milk[2].litres == nil), tostring(b == nil)}, ":")`;
+        expect(run({ files: DAIRY_FILES, engine, body })).toBe("3:ANGUS:100:40:false:true:true");
+    });
+
     test("a dashboard DairyConstants shadow is ignored", () => {
         const body = `rawset(_G, "DairyConstants", { CONTRACTS = { TYPES = { standard = { name = "Shadow" } } } })\n${dairyBody}`;
         expect(run({ files: DAIRY_FILES, engine: dairyEngine, body })).toBe(dairyExpected);

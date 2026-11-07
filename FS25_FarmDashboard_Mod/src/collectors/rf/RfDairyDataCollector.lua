@@ -198,6 +198,78 @@ local function barnRowFromRecord(mgr, barnId, barn)
 end
 
 --- DairyCore 1.0.5+ read contract (getBarnRows). Maps keys onto the frozen FarmHub schema.
+local function finiteNonnegative(value)
+    local n = tonumber(value)
+    if n == nil or n ~= n or n < 0 or n > 1000000000000 then return nil end
+    return n
+end
+
+local function boundedLabel(value)
+    if type(value) ~= "string" then return nil end
+    local label = value:gsub("[%c]", ""):sub(1, 64)
+    if label == "" then return nil end
+    return label
+end
+
+local function boundedBreedRows(values, maxRows)
+    local rows = {}
+    if type(values) ~= "table" then return rows end
+    local scanned = 0
+    for name, value in pairs(values) do
+        scanned = scanned + 1
+        if scanned > 64 then break end
+        local label, amount = boundedLabel(name), finiteNonnegative(value)
+        if label ~= nil and amount ~= nil then
+            rows[#rows + 1] = { name = label, value = amount }
+        end
+    end
+    table.sort(rows, function(a, b) return a.name < b.name end)
+    while #rows > maxRows do rows[#rows] = nil end
+    return rows
+end
+
+local function breedSurface(crow)
+    if tonumber(crow.breedSurfaceVersion) ~= 1
+        or tonumber(crow.breedSurfaceFarmId) == nil
+        or tonumber(crow.breedSurfaceFarmId) ~= tonumber(crow.farmId) then
+        return nil
+    end
+    local out = {}
+    local herd = crow.herdBreedComposition
+    if type(herd) == "table" then
+        out.herd = { available = herd.available == true }
+        if herd.available == true then
+            out.herd.totalMilkingHeadcount = finiteNonnegative(herd.totalMilkingHeadcount)
+            out.herd.breeds = boundedBreedRows(herd.counts, 12)
+        end
+    end
+    out.milk = {}
+    if type(crow.milkBreedProvenance) == "table" then
+        local names = {}
+        local scanned = 0
+        for name in pairs(crow.milkBreedProvenance) do
+            scanned = scanned + 1
+            if scanned > 32 then break end
+            if boundedLabel(name) ~= nil then names[#names + 1] = name end
+        end
+        table.sort(names)
+        for i = 1, math.min(#names, 4) do
+            local record = crow.milkBreedProvenance[names[i]]
+            if type(record) == "table" then
+                local row = { fillType = boundedLabel(names[i]), available = record.available == true }
+                if row.available then
+                    row.litres = finiteNonnegative(record.litres)
+                    row.unknownLitres = finiteNonnegative(record.unknownLitres)
+                    row.breeds = boundedBreedRows(record.knownLitres, 12)
+                end
+                out.milk[#out.milk + 1] = row
+            end
+        end
+    end
+    if out.herd == nil and #out.milk == 0 then return nil end
+    return out
+end
+
 local function barnRowFromContract(mgr, crow)
     if type(crow) ~= "table" or crow.barnId == nil then return nil end
     local barnId = crow.barnId
@@ -251,6 +323,7 @@ local function barnRowFromContract(mgr, crow)
         lastCollectionDay = lastDay,
         feedDiseaseFlag = feedFlag,
         contractSummary = summary,
+        breedSurface = breedSurface(crow),
     }
 end
 

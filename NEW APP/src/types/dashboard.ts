@@ -225,6 +225,10 @@ export interface RealisticFarmingPayload {
           lastCollectionDay?: number;
           feedDiseaseFlag?: boolean;
           contractSummary?: string | null;
+          breedSurface?: {
+            herd?: { available: boolean; totalMilkingHeadcount?: number; breeds?: { name: string; value: number }[] };
+            milk: { fillType: string; available: boolean; litres?: number; unknownLitres?: number; breeds?: { name: string; value: number }[] }[];
+          };
         }[];
       }
     >;

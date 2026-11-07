@@ -11,6 +11,50 @@ import {
 } from "@/lib/realisticFarming/dairy";
 import type { RealisticFarmingPayload } from "@/types/dashboard";
 
+function BreedSurface({ barn }: { barn: RfDairyBarn }) {
+  const surface = barn.breedSurface;
+  if (!surface) return null;
+  return (
+    <div class="fd-rf-dairy__breeds">
+      {surface.herd ? (
+        <div>
+          <h4>{t("pastures.rfDairy.breedHerd")}</h4>
+          {surface.herd.available ? (
+            <>
+              <strong>{surface.herd.totalMilkingHeadcount ?? t("common.notAvailable")}</strong>
+              <ul>{(surface.herd.breeds ?? []).map((breed) => (
+                <li key={breed.name}><span>{breed.name}</span><span>{Math.round(breed.value)}</span></li>
+              ))}</ul>
+            </>
+          ) : <p>{t("common.notAvailable")}</p>}
+        </div>
+      ) : null}
+      {surface.milk.length > 0 ? (
+        <div>
+          <h4>{t("pastures.rfDairy.breedMilk")}</h4>
+          {surface.milk.map((milk) => (
+            <div key={milk.fillType}>
+              <strong>{milk.fillType}: {milk.available && milk.litres != null
+                ? `${Math.round(milk.litres)} L`
+                : t("common.notAvailable")}</strong>
+              {milk.available ? (
+                <ul>
+                  {(milk.breeds ?? []).map((breed) => (
+                    <li key={breed.name}><span>{breed.name}</span><span>{Math.round(breed.value)} L</span></li>
+                  ))}
+                  {(milk.unknownLitres ?? 0) > 0 ? (
+                    <li><span>{t("pastures.rfDairy.breedUnknown")}</span><span>{Math.round(milk.unknownLitres!)} L</span></li>
+                  ) : null}
+                </ul>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function BarnCard({ barn }: { barn: RfDairyBarn }) {
   return (
     <div class="fd-rf-dairy__barn">
@@ -58,6 +102,7 @@ function BarnCard({ barn }: { barn: RfDairyBarn }) {
           </div>
         ) : null}
       </dl>
+      <BreedSurface barn={barn} />
     </div>
   );
 }

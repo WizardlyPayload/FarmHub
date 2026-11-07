@@ -146,6 +146,14 @@ local CATALOG = {
         globals = { "ResourceUsageControl" },
     },
     {
+        id = "factoryContracts",
+        title = "GN Realism - Factory Contracts",
+        category = "economy",
+        names = { "FS25_FactoryContracts", "KM_82639_Factory_Contracts" },
+        substrings = { "factorycontracts", "factory_contracts" },
+        globals = {},
+    },
+    {
         id = "dynamicFieldPrices",
         title = "Dynamic Field Prices",
         category = "fields",

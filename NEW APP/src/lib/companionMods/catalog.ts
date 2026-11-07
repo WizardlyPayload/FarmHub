@@ -242,6 +242,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "fields",
   },
   {
+    id: "factoryContracts",
+    title: "GN Realism - Factory Contracts",
+    category: "economy",
+    descKey: "companions.desc.factoryContracts",
+    desc: "Shows this farm's signed factory contracts, delivery progress and locked terms. It excludes the shared offer board.",
+    relatedSection: "economy",
+  },
+  {
     id: "dynamicFieldPrices",
     title: "Dynamic Field Prices",
     category: "fields",

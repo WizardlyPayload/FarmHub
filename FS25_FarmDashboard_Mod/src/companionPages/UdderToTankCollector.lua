@@ -1,7 +1,9 @@
 -- Udder to Tank: read stored udder milk for producing animals in this farm's pens.
 -- Do not call ensure/capacityFor/showInfo: those initialise or mutate animal records.
 
-local MAX_PLACEABLES, MAX_PENS, MAX_CLUSTERS, MAX_ANIMALS, MAX_ROWS = 300, 40, 240, 2000, 60
+-- The generic companion-page sanitizer preserves up to 200 array rows. Keep
+-- that full budget so a normal Realistic Livestock herd need not omit animals.
+local MAX_PLACEABLES, MAX_PENS, MAX_CLUSTERS, MAX_ANIMALS, MAX_ROWS = 300, 40, 240, 2000, 200
 
 CompanionPages.register({
     key = "udderToTank",

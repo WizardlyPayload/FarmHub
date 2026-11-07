@@ -77,3 +77,21 @@ test("invalid animal records cannot contribute a false total", () => {
     byFarm: { "1": { clusterCount: 1, animalCount: 1, storedLitres: 2 } } });
   expect(page.rows).toHaveLength(1);
 });
+
+test("keeps all 81 owned singleton groups within the bounded page budget", () => {
+  const many = SETUP.replace('pen(1, "Dairy Barn", { cow, young })', `pen(1, "Dairy Barn", (function()
+    local groups = {}
+    for i = 1, 80 do
+      groups[i] = { getNumAnimals = function() return 1 end,
+        udderMilkAnimals = { { id = tostring(i), liters = 1, capacityFactor = 1 } },
+        display = true, goat = false }
+    end
+    return groups
+  end)())`);
+  const page = runCompanionPage(FILE, many, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "ok", coverage: "complete",
+    byFarm: { "1": { clusterCount: 81, animalCount: 81, storedLitres: 82 } } });
+  expect(page.rows).toHaveLength(81);
+  const merged = normalizeCompanionPages({ pages: { udderToTank: page } }, { modules: loadModules() });
+  expect(merged.pages.udderToTank.rows).toHaveLength(81);
+});

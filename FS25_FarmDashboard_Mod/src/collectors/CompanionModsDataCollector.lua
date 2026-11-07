@@ -378,6 +378,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "multiplayerAchievements",
+        title = "Multiplayer Achievements",
+        category = "economy",
+        names = { "FS25_MultiplayerAchievements", "FS25_374265_Multiplayer_Achievements_-_Per_Player" },
+        substrings = { "multiplayerachievements", "multiplayer_achievements" },
+        globals = {},
+    },
+    {
         id = "realLandFinance",
         title = "Real Land Finance",
         category = "economy",

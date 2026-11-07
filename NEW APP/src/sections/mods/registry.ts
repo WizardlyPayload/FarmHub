@@ -39,6 +39,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/cryptoFarm").then((m) => m.Page) },
   { key: "netWorthTracker", catalogId: "netWorthTracker", title: "Net Worth Tracker", glyph: "NW", group: "finance",
     load: () => import("@/sections/mods/netWorthTracker").then((m) => m.Page) },
+  { key: "multiplayerAchievements", catalogId: "multiplayerAchievements", title: "Multiplayer Achievements", glyph: "MA", group: "finance",
+    load: () => import("@/sections/mods/multiplayerAchievements").then((m) => m.Page) },
   { key: "economicHistory", catalogId: "economicHistory", title: "Economic History", glyph: "EH", group: "finance",
     load: () => import("@/sections/mods/economicHistory").then((m) => m.Page) },
   { key: "usedEquipmentYards", catalogId: "usedEquipmentYards", title: "Used Equipment Yards", glyph: "UY", group: "finance",

@@ -458,6 +458,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "multiplayerAchievements",
+    title: "Multiplayer Achievements",
+    category: "economy",
+    descKey: "companions.desc.multiplayerAchievements",
+    desc: "Shows this farm's multiplayer eligibility balance, peak and breeding counts. Personal profile achievements and map-wide collectibles are not farm readings.",
+    relatedSection: "economy",
+  },
+  {
     id: "realLandFinance",
     title: "Real Land Finance",
     category: "economy",

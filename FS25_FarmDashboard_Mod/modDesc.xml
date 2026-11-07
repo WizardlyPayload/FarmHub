@@ -217,6 +217,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/GrainTicketsCollector.lua"/>
         <sourceFile filename="src/companionPages/HarvestLedgerCollector.lua"/>
         <sourceFile filename="src/companionPages/NetWorthTrackerCollector.lua"/>
+        <sourceFile filename="src/companionPages/MultiplayerAchievementsCollector.lua"/>
         <sourceFile filename="src/companionPages/EconomicHistoryCollector.lua"/>
         <sourceFile filename="src/companionPages/UsedEquipmentYardsCollector.lua"/>
         <sourceFile filename="src/companionPages/RealLandFinanceCollector.lua"/>

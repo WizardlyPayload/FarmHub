@@ -1100,6 +1100,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "shopRefund",
+        title = "Shop Refund",
+        category = "vehicles",
+        names = { "FS25_364635_Shop_Refund", "FS25_ShopRefund" },
+        substrings = { "shop_refund", "shoprefund" },
+        globals = {},
+    },
+    {
         id = "snowContracts",
         title = "Snow Contracts",
         category = "fields",

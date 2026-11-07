@@ -866,6 +866,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "shopRefund",
+    title: "Shop Refund",
+    category: "fleet",
+    descKey: "companions.desc.shopRefund",
+    desc: "Shows Shop Refund's tracked recent purchases for currently owned vehicles and their remaining operating-time window. A recorded price basis is not a guaranteed dealer refund.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "transportCompany",
     title: "Transport Company",
     category: "finance",

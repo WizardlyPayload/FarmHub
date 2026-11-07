@@ -5247,4 +5247,16 @@
   ,"companionPage.agriCreditSolutions.empty": "No linked AgriCredit building agreement is recorded for this farm."
   ,"companionPage.agriCreditSolutions.truncated": "Only some agreements or buildings were scanned."
   ,"companionPage.agriCreditSolutions.partial": "Some farm agreement records could not be read or linked."
-  ,"companions.desc.transportCompany": "Shows this farm's Transport Company books, accepted freight obligations, hired drivers and historical truck records. Open offers and sold trucks are kept separate from current farm assets."}
+  ,"companions.desc.transportCompany": "Shows this farm's Transport Company books, accepted freight obligations, hired drivers and historical truck records. Open offers and sold trucks are kept separate from current farm assets."
+  ,"companions.desc.shopRefund": "Shows Shop Refund's tracked recent purchases for currently owned vehicles and their remaining operating-time window. A recorded price basis is not a guaranteed dealer refund."
+  ,"companionPage.shopRefund.lead": "Shop Refund's tracked purchase records for this farm's currently owned vehicles within the operating-time and purchase-month window. The recorded price is a basis for the mod's refund calculation, not a guaranteed payout. Dealer location, condition and sale context must still qualify."
+  ,"companionPage.shopRefund.candidates": "Tracked current vehicles"
+  ,"companionPage.shopRefund.withheld": "Records withheld"
+  ,"companionPage.shopRefund.title": "Recorded refund candidates"
+  ,"companionPage.shopRefund.vehicle": "Current vehicle"
+  ,"companionPage.shopRefund.used": "Operating minutes used"
+  ,"companionPage.shopRefund.left": "Operating minutes left"
+  ,"companionPage.shopRefund.basis": "Recorded price basis"
+  ,"companionPage.shopRefund.empty": "No current Shop Refund candidate is recorded for this farm."
+  ,"companionPage.shopRefund.truncated": "Only some recorded purchases or owned vehicles were scanned."
+  ,"companionPage.shopRefund.partial": "Some records could not be linked to a current, in-window farm vehicle and were withheld."}

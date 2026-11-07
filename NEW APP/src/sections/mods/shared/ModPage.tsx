@@ -144,6 +144,10 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
           ? tOr("companionPage.flexibleCombiSeeder.noneEligible", "No eligible combi seeder is currently owned by this farm.")
         : key === "flexibleCombiSeeder" && page?.reason === "server-vehicles-only"
           ? tOr("companionPage.flexibleCombiSeeder.serverOnly", "Combi seeder modes can be read only from the game's server state.")
+        : key === "manualPaint" && page?.reason === "no-custom-owned-vehicles"
+          ? tOr("companionPage.manualPaint.noneCustomized", "No owned vehicle has saved Manual Paint customizations.")
+        : key === "manualPaint" && page?.reason === "server-vehicles-only"
+          ? tOr("companionPage.manualPaint.serverOnly", "Saved vehicle paint can be read only from the game's server state.")
         : key === "swathRouter" && page?.reason === "no-adopted-owned-swath-implement"
           ? tOr("companionPage.swathRouter.noneReady", "No owned swath implement has been prepared for AI pickup by this mod.")
         : key === "swathRouter" && page?.reason === "server-vehicles-only"

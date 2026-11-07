@@ -722,6 +722,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "manualPaint",
+    title: "Manual Paint",
+    category: "fleet",
+    descKey: "companions.desc.manualPaint",
+    desc: "Shows saved custom paint targets and finishes on owned vehicles. Rendered color can differ because of the material texture.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "swathRouter",
     title: "Swath Router",
     category: "fleet",

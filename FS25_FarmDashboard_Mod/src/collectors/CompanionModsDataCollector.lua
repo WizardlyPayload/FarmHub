@@ -457,6 +457,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "manualPaint",
+        title = "Manual Paint",
+        category = "fleet",
+        names = { "FS25_369086_FS25_ManualPaint", "FS25_ManualPaint" },
+        substrings = { "manualpaint" },
+        globals = {},
+    },
+    {
         id = "swathRouter",
         title = "Swath Router",
         category = "fleet",

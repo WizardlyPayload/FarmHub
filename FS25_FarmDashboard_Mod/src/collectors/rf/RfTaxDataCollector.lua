@@ -62,9 +62,6 @@ local function collectFarmIds()
             end
         end
     end
-    if #ids < 1 then
-        add(1)
-    end
     return ids
 end
 
@@ -76,11 +73,21 @@ local function monthsUntil(target, current)
     return d
 end
 
-local function buildFarmRow(mgr)
+local function buildFarmRow(mgr, farmId)
     local settings = mgr.settings or {}
     local stats = mgr.stats or {}
+    -- The global annual total is a local HUD mirror in Tax Mod, not a
+    -- per-farm amount. Withhold the row unless this farm has its own bucket.
+    local farmTax = type(stats.farmTax) == "table"
+        and (stats.farmTax[farmId] or stats.farmTax[tostring(farmId)]) or nil
+    if type(farmTax) ~= "table" then
+        return nil
+    end
     local annualRate = tonumber(settings.annualTaxRate) or 0.05
-    local accumulated = tonumber(stats.taxesAccumulatedAnnual) or 0
+    local accumulated = tonumber(farmTax.taxesAccumulatedAnnual)
+    if accumulated == nil or accumulated < 0 then
+        return nil
+    end
     local projected = math.floor(accumulated * annualRate)
 
     local dailyKey = settings.taxRate
@@ -133,16 +140,12 @@ function RfTaxDataCollector:collectStep(_opts)
             return { enabled = false }
         end
 
-        local row = buildFarmRow(mgr)
         local byFarm = {}
         for _, fid in ipairs(collectFarmIds()) do
-            byFarm[tostring(fid)] = {
-                accumulatedAnnual = row.accumulatedAnnual,
-                projectedBill = row.projectedBill,
-                taxRate = row.taxRate,
-                nextEventLabel = row.nextEventLabel,
-                nextEventDay = row.nextEventDay,
-            }
+            local row = buildFarmRow(mgr, fid)
+            if row ~= nil then
+                byFarm[tostring(fid)] = row
+            end
         end
 
         return {

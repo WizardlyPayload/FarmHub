@@ -160,6 +160,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/vehicleControlAddon").then((m) => m.Page) },
   { key: "advancedVehicleFunctions", catalogId: "advancedVehicleFunctions", title: "Advanced Vehicle Functions", glyph: "AV", group: "fleet",
     load: () => import("@/sections/mods/advancedVehicleFunctions").then((m) => m.Page) },
+  { key: "sowingMachineRollerReady", catalogId: "sowingMachineRollerReady", title: "Sowing Machine Roller Ready", glyph: "SR", group: "fleet",
+    load: () => import("@/sections/mods/sowingMachineRollerReady").then((m) => m.Page) },
   { key: "vehicleTradeIn", catalogId: "vehicleTradeIn", title: "Vehicle Trade In", glyph: "TI", group: "fleet",
     load: () => import("@/sections/mods/vehicleTradeIn").then((m) => m.Page) },
   { key: "dynamicDealership", catalogId: "dynamicDealership", title: "Dynamic Dealership", glyph: "DD", group: "fleet",

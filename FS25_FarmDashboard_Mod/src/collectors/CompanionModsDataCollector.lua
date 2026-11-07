@@ -433,6 +433,14 @@ local CATALOG = {
         globals = { "UdderMilk" },
     },
     {
+        id = "sowingMachineRollerReady",
+        title = "Sowing Machine Roller Ready",
+        category = "fleet",
+        names = { "FS25_327528_FS25_sowingMachineRollerReady", "FS25_sowingMachineRollerReady" },
+        substrings = { "sowingmachinerollerready" },
+        globals = { "SowingMachineRollerReady" },
+    },
+    {
         id = "whiteysFarmStaff",
         title = "Whitey's Farm Staff Manager",
         category = "fields",

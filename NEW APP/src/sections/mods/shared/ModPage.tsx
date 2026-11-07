@@ -136,6 +136,10 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
           ? tOr("companionPage.sowingMachineRollerReady.noneEligible", "No eligible seeder is currently owned by this farm.")
         : key === "sowingMachineRollerReady" && page?.reason === "server-vehicles-only"
           ? tOr("companionPage.sowingMachineRollerReady.serverOnly", "Seeder roller settings can be read only from the game's server state.")
+        : key === "advancedSeedingControl" && page?.reason === "no-applicable-owned-seeder"
+          ? tOr("companionPage.advancedSeedingControl.noneEligible", "No owned seeder has a readable Advanced Seeding Control setting.")
+        : key === "advancedSeedingControl" && page?.reason === "server-vehicles-only"
+          ? tOr("companionPage.advancedSeedingControl.serverOnly", "Seeder settings can be read only from the game's server state.")
         : key === "whiteysFarmStaff" && page?.reason === "singleplayer-farm-one-only"
           ? tOr("companionPage.whiteysFarmStaff.singleplayerOnly", "This staff roster is available only for the active single-player farm.")
         : key === "whiteysFarmStaff" && page?.reason === "staff-menu-manager-unavailable"

@@ -698,6 +698,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "advancedSeedingControl",
+    title: "Advanced Seeding Control",
+    category: "fleet",
+    descKey: "companions.desc.advancedSeedingControl",
+    desc: "Shows the current tramline mode, lane, widths and starter fertilizer switch on owned seeders. It does not record completed sowing.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "vehicleTradeIn",
     title: "Vehicle Trade In",
     category: "fleet",

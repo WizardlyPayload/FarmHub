@@ -441,6 +441,14 @@ local CATALOG = {
         globals = { "SowingMachineRollerReady" },
     },
     {
+        id = "advancedSeedingControl",
+        title = "Advanced Seeding Control",
+        category = "fleet",
+        names = { "FS25_372286_Advanced_Seeding_Control", "FS25_Advanced_Seeding_Control" },
+        substrings = { "advanced_seeding_control", "advancedseedingcontrol" },
+        globals = { "AdvancedSeedingControlLoader" },
+    },
+    {
         id = "whiteysFarmStaff",
         title = "Whitey's Farm Staff Manager",
         category = "fields",

@@ -714,6 +714,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "swathRouter",
+    title: "Swath Router",
+    category: "fleet",
+    descKey: "companions.desc.swathRouter",
+    desc: "Shows which owned swath implements have a current AI pickup setup. It does not record completed routes or collected crop.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "vehicleTradeIn",
     title: "Vehicle Trade In",
     category: "fleet",

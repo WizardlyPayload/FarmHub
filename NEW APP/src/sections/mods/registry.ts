@@ -166,6 +166,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/advancedSeedingControl").then((m) => m.Page) },
   { key: "flexibleCombiSeeder", catalogId: "flexibleCombiSeeder", title: "Flexible Combi Seeder", glyph: "FC", group: "fleet",
     load: () => import("@/sections/mods/flexibleCombiSeeder").then((m) => m.Page) },
+  { key: "swathRouter", catalogId: "swathRouter", title: "Swath Router", glyph: "SR", group: "fleet",
+    load: () => import("@/sections/mods/swathRouter").then((m) => m.Page) },
   { key: "vehicleTradeIn", catalogId: "vehicleTradeIn", title: "Vehicle Trade In", glyph: "TI", group: "fleet",
     load: () => import("@/sections/mods/vehicleTradeIn").then((m) => m.Page) },
   { key: "dynamicDealership", catalogId: "dynamicDealership", title: "Dynamic Dealership", glyph: "DD", group: "fleet",

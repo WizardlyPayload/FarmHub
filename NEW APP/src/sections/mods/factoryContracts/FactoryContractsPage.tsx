@@ -7,7 +7,7 @@ import {
 
 const K = "companionPage.factoryContracts";
 type Contract = {
-  id?: number; factoryId?: string; fillType?: string; fillTypeIndex?: number;
+  id?: number; factoryId?: string; destinationName?: string; fillType?: string; fillTypeIndex?: number;
   status?: string; totalLiters?: number; deliveredLiters?: number;
   remainingLiters?: number; lockedPrice?: number;
 };
@@ -25,9 +25,16 @@ function statusLabel(status?: string): string {
 }
 
 export function Page({ entry }: CompanionPageProps) {
-  const { page, farmData } = useCompanionPage(entry.key);
+  const { page, farmData, payload } = useCompanionPage(entry.key);
   const unitPrice = useUnitPrice();
   const rows = asList<Contract>(page?.contracts);
+  const titles = payload?.fillTypeTitles as Record<string, string> | undefined;
+  const catalog = payload?.fillTypeCatalog as Record<string, string> | undefined;
+  const productName = (row: Contract): string => {
+    if (row.fillTypeIndex == null) return row.fillType || "—";
+    const key = String(row.fillTypeIndex);
+    return titles?.[key] || row.fillType || catalog?.[key] || `#${formatNumber(row.fillTypeIndex, 0)}`;
+  };
   const tiles: ModStatTile[] = farmData ? [
     { key: "signed", label: tOr(`${K}.signed`, "Signed contracts"), value: formatNumber(farmData.signedCount, 0) },
     { key: "active", label: tOr(`${K}.activeCount`, "Active contracts"), value: formatNumber(farmData.activeCount, 0) },
@@ -53,8 +60,8 @@ export function Page({ entry }: CompanionPageProps) {
             key: `${row.id ?? index}`,
             cells: {
               id: formatNumber(row.id, 0),
-              factory: row.factoryId || "—",
-              crop: row.fillType || (row.fillTypeIndex == null ? "—" : `#${formatNumber(row.fillTypeIndex, 0)}`),
+              factory: row.destinationName || row.factoryId || "—",
+              crop: productName(row),
               status: statusLabel(row.status),
               target: formatNumber(row.totalLiters, 0),
               delivered: formatNumber(row.deliveredLiters, 0),

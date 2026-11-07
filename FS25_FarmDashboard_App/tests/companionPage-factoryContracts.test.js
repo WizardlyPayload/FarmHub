@@ -9,7 +9,7 @@ const SETUP = `
   _G.g_currentMission = {
     getIsServer = function() return true end,
     FactoryContracts = { loadState = 2, currentDay = 12, contracts = {
-      [7] = { id = 7, farmId = 1, factoryId = "mill-a", fillTypeIndex = 3,
+      [7] = { id = 7, farmId = 1, factoryId = "mill-a", destinationName = "Oak Bridge Mill", fillTypeIndex = 3,
         contractType = "rigido", status = "activo", totalQuantity = 10000,
         deliveredTotal = 2500, lockedPrice = 1.2, durationDays = 30 },
       [8] = { id = 8, farmId = 2, factoryId = "mill-b", fillTypeIndex = 4,
@@ -27,7 +27,7 @@ test("reads only the selected farm's signed obligations", () => {
   expect(page).toMatchObject({ readState: "ok", coverage: "complete",
     byFarm: { "1": { signedCount: 2, activeCount: 1, currentDay: 12 } } });
   expect(page.contracts.map((r) => r.id)).toEqual([7, 9]);
-  expect(page.contracts[0]).toMatchObject({ factoryId: "mill-a", totalLiters: 10000,
+  expect(page.contracts[0]).toMatchObject({ factoryId: "mill-a", destinationName: "Oak Bridge Mill", totalLiters: 10000,
     deliveredLiters: 2500, remainingLiters: 7500, lockedPrice: 1.2 });
   expect(JSON.stringify(page)).not.toContain("mill-b");
   expect(normalizeCompanionPages({ pages: { factoryContracts: page } }, { modules: loadModules() })

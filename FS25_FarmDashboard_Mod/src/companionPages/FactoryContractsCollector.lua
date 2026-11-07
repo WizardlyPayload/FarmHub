@@ -47,6 +47,7 @@ CompanionPages.register({
                     rows[#rows + 1] = {
                         id = math.floor(ctx.num(contract.id)),
                         factoryId = ctx.clip(tostring(contract.factoryId or ""), 80),
+                        destinationName = ctx.clip(contract.destinationName, 80),
                         fillType = fillName,
                         fillTypeIndex = fillIndex,
                         contractType = ctx.clip(contract.contractType, 32),

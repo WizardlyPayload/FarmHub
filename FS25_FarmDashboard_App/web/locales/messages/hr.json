@@ -5259,4 +5259,16 @@
   ,"companionPage.shopRefund.basis": "Recorded price basis"
   ,"companionPage.shopRefund.empty": "No current Shop Refund candidate is recorded for this farm."
   ,"companionPage.shopRefund.truncated": "Only some recorded purchases or owned vehicles were scanned."
-  ,"companionPage.shopRefund.partial": "Some records could not be linked to a current, in-window farm vehicle and were withheld."}
+  ,"companionPage.shopRefund.partial": "Some records could not be linked to a current, in-window farm vehicle and were withheld."
+  ,"companionPage.rentYourField.lead": "Active Rent Your Field agreements recorded for this farm. The mod transfers rented land to the game's no-owner state while preserving the farm's rental claim. Monthly rent and early-termination figures are current estimates, not payments received or charged."
+  ,"companionPage.rentYourField.count": "Active rented-out farmlands"
+  ,"companionPage.rentYourField.projection": "Projected monthly rent"
+  ,"companionPage.rentYourField.title": "Rented-out farmland agreements"
+  ,"companionPage.rentYourField.land": "Farmland"
+  ,"companionPage.rentYourField.elapsed": "Months elapsed"
+  ,"companionPage.rentYourField.minimum": "Minimum remaining"
+  ,"companionPage.rentYourField.rent": "Projected monthly rent"
+  ,"companionPage.rentYourField.penalty": "Estimated termination penalty"
+  ,"companionPage.rentYourField.empty": "No active Rent Your Field agreement is confirmed for this farm. The mod does not expose a load-complete flag for an empty register."
+  ,"companionPage.rentYourField.truncated": "Only some rental agreements were scanned."
+  ,"companionPage.rentYourField.partial": "Some agreements did not match a current unowned farmland record and were withheld."}

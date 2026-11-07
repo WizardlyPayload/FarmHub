@@ -199,6 +199,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/TransportCompanyCollector.lua"/>
         <sourceFile filename="src/companionPages/AgriCreditSolutionsCollector.lua"/>
         <sourceFile filename="src/companionPages/ShopRefundCollector.lua"/>
+        <sourceFile filename="src/companionPages/RentYourFieldCollector.lua"/>
         <sourceFile filename="src/companionPages/OrganicDemandCollector.lua"/>
         <sourceFile filename="src/companionPages/AdjustableFillLevelAdvancedCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticSeederCollector.lua"/>

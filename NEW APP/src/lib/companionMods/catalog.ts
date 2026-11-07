@@ -874,6 +874,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "rentYourField",
+    title: "Rent Your Field",
+    category: "fields",
+    descKey: "companions.desc.rentYourField",
+    desc: "Shows this farm's active Rent Your Field agreements and projected monthly rent. A projection is not a recorded payment.",
+    relatedSection: "fields",
+  },
+  {
     id: "transportCompany",
     title: "Transport Company",
     category: "finance",

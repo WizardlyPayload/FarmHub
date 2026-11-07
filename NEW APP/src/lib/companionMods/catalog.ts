@@ -1019,6 +1019,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "pastures",
   },
   {
+    id: "udderToTank",
+    title: "Udder to Tank",
+    category: "livestock",
+    descKey: "companions.desc.udderToTank",
+    desc: "Shows milk currently stored in producing animals' udders at this farm's pens, separately from milk already in barn tanks.",
+    relatedSection: "pastures",
+  },
+  {
     id: "whiteysFarmStaff",
     title: "Whitey's Farm Staff Manager",
     category: "fields",

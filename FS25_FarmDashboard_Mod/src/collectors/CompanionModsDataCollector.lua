@@ -426,6 +426,13 @@ local CATALOG = {
         globals = { "AutoMilk" },
     },
     {
+        id = "udderToTank",
+        title = "Udder to Tank",
+        category = "livestock",
+        names = { "KM_82886_Udder_to_Tank" },
+        globals = { "UdderMilk" },
+    },
+    {
         id = "whiteysFarmStaff",
         title = "Whitey's Farm Staff Manager",
         category = "fields",

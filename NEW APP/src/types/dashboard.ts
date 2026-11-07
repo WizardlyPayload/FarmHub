@@ -288,7 +288,7 @@ export interface RealisticFarmingPayload {
       levels: { fillType: string; liters: number; capacity?: number }[];
       seasonalPriceHint?: string | null;
     }[];
-    openOrders?: { id: string; summary: string; status?: string }[];
+    openOrders?: { id: string; farmId?: number | null; summary: string; status?: string }[];
   };
   weatherGuard?: {
     enabled: boolean;

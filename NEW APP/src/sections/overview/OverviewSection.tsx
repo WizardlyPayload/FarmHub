@@ -494,7 +494,7 @@ export function OverviewSection() {
       }
     }
     if (modPresence.fertilizerdepot) {
-      const orders = fertilizerDepotOrders(payload?.realisticFarming?.fertilizerDepot);
+      const orders = fertilizerDepotOrders(payload?.realisticFarming?.fertilizerDepot, farmId);
       if (orders.length > 0) {
         items.push({
           key: "rf-depot",

@@ -355,6 +355,7 @@ local function collectOpenOrders(mgr)
                 local liters = tonumber(order.maxLiters) or 0
                 orders[#orders + 1] = {
                     id = string.format("pending-%s-%s", tostring(farmId), tostring(order.depotId or "?")),
+                    farmId = tonumber(farmId),
                     summary = string.format("Farm %s · %s · %.0f L (silo pickup)", tostring(farmId), display, liters),
                     status = "pending",
                 }
@@ -378,6 +379,7 @@ local function collectOpenOrders(mgr)
                     end
                     orders[#orders + 1] = {
                         id = string.format("delivery-%s", tostring(depotId)),
+                        farmId = tonumber(rec.farmId),
                         summary = string.format(
                             "Depot #%s delivery · %d item(s) · farm %s",
                             tostring(depotId),

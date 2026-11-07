@@ -70,10 +70,12 @@ export function FertilizerDepotPanel({
   variant?: "storage" | "page";
 }) {
   const setSection = useDashboardStore((s) => s.setSection);
+  const activeFarmId = useDashboardStore((s) => s.activeFarmId);
   if (!isFertilizerDepotActive(fertilizerDepot)) return null;
-  const depots = fertilizerDepots(fertilizerDepot);
-  const orders = fertilizerDepotOrders(fertilizerDepot);
-  const seasonHint = fertilizerDepotSeasonHint(fertilizerDepot);
+  const farmId = activeFarmId ?? 1;
+  const depots = fertilizerDepots(fertilizerDepot, farmId);
+  const orders = fertilizerDepotOrders(fertilizerDepot, farmId);
+  const seasonHint = fertilizerDepotSeasonHint(fertilizerDepot, farmId);
   const settings = fertilizerDepotSettings(fertilizerDepot);
   const maxRows = variant === "page" ? 24 : 12;
   const title = variant === "page" ? undefined : t("storage.rfDepot.title");

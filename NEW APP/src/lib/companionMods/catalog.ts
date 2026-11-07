@@ -1107,6 +1107,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "manualAttach",
+    title: "Manual Attach",
+    category: "fleet",
+    descKey: "companions.desc.manualAttach",
+    desc: "Shows current hose and PTO connection readiness on this farm's attached implements. It does not record work or travel.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "organicDemand",
     title: "Demand-Oriented Organic Application",
     category: "fields",

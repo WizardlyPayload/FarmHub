@@ -1,0 +1,55 @@
+"use strict";
+
+const { runCompanionPage } = require("./helpers/companion-page-lua.cjs");
+const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge.cjs");
+
+const FILE = "ManualAttachCollector.lua";
+const GAME = `
+  _G.g_modIsLoaded = { FS25_340627_FS25_manualAttach = true }
+  _G.PowerTakeOffExtension = {
+    hasPowerTakeOffs = function(implement, parent) return implement.hasPto end,
+    hasAttachedPowerTakeOffs = function(implement, parent) return implement.ptoConnected end,
+  }
+  _G.ConnectionHosesExtension = {
+    hasConnectionHoses = function(implement, parent) return implement.hasHoses end,
+    hasAttachedConnectionHoses = function(implement) return implement.hosesConnected end,
+  }
+  local parent = { getFullName = function() return "Owned Tractor" end }
+  local function vehicle(id, owner, hasPto, ptoConnected, hasHoses, hosesConnected)
+    return { uniqueId = id, ownerFarmId = owner, hasPto = hasPto, ptoConnected = ptoConnected,
+      hasHoses = hasHoses, hosesConnected = hosesConnected,
+      spec_manualAttachPowerTakeOff = {}, spec_manualAttachConnectionHoses = {},
+      getAttacherVehicle = function() return parent end,
+      getFullName = function(self) return self.uniqueId end }
+  end
+  _G.g_currentMission = { getIsServer = function() return true end,
+    vehicleSystem = { vehicles = {
+      vehicle("ready", 1, true, true, true, true),
+      vehicle("needs-pto", 1, true, false, true, true),
+      vehicle("foreign-secret", 2, true, false, true, false),
+      vehicle("no-connections", 1, false, false, false, false),
+    } } }
+`;
+
+test("reads only owned attached implement connections and preserves false states", () => {
+  const page = runCompanionPage(FILE, GAME, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "ok", coverage: "complete",
+    byFarm: { "1": { implementCount: 2, connectedCount: 1, needsConnectionCount: 1 } } });
+  expect(page.rows.find((row) => row.vehicleId === "needs-pto"))
+    .toMatchObject({ pto: false, hoses: true, attachedTo: "Owned Tractor" });
+  expect(JSON.stringify(page)).not.toMatch(/foreign-secret|no-connections/);
+  const merged = normalizeCompanionPages({ pages: { manualAttach: page } }, { modules: loadModules() });
+  expect(merged.pages.manualAttach.rows).toHaveLength(2);
+});
+
+test("withholds client state and unavailable helper state", () => {
+  const client = GAME.replace("getIsServer = function() return true end", "getIsServer = function() return false end");
+  expect(runCompanionPage(FILE, client, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "server-vehicle-state-only" });
+  const unavailable = GAME.replace("_G.PowerTakeOffExtension = {", "_G.PowerTakeOffExtension = nil\n  local unused = {");
+  expect(runCompanionPage(FILE, unavailable, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "manual-attach-state-unavailable" });
+  const brokenCheck = GAME.replace("hasPowerTakeOffs = function(implement, parent) return implement.hasPto end,", "");
+  expect(runCompanionPage(FILE, brokenCheck, { farmId: 1 }))
+    .toMatchObject({ readState: "partial" });
+});

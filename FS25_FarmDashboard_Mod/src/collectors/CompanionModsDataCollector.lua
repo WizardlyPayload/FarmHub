@@ -689,6 +689,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "manualAttach",
+        title = "Manual Attach",
+        category = "fleet",
+        names = { "FS25_340627_FS25_manualAttach", "FS25_manualAttach" },
+        substrings = { "manualattach" },
+        globals = {},
+    },
+    {
         id = "organicDemand",
         title = "Demand-Oriented Organic Application",
         category = "fleet",

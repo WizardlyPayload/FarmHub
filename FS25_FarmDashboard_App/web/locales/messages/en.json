@@ -1302,6 +1302,7 @@
   "livestock.labelAge": "Age:",
   "livestock.labelLocation": "Location:",
   "livestock.labelHealth": "Health:",
+  "livestock.infectiousDiseaseRecords": "Current infectious disease records",
   "livestock.labelWeight": "Weight:",
   "livestock.labelReproduction": "Reproduction:",
   "livestock.labelMotherId": "Mother ID:",

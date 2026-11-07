@@ -152,6 +152,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/UdderToTankCollector.lua"/>
         <sourceFile filename="src/companionPages/WhiteysFarmStaffCollector.lua"/>
         <sourceFile filename="src/companionPages/EmployeesCollector.lua"/>
+        <sourceFile filename="src/companionPages/TramlineSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/ProductionWatcherCollector.lua"/>
         <sourceFile filename="src/companionPages/ProductionControlCollector.lua"/>
         <sourceFile filename="src/companionPages/ProductionBoosterSystemCollector.lua"/>

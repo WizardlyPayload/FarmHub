@@ -1162,6 +1162,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     desc: "Shows this farm's hired staff, contract terms, current-period hours, training and illness from the Employees mod. It does not report wages paid or jobs completed.",
     relatedSection: "fields",
   },
+  {
+    id: "tramlineSystem",
+    title: "Tramline System",
+    category: "fields",
+    descKey: "companions.desc.tramlineSystem",
+    desc: "Shows saved tramline setup and this mod's sowing-area counters on owned seeders. A lane setting does not prove a tramline was made.",
+    relatedSection: "fields",
+  },
 ];
 
 export function catalogEntry(id: string | undefined | null): CompanionCatalogEntry | undefined {

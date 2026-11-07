@@ -537,6 +537,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "tramlineSystem",
+        title = "Tramline System",
+        category = "fields",
+        names = { "FS25_TramlineSystem", "FS25_Tramline_System", "KM_83120_Tramline_System" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "baleBatchTracker",
         title = "Bale Batch Tracker",
         category = "storage",

@@ -137,17 +137,17 @@ local function buildFarmRow(mgr, farmId)
     local advisoryMonth = tonumber(stats.taxAdvisoryMonth) or 12
     local returnMonth = tonumber(stats.taxReturnMonth) or 3
     local nextEventLabel
-    local nextEventDay
+    local nextEventMonths
     local projected
     if currentMonth ~= nil and (mgr.settings or {}).enabled ~= false then
         local mToAdvisory = monthsUntil(advisoryMonth, currentMonth)
         local mToPayment = monthsUntil(returnMonth, currentMonth)
         if mToPayment <= mToAdvisory then
             nextEventLabel = "Tax payment"
-            nextEventDay = mToPayment
+            nextEventMonths = mToPayment
         else
             nextEventLabel = "Tax advisory"
-            nextEventDay = mToAdvisory
+            nextEventMonths = mToAdvisory
         end
         if currentYear ~= nil and annualRate ~= nil then
             local dueYear = currentYear + (currentMonth >= returnMonth and 1 or 0)
@@ -170,7 +170,7 @@ local function buildFarmRow(mgr, farmId)
         projectedBill = projected,
         taxRate = annualRate and annualRate * 100 or nil,
         nextEventLabel = nextEventLabel,
-        nextEventDay = nextEventDay,
+        nextEventMonths = nextEventMonths,
     }
 end
 

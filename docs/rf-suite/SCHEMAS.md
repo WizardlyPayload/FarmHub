@@ -123,7 +123,7 @@ The Fields section surfaces `reason` as a one-line "Soil Fertilizer is installed
 | Key | Type |
 |-----|------|
 | `enabled` | boolean |
-| `byFarm` | `{ [farmId]: { accumulatedAnnual?: number, projectedBill?: number, taxRate?: number, nextEventLabel?: string \| null, nextEventDay?: number \| null } }` |
+| `byFarm` | `{ [farmId]: { accumulatedAnnual?: number, projectedBill?: number, taxRate?: number, nextEventLabel?: string \| null, nextEventMonths?: number \| null } }` (`nextEventDay` in older exports held the same month count) |
 
 ### Economy — `marketDynamics`
 

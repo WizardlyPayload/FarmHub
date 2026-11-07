@@ -63,7 +63,7 @@ function TaxPanel({
         {row?.nextEventLabel
           ? t("economy.rf.tax.nextEventValue", {
               label: row.nextEventLabel,
-              months: row.nextEventDay ?? "—",
+              months: row.nextEventMonths ?? row.nextEventDay ?? "—",
             })
           : "—"}
       </MetaRow>

@@ -143,6 +143,8 @@ export interface RealisticFarmingPayload {
         projectedBill?: number;
         taxRate?: number;
         nextEventLabel?: string | null;
+        nextEventMonths?: number | null;
+        /** Older exports used this key for a month count. */
         nextEventDay?: number | null;
       }
     >;

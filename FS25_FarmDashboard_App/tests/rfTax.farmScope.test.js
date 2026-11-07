@@ -87,7 +87,7 @@ test("uses Tax Mod's effective annual rate and floors eligible imported buckets 
         projectedBill: 78,
         taxRate: 7.5,
         nextEventLabel: "Tax advisory",
-        nextEventDay: 6,
+        nextEventMonths: 6,
     }));
 });
 

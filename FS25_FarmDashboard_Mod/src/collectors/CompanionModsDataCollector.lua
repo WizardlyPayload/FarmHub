@@ -713,6 +713,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "realTireWear",
+        title = "Real Tire Wear",
+        category = "fleet",
+        names = { "KM_82753_Real_Tire_Wear", "FS25_RealTireWear" },
+        substrings = { "real_tire_wear", "realtirewear" },
+        globals = {},
+    },
+    {
         id = "adjustableFillLevelAdvanced",
         title = "Adjustable Fill Level Advanced",
         category = "fleet",

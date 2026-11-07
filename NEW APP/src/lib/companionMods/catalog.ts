@@ -738,6 +738,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "realTireWear",
+    title: "Real Tire Wear",
+    category: "fleet",
+    descKey: "companions.desc.realTireWear",
+    desc: "Shows recorded wheel wear and tire passports on this farm's vehicles, plus this farm's separate spare-tire stock.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "vehicleControlAddon",
     title: "Vehicle Control Addon",
     category: "fleet",

@@ -1219,6 +1219,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "fields",
   },
   {
+    id: "personnelManagement",
+    title: "Personnel Management",
+    category: "fields",
+    descKey: "companions.desc.personnelManagement",
+    desc: "Shows this farm's Personnel Management roster, applicant count, staff attributes, wage terms and recorded work counters. It does not hire staff or assign jobs.",
+    relatedSection: "fields",
+  },
+  {
     id: "tramlineSystem",
     title: "Tramline System",
     category: "fields",

@@ -127,6 +127,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/whiteysFarmStaff").then((m) => m.Page) },
   { key: "employees", catalogId: "employees", title: "Employees", glyph: "EM", group: "fields",
     load: () => import("@/sections/mods/employees").then((m) => m.Page) },
+  { key: "personnelManagement", catalogId: "personnelManagement", title: "Personnel Management", glyph: "PM", group: "fields",
+    load: () => import("@/sections/mods/personnelManagement").then((m) => m.Page) },
   { key: "tramlineSystem", catalogId: "tramlineSystem", title: "Tramline System", glyph: "TS", group: "fields",
     load: () => import("@/sections/mods/tramlineSystem").then((m) => m.Page) },
   { key: "fieldToDoPlannedCrops", catalogId: "fieldToDoPlannedCrops", title: "Field To-Do List", glyph: "TD", group: "fields",

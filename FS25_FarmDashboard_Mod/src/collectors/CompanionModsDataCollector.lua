@@ -545,6 +545,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "personnelManagement",
+        title = "Personnel Management",
+        category = "fields",
+        names = { "KM_79440_Personnel_Management", "FS25_HelperPersonnel" },
+        substrings = { "personnel_management", "helperpersonnel" },
+        globals = {},
+    },
+    {
         id = "tramlineSystem",
         title = "Tramline System",
         category = "fields",

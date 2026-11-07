@@ -258,6 +258,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "agroRealisticHealthLoss",
+    title: "Agro Realistic - animal health timer",
+    category: "livestock",
+    descKey: "companions.desc.agroRealisticHealthLoss",
+    desc: "Shows the mod's active zero-health hour counters for this farm's animal clusters. It does not record past animal losses.",
+    relatedSection: "pastures",
+  },
+  {
     id: "factoryContracts",
     title: "GN Realism - Factory Contracts",
     category: "economy",

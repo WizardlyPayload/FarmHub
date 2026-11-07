@@ -121,6 +121,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "dynamicMolehills",
+        title = "Dynamic Molehills",
+        category = "fields",
+        names = { "FS25_DynamicMolehills", "FS25_370425_FS25_DynamicMoleHills" },
+        substrings = { "dynamicmolehills", "dynamic_molehills" },
+        globals = { "DynamicMolehills" },
+    },
+    {
         id = "cropControlOverride",
         title = "Crop Control Override",
         category = "fields",

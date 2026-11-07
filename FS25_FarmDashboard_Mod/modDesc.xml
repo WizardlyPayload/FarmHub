@@ -169,6 +169,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/FieldLeasingCollector.lua"/>
         <sourceFile filename="src/companionPages/SoilWorkYieldBonusCollector.lua"/>
         <sourceFile filename="src/companionPages/SmartCropControlCollector.lua"/>
+        <sourceFile filename="src/companionPages/DynamicMolehillsCollector.lua"/>
         <sourceFile filename="src/companionPages/BushelPlusCollector.lua"/>
         <sourceFile filename="src/companionPages/OutOfFuelCollector.lua"/>
         <sourceFile filename="src/companionPages/VehicleMileageCollector.lua"/>

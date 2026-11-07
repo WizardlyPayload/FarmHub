@@ -218,6 +218,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "fields",
   },
   {
+    id: "dynamicMolehills",
+    title: "Dynamic Molehills",
+    category: "fields",
+    descKey: "companions.desc.dynamicMolehills",
+    desc: "Counts current active, compressed and smoothed mounds on this farm's land. It does not track removed mounds or mower damage.",
+    relatedSection: "fields",
+  },
+  {
     id: "cropControlOverride",
     title: "Crop Control Override",
     category: "fields",

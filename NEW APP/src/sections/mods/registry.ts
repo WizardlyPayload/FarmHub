@@ -168,6 +168,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/flexibleCombiSeeder").then((m) => m.Page) },
   { key: "manualPaint", catalogId: "manualPaint", title: "Manual Paint", glyph: "MP", group: "fleet",
     load: () => import("@/sections/mods/manualPaint").then((m) => m.Page) },
+  { key: "dynamicMolehills", catalogId: "dynamicMolehills", title: "Dynamic Molehills", glyph: "MH", group: "fields",
+    load: () => import("@/sections/mods/dynamicMolehills").then((m) => m.Page) },
   { key: "swathRouter", catalogId: "swathRouter", title: "Swath Router", glyph: "SR", group: "fleet",
     load: () => import("@/sections/mods/swathRouter").then((m) => m.Page) },
   { key: "vehicleTradeIn", catalogId: "vehicleTradeIn", title: "Vehicle Trade In", glyph: "TI", group: "fleet",

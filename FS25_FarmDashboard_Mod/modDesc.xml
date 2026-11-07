@@ -197,6 +197,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/VariableTirePressureCollector.lua"/>
         <sourceFile filename="src/companionPages/RealTireWearCollector.lua"/>
         <sourceFile filename="src/companionPages/TransportCompanyCollector.lua"/>
+        <sourceFile filename="src/companionPages/AgriCreditSolutionsCollector.lua"/>
         <sourceFile filename="src/companionPages/OrganicDemandCollector.lua"/>
         <sourceFile filename="src/companionPages/AdjustableFillLevelAdvancedCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticSeederCollector.lua"/>

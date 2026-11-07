@@ -858,6 +858,22 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "agriCreditSolutions",
+    title: "AgriCredit Solutions",
+    category: "finance",
+    descKey: "companions.desc.agriCreditSolutions",
+    desc: "Shows active AgriCredit building finance agreements for this farm when their buildings are still owned. Unlinked agreements are reported separately.",
+    relatedSection: "economy",
+  },
+  {
+    id: "transportCompany",
+    title: "Transport Company",
+    category: "finance",
+    descKey: "companions.desc.transportCompany",
+    desc: "Shows this farm's Transport Company books, accepted freight obligations, hired drivers and historical truck records. Open offers and sold trucks are kept separate from current farm assets.",
+    relatedSection: "economy",
+  },
+  {
     id: "futuresMarketPositions",
     title: "Futures Market",
     category: "finance",

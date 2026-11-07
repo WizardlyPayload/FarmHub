@@ -1092,6 +1092,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "agriCreditSolutions",
+        title = "AgriCredit Solutions",
+        category = "finance",
+        names = { "KM_81927_AgriCredit_Solutions", "FS25_AgriCredit_Solutions" },
+        substrings = { "agricredit_solutions", "agricreditsolutions" },
+        globals = {},
+    },
+    {
         id = "snowContracts",
         title = "Snow Contracts",
         category = "fields",

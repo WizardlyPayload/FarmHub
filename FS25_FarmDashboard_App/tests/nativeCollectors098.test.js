@@ -491,6 +491,28 @@ return tostring(p.enabled) .. "|" .. table.concat(out, "|")
         expect(run({ files: DAIRY_FILES, engine: dairyEngine, body: dairyBody })).toBe(dairyExpected);
     });
 
+    test("Dairy Core skips ownerless barns while retaining explicit farm 2", () => {
+        const engine = `${dairyEngine}
+DAIRY.barns.b1.farmId = nil
+DAIRY.getBarnRows = function(self)
+    return { { barnId = "b1", herdHealth = 90 }, { barnId = "b2", herdHealth = 70 } }
+end
+`;
+        const body = `local _, p = RfDairyDataCollector:collectStep({})
+return tostring(p.enabled) .. ":" .. tostring(p.byFarm["1"] == nil) .. ":" .. tostring(p.byFarm["2"].barns[1].barnId)`;
+        expect(run({ files: DAIRY_FILES, engine, body })).toBe("true:true:b2");
+    });
+
+    test("Dairy Core fallback does not assign ownerless barn to farm 1", () => {
+        const engine = `${dairyEngine}
+DAIRY.getBarnRows = nil
+DAIRY.barns.b1.farmId = nil
+`;
+        const body = `local _, p = RfDairyDataCollector:collectStep({})
+return tostring(p.enabled) .. ":" .. tostring(p.byFarm["1"] == nil) .. ":" .. tostring(p.byFarm["2"].barns[1].barnId)`;
+        expect(run({ files: DAIRY_FILES, engine, body })).toBe("true:true:b2");
+    });
+
     test("a dashboard DairyConstants shadow is ignored", () => {
         const body = `rawset(_G, "DairyConstants", { CONTRACTS = { TYPES = { standard = { name = "Shadow" } } } })\n${dairyBody}`;
         expect(run({ files: DAIRY_FILES, engine: dairyEngine, body })).toBe(dairyExpected);

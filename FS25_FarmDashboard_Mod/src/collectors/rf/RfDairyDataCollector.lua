@@ -290,7 +290,9 @@ local function collectPayload()
 
     local function addRow(farmId, row)
         if type(row) ~= "table" or row.barnId == nil then return end
-        local fid = tostring(farmId or 1)
+        local owner = tonumber(farmId)
+        if owner == nil or owner <= 0 or owner ~= math.floor(owner) then return end
+        local fid = tostring(owner)
         local bucket = byFarm[fid]
         if bucket == nil then
             bucket = { barns = {} }
@@ -314,7 +316,12 @@ local function collectPayload()
                     return barnRowFromContract(mgr, crow)
                 end)
                 if ok and type(row) == "table" then
-                    addRow(crow.farmId or 1, row)
+                    local owner = crow.farmId
+                    if owner == nil and type(mgr.barns) == "table" then
+                        local barn = mgr.barns[crow.barnId]
+                        if type(barn) == "table" then owner = barn.farmId end
+                    end
+                    addRow(owner, row)
                 end
             end
         end
@@ -330,7 +337,7 @@ local function collectPayload()
                         return barnRowFromRecord(mgr, barnId, barn)
                     end)
                     if ok and type(row) == "table" then
-                        addRow(barn.farmId or 1, row)
+                        addRow(barn.farmId, row)
                     end
                 end
             end

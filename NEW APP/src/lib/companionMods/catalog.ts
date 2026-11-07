@@ -466,6 +466,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "cropInsurance",
+    title: "Crop Insurance",
+    category: "finance",
+    descKey: "companions.desc.cropInsurance",
+    desc: "Shows this farm's recorded crop insurance policies and recent claim outcomes, without estimating a future payout.",
+    relatedSection: "economy",
+  },
+  {
     id: "grainTickets",
     title: "Grain Tickets",
     category: "contracts",
@@ -791,6 +799,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     category: "fleet",
     descKey: "companions.desc.vehicleMileage",
     desc: "Tracks odometer and trip distance on vehicles for service and usage history.",
+    relatedSection: "vehicles",
+  },
+  {
+    id: "terraFarmMachines",
+    title: "TerraFarm Machines",
+    category: "fleet",
+    descKey: "companions.desc.terraFarmMachines",
+    desc: "Shows the current landscaping setup of TerraFarm machines owned by this farm, without claiming excavation work or volume.",
     relatedSection: "vehicles",
   },
   {

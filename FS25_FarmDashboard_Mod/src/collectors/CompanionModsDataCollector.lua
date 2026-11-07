@@ -449,6 +449,22 @@ local CATALOG = {
         globals = { "AdvancedSeedingControlLoader" },
     },
     {
+        id = "flexibleCombiSeeder",
+        title = "Flexible Combi Seeder",
+        category = "fleet",
+        names = { "FS25_369800_FS25_FlexibleCombiSeeder", "KM_80682_Flexible_Combi_Seeder", "FS25_FlexibleCombiSeeder" },
+        substrings = { "flexiblecombiseeder" },
+        globals = {},
+    },
+    {
+        id = "swathRouter",
+        title = "Swath Router",
+        category = "fleet",
+        names = { "FS25_372019_Swath_Router", "KM_82873_Swath_Router", "FS25_Swath_Router" },
+        substrings = { "swath_router", "swathrouter" },
+        globals = {},
+    },
+    {
         id = "whiteysFarmStaff",
         title = "Whitey's Farm Staff Manager",
         category = "fields",

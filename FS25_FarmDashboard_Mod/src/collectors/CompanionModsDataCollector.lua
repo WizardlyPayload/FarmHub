@@ -553,6 +553,14 @@ local CATALOG = {
         globals = { "BaleBatchTracker" },
     },
     {
+        id = "ritterFreshLoss",
+        title = "Ritter Fresh",
+        category = "storage",
+        names = { "FS25_Fresh", "GH_rittermod__FS25_Fresh_FS25_Fresh" },
+        substrings = { "fs25_fresh" },
+        globals = { "RmFreshManager", "RmLossTracker" },
+    },
+    {
         id = "advancedMaintenance",
         title = "Advanced Maintenance",
         category = "fleet",

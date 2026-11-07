@@ -101,6 +101,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/mobileButcherMeatPickup").then((m) => m.Page) },
   { key: "baleBatchTracker", catalogId: "baleBatchTracker", title: "Bale Batch Tracker", glyph: "BB", group: "storage",
     load: () => import("@/sections/mods/baleBatchTracker").then((m) => m.Page) },
+  { key: "ritterFreshLoss", catalogId: "ritterFreshLoss", title: "Ritter Fresh", glyph: "RF", group: "storage",
+    load: () => import("@/sections/mods/ritterFreshLoss").then((m) => m.Page) },
   // Construction
   { key: "everythingConstructable", catalogId: "everythingConstructable", title: "Everything Constructable", glyph: "EC", group: "construction",
     load: () => import("@/sections/mods/everythingConstructable").then((m) => m.Page) },

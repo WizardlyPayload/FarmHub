@@ -1170,6 +1170,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     desc: "Shows saved tramline setup and this mod's sowing-area counters on owned seeders. A lane setting does not prove a tramline was made.",
     relatedSection: "fields",
   },
+  {
+    id: "ritterFreshLoss",
+    title: "Ritter Fresh",
+    category: "storage",
+    descKey: "companions.desc.ritterFreshLoss",
+    desc: "Shows this farm's recorded freshness losses and estimated market value at expiry. It does not report a cash debit or sale.",
+    relatedSection: "storage",
+  },
 ];
 
 export function catalogEntry(id: string | undefined | null): CompanionCatalogEntry | undefined {

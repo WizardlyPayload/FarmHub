@@ -866,6 +866,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "villageBank",
+    title: "Village Bank",
+    category: "finance",
+    descKey: "companions.desc.villageBank",
+    desc: "Shows this farm's Village Bank extra accounts, fixed deposits, finance and lease contracts, and recorded journal entries. Native farm money and loan balances remain in the core finance view.",
+    relatedSection: "economy",
+  },
+  {
     id: "shopRefund",
     title: "Shop Refund",
     category: "fleet",

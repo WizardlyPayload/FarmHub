@@ -553,6 +553,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "villageBank",
+        title = "Village Bank",
+        category = "finance",
+        names = { "KM_82435_Village_Bank", "FS25_VillageBank" },
+        substrings = { "village_bank", "villagebank" },
+        globals = {},
+    },
+    {
         id = "tramlineSystem",
         title = "Tramline System",
         category = "fields",

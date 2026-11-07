@@ -11,6 +11,14 @@ type LossRow = {
   fillTypeName?: string; amountLitres?: number; estimatedValue?: number;
   location?: string; entityType?: string;
 };
+type InventoryRow = {
+  farmId?: number; fillTypeName?: string; totalLitres?: number; expiringLitres?: number;
+  containerCount?: number; soonestHours?: number;
+};
+type Inventory = {
+  readState?: string; coverage?: string; warningHours?: number;
+  expirationEnabled?: boolean; rows?: InventoryRow[];
+};
 
 function gameDate(row: LossRow): string {
   if ([row.year, row.period, row.dayInPeriod, row.hour].some((v) => num(v) == null)) return "—";
@@ -21,6 +29,9 @@ export function Page({ entry }: CompanionPageProps) {
   const { page, farmData, farmId } = useCompanionPage(entry.key);
   const formatMoney = useMoney();
   const rows = asList<LossRow>(page?.rows).filter((row) => num(row.farmId) === farmId);
+  const inventory = page?.currentInventory as Inventory | undefined;
+  const inventoryRows = inventory?.readState === "ok" || inventory?.readState === "partial"
+    ? asList<InventoryRow>(inventory.rows).filter((row) => num(row.farmId) === farmId) : [];
   const tiles: ModStatTile[] = farmData ? [
     { key: "count", label: tOr(`${K}.count`, "Logged losses in scanned window"),
       value: formatNumber(farmData.loggedLossCountScanned, 0) },
@@ -32,6 +43,39 @@ export function Page({ entry }: CompanionPageProps) {
     <ModPage entry={entry} lead={tOr(`${K}.lead`,
       "Ritter Fresh records expired goods by farm. Its value at expiry is a market-price estimate, not a sale, debit or realized expense.")}>
       <ModStatTiles tiles={tiles} />
+      {inventory ? <Card title={tOr(`${K}.inventoryTitle`, "Current tracked freshness")}>
+        {inventory.readState === "settings-only" ? <ModEmpty>{tOr(`${K}.inventoryUnavailable`,
+          "Current freshness data is not ready in this export.")}</ModEmpty> : <>
+          {inventory.coverage === "partial" ? <ModEmpty>{tOr(`${K}.inventoryPartial`,
+            "Only containers with a verified current farm owner are shown. Some stock or rows could not be checked.")}</ModEmpty> : null}
+          {inventory.expirationEnabled === false ? <ModEmpty>{tOr(`${K}.inventoryPaused`,
+            "Freshness expiration is disabled; no current expiry warning is calculated.")}</ModEmpty> : null}
+          <ModTable
+            columns={[
+              { key: "commodity", label: tOr(`${K}.commodity`, "Commodity") },
+              { key: "amount", label: tOr(`${K}.inventoryAmount`, "Tracked amount"), align: "end" },
+              { key: "atRisk", label: tOr(`${K}.inventoryAtRisk`, "At or within warning time"), align: "end" },
+              { key: "soonest", label: tOr(`${K}.inventorySoonest`, "Soonest threshold"), align: "end" },
+            ]}
+            rows={inventoryRows.map((row, index) => ({
+              key: `${index}-${row.fillTypeName}`,
+              cells: {
+                commodity: row.fillTypeName || "—",
+                amount: num(row.totalLitres) == null ? "—" : `${formatNumber(row.totalLitres, 0)} L`,
+                atRisk: inventory.expirationEnabled === false || num(row.expiringLitres) == null
+                  ? "—" : `${formatNumber(row.expiringLitres, 0)} L`,
+                soonest: inventory.expirationEnabled === false || num(row.soonestHours) == null
+                  ? "—" : row.soonestHours! <= 0
+                    ? tOr(`${K}.inventoryOverdue`, "Past threshold")
+                    : `${formatNumber(row.soonestHours, 1)} h`,
+              },
+            }))}
+            empty={tOr(`${K}.inventoryEmpty`, "No current perishable batches with verified farm ownership were found.")}
+          />
+          <p class="fd-economy__muted">{tOr(`${K}.inventoryNote`,
+            "These are Ritter Fresh batch amounts, not independently measured native Storage levels. Ownership is checked against live entities or the owning object-storage building.")}</p>
+        </>}
+      </Card> : null}
       <Card title={tOr(`${K}.title`, "Recent logged freshness losses")}>
         {page?.coverage === "truncated" ? <ModEmpty>{tOr(`${K}.truncated`,
           "Only the most recent part of the log was scanned or listed. Counts and litres cover the scanned window only.")}</ModEmpty> : null}

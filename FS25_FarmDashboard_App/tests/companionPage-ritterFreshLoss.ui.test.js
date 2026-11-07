@@ -43,3 +43,18 @@ test("truncated history never appears as a complete zero-loss claim", () => {
   expect(host.textContent).toContain("scanned window only");
   expect(host.textContent).toContain("No losses for this farm in the scanned part of the log");
 });
+
+test("current stock view labels live-owner coverage and mod batch amounts", () => {
+  const host = ui.renderPage(payload({
+    readState: "ok", coverage: "complete", byFarm: {"1": {loggedLossCountScanned:0,lostLitresScanned:0}}, rows: [],
+    currentInventory: {readState:"partial",coverage:"partial",expirationEnabled:true,warningHours:24,
+      rows:[{farmId:1,fillTypeName:"TOMATO",totalLitres:150,expiringLitres:100,
+        containerCount:2,soonestHours:12}]},
+  }), {farmId:1});
+  expect(host.textContent).toContain("Current tracked freshness");
+  expect(host.textContent).toContain("verified current farm owner");
+  expect(host.textContent).toContain("150 L");
+  expect(host.textContent).toContain("100 L");
+  expect(host.textContent).toContain("12.0 h");
+  expect(host.textContent).toContain("not independently measured native Storage levels");
+});

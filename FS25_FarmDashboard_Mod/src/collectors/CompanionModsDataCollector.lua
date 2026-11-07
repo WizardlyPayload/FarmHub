@@ -1068,6 +1068,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "bankAndCreditLoans",
+        title = "Bank And Credit",
+        category = "finance",
+        names = { "KM_77828_Bank_And_Credit", "FS25_BankAndCredit" },
+        substrings = { "bank_and_credit", "bankandcredit" },
+        globals = {},
+    },
+    {
         id = "snowContracts",
         title = "Snow Contracts",
         category = "fields",

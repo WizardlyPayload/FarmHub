@@ -842,6 +842,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "bankAndCreditLoans",
+    title: "Bank And Credit loans",
+    category: "finance",
+    descKey: "companions.desc.bankAndCreditLoans",
+    desc: "Shows this farm's active loans recorded by Bank And Credit, including revolving drawn balances. This bank is separate from other finance mods.",
+    relatedSection: "economy",
+  },
+  {
     id: "futuresMarketPositions",
     title: "Futures Market",
     category: "finance",

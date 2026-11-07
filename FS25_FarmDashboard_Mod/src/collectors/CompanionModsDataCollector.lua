@@ -529,6 +529,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "employees",
+        title = "Employees",
+        category = "fields",
+        names = { "FS25_Employees", "KM_82420_Employees" },
+        substrings = { "fs25_employees" },
+        globals = {},
+    },
+    {
         id = "baleBatchTracker",
         title = "Bale Batch Tracker",
         category = "storage",

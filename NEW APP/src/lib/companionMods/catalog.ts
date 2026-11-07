@@ -1154,6 +1154,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     desc: "Shows the hired staff roster, availability and unpaid wages from this single-player farm. It does not infer work completed or money paid.",
     relatedSection: "fields",
   },
+  {
+    id: "employees",
+    title: "Employees",
+    category: "fields",
+    descKey: "companions.desc.employees",
+    desc: "Shows this farm's hired staff, contract terms, current-period hours, training and illness from the Employees mod. It does not report wages paid or jobs completed.",
+    relatedSection: "fields",
+  },
 ];
 
 export function catalogEntry(id: string | undefined | null): CompanionCatalogEntry | undefined {

@@ -138,6 +138,14 @@ local CATALOG = {
         globals = { "CropControlOverride" },
     },
     {
+        id = "resourceUsageControl",
+        title = "Resource Usage Control",
+        category = "fields",
+        names = { "FS25_ResourceUsageControl", "KM_82082_resource-usage-control" },
+        substrings = { "resourceusagecontrol", "resource_usage_control", "resource-usage-control" },
+        globals = { "ResourceUsageControl" },
+    },
+    {
         id = "dynamicFieldPrices",
         title = "Dynamic Field Prices",
         category = "fields",

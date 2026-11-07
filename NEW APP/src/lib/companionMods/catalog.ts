@@ -234,6 +234,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "fields",
   },
   {
+    id: "resourceUsageControl",
+    title: "Resource Usage Control",
+    category: "fields",
+    descKey: "companions.desc.resourceUsageControl",
+    desc: "Shows the current save-wide seed and spray usage policy. It does not measure a farm's actual supplies or cost.",
+    relatedSection: "fields",
+  },
+  {
     id: "dynamicFieldPrices",
     title: "Dynamic Field Prices",
     category: "fields",

@@ -16,6 +16,7 @@ test('parses substantive FarmHub and RF returns, including direct PARTIAL', () =
     '## [time] from Tina\r\nPASS RF-20261102-TINA-LOCAL-LOAD-1479 | restored',
     '## [time] from Tina\r\nFAIL RF-20261102-TINA-MP-JOIN-PROBE-1482: gate',
     '## [time] from Tina\r\nSTALL RF-20261102-TINA-SERVERREADY-1499 (Tina/Ally): restored',
+    '## [time] from Tina\r\nPARTIAL + INCIDENT FARMHUB-ALLY-20261107-VAULT-V53 (save missing): stop',
   ].join('\r\n\r\n');
   assert.deepEqual(parseSubstantiveReturns(text).map(({ id, kind }) => [id, kind]), [
     ['FARMHUB-ALLY-20261101-VAULT-V8', 'RESULT'],
@@ -28,6 +29,7 @@ test('parses substantive FarmHub and RF returns, including direct PARTIAL', () =
     ['RF-20261102-TINA-LOCAL-LOAD-1479', 'PASS'],
     ['RF-20261102-TINA-MP-JOIN-PROBE-1482', 'FAIL'],
     ['RF-20261102-TINA-SERVERREADY-1499', 'STALL'],
+    ['FARMHUB-ALLY-20261107-VAULT-V53', 'PARTIAL'],
   ]);
 });
 

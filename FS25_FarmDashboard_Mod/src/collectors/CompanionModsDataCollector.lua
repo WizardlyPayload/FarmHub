@@ -561,6 +561,14 @@ local CATALOG = {
         globals = { "RmFreshManager", "RmLossTracker" },
     },
     {
+        id = "productionAdvisorAlerts",
+        title = "Production Advisor",
+        category = "storage",
+        names = { "FS25_ProductionAdvisor", "KM_81606_Production_Advisor" },
+        substrings = { "productionadvisor", "production_advisor" },
+        globals = { "g_productionAdvisor" },
+    },
+    {
         id = "advancedMaintenance",
         title = "Advanced Maintenance",
         category = "fleet",

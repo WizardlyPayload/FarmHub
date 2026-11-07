@@ -1178,6 +1178,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     desc: "Shows this farm's recorded freshness losses and estimated market value at expiry. It does not report a cash debit or sale.",
     relatedSection: "storage",
   },
+  {
+    id: "productionAdvisorAlerts",
+    title: "Production Advisor",
+    category: "storage",
+    descKey: "companions.desc.productionAdvisorAlerts",
+    desc: "Shows this farm's configured product-value alerts and currently owned-field sowing reminders. It does not report sales or completed sowing.",
+    relatedSection: "storage",
+  },
 ];
 
 export function catalogEntry(id: string | undefined | null): CompanionCatalogEntry | undefined {

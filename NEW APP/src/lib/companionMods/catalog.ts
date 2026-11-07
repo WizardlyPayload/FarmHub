@@ -898,6 +898,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "fields",
   },
   {
+    id: "workplan",
+    title: "Workplan",
+    category: "fields",
+    descKey: "companions.desc.workplan",
+    desc: "Shows this farm's saved field plans and task statuses for land it still owns. Recorded statuses are plans, not proof of completed field work.",
+    relatedSection: "fields",
+  },
+  {
     id: "transportCompany",
     title: "Transport Company",
     category: "finance",

@@ -137,6 +137,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/tramlineSystem").then((m) => m.Page) },
   { key: "fieldToDoPlannedCrops", catalogId: "fieldToDoPlannedCrops", title: "Field To-Do List", glyph: "TD", group: "fields",
     load: () => import("@/sections/mods/fieldToDoPlannedCrops").then((m) => m.Page) },
+  { key: "workplan", catalogId: "workplan", title: "Workplan", glyph: "WP", group: "fields",
+    load: () => import("@/sections/mods/workplan").then((m) => m.Page) },
   { key: "harvestLedger", catalogId: "harvestLedger", title: "Harvest Ledger", glyph: "HL", group: "fields",
     load: () => import("@/sections/mods/harvestLedger").then((m) => m.Page) },
   { key: "realisticCropRotation", catalogId: "realisticCropRotation", title: "Realistic Crop Rotation", glyph: "CR", group: "fields",

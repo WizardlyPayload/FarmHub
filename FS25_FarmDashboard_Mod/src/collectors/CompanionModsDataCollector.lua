@@ -569,6 +569,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "workplan",
+        title = "Workplan",
+        category = "fields",
+        names = { "FS25_352974_Workplan", "FS25_Workplan" },
+        substrings = { "workplan" },
+        globals = {},
+    },
+    {
         id = "tramlineSystem",
         title = "Tramline System",
         category = "fields",

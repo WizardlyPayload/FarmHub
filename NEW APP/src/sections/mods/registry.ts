@@ -174,6 +174,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/resourceUsageControl").then((m) => m.Page) },
   { key: "farmLimitManager", catalogId: "farmLimitManager", title: "Farm Limit Manager", glyph: "LM", group: "finance",
     load: () => import("@/sections/mods/farmLimitManager").then((m) => m.Page) },
+  { key: "agroRealisticResale", catalogId: "agroRealisticResale", title: "Agro Realistic - land resale", glyph: "AR", group: "finance",
+    load: () => import("@/sections/mods/agroRealisticResale").then((m) => m.Page) },
   { key: "factoryContracts", catalogId: "factoryContracts", title: "GN Realism - Factory Contracts", glyph: "FC", group: "finance",
     load: () => import("@/sections/mods/factoryContracts").then((m) => m.Page) },
   { key: "swathRouter", catalogId: "swathRouter", title: "Swath Router", glyph: "SR", group: "fleet",

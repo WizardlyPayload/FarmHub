@@ -250,6 +250,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "agroRealisticResale",
+    title: "Agro Realistic - land resale",
+    category: "finance",
+    descKey: "companions.desc.agroRealisticResale",
+    desc: "Shows the mod's recorded land resale factor for this farm's currently owned land. The history start may be a migration value, not the original purchase date.",
+    relatedSection: "economy",
+  },
+  {
     id: "factoryContracts",
     title: "GN Realism - Factory Contracts",
     category: "economy",

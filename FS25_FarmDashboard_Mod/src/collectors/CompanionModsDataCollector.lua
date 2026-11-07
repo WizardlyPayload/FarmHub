@@ -154,6 +154,14 @@ local CATALOG = {
         globals = { "g_farmLimitManager" },
     },
     {
+        id = "agroRealisticResale",
+        title = "Agro Realistic - land resale",
+        category = "finance",
+        names = { "FS25_AgroRealistic", "FS25_371987_Agro_Realistic" },
+        substrings = { "agrorealistic", "agro_realistic" },
+        globals = { "LeandroFarmRules" },
+    },
+    {
         id = "factoryContracts",
         title = "GN Realism - Factory Contracts",
         category = "economy",

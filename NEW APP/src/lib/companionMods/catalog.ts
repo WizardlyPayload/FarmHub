@@ -242,6 +242,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "fields",
   },
   {
+    id: "farmLimitManager",
+    title: "Farm Limit Manager",
+    category: "finance",
+    descKey: "companions.desc.farmLimitManager",
+    desc: "Shows the five configured limits shared by every farm in this save. It does not count current jobs, buildings or contracts.",
+    relatedSection: "economy",
+  },
+  {
     id: "factoryContracts",
     title: "GN Realism - Factory Contracts",
     category: "economy",

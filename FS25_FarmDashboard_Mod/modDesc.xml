@@ -218,6 +218,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/CryptoFarmCollector.lua"/>
         <sourceFile filename="src/companionPages/CropControlOverrideCollector.lua"/>
         <sourceFile filename="src/companionPages/ResourceUsageControlCollector.lua"/>
+        <sourceFile filename="src/companionPages/FarmLimitManagerCollector.lua"/>
         <sourceFile filename="src/companionPages/FactoryContractsCollector.lua"/>
         <sourceFile filename="src/companionPages/FinanceYourFleetCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticFarmFinanceLoansCollector.lua"/>

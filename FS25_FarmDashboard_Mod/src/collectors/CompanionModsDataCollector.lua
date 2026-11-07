@@ -146,6 +146,14 @@ local CATALOG = {
         globals = { "ResourceUsageControl" },
     },
     {
+        id = "farmLimitManager",
+        title = "Farm Limit Manager",
+        category = "finance",
+        names = { "FS25_FarmLimitManager", "FS25_372370_Farm_Limit_Manager", "KM_82655_Farm_Limit_Manager" },
+        substrings = { "farmlimitmanager", "farm_limit_manager" },
+        globals = { "g_farmLimitManager" },
+    },
+    {
         id = "factoryContracts",
         title = "GN Realism - Factory Contracts",
         category = "economy",

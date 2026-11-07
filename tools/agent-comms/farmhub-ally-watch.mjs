@@ -103,6 +103,7 @@ const reviewedIds = new Set([
   'RF-20261102-TINA-SERVERREADY-1501', // reviewed when Graham assigned Ally to FarmHub
   'RF-20261102-TINA-LOCAL-LOAD-1479',
   'FARMHUB-ALLY-20261107-VAULT-V53', // incident reviewed manually before the parser fix
+  'FARMHUB-ALLY-20261107-V53-RECOVERY-AUDIT', // read-only result reviewed before qualifier parser fix
   ...[1, 2, 3, 4, 5].map(n => `FARMHUB-ALLY-20261102-STORAGE-ICONS-I${n}`),
 ]);
 const reviewed = initial.filter(event => reviewedIds.has(event.id));

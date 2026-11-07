@@ -681,6 +681,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "realisticSeeder",
+        title = "Realistic Seeder",
+        category = "fleet",
+        names = { "FS25_372197_Realistic_Seeder", "FS25_RealisticSeeder" },
+        substrings = { "realistic_seeder", "realisticseeder" },
+        globals = {},
+    },
+    {
         id = "organicDemand",
         title = "Demand-Oriented Organic Application",
         category = "fleet",

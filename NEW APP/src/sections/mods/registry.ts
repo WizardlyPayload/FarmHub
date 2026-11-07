@@ -156,6 +156,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/organicDemand").then((m) => m.Page) },
   { key: "adjustableFillLevelAdvanced", catalogId: "adjustableFillLevelAdvanced", title: "Adjustable Fill Level Advanced", glyph: "AF", group: "fleet",
     load: () => import("@/sections/mods/adjustableFillLevelAdvanced").then((m) => m.Page) },
+  { key: "realisticSeeder", catalogId: "realisticSeeder", title: "Realistic Seeder", glyph: "RS", group: "fleet",
+    load: () => import("@/sections/mods/realisticSeeder").then((m) => m.Page) },
   { key: "vehicleControlAddon", catalogId: "vehicleControlAddon", title: "Vehicle Control Addon", glyph: "VC", group: "fleet",
     load: () => import("@/sections/mods/vehicleControlAddon").then((m) => m.Page) },
   { key: "advancedVehicleFunctions", catalogId: "advancedVehicleFunctions", title: "Advanced Vehicle Functions", glyph: "AV", group: "fleet",

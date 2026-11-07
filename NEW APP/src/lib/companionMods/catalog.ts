@@ -1099,6 +1099,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "realisticSeeder",
+    title: "Realistic Seeder",
+    category: "fleet",
+    descKey: "companions.desc.realisticSeeder",
+    desc: "Shows the current unload and fertilizer choices on Realistic Seeder machines owned by this farm. It does not measure sowing or material used.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "organicDemand",
     title: "Demand-Oriented Organic Application",
     category: "fields",

@@ -169,6 +169,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/ProductionAdvisorAlertsCollector.lua"/>
         <sourceFile filename="src/companionPages/ProductionWatcherCollector.lua"/>
         <sourceFile filename="src/companionPages/ProductionControlCollector.lua"/>
+        <sourceFile filename="src/companionPages/PalletSpawnStoreCollector.lua"/>
         <sourceFile filename="src/companionPages/GreenhouseAutomaticWateringCollector.lua"/>
         <sourceFile filename="src/companionPages/AdjustProductionPointsCollector.lua"/>
         <sourceFile filename="src/companionPages/AnimalPlannerControlsCollector.lua"/>

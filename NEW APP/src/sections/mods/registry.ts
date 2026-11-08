@@ -125,6 +125,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/factoryProfitCalculator").then((m) => m.Page) },
   { key: "productionControl", catalogId: "productionControl", title: "Production Control", glyph: "PC", group: "storage",
     load: () => import("@/sections/mods/productionControl").then((m) => m.Page) },
+  { key: "palletSpawnStore", catalogId: "palletSpawnStore", title: "Pallet Spawn Store", glyph: "PS", group: "storage",
+    load: () => import("@/sections/mods/palletSpawnStore").then((m) => m.Page) },
   { key: "soilCompostBatches", catalogId: "soilCompostBatches", title: "Soil & Fertilizer compost batches", glyph: "SC", group: "storage",
     load: () => import("@/sections/mods/soilCompostBatches").then((m) => m.Page) },
   { key: "greenhouseAutomaticWatering", catalogId: "greenhouseAutomaticWatering", title: "Greenhouse Automatic Watering", glyph: "GW", group: "storage",

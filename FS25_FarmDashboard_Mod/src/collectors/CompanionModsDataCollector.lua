@@ -370,6 +370,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "palletSpawnStore",
+        title = "Pallet Spawn Store",
+        category = "production",
+        names = { "FS25_PalletSpawnStore", "FS25_352670_Pallet_Spawn_Store" },
+        substrings = { "palletspawnstore", "pallet_spawn_store" },
+        globals = {},
+    },
+    {
         id = "upgradableFactories",
         title = "Upgradable Factories",
         category = "production",

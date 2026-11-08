@@ -435,6 +435,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "productions",
   },
   {
+    id: "palletSpawnStore",
+    title: "Pallet Spawn Store",
+    category: "production",
+    descKey: "companions.desc.palletSpawnStore",
+    desc: "Shows how each owned production output is currently routed, including storing without pallets versus spawning pallets. It does not record output or sales.",
+    relatedSection: "productions",
+  },
+  {
     id: "soilCompostBatches",
     title: "Soil & Fertilizer compost batches",
     category: "storage",

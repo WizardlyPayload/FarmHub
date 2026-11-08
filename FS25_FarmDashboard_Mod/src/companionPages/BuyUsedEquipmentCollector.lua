@@ -4,7 +4,7 @@
 
 local MAX_SCAN = 120
 local MAX_ROWS = 60
-local LEVELS = { "Regular", "Extended", "Continuous" }
+local LEVELS = { "Normal", "Extended", "Continuous" }
 
 CompanionPages.register({
     key = "buyUsedEquipment",

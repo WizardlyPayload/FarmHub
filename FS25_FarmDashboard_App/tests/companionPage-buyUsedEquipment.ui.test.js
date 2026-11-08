@@ -14,7 +14,7 @@ test("shows selected farm's pending search without implying an offer", () => {
       key: KEY, detected: true, readState: "ok", coverage: "complete",
       byFarm: { "1": { pendingSearchCount: 1 } },
       rows: [
-        { farmId: 1, queueIndex: 1, equipment: "Owned tractor", equipmentXml: "owned.xml", searchLevel: "Regular", hoursRemaining: 10 },
+        { farmId: 1, queueIndex: 1, equipment: "Owned tractor", equipmentXml: "owned.xml", searchLevel: "Normal", hoursRemaining: 10 },
         { farmId: 2, queueIndex: 1, equipment: "Foreign tractor", equipmentXml: "foreign.xml", searchLevel: "Extended", hoursRemaining: 5 },
       ],
     } } },

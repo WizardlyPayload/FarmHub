@@ -837,6 +837,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "realisticHarvesting",
+    title: "Realistic Harvesting",
+    category: "fleet",
+    descKey: "companions.desc.realisticHarvesting",
+    desc: "Shows the current tuning memory for combines owned by this farm. It does not record harvested output or prove an active harvest.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "hydraulicSuspension",
     title: "Hydraulic Suspension System",
     category: "fleet",

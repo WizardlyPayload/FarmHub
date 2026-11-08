@@ -209,6 +209,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/VehicleInspectionHUCollector.lua"/>
         <sourceFile filename="src/companionPages/MajorServiceCollector.lua"/>
         <sourceFile filename="src/companionPages/UseYourTyresCollector.lua"/>
+        <sourceFile filename="src/companionPages/RealisticHarvestingCollector.lua"/>
         <sourceFile filename="src/companionPages/TerraFarmMachinesCollector.lua"/>
         <sourceFile filename="src/companionPages/DieselFuelSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/RoundBalerExtensionCollector.lua"/>

@@ -210,6 +210,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/majorService").then((m) => m.Page) },
   { key: "useYourTyres", catalogId: "useYourTyres", title: "Use Your Tyres", glyph: "TY", group: "fleet",
     load: () => import("@/sections/mods/useYourTyres").then((m) => m.Page) },
+  { key: "realisticHarvesting", catalogId: "realisticHarvesting", title: "Realistic Harvesting", glyph: "RH", group: "fleet",
+    load: () => import("@/sections/mods/realisticHarvesting").then((m) => m.Page) },
   { key: "hydraulicSuspension", catalogId: "hydraulicSuspension", title: "Hydraulic Suspension System", glyph: "HS", group: "fleet",
     load: () => import("@/sections/mods/hydraulicSuspension").then((m) => m.Page) },
   { key: "realDieselStart", catalogId: "realDieselStart", title: "Realistic Diesel Start", glyph: "RS", group: "fleet",

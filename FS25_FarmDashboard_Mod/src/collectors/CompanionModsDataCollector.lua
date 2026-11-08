@@ -881,6 +881,14 @@ local CATALOG = {
         globals = { "UseYourTyres" },
     },
     {
+        id = "realisticHarvesting",
+        title = "Realistic Harvesting",
+        category = "fleet",
+        names = { "FS25_RealisticHarvesting", "KM_73932_realistic-harvesting" },
+        substrings = { "realisticharvesting", "realistic_harvesting" },
+        globals = {},
+    },
+    {
         id = "terraFarmMachines",
         title = "TerraFarm Machines",
         category = "fleet",

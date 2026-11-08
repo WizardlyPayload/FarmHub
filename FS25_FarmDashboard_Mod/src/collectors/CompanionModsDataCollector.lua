@@ -1209,6 +1209,15 @@ local CATALOG = {
         globals = { "g_vehicleControlAddon" },
     },
     {
+        id = "universalAutoload",
+        title = "Universal Autoload",
+        category = "fleet",
+        names = { "FS25_UniversalAutoload", "KM_68066_Universal_Autoload",
+            "KM_58738_Universal_Autoload" },
+        substrings = { "universalautoload", "universal_autoload" },
+        globals = {},
+    },
+    {
         id = "advancedVehicleFunctions",
         title = "Advanced Vehicle Functions",
         category = "fleet",

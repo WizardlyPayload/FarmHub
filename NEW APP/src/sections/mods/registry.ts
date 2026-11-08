@@ -292,6 +292,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/manualAttach").then((m) => m.Page) },
   { key: "vehicleControlAddon", catalogId: "vehicleControlAddon", title: "Vehicle Control Addon", glyph: "VC", group: "fleet",
     load: () => import("@/sections/mods/vehicleControlAddon").then((m) => m.Page) },
+  { key: "universalAutoload", catalogId: "universalAutoload", title: "Universal Autoload", glyph: "UA", group: "fleet",
+    load: () => import("@/sections/mods/universalAutoload").then((m) => m.Page) },
   { key: "advancedVehicleFunctions", catalogId: "advancedVehicleFunctions", title: "Advanced Vehicle Functions", glyph: "AV", group: "fleet",
     load: () => import("@/sections/mods/advancedVehicleFunctions").then((m) => m.Page) },
   { key: "sowingMachineRollerReady", catalogId: "sowingMachineRollerReady", title: "Sowing Machine Roller Ready", glyph: "SR", group: "fleet",

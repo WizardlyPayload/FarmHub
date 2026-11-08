@@ -1117,6 +1117,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "universalAutoload",
+    title: "Universal Autoload",
+    category: "fleet",
+    descKey: "companions.desc.universalAutoload",
+    desc: "Shows current loading choices on this farm's autoload trailers. It does not duplicate loaded stock or record completed loads.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "advancedVehicleFunctions",
     title: "Advanced Vehicle Functions",
     category: "fleet",

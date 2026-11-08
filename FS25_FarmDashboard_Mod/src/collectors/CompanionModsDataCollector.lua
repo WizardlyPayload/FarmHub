@@ -977,6 +977,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "lockSteeringAxles",
+        title = "Lock Steering Axle",
+        category = "fleet",
+        names = { "FS25_311154_Lock_Steering_Axle", "FS25_lockSteeringAxles" },
+        globals = {},
+    },
+    {
         id = "universalSoundTuner",
         title = "Universal Sound Tuner",
         category = "fleet",

@@ -869,6 +869,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "implementMaintenance",
+    title: "Implement Maintenance",
+    category: "fleet",
+    descKey: "companions.desc.implementMaintenance",
+    desc: "Shows component wear and completed service entries on implements this farm owns now. Service entries may predate ownership.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "hydraulicSuspension",
     title: "Hydraulic Suspension System",
     category: "fleet",

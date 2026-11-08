@@ -913,6 +913,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "implementMaintenance",
+        title = "Implement Maintenance",
+        category = "fleet",
+        names = { "KM_81822_implement-maintenance", "FS25_MantenimientoImplementos", "FS25_GN_MantenimientoImplementos" },
+        substrings = { "implement-maintenance", "mantenimientoimplementos" },
+        globals = {},
+    },
+    {
         id = "terraFarmMachines",
         title = "TerraFarm Machines",
         category = "fleet",

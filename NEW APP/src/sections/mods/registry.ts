@@ -218,6 +218,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/jobQueue").then((m) => m.Page) },
   { key: "agriculturalTerminal", catalogId: "agriculturalTerminal", title: "Agricultural Terminal", glyph: "AT", group: "fleet",
     load: () => import("@/sections/mods/agriculturalTerminal").then((m) => m.Page) },
+  { key: "implementMaintenance", catalogId: "implementMaintenance", title: "Implement Maintenance", glyph: "IM", group: "fleet",
+    load: () => import("@/sections/mods/implementMaintenance").then((m) => m.Page) },
   { key: "hydraulicSuspension", catalogId: "hydraulicSuspension", title: "Hydraulic Suspension System", glyph: "HS", group: "fleet",
     load: () => import("@/sections/mods/hydraulicSuspension").then((m) => m.Page) },
   { key: "realDieselStart", catalogId: "realDieselStart", title: "Realistic Diesel Start", glyph: "RS", group: "fleet",

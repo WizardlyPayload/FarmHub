@@ -885,6 +885,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "map",
   },
   {
+    id: "bhFuelTerminal",
+    title: "BH Bulk Fuel Terminal",
+    category: "storage",
+    descKey: "companions.desc.bhFuelTerminal",
+    desc: "Shows owned terminals' saved control state and lifetime diesel transfers, not sales.",
+    relatedSection: "storage",
+  },
+  {
     id: "powertrainUpgrade",
     title: "Powertrain Upgrade",
     category: "fleet",

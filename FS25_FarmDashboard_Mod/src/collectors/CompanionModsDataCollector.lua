@@ -929,6 +929,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "bhFuelTerminal",
+        title = "BH Bulk Fuel Terminal",
+        category = "storage",
+        names = { "FS25_BH_FuelTerminal_V1", "ITCH_5227540_FS25_BH_FuelTerminal_V1" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "powertrainUpgrade",
         title = "Powertrain Upgrade",
         category = "fleet",

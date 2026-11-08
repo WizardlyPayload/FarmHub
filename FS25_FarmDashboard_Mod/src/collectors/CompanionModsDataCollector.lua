@@ -226,6 +226,14 @@ local CATALOG = {
         globals = { "ContractorHarvesting" },
     },
     {
+        id = "vipOrderManager",
+        title = "VIP Order Manager",
+        category = "economy",
+        names = { "KM_65282_VIP_Order_Manager" },
+        substrings = {},
+        globals = { "VIPOrderManager" },
+    },
+    {
         id = "factoryContracts",
         title = "GN Realism - Factory Contracts",
         category = "economy",

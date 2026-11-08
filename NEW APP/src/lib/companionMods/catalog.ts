@@ -669,6 +669,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "storage",
   },
   {
+    id: "objectStorageExtension",
+    title: "Object Storage Extension",
+    category: "storage",
+    descKey: "companions.desc.objectStorageExtension",
+    desc: "Shows each owned object store's configured capacity, accepted bale or pallet types and input-trigger state. Stored inventory remains on the Storage page.",
+    relatedSection: "storage",
+  },
+  {
     id: "autoSellSilo",
     title: "Auto Sell Silo",
     category: "economy",

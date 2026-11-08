@@ -157,6 +157,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/mobileButcherMeatPickup").then((m) => m.Page) },
   { key: "automaticBaleStorage", catalogId: "automaticBaleStorage", title: "Automatic Bale Storage", glyph: "AB", group: "storage",
     load: () => import("@/sections/mods/automaticBaleStorage").then((m) => m.Page) },
+  { key: "objectStorageExtension", catalogId: "objectStorageExtension", title: "Object Storage Extension", glyph: "OS", group: "storage",
+    load: () => import("@/sections/mods/objectStorageExtension").then((m) => m.Page) },
   { key: "baleBatchTracker", catalogId: "baleBatchTracker", title: "Bale Batch Tracker", glyph: "BB", group: "storage",
     load: () => import("@/sections/mods/baleBatchTracker").then((m) => m.Page) },
   { key: "ritterFreshLoss", catalogId: "ritterFreshLoss", title: "Ritter Fresh", glyph: "RF", group: "storage",

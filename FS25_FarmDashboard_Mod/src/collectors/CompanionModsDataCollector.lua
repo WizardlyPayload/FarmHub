@@ -801,6 +801,14 @@ local CATALOG = {
         globals = { "AutomaticBaleStorage" },
     },
     {
+        id = "objectStorageExtension",
+        title = "Object Storage Extension",
+        category = "storage",
+        names = { "FS25_342403_Object_Storage_Extension", "FS25_ObjectStorageExtension" },
+        substrings = { "object_storage_extension", "objectstorageextension" },
+        globals = {},
+    },
+    {
         id = "baleBatchTracker",
         title = "Bale Batch Tracker",
         category = "storage",

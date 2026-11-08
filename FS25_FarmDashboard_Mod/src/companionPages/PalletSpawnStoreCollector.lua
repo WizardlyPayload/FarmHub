@@ -58,8 +58,8 @@ CompanionPages.register({
                 local placeable = type(point.owningPlaceable) == "table" and point.owningPlaceable or nil
                 local owner = placeable and (ctx.call(placeable, "getOwnerFarmId")
                     or placeable.ownerFarmId) or nil
-                -- ProductionPoint has no ownerFarmId in FS25. The farm list may
-                -- include accessible points, so verify the owning placeable.
+                -- The farm list may include accessible points. Verify the
+                -- owning placeable even though the point also has ownerFarmId.
                 local ownerId = ctx.num(owner)
                 if ownerId == nil then
                     invalid = true

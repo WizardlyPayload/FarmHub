@@ -821,6 +821,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "majorService",
+    title: "Major Service",
+    category: "fleet",
+    descKey: "companions.desc.majorService",
+    desc: "Shows the last recorded major-service operating hour and hours since then for your current vehicles. Service and charges happen in the game.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "hydraulicSuspension",
     title: "Hydraulic Suspension System",
     category: "fleet",

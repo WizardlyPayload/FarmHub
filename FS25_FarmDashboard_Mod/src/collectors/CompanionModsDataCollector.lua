@@ -865,6 +865,14 @@ local CATALOG = {
         globals = { "g_huManager" },
     },
     {
+        id = "majorService",
+        title = "Major Service",
+        category = "fleet",
+        names = { "FS25_318291_Major_Service", "FS25_MajorService" },
+        substrings = { "major_service", "majorservice" },
+        globals = {},
+    },
+    {
         id = "terraFarmMachines",
         title = "TerraFarm Machines",
         category = "fleet",

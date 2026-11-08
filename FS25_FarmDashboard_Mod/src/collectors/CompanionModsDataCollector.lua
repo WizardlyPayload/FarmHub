@@ -2639,12 +2639,14 @@ local function collectProductionSchedule()
     -- The mod environment inherits engine globals; rawget misses the live mission.
     local mission = _G.g_currentMission
     local manager = mission and mission.productionChainManager or nil
-    local points = nil
-    if manager ~= nil and type(manager.getProductionPointsForFarmId) == "function" then
-        local ok, result = pcall(manager.getProductionPointsForFarmId, manager, farmId)
-        if ok and type(result) == "table" then points = result end
+    if mission == nil then
+        return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "no-mission" }
     end
-    if type(points) ~= "table" then
+    if manager == nil or type(manager.getProductionPointsForFarmId) ~= "function" then
+        return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "no-owned-production-api" }
+    end
+    local okPoints, points = pcall(manager.getProductionPointsForFarmId, manager, farmId)
+    if not okPoints or type(points) ~= "table" then
         return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "no-owned-production-list" }
     end
     if type(sched.getPointKey) ~= "function" then

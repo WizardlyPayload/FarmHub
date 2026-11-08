@@ -829,6 +829,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "chainsawConsumables",
+    title: "Chainsaw Consumables",
+    category: "fleet",
+    descKey: "companions.desc.chainsawConsumables",
+    desc: "Shows current fuel, chain oil and condition on owned saws, not fuel use or service history.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "powertrainUpgrade",
     title: "Powertrain Upgrade",
     category: "fleet",

@@ -873,6 +873,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "chainsawConsumables",
+        title = "Chainsaw Consumables",
+        category = "fleet",
+        names = { "KM_82857_Chainsaw_Consumables" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "powertrainUpgrade",
         title = "Powertrain Upgrade",
         category = "fleet",

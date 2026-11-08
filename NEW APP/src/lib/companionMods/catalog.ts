@@ -845,6 +845,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "multipleSilageTypes",
+    title: "Multiple Silage Types",
+    category: "fleet",
+    descKey: "companions.desc.multipleSilageTypes",
+    desc: "Shows owned baler and forage-wagon knife choices and the recorded mix in closed bunkers.",
+    relatedSection: "storage",
+  },
+  {
     id: "powertrainUpgrade",
     title: "Powertrain Upgrade",
     category: "fleet",

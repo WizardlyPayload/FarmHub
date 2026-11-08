@@ -889,6 +889,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "multipleSilageTypes",
+        title = "Multiple Silage Types",
+        category = "fleet",
+        names = { "FS25_354139_Multiple_Silage_Types" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "powertrainUpgrade",
         title = "Powertrain Upgrade",
         category = "fleet",

@@ -5422,4 +5422,17 @@
   ,"companionPage.sellToTheBestBidder.waiting": "Waiting for buyer"
   ,"companionPage.sellToTheBestBidder.empty": "No vehicle is currently listed by this farm."
   ,"companionPage.sellToTheBestBidder.truncated": "Only part of the active listing register was scanned or displayed."
-  ,"companionPage.sellToTheBestBidder.partial": "Listings with uncertain current ownership or invalid values were withheld."}
+  ,"companionPage.sellToTheBestBidder.partial": "Listings with uncertain current ownership or invalid values were withheld."
+  ,"companions.desc.incomeModEmergencyDebt": "Shows this farm's Income Mod emergency-debt record separately from its native bank loan."
+  ,"companionPage.incomeModEmergencyDebt.lead": "Income Mod's emergency-debt record for this farm. This debt is separate from the game's native bank loan. A retained retired record can show past draw count without an amount currently owed."
+  ,"companionPage.incomeModEmergencyDebt.title": "Emergency-debt record"
+  ,"companionPage.incomeModEmergencyDebt.status": "Record status"
+  ,"companionPage.incomeModEmergencyDebt.active": "Active debt"
+  ,"companionPage.incomeModEmergencyDebt.retired": "Retired record"
+  ,"companionPage.incomeModEmergencyDebt.outstanding": "Emergency debt outstanding"
+  ,"companionPage.incomeModEmergencyDebt.principal": "Principal"
+  ,"companionPage.incomeModEmergencyDebt.interest": "Accrued interest"
+  ,"companionPage.incomeModEmergencyDebt.draws": "Recorded draws"
+  ,"companionPage.incomeModEmergencyDebt.empty": "No ready Income Mod emergency-debt record is available for this farm."
+  ,"companionPage.incomeModEmergencyDebt.settled": "Last settled period counter"
+  ,"companionPage.incomeModEmergencyDebt.eligible": "Interest eligible from period counter"}

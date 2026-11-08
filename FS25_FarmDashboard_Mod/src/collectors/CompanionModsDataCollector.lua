@@ -585,6 +585,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "incomeModEmergencyDebt",
+        title = "Income Mod Emergency Debt",
+        category = "finance",
+        names = { "FS25_IncomeMod" },
+        substrings = { "incomemod" },
+        globals = {},
+    },
+    {
         id = "tramlineSystem",
         title = "Tramline System",
         category = "fields",

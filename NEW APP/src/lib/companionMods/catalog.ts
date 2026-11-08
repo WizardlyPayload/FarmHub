@@ -914,6 +914,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "incomeModEmergencyDebt",
+    title: "Income Mod Emergency Debt",
+    category: "finance",
+    descKey: "companions.desc.incomeModEmergencyDebt",
+    desc: "Shows this farm's Income Mod emergency-debt record separately from its native bank loan.",
+    relatedSection: "economy",
+  },
+  {
     id: "transportCompany",
     title: "Transport Company",
     category: "finance",

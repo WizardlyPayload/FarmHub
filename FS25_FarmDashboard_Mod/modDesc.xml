@@ -221,6 +221,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/SmartBarrierCollector.lua"/>
         <sourceFile filename="src/companionPages/BhFuelTerminalCollector.lua"/>
         <sourceFile filename="src/companionPages/BhWaterBatteryCollector.lua"/>
+        <sourceFile filename="src/companionPages/BhSandFacilitiesCollector.lua"/>
         <sourceFile filename="src/companionPages/PowertrainUpgradeCollector.lua"/>
         <sourceFile filename="src/companionPages/CapacityUpgradeCollector.lua"/>
         <sourceFile filename="src/companionPages/VariableTirePressureCollector.lua"/>

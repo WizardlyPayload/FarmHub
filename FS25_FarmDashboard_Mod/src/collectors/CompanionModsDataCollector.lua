@@ -945,6 +945,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "bhSandFacilities",
+        title = "BH Sand Facilities",
+        category = "storage",
+        names = { "FS25_BH_SandFacilities", "ITCH_5226982_FS25_BH_SandFacilities" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "powertrainUpgrade",
         title = "Powertrain Upgrade",
         category = "fleet",

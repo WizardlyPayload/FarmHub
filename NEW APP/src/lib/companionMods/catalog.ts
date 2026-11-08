@@ -901,6 +901,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "storage",
   },
   {
+    id: "bhSandFacilities",
+    title: "BH Sand Facilities",
+    category: "storage",
+    descKey: "companions.desc.bhSandFacilities",
+    desc: "Shows owned silo sand and use-cycle state separately from an unlimited paid yard.",
+    relatedSection: "storage",
+  },
+  {
     id: "powertrainUpgrade",
     title: "Powertrain Upgrade",
     category: "fleet",

@@ -942,6 +942,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "universalSoundTuner",
+        title = "Universal Sound Tuner",
+        category = "fleet",
+        names = { "KM_83598_Universal_Sound_Tuner", "FS25_UniversalSoundTuner" },
+        globals = {},
+    },
+    {
         id = "fillLevelLimiter",
         title = "Fill Level Limiter",
         category = "fleet",

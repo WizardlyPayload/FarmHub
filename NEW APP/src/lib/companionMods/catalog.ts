@@ -901,6 +901,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "universalSoundTuner",
+    title: "Universal Sound Tuner",
+    category: "fleet",
+    descKey: "companions.desc.universalSoundTuner",
+    desc: "Shows nondefault saved tune choices on owned vehicles, including configured performance multipliers. It does not measure delivered power, fuel use or driving results.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "fillLevelLimiter",
     title: "Fill Level Limiter",
     category: "fleet",

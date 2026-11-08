@@ -228,6 +228,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/variableWorkingDepth").then((m) => m.Page) },
   { key: "vehicleAssistanceSystem", catalogId: "vehicleAssistanceSystem", title: "Vehicle Assistance System", glyph: "VA", group: "fleet",
     load: () => import("@/sections/mods/vehicleAssistanceSystem").then((m) => m.Page) },
+  { key: "universalSoundTuner", catalogId: "universalSoundTuner", title: "Universal Sound Tuner", glyph: "ST", group: "fleet",
+    load: () => import("@/sections/mods/universalSoundTuner").then((m) => m.Page) },
   { key: "fillLevelLimiter", catalogId: "fillLevelLimiter", title: "Fill Level Limiter", glyph: "FL", group: "fleet",
     load: () => import("@/sections/mods/fillLevelLimiter").then((m) => m.Page) },
   { key: "farmGateKeys", catalogId: "farmGateKeys", title: "Farm Gate Keys", glyph: "GK", group: "construction",

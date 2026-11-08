@@ -6516,5 +6516,17 @@
   "companionPage.farmGateKeys.map": "Map object",
   "companionPage.farmGateKeys.placeableGate": "Placeable",
   "companionPage.farmGateKeys.empty": "No readable gate locks held by this farm.",
-  "companionPage.farmGateKeys.partial": "Some gate lock states were unavailable; totals are withheld."
+  "companionPage.farmGateKeys.partial": "Some gate lock states were unavailable; totals are withheld.",
+  "companions.desc.universalSoundTuner": "Shows nondefault saved tune choices on owned vehicles, including configured performance multipliers. It does not measure delivered power, fuel use or driving results.",
+  "companionPage.universalSoundTuner.lead": "Current nondefault tune settings on owned vehicles. Performance multipliers are configured choices, not measured power, speed or fuel use.",
+  "companionPage.universalSoundTuner.vehicles": "Supported owned vehicles",
+  "companionPage.universalSoundTuner.changedVehicles": "Vehicles with custom tunes",
+  "companionPage.universalSoundTuner.changes": "Custom tune settings",
+  "companionPage.universalSoundTuner.tableTitle": "Owned vehicle tune changes",
+  "companionPage.universalSoundTuner.vehicle": "Vehicle",
+  "companionPage.universalSoundTuner.setting": "Setting",
+  "companionPage.universalSoundTuner.value": "Configured",
+  "companionPage.universalSoundTuner.default": "Default",
+  "companionPage.universalSoundTuner.empty": "No owned vehicle has a readable nondefault tune.",
+  "companionPage.universalSoundTuner.partial": "Some tune settings were unavailable; totals are withheld."
 }

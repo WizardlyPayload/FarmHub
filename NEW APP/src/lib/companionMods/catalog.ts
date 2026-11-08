@@ -789,6 +789,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "twoRotorRakeControl",
+    title: "Universal Two-Rotor Rake Control",
+    category: "fleet",
+    descKey: "companions.desc.twoRotorRakeControl",
+    desc: "Shows the left and right rotor targets on your rakes while independent control is active.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "realisticMechanicalSystems",
     title: "Realistic Mechanical Systems",
     category: "fleet",

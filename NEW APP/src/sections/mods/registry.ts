@@ -208,6 +208,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/hydraulicSuspension").then((m) => m.Page) },
   { key: "realDieselStart", catalogId: "realDieselStart", title: "Realistic Diesel Start", glyph: "RS", group: "fleet",
     load: () => import("@/sections/mods/realDieselStart").then((m) => m.Page) },
+  { key: "twoRotorRakeControl", catalogId: "twoRotorRakeControl", title: "Universal Two-Rotor Rake Control", glyph: "TR", group: "fleet",
+    load: () => import("@/sections/mods/twoRotorRakeControl").then((m) => m.Page) },
   { key: "terraFarmMachines", catalogId: "terraFarmMachines", title: "TerraFarm Machines", glyph: "TF", group: "fleet",
     load: () => import("@/sections/mods/terraFarmMachines").then((m) => m.Page) },
   { key: "realisticMechanicalSystems", catalogId: "realisticMechanicalSystems", title: "Realistic Mechanical Systems", glyph: "MS", group: "fleet",

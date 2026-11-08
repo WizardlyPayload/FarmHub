@@ -905,6 +905,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "rcSheepBarn",
+        title = "RC Sheep Barn and Storage",
+        category = "livestock",
+        names = { "KM_82926_Sheep_Barn" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "powertrainUpgrade",
         title = "Powertrain Upgrade",
         category = "fleet",

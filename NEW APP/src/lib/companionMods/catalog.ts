@@ -861,6 +861,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "storage",
   },
   {
+    id: "rcSheepBarn",
+    title: "RC Sheep Barn and Storage",
+    category: "livestock",
+    descKey: "companions.desc.rcSheepBarn",
+    desc: "Shows owned RC sheep barns' saved straw and required ration ingredients, not feeding or manure production.",
+    relatedSection: "livestock",
+  },
+  {
     id: "powertrainUpgrade",
     title: "Powertrain Upgrade",
     category: "fleet",

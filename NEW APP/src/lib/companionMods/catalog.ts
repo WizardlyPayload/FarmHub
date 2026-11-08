@@ -403,6 +403,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "productions",
   },
   {
+    id: "greenhouseAutomaticWatering",
+    title: "Greenhouse Automatic Watering",
+    category: "production",
+    descKey: "companions.desc.greenhouseAutomaticWatering",
+    desc: "Shows the automatic-watering switch on this farm's water-using production buildings. It does not measure water added or costs charged.",
+    relatedSection: "productions",
+  },
+  {
     id: "upgradeYourFactory",
     title: "Upgrade Your Factory",
     category: "production",

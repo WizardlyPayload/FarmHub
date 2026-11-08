@@ -330,6 +330,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "greenhouseAutomaticWatering",
+        title = "Greenhouse Automatic Watering",
+        category = "production",
+        names = { "FS25_303379_Greenhouse_Automatic_Watering" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "grainHaulingService",
         title = "Grain Hauling Service",
         category = "economy",

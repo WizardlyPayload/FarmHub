@@ -273,6 +273,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/EconomicHistoryCollector.lua"/>
         <sourceFile filename="src/companionPages/UsedEquipmentYardsCollector.lua"/>
         <sourceFile filename="src/companionPages/RealLandFinanceCollector.lua"/>
+        <sourceFile filename="src/companionPages/LandFinancingCollector.lua"/>
         <sourceFile filename="src/companionPages/ContractManagerCollector.lua"/>
         <sourceFile filename="src/companionPages/MowingContractsPlusCollector.lua"/>
         <sourceFile filename="src/companionPages/CryptoFarmCollector.lua"/>

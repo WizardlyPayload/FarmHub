@@ -538,6 +538,14 @@ local CATALOG = {
         globals = { "g_ftrManager" },
     },
     {
+        id = "landFinancing",
+        title = "Land Financing",
+        category = "economy",
+        names = { "KM_82121_land-financing" },
+        substrings = { "land-financing" },
+        globals = {},
+    },
+    {
         id = "contractManager",
         title = "Contract Manager",
         category = "economy",

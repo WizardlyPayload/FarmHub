@@ -557,6 +557,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "landFinancing",
+    title: "Land Financing",
+    category: "economy",
+    descKey: "companions.desc.landFinancing",
+    desc: "Shows active land-loan balances and scheduled installments recorded for the local single-player farm.",
+    relatedSection: "economy",
+  },
+  {
     id: "contractManager",
     title: "Contract Manager",
     category: "contracts",

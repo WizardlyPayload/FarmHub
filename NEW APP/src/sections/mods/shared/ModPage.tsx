@@ -124,6 +124,8 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
           ? tOr("companionPage.realisticMechanicalSystems.empty", "No owned machine has a captured mechanical reading yet.")
         : key === "realFuelConsumption" && page?.reason === "no-captured-owned-vehicle"
           ? tOr("companionPage.realFuelConsumption.empty", "No owned vehicle has recorded engine time yet.")
+        : key === "automaticBaleStorage" && page?.reason === "no-owned-object-storage"
+          ? tOr("companionPage.automaticBaleStorage.noOwned", "No owned object storage was found for this farm.")
         : key === "bullMilkProduction" && page?.reason === "no-captured-owned-cow-barn"
           ? tOr("companionPage.bullMilkProduction.empty", "No owned cow barn has a calculated Bull Milk rate yet.")
         : key === "automaticMilkDistribution" && page?.reason === "barn-switch-unavailable"

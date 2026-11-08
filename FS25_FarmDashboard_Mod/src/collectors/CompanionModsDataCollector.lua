@@ -729,6 +729,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "automaticBaleStorage",
+        title = "Automatic Bale Storage",
+        category = "storage",
+        names = { "FS25_363427_FS25_AutomaticBaleStorage", "KM_78542_Automatic_Bale_Storage" },
+        substrings = {},
+        globals = { "AutomaticBaleStorage" },
+    },
+    {
         id = "baleBatchTracker",
         title = "Bale Batch Tracker",
         category = "storage",

@@ -877,6 +877,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "rhmClogging",
+    title: "Realistic Harvesting Clogging Addon",
+    category: "fleet",
+    descKey: "companions.desc.rhmClogging",
+    desc: "Shows current forage-harvester knife sharpness for vehicles owned by this farm. It does not record sharpening or harvested output.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "jobQueue",
     title: "Job Queue",
     category: "fleet",

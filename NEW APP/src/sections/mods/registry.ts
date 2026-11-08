@@ -220,6 +220,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/useYourTyres").then((m) => m.Page) },
   { key: "realisticHarvesting", catalogId: "realisticHarvesting", title: "Realistic Harvesting", glyph: "RH", group: "fleet",
     load: () => import("@/sections/mods/realisticHarvesting").then((m) => m.Page) },
+  { key: "rhmClogging", catalogId: "rhmClogging", title: "Harvesting Clogging Addon", glyph: "KN", group: "fleet",
+    load: () => import("@/sections/mods/rhmClogging").then((m) => m.Page) },
   { key: "jobQueue", catalogId: "jobQueue", title: "Job Queue", glyph: "JQ", group: "fleet",
     load: () => import("@/sections/mods/jobQueue").then((m) => m.Page) },
   { key: "agriculturalTerminal", catalogId: "agriculturalTerminal", title: "Agricultural Terminal", glyph: "AT", group: "fleet",

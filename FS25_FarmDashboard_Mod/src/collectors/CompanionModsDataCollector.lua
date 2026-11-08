@@ -921,6 +921,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "rhmClogging",
+        title = "Realistic Harvesting Clogging Addon",
+        category = "fleet",
+        names = { "WA25_RHM_CloggingAddon", "KM_81204_Clogging_Addon" },
+        globals = {},
+    },
+    {
         id = "jobQueue",
         title = "Job Queue",
         category = "fleet",

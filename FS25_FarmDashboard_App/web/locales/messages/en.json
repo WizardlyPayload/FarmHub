@@ -6446,5 +6446,13 @@
 "companionPage.handTools.modes": "Active saved modes",
 "companionPage.handTools.picker": "Picker boost",
 "companionPage.handTools.empty": "No readable owned Hand Tools vehicle is available yet.",
-"companionPage.handTools.partial": "Some tool state was unavailable; totals are withheld."
+"companionPage.handTools.partial": "Some tool state was unavailable; totals are withheld.",
+  "companions.desc.rhmClogging": "Shows current forage-harvester knife sharpness for vehicles owned by this farm. It does not record sharpening or harvested output.",
+  "companionPage.rhmClogging.lead": "Current knife sharpness for this farm's forage harvesters. A reading does not prove a sharpening action, harvest, crop loss or fuel use.",
+  "companionPage.rhmClogging.vehicles": "Forage harvesters with knife readings",
+  "companionPage.rhmClogging.tableTitle": "Owned forage-harvester knives",
+  "companionPage.rhmClogging.vehicle": "Forage harvester",
+  "companionPage.rhmClogging.sharpness": "Knife sharpness",
+  "companionPage.rhmClogging.empty": "No owned forage harvester has a readable knife condition.",
+  "companionPage.rhmClogging.partial": "Some knife readings were unavailable; totals are withheld."
 }

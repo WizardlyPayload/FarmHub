@@ -211,6 +211,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/MajorServiceCollector.lua"/>
         <sourceFile filename="src/companionPages/UseYourTyresCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticHarvestingCollector.lua"/>
+        <sourceFile filename="src/companionPages/RhmCloggingCollector.lua"/>
         <sourceFile filename="src/companionPages/JobQueueCollector.lua"/>
         <sourceFile filename="src/companionPages/AgriculturalTerminalCollector.lua"/>
         <sourceFile filename="src/companionPages/ImplementMaintenanceCollector.lua"/>

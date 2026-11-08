@@ -212,6 +212,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/forageWagonCompression").then((m) => m.Page) },
   { key: "enhancedMixerWagons", catalogId: "enhancedMixerWagons", title: "Enhanced Mixer Wagons", glyph: "MW", group: "fleet",
     load: () => import("@/sections/mods/enhancedMixerWagons").then((m) => m.Page) },
+  { key: "mixerWagonFeedSwitcher", catalogId: "mixerWagonFeedSwitcher", title: "Mixer Wagon Feed Switcher", glyph: "MF", group: "fleet",
+    load: () => import("@/sections/mods/mixerWagonFeedSwitcher").then((m) => m.Page) },
   { key: "powertrainUpgrade", catalogId: "powertrainUpgrade", title: "Powertrain Upgrade", glyph: "PU", group: "fleet",
     load: () => import("@/sections/mods/powertrainUpgrade").then((m) => m.Page) },
   { key: "capacityUpgrade", catalogId: "capacityUpgrade", title: "Capacity Upgrade", glyph: "CU", group: "fleet",

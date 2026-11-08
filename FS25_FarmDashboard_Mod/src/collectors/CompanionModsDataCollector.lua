@@ -865,6 +865,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "mixerWagonFeedSwitcher",
+        title = "Mixer Wagon Feed Switcher",
+        category = "fleet",
+        names = { "KM_80956_Mixer_Wagon_Feed_Switcher" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "powertrainUpgrade",
         title = "Powertrain Upgrade",
         category = "fleet",

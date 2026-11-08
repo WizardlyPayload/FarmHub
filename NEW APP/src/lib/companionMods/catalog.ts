@@ -821,6 +821,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "mixerWagonFeedSwitcher",
+    title: "Mixer Wagon Feed Switcher",
+    category: "fleet",
+    descKey: "companions.desc.mixerWagonFeedSwitcher",
+    desc: "Shows custom recipe choices and mix groups on owned mixer wagons, not feed production or delivery.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "powertrainUpgrade",
     title: "Powertrain Upgrade",
     category: "fleet",

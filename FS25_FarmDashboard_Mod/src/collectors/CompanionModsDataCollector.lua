@@ -609,6 +609,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "leaseLivestock",
+        title = "Lease Livestock",
+        category = "animals",
+        names = { "KM_81709_Lease_Livestock", "FS25_LeaseLivestock", "FS25_Lease_Livestock" },
+        substrings = { "lease_livestock", "leaselivestock" },
+        globals = {},
+    },
+    {
         id = "tramlineSystem",
         title = "Tramline System",
         category = "fields",

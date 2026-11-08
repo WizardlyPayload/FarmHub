@@ -76,6 +76,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
   { key: "autoSellSilo", catalogId: "autoSellSilo", title: "Auto Sell Silo", glyph: "AS", group: "finance",
     load: () => import("@/sections/mods/autoSellSilo").then((m) => m.Page) },
   // Livestock
+  { key: "leaseLivestock", catalogId: "leaseLivestock", title: "Lease Livestock", glyph: "LL", group: "livestock",
+    load: () => import("@/sections/mods/leaseLivestock").then((m) => m.Page) },
   { key: "veterinarian", catalogId: "veterinarian", title: "Veterinarian and Animal Diseases", glyph: "VT", group: "livestock",
     load: () => import("@/sections/mods/veterinarian").then((m) => m.Page) },
   { key: "seasonalMilkProduction", catalogId: "seasonalMilkProduction", title: "Seasonal Milk Production", glyph: "SM", group: "livestock",

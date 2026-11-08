@@ -5474,4 +5474,17 @@
   ,"companionPage.autoGrovePlantings.other": "Other planting"
   ,"companionPage.autoGrovePlantings.empty": "No Auto Grove planting record is available for a field this farm still owns."
   ,"companionPage.autoGrovePlantings.truncated": "Only part of the saved planting register was scanned or displayed."
-  ,"companionPage.autoGrovePlantings.partial": "Invalid records and plantings whose current field ownership could not be confirmed were withheld."}
+  ,"companionPage.autoGrovePlantings.partial": "Invalid records and plantings whose current field ownership could not be confirmed were withheld."
+  ,"companions.desc.leaseLivestock": "Shows leased animals in this farm's husbandries and their estimated charge per game period. It is not a payment history."
+  ,"companionPage.leaseLivestock.lead": "Lease Livestock marks current animals as leased in the husbandry. Charges are calculated from today's subtype price at age 18. They are estimates for a future period, not a record of money paid."
+  ,"companionPage.leaseLivestock.leasedAnimals": "Currently leased animals"
+  ,"companionPage.leaseLivestock.estimatedCharge": "Estimated charge next period"
+  ,"companionPage.leaseLivestock.title": "Current leased animal groups"
+  ,"companionPage.leaseLivestock.pen": "Husbandry"
+  ,"companionPage.leaseLivestock.animal": "Animal subtype"
+  ,"companionPage.leaseLivestock.count": "Leased animals"
+  ,"companionPage.leaseLivestock.rate": "Rate per animal / period"
+  ,"companionPage.leaseLivestock.charge": "Estimated period charge"
+  ,"companionPage.leaseLivestock.empty": "No leased animal group was found in a husbandry owned by this farm."
+  ,"companionPage.leaseLivestock.truncated": "Only part of the current husbandry register was scanned or displayed."
+  ,"companionPage.leaseLivestock.partial": "Some husbandry or leased-cluster values were unavailable; totals and charges may be incomplete."}

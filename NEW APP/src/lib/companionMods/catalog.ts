@@ -938,6 +938,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "fields",
   },
   {
+    id: "leaseLivestock",
+    title: "Lease Livestock",
+    category: "livestock",
+    descKey: "companions.desc.leaseLivestock",
+    desc: "Shows leased animals in this farm's husbandries and their estimated charge per game period. It is not a payment history.",
+    relatedSection: "pastures",
+  },
+  {
     id: "transportCompany",
     title: "Transport Company",
     category: "finance",

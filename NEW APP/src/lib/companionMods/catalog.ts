@@ -621,6 +621,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "kommunalServices",
+    title: "Kommunal Services",
+    category: "contracts",
+    descKey: "companions.desc.kommunalServices",
+    desc: "Shows trimmed-area progress on this farm's accepted, running Kommunal Services missions. It does not record payouts or completed contracts.",
+    relatedSection: "economy",
+  },
+  {
     id: "supplyTransportContracts",
     title: "Supply and Transport Contracts",
     category: "contracts",

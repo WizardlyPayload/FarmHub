@@ -31,6 +31,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/cropContracts").then((m) => m.Page) },
   { key: "woodChipsMissions", catalogId: "woodChipsMissions", title: "Wood Chips Missions", glyph: "WC", group: "finance",
     load: () => import("@/sections/mods/woodChipsMissions").then((m) => m.Page) },
+  { key: "kommunalServices", catalogId: "kommunalServices", title: "Kommunal Services", glyph: "KS", group: "finance",
+    load: () => import("@/sections/mods/kommunalServices").then((m) => m.Page) },
   { key: "supplyTransportContracts", catalogId: "supplyTransportContracts", title: "Supply and Transport Contracts", glyph: "ST", group: "finance",
     load: () => import("@/sections/mods/supplyTransportContracts").then((m) => m.Page) },
   { key: "cropInsurance", catalogId: "cropInsurance", title: "Crop Insurance", glyph: "CI", group: "finance",

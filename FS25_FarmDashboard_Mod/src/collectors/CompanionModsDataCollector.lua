@@ -490,6 +490,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "kommunalServices",
+        title = "Kommunal Services",
+        category = "contracts",
+        names = { "FS25_316057_Kommunal_Services", "FS25_KommunalServices" },
+        substrings = { "kommunal_services", "kommunalservices" },
+        globals = {},
+    },
+    {
         id = "cropInsurance",
         title = "Crop Insurance",
         category = "economy",

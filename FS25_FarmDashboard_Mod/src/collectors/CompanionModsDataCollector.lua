@@ -965,7 +965,7 @@ local CATALOG = {
         id = "courseplay",
         title = "Courseplay",
         category = "fleet",
-        names = { "FS25_Courseplay" },
+        names = { "FS25_Courseplay", "FS25_331515_CoursePlay" },
         substrings = {},
         globals = { "g_Courseplay" },
     },

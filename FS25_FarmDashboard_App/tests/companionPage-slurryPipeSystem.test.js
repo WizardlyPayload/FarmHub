@@ -6,6 +6,9 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "SlurryPipeSystemCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { FS25_SlurryPipeSystem = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "FS25_SlurryPipeSystem", version = "1.0.1.7" }
+  } end }
   local mission = { getIsServer = function() return true end }
   _G.g_currentMission = mission
   local function place(farm, name)

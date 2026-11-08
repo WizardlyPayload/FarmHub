@@ -18,7 +18,7 @@ CompanionPages.register({
         if ctx.mission.isMissionStarted == false then
             return { readState = "settings-only", reason = "world-not-started" }
         end
-        if ctx.version ~= nil and ctx.version ~= "1.0.1.7" then
+        if ctx.version ~= "1.0.1.7" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
         local manager = ctx.global("g_slurryPipeManager")

@@ -314,6 +314,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "upgradeYourFactory",
+        title = "Upgrade Your Factory",
+        category = "production",
+        names = { "FS25_335994_Upgrade_Your_Factory", "FS25_UpgradeYourFactory" },
+        substrings = { "upgrade_your_factory", "upgradeyourfactory" },
+        globals = { "UpgradeYourFactory" },
+    },
+    {
         id = "productionBoosterSystem",
         title = "Production Booster System",
         category = "production",

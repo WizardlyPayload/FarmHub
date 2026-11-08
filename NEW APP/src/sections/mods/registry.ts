@@ -103,6 +103,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/factoryProfitCalculator").then((m) => m.Page) },
   { key: "productionControl", catalogId: "productionControl", title: "Production Control", glyph: "PC", group: "storage",
     load: () => import("@/sections/mods/productionControl").then((m) => m.Page) },
+  { key: "upgradeYourFactory", catalogId: "upgradeYourFactory", title: "Upgrade Your Factory", glyph: "UF", group: "storage",
+    load: () => import("@/sections/mods/upgradeYourFactory").then((m) => m.Page) },
   { key: "productionBoosterSystem", catalogId: "productionBoosterSystem", title: "Production Booster System", glyph: "PB", group: "storage",
     load: () => import("@/sections/mods/productionBoosterSystem").then((m) => m.Page) },
   { key: "productionRevamp", catalogId: "productionRevamp", title: "Production Revamp", glyph: "PR", group: "storage",

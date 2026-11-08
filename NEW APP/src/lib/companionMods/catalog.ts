@@ -400,6 +400,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "productions",
   },
   {
+    id: "upgradeYourFactory",
+    title: "Upgrade Your Factory",
+    category: "production",
+    descKey: "companions.desc.upgradeYourFactory",
+    desc: "Shows this farm's current production upgrade levels and next-price previews in single player.",
+    relatedSection: "productions",
+  },
+  {
     id: "productionBoosterSystem",
     title: "Production Booster System",
     category: "production",

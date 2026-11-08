@@ -837,6 +837,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "vehicleAnchor",
+    title: "Vehicle Anchor",
+    category: "fleet",
+    descKey: "companions.desc.vehicleAnchor",
+    desc: "Shows saved anchor choices and whether the joint is currently applied on owned vehicles.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "powertrainUpgrade",
     title: "Powertrain Upgrade",
     category: "fleet",

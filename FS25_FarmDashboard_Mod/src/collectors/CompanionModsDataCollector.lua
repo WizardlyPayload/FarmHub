@@ -881,6 +881,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "vehicleAnchor",
+        title = "Vehicle Anchor",
+        category = "fleet",
+        names = { "KM_81498_Vehicle_Anchor" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "powertrainUpgrade",
         title = "Powertrain Upgrade",
         category = "fleet",

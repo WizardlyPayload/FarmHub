@@ -213,6 +213,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/EnhancedMixerWagonsCollector.lua"/>
         <sourceFile filename="src/companionPages/MixerWagonFeedSwitcherCollector.lua"/>
         <sourceFile filename="src/companionPages/ChainsawConsumablesCollector.lua"/>
+        <sourceFile filename="src/companionPages/VehicleAnchorCollector.lua"/>
         <sourceFile filename="src/companionPages/PowertrainUpgradeCollector.lua"/>
         <sourceFile filename="src/companionPages/CapacityUpgradeCollector.lua"/>
         <sourceFile filename="src/companionPages/VariableTirePressureCollector.lua"/>

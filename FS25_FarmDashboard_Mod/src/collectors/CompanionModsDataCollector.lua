@@ -984,6 +984,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "helperSilageCompacting",
+        title = "Helper Silage Compacting",
+        category = "fleet",
+        names = { "KM_81547_Helper_Silage_Compacting" },
+        globals = {},
+    },
+    {
         id = "universalSoundTuner",
         title = "Universal Sound Tuner",
         category = "fleet",

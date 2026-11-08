@@ -240,6 +240,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/buyableGps").then((m) => m.Page) },
   { key: "lockSteeringAxles", catalogId: "lockSteeringAxles", title: "Lock Steering Axle", glyph: "LA", group: "fleet",
     load: () => import("@/sections/mods/lockSteeringAxles").then((m) => m.Page) },
+  { key: "helperSilageCompacting", catalogId: "helperSilageCompacting", title: "Helper Silage Compacting", glyph: "HC", group: "fleet",
+    load: () => import("@/sections/mods/helperSilageCompacting").then((m) => m.Page) },
   { key: "universalSoundTuner", catalogId: "universalSoundTuner", title: "Universal Sound Tuner", glyph: "ST", group: "fleet",
     load: () => import("@/sections/mods/universalSoundTuner").then((m) => m.Page) },
   { key: "welchyPerformanceAddon", catalogId: "welchyPerformanceAddon", title: "Welchy Performance Addon", glyph: "WP", group: "fleet",

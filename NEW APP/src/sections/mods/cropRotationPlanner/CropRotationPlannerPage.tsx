@@ -24,9 +24,9 @@ export function Page({ entry }: CompanionPageProps) {
     { key: "steps", label: tOr(`${K}.steps`, "Planned steps"), value: formatNumber(farmData.stepCount, 0) },
   ] : [];
   return (
-    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Named crop rotation templates saved for this farm. They are plans, not assignments to fields, completed rotations or measured yields.")}>
+    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Current named crop rotation plans for this farm. They are plans, not assignments to fields, completed rotations or measured yields.")}>
       <ModStatTiles tiles={tiles} />
-      <Card title={tOr(`${K}.title`, "Saved rotation templates")}>
+      <Card title={tOr(`${K}.title`, "Crop rotation plans")}>
         <ModTable columns={[
           { key: "plan", label: tOr(`${K}.plan`, "Plan") },
           { key: "step", label: tOr(`${K}.step`, "Step"), align: "end" },

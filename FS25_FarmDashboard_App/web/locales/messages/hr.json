@@ -5597,10 +5597,10 @@
   ,"companionPage.fairLeasingPlus.unavailable": "The mod's rewards register is not readable for this farm."
 
   ,"companions.desc.cropRotationPlanner": "Shows this farm's named rotation templates and ordered crop steps. A plan is not an assigned field or completed rotation."
-  ,"companionPage.cropRotationPlanner.lead": "Named crop rotation templates saved for this farm. They are plans, not assignments to fields, completed rotations or measured yields."
+  ,"companionPage.cropRotationPlanner.lead": "Current named crop rotation plans for this farm. They are plans, not assignments to fields, completed rotations or measured yields."
   ,"companionPage.cropRotationPlanner.plans": "Named plans"
   ,"companionPage.cropRotationPlanner.steps": "Planned steps"
-  ,"companionPage.cropRotationPlanner.title": "Saved rotation templates"
+  ,"companionPage.cropRotationPlanner.title": "Crop rotation plans"
   ,"companionPage.cropRotationPlanner.plan": "Plan"
   ,"companionPage.cropRotationPlanner.step": "Step"
   ,"companionPage.cropRotationPlanner.crop": "Crop"

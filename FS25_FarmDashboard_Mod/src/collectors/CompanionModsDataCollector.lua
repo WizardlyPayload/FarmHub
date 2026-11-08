@@ -921,6 +921,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "nonStopCrop",
+        title = "Non-Stop Crop",
+        category = "fleet",
+        names = { "FS25_363554_Non-Stop_Crop", "FS25_NonStopCrop" },
+        substrings = { "non-stop_crop", "nonstopcrop" },
+        globals = {},
+    },
+    {
         id = "terraFarmMachines",
         title = "TerraFarm Machines",
         category = "fleet",

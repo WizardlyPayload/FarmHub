@@ -877,6 +877,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "nonStopCrop",
+    title: "Non-Stop Crop",
+    category: "fleet",
+    descKey: "companions.desc.nonStopCrop",
+    desc: "Shows the saved routing choice on this farm's current harvest vehicles. A selected target is not proof that crop was transferred.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "hydraulicSuspension",
     title: "Hydraulic Suspension System",
     category: "fleet",

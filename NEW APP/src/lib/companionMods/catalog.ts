@@ -930,6 +930,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "fields",
   },
   {
+    id: "autoGrovePlantings",
+    title: "Auto Grove Planting Records",
+    category: "fields",
+    descKey: "companions.desc.autoGrovePlantings",
+    desc: "Shows Auto Grove's last recorded planting for fields this farm still owns. Records do not prove a grove still exists.",
+    relatedSection: "fields",
+  },
+  {
     id: "transportCompany",
     title: "Transport Company",
     category: "finance",

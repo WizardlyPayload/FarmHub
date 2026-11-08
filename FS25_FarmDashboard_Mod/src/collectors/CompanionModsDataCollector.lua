@@ -601,6 +601,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "autoGrovePlantings",
+        title = "Auto Grove Planting Records",
+        category = "fields",
+        names = { "FS25_AutoGrove", "KM_82201_Auto_Grove" },
+        substrings = { "autogrove", "auto_grove" },
+        globals = {},
+    },
+    {
         id = "tramlineSystem",
         title = "Tramline System",
         category = "fields",

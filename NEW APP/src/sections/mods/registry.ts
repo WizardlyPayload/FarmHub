@@ -226,6 +226,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/incomeModEmergencyDebt").then((m) => m.Page) },
   { key: "workplaceTriggersSites", catalogId: "workplaceTriggersSites", title: "Workplace Triggers Sites", glyph: "WT", group: "fields",
     load: () => import("@/sections/mods/workplaceTriggersSites").then((m) => m.Page) },
+  { key: "autoGrovePlantings", catalogId: "autoGrovePlantings", title: "Auto Grove Planting Records", glyph: "AG", group: "fields",
+    load: () => import("@/sections/mods/autoGrovePlantings").then((m) => m.Page) },
   { key: "dynamicDealership", catalogId: "dynamicDealership", title: "Dynamic Dealership", glyph: "DD", group: "fleet",
     load: () => import("@/sections/mods/dynamicDealership").then((m) => m.Page) },
   { key: "tuvSystem", catalogId: "tuvSystem", title: "TUV System", glyph: "TV", group: "fleet",

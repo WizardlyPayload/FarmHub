@@ -829,6 +829,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "useYourTyres",
+    title: "Use Your Tyres",
+    category: "fleet",
+    descKey: "companions.desc.useYourTyres",
+    desc: "Shows active wheel travel and calculated tyre wear for vehicles currently owned by this farm. It does not record a replacement.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "hydraulicSuspension",
     title: "Hydraulic Suspension System",
     category: "fleet",

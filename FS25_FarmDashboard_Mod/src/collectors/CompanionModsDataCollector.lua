@@ -873,6 +873,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "useYourTyres",
+        title = "Use Your Tyres",
+        category = "fleet",
+        names = { "FS25_321793_Use_Up_Your_Tyres", "FS25_useYourTyres" },
+        substrings = { "use_up_your_tyres", "useyourtyres" },
+        globals = { "UseYourTyres" },
+    },
+    {
         id = "terraFarmMachines",
         title = "TerraFarm Machines",
         category = "fleet",

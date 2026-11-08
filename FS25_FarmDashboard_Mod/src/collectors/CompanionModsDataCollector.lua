@@ -921,6 +921,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "smartBarrier",
+        title = "Smart Barrier Pack",
+        category = "construction",
+        names = { "KM_82078_smart-barrier-pack", "FS25_SmartBarrierPack" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "powertrainUpgrade",
         title = "Powertrain Upgrade",
         category = "fleet",

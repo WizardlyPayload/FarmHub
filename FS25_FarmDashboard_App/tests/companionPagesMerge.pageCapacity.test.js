@@ -24,7 +24,7 @@ test("keeps every registered dedicated page when all are detected", () => {
 });
 
 test("still caps an unexpectedly large page payload", () => {
-  const result = normalizeCompanionPages(sourcePages(140), { modules: new Map() });
-  expect(Object.keys(result.pages)).toHaveLength(128);
-  expect(result.pages.mod129).toBeUndefined();
+  const result = normalizeCompanionPages(sourcePages(260), { modules: new Map() });
+  expect(Object.keys(result.pages)).toHaveLength(256);
+  expect(result.pages.mod257).toBeUndefined();
 });

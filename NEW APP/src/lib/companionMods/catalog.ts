@@ -877,6 +877,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "smartBarrier",
+    title: "Smart Barrier Pack",
+    category: "construction",
+    descKey: "companions.desc.smartBarrier",
+    desc: "Shows owned barriers' saved mode and schedule beside their current arm and warning state.",
+    relatedSection: "map",
+  },
+  {
     id: "powertrainUpgrade",
     title: "Powertrain Upgrade",
     category: "fleet",

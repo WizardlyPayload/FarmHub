@@ -1241,6 +1241,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "handTools",
+        title = "Hand Tools",
+        category = "fleet",
+        names = { "FS25_369801_Hand_Tools", "FS25_HandTools" },
+        globals = {},
+    },
+    {
         id = "advancedVehicleFunctions",
         title = "Advanced Vehicle Functions",
         category = "fleet",

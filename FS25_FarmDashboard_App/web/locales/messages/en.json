@@ -6429,5 +6429,22 @@
 "companionPage.handToolDrop.x": "World X (m)",
 "companionPage.handToolDrop.z": "World Z (m)",
 "companionPage.handToolDrop.empty": "No readable hand tool is currently dropped by this farm.",
-"companionPage.handToolDrop.partial": "Some dropped hand tools could not be located; totals are withheld."
+"companionPage.handToolDrop.partial": "Some dropped hand tools could not be located; totals are withheld.",
+"companions.desc.handTools": "Shows current placement, saved mode switches and picker capacity boost on this farm's hand-tool vehicles. It does not record completed work.",
+"companionPage.handTools.yes": "Yes",
+"companionPage.handTools.no": "No",
+"companionPage.handTools.none": "None",
+"companionPage.handTools.mode.converter": "Fill converter",
+"companionPage.handTools.mode.tedding": "Tedding",
+"companionPage.handTools.tools": "Owned hand tools",
+"companionPage.handTools.stuckCount": "Placed in ground",
+"companionPage.handTools.boosted": "Boosted bale pickers",
+"companionPage.handTools.lead": "Current mod-specific state on this farm's hand-tool vehicles. Active modes are saveable switches; these readings do not prove completed tool work or bale handling.",
+"companionPage.handTools.table": "Owned hand-tool states",
+"companionPage.handTools.tool": "Tool",
+"companionPage.handTools.stuck": "Placed in ground",
+"companionPage.handTools.modes": "Active saved modes",
+"companionPage.handTools.picker": "Picker boost",
+"companionPage.handTools.empty": "No readable owned Hand Tools vehicle is available yet.",
+"companionPage.handTools.partial": "Some tool state was unavailable; totals are withheld."
 }

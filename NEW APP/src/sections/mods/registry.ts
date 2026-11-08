@@ -53,6 +53,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/economicHistory").then((m) => m.Page) },
   { key: "usedEquipmentYards", catalogId: "usedEquipmentYards", title: "Used Equipment Yards", glyph: "UY", group: "finance",
     load: () => import("@/sections/mods/usedEquipmentYards").then((m) => m.Page) },
+  { key: "buyUsedEquipment", catalogId: "buyUsedEquipment", title: "Buy Used Equipment", glyph: "BU", group: "finance",
+    load: () => import("@/sections/mods/buyUsedEquipment").then((m) => m.Page) },
   { key: "realLandFinance", catalogId: "realLandFinance", title: "Real Land Finance", glyph: "LF", group: "finance",
     load: () => import("@/sections/mods/realLandFinance").then((m) => m.Page) },
   { key: "landFinancing", catalogId: "landFinancing", title: "Land Financing", glyph: "LN", group: "finance",

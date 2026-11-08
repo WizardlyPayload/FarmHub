@@ -113,6 +113,13 @@ local CATALOG = {
         globals = { "g_priceTicker" },
     },
     {
+        id = "buyUsedEquipment",
+        title = "Buy Used Equipment",
+        category = "economy",
+        names = { "FS25_312631_Buy_Used_Equipment", "FS25_BuyUsedEquipment" },
+        globals = {},
+    },
+    {
         id = "enhancedSeasonalPrices",
         title = "Enhanced Seasonal Prices",
         category = "economy",

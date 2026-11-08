@@ -6579,4 +6579,13 @@
   ,"companionPage.toggleableSilageAdditive.state": "Additive usage"
   ,"companionPage.toggleableSilageAdditive.empty": "No owned equipment has readable additive-switch state."
   ,"companionPage.toggleableSilageAdditive.partial": "Some equipment states were unavailable; totals are withheld."
+  ,"companions.desc.buyUsedEquipment": "Shows pending used-equipment broker searches for your farm."
+  ,"companionPage.buyUsedEquipment.pending": "Pending searches"
+  ,"companionPage.buyUsedEquipment.lead": "Your farm's pending used-equipment broker searches. Remaining hours count down in game time. A search is not a found offer or a purchased vehicle; its result is not guaranteed."
+  ,"companionPage.buyUsedEquipment.title": "Pending equipment searches"
+  ,"companionPage.buyUsedEquipment.equipment": "Equipment"
+  ,"companionPage.buyUsedEquipment.level": "Search level"
+  ,"companionPage.buyUsedEquipment.hours": "Hours remaining"
+  ,"companionPage.buyUsedEquipment.empty": "No pending searches for this farm."
+  ,"companionPage.buyUsedEquipment.partial": "Some searches were unavailable; the total is withheld."
 }

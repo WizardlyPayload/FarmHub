@@ -1122,6 +1122,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "cropRotationPlanner",
+        title = "Crop Rotation",
+        category = "fields",
+        names = { "FS25_347316_Crop_Rotation" },
+        substrings = {},
+        globals = { "g_cropRotationPlanner" },
+    },
+    {
         id = "yieldTracker",
         title = "Yield Tracker",
         category = "fields",

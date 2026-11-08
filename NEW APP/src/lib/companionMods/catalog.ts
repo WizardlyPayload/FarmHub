@@ -64,6 +64,7 @@ const LIMITED_IDS = new Set([
   "realisticVehicleService",
   "farmReputation",
   "realisticCropRotation",
+  "cropRotationPlanner",
   "moistureSystem",
   "rentYourField",
   "farmlandMarketplace",
@@ -1210,6 +1211,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     desc: "Saves four-step crop and cover-crop plans plus recent crop history by farmland. FarmHub shows only the land currently owned by this farm; plans are not completed harvests.",
     relatedSection: "fields",
     liveKey: "realisticCropRotation",
+  },
+  {
+    id: "cropRotationPlanner",
+    title: "Crop Rotation",
+    category: "fields",
+    descKey: "companions.desc.cropRotationPlanner",
+    desc: "Shows this farm's named rotation templates and ordered crop steps. A plan is not an assigned field or a completed rotation.",
+    relatedSection: "fields",
   },
   {
     id: "yieldTracker",

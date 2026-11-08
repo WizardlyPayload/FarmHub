@@ -161,6 +161,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/harvestLedger").then((m) => m.Page) },
   { key: "realisticCropRotation", catalogId: "realisticCropRotation", title: "Realistic Crop Rotation", glyph: "CR", group: "fields",
     load: () => import("@/sections/mods/realisticCropRotation").then((m) => m.Page) },
+  { key: "cropRotationPlanner", catalogId: "cropRotationPlanner", title: "Crop Rotation", glyph: "CP", group: "fields",
+    load: () => import("@/sections/mods/cropRotationPlanner").then((m) => m.Page) },
   { key: "restrictedPeriods", catalogId: "restrictedPeriods", title: "Restricted Periods", glyph: "RP", group: "fields",
     load: () => import("@/sections/mods/restrictedPeriods").then((m) => m.Page) },
   { key: "regionalCropCalendar", catalogId: "regionalCropCalendar", title: "Regional Crop Calendar", glyph: "RC", group: "fields",

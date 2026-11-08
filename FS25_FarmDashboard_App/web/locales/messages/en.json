@@ -6419,5 +6419,15 @@
 "companionPage.unloadPotatoSeeders.vehicle": "Seeder",
 "companionPage.unloadPotatoSeeders.selected": "Selected unload type",
 "companionPage.unloadPotatoSeeders.empty": "No readable owned potato seeder is available yet.",
-"companionPage.unloadPotatoSeeders.partial": "Some owned seeder choices were unavailable; totals are withheld."
+"companionPage.unloadPotatoSeeders.partial": "Some owned seeder choices were unavailable; totals are withheld.",
+"companions.desc.handToolDrop": "Shows the current positions of this farm's hand tools that have live dropped objects. It does not record earlier drops or tool use.",
+"companionPage.handToolDrop.tools": "Owned hand tools with this feature",
+"companionPage.handToolDrop.dropped": "Currently dropped",
+"companionPage.handToolDrop.lead": "Current locations of this farm's hand tools with live dropped objects. Coordinates are game-world metres; this is not a drop history or proof of tool use.",
+"companionPage.handToolDrop.table": "Dropped hand tools",
+"companionPage.handToolDrop.tool": "Hand tool",
+"companionPage.handToolDrop.x": "World X (m)",
+"companionPage.handToolDrop.z": "World Z (m)",
+"companionPage.handToolDrop.empty": "No readable hand tool is currently dropped by this farm.",
+"companionPage.handToolDrop.partial": "Some dropped hand tools could not be located; totals are withheld."
 }

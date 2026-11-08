@@ -298,6 +298,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/universalAutoload").then((m) => m.Page) },
   { key: "unloadPotatoSeeders", catalogId: "unloadPotatoSeeders", title: "Unload Potato Seeders", glyph: "PS", group: "fleet",
     load: () => import("@/sections/mods/unloadPotatoSeeders").then((m) => m.Page) },
+  { key: "handToolDrop", catalogId: "handToolDrop", title: "Hand Tool Drop", glyph: "HT", group: "fleet",
+    load: () => import("@/sections/mods/handToolDrop").then((m) => m.Page) },
   { key: "advancedVehicleFunctions", catalogId: "advancedVehicleFunctions", title: "Advanced Vehicle Functions", glyph: "AV", group: "fleet",
     load: () => import("@/sections/mods/advancedVehicleFunctions").then((m) => m.Page) },
   { key: "sowingMachineRollerReady", catalogId: "sowingMachineRollerReady", title: "Sowing Machine Roller Ready", glyph: "SR", group: "fleet",

@@ -1141,6 +1141,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "handToolDrop",
+    title: "Hand Tool Drop",
+    category: "fleet",
+    descKey: "companions.desc.handToolDrop",
+    desc: "Shows the current positions of this farm's hand tools that have live dropped objects. It does not record earlier drops or tool use.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "advancedVehicleFunctions",
     title: "Advanced Vehicle Functions",
     category: "fleet",

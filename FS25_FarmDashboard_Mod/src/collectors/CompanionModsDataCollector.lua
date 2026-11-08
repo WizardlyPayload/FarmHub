@@ -1234,6 +1234,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "handToolDrop",
+        title = "Hand Tool Drop",
+        category = "fleet",
+        names = { "KM_82920_Hand_Tool_Drop" },
+        globals = {},
+    },
+    {
         id = "advancedVehicleFunctions",
         title = "Advanced Vehicle Functions",
         category = "fleet",

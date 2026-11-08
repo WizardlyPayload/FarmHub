@@ -6494,5 +6494,16 @@
   "companionPage.realisticMilkingTimes.tableTitle": "Pending milk by dairy pen",
   "companionPage.realisticMilkingTimes.barn": "Dairy pen",
   "companionPage.realisticMilkingTimes.empty": "No owned dairy pen has a readable pending milk buffer.",
-  "companionPage.realisticMilkingTimes.partial": "Some dairy-pen milk buffers were unavailable; totals are withheld."
+  "companionPage.realisticMilkingTimes.partial": "Some dairy-pen milk buffers were unavailable; totals are withheld.",
+  "companions.desc.fillLevelLimiter": "Shows custom fill-unit limits below native capacity on this farm's vehicles. It does not record overflow or rejected loads.",
+  "companionPage.fillLevelLimiter.lead": "Configured fill-unit limits below native capacity on this farm's vehicles. A limit is not a measured fill level, rejected load or crop loss.",
+  "companionPage.fillLevelLimiter.vehicles": "Owned vehicles with custom limits",
+  "companionPage.fillLevelLimiter.limits": "Custom fill-unit limits",
+  "companionPage.fillLevelLimiter.tableTitle": "Owned vehicle fill limits",
+  "companionPage.fillLevelLimiter.vehicle": "Vehicle",
+  "companionPage.fillLevelLimiter.unit": "Fill unit",
+  "companionPage.fillLevelLimiter.limit": "Configured limit",
+  "companionPage.fillLevelLimiter.capacity": "Native capacity",
+  "companionPage.fillLevelLimiter.empty": "No owned vehicle has a readable custom fill-unit limit.",
+  "companionPage.fillLevelLimiter.partial": "Some vehicle fill limits were unavailable; totals are withheld."
 }

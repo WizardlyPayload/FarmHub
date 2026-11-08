@@ -942,6 +942,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "fillLevelLimiter",
+        title = "Fill Level Limiter",
+        category = "fleet",
+        names = { "FS25_325794_Fill_Level_Limiter", "FS25_FillLevelLimiter" },
+        globals = {},
+    },
+    {
         id = "jobQueue",
         title = "Job Queue",
         category = "fleet",

@@ -901,6 +901,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "fillLevelLimiter",
+    title: "Fill Level Limiter",
+    category: "fleet",
+    descKey: "companions.desc.fillLevelLimiter",
+    desc: "Shows custom fill-unit limits below native capacity on this farm's vehicles. It does not record overflow or rejected loads.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "jobQueue",
     title: "Job Queue",
     category: "fleet",

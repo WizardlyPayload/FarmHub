@@ -573,6 +573,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "supplyTransportContracts",
+    title: "Supply and Transport Contracts",
+    category: "contracts",
+    descKey: "companions.desc.supplyTransportContracts",
+    desc: "Shows destination, commodity and delivered litres for this farm's accepted, running transport contracts. Listed rewards are not income received.",
+    relatedSection: "economy",
+  },
+  {
     id: "cropInsurance",
     title: "Crop Insurance",
     category: "finance",

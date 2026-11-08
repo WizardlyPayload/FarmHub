@@ -75,6 +75,7 @@ export function FertilizerDepotPanel({
   const farmId = activeFarmId ?? 1;
   const depots = fertilizerDepots(fertilizerDepot, farmId);
   const orders = fertilizerDepotOrders(fertilizerDepot, farmId);
+  const orderState = fertilizerDepot?.orderState;
   const seasonHint = fertilizerDepotSeasonHint(fertilizerDepot, farmId);
   const settings = fertilizerDepotSettings(fertilizerDepot);
   const maxRows = variant === "page" ? 24 : 12;
@@ -113,7 +114,7 @@ export function FertilizerDepotPanel({
           </div>
           <div>
             <span class="fd-economy__muted">{t("storage.rfDepot.openOrders")}</span>
-            <strong>{orders.length}</strong>
+            <strong>{orderState === "ready" ? orders.length : "—"}</strong>
           </div>
         </div>
       ) : null}
@@ -140,8 +141,11 @@ export function FertilizerDepotPanel({
             ))}
           </ul>
         </div>
-      ) : variant === "page" ? (
+      ) : variant === "page" && orderState === "ready" ? (
         <p class="fd-muted-sm">{tOr("rf.depot.noOrders", "No open orders.")}</p>
+      ) : null}
+      {variant === "page" && orderState !== "ready" ? (
+        <p class="fd-muted-sm">{tOr("rf.depot.orderUnavailable", "This Fertilizer Depot build did not expose a complete order register; an empty order count cannot be confirmed.")}</p>
       ) : null}
 
       {variant === "storage" ? (

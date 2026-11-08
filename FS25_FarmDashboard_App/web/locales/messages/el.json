@@ -5561,4 +5561,6 @@
   ,"companionPage.autoSwitchTireLife.truncated": "Only part of the owned tire records is shown."
   ,"companionPage.autoSwitchTireLife.partial": "Some tire records were unavailable or malformed; shown readings are incomplete."
 
+  ,"rf.depot.orderUnavailable": "This Fertilizer Depot build did not expose a complete order register; an empty order count cannot be confirmed."
+
 }

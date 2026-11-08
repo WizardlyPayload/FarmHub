@@ -42,4 +42,14 @@ test("the live reader carries farm IDs on both order kinds", () => {
     expect.objectContaining({ id: "pending-1-5", farmId: 1 }),
     expect.objectContaining({ id: "delivery-8", farmId: 2 }),
   ]));
+  expect(result.orderState).toBe("ready");
+});
+
+test("does not report zero open orders when the exact build has no order registers", () => {
+  const result = runCompanionLua([FILE], `
+    _G.g_currentMission = { depotManager = { depotSystem = { _depots = {} } } }
+  `, `return __fdEncode(RfFertilizerDepotDataCollector:collect())`);
+  expect(result.enabled).toBe(true);
+  expect(result.orderState).toBe("unavailable");
+  expect(Object.keys(result.openOrders)).toHaveLength(0);
 });

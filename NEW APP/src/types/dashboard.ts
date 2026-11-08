@@ -293,6 +293,8 @@ export interface RealisticFarmingPayload {
       seasonalPriceHint?: string | null;
     }[];
     openOrders?: { id: string; farmId?: number | null; summary: string; status?: string }[];
+    /** ready means both mod-owned order registers were readable. */
+    orderState?: "ready" | "partial" | "unavailable";
   };
   weatherGuard?: {
     enabled: boolean;

@@ -343,8 +343,13 @@ end
 
 local function collectOpenOrders(mgr)
     local orders = {}
+    local pendingReady = type(mgr.pendingOrders) == "table"
+    local deliveryReady = type(mgr.deliverySystem) == "table"
+        and type(mgr.deliverySystem.deliveries) == "table"
+    local state = pendingReady and deliveryReady and "ready"
+        or (pendingReady or deliveryReady) and "partial" or "unavailable"
 
-    pcall(function()
+    local pendingOk = pcall(function()
         local pending = mgr.pendingOrders
         if type(pending) ~= "table" then
             return
@@ -363,7 +368,7 @@ local function collectOpenOrders(mgr)
         end
     end)
 
-    pcall(function()
+    local deliveryOk = pcall(function()
         local ds = mgr.deliverySystem
         if ds == nil or type(ds.deliveries) ~= "table" then
             return
@@ -393,7 +398,10 @@ local function collectOpenOrders(mgr)
         end
     end)
 
-    return orders
+    if not pendingOk or not deliveryOk or #orders >= MAX_OPEN_ORDERS then
+        state = "partial"
+    end
+    return orders, state
 end
 
 local function collectPayload()
@@ -461,12 +469,14 @@ local function collectPayload()
     local settings = collectSettings(mgr)
     settings.stockSource = stockSource
 
+    local orders, orderState = collectOpenOrders(mgr)
     return {
         enabled = true,
         seasonalPriceHint = hint,
         settings = settings,
         depots = depots,
-        openOrders = collectOpenOrders(mgr),
+        openOrders = orders,
+        orderState = orderState,
     }
 end
 

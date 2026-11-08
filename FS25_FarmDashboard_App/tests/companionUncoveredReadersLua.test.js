@@ -16,12 +16,12 @@ test("livestock display and two vehicle-service readers keep only the active far
             {id=10, ownerFarmId=1, getName=function() return 'Owned' end,
                 spec_extendedVehicleMaintenance={_runtimeCreated=true, hoursPool=13,
                     isServiceActive=true, serviceRemainingGameMs=4000,
-                    failureType='engine', failureSeverity=2},
+                    failureType='engine', failureSeverity=2, batteryCharge=0.12},
                 spec_realisticVehiclesBreakdown={state={rvCondition=75,
                     serviceSoon=true, warmupCountdownMs=500, hasKeyInserted=true,
                     immobilizerArmed=false, activeFaults={engine=true}}}},
             {id=20, ownerFarmId=2, getName=function() return 'Other farm' end,
-                spec_extendedVehicleMaintenance={_runtimeCreated=true, hoursPool=99},
+                spec_extendedVehicleMaintenance={_runtimeCreated=true, hoursPool=99, batteryCharge=0.05},
                 spec_realisticVehiclesBreakdown={state={rvCondition=1}}}
         }}}
         g_modIsLoaded={FS25_LivestockMonitor=true,
@@ -40,6 +40,7 @@ test("livestock display and two vehicle-service readers keep only the active far
             o.extendedVehicleMaintenance.readState,
             tostring(#o.extendedVehicleMaintenance.machines),
             tostring(o.extendedVehicleMaintenance.machines[1].hoursPool),
+            tostring(o.extendedVehicleMaintenance.machines[1].batteryCharge),
             o.realisticVehicleService.readState,
             tostring(#o.realisticVehicleService.machines),
             tostring(o.realisticVehicleService.machines[1].condition),
@@ -51,5 +52,5 @@ test("livestock display and two vehicle-service readers keep only the active far
         throw new Error(to_jsstring(lua.lua_tostring(L, -1)));
     }
     expect(to_jsstring(lua.lua_tostring(L, -1)))
-        .toBe("ok|alerts|2|ok|1|13|ok|1|75");
+        .toBe("ok|alerts|2|ok|1|13|0.12|ok|1|75");
 });

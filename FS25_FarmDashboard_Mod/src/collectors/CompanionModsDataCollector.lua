@@ -3930,6 +3930,10 @@ local function collectExtendedVehicleMaintenance()
             return "pending"
         end
         local ok, row = pcall(function()
+            local batteryCharge = tonumber(spec.batteryCharge)
+            if batteryCharge == nil or batteryCharge ~= batteryCharge or batteryCharge < 0 or batteryCharge > 1 then
+                batteryCharge = nil
+            end
             return {
                 id = vehicleKey(vehicle),
                 name = vehicleName(vehicle),
@@ -3938,6 +3942,7 @@ local function collectExtendedVehicleMaintenance()
                 serviceRemainingMs = tonumber(spec.serviceRemainingGameMs),
                 failureType = clipText(spec.failureType, 40),
                 failureSeverity = tonumber(spec.failureSeverity),
+                batteryCharge = batteryCharge,
             }
         end)
         if not ok then

@@ -2624,6 +2624,7 @@
   "companions.live.evmService": "{{count}} machine(s) in service: {{names}}",
   "companions.live.evmClear": "No machine on this farm is in service.",
   "companions.live.evmFailures": "{{count}} machine(s) with a failure: {{names}}",
+  "companions.live.evmLowBattery": "{{count}} machine(s) below 20% battery charge: {{names}}",
   "companions.live.rvsFaults": "{{count}} machine(s) with a stored fault: {{names}}",
   "companions.live.rvsClear": "No stored service faults on this farm.",
   "companions.live.rvsServiceSoon": "{{count}} machine(s) due for service soon",

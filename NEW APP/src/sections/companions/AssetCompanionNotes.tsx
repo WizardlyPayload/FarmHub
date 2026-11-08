@@ -204,6 +204,14 @@ function MaintenanceLines({ companion, farmId, advanced }: { companion: Companio
                   })}
                 </Badge>
               ) : null}
+              {evm.lowBattery.length ? (
+                <Badge tone="warn">
+                  {text("companions.live.evmLowBattery", "{{count}} machine(s) below 20% battery charge: {{names}}", {
+                    count: evm.lowBattery.length,
+                    names: names(evm.lowBattery),
+                  })}
+                </Badge>
+              ) : null}
             </>
           )}
         </StatusOr>

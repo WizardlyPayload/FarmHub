@@ -104,6 +104,20 @@ test("a partial page reading cannot assert that every machine is clear", () => {
     expect(text).not.toContain("No machine on this farm is blocked from starting.");
 });
 
+test("Extended Vehicle Maintenance names only the selected farm's measured low battery", () => {
+    const text = paint({ companionMods: {
+        extendedVehicleMaintenance: {
+            enabled: true, readState: "ok", coverage: "complete", scope: "farm", farmId: 1,
+            machines: [
+                { id: "a", name: "MF 8570", batteryCharge: 0.12, serviceActive: false },
+                { id: "b", name: "Trailer", batteryCharge: 0.8, serviceActive: false },
+            ],
+        },
+    } });
+    expect(text).toContain("1 machine(s) below 20% battery charge: MF 8570");
+    expect(text).not.toContain("Trailer");
+});
+
 test("Storage uses the complete farm-scoped RealSilo page instead of the older unavailable summary", () => {
     state.payload = {
         companionMods: {

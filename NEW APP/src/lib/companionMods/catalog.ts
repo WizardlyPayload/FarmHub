@@ -853,6 +853,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "agriculturalTerminal",
+    title: "Agricultural Terminal",
+    category: "fleet",
+    descKey: "companions.desc.agriculturalTerminal",
+    desc: "Shows saved work records on vehicles this farm owns now. Records may predate the farm's ownership and are not farm totals.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "hydraulicSuspension",
     title: "Hydraulic Suspension System",
     category: "fleet",

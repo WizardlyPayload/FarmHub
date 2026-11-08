@@ -897,6 +897,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "agriculturalTerminal",
+        title = "Agricultural Terminal",
+        category = "fleet",
+        names = { "KM_82990_Agricultural_Terminal" },
+        substrings = { "agricultural_terminal" },
+        globals = {},
+    },
+    {
         id = "terraFarmMachines",
         title = "TerraFarm Machines",
         category = "fleet",

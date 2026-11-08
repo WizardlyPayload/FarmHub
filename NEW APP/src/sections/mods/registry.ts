@@ -79,6 +79,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/baleDirect").then((m) => m.Page) },
   { key: "grainHaulingService", catalogId: "grainHaulingService", title: "Grain Hauling Service", glyph: "GH", group: "finance",
     load: () => import("@/sections/mods/grainHaulingService").then((m) => m.Page) },
+  { key: "overburden", catalogId: "overburden", title: "Overburden", glyph: "OB", group: "fields",
+    load: () => import("@/sections/mods/overburden").then((m) => m.Page) },
   { key: "slurryPipeSystem", catalogId: "slurryPipeSystem", title: "Slurry Pipe System", glyph: "SP", group: "storage",
     load: () => import("@/sections/mods/slurryPipeSystem").then((m) => m.Page) },
   // Livestock

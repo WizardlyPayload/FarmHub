@@ -578,6 +578,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "overburden",
+    title: "Overburden",
+    category: "fields",
+    descKey: "companions.desc.overburden",
+    desc: "Shows this farm's loaded mine surveys and their selected materials, status and geometry.",
+    relatedSection: "fields",
+  },
+  {
     id: "slurryPipeSystem",
     title: "Slurry Pipe System",
     category: "storage",

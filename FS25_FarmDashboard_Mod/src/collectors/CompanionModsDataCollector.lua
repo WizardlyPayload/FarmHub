@@ -322,6 +322,14 @@ local CATALOG = {
         globals = { "GrainHaulingService" },
     },
     {
+        id = "overburden",
+        title = "Overburden",
+        category = "fields",
+        names = { "KM_83309_Overburden", "FS25_Overburden" },
+        substrings = { "overburden" },
+        globals = { "Overburden" },
+    },
+    {
         id = "upgradeYourFactory",
         title = "Upgrade Your Factory",
         category = "production",

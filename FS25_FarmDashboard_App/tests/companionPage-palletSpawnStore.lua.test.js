@@ -9,7 +9,16 @@ const SETUP = `
   _G.g_modManager = { getActiveMods = function() return {
     { modName = "FS25_PalletSpawnStore", version = "1.0.0.0" }
   } end }
-  _G.FS25_PalletSpawnStore = { PalletSpawnMode = { psmHasLoaded = true } }
+  _G.FS25_PalletSpawnStore = { PalletSpawnMode = {
+    psmHasLoaded = true,
+    MODE_STORE = 0, MODE_SPAWN = 1, MODE_SELL = 2, MODE_DISTRIBUTE = 3,
+    getExtendedMode = function(point, fill)
+      local base = point:getOutputDistributionMode(fill)
+      if base == 1 then return 2 end
+      if base == 2 then return 3 end
+      return point.psm_spawnDisabled[fill] == true and 0 or 1
+    end,
+  } }
   _G.ProductionPoint = { OUTPUT_MODE = { KEEP = 0, DIRECT_SELL = 1, AUTO_DELIVER = 2 } }
   _G.g_fillTypeManager = {
     getFillTypeNameByIndex = function(_, id)
@@ -25,7 +34,7 @@ const SETUP = `
       getOwnerFarmId = function(self) return self.ownerFarmId end,
       getName = function() return "Greenhouse " .. id end,
     }, outputFillTypeIds = { [1] = true, [2] = true, [3] = true, [4] = true },
-    outputFillTypeIdsArray = { 1, 2, 3, 4 },
+    outputFillTypeIdsArray = { 1 },
     psm_spawnDisabled = { [1] = true, [2] = false, [3] = true, [4] = true },
     getOutputDistributionMode = function(_, fill)
       if fill == 3 then return 1 end
@@ -42,7 +51,7 @@ const SETUP = `
   }
 `;
 
-test("reads four routing choices on owned outputs without counting foreign stock", () => {
+test("reads the keyed output set and the mod's displayed modes without counting foreign stock", () => {
   const page = runCompanionPage(FILE, SETUP, { farmId: 1 });
   expect(page).toMatchObject({ readState: "ok", coverage: "complete",
     byFarm: { "1": { outputCount: 4, storeCount: 1, spawnCount: 1 } } });
@@ -55,6 +64,15 @@ test("reads four routing choices on owned outputs without counting foreign stock
   const merged = normalizeCompanionPages({ pages: { palletSpawnStore: page } },
     { modules: loadModules() });
   expect(merged.pages.palletSpawnStore.rows).toHaveLength(4);
+});
+
+test("uses the mod's Store fallback when a direct native mode is unavailable", () => {
+  const page = runCompanionPage(FILE,
+    SETUP.replace('if fill == 3 then return 1 end',
+      'if fill == 3 then return nil end'), { farmId: 1 });
+  expect(page).toMatchObject({ readState: "ok", coverage: "complete" });
+  expect(page.rows).toHaveLength(4);
+  expect(page.rows.find((row) => row.fillType === "STRAWBERRY").mode).toBe("store");
 });
 
 test("skips foreign access and withholds totals on duplicate or bad owned output", () => {
@@ -71,9 +89,10 @@ test("skips foreign access and withholds totals on duplicate or bad owned output
   expect(duplicate).toMatchObject({ readState: "partial", coverage: "partial" });
   expect(Object.keys(duplicate.rows)).toHaveLength(0);
   const bad = runCompanionPage(FILE,
-    SETUP.replace('outputFillTypeIdsArray = { 1, 2, 3, 4 }',
-      'outputFillTypeIdsArray = { 1, 2, 999, 4 }'), { farmId: 1 });
+    SETUP.replace('outputFillTypeIds = { [1] = true, [2] = true, [3] = true, [4] = true }',
+      'outputFillTypeIds = { [1] = true, [2] = true, [3] = true, [4] = true, [999] = true }'), { farmId: 1 });
   expect(bad).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(bad.invalidReasons).toMatchObject({ "fill-name": 1 });
   expect(bad.byFarm).toBeUndefined();
 });
 

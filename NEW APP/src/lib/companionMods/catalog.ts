@@ -893,6 +893,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "storage",
   },
   {
+    id: "bhWaterBattery",
+    title: "BH Produced Water Tank Batteries",
+    category: "storage",
+    descKey: "companions.desc.bhWaterBattery",
+    desc: "Shows owned batteries' native water levels and saved safety controls, not sales.",
+    relatedSection: "storage",
+  },
+  {
     id: "powertrainUpgrade",
     title: "Powertrain Upgrade",
     category: "fleet",

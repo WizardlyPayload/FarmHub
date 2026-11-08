@@ -937,6 +937,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "bhWaterBattery",
+        title = "BH Produced Water Tank Batteries",
+        category = "storage",
+        names = { "FS25_BHProducedWaterTankBatteries", "ITCH_5209033_FS25_BHProducedWaterTankBatteries" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "powertrainUpgrade",
         title = "Powertrain Upgrade",
         category = "fleet",

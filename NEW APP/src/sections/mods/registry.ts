@@ -230,6 +230,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/smartBarrier").then((m) => m.Page) },
   { key: "bhFuelTerminal", catalogId: "bhFuelTerminal", title: "BH Bulk Fuel Terminal", glyph: "FT", group: "storage",
     load: () => import("@/sections/mods/bhFuelTerminal").then((m) => m.Page) },
+  { key: "bhWaterBattery", catalogId: "bhWaterBattery", title: "BH Produced Water Tank Batteries", glyph: "WB", group: "storage",
+    load: () => import("@/sections/mods/bhWaterBattery").then((m) => m.Page) },
   { key: "powertrainUpgrade", catalogId: "powertrainUpgrade", title: "Powertrain Upgrade", glyph: "PU", group: "fleet",
     load: () => import("@/sections/mods/powertrainUpgrade").then((m) => m.Page) },
   { key: "capacityUpgrade", catalogId: "capacityUpgrade", title: "Capacity Upgrade", glyph: "CU", group: "fleet",

@@ -9,7 +9,7 @@ const source = fs.readFileSync(path.resolve(__dirname,
     .replace("local function collectEconomicHistory()",
         "TestProductionSchedule = collectProductionSchedule\nlocal function collectEconomicHistory()");
 
-function run(foreignOwner) {
+function run(foreignOwner, inheritedMission = false) {
     const L = lauxlib.luaL_newstate();
     lualib.luaL_openlibs(L);
     const chunk = [
@@ -19,6 +19,7 @@ function run(foreignOwner) {
         'local point={ id="bakery", getOwnerFarmId=function() return 1 end, owningPlaceable=place, name="Bakery", productionsIdToObj={ bread={name="Bread"} } }',
         'local foreign={ id="foreign", getOwnerFarmId=function() return ' + foreignOwner + ' end, owningPlaceable=place, productionsIdToObj={ cake={name="Cake"} } }',
         'g_currentMission={ getFarmId=function() return 1 end, productionChainManager={ getProductionPointsForFarmId=function() return { point } end } }',
+        ...(inheritedMission ? ['local mission=g_currentMission; g_currentMission=nil; setmetatable(_G,{__index={g_currentMission=mission}})'] : []),
         'ProductionSchedule={ modName="FS25_352788_Production_Schedule", getPointKey=function(_,p) return p.id end, data={ bakery={ bread={status="aktiv",months={[3]=true,[7]=true}}, ghost={status="aktiv",months={[2]=true}} }, foreign={ cake={status="aktiv",months={[4]=true}} } } }',
         source,
         'local p=TestProductionSchedule()',
@@ -33,4 +34,8 @@ function run(foreignOwner) {
 test("Production Schedule joins a current owned point by the mod key without a runtime map", () => {
     expect(run(0)).toBe("partial|partial|1|Bakery|Bread|3,7|1");
     expect(run(2)).toBe("partial|partial|1|Bakery|Bread|3,7|1");
+});
+
+test("Production Schedule reads the engine mission inherited by a mod environment", () => {
+    expect(run(2, true)).toBe("partial|partial|1|Bakery|Bread|3,7|1");
 });

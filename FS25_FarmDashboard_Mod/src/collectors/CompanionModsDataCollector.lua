@@ -2636,7 +2636,8 @@ local function collectProductionSchedule()
     if sched.modName == nil or modVersion(sched.modName) ~= "1.1.0.0" then
         return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "unreviewed-version" }
     end
-    local mission = rawget(_G, "g_currentMission")
+    -- The mod environment inherits engine globals; rawget misses the live mission.
+    local mission = _G.g_currentMission
     local manager = mission and mission.productionChainManager or nil
     local points = nil
     if manager ~= nil and type(manager.getProductionPointsForFarmId) == "function" then

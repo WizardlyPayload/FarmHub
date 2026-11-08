@@ -170,6 +170,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/ProductionControlCollector.lua"/>
         <sourceFile filename="src/companionPages/GreenhouseAutomaticWateringCollector.lua"/>
         <sourceFile filename="src/companionPages/AdjustProductionPointsCollector.lua"/>
+        <sourceFile filename="src/companionPages/AnimalPlannerControlsCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticFuelingSilosCollector.lua"/>
         <sourceFile filename="src/companionPages/GrainHaulingServiceCollector.lua"/>
         <sourceFile filename="src/companionPages/OverburdenCollector.lua"/>

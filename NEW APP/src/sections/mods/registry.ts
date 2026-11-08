@@ -110,6 +110,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/automaticMilkDistribution").then((m) => m.Page) },
   { key: "udderToTank", catalogId: "udderToTank", title: "Udder to Tank", glyph: "UT", group: "livestock",
     load: () => import("@/sections/mods/udderToTank").then((m) => m.Page) },
+  { key: "animalPlanner", catalogId: "animalPlanner", title: "Animal Planner", glyph: "AP", group: "livestock",
+    load: () => import("@/sections/mods/animalPlanner").then((m) => m.Page) },
   // Storage and production
   { key: "factoryProfitCalculator", catalogId: "factoryProfitCalculator", title: "Factory Profit Calculator", glyph: "FP", group: "storage",
     load: () => import("@/sections/mods/factoryProfitCalculator").then((m) => m.Page) },

@@ -54,64 +54,75 @@ CompanionPages.register({
         for _, point in pairs(points) do
             scanned = scanned + 1
             if scanned > MAX_POINTS then truncated = true; break end
-            if type(point) == "table" and ctx.num(point.ownerFarmId) == farmId then
+            if type(point) == "table" then
                 local placeable = type(point.owningPlaceable) == "table" and point.owningPlaceable or nil
                 local owner = placeable and (ctx.call(placeable, "getOwnerFarmId")
                     or placeable.ownerFarmId) or nil
-                local id = placeable and placeable.uniqueId or nil
-                if ctx.num(owner) ~= farmId or type(id) ~= "string" or id == ""
-                    or #id > 80 or seen[id] then
+                -- ProductionPoint has no ownerFarmId in FS25. The farm list may
+                -- include accessible points, so verify the owning placeable.
+                local ownerId = ctx.num(owner)
+                if ownerId == nil then
                     invalid = true
-                    if type(id) == "string" then seen[id] = (seen[id] or 0) + 1 end
-                else
-                    seen[id] = 1
-                    local outputs = point.outputFillTypeIds
-                    if type(outputs) ~= "table" then
+                elseif ownerId == farmId then
+                    local id = placeable and placeable.uniqueId or nil
+                    if type(id) ~= "string" or id == ""
+                        or #id > 80 or seen[id] then
                         invalid = true
+                        if type(id) == "string" then seen[id] = (seen[id] or 0) + 1 end
                     else
-                        local outputCount = 0
-                        local seenFill = {}
-                        for _, rawFillId in ipairs(outputs) do
-                            outputCount = outputCount + 1
-                            if outputCount > MAX_OUTPUTS then truncated = true; break end
-                            local fillId = positiveId(rawFillId)
-                            local name = fillId and ctx.call(fillTypes,
-                                "getFillTypeNameByIndex", fillId) or nil
-                            local fill = fillId and ctx.call(fillTypes,
-                                "getFillTypeByIndex", fillId) or nil
-                            local title = type(fill) == "table" and fill.title or nil
-                            local base = fillId and ctx.call(point,
-                                "getOutputDistributionMode", fillId) or nil
-                            local disabled = fillId and type(point.psm_spawnDisabled) == "table"
-                                and point.psm_spawnDisabled[fillId] or nil
-                            local mode = base == modes.KEEP and
-                                (disabled == true and "store" or "spawn")
-                                or base == modes.DIRECT_SELL and "sell"
-                                or base == modes.AUTO_DELIVER and "distribute" or nil
-                            if not fillId or seenFill[fillId] or type(name) ~= "string"
-                                or name == "" or #name > 80 or mode == nil
-                                or (disabled ~= nil and type(disabled) ~= "boolean") then
-                                invalid = true
-                            else
-                                seenFill[fillId] = true
-                                count = count + 1
-                                if mode == "store" then noPallets = noPallets + 1 end
-                                if mode == "spawn" then withPallets = withPallets + 1 end
-                                if #rows < MAX_ROWS then
-                                    rows[#rows + 1] = {
-                                        farmId = farmId, placeableId = id,
-                                        production = ctx.clip(ctx.call(point, "getName")
-                                            or ctx.call(placeable, "getName") or id, 80),
-                                        fillType = name, fillTitle = ctx.clip(title, 80),
-                                        mode = mode,
-                                    }
+                        seen[id] = 1
+                        -- outputFillTypeIds is a set keyed by fill type ID. The
+                        -- ordered IDs used by the production menu live here.
+                        local outputs = point.outputFillTypeIdsArray
+                        if type(outputs) ~= "table" then
+                            invalid = true
+                        else
+                            local outputCount = 0
+                            local seenFill = {}
+                            for _, rawFillId in ipairs(outputs) do
+                                outputCount = outputCount + 1
+                                if outputCount > MAX_OUTPUTS then truncated = true; break end
+                                local fillId = positiveId(rawFillId)
+                                local name = fillId and ctx.call(fillTypes,
+                                    "getFillTypeNameByIndex", fillId) or nil
+                                local fill = fillId and ctx.call(fillTypes,
+                                    "getFillTypeByIndex", fillId) or nil
+                                local title = type(fill) == "table" and fill.title or nil
+                                local base = fillId and ctx.call(point,
+                                    "getOutputDistributionMode", fillId) or nil
+                                local disabled = fillId and type(point.psm_spawnDisabled) == "table"
+                                    and point.psm_spawnDisabled[fillId] or nil
+                                local mode = base == modes.KEEP and
+                                    (disabled == true and "store" or "spawn")
+                                    or base == modes.DIRECT_SELL and "sell"
+                                    or base == modes.AUTO_DELIVER and "distribute" or nil
+                                if not fillId or seenFill[fillId] or type(name) ~= "string"
+                                    or name == "" or #name > 80 or mode == nil
+                                    or (disabled ~= nil and type(disabled) ~= "boolean") then
+                                    invalid = true
                                 else
-                                    truncated = true
+                                    seenFill[fillId] = true
+                                    count = count + 1
+                                    if mode == "store" then noPallets = noPallets + 1 end
+                                    if mode == "spawn" then withPallets = withPallets + 1 end
+                                    if #rows < MAX_ROWS then
+                                        rows[#rows + 1] = {
+                                            farmId = farmId, placeableId = id,
+                                            production = ctx.clip(ctx.call(point, "getName")
+                                                or ctx.call(placeable, "getName") or id, 80),
+                                            fillType = name, fillTitle = ctx.clip(title, 80),
+                                            mode = mode,
+                                        }
+                                    else
+                                        truncated = true
+                                    end
                                 end
                             end
                         end
                     end
                 end
+            else
+                invalid = true
             end
         end
         if invalid then

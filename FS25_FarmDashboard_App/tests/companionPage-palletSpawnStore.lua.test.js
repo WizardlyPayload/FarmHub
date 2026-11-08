@@ -19,12 +19,13 @@ const SETUP = `
       return { title = ({ "Tomatoes", "Lettuce", "Strawberries", "Bread" })[id] }
     end,
   }
-  local function point(id, owner, placeableOwner)
-    return { ownerFarmId = owner, owningPlaceable = {
+  local function point(id, placeableOwner)
+    return { owningPlaceable = {
       uniqueId = id, ownerFarmId = placeableOwner,
       getOwnerFarmId = function(self) return self.ownerFarmId end,
       getName = function() return "Greenhouse " .. id end,
-    }, outputFillTypeIds = { 1, 2, 3, 4 },
+    }, outputFillTypeIds = { [1] = true, [2] = true, [3] = true, [4] = true },
+    outputFillTypeIdsArray = { 1, 2, 3, 4 },
     psm_spawnDisabled = { [1] = true, [2] = false, [3] = true, [4] = true },
     getOutputDistributionMode = function(_, fill)
       if fill == 3 then return 1 end
@@ -35,7 +36,7 @@ const SETUP = `
   _G.g_currentMission = { getIsServer = function() return true end,
     productionChainManager = {
       getProductionPointsForFarmId = function() return {
-        point("owned", 1, 1), point("foreign", 2, 2),
+        point("owned", 1), point("foreign", 2),
       } end,
     },
   }
@@ -56,17 +57,22 @@ test("reads four routing choices on owned outputs without counting foreign stock
   expect(merged.pages.palletSpawnStore.rows).toHaveLength(4);
 });
 
-test("withholds totals on wrong owner, duplicate placeable or bad output", () => {
+test("skips foreign access and withholds totals on duplicate or bad owned output", () => {
   const wrong = runCompanionPage(FILE,
-    SETUP.replace('point("owned", 1, 1)', 'point("owned", 1, 2)'), { farmId: 1 });
-  expect(wrong).toMatchObject({ readState: "partial", coverage: "partial" });
-  expect(wrong.byFarm).toBeUndefined();
+    SETUP.replace('point("owned", 1)', 'point("owned", 2)'), { farmId: 1 });
+  expect(wrong).toMatchObject({ readState: "settings-only", coverage: "complete",
+    byFarm: { "1": { outputCount: 0 } } });
+  const unknown = runCompanionPage(FILE,
+    SETUP.replace('point("owned", 1)', 'point("owned", nil)'), { farmId: 1 });
+  expect(unknown).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(unknown.byFarm).toBeUndefined();
   const duplicate = runCompanionPage(FILE,
-    SETUP.replace('point("foreign", 2, 2)', 'point("owned", 1, 1)'), { farmId: 1 });
+    SETUP.replace('point("foreign", 2)', 'point("owned", 1)'), { farmId: 1 });
   expect(duplicate).toMatchObject({ readState: "partial", coverage: "partial" });
   expect(Object.keys(duplicate.rows)).toHaveLength(0);
   const bad = runCompanionPage(FILE,
-    SETUP.replace('outputFillTypeIds = { 1, 2, 3, 4 }', 'outputFillTypeIds = { 1, 2, 999, 4 }'), { farmId: 1 });
+    SETUP.replace('outputFillTypeIdsArray = { 1, 2, 3, 4 }',
+      'outputFillTypeIdsArray = { 1, 2, 999, 4 }'), { farmId: 1 });
   expect(bad).toMatchObject({ readState: "partial", coverage: "partial" });
   expect(bad.byFarm).toBeUndefined();
 });

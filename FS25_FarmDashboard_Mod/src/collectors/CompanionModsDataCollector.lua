@@ -338,6 +338,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "adjustProductionPoints",
+        title = "Adjust Production Points",
+        category = "production",
+        names = { "FS25_352087_Adjust_Production_Points" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "realisticFuelingSilos",
         title = "Realistic Fueling System silos",
         category = "storage",

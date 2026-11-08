@@ -411,6 +411,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "productions",
   },
   {
+    id: "adjustProductionPoints",
+    title: "Adjust Production Points",
+    category: "production",
+    descKey: "companions.desc.adjustProductionPoints",
+    desc: "Shows changed production rates and storage limits on this farm's production points. It does not measure output.",
+    relatedSection: "productions",
+  },
+  {
     id: "realisticFuelingSilos",
     title: "Realistic Fueling System silos",
     category: "storage",

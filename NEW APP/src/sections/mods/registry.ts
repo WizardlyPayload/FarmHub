@@ -117,6 +117,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/productionControl").then((m) => m.Page) },
   { key: "greenhouseAutomaticWatering", catalogId: "greenhouseAutomaticWatering", title: "Greenhouse Automatic Watering", glyph: "GW", group: "storage",
     load: () => import("@/sections/mods/greenhouseAutomaticWatering").then((m) => m.Page) },
+  { key: "adjustProductionPoints", catalogId: "adjustProductionPoints", title: "Adjust Production Points", glyph: "AP", group: "storage",
+    load: () => import("@/sections/mods/adjustProductionPoints").then((m) => m.Page) },
   { key: "realisticFuelingSilos", catalogId: "realisticFuelingSilos", title: "Realistic Fueling System silos", glyph: "FS", group: "storage",
     load: () => import("@/sections/mods/realisticFuelingSilos").then((m) => m.Page) },
   { key: "upgradeYourFactory", catalogId: "upgradeYourFactory", title: "Upgrade Your Factory", glyph: "UF", group: "storage",

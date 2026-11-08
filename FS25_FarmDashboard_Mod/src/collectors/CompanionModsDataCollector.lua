@@ -956,6 +956,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "toggleableSilageAdditive",
+        title = "Toggleable Silage Additive",
+        category = "fleet",
+        names = { "FS25_330718_Toggleable_Silage_Additive", "FS25_toggleableSilageAdditive" },
+        globals = {},
+    },
+    {
         id = "universalSoundTuner",
         title = "Universal Sound Tuner",
         category = "fleet",

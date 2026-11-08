@@ -5,7 +5,7 @@ local MAX_ROWS = 150
 
 CompanionPages.register({
     key = "vehicleAssistanceSystem",
-    modNames = { "FS25_350273_Vehicle_Assistance_System", "FS25_VehicleAssistanceSystem" },
+    modNames = { "FS25_350273_Vehicle_Assistance_System", "FS25_VehicleAssistanceSystem", "FS25_vehicleAssistanceSystem" },
     collect = function(ctx)
         if ctx.version ~= "1.0.0.1" then
             return { readState = "settings-only", reason = "unreviewed-version" }

@@ -938,7 +938,7 @@ local CATALOG = {
         id = "vehicleAssistanceSystem",
         title = "Vehicle Assistance System",
         category = "fleet",
-        names = { "FS25_350273_Vehicle_Assistance_System", "FS25_VehicleAssistanceSystem" },
+        names = { "FS25_350273_Vehicle_Assistance_System", "FS25_VehicleAssistanceSystem", "FS25_vehicleAssistanceSystem" },
         globals = {},
     },
     {
@@ -2731,9 +2731,16 @@ local function collectProductionSchedule()
                         partial = true
                     else
                         table.sort(monthList)
+                        local pointName = point.name or point.baseName or pointKey
+                        if type(point.owningPlaceable.getName) == "function" then
+                            local okName, placeableName = pcall(point.owningPlaceable.getName, point.owningPlaceable)
+                            if okName and type(placeableName) == "string" and placeableName ~= "" then
+                                pointName = placeableName
+                            end
+                        end
                         rows[#rows + 1] = {
                             pointKey = clipText(pointKey, 80),
-                            pointName = clipText(point.name or point.baseName or pointKey, 60),
+                            pointName = clipText(pointName, 60),
                             recipeId = clipText(prodId, 40),
                             recipeName = clipText(recipe.name or recipe.id or prodId, 60),
                             status = status,

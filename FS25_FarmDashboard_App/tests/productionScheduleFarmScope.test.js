@@ -9,13 +9,14 @@ const source = fs.readFileSync(path.resolve(__dirname,
     .replace("local function collectEconomicHistory()",
         "TestProductionSchedule = collectProductionSchedule\nlocal function collectEconomicHistory()");
 
-function run(foreignOwner, inheritedMission = false, validOnly = false) {
+function run(foreignOwner, inheritedMission = false, validOnly = false, friendlyName = false) {
     const L = lauxlib.luaL_newstate();
     lualib.luaL_openlibs(L);
     const chunk = [
         'g_modIsLoaded={ FS25_352788_Production_Schedule=true }',
         'g_modManager={ getActiveMods=function() return { { modName="FS25_352788_Production_Schedule", version="1.1.0.0" } } end }',
         'local place={ getOwnerFarmId=function() return 1 end }',
+        ...(friendlyName ? ['place.getName=function() return "Small Glass Greenhouse" end'] : []),
         'local point={ id="bakery", getOwnerFarmId=function() return 1 end, owningPlaceable=place, name="Bakery", productionsIdToObj={ bread={name="Bread"} } }',
         'local foreign={ id="foreign", getOwnerFarmId=function() return ' + foreignOwner + ' end, owningPlaceable=place, productionsIdToObj={ cake={name="Cake"} } }',
         'g_currentMission={ getFarmId=function() return 1 end, productionChainManager={ getProductionPointsForFarmId=function() return { point } end } }',
@@ -43,4 +44,8 @@ test("Production Schedule reads the engine mission inherited by a mod environmen
 
 test("Production Schedule accepts one active recipe with no selected months", () => {
     expect(run(2, true, true)).toBe("ok|complete|1|Bakery|Bread|aktiv||1");
+});
+
+test("Production Schedule names the owned placeable instead of its internal point key", () => {
+    expect(run(2, true, true, true)).toBe("ok|complete|1|Small Glass Greenhouse|Bread|aktiv||1");
 });

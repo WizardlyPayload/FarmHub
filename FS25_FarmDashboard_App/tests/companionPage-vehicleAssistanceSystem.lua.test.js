@@ -63,3 +63,10 @@ test("gates unreviewed version and client state", () => {
       "getIsServer = function() return false end"), { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "server-vehicle-state-only" });
 });
+
+test("recognizes the as-found loaded Vehicle Assistance System name", () => {
+  const loadedName = SETUP.replaceAll("FS25_350273_Vehicle_Assistance_System", "FS25_vehicleAssistanceSystem");
+  expect(runCompanionPage(FILE, loadedName, { farmId: 1 }))
+    .toMatchObject({ readState: "ok", coverage: "complete",
+      byFarm: { "1": { vehicleCount: 2 } } });
+});

@@ -578,6 +578,14 @@ local CATALOG = {
         globals = { "AutoMilk" },
     },
     {
+        id = "bullMilkProduction",
+        title = "Bull Milk Production",
+        category = "livestock",
+        names = { "KM_82260_Bull_milk_production" },
+        substrings = {},
+        globals = { "BullMilkStandalone" },
+    },
+    {
         id = "udderToTank",
         title = "Udder to Tank",
         category = "livestock",

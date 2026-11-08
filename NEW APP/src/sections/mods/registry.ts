@@ -108,6 +108,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/animalFoodCalculator").then((m) => m.Page) },
   { key: "automaticMilkDistribution", catalogId: "automaticMilkDistribution", title: "Automatic Milk Distribution", glyph: "MD", group: "livestock",
     load: () => import("@/sections/mods/automaticMilkDistribution").then((m) => m.Page) },
+  { key: "bullMilkProduction", catalogId: "bullMilkProduction", title: "Bull Milk Production", glyph: "BM", group: "livestock",
+    load: () => import("@/sections/mods/bullMilkProduction").then((m) => m.Page) },
   { key: "udderToTank", catalogId: "udderToTank", title: "Udder to Tank", glyph: "UT", group: "livestock",
     load: () => import("@/sections/mods/udderToTank").then((m) => m.Page) },
   { key: "animalPlanner", catalogId: "animalPlanner", title: "Animal Planner", glyph: "AP", group: "livestock",

@@ -949,6 +949,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "welchyPerformanceAddon",
+        title = "Welchy Performance Addon",
+        category = "fleet",
+        names = { "KM_83271_Welchys_Performance_Addon" },
+        globals = {},
+    },
+    {
         id = "fillLevelLimiter",
         title = "Fill Level Limiter",
         category = "fleet",

@@ -6531,4 +6531,16 @@
   "companionPage.universalSoundTuner.default": "Default",
   "companionPage.universalSoundTuner.empty": "No owned vehicle has a readable nondefault tune.",
   "companionPage.universalSoundTuner.partial": "Some tune settings were unavailable; totals are withheld."
+  ,"companions.desc.welchyPerformanceAddon": "Shows nondefault saved limiter, sound and burnout tuning choices on owned vehicles. It does not measure power, acceleration or fuel use."
+  ,"companionPage.welchyPerformanceAddon.lead": "Current nondefault Welchy settings on owned vehicles. These are configured choices, not measured power, acceleration or fuel use."
+  ,"companionPage.welchyPerformanceAddon.vehicles": "Supported owned vehicles"
+  ,"companionPage.welchyPerformanceAddon.changedVehicles": "Vehicles with custom settings"
+  ,"companionPage.welchyPerformanceAddon.changes": "Custom settings"
+  ,"companionPage.welchyPerformanceAddon.tableTitle": "Owned vehicle performance settings"
+  ,"companionPage.welchyPerformanceAddon.vehicle": "Vehicle"
+  ,"companionPage.welchyPerformanceAddon.setting": "Setting"
+  ,"companionPage.welchyPerformanceAddon.value": "Configured"
+  ,"companionPage.welchyPerformanceAddon.default": "Default"
+  ,"companionPage.welchyPerformanceAddon.empty": "No owned vehicle has a readable nondefault Welchy setting."
+  ,"companionPage.welchyPerformanceAddon.partial": "Some vehicle settings were unavailable; totals are withheld."
 }

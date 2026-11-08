@@ -909,6 +909,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "welchyPerformanceAddon",
+    title: "Welchy Performance Addon",
+    category: "fleet",
+    descKey: "companions.desc.welchyPerformanceAddon",
+    desc: "Shows nondefault saved limiter, sound and burnout tuning choices on owned vehicles. It does not measure power, acceleration or fuel use.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "fillLevelLimiter",
     title: "Fill Level Limiter",
     category: "fleet",

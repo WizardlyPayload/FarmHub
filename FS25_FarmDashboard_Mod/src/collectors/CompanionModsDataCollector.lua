@@ -942,6 +942,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "hudPlus",
+        title = "HUD+",
+        category = "fleet",
+        names = { "KM_81497_HUD_" },
+        globals = {},
+    },
+    {
         id = "universalSoundTuner",
         title = "Universal Sound Tuner",
         category = "fleet",

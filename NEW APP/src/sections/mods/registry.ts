@@ -228,6 +228,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/variableWorkingDepth").then((m) => m.Page) },
   { key: "vehicleAssistanceSystem", catalogId: "vehicleAssistanceSystem", title: "Vehicle Assistance System", glyph: "VA", group: "fleet",
     load: () => import("@/sections/mods/vehicleAssistanceSystem").then((m) => m.Page) },
+  { key: "hudPlus", catalogId: "hudPlus", title: "HUD+", glyph: "HP", group: "fleet",
+    load: () => import("@/sections/mods/hudPlus").then((m) => m.Page) },
   { key: "universalSoundTuner", catalogId: "universalSoundTuner", title: "Universal Sound Tuner", glyph: "ST", group: "fleet",
     load: () => import("@/sections/mods/universalSoundTuner").then((m) => m.Page) },
   { key: "welchyPerformanceAddon", catalogId: "welchyPerformanceAddon", title: "Welchy Performance Addon", glyph: "WP", group: "fleet",

@@ -949,6 +949,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "realisticBrakes",
+        title = "Realistic Brakes",
+        category = "fleet",
+        names = { "FS25_RealisticBrakes", "KM_79862_realistic-brakes" },
+        globals = {},
+    },
+    {
         id = "universalSoundTuner",
         title = "Universal Sound Tuner",
         category = "fleet",

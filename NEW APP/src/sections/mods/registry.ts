@@ -230,6 +230,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/vehicleAssistanceSystem").then((m) => m.Page) },
   { key: "hudPlus", catalogId: "hudPlus", title: "HUD+", glyph: "HP", group: "fleet",
     load: () => import("@/sections/mods/hudPlus").then((m) => m.Page) },
+  { key: "realisticBrakes", catalogId: "realisticBrakes", title: "Realistic Brakes", glyph: "RB", group: "fleet",
+    load: () => import("@/sections/mods/realisticBrakes").then((m) => m.Page) },
   { key: "universalSoundTuner", catalogId: "universalSoundTuner", title: "Universal Sound Tuner", glyph: "ST", group: "fleet",
     load: () => import("@/sections/mods/universalSoundTuner").then((m) => m.Page) },
   { key: "welchyPerformanceAddon", catalogId: "welchyPerformanceAddon", title: "Welchy Performance Addon", glyph: "WP", group: "fleet",

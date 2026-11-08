@@ -1,0 +1,439 @@
+{
+  "scope": "Source screen of 22 score-8 archive paths absent from the 2026-10-31 audit at capture time. This is not a game or integration pass.",
+  "sourceSignals": "VAULT-LUA-SIGNALS-2026-11-07.json",
+  "reviewedState": {
+    "autoload-mode": "Vehicle objectMode configuration; source save hook calls setUnload, not a farm work ledger.",
+    "multiple-unit-control": "Saved vehicle enabled boolean, not rail work or cargo history.",
+    "interactive-open-state": "Saved interactive object open booleans, not work history.",
+    "vehicle-presentation-controls": "Vehicle visual/siren/animation controls; no separate farm ledger found in reviewed Lua."
+  },
+  "archives": [
+    {
+      "archive": "KM_79687_fsaf-famille-sol-air-futurs.zip",
+      "category": "trucks",
+      "title": "FS25_fsaf_PUENTE",
+      "version": "1.0.0.0",
+      "sizeBytes": 345907324,
+      "sha256": "AD07F10C2E2E142898D72B99CA9D324D2406C0A268AB40CBFCE70D374A0A7844",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 6,
+      "luaHashes": {
+        "scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_79688_radio-frequency-rf-in-fsaf.zip",
+      "category": "trucks",
+      "title": "FS25_fsaf_RADIOFRECUENCIA",
+      "version": "1.0.0.0",
+      "sizeBytes": 415681302,
+      "sha256": "033DE725F1163BD9A1AB4768B222CBDFB614E6778D2AFCC80D782A9BF785CDFE",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 6,
+      "luaHashes": {
+        "scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_79689_fsaf-sampt-mamba-misil.zip",
+      "category": "trucks",
+      "title": "FS25_fsaf_sampt_mamba_MISIL",
+      "version": "1.0.0.0",
+      "sizeBytes": 348685124,
+      "sha256": "A586D5F9FB2B049E621CE0ECF2915E099CD414667328AE9B6FC9569FAA57000D",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 6,
+      "luaHashes": {
+        "scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_79762_fsaf-sampt-mamba.zip",
+      "category": "trucks",
+      "title": "FS25_fsaf_sampt_mamba_tads",
+      "version": "1.0.0.0",
+      "sizeBytes": 257072509,
+      "sha256": "CFF7BEC61D3F2FD963F455153A835018307CCFCB64D01587D00FE91EA2C1794D",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 6,
+      "luaHashes": {
+        "scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_79899_irist-slm.zip",
+      "category": "trucks",
+      "title": "FS25_iri_t_slmtads",
+      "version": "1.0.0.0",
+      "sizeBytes": 203291435,
+      "sha256": "CFF158935C858D5DFD6C253C32D8FB59819AEC1B63DF8207ECC43D07D1961962",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 6,
+      "luaHashes": {
+        "scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_80629_t54-tracked-multiple-rocket.zip",
+      "category": "trucks",
+      "title": "FS25_9K31_Strela1",
+      "version": "1.0.0.0",
+      "sizeBytes": 111952182,
+      "sha256": "22553F2974C9EF01FF2BEEF72EBFAB01B54A517EF95B3C2931F39255AE4A1F3C",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 10,
+      "luaHashes": {
+        "radar/scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "radar/scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "radar/scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "radar/scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "radar/scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/TerraTrac.lua": "C5DECC490723F450ED124E38155D18656976191BB4C4A48751B0CF594366C608",
+        "scripts/toggleAnimation.lua": "1C7BA1CD5152F98CC011E72BABF9FA2891F009A5A52818090C415AEED6B1F9E0",
+        "scripts/TracAnimSDM.lua": "D21BE1B08D74D166B8705CAA006BAFCF14820CC6B521874F66C086D0F2C1DC4D",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_80664_2k22m-tunguska.zip",
+      "category": "trucks",
+      "title": "FS25_2k22m_tunguska",
+      "version": "1.0.0.0",
+      "sizeBytes": 214932772,
+      "sha256": "C3CE4023AA52036D7521538906015729CF10F646782B898973EC3F2C9270A96B",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 10,
+      "luaHashes": {
+        "radar/scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "radar/scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "radar/scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "radar/scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "radar/scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/TerraTrac.lua": "C5DECC490723F450ED124E38155D18656976191BB4C4A48751B0CF594366C608",
+        "scripts/toggleAnimation.lua": "1C7BA1CD5152F98CC011E72BABF9FA2891F009A5A52818090C415AEED6B1F9E0",
+        "scripts/TracAnimSDM.lua": "D21BE1B08D74D166B8705CAA006BAFCF14820CC6B521874F66C086D0F2C1DC4D",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_80694_snr-75m3-fan-song-e.zip",
+      "category": "trucks",
+      "title": "FS25_SNR_75M3",
+      "version": "1.0.0.0",
+      "sizeBytes": 124997237,
+      "sha256": "E4729BDC63098FCA0246A8FD24EA9C9B9576D5A55F8189DC4F253B5B484495BF",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 9,
+      "luaHashes": {
+        "radar/scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "radar/scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "radar/scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "radar/scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "radar/scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/TerraTrac.lua": "C5DECC490723F450ED124E38155D18656976191BB4C4A48751B0CF594366C608",
+        "scripts/TracAnimSDM.lua": "D21BE1B08D74D166B8705CAA006BAFCF14820CC6B521874F66C086D0F2C1DC4D",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_80695_9k330-tor.zip",
+      "category": "trucks",
+      "title": "FS25_9K330",
+      "version": "1.0.0.0",
+      "sizeBytes": 292321922,
+      "sha256": "C2F5071A8BA4E3507F7856085A1471AEB11E65DEA77CE31FC8F8BF2A6BA23958",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 10,
+      "luaHashes": {
+        "radar/scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "radar/scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "radar/scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "radar/scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "radar/scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/TerraTrac.lua": "C5DECC490723F450ED124E38155D18656976191BB4C4A48751B0CF594366C608",
+        "scripts/toggleAnimation.lua": "1C7BA1CD5152F98CC011E72BABF9FA2891F009A5A52818090C415AEED6B1F9E0",
+        "scripts/TracAnimSDM.lua": "D21BE1B08D74D166B8705CAA006BAFCF14820CC6B521874F66C086D0F2C1DC4D",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_80914_pmp-m-pontifex.zip",
+      "category": "trucks",
+      "title": "FS25_Oshkosh_HEMTT_8x8_platform_PUENTE",
+      "version": "1.0.0.0",
+      "sizeBytes": 83270433,
+      "sha256": "4106C69378DBEBA94651B07CD99C4F9B6E178482EDDCE96D7BE66D219E2143CA",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 7,
+      "luaHashes": {
+        "scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "scripts/toggleAnimation.lua": "1C7BA1CD5152F98CC011E72BABF9FA2891F009A5A52818090C415AEED6B1F9E0",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_80990_kamaz-mlrs.zip",
+      "category": "trucks",
+      "title": "FS25_ISDM_Zemledeliye",
+      "version": "1.0.0.0",
+      "sizeBytes": 115274487,
+      "sha256": "5A50D4DDFFC31A4F2E406B4743610E2D1B95538F7838FB51770477C90BA94E7D",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 6,
+      "luaHashes": {
+        "scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_80991_bf-mittelberg-military.zip",
+      "category": "trucks",
+      "title": "FS25_KARLZU_BF_Mittelberg",
+      "version": "1.0.0.0",
+      "sizeBytes": 192909531,
+      "sha256": "6EB999EB049982E7D5720214E9088F048654D0C72142F652456C9B4D0EC13CB5",
+      "capabilityClass": "vehicle-presentation-controls",
+      "luaMemberCount": 5,
+      "luaHashes": {
+        "scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/LightExtension.lua": "96D1913250FAC2139AE1FACD86B6A00942D143BD211CF3DA6744C4F3F4215542",
+        "scripts/SoSiHornScript.lua": "1399C78D610E14F629D1D8814BB27637756121AA2CE8303C8544DB72566EF8D4",
+        "scripts/toggleAnimation.lua": "1C7BA1CD5152F98CC011E72BABF9FA2891F009A5A52818090C415AEED6B1F9E0"
+      }
+    },
+    {
+      "archive": "KM_81146_Railway_locomotives.zip",
+      "category": "objects",
+      "title": "Railroad Locomotives",
+      "version": "2.0.3.0",
+      "sizeBytes": 3688913731,
+      "sha256": "F5157E16EC5752C98D5F08AE00D642D11A2ECC3E5F0FCAB8A09657A7960BB5F7",
+      "capabilityClass": "multiple-unit-control",
+      "luaMemberCount": 3,
+      "luaHashes": {
+        "scripts/AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3",
+        "scripts/LightExtension.lua": "4D23F72B12A08FC68ECBFF5D846C7F55C33770F1DE89DAB8379BD5A6B0AB6DAB",
+        "scripts/MultipleUnitControl.lua": "C1053810EAE3C0EE3A78B70CDC9C4A9997DCA19247A7C2FCE6D801A4088E331A"
+      }
+    },
+    {
+      "archive": "KM_81151_man-military-utility-trucks.zip",
+      "category": "trucks",
+      "title": "AMILITAR",
+      "version": "1.0.0.0",
+      "sizeBytes": 90414348,
+      "sha256": "2AEC1954266C8F7B25E8EB9C6DA513D94BD5E8FFB0915A19BA538BBDD18C20E6",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 6,
+      "luaHashes": {
+        "scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_81243_man-8x8-utility-truck.zip",
+      "category": "trucks",
+      "title": "FS25_Man_logistic_MILITARY",
+      "version": "1.0.0.0",
+      "sizeBytes": 75229116,
+      "sha256": "FE956B10C5F031279C25C7A06DB709EEA428AFDDABD8F0867A00F04DFA53E7EC",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 6,
+      "luaHashes": {
+        "scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_81244_man-8x8-air-defense-and-ballistic-missile-system.zip",
+      "category": "trucks",
+      "title": "FS25_Man_sistem_defens",
+      "version": "1.0.0.0",
+      "sizeBytes": 103332764,
+      "sha256": "96B0A550A7AD51D0625D6D6EA12CB86EA7F69C7E1AA3F508FB2EAA47F1C8A22C",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 6,
+      "luaHashes": {
+        "scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_81457_tracked-multi-missile-air-defense-system.zip",
+      "category": "trucks",
+      "title": "KARLZU",
+      "version": "1.0.0.0",
+      "sizeBytes": 129619263,
+      "sha256": "492BCF352553FF37C2E1095BF61188D704A95F53A5608773C6026C7C0C4F6659",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 11,
+      "luaHashes": {
+        "toggleAnimation.lua": "1C7BA1CD5152F98CC011E72BABF9FA2891F009A5A52818090C415AEED6B1F9E0",
+        "radar/scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "radar/scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "radar/scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "radar/scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "radar/scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/TerraTrac.lua": "C5DECC490723F450ED124E38155D18656976191BB4C4A48751B0CF594366C608",
+        "scripts/toggleAnimation.lua": "1C7BA1CD5152F98CC011E72BABF9FA2891F009A5A52818090C415AEED6B1F9E0",
+        "scripts/TracAnimSDM.lua": "D21BE1B08D74D166B8705CAA006BAFCF14820CC6B521874F66C086D0F2C1DC4D",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_81845_jelcz-truck-series-radar-transport-platform.zip",
+      "category": "trucks",
+      "title": "FS25_Jelcz_misil3",
+      "version": "1.0.0.0",
+      "sizeBytes": 122105475,
+      "sha256": "F5501A7EF16E63600B8669B725B26F11413D0EC231AC5BA7975705BF7F5A3510",
+      "capabilityClass": "interactive-open-state",
+      "luaMemberCount": 6,
+      "luaHashes": {
+        "scripts/AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/InteractiveComponentInterface.lua": "DA38DE8EF576F1286413A9277395D8D75EB313F1C3F80C361EADD76D1D5B7668",
+        "scripts/InteractiveControl.lua": "B293A282AA9B70BE517084D94B5C40C06DFC6E908913D930F8F469CAF30D3D44",
+        "scripts/InteractiveWindows.lua": "BFE26A1D6E4277114C602F72D498D43D4EBA149C5B9918D59717D934251E665E",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_82220_bf-mittelberg-articulated-fire-truck.zip",
+      "category": "trucks",
+      "title": "FS25_KARLZU_BF_Mittelberg",
+      "version": "1.0.0.0",
+      "sizeBytes": 192760692,
+      "sha256": "76B83DF288D97B2DB22D9B0AF2DE28CAE3761E90470E222EBB629F40BFE2F22C",
+      "capabilityClass": "vehicle-presentation-controls",
+      "luaMemberCount": 5,
+      "luaHashes": {
+        "scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/LightExtension.lua": "96D1913250FAC2139AE1FACD86B6A00942D143BD211CF3DA6744C4F3F4215542",
+        "scripts/SoSiHornScript.lua": "1399C78D610E14F629D1D8814BB27637756121AA2CE8303C8544DB72566EF8D4",
+        "scripts/toggleAnimation.lua": "1C7BA1CD5152F98CC011E72BABF9FA2891F009A5A52818090C415AEED6B1F9E0"
+      }
+    },
+    {
+      "archive": "KM_82277_rgn1-sentinel.zip",
+      "category": "trucks",
+      "title": "AFS25_RadarGuardian_N1",
+      "version": "1.0.0.0",
+      "sizeBytes": 96766932,
+      "sha256": "B435BFCE479DBEB96F3AE6D211A6EA993D90F4D3DC9A38F59E30569DD692A917",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 11,
+      "luaHashes": {
+        "radar/scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "radar/scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "radar/scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "radar/scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "radar/scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_83190_KAMAZ_Air_Defense_System_8x8_Heavy_Chassis_with_Combined_Radar_and_Missile_Tower.zip",
+      "category": "uncategorized",
+      "title": "FS25_KAMAZ_MISILES",
+      "version": "1.0.0.0",
+      "sizeBytes": 85130157,
+      "sha256": "59904D5E82CCD5D057551EC8DDA1381CEA64BB632A34B136744D59203F63EF54",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 12,
+      "luaHashes": {
+        "radar/scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "radar/scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "radar/scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "radar/scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "radar/scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "scripts/toggleAnimation.lua": "1C7BA1CD5152F98CC011E72BABF9FA2891F009A5A52818090C415AEED6B1F9E0",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    },
+    {
+      "archive": "KM_83233_AFT-10_Heavy_Tracked_Anti-Tank_Guided_Missile_Carrier_with_HJ-10_Launchers_.zip",
+      "category": "uncategorized",
+      "title": "FS25_aft10",
+      "version": "1.0.0.0",
+      "sizeBytes": 187069508,
+      "sha256": "E45A5516670B8710D89C48D2EEBD359BA4CB2D6E7830A13E6A9318FE7014F9FF",
+      "capabilityClass": "autoload-mode",
+      "luaMemberCount": 10,
+      "luaHashes": {
+        "radar/scripts/categorizer.lua": "E2FC80C5B7498E5146798EEFE4B6626E747D529574BAFE6315B4DBDBA546BE7D",
+        "radar/scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "radar/scripts/easyAutoLoader.lua": "DBBCD8E19FEE9AC7B0A2A831180C3F483D56D18CE1130AD62E0FE5F6DDBABC34",
+        "radar/scripts/LightExtension.lua": "C9B9D7BF2EA82CEA0D01FE0753AE52C2BAC7A136028BA823EA828556AD902620",
+        "radar/scripts/logsWinch.lua": "DD6792FD3A20C61594409DF519B92EE7D319D9F38F05131EE9506E83C1E18825",
+        "scripts/ChangeModTitle.lua": "282E508E071BF5BFA27915576EDA472CAA1EF094D3F04A35516404DB540FD2A4",
+        "scripts/TerraTrac.lua": "C5DECC490723F450ED124E38155D18656976191BB4C4A48751B0CF594366C608",
+        "scripts/toggleAnimation.lua": "1C7BA1CD5152F98CC011E72BABF9FA2891F009A5A52818090C415AEED6B1F9E0",
+        "scripts/TracAnimSDM.lua": "D21BE1B08D74D166B8705CAA006BAFCF14820CC6B521874F66C086D0F2C1DC4D",
+        "AddStoreCategory.lua": "5D5786737D89EC1CF4E414299DF70E8A06972C243B2ABCADFCAF2FB8914448A3"
+      }
+    }
+  ]
+}

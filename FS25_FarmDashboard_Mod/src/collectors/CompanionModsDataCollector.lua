@@ -825,6 +825,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "enhancedMixerWagons",
+        title = "Enhanced Mixer Wagons",
+        category = "fleet",
+        names = { "FS25_308285_Enhanced_Mixer_Wagons" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "powertrainUpgrade",
         title = "Powertrain Upgrade",
         category = "fleet",

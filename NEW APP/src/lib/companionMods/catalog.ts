@@ -781,6 +781,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "enhancedMixerWagons",
+    title: "Enhanced Mixer Wagons",
+    category: "fleet",
+    descKey: "companions.desc.enhancedMixerWagons",
+    desc: "Shows current mixing timer progress on this farm's mixer wagons, not feed produced or delivered.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "powertrainUpgrade",
     title: "Powertrain Upgrade",
     category: "fleet",

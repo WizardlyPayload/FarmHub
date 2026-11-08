@@ -913,6 +913,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "unloadGarage",
+        title = "Unload Garage",
+        category = "fleet",
+        names = { "KM_77604_Unload_Garage" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "powertrainUpgrade",
         title = "Powertrain Upgrade",
         category = "fleet",

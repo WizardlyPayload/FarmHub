@@ -224,6 +224,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/handPlantSaplings").then((m) => m.Page) },
   { key: "rcSheepBarn", catalogId: "rcSheepBarn", title: "RC Sheep Barn and Storage", glyph: "SB", group: "livestock",
     load: () => import("@/sections/mods/rcSheepBarn").then((m) => m.Page) },
+  { key: "unloadGarage", catalogId: "unloadGarage", title: "Unload Garage", glyph: "UG", group: "fleet",
+    load: () => import("@/sections/mods/unloadGarage").then((m) => m.Page) },
   { key: "powertrainUpgrade", catalogId: "powertrainUpgrade", title: "Powertrain Upgrade", glyph: "PU", group: "fleet",
     load: () => import("@/sections/mods/powertrainUpgrade").then((m) => m.Page) },
   { key: "capacityUpgrade", catalogId: "capacityUpgrade", title: "Capacity Upgrade", glyph: "CU", group: "fleet",

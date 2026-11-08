@@ -869,6 +869,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "livestock",
   },
   {
+    id: "unloadGarage",
+    title: "Unload Garage",
+    category: "fleet",
+    descKey: "companions.desc.unloadGarage",
+    desc: "Shows vehicles stored in owned unload garages, which are absent from the live fleet while stored.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "powertrainUpgrade",
     title: "Powertrain Upgrade",
     category: "fleet",

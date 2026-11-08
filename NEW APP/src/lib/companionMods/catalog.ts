@@ -845,6 +845,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "jobQueue",
+    title: "Job Queue",
+    category: "fleet",
+    descKey: "companions.desc.jobQueue",
+    desc: "Shows the planned AI entries attached to vehicles this farm owns. A running flag records queue intent, not completed work.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "hydraulicSuspension",
     title: "Hydraulic Suspension System",
     category: "fleet",

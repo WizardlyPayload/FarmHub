@@ -889,6 +889,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "jobQueue",
+        title = "Job Queue",
+        category = "fleet",
+        names = { "KM_82197_Job_Queue", "FS25_JobQueue" },
+        substrings = { "job_queue", "jobqueue" },
+        globals = {},
+    },
+    {
         id = "terraFarmMachines",
         title = "TerraFarm Machines",
         category = "fleet",

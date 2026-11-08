@@ -65,6 +65,7 @@ const LIMITED_IDS = new Set([
   "farmReputation",
   "realisticCropRotation",
   "cropRotationPlanner",
+  "vehicleWeightModifier",
   "moistureSystem",
   "rentYourField",
   "farmlandMarketplace",
@@ -1219,6 +1220,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     descKey: "companions.desc.cropRotationPlanner",
     desc: "Shows this farm's named rotation templates and ordered crop steps. A plan is not an assigned field or a completed rotation.",
     relatedSection: "fields",
+  },
+  {
+    id: "vehicleWeightModifier",
+    title: "Vehicle Weight Modifier",
+    category: "fleet",
+    descKey: "companions.desc.vehicleWeightModifier",
+    desc: "Shows saved weight, brake and engine multipliers for vehicles this farm currently owns. These are settings, not measured performance.",
+    relatedSection: "vehicles",
   },
   {
     id: "yieldTracker",

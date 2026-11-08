@@ -1130,6 +1130,14 @@ local CATALOG = {
         globals = { "g_cropRotationPlanner" },
     },
     {
+        id = "vehicleWeightModifier",
+        title = "Vehicle Weight Modifier",
+        category = "fleet",
+        names = { "FS25_357616_Vehicle_Weight_Modifier" },
+        substrings = {},
+        globals = { "VehicleWeightModifierVehicleSettings" },
+    },
+    {
         id = "yieldTracker",
         title = "Yield Tracker",
         category = "fields",

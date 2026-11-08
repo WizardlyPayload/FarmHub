@@ -265,6 +265,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/SlurryPipeSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticCropRotationCollector.lua"/>
         <sourceFile filename="src/companionPages/CropRotationPlannerCollector.lua"/>
+        <sourceFile filename="src/companionPages/VehicleWeightModifierCollector.lua"/>
         <sourceFile filename="src/companionPages/ProductionSupplyManagerCollector.lua"/>
         <sourceFile filename="src/companionPages/CourseplayCollector.lua"/>
         <sourceFile filename="src/companionPages/BritishFillUnitsCollector.lua"/>

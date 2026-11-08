@@ -435,6 +435,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "productions",
   },
   {
+    id: "upgradableFactories",
+    title: "Upgradable Factories",
+    category: "production",
+    descKey: "companions.desc.upgradableFactories",
+    desc: "Shows saved upgrade levels and configured speed multipliers for factories this farm owns.",
+    relatedSection: "productions",
+  },
+  {
     id: "productionBoosterSystem",
     title: "Production Booster System",
     category: "production",

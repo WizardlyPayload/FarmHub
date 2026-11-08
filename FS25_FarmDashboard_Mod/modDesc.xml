@@ -217,6 +217,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/VehicleAnchorCollector.lua"/>
         <sourceFile filename="src/companionPages/MultipleSilageTypesCollector.lua"/>
         <sourceFile filename="src/companionPages/HandPlantSaplingsCollector.lua"/>
+        <sourceFile filename="src/companionPages/UpgradableFactoriesCollector.lua"/>
         <sourceFile filename="src/companionPages/RcSheepBarnCollector.lua"/>
         <sourceFile filename="src/companionPages/UnloadGarageCollector.lua"/>
         <sourceFile filename="src/companionPages/SmartBarrierCollector.lua"/>

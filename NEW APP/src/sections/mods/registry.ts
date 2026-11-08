@@ -127,6 +127,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/realisticFuelingSilos").then((m) => m.Page) },
   { key: "upgradeYourFactory", catalogId: "upgradeYourFactory", title: "Upgrade Your Factory", glyph: "UF", group: "storage",
     load: () => import("@/sections/mods/upgradeYourFactory").then((m) => m.Page) },
+  { key: "upgradableFactories", catalogId: "upgradableFactories", title: "Upgradable Factories", glyph: "UF", group: "storage",
+    load: () => import("@/sections/mods/upgradableFactories").then((m) => m.Page) },
   { key: "productionBoosterSystem", catalogId: "productionBoosterSystem", title: "Production Booster System", glyph: "PB", group: "storage",
     load: () => import("@/sections/mods/productionBoosterSystem").then((m) => m.Page) },
   { key: "productionRevamp", catalogId: "productionRevamp", title: "Production Revamp", glyph: "PR", group: "storage",

@@ -185,6 +185,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/RegionalCropCalendarCollector.lua"/>
         <sourceFile filename="src/companionPages/MoistureSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/FieldLeasingCollector.lua"/>
+        <sourceFile filename="src/companionPages/FairLeasingPlusCollector.lua"/>
         <sourceFile filename="src/companionPages/SoilWorkYieldBonusCollector.lua"/>
         <sourceFile filename="src/companionPages/SmartCropControlCollector.lua"/>
         <sourceFile filename="src/companionPages/DynamicMolehillsCollector.lua"/>

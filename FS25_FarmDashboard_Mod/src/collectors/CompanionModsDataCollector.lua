@@ -1146,6 +1146,14 @@ local CATALOG = {
         globals = { "g_fieldLeasingManager" },
     },
     {
+        id = "fairLeasingPlus",
+        title = "Fair Leasing Plus",
+        category = "finance",
+        names = { "FS25_FairLeasingPlus", "FS25_356407_Fair_Leasing_Plus" },
+        substrings = { "fairleasingplus", "fair_leasing_plus" },
+        globals = { "FairLeasingPlus" },
+    },
+    {
         id = "rentYourField",
         title = "Rent Your Field",
         category = "fields",

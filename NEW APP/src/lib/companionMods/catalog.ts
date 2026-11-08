@@ -1239,6 +1239,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     liveKey: "fieldLeases",
   },
   {
+    id: "fairLeasingPlus",
+    title: "Fair Leasing Plus",
+    category: "finance",
+    descKey: "companions.desc.fairLeasingPlus",
+    desc: "Shows this farm's recorded leased-vehicle return rewards, rank and discounts. Its cumulative upfront-fee saving is the mod's estimate, not realized income.",
+    relatedSection: "economy",
+  },
+  {
     id: "rentYourField",
     title: "Rent Your Field",
     category: "fields",

@@ -13,6 +13,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
   // Finance
   { key: "enhancedLoanSystem", catalogId: "enhancedLoanSystem", title: "Enhanced Loan System", glyph: "EL", group: "finance",
     load: () => import("@/sections/mods/enhancedLoanSystem").then((m) => m.Page) },
+  { key: "fairLeasingPlus", catalogId: "fairLeasingPlus", title: "Fair Leasing Plus", glyph: "FL", group: "finance",
+    load: () => import("@/sections/mods/fairLeasingPlus").then((m) => m.Page) },
   { key: "iNeedALoan", catalogId: "iNeedALoan", title: "I Need A Loan", glyph: "NL", group: "finance",
     load: () => import("@/sections/mods/iNeedALoan").then((m) => m.Page) },
   { key: "automaticLoanRepay", catalogId: "automaticLoanRepay", title: "Automatic Loan Repay", glyph: "LR", group: "finance",

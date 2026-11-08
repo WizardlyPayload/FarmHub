@@ -773,6 +773,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "hydraulicSuspension",
+    title: "Hydraulic Suspension System",
+    category: "fleet",
+    descKey: "companions.desc.hydraulicSuspension",
+    desc: "Shows the current suspension mode and requested manual offset for farm-owned vehicles with this system enabled. It does not measure axle movement.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "realisticMechanicalSystems",
     title: "Realistic Mechanical Systems",
     category: "fleet",

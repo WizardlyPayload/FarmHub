@@ -216,6 +216,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/VariableWorkingDepthCollector.lua"/>
         <sourceFile filename="src/companionPages/VehicleAssistanceSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/FillLevelLimiterCollector.lua"/>
+        <sourceFile filename="src/companionPages/FarmGateKeysCollector.lua"/>
         <sourceFile filename="src/companionPages/JobQueueCollector.lua"/>
         <sourceFile filename="src/companionPages/AgriculturalTerminalCollector.lua"/>
         <sourceFile filename="src/companionPages/ImplementMaintenanceCollector.lua"/>

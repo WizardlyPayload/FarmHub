@@ -949,6 +949,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "farmGateKeys",
+        title = "Farm Gate Keys",
+        category = "construction",
+        names = { "FS25_356593_Farm_Gate_Keys" },
+        globals = {},
+    },
+    {
         id = "jobQueue",
         title = "Job Queue",
         category = "fleet",

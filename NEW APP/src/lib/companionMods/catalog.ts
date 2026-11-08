@@ -909,6 +909,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "farmGateKeys",
+    title: "Farm Gate Keys",
+    category: "construction",
+    descKey: "companions.desc.farmGateKeys",
+    desc: "Shows currently locked animated gates whose lock is held by this farm; it does not claim gate ownership or entry history.",
+    relatedSection: "overview",
+  },
+  {
     id: "jobQueue",
     title: "Job Queue",
     category: "fleet",

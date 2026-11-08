@@ -6507,5 +6507,16 @@
   "companionPage.fillLevelLimiter.limit": "Configured limit",
   "companionPage.fillLevelLimiter.capacity": "Native capacity",
   "companionPage.fillLevelLimiter.empty": "No owned vehicle has a readable custom fill-unit limit.",
-  "companionPage.fillLevelLimiter.partial": "Some vehicle fill limits were unavailable; totals are withheld."
+  "companionPage.fillLevelLimiter.partial": "Some vehicle fill limits were unavailable; totals are withheld.",
+  "companions.desc.farmGateKeys": "Shows currently locked animated gates whose lock is held by this farm; it does not claim gate ownership or entry history.",
+  "companionPage.farmGateKeys.lead": "Current locks this farm placed on animated gates. The lock holder may differ from the gate's property owner; no entry or access history is recorded.",
+  "companionPage.farmGateKeys.heldLocks": "Gate locks held by this farm",
+  "companionPage.farmGateKeys.tableTitle": "Locked gates",
+  "companionPage.farmGateKeys.gate": "Gate ID",
+  "companionPage.farmGateKeys.source": "Source",
+  "companionPage.farmGateKeys.placeable": "Placeable ID",
+  "companionPage.farmGateKeys.map": "Map object",
+  "companionPage.farmGateKeys.placeableGate": "Placeable",
+  "companionPage.farmGateKeys.empty": "No readable gate locks held by this farm.",
+  "companionPage.farmGateKeys.partial": "Some gate lock states were unavailable; totals are withheld."
 }

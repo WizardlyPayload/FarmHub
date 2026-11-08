@@ -2183,8 +2183,36 @@ local function collectProductionSchedule()
     if type(sched) ~= "table" or type(sched.data) ~= "table" then
         return { enabled = true, readState = "unavailable", source = "productionSchedule" }
     end
+    if sched.modName == nil or modVersion(sched.modName) ~= "1.1.0.0" then
+        return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "unreviewed-version" }
+    end
+    local mission = rawget(_G, "g_currentMission")
+    local manager = type(mission) == "table" and mission.productionChainManager or nil
+    local points = nil
+    if type(manager) == "table" and type(manager.getProductionPointsForFarmId) == "function" then
+        local ok, result = pcall(manager.getProductionPointsForFarmId, manager, farmId)
+        if ok and type(result) == "table" then points = result end
+    end
+    if type(points) ~= "table" or type(sched.runtime) ~= "table" then
+        return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "no-owned-production-list" }
+    end
+    local owned = {}
+    local pointCount = 0
+    for _, point in pairs(points) do
+        pointCount = pointCount + 1
+        if pointCount > 200 then
+            return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "owned-point-limit" }
+        end
+        if type(point) == "table" and tonumber(point.ownerFarmId) == farmId then
+            local placeable = point.owningPlaceable
+            if type(placeable) == "table" and type(placeable.getOwnerFarmId) == "function" then
+                local ok, owner = pcall(placeable.getOwnerFarmId, placeable)
+                if ok and tonumber(owner) == farmId then owned[point] = true end
+            end
+        end
+    end
     local rows = {}
-    local skipped = 0
+    local partial = false
     local truncated = false
     local scanned = 0
     for pointKey, recipes in pairs(sched.data) do
@@ -2193,50 +2221,61 @@ local function collectProductionSchedule()
             truncated = true
             break
         end
-        local owner = nil
-        if type(sched.runtime) == "table" and type(sched.runtime[pointKey]) == "table" then
-            owner = tonumber(sched.runtime[pointKey].ownerFarmId)
-        end
-        local owned = owner == farmId or owner == 0
-        if not owned then
-            skipped = skipped + 1
-        elseif type(recipes) == "table" then
+        local point = sched.runtime[pointKey]
+        if owned[point] and type(recipes) == "table" then
+            local knownRecipes = type(point.productionsIdToObj) == "table" and point.productionsIdToObj or {}
             for prodId, raw in pairs(recipes) do
                 if #rows >= 40 then
                     truncated = true
                     break
                 end
-                local status = nil
-                local months = nil
-                if type(raw) == "table" and (raw.status == "aktiv" or raw.status == "inaktiv") then
-                    status = raw.status
-                    months = raw.months
-                elseif type(raw) == "table" then
-                    months = raw
-                end
-                local monthList = {}
-                if type(months) == "table" then
-                    for month, on in pairs(months) do
-                        if type(month) == "number" and on == true and #monthList < 12 then
-                            monthList[#monthList + 1] = month
+                local numericId = tonumber(prodId)
+                local recipe = knownRecipes[prodId] or knownRecipes[tostring(prodId)]
+                    or (numericId and knownRecipes[numericId])
+                if type(recipe) ~= "table" then
+                    partial = true
+                else
+                    local status = nil
+                    local months = nil
+                    if type(raw) == "table" and (raw.status == "aktiv" or raw.status == "inaktiv") then
+                        status = raw.status
+                        months = raw.months
+                    elseif type(raw) == "table" then
+                        status = "aktiv"
+                        months = raw
+                    end
+                    local monthList = {}
+                    if type(months) == "table" then
+                        for month, on in pairs(months) do
+                            local n = tonumber(month)
+                            if n and n == math.floor(n) and n >= 1 and n <= 12 and on == true then
+                                monthList[#monthList + 1] = n
+                            else partial = true end
                         end
                     end
+                    if status == nil or type(months) ~= "table" then
+                        partial = true
+                    else
+                        table.sort(monthList)
+                        rows[#rows + 1] = {
+                            pointKey = clipText(pointKey, 80),
+                            pointName = clipText(point.name or point.baseName or pointKey, 60),
+                            recipeId = clipText(prodId, 40),
+                            recipeName = clipText(recipe.name or recipe.id or prodId, 60),
+                            status = status,
+                            months = monthList,
+                            ownerFarmId = farmId,
+                        }
+                    end
                 end
-                rows[#rows + 1] = {
-                    pointKey = clipText(pointKey, 80),
-                    recipeId = clipText(prodId, 40),
-                    status = status,
-                    months = monthList,
-                    ownerFarmId = owner,
-                }
             end
         end
     end
     return {
         enabled = true,
         source = "productionSchedule",
-        readState = #rows == 0 and "empty" or "ok",
-        coverage = truncated and "truncated" or (skipped > 0 and "partial" or "complete"),
+        readState = (partial or truncated) and "partial" or #rows == 0 and "empty" or "ok",
+        coverage = truncated and "truncated" or partial and "partial" or "complete",
         farmId = farmId,
         recipes = rows,
     }

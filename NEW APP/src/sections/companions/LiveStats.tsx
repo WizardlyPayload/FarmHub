@@ -612,7 +612,8 @@ export function LiveStats({
       <div class="fd-economy__env">
         {recipes.slice(0, 3).map((row) => (
           <Badge key={`${row.pointKey}-${row.recipeId}`}>
-            {row.recipeId} {row.status === "aktiv" ? tOr("companions.live.scheduleOn", "scheduled") : tOr("companions.live.scheduleOff", "not scheduled")}
+            {row.pointName || row.pointKey}: {row.recipeName || row.recipeId} {row.status === "aktiv" ? tOr("companions.live.scheduleOn", "scheduled") : tOr("companions.live.scheduleOff", "not scheduled")}
+            {Array.isArray(row.months) && row.months.length > 0 ? ` (${row.months.join(", ")})` : ""}
           </Badge>
         ))}
       </div>

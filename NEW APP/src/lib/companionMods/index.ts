@@ -192,7 +192,7 @@ export type CompanionModsPayload = {
   productionSchedule?: {
     enabled?: boolean;
     readState?: string;
-    recipes?: Array<{ pointKey?: string; recipeId?: string; status?: string | null }>;
+    recipes?: Array<{ pointKey?: string; pointName?: string; recipeId?: string; recipeName?: string; status?: string | null; months?: number[]; ownerFarmId?: number }>;
   };
   economicHistory?: {
     enabled?: boolean;

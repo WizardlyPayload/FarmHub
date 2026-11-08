@@ -6489,5 +6489,12 @@
   "companionPage.vehicleAssistanceSystem.on": "Enabled",
   "companionPage.vehicleAssistanceSystem.off": "Disabled",
   "companionPage.vehicleAssistanceSystem.empty": "No owned vehicle has readable assistance controls.",
-  "companionPage.vehicleAssistanceSystem.partial": "Some vehicle control states were unavailable; totals are withheld."
+  "companionPage.vehicleAssistanceSystem.partial": "Some vehicle control states were unavailable; totals are withheld.",
+  "companionPage.realisticMilkingTimes.lead": "Milk held by Realistic Milking Times in this farm's dairy pens until its 06:00 or 18:00 release. This is not milk already in storage, sold or earned.",
+  "companionPage.realisticMilkingTimes.pens": "Owned dairy pens",
+  "companionPage.realisticMilkingTimes.pending": "Milk pending release",
+  "companionPage.realisticMilkingTimes.tableTitle": "Pending milk by dairy pen",
+  "companionPage.realisticMilkingTimes.barn": "Dairy pen",
+  "companionPage.realisticMilkingTimes.empty": "No owned dairy pen has a readable pending milk buffer.",
+  "companionPage.realisticMilkingTimes.partial": "Some dairy-pen milk buffers were unavailable; totals are withheld."
 }

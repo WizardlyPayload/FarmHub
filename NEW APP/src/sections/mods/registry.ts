@@ -102,6 +102,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/leaseLivestock").then((m) => m.Page) },
   { key: "veterinarian", catalogId: "veterinarian", title: "Veterinarian and Animal Diseases", glyph: "VT", group: "livestock",
     load: () => import("@/sections/mods/veterinarian").then((m) => m.Page) },
+  { key: "realisticMilkingTimes", catalogId: "realisticMilkingTimes", title: "Realistic Milking Times", glyph: "MT", group: "livestock",
+    load: () => import("@/sections/mods/realisticMilkingTimes").then((m) => m.Page) },
   { key: "seasonalMilkProduction", catalogId: "seasonalMilkProduction", title: "Seasonal Milk Production", glyph: "SM", group: "livestock",
     load: () => import("@/sections/mods/seasonalMilkProduction").then((m) => m.Page) },
   { key: "seasonalWoolProduction", catalogId: "seasonalWoolProduction", title: "Seasonal Wool Production", glyph: "SW", group: "livestock",

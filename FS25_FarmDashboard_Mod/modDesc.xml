@@ -144,6 +144,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/DynamicMarketCollector.lua"/>
         <sourceFile filename="src/companionPages/BetterContractsCollector.lua"/>
         <sourceFile filename="src/companionPages/SeasonalMilkProductionCollector.lua"/>
+        <sourceFile filename="src/companionPages/RealisticMilkingTimesCollector.lua"/>
         <sourceFile filename="src/companionPages/SeasonalWoolProductionCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticAnimalLossesCollector.lua"/>
         <sourceFile filename="src/companionPages/LeaseLivestockCollector.lua"/>

@@ -389,7 +389,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Realistic Milking Times",
     category: "livestock",
     descKey: "companions.desc.realisticMilkingTimes",
-    desc: "Restricts milking to realistic windows instead of continuous dairy output.",
+    desc: "Shows milk currently held in this farm's dairy pens between the mod's milking windows. It does not show milk already released, stored or sold.",
     relatedSection: "pastures",
   },
   {

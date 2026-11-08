@@ -2484,7 +2484,7 @@
   "companions.desc.animalFoodOverview": "Explains animal feed groups and the foods each group accepts. Barn stock levels are a separate reading.",
   "companions.desc.animalFoodCalculator": "Scales animal food, water, and straw use. FarmHub reads the mode, the scales, and days per period. It does not apply that scale again to barn stocks.",
   "companions.desc.realisticAnimalLosses": "Animals can die or leave when care is neglected — health, food, and housing matter more.",
-  "companions.desc.realisticMilkingTimes": "Restricts milking to realistic windows instead of continuous dairy output.",
+  "companions.desc.realisticMilkingTimes": "Shows milk currently held in this farm's dairy pens between the mod's milking windows. It does not show milk already released, stored or sold.",
   "companions.desc.seasonalMilkProduction": "Scales milk output with the season. FarmHub reads the current period factor and does not change the barn.",
   "companions.live.milkFactor": "Season factor {{percent}}%",
   "companions.desc.animalTrader": "A placeable animal business with its own buying, selling, and rent rules. Animal and money totals stay on the existing farm pages.",
@@ -6487,5 +6487,12 @@
   "companionPage.vehicleAssistanceSystem.on": "Enabled",
   "companionPage.vehicleAssistanceSystem.off": "Disabled",
   "companionPage.vehicleAssistanceSystem.empty": "No owned vehicle has readable assistance controls.",
-  "companionPage.vehicleAssistanceSystem.partial": "Some vehicle control states were unavailable; totals are withheld."
+  "companionPage.vehicleAssistanceSystem.partial": "Some vehicle control states were unavailable; totals are withheld.",
+  "companionPage.realisticMilkingTimes.lead": "Milk held by Realistic Milking Times in this farm's dairy pens until its 06:00 or 18:00 release. This is not milk already in storage, sold or earned.",
+  "companionPage.realisticMilkingTimes.pens": "Owned dairy pens",
+  "companionPage.realisticMilkingTimes.pending": "Milk pending release",
+  "companionPage.realisticMilkingTimes.tableTitle": "Pending milk by dairy pen",
+  "companionPage.realisticMilkingTimes.barn": "Dairy pen",
+  "companionPage.realisticMilkingTimes.empty": "No owned dairy pen has a readable pending milk buffer.",
+  "companionPage.realisticMilkingTimes.partial": "Some dairy-pen milk buffers were unavailable; totals are withheld."
 }

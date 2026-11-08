@@ -26,10 +26,13 @@ export function ProStaffSection() {
 
   const farm = getProStaffForFarm(rf, farmId);
   if (!farm) {
+    const incomplete = block.coverage === "partial" || block.coverage === "truncated";
     return (
       <div class="fd-economy__empty">
         <h2>{t("nav.mod.prostaff")}</h2>
-        <p>{tOr("rf.prostaff.hintEmpty", "No Pro Staff data for this farm yet.")}</p>
+        <p>{incomplete
+          ? tOr("companions.live.partialNoRows", "The reading was incomplete, so no rows are shown. This is not an empty result.")
+          : tOr("rf.prostaff.hintEmpty", "No Pro Staff data for this farm yet.")}</p>
       </div>
     );
   }

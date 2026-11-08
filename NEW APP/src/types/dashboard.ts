@@ -265,6 +265,7 @@ export interface RealisticFarmingPayload {
   };
   proStaff?: {
     enabled: boolean;
+    coverage?: "partial" | "truncated";
     byFarm?: Record<
       string,
       {

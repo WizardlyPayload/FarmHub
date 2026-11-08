@@ -8,6 +8,9 @@ RfProStaffDataCollector = {}
 local MOD_NAME = "FS25_ProStaffCoOp"
 local MAX_DISCOUNTS = 12
 local MAX_FLAGS = 8
+local MAX_FARMS = 32
+local MAX_SCAN = 256
+local MAX_INVESTMENT = 1000000000000
 
 -- Discount getters that return multipliers (1.0 = neutral / no discount).
 local DISCOUNT_GETTERS = {
@@ -67,53 +70,25 @@ end
 local function collectFarmIds(mgr)
     local seen = {}
     local farmIds = {}
+    local scanned = 0
 
-    local function add(fid)
-        fid = tonumber(fid)
-        if fid and fid > 0 and not seen[fid] then
+    local function add(fid, record)
+        if type(fid) == "number" and fid == math.floor(fid)
+            and fid >= 1 and fid <= 255 and type(record) == "table" and not seen[fid] then
             seen[fid] = true
             farmIds[#farmIds + 1] = fid
         end
     end
 
     if mgr and type(mgr.farms) == "table" then
-        for farmId, _ in pairs(mgr.farms) do
-            add(farmId)
+        for farmId, record in pairs(mgr.farms) do
+            scanned = scanned + 1
+            if scanned > MAX_SCAN then return {}, true end
+            add(farmId, record)
         end
     end
-
-    if _G.g_farmManager and _G.g_farmManager.farms then
-        for _, farm in pairs(_G.g_farmManager.farms) do
-            local fid = farm and tonumber(farm.farmId)
-            if fid and fid > 0 then
-                local hasPlayers = false
-                if farm.players then
-                    for _ in pairs(farm.players) do
-                        hasPlayers = true
-                        break
-                    end
-                end
-                local name = farm.name and tostring(farm.name):match("^%s*(.-)%s*$") or ""
-                if hasPlayers or name ~= "" then
-                    add(fid)
-                end
-            end
-        end
-    end
-
-    if #farmIds < 1 then
-        local mission = _G.g_currentMission
-        if mission and mission.getFarmId then
-            local ok, fid = pcall(function() return mission:getFarmId() end)
-            if ok then
-                add(fid)
-            end
-        end
-    end
-    if #farmIds < 1 then
-        add(1)
-    end
-    return farmIds
+    table.sort(farmIds)
+    return farmIds, false
 end
 
 local function callNum(mgr, method, farmId)
@@ -121,7 +96,7 @@ local function callNum(mgr, method, farmId)
         return nil
     end
     local ok, v = pcall(function() return mgr[method](mgr, farmId) end)
-    if ok and type(v) == "number" then
+    if ok and type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge then
         return v
     end
     return nil
@@ -167,28 +142,20 @@ local function buildFlags(mgr, farmId)
 end
 
 local function farmRow(mgr, farmId)
-    local level = 0
-    if type(mgr.getLevel) == "function" then
-        local ok, v = pcall(function() return mgr:getLevel(farmId) end)
-        if ok and type(v) == "number" then
-            level = v
-        end
-    end
-
     local rec = mgr.farms and mgr.farms[farmId]
-    local membershipActive = true
-    local investmentTotal = nil
-    if type(rec) == "table" then
-        membershipActive = rec.membershipActive ~= false
-        investmentTotal = tonumber(rec.investmentTotal)
-        if level == 0 and tonumber(rec.level) then
-            level = tonumber(rec.level)
-        end
+    if type(rec) ~= "table" then return nil end
+    local level = rec.level
+    local investmentTotal = rec.investmentTotal
+    if type(level) ~= "number" or level ~= math.floor(level) or level < 0 or level > 20
+        or type(investmentTotal) ~= "number" or investmentTotal ~= math.floor(investmentTotal)
+        or investmentTotal < 0 or investmentTotal > MAX_INVESTMENT
+        or (rec.membershipActive ~= nil and type(rec.membershipActive) ~= "boolean") then
+        return nil
     end
 
     return {
         level = level,
-        membershipActive = membershipActive,
+        membershipActive = rec.membershipActive ~= false,
         investmentTotal = investmentTotal,
         discounts = buildDiscounts(mgr, farmId),
         flags = buildFlags(mgr, farmId),
@@ -213,15 +180,32 @@ function RfProStaffDataCollector:collectStep(_opts)
         return true, { enabled = false }
     end
 
+    local mission = _G.g_currentMission
+    if mission == nil or type(mission.getIsServer) ~= "function" then
+        return true, { enabled = true, byFarm = {} }
+    end
+    local serverOk, isServer = pcall(mission.getIsServer, mission)
+    if not serverOk or isServer ~= true then
+        return true, { enabled = true, byFarm = {} }
+    end
+
     local mgr = resolveManager()
-    if mgr == nil then
+    if type(mgr) ~= "table" or type(mgr.farms) ~= "table" then
         return true, { enabled = true, byFarm = {} }
     end
 
     local ok, payload = pcall(function()
         local byFarm = {}
-        for _, farmId in ipairs(collectFarmIds(mgr)) do
-            byFarm[tostring(farmId)] = farmRow(mgr, farmId)
+        local farmIds, truncated = collectFarmIds(mgr)
+        if truncated or #farmIds > MAX_FARMS then
+            return { enabled = true, byFarm = {}, coverage = "truncated" }
+        end
+        for _, farmId in ipairs(farmIds) do
+            local row = farmRow(mgr, farmId)
+            if row == nil then
+                return { enabled = true, byFarm = {}, coverage = "partial" }
+            end
+            byFarm[tostring(farmId)] = row
         end
         return { enabled = true, byFarm = byFarm }
     end)

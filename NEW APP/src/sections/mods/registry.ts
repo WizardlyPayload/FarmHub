@@ -165,6 +165,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/cropRotationPlanner").then((m) => m.Page) },
   { key: "vehicleWeightModifier", catalogId: "vehicleWeightModifier", title: "Vehicle Weight Modifier", glyph: "VW", group: "fleet",
     load: () => import("@/sections/mods/vehicleWeightModifier").then((m) => m.Page) },
+  { key: "flockCamera", catalogId: "flockCamera", title: "Flock Camera", glyph: "FC", group: "construction",
+    load: () => import("@/sections/mods/flockCamera").then((m) => m.Page) },
   { key: "restrictedPeriods", catalogId: "restrictedPeriods", title: "Restricted Periods", glyph: "RP", group: "fields",
     load: () => import("@/sections/mods/restrictedPeriods").then((m) => m.Page) },
   { key: "regionalCropCalendar", catalogId: "regionalCropCalendar", title: "Regional Crop Calendar", glyph: "RC", group: "fields",

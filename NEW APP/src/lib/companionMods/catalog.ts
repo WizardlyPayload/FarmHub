@@ -66,6 +66,7 @@ const LIMITED_IDS = new Set([
   "realisticCropRotation",
   "cropRotationPlanner",
   "vehicleWeightModifier",
+  "flockCamera",
   "moistureSystem",
   "rentYourField",
   "farmlandMarketplace",
@@ -1228,6 +1229,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     descKey: "companions.desc.vehicleWeightModifier",
     desc: "Shows saved weight, brake and engine multipliers for vehicles this farm currently owns. These are settings, not measured performance.",
     relatedSection: "vehicles",
+  },
+  {
+    id: "flockCamera",
+    title: "Flock Camera",
+    category: "construction",
+    descKey: "companions.desc.flockCamera",
+    desc: "Shows owned camera modes, fallen status and a short log of game-time-stamped notices. The log is not video or a speed violation record.",
+    relatedSection: "map",
   },
   {
     id: "yieldTracker",

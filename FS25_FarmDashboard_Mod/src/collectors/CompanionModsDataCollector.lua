@@ -1138,6 +1138,14 @@ local CATALOG = {
         globals = { "VehicleWeightModifierVehicleSettings" },
     },
     {
+        id = "flockCamera",
+        title = "Flock Camera",
+        category = "construction",
+        names = { "KM_82460_Flock_Camera" },
+        substrings = {},
+        globals = { "FlockCamera" },
+    },
+    {
         id = "yieldTracker",
         title = "Yield Tracker",
         category = "fields",

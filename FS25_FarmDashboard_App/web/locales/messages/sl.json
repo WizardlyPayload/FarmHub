@@ -5970,7 +5970,7 @@
   ,"companionPage.bullMilkProduction.empty": "No owned cow barn has a calculated Bull Milk rate yet."
   ,"companionPage.bullMilkProduction.truncated": "Only part of the owned cow barn list was read; totals are withheld."
   ,"companionPage.bullMilkProduction.partial": "An owned cow barn had ambiguous identity or unreadable Bull Milk state and was withheld; totals are withheld."
-  ,"companions.desc.upgradableFactories": "Shows saved upgrade levels and configured speed multipliers for factories this farm owns."
+  ,"companions.desc.upgradableFactories": "Shows current upgrade levels and configured speed multipliers for factories this farm owns."
   ,"companionPage.upgradableFactories.lead": "Current upgrade levels for this farm's production points. The multiplier is this mod's configured factor; it does not prove actual throughput or output."
   ,"companionPage.upgradableFactories.factories": "Owned factories"
   ,"companionPage.upgradableFactories.upgraded": "Factories above level 0"

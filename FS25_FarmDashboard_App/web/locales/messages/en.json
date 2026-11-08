@@ -6091,7 +6091,7 @@
   ,"companionPage.vipOrderManager.empty": "No current VIP order was recorded for this farm."
   ,"companionPage.vipOrderManager.truncated": "Only part of the current order was read; item totals are withheld."
   ,"companionPage.vipOrderManager.partial": "Some current-order values were invalid; item totals are withheld."
-  ,"companions.desc.upgradableFactories": "Shows saved upgrade levels and configured speed multipliers for factories this farm owns."
+  ,"companions.desc.upgradableFactories": "Shows current upgrade levels and configured speed multipliers for factories this farm owns."
   ,"companionPage.upgradableFactories.lead": "Current upgrade levels for this farm's production points. The multiplier is this mod's configured factor; it does not prove actual throughput or output."
   ,"companionPage.upgradableFactories.factories": "Owned factories"
   ,"companionPage.upgradableFactories.upgraded": "Factories above level 0"

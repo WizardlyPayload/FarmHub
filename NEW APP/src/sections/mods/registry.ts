@@ -55,6 +55,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/bankAndCreditLoans").then((m) => m.Page) },
   { key: "agriCreditSolutions", catalogId: "agriCreditSolutions", title: "AgriCredit Solutions", glyph: "AC", group: "finance",
     load: () => import("@/sections/mods/agriCreditSolutions").then((m) => m.Page) },
+  { key: "kringstadPiler", catalogId: "kringstadPiler", title: "Sugar Beet Piler tare balance", glyph: "SB", group: "finance",
+    load: () => import("@/sections/mods/kringstadPiler").then((m) => m.Page) },
   { key: "villageBank", catalogId: "villageBank", title: "Village Bank", glyph: "VB", group: "finance",
     load: () => import("@/sections/mods/villageBank").then((m) => m.Page) },
   { key: "investmentSystem", catalogId: "investmentSystem", title: "Investment System", glyph: "IS", group: "finance",

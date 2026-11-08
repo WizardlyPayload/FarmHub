@@ -594,6 +594,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "kringstadPiler",
+    title: "Sugar Beet Piler tare balance",
+    category: "economy",
+    descKey: "companions.desc.kringstadPiler",
+    desc: "Shows this farm's outstanding tare dirt and pending generation on Kringstad pilers, including shared public pilers.",
+    relatedSection: "economy",
+  },
+  {
     id: "overburden",
     title: "Overburden",
     category: "fields",

@@ -5563,4 +5563,16 @@
 
   ,"rf.depot.orderUnavailable": "This Fertilizer Depot build did not expose a complete order register; an empty order count cannot be confirmed."
 
+  ,"companions.desc.kringstadPiler": "Shows this farm's outstanding tare dirt and pending generation on Kringstad pilers, including shared public pilers."
+  ,"companionPage.kringstadPiler.lead": "The piler's current tare dirt obligation for this farm, including public pilers used by several farms. Pending generation has not yet become physical tare. A fee rate is not a charge already made; day-end disposal and the actual charge depend on the physical tare and piler settings."
+  ,"companionPage.kringstadPiler.pilers": "Pilers scanned"
+  ,"companionPage.kringstadPiler.outstanding": "Farm tare outstanding"
+  ,"companionPage.kringstadPiler.pending": "Pending tare generation"
+  ,"companionPage.kringstadPiler.title": "Farm tare balances by piler"
+  ,"companionPage.kringstadPiler.piler": "Piler"
+  ,"companionPage.kringstadPiler.rate": "Configured disposal rate"
+  ,"companionPage.kringstadPiler.empty": "No current farm tare row is available."
+  ,"companionPage.kringstadPiler.truncated": "The piler scan was capped; farm totals are withheld."
+  ,"companionPage.kringstadPiler.partial": "Some tare ledger values could not be read; farm totals are withheld."
+
 }

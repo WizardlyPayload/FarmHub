@@ -338,6 +338,14 @@ local CATALOG = {
         globals = { "GrainHaulingService" },
     },
     {
+        id = "kringstadPiler",
+        title = "Sugar Beet Piler tare balance",
+        category = "economy",
+        names = { "KM_82896_Kringstad_Ironworks_Sugar_Beet_Piler" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "overburden",
         title = "Overburden",
         category = "fields",

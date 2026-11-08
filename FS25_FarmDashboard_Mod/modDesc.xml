@@ -260,6 +260,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/BaleDirectCollector.lua"/>
         <sourceFile filename="src/companionPages/AutoSwitchCoopCollector.lua"/>
         <sourceFile filename="src/companionPages/AutoSwitchTireLifeCollector.lua"/>
+        <sourceFile filename="src/companionPages/KringstadPilerCollector.lua"/>
         <sourceFile filename="src/companionPages/SlurryPipeSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticCropRotationCollector.lua"/>
         <sourceFile filename="src/companionPages/ProductionSupplyManagerCollector.lua"/>

@@ -570,6 +570,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "autoSwitchCoop",
+    title: "AutoSwitch co-operative payments",
+    category: "economy",
+    descKey: "companions.desc.autoSwitchCoop",
+    desc: "Shows this farm's unpaid co-operative sale proceeds and their sale period; it is not cash already received.",
+    relatedSection: "economy",
+  },
+  {
     id: "grainHaulingService",
     title: "Grain Hauling Service",
     category: "economy",

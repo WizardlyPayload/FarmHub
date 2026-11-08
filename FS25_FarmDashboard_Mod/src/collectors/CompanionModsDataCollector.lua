@@ -81,6 +81,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "autoSwitchCoop",
+        title = "AutoSwitch co-operative payments",
+        category = "economy",
+        names = { "KM_82844_AutoSwitch", "FS25_AutoSwitch" },
+        substrings = { "autoswitch" },
+        globals = { "AS_CoopPay" },
+    },
+    {
         id = "slurryPipeSystem",
         title = "Slurry Pipe System",
         category = "storage",

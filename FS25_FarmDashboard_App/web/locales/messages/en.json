@@ -5576,4 +5576,14 @@
   ,"companionPage.overburden.note": "Area and depth are saved survey geometry. TerraFarm digging and extracted material are separate gameplay and are not measured here."
   ,"companionPage.overburden.truncated": "Only part of the mine register was scanned; summary counts are withheld."
   ,"companionPage.overburden.partial": "Some owned mine records could not be verified; summary counts are withheld."
+  ,"companions.desc.autoSwitchCoop": "Shows this farm's unpaid co-operative sale proceeds and their sale period; it is not cash already received."
+  ,"companionPage.autoSwitchCoop.title": "AutoSwitch co-operative payments"
+  ,"companionPage.autoSwitchCoop.lead": "Co-operative sale proceeds held for a later game period. This is a pending receivable, not farm cash already received or a completed payment ledger."
+  ,"companionPage.autoSwitchCoop.pending": "Awaiting co-operative payment"
+  ,"companionPage.autoSwitchCoop.details": "Payment details"
+  ,"companionPage.autoSwitchCoop.salePeriod": "Sale period"
+  ,"companionPage.autoSwitchCoop.empty": "No co-operative payment is currently pending for this farm."
+  ,"companionPage.autoSwitchCoop.unknownPeriod": "The sale period was not captured."
+  ,"companionPage.autoSwitchCoop.unavailable": "The co-operative payment register is unavailable or incomplete; no amount is asserted."
+
 }

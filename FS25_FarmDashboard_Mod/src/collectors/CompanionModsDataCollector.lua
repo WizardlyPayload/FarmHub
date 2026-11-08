@@ -73,6 +73,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "baleDirect",
+        title = "Bale Direct",
+        category = "economy",
+        names = { "FS25_354119_Bale_Direct", "FS25_BaleDirect" },
+        substrings = { "bale_direct", "baledirect" },
+        globals = {},
+    },
+    {
         id = "marketPriceHelper",
         title = "Market Price Helper",
         category = "economy",

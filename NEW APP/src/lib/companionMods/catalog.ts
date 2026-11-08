@@ -554,6 +554,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "baleDirect",
+    title: "Bale Direct",
+    category: "economy",
+    descKey: "companions.desc.baleDirect",
+    desc: "Shows this farm's standard-delivery bale and windrow payments awaiting the next game year; it does not count paid sales twice.",
+    relatedSection: "economy",
+  },
+  {
     id: "productionsManager",
     title: "Productions Manager",
     category: "production",

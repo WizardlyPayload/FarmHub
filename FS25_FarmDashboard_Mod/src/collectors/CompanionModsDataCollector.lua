@@ -2637,27 +2637,45 @@ local function collectProductionSchedule()
         return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "unreviewed-version" }
     end
     local mission = rawget(_G, "g_currentMission")
-    local manager = type(mission) == "table" and mission.productionChainManager or nil
+    local manager = mission and mission.productionChainManager or nil
     local points = nil
-    if type(manager) == "table" and type(manager.getProductionPointsForFarmId) == "function" then
+    if manager ~= nil and type(manager.getProductionPointsForFarmId) == "function" then
         local ok, result = pcall(manager.getProductionPointsForFarmId, manager, farmId)
         if ok and type(result) == "table" then points = result end
     end
-    if type(points) ~= "table" or type(sched.runtime) ~= "table" then
+    if type(points) ~= "table" then
         return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "no-owned-production-list" }
     end
-    local owned = {}
+    if type(sched.getPointKey) ~= "function" then
+        return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "no-point-key" }
+    end
+    local ownedByKey = {}
+    local duplicateKeys = {}
     local pointCount = 0
     for _, point in pairs(points) do
         pointCount = pointCount + 1
         if pointCount > 200 then
             return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "owned-point-limit" }
         end
-        if type(point) == "table" and tonumber(point.ownerFarmId) == farmId then
+        if type(point) == "table" and type(point.getOwnerFarmId) == "function" then
+            local okPoint, pointOwner = pcall(point.getOwnerFarmId, point)
             local placeable = point.owningPlaceable
-            if type(placeable) == "table" and type(placeable.getOwnerFarmId) == "function" then
-                local ok, owner = pcall(placeable.getOwnerFarmId, placeable)
-                if ok and tonumber(owner) == farmId then owned[point] = true end
+            if okPoint and tonumber(pointOwner) == farmId
+                and type(placeable) == "table" and type(placeable.getOwnerFarmId) == "function" then
+                local okPlaceable, placeableOwner = pcall(placeable.getOwnerFarmId, placeable)
+                if okPlaceable and tonumber(placeableOwner) == farmId then
+                    local okKey, key = pcall(sched.getPointKey, sched, point)
+                    if okKey and (type(key) == "string" or type(key) == "number") then
+                        key = tostring(key)
+                        if #key > 0 and #key <= 80 then
+                            if ownedByKey[key] ~= nil and ownedByKey[key] ~= point then
+                                duplicateKeys[key] = true
+                            else
+                                ownedByKey[key] = point
+                            end
+                        end
+                    end
+                end
             end
         end
     end
@@ -2671,8 +2689,11 @@ local function collectProductionSchedule()
             truncated = true
             break
         end
-        local point = sched.runtime[pointKey]
-        if owned[point] and type(recipes) == "table" then
+        local key = tostring(pointKey)
+        local point = ownedByKey[key]
+        if duplicateKeys[key] then
+            partial = true
+        elseif point ~= nil and type(recipes) == "table" then
             local knownRecipes = type(point.productionsIdToObj) == "table" and point.productionsIdToObj or {}
             for prodId, raw in pairs(recipes) do
                 if #rows >= 40 then

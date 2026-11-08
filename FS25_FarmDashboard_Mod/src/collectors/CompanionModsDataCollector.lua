@@ -210,6 +210,14 @@ local CATALOG = {
         globals = { "FinancialDashboard" },
     },
     {
+        id = "fieldContractors",
+        title = "Field Contractors",
+        category = "economy",
+        names = { "KM_82386_Field_Contractors" },
+        substrings = {},
+        globals = { "FieldContractors" },
+    },
+    {
         id = "factoryContracts",
         title = "GN Realism - Factory Contracts",
         category = "economy",

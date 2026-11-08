@@ -44,6 +44,12 @@ test("TUV vault filename is detected as its dedicated page catalog ID", () => {
 test.each([
     ["FS25_369800_FS25_FlexibleCombiSeeder", "flexibleCombiSeeder"],
     ["FS25_372019_Swath_Router", "swathRouter"],
+    ["FS25_SoilFertilizer", "soilCompostBatches"],
+    ["FS25_340901_Upgradable_Factories", "upgradableFactories"],
+    ["FS25_311954_Supply_Transport_Contracts", "supplyTransportContracts"],
+    ["KM_82643_Hydraulic_Suspension_System", "hydraulicSuspension"],
+    ["KM_79619_realistic-diesel-start", "realDieselStart"],
+    ["KM_80712_Universal_Two-Rotor_Rake_Control", "twoRotorRakeControl"],
 ])("%s has a detector for its dedicated page", (modName, expectedId) => {
     const L = lauxlib.luaL_newstate();
     lualib.luaL_openlibs(L);

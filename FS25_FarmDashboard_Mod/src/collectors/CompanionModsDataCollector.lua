@@ -935,6 +935,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "vehicleAssistanceSystem",
+        title = "Vehicle Assistance System",
+        category = "fleet",
+        names = { "FS25_350273_Vehicle_Assistance_System", "FS25_VehicleAssistanceSystem" },
+        globals = {},
+    },
+    {
         id = "jobQueue",
         title = "Job Queue",
         category = "fleet",

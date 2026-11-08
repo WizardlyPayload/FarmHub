@@ -6471,5 +6471,21 @@
   "companionPage.variableWorkingDepth.calibrated": "Calibrated",
   "companionPage.variableWorkingDepth.uncalibrated": "Not calibrated",
   "companionPage.variableWorkingDepth.empty": "No owned supported implement has readable variable-depth controls.",
-  "companionPage.variableWorkingDepth.partial": "Some implement depth controls were unavailable; totals are withheld."
+  "companionPage.variableWorkingDepth.partial": "Some implement depth controls were unavailable; totals are withheld.",
+  "companions.desc.vehicleAssistanceSystem": "Shows saved cruise and automatic-light control choices on this farm's vehicles, not driving or safety-event history.",
+  "companionPage.vehicleAssistanceSystem.lead": "Current saved assistance controls on owned vehicles. These settings do not prove a braking, lighting or cruise event occurred.",
+  "companionPage.vehicleAssistanceSystem.vehicles": "Supported owned vehicles",
+  "companionPage.vehicleAssistanceSystem.cruiseCount": "Intelligent cruise enabled",
+  "companionPage.vehicleAssistanceSystem.lowBeamCount": "Automatic low beam enabled",
+  "companionPage.vehicleAssistanceSystem.highBeamCount": "Automatic high beam enabled",
+  "companionPage.vehicleAssistanceSystem.tableTitle": "Owned vehicle assistance controls",
+  "companionPage.vehicleAssistanceSystem.vehicle": "Vehicle",
+  "companionPage.vehicleAssistanceSystem.cruise": "Intelligent cruise",
+  "companionPage.vehicleAssistanceSystem.lowBeam": "Automatic low beam",
+  "companionPage.vehicleAssistanceSystem.highBeam": "Automatic high beam",
+  "companionPage.vehicleAssistanceSystem.unsupported": "Unavailable",
+  "companionPage.vehicleAssistanceSystem.on": "Enabled",
+  "companionPage.vehicleAssistanceSystem.off": "Disabled",
+  "companionPage.vehicleAssistanceSystem.empty": "No owned vehicle has readable assistance controls.",
+  "companionPage.vehicleAssistanceSystem.partial": "Some vehicle control states were unavailable; totals are withheld."
 }

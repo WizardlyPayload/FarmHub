@@ -232,7 +232,12 @@ function selectStatusSource(input = {}) {
 
 function sourceSetupEvidence(state, options = {}) {
     const current = state || {};
-    const merged = current.mergedData || null;
+    // A bound held publication can still be shown after the live source stops.
+    // Count it as existing export data so setup does not claim this save has none.
+    const held = !current.mergedData && options.heldBindingStatus === 'held'
+        && options.heldPayload && typeof options.heldPayload === 'object'
+        ? options.heldPayload : null;
+    const merged = current.mergedData || held;
     const now = options.nowMs || Date.now();
     const staleMs = Number(options.staleMs) || LUA_EXPORT_STALE_MS;
     const luaAt = current.lastLuaReceivedAt || null;
@@ -244,7 +249,7 @@ function sourceSetupEvidence(state, options = {}) {
     const vehicles = merged && Array.isArray(merged.vehicles) ? merged.vehicles : [];
     return {
         hasMergedData: !!merged,
-        luaFresh: !!(luaAt && !isLuaExportStale(luaAt, now, staleMs)),
+        luaFresh: !held && !!(luaAt && !isLuaExportStale(luaAt, now, staleMs)),
         xmlAvailable: !!(current.xmlData || current.lastXmlReceivedAt || (merged && merged.xmlAvailable)),
         modVersionCheck: (merged && merged.modVersionCheck) || {},
         pathDenied: !!(warning && /denied|eacces|permission/i.test(String(warning))),

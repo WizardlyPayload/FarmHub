@@ -2064,7 +2064,12 @@ function buildRuntimeSetupStatus(opts) {
         : true;
     const config = store.get('config') || {};
     const resolved = statusSourceSelection(opts && opts.sourceId);
-    const evidence = sourceSetupEvidence(resolved.state, { staleMs: getLuaExportStaleMs() });
+    const published = resolved.id ? boundSources.snapshot(resolved.id) : null;
+    const evidence = sourceSetupEvidence(resolved.state, {
+        staleMs: getLuaExportStaleMs(),
+        heldBindingStatus: published?.sourceBinding?.stateStatus,
+        heldPayload: published?.payload,
+    });
     const status = buildSetupStatus({
         config,
         httpListening: !!(server && server.listening),

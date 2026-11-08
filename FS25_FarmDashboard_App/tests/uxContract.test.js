@@ -99,6 +99,25 @@ describe("uxContract", () => {
         expect(ready.configCompleteness).toBe(1);
     });
 
+    test("held committed export does not become a false first-export prompt", () => {
+        const held = { exportGeneration: 8, xmlAvailable: true,
+            companionPages: { pages: { objectStorageExtension: { rows: [{ placeableId: "owned-store" }] } } } };
+        const state = { lastLuaReceivedAt: new Date().toISOString() };
+        const evidence = sourceSetupEvidence(state, {
+            heldBindingStatus: "held", heldPayload: held,
+        });
+        expect(evidence).toMatchObject({ hasMergedData: true, luaFresh: false,
+            exportGeneration: 8, xmlAvailable: true });
+        const status = buildSetupStatus({
+            config: { isConfigured: true, servers: [{ id: "s1", mode: "local" }] },
+            httpListening: true, setupTokenValid: true, ...evidence,
+        });
+        expect(status.status).toBe("degraded");
+        expect(status.lastErrorCode).toBe(ERROR_CODES.E_LUA_STALE);
+        expect(sourceSetupEvidence(state, { heldBindingStatus: "blocked", heldPayload: held })
+            .hasMergedData).toBe(false);
+    });
+
     test("invalid token is a user-action nextAction", () => {
         const out = buildSetupStatus({
             config: {

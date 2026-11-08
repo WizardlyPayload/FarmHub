@@ -970,6 +970,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "buyableGps",
+        title = "Buyable GPS",
+        category = "fleet",
+        names = { "FS25_324860_Buyable_GPS", "FS25_BuyableGPS" },
+        globals = {},
+    },
+    {
         id = "universalSoundTuner",
         title = "Universal Sound Tuner",
         category = "fleet",

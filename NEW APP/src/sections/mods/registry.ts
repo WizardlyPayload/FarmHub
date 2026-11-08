@@ -236,6 +236,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/realisticBrakes").then((m) => m.Page) },
   { key: "toggleableSilageAdditive", catalogId: "toggleableSilageAdditive", title: "Toggleable Silage Additive", glyph: "SA", group: "fleet",
     load: () => import("@/sections/mods/toggleableSilageAdditive").then((m) => m.Page) },
+  { key: "buyableGps", catalogId: "buyableGps", title: "Buyable GPS", glyph: "GP", group: "fleet",
+    load: () => import("@/sections/mods/buyableGps").then((m) => m.Page) },
   { key: "universalSoundTuner", catalogId: "universalSoundTuner", title: "Universal Sound Tuner", glyph: "ST", group: "fleet",
     load: () => import("@/sections/mods/universalSoundTuner").then((m) => m.Page) },
   { key: "welchyPerformanceAddon", catalogId: "welchyPerformanceAddon", title: "Welchy Performance Addon", glyph: "WP", group: "fleet",

@@ -219,6 +219,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/RealisticBrakesCollector.lua"/>
         <sourceFile filename="src/companionPages/ToggleableSilageAdditiveCollector.lua"/>
         <sourceFile filename="src/companionPages/BuyUsedEquipmentCollector.lua"/>
+        <sourceFile filename="src/companionPages/BuyableGpsCollector.lua"/>
         <sourceFile filename="src/companionPages/UniversalSoundTunerCollector.lua"/>
         <sourceFile filename="src/companionPages/WelchyPerformanceAddonCollector.lua"/>
         <sourceFile filename="src/companionPages/FillLevelLimiterCollector.lua"/>

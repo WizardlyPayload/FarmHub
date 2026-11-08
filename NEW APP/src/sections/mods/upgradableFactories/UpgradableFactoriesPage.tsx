@@ -19,7 +19,7 @@ export function Page({ entry }: CompanionPageProps) {
     { key: "upgraded", label: tOr(`${K}.upgraded`, "Factories above level 0"), value: formatNumber(farmData.upgradedCount, 0) },
   ] : [];
   return (
-    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Current saved upgrade levels for this farm's production points. The multiplier is this mod's configured factor; it does not prove actual throughput or output.")}>
+    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Current upgrade levels for this farm's production points. The multiplier is this mod's configured factor; it does not prove actual throughput or output.")}>
       <ModStatTiles tiles={tiles} />
       <Card title={tOr(`${K}.title`, "Factory upgrades")}>
         <ModTable columns={[

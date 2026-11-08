@@ -1133,6 +1133,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "unloadPotatoSeeders",
+    title: "Unload Potato Seeders",
+    category: "fleet",
+    descKey: "companions.desc.unloadPotatoSeeders",
+    desc: "Shows the current selected unload type on owned potato seeders. The choice resets on reload and does not record unloading.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "advancedVehicleFunctions",
     title: "Advanced Vehicle Functions",
     category: "fleet",

@@ -1226,6 +1226,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "unloadPotatoSeeders",
+        title = "Unload Potato Seeders",
+        category = "fleet",
+        names = { "FS25_UnloadPotatoSeeders", "FS25_326817_Unload_Potato_Seeders" },
+        substrings = { "unloadpotatoseeders", "unload_potato_seeders" },
+        globals = {},
+    },
+    {
         id = "advancedVehicleFunctions",
         title = "Advanced Vehicle Functions",
         category = "fleet",

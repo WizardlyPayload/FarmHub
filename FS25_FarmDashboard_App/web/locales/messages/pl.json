@@ -6408,4 +6408,16 @@
 ,"companionPage.palletSpawnStore.mode": "Current routing"
 ,"companionPage.palletSpawnStore.empty": "No readable owned production output is available yet."
 ,"companionPage.palletSpawnStore.partial": "Some owned output settings were unavailable; totals are withheld."
+,
+"companions.desc.unloadPotatoSeeders": "Shows the current selected unload type on owned potato seeders. The choice resets on reload and does not record unloading.",
+"companionPage.unloadPotatoSeeders.seeders": "Owned potato seeders",
+"companionPage.unloadPotatoSeeders.potato": "Potatoes",
+"companionPage.unloadPotatoSeeders.seeds": "Seeds",
+"companionPage.unloadPotatoSeeders.fertilizer": "Fertilizer",
+"companionPage.unloadPotatoSeeders.lead": "Current selected unload type on owned potato seeders. This choice resets on reload and does not prove any material was unloaded.",
+"companionPage.unloadPotatoSeeders.table": "Owned potato seeders",
+"companionPage.unloadPotatoSeeders.vehicle": "Seeder",
+"companionPage.unloadPotatoSeeders.selected": "Selected unload type",
+"companionPage.unloadPotatoSeeders.empty": "No readable owned potato seeder is available yet.",
+"companionPage.unloadPotatoSeeders.partial": "Some owned seeder choices were unavailable; totals are withheld."
 }

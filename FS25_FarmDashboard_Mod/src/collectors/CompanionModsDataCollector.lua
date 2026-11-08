@@ -801,6 +801,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "adjustFuelTank",
+        title = "Adjustable Fuel Tank + Elektro",
+        category = "fleet",
+        names = { "KM_80971_adjust-fuel-tank", "FS25_AdjustFuelTank" },
+        substrings = { "adjust-fuel-tank", "adjustfueltank" },
+        globals = {},
+    },
+    {
         id = "realisticSeeder",
         title = "Realistic Seeder",
         category = "fleet",

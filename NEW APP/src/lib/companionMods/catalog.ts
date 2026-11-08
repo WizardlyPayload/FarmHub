@@ -1219,6 +1219,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "adjustFuelTank",
+    title: "Adjustable Fuel Tank + Elektro",
+    category: "fleet",
+    descKey: "companions.desc.adjustFuelTank",
+    desc: "Shows non-stock Diesel, DEF and electric tank selections on this farm's vehicles, with observed capacity shown separately.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "realisticSeeder",
     title: "Realistic Seeder",
     category: "fleet",

@@ -202,6 +202,14 @@ local CATALOG = {
         globals = { "LeandroFarmRulesAnimalHealthLoss" },
     },
     {
+        id = "financialDashboardHistory",
+        title = "Financial Dashboard History",
+        category = "economy",
+        names = { "KM_83516_Financial_Dashboard" },
+        substrings = {},
+        globals = { "FinancialDashboard" },
+    },
+    {
         id = "factoryContracts",
         title = "GN Realism - Factory Contracts",
         category = "economy",

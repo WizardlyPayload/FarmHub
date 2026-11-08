@@ -280,6 +280,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/agroRealisticResale").then((m) => m.Page) },
   { key: "agroRealisticHealthLoss", catalogId: "agroRealisticHealthLoss", title: "Agro Realistic - animal health timer", glyph: "AH", group: "livestock",
     load: () => import("@/sections/mods/agroRealisticHealthLoss").then((m) => m.Page) },
+  { key: "financialDashboardHistory", catalogId: "financialDashboardHistory", title: "Financial Dashboard History", glyph: "FH", group: "finance",
+    load: () => import("@/sections/mods/financialDashboardHistory").then((m) => m.Page) },
   { key: "factoryContracts", catalogId: "factoryContracts", title: "GN Realism - Factory Contracts", glyph: "FC", group: "finance",
     load: () => import("@/sections/mods/factoryContracts").then((m) => m.Page) },
   { key: "swathRouter", catalogId: "swathRouter", title: "Swath Router", glyph: "SR", group: "fleet",

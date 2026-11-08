@@ -124,6 +124,12 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
           ? tOr("companionPage.realisticMechanicalSystems.empty", "No owned machine has a captured mechanical reading yet.")
         : key === "realFuelConsumption" && page?.reason === "no-captured-owned-vehicle"
           ? tOr("companionPage.realFuelConsumption.empty", "No owned vehicle has recorded engine time yet.")
+        : key === "financialDashboardHistory" && page?.reason === "no-observed-change"
+          ? tOr("companionPage.financialDashboardHistory.noChange", "Only a baseline balance is recorded; no balance change has been observed yet.")
+        : key === "financialDashboardHistory" && page?.reason === "local-farm-mismatch"
+          ? tOr("companionPage.financialDashboardHistory.farmMismatch", "This local history belongs to a different farm.")
+        : key === "financialDashboardHistory" && page?.reason === "single-player-only"
+          ? tOr("companionPage.financialDashboardHistory.singlePlayer", "This mod records local single-player history only.")
         : key === "automaticBaleStorage" && page?.reason === "no-owned-object-storage"
           ? tOr("companionPage.automaticBaleStorage.noOwned", "No owned object storage was found for this farm.")
         : key === "bullMilkProduction" && page?.reason === "no-captured-owned-cow-barn"

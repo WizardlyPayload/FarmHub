@@ -314,6 +314,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "grainHaulingService",
+        title = "Grain Hauling Service",
+        category = "economy",
+        names = { "KM_81831_Getreidetransport-Service", "FS25_GrainHaulingService" },
+        substrings = { "getreidetransport-service", "grainhaulingservice" },
+        globals = { "GrainHaulingService" },
+    },
+    {
         id = "upgradeYourFactory",
         title = "Upgrade Your Factory",
         category = "production",

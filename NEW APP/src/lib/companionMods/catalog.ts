@@ -570,6 +570,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "grainHaulingService",
+    title: "Grain Hauling Service",
+    category: "economy",
+    descKey: "companions.desc.grainHaulingService",
+    desc: "Shows this farm's dispatched grain loads and net payments still awaiting delivery.",
+    relatedSection: "economy",
+  },
+  {
     id: "slurryPipeSystem",
     title: "Slurry Pipe System",
     category: "storage",

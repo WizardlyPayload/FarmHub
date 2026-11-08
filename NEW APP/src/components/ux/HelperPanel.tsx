@@ -8,6 +8,7 @@ import "@/components/ux/ux.css";
 
 interface Props {
   status: SetupStatus | null;
+  hasCommittedExport?: boolean;
   onUpdated?: (next: SetupStatus | null) => void;
   onOpenSettings?: () => void;
 }
@@ -26,8 +27,11 @@ function actionHint(status: SetupStatus): string[] {
   return [...new Set(items)].slice(0, 4);
 }
 
-export function HelperPanel({ status, onUpdated, onOpenSettings }: Props) {
+export function HelperPanel({ status, hasCommittedExport, onUpdated, onOpenSettings }: Props) {
   if (!status || status.status === "ready") return null;
+  // A publication may arrive after the last setup-status poll. Do not keep
+  // telling the user to start a game whose export is already on this page.
+  if (status.waitingFor === "first-export" && hasCommittedExport) return null;
   if (status.status === "degraded" && status.lastErrorCode === "E_LUA_STALE") return null;
   const current = status;
   const hints = actionHint(current);

@@ -562,6 +562,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "slurryPipeSystem",
+    title: "Slurry Pipe System",
+    category: "storage",
+    descKey: "companions.desc.slurryPipeSystem",
+    desc: "Shows live settling and dry matter pools only for this farm's owned registered slurry stores.",
+    relatedSection: "storage",
+  },
+  {
     id: "productionsManager",
     title: "Productions Manager",
     category: "production",

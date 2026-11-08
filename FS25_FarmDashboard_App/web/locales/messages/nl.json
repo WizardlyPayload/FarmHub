@@ -5474,4 +5474,17 @@
   ,"companionPage.adjustFuelTank.unverified": "Not verified"
   ,"companionPage.adjustFuelTank.empty": "No owned vehicle has a non-stock Adjustable Fuel Tank choice yet."
   ,"companionPage.adjustFuelTank.truncated": "Only part of the selected tank register was scanned or displayed."
-  ,"companionPage.adjustFuelTank.partial": "Some selected tank capacities could not be verified against the observed fill units."}
+  ,"companionPage.adjustFuelTank.partial": "Some selected tank capacities could not be verified against the observed fill units."
+  ,"companions.desc.slurryPipeSystem": "Shows live settling and dry matter pools only for this farm's owned registered slurry stores."
+  ,"companionPage.slurryPipeSystem.lead": "Live settling and dry matter pools in this farm's registered slurry stores. Pipe connections belong to the whole map and are not assigned to this farm."
+  ,"companionPage.slurryPipeSystem.count": "Owned active slurry stores"
+  ,"companionPage.slurryPipeSystem.tableTitle": "Slurry store condition"
+  ,"companionPage.slurryPipeSystem.placeable": "Placeable"
+  ,"companionPage.slurryPipeSystem.store": "Store ID"
+  ,"companionPage.slurryPipeSystem.settling": "Settling (%)"
+  ,"companionPage.slurryPipeSystem.solids": "Dry matter pool (L equivalent)"
+  ,"companionPage.slurryPipeSystem.empty": "No owned store has a live settling pool yet."
+  ,"companionPage.slurryPipeSystem.note": "Settling is the mod's current 0–100% crust offset; the dry matter pool is a mod estimate, not a laboratory measurement or delivered slurry."
+  ,"companionPage.slurryPipeSystem.truncated": "Only some registered stores were scanned or displayed; the count is withheld."
+  ,"companionPage.slurryPipeSystem.partial": "Some owned store pools were not ready or had invalid values; the count is withheld."
+}

@@ -81,6 +81,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "slurryPipeSystem",
+        title = "Slurry Pipe System",
+        category = "storage",
+        names = { "FS25_SlurryPipeSystem" },
+        substrings = { "slurrypipesystem", "slurry_pipe_system" },
+        globals = { "g_slurryPipeManager" },
+    },
+    {
         id = "marketPriceHelper",
         title = "Market Price Helper",
         category = "economy",

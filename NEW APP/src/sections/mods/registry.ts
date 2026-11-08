@@ -77,6 +77,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/autoSellSilo").then((m) => m.Page) },
   { key: "baleDirect", catalogId: "baleDirect", title: "Bale Direct", glyph: "BD", group: "finance",
     load: () => import("@/sections/mods/baleDirect").then((m) => m.Page) },
+  { key: "slurryPipeSystem", catalogId: "slurryPipeSystem", title: "Slurry Pipe System", glyph: "SP", group: "storage",
+    load: () => import("@/sections/mods/slurryPipeSystem").then((m) => m.Page) },
   // Livestock
   { key: "leaseLivestock", catalogId: "leaseLivestock", title: "Lease Livestock", glyph: "LL", group: "livestock",
     load: () => import("@/sections/mods/leaseLivestock").then((m) => m.Page) },

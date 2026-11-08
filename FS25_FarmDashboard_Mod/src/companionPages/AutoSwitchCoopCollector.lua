@@ -47,7 +47,7 @@ CompanionPages.register({
         end
         if selected == nil then
             return { readState = "settings-only", coverage = "complete",
-                reason = "no-pending-coop-payment", byFarm = { [tostring(farmId)] = { pendingAmount = 0 } } }
+                reason = "no-pending-coop-payment" }
         end
 
         local amount = ctx.num(selected.money)

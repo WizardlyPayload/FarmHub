@@ -5538,7 +5538,7 @@
   ,"companionPage.autoSwitchCoop.pending": "Awaiting co-operative payment"
   ,"companionPage.autoSwitchCoop.details": "Payment details"
   ,"companionPage.autoSwitchCoop.salePeriod": "Sale period"
-  ,"companionPage.autoSwitchCoop.empty": "No co-operative payment is currently pending for this farm."
+  ,"companionPage.autoSwitchCoop.empty": "The live register reports no pending co-operative payment for this farm."
   ,"companionPage.autoSwitchCoop.unknownPeriod": "The sale period was not captured."
   ,"companionPage.autoSwitchCoop.unavailable": "The co-operative payment register is unavailable or incomplete; no amount is asserted."
 

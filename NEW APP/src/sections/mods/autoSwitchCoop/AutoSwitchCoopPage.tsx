@@ -22,7 +22,7 @@ export function Page({ entry }: CompanionPageProps) {
         {amount != null && amount > 0 && year != null && period != null ? (
           <div>{tOr("companionPage.autoSwitchCoop.salePeriod", "Sale period")}: {formatNumber(year, 0)} / {formatNumber(period, 0)}</div>
         ) : null}
-        {amount === 0 ? <ModEmpty>{tOr("companionPage.autoSwitchCoop.empty", "No co-operative payment is currently pending for this farm.")}</ModEmpty> : null}
+        {complete && page?.reason === "no-pending-coop-payment" ? <ModEmpty>{tOr("companionPage.autoSwitchCoop.empty", "The live register reports no pending co-operative payment for this farm.")}</ModEmpty> : null}
         {amount != null && amount > 0 && (year == null || period == null) ? <ModEmpty>{tOr("companionPage.autoSwitchCoop.unknownPeriod", "The sale period was not captured.")}</ModEmpty> : null}
         {!complete ? <ModEmpty>{tOr("companionPage.autoSwitchCoop.unavailable", "The co-operative payment register is unavailable or incomplete; no amount is asserted.")}</ModEmpty> : null}
       </Card>

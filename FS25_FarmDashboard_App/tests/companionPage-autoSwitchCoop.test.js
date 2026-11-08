@@ -30,4 +30,9 @@ test("withholds uninitialized, client, unreviewed and malformed state", () => {
   const malformed = runCompanionPage(FILE, GAME.replace("money = 1425.75", "money = 0/0"), { farmId: 1 });
   expect(malformed).toMatchObject({ readState: "partial", coverage: "partial" });
   expect(malformed.byFarm).toBeUndefined();
+  const noRow = runCompanionPage(FILE,
+    GAME.replace("[1] = { money = 1425.75, key = 406 }, ", ""), { farmId: 1 });
+  expect(noRow).toMatchObject({ readState: "settings-only", coverage: "complete",
+    reason: "no-pending-coop-payment" });
+  expect(noRow.byFarm).toBeUndefined();
 });

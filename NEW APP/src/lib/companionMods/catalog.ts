@@ -781,6 +781,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "realDieselStart",
+    title: "Realistic Diesel Start",
+    category: "fleet",
+    descKey: "companions.desc.realDieselStart",
+    desc: "Shows modeled residual heat on your current non-electric motorized vehicles and air pressure on trucks with the mod's air system.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "realisticMechanicalSystems",
     title: "Realistic Mechanical Systems",
     category: "fleet",

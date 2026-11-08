@@ -206,6 +206,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/vehicleInspectionHU").then((m) => m.Page) },
   { key: "hydraulicSuspension", catalogId: "hydraulicSuspension", title: "Hydraulic Suspension System", glyph: "HS", group: "fleet",
     load: () => import("@/sections/mods/hydraulicSuspension").then((m) => m.Page) },
+  { key: "realDieselStart", catalogId: "realDieselStart", title: "Realistic Diesel Start", glyph: "RS", group: "fleet",
+    load: () => import("@/sections/mods/realDieselStart").then((m) => m.Page) },
   { key: "terraFarmMachines", catalogId: "terraFarmMachines", title: "TerraFarm Machines", glyph: "TF", group: "fleet",
     load: () => import("@/sections/mods/terraFarmMachines").then((m) => m.Page) },
   { key: "realisticMechanicalSystems", catalogId: "realisticMechanicalSystems", title: "Realistic Mechanical Systems", glyph: "MS", group: "fleet",

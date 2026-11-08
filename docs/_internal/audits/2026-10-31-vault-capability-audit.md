@@ -1,6 +1,6 @@
 # FS25 vault capability audit
 
-Status: **in progress**, last updated 7 November 2026. This audit reopens the question that the 65-entry companion validation matrix could not answer: whether every vault mod with useful, distinct data has an honest Farm Dashboard reading. The completed matrix is evidence for its tested integrations, not a vault-wide pass.
+Status: **in progress**, last updated 8 November 2026. This audit reopens the question that the 65-entry companion validation matrix could not answer: whether every vault mod with useful, distinct data has an honest Farm Dashboard reading. The completed matrix is evidence for its tested integrations, not a vault-wide pass.
 
 ## Inventory boundary
 
@@ -9,6 +9,7 @@ Status: **in progress**, last updated 7 November 2026. This audit reopens the qu
 - The read-only `2026-10-31-scan-vault.py` scan covered all 8,012 current category-tree ZIP paths. **1,803** contain Lua and **1,549** declare source files in `modDesc.xml`. **1,201** Lua-bearing ZIP names were outside the older 665-name screen. The full machine-readable result is `Z:\Graham\agent-comms\farmhub-companion-acceptance\VAULT-SCAN-2026-10-31.json`.
 - `FS25_Bale_Storage.zip` in `uncategorized` was unreadable as a ZIP; its contents and playability are unproved. No vault files were modified.
 - A title/category/source-file keyword pass put **118 ZIPs across 91 normalized titles** into an initial review queue. The queue includes duplicate versions, RF packages, native-data overlap and false positives; **118 is not a missing-integration count**. The sortable 1,201-row Lua triage file is `Z:\Graham\agent-comms\farmhub-companion-acceptance\VAULT-LUA-TRIAGE-2026-10-31.csv`. Every row is still a source-review lead, not an acceptance result. Lower-scoring rows must also be assessed before claiming the vault audit exhaustive.
+- The repeatable `2026-11-08-vault-review-queue.py` compares exact archive names in the 7 November 1,803-row Lua-signal snapshot with this audit. At score ≥15 it finds 36 of 137 paths not named exactly here; at score ≥9 it finds 270 of 475. These are **name-mention gaps only**, not 270 missing integrations or proof the other paths were source-reviewed. Maps, RF-owned packages, duplicate versions and control-only mods appear in the unmentioned queue. The check is used to choose the next source review without treating a textual mention as acceptance.
 
 ## Decision rule
 

@@ -218,6 +218,14 @@ local CATALOG = {
         globals = { "FieldContractors" },
     },
     {
+        id = "farmContractorServices",
+        title = "Farm Contractor Services",
+        category = "economy",
+        names = { "KM_82945_Farm_Contractor_Services" },
+        substrings = {},
+        globals = { "ContractorHarvesting" },
+    },
+    {
         id = "factoryContracts",
         title = "GN Realism - Factory Contracts",
         category = "economy",

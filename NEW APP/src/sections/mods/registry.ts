@@ -284,6 +284,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/financialDashboardHistory").then((m) => m.Page) },
   { key: "fieldContractors", catalogId: "fieldContractors", title: "Field Contractors", glyph: "CT", group: "finance",
     load: () => import("@/sections/mods/fieldContractors").then((m) => m.Page) },
+  { key: "farmContractorServices", catalogId: "farmContractorServices", title: "Farm Contractor Services", glyph: "FS", group: "finance",
+    load: () => import("@/sections/mods/farmContractorServices").then((m) => m.Page) },
   { key: "factoryContracts", catalogId: "factoryContracts", title: "GN Realism - Factory Contracts", glyph: "FC", group: "finance",
     load: () => import("@/sections/mods/factoryContracts").then((m) => m.Page) },
   { key: "swathRouter", catalogId: "swathRouter", title: "Swath Router", glyph: "SR", group: "fleet",

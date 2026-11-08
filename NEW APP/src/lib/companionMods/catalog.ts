@@ -533,6 +533,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "woodChipsMissions",
+    title: "Wood Chips Missions",
+    category: "contracts",
+    descKey: "companions.desc.woodChipsMissions",
+    desc: "Shows wood-chip delivery progress for accepted, running missions of this farm. Progress is not a payout.",
+    relatedSection: "economy",
+  },
+  {
     id: "cropInsurance",
     title: "Crop Insurance",
     category: "finance",

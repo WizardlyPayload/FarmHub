@@ -233,6 +233,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/ImplementUsageCounterCollector.lua"/>
         <sourceFile filename="src/companionPages/BaleBatchTrackerCollector.lua"/>
         <sourceFile filename="src/companionPages/CropContractsCollector.lua"/>
+        <sourceFile filename="src/companionPages/WoodChipsMissionsCollector.lua"/>
         <sourceFile filename="src/companionPages/CropInsuranceCollector.lua"/>
         <sourceFile filename="src/companionPages/GrainTicketsCollector.lua"/>
         <sourceFile filename="src/companionPages/HarvestLedgerCollector.lua"/>

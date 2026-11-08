@@ -410,6 +410,14 @@ local CATALOG = {
         globals = { "CropContractsMod" },
     },
     {
+        id = "woodChipsMissions",
+        title = "Wood Chips Missions",
+        category = "economy",
+        names = { "FS25_351625_Wood_Chips_Missions" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "cropInsurance",
         title = "Crop Insurance",
         category = "economy",

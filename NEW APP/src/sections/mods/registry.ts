@@ -29,6 +29,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/betterContracts").then((m) => m.Page) },
   { key: "cropContracts", catalogId: "cropContracts", title: "Crop Contracts", glyph: "CC", group: "finance",
     load: () => import("@/sections/mods/cropContracts").then((m) => m.Page) },
+  { key: "woodChipsMissions", catalogId: "woodChipsMissions", title: "Wood Chips Missions", glyph: "WC", group: "finance",
+    load: () => import("@/sections/mods/woodChipsMissions").then((m) => m.Page) },
   { key: "cropInsurance", catalogId: "cropInsurance", title: "Crop Insurance", glyph: "CI", group: "finance",
     load: () => import("@/sections/mods/cropInsurance").then((m) => m.Page) },
   { key: "grainTickets", catalogId: "grainTickets", title: "Grain Tickets", glyph: "GT", group: "finance",

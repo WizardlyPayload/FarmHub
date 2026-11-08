@@ -593,6 +593,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "workplaceTriggersSites",
+        title = "Workplace Triggers Sites",
+        category = "fields",
+        names = { "FS25_WorkplaceTriggers" },
+        substrings = { "workplacetriggers" },
+        globals = {},
+    },
+    {
         id = "tramlineSystem",
         title = "Tramline System",
         category = "fields",

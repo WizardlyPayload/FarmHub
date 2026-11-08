@@ -158,6 +158,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/WorkplanCollector.lua"/>
         <sourceFile filename="src/companionPages/SellToTheBestBidderCollector.lua"/>
         <sourceFile filename="src/companionPages/IncomeModEmergencyDebtCollector.lua"/>
+        <sourceFile filename="src/companionPages/WorkplaceTriggersCollector.lua"/>
         <sourceFile filename="src/companionPages/TramlineSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/RitterFreshLossCollector.lua"/>
         <sourceFile filename="src/companionPages/FieldToDoPlannedCropCollector.lua"/>

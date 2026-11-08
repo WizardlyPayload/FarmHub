@@ -922,6 +922,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "workplaceTriggersSites",
+    title: "Workplace Triggers Sites",
+    category: "fields",
+    descKey: "companions.desc.workplaceTriggersSites",
+    desc: "Shows this farm's named Workplace Triggers sites and current live shift terms. Site definitions do not prove work or earnings.",
+    relatedSection: "fields",
+  },
+  {
     id: "transportCompany",
     title: "Transport Company",
     category: "finance",

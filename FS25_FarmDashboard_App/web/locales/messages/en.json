@@ -6454,5 +6454,22 @@
   "companionPage.rhmClogging.vehicle": "Forage harvester",
   "companionPage.rhmClogging.sharpness": "Knife sharpness",
   "companionPage.rhmClogging.empty": "No owned forage harvester has a readable knife condition.",
-  "companionPage.rhmClogging.partial": "Some knife readings were unavailable; totals are withheld."
+  "companionPage.rhmClogging.partial": "Some knife readings were unavailable; totals are withheld.",
+  "companions.desc.variableWorkingDepth": "Shows current variable-depth controls on owned implements. A setpoint does not prove measured field depth or completed work.",
+  "companionPage.variableWorkingDepth.lead": "Current variable-depth controls for owned implements. Setpoint is a control percentage, not measured field depth or completed cultivation.",
+  "companionPage.variableWorkingDepth.implements": "Supported owned implements",
+  "companionPage.variableWorkingDepth.enabledCount": "Variable depth enabled",
+  "companionPage.variableWorkingDepth.tableTitle": "Owned implement depth controls",
+  "companionPage.variableWorkingDepth.vehicle": "Implement",
+  "companionPage.variableWorkingDepth.mode": "Control",
+  "companionPage.variableWorkingDepth.setpoint": "Setpoint",
+  "companionPage.variableWorkingDepth.status": "Status",
+  "companionPage.variableWorkingDepth.wheels": "Wheels",
+  "companionPage.variableWorkingDepth.hitch": "Hitch",
+  "companionPage.variableWorkingDepth.on": "Enabled",
+  "companionPage.variableWorkingDepth.off": "Disabled",
+  "companionPage.variableWorkingDepth.calibrated": "Calibrated",
+  "companionPage.variableWorkingDepth.uncalibrated": "Not calibrated",
+  "companionPage.variableWorkingDepth.empty": "No owned supported implement has readable variable-depth controls.",
+  "companionPage.variableWorkingDepth.partial": "Some implement depth controls were unavailable; totals are withheld."
 }

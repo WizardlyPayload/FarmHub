@@ -885,6 +885,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "variableWorkingDepth",
+    title: "Variable Working Depth",
+    category: "fleet",
+    descKey: "companions.desc.variableWorkingDepth",
+    desc: "Shows current variable-depth controls on owned implements. A setpoint does not prove measured field depth or completed work.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "jobQueue",
     title: "Job Queue",
     category: "fleet",

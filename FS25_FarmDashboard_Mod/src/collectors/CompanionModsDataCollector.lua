@@ -928,6 +928,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "variableWorkingDepth",
+        title = "Variable Working Depth",
+        category = "fleet",
+        names = { "FS25_VariableWorkingDepth", "KM_81882_variable-working-depth" },
+        globals = {},
+    },
+    {
         id = "jobQueue",
         title = "Job Queue",
         category = "fleet",

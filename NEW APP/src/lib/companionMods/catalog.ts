@@ -853,6 +853,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "storage",
   },
   {
+    id: "handPlantSaplings",
+    title: "Hand Plant Saplings",
+    category: "storage",
+    descKey: "companions.desc.handPlantSaplings",
+    desc: "Shows current sapling pieces by tree type in owned racks and linked shovel backpacks, not planted trees.",
+    relatedSection: "storage",
+  },
+  {
     id: "powertrainUpgrade",
     title: "Powertrain Upgrade",
     category: "fleet",

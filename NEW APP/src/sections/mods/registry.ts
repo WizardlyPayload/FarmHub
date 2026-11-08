@@ -220,6 +220,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/vehicleAnchor").then((m) => m.Page) },
   { key: "multipleSilageTypes", catalogId: "multipleSilageTypes", title: "Multiple Silage Types", glyph: "MS", group: "fleet",
     load: () => import("@/sections/mods/multipleSilageTypes").then((m) => m.Page) },
+  { key: "handPlantSaplings", catalogId: "handPlantSaplings", title: "Hand Plant Saplings", glyph: "SP", group: "storage",
+    load: () => import("@/sections/mods/handPlantSaplings").then((m) => m.Page) },
   { key: "powertrainUpgrade", catalogId: "powertrainUpgrade", title: "Powertrain Upgrade", glyph: "PU", group: "fleet",
     load: () => import("@/sections/mods/powertrainUpgrade").then((m) => m.Page) },
   { key: "capacityUpgrade", catalogId: "capacityUpgrade", title: "Capacity Upgrade", glyph: "CU", group: "fleet",

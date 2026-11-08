@@ -897,6 +897,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "handPlantSaplings",
+        title = "Hand Plant Saplings",
+        category = "storage",
+        names = { "KM_71329_Hand_Plant_Saplings" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "powertrainUpgrade",
         title = "Powertrain Upgrade",
         category = "fleet",

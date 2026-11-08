@@ -198,6 +198,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/variableTirePressure").then((m) => m.Page) },
   { key: "realTireWear", catalogId: "realTireWear", title: "Real Tire Wear", glyph: "TW", group: "fleet",
     load: () => import("@/sections/mods/realTireWear").then((m) => m.Page) },
+  { key: "autoSwitchTireLife", catalogId: "autoSwitchTireLife", title: "AutoSwitch tire life", glyph: "AT", group: "fleet",
+    load: () => import("@/sections/mods/autoSwitchTireLife").then((m) => m.Page) },
   { key: "organicDemand", catalogId: "organicDemand", title: "Demand-Oriented Organic Application", glyph: "OD", group: "fleet",
     load: () => import("@/sections/mods/organicDemand").then((m) => m.Page) },
   { key: "adjustableFillLevelAdvanced", catalogId: "adjustableFillLevelAdvanced", title: "Adjustable Fill Level Advanced", glyph: "AF", group: "fleet",

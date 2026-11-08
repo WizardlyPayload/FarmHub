@@ -5542,4 +5542,23 @@
   ,"companionPage.autoSwitchCoop.unknownPeriod": "The sale period was not captured."
   ,"companionPage.autoSwitchCoop.unavailable": "The co-operative payment register is unavailable or incomplete; no amount is asserted."
 
+  ,"companions.desc.autoSwitchTireLife": "Shows AutoSwitch's recorded tire wear for vehicles currently owned by this farm, including saved wheel configurations."
+  ,"companionPage.autoSwitchTireLife.shown": "Shown wheel readings"
+  ,"companionPage.autoSwitchTireLife.inactive": "AutoSwitch tire life is not active in this game; no current wear is asserted."
+  ,"companionPage.autoSwitchTireLife.unavailable": "No readable AutoSwitch tire record is available for an owned vehicle."
+  ,"companionPage.autoSwitchTireLife.lead": "AutoSwitch tire wear on vehicles currently owned by this farm. Live wheels and saved wheel configurations are labelled separately; a reading does not prove a repair or distance driven."
+  ,"companionPage.autoSwitchTireLife.title": "Owned vehicle tire readings"
+  ,"companionPage.autoSwitchTireLife.vehicle": "Vehicle"
+  ,"companionPage.autoSwitchTireLife.config": "Wheel set"
+  ,"companionPage.autoSwitchTireLife.wheel": "Wheel"
+  ,"companionPage.autoSwitchTireLife.wear": "Wear"
+  ,"companionPage.autoSwitchTireLife.cut": "Track cut"
+  ,"companionPage.autoSwitchTireLife.source": "Reading"
+  ,"companionPage.autoSwitchTireLife.yes": "Yes"
+  ,"companionPage.autoSwitchTireLife.no": "No"
+  ,"companionPage.autoSwitchTireLife.live": "Live wheel"
+  ,"companionPage.autoSwitchTireLife.saved": "Saved wheel set"
+  ,"companionPage.autoSwitchTireLife.truncated": "Only part of the owned tire records is shown."
+  ,"companionPage.autoSwitchTireLife.partial": "Some tire records were unavailable or malformed; shown readings are incomplete."
+
 }

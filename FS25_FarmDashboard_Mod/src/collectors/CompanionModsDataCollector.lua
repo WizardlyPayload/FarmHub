@@ -89,6 +89,14 @@ local CATALOG = {
         globals = { "AS_CoopPay" },
     },
     {
+        id = "autoSwitchTireLife",
+        title = "AutoSwitch tire life",
+        category = "fleet",
+        names = { "KM_82844_AutoSwitch", "FS25_AutoSwitch" },
+        substrings = { "autoswitch" },
+        globals = { "AS_TireLife" },
+    },
+    {
         id = "slurryPipeSystem",
         title = "Slurry Pipe System",
         category = "storage",

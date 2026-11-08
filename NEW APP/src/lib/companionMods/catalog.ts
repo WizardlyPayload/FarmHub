@@ -578,6 +578,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "autoSwitchTireLife",
+    title: "AutoSwitch tire life",
+    category: "fleet",
+    descKey: "companions.desc.autoSwitchTireLife",
+    desc: "Shows AutoSwitch's recorded tire wear for vehicles currently owned by this farm, including saved wheel configurations.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "grainHaulingService",
     title: "Grain Hauling Service",
     category: "economy",

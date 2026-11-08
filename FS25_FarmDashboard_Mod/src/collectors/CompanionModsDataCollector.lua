@@ -338,6 +338,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "realisticFuelingSilos",
+        title = "Realistic Fueling System silos",
+        category = "storage",
+        names = { "FS25_344040_Realistic_Fueling_System" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "grainHaulingService",
         title = "Grain Hauling Service",
         category = "economy",

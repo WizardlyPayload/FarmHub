@@ -411,6 +411,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "productions",
   },
   {
+    id: "realisticFuelingSilos",
+    title: "Realistic Fueling System silos",
+    category: "storage",
+    descKey: "companions.desc.realisticFuelingSilos",
+    desc: "Shows configured diesel and DEF prices at fuel silos this farm owns. These prices are not proof of a sale or income.",
+    relatedSection: "storage",
+  },
+  {
     id: "upgradeYourFactory",
     title: "Upgrade Your Factory",
     category: "production",

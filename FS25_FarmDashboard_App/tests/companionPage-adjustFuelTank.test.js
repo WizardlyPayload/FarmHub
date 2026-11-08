@@ -65,4 +65,11 @@ test("client, invalid choice and missing mod do not produce tank claims", () => 
     .toMatchObject({ readState: "settings-only", reason: "no-nonstock-owned-tank" });
   expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", { farmId: 1 }))
     .toBeUndefined();
+  const newer = GAME + `
+    _G.g_modManager = { getActiveMods = function() return {
+      { modName = "KM_80971_adjust-fuel-tank", version = "9.9.9.9" }
+    } end }
+  `;
+  expect(runCompanionPage(FILE, newer, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
 });

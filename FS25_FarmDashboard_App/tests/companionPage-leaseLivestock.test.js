@@ -73,4 +73,11 @@ test("unpriced leased cluster withholds farm charge rather than reporting a fals
     .toBeUndefined();
   expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", { farmId: 1 }))
     .toBeUndefined();
+  const newer = GAME + `
+    _G.g_modManager = { getActiveMods = function() return {
+      { modName = "KM_81709_Lease_Livestock", version = "9.9.9.9" }
+    } end }
+  `;
+  expect(runCompanionPage(FILE, newer, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
 });

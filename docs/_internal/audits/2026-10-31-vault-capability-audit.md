@@ -2385,3 +2385,17 @@ These classifications are for the exact ZIP versions and inspected writer paths.
 ### Full Lua-member coverage check
 
 The R3 signal pass capped each archive at 256 Lua members and each script at 2 MB, leaving CoursePlay's last 15 Lua files and one large member in each of two Fields of Stories and two Manual Paint ZIPs unread by the signal scanner. A read-only R4 pass raised those limits to 512 members and 4 MB per script after checking their actual counts and sizes. `Z:\Graham\agent-comms\farmhub-companion-acceptance\VAULT-LUA-SIGNALS-2026-11-13-R4.json` scanned all 1,803 Lua-bearing ZIP paths with zero scan errors and **zero incomplete archives**. The 456 score-at-least-10 count and each archive's signal set/score were unchanged from R3. This closes the scanner coverage gap for the current vault snapshot; it does not convert regex hits into source-reviewed farm capabilities or runtime proof.
+
+### Low-score editor and player-control ZIPs
+
+The current full scan has 28 archive paths with a create/save/raw-write signal whose exact basename had not yet appeared in this audit. That is a source-review queue, not 28 farm-data gaps. Seven of those paths were checked here:
+
+- Vehicle XML Previewer `objects/KM_81271_vehicle-xml-previewer.zip` SHA-256 `23AF9215A469B2CA9D4C258DF94976C3128B6A128AE75E8EDC474AB305360D3D` contains only `VehicleXMLPreviewer.lua` and **no `modDesc.xml`**. Its `fileWrite` path explicitly uses GIANTS Editor APIs to write a preview file. This is an editor tool ZIP, not a loadable FS25 game mod or farm reading.
+- Head Tracking Alternative `uncategorized/KM_83429_Camera_follows_steering_angle_-_head_tracker_replacement.zip` v1.0.0.5 SHA-256 `03253978F8FFFE5B5B29B26D5AFA103D894B645FAAFC65EFCB7768C8F2F8581D` writes first-person camera choices under profile `modSettings`. It records no owned vehicle work or field result in the inspected writer path. No page.
+- Lights Symbol HUD `objects/KM_81022_lights-symbol-hud.zip` v1.2.2.4 SHA-256 `CF226CCD4A159C20D40E6BFC6682EEEF2A123BC929A02EE12129D25CEF82E723` writes HUD preferences to profile XML. Its light indicators belong in game; the writer is not a farm service log. No page.
+- RealClock Mod `uncategorized/FS25_303705_RealClock_Mod.zip` v1.0.0.0 SHA-256 `645D347AA61C238AA48D113B8CEBC825B63A0369BDEB1094C6405D3C78DBB127` writes clock-display preferences in profile `modSettings`. No farm-owned time or work result is persisted by that setting path. No page.
+- 3DInspector `uncategorized/KM_76820_3DInspector.zip` v1.1.0.0 SHA-256 `DD836D594E125EDE22490A2847945E6A5B02AF2FB26447CF102560FEF0BAC8DE` writes an inspector settings XML in profile `modSettings`. It is a viewing tool, not a farm outcome. No page.
+- Quick Selector `uncategorized/FS25_315816_Quick_Selector.zip` v1.2.0.0 SHA-256 `B7A3B271DC58DB0AC205D791FEADCC023990AA1769AE957E71D8BE5E1B076290` saves selector configuration in profile `modSettings/quickSelectorConfig.xml`. This is an interface control, without a farm work ledger. No page.
+- AutoFOV `uncategorized/FS25_342571_AutoFOV.zip` v1.0.0.0 SHA-256 `703042C295D0B13DA8A5CAF03E440B616B5DBED320B659D4C63D1E526E6A2403` writes field-of-view settings to profile `modSettings/FS25_AutoFOV.xml`. This is a camera preference, not farm state. No page.
+
+These are exact-source classifications. No game run, fixture or save edit was made for them.

@@ -140,10 +140,6 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
           ? tOr("companionPage.udderToTank.registerUnavailable", "The Udder to Tank animal records are unavailable in this game session.")
         : key === "udderToTank" && page?.reason === "no-husbandry-list"
           ? tOr("companionPage.udderToTank.pensUnavailable", "The game's animal pens are unavailable in this reading.")
-        : key === "flexibleCombiSeeder" && page?.reason === "no-eligible-owned-combi-seeder"
-          ? tOr("companionPage.flexibleCombiSeeder.noneEligible", "No eligible combi seeder is currently owned by this farm.")
-        : key === "flexibleCombiSeeder" && page?.reason === "server-vehicles-only"
-          ? tOr("companionPage.flexibleCombiSeeder.serverOnly", "Combi seeder modes can be read only from the game's server state.")
         : key === "dynamicMolehills" && page?.reason === "server-state-only"
           ? tOr("companionPage.dynamicMolehills.serverOnly", "Molehill states can be read only from the game's server state.")
         : key === "swathRouter" && page?.reason === "no-adopted-owned-swath-implement"

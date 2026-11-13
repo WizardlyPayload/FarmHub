@@ -55,6 +55,7 @@ const DETECTION_ONLY_IDS = new Set([
   "parkingBrake",
   "manualPaint",
   "advancedSeedingControl",
+  "flexibleCombiSeeder",
 ]);
 
 const LIMITED_IDS = new Set([
@@ -1294,7 +1295,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Flexible Combi Seeder",
     category: "fleet",
     descKey: "companions.desc.flexibleCombiSeeder",
-    desc: "Shows whether eligible owned combi seeders use their second tank for seeds or fertilizer. It does not record field work.",
+    desc: "Detects Flexible Combi Seeder. Its selected tank mode does not report seed use or field work.",
     relatedSection: "vehicles",
   },
   {

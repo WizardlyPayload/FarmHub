@@ -5038,7 +5038,7 @@
   ,"companionPage.advancedSeedingControl.noneEligible": "No owned seeder has a readable Advanced Seeding Control setting."
   ,"companionPage.advancedSeedingControl.serverOnly": "Seeder settings can be read only from the game's server state."
 
-  ,"companions.desc.flexibleCombiSeeder": "Shows whether eligible owned combi seeders use their second tank for seeds or fertilizer. It does not record field work."
+  ,"companions.desc.flexibleCombiSeeder": "Detects Flexible Combi Seeder. Its selected tank mode does not report seed use or field work."
   ,"companionPage.flexibleCombiSeeder.title": "Flexible Combi Seeder"
   ,"companionPage.flexibleCombiSeeder.lead": "Current fertilizer-tank mode on eligible combi seeders owned by this farm. Seed mode does not prove any field was sown or fertilized."
   ,"companionPage.flexibleCombiSeeder.eligible": "Eligible owned combi seeders"

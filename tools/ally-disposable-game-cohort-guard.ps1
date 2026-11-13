@@ -73,22 +73,23 @@ function ProfileChanged($baseline, [string]$root) {
     return $null
 }
 function StopCohort([DateTimeOffset]$armUtc, [string]$log, [string]$reason) {
-    foreach ($p in @(Fs25Cohort $armUtc)) {
-        try {
-            $live = Get-Process -Id $p.Id -ErrorAction SilentlyContinue
-            if ($null -eq $live -or $live.ProcessName -ne $p.Name) { continue }
-            $start = [DateTimeOffset]::new($live.StartTime.ToUniversalTime())
-            if ([Math]::Abs(($start - $p.Start).TotalSeconds) -gt 2) { continue }
-            Stop-Process -Id $p.Id -Force -ErrorAction Stop
-            Log $log ('STOPPED reason={0} pid={1} name={2} start={3:o}' -f $reason, $p.Id, $p.Name, $p.Start)
-        } catch { Log $log ('STOP_FAILED reason={0} pid={1} error={2}' -f $reason, $p.Id, $_.Exception.Message) }
+    for ($attempt = 0; $attempt -lt 5; $attempt++) {
+        $cohort = @(Fs25Cohort $armUtc)
+        if ($cohort.Count -eq 0) { return }
+        foreach ($p in $cohort) {
+            try {
+                $live = Get-Process -Id $p.Id -ErrorAction SilentlyContinue
+                if ($null -eq $live -or $live.ProcessName -ne $p.Name) { continue }
+                $start = [DateTimeOffset]::new($live.StartTime.ToUniversalTime())
+                if ([Math]::Abs(($start - $p.Start).TotalSeconds) -gt 2) { continue }
+                Stop-Process -Id $p.Id -Force -ErrorAction Stop
+                Log $log ('STOPPED reason={0} pid={1} name={2} start={3:o}' -f $reason, $p.Id, $p.Name, $p.Start)
+            } catch { Log $log ('STOP_FAILED reason={0} pid={1} error={2}' -f $reason, $p.Id, $_.Exception.Message) }
+        }
+        Start-Sleep -Seconds 1
     }
-    Start-Sleep -Seconds 1
-    $survivors = @(Fs25Cohort $armUtc)
-    if ($survivors.Count -ne 0) {
-        Log $log ('SURVIVED reason={0} count={1}' -f $reason, $survivors.Count)
-        throw 'A post-arm FS25 process survived the stop attempt.'
-    }
+    Log $log ('SURVIVED reason={0} count={1}' -f $reason, @(Fs25Cohort $armUtc).Count)
+    throw 'A post-arm FS25 process survived the stop attempts.'
 }
 function TaskAction([string]$script, [string]$mode, [string]$manifest) {
     $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'

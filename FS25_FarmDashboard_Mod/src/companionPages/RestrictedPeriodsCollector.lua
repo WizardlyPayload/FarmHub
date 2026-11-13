@@ -26,9 +26,40 @@ local function vehicleList(mission)
     return type(vehicles) == "table" and vehicles or nil
 end
 
+local function loadedCategory(ctx, vehicle, category, fillTypes)
+    local units = ctx.call(vehicle, "getFillUnits")
+    if type(units) ~= "table" then
+        return false
+    end
+    for _, unit in pairs(units) do
+        if type(unit) == "table"
+            and fillTypes[ctx.num(unit.fillType)] == category
+            and (ctx.num(unit.fillLevel) or 0) > 0 then
+            return true
+        end
+    end
+    return false
+end
+
 local function scanVehicles(ctx, ban, farmId, liquidReason, solidReason)
     local vehicles = vehicleList(ctx.mission)
-    if vehicles == nil or type(ban.getVehicleBanCategory) ~= "function" then
+    local fillManager = ctx.global("g_fillTypeManager")
+    if vehicles == nil or type(ban.getVehicleBanCategory) ~= "function"
+        or type(fillManager) ~= "table" then
+        return nil
+    end
+    local fillTypes = {}
+    for _, row in ipairs({
+        { "LIQUIDMANURE", "liquid" },
+        { "DIGESTATE", "liquid" },
+        { "MANURE", "solid" },
+    }) do
+        local index = ctx.num(ctx.call(fillManager, "getFillTypeIndexByName", row[1]))
+        if index ~= nil and index > 0 then
+            fillTypes[index] = row[2]
+        end
+    end
+    if next(fillTypes) == nil then
         return nil
     end
     local shared = type(ctx.ownedVehicles) == "function" and ctx.try(ctx.ownedVehicles) or nil
@@ -45,7 +76,8 @@ local function scanVehicles(ctx, ban, farmId, liquidReason, solidReason)
         end
         if type(vehicle) == "table" and ctx.num(vehicle.ownerFarmId) == farmId and type(vehicle.getFillUnits) == "function" then
             local category = ctx.try(ban.getVehicleBanCategory, vehicle)
-            if category == "liquid" or category == "solid" then
+            if (category == "liquid" or category == "solid")
+                and loadedCategory(ctx, vehicle, category, fillTypes) then
                 out[category] = out[category] + 1
                 local reason = category == "liquid" and liquidReason or solidReason
                 if reason ~= nil then

@@ -175,7 +175,7 @@ export function Page({ entry }: CompanionPageProps) {
         },
       ]
     : [];
-  if (hasLive && farmData) {
+  if (hasLive && page?.vehicleCoverage === "complete" && farmData) {
     tiles.push({
       key: "blocked",
       label: tOr("companionPage.restrictedPeriods.statBlocked", "Your vehicles blocked now"),
@@ -247,11 +247,9 @@ export function Page({ entry }: CompanionPageProps) {
                 ),
               },
             }))}
-            empty={
-              hasLive
-                ? tOr("companionPage.restrictedPeriods.noVehicles", "None of your vehicles is carrying slurry, digestate or manure right now.")
-                : tOr("companionPage.restrictedPeriods.waitingVehicles", "Your spreaders appear after the next export.")
-            }
+            empty={hasLive && page?.vehicleCoverage === "complete"
+              ? tOr("companionPage.restrictedPeriods.noVehicles", "None of your vehicles is carrying slurry, digestate or manure right now.")
+              : tOr("companionPage.restrictedPeriods.notRead", "Not read")}
           />
           {page?.vehicleCoverage === "truncated" ? (
             <ModEmpty>{tOr("companionPage.restrictedPeriods.vehiclesTruncated", "Only the first vehicles are listed.")}</ModEmpty>

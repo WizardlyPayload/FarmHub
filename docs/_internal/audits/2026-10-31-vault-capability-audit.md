@@ -2155,3 +2155,11 @@ These are source classifications, not runtime compatibility tests. No fleet page
 - `uncategorized/KM_82614_Manual_Machine_Hydraulics_Control.zip` is byte-identical (SHA-256 `C39B911615DB0D5E7E1F64F784BD51E74CDE5B0D209892CF147C340C461DE2EC`, v1.0.0.0) to the previously source-reviewed `gameplay/FS25_374138_Manual_Machine_Hydraulics_Control.zip`. Profile options and live linkage/fold controls do not become two farm histories because the ZIP has two vault paths.
 
 Hashes prove duplicate archive bytes for each pair; they do not prove game compatibility or a completed PTO/hydraulic action.
+
+## 2026-11-13 low-score visual and selection controls
+
+- Dirty Tire Tracks `uncategorized/FS25_360402_Dirty_Tire_Tracks.zip` v1.0.0.0 SHA-256 `8F1155A3FB89073305ADA991FB0E7AE0C6E79F13E53F0B9B6EA163242929154B` gathers live wheel/ground data to color transient tracks. Its saved XML is a profile-wide fade preference under `modSettings/FS25_dirtyTireTracks/`; the reviewed sources do not persist where this farm drove or record a field treatment. Visual tracks in the game are the intended result, not a dashboard work map.
+- Automatic Hall Lights has two byte-identical v1.0.0.0 vault paths, `objects/KM_80899_Automatic_Hall_Lights.zip` and `uncategorized/FS25_370597_Automatic_Hall_Lights.zip`, SHA-256 `CB2FB4715E1223A3D7E67F3DF5A7B7BD1ED4E1C220D9B0C619213D9508CADD37`. Its update loop applies time-of-day state to native placeable light groups; `ahlLastTargetStates` and `ahlPendingConfirm` are runtime control caches. No mod-owned per-farm power-cost, building work or lighting ledger appears in the reviewed script. Count one control package, not two building integrations.
+- Quick Vehicle Select `uncategorized/FS25_358229_Quick_Vehicle_Select.zip` v1.0.1.0 SHA-256 `500435F87DF94EFDCD318D230F40D421DF915431B23846FF2CC1C6A3E33A9407` persists the player's vehicle selection order, tab names and appearance under profile-wide `modSettings`; hover logic checks live vehicle farm ownership for UI filtering. Those preferences have no save identity and are not a vehicle work, location or ownership history. The game selection UI is the useful surface; no farm results page is justified.
+
+These source checks did not place a building, change a save or test runtime compatibility.

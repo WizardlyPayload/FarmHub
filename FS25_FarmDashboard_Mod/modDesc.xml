@@ -139,7 +139,6 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/EnhancedLoanSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/INeedALoanCollector.lua"/>
         <sourceFile filename="src/companionPages/AutomaticLoanRepayCollector.lua"/>
-        <sourceFile filename="src/companionPages/RealisticDieselPriceCollector.lua"/>
         <sourceFile filename="src/companionPages/LumberjackHutCollector.lua"/>
         <sourceFile filename="src/companionPages/FluctuatingDieselPriceCollector.lua"/>
         <sourceFile filename="src/companionPages/DynamicMarketCollector.lua"/>

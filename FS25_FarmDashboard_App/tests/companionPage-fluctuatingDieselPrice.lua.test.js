@@ -53,4 +53,11 @@ describe("companion page: Fluctuating Diesel Price (Lua)", () => {
         `);
         expect(page).toMatchObject({ outsideBand: true, nextChangeHour: 0, hoursUntilChange: 4 });
     });
+
+    test("reports the second diesel writer without a Realistic Diesel page collector", () => {
+        const page = runCompanionPage(FILE, `${SETUP}
+            _G.g_modIsLoaded.FS25_363612_Realistic_Diesel_Price = true
+        `);
+        expect(page.otherDieselMod).toBe("realisticDieselPrice");
+    });
 });

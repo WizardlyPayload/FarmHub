@@ -11,6 +11,24 @@ local BANDS = {
 local CHANGE_HOURS = { 0, 6, 12, 18 }
 local MAX_HISTORY = 28
 
+local function realisticDieselLoaded(ctx)
+    local loaded = ctx.global("g_modIsLoaded")
+    if type(loaded) ~= "table" then return false end
+    if loaded.FS25_RealisticDieselPrice or loaded.FS25_363612_Realistic_Diesel_Price then
+        return true
+    end
+    for name, active in pairs(loaded) do
+        if active and type(name) == "string" then
+            local lower = string.lower(name)
+            if string.find(lower, "realisticdieselprice", 1, true)
+                or string.find(lower, "realistic_diesel_price", 1, true) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 -- Observed samples persist across export cycles for this session only (not saved).
 local history = {}
 
@@ -82,8 +100,6 @@ CompanionPages.register({
             high = (high == nil or s.price > high) and s.price or high
             sum = sum + s.price
         end
-        local rdp = CompanionPages.loadedName and CompanionPages.loadedName("realisticDieselPrice") or nil
-
         return {
             readState = price and "ok" or "partial",
             modActive = type(ctx.symbol("randomDieselPrice")) == "table",
@@ -103,7 +119,7 @@ CompanionPages.register({
                 average = #samples > 0 and ctx.round2(sum / #samples) or nil,
                 samples = samples,
             },
-            otherDieselMod = rdp ~= nil and "realisticDieselPrice" or nil,
+            otherDieselMod = realisticDieselLoaded(ctx) and "realisticDieselPrice" or nil,
         }
     end,
 })

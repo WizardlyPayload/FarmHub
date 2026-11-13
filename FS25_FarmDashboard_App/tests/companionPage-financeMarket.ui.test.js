@@ -16,29 +16,6 @@ afterEach(() => {
     document.body.innerHTML = "";
 });
 
-describe("realisticDieselPrice page", () => {
-    test("shows game vs target price, the selected region's presets and all regions", () => {
-        const ui = loadCompanionPage("realisticDieselPrice");
-        const host = ui.renderPage(payload("realisticDieselPrice", {
-            readState: "ok", customMode: false, customPrice: 1.5, region: "Europe", country: "United Kingdom",
-            presetPrice: 1.96, targetPrice: 1.96, gamePrice: 1.31, inSync: false, settingsMenuInstalled: true,
-            otherDieselMod: "fluctuatingDieselPrice",
-            regions: [
-                { name: "Europe", selected: true, countries: [{ label: "Germany", price: 1.9 }, { label: "United Kingdom", price: 1.96, selected: true }] },
-                { name: "Asia", selected: false, countries: [{ label: "Japan", price: 0.86 }] },
-            ],
-        }));
-        expect(host.querySelector('[data-stat="game"]').className).toContain("is-warn");
-        expect(text(host, '[data-stat="game"]')).toContain("1.31");
-        expect(text(host, '[data-stat="mode"]')).toContain("United Kingdom, Europe");
-        expect(text(host, '[data-stat="countries"]')).toContain("3");
-        expect(host.querySelector('[data-row="United Kingdom"]').className).toContain("is-ok");
-        expect(text(host, '[data-row="Asia"]')).toContain("0.86");
-        expect(host.textContent).toContain("Fluctuating Diesel Price is also loaded");
-        expect(host.querySelectorAll(".fd-mod-page__chart-col")).toHaveLength(2);
-    });
-});
-
 describe("fluctuatingDieselPrice page", () => {
     test("shows the band, next change and the observed history chart", () => {
         const ui = loadCompanionPage("fluctuatingDieselPrice");

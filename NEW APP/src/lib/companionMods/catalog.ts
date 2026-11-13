@@ -1497,7 +1497,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "TerraFarm Machines",
     category: "fleet",
     descKey: "companions.desc.terraFarmMachines",
-    desc: "Shows the current landscaping setup of TerraFarm machines owned by this farm, without claiming excavation work or volume.",
+    desc: "Detects TerraFarm. Its machine setup does not record excavation volume or completed work for a farm decision.",
     relatedSection: "vehicles",
   },
   {

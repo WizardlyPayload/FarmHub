@@ -226,7 +226,6 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/ImplementMaintenanceCollector.lua"/>
         <sourceFile filename="src/companionPages/NonStopCropCollector.lua"/>
         <sourceFile filename="src/companionPages/HandToolDropCollector.lua"/>
-        <sourceFile filename="src/companionPages/TerraFarmMachinesCollector.lua"/>
         <sourceFile filename="src/companionPages/DieselFuelSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/BaleCapacityMultiplierCollector.lua"/>
         <sourceFile filename="src/companionPages/ForageWagonCompressionCollector.lua"/>

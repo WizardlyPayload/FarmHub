@@ -210,14 +210,6 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "storage",
   },
   {
-    id: "oilGreaseService",
-    title: "Oil And Grease Service",
-    category: "fleet",
-    descKey: "companions.desc.oilGreaseService",
-    desc: "Shows oil and grease levels on owned vehicles so service can be planned before work. It does not record repairs or costs.",
-    relatedSection: "vehicles",
-  },
-  {
     id: "enhancedSeasonalPrices",
     title: "Enhanced Seasonal Prices",
     category: "economy",

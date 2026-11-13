@@ -6472,7 +6472,7 @@
   "companionPage.variableWorkingDepth.uncalibrated": "Not calibrated",
   "companionPage.variableWorkingDepth.empty": "No owned supported implement has readable variable-depth controls.",
   "companionPage.variableWorkingDepth.partial": "Some implement depth controls were unavailable; totals are withheld.",
-  "companions.desc.vehicleAssistanceSystem": "Shows saved cruise and automatic-light control choices on this farm's vehicles, not driving or safety-event history.",
+  "companions.desc.vehicleAssistanceSystem": "Detects Vehicle Assistance System. Saved cruise and light switches do not report vehicle work or safety events.",
   "companionPage.vehicleAssistanceSystem.lead": "Current saved assistance controls on owned vehicles. These settings do not prove a braking, lighting or cruise event occurred.",
   "companionPage.vehicleAssistanceSystem.vehicles": "Supported owned vehicles",
   "companionPage.vehicleAssistanceSystem.cruiseCount": "Intelligent cruise enabled",

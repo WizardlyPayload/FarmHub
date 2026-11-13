@@ -236,8 +236,6 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/rhmClogging").then((m) => m.Page) },
   { key: "variableWorkingDepth", catalogId: "variableWorkingDepth", title: "Variable Working Depth", glyph: "WD", group: "fleet",
     load: () => import("@/sections/mods/variableWorkingDepth").then((m) => m.Page) },
-  { key: "vehicleAssistanceSystem", catalogId: "vehicleAssistanceSystem", title: "Vehicle Assistance System", glyph: "VA", group: "fleet",
-    load: () => import("@/sections/mods/vehicleAssistanceSystem").then((m) => m.Page) },
   { key: "hudPlus", catalogId: "hudPlus", title: "HUD+", glyph: "HP", group: "fleet",
     load: () => import("@/sections/mods/hudPlus").then((m) => m.Page) },
   { key: "realisticBrakes", catalogId: "realisticBrakes", title: "Realistic Brakes", glyph: "RB", group: "fleet",

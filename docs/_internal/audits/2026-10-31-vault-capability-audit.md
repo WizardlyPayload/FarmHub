@@ -2444,6 +2444,10 @@ The source-tested Hand Tools reader described earlier exported saveable mode swi
 
 The previous source candidate reported only a compatible owned wrapper's current manual/automatic/collect choice and on/off switch. Its tractor-side wrapped-bale count resets on drop and cannot serve as completed or lifetime bale output. A dedicated dashboard page repeating an implement control does not answer how many bales were produced or what work remains. The current source removes that collector and page and retains exact-mod detection. The private V5 5.2.52/exporter 5.1.0.40 package and focused tests described earlier are historical source/package evidence; no installed game/export/page acceptance occurred, and those frozen bytes cannot validate this change. No baler or other fixture was bought or run for the correction.
 
+### Vehicle Assistance System value correction (13 November)
+
+The V68R1 run proved a bounded ABS-like control display path on one owned vehicle for the frozen private bytes, but the current page read only saved cruise and automatic-light choices. It recorded no braking, lighting, cruise intervention, accident, vehicle work or maintenance need. As with other switch-only pages, this does not yet justify a separate remote farm-management view. The current source removes the dedicated collector and page and retains exact-mod detection, including the verified as-found lower-case package alias. V68R1 remains valid historical display evidence, not a current source-page claim. No vehicle was driven or altered for this correction.
+
 ### Current page value gate (13 November)
 
 For a dedicated page, the reader must answer a named farm decision or report a useful observed result. A mod being loadable, a value being nondefault, a UI control being readable, or a source fixture being nonempty is insufficient by itself. Do not place a building, buy a machine or alter a save merely to populate a page. Detection can remain in the catalog without a dedicated collector or page. Keep source testing, private packaging and game/export/installed acceptance separate.

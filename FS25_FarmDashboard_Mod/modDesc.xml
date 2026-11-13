@@ -215,7 +215,6 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/RealisticHarvestingCollector.lua"/>
         <sourceFile filename="src/companionPages/RhmCloggingCollector.lua"/>
         <sourceFile filename="src/companionPages/VariableWorkingDepthCollector.lua"/>
-        <sourceFile filename="src/companionPages/VehicleAssistanceSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/HUDPlusCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticBrakesCollector.lua"/>
         <sourceFile filename="src/companionPages/HydraulicBrokenTrailerCollector.lua"/>

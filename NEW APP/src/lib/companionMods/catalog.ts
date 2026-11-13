@@ -936,7 +936,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Vehicle Assistance System",
     category: "fleet",
     descKey: "companions.desc.vehicleAssistanceSystem",
-    desc: "Shows saved cruise and automatic-light control choices on this farm's vehicles, not driving or safety-event history.",
+    desc: "Detects Vehicle Assistance System. Saved cruise and light switches do not report vehicle work or safety events.",
     relatedSection: "vehicles",
   },
   {

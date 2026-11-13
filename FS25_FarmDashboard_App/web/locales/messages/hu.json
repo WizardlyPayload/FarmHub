@@ -6693,7 +6693,7 @@
   ,"companionPage.grapeOliveYieldSettings.multiplier": "Mod setting"
   ,"companionPage.grapeOliveYieldSettings.rate": "Current game parameter"
   ,"companionPage.grapeOliveYieldSettings.empty": "The active server yield rule is not available."
-  ,"companions.desc.realPowertrain": "Shows saved CVT control settings on vehicles owned by this farm. It does not measure power, fuel use or work completed."
+  ,"companions.desc.realPowertrain": "Detects Real Powertrain. Saved CVT controls do not show machine work, fuel use or service needs."
   ,"companionPage.realPowertrain.lead": "Current Real Powertrain CVT settings on this farm's owned vehicles. These are controls, not measured output, fuel use, wear or work history. Other vehicles and profile-wide module settings are outside this reading."
   ,"companionPage.realPowertrain.count": "Owned CVT powertrains"
   ,"companionPage.realPowertrain.partial": "Some CVT control states could not be verified; the count is withheld."

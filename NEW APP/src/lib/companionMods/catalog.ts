@@ -288,7 +288,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Real Powertrain",
     category: "fleet",
     descKey: "companions.desc.realPowertrain",
-    desc: "Shows saved CVT control settings on vehicles owned by this farm. It does not measure power, fuel use or work completed.",
+    desc: "Detects Real Powertrain. Saved CVT controls do not show machine work, fuel use or service needs.",
     relatedSection: "vehicles",
   },
   {

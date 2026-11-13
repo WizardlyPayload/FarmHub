@@ -153,7 +153,7 @@ export function Page({ entry }: CompanionPageProps) {
 
   const tiles: ModStatTile[] = hasLive
     ? [
-        { key: "period", label: tOr("companionPage.restrictedPeriods.statPeriod", "Current period"), value: periodLabel(currentPeriod) },
+        { key: "period", label: tOr("companionPage.restrictedPeriods.statPeriod", "Period at last reading"), value: periodLabel(currentPeriod) },
         {
           key: "spreading",
           label: tOr("companionPage.restrictedPeriods.statSpreading", "Organic spreading"),
@@ -178,7 +178,7 @@ export function Page({ entry }: CompanionPageProps) {
   if (hasLive && page?.vehicleCoverage === "complete" && farmData) {
     tiles.push({
       key: "blocked",
-      label: tOr("companionPage.restrictedPeriods.statBlocked", "Your vehicles blocked now"),
+      label: tOr("companionPage.restrictedPeriods.statBlocked", "Your vehicles blocked at last reading"),
       value: formatNumber(farmData.blockedVehicles, 0),
       tone: (num(farmData.blockedVehicles) ?? 0) > 0 ? "warn" : undefined,
       hint: tOr("companionPage.restrictedPeriods.statBlockedHint", "{{liquid}} liquid, {{solid}} solid loaded", {
@@ -193,7 +193,7 @@ export function Page({ entry }: CompanionPageProps) {
       entry={entry}
       lead={tOr(
         "companionPage.restrictedPeriods.lead",
-        "Restricted Periods stops you switching on slurry, digestate and manure spreaders during closed periods, and liquids in ground frost. This page shows whether spreading is allowed right now.",
+        "Restricted Periods stops you switching on slurry, digestate and manure spreaders during closed periods, and liquids in ground frost. This page shows spreading conditions at the last reading; check the reading time before acting.",
       )}
     >
       <ModStatTiles tiles={tiles} />
@@ -205,13 +205,13 @@ export function Page({ entry }: CompanionPageProps) {
               <span><i class="fd-cp-rp__swatch is-closed" />{ruleLabel("closed")}</span>
               <span><i class="fd-cp-rp__swatch is-frost" />{ruleLabel("frost")}</span>
               {hasLive ? (
-                <span><i class="fd-cp-rp__swatch is-current" />{tOr("companionPage.restrictedPeriods.legendCurrent", "Current period")}</span>
+                <span><i class="fd-cp-rp__swatch is-current" />{tOr("companionPage.restrictedPeriods.legendCurrent", "Period at last reading")}</span>
               ) : null}
             </div>
             {hasLive ? <p class="fd-economy__muted">
               {tOr(
                 "companionPage.restrictedPeriods.rulesNote",
-                "These are the rules written into version {{version}} of the mod. The ban and frost check above are read live from the game.",
+                "These are the rules written into version {{version}} of the mod. The ban and frost check above come from the game at the last reading.",
                 { version: RULES_VERSION },
               )}
             </p> : null}
@@ -248,7 +248,7 @@ export function Page({ entry }: CompanionPageProps) {
               },
             }))}
             empty={hasLive && page?.vehicleCoverage === "complete"
-              ? tOr("companionPage.restrictedPeriods.noVehicles", "None of your vehicles is carrying slurry, digestate or manure right now.")
+              ? tOr("companionPage.restrictedPeriods.noVehicles", "No owned vehicle carried slurry, digestate or manure at the last reading.")
               : tOr("companionPage.restrictedPeriods.notRead", "Not read")}
           />
           {page?.vehicleCoverage === "truncated" ? (

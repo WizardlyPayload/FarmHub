@@ -246,7 +246,7 @@ export function Page({ entry }: CompanionPageProps) {
           }))}
           empty={
             hasMap
-              ? tOr("companionPage.smartCropControl.noFields", "No NPC field is growing or planning a controlled crop right now.")
+              ? tOr("companionPage.smartCropControl.noFields", "No NPC field was growing or planning a controlled crop at the last reading.")
               : tOr("companionPage.smartCropControl.waitingMap", "NPC fields appear after the next export.")
           }
         />

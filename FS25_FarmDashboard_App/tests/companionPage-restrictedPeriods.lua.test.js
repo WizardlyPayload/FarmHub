@@ -102,6 +102,14 @@ describe("Restricted Periods page collector", () => {
         expect(noClass.readState).toBe("detection-only");
     });
 
+    test("unreviewed version withholds the live rules and vehicle reading", () => {
+        const setup = modEnv(10, 5).replace('version = "1.0.0.0"', 'version = "1.1.0.0"');
+        const page = runCompanionPage(FILE, setup, { farmId: 1 });
+        expect(page).toMatchObject({ readState: "settings-only", reason: "unreviewed-version", version: "1.1.0.0" });
+        expect(page.currentPeriod).toBeUndefined();
+        expect(page.vehicles).toBeUndefined();
+    });
+
     test("collector parses as Lua", () => {
         const src = fs.readFileSync(path.join(__dirname, "../../FS25_FarmDashboard_Mod/src/companionPages", FILE), "utf8");
         const L = lauxlib.luaL_newstate();

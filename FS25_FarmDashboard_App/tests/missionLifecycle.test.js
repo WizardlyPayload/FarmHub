@@ -59,7 +59,7 @@ describe("mission lifecycle and per-reader isolation", () => {
             _G.g_modManager = { getActiveMods = function()
                 return {
                     { modName = 'FS25_EnhancedLoanSystem' },
-                    { modName = 'FS25_RestrictedPeriods' },
+                    { modName = 'FS25_RestrictedPeriods', version = '1.0.0.0' },
                 }
             end }
             _G.FS25_EnhancedLoanSystem = { g_els_loanManager = { loans = {

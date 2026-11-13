@@ -73,6 +73,9 @@ CompanionPages.register({
     modNames = { "FS25_RestrictedPeriods", "FS25_352961_Restricted_Periods", "RestrictedPeriods" },
     substrings = { "restrictedperiods", "restricted_periods" },
     collect = function(ctx)
+        if ctx.version ~= "1.0.0.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local ban = ctx.symbol("SlurryBan")
         if type(ban) ~= "table" or type(ban.isBanActive) ~= "function" then
             return nil

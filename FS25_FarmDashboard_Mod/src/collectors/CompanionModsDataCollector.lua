@@ -2365,7 +2365,10 @@ local function collectDiesel(detectedIds)
     }
 end
 
-local function collectRestrictedPeriods()
+local function collectRestrictedPeriods(modName)
+    if modName == nil or modVersion(modName) ~= "1.0.0.0" then
+        return { enabled = true, readState = "unavailable", reason = "unreviewed-version" }
+    end
     local slurry = companionSymbol({
         "FS25_RestrictedPeriods",
         "FS25_352961_Restricted_Periods",
@@ -4951,6 +4954,7 @@ function CompanionModsDataCollector:collectStep(_opts)
     local ok, payload = pcall(function()
         local mods = {}
         local detectedIds = {}
+        local detectedNames = {}
         local any = false
 
         for _, entry in ipairs(CATALOG) do
@@ -4964,6 +4968,7 @@ function CompanionModsDataCollector:collectStep(_opts)
             if detected then
                 any = true
                 detectedIds[entry.id] = true
+                detectedNames[entry.id] = listedName
                 mods[#mods + 1] = {
                     id = entry.id,
                     title = entry.title,
@@ -5011,7 +5016,7 @@ function CompanionModsDataCollector:collectStep(_opts)
         end
 
         if detectedIds.restrictedPeriods then
-            out.restrictedPeriods = readAdapter("restrictedPeriods", collectRestrictedPeriods, { enabled = true, readState = "failed" })
+            out.restrictedPeriods = readAdapter("restrictedPeriods", function() return collectRestrictedPeriods(detectedNames.restrictedPeriods) end, { enabled = true, readState = "failed" })
         end
 
         if detectedIds.regionalCropCalendar then

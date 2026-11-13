@@ -143,12 +143,13 @@ function RuleGrid({ current }: { current: number | null }) {
 }
 
 export function Page({ entry }: CompanionPageProps) {
-  const { page, farmData, farmId } = useCompanionPage(entry.key);
+  const { page, mod, farmData, farmId } = useCompanionPage(entry.key);
   const current = num(page?.currentPeriod);
   const currentPeriod = current != null && current >= 1 && current <= 12 ? Math.round(current) : null;
-  const vehicles = asList<VehicleRow>(page?.vehicles).filter((v) => num(v.farmId) === farmId);
-  const version = typeof page?.version === "string" ? page.version : null;
-  const hasLive = page != null && currentPeriod != null;
+  const version = typeof mod?.version === "string" ? mod.version : typeof page?.version === "string" ? page.version : null;
+  const rulesReviewed = version === RULES_VERSION && (page == null || page.version === RULES_VERSION);
+  const hasLive = rulesReviewed && page?.readState === "ok" && currentPeriod != null;
+  const vehicles = hasLive ? asList<VehicleRow>(page?.vehicles).filter((v) => num(v.farmId) === farmId) : [];
 
   const tiles: ModStatTile[] = hasLive
     ? [
@@ -198,21 +199,23 @@ export function Page({ entry }: CompanionPageProps) {
       <ModStatTiles tiles={tiles} />
       <div class="fd-mod-page__grid">
         <Card title={tOr("companionPage.restrictedPeriods.rulesTitle", "Closed periods by fertiliser")}>
-          <RuleGrid current={currentPeriod} />
-          <div class="fd-cp-rp__legend">
-            <span><i class="fd-cp-rp__swatch is-closed" />{ruleLabel("closed")}</span>
-            <span><i class="fd-cp-rp__swatch is-frost" />{ruleLabel("frost")}</span>
-            {currentPeriod != null ? (
-              <span><i class="fd-cp-rp__swatch is-current" />{tOr("companionPage.restrictedPeriods.legendCurrent", "Current period")}</span>
-            ) : null}
-          </div>
-          <p class="fd-economy__muted">
-            {tOr(
-              "companionPage.restrictedPeriods.rulesNote",
-              "These are the rules written into version {{version}} of the mod. The ban and frost check above are read live from the game.",
-              { version: RULES_VERSION },
-            )}
-          </p>
+          {rulesReviewed ? <>
+            <RuleGrid current={hasLive ? currentPeriod : null} />
+            <div class="fd-cp-rp__legend">
+              <span><i class="fd-cp-rp__swatch is-closed" />{ruleLabel("closed")}</span>
+              <span><i class="fd-cp-rp__swatch is-frost" />{ruleLabel("frost")}</span>
+              {hasLive ? (
+                <span><i class="fd-cp-rp__swatch is-current" />{tOr("companionPage.restrictedPeriods.legendCurrent", "Current period")}</span>
+              ) : null}
+            </div>
+            {hasLive ? <p class="fd-economy__muted">
+              {tOr(
+                "companionPage.restrictedPeriods.rulesNote",
+                "These are the rules written into version {{version}} of the mod. The ban and frost check above are read live from the game.",
+                { version: RULES_VERSION },
+              )}
+            </p> : null}
+          </> : null}
           {version && version !== RULES_VERSION ? (
             <p class="fd-economy__muted" data-rules-version="mismatch">
               {tOr(
@@ -222,8 +225,9 @@ export function Page({ entry }: CompanionPageProps) {
               )}
             </p>
           ) : null}
+          {!rulesReviewed && version === null ? <ModEmpty>{tOr("companionPage.restrictedPeriods.notRead", "Not read")}</ModEmpty> : null}
         </Card>
-        <Card title={tOr("companionPage.restrictedPeriods.vehiclesTitle", "Your loaded spreaders")}>
+        {rulesReviewed ? <Card title={tOr("companionPage.restrictedPeriods.vehiclesTitle", "Your loaded spreaders")}>
           <ModTable
             columns={[
               { key: "name", label: tOr("companionPage.restrictedPeriods.colVehicle", "Vehicle") },
@@ -252,7 +256,7 @@ export function Page({ entry }: CompanionPageProps) {
           {page?.vehicleCoverage === "truncated" ? (
             <ModEmpty>{tOr("companionPage.restrictedPeriods.vehiclesTruncated", "Only the first vehicles are listed.")}</ModEmpty>
           ) : null}
-        </Card>
+        </Card> : null}
       </div>
       <ModAbout
         entry={entry}

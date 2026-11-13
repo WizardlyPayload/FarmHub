@@ -56,7 +56,7 @@ const activeReaders = `
     engine.g_modManager = { getActiveMods = function()
         return {
             { modName = 'FS25_EnhancedLoanSystem' },
-            { modName = 'FS25_RestrictedPeriods' },
+            { modName = 'FS25_RestrictedPeriods', version = '1.0.0.0' },
         }
     end }
     engine.FS25_EnhancedLoanSystem = { g_els_loanManager = { loans = {
@@ -100,7 +100,7 @@ describe("ordinary mod sandbox and production settings boundary", () => {
             _G.g_modManager = { getActiveMods = function()
                 return {
                     { modName = 'FS25_EnhancedLoanSystem' },
-                    { modName = 'FS25_RestrictedPeriods' },
+                    { modName = 'FS25_RestrictedPeriods', version = '1.0.0.0' },
                 }
             end }
             _G.FS25_EnhancedLoanSystem = { g_els_loanManager = { loans = {

@@ -44,8 +44,8 @@ CompanionPages.register({
                         local entry = values[i]
                         if type(entry) == "table" then
                             local price, day, hour, period = ctx.num(entry.price), ctx.num(entry.day), ctx.num(entry.hour), ctx.num(entry.period)
-                            if price and price > 0 and day and day >= 0 and hour and hour >= 0 and hour < 24
-                                and period and period >= 0 and period <= 12 then
+                            if price and price > 0 and day and day >= 1 and hour and hour >= 0 and hour < 24
+                                and period and period >= 1 and period <= 12 then
                                 samples = samples + 1
                                 low = low and math.min(low, price) or price
                                 high = high and math.max(high, price) or price

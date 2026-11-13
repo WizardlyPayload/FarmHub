@@ -24,12 +24,14 @@ const LIVE = `
           { price = 0.81, day = 4, hour = 9, period = 2 },
         },
         [2] = { { price = 1.35, day = 4, hour = 9, period = 2 } },
+        [3] = { { price = 1.5, day = 0, hour = 9, period = 0 } },
       }
     }
   }
   _G.g_fillTypeManager = { getFillTypeByIndex = function(self, index)
     if index == 1 then return { name = "WHEAT", title = "Wheat" } end
     if index == 2 then return { name = "SORGHUM", title = "Sorghum" } end
+    if index == 3 then return { name = "BARLEY", title = "Barley" } end
   end }
 `;
 

@@ -985,7 +985,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Farm Gate Keys",
     category: "construction",
     descKey: "companions.desc.farmGateKeys",
-    desc: "Shows currently locked animated gates whose lock is held by this farm; it does not claim gate ownership or entry history.",
+    desc: "Detects Farm Gate Keys. Use the in-game gates; internal gate IDs alone do not identify a useful farm action.",
     relatedSection: "overview",
   },
   {

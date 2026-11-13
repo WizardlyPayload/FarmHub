@@ -242,8 +242,6 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/tripComputer").then((m) => m.Page) },
   { key: "fillLevelLimiter", catalogId: "fillLevelLimiter", title: "Fill Level Limiter", glyph: "FL", group: "fleet",
     load: () => import("@/sections/mods/fillLevelLimiter").then((m) => m.Page) },
-  { key: "farmGateKeys", catalogId: "farmGateKeys", title: "Farm Gate Keys", glyph: "GK", group: "construction",
-    load: () => import("@/sections/mods/farmGateKeys").then((m) => m.Page) },
   { key: "jobQueue", catalogId: "jobQueue", title: "Job Queue", glyph: "JQ", group: "fleet",
     load: () => import("@/sections/mods/jobQueue").then((m) => m.Page) },
   { key: "agriculturalTerminal", catalogId: "agriculturalTerminal", title: "Agricultural Terminal", glyph: "AT", group: "fleet",

@@ -6508,7 +6508,7 @@
   "companionPage.fillLevelLimiter.capacity": "Native capacity",
   "companionPage.fillLevelLimiter.empty": "No owned vehicle has a readable custom fill-unit limit.",
   "companionPage.fillLevelLimiter.partial": "Some vehicle fill limits were unavailable; totals are withheld.",
-  "companions.desc.farmGateKeys": "Shows currently locked animated gates whose lock is held by this farm; it does not claim gate ownership or entry history.",
+  "companions.desc.farmGateKeys": "Detects Farm Gate Keys. Use the in-game gates; internal gate IDs alone do not identify a useful farm action.",
   "companionPage.farmGateKeys.lead": "Current locks this farm placed on animated gates. The lock holder may differ from the gate's property owner; no entry or access history is recorded.",
   "companionPage.farmGateKeys.heldLocks": "Gate locks held by this farm",
   "companionPage.farmGateKeys.tableTitle": "Locked gates",

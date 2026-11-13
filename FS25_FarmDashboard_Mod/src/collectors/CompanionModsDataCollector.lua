@@ -1012,6 +1012,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "cvtAddon",
+        title = "CVT Addon",
+        category = "fleet",
+        names = { "FS25_CVT_Addon" },
+        globals = {},
+    },
+    {
         id = "helperSilageCompacting",
         title = "Helper Silage Compacting",
         category = "fleet",

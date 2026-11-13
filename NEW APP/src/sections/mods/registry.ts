@@ -248,6 +248,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/lockSteeringAxles").then((m) => m.Page) },
   { key: "automaticTramlineSystem", catalogId: "automaticTramlineSystem", title: "Automatic Tramline System", glyph: "AT", group: "fields",
     load: () => import("@/sections/mods/automaticTramlineSystem").then((m) => m.Page) },
+  { key: "cvtAddon", catalogId: "cvtAddon", title: "CVT Addon", glyph: "CV", group: "fleet",
+    load: () => import("@/sections/mods/cvtAddon").then((m) => m.Page) },
   { key: "helperSilageCompacting", catalogId: "helperSilageCompacting", title: "Helper Silage Compacting", glyph: "HC", group: "fleet",
     load: () => import("@/sections/mods/helperSilageCompacting").then((m) => m.Page) },
   { key: "universalSoundTuner", catalogId: "universalSoundTuner", title: "Universal Sound Tuner", glyph: "ST", group: "fleet",

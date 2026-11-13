@@ -1806,6 +1806,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "fields",
   },
   {
+    id: "cvtAddon",
+    title: "CVT Addon",
+    category: "fleet",
+    descKey: "companions.desc.cvtAddon",
+    desc: "Shows this mod's transmission wear on owned CVT configured vehicles. It does not report repair costs or completed servicing.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "ritterFreshLoss",
     title: "Ritter Fresh",
     category: "storage",

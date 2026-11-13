@@ -6635,4 +6635,13 @@
   ,"companionPage.automaticTramlineSystem.total": "Recorded area"
   ,"companionPage.automaticTramlineSystem.empty": "No owned compatible seeder has a readable record."
   ,"companionPage.automaticTramlineSystem.partial": "Some seeder records were unavailable; totals are withheld."
+  ,"companions.desc.cvtAddon": "Shows this mod's transmission wear on owned CVT configured vehicles. It does not report repair costs or completed servicing."
+  ,"companionPage.cvtAddon.configured": "Owned CVT configured vehicles"
+  ,"companionPage.cvtAddon.worn": "Vehicles with CVT wear"
+  ,"companionPage.cvtAddon.lead": "CVT Addon's current transmission wear on your owned vehicles with its CVT option enabled. This is the mod's condition reading, not a repair cost or service record."
+  ,"companionPage.cvtAddon.title": "Owned vehicle CVT condition"
+  ,"companionPage.cvtAddon.vehicle": "Vehicle"
+  ,"companionPage.cvtAddon.wear": "CVT wear"
+  ,"companionPage.cvtAddon.empty": "No owned CVT configured vehicle has readable transmission wear."
+  ,"companionPage.cvtAddon.partial": "Some CVT readings were unavailable; counts are withheld."
 }

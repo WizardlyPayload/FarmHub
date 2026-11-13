@@ -304,7 +304,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Farm Limit Manager",
     category: "finance",
     descKey: "companions.desc.farmLimitManager",
-    desc: "Shows the five configured limits shared by every farm in this save. It does not count current jobs, buildings or contracts.",
+    desc: "Detects Farm Limit Manager. Its configured caps do not show current usage or an observed limit event.",
     relatedSection: "economy",
   },
   {

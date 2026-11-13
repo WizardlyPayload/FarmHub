@@ -305,7 +305,6 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/CropControlOverrideCollector.lua"/>
         <sourceFile filename="src/companionPages/RealPowertrainCollector.lua"/>
         <sourceFile filename="src/companionPages/ResourceUsageControlCollector.lua"/>
-        <sourceFile filename="src/companionPages/FarmLimitManagerCollector.lua"/>
         <sourceFile filename="src/companionPages/AgroRealisticResaleCollector.lua"/>
         <sourceFile filename="src/companionPages/AgroRealisticHealthLossCollector.lua"/>
         <sourceFile filename="src/companionPages/FinancialDashboardCollector.lua"/>

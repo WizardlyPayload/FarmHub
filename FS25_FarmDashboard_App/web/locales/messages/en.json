@@ -5153,7 +5153,7 @@
   ,"companionPage.factoryContracts.defaulted": "Defaulted"
   ,"companionPage.factoryContracts.cancelled": "Cancelled"
   ,"companionPage.factoryContracts.partialStatus": "Partially fulfilled"
-  ,"companions.desc.farmLimitManager": "Shows the five configured limits shared by every farm in this save. It does not count current jobs, buildings or contracts."
+  ,"companions.desc.farmLimitManager": "Detects Farm Limit Manager. Its configured caps do not show current usage or an observed limit event."
   ,"companionPage.farmLimitManager.title": "Farm Limit Manager"
   ,"companionPage.farmLimitManager.lead": "These configured limits apply to every farm in this save. They are policy settings, not a count of current workers, buildings or contracts, and do not prove a limit was enforced."
   ,"companionPage.farmLimitManager.tableTitle": "Save-wide limits per farm"

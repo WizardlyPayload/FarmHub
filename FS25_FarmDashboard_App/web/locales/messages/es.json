@@ -5760,7 +5760,7 @@
   ,"companionPage.chainsawConsumables.truncated": "Only part of the owned chainsaw condition is shown."
   ,"companionPage.chainsawConsumables.partial": "A saw had ambiguous identity or unreadable condition and was withheld."
 
-  ,"companions.desc.vehicleAnchor": "Shows saved anchor choices and whether the joint is currently applied on owned vehicles."
+  ,"companions.desc.vehicleAnchor": "Detects Vehicle Anchor. Its current switch and joint state do not record work, location or an incident."
   ,"companionPage.vehicleAnchor.supported": "Supported owned vehicles"
   ,"companionPage.vehicleAnchor.selected": "Anchor selected"
   ,"companionPage.vehicleAnchor.applied": "Joint applied now"

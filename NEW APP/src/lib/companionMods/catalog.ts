@@ -1129,7 +1129,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Vehicle Anchor",
     category: "fleet",
     descKey: "companions.desc.vehicleAnchor",
-    desc: "Shows saved anchor choices and whether the joint is currently applied on owned vehicles.",
+    desc: "Detects Vehicle Anchor. Its current switch and joint state do not record work, location or an incident.",
     relatedSection: "vehicles",
   },
   {

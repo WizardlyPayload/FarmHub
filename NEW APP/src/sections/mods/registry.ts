@@ -270,8 +270,6 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/mixerWagonFeedSwitcher").then((m) => m.Page) },
   { key: "chainsawConsumables", catalogId: "chainsawConsumables", title: "Chainsaw Consumables", glyph: "CS", group: "fleet",
     load: () => import("@/sections/mods/chainsawConsumables").then((m) => m.Page) },
-  { key: "vehicleAnchor", catalogId: "vehicleAnchor", title: "Vehicle Anchor", glyph: "VA", group: "fleet",
-    load: () => import("@/sections/mods/vehicleAnchor").then((m) => m.Page) },
   { key: "multipleSilageTypes", catalogId: "multipleSilageTypes", title: "Multiple Silage Types", glyph: "MS", group: "fleet",
     load: () => import("@/sections/mods/multipleSilageTypes").then((m) => m.Page) },
   { key: "handPlantSaplings", catalogId: "handPlantSaplings", title: "Hand Plant Saplings", glyph: "SP", group: "storage",

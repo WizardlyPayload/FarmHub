@@ -2137,3 +2137,14 @@ These four exact vault ZIPs were inspected by descriptor, declared Lua and repre
 - Large Pull Through Garage `placeables/KM_79409_dream-mix-large-pull-through-garage.zip` v2.7.0.0 SHA-256 `D5E29A0F4D89D6C026E10A3D45FCC2D00594655BE8F1240F048ECD8AF3AA0280` declares a workshop placeable. Its Lua synchronizes two native animated light-switch objects, door collision and color-dialog materials. These are presentation/interaction behaviours, not serviced-vehicle history or workshop income. A separate garage page would have no verified farming decision to support.
 
 No collector, page or disposable building fixture is warranted by this source review. Loaded-mod behaviour and native-data parity were not game-tested.
+
+## 2026-11-13 vehicle-control and traffic source checks
+
+Four more exact ZIPs were checked for a distinct owned-vehicle outcome before adding any fleet page:
+
+- Universal CVT `uncategorized/KM_82722_Universal_CVT.zip` v1.0.0.5 SHA-256 `8426E0D57E599C5A640E9D29BDD3E87571BA64DD0D780551132AD7C09DA408B6` adds a shop configuration and converts the selected motor to CVT when loaded. The selection is in native `vehicle.configurations["universalCVT"]`; the script stores no shift-use, efficiency or repair history. A separate fleet outcome cannot be inferred from selecting the option.
+- Manual Connection System `uncategorized/KM_82644_Manual_connection_system.zip` v2.0.0.0 SHA-256 `AA2C0F085CD95D0EEC9194C384978920188689F2D3393225D49372FF381F1EF1` creates live Interactive Control click points and hose/PTO connection visuals on attached equipment. The reviewed `onPostLoad` hook prepares controls from the current vehicle/attachment state; `MCSHoseEvent` streams an interaction, while the source has no separate farm-keyed hose-work ledger. A momentary connection is an in-game control, not a completed field-work reading.
+- Real Speed Limit `uncategorized/FS25_309726_Real_Speed_Limit.zip` v1.0.0.0 SHA-256 `6FDA013D300688703FDD05037AF8A6348EAFD58A212454265355BCD619DB432F` reads the base speed limit from vehicle XML, toggles a runtime specialization and sends the toggle by event. The reviewed code has no save hook or travel/work record; a dashboard speed history would be invented.
+- Traffic Density Control `objects/KM_79883_Traffic_Density_Control.zip` v1.0.1.0 SHA-256 `EA4929EB3EB818D31B39703CFB2750A35BB39F637BB4E4A0ED34DDD5DA0A0F0C` saves its target traffic-vehicle setting under profile-wide `modSettings`, changes the game's ambient traffic system and synchronizes admin settings. Ambient NPC traffic is not a farm-owned fleet, route or delivery result.
+
+These are source classifications, not runtime compatibility tests. No fleet page, building or vehicle fixture was added.

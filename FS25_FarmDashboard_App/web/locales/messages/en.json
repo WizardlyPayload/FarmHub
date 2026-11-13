@@ -5116,7 +5116,7 @@
   ,"companionPage.dynamicMolehills.partial": "Some mounds could not be matched to current farmland ownership."
   ,"companionPage.dynamicMolehills.noOwned": "No current mounds were found on this farm's land."
   ,"companionPage.dynamicMolehills.serverOnly": "Molehill states can be read only from the game's server state."
-  ,"companions.desc.resourceUsageControl": "Shows the current save-wide seed and spray usage policy. It does not measure a farm's actual supplies or cost."
+  ,"companions.desc.resourceUsageControl": "Detects Resource Usage Control. Seed and spray multipliers alone do not show supplies needed, used or spent."
   ,"companionPage.resourceUsageControl.lead": "These are live seed and spray usage settings shared by every farm in this save. They are not a record of supplies applied, money spent or crop yield."
   ,"companionPage.resourceUsageControl.individual": "Individual"
   ,"companionPage.resourceUsageControl.global": "Global"

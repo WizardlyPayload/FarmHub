@@ -346,8 +346,6 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/manualPaint").then((m) => m.Page) },
   { key: "dynamicMolehills", catalogId: "dynamicMolehills", title: "Dynamic Molehills", glyph: "MH", group: "fields",
     load: () => import("@/sections/mods/dynamicMolehills").then((m) => m.Page) },
-  { key: "resourceUsageControl", catalogId: "resourceUsageControl", title: "Resource Usage Control", glyph: "RU", group: "fields",
-    load: () => import("@/sections/mods/resourceUsageControl").then((m) => m.Page) },
   { key: "agroRealisticResale", catalogId: "agroRealisticResale", title: "Agro Realistic - land resale", glyph: "AR", group: "finance",
     load: () => import("@/sections/mods/agroRealisticResale").then((m) => m.Page) },
   { key: "agroRealisticHealthLoss", catalogId: "agroRealisticHealthLoss", title: "Agro Realistic - animal health timer", glyph: "AH", group: "livestock",

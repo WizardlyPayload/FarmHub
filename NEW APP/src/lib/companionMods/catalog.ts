@@ -296,7 +296,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Resource Usage Control",
     category: "fields",
     descKey: "companions.desc.resourceUsageControl",
-    desc: "Shows the current save-wide seed and spray usage policy. It does not measure a farm's actual supplies or cost.",
+    desc: "Detects Resource Usage Control. Seed and spray multipliers alone do not show supplies needed, used or spent.",
     relatedSection: "fields",
   },
   {

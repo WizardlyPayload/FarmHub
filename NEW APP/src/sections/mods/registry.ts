@@ -240,8 +240,6 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/cvtAddon").then((m) => m.Page) },
   { key: "tripComputer", catalogId: "tripComputer", title: "Trip Computer", glyph: "TC", group: "fleet",
     load: () => import("@/sections/mods/tripComputer").then((m) => m.Page) },
-  { key: "helperSilageCompacting", catalogId: "helperSilageCompacting", title: "Helper Silage Compacting", glyph: "HC", group: "fleet",
-    load: () => import("@/sections/mods/helperSilageCompacting").then((m) => m.Page) },
   { key: "fillLevelLimiter", catalogId: "fillLevelLimiter", title: "Fill Level Limiter", glyph: "FL", group: "fleet",
     load: () => import("@/sections/mods/fillLevelLimiter").then((m) => m.Page) },
   { key: "farmGateKeys", catalogId: "farmGateKeys", title: "Farm Gate Keys", glyph: "GK", group: "construction",

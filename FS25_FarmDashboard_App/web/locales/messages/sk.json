@@ -6610,7 +6610,7 @@
   ,"companionPage.lockSteeringAxles.no": "Unlocked"
   ,"companionPage.lockSteeringAxles.empty": "No owned compatible trailer has readable axle-lock state."
   ,"companionPage.lockSteeringAxles.partial": "Some trailer states were unavailable; totals are withheld."
-  ,"companions.desc.helperSilageCompacting": "Shows current bunker helper assignment and AI state on owned tractors."
+  ,"companions.desc.helperSilageCompacting": "Detects Helper Silage Compacting. Use the game's helper controls and native bunker progress for the farming decision."
   ,"companionPage.helperSilageCompacting.assigned": "Owned tractors at bunkers"
   ,"companionPage.helperSilageCompacting.running": "Helpers running"
   ,"companionPage.helperSilageCompacting.waiting": "Helpers waiting"

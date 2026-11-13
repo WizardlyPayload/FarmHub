@@ -1966,7 +1966,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
   {
     id: "helperSilageCompacting", title: "Helper Silage Compacting", category: "fleet",
     descKey: "companions.desc.helperSilageCompacting",
-    desc: "Shows assigned helper state on owned tractors, not completed compaction.",
+    desc: "Detects Helper Silage Compacting. Use the game's helper controls and native bunker progress for the farming decision.",
     relatedSection: "vehicles",
   },
 ];

@@ -2581,6 +2581,14 @@ No new collector, building, machine, save or PC UI change followed from this tri
 
 ### Vehicle Control Addon value correction (13 November)
 
+### Remaining unique score-one scripts (13 November)
+
+The [final 21 exact-archive evidence rows](2026-11-13-score1-remaining-evidence.tsv) record full ZIP SHA-256, descriptor version, Lua member names/fingerprints and a concise source role for each remaining score-one archive name absent from the audit. These include equipment appearance/configuration scripts, shop preview fixes, lighting and vehicle input/animation helpers. The most operational-looking members were checked separately: Dakota's tree-count helper raises an engine limit rather than counting this farm's harvested trees; Cat's pipe/attachment hook changes action behavior; Landsberg changes lowering behavior; Komatsu validates configuration subsets; the Dodge package alters burnout/transmission presentation; Kirovets bridges interactive controls. None of the inspected scripts establishes a separate owned-farm work, stock, expenditure or maintenance record. For prefab and nested content, archive presence does not establish that the script runs as a root mod. No page, installed behavior or gameplay pass is inferred from this queue hygiene work.
+
+The current R4 name queue now has zero **absent score-one-or-higher archive names** after accounting for the audit prose and linked exact-archive TSVs. This is a coverage check against 1,575 scanner-eligible paths, not a claim that all 1,803 Lua-bearing vault ZIPs, all duplicate versions, every low-score script or all installed combinations are fully source-reviewed or accepted. The scanner remains a triage aid; genuine farm-scoped leads and existing page value gates still require their own evidence.
+
+### Vehicle Control Addon value correction (13 November)
+
 ### Reused score-one Lua groups (13 November)
 
 The [27 exact-archive evidence rows](2026-11-13-score1-shared-script-evidence.tsv) record each ZIP path, version, full SHA-256, Lua member names/fingerprints and reviewed role. All 27 full ZIP hashes differ; shared Lua bytes are source reuse, **not** duplicate packages. The groups are nine helicopter input/flight-control packages (including a different Mil-8 script variant), five delimber action/animation packages, four random map-message packages, four crawler track-animation packages, three beacon-priority/light packages and two ZIPs with a nested shop-category helper. Their inspected Lua handles controls, presentation, animation or category registration. It supplies no distinct saved farm-owned flight/work/timber/earthwork/stock record to justify a FarmHub page. Some helper files are nested or prefab content; a Lua member's presence in a ZIP alone does not prove it loads in the root mod. No game behavior or installed acceptance is claimed. This source check reduces the score-one name queue without treating a scanner score or shared script name as feature proof.

@@ -6566,7 +6566,7 @@
   ,"companionPage.realisticBrakes.park": "Parking brake"
   ,"companionPage.realisticBrakes.empty": "No owned vehicle has readable Realistic Brakes state."
   ,"companionPage.realisticBrakes.partial": "Some brake states were unavailable; totals are withheld."
-  ,"companions.desc.toggleableSilageAdditive": "Shows the current silage-additive switch on owned supported equipment."
+  ,"companions.desc.toggleableSilageAdditive": "Detected only. Check additive control in game; its current switch does not show additive used or work done."
   ,"companionPage.toggleableSilageAdditive.supported": "Owned equipment with additive control"
   ,"companionPage.toggleableSilageAdditive.disabled": "Additive usage switched off"
   ,"companionPage.toggleableSilageAdditive.on": "On"

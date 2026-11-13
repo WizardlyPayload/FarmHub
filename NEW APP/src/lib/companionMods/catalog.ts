@@ -1931,7 +1931,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
   {
     id: "toggleableSilageAdditive", title: "Toggleable Silage Additive", category: "fleet",
     descKey: "companions.desc.toggleableSilageAdditive",
-    desc: "Shows the additive switch on owned equipment, not additive consumed or crop worked.",
+    desc: "Detected only. Check additive control in game; its current switch does not show additive used or work done.",
     relatedSection: "vehicles",
   },
   {

@@ -2399,3 +2399,33 @@ The current full scan has 28 archive paths with a create/save/raw-write signal w
 - AutoFOV `uncategorized/FS25_342571_AutoFOV.zip` v1.0.0.0 SHA-256 `703042C295D0B13DA8A5CAF03E440B616B5DBED320B659D4C63D1E526E6A2403` writes field-of-view settings to profile `modSettings/FS25_AutoFOV.xml`. This is a camera preference, not farm state. No page.
 
 These are exact-source classifications. No game run, fixture or save edit was made for them.
+
+### More low-score profile writers
+
+- Custom Farm Logo `uncategorized/FS25_361530_Custom_Farm_Logo.zip` v1.0.0.0 SHA-256 `AFA105B3842D4E52E5CA6B8211C24522D773739FD89531BE600CC8E294F775EF` creates profile `modSettings` logo configuration and writes a README. This is presentation setup, not a saved farm output or cost. No page.
+- Live Visual Tuner `uncategorized/KM_82576_Live_Visual_Tuner.zip` is byte-identical to the reviewed gameplay ZIP, v1.0.0.0 SHA-256 `36DE015FEF45980701B716F673DE67AA28672B1BE39B9C2E983F312883D373F1`. Its additional profile preset file remains a visual preference. Count one package, no page.
+- FastNight `uncategorized/FS25_306236_FastNight.zip` v1.0.0.0 SHA-256 `B627FDE58E74380B2F3A32C6FE82218FFD27B617439796AE7315CF0DDDD63B1F` saves fast-night preferences to profile `modSettings`; no farm work or production record appears in that writer. No page.
+- EBC2 Server Messages `uncategorized/FS25_343316_EBC2_Server_Messages.zip` v1.0.0.0 SHA-256 `AF6A1AF0586973C7A011BDDB1CD88C5D0C3B6764E29B3DF46AD0F72934D0CCDA` writes broadcaster settings under profile `modSettings/FS25_EBC2/`. It does not persist a farm operation in that path. No page.
+- No AI Traffic Collision `uncategorized/FS25_352720_No_AI_Traffic_Collision.zip` v1.0.0.0 SHA-256 `3FB8562BE574ECEF17C0D7ACD63CFA7A92451EB6A75FE486E993BA17A5FBC96E` writes traffic-collision preferences to profile settings. It records no collision, expense or work result in the reviewed writer. No page.
+- Field Gulls `uncategorized/FS25_355664_Field_Gulls.zip` v1.0.0.1 SHA-256 `4014780F17656E49E34C285CB0EC4993BD519615266F8032F23BE7967B9C3A72` writes bird-visual settings under profile `modSettings/FieldGulls.xml`. It is not a yield-loss or bird-control ledger. No page.
+- Steering Lock `uncategorized/FS25_359554_Steering_Lock.zip` v1.0.0.0 SHA-256 `87C5D429D402BE7533551C2E260372148D9578C1E764125E6CE9484E77EA2BB4` saves HUD x/y placement under profile `modSettings/FS25_SteeringLock/settings.xml`. That writer is not a steering-use or transport-safety history. No page.
+- Shop Sounds `gameplay/FS25_365222_FS25_ShopSounds.zip` and `uncategorized/KM_79799_Shop_Sounds.zip` are byte-identical v1.1.0.0 SHA-256 `E0B82DE42341FF3D7AF924CA2E1072C268A0B458D94F25BE48E101EAA3A8ACF8`. Its writer uses profile `modSettings/FS25_ShopSounds.xml` for sound preferences. Count one package, no farm page.
+- SmartLights `uncategorized/FS25_367885_SmartLights.zip` v1.0.0.0 SHA-256 `8AC9D87E1E1037239D72F6C401ED099F181BDFA2F45C5C140B3F191768719F30` writes lighting control settings to profile `modSettings/SmartLights.xml`. The writer is not an energy-cost or building-work ledger. No page.
+
+These exact source paths were checked without a game run or any farm fixture.
+
+### Remaining low-score profile and utility writers
+
+- Silage Additive Alarm `objects/KM_81953_Silage_Additive_Alarm.zip` v1.0.0.0 SHA-256 `18E62B51EA406A9E2B89C17FE9560104F509BBB86890F4F1B2ACDB9668719550` saves alarm threshold and type in profile `modSettings`; it does not save additive consumed, crop treated or an alarm history. The immediate alarm is the useful in-game surface. No page.
+- 3D Attitude Compass `objects/KM_82085_3d-attitude-compass.zip` v1.0.40 SHA-256 `6F1BA3A99AA66BC12835C9456E16977E33B5D2648FCCA5D0DAB8838E0C9C307B` saves compass display settings to profile `modSettings`. It does not keep a slope incident or vehicle work record. No page.
+- RealisticJoystickDriving `uncategorized/KM_82692_Realistic_Joystick_Driving.zip` v1.0.4.0 SHA-256 `CAF9D8F370BBE512EC0733A5D3B210498FACC52503D3B4B11CA01925BC868EB8` stores controller preferences in profile XML. No farm result is saved there. No page.
+- Player Movement `uncategorized/FS25_303901_Player_Movement.zip` v1.0.0.0 SHA-256 `0310BCF20E1C8369823F00060D0545F0FE07A3E3BB339919DB5370EB0828C247` stores movement settings in profile `modSettings/PlayerMovement.xml`. No farm reading. No page.
+- Heap Preview `uncategorized/FS25_307812_Heap_Preview.zip` v1.0.0.0 SHA-256 `011B010A60757870396DC915921744C57B7904C8338C295D771FA78E6EFDF379` stores preview settings under profile `modSettings/FS25_HeapPreview/`; its heap quantity is drawn from native live data, not a separate saved farm ledger. No mod-specific page.
+- VG Broadcast `uncategorized/FS25_324583_VG_Broadcast.zip` v1.0.0.1 SHA-256 `2535EE2A1D2FABC0CEBAE08039E4A7AB4906D2C507C75B49FA89398F442E40E3` reads one message from profile `modSettings/vg_broadcast.xml`, clears it and broadcasts chat/console content. The `getFarmId()` argument identifies the chat sender; this is no farm production or communication history. No page.
+- Critters `uncategorized/FS25_339103_Critters.zip` v1.0.0.0 SHA-256 `B46F72A08CDCDA1C9D7F6FCE40331778726C47227BA88FE9EE6A9D3CF33E1DFE` writes profile `modSettings/critters.xml` settings. No pest-damage or treatment ledger was found in that writer. No page.
+- Input Binding Backup `uncategorized/FS25_359065_Input_Binding_Backup.zip` v1.0.0.0 SHA-256 `ADAF60E9FEB37B07B1242014EF8EB1A281E0542497E416B2FE43FF188542918F` writes an input-binding backup manifest. It helps restore controls, not manage a farm's assets or output. No farm page.
+- Field Detail Hud Infos `uncategorized/FS25_362684_Field_Detail_Hud_Infos.zip` v1.1.0.0 SHA-256 `414231FB9A8AFC1AFEA13BF73F242EE2D93C2CCCAFDDE87277724D1850BB9102` saves profile display choices in `FS25_FieldDetailInfos.xml` and reads native field facts for its HUD. The writer adds no distinct field work record. No mod-specific page.
+- Bigger Paint Brush `objects/KM_81188_Bigger_Paint_Brush.zip` v1.2.0.0 SHA-256 `4AB9557AF6B768376014E62E5AC7BE105B9D9986FFC9475B9A2E54AD168F27AE` saves a brush preference in profile `modSettings`; it does not record painted area or material cost. No page.
+- Draw Distance `objects/KM_82195_Draw_Distance.zip` v1.0.0.0 SHA-256 `6B31AFCB76CB1F88CE021C2C79DAA62CED2F1B9EB1FA72E9F08CB1500BBA865E` writes draw-distance settings under profile `modSettings`. No farm result. No page.
+
+All 28 previously unmentioned create/save/raw-write leads are now named and classified by their exact ZIP paths in this audit. That closes this specific low-score writer queue, not the broader capability audit, installed compatibility or gameplay acceptance. No building, field, equipment or save was changed for this review.

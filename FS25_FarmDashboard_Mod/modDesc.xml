@@ -184,6 +184,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/ProductionsManagerCollector.lua"/>
         <sourceFile filename="src/companionPages/PalletDegradationCollector.lua"/>
         <sourceFile filename="src/companionPages/RealSiloCollector.lua"/>
+        <sourceFile filename="src/companionPages/HarvestoreConveyorCollector.lua"/>
         <sourceFile filename="src/companionPages/MobileButcherMeatPickupCollector.lua"/>
         <sourceFile filename="src/companionPages/EverythingConstructableCollector.lua"/>
         <sourceFile filename="src/companionPages/FactoryProfitCalculatorCollector.lua"/>

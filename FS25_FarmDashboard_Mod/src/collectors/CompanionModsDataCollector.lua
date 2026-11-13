@@ -641,6 +641,13 @@ local CATALOG = {
         globals = { "realSiloManager" },
     },
     {
+        id = "harvestoreConveyor",
+        title = "Harvestore Conveyor",
+        category = "storage",
+        names = { "KM_83595_Harvestore_Silo_Pack" },
+        globals = {},
+    },
+    {
         id = "mobileButcherMeatPickup",
         title = "Mobile Butcher Meat Pickup",
         category = "storage",

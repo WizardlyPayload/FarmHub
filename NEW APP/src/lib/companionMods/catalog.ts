@@ -202,6 +202,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "storage",
   },
   {
+    id: "lumberjackHut",
+    title: "Lumberjack Hut",
+    category: "storage",
+    descKey: "companions.desc.lumberjackHut",
+    desc: "Shows wood waiting to be matched to standing trees and the current cycle state at this farm's owned huts. It does not record delivered wood or sales.",
+    relatedSection: "storage",
+  },
+  {
     id: "enhancedSeasonalPrices",
     title: "Enhanced Seasonal Prices",
     category: "economy",
@@ -1884,6 +1892,66 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     descKey: "companions.desc.productionAdvisorAlerts",
     desc: "Shows this farm's configured product-value alerts and currently owned-field sowing reminders. It does not report sales or completed sowing.",
     relatedSection: "storage",
+  },
+  {
+    id: "buyUsedEquipment", title: "Buy Used Equipment", category: "economy",
+    descKey: "companions.desc.buyUsedEquipment",
+    desc: "Shows this farm's pending used-equipment broker searches, not purchases or guaranteed offers.",
+    relatedSection: "economy",
+  },
+  {
+    id: "harvestoreConveyor", title: "Harvestore Conveyor", category: "storage",
+    descKey: "companions.desc.harvestoreConveyor",
+    desc: "Shows material queued in this farm's conveyors, awaiting transfer to a receiving vehicle.",
+    relatedSection: "storage",
+  },
+  {
+    id: "hudPlus", title: "HUD+", category: "fleet",
+    descKey: "companions.desc.hudPlus",
+    desc: "Shows HUD+ distance and trip counters on owned vehicles; trip fuel is not a purchase or expense.",
+    relatedSection: "vehicles",
+  },
+  {
+    id: "realisticBrakes", title: "Realistic Brakes", category: "fleet",
+    descKey: "companions.desc.realisticBrakes",
+    desc: "Shows current brake condition on owned vehicles, separate from base-game vehicle damage.",
+    relatedSection: "vehicles",
+  },
+  {
+    id: "hydraulicBrokenTrailer", title: "Hydraulic Broken Trailer", category: "fleet",
+    descKey: "companions.desc.hydraulicBrokenTrailer",
+    desc: "Shows current hydraulic condition on owned tipping trailers, not repair or tipping history.",
+    relatedSection: "vehicles",
+  },
+  {
+    id: "parkingBrake", title: "Parking Brake", category: "fleet",
+    descKey: "companions.desc.parkingBrake",
+    desc: "Shows the mod's current parking-brake state on owned vehicles, not proof of safe parking.",
+    relatedSection: "vehicles",
+  },
+  {
+    id: "toggleableSilageAdditive", title: "Toggleable Silage Additive", category: "fleet",
+    descKey: "companions.desc.toggleableSilageAdditive",
+    desc: "Shows the additive switch on owned equipment, not additive consumed or crop worked.",
+    relatedSection: "vehicles",
+  },
+  {
+    id: "buyableGps", title: "Buyable GPS", category: "fleet",
+    descKey: "companions.desc.buyableGps",
+    desc: "Shows purchased GPS configuration on owned vehicles, not steering use or field coverage.",
+    relatedSection: "vehicles",
+  },
+  {
+    id: "lockSteeringAxles", title: "Lock Steering Axle", category: "fleet",
+    descKey: "companions.desc.lockSteeringAxles",
+    desc: "Shows the steering-axle lock setting on compatible owned trailers.",
+    relatedSection: "vehicles",
+  },
+  {
+    id: "helperSilageCompacting", title: "Helper Silage Compacting", category: "fleet",
+    descKey: "companions.desc.helperSilageCompacting",
+    desc: "Shows assigned helper state on owned tractors, not completed compaction.",
+    relatedSection: "vehicles",
   },
 ];
 

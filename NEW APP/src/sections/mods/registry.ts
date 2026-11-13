@@ -25,6 +25,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/marketPriceHelper").then((m) => m.Page) },
   { key: "woodManager", catalogId: "woodManager", title: "Wood Manager", glyph: "WM", group: "storage",
     load: () => import("@/sections/mods/woodManager").then((m) => m.Page) },
+  { key: "lumberjackHut", catalogId: "lumberjackHut", title: "Lumberjack Hut", glyph: "LH", group: "storage",
+    load: () => import("@/sections/mods/lumberjackHut").then((m) => m.Page) },
   { key: "fluctuatingDieselPrice", catalogId: "fluctuatingDieselPrice", title: "Fluctuating Diesel Price", glyph: "FD", group: "finance",
     load: () => import("@/sections/mods/fluctuatingDieselPrice").then((m) => m.Page) },
   { key: "dynamicMarket", catalogId: "dynamicMarket", title: "Dynamic Market", glyph: "DM", group: "finance",

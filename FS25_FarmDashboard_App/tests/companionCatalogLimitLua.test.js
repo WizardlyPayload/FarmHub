@@ -50,6 +50,11 @@ test.each([
     ["KM_82643_Hydraulic_Suspension_System", "hydraulicSuspension"],
     ["KM_79619_realistic-diesel-start", "realDieselStart"],
     ["KM_80712_Universal_Two-Rotor_Rake_Control", "twoRotorRakeControl"],
+    ["FS25_347200_Wood_Manager", "woodManager"],
+    ["KM_83343_Lumberjack_Hut", "lumberjackHut"],
+    ["FS25_366544_Grape_And_Olive_Yield_Settings", "grapeOliveYieldSettings"],
+    ["KM_83605_Real_Power_Train", "realPowertrain"],
+    ["FS25_318102_Towing_Chain_With_Hook", "towingChainHook"],
 ])("%s has a detector for its dedicated page", (modName, expectedId) => {
     const L = lauxlib.luaL_newstate();
     lualib.luaL_openlibs(L);

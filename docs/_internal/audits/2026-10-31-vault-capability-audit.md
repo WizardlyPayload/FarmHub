@@ -2148,3 +2148,10 @@ Four more exact ZIPs were checked for a distinct owned-vehicle outcome before ad
 - Traffic Density Control `objects/KM_79883_Traffic_Density_Control.zip` v1.0.1.0 SHA-256 `EA4929EB3EB818D31B39703CFB2750A35BB39F637BB4E4A0ED34DDD5DA0A0F0C` saves its target traffic-vehicle setting under profile-wide `modSettings`, changes the game's ambient traffic system and synchronizes admin settings. Ambient NPC traffic is not a farm-owned fleet, route or delivery result.
 
 These are source classifications, not runtime compatibility tests. No fleet page, building or vehicle fixture was added.
+
+## 2026-11-13 duplicate control archives
+
+- `uncategorized/KM_82830_PTO_Load_System.zip` is byte-identical (SHA-256 `4AAEFA588D11BD2817E491F3FAF366A20C8DF534FB0F722D740931EDD44E64FF`, v1.0.0.0) to the previously source-reviewed `gameplay/FS25_372063_PTO_Load_System.zip`. Its local/HUD requested-power model remains a transient estimate, not a second farm-work ledger or another integration.
+- `uncategorized/KM_82614_Manual_Machine_Hydraulics_Control.zip` is byte-identical (SHA-256 `C39B911615DB0D5E7E1F64F784BD51E74CDE5B0D209892CF147C340C461DE2EC`, v1.0.0.0) to the previously source-reviewed `gameplay/FS25_374138_Manual_Machine_Hydraulics_Control.zip`. Profile options and live linkage/fold controls do not become two farm histories because the ZIP has two vault paths.
+
+Hashes prove duplicate archive bytes for each pair; they do not prove game compatibility or a completed PTO/hydraulic action.

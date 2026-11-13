@@ -11,7 +11,10 @@ const LIVE = `
   } end }
   _G.g_client = {}
   _G.g_server = {}
-  _G.g_currentMission = { missionDynamicInfo = { isMultiplayer = false } }
+  _G.g_currentMission = {
+    missionDynamicInfo = { isMultiplayer = false },
+    missionInfo = { savegameDirectory = "savegame20" }
+  }
   _G.FS25_362332_Market_Price_Helper = {
     g_priceTicker = {
       mission = _G.g_currentMission, isClient = true,
@@ -49,6 +52,7 @@ test("withholds remote, missing, unreviewed and foreign-mission histories", () =
     [LIVE.replace("_G.g_server = {}", "_G.g_server = nil"), "local-single-player-only"],
     [LIVE.replace("version = \"1.0.0.1\"", "version = \"2.0.0.0\""), "unreviewed-version"],
     [LIVE.replace("mission = _G.g_currentMission", "mission = {}"), "local-history-unavailable"],
+    [LIVE.replace('savegameDirectory = "savegame20"', 'savegameDirectory = ""'), "save-identity-unavailable"],
   ];
   for (const [source, reason] of cases) {
     expect(runCompanionPage(FILE, source, { farmId: 1 })).toMatchObject({ readState: "settings-only", reason, scope: "save-wide" });

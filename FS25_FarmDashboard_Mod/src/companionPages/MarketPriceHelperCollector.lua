@@ -16,6 +16,11 @@ CompanionPages.register({
         if ctx.isMultiplayer or ctx.global("g_client") == nil or ctx.global("g_server") == nil then
             return { readState = "settings-only", reason = "local-single-player-only", scope = scope }
         end
+        local info = type(ctx.mission) == "table" and ctx.mission.missionInfo or nil
+        if type(info) ~= "table" or type(info.savegameDirectory) ~= "string"
+            or info.savegameDirectory == "" then
+            return { readState = "settings-only", reason = "save-identity-unavailable", scope = scope }
+        end
         local ticker = ctx.symbol("g_priceTicker")
         if type(ticker) ~= "table" or ticker.mission ~= ctx.mission or ticker.isClient ~= true
             or type(ticker.history) ~= "table" then

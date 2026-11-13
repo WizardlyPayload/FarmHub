@@ -4,6 +4,7 @@ import { Badge, Button, Card } from "@/components/ui";
 import { tOr } from "@/i18n/i18n";
 import { catalogEntry } from "@/lib/companionMods/catalog";
 import { formatCurrency } from "@/lib/economy";
+import { formatFetchedAt, readFreshness } from "@/lib/ux-freshness";
 import { useUnitDisplay } from "@/lib/fill-unit-mode";
 import { formatProfileUnitPrice, saveProfileFromUnitDisplay } from "@/lib/profile-display";
 import { useDashboardStore } from "@/store/dashboard-store";
@@ -213,6 +214,9 @@ export function ModPage({
   const state = readingState(page, mod);
   const version = page?.version ?? mod?.version ?? null;
   const notice = stateNotice(state, page, entry.key);
+  const sourceAt = readFreshness(dash).sourceAt;
+  const receivedAt = formatFetchedAt(sourceAt,
+    typeof navigator === "undefined" ? "en-GB" : navigator.language);
   return (
     <div class="fd-economy fd-mod-page" data-mod-page={entry.key}>
       <header class="fd-section-header fd-mod-page__header">
@@ -222,6 +226,9 @@ export function ModPage({
           {stateBadge(state, live)}
         </div>
         {lead ? <p class="fd-muted-sm">{lead}</p> : null}
+        {page && receivedAt ? <p class="fd-muted-sm">
+          {tOr("companionPage.shared.receivedAt", "Dashboard received game data: {{time}}", { time: receivedAt })}
+        </p> : null}
       </header>
       {state === "missing" ? (
         <div class="fd-economy__empty">

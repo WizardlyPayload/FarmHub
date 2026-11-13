@@ -2356,3 +2356,7 @@ Exact low-scored write hits were checked against source and the farmer's decisio
 - Player Last Position `uncategorized/FS25_354067_Player_Last_Position.zip` v1.1.0.0 SHA-256 `37F823BFE172B192277694C0FFCAB3BCFBCC8AF085C2D7D6794260B98360617E` saves player coordinates, yaw and vehicle ID to profile `modSettings/FS25_PlayerLastPosition/`. That supports resume positioning, without a separate farm action a dashboard reading would enable. No new page.
 
 The remaining promoted paths still require source classification before any integration claim. A new collector must identify a real, farm-scoped state and an action it helps the farmer take; a mod setting or an artificially placed building does not satisfy that gate. This pass added no collector, page, equipment or building.
+
+### Seeder roller switch value correction
+
+The earlier Sowing Machine Roller Ready reader reported only `allowRollerSowingMachine`, a switch already controlled in the game. V52 supplied partial export rows for two owned machines, but no in-game switch action, rolled area, yield effect or installed-page agreement. Under the same value gate used for Toggleable Silage Additive, the current source candidate removes the dedicated collector and page and retains mod detection only. The catalog now directs the player to the in-game switch. This does not erase the historical V52 export evidence or establish any roller-work result. No seeder was bought or operated for this correction.

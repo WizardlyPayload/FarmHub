@@ -5000,7 +5000,7 @@
   ,"companionPage.udderToTank.serverOnly": "Udder records can be read only from the game's server state."
   ,"companionPage.udderToTank.registerUnavailable": "The Udder to Tank animal records are unavailable in this game session."
   ,"companionPage.udderToTank.pensUnavailable": "The game's animal pens are unavailable in this reading."
-  ,"companions.desc.sowingMachineRollerReady": "Shows whether the roller switch is on for eligible seeders owned by this farm. It does not record field work or yield."
+  ,"companions.desc.sowingMachineRollerReady": "Detected only. Check the roller switch in game; it does not show area rolled or yield gained."
   ,"companionPage.sowingMachineRollerReady.title": "Sowing Machine Roller Ready"
   ,"companionPage.sowingMachineRollerReady.lead": "Current roller switch on eligible seeders owned by this farm. A switch set to On does not prove any field was rolled or yield gained."
   ,"companionPage.sowingMachineRollerReady.eligible": "Eligible owned seeders"

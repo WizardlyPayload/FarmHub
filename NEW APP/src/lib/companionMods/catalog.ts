@@ -1264,7 +1264,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Sowing Machine Roller Ready",
     category: "fleet",
     descKey: "companions.desc.sowingMachineRollerReady",
-    desc: "Shows whether the roller switch is on for eligible seeders owned by this farm. It does not record field work or yield.",
+    desc: "Detected only. Check the roller switch in game; it does not show area rolled or yield gained.",
     relatedSection: "vehicles",
   },
   {

@@ -346,8 +346,6 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/handTools").then((m) => m.Page) },
   { key: "advancedVehicleFunctions", catalogId: "advancedVehicleFunctions", title: "Advanced Vehicle Functions", glyph: "AV", group: "fleet",
     load: () => import("@/sections/mods/advancedVehicleFunctions").then((m) => m.Page) },
-  { key: "sowingMachineRollerReady", catalogId: "sowingMachineRollerReady", title: "Sowing Machine Roller Ready", glyph: "SR", group: "fleet",
-    load: () => import("@/sections/mods/sowingMachineRollerReady").then((m) => m.Page) },
   { key: "advancedSeedingControl", catalogId: "advancedSeedingControl", title: "Advanced Seeding Control", glyph: "AC", group: "fleet",
     load: () => import("@/sections/mods/advancedSeedingControl").then((m) => m.Page) },
   { key: "flexibleCombiSeeder", catalogId: "flexibleCombiSeeder", title: "Flexible Combi Seeder", glyph: "FC", group: "fleet",

@@ -1,4 +1,4 @@
-"""List vault Lua-signal leads whose exact archive name is absent from the audit.
+"""List vault Lua-signal leads absent from the audit and linked TSV registers.
 
 This is a queue hygiene check. A name mentioned in the audit is not proof that
 its source was fully reviewed, integrated, or accepted in game.
@@ -6,7 +6,9 @@ Grouping by title and version is only a triage aid, never duplicate-byte proof.
 """
 
 import argparse
+import csv
 import json
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -28,12 +30,26 @@ def main() -> None:
         raise ValueError("Expected a JSON list of archive rows")
     audit = args.audit.read_text(encoding="utf-8")
     audit_folded = audit.casefold()
+    evidence_names = set()
+    evidence_files = []
+    audit_dir = args.audit.parent.resolve()
+    for link in re.findall(r"\]\(([^)#]+\.tsv)\)", audit, flags=re.IGNORECASE):
+        evidence_path = (audit_dir / link).resolve()
+        if not evidence_path.is_relative_to(audit_dir):
+            raise ValueError(f"Linked evidence path escapes audit directory: {link}")
+        with evidence_path.open(encoding="utf-8-sig", newline="") as handle:
+            reader = csv.DictReader(handle, delimiter="\t")
+            if reader.fieldnames is None or "archive" not in reader.fieldnames:
+                raise ValueError(f"Linked evidence has no archive column: {link}")
+            evidence_names.update(row["archive"] for row in reader if row.get("archive"))
+        evidence_files.append(link)
 
     eligible = [row for row in rows if isinstance(row, dict)
                 and isinstance(row.get("archive"), str)
                 and isinstance(row.get("triageScore"), int)
                 and row["triageScore"] >= args.min_score]
-    unmentioned = [row for row in eligible if row["archive"] not in audit]
+    unmentioned = [row for row in eligible
+                   if row["archive"] not in audit and row["archive"] not in evidence_names]
     by_score = Counter(row["triageScore"] for row in unmentioned)
     groups = {}
     if args.group:
@@ -46,8 +62,10 @@ def main() -> None:
         "minScore": args.min_score,
         "eligible": len(eligible),
         "exactArchiveNameAbsent": len(unmentioned),
+        "linkedEvidenceFiles": evidence_files,
+        "linkedEvidenceArchiveNames": len(evidence_names),
         "absentByScore": dict(sorted(by_score.items(), reverse=True)),
-        "meaning": "Mention check only; neither mention nor absence establishes source review or missing integration",
+        "meaning": "Name check only; prose and linked evidence rows do not establish complete source review or missing integration",
     }
     if args.group:
         summary["titleVersionGroups"] = len(groups)

@@ -1008,7 +1008,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Hydraulic Suspension System",
     category: "fleet",
     descKey: "companions.desc.hydraulicSuspension",
-    desc: "Shows the current suspension mode and requested manual offset for farm-owned vehicles with this system enabled. It does not measure axle movement.",
+    desc: "Detected only. Set suspension mode in game; its requested height is not a reading of work done or equipment condition.",
     relatedSection: "vehicles",
   },
   {
@@ -1024,7 +1024,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Universal Two-Rotor Rake Control",
     category: "fleet",
     descKey: "companions.desc.twoRotorRakeControl",
-    desc: "Shows the left and right rotor targets on your rakes while independent control is active.",
+    desc: "Detected only. Set rotor targets in game; those controls do not measure raked area or crop collected.",
     relatedSection: "vehicles",
   },
   {

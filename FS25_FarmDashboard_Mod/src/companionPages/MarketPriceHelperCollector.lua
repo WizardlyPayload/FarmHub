@@ -6,7 +6,7 @@ local MAX_SAMPLES = 320
 
 CompanionPages.register({
     key = "marketPriceHelper",
-    modNames = { "FS25_362332_Market_Price_Helper", "KM_79555_Market_Price_Helper" },
+    modNames = { "FS25_362332_Market_Price_Helper", "KM_79555_Market_Price_Helper", "FS25_PriceTicker" },
     substrings = { "market_price_helper" },
     collect = function(ctx)
         local scope = "save-wide"

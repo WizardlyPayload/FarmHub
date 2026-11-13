@@ -54,3 +54,10 @@ test("withholds remote, missing, unreviewed and foreign-mission histories", () =
     expect(runCompanionPage(FILE, source, { farmId: 1 })).toMatchObject({ readState: "settings-only", reason, scope: "save-wide" });
   }
 });
+
+test("recognizes an FS25_PriceTicker staging alias of the reviewed bytes", () => {
+  const source = LIVE.replaceAll("FS25_362332_Market_Price_Helper", "FS25_PriceTicker");
+  expect(runCompanionPage(FILE, source, { farmId: 1 })).toMatchObject({
+    readState: "ok", fillTypeCount: 2, modName: "FS25_PriceTicker",
+  });
+});

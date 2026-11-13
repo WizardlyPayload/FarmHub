@@ -336,6 +336,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/realisticSeeder").then((m) => m.Page) },
   { key: "manualAttach", catalogId: "manualAttach", title: "Manual Attach", glyph: "MA", group: "fleet",
     load: () => import("@/sections/mods/manualAttach").then((m) => m.Page) },
+  { key: "towingChainHook", catalogId: "towingChainHook", title: "Towing Chain With Hook", glyph: "TC", group: "fleet",
+    load: () => import("@/sections/mods/towingChainHook").then((m) => m.Page) },
   { key: "vehicleControlAddon", catalogId: "vehicleControlAddon", title: "Vehicle Control Addon", glyph: "VC", group: "fleet",
     load: () => import("@/sections/mods/vehicleControlAddon").then((m) => m.Page) },
   { key: "universalAutoload", catalogId: "universalAutoload", title: "Universal Autoload", glyph: "UA", group: "fleet",

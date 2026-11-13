@@ -272,6 +272,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/AdjustableFillLevelAdvancedCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticSeederCollector.lua"/>
         <sourceFile filename="src/companionPages/ManualAttachCollector.lua"/>
+        <sourceFile filename="src/companionPages/TowingChainHookCollector.lua"/>
         <sourceFile filename="src/companionPages/VehicleControlAddonCollector.lua"/>
         <sourceFile filename="src/companionPages/UniversalAutoloadCollector.lua"/>
         <sourceFile filename="src/companionPages/AdvancedVehicleFunctionsCollector.lua"/>

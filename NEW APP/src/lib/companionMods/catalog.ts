@@ -1742,6 +1742,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "towingChainHook",
+    title: "Towing Chain With Hook",
+    category: "fleet",
+    descKey: "companions.desc.towingChainHook",
+    desc: "Shows current towing-chain links between vehicles owned by this farm. It does not measure towing work or recovery income.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "organicDemand",
     title: "Demand-Oriented Organic Application",
     category: "fields",

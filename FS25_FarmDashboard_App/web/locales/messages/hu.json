@@ -5663,7 +5663,7 @@
   ,"companionPage.woodChipsMissions.empty": "No running wood-chip mission is assigned to this farm."
   ,"companionPage.woodChipsMissions.partial": "A running mission had unreadable progress and was withheld."
   ,"companionPage.woodChipsMissions.truncated": "Only part of the mission list is shown."
-  ,"companions.desc.greenhouseAutomaticWatering": "Shows the automatic-watering switch on this farm's water-using production buildings. It does not measure water added or costs charged."
+  ,"companions.desc.greenhouseAutomaticWatering": "Detected only. Check watering control in game; the switch does not show water added or charges paid."
   ,"companionPage.greenhouseAutomaticWatering.lead": "The automatic-watering switch on this farm's water-using production buildings. This setting does not prove that water was added or money charged."
   ,"companionPage.greenhouseAutomaticWatering.eligible": "Owned water-using productions"
   ,"companionPage.greenhouseAutomaticWatering.enabled": "Auto watering on"

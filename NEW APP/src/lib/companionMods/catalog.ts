@@ -486,7 +486,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Greenhouse Automatic Watering",
     category: "production",
     descKey: "companions.desc.greenhouseAutomaticWatering",
-    desc: "Shows the automatic-watering switch on this farm's water-using production buildings. It does not measure water added or costs charged.",
+    desc: "Detected only. Check watering control in game; the switch does not show water added or charges paid.",
     relatedSection: "productions",
   },
   {

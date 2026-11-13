@@ -16,8 +16,8 @@ import zipfile
 from pathlib import Path
 
 
-MAX_LUA_FILES = 256
-MAX_SCRIPT_BYTES = 2_000_000
+MAX_LUA_FILES = 512
+MAX_SCRIPT_BYTES = 4_000_000
 SIGNALS = {
     "savegamePath": re.compile(rb"savegameDirectory|savegameFolderPath|savegameDirectoryName", re.I),
     "xmlPersistence": re.compile(rb"saveToXML|loadFromXML|registerXMLPaths|XMLFile\.(?:create|load)", re.I),

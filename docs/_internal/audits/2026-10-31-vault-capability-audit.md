@@ -2381,3 +2381,7 @@ These exact-version findings are source classification, not installed compatibil
 - Hide Help Texts `uncategorized/FS25_344217_Hide_Help_Texts.zip` v1.0.0.0 SHA-256 `11B22FC2300F10211E2AE58E94C3B1675CC54442DAED34AA1393640D4BBA7EF7` writes hidden help-text identifiers and labels under `g_modSettingsDirectory`. This is interface preference state. No page.
 
 These classifications are for the exact ZIP versions and inspected writer paths. They do not establish runtime compatibility or all behaviour; no player save, map or building was edited.
+
+### Full Lua-member coverage check
+
+The R3 signal pass capped each archive at 256 Lua members and each script at 2 MB, leaving CoursePlay's last 15 Lua files and one large member in each of two Fields of Stories and two Manual Paint ZIPs unread by the signal scanner. A read-only R4 pass raised those limits to 512 members and 4 MB per script after checking their actual counts and sizes. `Z:\Graham\agent-comms\farmhub-companion-acceptance\VAULT-LUA-SIGNALS-2026-11-13-R4.json` scanned all 1,803 Lua-bearing ZIP paths with zero scan errors and **zero incomplete archives**. The 456 score-at-least-10 count and each archive's signal set/score were unchanged from R3. This closes the scanner coverage gap for the current vault snapshot; it does not convert regex hits into source-reviewed farm capabilities or runtime proof.

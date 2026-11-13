@@ -23,7 +23,7 @@ export function Page({ entry }: CompanionPageProps) {
     { key: "types", label: tOr(`${K}.types`, "Crops with observations"), value: formatNumber(page.fillTypeCount) },
   ] : [];
   return (
-    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Saved best selling-station price observations from this local single-player game. Prices are market-wide, not this farm's sales, income or stock. The range covers at most the latest 320 samples per crop.")}>
+    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Best selling-station price observations held by the mod in this local single-player game. Prices are market-wide, not this farm's sales, income or stock. The range covers at most the latest 320 samples per crop.")}>
       <ModStatTiles tiles={tiles} />
       {page?.reason === "local-single-player-only" ? (
         <ModEmpty>{tOr(`${K}.singlePlayer`, "This history is available only from the local single-player game.")}</ModEmpty>

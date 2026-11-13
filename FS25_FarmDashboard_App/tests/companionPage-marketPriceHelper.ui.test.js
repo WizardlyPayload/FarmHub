@@ -7,7 +7,7 @@ const ui = loadCompanionPage(KEY, { title: "Market Price Helper", group: "financ
 
 afterEach(() => { document.body.innerHTML = ""; });
 
-test("labels saved market samples without presenting sales or income", () => {
+test("labels observed market samples without presenting sales or income", () => {
   const host = ui.renderPage({
     companionMods: { mods: [{ id: KEY, detected: true, version: "1.0.0.1" }] },
     companionPages: { pages: { [KEY]: {
@@ -18,7 +18,7 @@ test("labels saved market samples without presenting sales or income", () => {
     } } },
   }, { farmId: 1 });
   expect(host.textContent).toContain("Sorghum");
-  expect(host.textContent).toContain("Saved best selling-station price observations");
+  expect(host.textContent).toContain("Best selling-station price observations held by the mod");
   expect(host.textContent).toContain("not this farm's sales, income or stock");
   expect(host.textContent).toContain("4 · 09:00");
 });

@@ -190,7 +190,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Market Price Helper",
     category: "economy",
     descKey: "companions.desc.marketPriceHelper",
-    desc: "Shows saved best selling-station price observations from a local single-player game. Market observations are not farm sales or income.",
+    desc: "Shows the mod's best selling-station price observations in a local single-player game. Market observations are not farm sales or income.",
     relatedSection: "economy",
   },
   {

@@ -39,6 +39,7 @@ const DETECTION_ONLY_IDS = new Set([
   "outOfFuel",
   "soilWorkYieldBonus",
   "woodManager",
+  "grapeOliveYieldSettings",
 ]);
 
 const LIMITED_IDS = new Set([
@@ -280,8 +281,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Grape and Olive Yield Settings",
     category: "fields",
     descKey: "companions.desc.grapeOliveYieldSettings",
-    desc: "Shows the active grape and olive yield multipliers shared by the whole save. It does not measure harvested crop or predict a field's yield.",
-    relatedSection: "fields",
+    desc: "FarmHub detects this mod. Its save-wide yield multipliers do not measure this farm's grape or olive harvest or predict a field's yield.",
   },
   {
     id: "realPowertrain",

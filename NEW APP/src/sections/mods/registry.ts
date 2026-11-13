@@ -219,8 +219,6 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/smartCropControl").then((m) => m.Page) },
   { key: "cropControlOverride", catalogId: "cropControlOverride", title: "Crop Control Override", glyph: "CO", group: "fields",
     load: () => import("@/sections/mods/cropControlOverride").then((m) => m.Page) },
-  { key: "grapeOliveYieldSettings", catalogId: "grapeOliveYieldSettings", title: "Grape and Olive Yield Settings", glyph: "GO", group: "fields",
-    load: () => import("@/sections/mods/grapeOliveYieldSettings").then((m) => m.Page) },
   { key: "realPowertrain", catalogId: "realPowertrain", title: "Real Powertrain", glyph: "RP", group: "fleet",
     load: () => import("@/sections/mods/realPowertrain").then((m) => m.Page) },
   // Fleet

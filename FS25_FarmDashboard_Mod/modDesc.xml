@@ -310,7 +310,6 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/MowingContractsPlusCollector.lua"/>
         <sourceFile filename="src/companionPages/CryptoFarmCollector.lua"/>
         <sourceFile filename="src/companionPages/CropControlOverrideCollector.lua"/>
-        <sourceFile filename="src/companionPages/GrapeOliveYieldSettingsCollector.lua"/>
         <sourceFile filename="src/companionPages/RealPowertrainCollector.lua"/>
         <sourceFile filename="src/companionPages/ResourceUsageControlCollector.lua"/>
         <sourceFile filename="src/companionPages/FarmLimitManagerCollector.lua"/>

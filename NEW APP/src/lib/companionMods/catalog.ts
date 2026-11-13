@@ -1818,7 +1818,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Trip Computer",
     category: "fleet",
     descKey: "companions.desc.tripComputer",
-    desc: "Shows resettable distance, fuel used and engine time on owned vehicles. It does not replace lifetime mileage or record fuel purchases.",
+    desc: "Shows resettable distance, fuel used and engine time on owned vehicles. Do not add these to HUD+ trip totals or treat them as lifetime mileage or fuel purchases.",
     relatedSection: "vehicles",
   },
   {

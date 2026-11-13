@@ -24,7 +24,7 @@ export function Page({ entry }: CompanionPageProps) {
   ] : [];
   return (
     <ModPage entry={entry} lead={tOr(`${K}.lead`,
-      "Resettable trip distance, fuel used and engine time from Trip Computer on your owned vehicles. Values start again when that vehicle's trip computer is reset; they are not lifetime mileage, a fuel purchase or a cost.")}>
+      "Resettable trip distance, fuel used and engine time from Trip Computer on your owned vehicles. Values start again when that vehicle's trip computer is reset. Do not add these to HUD+ trip totals; they are not lifetime mileage, a fuel purchase or a cost.")}>
       <ModStatTiles tiles={tiles} />
       <Card title={tOr(`${K}.title`, "Owned vehicle trips")}>
         <ModTable columns={[

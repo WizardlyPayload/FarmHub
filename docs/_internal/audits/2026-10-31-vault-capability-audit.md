@@ -2327,3 +2327,10 @@ These five exact ZIPs were classified by source without a new collector or page:
 - Furrow Wheel `uncategorized/FS25_360254_Furrow_Wheel.zip` v1.0.0.0 SHA-256 `CFF8BB0E1759389FE4CCACA3D57097D4541EAFC8D6B2180A0D4D4E7B9683B0C2` samples wheel position against terrain height and temporarily narrows wheel collision shape when it detects a furrow. Its `lastInFurrow` table is runtime transition state, not a saved field or machine result.
 
 None of these exact source paths warrants a separate Farm Dashboard collector or page. This classification does not prove game compatibility or quantify the native gameplay effects; no implement, machine, field or save was changed to manufacture evidence.
+
+## 2026-11-13 score-zero AI and menu behaviour ZIP check
+
+- MultiFruit AI Tedder `uncategorized/FS25_311441_MultiFruit_AI_Tedder.zip` and `forage/KM_67505_MultiFruit_AI_Tedder.zip` are byte-identical v1.0.0.0 SHA-256 `3A5DFB6A091C00A5B2496E3BECF97D11631DDED1A957321433F6B572566143A7`. Its one 33-line script adds windrow-category fill types as AI density-height requirements when a tedder loads. It does not record AI jobs, area tedded, crop quantity or a farm result. Count one behaviour package, not two integrations.
+- Stop Tractor On Menu `uncategorized/FS25_367878_Stop_Tractor_On_Menu.zip` v1.0.0.0 SHA-256 `21B5D76BDBCEE8C62DD4AEA1EBC68E35C98DC54CD6D0CB06E043DC271B5D1E49` zeros linear and angular velocity of the local player's current vehicle while a GUI is visible. Its 18-line script does not keep a stop event, fuel saving, damage avoidance or fleet history. The effect is a momentary control intervention.
+
+These reviewed versions have no distinct farm-owned data to collect or show. This is source classification, not proof of in-game behaviour; no field, vehicle, save or building was changed.

@@ -977,6 +977,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "parkingBrake",
+        title = "Parking Brake",
+        category = "fleet",
+        names = { "FS25_ParkingBrake", "KM_81129_Parking_Brake_Mod" },
+        globals = {},
+    },
+    {
         id = "toggleableSilageAdditive",
         title = "Toggleable Silage Additive",
         category = "fleet",

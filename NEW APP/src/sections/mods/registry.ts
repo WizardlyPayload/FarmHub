@@ -238,6 +238,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/realisticBrakes").then((m) => m.Page) },
   { key: "hydraulicBrokenTrailer", catalogId: "hydraulicBrokenTrailer", title: "Hydraulic Broken Trailer", glyph: "HB", group: "fleet",
     load: () => import("@/sections/mods/hydraulicBrokenTrailer").then((m) => m.Page) },
+  { key: "parkingBrake", catalogId: "parkingBrake", title: "Parking Brake", glyph: "PB", group: "fleet",
+    load: () => import("@/sections/mods/parkingBrake").then((m) => m.Page) },
   { key: "toggleableSilageAdditive", catalogId: "toggleableSilageAdditive", title: "Toggleable Silage Additive", glyph: "SA", group: "fleet",
     load: () => import("@/sections/mods/toggleableSilageAdditive").then((m) => m.Page) },
   { key: "buyableGps", catalogId: "buyableGps", title: "Buyable GPS", glyph: "GP", group: "fleet",

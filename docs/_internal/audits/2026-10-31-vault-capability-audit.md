@@ -2171,6 +2171,18 @@ These are source classifications, not runtime compatibility tests. No fleet page
 
 Hashes prove duplicate archive bytes for each pair; they do not prove game compatibility or a completed PTO/hydraulic action.
 
+## 2026-11-13 score-2 equipment and driving controls
+
+These current vault ZIPs were checked by full archive hash, descriptor version and declared Lua. Their game controls may be useful to a player, but the reviewed code does not add a separate farm outcome for Farm Dashboard:
+
+- Direct Drill Addon `uncategorized/FS25_318471_Direct_Drill_Addon.zip` v1.0.0.0 SHA-256 `B360F96CEC8441A4A230A6E6326F37123A7D785458649F909430DE3B569BCC88` toggles the native sowing machine's `useDirectPlanting` state and sends an event. Its three declared Lua files have no save hook or record of hectares drilled, soil outcome or seed used. Field treatment and fill belong to native game state.
+- Split Brakes `uncategorized/FS25_324019_Split_Brakes.zip` v1.1.0.0 SHA-256 `5E4B1E5E2FA2CD9431D9F01CC995922F9313C8FBE9C6823C568430F52D2999BB` resets left/right brake flags on vehicle load, streams the momentary inputs and adjusts wheel physics. Its declared scripts do not save braking use, tyre wear or a work result. A live driving control is not a farm history.
+- Tool Height Control For Headers Additional Features has two **byte-identical** v1.0.0.1 ZIPs: `uncategorized/FS25_311018_Tool_Height_Control_For_Headers_Additional_Features.zip` and `harvesters/KM_62530_Tool_Height_Control_For_Headers_Additional_Features.zip`, SHA-256 `977F37216777B41DC9D304A2B2B56874B429AA5FEA8A456EC815CAB70F192C43`. The declared `AttacherJointControllable` hooks attach/detach, turn-on and AI implement behaviour; companion scripts register types and remove a duplicate shop item. No saved header-height work or crop-loss ledger appears in the reviewed Lua. Count one package, not two integrations.
+- Machine Drive Controls `objects/KM_81740_Machine_Drive_Controls.zip` v1.0.1.0 SHA-256 `A58D201CB8B555B6C12E8882E42F61D58A9402F9B09C953E1E211B5849B12027` injects a native shop drive-profile configuration and changes driving/engine input behaviour. Its `saveToXMLFile` wrapper normalises the player's input bindings; it is **not** a farm vehicle-work save hook. The selected profile remains native `vehicle.configurations`, with no separate distance, fuel or fieldwork record in the reviewed script.
+- Ropa Keiler RK22 has two **byte-identical** v1.1.0.0 ZIPs: `uncategorized/FS25_341205_Ropa_Keiler_RK22.zip` and `tools/KM_73170_Ropa_Keiler_RK22.zip`, SHA-256 `C00E142E88E65AAD3677AE6EF5BA38EC05C98CD6DDAD9526D1CA8052B5234FB2`. Its `ManualTrailerSteering.lua` reads steering parameters from vehicle XML and handles live steering; the reviewed script has no separate saved harvest or repair ledger. Native owned equipment and harvested crop data can still be useful without a Ropa-specific page.
+
+No dashboard collector, owned equipment fixture, installed comparison or game compatibility result was added for these five distinct source classifications. The score-2 queue and lower scores remain open; filename mentions do not settle their other ZIPs.
+
 ## 2026-11-13 low-score visual and selection controls
 
 - Dirty Tire Tracks `uncategorized/FS25_360402_Dirty_Tire_Tracks.zip` v1.0.0.0 SHA-256 `8F1155A3FB89073305ADA991FB0E7AE0C6E79F13E53F0B9B6EA163242929154B` gathers live wheel/ground data to color transient tracks. Its saved XML is a profile-wide fade preference under `modSettings/FS25_dirtyTireTracks/`; the reviewed sources do not persist where this farm drove or record a field treatment. Visual tracks in the game are the intended result, not a dashboard work map.

@@ -91,7 +91,8 @@ if ($Mode -eq 'Check') {
     if ($marker -notmatch ('nonce=' + [Regex]::Escape([string]$manifest.nonce))) {
         throw 'Probe marker nonce mismatch.'
     }
-    if ($info.LastTaskResult -ne 0 -or $info.LastRunTime.ToUniversalTime() -lt $dueUtc.AddSeconds(-10)) {
+    $lastRunUtc = [DateTimeOffset]::new($info.LastRunTime.ToUniversalTime())
+    if ($info.LastTaskResult -ne 0 -or $lastRunUtc -lt $dueUtc.AddSeconds(-10)) {
         throw 'Task Scheduler did not report a successful due-time run.'
     }
     Write-Output ('PASSED task={0} lastRun={1:o} marker={2}' -f $manifest.taskName, $info.LastRunTime, $marker)

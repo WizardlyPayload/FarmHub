@@ -1019,6 +1019,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "tripComputer",
+        title = "Trip Computer",
+        category = "fleet",
+        names = { "FS25_341715_Trip_Computer", "FS25_TripComputer", "FS25_Trip_Computer" },
+        globals = {},
+    },
+    {
         id = "helperSilageCompacting",
         title = "Helper Silage Compacting",
         category = "fleet",

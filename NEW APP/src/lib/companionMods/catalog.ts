@@ -1814,6 +1814,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "tripComputer",
+    title: "Trip Computer",
+    category: "fleet",
+    descKey: "companions.desc.tripComputer",
+    desc: "Shows resettable distance, fuel used and engine time on owned vehicles. It does not replace lifetime mileage or record fuel purchases.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "ritterFreshLoss",
     title: "Ritter Fresh",
     category: "storage",

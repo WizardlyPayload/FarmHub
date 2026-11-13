@@ -2371,3 +2371,13 @@ Manual source inspection found `setXML*` alone is too broad for a saved-state sc
 - Tire Sound `uncategorized/FS25_367658_Tire_Sound.zip` v1.0.0.0 SHA-256 `714966E18136185E5392BE342D2789744EACC8A06617BE0C4A96084D8CF069F3` calls `setXMLFloat` on a loaded bundled sound XML object before `g_soundManager:loadSampleFromXML`. That is an in-memory sound radius adjustment, with no save call or recorded farm state in this path. No page is warranted.
 
 These exact-version findings are source classification, not installed compatibility or proof about every version. No game fixture, building, vehicle or save was changed.
+
+### Further profile and tool-output writers
+
+- Rename Your Dog `uncategorized/FS25_354927_Rename_Your_Dog.zip` v1.0.0.1 SHA-256 `88C1109077935F4F2DFA2317BD2D3EB2B2CAA3C25E32D86C596DCEA60599E8D7` writes debug and multiple-doghouse options to the user profile `modSettings` XML. A dog-name change is already visible in game; this writer is not a farm husbandry production or animal-health record. No page.
+- Unused Mods `uncategorized/KM_82839_Unused_Mods.zip` v1.0.0.0 SHA-256 `F0D365AEDBC6DC1ED444E6BD4C1EA8E1BDE645CDD4509B113AC8EC359CC8F0C4` writes a mod-usage report to `modSettings/UnusedMods/unusedMods.xml` and the log. This is a profile maintenance report, without a farm-owned result. No farm dashboard page.
+- Live Visual Tuner `gameplay/FS25_374042_Live_Visual_Tuner.zip` v1.0.0.0 SHA-256 `36DE015FEF45980701B716F673DE67AA28672B1BE39B9C2E983F312883D373F1` writes visual tuner enablement, panel location and selected levels to profile `modSettings/FS25_LiveVisualTuner/`. Those are display choices, not measured farm performance. No page.
+- Terrain Texture And Object Picker `gameplay/FS25_363383_Terrain_Texture_And_Object_Picker.zip` v2.2.0.0 SHA-256 `E18834F91A8EBE8F12255B8EACD2EA5292107E9CCCA57CF88EF01D4032E1BFC0` writes menu choices and map foliage-picker files under profile `modSettings`. Its reviewed writers do not hold field treatment, crop or owned-placeable production results. No page.
+- Hide Help Texts `uncategorized/FS25_344217_Hide_Help_Texts.zip` v1.0.0.0 SHA-256 `11B22FC2300F10211E2AE58E94C3B1675CC54442DAED34AA1393640D4BBA7EF7` writes hidden help-text identifiers and labels under `g_modSettingsDirectory`. This is interface preference state. No page.
+
+These classifications are for the exact ZIP versions and inspected writer paths. They do not establish runtime compatibility or all behaviour; no player save, map or building was edited.

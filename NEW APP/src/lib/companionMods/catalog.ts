@@ -1,5 +1,5 @@
 /**
- * Static catalog for high-value third-party companion mods.
+ * Static catalog for detected third-party companion mods.
  * Descriptions explain what the mod does in-game; live stats come from `companionMods` export.
  */
 
@@ -40,6 +40,20 @@ const DETECTION_ONLY_IDS = new Set([
   "soilWorkYieldBonus",
   "woodManager",
   "grapeOliveYieldSettings",
+  "greenhouseAutomaticWatering",
+  "farmLimitManager",
+  "handTools",
+  "sowingMachineRollerReady",
+  "roundBalerExtension",
+  "vehicleAssistanceSystem",
+  "resourceUsageControl",
+  "realPowertrain",
+  "advancedVehicleFunctions",
+  "lockSteeringAxles",
+  "automaticMilkDistribution",
+  "vehicleWeightModifier",
+  "parkingBrake",
+  "manualPaint",
 ]);
 
 const LIMITED_IDS = new Set([
@@ -68,7 +82,6 @@ const LIMITED_IDS = new Set([
   "farmReputation",
   "realisticCropRotation",
   "cropRotationPlanner",
-  "vehicleWeightModifier",
   "flockCamera",
   "moistureSystem",
   "rentYourField",
@@ -1288,7 +1301,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Manual Paint",
     category: "fleet",
     descKey: "companions.desc.manualPaint",
-    desc: "Shows saved custom paint targets and finishes on owned vehicles. Rendered color can differ because of the material texture.",
+    desc: "Detects Manual Paint. Saved colour targets are cosmetic and do not report machine condition or farm work.",
     relatedSection: "vehicles",
   },
   {
@@ -1658,7 +1671,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Vehicle Weight Modifier",
     category: "fleet",
     descKey: "companions.desc.vehicleWeightModifier",
-    desc: "Shows saved weight, brake and engine multipliers for vehicles this farm currently owns. These are settings, not measured performance.",
+    desc: "Detects Vehicle Weight Modifier. Saved factors do not measure machine mass, braking or work.",
     relatedSection: "vehicles",
   },
   {
@@ -1925,7 +1938,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
   {
     id: "parkingBrake", title: "Parking Brake", category: "fleet",
     descKey: "companions.desc.parkingBrake",
-    desc: "Shows the mod's current parking-brake state on owned vehicles, not proof of safe parking.",
+    desc: "Detects Parking Brake. Its switch does not prove a machine is parked safely or record work.",
     relatedSection: "vehicles",
   },
   {

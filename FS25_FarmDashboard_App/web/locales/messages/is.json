@@ -5071,7 +5071,7 @@
   ,"companionPage.swathRouter.partial": "Some owned swath setups could not be read."
   ,"companionPage.swathRouter.noneReady": "No owned swath implement has been prepared for AI pickup by this mod."
   ,"companionPage.swathRouter.serverOnly": "AI swath readiness can be read only from the game's server state."
-  ,"companions.desc.manualPaint": "Shows saved custom paint targets and finishes on owned vehicles. Rendered color can differ because of the material texture."
+  ,"companions.desc.manualPaint": "Detects Manual Paint. Saved colour targets are cosmetic and do not report machine condition or farm work."
   ,"companionPage.manualPaint.vehicleCount": "Customized owned vehicles"
   ,"companionPage.manualPaint.partCount": "Saved customized parts"
   ,"companionPage.manualPaint.lead": "Saved Manual Paint targets and finishes on vehicles owned by this farm. Material textures can change the visible color; these targets are not a screenshot of the rendered machine."
@@ -5607,7 +5607,7 @@
   ,"companionPage.cropRotationPlanner.catch": "Catch crop"
   ,"companionPage.cropRotationPlanner.empty": "No named rotation plan is available for this farm."
   ,"companionPage.cropRotationPlanner.partial": "The rotation plan could not be read completely; no steps are shown."
-  ,"companions.desc.vehicleWeightModifier": "Shows saved weight, brake and engine multipliers for vehicles this farm currently owns. These are settings, not measured performance."
+  ,"companions.desc.vehicleWeightModifier": "Detects Vehicle Weight Modifier. Saved factors do not measure machine mass, braking or work."
   ,"companionPage.vehicleWeightModifier.lead": "Saved weight, braking and engine factors for vehicles this farm currently owns. These are configured multipliers, not measured mass, braking distance or engine power."
   ,"companionPage.vehicleWeightModifier.vehicles": "Owned vehicles with saved factors"
   ,"companionPage.vehicleWeightModifier.title": "Vehicle settings"
@@ -6745,5 +6745,5 @@
   "companionPage.lumberjackHut.incomplete": "Some owned hut values could not be verified; totals are withheld.",
   "companions.desc.harvestoreConveyor": "Shows material queued in this farm's conveyors, awaiting transfer to a receiving vehicle.",
   "companions.desc.hydraulicBrokenTrailer": "Shows current hydraulic condition on owned tipping trailers, not repair or tipping history.",
-  "companions.desc.parkingBrake": "Shows the mod's current parking-brake state on owned vehicles, not proof of safe parking."
+  "companions.desc.parkingBrake": "Detects Parking Brake. Its switch does not prove a machine is parked safely or record work."
 }

@@ -217,7 +217,6 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/HUDPlusCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticBrakesCollector.lua"/>
         <sourceFile filename="src/companionPages/HydraulicBrokenTrailerCollector.lua"/>
-        <sourceFile filename="src/companionPages/ParkingBrakeCollector.lua"/>
         <sourceFile filename="src/companionPages/BuyUsedEquipmentCollector.lua"/>
         <sourceFile filename="src/companionPages/BuyableGpsCollector.lua"/>
         <sourceFile filename="src/companionPages/AutomaticTramlineSystemCollector.lua"/>
@@ -267,7 +266,6 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/UniversalAutoloadCollector.lua"/>
         <sourceFile filename="src/companionPages/AdvancedSeedingControlCollector.lua"/>
         <sourceFile filename="src/companionPages/FlexibleCombiSeederCollector.lua"/>
-        <sourceFile filename="src/companionPages/ManualPaintCollector.lua"/>
         <sourceFile filename="src/companionPages/SwathRouterCollector.lua"/>
         <sourceFile filename="src/companionPages/VehicleTradeInCollector.lua"/>
         <sourceFile filename="src/companionPages/DynamicDealershipCollector.lua"/>
@@ -318,7 +316,6 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/SlurryPipeSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/RealisticCropRotationCollector.lua"/>
         <sourceFile filename="src/companionPages/CropRotationPlannerCollector.lua"/>
-        <sourceFile filename="src/companionPages/VehicleWeightModifierCollector.lua"/>
           <sourceFile filename="src/companionPages/FlockCameraCollector.lua"/>
         <sourceFile filename="src/companionPages/ProductionSupplyManagerCollector.lua"/>
         <sourceFile filename="src/companionPages/CourseplayCollector.lua"/>

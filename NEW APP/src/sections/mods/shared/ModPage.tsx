@@ -134,8 +134,6 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
           ? tOr("companionPage.automaticBaleStorage.noOwned", "No owned object storage was found for this farm.")
         : key === "bullMilkProduction" && page?.reason === "no-captured-owned-cow-barn"
           ? tOr("companionPage.bullMilkProduction.empty", "No owned cow barn has a calculated Bull Milk rate yet.")
-        : key === "automaticMilkDistribution" && page?.reason === "barn-switch-unavailable"
-          ? tOr("companionPage.automaticMilkDistribution.unavailable", "An owned milk barn was found, but its automatic distribution switch could not be read.")
         : key === "udderToTank" && page?.reason === "server-animals-only"
           ? tOr("companionPage.udderToTank.serverOnly", "Udder records can be read only from the game's server state.")
         : key === "udderToTank" && page?.reason === "no-udder-register"

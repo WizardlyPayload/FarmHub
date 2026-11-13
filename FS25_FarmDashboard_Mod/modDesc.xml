@@ -153,7 +153,6 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/AdjustFuelTankCollector.lua"/>
         <sourceFile filename="src/companionPages/AnimalFoodOverviewCollector.lua"/>
         <sourceFile filename="src/companionPages/AnimalFoodCalculatorCollector.lua"/>
-        <sourceFile filename="src/companionPages/AutomaticMilkDistributionCollector.lua"/>
         <sourceFile filename="src/companionPages/BullMilkProductionCollector.lua"/>
         <sourceFile filename="src/companionPages/UdderToTankCollector.lua"/>
         <sourceFile filename="src/companionPages/WhiteysFarmStaffCollector.lua"/>

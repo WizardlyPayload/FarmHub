@@ -1801,7 +1801,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Automatic Milk Distribution",
     category: "livestock",
     descKey: "companions.desc.automaticMilkDistribution",
-    desc: "Shows which of this farm's milk barns have automatic distribution enabled. It does not infer milk transferred or transport charges.",
+    desc: "Detects Automatic Milk Distribution. Milk inventory belongs in Storage; the mod's switch does not record transfers or charges.",
     relatedSection: "pastures",
   },
   {

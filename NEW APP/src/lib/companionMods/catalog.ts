@@ -1249,7 +1249,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Unload Potato Seeders",
     category: "fleet",
     descKey: "companions.desc.unloadPotatoSeeders",
-    desc: "Shows the current selected unload type on owned potato seeders. The choice resets on reload and does not record unloading.",
+    desc: "Detects Unload Potato Seeders. Its temporary unload selection does not record material moved or field work.",
     relatedSection: "vehicles",
   },
   {
@@ -1778,7 +1778,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Realistic Seeder",
     category: "fleet",
     descKey: "companions.desc.realisticSeeder",
-    desc: "Shows the current unload and fertilizer choices on Realistic Seeder machines owned by this farm. It does not measure sowing or material used.",
+    desc: "Detects Realistic Seeder. Its machine controls do not measure sowing, fertilizer used or unloading.",
     relatedSection: "vehicles",
   },
   {

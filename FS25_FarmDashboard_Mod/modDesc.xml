@@ -225,7 +225,6 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/AgriculturalTerminalCollector.lua"/>
         <sourceFile filename="src/companionPages/ImplementMaintenanceCollector.lua"/>
         <sourceFile filename="src/companionPages/NonStopCropCollector.lua"/>
-        <sourceFile filename="src/companionPages/UnloadPotatoSeedersCollector.lua"/>
         <sourceFile filename="src/companionPages/HandToolDropCollector.lua"/>
         <sourceFile filename="src/companionPages/TerraFarmMachinesCollector.lua"/>
         <sourceFile filename="src/companionPages/DieselFuelSystemCollector.lua"/>
@@ -255,7 +254,6 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/RentYourFieldCollector.lua"/>
         <sourceFile filename="src/companionPages/OrganicDemandCollector.lua"/>
         <sourceFile filename="src/companionPages/AdjustableFillLevelAdvancedCollector.lua"/>
-        <sourceFile filename="src/companionPages/RealisticSeederCollector.lua"/>
         <sourceFile filename="src/companionPages/ManualAttachCollector.lua"/>
         <sourceFile filename="src/companionPages/TowingChainHookCollector.lua"/>
         <sourceFile filename="src/companionPages/UniversalAutoloadCollector.lua"/>

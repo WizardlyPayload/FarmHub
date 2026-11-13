@@ -6409,7 +6409,7 @@
 ,"companionPage.palletSpawnStore.empty": "No readable owned production output is available yet."
 ,"companionPage.palletSpawnStore.partial": "Some owned output settings were unavailable; totals are withheld."
 ,
-"companions.desc.unloadPotatoSeeders": "Shows the current selected unload type on owned potato seeders. The choice resets on reload and does not record unloading.",
+"companions.desc.unloadPotatoSeeders": "Detects Unload Potato Seeders. Its temporary unload selection does not record material moved or field work.",
 "companionPage.unloadPotatoSeeders.seeders": "Owned potato seeders",
 "companionPage.unloadPotatoSeeders.potato": "Potatoes",
 "companionPage.unloadPotatoSeeders.seeds": "Seeds",

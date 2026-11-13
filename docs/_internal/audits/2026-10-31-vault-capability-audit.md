@@ -2115,3 +2115,14 @@ These four exact `uncategorized` ZIPs were read from the current vault. Each has
 - AICost `FS25_307802_AICost.zip` v1.0.0.0 SHA-256 `4B698A00B2493B76E5B0DB8EF4FCAD4CC04795F65DDD65D342D16C864A7815C0` overwrites AI job price-per-millisecond methods and `EconomyManager.getCostPerLiter` with fixed rules. It keeps no task-cost or purchase history. Actual charges belong to native finance; a new mod page would be a rule display or forecast, not observed spending.
 
 No collector, page, building, vehicle or game test was added for these classifications. Their source review does not prove loaded-mod coexistence or settle the rest of the low-score queue.
+
+## 2026-11-13 low-score application and AI-control checks
+
+These four current `uncategorized` ZIPs were source-read to test whether they add a useful farm-owned record. They do not:
+
+- Realistic Refueling `FS25_303916_Realistic_Refueling.zip` v1.0.0.0 SHA-256 `CC2A94356C2C1B1BF562FD393E0663A43E7B19B4C5E3ECB3FBA3EEDF4C0E22EB` only prepends `LoadTrigger.startLoading` to set the live diesel fill speed to 2.25 L/s. It does not record litres bought, costs or a vehicle refuelling history. Native fuel/finance readings remain the source for those results.
+- Better Animal Waste Products `FS25_309253_Better_Animal_Waste_Products.zip` v1.0.0.0 SHA-256 `0E3DBF6FC58FEA98EC36585BD48BA7CBFE3178043EEB97A3677595C769EB2690` adjusts the live manure, liquid-manure and digestate `litersPerSecond` spray-type rules relative to fertilizer. Despite the title, the reviewed script does not store animal-waste production, sale or field-application history. Actual stock and work remain native data; this is a rate rule, not another farm result.
+- AI Baler And Forage Wagon `FS25_342075_AI_Baler_And_Forage_Wagon.zip` v1.0.0.2 SHA-256 `05FFECDC00A496242B55C02E5A54F6D9871BF224D167CD369D47DE04E34A270B` activates attached balers/wagons and adjusts AI field-worker speed/stop behaviour through runtime vehicle hooks. `spec_aiBaler` caches implements and current desired speed only while work runs; the source explicitly adds no save specialization or XML. It does not retain harvested tonnage, bales or AI job outcomes.
+- Reduced Organic Fertilizer Usage `FS25_367543_Reduced_Organic_Fertilizer_Usage.zip` v1.1.0.0 SHA-256 `34834339C61404C36A42146DF8C17D6C5E0E850CE62D019D655147467E50F394` applies configurable manure/liquid-manure/digestate usage multipliers and synchronizes the rules to clients. It saves those multipliers in profile-wide `modSettings/<modName>.xml`, not a save- or farm-keyed application ledger. A rate setting can be useful in the game, but it does not prove volume applied or fertiliser saved on this farm.
+
+No new FarmHub page or test fixture is justified by these scripts. Source classification does not prove game compatibility or actual field/refuelling outcomes.

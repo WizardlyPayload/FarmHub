@@ -2,7 +2,7 @@ import { Card } from "@/components/ui";
 import { tOr } from "@/i18n/i18n";
 import {
   ModEmpty, ModPage, ModStatTiles, ModTable, asList, formatNumber, num,
-  useCompanionPage, useUnitPrice, type CompanionPageProps, type ModStatTile,
+  useCompanionPage, useMoney, type CompanionPageProps, type ModStatTile,
 } from "@/sections/mods/shared";
 
 type Observation = { pricePerLitre?: number; day?: number; hour?: number; period?: number };
@@ -16,9 +16,9 @@ const K = "companionPage.marketPriceHelper";
 
 export function Page({ entry }: CompanionPageProps) {
   const { page } = useCompanionPage(entry.key);
-  const unitPrice = useUnitPrice();
+  const money = useMoney();
   const rows = asList<PriceRow>(page?.rows);
-  const perLitre = (value: unknown) => num(value) == null ? "—" : `${unitPrice(value)} / L`;
+  const perThousandLitres = (value: unknown) => num(value) == null ? "—" : money((num(value) ?? 0) * 1000);
   const tiles: ModStatTile[] = page ? [
     { key: "types", label: tOr(`${K}.types`, "Crops with observations"), value: formatNumber(page.fillTypeCount) },
   ] : [];
@@ -32,8 +32,8 @@ export function Page({ entry }: CompanionPageProps) {
         <ModTable
           columns={[
             { key: "crop", label: tOr(`${K}.crop`, "Crop") },
-            { key: "latest", label: tOr(`${K}.latest`, "Latest / L"), align: "end" },
-            { key: "range", label: tOr(`${K}.range`, "Sample range / L"), align: "end" },
+            { key: "latest", label: tOr(`${K}.latest`, "Latest / 1,000 L"), align: "end" },
+            { key: "range", label: tOr(`${K}.range`, "Sample range / 1,000 L"), align: "end" },
             { key: "time", label: tOr(`${K}.time`, "Game day · hour"), align: "end" },
             { key: "samples", label: tOr(`${K}.samples`, "Samples"), align: "end" },
           ]}
@@ -41,8 +41,8 @@ export function Page({ entry }: CompanionPageProps) {
             key: `${row.fillType ?? "fill"}-${index}`,
             cells: {
               crop: row.title || row.fillType || "—",
-              latest: perLitre(row.latest?.pricePerLitre),
-              range: `${perLitre(row.lowPricePerLitre)} – ${perLitre(row.highPricePerLitre)}`,
+              latest: perThousandLitres(row.latest?.pricePerLitre),
+              range: `${perThousandLitres(row.lowPricePerLitre)} – ${perThousandLitres(row.highPricePerLitre)}`,
               time: num(row.latest?.day) == null || num(row.latest?.hour) == null
                 ? "—" : `${formatNumber(row.latest?.day)} · ${formatNumber(row.latest?.hour).padStart(2, "0")}:00`,
               samples: `${row.historyTruncated ? "≥" : ""}${formatNumber(row.sampleCount)}`,

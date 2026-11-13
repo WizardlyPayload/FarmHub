@@ -21,4 +21,5 @@ test("labels observed market samples without presenting sales or income", () => 
   expect(host.textContent).toContain("Best selling-station price observations held by the mod");
   expect(host.textContent).toContain("not this farm's sales, income or stock");
   expect(host.textContent).toContain("4 · 09:00");
+  expect(host.textContent).toContain("810");
 });

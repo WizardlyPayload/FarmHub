@@ -229,8 +229,6 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/CvtAddonCollector.lua"/>
         <sourceFile filename="src/companionPages/TripComputerCollector.lua"/>
         <sourceFile filename="src/companionPages/HelperSilageCompactingCollector.lua"/>
-        <sourceFile filename="src/companionPages/UniversalSoundTunerCollector.lua"/>
-        <sourceFile filename="src/companionPages/WelchyPerformanceAddonCollector.lua"/>
         <sourceFile filename="src/companionPages/FillLevelLimiterCollector.lua"/>
         <sourceFile filename="src/companionPages/FarmGateKeysCollector.lua"/>
         <sourceFile filename="src/companionPages/JobQueueCollector.lua"/>

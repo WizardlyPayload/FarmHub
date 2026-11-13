@@ -944,7 +944,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Universal Sound Tuner",
     category: "fleet",
     descKey: "companions.desc.universalSoundTuner",
-    desc: "Shows nondefault saved tune choices on owned vehicles, including configured performance multipliers. It does not measure delivered power, fuel use or driving results.",
+    desc: "Detected only. Adjust this mod's sound and performance choices in game; the saved choices do not measure farm work, power or fuel use.",
     relatedSection: "vehicles",
   },
   {
@@ -952,7 +952,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Welchy Performance Addon",
     category: "fleet",
     descKey: "companions.desc.welchyPerformanceAddon",
-    desc: "Shows nondefault saved limiter, sound and burnout tuning choices on owned vehicles. It does not measure power, acceleration or fuel use.",
+    desc: "Detected only. Adjust this mod's limiter, sound and burnout choices in game; the saved choices do not measure farm work, acceleration or fuel use.",
     relatedSection: "vehicles",
   },
   {

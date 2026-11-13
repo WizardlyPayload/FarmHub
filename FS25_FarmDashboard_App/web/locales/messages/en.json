@@ -2471,7 +2471,7 @@
   "companions.desc.statisticsExtended": "Expands the in-game statistics screens with extra farm performance detail.",
   "companions.desc.restrictedPeriods": "Blocks spreading slurry, digestate, and manure during closed seasons (and frost for liquids), matching fertilizer ordinance-style rules.",
   "companions.desc.regionalCropCalendar": "Applies a regional planting/harvest calendar with optional weather and yield profiles instead of the vanilla global calendar.",
-  "companions.desc.soilWorkYieldBonus": "Pays a yield bonus on soil you have worked until it is harvested. FarmHub reads the mod's tool bonuses and totals the worked ground waiting for harvest (the mod keeps one grid for the whole map).",
+  "companions.desc.soilWorkYieldBonus": "Can add a yield bonus to worked ground. FarmHub detects this mod but does not assign its map-wide grid to your farm or fields.",
   "companions.desc.smartCropControl": "Controls selected NPC crop allocation by field size and category. It does not plan the player's own crops.",
   "companions.desc.dynamicFieldPrices": "Makes farmland buy prices move with demand and ownership instead of static PDA prices.",
   "companions.desc.farmlandMarketplace": "Lists farmland sale and lease offers between farms. FarmHub reads this farm's rows and does not accept or withdraw them.",
@@ -6517,7 +6517,7 @@
   "companionPage.farmGateKeys.placeableGate": "Placeable",
   "companionPage.farmGateKeys.empty": "No readable gate locks held by this farm.",
   "companionPage.farmGateKeys.partial": "Some gate lock states were unavailable; totals are withheld.",
-  "companions.desc.universalSoundTuner": "Shows nondefault saved tune choices on owned vehicles, including configured performance multipliers. It does not measure delivered power, fuel use or driving results.",
+  "companions.desc.universalSoundTuner": "Detected only. Adjust this mod's sound and performance choices in game; the saved choices do not measure farm work, power or fuel use.",
   "companionPage.universalSoundTuner.lead": "Current nondefault tune settings on owned vehicles. Performance multipliers are configured choices, not measured power, speed or fuel use.",
   "companionPage.universalSoundTuner.vehicles": "Supported owned vehicles",
   "companionPage.universalSoundTuner.changedVehicles": "Vehicles with custom tunes",
@@ -6529,7 +6529,7 @@
   "companionPage.universalSoundTuner.default": "Default",
   "companionPage.universalSoundTuner.empty": "No owned vehicle has a readable nondefault tune.",
   "companionPage.universalSoundTuner.partial": "Some tune settings were unavailable; totals are withheld."
-  ,"companions.desc.welchyPerformanceAddon": "Shows nondefault saved limiter, sound and burnout tuning choices on owned vehicles. It does not measure power, acceleration or fuel use."
+  ,"companions.desc.welchyPerformanceAddon": "Detected only. Adjust this mod's limiter, sound and burnout choices in game; the saved choices do not measure farm work, acceleration or fuel use."
   ,"companionPage.welchyPerformanceAddon.lead": "Current nondefault Welchy settings on owned vehicles. These are configured choices, not measured power, acceleration or fuel use."
   ,"companionPage.welchyPerformanceAddon.vehicles": "Supported owned vehicles"
   ,"companionPage.welchyPerformanceAddon.changedVehicles": "Vehicles with custom settings"
@@ -6682,7 +6682,7 @@
   ,"companionPage.autoSwitchRegister.truncated": "The latest 60 readings of each type are shown; full totals are withheld."
   ,"companionPage.autoSwitchRegister.noWeighings": "No weighings recorded for this farm."
   ,"companionPage.autoSwitchRegister.noSales": "No sales recorded for this farm."
-  ,"companions.desc.grapeOliveYieldSettings": "Shows the active grape and olive yield multipliers shared by the whole save. It does not measure harvested crop or predict a field's yield."
+  ,"companions.desc.grapeOliveYieldSettings": "FarmHub detects this mod. Its save-wide yield multipliers do not measure this farm's grape or olive harvest or predict a field's yield."
   ,"companionPage.grapeOliveYieldSettings.lead": "These live settings apply to grapes and olives across the whole save. The game yield parameter may also reflect other mods. This page does not measure a harvest or predict yield from a field."
   ,"companionPage.grapeOliveYieldSettings.grape": "Grape"
   ,"companionPage.grapeOliveYieldSettings.olive": "Olive"
@@ -6716,7 +6716,7 @@
   "companionPage.marketPriceHelper.time": "Game day · hour",
   "companionPage.marketPriceHelper.samples": "Samples",
   "companionPage.marketPriceHelper.empty": "No valid saved price observations are available yet.",
-  "companions.desc.woodManager": "Shows live nondefault split-wood price and wood-chip yield settings shared by the save. It does not record this farm's sales or harvest.",
+  "companions.desc.woodManager": "FarmHub detects Wood Manager. Its save-wide price and wood-chip settings are available in the mod, but it records no farm-owned wood sales, harvest or income for a separate Dashboard view.",
   "companionPage.woodManager.lead": "These nondefault split-wood price and wood-chip yield settings apply across this save. They are live rules, not this farm's wood sales, harvested volume or income. The mod's configuration may not yet be saved to disk.",
   "companionPage.woodManager.count": "Applied split-wood overrides",
   "companionPage.woodManager.tableTitle": "Active split-wood rules",

@@ -194,6 +194,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "woodManager",
+    title: "Wood Manager",
+    category: "storage",
+    descKey: "companions.desc.woodManager",
+    desc: "Shows active nondefault split-wood price and wood-chip yield settings shared by the save. It does not record a farm's wood sales or harvest.",
+    relatedSection: "storage",
+  },
+  {
     id: "enhancedSeasonalPrices",
     title: "Enhanced Seasonal Prices",
     category: "economy",

@@ -23,6 +23,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/realisticDieselPrice").then((m) => m.Page) },
   { key: "marketPriceHelper", catalogId: "marketPriceHelper", title: "Market Price Helper", glyph: "MP", group: "finance",
     load: () => import("@/sections/mods/marketPriceHelper").then((m) => m.Page) },
+  { key: "woodManager", catalogId: "woodManager", title: "Wood Manager", glyph: "WM", group: "storage",
+    load: () => import("@/sections/mods/woodManager").then((m) => m.Page) },
   { key: "fluctuatingDieselPrice", catalogId: "fluctuatingDieselPrice", title: "Fluctuating Diesel Price", glyph: "FD", group: "finance",
     load: () => import("@/sections/mods/fluctuatingDieselPrice").then((m) => m.Page) },
   { key: "dynamicMarket", catalogId: "dynamicMarket", title: "Dynamic Market", glyph: "DM", group: "finance",

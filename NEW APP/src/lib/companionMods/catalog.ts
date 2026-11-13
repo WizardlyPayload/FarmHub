@@ -37,6 +37,7 @@ export type CompanionSupport = "live" | "limited" | "detection-only" | "unmapped
 const DETECTION_ONLY_IDS = new Set([
   "dynamicMarket",
   "outOfFuel",
+  "soilWorkYieldBonus",
 ]);
 
 const LIMITED_IDS = new Set([
@@ -74,7 +75,6 @@ const LIMITED_IDS = new Set([
   "silageCompactionMonitor",
   "farmOperationsDashboard",
   "factoryProfitCalculator",
-  "soilWorkYieldBonus",
 ]);
 
 /** What FarmHub actually reads. A catalog row is not a live integration by itself. */
@@ -248,8 +248,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Soil Work Yield Bonus",
     category: "fields",
     descKey: "companions.desc.soilWorkYieldBonus",
-    desc: "Pays a yield bonus on soil you have worked until it is harvested. FarmHub reads the mod's tool bonuses and totals the worked ground waiting for harvest (the mod keeps one grid for the whole map).",
-    relatedSection: "fields",
+    desc: "Can add a yield bonus to worked ground. FarmHub detects this mod but does not assign its map-wide grid to your farm or fields.",
     liveKey: "soilWorkYieldBonus",
   },
   {

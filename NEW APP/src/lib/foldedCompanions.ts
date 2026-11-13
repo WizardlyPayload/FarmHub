@@ -10,7 +10,6 @@ export const FOLDED_COMPANIONS = {
   collisionDamage: "vehicles",
   puncturedTires: "vehicles",
   bushelPlus: "vehicles",
-  soilWorkYieldBonus: "fields",
   // British Fill Units drives fill-unit display without a dedicated page.
   britishFillUnits: "economy",
 } as const;

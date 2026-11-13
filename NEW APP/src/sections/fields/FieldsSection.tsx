@@ -30,7 +30,6 @@ import {
 } from "./field-sort";
 import type { FieldFilterType } from "./types";
 import { FieldCard } from "./FieldCard";
-import { SoilWorkBonusCard } from "./SoilWorkBonusCard";
 import { UiStatePanel } from "@/components/ux/UiStatePanel";
 import { FreshnessChip } from "@/components/ux/FreshnessChip";
 import { buildModuleUiState } from "@/lib/ux-state";
@@ -341,7 +340,6 @@ export function FieldsSection() {
         <FreshnessChip payload={payload} onRefresh={() => void refreshDashboard()} />
       </header>
 
-      <SoilWorkBonusCard />
 
       <div class="fd-fields__stats">
         <Card title={t("fields.totalFields")}>

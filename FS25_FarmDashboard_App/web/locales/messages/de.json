@@ -4715,7 +4715,7 @@
   "companionPage.roundBalerExtension.empty": "No compatible owned baler wrapper has mod state yet.",
   "companionPage.roundBalerExtension.truncated": "Only the first compatible balers are listed.",
   "companionPage.dieselFuelSystem.oxidation": "Oxidation {{value}}%",
-  "companions.desc.advancedVehicleFunctions": "Shows this farm's current ABS, traction, stability and drivetrain switches on owned vehicles. It does not record driving or accidents.",
+  "companions.desc.advancedVehicleFunctions": "Detects Advanced Vehicle Functions. Its saved switches do not report interventions, incidents or machine work.",
   "companions.desc.vehicleControlAddon": "Shows current guidance, spacing, speed limiter and differential choices on vehicles owned by this farm. It does not record driving history.",
   "companionPage.advancedVehicleFunctions.on": "On",
   "companionPage.advancedVehicleFunctions.off": "Off",
@@ -6599,7 +6599,7 @@
   ,"companionPage.buyableGps.no": "Not installed"
   ,"companionPage.buyableGps.empty": "No owned vehicle has a readable Buyable GPS configuration."
   ,"companionPage.buyableGps.partial": "Some vehicle configurations were unavailable; totals are withheld."
-  ,"companions.desc.lockSteeringAxles": "Shows current steering-axle lock state on owned compatible trailers."
+  ,"companions.desc.lockSteeringAxles": "Detects Lock Steering Axle. The trailer's current switch is available in game; it is not a work or handling result."
   ,"companionPage.lockSteeringAxles.compatible": "Owned compatible trailers"
   ,"companionPage.lockSteeringAxles.locked": "Steering axles locked"
   ,"companionPage.lockSteeringAxles.lead": "Current steering-axle lock on your compatible owned trailers. This is a control setting, not a measure of turning or handling performance."

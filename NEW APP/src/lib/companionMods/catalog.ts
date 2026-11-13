@@ -1256,7 +1256,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Advanced Vehicle Functions",
     category: "fleet",
     descKey: "companions.desc.advancedVehicleFunctions",
-    desc: "Shows this farm's current ABS, traction, stability and drivetrain switches on owned vehicles. It does not record driving or accidents.",
+    desc: "Detects Advanced Vehicle Functions. Its saved switches do not report interventions, incidents or machine work.",
     relatedSection: "vehicles",
   },
   {
@@ -1943,7 +1943,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
   {
     id: "lockSteeringAxles", title: "Lock Steering Axle", category: "fleet",
     descKey: "companions.desc.lockSteeringAxles",
-    desc: "Shows the steering-axle lock setting on compatible owned trailers.",
+    desc: "Detects Lock Steering Axle. The trailer's current switch is available in game; it is not a work or handling result.",
     relatedSection: "vehicles",
   },
   {

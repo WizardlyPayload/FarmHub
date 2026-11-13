@@ -235,7 +235,6 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/NonStopCropCollector.lua"/>
         <sourceFile filename="src/companionPages/UnloadPotatoSeedersCollector.lua"/>
         <sourceFile filename="src/companionPages/HandToolDropCollector.lua"/>
-        <sourceFile filename="src/companionPages/HandToolsCollector.lua"/>
         <sourceFile filename="src/companionPages/TerraFarmMachinesCollector.lua"/>
         <sourceFile filename="src/companionPages/DieselFuelSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/RoundBalerExtensionCollector.lua"/>

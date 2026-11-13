@@ -1248,7 +1248,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Hand Tools",
     category: "fleet",
     descKey: "companions.desc.handTools",
-    desc: "Shows current placement, saved mode switches and picker capacity boost on this farm's hand-tool vehicles. It does not record completed work.",
+    desc: "Detects Hand Tools. Saved mode switches and placement flags do not show tool work or a useful location.",
     relatedSection: "vehicles",
   },
   {

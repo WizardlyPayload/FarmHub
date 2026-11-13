@@ -137,6 +137,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "oilGreaseService",
+        title = "Oil And Grease Service",
+        category = "fleet",
+        names = { "FS25_358863_Oil_And_Grease_Service", "FS25_OilAndGreaseService" },
+        substrings = { "oil_and_grease_service", "oilgreaseservice" },
+        globals = {},
+    },
+    {
         id = "grapeOliveYieldSettings",
         title = "Grape And Olive Yield Settings",
         category = "fields",

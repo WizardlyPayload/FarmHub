@@ -6745,5 +6745,19 @@
   "companionPage.lumberjackHut.incomplete": "Some owned hut values could not be verified; totals are withheld.",
   "companions.desc.harvestoreConveyor": "Shows material queued in this farm's conveyors, awaiting transfer to a receiving vehicle.",
   "companions.desc.hydraulicBrokenTrailer": "Shows current hydraulic condition on owned tipping trailers, not repair or tipping history.",
-  "companions.desc.parkingBrake": "Shows the mod's current parking-brake state on owned vehicles, not proof of safe parking."
+  "companions.desc.parkingBrake": "Shows the mod's current parking-brake state on owned vehicles, not proof of safe parking.",
+  "companions.desc.oilGreaseService": "Shows oil and grease levels on owned vehicles so service can be planned before work. It does not record repairs or costs.",
+  "companionPage.oilGreaseService.lead": "Check which owned vehicles need oil or grease before their next job. These are the Oil And Grease Service mod's live reservoir levels, separate from fuel. A low level is a service prompt, not a completed repair or recorded expense.",
+  "companionPage.oilGreaseService.monitored": "Owned vehicles monitored",
+  "companionPage.oilGreaseService.serviceNeeded": "Below full level",
+  "companionPage.oilGreaseService.title": "Owned vehicle oil and grease",
+  "companionPage.oilGreaseService.vehicle": "Vehicle",
+  "companionPage.oilGreaseService.oil": "Oil",
+  "companionPage.oilGreaseService.grease": "Grease",
+  "companionPage.oilGreaseService.action": "Service check",
+  "companionPage.oilGreaseService.off": "Off",
+  "companionPage.oilGreaseService.belowFull": "Below full; check workshop",
+  "companionPage.oilGreaseService.full": "Full",
+  "companionPage.oilGreaseService.empty": "No readable oil and grease levels are available for owned vehicles.",
+  "companionPage.oilGreaseService.incomplete": "Some owned vehicle levels are unavailable; fleet totals are withheld."
 }

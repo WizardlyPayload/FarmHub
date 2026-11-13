@@ -1,8 +1,10 @@
 <#
-Stops only the identified FS25 process from a disposable Ally test after a hard
-wall-clock limit. Tina launches this helper hidden after recording the game's
-PID and UTC start time, before interacting with the world. It does not save or
-restore any profile data; the normal full restoration remains required.
+Polls the identified FS25 process from a disposable Ally test. This hidden
+child is NOT a sufficient independent hard stop: V76R1's helper logged ARMED,
+but was absent after the launcher call was interrupted; the game remained live
+past the limit. The cause of helper exit is unproved. Pair future runs with a proven
+scheduled deadline; do not infer safety from ARMED alone. This script does not
+save or restore profile data; full restoration remains required.
 #>
 [CmdletBinding()]
 param(

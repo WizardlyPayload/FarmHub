@@ -254,7 +254,6 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/AdjustableFillLevelAdvancedCollector.lua"/>
         <sourceFile filename="src/companionPages/ManualAttachCollector.lua"/>
         <sourceFile filename="src/companionPages/TowingChainHookCollector.lua"/>
-        <sourceFile filename="src/companionPages/UniversalAutoloadCollector.lua"/>
         <sourceFile filename="src/companionPages/SwathRouterCollector.lua"/>
         <sourceFile filename="src/companionPages/VehicleTradeInCollector.lua"/>
         <sourceFile filename="src/companionPages/DynamicDealershipCollector.lua"/>

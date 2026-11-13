@@ -38,6 +38,7 @@ const DETECTION_ONLY_IDS = new Set([
   "dynamicMarket",
   "outOfFuel",
   "soilWorkYieldBonus",
+  "woodManager",
 ]);
 
 const LIMITED_IDS = new Set([
@@ -198,8 +199,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Wood Manager",
     category: "storage",
     descKey: "companions.desc.woodManager",
-    desc: "Shows active nondefault split-wood price and wood-chip yield settings shared by the save. It does not record a farm's wood sales or harvest.",
-    relatedSection: "storage",
+    desc: "FarmHub detects Wood Manager. Its save-wide price and wood-chip settings are available in the mod, but it records no farm-owned wood sales, harvest or income for a separate Dashboard view.",
   },
   {
     id: "lumberjackHut",

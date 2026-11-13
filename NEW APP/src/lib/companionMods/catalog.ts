@@ -1798,6 +1798,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "fields",
   },
   {
+    id: "automaticTramlineSystem",
+    title: "Automatic Tramline System",
+    category: "fields",
+    descKey: "companions.desc.automaticTramlineSystem",
+    desc: "Shows this mod's per-seeder sowing-area counters and current tramline mode. It does not record field assignments or completed tramlines.",
+    relatedSection: "fields",
+  },
+  {
     id: "ritterFreshLoss",
     title: "Ritter Fresh",
     category: "storage",

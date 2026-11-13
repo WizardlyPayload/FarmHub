@@ -1005,6 +1005,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "automaticTramlineSystem",
+        title = "Automatic Tramline System",
+        category = "fields",
+        names = { "FS25_AutomaticTramlineSystem", "FS25_355320_Automatic_Tramline_System" },
+        globals = {},
+    },
+    {
         id = "helperSilageCompacting",
         title = "Helper Silage Compacting",
         category = "fleet",

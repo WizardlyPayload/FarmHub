@@ -89,6 +89,14 @@ local CATALOG = {
         globals = { "AS_CoopPay" },
     },
     {
+        id = "autoSwitchRegister",
+        title = "AutoSwitch weighings and sales",
+        category = "economy",
+        names = { "KM_82844_AutoSwitch", "FS25_AutoSwitch" },
+        substrings = { "autoswitch" },
+        globals = { "AS_Register" },
+    },
+    {
         id = "autoSwitchTireLife",
         title = "AutoSwitch tire life",
         category = "fleet",

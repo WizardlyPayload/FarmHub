@@ -709,6 +709,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "autoSwitchRegister",
+    title: "AutoSwitch weighings and sales",
+    category: "economy",
+    descKey: "companions.desc.autoSwitchRegister",
+    desc: "Shows this farm's recorded weighbridge readings and sales. Sales also appear in native finance data; weighings are not deliveries.",
+    relatedSection: "economy",
+  },
+  {
     id: "autoSwitchTireLife",
     title: "AutoSwitch tire life",
     category: "fleet",

@@ -93,6 +93,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/baleDirect").then((m) => m.Page) },
   { key: "autoSwitchCoop", catalogId: "autoSwitchCoop", title: "AutoSwitch co-operative payments", glyph: "AC", group: "finance",
     load: () => import("@/sections/mods/autoSwitchCoop").then((m) => m.Page) },
+  { key: "autoSwitchRegister", catalogId: "autoSwitchRegister", title: "AutoSwitch weighings and sales", glyph: "AR", group: "finance",
+    load: () => import("@/sections/mods/autoSwitchRegister").then((m) => m.Page) },
   { key: "grainHaulingService", catalogId: "grainHaulingService", title: "Grain Hauling Service", glyph: "GH", group: "finance",
     load: () => import("@/sections/mods/grainHaulingService").then((m) => m.Page) },
   { key: "overburden", catalogId: "overburden", title: "Overburden", glyph: "OB", group: "fields",

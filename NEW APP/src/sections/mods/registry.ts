@@ -280,8 +280,6 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/realFuelConsumption").then((m) => m.Page) },
   { key: "dieselFuelSystem", catalogId: "dieselFuelSystem", title: "Diesel Fuel System", glyph: "DF", group: "fleet",
     load: () => import("@/sections/mods/dieselFuelSystem").then((m) => m.Page) },
-  { key: "roundBalerExtension", catalogId: "roundBalerExtension", title: "Round Baler Extension", glyph: "RB", group: "fleet",
-    load: () => import("@/sections/mods/roundBalerExtension").then((m) => m.Page) },
   { key: "baleCapacityMultiplier", catalogId: "baleCapacityMultiplier", title: "Bale Capacity Multiplier", glyph: "BC", group: "fleet",
     load: () => import("@/sections/mods/baleCapacityMultiplier").then((m) => m.Page) },
   { key: "forageWagonCompression", catalogId: "forageWagonCompression", title: "Forage Wagon Compression", glyph: "FW", group: "fleet",

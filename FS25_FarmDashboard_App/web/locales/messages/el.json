@@ -4698,7 +4698,7 @@
   "companionPage.enhancedVehicle.km": "{{value}} km",
   "companionPage.enhancedVehicle.empty": "No EnhancedVehicle odometer is readable for this farm yet.",
   "companionPage.enhancedVehicle.truncated": "Only the first tracked vehicles are listed.",
-  "companions.desc.roundBalerExtension": "Shows the current drop mode and wrapper state of compatible balers owned by this farm. It does not count bales made.",
+  "companions.desc.roundBalerExtension": "Detects Round Baler Extension. Drop-mode and wrapper switches do not report bales made or work completed.",
   "companionPage.roundBalerExtension.lead": "Current drop mode and wrapper switch on compatible balers owned by this farm. Collect mode is an operating choice, not a lifetime bale count.",
   "companionPage.roundBalerExtension.wrappers": "Owned wrappers",
   "companionPage.roundBalerExtension.collectCount": "In collect mode",

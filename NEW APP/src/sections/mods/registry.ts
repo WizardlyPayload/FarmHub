@@ -318,8 +318,6 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/manualAttach").then((m) => m.Page) },
   { key: "towingChainHook", catalogId: "towingChainHook", title: "Towing Chain With Hook", glyph: "TC", group: "fleet",
     load: () => import("@/sections/mods/towingChainHook").then((m) => m.Page) },
-  { key: "vehicleControlAddon", catalogId: "vehicleControlAddon", title: "Vehicle Control Addon", glyph: "VC", group: "fleet",
-    load: () => import("@/sections/mods/vehicleControlAddon").then((m) => m.Page) },
   { key: "universalAutoload", catalogId: "universalAutoload", title: "Universal Autoload", glyph: "UA", group: "fleet",
     load: () => import("@/sections/mods/universalAutoload").then((m) => m.Page) },
   { key: "unloadPotatoSeeders", catalogId: "unloadPotatoSeeders", title: "Unload Potato Seeders", glyph: "PS", group: "fleet",

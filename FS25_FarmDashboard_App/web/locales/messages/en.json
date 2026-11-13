@@ -4734,7 +4734,7 @@
   "companionPage.roundBalerExtension.truncated": "Only the first compatible balers are listed.",
   "companionPage.dieselFuelSystem.oxidation": "Oxidation {{value}}%",
   "companions.desc.advancedVehicleFunctions": "Detects Advanced Vehicle Functions. Its saved switches do not report interventions, incidents or machine work.",
-  "companions.desc.vehicleControlAddon": "Shows current guidance, spacing, speed limiter and differential choices on vehicles owned by this farm. It does not record driving history.",
+  "companions.desc.vehicleControlAddon": "Detects Vehicle Control Addon. Its current vehicle switches do not report guided work or driving history.",
   "companionPage.advancedVehicleFunctions.on": "On",
   "companionPage.advancedVehicleFunctions.off": "Off",
   "companionPage.advancedVehicleFunctions.vehicles": "Owned AVF vehicles",

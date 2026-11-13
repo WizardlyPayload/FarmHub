@@ -56,6 +56,7 @@ const DETECTION_ONLY_IDS = new Set([
   "manualPaint",
   "advancedSeedingControl",
   "flexibleCombiSeeder",
+  "vehicleControlAddon",
 ]);
 
 const LIMITED_IDS = new Set([
@@ -1231,7 +1232,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Vehicle Control Addon",
     category: "fleet",
     descKey: "companions.desc.vehicleControlAddon",
-    desc: "Shows current guidance, spacing, speed limiter and differential choices on vehicles owned by this farm. It does not record driving history.",
+    desc: "Detects Vehicle Control Addon. Its current vehicle switches do not report guided work or driving history.",
     relatedSection: "vehicles",
   },
   {

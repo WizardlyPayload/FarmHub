@@ -261,6 +261,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "fields",
   },
   {
+    id: "grapeOliveYieldSettings",
+    title: "Grape and Olive Yield Settings",
+    category: "fields",
+    descKey: "companions.desc.grapeOliveYieldSettings",
+    desc: "Shows the active grape and olive yield multipliers shared by the whole save. It does not measure harvested crop or predict a field's yield.",
+    relatedSection: "fields",
+  },
+  {
     id: "resourceUsageControl",
     title: "Resource Usage Control",
     category: "fields",

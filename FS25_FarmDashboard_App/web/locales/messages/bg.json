@@ -6684,4 +6684,13 @@
   ,"companionPage.autoSwitchRegister.truncated": "The latest 60 readings of each type are shown; full totals are withheld."
   ,"companionPage.autoSwitchRegister.noWeighings": "No weighings recorded for this farm."
   ,"companionPage.autoSwitchRegister.noSales": "No sales recorded for this farm."
+  ,"companions.desc.grapeOliveYieldSettings": "Shows the active grape and olive yield multipliers shared by the whole save. It does not measure harvested crop or predict a field's yield."
+  ,"companionPage.grapeOliveYieldSettings.lead": "These live settings apply to grapes and olives across the whole save. The game yield parameter may also reflect other mods. This page does not measure a harvest or predict yield from a field."
+  ,"companionPage.grapeOliveYieldSettings.grape": "Grape"
+  ,"companionPage.grapeOliveYieldSettings.olive": "Olive"
+  ,"companionPage.grapeOliveYieldSettings.tableTitle": "Current crop yield rules"
+  ,"companionPage.grapeOliveYieldSettings.crop": "Crop"
+  ,"companionPage.grapeOliveYieldSettings.multiplier": "Mod setting"
+  ,"companionPage.grapeOliveYieldSettings.rate": "Current game parameter"
+  ,"companionPage.grapeOliveYieldSettings.empty": "The active server yield rule is not available."
 }

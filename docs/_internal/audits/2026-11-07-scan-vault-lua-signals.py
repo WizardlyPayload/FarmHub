@@ -2,8 +2,9 @@
 
 Signals only select archives for manual review. A hit does not establish mod-owned
 state, farm scope, safe runtime access, distinct value, or game compatibility.
-Legacy XML reads are recorded separately from writes and do not add score. A
-write hit may still be a profile setting, editor output, or comment.
+Legacy XML reads and setters are recorded separately from file commits and do
+not add score. A commit hit may still be a profile setting, editor output, or
+comment.
 No ZIP is modified and this script does not hash entire archives.
 """
 
@@ -20,9 +21,8 @@ MAX_SCRIPT_BYTES = 2_000_000
 SIGNALS = {
     "savegamePath": re.compile(rb"savegameDirectory|savegameFolderPath|savegameDirectoryName", re.I),
     "xmlPersistence": re.compile(rb"saveToXML|loadFromXML|registerXMLPaths|XMLFile\.(?:create|load)", re.I),
-    "legacyXmlWrite": re.compile(
-        rb"\b(?:createXMLFile|saveXMLFile|setXML(?:String|Int|Float|Bool))\b", re.I
-    ),
+    "legacyXmlCommit": re.compile(rb"\b(?:createXMLFile|saveXMLFile)\b", re.I),
+    "legacyXmlSet": re.compile(rb"\bsetXML(?:String|Int|Float|Bool)\b", re.I),
     "legacyXmlRead": re.compile(rb"\bloadXMLFile\b", re.I),
     "rawFileWrite": re.compile(
         rb"\b(?:fileCreate|fileWrite|io\.open\s*\([^\n]{0,160},\s*['\"](?:w|a|wb|ab))", re.I
@@ -65,7 +65,7 @@ def scan_archive(row: dict) -> dict:
         result["error"] = str(exc)[:160]
     signals = result["signals"]
     result["triageScore"] = sum(weight for key, weight in {
-        "savegamePath": 4, "xmlPersistence": 3, "legacyXmlWrite": 3,
+        "savegamePath": 4, "xmlPersistence": 3, "legacyXmlCommit": 3,
         "rawFileWrite": 3, "farmKey": 3,
         "ownerLookup": 2, "recordHint": 2, "vehicleState": 1,
         "placeableState": 1, "network": 1,

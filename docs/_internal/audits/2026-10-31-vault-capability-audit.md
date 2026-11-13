@@ -2214,6 +2214,13 @@ The next lower-score source pass prioritised titles that might imply maintenance
 
 No game or installed comparison, new collector, placed building, bought machine or altered save follows from this source pass. Similar score-1 titles remain open; exact duplicate bytes are stated only for pairs whose full hashes match.
 
+Five more score-1 names with apparent economic or fieldwork value were read in full at their declared Lua entrypoints. None creates a separate farm outcome:
+
+- Reduce Wearout `uncategorized/FS25_304593_Reduce_Wearout.zip` v1.0.0.0 SHA-256 `3E361718BFE28CC1764B29168BAEFE78EC39D822EFA903E21F4BD68AE510DE5D` wraps native `updateDamageAmount` with a reduction factor; the resulting wear is native vehicle damage. Full Refund `uncategorized/FS25_305054_Full_Refund.zip` v1.0.0.0 SHA-256 `89AE32885DC9C41DD2351E53EB095C6B5F58D8548D3F28E1E1E7EA3D03EED29E` replaces sell-price getters with current object price. Guaranteed Placeable Refund `uncategorized/FS25_306728_Guaranteed_Placeable_Refund.zip` v1.0.0.0 SHA-256 `5780A6C2B7CA960DB278EBF2B98C9E107198DA83C8466470AEB25D89D5BF2EC0` similarly replaces placeable/economy sell-price getters. Neither saves a separate sale, paid amount or refund ledger; actual transactions belong to native finance.
+- Fertilize Once `uncategorized/FS25_305502_Fertilize_Once.zip` v1.0.0.0 SHA-256 `934C5566513AD76984D5BCD24D21E270FF3617B378631C399C7DFE01AC6C14DC` changes sprayer fertilizer application rules at load; it does not record treated area or litres applied. Real Mulcher `uncategorized/FS25_305973_Real_Mulcher.zip` v1.0.0.0 SHA-256 `5B894F763541BCBEDB75CEDDFA2E167EC2C172D99E2981DFD534B058C719C655` broadens where a native mulcher works and clears decoration density after native `processMulcherArea`; it records no separate worked-field or crop-loss history. Any resulting field/world state needs native ownership and gameplay evidence before a farm claim.
+
+No sale, fertilizer pass or mulching action was performed for this source classification.
+
 ## 2026-11-13 low-score visual and selection controls
 
 - Dirty Tire Tracks `uncategorized/FS25_360402_Dirty_Tire_Tracks.zip` v1.0.0.0 SHA-256 `8F1155A3FB89073305ADA991FB0E7AE0C6E79F13E53F0B9B6EA163242929154B` gathers live wheel/ground data to color transient tracks. Its saved XML is a profile-wide fade preference under `modSettings/FS25_dirtyTireTracks/`; the reviewed sources do not persist where this farm drove or record a field treatment. Visual tracks in the game are the intended result, not a dashboard work map.

@@ -2750,6 +2750,8 @@ Tina returned a substantive bounded PASS for the resumed cohort-guard probe and 
 
 This no-game result establishes task registration, an independently firing deadline, watcher exit and disarm on Ally. It does **not** establish stopping a launcher-replaced game PID, `-profile` isolation, or full-DLC StockGuard/FarmHub compatibility. The earlier game-stop isolation failure and RF-owned `GROUND_CAPACITY (POLIFOSKA)` normal-roster load gate remain open; no further FarmHub game run or gameplay fixture follows from this probe.
 
+At 21:12 UTC Tina ACKed Brian's newer `RF-STOCKGUARD-GROUNDCAP-WORLD-20261113-BRIAN-2113` request. RF therefore owns Ally again until its substantive result and restoration; no FarmHub game test has been queued across that ownership boundary.
+
 ### Fifteen equipment ZIPs with one Lua helper each (13 November)
 
 The [exact equipment-helper register](2026-11-13-score0-equipment-helper-evidence.tsv) records 15 distinct full ZIP hashes, root descriptor versions, each sole Lua member and its root descriptor reference. The two Ross More slurry tankers contain identical `ManureSystemRegistry.lua` helper bytes, though their **full ZIPs differ**; one archive does not reference that member from its root descriptor. Four heavy machines contain small shop-category registration scripts. Three equipment packs register ManureSystem vehicle feature flags from their XML. PJU-9 and Trail King repair converted material slots; the Fendt pack registers native colour/design choices. The Hilux animates a gear selector from native motor direction, the ROPA Maus supplies a cultivator speed-gate function, and the John Deere pack registers a ManureSystem compatibility specialization.

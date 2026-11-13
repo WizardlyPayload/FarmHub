@@ -2466,7 +2466,7 @@
   "companions.desc.realisticDieselPrice": "Sets diesel price from real-world country presets via the game settings menu. Tank fill can cost more than station fuel; multiplayer supported.",
   "companions.desc.fluctuatingDieselPrice": "Moves diesel price over time with the economy difficulty and in-game clock instead of a fixed country rate.",
   "companions.desc.dynamicMarket": "Selling-station prices move by market group each period with season, weather, supply and demand, and big sales push one station's price down for a while. FarmHub shows the group moves, seasonal price curves and station sell pressure on its own page, and never changes prices.",
-  "companions.desc.marketPriceHelper": "Shows the mod's best selling-station price observations in a local single-player game. Market observations are not farm sales or income.",
+  "companions.desc.marketPriceHelper": "Detects Market Price Helper. Its local price history is market-wide and does not establish a sale decision for the selected farm.",
   "companions.desc.enhancedSeasonalPrices": "Changes buying prices as well as selling prices, and needs the Seasonal Prices base package. FarmHub does not read those prices from this mod.",
   "companions.desc.statisticsExtended": "Expands the in-game statistics screens with extra farm performance detail.",
   "companions.desc.restrictedPeriods": "Blocks spreading slurry, digestate, and manure during closed seasons (and frost for liquids), matching fertilizer ordinance-style rules.",

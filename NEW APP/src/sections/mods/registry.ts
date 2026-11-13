@@ -21,8 +21,6 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/automaticLoanRepay").then((m) => m.Page) },
   { key: "realisticDieselPrice", catalogId: "realisticDieselPrice", title: "Realistic Diesel Price", glyph: "RD", group: "finance",
     load: () => import("@/sections/mods/realisticDieselPrice").then((m) => m.Page) },
-  { key: "marketPriceHelper", catalogId: "marketPriceHelper", title: "Market Price Helper", glyph: "MP", group: "finance",
-    load: () => import("@/sections/mods/marketPriceHelper").then((m) => m.Page) },
   { key: "lumberjackHut", catalogId: "lumberjackHut", title: "Lumberjack Hut", glyph: "LH", group: "storage",
     load: () => import("@/sections/mods/lumberjackHut").then((m) => m.Page) },
   { key: "fluctuatingDieselPrice", catalogId: "fluctuatingDieselPrice", title: "Fluctuating Diesel Price", glyph: "FD", group: "finance",

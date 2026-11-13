@@ -35,6 +35,7 @@ export type CompanionCatalogEntry = {
 export type CompanionSupport = "live" | "limited" | "detection-only" | "unmapped";
 
 const DETECTION_ONLY_IDS = new Set([
+  "marketPriceHelper",
   "dynamicMarket",
   "outOfFuel",
   "soilWorkYieldBonus",
@@ -208,7 +209,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Market Price Helper",
     category: "economy",
     descKey: "companions.desc.marketPriceHelper",
-    desc: "Shows the mod's best selling-station price observations in a local single-player game. Market observations are not farm sales or income.",
+    desc: "Detects Market Price Helper. Its local price history is market-wide and does not establish a sale decision for the selected farm.",
     relatedSection: "economy",
   },
   {

@@ -148,6 +148,7 @@ if ($Mode -eq 'Arm') {
         Write-Output ('ARMED watch={0} stop={1} deadlineUtc={2:o}' -f $watchName, $stopName, $deadline)
     } catch {
         foreach ($name in @($watchName, $stopName)) {
+            Stop-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
             Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
         }
         throw

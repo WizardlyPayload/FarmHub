@@ -6,6 +6,11 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "ProductionRevampCollector.lua";
 const SETUP = `
   _G.g_modIsLoaded = { FS25_378044_Production_Revamp = true }
+  _G.g_modManager = {
+    getActiveMods = function()
+      return { { modName = "FS25_378044_Production_Revamp", version = "1.0.0.0" } }
+    end
+  }
   _G.FS25_378044_Production_Revamp = {
     Revamp = { settings = { storageActive = true, distributionActive = true } }
   }
@@ -99,6 +104,15 @@ test("withholds an invalid recipe mode rather than reporting a false choice", ()
     SETUP.replace('mixMode = "MOST"', 'mixMode = "INVALID"'), { farmId: 1 });
   expect(page).toMatchObject({ readState: "partial", coverage: "partial",
     byFarm: { "1": { recipeChoiceCount: 0 } }, recipeRows: {} });
+});
+
+test("withholds production choices for a changed or unknown mod version", () => {
+  const changed = SETUP.replace('version = "1.0.0.0"', 'version = "1.0.0.1"');
+  expect(runCompanionPage(FILE, changed, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
+  const unknown = SETUP.replace(', version = "1.0.0.0"', "");
+  expect(runCompanionPage(FILE, unknown, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
 });
 
 test("withholds client state and unresolved target; distinguishes saved inactive settings", () => {

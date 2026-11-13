@@ -20,6 +20,9 @@ CompanionPages.register({
     modNames = { "FS25_378044_Production_Revamp", "FS25_ProductionRevamp" },
     substrings = { "production_revamp", "productionrevamp" },
     collect = function(ctx)
+        if ctx.version ~= "1.0.0.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local farmId, mission = ctx.farmId, ctx.mission
         if farmId == nil or farmId <= 0 then
             return { readState = "settings-only", reason = "no-farm" }

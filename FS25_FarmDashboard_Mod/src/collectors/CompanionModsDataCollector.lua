@@ -970,6 +970,13 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "hydraulicBrokenTrailer",
+        title = "Hydraulic Broken Trailer",
+        category = "fleet",
+        names = { "KM_81545_Hydraulic_Broken_Trailer" },
+        globals = {},
+    },
+    {
         id = "toggleableSilageAdditive",
         title = "Toggleable Silage Additive",
         category = "fleet",

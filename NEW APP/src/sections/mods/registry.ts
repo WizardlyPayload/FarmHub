@@ -236,6 +236,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/hudPlus").then((m) => m.Page) },
   { key: "realisticBrakes", catalogId: "realisticBrakes", title: "Realistic Brakes", glyph: "RB", group: "fleet",
     load: () => import("@/sections/mods/realisticBrakes").then((m) => m.Page) },
+  { key: "hydraulicBrokenTrailer", catalogId: "hydraulicBrokenTrailer", title: "Hydraulic Broken Trailer", glyph: "HB", group: "fleet",
+    load: () => import("@/sections/mods/hydraulicBrokenTrailer").then((m) => m.Page) },
   { key: "toggleableSilageAdditive", catalogId: "toggleableSilageAdditive", title: "Toggleable Silage Additive", glyph: "SA", group: "fleet",
     load: () => import("@/sections/mods/toggleableSilageAdditive").then((m) => m.Page) },
   { key: "buyableGps", catalogId: "buyableGps", title: "Buyable GPS", glyph: "GP", group: "fleet",

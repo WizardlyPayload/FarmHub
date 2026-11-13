@@ -227,7 +227,7 @@ export function ModPage({
         </div>
         {lead ? <p class="fd-muted-sm">{lead}</p> : null}
         {page && receivedAt ? <p class="fd-muted-sm">
-          {tOr("companionPage.shared.receivedAt", "Dashboard received game data: {{time}}", { time: receivedAt })}
+          {tOr("companionPage.shared.dataTimestamp", "Game data timestamp: {{time}}", { time: receivedAt })}
         </p> : null}
       </header>
       {state === "missing" ? (

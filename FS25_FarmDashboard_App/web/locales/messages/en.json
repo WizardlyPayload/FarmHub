@@ -3091,7 +3091,7 @@
   "companionPage.shared.noticeSettings": "Only this mod's settings are readable. Live figures stay in the game.",
   "companionPage.shared.noticeFailed": "FarmHub could not read this mod on the last export. The figures below may be missing or out of date.",
   "companionPage.shared.noticePartial": "Some of this mod's readings were unavailable on the last export.",
-  "companionPage.shared.receivedAt": "Dashboard received game data: {{time}}",
+  "companionPage.shared.dataTimestamp": "Game data timestamp: {{time}}",
   "companionPage.shared.version": "v{{version}}",
   "companionPage.shared.notDetectedTitle": "Not detected in this save",
   "companionPage.shared.notDetected": "{{mod}} is not loaded in the save FarmHub is reading. Enable it in the game's mod list and load the save.",

@@ -2995,7 +2995,7 @@
   "companionPage.dynamicMarket.setPressureRule": "Pressure rule",
   "companionPage.dynamicMarket.pressureRule": "−{{step}}% per {{liters}} L sold, up to −{{max}}%, recovers {{decay}}% per hour",
   "companionPage.dynamicMarket.setNotices": "Market notices in game",
-  "companionPage.dynamicMarket.lead": "Dynamic Market moves selling prices by market group each period, driven by season, weather, supply and demand. Selling large amounts at one station pushes its price down for a while. This page shows each group's current move and the outlook for next period.",
+  "companionPage.dynamicMarket.lead": "These prices and trends belong to the shared market, not this farm's sales or income. Dynamic Market moves selling prices by group with season, weather, supply and demand; large sales can temporarily lower one station's price. Use the current move and next-period outlook to plan when and where to sell.",
   "companionPage.dynamicMarket.groupsTitle": "Market groups",
   "companionPage.dynamicMarket.colGroup": "Group",
   "companionPage.dynamicMarket.colChange": "Price move now",

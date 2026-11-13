@@ -54,6 +54,7 @@ const DETECTION_ONLY_IDS = new Set([
   "vehicleWeightModifier",
   "parkingBrake",
   "manualPaint",
+  "advancedSeedingControl",
 ]);
 
 const LIMITED_IDS = new Set([
@@ -1285,7 +1286,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Advanced Seeding Control",
     category: "fleet",
     descKey: "companions.desc.advancedSeedingControl",
-    desc: "Shows the current tramline mode, lane, widths and starter fertilizer switch on owned seeders. It does not record completed sowing.",
+    desc: "Detects Advanced Seeding Control. Saved tramline choices do not show field work or a completed pass.",
     relatedSection: "vehicles",
   },
   {

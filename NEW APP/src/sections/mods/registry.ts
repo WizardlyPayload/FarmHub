@@ -326,8 +326,6 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/unloadPotatoSeeders").then((m) => m.Page) },
   { key: "handToolDrop", catalogId: "handToolDrop", title: "Hand Tool Drop", glyph: "HT", group: "fleet",
     load: () => import("@/sections/mods/handToolDrop").then((m) => m.Page) },
-  { key: "advancedSeedingControl", catalogId: "advancedSeedingControl", title: "Advanced Seeding Control", glyph: "AC", group: "fleet",
-    load: () => import("@/sections/mods/advancedSeedingControl").then((m) => m.Page) },
   { key: "flexibleCombiSeeder", catalogId: "flexibleCombiSeeder", title: "Flexible Combi Seeder", glyph: "FC", group: "fleet",
     load: () => import("@/sections/mods/flexibleCombiSeeder").then((m) => m.Page) },
   { key: "dynamicMolehills", catalogId: "dynamicMolehills", title: "Dynamic Molehills", glyph: "MH", group: "fields",

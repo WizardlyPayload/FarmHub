@@ -5015,7 +5015,7 @@
   ,"companionPage.sowingMachineRollerReady.partial": "Some eligible seeders had an unreadable roller switch."
   ,"companionPage.sowingMachineRollerReady.noneEligible": "No eligible seeder is currently owned by this farm."
   ,"companionPage.sowingMachineRollerReady.serverOnly": "Seeder roller settings can be read only from the game's server state."
-  ,"companions.desc.advancedSeedingControl": "Shows the current tramline mode, lane, widths and starter fertilizer switch on owned seeders. It does not record completed sowing."
+  ,"companions.desc.advancedSeedingControl": "Detects Advanced Seeding Control. Saved tramline choices do not show field work or a completed pass."
   ,"companionPage.advancedSeedingControl.title": "Advanced Seeding Control"
   ,"companionPage.advancedSeedingControl.lead": "Current tramline choices on seeders owned by this farm. These settings do not prove a pass was completed or a tramline was made in a field."
   ,"companionPage.advancedSeedingControl.seeders": "Owned ASC seeders"

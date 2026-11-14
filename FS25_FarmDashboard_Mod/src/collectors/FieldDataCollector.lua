@@ -2,6 +2,43 @@
 
 FieldDataCollector = {}
 
+-- Realistic Weather v1.2.1.0 keeps irrigation by farmland ID. Its frame also
+-- uses engine field IDs, which need not be the same namespace on every map.
+-- Read only the server's live parcel record; never infer it from moisture cells.
+function FieldDataCollector.readRealisticWeatherIrrigation(parcelId, ownerFarmId)
+    local modName = "FS25_RealisticWeather"
+    if _G.g_server == nil or type(_G.g_modIsLoaded) ~= "table" or _G.g_modIsLoaded[modName] ~= true then
+        return nil
+    end
+    local modManager = _G.g_modManager
+    if type(modManager) ~= "table" or type(modManager.getModByName) ~= "function" then return nil end
+    local okMod, mod = pcall(modManager.getModByName, modManager, modName)
+    if not okMod or type(mod) ~= "table" or mod.version ~= "1.2.1.0" then return nil end
+    local mission = _G.g_currentMission
+    local sys = type(mission) == "table" and mission.moistureSystem or nil
+    if type(sys) ~= "table" or sys.isServer ~= true or sys.mission ~= mission or type(sys.irrigatingFields) ~= "table" then
+        return nil
+    end
+    if type(parcelId) ~= "number" or parcelId < 1 or parcelId % 1 ~= 0 or
+       type(ownerFarmId) ~= "number" or ownerFarmId < 1 or ownerFarmId == 100 then
+        return nil
+    end
+    local farmlandManager = _G.g_farmlandManager
+    if type(farmlandManager) ~= "table" or type(farmlandManager.getFarmlandOwner) ~= "function" then return nil end
+    local okOwner, currentOwner = pcall(farmlandManager.getFarmlandOwner, farmlandManager, parcelId)
+    if not okOwner or currentOwner ~= ownerFarmId then return nil end
+    local record = sys.irrigatingFields[parcelId]
+    if type(record) ~= "table" or record.id ~= parcelId or type(record.isActive) ~= "boolean" then return nil end
+    local pending = record.pendingCost
+    if type(pending) ~= "number" or pending ~= pending or pending < 0 or pending > 1000000000 then return nil end
+    if not record.isActive and pending == 0 then return nil end
+    return {
+        parcelId = parcelId,
+        active = record.isActive,
+        pendingNextDay = math.floor(pending * 100 + 0.5) / 100,
+    }
+end
+
 local soilSampleHold = {}
 
 --- Mission-monotonic g_time, inherited through the mod environment.
@@ -3383,6 +3420,8 @@ function FieldDataCollector:_collectImpl()
             fData.fruitMapColor = hex
         end
 
+        local parcelId = field.farmland and field.farmland.id or nil
+        fData.realisticWeatherIrrigation = FieldDataCollector.readRealisticWeatherIrrigation(parcelId, ownerFarmId)
         table.insert(fieldData, fData)
         fieldCoopTick()
         end

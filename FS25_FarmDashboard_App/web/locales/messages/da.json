@@ -393,6 +393,8 @@
   "map.fieldMerged": "Felter {{ids}}",
   "map.iconHint": "Ikoner viser køretøjstype og -flade, som maskinen peger i, når livedata inkluderer retning. Skjul kortkantbeskæringer PDA-krom fra oversigten.",
   "fields.title": "Feltstyring",
+  "fields.realisticWeatherIrrigation": "Irrigation at last update: {{active}} active; parcels {{parcels}}{{pendingText}}.",
+  "fields.realisticWeatherIrrigationPending": "; {{amount}} unpaid for the next day",
   "fields.subtitle": "Live-feltdata — opdateres hvert 5. sekund",
   "fields.totalFields": "Samlede felter",
   "fields.totalArea": "Samlet areal",

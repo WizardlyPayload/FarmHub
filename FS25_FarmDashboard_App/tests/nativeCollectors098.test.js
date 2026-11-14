@@ -158,6 +158,50 @@ return "bales=" .. tostring(f.baleCountOnField) .. "|registered=" .. tostring(f.
 `;
 
 describe("098 field and soil collectors under the native mod environment", () => {
+    test("Realistic Weather irrigation uses the exact loaded version and current farmland owner", () => {
+        const body = `
+local modName = "FS25_RealisticWeather"
+ENGINE.g_server = {}
+ENGINE.g_modIsLoaded[modName] = true
+ENGINE.g_modManager = { getModByName = function(self, name) if name == modName then return { version = "1.2.1.0" } end end }
+ENGINE.g_farmlandManager.getFarmlandOwner = function(self, id) return id == 5 and 1 or 2 end
+ENGINE.g_currentMission.moistureSystem = {
+    mission = ENGINE.g_currentMission, isServer = true,
+    irrigatingFields = { [5] = { id = 5, isActive = true, pendingCost = 18.257 } },
+}
+local owned = FieldDataCollector.readRealisticWeatherIrrigation(5, 1)
+local foreign = FieldDataCollector.readRealisticWeatherIrrigation(5, 2)
+local engineFieldId = FieldDataCollector.readRealisticWeatherIrrigation(1, 1)
+ENGINE.g_modManager.getModByName = function() return { version = "1.2.0.0" } end
+local wrongVersion = FieldDataCollector.readRealisticWeatherIrrigation(5, 1)
+ENGINE.g_server = nil
+local client = FieldDataCollector.readRealisticWeatherIrrigation(5, 1)
+return tostring(owned.parcelId) .. "|" .. tostring(owned.active) .. "|" .. tostring(owned.pendingNextDay) .. "|" ..
+       tostring(foreign) .. "|" .. tostring(engineFieldId) .. "|" .. tostring(wrongVersion) .. "|" .. tostring(client)
+`;
+        expect(run({ files: FIELD_FILES, body })).toBe("5|true|18.26|nil|nil|nil|nil");
+    });
+
+    test("Realistic Weather parcel joins a field whose engine field ID differs", () => {
+        const body = `
+local modName = "FS25_RealisticWeather"
+ENGINE.g_server = {}
+ENGINE.g_modIsLoaded[modName] = true
+ENGINE.g_modManager = { getModByName = function() return { version = "1.2.1.0" } end }
+ENGINE.g_farmlandManager.getFarmlandOwner = function(self, id) return id == 5 and 1 or 2 end
+ENGINE.g_currentMission.moistureSystem = {
+    mission = ENGINE.g_currentMission, isServer = true,
+    irrigatingFields = { [5] = { id = 5, isActive = true, pendingCost = 18.257 } },
+}
+local fields = FieldDataCollector:collect()
+local field = fields[1]
+return tostring(field.id) .. "|" .. tostring(field.farmlandId) .. "|" ..
+       tostring(field.realisticWeatherIrrigation.parcelId) .. "|" ..
+       tostring(field.realisticWeatherIrrigation.pendingNextDay)
+`;
+        expect(run({ files: FIELD_FILES, body })).toBe("1|5|5|18.26");
+    });
+
     test("slot-system bales and engine height types reach the field export", () => {
         expect(run({ files: FIELD_FILES, engine: slotBale, body: fieldBody })).toBe("bales=1|registered=2");
     });

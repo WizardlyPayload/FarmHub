@@ -393,6 +393,8 @@
   "map.fieldMerged": "Lauki {{ids}}",
   "map.iconHint": "Ikonas rāda transportlīdzekļa tipu un virzienu, kurā mašīna ir vērsta, ja tiešraides dati ietver virzienu. Paslēpt kartes robežu, lai PDA hroms netiktu rādīts pārskatā.",
   "fields.title": "Lauka pārvaldība",
+  "fields.realisticWeatherIrrigation": "Irrigation at last update: {{active}} active; parcels {{parcels}}{{pendingText}}.",
+  "fields.realisticWeatherIrrigationPending": "; {{amount}} unpaid for the next day",
   "fields.subtitle": "Tiešraides lauka dati — tiek atsvaidzināti ik pēc 5 sekundēm",
   "fields.totalFields": "Kopējais lauku skaits",
   "fields.totalArea": "Kopējā platība",

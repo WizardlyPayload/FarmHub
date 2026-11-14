@@ -393,6 +393,8 @@
   "map.fieldMerged": "Polja {{ids}}",
   "map.iconHint": "Ikone prikazuju vrstu vozila i smjer u kojem je stroj usmjeren kada podaci uživo uključuju smjer. Sakrij obrub karte, izrezivanje PDA chromea izvan pregleda.",
   "fields.title": "Upravljanje terenom",
+  "fields.realisticWeatherIrrigation": "Irrigation at last update: {{active}} active; parcels {{parcels}}{{pendingText}}.",
+  "fields.realisticWeatherIrrigationPending": "; {{amount}} unpaid for the next day",
   "fields.subtitle": "Podaci s terena uživo — osvježavaju se svakih 5 sekundi",
   "fields.totalFields": "Ukupan broj polja",
   "fields.totalArea": "Ukupna površina",

@@ -393,6 +393,8 @@
   "map.fieldMerged": "Velden {{ids}}",
   "map.iconHint": "Pictogrammen tonen het voertuigtype en de richting waarin de machine wijst wanneer live data de rijrichting bevat. Verberg de kaartrand en snijd de PDA Chrome-weergave uit.",
   "fields.title": "Veldmanagement",
+  "fields.realisticWeatherIrrigation": "Irrigation at last update: {{active}} active; parcels {{parcels}}{{pendingText}}.",
+  "fields.realisticWeatherIrrigationPending": "; {{amount}} unpaid for the next day",
   "fields.subtitle": "Live veldgegevens — worden elke 5 seconden vernieuwd.",
   "fields.totalFields": "Totaal aantal velden",
   "fields.totalArea": "Totale oppervlakte",

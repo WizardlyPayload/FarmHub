@@ -7,6 +7,7 @@ import { refreshFieldRulesCache } from "@/lib/rules-engine";
 import { useDashboardStore } from "@/store/dashboard-store";
 import { saveProfileFromUnitDisplay } from "@/lib/profile-display";
 import { unitDisplayFromPayload } from "@/lib/fill-units";
+import { formatCurrency } from "@/lib/economy";
 import {
   clusterFieldsForDisplay,
   type FieldRecord,
@@ -93,6 +94,34 @@ function buildSoilTriage(rows: FieldRecord[]): SoilTriage {
   }
 
   return { active: true, urgent, watch, good };
+}
+
+/** Realistic Weather's irrigation key is a parcel ID, not an engine field ID. */
+function readRealisticWeatherIrrigation(fields: FieldRecord[], farmId: number) {
+  const parcels = new Map<number, { active: boolean; pending: number }>();
+  const ambiguous = new Set<number>();
+  for (const field of fields) {
+    if (Number(field.ownerFarmId ?? field.farmId ?? 0) !== farmId) continue;
+    const row = field.realisticWeatherIrrigation;
+    // The native collector sets farmlandId from field.farmland.id when present.
+    const id = Number(field.farmlandId);
+    const pending = Number(row?.pendingNextDay);
+    if (!row || !Number.isInteger(id) || id < 1 || Number(row.parcelId) !== id ||
+        typeof row.active !== "boolean" || !Number.isFinite(pending) || pending < 0 || ambiguous.has(id)) continue;
+    const prior = parcels.get(id);
+    if (prior && (prior.active !== row.active || prior.pending !== pending)) {
+      parcels.delete(id);
+      ambiguous.add(id);
+    } else {
+      parcels.set(id, { active: row.active, pending });
+    }
+  }
+  if (!parcels.size) return null;
+  return {
+    ids: [...parcels.keys()].sort((a, b) => a - b),
+    active: [...parcels.values()].filter((row) => row.active).length,
+    pending: [...parcels.values()].reduce((sum, row) => sum + row.pending, 0),
+  };
 }
 
 function asFieldFilter(raw: string | undefined): FieldFilterType {
@@ -203,6 +232,10 @@ export function FieldsSection() {
 
   const stats = useMemo(() => computeFieldStats(displayRows), [displayRows]);
   const areaProfile = saveProfileFromUnitDisplay(unitDisplayFromPayload(payload));
+  const realisticWeatherIrrigation = useMemo(
+    () => readRealisticWeatherIrrigation(allFields, farmId),
+    [allFields, farmId],
+  );
   const areaAcres = areaProfile?.effective?.acre === true;
   const areaValue = stats.totalArea === "—" || !areaAcres
     ? stats.totalArea
@@ -356,6 +389,20 @@ export function FieldsSection() {
           <p class="fd-fields__stat-value">{stats.harvestReady}</p>
         </Card>
       </div>
+
+      {realisticWeatherIrrigation ? (
+        <p class="fd-fields__irrigation-note">
+          {tOr("fields.realisticWeatherIrrigation", "Irrigation at last update: {{active}} active; parcels {{parcels}}{{pendingText}}.", {
+            active: realisticWeatherIrrigation.active,
+            parcels: realisticWeatherIrrigation.ids.join(", "),
+            pendingText: realisticWeatherIrrigation.pending > 0
+              ? tOr("fields.realisticWeatherIrrigationPending", "; {{amount}} unpaid for the next day", {
+                  amount: formatCurrency(realisticWeatherIrrigation.pending, areaProfile),
+                })
+              : "",
+          })}
+        </p>
+      ) : null}
 
       <CompanionModsEmbed categories={["fields"]} ids={FIELD_SURFACE_IDS} title={tOr("companions.embedFields", "Field companion mods")} />
 

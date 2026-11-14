@@ -393,6 +393,8 @@
   "map.fieldMerged": "Réimsí {{ids}}",
   "map.iconHint": "Taispeánann deilbhíní cineál feithicle agus aghaidh an treo a bhfuil an meaisín ag díriú nuair a chuimsíonn sonraí beo treo. Folaigh barraí imeall an léarscáil PDA chrome as an bhforbhreathnú.",
   "fields.title": "Bainistíocht Réimse",
+  "fields.realisticWeatherIrrigation": "Irrigation at last update: {{active}} active; parcels {{parcels}}{{pendingText}}.",
+  "fields.realisticWeatherIrrigationPending": "; {{amount}} unpaid for the next day",
   "fields.subtitle": "Sonraí allamuigh beo — athnuachan gach 5 soicind",
   "fields.totalFields": "Iomlán na Réimsí",
   "fields.totalArea": "Achar Iomlán",

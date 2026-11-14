@@ -393,6 +393,8 @@
   "map.fieldMerged": "Kentät {{ids}}",
   "map.iconHint": "Kuvakkeet näyttävät ajoneuvotyypin ja suunnan, johon kone osoittaa, kun reaaliaikaiset tiedot sisältävät suunnan. Piilota kartan reunat yleiskatsauksesta.",
   "fields.title": "Kenttähallinta",
+  "fields.realisticWeatherIrrigation": "Irrigation at last update: {{active}} active; parcels {{parcels}}{{pendingText}}.",
+  "fields.realisticWeatherIrrigationPending": "; {{amount}} unpaid for the next day",
   "fields.subtitle": "Reaaliaikaiset kenttätiedot – päivittyvät 5 sekunnin välein",
   "fields.totalFields": "Kenttien kokonaismäärä",
   "fields.totalArea": "Kokonaispinta-ala",

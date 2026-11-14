@@ -393,6 +393,8 @@
   "map.fieldMerged": "Campos {{ids}}",
   "map.iconHint": "Os ícones mostram o tipo de veículo e indicam a direção para a qual a máquina está apontando quando os dados em tempo real incluem a direção. Ocultar a borda do mapa corta a interface do PDA da visão geral.",
   "fields.title": "Gestão de Campo",
+  "fields.realisticWeatherIrrigation": "Irrigation at last update: {{active}} active; parcels {{parcels}}{{pendingText}}.",
+  "fields.realisticWeatherIrrigationPending": "; {{amount}} unpaid for the next day",
   "fields.subtitle": "Dados de campo em tempo real — atualizados a cada 5 segundos",
   "fields.totalFields": "Total de campos",
   "fields.totalArea": "Área total",

@@ -393,6 +393,8 @@
   "map.fieldMerged": "Fields {{ids}}",
   "map.iconHint": "Icons show vehicle type and face the way the machine is pointing when live data includes heading. Hide map border crops PDA chrome off the overview.",
   "fields.title": "Field Management",
+  "fields.realisticWeatherIrrigation": "Irrigation at last update: {{active}} active; parcels {{parcels}}{{pendingText}}.",
+  "fields.realisticWeatherIrrigationPending": "; {{amount}} unpaid for the next day",
   "fields.subtitle": "Live field data — refreshes every 5 seconds",
   "fields.totalFields": "Total Fields",
   "fields.totalArea": "Total Area",

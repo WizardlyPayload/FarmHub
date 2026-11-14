@@ -393,6 +393,8 @@
   "map.fieldMerged": "Fält {{ids}}",
   "map.iconHint": "Ikoner visar fordonstyp och hur maskinen pekar när livedata inkluderar kurs. Dölj kartans kantlinje beskärs PDA-krom från översikten.",
   "fields.title": "Fälthantering",
+  "fields.realisticWeatherIrrigation": "Irrigation at last update: {{active}} active; parcels {{parcels}}{{pendingText}}.",
+  "fields.realisticWeatherIrrigationPending": "; {{amount}} unpaid for the next day",
   "fields.subtitle": "Livefältdata — uppdateras var 5:e sekund",
   "fields.totalFields": "Totalt antal fält",
   "fields.totalArea": "Total yta",

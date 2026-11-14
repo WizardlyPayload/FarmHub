@@ -393,6 +393,8 @@
   "map.fieldMerged": "Polia {{ids}}",
   "map.iconHint": "Ikony zobrazujú typ vozidla a smerujú smerom, ktorým je stroj nasmerovaný, keď aktuálne údaje zahŕňajú smer. Skryť okraj mapy, orezať PDA chrome mimo prehľadu.",
   "fields.title": "Správa terénu",
+  "fields.realisticWeatherIrrigation": "Irrigation at last update: {{active}} active; parcels {{parcels}}{{pendingText}}.",
+  "fields.realisticWeatherIrrigationPending": "; {{amount}} unpaid for the next day",
   "fields.subtitle": "Údaje z terénu v reálnom čase – obnovujú sa každých 5 sekúnd",
   "fields.totalFields": "Celkový počet polí",
   "fields.totalArea": "Celková plocha",

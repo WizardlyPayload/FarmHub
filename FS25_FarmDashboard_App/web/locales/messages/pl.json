@@ -393,6 +393,8 @@
   "map.fieldMerged": "Pola {{ids}}",
   "map.iconHint": "Ikony pokazują typ pojazdu i kierunek, w którym maszyna jest skierowana, gdy dane na żywo obejmują kierunek. Ukryj przycięte obramowanie mapy w widoku podglądu.",
   "fields.title": "Zarządzanie terenem",
+  "fields.realisticWeatherIrrigation": "Irrigation at last update: {{active}} active; parcels {{parcels}}{{pendingText}}.",
+  "fields.realisticWeatherIrrigationPending": "; {{amount}} unpaid for the next day",
   "fields.subtitle": "Dane z terenu na żywo — odświeżane co 5 sekund",
   "fields.totalFields": "Łączna liczba pól",
   "fields.totalArea": "Całkowita powierzchnia",

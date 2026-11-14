@@ -393,6 +393,8 @@
   "map.fieldMerged": "Поля {{ids}}",
   "map.iconHint": "Значки показують тип транспортного засобу та напрямок руху машини, коли дані в реальному часі включають напрямок. Приховування меж карти, обрізки PDA chrome в огляді.",
   "fields.title": "Управління полем",
+  "fields.realisticWeatherIrrigation": "Irrigation at last update: {{active}} active; parcels {{parcels}}{{pendingText}}.",
+  "fields.realisticWeatherIrrigationPending": "; {{amount}} unpaid for the next day",
   "fields.subtitle": "Дані поля в реальному часі — оновлюються кожні 5 секунд",
   "fields.totalFields": "Загальна кількість полів",
   "fields.totalArea": "Загальна площа",

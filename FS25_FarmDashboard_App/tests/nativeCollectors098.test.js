@@ -511,6 +511,23 @@ return "scanned=" .. scanned .. "|farm1=" .. #(a.items or {}) .. "|farm2=" .. #(
 `;
         expect(run({ files: STOCK_FILES, engine: stockEngine, body })).toBe("scanned=2|farm1=1|farm2=1");
     });
+
+    test("compressed object storage excludes foreign bales from owned stock and bale counts", () => {
+        const body = `
+local placeable = { ownerFarmId = 1, getName = function() return "Bale store" end,
+    spec_objectStorage = { objectInfos = {
+        { numObjects = 3, objects = { { baleAttributes = { farmId = 2, fillType = 3, fillLevel = 4000 } } } },
+        { numObjects = 2, objects = { { baleAttributes = { farmId = 1, fillType = 3, fillLevel = 4000 } } } },
+        { numObjects = 1, objects = { { baleAttributes = { fillType = 3, fillLevel = 4000 } } } },
+    } } }
+local stock = InventoryScan.newStockState({ 1 })
+local bales = InventoryScan.newBaleState({ 1 })
+InventoryScan.scanGiantsObjectStorage(placeable, 1, stock, bales)
+local items = stock.byFarm["1"].items
+return tostring(#items) .. "|" .. tostring(items[1].totalLiters) .. "|" .. tostring(bales.byFarm["1"].inStorage.straw)
+`;
+        expect(run({ files: STOCK_FILES, body })).toBe("1|12000|3");
+    });
 });
 
 describe("098 prices and season periods under the native mod environment", () => {

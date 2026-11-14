@@ -17,6 +17,15 @@ const GAME = `
       { id = 20, farmId = 1, type = "TERM", paidOff = true, principal = 0, arrearsBalance = 0 },
       { id = 21, farmId = 2, type = "TERM", paidOff = false, principal = 900000,
         arrearsBalance = 1000 },
+    }, assetFinance = {
+      { id = 31, farmId = 1, product = "HIRE_PURCHASE", status = "ACTIVE", vehicleName = "MF 8570",
+        principal = 12000.345, monthlyPayment = 250.125, arrearsBalance = 10.5, remainingMonths = 24 },
+      { id = 32, farmId = 1, product = "OPERATING_LEASE", status = "RETURN_DUE", vehicleName = "Trailer",
+        principal = 0, monthlyPayment = 75, arrearsBalance = 0, remainingMonths = 0, refundableDeposit = 500 },
+      { id = 33, farmId = 2, product = "HIRE_PURCHASE", status = "ACTIVE", vehicleName = "Other farm",
+        principal = 8000, monthlyPayment = 100, arrearsBalance = 0, remainingMonths = 12 },
+      { id = 34, farmId = 1, product = "HIRE_PURCHASE", status = "COMPLETED", vehicleName = "Completed",
+        principal = 0, monthlyPayment = 0, arrearsBalance = 0, remainingMonths = 0 },
     } } } }
 `;
 
@@ -27,8 +36,19 @@ test("exports only supported active loans for the selected farm", () => {
   expect(page.rows.map((row) => row.id)).toEqual([17, 18]);
   expect(page.rows[0]).toMatchObject({ kind: "TERM", principal: 25000.57, arrears: 300.4 });
   expect(page.rows.some((row) => row.farmId === 2 || row.id === 19 || row.id === 20)).toBe(false);
+  expect(page.byFarm["1"]).toMatchObject({ assetFinanceCount: 2, assetArrearsCount: 1, operatingLeaseCount: 1, assetRegisterAvailable: true });
+  expect(page.assetRows.map((row) => row.id)).toEqual([31, 32]);
+  expect(page.assetRows[0]).toMatchObject({ asset: "MF 8570", principal: 12000.35, monthlyPayment: 250.13, arrears: 10.5 });
+  expect(page.assetRows[1]).toMatchObject({ product: "OPERATING_LEASE", status: "RETURN_DUE", refundableDeposit: 500 });
   const merged = normalizeCompanionPages({ pages: { realisticFarmFinanceLoans: page } }, { modules: loadModules() });
   expect(merged.pages.realisticFarmFinanceLoans.rows).toHaveLength(2);
+  expect(merged.pages.realisticFarmFinanceLoans.assetRows).toHaveLength(2);
+});
+
+test("withholds an absent asset register instead of reporting zero agreements", () => {
+  const page = runCompanionPage(FILE, GAME.replace(/, assetFinance = \{[\s\S]*?\n    \} \} \} \}/, " } } }"), { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(page.byFarm["1"].assetRegisterAvailable).toBe(false);
 });
 
 test("withholds an unloaded repository and an unloaded mod", () => {

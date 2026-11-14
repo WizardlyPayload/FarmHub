@@ -1,10 +1,14 @@
 -- Realistic Farm Finance v1.2.0.0 has several finance products. This page
--- reads only active term, mortgage and bullet loan obligations for one farm.
+-- reads active term, mortgage and bullet loans plus distinct asset-finance
+-- agreements for one farm. It does not equate contract asset names with current
+-- vehicle ownership or a scheduled payment with a payment already made.
 -- Revolving/overdraft facilities have different balance semantics and are withheld.
 
 local MAX_SCAN = 300
 local MAX_ROWS = 40
 local SUPPORTED = { TERM = true, MORTGAGE = true, BULLET = true }
+local ASSET_PRODUCTS = { HIRE_PURCHASE = true, OPERATING_LEASE = true }
+local ASSET_STATES = { ACTIVE = true, RETURN_DUE = true }
 
 CompanionPages.register({
     key = "realisticFarmFinanceLoans",
@@ -60,16 +64,76 @@ CompanionPages.register({
             end
         end
         table.sort(rows, function(a, b) return a.id < b.id end)
+
+        local assetRows, assetCount, assetArrearsCount, assetLeaseCount = {}, 0, 0, 0
+        local assetAvailable = type(repo.assetFinance) == "table"
+        local assetInvalid, assetTruncated, assetOmitted = false, false, 0
+        if assetAvailable then
+            local assetScanned = 0
+            for _, agreement in pairs(repo.assetFinance) do
+                assetScanned = assetScanned + 1
+                if assetScanned > MAX_SCAN then assetTruncated = true; break end
+                if type(agreement) == "table" and ctx.num(agreement.farmId) == farmId
+                    and ASSET_STATES[agreement.status] then
+                    if not ASSET_PRODUCTS[agreement.product] then
+                        assetOmitted = assetOmitted + 1
+                    else
+                        local id = ctx.num(agreement.id)
+                        local principal = ctx.num(agreement.principal)
+                        local payment = ctx.num(agreement.monthlyPayment)
+                        local arrears = ctx.num(agreement.arrearsBalance)
+                        local remaining = ctx.num(agreement.remainingMonths)
+                        local deposit = agreement.product == "OPERATING_LEASE"
+                            and ctx.num(agreement.refundableDeposit) or nil
+                        if id == nil or id <= 0 or principal == nil or principal < 0
+                            or payment == nil or payment < 0 or arrears == nil or arrears < 0
+                            or remaining == nil or remaining < 0
+                            or (agreement.product == "OPERATING_LEASE" and (deposit == nil or deposit < 0)) then
+                            assetInvalid = true
+                        else
+                            assetCount = assetCount + 1
+                            if arrears > 0 then assetArrearsCount = assetArrearsCount + 1 end
+                            if agreement.product == "OPERATING_LEASE" then assetLeaseCount = assetLeaseCount + 1 end
+                            if #assetRows >= MAX_ROWS then
+                                assetTruncated = true
+                            else
+                                assetRows[#assetRows + 1] = {
+                                    farmId = farmId,
+                                    id = math.floor(id),
+                                    product = agreement.product,
+                                    status = agreement.status,
+                                    asset = ctx.clip(agreement.vehicleName, 80),
+                                    principal = ctx.round2(principal),
+                                    monthlyPayment = ctx.round2(payment),
+                                    arrears = ctx.round2(arrears),
+                                    remainingMonths = math.floor(remaining),
+                                    refundableDeposit = deposit and ctx.round2(deposit) or nil,
+                                }
+                            end
+                        end
+                    end
+                end
+            end
+            table.sort(assetRows, function(a, b) return a.id < b.id end)
+        end
+        local partial = invalid or assetInvalid or not assetAvailable
+        local anyRows = count > 0 or assetCount > 0
         return {
-            readState = invalid and "partial" or (count > 0 and "ok" or "settings-only"),
-            reason = count == 0 and "no-supported-farm-loans" or nil,
-            coverage = truncated and "truncated" or invalid and "partial" or "complete",
+            readState = partial and "partial" or (anyRows and "ok" or "settings-only"),
+            reason = not anyRows and "no-supported-farm-obligations" or nil,
+            coverage = (truncated or assetTruncated) and "truncated" or partial and "partial" or "complete",
             byFarm = { [tostring(farmId)] = {
                 loanCount = count,
                 arrearsCount = arrearsCount,
                 otherProductCount = omittedCount,
+                assetFinanceCount = assetCount,
+                assetArrearsCount = assetArrearsCount,
+                operatingLeaseCount = assetLeaseCount,
+                otherAssetProductCount = assetOmitted,
+                assetRegisterAvailable = assetAvailable,
             } },
             rows = rows,
+            assetRows = assetRows,
         }
     end,
 })

@@ -140,7 +140,7 @@ function consume(json) {
 }
 
 describe("106 fractional money-per-litre prices survive producer, JSON and consumer", () => {
-    test("native 0.80/L beats the 0.30/L market and exports 0.8, read as 800 per 1000 L without economy data", () => {
+    test("native buyer at 0.80/L exports 0.8, read as 800 per 1000 L without economy data", () => {
         const engine = `stations({ buyer("Public", 0, 0.8) })`;
         expect(run(engine, `return priceOf(1)`)).toBe("0.8|Public");
         const json = run(engine, `return jsonItems(StockDataCollector:collect(), 1)`);
@@ -171,9 +171,10 @@ describe("106 fractional money-per-litre prices survive producer, JSON and consu
         expect(consume(json)[0].per1000).toBeCloseTo(3.5, 9);
     });
 
-    test("with no selling stations the market fallback price is kept fractional", () => {
-        expect(run(`stations({})`, `return priceOf(1)`)).toBe("0.3|Market");
-        expect(run(`stations({}); g_currentMission.storageSystem = { getUnloadingStations = function() error("not ready") end }`, `return priceOf(2)`)).toBe("0.3|Market");
+    test("a seasonal base price is not represented as an available buyer", () => {
+        expect(run(`stations({})`, `return priceOf(1)`)).toBe("nil|nil");
+        expect(run(`stations({}); g_currentMission.storageSystem = { getUnloadingStations = function() error("not ready") end }`, `return priceOf(2)`)).toBe("nil|nil");
+        expect(run(`MARKET = 2; stations({ buyer("Actual buyer", 0, 0.2) })`, `return priceOf(1)`)).toBe("0.2|Actual buyer");
     });
 
     test("no valid price at all leaves the item unpriced instead of 0", () => {
@@ -268,7 +269,7 @@ return table.concat(out, "|")
         const engine = `stations({ buyer("Farm A buyer", 1, 5.0), buyer("Farm B buyer", 2, 5.0) })`;
         expect(run(engine + "\nVIEWER = 2", perFarm)).toBe("1:Farm B buyer|2:Farm A buyer");
         const selfOnly = `stations({ buyer("Farm A buyer", 1, 5.0) })`;
-        expect(run(selfOnly + "\nVIEWER = 2", `return priceOf(1) .. "/" .. priceOf(2)`)).toBe("0.3|Market/5|Farm A buyer");
+        expect(run(selfOnly + "\nVIEWER = 2", `return priceOf(1) .. "/" .. priceOf(2)`)).toBe("nil|nil/5|Farm A buyer");
     });
 
     test("unowned buyers (ownerFarmId 0 or nil) serve every farm", () => {

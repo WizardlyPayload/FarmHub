@@ -98,14 +98,10 @@ local function _attachSellPrices(byFarm)
         for _, item in ipairs(farmBucket.items or {}) do
             local idx = tonumber(item.fillTypeIndex)
             if idx then
+                -- EconomyManager:getPricePerLiter is a seasonal base price, not
+                -- a buyer's offer. Only an eligible selling station can supply
+                -- an actionable best sell price and destination.
                 local bestPrice, bestStation, greatDemand, priceTrend = 0, nil, false, 0
-                if em and em.getPricePerLiter then
-                    local okE, p = pcall(function() return em:getPricePerLiter(idx) end)
-                    p = okE and _pricePerLiter(p) or nil
-                    if p and p > bestPrice then
-                        bestPrice, bestStation = p, "Market"
-                    end
-                end
                 for _, station in pairs(stations) do
                     if _isSellingStation(station) then
                         if type(station.acceptedFillTypes) == "table" and station.acceptedFillTypes[idx]

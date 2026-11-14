@@ -181,6 +181,32 @@ describe("106 fractional money-per-litre prices survive producer, JSON and consu
         expect(run(engine, `local it = item(StockDataCollector:collect(), 1); return tostring(it.bestSellPrice) .. "|" .. tostring(it.bestSellStation) .. "|" .. it.totalLiters`)).toBe("nil|nil|1000");
     });
 
+    test("a winning native station uses its placeable name when SellingStation:getName returns nil", () => {
+        const engine = `
+local st = buyer("", 0, 0.8)
+st.getName = function() return nil end
+st.owningPlaceable = { getName = function() return "Grain East" end }
+stations({ st })
+`;
+        expect(run(engine, `return priceOf(1)`)).toBe("0.8|Grain East");
+        const nameless = `
+local st = buyer("", 0, 0.8)
+st.getName = function() return nil end
+stations({ st })
+`;
+        expect(run(nameless, `return priceOf(1)`)).toBe("0.8|nil");
+    });
+
+    test("a higher priced station replaces earlier demand and trend metadata", () => {
+        const engine = `
+local low = buyer("Demand", 0, 0.6)
+low.greatDemandFillType = 11
+low.getCurrentPricingTrend = function() return 4 end
+stations({ low, buyer("Higher", 0, 0.8) })
+`;
+        expect(run(engine, `local it = item(StockDataCollector:collect(), 1); return tostring(it.bestSellStation) .. "|" .. tostring(it.greatDemand) .. "|" .. tostring(it.priceTrend)`)).toBe("Higher|false|0");
+    });
+
     test("throwing readers are isolated and the good buyer still wins", () => {
         const engine = `
 local badIsa = buyer("Broken isa", 0, 9); badIsa.isa = function() error("not ready") end

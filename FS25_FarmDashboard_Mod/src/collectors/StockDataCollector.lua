@@ -56,6 +56,27 @@ local function _buyerServesFarm(station, stockFarmId)
     return stockFarmId ~= nil and owner ~= stockFarmId
 end
 
+local function _sellingStationName(station)
+    local function nameFrom(object)
+        if not object or type(object.getName) ~= "function" then return nil end
+        local ok, name = pcall(object.getName, object)
+        if ok and type(name) == "string" and name:match("%S")
+            and name ~= "Unknown" and name ~= "?" then
+            return name
+        end
+        return nil
+    end
+
+    -- SellingStation:getName can return nil while its owning placeable has a name.
+    local name = nameFrom(station) or nameFrom(station.owningPlaceable)
+    if name then return name end
+    if type(station.stationName) == "string" and station.stationName:match("%S")
+        and station.stationName ~= "Unknown" and station.stationName ~= "?" then
+        return station.stationName
+    end
+    return nil
+end
+
 local function _attachSellPrices(byFarm)
     local mission = _G.g_currentMission
     if not mission then return end
@@ -97,12 +118,9 @@ local function _attachSellPrices(byFarm)
                             end)
                             price = okP and _pricePerLiter(price) or nil
                             if price and price > bestPrice then
-                                bestPrice = price
-                                if station.getName then
-                                    local okN, nm = pcall(function() return station:getName() end)
-                                    if okN and nm then bestStation = nm end
-                                end
-                                if station.greatDemandFillType == idx then greatDemand = true end
+                                bestPrice, bestStation = price, _sellingStationName(station)
+                                greatDemand = station.greatDemandFillType == idx
+                                priceTrend = 0
                                 if station.getCurrentPricingTrend then
                                     local okT, tr = pcall(function() return station:getCurrentPricingTrend(idx) end)
                                     if okT and tr then priceTrend = tr end

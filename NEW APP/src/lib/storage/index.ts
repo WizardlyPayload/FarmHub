@@ -362,14 +362,16 @@ function bestCropLocationPrice(crop: CropLike | null | undefined): number {
 }
 
 export function resolvePricePer1000(item: StockItem, crop: CropLike | null | undefined): number {
+  // The stock collector's eligible selling-station offer is a current price.
+  // Economy crop locations and averages can include virtual base prices.
+  const modPrice = Number(item?.bestSellPrice) || 0;
+  if (modPrice > 0 && item?.bestSellStation !== "Market" && item?.bestSellStation !== "Market Base Prices") {
+    return modPrice < 50 ? modPrice * 1000 : modPrice;
+  }
   const fromCrop = bestCropLocationPrice(crop);
   if (fromCrop > 0) return fromCrop;
   const fromXmlAvg = Number(crop?.avgXmlPrice) || Number(crop?.avgPrice) || 0;
   if (fromXmlAvg > 0) return fromXmlAvg;
-  const modPrice = Number(item?.bestSellPrice) || 0;
-  if (modPrice > 0) {
-    return modPrice < 50 ? modPrice * 1000 : modPrice;
-  }
   return 0;
 }
 

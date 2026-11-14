@@ -152,6 +152,14 @@ describe("106 fractional money-per-litre prices survive producer, JSON and consu
         expect(storage.resolvePricePer1000(JSON.parse(json)[0], null)).toBeCloseTo(800, 9);
     });
 
+    test("an actual buyer offer takes priority over a virtual economy base price", () => {
+        const json = run(`MARKET = 1; stations({ buyer("Public", 0, 0.8) })`, `return jsonItems(StockDataCollector:collect(), 1)`);
+        const [item] = JSON.parse(json);
+        const crop = { avgXmlPrice: 1000, locations: [{ name: "Market Base Prices", price: 1000 }] };
+        expect(storage.resolvePricePer1000(item, crop)).toBeCloseTo(800, 9);
+        expect(storage.resolveStationName(item, crop)).toBe("Public");
+    });
+
     test("a price above 1/L keeps its fraction (1.10 stays 1.1, read as 1100)", () => {
         const engine = `stations({ buyer("Mill", 0, 1.1) })`;
         const json = run(engine, `return jsonItems(StockDataCollector:collect(), 2)`);

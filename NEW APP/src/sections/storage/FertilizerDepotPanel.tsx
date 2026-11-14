@@ -72,9 +72,12 @@ export function FertilizerDepotPanel({
   const setSection = useDashboardStore((s) => s.setSection);
   const activeFarmId = useDashboardStore((s) => s.activeFarmId);
   if (!isFertilizerDepotActive(fertilizerDepot)) return null;
-  const farmId = activeFarmId ?? 1;
+  const farmId = activeFarmId ?? 0;
   const depots = fertilizerDepots(fertilizerDepot, farmId);
   const orders = fertilizerDepotOrders(fertilizerDepot, farmId);
+  // Storage is for this farm's usable stock and orders. A configured mod with
+  // neither should not prompt the player to place a building just to fill UI.
+  if (variant === "storage" && depots.length === 0 && orders.length === 0) return null;
   const orderState = fertilizerDepot?.orderState;
   const seasonHint = fertilizerDepotSeasonHint(fertilizerDepot, farmId);
   const settings = fertilizerDepotSettings(fertilizerDepot);

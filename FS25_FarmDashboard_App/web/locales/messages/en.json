@@ -2128,7 +2128,7 @@
   "redtape.colCropRecent": "Most recent",
   "redtape.noCropRotation": "No harvest history exported for this farm yet.",
   "redtape.taxTitle": "Tax",
-  "redtape.taxCurrentMonth": "This month: income {{income}}, expenses {{expenses}}",
+  "redtape.taxCurrentMonth": "Recorded tax lines this month: income {{income}}, expenses {{expenses}}",
   "redtape.noTaxStatements": "No statements yet",
   "redtape.colMonth": "Month",
   "redtape.colTaxable": "Taxable",

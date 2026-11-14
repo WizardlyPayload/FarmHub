@@ -35,6 +35,8 @@ const GAME = `
     recordPlanting = function() error("must not record planting") end,
     clearPlanting = function() error("must not clear planting") end,
   } }
+  _G["KM_82201_Auto_Grove"] = { FSCoreAutoPlant = _G.FSCoreAutoPlant }
+  _G.FSCoreAutoPlant = nil
 `;
 
 test("shows last planting only for currently owned fields of selected farm", () => {

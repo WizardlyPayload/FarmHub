@@ -25,7 +25,7 @@ CompanionPages.register({
         if type(loaded) == "table" and loaded.FS25_FSCoreAutoPlant == true then
             return { readState = "settings-only", reason = "other-edition-loaded" }
         end
-        local mod = ctx.global("FSCoreAutoPlant")
+        local mod = ctx.symbol("FSCoreAutoPlant")
         local data = type(mod) == "table" and mod.Data or nil
         local plantings = type(data) == "table" and data.plantings or nil
         if type(mod) ~= "table" or mod.initialized ~= true

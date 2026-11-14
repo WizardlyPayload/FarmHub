@@ -25,6 +25,8 @@ const GAME = `
       getProductionPointsForFarmId = function() return points end,
     },
   }
+  _G["FS25_335994_Upgrade_Your_Factory"] = { UpgradeYourFactory = _G.UpgradeYourFactory }
+  _G.UpgradeYourFactory = nil
 `;
 
 test("reports the selected farm's live upgrade level without foreign price or history", () => {

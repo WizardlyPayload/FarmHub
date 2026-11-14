@@ -30,7 +30,7 @@ CompanionPages.register({
         if ctx.version ~= "1.0.1.0" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
-        local mod = ctx.global("UpgradeYourFactory")
+        local mod = ctx.symbol("UpgradeYourFactory")
         local maxLevel = type(mod) == "table" and whole(ctx, mod.MAX_LEVEL) or nil
         local manager = mission.productionChainManager
         local points = ctx.call(manager, "getProductionPointsForFarmId", farmId)

@@ -25,19 +25,21 @@ const GAME = `
   }
 `;
 
-test("exports only the selected farm's recorded weighing and sale", () => {
+test("exports only this farm's weighings and withholds unreliable sale quantities", () => {
   const page = runCompanionPage(FILE, GAME, { farmId: 1 });
   expect(page).toMatchObject({ readState: "ok", coverage: "complete",
-    byFarm: { "1": { weighingCount: 1, saleCount: 1 } } });
-  expect(page.rows).toEqual(expect.arrayContaining([
+    byFarm: { "1": { weighingCount: 1 } } });
+  expect(page.rows).toEqual([
     expect.objectContaining({ kind: "weighing", vehicle: "MF 8570", loadKg: 8350 }),
-    expect.objectContaining({ kind: "sale", fillType: "WHEAT", litres: 10000, pending: 2000 }),
-  ]));
+  ]);
+  expect(page.byFarm["1"].saleCount).toBeUndefined();
+  expect(JSON.stringify(page)).not.toContain("litres");
+  expect(JSON.stringify(page)).not.toContain("2000");
   expect(JSON.stringify(page)).not.toContain("999999");
   expect(JSON.stringify(page)).not.toContain("Other farm secret");
 });
 
-test("does not assert zero or money from an empty or invalid register", () => {
+test("does not assert zero from an empty or invalid weighing register", () => {
   const empty = runCompanionPage(FILE, GAME.replace(/weighings = \{[\s\S]*?\},\n    sales = \{[\s\S]*?\}\n  \}/, "weighings = {}, sales = {}\n  }"), { farmId: 1 });
   expect(empty).toMatchObject({ readState: "settings-only", reason: "no-farm-records" });
   expect(empty.byFarm).toBeUndefined();
@@ -45,6 +47,11 @@ test("does not assert zero or money from an empty or invalid register", () => {
   expect(invalid).toMatchObject({ readState: "partial", coverage: "partial" });
   expect(invalid.rows).toBeUndefined();
   expect(invalid.byFarm).toBeUndefined();
+  const saleOnly = runCompanionPage(FILE,
+    GAME.replace(/weighings = \{[\s\S]*?\},\n    sales = \{/, "weighings = {},\n    sales = {"),
+    { farmId: 1 });
+  expect(saleOnly).toMatchObject({ readState: "settings-only", reason: "no-farm-records" });
+  expect(saleOnly.rows).toBeUndefined();
 });
 
 test("gates wrong version and client state", () => {

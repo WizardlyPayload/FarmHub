@@ -71,7 +71,7 @@ export function Page({ entry }: CompanionPageProps) {
     ] : []),
   ] : [];
   return (
-    <ModPage entry={entry} lead={tOr("companionPage.realisticFarmFinanceLoans.leadObligations", "Current loans, asset-finance agreements and tenancies recorded by Realistic Farm Finance for this farm. Contract asset names do not prove vehicle ownership; scheduled payments are not payments already made. Revolving credit, overdrafts and insurance require separate readings.")}>
+    <ModPage entry={entry} lead={tOr("companionPage.realisticFarmFinanceLoans.lead", "Current loans, asset-finance agreements and tenancies recorded by Realistic Farm Finance for this farm. Contract asset names do not prove vehicle ownership; scheduled payments are not payments already made. Revolving credit, overdrafts and insurance need separate readings.")}>
       <ModStatTiles tiles={tiles} />
       {rows.length === 0 && assetRows.length === 0 && tenancyRows.length === 0
         ? <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.noObligations", "No current supported obligation was captured for this farm.")}</ModEmpty> : null}

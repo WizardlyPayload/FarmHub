@@ -26,6 +26,13 @@ const GAME = `
         principal = 8000, monthlyPayment = 100, arrearsBalance = 0, remainingMonths = 12 },
       { id = 34, farmId = 1, product = "HIRE_PURCHASE", status = "COMPLETED", vehicleName = "Completed",
         principal = 0, monthlyPayment = 0, arrearsBalance = 0, remainingMonths = 0 },
+    }, tenancies = {
+      { id = 41, farmId = 1, holdingName = "North Farm", status = "NOTICE_SERVED",
+        monthlyRent = 425.255, rentDue = 425.25, arrears = 50, nextRentDuePeriod = 22 },
+      { id = 42, farmId = 2, holdingName = "Other farm", status = "ACTIVE",
+        monthlyRent = 1000, rentDue = 1000, arrears = 500, nextRentDuePeriod = 22 },
+      { id = 43, farmId = 1, holdingName = "Ended", status = "ENDED",
+        monthlyRent = 0, rentDue = 0, arrears = 0, nextRentDuePeriod = 0 },
     } } } }
 `;
 
@@ -40,15 +47,24 @@ test("exports only supported active loans for the selected farm", () => {
   expect(page.assetRows.map((row) => row.id)).toEqual([31, 32]);
   expect(page.assetRows[0]).toMatchObject({ asset: "MF 8570", principal: 12000.35, monthlyPayment: 250.13, arrears: 10.5 });
   expect(page.assetRows[1]).toMatchObject({ product: "OPERATING_LEASE", status: "RETURN_DUE", refundableDeposit: 500 });
+  expect(page.byFarm["1"]).toMatchObject({ tenancyCount: 1, tenancyArrearsCount: 1, tenancyRegisterAvailable: true });
+  expect(page.tenancyRows[0]).toMatchObject({ holding: "North Farm", monthlyRent: 425.26, rentDue: 425.25, arrears: 50, nextRentDuePeriod: 22 });
   const merged = normalizeCompanionPages({ pages: { realisticFarmFinanceLoans: page } }, { modules: loadModules() });
   expect(merged.pages.realisticFarmFinanceLoans.rows).toHaveLength(2);
   expect(merged.pages.realisticFarmFinanceLoans.assetRows).toHaveLength(2);
+  expect(merged.pages.realisticFarmFinanceLoans.tenancyRows).toHaveLength(1);
 });
 
 test("withholds an absent asset register instead of reporting zero agreements", () => {
-  const page = runCompanionPage(FILE, GAME.replace(/, assetFinance = \{[\s\S]*?\n    \} \} \} \}/, " } } }"), { farmId: 1 });
+  const page = runCompanionPage(FILE, GAME.replace("assetFinance = {", "unavailableAssetFinance = {"), { farmId: 1 });
   expect(page).toMatchObject({ readState: "partial", coverage: "partial" });
   expect(page.byFarm["1"].assetRegisterAvailable).toBe(false);
+});
+
+test("withholds an absent tenancy register instead of reporting zero tenancies", () => {
+  const page = runCompanionPage(FILE, GAME.replace("tenancies = {", "unavailableTenancies = {"), { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(page.byFarm["1"].tenancyRegisterAvailable).toBe(false);
 });
 
 test("shows a farm asset agreement when no supported loan exists", () => {
@@ -59,13 +75,28 @@ test("shows a farm asset agreement when no supported loan exists", () => {
         { id = 4, farmId = 1, product = "OPERATING_LEASE", status = "ACTIVE",
           vehicleName = "Leased seeder", principal = 0, monthlyPayment = 120,
           arrearsBalance = 0, remainingMonths = 9, refundableDeposit = 600 },
-      } } } }
+      }, tenancies = {} } } }
   `;
   const page = runCompanionPage(FILE, assetOnly, { farmId: 1 });
   expect(page).toMatchObject({ readState: "ok", coverage: "complete" });
   expect(Object.keys(page.rows)).toHaveLength(0);
   expect(page.assetRows).toHaveLength(1);
   expect(page.byFarm["1"]).toMatchObject({ loanCount: 0, assetFinanceCount: 1 });
+});
+
+test("shows a current farm tenancy without a loan or asset agreement", () => {
+  const tenancyOnly = `
+    _G.g_modIsLoaded = { KM_82429_Realistic_Farm_Finance = true }
+    _G.g_currentMission = { getFarmId = function() return 1 end,
+      realisticFarmFinance = { repository = { loaded = true, loans = {}, assetFinance = {}, tenancies = {
+        { id = 6, farmId = 1, holdingName = "West Field", status = "EXPIRING",
+          monthlyRent = 200, rentDue = 0, arrears = 0, nextRentDuePeriod = 25 },
+      } } } }
+  `;
+  const page = runCompanionPage(FILE, tenancyOnly, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "ok", coverage: "complete" });
+  expect(page.byFarm["1"]).toMatchObject({ loanCount: 0, assetFinanceCount: 0, tenancyCount: 1 });
+  expect(page.tenancyRows[0]).toMatchObject({ holding: "West Field", status: "EXPIRING", nextRentDuePeriod: 25 });
 });
 
 test("withholds an unloaded repository and an unloaded mod", () => {

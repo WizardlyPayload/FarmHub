@@ -1,6 +1,6 @@
 -- Realistic Farm Finance v1.2.0.0 has several finance products. This page
 -- reads active term, mortgage and bullet loans plus distinct asset-finance
--- agreements for one farm. It does not equate contract asset names with current
+-- agreements and current tenancies for one farm. It does not equate contract asset names with current
 -- vehicle ownership or a scheduled payment with a payment already made.
 -- Revolving/overdraft facilities have different balance semantics and are withheld.
 
@@ -9,6 +9,7 @@ local MAX_ROWS = 40
 local SUPPORTED = { TERM = true, MORTGAGE = true, BULLET = true }
 local ASSET_PRODUCTS = { HIRE_PURCHASE = true, OPERATING_LEASE = true }
 local ASSET_STATES = { ACTIVE = true, RETURN_DUE = true }
+local TENANCY_STATES = { ACTIVE = true, NOTICE_SERVED = true, RENEWAL_OFFERED = true, EXPIRING = true }
 
 CompanionPages.register({
     key = "realisticFarmFinanceLoans",
@@ -116,12 +117,55 @@ CompanionPages.register({
             end
             table.sort(assetRows, function(a, b) return a.id < b.id end)
         end
-        local partial = invalid or assetInvalid or not assetAvailable
-        local anyRows = count > 0 or assetCount > 0
+
+        local tenancyRows, tenancyCount, tenancyArrearsCount = {}, 0, 0
+        local tenancyAvailable = type(repo.tenancies) == "table"
+        local tenancyInvalid, tenancyTruncated = false, false
+        if tenancyAvailable then
+            local tenancyScanned = 0
+            for _, tenancy in pairs(repo.tenancies) do
+                tenancyScanned = tenancyScanned + 1
+                if tenancyScanned > MAX_SCAN then tenancyTruncated = true; break end
+                local status = type(tenancy) == "table" and (tenancy.status or "ACTIVE") or nil
+                if type(tenancy) == "table" and ctx.num(tenancy.farmId) == farmId
+                    and TENANCY_STATES[status] then
+                    local id = ctx.num(tenancy.id)
+                    local monthly = ctx.num(tenancy.monthlyRent)
+                    local due = ctx.num(tenancy.rentDue)
+                    local arrears = ctx.num(tenancy.arrears)
+                    local nextPeriod = ctx.num(tenancy.nextRentDuePeriod)
+                    if id == nil or id <= 0 or monthly == nil or monthly < 0
+                        or due == nil or due < 0 or arrears == nil or arrears < 0
+                        or nextPeriod == nil or nextPeriod < 0 then
+                        tenancyInvalid = true
+                    else
+                        tenancyCount = tenancyCount + 1
+                        if arrears > 0 then tenancyArrearsCount = tenancyArrearsCount + 1 end
+                        if #tenancyRows >= MAX_ROWS then
+                            tenancyTruncated = true
+                        else
+                            tenancyRows[#tenancyRows + 1] = {
+                                farmId = farmId,
+                                id = math.floor(id),
+                                holding = ctx.clip(tenancy.holdingName, 80),
+                                status = status,
+                                monthlyRent = ctx.round2(monthly),
+                                rentDue = ctx.round2(due),
+                                arrears = ctx.round2(arrears),
+                                nextRentDuePeriod = math.floor(nextPeriod),
+                            }
+                        end
+                    end
+                end
+            end
+            table.sort(tenancyRows, function(a, b) return a.id < b.id end)
+        end
+        local partial = invalid or assetInvalid or tenancyInvalid or not assetAvailable or not tenancyAvailable
+        local anyRows = count > 0 or assetCount > 0 or tenancyCount > 0
         return {
             readState = partial and "partial" or (anyRows and "ok" or "settings-only"),
             reason = not anyRows and "no-supported-farm-obligations" or nil,
-            coverage = (truncated or assetTruncated) and "truncated" or partial and "partial" or "complete",
+            coverage = (truncated or assetTruncated or tenancyTruncated) and "truncated" or partial and "partial" or "complete",
             byFarm = { [tostring(farmId)] = {
                 loanCount = count,
                 arrearsCount = arrearsCount,
@@ -131,9 +175,13 @@ CompanionPages.register({
                 operatingLeaseCount = assetLeaseCount,
                 otherAssetProductCount = assetOmitted,
                 assetRegisterAvailable = assetAvailable,
+                tenancyCount = tenancyCount,
+                tenancyArrearsCount = tenancyArrearsCount,
+                tenancyRegisterAvailable = tenancyAvailable,
             } },
             rows = rows,
             assetRows = assetRows,
+            tenancyRows = tenancyRows,
         }
     end,
 })

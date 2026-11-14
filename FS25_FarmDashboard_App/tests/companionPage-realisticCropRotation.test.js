@@ -100,3 +100,25 @@ test("separates owned predictive pressure from a visible outbreak and withholds 
     });
     expect(runCompanionPage(FILE, unknownOwner, { farmId: 1 }).disease.atRiskCount).toBeUndefined();
 });
+
+test("includes ambient pressure on tracked owned crops before disease state exists", () => {
+    const setup = SETUP + `
+      _G.g_modManager = { getActiveMods = function() return {
+        { modName = "FS25_370461_Realistic_Crop_Rotation", version = "1.1.0.1" }
+      } end }
+      _G.g_currentMission = { getFarmId = function() return 1 end,
+        getIsServer = function() return true end }
+      _G.FS25_370461_Realistic_Crop_Rotation.RealisticCropRotation.disease = {
+        state = {}, reservoir = {}, crop = {},
+        getRiskBand = function(_, id) return id == 36 and 1 or 3 end,
+        getWorstGroup = function() return nil end,
+      }
+    `;
+    const page = runCompanionPage(FILE, setup, { farmId: 1 });
+    expect(page.disease).toMatchObject({
+        readState: "ok", coverage: "tracked-parcels",
+        atRiskCount: 1, visibleOutbreakCount: 0,
+        rows: [{ farmId: 1, farmlandId: 36, riskBand: 1 }],
+    });
+    expect(JSON.stringify(page.disease)).not.toContain('"farmlandId":42');
+});

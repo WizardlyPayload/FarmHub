@@ -21,7 +21,7 @@ end
 
 -- Predictive pressure and visible outbreaks are distinct. Read only tracked
 -- parcel keys; the mod's disease save has no farm id of its own.
-local function diseaseSnapshot(ctx, mod, farmlandManager, farmId)
+local function diseaseSnapshot(ctx, mod, repository, farmlandManager, farmId)
     if ctx.version ~= "1.1.0.1" then
         return { readState = "unavailable", reason = "unreviewed-version" }
     end
@@ -34,7 +34,13 @@ local function diseaseSnapshot(ctx, mod, farmlandManager, farmId)
         return { readState = "unavailable", reason = "no-disease-state" }
     end
     local ids, seen, scanned, truncated = {}, {}, 0, false
-    for _, source in ipairs({ disease.state, disease.reservoir, disease.crop or {} }) do
+    -- Ambient pressure can be positive for a standing host before the disease
+    -- state/reservoir tables contain an entry. Include the mod's tracked land.
+    for _, source in ipairs({
+        disease.state, disease.reservoir, disease.crop or {},
+        repository.history or {}, repository.plans or {},
+        repository.coverPlans or {}, repository.lastKnownActiveCrop or {},
+    }) do
         if type(source) == "table" then
             for key in pairs(source) do
                 scanned = scanned + 1
@@ -168,7 +174,7 @@ CompanionPages.register({
                 farmlandCount = #rows, plannedCount = planned, historyCount = withHistory,
             } },
             rows = rows,
-            disease = diseaseSnapshot(ctx, mod, farmlandManager, farmId),
+            disease = diseaseSnapshot(ctx, mod, repository, farmlandManager, farmId),
         }
     end,
 })

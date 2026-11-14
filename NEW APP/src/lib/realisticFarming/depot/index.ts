@@ -58,6 +58,14 @@ export function fertilizerDepotOrders(
   return Array.isArray(depot?.openOrders) ? depot!.openOrders!.filter((row) => row.farmId === farmId) : [];
 }
 
+/** Show a depot surface only when the selected farm has an owned row to act on. */
+export function hasOwnedFertilizerDepotData(
+  depot: RealisticFarmingPayload["fertilizerDepot"] | null | undefined,
+  farmId: number,
+): boolean {
+  return fertilizerDepots(depot, farmId).length > 0 || fertilizerDepotOrders(depot, farmId).length > 0;
+}
+
 export function depotFillPercent(liters: number, capacity?: number): number | null {
   const cap = Number(capacity);
   const L = Number(liters);

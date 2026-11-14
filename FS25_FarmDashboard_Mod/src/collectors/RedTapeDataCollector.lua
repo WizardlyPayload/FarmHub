@@ -5,6 +5,8 @@ RedTapeDataCollector = {}
 
 local MAX_EVENTS = 20
 local MAX_TAX_STATEMENTS = 12
+local MAX_CURRENT_MONTH_LINES = 256
+local REVIEWED_TAX_VERSION = "1.0.3.0"
 local MAX_POLICIES = 16
 local MAX_SCHEMES = 12
 local MAX_GRANTS = 8
@@ -328,15 +330,36 @@ local function rtSerializeTax(rt, taxSystem, farmId)
         local ok, value = pcall(rt.getCumulativeMonth)
         if ok then cumMonth = tonumber(value) end
     end
-    if cumMonth then
-        income, expenses = 0, 0
-        if taxSystem.lineItems and taxSystem.lineItems[farmId] and taxSystem.lineItems[farmId][cumMonth] then
-            for _, line in ipairs(taxSystem.lineItems[farmId][cumMonth]) do
-                if line then
-                    income = income + (tonumber(line.income) or 0)
-                    expenses = expenses + (tonumber(line.expense) or 0)
+    -- RTTaxLineItem in the reviewed Red Tape build has signed `amount` and
+    -- `statistic` fields. It does not have `income` or `expense` fields. These
+    -- are recorded line-item inflows/outflows, not taxable/deductible totals.
+    local byFarm = type(taxSystem.lineItems) == "table" and taxSystem.lineItems[farmId] or nil
+    local lines = type(byFarm) == "table" and byFarm[cumMonth] or nil
+    local reviewedTaxVersion = false
+    if _G.g_modManager and _G.g_modManager.getActiveModByName then
+        local ok, mod = pcall(function()
+            return _G.g_modManager:getActiveModByName("FS25_RedTape")
+        end)
+        reviewedTaxVersion = ok and type(mod) == "table" and mod.version == REVIEWED_TAX_VERSION
+    end
+    if reviewedTaxVersion and cumMonth and type(taxSystem.lineItems) == "table" and
+        (byFarm == nil or type(byFarm) == "table") and
+        (lines == nil or type(lines) == "table") then
+        local selected = lines or {}
+        if #selected <= MAX_CURRENT_MONTH_LINES then
+            local monthIncome, monthExpenses = 0, 0
+            local valid = true
+            for _, line in ipairs(selected) do
+                local amount = type(line) == "table" and tonumber(line.amount) or nil
+                if type(line) ~= "table" or type(line.statistic) ~= "string" or
+                    amount == nil or amount ~= amount or math.abs(amount) == math.huge then
+                    valid = false
+                    break
                 end
+                if amount > 0 then monthIncome = monthIncome + amount end
+                if amount < 0 then monthExpenses = monthExpenses - amount end
             end
+            if valid then income, expenses = monthIncome, monthExpenses end
         end
     end
 

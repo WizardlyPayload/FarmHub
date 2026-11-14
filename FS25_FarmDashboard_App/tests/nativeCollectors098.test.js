@@ -303,12 +303,19 @@ g_densityMapHeightManager = { getIsValid = function() error("not ready") end, ge
 describe("Red Tape current-month tax under a separate mod environment", () => {
     const engine = `
 g_modIsLoaded.FS25_RedTape = true
+g_modManager = { getActiveModByName = function(self, name)
+    if name == "FS25_RedTape" then return { version = "1.0.3.0" } end
+end }
 g_farmManager = { farms = { { farmId = 1, name = "Owned" }, { farmId = 14, name = "Other" } } }
 g_currentMission.RedTape = {
     getCumulativeMonth = function() return 42 end,
     TaxSystem = { lineItems = {
-        [1] = { [42] = { { income = 100, expense = 25 } }, [41] = { { income = 900 } } },
-        [14] = { [42] = { { income = 999, expense = 10 } } },
+        [1] = { [42] = { { amount = 100, statistic = "soldProducts" },
+            { amount = -25, statistic = "purchaseSeeds" },
+            { amount = -5, statistic = "policyFine" } },
+            [41] = { { amount = 900, statistic = "soldProducts" } } },
+        [14] = { [42] = { { amount = 999, statistic = "soldVehicles" },
+            { amount = -10, statistic = "propertyMaintenance" } } },
     }, taxStatements = {} },
 }
 makeModEnv("FS25_RedTape", { RedTape = g_currentMission.RedTape })
@@ -322,7 +329,7 @@ return table.concat({ tostring(a.currentMonthIncome), tostring(a.currentMonthExp
     tostring(b.currentMonthIncome), tostring(b.currentMonthExpenses),
     tostring(rawget(_G, "RedTape") == nil) }, "|")
 `;
-        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("100|25|999|10|true");
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("100|30|999|10|true");
     });
 
     test("withholds current-month totals when the target month is unavailable", () => {
@@ -331,6 +338,44 @@ g_currentMission.RedTape.getCumulativeMonth = nil
 local out = RedTapeDataCollector:collect()
 local a = out.byFarm["1"].tax
 return tostring(a.currentMonthIncome) .. "|" .. tostring(a.currentMonthExpenses)
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
+    });
+
+    test("withholds old invented income/expense fields instead of reporting false zero", () => {
+        const body = `
+g_currentMission.RedTape.TaxSystem.lineItems[1][42] = { { income = 100, expense = 25 } }
+local tax = RedTapeDataCollector:collect().byFarm["1"].tax
+return tostring(tax.currentMonthIncome) .. "|" .. tostring(tax.currentMonthExpenses)
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
+    });
+
+    test("withholds month totals for an unreviewed Red Tape version", () => {
+        const body = `
+g_modManager.getActiveModByName = function() return { version = "1.0.4.0" } end
+local tax = RedTapeDataCollector:collect().byFarm["1"].tax
+return tostring(tax.currentMonthIncome) .. "|" .. tostring(tax.currentMonthExpenses)
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
+    });
+
+    test("withholds month totals when the tax line register is unavailable", () => {
+        const body = `
+g_currentMission.RedTape.TaxSystem.lineItems = nil
+local tax = RedTapeDataCollector:collect().byFarm["1"].tax
+return tostring(tax.currentMonthIncome) .. "|" .. tostring(tax.currentMonthExpenses)
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
+    });
+
+    test("withholds an oversized current-month register instead of presenting a partial total", () => {
+        const body = `
+local lines = {}
+for i = 1, 257 do lines[i] = { amount = 1, statistic = "soldProducts" } end
+g_currentMission.RedTape.TaxSystem.lineItems[1][42] = lines
+local tax = RedTapeDataCollector:collect().byFarm["1"].tax
+return tostring(tax.currentMonthIncome) .. "|" .. tostring(tax.currentMonthExpenses)
 `;
         expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
     });

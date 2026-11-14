@@ -1289,7 +1289,13 @@ export function displayMarketPrices(marketData) {
           const formattedCropName = this.formatCropName(cropName);
           if (!formattedCropName) return; // Skip items that shouldn't be displayed
           
-          const cropAvg = marketData.crops[cropName] ? marketData.crops[cropName].avgPrice : priceInfo.price;
+          const buyerPrices = (marketData.crops[cropName]?.locations || [])
+            .filter(location => location.name !== 'Market Base Prices')
+            .map(location => Number(location.price) || 0)
+            .filter(price => price > 0);
+          const cropAvg = buyerPrices.length > 0
+            ? buyerPrices.reduce((sum, price) => sum + price, 0) / buyerPrices.length
+            : priceInfo.price;
           const isAboveAvg = priceInfo.price > cropAvg;
           
           
@@ -1304,7 +1310,7 @@ export function displayMarketPrices(marketData) {
               </td>
               <td class="text-center">
                 ${priceInfo.isSpecialEvent ? '<span class="badge bg-warning"><i class="bi bi-star-fill"></i></span>' : ''}
-                ${isAboveAvg ? '<span class="badge bg-success"><i class="bi bi-arrow-up"></i></span>' : '<span class="badge bg-danger"><i class="bi bi-arrow-down"></i></span>'}
+                ${buyerPrices.length <= 1 || priceInfo.price === cropAvg ? '<span class="text-muted">—</span>' : isAboveAvg ? '<span class="badge bg-success"><i class="bi bi-arrow-up"></i></span>' : '<span class="badge bg-danger"><i class="bi bi-arrow-down"></i></span>'}
               </td>
             </tr>
           `;

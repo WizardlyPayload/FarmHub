@@ -439,8 +439,13 @@ function MarketTab({ economy }: { economy: Record<string, unknown> | null | unde
                             const label = formatCropName(cropName);
                             if (!label) return null;
                             const mult = Number(info.multiplier) || 1;
-                            const cropAvg =
-                              Number(marketPrices?.crops?.[cropName]?.avgPrice) || Number(info.price) || 0;
+                            const buyerPrices = (marketPrices?.crops?.[cropName]?.locations || [])
+                              .filter((loc) => loc.name !== "Market Base Prices")
+                              .map((loc) => Number(loc.price) || 0)
+                              .filter((p) => p > 0);
+                            const cropAvg = buyerPrices.length > 0
+                              ? buyerPrices.reduce((sum, p) => sum + p, 0) / buyerPrices.length
+                              : Number(info.price) || 0;
                             const price = Number(info.price) || 0;
                             const aboveAvg = price > cropAvg;
                             return (
@@ -457,6 +462,8 @@ function MarketTab({ economy }: { economy: Record<string, unknown> | null | unde
                                 <td class="text-center">
                                   {info.isSpecialEvent ? (
                                     <Badge tone="warn">{t("economy.specialEvent")}</Badge>
+                                  ) : buyerPrices.length <= 1 || price === cropAvg ? (
+                                    <span class="fd-economy__muted">—</span>
                                   ) : aboveAvg ? (
                                     <Badge tone="accent">{t("economy.priceAboveAvg")}</Badge>
                                   ) : (

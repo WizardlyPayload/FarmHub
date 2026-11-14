@@ -22,6 +22,9 @@ CompanionPages.register({
     modNames = { "FS25_340627_FS25_manualAttach", "FS25_manualAttach" },
     substrings = { "manualattach" },
     collect = function(ctx)
+        if ctx.version ~= "1.1.0.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local farmId = ctx.farmId
         if farmId == nil or farmId <= 0 then
             return { readState = "settings-only", reason = "no-farm" }

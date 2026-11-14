@@ -6,6 +6,9 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "ManualAttachCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { FS25_340627_FS25_manualAttach = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "FS25_340627_FS25_manualAttach", version = "1.1.0.0" }
+  } end }
   _G.PowerTakeOffExtension = {
     hasPowerTakeOffs = function(implement, parent) return implement.hasPto end,
     hasAttachedPowerTakeOffs = function(implement, parent) return implement.ptoConnected end,
@@ -50,6 +53,13 @@ test("withholds an owned implement attached to a parent with unknown ownership",
   expect(page).toMatchObject({ readState: "partial",
     byFarm: { "1": { implementCount: 0, connectedCount: 0, needsConnectionCount: 0 } } });
   expect(page.rows).toEqual({});
+});
+
+test("does not interpret an unreviewed Manual Attach version", () => {
+  const newer = GAME.replace('version = "1.1.0.0"', 'version = "1.2.0.0"');
+  const page = runCompanionPage(FILE, newer, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
+  expect(page.rows).toBeUndefined();
 });
 
 test("withholds client state and unavailable helper state", () => {

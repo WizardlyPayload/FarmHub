@@ -96,8 +96,8 @@ function buildSoilTriage(rows: FieldRecord[]): SoilTriage {
   return { active: true, urgent, watch, good };
 }
 
-/** Realistic Weather's irrigation key is a parcel ID, not an engine field ID. */
-function readRealisticWeatherIrrigation(fields: FieldRecord[], farmId: number) {
+/** Billing uses parcel IDs; the mod's menu toggle uses engine field IDs. */
+function readRealisticWeatherIrrigationCharges(fields: FieldRecord[], farmId: number) {
   const parcels = new Map<number, { active: boolean; pending: number }>();
   const ambiguous = new Set<number>();
   for (const field of fields) {
@@ -117,11 +117,24 @@ function readRealisticWeatherIrrigation(fields: FieldRecord[], farmId: number) {
     }
   }
   if (!parcels.size) return null;
+  const pending = [...parcels.values()].reduce((sum, row) => sum + row.pending, 0);
+  if (pending <= 0) return null;
   return {
-    ids: [...parcels.keys()].sort((a, b) => a - b),
-    active: [...parcels.values()].filter((row) => row.active).length,
-    pending: [...parcels.values()].reduce((sum, row) => sum + row.pending, 0),
+    ids: [...parcels.entries()].filter(([, row]) => row.pending > 0).map(([id]) => id).sort((a, b) => a - b),
+    pending,
   };
+}
+
+function readRealisticWeatherIrrigationMenu(fields: FieldRecord[], farmId: number) {
+  const names = new Map<number, string>();
+  for (const field of fields) {
+    if (Number(field.ownerFarmId ?? field.farmId ?? 0) !== farmId) continue;
+    const row = field.realisticWeatherIrrigationMenu;
+    const fieldId = Number(field.id);
+    if (!row || row.active !== true || Number(row.fieldId) !== fieldId || !Number.isInteger(fieldId)) continue;
+    names.set(fieldId, String(field.name || `Field ${fieldId}`));
+  }
+  return [...names.entries()].sort(([a], [b]) => a - b).map(([, name]) => name);
 }
 
 function asFieldFilter(raw: string | undefined): FieldFilterType {
@@ -232,8 +245,12 @@ export function FieldsSection() {
 
   const stats = useMemo(() => computeFieldStats(displayRows), [displayRows]);
   const areaProfile = saveProfileFromUnitDisplay(unitDisplayFromPayload(payload));
-  const realisticWeatherIrrigation = useMemo(
-    () => readRealisticWeatherIrrigation(allFields, farmId),
+  const realisticWeatherIrrigationCharges = useMemo(
+    () => readRealisticWeatherIrrigationCharges(allFields, farmId),
+    [allFields, farmId],
+  );
+  const realisticWeatherIrrigationMenu = useMemo(
+    () => readRealisticWeatherIrrigationMenu(allFields, farmId),
     [allFields, farmId],
   );
   const areaAcres = areaProfile?.effective?.acre === true;
@@ -390,16 +407,18 @@ export function FieldsSection() {
         </Card>
       </div>
 
-      {realisticWeatherIrrigation ? (
+      {realisticWeatherIrrigationMenu.length ? (
         <p class="fd-fields__irrigation-note">
-          {tOr("fields.realisticWeatherIrrigation", "Irrigation at last update: {{active}} active; parcels {{parcels}}{{pendingText}}.", {
-            active: realisticWeatherIrrigation.active,
-            parcels: realisticWeatherIrrigation.ids.join(", "),
-            pendingText: realisticWeatherIrrigation.pending > 0
-              ? tOr("fields.realisticWeatherIrrigationPending", "; {{amount}} unpaid for the next day", {
-                  amount: formatCurrency(realisticWeatherIrrigation.pending, areaProfile),
-                })
-              : "",
+          {tOr("fields.realisticWeatherIrrigation", "Realistic Weather menu shows irrigation active on: {{fields}}.", {
+            fields: realisticWeatherIrrigationMenu.join(", "),
+          })}
+        </p>
+      ) : null}
+      {realisticWeatherIrrigationCharges ? (
+        <p class="fd-fields__irrigation-note">
+          {tOr("fields.realisticWeatherIrrigationPending", "Realistic Weather shows {{amount}} unpaid for the next day on parcels {{parcels}}.", {
+            amount: formatCurrency(realisticWeatherIrrigationCharges.pending, areaProfile),
+            parcels: realisticWeatherIrrigationCharges.ids.join(", "),
           })}
         </p>
       ) : null}

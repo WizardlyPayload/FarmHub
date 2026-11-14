@@ -202,6 +202,28 @@ return tostring(field.id) .. "|" .. tostring(field.farmlandId) .. "|" ..
         expect(run({ files: FIELD_FILES, body })).toBe("1|5|5|18.26");
     });
 
+    test("Realistic Weather menu field ID is separate from the billed parcel ID", () => {
+        const body = `
+local modName = "FS25_RealisticWeather"
+ENGINE.g_server = {}
+ENGINE.g_modIsLoaded[modName] = true
+ENGINE.g_modManager = { getModByName = function() return { version = "1.2.1.0" } end }
+ENGINE.g_farmlandManager.getFarmlandOwner = function(self, id) return id == 5 and 1 or 2 end
+ENGINE.g_currentMission.moistureSystem = {
+    mission = ENGINE.g_currentMission, isServer = true,
+    irrigatingFields = { [29] = { id = 29, isActive = true, pendingCost = 0 } },
+}
+local menu = FieldDataCollector.readRealisticWeatherIrrigationMenu(29, 5, 1)
+local foreign = FieldDataCollector.readRealisticWeatherIrrigationMenu(29, 5, 2)
+local charge = FieldDataCollector.readRealisticWeatherIrrigation(5, 1)
+ENGINE.g_currentMission.moistureSystem.irrigatingFields[29].isActive = false
+local stopped = FieldDataCollector.readRealisticWeatherIrrigationMenu(29, 5, 1)
+return tostring(menu.fieldId) .. "|" .. tostring(menu.active) .. "|" ..
+       tostring(foreign) .. "|" .. tostring(charge) .. "|" .. tostring(stopped)
+`;
+        expect(run({ files: FIELD_FILES, body })).toBe("29|true|nil|nil|nil");
+    });
+
     test("slot-system bales and engine height types reach the field export", () => {
         expect(run({ files: FIELD_FILES, engine: slotBale, body: fieldBody })).toBe("bales=1|registered=2");
     });

@@ -2,10 +2,9 @@
 
 FieldDataCollector = {}
 
--- Realistic Weather v1.2.1.0 keeps irrigation by farmland ID. Its frame also
--- uses engine field IDs, which need not be the same namespace on every map.
--- Read only the server's live parcel record; never infer it from moisture cells.
-function FieldDataCollector.readRealisticWeatherIrrigation(parcelId, ownerFarmId)
+-- Realistic Weather v1.2.1.0 writes both menu toggles by engine field ID and
+-- grid charges by farmland ID into one table. Keep those meanings separate.
+local function realisticWeatherIrrigationSystem()
     local modName = "FS25_RealisticWeather"
     if _G.g_server == nil or type(_G.g_modIsLoaded) ~= "table" or _G.g_modIsLoaded[modName] ~= true then
         return nil
@@ -19,14 +18,23 @@ function FieldDataCollector.readRealisticWeatherIrrigation(parcelId, ownerFarmId
     if type(sys) ~= "table" or sys.isServer ~= true or sys.mission ~= mission or type(sys.irrigatingFields) ~= "table" then
         return nil
     end
+    return sys
+end
+
+local function ownedRealisticWeatherParcel(parcelId, ownerFarmId)
     if type(parcelId) ~= "number" or parcelId < 1 or parcelId % 1 ~= 0 or
-       type(ownerFarmId) ~= "number" or ownerFarmId < 1 or ownerFarmId == 100 then
-        return nil
-    end
+       type(ownerFarmId) ~= "number" or ownerFarmId < 1 or ownerFarmId == 100 then return false end
     local farmlandManager = _G.g_farmlandManager
-    if type(farmlandManager) ~= "table" or type(farmlandManager.getFarmlandOwner) ~= "function" then return nil end
+    if type(farmlandManager) ~= "table" or type(farmlandManager.getFarmlandOwner) ~= "function" then return false end
     local okOwner, currentOwner = pcall(farmlandManager.getFarmlandOwner, farmlandManager, parcelId)
-    if not okOwner or currentOwner ~= ownerFarmId then return nil end
+    return okOwner and currentOwner == ownerFarmId
+end
+
+-- Billing resolves the record key as a farmland parcel ID. Never report a
+-- menu field-ID record as an owned next-day charge merely because it is active.
+function FieldDataCollector.readRealisticWeatherIrrigation(parcelId, ownerFarmId)
+    local sys = realisticWeatherIrrigationSystem()
+    if not sys or not ownedRealisticWeatherParcel(parcelId, ownerFarmId) then return nil end
     local record = sys.irrigatingFields[parcelId]
     if type(record) ~= "table" or record.id ~= parcelId or type(record.isActive) ~= "boolean" then return nil end
     local pending = record.pendingCost
@@ -37,6 +45,19 @@ function FieldDataCollector.readRealisticWeatherIrrigation(parcelId, ownerFarmId
         active = record.isActive,
         pendingNextDay = math.floor(pending * 100 + 0.5) / 100,
     }
+end
+
+-- The mod's own menu calls getIsFieldBeingIrrigated(engineFieldId). This
+-- mirrors that visible toggle, with a separate current parcel-owner gate.
+-- It does not claim that the record's pendingCost will be billed to this farm.
+function FieldDataCollector.readRealisticWeatherIrrigationMenu(fieldId, parcelId, ownerFarmId)
+    local sys = realisticWeatherIrrigationSystem()
+    if not sys or not ownedRealisticWeatherParcel(parcelId, ownerFarmId) or
+       type(fieldId) ~= "number" or fieldId < 1 or fieldId % 1 ~= 0 then return nil end
+    local record = sys.irrigatingFields[fieldId]
+    if type(record) ~= "table" or record.id ~= fieldId or type(record.isActive) ~= "boolean" or
+       not record.isActive then return nil end
+    return { fieldId = fieldId, active = true }
 end
 
 local soilSampleHold = {}
@@ -3422,6 +3443,7 @@ function FieldDataCollector:_collectImpl()
 
         local parcelId = field.farmland and field.farmland.id or nil
         fData.realisticWeatherIrrigation = FieldDataCollector.readRealisticWeatherIrrigation(parcelId, ownerFarmId)
+        fData.realisticWeatherIrrigationMenu = FieldDataCollector.readRealisticWeatherIrrigationMenu(fieldId, parcelId, ownerFarmId)
         table.insert(fieldData, fData)
         fieldCoopTick()
         end

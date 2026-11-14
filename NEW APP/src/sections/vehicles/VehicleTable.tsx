@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui";
 import { AttachedEquipmentLine } from "@/sections/vehicles/AttachedEquipmentLine";
+import { TornadoRepairLine } from "@/sections/vehicles/TornadoRepairLine";
 import { t, tOr } from "@/i18n/i18n";
 import { vehicleRowFor } from "@/lib/companionFold";
 import {
@@ -164,6 +165,7 @@ function VehicleTableRow({
       <td>
         <strong>{displayName}</strong>
         <AttachedEquipmentLine vehicle={vehicle} />
+        <TornadoRepairLine vehicle={vehicle} />
         {focused ? <Badge tone="accent">{t("vehicles.focusHint")}</Badge> : null}
         <VehicleModFlags c={companions} vehicle={vehicle} />
       </td>

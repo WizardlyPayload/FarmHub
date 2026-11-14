@@ -454,6 +454,50 @@ return "missing"
 });
 
 describe("098 vehicle ownership under the native mod environment", () => {
+    test("Tornado Physics reports only a linked owned repair in the reviewed server version", () => {
+        const body = `
+local name = "FS25_344814_FS25_TornadoPhysics"
+ENGINE.g_server = {}
+ENGINE.g_modIsLoaded[name] = true
+local version = "4.0.0.0"
+ENGINE.g_modManager = {
+    getModByName = function(self, query)
+        if query == name then return { version = version } end
+    end
+}
+local vehicle = { rootNode = 101, getOwnerFarmId = function() return 1 end }
+local state = {
+    isInitialized = true, _pendingLoad = {},
+    _destroyedObjects = { [101] = { obj = vehicle, repairTimer = 5400000 } },
+}
+makeModEnv(name, { TornadoDestruction = state })
+local linked = VehicleDataCollector:_serializeTornadoRepair(vehicle)
+state._pendingLoad = { { filename = "same-model" } }
+local pending = VehicleDataCollector:_serializeTornadoRepair(vehicle)
+state._pendingLoad = {}
+local unowned = VehicleDataCollector:_serializeTornadoRepair({ rootNode = 101, getOwnerFarmId = function() return 0 end })
+state._destroyedObjects[101].obj = {}
+local stale = VehicleDataCollector:_serializeTornadoRepair(vehicle)
+state._destroyedObjects[101].obj = vehicle
+version = "4.0.0.1"
+local unreviewed = VehicleDataCollector:_serializeTornadoRepair(vehicle)
+version = "4.0.0.0"
+ENGINE.g_server = nil
+local client = VehicleDataCollector:_serializeTornadoRepair(vehicle)
+ENGINE.g_server = {}
+ENGINE.g_modIsLoaded[name] = false
+local alias = "KM_73973_Tornado_Physics"
+ENGINE.g_modIsLoaded[alias] = true
+ENGINE.g_modManager.getModByName = function(self, query)
+    if query == alias then return { version = "4.0.0.0" } end
+end
+makeModEnv(alias, { TornadoDestruction = state })
+local duplicatePath = VehicleDataCollector:_serializeTornadoRepair(vehicle)
+return tostring(linked and linked.remainingMs) .. ":" .. tostring(pending) .. ":" .. tostring(unowned) .. ":" .. tostring(stale) .. ":" .. tostring(unreviewed) .. ":" .. tostring(client) .. ":" .. tostring(duplicatePath and duplicatePath.remainingMs)
+`;
+        expect(run({ files: VEHICLE_FILES, body })).toBe("5400000:nil:nil:nil:nil:nil:5400000");
+    });
+
     test("base-game attachment records yield direct equipment names without a companion mod", () => {
         const body = `
 local tractor = {

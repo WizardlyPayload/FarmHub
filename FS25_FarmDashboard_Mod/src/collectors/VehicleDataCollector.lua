@@ -10,6 +10,11 @@ local ADS_SYSTEM_KEYS = {
 local ADS_STATE_READY = "ads_spec_state_ready"
 local ADS_STATE_BROKEN = "ads_spec_state_broken"
 
+local TORNADO_REPAIR_MODS = {
+    "FS25_344814_FS25_TornadoPhysics",
+    "KM_73973_Tornado_Physics",
+}
+
 -- Mirrors ADS_InspectionDialog STATUS_PRIORITY (severity for dashboard warnings).
 local ADS_INSPECTION_STATUS_PRIORITY = {
     ["ads_inspection_ok"] = 0,
@@ -767,6 +772,39 @@ function VehicleDataCollector:_serializeAttachedEquipment(vehicle)
     return #implements, #names > 0 and names or nil
 end
 
+-- The reviewed Tornado Physics v4.0.0.0 keeps its damaged-vehicle registry in
+-- its mod environment. Its saved XML has no farm ID, so never join that file
+-- by model/position or export an unresolved record as an owned vehicle.
+function VehicleDataCollector:_serializeTornadoRepair(vehicle)
+    if _G.g_server == nil or vehicle == nil or vehicle.rootNode == nil then return nil end
+    if type(vehicle.getOwnerFarmId) ~= "function" then return nil end
+    local okOwner, farmId = pcall(function() return vehicle:getOwnerFarmId() end)
+    farmId = okOwner and tonumber(farmId) or nil
+    if farmId == nil or farmId <= 0 or farmId == 100 then return nil end
+
+    for _, modName in ipairs(TORNADO_REPAIR_MODS) do
+        local loaded = _G.g_modIsLoaded and _G.g_modIsLoaded[modName] == true
+        if loaded and _G.g_modManager and type(_G.g_modManager.getModByName) == "function" then
+            local okMod, mod = pcall(function() return _G.g_modManager:getModByName(modName) end)
+            if okMod and type(mod) == "table" and tostring(mod.version) == "4.0.0.0" then
+                local modEnv = _G[modName]
+                local state = type(modEnv) == "table" and rawget(modEnv, "TornadoDestruction") or nil
+                if type(state) == "table" and state.isInitialized == true
+                    and type(state._destroyedObjects) == "table"
+                    and (type(state._pendingLoad) ~= "table" or next(state._pendingLoad) == nil) then
+                    local record = state._destroyedObjects[vehicle.rootNode]
+                    local remaining = record and tonumber(record.repairTimer)
+                    if record and record.obj == vehicle and remaining
+                        and remaining == remaining and remaining >= 0 and remaining < math.huge then
+                        return { remainingMs = math.floor(remaining) }
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
 function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
     local vData = {}
 
@@ -1008,6 +1046,7 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
         end
     end
     vData.attachedImplementsCount, vData.attachedEquipment = self:_serializeAttachedEquipment(vehicle)
+    vData.tornadoRepair = self:_serializeTornadoRepair(vehicle)
     -- Authoritative store icon key: the game's own store image basename (e.g. ".../store_t7.dds"
     -- -> "store_t7"). The desktop app keys its shipped image library by exactly this token, so
     -- exporting it lets the dashboard pick the correct picture instead of fuzzy-matching the

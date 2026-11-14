@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui";
 import { AttachedEquipmentLine } from "@/sections/vehicles/AttachedEquipmentLine";
+import { TornadoRepairLine } from "@/sections/vehicles/TornadoRepairLine";
 import { t } from "@/i18n/i18n";
 import { vehicleRowFor } from "@/lib/companionFold";
 import { vehicleNeedsAdsWarning } from "@/lib/vehicleAds";
@@ -119,6 +120,7 @@ export function VehicleCard({ vehicle, companions, focused, onSelect, onShowOnMa
 
       <div class="fd-vehicle-card__body">
         <AttachedEquipmentLine vehicle={vehicle} />
+        <TornadoRepairLine vehicle={vehicle} />
         <div class="fd-vehicle-card__stats">
           <div class="fd-vehicle-card__stat">
             <small class="fd-muted">{t("vehicles.cardOperatingTime")}</small>

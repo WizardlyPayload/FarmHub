@@ -97,6 +97,14 @@ local CATALOG = {
         globals = { "AS_Register" },
     },
     {
+        id = "autoSwitchFieldWork",
+        title = "AutoSwitch field-work dates",
+        category = "fields",
+        names = { "KM_82844_AutoSwitch", "FS25_AutoSwitch" },
+        substrings = { "autoswitch" },
+        globals = { "AS_Fields" },
+    },
+    {
         id = "autoSwitchTireLife",
         title = "AutoSwitch tire life",
         category = "fleet",

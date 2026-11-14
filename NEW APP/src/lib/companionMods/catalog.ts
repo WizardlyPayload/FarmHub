@@ -765,6 +765,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "autoSwitchFieldWork",
+    title: "AutoSwitch field-work dates",
+    category: "fields",
+    descKey: "companions.desc.autoSwitchFieldWork",
+    desc: "Shows the last recorded sowing, fertiliser and herbicide passes on land this farm owns now. A dated pass may predate its purchase.",
+    relatedSection: "fields",
+  },
+  {
     id: "autoSwitchTireLife",
     title: "AutoSwitch tire life",
     category: "fleet",

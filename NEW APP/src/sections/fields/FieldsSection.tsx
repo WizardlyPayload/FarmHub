@@ -130,9 +130,11 @@ function readRealisticWeatherIrrigationMenu(fields: FieldRecord[], farmId: numbe
   for (const field of fields) {
     if (Number(field.ownerFarmId ?? field.farmId ?? 0) !== farmId) continue;
     const row = field.realisticWeatherIrrigationMenu;
-    const fieldId = Number(field.id);
-    if (!row || row.active !== true || Number(row.fieldId) !== fieldId || !Number.isInteger(fieldId)) continue;
-    names.set(fieldId, String(field.name || `Field ${fieldId}`));
+    // The collector resolves the mod's field:getId() on this owned native field.
+    // field.id is the field-manager table index and can be a different number.
+    const menuFieldId = Number(row?.fieldId);
+    if (!row || row.active !== true || !Number.isInteger(menuFieldId) || menuFieldId < 1) continue;
+    names.set(menuFieldId, String(field.name || `Field ${field.id ?? menuFieldId}`));
   }
   return [...names.entries()].sort(([a], [b]) => a - b).map(([, name]) => name);
 }

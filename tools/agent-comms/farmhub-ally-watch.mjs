@@ -66,7 +66,7 @@ function armedRfGateId() {
     if (/^FARMHUB-[A-Z0-9-]+$/.test(gate.rfAfterHeading ?? '')) {
       return firstRfRequestAfterHandoff(fs.readFileSync(outbox, 'utf8'), gate.rfAfterHeading);
     }
-    return /^RF-\d{8}-TINA-[A-Z0-9-]+$/.test(gate.rfId ?? '') ? gate.rfId : '';
+    return /^RF-[A-Z0-9-]*TINA-[A-Z0-9-]+$/.test(gate.rfId ?? '') ? gate.rfId : '';
   } catch { return ''; }
 }
 function alive(pid) {

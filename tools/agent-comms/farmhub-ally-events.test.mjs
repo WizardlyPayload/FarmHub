@@ -18,6 +18,7 @@ test('parses substantive FarmHub and RF returns, including direct PARTIAL', () =
     '## [time] from Tina\r\nSTALL RF-20261102-TINA-SERVERREADY-1499 (Tina/Ally): restored',
     '## [time] from Tina\r\nPARTIAL + INCIDENT FARMHUB-ALLY-20261107-VAULT-V53 (save missing): stop',
     '## [time] from Tina\r\nBLOCKED (no exact copy found) FARMHUB-ALLY-20261107-V53-RECOVERY-AUDIT - retained backup',
+    '## [time] from Tina\r\nRESULT RF-SOIL-1443-CELLIDENTITY-20261114-TINA-2235 | restored',
   ].join('\r\n\r\n');
   assert.deepEqual(parseSubstantiveReturns(text).map(({ id, kind }) => [id, kind]), [
     ['FARMHUB-ALLY-20261101-VAULT-V8', 'RESULT'],
@@ -32,6 +33,7 @@ test('parses substantive FarmHub and RF returns, including direct PARTIAL', () =
     ['RF-20261102-TINA-SERVERREADY-1499', 'STALL'],
     ['FARMHUB-ALLY-20261107-VAULT-V53', 'PARTIAL'],
     ['FARMHUB-ALLY-20261107-V53-RECOVERY-AUDIT', 'BLOCKED'],
+    ['RF-SOIL-1443-CELLIDENTITY-20261114-TINA-2235', 'RESULT'],
   ]);
 });
 
@@ -59,6 +61,9 @@ test('unrelated RF returns stay silent unless an exact release gate is armed', (
   assert.deepEqual(events.map(event => shouldWakeFarmHub(event)), [true, false]);
   assert.deepEqual(events.map(event => shouldWakeFarmHub(event, 'RF-20261102-TINA-VEHICLE-IDENTITY-1486')), [true, true]);
   assert.equal(shouldWakeFarmHub(events[1], 'RF-20261102-TINA-VEHICLE-IDENTITY-1484'), false);
+  const soil = parseSubstantiveReturns('## RESULT RF-SOIL-1443-CELLIDENTITY-20261114-TINA-2235 | restored')[0];
+  assert.equal(shouldWakeFarmHub(soil), false);
+  assert.equal(shouldWakeFarmHub(soil, soil.id), true);
 });
 
 test('resolves only the first RF request after an explicit Ally handoff', () => {

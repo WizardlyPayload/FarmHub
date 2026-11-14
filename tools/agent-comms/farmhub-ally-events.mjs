@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 // and RF's direct PASS/FAIL/STALL outcomes. ACK and STATUS are receipt only.
 // Parse RF returns for exact, explicitly armed release gates; an unrelated RF
 // result must not spend a FarmHub model turn.
-const RETURN = /^(RESULT|BLOCKED|PARTIAL|COMPLETE|PASS|FAIL|STALL)(?:(?:\s*\+\s*INCIDENT)|(?:\s*\([^\r\n)]{1,80}\)))*\s+(?:RESULT\s+)?(FARMHUB-ALLY-\d{8}-[A-Z0-9-]+|RF-\d{8}-TINA-[A-Z0-9-]+)(?=\s|[|:])/m;
+const RETURN = /^(RESULT|BLOCKED|PARTIAL|COMPLETE|PASS|FAIL|STALL)(?:(?:\s*\+\s*INCIDENT)|(?:\s*\([^\r\n)]{1,80}\)))*\s+(?:RESULT\s+)?(FARMHUB-ALLY-\d{8}-[A-Z0-9-]+|RF-[A-Z0-9-]*TINA-[A-Z0-9-]+)(?=\s|[|:])/m;
 
 export function parseSubstantiveReturns(text) {
   const out = [];
@@ -24,13 +24,13 @@ export function parseSubstantiveReturns(text) {
 
 export function shouldWakeFarmHub(event, rfGateId = '') {
   if (event.id.startsWith('FARMHUB-ALLY-')) return true;
-  return /^RF-\d{8}-TINA-[A-Z0-9-]+$/.test(rfGateId) && event.id === rfGateId;
+  return /^RF-[A-Z0-9-]*TINA-[A-Z0-9-]+$/.test(rfGateId) && event.id === rfGateId;
 }
 
 export function firstRfRequestAfterHandoff(text, heading) {
   const marker = `## ${heading}`;
   const start = text.lastIndexOf(marker);
   if (start < 0) return '';
-  const match = text.slice(start + marker.length).match(/^##[^\r\n]*?\b(RF-\d{8}-TINA-[A-Z0-9-]+)(?=\s|$)/m);
+  const match = text.slice(start + marker.length).match(/^##[^\r\n]*?\b(RF-[A-Z0-9-]*TINA-[A-Z0-9-]+)(?=\s|$)/m);
   return match?.[1] ?? '';
 }

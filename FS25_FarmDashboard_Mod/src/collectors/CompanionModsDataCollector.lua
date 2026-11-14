@@ -44,7 +44,7 @@ local CATALOG = {
         id = "realisticDieselPrice",
         title = "Realistic Diesel Price",
         category = "economy",
-        names = { "FS25_RealisticDieselPrice", "FS25_363612_Realistic_Diesel_Price" },
+        names = { "FS25_RealisticDieselPrice", "FS25_363612_FS25_RealisticDieselPrice", "FS25_363612_Realistic_Diesel_Price" },
         substrings = { "realisticdieselprice", "realistic_diesel_price" },
         globals = {},
     },
@@ -691,6 +691,7 @@ local CATALOG = {
         category = "storage",
         names = {
             "FS25_RealSilo",
+            "FS25_369067_FS25_RealSilo",
             "FS25_369067_RealSilo_Realistic_Silo_Compartments",
         },
         substrings = { "realsilo", "realistic_silo" },
@@ -1696,7 +1697,7 @@ local CATALOG = {
         id = "moistureSystem",
         title = "Moisture System",
         category = "fields",
-        names = { "FS25_MoistureSystem", "FS25_354130_Moisture_System" },
+        names = { "FS25_MoistureSystem", "FS25_354130_FS25_MoistureSystem", "FS25_354130_Moisture_System" },
         substrings = { "moisturesystem", "moisture_system" },
         globals = {},
     },
@@ -1728,7 +1729,7 @@ local CATALOG = {
         id = "distributionRedux",
         title = "Distribution Redux",
         category = "production",
-        names = { "FS25_DistributionRedux", "FS25_365583_Distribution_Redux" },
+        names = { "FS25_DistributionRedux", "FS25_365583_FS25_Distribution_Redux", "FS25_365583_Distribution_Redux" },
         substrings = { "distributionredux", "distribution_redux" },
         globals = {},
     },
@@ -1736,7 +1737,7 @@ local CATALOG = {
         id = "silageCompactionMonitor",
         title = "Silage Compaction Monitor",
         category = "storage",
-        names = { "FS25_SilageCompactionMonitor", "FS25_349039_Silage_Compaction_Monitor" },
+        names = { "FS25_SilageCompactionMonitor", "FS25_349039_FS25_Silage_Compaction_Monitor", "FS25_349039_Silage_Compaction_Monitor" },
         substrings = { "silagecompaction", "silage_compaction" },
         globals = {},
     },
@@ -2169,7 +2170,7 @@ local function providerSymbol(modNames, symbolName)
 end
 
 local LOAN_REPAY_MODS = { "FS25_AutomaticLoanRepay", "FS25_365758_Automatic_Loan_Repay" }
-local DIESEL_PRICE_MODS = { "FS25_RealisticDieselPrice", "FS25_363612_Realistic_Diesel_Price" }
+local DIESEL_PRICE_MODS = { "FS25_RealisticDieselPrice", "FS25_363612_FS25_RealisticDieselPrice", "FS25_363612_Realistic_Diesel_Price" }
 local BETTER_CONTRACTS_MODS = { "FS25_BetterContracts", "FS25_307829_Better_Contracts" }
 local WOOL_MODS = { "FS25_SeasonalWoolProduction", "FS25_356143_Seasonal_Wool_Production" }
 local SCHEDULE_MODS = { "FS25_ProductionSchedule", "FS25_352788_Production_Schedule" }
@@ -2180,7 +2181,7 @@ local VIP_MODS = { "FS25_VIPOrderManager", "FS25_310861_VIP_Order_Manager" }
 local MILK_MODS = { "FS25_SeasonalMilkProduction", "FS25_365513_Seasonal_Milk_Production" }
 local YIELD_MODS = { "FS25_YieldTracker", "FS25_326441_Yield_Tracker" }
 local LEASE_MODS = { "FS25_FieldLeasing", "FS25_338381_Field_Leasing" }
-local SILO_MODS = { "FS25_RealSilo", "FS25_369067_RealSilo_Realistic_Silo_Compartments" }
+local SILO_MODS = { "FS25_RealSilo", "FS25_369067_FS25_RealSilo", "FS25_369067_RealSilo_Realistic_Silo_Compartments" }
 local PALLET_MODS = {
     "FS25_StorageOverhaulPalletDegradation",
     "FS25_StorageOverhaul",
@@ -2188,11 +2189,11 @@ local PALLET_MODS = {
     "FS25_360720_Storage_Overhaul_Pallet_Degradation_System",
 }
 local REPUTATION_MODS = { "FS25_FarmReputation", "FS25_367320_Farm_Reputation", "FS25_367320_FS25_FarmReputation" }
-local MOISTURE_MODS = { "FS25_MoistureSystem", "FS25_354130_Moisture_System" }
+local MOISTURE_MODS = { "FS25_MoistureSystem", "FS25_354130_FS25_MoistureSystem", "FS25_354130_Moisture_System" }
 local RENT_MODS = { "FS25_RentYourField", "FS25_356641_Rent_Your_Field" }
 local MARKET_MODS = { "FS25_FarmlandMarketplace", "FS25_369241_FS25_FarmlandMarketplace", "FS25_369241_Farmland_Marketplace" }
-local DIST_MODS = { "FS25_DistributionRedux", "FS25_365583_Distribution_Redux" }
-local SILAGE_MODS = { "FS25_SilageCompactionMonitor", "FS25_349039_Silage_Compaction_Monitor" }
+local DIST_MODS = { "FS25_DistributionRedux", "FS25_365583_FS25_Distribution_Redux", "FS25_365583_Distribution_Redux" }
+local SILAGE_MODS = { "FS25_SilageCompactionMonitor", "FS25_349039_FS25_Silage_Compaction_Monitor", "FS25_349039_Silage_Compaction_Monitor" }
 local OPS_MODS = { "FS25_FarmOperationsDashboard", "FS25_364188_Farm_Operations_Dashboard" }
 local FACTORY_MODS = { "FS25_FactoryProfitCalculator", "FS25_368477_Factory_Profit_Calculator" }
 local LIVESTOCK_MONITOR_MODS = { "FS25_LivestockMonitor", "FS25_367447_Livestock_Monitor" }

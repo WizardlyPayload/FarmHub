@@ -342,9 +342,10 @@ local function rtSerializeTax(rt, taxSystem, farmId)
         end)
         reviewedTaxVersion = ok and type(mod) == "table" and mod.version == REVIEWED_TAX_VERSION
     end
-    -- An empty register is meaningful only while the mod is recording tax
-    -- lines. With recording disabled, zero would falsely imply no activity.
+    -- An empty register is meaningful only while tax and line recording are
+    -- enabled. The mod clears its register when tax is disabled.
     if reviewedTaxVersion and rt and type(rt.settings) == "table" and
+        rt.settings.taxEnabled == true and
         rt.settings.taxRecordingEnabled == true and cumMonth and
         type(taxSystem.lineItems) == "table" and
         (byFarm == nil or type(byFarm) == "table") and

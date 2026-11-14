@@ -10,6 +10,13 @@ local function readBool(helper, method, implement, parent)
     return nil
 end
 
+local function ownerFarmId(ctx, vehicle)
+    local stored = ctx.num(vehicle.ownerFarmId)
+    local current = ctx.num(ctx.call(vehicle, "getOwnerFarmId"))
+    if stored ~= nil and current ~= nil and stored ~= current then return nil end
+    return current or stored
+end
+
 CompanionPages.register({
     key = "manualAttach",
     modNames = { "FS25_340627_FS25_manualAttach", "FS25_manualAttach" },
@@ -36,9 +43,15 @@ CompanionPages.register({
         local eligible, incomplete = 0, false
         local truncated = ctx.ownedScanTruncated == true
         for _, vehicle in ipairs(vehicles) do
-            if type(vehicle) == "table" then
+            if type(vehicle) == "table" and ownerFarmId(ctx, vehicle) == farmId then
                 local parent = ctx.call(vehicle, "getAttacherVehicle")
-                if type(parent) == "table" then
+                local parentOwner = type(parent) == "table" and ownerFarmId(ctx, parent) or nil
+                if type(parent) == "table" and parentOwner == nil
+                    and (type(vehicle.spec_manualAttachPowerTakeOff) == "table"
+                        or type(vehicle.spec_manualAttachConnectionHoses) == "table") then
+                    incomplete = true
+                end
+                if parentOwner == farmId then
                     local hasPto = nil
                     local hasHoses = nil
                     if type(vehicle.spec_manualAttachPowerTakeOff) == "table" then

@@ -14,8 +14,9 @@ const GAME = `
     hasConnectionHoses = function(implement, parent) return implement.hasHoses end,
     hasAttachedConnectionHoses = function(implement) return implement.hosesConnected end,
   }
-  local parent = { getFullName = function() return "Owned Tractor" end }
-  local function vehicle(id, owner, hasPto, ptoConnected, hasHoses, hosesConnected)
+  local function vehicle(id, owner, hasPto, ptoConnected, hasHoses, hosesConnected, parentOwner)
+    local parent = { ownerFarmId = parentOwner or 1,
+      getFullName = function() return "Owned Tractor" end }
     return { uniqueId = id, ownerFarmId = owner, hasPto = hasPto, ptoConnected = ptoConnected,
       hasHoses = hasHoses, hosesConnected = hosesConnected,
       spec_manualAttachPowerTakeOff = {}, spec_manualAttachConnectionHoses = {},
@@ -27,6 +28,7 @@ const GAME = `
       vehicle("ready", 1, true, true, true, true),
       vehicle("needs-pto", 1, true, false, true, true),
       vehicle("foreign-secret", 2, true, false, true, false),
+      vehicle("foreign-parent", 1, true, false, true, false, 2),
       vehicle("no-connections", 1, false, false, false, false),
     } } }
 `;
@@ -37,9 +39,17 @@ test("reads only owned attached implement connections and preserves false states
     byFarm: { "1": { implementCount: 2, connectedCount: 1, needsConnectionCount: 1 } } });
   expect(page.rows.find((row) => row.vehicleId === "needs-pto"))
     .toMatchObject({ pto: false, hoses: true, attachedTo: "Owned Tractor" });
-  expect(JSON.stringify(page)).not.toMatch(/foreign-secret|no-connections/);
+  expect(JSON.stringify(page)).not.toMatch(/foreign-secret|foreign-parent|no-connections/);
   const merged = normalizeCompanionPages({ pages: { manualAttach: page } }, { modules: loadModules() });
   expect(merged.pages.manualAttach.rows).toHaveLength(2);
+});
+
+test("withholds an owned implement attached to a parent with unknown ownership", () => {
+  const unknownParent = GAME.replace("ownerFarmId = parentOwner or 1,", "ownerFarmId = nil,");
+  const page = runCompanionPage(FILE, unknownParent, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial",
+    byFarm: { "1": { implementCount: 0, connectedCount: 0, needsConnectionCount: 0 } } });
+  expect(page.rows).toEqual({});
 });
 
 test("withholds client state and unavailable helper state", () => {

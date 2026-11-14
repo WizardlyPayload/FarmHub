@@ -90,7 +90,7 @@ export function Page({ entry }: CompanionPageProps) {
             outbreak: row.visibleOutbreak || "—",
           },
         }))} empty={tOr("companionPage.realisticCropRotation.noDiseaseRows", "No tracked owned parcel has a positive pressure band or visible outbreak.")} />
-        <ModEmpty>{tOr("companionPage.realisticCropRotation.diseaseNote", "Pressure is a prediction for the standing crop, not a confirmed infection. These are last-export readings for tracked parcels, not a complete farm survey or treatment prescription.")}</ModEmpty>
+        <ModEmpty>{tOr("companionPage.realisticCropRotation.diseaseNote", "Pressure bands: 1 low, 2 moderate, 3 high. Pressure is a prediction for the standing crop, not a confirmed infection. These are last-export readings for tracked parcels, not a complete farm survey or treatment prescription.")}</ModEmpty>
         {disease?.readState === "partial" ? <ModEmpty>{tOr("companionPage.realisticCropRotation.diseasePartial", "Some parcel disease or ownership readings were unavailable; totals are withheld.")}</ModEmpty> : null}
       </Card> : null}
     </ModPage>

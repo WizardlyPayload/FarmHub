@@ -1640,7 +1640,7 @@ local CATALOG = {
         id = "fieldProfitabilityLedger",
         title = "Field Profitability Ledger",
         category = "fields",
-        names = { "FS25_FieldProfitabilityLedger", "FS25_369866_Field_Profitability_Ledger" },
+        names = { "FS25_FieldProfitabilityLedger", "FS25_369866_FS25_FieldProfitabilityLedger", "FS25_369866_Field_Profitability_Ledger" },
         substrings = { "fieldprofitability", "field_profitability" },
         globals = { "FieldProfitabilityLedger" },
     },
@@ -4573,7 +4573,7 @@ local function collectExtendedVehicleMaintenance()
     }
 end
 
-local LEDGER_MODS = { "FS25_FieldProfitabilityLedger", "FS25_369866_Field_Profitability_Ledger" }
+local LEDGER_MODS = { "FS25_FieldProfitabilityLedger", "FS25_369866_FS25_FieldProfitabilityLedger", "FS25_369866_Field_Profitability_Ledger" }
 local LEDGER_HEADER_CAP = 8
 local LEDGER_TOTAL_CAP = 12
 local LEDGER_TOTAL_SCAN_CAP = 64

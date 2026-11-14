@@ -174,6 +174,11 @@ describe("wave 2 reads stay bounded", () => {
         expect(entry.desc).toContain("sales are not shown");
         expect(inModEnv(ledgerProvider(false), ledgerRow))
             .toBe("ok|farm|1|Field 3/ok|c1:0:false|false|nil|nil");
+        const exactVaultName = ledgerProvider(false).replaceAll(
+            "FS25_FieldProfitabilityLedger", "FS25_369866_FS25_FieldProfitabilityLedger",
+        );
+        expect(inModEnv(exactVaultName, ledgerRow))
+            .toBe("ok|farm|1|Field 3/ok|c1:0:false|false|nil|nil");
         expect(inModEnv(ledgerProvider(true), ledgerRow))
             .toBe("unavailable|nil|nil|||false|mp-disabled|nil");
     });

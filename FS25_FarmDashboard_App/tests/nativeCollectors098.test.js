@@ -144,6 +144,7 @@ const COMPANION_FILES = ["MissionActiveRegistry.lua", "collectors/CompanionModsD
 const COMPANION_FLAT_FILES = ["collectors/CompanionModsDataCollector.lua"];
 const CROP_FILES = ["collectors/rf/RfCropStressDataCollector.lua"];
 const DAIRY_FILES = ["collectors/rf/RfDairyDataCollector.lua"];
+const RED_TAPE_FILES = ["collectors/RedTapeDataCollector.lua"];
 
 const slotBale = `
 BALE = { uniqueId = "b1", nodeId = 101, fillType = 3, fillLevel = 4000, ownerFarmId = 1, className = "Bale" }
@@ -204,6 +205,42 @@ DensityMapHeightUtil = { getFillLevelAtArea = function() return 0 end }
 g_densityMapHeightManager = { getIsValid = function() error("not ready") end, getDensityMapHeightTypes = function() return {} end }
 `;
         expect(run({ files: FIELD_FILES, engine, body: fieldBody })).toBe("bales=1|registered=1");
+    });
+});
+
+describe("Red Tape current-month tax under a separate mod environment", () => {
+    const engine = `
+g_modIsLoaded.FS25_RedTape = true
+g_farmManager = { farms = { { farmId = 1, name = "Owned" }, { farmId = 14, name = "Other" } } }
+g_currentMission.RedTape = {
+    getCumulativeMonth = function() return 42 end,
+    TaxSystem = { lineItems = {
+        [1] = { [42] = { { income = 100, expense = 25 } }, [41] = { { income = 900 } } },
+        [14] = { [42] = { { income = 999, expense = 10 } } },
+    }, taxStatements = {} },
+}
+makeModEnv("FS25_RedTape", { RedTape = g_currentMission.RedTape })
+`;
+
+    test("reads the live target month and keeps farm totals separate", () => {
+        const body = `
+local out = RedTapeDataCollector:collect()
+local a, b = out.byFarm["1"].tax, out.byFarm["14"].tax
+return table.concat({ tostring(a.currentMonthIncome), tostring(a.currentMonthExpenses),
+    tostring(b.currentMonthIncome), tostring(b.currentMonthExpenses),
+    tostring(rawget(_G, "RedTape") == nil) }, "|")
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("100|25|999|10|true");
+    });
+
+    test("withholds current-month totals when the target month is unavailable", () => {
+        const body = `
+g_currentMission.RedTape.getCumulativeMonth = nil
+local out = RedTapeDataCollector:collect()
+local a = out.byFarm["1"].tax
+return tostring(a.currentMonthIncome) .. "|" .. tostring(a.currentMonthExpenses)
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
     });
 });
 

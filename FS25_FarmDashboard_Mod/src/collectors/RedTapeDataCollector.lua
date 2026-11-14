@@ -287,9 +287,9 @@ local function rtSerializeGrants(grantSystem, farmId)
     return out
 end
 
-local function rtSerializeTax(taxSystem, farmId)
+local function rtSerializeTax(rt, taxSystem, farmId)
     if not taxSystem then
-        return { statements = {}, currentMonthIncome = 0, currentMonthExpenses = 0 }
+        return { statements = {} }
     end
     local statements = {}
     if taxSystem.taxStatements then
@@ -308,10 +308,15 @@ local function rtSerializeTax(taxSystem, farmId)
     end
     table.sort(statements, function(a, b) return (a.month or 0) > (b.month or 0) end)
 
-    local income, expenses = 0, 0
-    if taxSystem.lineItems and taxSystem.lineItems[farmId] then
-        local cumMonth = _G.RedTape and _G.RedTape.getCumulativeMonth and _G.RedTape.getCumulativeMonth() or nil
-        if cumMonth and taxSystem.lineItems[farmId][cumMonth] then
+    local income, expenses = nil, nil
+    local cumMonth = nil
+    if rt and type(rt.getCumulativeMonth) == "function" then
+        local ok, value = pcall(rt.getCumulativeMonth)
+        if ok then cumMonth = tonumber(value) end
+    end
+    if cumMonth then
+        income, expenses = 0, 0
+        if taxSystem.lineItems and taxSystem.lineItems[farmId] and taxSystem.lineItems[farmId][cumMonth] then
             for _, line in ipairs(taxSystem.lineItems[farmId][cumMonth]) do
                 if line then
                     income = income + (tonumber(line.income) or 0)
@@ -364,7 +369,7 @@ local function rtSerializeFarm(rt, farmId)
         end
     end
 
-    local tax = rtSerializeTax(rt.TaxSystem, farmId)
+    local tax = rtSerializeTax(rt, rt.TaxSystem, farmId)
 
     local activeSchemes = {}
     local okAct, act = pcall(function()

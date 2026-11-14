@@ -200,6 +200,16 @@ describe("106 fractional money-per-litre prices survive producer, JSON and consu
         expect(run(`MARKET = 2; stations({ buyer("Actual buyer", 0, 0.2) })`, `return priceOf(1)`)).toBe("0.2|Actual buyer");
     });
 
+    test("station without an effective offer method cannot turn the base price into a buyer quote", () => {
+        const engine = `
+local st = buyer("Method absent", 0, 0.8)
+st.getEffectiveFillTypePrice = nil
+stations({ st })
+MARKET = 2
+`;
+        expect(run(engine, `return priceOf(1)`)).toBe("nil|nil");
+    });
+
     test("no valid price at all leaves the item unpriced instead of 0", () => {
         const engine = `MARKET = 0; stations({ buyer("Closed", 0, 0) })`;
         expect(run(engine, `local it = item(StockDataCollector:collect(), 1); return tostring(it.bestSellPrice) .. "|" .. tostring(it.bestSellStation) .. "|" .. it.totalLiters`)).toBe("nil|nil|1000");

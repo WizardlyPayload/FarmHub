@@ -26,7 +26,7 @@ local function _isSellingStation(station)
     return false
 end
 
--- Engine money per litre (SellingStation:getEffectiveFillTypePrice, EconomyManager:getPricePerLiter).
+-- Engine money per litre from a live SellingStation offer.
 -- Kept fractional: 0.80/L is a real price. Anything but a finite positive number is no price.
 local function _pricePerLiter(p)
     if type(p) ~= "number" or p ~= p or p <= 0 or p == math.huge then return nil end
@@ -80,14 +80,13 @@ end
 local function _attachSellPrices(byFarm)
     local mission = _G.g_currentMission
     if not mission then return end
-    local em = mission.economyManager
     local stations = {}
     if mission.storageSystem and mission.storageSystem.getUnloadingStations then
         local ok, list = pcall(function() return mission.storageSystem:getUnloadingStations() end)
         if ok and type(list) == "table" then stations = list end
     end
-    if em and em.sellingStations then
-        for _, st in pairs(em.sellingStations) do
+    if mission.economyManager and mission.economyManager.sellingStations then
+        for _, st in pairs(mission.economyManager.sellingStations) do
             if st then table.insert(stations, st) end
         end
     end
@@ -110,7 +109,7 @@ local function _attachSellPrices(byFarm)
                                 if station.getEffectiveFillTypePrice then
                                     return station:getEffectiveFillTypePrice(idx)
                                 end
-                                return em and em.getPricePerLiter and em:getPricePerLiter(idx, station)
+                                return nil
                             end)
                             price = okP and _pricePerLiter(price) or nil
                             if price and price > bestPrice then

@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "lieux",
   "economy.marketBasePricesTitle": "Prix de base du marché",
   "economy.marketBasePricesHint": "Prix de base du jeu avant application des multiplicateurs de points de vente. Rendez-vous aux points de vente sur la carte pour afficher les prix en temps réel.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Aucun équipement ne correspond à ce filtre.",
   "economy.purchasesEmptyVehicles": "Aucun véhicule motorisé n'a été trouvé dans cette ferme.",
   "economy.purchasesEmptyImplements": "Aucun outil ni remorque n'a été trouvé pour cette ferme.",

@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "lokalizacje",
   "economy.marketBasePricesTitle": "Ceny bazowe rynkowe",
   "economy.marketBasePricesHint": "Domyślna cena w grze przed mnożnikiem punktów sprzedaży. Jedź do punktów sprzedaży na mapie, aby odblokować ceny w czasie rzeczywistym.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Żaden sprzęt nie pasuje do tego filtra.",
   "economy.purchasesEmptyVehicles": "Nie znaleziono pojazdów silnikowych dla tej farmy.",
   "economy.purchasesEmptyImplements": "Nie znaleziono żadnych narzędzi ani przyczep dla tego gospodarstwa.",

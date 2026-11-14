@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "locații",
   "economy.marketBasePricesTitle": "Prețuri de bază de piață",
   "economy.marketBasePricesHint": "Prețul implicit al jocului înainte de multiplicatorii punctelor de vânzare. Conduceți către punctele de vânzare de pe hartă pentru a debloca prețuri live.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Niciun echipament nu se potrivește cu acest filtru.",
   "economy.purchasesEmptyVehicles": "Nu s-au găsit vehicule motorizate pentru această fermă.",
   "economy.purchasesEmptyImplements": "Nu s-au găsit utilaje sau remorci pentru această fermă.",

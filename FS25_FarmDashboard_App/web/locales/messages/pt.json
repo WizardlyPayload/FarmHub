@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "locais",
   "economy.marketBasePricesTitle": "Preços de base de mercado",
   "economy.marketBasePricesHint": "Preço padrão do jogo antes dos multiplicadores de pontos de venda. Dirija até os pontos de venda no mapa para desbloquear os preços em tempo real.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Nenhum equipamento é compatível com este filtro.",
   "economy.purchasesEmptyVehicles": "Nenhum veículo motorizado foi encontrado nesta fazenda.",
   "economy.purchasesEmptyImplements": "Não foram encontrados implementos ou reboques para esta fazenda.",

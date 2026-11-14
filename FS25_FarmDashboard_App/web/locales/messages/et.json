@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "asukohad",
   "economy.marketBasePricesTitle": "Turu baashinnad",
   "economy.marketBasePricesHint": "Mängu vaikehind enne müügipunktide kordajaid. Sõida kaardil müügipunktide poole, et avada reaalajas hinnad.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Sellele filtrile ei vasta ükski seade.",
   "economy.purchasesEmptyVehicles": "Selle talu kohta ei leitud mootorsõidukeid.",
   "economy.purchasesEmptyImplements": "Sellele talule ei leitud ühtegi tööriista ega haagist.",

@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "suíomhanna",
   "economy.marketBasePricesTitle": "Praghsanna Bonn an Mhargaidh",
   "economy.marketBasePricesHint": "Praghas réamhshocraithe an chluiche roimh iolraitheoirí pointí díola. Tiomáin chuig pointí díola ar an léarscáil chun praghsanna beo a dhíghlasáil.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Níl aon trealamh a oireann don scagaire seo.",
   "economy.purchasesEmptyVehicles": "Ní bhfuarthas aon fheithiclí mótairithe don fheirm seo.",
   "economy.purchasesEmptyImplements": "Ní bhfuarthas aon uirlisí ná leantóirí don fheirm seo.",

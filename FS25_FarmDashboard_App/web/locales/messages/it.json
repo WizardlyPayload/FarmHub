@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "posizioni",
   "economy.marketBasePricesTitle": "Prezzi di base di mercato",
   "economy.marketBasePricesHint": "Prezzo di gioco predefinito prima dei moltiplicatori dei punti vendita. Recati ai punti vendita sulla mappa per sbloccare i prezzi in tempo reale.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Nessun apparecchio corrisponde a questo filtro.",
   "economy.purchasesEmptyVehicles": "In questa fattoria non sono stati rilevati veicoli a motore.",
   "economy.purchasesEmptyImplements": "Nessun attrezzo o rimorchio trovato per questa azienda agricola.",

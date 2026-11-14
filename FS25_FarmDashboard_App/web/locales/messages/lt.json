@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "vietos",
   "economy.marketBasePricesTitle": "Rinkos bazinės kainos",
   "economy.marketBasePricesHint": "Numatytoji žaidimo kaina prieš pardavimo taškų daugiklius. Norėdami atrakinti realias kainas, važiuokite iki pardavimo taškų žemėlapyje.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Nėra šio filtro neatitinkančios įrangos.",
   "economy.purchasesEmptyVehicles": "Šiam ūkiui nerasta jokių motorinių transporto priemonių.",
   "economy.purchasesEmptyImplements": "Šiam ūkiui nerasta jokių padargų ar priekabų.",

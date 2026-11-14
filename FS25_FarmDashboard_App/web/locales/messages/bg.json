@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "местоположения",
   "economy.marketBasePricesTitle": "Пазарни базови цени",
   "economy.marketBasePricesHint": "Стандартна цена на играта преди множителите на точките за продажба. Карайте, за да продавате точки на картата, за да отключите цените в реално време.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Няма оборудване, което да съответства на този филтър.",
   "economy.purchasesEmptyVehicles": "Не са намерени моторни превозни средства за тази ферма.",
   "economy.purchasesEmptyImplements": "Не са намерени инструменти или ремаркета за тази ферма.",

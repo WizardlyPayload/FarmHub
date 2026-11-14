@@ -706,7 +706,7 @@ export function normalizeSellPoints(marketData: MarketPrices | null | undefined)
   return list
     .filter((sellPoint) => {
       const name = String(sellPoint?.name || "");
-      return !skipPatterns.some((pattern) => pattern.test(name));
+      return name !== "Market Base Prices" && !skipPatterns.some((pattern) => pattern.test(name));
     })
     .map((sellPoint) => {
       const usable = sellPointUsablePriceEntries(sellPoint.prices);

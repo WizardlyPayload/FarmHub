@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "postijiet",
   "economy.marketBasePricesTitle": "Prezzijiet Bażi tas-Suq",
   "economy.marketBasePricesHint": "Prezz awtomatiku tal-logħba qabel il-multiplikaturi tal-punti tal-bejgħ. Sewqan lejn il-punti tal-bejgħ fuq il-mappa biex tiftaħ prezzijiet ħajjin.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "L-ebda tagħmir ma jaqbel ma' dan il-filtru.",
   "economy.purchasesEmptyVehicles": "Ma nstab l-ebda vettura bil-mutur għal din ir-razzett.",
   "economy.purchasesEmptyImplements": "Ma nstab l-ebda għodda jew trejler għal din ir-razzett.",

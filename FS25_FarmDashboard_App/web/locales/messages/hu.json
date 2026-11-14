@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "helyszínek",
   "economy.marketBasePricesTitle": "Piaci alapárak",
   "economy.marketBasePricesHint": "Alapértelmezett játékár az eladási pont szorzók előtt. Hajts az eladási pontok felé a térképen az élő árak feloldásához.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Egyetlen eszköz sem felel meg ennek a szűrőnek.",
   "economy.purchasesEmptyVehicles": "Nem találhatók motoros járművek ehhez a farmhoz.",
   "economy.purchasesEmptyImplements": "Nem található ehhez a farmhoz szükséges munkagép vagy pótkocsi.",

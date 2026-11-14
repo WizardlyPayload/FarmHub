@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "staðsetningar",
   "economy.marketBasePricesTitle": "Grunnverð markaðarins",
   "economy.marketBasePricesHint": "Sjálfgefið verð í leiknum fyrir margföldun sölustiga. Keyrðu til að selja stig á kortinu til að opna rauntímaverð.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Enginn búnaður passar við þessa síu.",
   "economy.purchasesEmptyVehicles": "Engin vélknúin ökutæki fundust fyrir þennan bæ.",
   "economy.purchasesEmptyImplements": "Engin verkfæri eða tengivagnar fundust fyrir þennan bæ.",

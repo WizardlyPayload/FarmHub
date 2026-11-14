@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "lokality",
   "economy.marketBasePricesTitle": "Tržní základní ceny",
   "economy.marketBasePricesHint": "Výchozí cena hry před multiplikátory prodejních bodů. Jeďte prodávat body na mapě a odemkněte si aktuální ceny.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Tomuto filtru neodpovídá žádné vybavení.",
   "economy.purchasesEmptyVehicles": "Pro tuto farmu nebyla nalezena žádná motorová vozidla.",
   "economy.purchasesEmptyImplements": "Pro tuto farmu nebylo nalezeno žádné nářadí ani přívěsy.",

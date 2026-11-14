@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "atrašanās vietas",
   "economy.marketBasePricesTitle": "Tirgus bāzes cenas",
   "economy.marketBasePricesHint": "Spēles noklusējuma cena pirms pārdošanas punktu reizinātājiem. Brauciet uz pārdošanas punktiem kartē, lai atbloķētu cenas reāllaikā.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Neviens aprīkojums neatbilst šim filtram.",
   "economy.purchasesEmptyVehicles": "Šai saimniecībai nav atrasti motorizēti transportlīdzekļi.",
   "economy.purchasesEmptyImplements": "Šai saimniecībai nav atrasts neviens darbarīks vai piekabe.",

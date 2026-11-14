@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "місця розташування",
   "economy.marketBasePricesTitle": "Базові ринкові ціни",
   "economy.marketBasePricesHint": "Ціна гри за замовчуванням до врахування множників очок продажу. Їдьте продавати очки на карті, щоб розблокувати ціни в реальному часі.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Жодне обладнання не відповідає цьому фільтру.",
   "economy.purchasesEmptyVehicles": "Для цієї ферми не знайдено жодних моторизованих транспортних засобів.",
   "economy.purchasesEmptyImplements": "Для цієї ферми не знайдено жодного знаряддя чи причепів.",

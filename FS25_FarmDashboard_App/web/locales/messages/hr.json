@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "lokacije",
   "economy.marketBasePricesTitle": "Osnovne tržišne cijene",
   "economy.marketBasePricesHint": "Zadana cijena igre prije množitelja prodajnih bodova. Vozite se kako biste prodali bodove na karti kako biste otključali cijene u stvarnom vremenu.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Nijedna oprema ne odgovara ovom filteru.",
   "economy.purchasesEmptyVehicles": "Za ovu farmu nisu pronađena motorna vozila.",
   "economy.purchasesEmptyImplements": "Za ovu farmu nisu pronađeni priključki ili prikolice.",

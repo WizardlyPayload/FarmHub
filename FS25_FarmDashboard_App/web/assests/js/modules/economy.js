@@ -1151,48 +1151,48 @@ export function displayMarketPrices(marketData) {
         const sortedLocations = cropData.locations ? 
           [...cropData.locations].sort((a, b) => b.price - a.price) : [];
         
-        // Check if Market Base Prices is the best option (bad time to sell)
-        const bestLocation = sortedLocations.length > 0 ? sortedLocations[0] : null;
-        const isBadTimeToSell = bestLocation && bestLocation.name === 'Market Base Prices' && sortedLocations.length > 1;
+        const buyerLocations = sortedLocations.filter(location => location.name !== 'Market Base Prices');
+        const referenceLocations = sortedLocations.filter(location => location.name === 'Market Base Prices');
+        const displayLocations = [...buyerLocations, ...referenceLocations];
         
         html += `
           <div class="col-md-6 col-lg-4 mb-3 market-crop-card" data-crop-name="${_safe(cropName.toLowerCase())}" data-search-text="${_safe(formattedName.toLowerCase())}">
-            <div class="card ${isBadTimeToSell ? 'bg-danger bg-opacity-25 border-danger' : 'bg-secondary'} h-100">
+            <div class="card bg-secondary h-100">
               <div class="card-body">
                 <h6 class="card-title text-farm-accent mb-2">
                   <i class="bi ${category.icon}"></i> ${_safe(formattedName)}
                 </h6>
-                ${isBadTimeToSell ? `
+                ${buyerLocations.length === 0 ? `
                 <div class="alert alert-warning py-2 px-2 mb-3" style="font-size: 0.75rem;">
                   <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                  <strong>Poor Market!</strong> Wait for better prices.
+                  No selling point available.
                 </div>
                 ` : ''}
                 
                 <div class="mb-2">
                   <small class="text-muted d-block mb-2">Selling Locations:</small>
-                  ${sortedLocations.length > 0 ? sortedLocations.map((location, index) => `
-                    <div class="d-flex justify-content-between align-items-center mb-1 ${index === 0 ? 'bg-success bg-opacity-25 rounded px-2 py-1' : ''}">
-                      <small class="${index === 0 ? 'text-success fw-bold' : 'text-light'}">
-                        <i class="bi ${index === 0 ? 'bi-geo-alt-fill' : 'bi-geo-alt'}"></i> 
+                  ${displayLocations.length > 0 ? displayLocations.map((location, index) => `
+                    <div class="d-flex justify-content-between align-items-center mb-1 ${index === 0 && buyerLocations.length > 0 ? 'bg-success bg-opacity-25 rounded px-2 py-1' : ''}">
+                      <small class="${index === 0 && buyerLocations.length > 0 ? 'text-success fw-bold' : 'text-light'}">
+                        <i class="bi ${index === 0 && buyerLocations.length > 0 ? 'bi-geo-alt-fill' : 'bi-geo-alt'}"></i>
                         ${location.name === 'Market Base Prices' ? 
                           `<span style="cursor: pointer;" onclick="dashboard.showMarketBasePricesModal()" title="Click for explanation">
                             ${_safe(location.name)} <i class="bi bi-info-circle ms-1"></i>
                           </span>` : 
                           _safe(location.name)}
                       </small>
-                      <small class="${index === 0 ? 'text-success fw-bold' : 'text-warning'}">
+                      <small class="${index === 0 && buyerLocations.length > 0 ? 'text-success fw-bold' : 'text-warning'}">
                         $${location.price.toFixed(0)}
                       </small>
                     </div>
                   `).join('') : '<small class="text-muted">No locations available</small>'}
                 </div>
                 
-                ${sortedLocations.length > 1 ? `
+                ${buyerLocations.length > 1 ? `
                 <div class="mt-3">
                   <small class="text-muted">Average Price: </small>
-                  <span class="text-warning fw-bold">$${cropData.avgPrice.toFixed(0)}</span>
-                  <small class="text-muted ms-2">(${sortedLocations.length} locations)</small>
+                  <span class="text-warning fw-bold">$${(buyerLocations.reduce((sum, location) => sum + location.price, 0) / buyerLocations.length).toFixed(0)}</span>
+                  <small class="text-muted ms-2">(${buyerLocations.length} locations)</small>
                 </div>
                 ` : ''}
                 
@@ -1224,7 +1224,7 @@ export function displayMarketPrices(marketData) {
         /Stable$/
       ];
       
-      return !skipPatterns.some(pattern => pattern.test(sellPoint.name));
+      return sellPoint.name !== 'Market Base Prices' && !skipPatterns.some(pattern => pattern.test(sellPoint.name));
     });
     
     if (filteredSellPoints.length === 0) {
@@ -1739,9 +1739,9 @@ export function showMarketBasePricesModal() {
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <p>Market Base Prices show the <strong>default game price</strong> for a crop before any market location multipliers are applied.</p>
-            <p>If a crop only shows <em>Market Base Prices</em> as its selling location, it means <strong>no active sell points have been discovered yet</strong> for that crop on the map.</p>
-            <p class="text-muted mb-0"><small><i class="bi bi-lightbulb me-1"></i>Tip: Drive to sell points on the map to unlock their prices in the dashboard.</small></p>
+            <p>Market Base Prices are game fill-type reference prices, not offers from a verified selling place.</p>
+            <p>If a crop only has a base price here, no current buyer offer was verified for that crop.</p>
+            <p class="text-muted mb-0"><small>Check the named buyers in the game for a sale price.</small></p>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>

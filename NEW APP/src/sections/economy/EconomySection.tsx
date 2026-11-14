@@ -334,29 +334,29 @@ function MarketTab({ economy }: { economy: Record<string, unknown> | null | unde
                     const locs = [...(item.data.locations || [])].sort(
                       (a, b) => (Number(b.price) || 0) - (Number(a.price) || 0)
                     );
-                    const best = locs[0];
-                    const poor =
-                      best && best.name === "Market Base Prices" && locs.length > 1;
+                    const buyers = locs.filter((loc) => loc.name !== "Market Base Prices");
+                    const references = locs.filter((loc) => loc.name === "Market Base Prices");
+                    const displayLocs = [...buyers, ...references];
                     return (
-                      <Card key={item.name} title={item.displayName} class={poor ? "fd-economy__poor" : ""}>
-                        {poor ? (
-                          <div class="fd-economy__warn">{t("economy.poorMarket")}</div>
+                      <Card key={item.name} title={item.displayName}>
+                        {buyers.length === 0 ? (
+                          <div class="fd-economy__warn">{t("storage.noSellingPoint")}</div>
                         ) : null}
                         <div class="fd-economy__loc-list">
-                          {locs.length === 0 ? (
+                          {displayLocs.length === 0 ? (
                             <span class="fd-economy__muted">{t("economy.noLocations")}</span>
                           ) : (
-                            locs.map((loc, idx) => (
+                            displayLocs.map((loc, idx) => (
                               <div
                                 key={`${loc.name}-${idx}`}
-                                class={`fd-economy__loc-row ${idx === 0 ? "is-best" : ""}`}
+                                class={`fd-economy__loc-row ${idx === 0 && buyers.length > 0 ? "is-best" : ""}`}
                               >
                                 <span>
                                   {loc.name === "Market Base Prices" ? (
                                     <button
                                       type="button"
                                       class="fd-economy__link-btn"
-                                      title={t("economy.marketBasePricesHint")}
+                                      title={t("economy.referenceOfferHint")}
                                       onClick={() => setBasePricesHint((v) => !v)}
                                     >
                                       {loc.name} ⓘ
@@ -373,13 +373,13 @@ function MarketTab({ economy }: { economy: Record<string, unknown> | null | unde
                         {basePricesHint ? (
                           <p class="fd-economy__muted" style={{ marginTop: "0.5rem" }}>
                             <strong>{t("economy.marketBasePricesTitle")}:</strong>{" "}
-                            {t("economy.marketBasePricesHint")}
+                            {t("economy.referenceOfferHint")}
                           </p>
                         ) : null}
-                        {locs.length > 1 ? (
+                        {buyers.length > 1 ? (
                           <div class="fd-economy__meta-row" style={{ marginTop: "0.5rem" }}>
                             <span class="fd-economy__meta-label">{t("economy.avgPrice")}</span>
-                            <strong>{quote(item.name, item.data.avgPrice)}</strong>
+                            <strong>{quote(item.name, buyers.reduce((sum, loc) => sum + Number(loc.price || 0), 0) / buyers.length)}</strong>
                           </div>
                         ) : null}
                       </Card>

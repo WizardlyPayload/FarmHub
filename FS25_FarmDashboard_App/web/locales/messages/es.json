@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "ubicaciones",
   "economy.marketBasePricesTitle": "Precios base de mercado",
   "economy.marketBasePricesHint": "Precio predeterminado del juego antes de aplicar los multiplicadores de puntos de venta. Conduce hasta los puntos de venta en el mapa para desbloquear los precios en tiempo real.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Ningún equipo coincide con este filtro.",
   "economy.purchasesEmptyVehicles": "No se encontraron vehículos motorizados en esta granja.",
   "economy.purchasesEmptyImplements": "No se encontraron implementos ni remolques para esta granja.",

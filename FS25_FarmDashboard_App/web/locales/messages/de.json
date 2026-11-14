@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "Standorte",
   "economy.marketBasePricesTitle": "Marktbasierte Preise",
   "economy.marketBasePricesHint": "Standardspielpreis vor Anwendung der Verkaufspunkt-Multiplikatoren. Fahre zu den Verkaufspunkten auf der Karte, um die Live-Preise freizuschalten.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Zu diesem Filter passt kein Gerät.",
   "economy.purchasesEmptyVehicles": "Für diesen Bauernhof wurden keine motorisierten Fahrzeuge gefunden.",
   "economy.purchasesEmptyImplements": "Für diesen Bauernhof wurden keine Geräte oder Anhänger gefunden.",

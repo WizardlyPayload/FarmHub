@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "platser",
   "economy.marketBasePricesTitle": "Marknadsbaspriser",
   "economy.marketBasePricesHint": "Standardpriset i spelet före multiplikatorer för säljpoäng. Kör för att sälja poäng på kartan för att låsa upp priser i realtid.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Ingen utrustning matchar detta filter.",
   "economy.purchasesEmptyVehicles": "Inga motorfordon hittades för denna gård.",
   "economy.purchasesEmptyImplements": "Inga redskap eller släpvagnar hittades för denna gård.",

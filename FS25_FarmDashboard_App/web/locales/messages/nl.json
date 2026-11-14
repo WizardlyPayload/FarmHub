@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "locaties",
   "economy.marketBasePricesTitle": "Marktbasisprijzen",
   "economy.marketBasePricesHint": "Standaard spelprijs vóór verkooppuntmultiplicatoren. Rijd naar verkooppunten op de kaart om live prijzen te ontgrendelen.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Geen enkel apparaat is compatibel met dit filter.",
   "economy.purchasesEmptyVehicles": "Er zijn geen gemotoriseerde voertuigen aangetroffen bij deze boerderij.",
   "economy.purchasesEmptyImplements": "Er zijn geen werktuigen of aanhangers gevonden voor deze boerderij.",

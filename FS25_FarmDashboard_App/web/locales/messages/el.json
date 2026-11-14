@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "τοποθεσίες",
   "economy.marketBasePricesTitle": "Βασικές τιμές αγοράς",
   "economy.marketBasePricesHint": "Προεπιλεγμένη τιμή παιχνιδιού πριν από τους πολλαπλασιαστές πόντων πώλησης. Οδηγήστε για να πουλήσετε πόντους στον χάρτη για να ξεκλειδώσετε ζωντανές τιμές.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Δεν υπάρχει εξοπλισμός που να ταιριάζει με αυτό το φίλτρο.",
   "economy.purchasesEmptyVehicles": "Δεν βρέθηκαν μηχανοκίνητα οχήματα για αυτό το αγρόκτημα.",
   "economy.purchasesEmptyImplements": "Δεν βρέθηκαν εργαλεία ή ρυμουλκούμενα για αυτό το αγρόκτημα.",

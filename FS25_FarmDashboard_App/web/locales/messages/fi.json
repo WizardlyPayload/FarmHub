@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "sijainnit",
   "economy.marketBasePricesTitle": "Markkinahinnat",
   "economy.marketBasePricesHint": "Pelin oletushinta ennen myyntipistekertoimia. Aja kartalla myyntipisteisiin avataksesi reaaliaikaiset hinnat.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Mikään laite ei vastaa tätä suodatinta.",
   "economy.purchasesEmptyVehicles": "Tälle tilalle ei löytynyt moottoriajoneuvoja.",
   "economy.purchasesEmptyImplements": "Tälle tilalle ei löytynyt työkoneita tai perävaunuja.",

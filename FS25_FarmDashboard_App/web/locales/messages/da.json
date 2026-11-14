@@ -883,6 +883,7 @@
   "economy.marketNoResultsLocations": "steder",
   "economy.marketBasePricesTitle": "Markedsbasispriser",
   "economy.marketBasePricesHint": "Standardprisen i spillet før salgspointmultiplikatorer. Kør for at sælge point på kortet for at låse op for livepriser.",
+  "economy.referenceOfferHint": "Game fill-type reference price, not a verified offer from a selling place. Check named buyers for a sale price.",
   "economy.purchasesEmptyFilter": "Intet udstyr matcher dette filter.",
   "economy.purchasesEmptyVehicles": "Der blev ikke fundet nogen motorkøretøjer til denne gård.",
   "economy.purchasesEmptyImplements": "Ingen redskaber eller trailere fundet til denne gård.",

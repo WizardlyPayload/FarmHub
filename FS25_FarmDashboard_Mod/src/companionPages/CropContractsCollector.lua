@@ -1,7 +1,7 @@
 -- Crop Contracts v1.2.0.0 persists farm-keyed forward-sale contracts.
 -- Read the server register only; its query/migration methods can mutate state.
 
-local MAX_ROWS = 40
+local MAX_SCAN, MAX_ROWS = 300, 40
 local STATES = { ACTIVE = true, COMPLETED = true, EXPIRED = true }
 
 CompanionPages.register({
@@ -19,8 +19,10 @@ CompanionPages.register({
             return { readState = "settings-only", reason = "no-contract-register" }
         end
         local rows, active, completed, expired = {}, 0, 0, 0
-        local truncated = false
+        local truncated, invalid, scanned = false, false, 0
         for _, contract in ipairs(manager.contracts) do
+            scanned = scanned + 1
+            if scanned > MAX_SCAN then truncated = true; break end
             if type(contract) == "table" and ctx.num(contract.farmId) == farmId then
                 local state = tostring(contract.status or "")
                 local target = ctx.num(contract.targetLiters)
@@ -49,6 +51,8 @@ CompanionPages.register({
                     else
                         truncated = true
                     end
+                else
+                    invalid = true
                 end
             end
         end
@@ -56,8 +60,8 @@ CompanionPages.register({
             return (a.id or 0) < (b.id or 0)
         end)
         return {
-            readState = "ok",
-            coverage = truncated and "truncated" or "complete",
+            readState = invalid and "partial" or "ok",
+            coverage = truncated and "truncated" or invalid and "partial" or "complete",
             byFarm = { [tostring(farmId)] = {
                 activeCount = active, completedCount = completed, expiredCount = expired,
             } },

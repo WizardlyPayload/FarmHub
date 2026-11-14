@@ -4294,6 +4294,7 @@
   "companionPage.cropContracts.period": "Y{{year}} / P{{period}}",
   "companionPage.cropContracts.empty": "No forward crop contracts for this farm yet.",
   "companionPage.cropContracts.truncated": "Only the first contracts are listed."
+  ,"companionPage.cropContracts.partial": "Some contracts could not be read; the list may be incomplete."
   ,"companions.desc.harvestLedger": "Saves measured harvest area and product volume by field and month. FarmHub reads this farm's single-player history; harvest is not income."
   ,"companionPage.harvestLedger.title": "Harvest Ledger"
   ,"companionPage.harvestLedger.lead": "See measured harvest area and product volume saved by Harvest Ledger for your farm. These figures are physical harvests, not sales or profit. Multiplayer history is withheld until older records have verifiable farm ownership."

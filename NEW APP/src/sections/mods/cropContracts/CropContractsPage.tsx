@@ -64,6 +64,7 @@ export function Page({ entry }: CompanionPageProps) {
           empty={tOr("companionPage.cropContracts.empty", "No forward crop contracts for this farm yet.")}
         />
         {page?.coverage === "truncated" ? <ModEmpty>{tOr("companionPage.cropContracts.truncated", "Only the first contracts are listed.")}</ModEmpty> : null}
+        {page?.coverage === "partial" ? <ModEmpty>{tOr("companionPage.cropContracts.partial", "Some contracts could not be read; the list may be incomplete.")}</ModEmpty> : null}
       </Card>
     </ModPage>
   );

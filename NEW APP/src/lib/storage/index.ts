@@ -373,6 +373,7 @@ export function resolvePricePer1000(item: StockItem, crop: CropLike | null | und
   if (fromCrop > 0) return fromCrop;
   const fromXmlAvg = Number(crop?.avgXmlPrice) || Number(crop?.avgPrice) || 0;
   if (fromXmlAvg > 0) return fromXmlAvg;
+  if (modPrice > 0) return modPrice < 50 ? modPrice * 1000 : modPrice;
   return 0;
 }
 

@@ -179,6 +179,11 @@ describe("wave 2 reads stay bounded", () => {
         );
         expect(inModEnv(exactVaultName, ledgerRow))
             .toBe("ok|farm|1|Field 3/ok|c1:0:false|false|nil|nil");
+        const kmVaultName = ledgerProvider(false).replaceAll(
+            "FS25_FieldProfitabilityLedger", "KM_80685_Field_Profitability_Ledger",
+        );
+        expect(inModEnv(kmVaultName, ledgerRow))
+            .toBe("ok|farm|1|Field 3/ok|c1:0:false|false|nil|nil");
         expect(inModEnv(ledgerProvider(true), ledgerRow))
             .toBe("unavailable|nil|nil|||false|mp-disabled|nil");
     });

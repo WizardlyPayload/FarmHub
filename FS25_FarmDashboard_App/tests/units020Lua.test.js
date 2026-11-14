@@ -173,7 +173,7 @@ describe("owning-mod companion readers", () => {
         `, "out.farmlandMarketplace.readState..'|'..tostring(#out.farmlandMarketplace.rows)..'|'..tostring(out.farmlandMarketplace.rows[1].farmlandIds[1])..'|'..tostring(out.farmlandMarketplace.rows[1].farmlandIds[2])..'|'..tostring(out.farmlandMarketplace.rows[1].price)");
         expect(market).toBe("ok|1|7|47|1500");
 
-        const exactVaultMarket = run(`
+        const exactVaultMarketSetup = `
             getfenv = function() return _G end
             g_currentMission = { getFarmId = function() return 1 end }
             g_modIsLoaded = { ['FS25_369241_FS25_FarmlandMarketplace'] = true }
@@ -183,8 +183,14 @@ describe("owning-mod companion readers", () => {
                     leaseOffers = {}, leases = {},
                 } } },
             }
-        `, "out.farmlandMarketplace.readState..'|'..tostring(#out.farmlandMarketplace.rows)");
+        `;
+        const marketReading = "out.farmlandMarketplace.readState..'|'..tostring(#out.farmlandMarketplace.rows)";
+        const exactVaultMarket = run(exactVaultMarketSetup, marketReading);
         expect(exactVaultMarket).toBe("ok|1");
+        const kmVaultMarket = run(exactVaultMarketSetup.replaceAll(
+            "FS25_369241_FS25_FarmlandMarketplace", "KM_80211_Farmland_Marketplace",
+        ), marketReading);
+        expect(kmVaultMarket).toBe("ok|1");
 
         const buyer = run(`
             getfenv = function() return _G end

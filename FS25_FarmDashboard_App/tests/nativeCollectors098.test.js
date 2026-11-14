@@ -242,6 +242,32 @@ return tostring(a.currentMonthIncome) .. "|" .. tostring(a.currentMonthExpenses)
 `;
         expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
     });
+
+    test("reads Red Tape's own scheme definitions to exclude active duplicates", () => {
+        const body = `
+FS25_RedTape.RTSchemes = {
+    [1] = { name = "Active", duplicationKey = "A" },
+    [2] = { name = "Duplicate", duplicationKey = "A" },
+    [3] = { name = "Other", duplicationKey = "B" },
+}
+g_currentMission.RedTape.PolicySystem = {
+    policies = {}, getProgressForFarm = function() return { tier = 1 } end,
+}
+g_currentMission.RedTape.SchemeSystem = {
+    availableSchemes = { [1] = { { schemeIndex = 2, tier = 1 }, { schemeIndex = 3, tier = 1 } } },
+    getActiveSchemesForFarm = function(self, farmId)
+        if farmId == 1 then return { { schemeIndex = 1, farmId = 1, tier = 1 } } end
+        return {}
+    end,
+}
+local out = RedTapeDataCollector:collect()
+local a, b = out.byFarm["1"].availableSchemes, out.byFarm["14"].availableSchemes
+return table.concat({ tostring(#a), tostring(a[1] and a[1].schemeIndex),
+    tostring(a[1] and a[1].nameKey), tostring(#b),
+    tostring(rawget(_G, "RTSchemes") == nil) }, "|")
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("1|3|Other|2|true");
+    });
 });
 
 describe("098 inventory and bale collectors under the native mod environment", () => {

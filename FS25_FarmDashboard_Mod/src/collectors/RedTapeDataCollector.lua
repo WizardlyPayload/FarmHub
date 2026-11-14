@@ -47,6 +47,17 @@ local function rtTierLabel(tierNum)
     return TIER_NAMES[tonumber(tierNum)] or "D"
 end
 
+local function rtDefinitions(symbol)
+    for _, modName in ipairs({ "FS25_RedTape", "FS25_RedTape_CareerSavegame" }) do
+        local modEnv = _G[modName]
+        if type(modEnv) == "table" and type(modEnv[symbol]) == "table" then
+            return modEnv[symbol]
+        end
+    end
+    local flat = rawget(_G, symbol)
+    return type(flat) == "table" and flat or nil
+end
+
 local function rtPolicyNameKey(policy)
     if not policy then return nil end
     if policy.getName then
@@ -54,8 +65,9 @@ local function rtPolicyNameKey(policy)
         if ok and name then return tostring(name) end
     end
     local idx = tonumber(policy.policyIndex)
-    if idx and _G.RTPolicies and _G.RTPolicies[idx] then
-        return _G.RTPolicies[idx].name
+    local definitions = rtDefinitions("RTPolicies")
+    if idx and definitions and definitions[idx] then
+        return definitions[idx].name
     end
     return nil
 end
@@ -67,8 +79,9 @@ local function rtSchemeNameKey(scheme)
         if ok and name then return tostring(name) end
     end
     local idx = tonumber(scheme.schemeIndex)
-    if idx and _G.RTSchemes and _G.RTSchemes[idx] then
-        return _G.RTSchemes[idx].name
+    local definitions = rtDefinitions("RTSchemes")
+    if idx and definitions and definitions[idx] then
+        return definitions[idx].name
     end
     return nil
 end
@@ -148,6 +161,7 @@ rtSerializeAvailableSchemesForFarm = function(schemeSystem, policySystem, farmId
     local tierList = schemeSystem.availableSchemes and schemeSystem.availableSchemes[farmTier]
     if type(tierList) ~= "table" then return {} end
     local activeSchemes = schemeSystem.getActiveSchemesForFarm and schemeSystem:getActiveSchemesForFarm(farmId) or {}
+    local definitions = rtDefinitions("RTSchemes")
     local out = {}
     for _, scheme in pairs(tierList) do
         if scheme and #out < MAX_SCHEMES then
@@ -155,10 +169,10 @@ rtSerializeAvailableSchemesForFarm = function(schemeSystem, policySystem, farmId
                 -- skip wrong tier bucket
             else
                 local available = true
-                local schemeInfo = _G.RTSchemes and _G.RTSchemes[scheme.schemeIndex]
+                local schemeInfo = definitions and definitions[scheme.schemeIndex]
                 if schemeInfo and schemeInfo.duplicationKey then
                     for _, active in pairs(activeSchemes) do
-                        local activeInfo = _G.RTSchemes and _G.RTSchemes[active.schemeIndex]
+                        local activeInfo = definitions and definitions[active.schemeIndex]
                         if activeInfo and activeInfo.duplicationKey == schemeInfo.duplicationKey then
                             available = false
                             break

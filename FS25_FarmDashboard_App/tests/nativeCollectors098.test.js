@@ -338,7 +338,7 @@ describe("098 vehicle ownership under the native mod environment", () => {
 local tractor = {
     getAttachedImplements = function()
         return {
-            { object = { getFullName = function() return "Kuhn Seeder" end } },
+            { object = { getFullName = function() return "Kühn Seeder" end } },
             { object = { getFullName = function() error("name unavailable") end,
                          getName = function() return "Brantner Trailer" end } },
             { object = {} }
@@ -349,7 +349,7 @@ local count, names = VehicleDataCollector:_serializeAttachedEquipment(tractor)
 local emptyCount, emptyNames = VehicleDataCollector:_serializeAttachedEquipment({})
 return tostring(count) .. ":" .. table.concat(names, ",") .. ":" .. tostring(emptyCount) .. ":" .. tostring(emptyNames)
 `;
-        expect(run({ files: VEHICLE_FILES, body })).toBe("3:Kuhn Seeder,Brantner Trailer:0:nil");
+        expect(run({ files: VEHICLE_FILES, body })).toBe("3:Kühn Seeder,Brantner Trailer:0:nil");
     });
 
     const vehicleBody = `

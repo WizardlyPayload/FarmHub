@@ -760,7 +760,7 @@ function VehicleDataCollector:_serializeAttachedEquipment(vehicle)
                 if ok and type(shortName) == "string" then name = shortName end
             end
             if name and name ~= "" and name ~= "Unknown" then
-                names[#names + 1] = name:sub(1, 100)
+                names[#names + 1] = name
             end
         end
     end

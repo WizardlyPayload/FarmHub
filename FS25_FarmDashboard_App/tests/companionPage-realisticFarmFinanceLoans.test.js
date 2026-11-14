@@ -51,6 +51,23 @@ test("withholds an absent asset register instead of reporting zero agreements", 
   expect(page.byFarm["1"].assetRegisterAvailable).toBe(false);
 });
 
+test("shows a farm asset agreement when no supported loan exists", () => {
+  const assetOnly = `
+    _G.g_modIsLoaded = { KM_82429_Realistic_Farm_Finance = true }
+    _G.g_currentMission = { getFarmId = function() return 1 end,
+      realisticFarmFinance = { repository = { loaded = true, loans = {}, assetFinance = {
+        { id = 4, farmId = 1, product = "OPERATING_LEASE", status = "ACTIVE",
+          vehicleName = "Leased seeder", principal = 0, monthlyPayment = 120,
+          arrearsBalance = 0, remainingMonths = 9, refundableDeposit = 600 },
+      } } } }
+  `;
+  const page = runCompanionPage(FILE, assetOnly, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "ok", coverage: "complete" });
+  expect(Object.keys(page.rows)).toHaveLength(0);
+  expect(page.assetRows).toHaveLength(1);
+  expect(page.byFarm["1"]).toMatchObject({ loanCount: 0, assetFinanceCount: 1 });
+});
+
 test("withholds an unloaded repository and an unloaded mod", () => {
   expect(runCompanionPage(FILE, GAME.replace("loaded = true", "loaded = false"), { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "finance-repository-unavailable" });

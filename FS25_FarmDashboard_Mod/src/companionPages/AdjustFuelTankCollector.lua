@@ -22,7 +22,7 @@ CompanionPages.register({
         if ctx.call(ctx.mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-vehicles-only" }
         end
-        if ctx.version ~= nil and ctx.version ~= "2.1.0.23" then
+        if ctx.version ~= "2.1.0.23" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
         local vehicles = ctx.ownedVehicles()

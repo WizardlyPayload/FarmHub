@@ -6,6 +6,7 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "FactoryContractsCollector.lua";
 const SETUP = `
   _G.g_modIsLoaded = { FS25_FactoryContracts = true }
+  _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_FactoryContracts", version = "1.1.0.0" } } end }
   _G.g_currentMission = {
     getIsServer = function() return true end,
     FactoryContracts = { loadState = 2, currentDay = 12, contracts = {

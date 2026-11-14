@@ -6,6 +6,7 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "AgroRealisticHealthLossCollector.lua";
 const SETUP = `
   _G.g_modIsLoaded = { FS25_AgroRealistic = true }
+  _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_AgroRealistic", version = "1.0.0.0" } } end }
   _G.FS25_AgroRealistic = { LeandroFarmRulesAnimalHealthLoss = {
     timers = {
       ["pen-1|7"] = { placeableId = "pen-1", clusterId = 7, hours = 9 },

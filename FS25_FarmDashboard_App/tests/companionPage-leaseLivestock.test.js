@@ -6,6 +6,7 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "LeaseLivestockCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { KM_81709_Lease_Livestock = true }
+  _G.g_modManager = { getActiveMods = function() return { { modName = "KM_81709_Lease_Livestock", version = "1.0.0.0" } } end }
   _G.LL_LeaseLivestock = { addLease = function() error("must not lease") end }
   local function pen(farm, name, clusters)
     return { ownerFarmId = farm, getOwnerFarmId = function(self) return self.ownerFarmId end,

@@ -6,6 +6,7 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "SellToTheBestBidderCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { FS25_359753_Sell_To_The_Best_Bidder = true }
+  _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_359753_Sell_To_The_Best_Bidder", version = "1.0.0.1" } } end }
   _G.g_currentMission = { getIsServer = function() return true end }
   local owned = { ownerFarmId = 1, name = "8570", brand = { title = "Massey Ferguson" },
     getName = function(self) return self.name end }

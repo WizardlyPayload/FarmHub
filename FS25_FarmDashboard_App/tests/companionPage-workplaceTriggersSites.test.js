@@ -6,6 +6,7 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "WorkplaceTriggersCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { FS25_WorkplaceTriggers = true }
+  _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_WorkplaceTriggers", version = "1.1.2.4" } } end }
   local mission = { getIsServer = function() return true end }
   local system = { mission = mission, isInitialized = true,
     siteService = { store = {

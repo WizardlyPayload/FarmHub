@@ -16,7 +16,7 @@ CompanionPages.register({
         if ctx.call(ctx.mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-register-only" }
         end
-        if ctx.version ~= nil and ctx.version ~= "1.1.0.0" then
+        if ctx.version ~= "1.1.0.0" then
             return { readState = "settings-only", reason = "version-unreviewed" }
         end
         local manager = type(ctx.mission) == "table" and ctx.mission.FactoryContracts or nil

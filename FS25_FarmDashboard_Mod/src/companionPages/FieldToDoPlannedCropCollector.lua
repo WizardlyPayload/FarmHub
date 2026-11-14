@@ -23,7 +23,7 @@ CompanionPages.register({
         if ctx.call(ctx.mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-register-only" }
         end
-        if ctx.version ~= nil and ctx.version ~= "0.1.0.17" then
+        if ctx.version ~= "0.1.0.17" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
         local mod = ctx.symbol("FieldPlannedCrop")

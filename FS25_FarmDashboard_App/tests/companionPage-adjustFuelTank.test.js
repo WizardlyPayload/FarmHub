@@ -6,6 +6,7 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "AdjustFuelTankCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { ["KM_80971_adjust-fuel-tank"] = true }
+  _G.g_modManager = { getActiveMods = function() return { { modName = "KM_80971_adjust-fuel-tank", version = "2.1.0.23" } } end }
   _G.FillType = { DIESEL = 7, DEF = 8, ELECTRICCHARGE = 9 }
   _G.g_currentMission = { getIsServer = function() return true end,
     vehicleSystem = { vehicles = {

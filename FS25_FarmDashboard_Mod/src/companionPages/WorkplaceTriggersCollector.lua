@@ -18,7 +18,7 @@ CompanionPages.register({
         if ctx.call(ctx.mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-sites-only" }
         end
-        if ctx.version ~= nil and ctx.version ~= "1.1.2.4" then
+        if ctx.version ~= "1.1.2.4" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
         local system = type(ctx.mission) == "table" and ctx.mission.workplaceTriggers or nil

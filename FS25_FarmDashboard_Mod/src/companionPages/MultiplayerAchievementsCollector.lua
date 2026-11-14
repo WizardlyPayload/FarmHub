@@ -28,7 +28,7 @@ CompanionPages.register({
             or ctx.call(ctx.mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "active-multiplayer-server-only" }
         end
-        if ctx.version ~= nil and ctx.version ~= "1.0.0.0" then
+        if ctx.version ~= "1.0.0.0" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
         local farmManager = ctx.global("g_farmManager")

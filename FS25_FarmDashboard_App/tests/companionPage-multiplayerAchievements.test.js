@@ -5,6 +5,7 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "MultiplayerAchievementsCollector.lua";
 const SETUP = `
   _G.g_modIsLoaded = { FS25_MultiplayerAchievements = true }
+  _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_MultiplayerAchievements", version = "1.0.0.0" } } end }
   _G.g_server = {}
   _G.g_currentMission = {
     missionDynamicInfo = { isMultiplayer = true }, gameStarted = true,

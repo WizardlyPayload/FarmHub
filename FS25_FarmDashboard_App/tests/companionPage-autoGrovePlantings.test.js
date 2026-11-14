@@ -6,6 +6,7 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "AutoGroveCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { KM_82201_Auto_Grove = true }
+  _G.g_modManager = { getActiveMods = function() return { { modName = "KM_82201_Auto_Grove", version = "1.0.0.0" } } end }
   _G.g_currentMission = { getIsServer = function() return true end }
   local function field(id)
     return { farmland = { id = id }, getId = function(self) return self.farmland.id end }

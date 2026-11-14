@@ -6,6 +6,7 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "RitterFreshLossCollector.lua";
 const SETUP = `
   _G.g_modIsLoaded = { FS25_Fresh = true }
+  _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_Fresh", version = "1.1.0.0-dev.1" } } end }
   _G.g_currentMission = { getIsServer = function() return true end }
   _G.FS25_Fresh = {
     RmFreshManager = { initialized = true },
@@ -50,6 +51,7 @@ test("labels incomplete history and rejects malformed exact-farm rows", () => {
 
   const many = `
     _G.g_modIsLoaded = { FS25_Fresh = true }
+    _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_Fresh", version = "1.1.0.0-dev.1" } } end }
     _G.g_currentMission = { getIsServer = function() return true end }
     local log = {}
     for i=1,45 do log[i] = { farmId=1, year=2, period=6,
@@ -63,6 +65,7 @@ test("labels incomplete history and rejects malformed exact-farm rows", () => {
 
   const longLog = `
     _G.g_modIsLoaded = { FS25_Fresh = true }
+    _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_Fresh", version = "1.1.0.0-dev.1" } } end }
     _G.g_currentMission = { getIsServer = function() return true end }
     local log = { { farmId=1, year=2, period=6, dayInPeriod=1, hour=0,
       fillTypeName="OLD", amount=100, value=20 } }
@@ -90,6 +93,7 @@ test("withholds client, unready manager and absent mod", () => {
 test("current freshness follows live ownership, including stored objects", () => {
   const setup = `
     _G.g_modIsLoaded = { FS25_Fresh = true }
+    _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_Fresh", version = "1.1.0.0-dev.1" } } end }
     local owned = { uniqueId="silo-1", getOwnerFarmId=function() return 1 end,
       spec_objectStorage={storedObjects={}} }
     local stored = {}

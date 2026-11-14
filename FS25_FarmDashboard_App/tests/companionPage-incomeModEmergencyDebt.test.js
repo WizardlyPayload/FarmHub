@@ -6,6 +6,7 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "IncomeModEmergencyDebtCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { FS25_IncomeMod = true }
+  _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_IncomeMod", version = "2.2.0.7" } } end }
   _G.g_currentMission = { getIsServer = function() return true end }
   _G.g_IncomeManager = { emergencyLoan = {
     readiness = "READY",

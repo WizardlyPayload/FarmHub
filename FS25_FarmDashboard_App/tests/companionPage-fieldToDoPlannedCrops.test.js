@@ -5,6 +5,9 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "FieldToDoPlannedCropCollector.lua";
 const SETUP = `
   _G.g_modIsLoaded = { FS25_FieldToDoList = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "FS25_FieldToDoList", version = "0.1.0.17" }
+  } end }
   _G.g_currentMission = { getIsServer = function() return true end }
   _G.FS25_FieldToDoList = {
     FieldPlannedCrop = { byFieldId = {
@@ -56,4 +59,13 @@ test("withholds client and absent mod", () => {
   expect(runCompanionPage(FILE, client, {farmId:1}))
     .toMatchObject({readState:"settings-only",reason:"server-register-only"});
   expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", {farmId:1})).toBeUndefined();
+});
+
+test("withholds planned crops when the active mod version cannot be verified", () => {
+  const unknown = SETUP.replace('version = "0.1.0.17"', 'version = "9.9.9.9"');
+  expect(runCompanionPage(FILE, unknown, {farmId:1}))
+    .toMatchObject({readState:"settings-only",reason:"unreviewed-version"});
+  const missing = SETUP.replace('version = "0.1.0.17"', 'version = nil');
+  expect(runCompanionPage(FILE, missing, {farmId:1}))
+    .toMatchObject({readState:"settings-only",reason:"unreviewed-version"});
 });

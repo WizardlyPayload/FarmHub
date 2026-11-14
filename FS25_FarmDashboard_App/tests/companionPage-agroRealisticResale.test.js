@@ -6,6 +6,7 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "AgroRealisticResaleCollector.lua";
 const SETUP = `
   _G.g_modIsLoaded = { FS25_AgroRealistic = true }
+  _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_AgroRealistic", version = "1.0.0.0" } } end }
   _G.g_currentMission = { getIsServer = function() return true end,
     environment = { currentYear = 3, currentPeriod = 1 } }
   _G.FS25_AgroRealistic = { LeandroFarmRules = {

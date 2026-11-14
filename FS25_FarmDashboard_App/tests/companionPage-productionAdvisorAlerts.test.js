@@ -6,6 +6,7 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "ProductionAdvisorAlertsCollector.lua";
 const SETUP = `
   _G.g_modIsLoaded = { FS25_ProductionAdvisor = true }
+  _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_ProductionAdvisor", version = "1.0.0.1" } } end }
   _G.g_currentMission = { getIsServer = function() return true end }
   _G.g_fillTypeManager = {
     getFillTypeByIndex = function(_, index)
@@ -49,6 +50,7 @@ test("exports selected-farm product settings and only currently owned field remi
 test("does not turn an empty or unready register into a no-alerts fact", () => {
   const empty = `
     _G.g_modIsLoaded = { FS25_ProductionAdvisor = true }
+    _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_ProductionAdvisor", version = "1.0.0.1" } } end }
     _G.g_currentMission = { getIsServer = function() return true end }
     _G.FS25_ProductionAdvisor = { g_productionAdvisor = {
       alertSettingsByFarmId = {}, farmlandSowingAlertsById = {},

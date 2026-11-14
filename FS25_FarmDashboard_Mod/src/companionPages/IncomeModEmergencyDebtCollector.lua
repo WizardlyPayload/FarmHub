@@ -23,7 +23,7 @@ CompanionPages.register({
         if ctx.call(ctx.mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-debt-only" }
         end
-        if ctx.version ~= nil and ctx.version ~= "2.2.0.7" then
+        if ctx.version ~= "2.2.0.7" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
         local manager = ctx.global("g_IncomeManager")

@@ -25,7 +25,7 @@ CompanionPages.register({
         if ctx.call(ctx.mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-plan-only" }
         end
-        if ctx.version ~= nil and ctx.version ~= "1.0.0.0" then
+        if ctx.version ~= "1.0.0.0" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
         local plan = type(ctx.mission) == "table" and ctx.mission.workplan or nil

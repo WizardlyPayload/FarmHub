@@ -6,6 +6,7 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "BaleDirectCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { FS25_354119_Bale_Direct = true }
+  _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_354119_Bale_Direct", version = "1.0.0.0" } } end }
   local mission = { getIsServer = function() return true end }
   mission.baleDirect = { paymentSystem = {
     mission = mission, isInitialized = true,
@@ -48,7 +49,8 @@ test("withholds a client, uninitialized register and mismatched mission", () => 
   `;
   expect(runCompanionPage(FILE, newer, { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
-  expect(runCompanionPage(FILE, GAME.replace("FS25_354119_Bale_Direct = true", "OtherMod = true"), { farmId: 1 }))
+  expect(runCompanionPage(FILE, GAME.replace("FS25_354119_Bale_Direct = true", "OtherMod = true")
+    .replace('modName = "FS25_354119_Bale_Direct"', 'modName = "OtherMod"'), { farmId: 1 }))
     .toBeUndefined();
 });
 

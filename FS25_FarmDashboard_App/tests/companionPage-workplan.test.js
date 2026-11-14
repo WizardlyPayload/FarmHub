@@ -6,6 +6,7 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "WorkplanCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { FS25_352974_Workplan = true }
+  _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_352974_Workplan", version = "1.0.0.0" } } end }
   _G.g_fruitTypeManager = {
     getFruitTypeNameByIndex = function(self, id)
       if id == 2 then return "SORGHUM" end

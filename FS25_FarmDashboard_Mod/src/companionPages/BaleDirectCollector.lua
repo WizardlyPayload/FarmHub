@@ -19,7 +19,7 @@ CompanionPages.register({
         if ctx.mission.isMissionStarted == false then
             return { readState = "settings-only", reason = "world-not-started" }
         end
-        if ctx.version ~= nil and ctx.version ~= "1.0.0.0" then
+        if ctx.version ~= "1.0.0.0" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
         local mod = type(ctx.mission) == "table" and ctx.mission.baleDirect or nil

@@ -37,7 +37,7 @@ CompanionPages.register({
     modNames = { "FS25_FairLeasingPlus", "FS25_356407_Fair_Leasing_Plus" },
     substrings = { "fairleasingplus", "fair_leasing_plus" },
     collect = function(ctx)
-        if ctx.version ~= nil and ctx.version ~= "1.0.0.0" then
+        if ctx.version ~= "1.0.0.0" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
         local farmId = count(ctx, ctx.farmId)

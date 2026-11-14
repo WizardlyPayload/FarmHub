@@ -41,6 +41,7 @@ export function Page({ entry }: CompanionPageProps) {
             { key: "station", label: tOr("companionPage.cropContracts.station", "Sell point") },
             { key: "status", label: tOr("companionPage.cropContracts.status", "Status") },
             { key: "delivery", label: tOr("companionPage.cropContracts.delivery", "Delivered / target"), align: "end" },
+            { key: "remaining", label: tOr("companionPage.cropContracts.remaining", "Undelivered"), align: "end" },
             { key: "bid", label: tOr("companionPage.cropContracts.bid", "Locked bid / 1,000 L"), align: "end" },
             { key: "due", label: tOr("companionPage.cropContracts.due", "Due"), align: "end" },
           ]}
@@ -51,6 +52,8 @@ export function Page({ entry }: CompanionPageProps) {
               station: row.station || "—",
               status: tOr(`companionPage.cropContracts.status.${row.status || ""}`, states[row.status || ""] || row.status || "—"),
               delivery: `${formatNumber(row.deliveredLiters, 0)} / ${formatNumber(row.targetLiters, 0)} L`,
+              remaining: num(row.targetLiters) != null && num(row.deliveredLiters) != null
+                ? `${formatNumber(Math.max(0, num(row.targetLiters)! - num(row.deliveredLiters)!), 0)} L` : "—",
               bid: num(row.lockedPricePerLiter) != null ? money((num(row.lockedPricePerLiter) || 0) * 1000) : "—",
               due: num(row.dueYear) != null && num(row.duePeriod) != null
                 ? tOr("companionPage.cropContracts.period", "Y{{year}} / P{{period}}", {

@@ -4285,6 +4285,7 @@
   "companionPage.cropContracts.station": "Sell point",
   "companionPage.cropContracts.status": "Status",
   "companionPage.cropContracts.delivery": "Delivered / target",
+  "companionPage.cropContracts.remaining": "Undelivered",
   "companionPage.cropContracts.bid": "Locked bid / 1,000 L",
   "companionPage.cropContracts.due": "Due",
   "companionPage.cropContracts.status.ACTIVE": "Active",

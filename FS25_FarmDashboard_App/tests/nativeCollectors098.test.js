@@ -330,6 +330,64 @@ return tostring(first) .. "|" .. tostring(second)
     test("a wrong-typed SeasonPeriod falls back to period-indexed factors", () => {
         expect(run({ files: ECON_FILES, engine: econEngine + "\nSeasonPeriod = 12\n", body: econBody })).toBe("Sep|1.0|1.3");
     });
+
+    test("production inputs and animal dealers do not become quoted selling offers", () => {
+        const engine = `
+g_currentMission.economyManager = { getPricePerLiter = function() return 0.45 end }
+local production = { getName = function() return "Grain Mill" end,
+    spec_productionPoint = { inputFillTypes = { [2] = true } } }
+local dealer = { getName = function() return "Animal Dealer" end,
+    spec_animalDealer = { animals = { { name = "WHEAT", price = 500 } } } }
+g_currentMission.placeableSystem = { placeables = { production, dealer } }
+`;
+        const body = `
+local market = EconomyDataCollector:collect().marketPrices
+for _, point in pairs(market.sellPoints) do
+    if point.name == "Grain Mill" or point.name == "Animal Dealer" then
+        return "invented:" .. point.name .. ":" .. tostring(point.prices.WHEAT and point.prices.WHEAT.price)
+    end
+end
+return "reference:" .. tostring(market.crops.WHEAT ~= nil)
+`;
+        expect(run({ files: ECON_FILES, engine, body })).toBe("reference:true");
+    });
+
+    test("a live selling-station offer below the seasonal base remains the actual quote", () => {
+        const engine = `
+local buyer = { id = 19, acceptedFillTypes = { [2] = true },
+    getName = function() return "Grain Buyer" end,
+    getEffectiveFillTypePrice = function() return 0.3 end }
+g_currentMission.economyManager = {
+    sellingStations = { buyer }, getPricePerLiter = function() return 0.45 end }
+`;
+        const body = `
+local market = EconomyDataCollector:collect().marketPrices
+for _, point in pairs(market.sellPoints) do
+    if point.name == "Grain Buyer" then return tostring(point.prices.WHEAT.price) end
+end
+return "missing"
+`;
+        expect(run({ files: ECON_FILES, engine, body })).toBe("300.0");
+    });
+
+    test("a live station uses its owning placeable name when the engine name getter returns nil", () => {
+        const engine = `
+local buyer = { id = 19, acceptedFillTypes = { [2] = true },
+    getName = function() return nil end,
+    owningPlaceable = { getName = function() return "Goldcrest Valley" end },
+    getEffectiveFillTypePrice = function() return 0.3 end }
+g_currentMission.economyManager = {
+    sellingStations = { buyer }, getPricePerLiter = function() return 0.45 end }
+`;
+        const body = `
+local market = EconomyDataCollector:collect().marketPrices
+for _, point in pairs(market.sellPoints) do
+    if point.name == "Goldcrest Valley" then return tostring(point.prices.WHEAT.price) end
+end
+return "missing"
+`;
+        expect(run({ files: ECON_FILES, engine, body })).toBe("300.0");
+    });
 });
 
 describe("098 vehicle ownership under the native mod environment", () => {

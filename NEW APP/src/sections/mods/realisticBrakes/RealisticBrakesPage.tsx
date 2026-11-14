@@ -27,14 +27,14 @@ export function Page({ entry }: CompanionPageProps) {
   const tiles: ModStatTile[] = farmData && page?.coverage === "complete" ? [
     { key: "vehicles", label: tOr(`${K}.vehicles`, "Supported owned vehicles"), value: formatNumber(farmData.supportedVehicleCount, 0) },
     { key: "damaged", label: tOr(`${K}.damaged`, "Vehicles with permanent brake damage"), value: formatNumber(farmData.damagedVehicleCount, 0) },
-    { key: "parked", label: tOr(`${K}.parked`, "Parking brakes engaged"), value: formatNumber(farmData.parkedVehicleCount, 0) },
+    { key: "parked", label: tOr(`${K}.parked`, "Parking brakes engaged at last reading"), value: formatNumber(farmData.parkedVehicleCount, 0) },
   ] : [];
   const park = (value: boolean | undefined) => value === undefined ? "—"
     : value ? tOr(`${K}.on`, "Engaged") : tOr(`${K}.off`, "Released");
   return (
-    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Current Realistic Brakes condition on owned vehicles. Permanent brake damage is the mod's brake-force reduction, separate from base-game vehicle damage. Temperature is a live reading; these values do not establish a braking event or service history.")}>
+    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Realistic Brakes condition from the last game export for owned vehicles. Permanent brake damage is the mod's brake-force reduction, separate from base-game vehicle damage. Temperature and parking brake can change before the next export; check the reading time. These values do not establish a braking event or service history.")}>
       <ModStatTiles tiles={tiles} />
-      <Card title={tOr(`${K}.title`, "Owned vehicle brake condition")}>
+      <Card title={tOr(`${K}.title`, "Owned vehicle brake condition at last reading")}>
         <ModTable columns={[
           { key: "vehicle", label: tOr(`${K}.vehicle`, "Vehicle") },
           { key: "damage", label: tOr(`${K}.damage`, "Permanent brake damage"), align: "end" },

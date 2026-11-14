@@ -41,6 +41,16 @@ test('normalizing line endings keeps an event hash stable', () => {
     parseSubstantiveReturns(block.replace(/\n/g, '\r\n'))[0].hash);
 });
 
+test('parses a substantive result in Tina\'s Markdown heading without treating ACK as a result', () => {
+  const events = parseSubstantiveReturns([
+    '## ACK FARMHUB-ALLY-20261114-VAULT-V98 | receipt only',
+    '## RESULT FARMHUB-ALLY-20261114-VAULT-V98 | Tina | PASS',
+  ].join('\n\n'));
+  assert.deepEqual(events.map(({ id, kind }) => [id, kind]), [
+    ['FARMHUB-ALLY-20261114-VAULT-V98', 'RESULT'],
+  ]);
+});
+
 test('unrelated RF returns stay silent unless an exact release gate is armed', () => {
   const events = parseSubstantiveReturns([
     '## [time] from Tina\nRESULT FARMHUB-ALLY-20261102-STORAGE-ICONS-I6 | pass',

@@ -9,7 +9,9 @@ const RETURN = /^(RESULT|BLOCKED|PARTIAL|COMPLETE|PASS|FAIL|STALL)(?:(?:\s*\+\s*
 export function parseSubstantiveReturns(text) {
   const out = [];
   for (const block of text.replace(/^\uFEFF/, '').split(/(?=^## )/m)) {
-    const match = block.match(RETURN);
+    // Tina now also puts the result on the Markdown heading itself.
+    const searchable = block.replace(/^## (?=(?:RESULT|BLOCKED|PARTIAL|COMPLETE|PASS|FAIL|STALL)\b)/, '');
+    const match = searchable.match(RETURN);
     if (!match) continue;
     out.push({
       id: match[2],

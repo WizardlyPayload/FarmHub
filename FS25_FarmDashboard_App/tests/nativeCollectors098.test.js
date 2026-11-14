@@ -224,6 +224,32 @@ return tostring(menu.fieldId) .. "|" .. tostring(menu.active) .. "|" ..
         expect(run({ files: FIELD_FILES, body })).toBe("29|true|nil|nil|nil");
     });
 
+    test("Realistic Weather collection uses field:getId rather than the field table index", () => {
+        const body = `
+local modName = "FS25_RealisticWeather"
+ENGINE.g_server = {}
+ENGINE.g_modIsLoaded[modName] = true
+ENGINE.g_modManager = { getModByName = function() return { version = "1.2.1.0" } end }
+ENGINE.g_farmlandManager.getFarmlandOwner = function(self, id) return id == 5 and 1 or 2 end
+local field = ENGINE.g_fieldManager.fields[1]
+ENGINE.g_fieldManager.fields = { [29] = field }
+field.getId = function(self) return 2 end
+ENGINE.g_currentMission.moistureSystem = {
+    mission = ENGINE.g_currentMission, isServer = true,
+    irrigatingFields = {
+        [2] = { id = 2, isActive = true, pendingCost = 0 },
+        [5] = { id = 5, isActive = true, pendingCost = 18.257 },
+    },
+}
+local row = FieldDataCollector:collect()[1]
+return tostring(row.id) .. "|" .. tostring(row.farmlandId) .. "|" ..
+       tostring(row.realisticWeatherIrrigationMenu.fieldId) .. "|" ..
+       tostring(row.realisticWeatherIrrigation.parcelId) .. "|" ..
+       tostring(row.realisticWeatherIrrigation.pendingNextDay)
+`;
+        expect(run({ files: FIELD_FILES, body })).toBe("29|5|2|5|18.26");
+    });
+
     test("slot-system bales and engine height types reach the field export", () => {
         expect(run({ files: FIELD_FILES, engine: slotBale, body: fieldBody })).toBe("bales=1|registered=2");
     });

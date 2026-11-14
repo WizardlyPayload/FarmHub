@@ -2,8 +2,9 @@
 
 FieldDataCollector = {}
 
--- Realistic Weather v1.2.1.0 writes both menu toggles by engine field ID and
--- grid charges by farmland ID into one table. Keep those meanings separate.
+-- Realistic Weather v1.2.1.0 writes menu toggles by field:getId() and grid
+-- charges by farmland ID into one table. The field table index can differ
+-- from both. Keep the meanings separate even where their numbers coincide.
 local function realisticWeatherIrrigationSystem()
     local modName = "FS25_RealisticWeather"
     if _G.g_server == nil or type(_G.g_modIsLoaded) ~= "table" or _G.g_modIsLoaded[modName] ~= true then
@@ -47,7 +48,7 @@ function FieldDataCollector.readRealisticWeatherIrrigation(parcelId, ownerFarmId
     }
 end
 
--- The mod's own menu calls getIsFieldBeingIrrigated(engineFieldId). This
+-- The mod's own menu calls getIsFieldBeingIrrigated(field:getId()). This
 -- mirrors that visible toggle, with a separate current parcel-owner gate.
 -- It does not claim that the record's pendingCost will be billed to this farm.
 function FieldDataCollector.readRealisticWeatherIrrigationMenu(fieldId, parcelId, ownerFarmId)
@@ -3442,8 +3443,13 @@ function FieldDataCollector:_collectImpl()
         end
 
         local parcelId = field.farmland and field.farmland.id or nil
+        local menuFieldId = nil
+        if type(field.getId) == "function" then
+            local okId, value = pcall(field.getId, field)
+            if okId then menuFieldId = value end
+        end
         fData.realisticWeatherIrrigation = FieldDataCollector.readRealisticWeatherIrrigation(parcelId, ownerFarmId)
-        fData.realisticWeatherIrrigationMenu = FieldDataCollector.readRealisticWeatherIrrigationMenu(fieldId, parcelId, ownerFarmId)
+        fData.realisticWeatherIrrigationMenu = FieldDataCollector.readRealisticWeatherIrrigationMenu(menuFieldId, parcelId, ownerFarmId)
         table.insert(fieldData, fData)
         fieldCoopTick()
         end

@@ -13,6 +13,7 @@ function escapeHtml(s) {
 }
 
 function formatMoney(v) {
+  if (v == null || v === "") return "—";
   const n = Number(v);
   if (!Number.isFinite(n)) return "—";
   return `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;

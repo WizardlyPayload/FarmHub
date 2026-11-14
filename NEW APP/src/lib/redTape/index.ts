@@ -71,6 +71,7 @@ export interface RedTapePayload {
 }
 
 export function formatMoney(v: unknown, profile?: SaveProfileDisplay | null): string {
+  if (v == null || v === "") return "—";
   const n = Number(v);
   if (!Number.isFinite(n)) return "—";
   return formatProfileMoney(n, profile);

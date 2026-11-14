@@ -302,8 +302,6 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/adjustableFillLevelAdvanced").then((m) => m.Page) },
   { key: "adjustFuelTank", catalogId: "adjustFuelTank", title: "Adjustable Fuel Tank + Elektro", glyph: "FT", group: "fleet",
     load: () => import("@/sections/mods/adjustFuelTank").then((m) => m.Page) },
-  { key: "manualAttach", catalogId: "manualAttach", title: "Manual Attach", glyph: "MA", group: "fleet",
-    load: () => import("@/sections/mods/manualAttach").then((m) => m.Page) },
   { key: "towingChainHook", catalogId: "towingChainHook", title: "Towing Chain With Hook", glyph: "TC", group: "fleet",
     load: () => import("@/sections/mods/towingChainHook").then((m) => m.Page) },
   { key: "handToolDrop", catalogId: "handToolDrop", title: "Hand Tool Drop", glyph: "HT", group: "fleet",

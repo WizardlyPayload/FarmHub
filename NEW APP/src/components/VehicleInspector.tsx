@@ -1,4 +1,5 @@
 import { Badge, Button } from "@/components/ui";
+import { AttachedEquipmentLine } from "@/sections/vehicles/AttachedEquipmentLine";
 import { t } from "@/i18n/i18n";
 import { AdsVehiclePanel } from "@/sections/vehicles/AdsVehiclePanel";
 import { MileageVehiclePanel } from "@/sections/vehicles/MileageVehiclePanel";
@@ -81,6 +82,7 @@ export function VehicleInspector({ vehicle, onClose, onShowOnMap }: Props) {
       </header>
 
       <div class="fd-inspector__body">
+        <AttachedEquipmentLine vehicle={vehicle} />
         <div class="fd-inspector__stat">
           <small class="fd-muted">{t("vehicles.cardOperatingTime")}</small>
           <strong>{formatOperatingTime(vehicle.operatingTime || 0)}</strong>

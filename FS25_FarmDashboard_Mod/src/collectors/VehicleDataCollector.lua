@@ -739,6 +739,34 @@ function VehicleDataCollector:_isVehicleAlive(vehicle)
     return ok and alive == true
 end
 
+function VehicleDataCollector:_serializeAttachedEquipment(vehicle)
+    if type(vehicle.getAttachedImplements) ~= "function" then return 0, nil end
+    local success, implements = pcall(function() return vehicle:getAttachedImplements() end)
+    if not success or type(implements) ~= "table" then return 0, nil end
+
+    -- Native AttacherJoints records contain the attached vehicle as `object`.
+    -- These are direct attachments only; no companion mod is needed.
+    local names = {}
+    for i = 1, math.min(#implements, 12) do
+        local attached = implements[i] and implements[i].object
+        if attached then
+            local name
+            if type(attached.getFullName) == "function" then
+                local ok, fullName = pcall(function() return attached:getFullName() end)
+                if ok and type(fullName) == "string" then name = fullName end
+            end
+            if (not name or name == "") and type(attached.getName) == "function" then
+                local ok, shortName = pcall(function() return attached:getName() end)
+                if ok and type(shortName) == "string" then name = shortName end
+            end
+            if name and name ~= "" and name ~= "Unknown" then
+                names[#names + 1] = name:sub(1, 100)
+            end
+        end
+    end
+    return #implements, #names > 0 and names or nil
+end
+
 function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
     local vData = {}
 
@@ -908,12 +936,6 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
     end
 
     vData.attachedImplementsCount = 0
-    if vehicle.getAttachedImplements then
-        local success, implements = pcall(function() return vehicle:getAttachedImplements() end)
-        if success and implements then
-            vData.attachedImplementsCount = #implements
-        end
-    end
 
     vData.vehicleType = "unknown"
     local okType, vehicleType = pcall(function()
@@ -985,6 +1007,7 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
             vData.vehicleType = "trailer"
         end
     end
+    vData.attachedImplementsCount, vData.attachedEquipment = self:_serializeAttachedEquipment(vehicle)
     -- Authoritative store icon key: the game's own store image basename (e.g. ".../store_t7.dds"
     -- -> "store_t7"). The desktop app keys its shipped image library by exactly this token, so
     -- exporting it lets the dashboard pick the correct picture instead of fuzzy-matching the

@@ -333,6 +333,25 @@ return tostring(first) .. "|" .. tostring(second)
 });
 
 describe("098 vehicle ownership under the native mod environment", () => {
+    test("base-game attachment records yield direct equipment names without a companion mod", () => {
+        const body = `
+local tractor = {
+    getAttachedImplements = function()
+        return {
+            { object = { getFullName = function() return "Kuhn Seeder" end } },
+            { object = { getFullName = function() error("name unavailable") end,
+                         getName = function() return "Brantner Trailer" end } },
+            { object = {} }
+        }
+    end
+}
+local count, names = VehicleDataCollector:_serializeAttachedEquipment(tractor)
+local emptyCount, emptyNames = VehicleDataCollector:_serializeAttachedEquipment({})
+return tostring(count) .. ":" .. table.concat(names, ",") .. ":" .. tostring(emptyCount) .. ":" .. tostring(emptyNames)
+`;
+        expect(run({ files: VEHICLE_FILES, body })).toBe("3:Kuhn Seeder,Brantner Trailer:0:nil");
+    });
+
     const vehicleBody = `
 local out = {}
 for _, ps in ipairs({ 2, 3, 5 }) do

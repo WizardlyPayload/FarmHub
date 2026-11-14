@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Tasso salariale",
   "economy.rf.workers.next": "Prossimo pagamento",
   "economy.rf.workers.period": "Spesa del periodo",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Fattori scatenanti sul luogo di lavoro",
   "economy.rf.workplace.empty": "Non sono ancora stati assegnati posti di lavoro.",
   "economy.rf.workplace.onClock": "Sull'orologio",

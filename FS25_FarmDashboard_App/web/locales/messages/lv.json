@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Algas likme",
   "economy.rf.workers.next": "Nākamais maksājums",
   "economy.rf.workers.period": "Perioda izdevumi",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Darba vietas izraisītāji",
   "economy.rf.workplace.empty": "Darba vietas vēl nav izveidotas.",
   "economy.rf.workplace.onClock": "Uz pulksteņa",

@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Darbo užmokesčio tarifas",
   "economy.rf.workers.next": "Kitas mokėjimas",
   "economy.rf.workers.period": "Laikotarpio išlaidos",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Darbo vietos veiksniai",
   "economy.rf.workplace.empty": "Darbo vietų dar nėra.",
   "economy.rf.workplace.onClock": "Laikrodis",

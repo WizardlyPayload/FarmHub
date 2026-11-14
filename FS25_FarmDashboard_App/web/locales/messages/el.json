@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Μισθός",
   "economy.rf.workers.next": "Επόμενη πληρωμή",
   "economy.rf.workers.period": "Δαπάνες περιόδου",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Ενεργοποιητές χώρου εργασίας",
   "economy.rf.workplace.empty": "Δεν έχουν τοποθετηθεί ακόμη χώροι εργασίας.",
   "economy.rf.workplace.onClock": "Στο ρολόι",

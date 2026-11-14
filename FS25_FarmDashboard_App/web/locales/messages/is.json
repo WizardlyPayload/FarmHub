@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Launahlutfall",
   "economy.rf.workers.next": "Næsta greiðsla",
   "economy.rf.workers.period": "Tímabundin útgjöld",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Vinnustaðakveikjarar",
   "economy.rf.workplace.empty": "Engir vinnustaðir auglýstir ennþá.",
   "economy.rf.workplace.onClock": "Á klukku",

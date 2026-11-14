@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Размер на заплатата",
   "economy.rf.workers.next": "Следващо плащане",
   "economy.rf.workers.period": "Разходи за период",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Тригери на работното място",
   "economy.rf.workplace.empty": "Все още няма осигурени работни места.",
   "economy.rf.workplace.onClock": "На часовника",

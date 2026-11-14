@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Rata tal-paga",
   "economy.rf.workers.next": "Il-ħlas li jmiss",
   "economy.rf.workers.period": "Nfiq tal-perjodu",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Triggers fuq il-post tax-xogħol",
   "economy.rf.workplace.empty": "Għad m'hemm l-ebda post tax-xogħol imqiegħed.",
   "economy.rf.workplace.onClock": "Fuq l-arloġġ",

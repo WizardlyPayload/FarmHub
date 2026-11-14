@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Tasa salarial",
   "economy.rf.workers.next": "Próximo pago",
   "economy.rf.workers.period": "Período de gasto",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Desencadenantes en el lugar de trabajo",
   "economy.rf.workplace.empty": "Aún no se han asignado puestos de trabajo.",
   "economy.rf.workplace.onClock": "En el reloj",

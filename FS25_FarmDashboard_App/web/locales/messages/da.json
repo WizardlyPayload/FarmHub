@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Lønsats",
   "economy.rf.workers.next": "Næste betaling",
   "economy.rf.workers.period": "Periodeforbrug",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Udløsere på arbejdspladsen",
   "economy.rf.workplace.empty": "Ingen arbejdspladser placeret endnu.",
   "economy.rf.workplace.onClock": "På uret",

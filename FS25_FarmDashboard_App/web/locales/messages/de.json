@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Lohnsatz",
   "economy.rf.workers.next": "Nächste Zahlung",
   "economy.rf.workers.period": "Zeitaufwand",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Auslöser am Arbeitsplatz",
   "economy.rf.workplace.empty": "Es wurden noch keine Arbeitsplätze zugewiesen.",
   "economy.rf.workplace.onClock": "Auf der Uhr",

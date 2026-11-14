@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Ставка заробітної плати",
   "economy.rf.workers.next": "Наступний платіж",
   "economy.rf.workers.period": "Витрати за період",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Тригери на робочому місці",
   "economy.rf.workplace.empty": "Робочі місця ще не розміщені.",
   "economy.rf.workplace.onClock": "На годиннику",

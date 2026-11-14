@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Stopa plaće",
   "economy.rf.workers.next": "Sljedeće plaćanje",
   "economy.rf.workers.period": "Potrošnja razdoblja",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Okidači na radnom mjestu",
   "economy.rf.workplace.empty": "Još nije postavljeno nijedno radno mjesto.",
   "economy.rf.workplace.onClock": "Na satu",

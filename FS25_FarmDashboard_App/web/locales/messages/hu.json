@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Bérráta",
   "economy.rf.workers.next": "Következő fizetés",
   "economy.rf.workers.period": "Időszaki kiadások",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Munkahelyi kiváltó okok",
   "economy.rf.workplace.empty": "Még nincsenek kialakított munkahelyek.",
   "economy.rf.workplace.onClock": "Óránként",

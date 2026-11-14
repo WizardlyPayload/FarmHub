@@ -143,7 +143,7 @@ function WorkersPanel({
         <strong>{formatRfMoney(row?.wageRate, profile)}</strong>
       </MetaRow>
       <MetaRow label={t("economy.rf.workers.next")}>{row?.nextPaymentLabel || "—"}</MetaRow>
-      <MetaRow label={t("economy.rf.workers.period")}>
+      <MetaRow label={t("economy.rf.workers.unpaidBase")}>
         <strong>{formatRfMoney(row?.periodSpend, profile)}</strong>
       </MetaRow>
     </Card>

@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Ráta pá",
   "economy.rf.workers.next": "An chéad íocaíocht eile",
   "economy.rf.workers.period": "Caiteachas tréimhse",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Spreagthóirí san ionad oibre",
   "economy.rf.workplace.empty": "Níl aon ionaid oibre curtha in áirithe go fóill.",
   "economy.rf.workplace.onClock": "Ar an gclog",

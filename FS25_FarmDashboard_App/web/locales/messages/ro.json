@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Rata salarială",
   "economy.rf.workers.next": "Următoarea plată",
   "economy.rf.workers.period": "Cheltuieli periodice",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Factori declanșatori la locul de muncă",
   "economy.rf.workplace.empty": "Încă nu au fost plasate locuri de muncă.",
   "economy.rf.workplace.onClock": "La ceas",

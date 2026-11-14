@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Palkkataso",
   "economy.rf.workers.next": "Seuraava maksu",
   "economy.rf.workers.period": "Kauden menot",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Työpaikan laukaisevat tekijät",
   "economy.rf.workplace.empty": "Työpaikkoja ei ole vielä sijoitettu.",
   "economy.rf.workplace.onClock": "Kellonaika",

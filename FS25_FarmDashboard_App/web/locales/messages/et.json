@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Palgamäär",
   "economy.rf.workers.next": "Järgmine makse",
   "economy.rf.workers.period": "Perioodi kulud",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Töökohal toimuvad päästikud",
   "economy.rf.workplace.empty": "Töökohti pole veel loodud.",
   "economy.rf.workplace.onClock": "Kella peal",

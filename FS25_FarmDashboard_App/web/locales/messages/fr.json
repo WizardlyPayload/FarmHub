@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "taux de salaire",
   "economy.rf.workers.next": "Prochain paiement",
   "economy.rf.workers.period": "Dépenses périodiques",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Déclencheurs en milieu de travail",
   "economy.rf.workplace.empty": "Aucun lieu de travail n'a encore été placé.",
   "economy.rf.workplace.onClock": "À l'heure",

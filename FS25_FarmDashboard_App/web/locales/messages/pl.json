@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Stawka płac",
   "economy.rf.workers.next": "Następna płatność",
   "economy.rf.workers.period": "Okres spędzany",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Wyzwalacze w miejscu pracy",
   "economy.rf.workplace.empty": "Nie przygotowano jeszcze żadnych miejsc pracy.",
   "economy.rf.workplace.onClock": "Na zegarze",

@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Loonpercentage",
   "economy.rf.workers.next": "Volgende betaling",
   "economy.rf.workers.period": "Periode-uitgaven",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Werkplektriggers",
   "economy.rf.workplace.empty": "Er zijn nog geen werkplekken toegewezen.",
   "economy.rf.workplace.onClock": "Op de klok",

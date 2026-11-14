@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Wage rate",
   "economy.rf.workers.next": "Next payment",
   "economy.rf.workers.period": "Period spend",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Workplace triggers",
   "economy.rf.workplace.empty": "No workplaces placed yet.",
   "economy.rf.workplace.onClock": "On clock",

@@ -921,6 +921,7 @@
   "economy.rf.workers.rate": "Mzdová sadzba",
   "economy.rf.workers.next": "Ďalšia platba",
   "economy.rf.workers.period": "Výdavky za obdobie",
+  "economy.rf.workers.unpaidBase": "Unpaid base wages",
   "economy.rf.workplace.title": "Spúšťače na pracovisku",
   "economy.rf.workplace.empty": "Zatiaľ neboli umiestnené žiadne pracoviská.",
   "economy.rf.workplace.onClock": "Na hodinách",

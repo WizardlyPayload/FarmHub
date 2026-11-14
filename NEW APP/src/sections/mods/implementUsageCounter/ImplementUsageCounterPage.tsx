@@ -20,6 +20,14 @@ const activities: Record<string, string> = {
   sowingMachine: "Seeding / planting", sprayer: "Spraying", baleWrap: "Bale wrapping",
 };
 
+function formatUsage(value: unknown, unit: UsageRow["unit"]): string {
+  const amount = num(value);
+  if (unit === "ha" && amount != null && amount > 0 && amount < 0.005) {
+    return `<${formatNumber(0.01, 2)} ha`;
+  }
+  return `${formatNumber(value, unit === "ha" ? 2 : 0)} ${unit || ""}`;
+}
+
 export function Page({ entry }: CompanionPageProps) {
   const { page, farmData, farmId } = useCompanionPage(entry.key);
   const rows = asList<UsageRow>(page?.rows).filter((row) => num(row.farmId) === farmId);
@@ -46,8 +54,8 @@ export function Page({ entry }: CompanionPageProps) {
             cells: {
               vehicle: row.vehicle || "—",
               activity: tOr(`companionPage.implementUsageCounter.activity.${row.activity || ""}`, activities[row.activity || ""] || row.activity || "—"),
-              lifetime: `${formatNumber(row.lifetime, row.unit === "ha" ? 2 : 0)} ${row.unit || ""}`,
-              session: `${formatNumber(row.session, row.unit === "ha" ? 2 : 0)} ${row.unit || ""}`,
+              lifetime: formatUsage(row.lifetime, row.unit),
+              session: formatUsage(row.session, row.unit),
             },
           }))}
           empty={tOr("companionPage.implementUsageCounter.empty", "No usage counters for your current implements yet.")}

@@ -41,8 +41,10 @@ CompanionPages.register({
                     vehicle = ctx.clip(ctx.call(vehicle, "getFullName") or ctx.call(vehicle, "getName"), 70),
                     activity = activity,
                     unit = unit,
-                    lifetime = ctx.round2(lifetime),
-                    session = ctx.round2(session),
+                    -- Preserve a real sub-0.005 ha reading so the UI can show
+                    -- "<0.01 ha" instead of an apparent zero beside Used=1.
+                    lifetime = unit == "ha" and lifetime > 0 and lifetime < 0.005 and lifetime or ctx.round2(lifetime),
+                    session = unit == "ha" and session > 0 and session < 0.005 and session or ctx.round2(session),
                 }
             end
             return true

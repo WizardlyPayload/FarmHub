@@ -5,6 +5,7 @@ Status: **in progress**, last updated 14 November 2026. This audit reopens the q
 ## Inventory boundary
 
 - Current read-only `P:\FS25 MOD VAULT\by-category` enumeration: **8,012 ZIP paths**. The maintained vault index dated 26 October lists 8,011, so it is not an exact current inventory.
+- A 14 November read-only filesystem count still found 8,012 ZIP paths. It did not rerun the Lua/content scan; unchanged path count alone does not prove unchanged archive bytes or preserve the 1,803 Lua-bearing classification.
 - The 23 September source-screening inventory covered **665 ZIP names**. By filename, 602 remain in the current category tree, 63 are absent, and 7,407 distinct current names were outside that older sample. Filename overlap is a triage aid, not proof of identical bytes or versions.
 - The read-only `2026-10-31-scan-vault.py` scan covered all 8,012 current category-tree ZIP paths. **1,803** contain Lua and **1,549** declare source files in `modDesc.xml`. **1,201** Lua-bearing ZIP names were outside the older 665-name screen. The full machine-readable result is `Z:\Graham\agent-comms\farmhub-companion-acceptance\VAULT-SCAN-2026-10-31.json`.
 - `FS25_Bale_Storage.zip` in `uncategorized` was unreadable as a ZIP; its contents and playability are unproved. No vault files were modified.

@@ -86,6 +86,27 @@ describe("owning-mod companion readers", () => {
         `, "out.realSilo.readState..'|'..tostring(out.realSilo.silos[1].slots[1].fillLevel)");
         expect(silo).toBe("ok|250");
 
+        const olderSilo = run(`
+            getfenv = function() return _G end
+            g_currentMission = { getFarmId = function() return 1 end }
+            g_modIsLoaded = { ['KM_80484_RealSilo_Realistic_Silo_Compartments'] = true }
+            _G['KM_80484_RealSilo_Realistic_Silo_Compartments'] = {
+                realSiloManager = {
+                    silos = {
+                        own = { placeable = { ownerFarmId = 1 }, config = { isConfigured = true, numCompartments = 2, capacityPerCompartment = 1000 } },
+                        foreign = { placeable = { ownerFarmId = 2 }, config = { isConfigured = true, numCompartments = 2, capacityPerCompartment = 1000 } },
+                    },
+                    siloNames = { own = 'Old Grain', foreign = 'Other Farm' },
+                    applyConfig = function() error('write') end,
+                },
+                RealSiloCompartmentStorage = { siloSlots = {
+                    own = { activeSlot = 1, slots = { { index = 1, fillType = 1, fillLevel = 250, capacity = 1000, isActive = true } } },
+                    foreign = { activeSlot = 1, slots = { { index = 1, fillType = 1, fillLevel = 900, capacity = 1000, isActive = true } } },
+                } },
+            }
+        `, "out.realSilo.readState..'|'..tostring(#out.realSilo.silos)..'|'..tostring(out.realSilo.silos[1].slots[1].fillLevel)");
+        expect(olderSilo).toBe("ok|1|250");
+
         const pallet = run(`
             getfenv = function() return _G end
             g_currentMission = {

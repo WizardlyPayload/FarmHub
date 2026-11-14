@@ -87,6 +87,15 @@ describe("RealSilo page collector", () => {
         expect(silo.slots[3].isExtension).toBe(true);
     });
 
+    test("recognizes the exact older KM archive name without exposing another farm", () => {
+        const namedEnv = MOD_ENV.replaceAll("FS25_RealSilo", "KM_80484_RealSilo_Realistic_Silo_Compartments");
+        const page = runCompanionPage(FILE, namedEnv, { farmId: 1 });
+        expect(page.readState).toBe("ok");
+        expect(page.version).toBe("1.1.0.2");
+        expect(page.silos).toHaveLength(1);
+        expect(page.silos[0]).toMatchObject({ name: "North", fill: 47000, activeSlot: 2 });
+    });
+
     test("partial when the compartment storage table is missing", () => {
         const page = runCompanionPage(FILE, `${MOD_ENV}
             _G.FS25_RealSilo.RealSiloCompartmentStorage = nil

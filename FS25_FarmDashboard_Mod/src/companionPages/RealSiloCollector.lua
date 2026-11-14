@@ -62,7 +62,7 @@ end
 
 CompanionPages.register({
     key = "realSilo",
-    modNames = { "FS25_RealSilo", "FS25_369067_RealSilo_Realistic_Silo_Compartments" },
+    modNames = { "FS25_RealSilo", "FS25_369067_RealSilo_Realistic_Silo_Compartments", "KM_80484_RealSilo_Realistic_Silo_Compartments" },
     substrings = { "realsilo", "realistic_silo" },
     collect = function(ctx)
         local mgr = ctx.symbol("realSiloManager")

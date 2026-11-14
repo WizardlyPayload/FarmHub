@@ -693,6 +693,7 @@ local CATALOG = {
             "FS25_RealSilo",
             "FS25_369067_FS25_RealSilo",
             "FS25_369067_RealSilo_Realistic_Silo_Compartments",
+            "KM_80484_RealSilo_Realistic_Silo_Compartments",
         },
         substrings = { "realsilo", "realistic_silo" },
         globals = { "realSiloManager" },
@@ -2181,7 +2182,7 @@ local VIP_MODS = { "FS25_VIPOrderManager", "FS25_310861_VIP_Order_Manager" }
 local MILK_MODS = { "FS25_SeasonalMilkProduction", "FS25_365513_Seasonal_Milk_Production" }
 local YIELD_MODS = { "FS25_YieldTracker", "FS25_326441_Yield_Tracker" }
 local LEASE_MODS = { "FS25_FieldLeasing", "FS25_338381_Field_Leasing" }
-local SILO_MODS = { "FS25_RealSilo", "FS25_369067_FS25_RealSilo", "FS25_369067_RealSilo_Realistic_Silo_Compartments" }
+local SILO_MODS = { "FS25_RealSilo", "FS25_369067_FS25_RealSilo", "FS25_369067_RealSilo_Realistic_Silo_Compartments", "KM_80484_RealSilo_Realistic_Silo_Compartments" }
 local PALLET_MODS = {
     "FS25_StorageOverhaulPalletDegradation",
     "FS25_StorageOverhaul",

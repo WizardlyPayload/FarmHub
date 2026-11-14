@@ -19,6 +19,75 @@ local function slots(source, ctx, history)
     return out
 end
 
+-- Predictive pressure and visible outbreaks are distinct. Read only tracked
+-- parcel keys; the mod's disease save has no farm id of its own.
+local function diseaseSnapshot(ctx, mod, farmlandManager, farmId)
+    if ctx.version ~= "1.1.0.1" then
+        return { readState = "unavailable", reason = "unreviewed-version" }
+    end
+    if ctx.call(ctx.mission, "getIsServer") ~= true then
+        return { readState = "unavailable", reason = "server-disease-state-only" }
+    end
+    local disease = type(mod) == "table" and mod.disease or nil
+    if type(disease) ~= "table" or type(disease.state) ~= "table"
+        or type(disease.reservoir) ~= "table" then
+        return { readState = "unavailable", reason = "no-disease-state" }
+    end
+    local ids, seen, scanned, truncated = {}, {}, 0, false
+    for _, source in ipairs({ disease.state, disease.reservoir, disease.crop or {} }) do
+        if type(source) == "table" then
+            for key in pairs(source) do
+                scanned = scanned + 1
+                if scanned > MAX_SCAN then truncated = true; break end
+                local id = ctx.num(key)
+                if id ~= nil and id > 0 and id == math.floor(id) and not seen[id] then
+                    seen[id] = true
+                    ids[#ids + 1] = id
+                end
+            end
+        end
+        if truncated then break end
+    end
+    table.sort(ids)
+    local rows, riskCount, outbreakCount, unknownOwner = {}, 0, 0, false
+    for _, id in ipairs(ids) do
+        local owner = ctx.num(ctx.call(farmlandManager, "getFarmlandOwner", id))
+        if owner == nil then
+            unknownOwner = true
+        elseif owner == farmId then
+            local band = ctx.num(ctx.call(disease, "getRiskBand", id))
+            local group = ctx.call(disease, "getWorstGroup", id)
+            if band == nil or band < 0 or band > 3 or band ~= math.floor(band)
+                or (group ~= nil and type(group) ~= "string") then
+                truncated = true
+            elseif band > 0 or (type(group) == "string" and group ~= "") then
+                if band > 0 then riskCount = riskCount + 1 end
+                if group ~= nil and group ~= "" then outbreakCount = outbreakCount + 1 end
+                if #rows < MAX_ROWS then
+                    local name = group ~= nil and ctx.call(disease, "getDisplayName", group) or nil
+                    rows[#rows + 1] = {
+                        farmId = farmId,
+                        farmlandId = id,
+                        riskBand = band,
+                        visibleOutbreak = group ~= nil and group ~= "" and
+                            ctx.clip(type(name) == "string" and name or group, 64) or nil,
+                    }
+                else
+                    truncated = true
+                end
+            end
+        end
+    end
+    local complete = not truncated and not unknownOwner
+    return {
+        readState = complete and "ok" or "partial",
+        coverage = complete and "tracked-parcels" or "partial",
+        atRiskCount = complete and riskCount or nil,
+        visibleOutbreakCount = complete and outbreakCount or nil,
+        rows = rows,
+    }
+end
+
 CompanionPages.register({
     key = "realisticCropRotation",
     modNames = { "FS25_370461_Realistic_Crop_Rotation", "KM_83006_Realistic_Crop_Rotation" },
@@ -99,6 +168,7 @@ CompanionPages.register({
                 farmlandCount = #rows, plannedCount = planned, historyCount = withHistory,
             } },
             rows = rows,
+            disease = diseaseSnapshot(ctx, mod, farmlandManager, farmId),
         }
     end,
 })

@@ -62,3 +62,41 @@ test("exports a new owned plan before any crop history exists", () => {
         byFarm: { "1": { farmlandCount: 1, plannedCount: 1, historyCount: 0 } } });
     expect(page.rows[0]).toMatchObject({ farmlandId: 36, plan: ["CANOLA", "", "", ""] });
 });
+
+test("separates owned predictive pressure from a visible outbreak and withholds foreign disease data", () => {
+    const setup = SETUP + `
+      _G.g_modManager = { getActiveMods = function() return {
+        { modName = "FS25_370461_Realistic_Crop_Rotation", version = "1.1.0.1" }
+      } end }
+      _G.g_currentMission = { getFarmId = function() return 1 end,
+        getIsServer = function() return true end }
+      _G.FS25_370461_Realistic_Crop_Rotation.RealisticCropRotation.disease = {
+        state = { [36] = { FUNGUS = { severity = 0.4 } },
+                  [42] = { SECRET = { severity = 0.9 } } },
+        reservoir = { [36] = { FUNGUS = 0.5 }, [42] = { SECRET = 0.9 } },
+        getRiskBand = function(_, id) return id == 36 and 2 or 3 end,
+        getWorstGroup = function(_, id) return id == 36 and "FUNGUS" or "SECRET" end,
+        getDisplayName = function(_, group) return group == "FUNGUS" and "Leaf disease" or "Other farm disease" end,
+      }
+    `;
+    const page = runCompanionPage(FILE, setup, { farmId: 1 });
+    expect(page.disease).toMatchObject({
+        readState: "ok", coverage: "tracked-parcels",
+        atRiskCount: 1, visibleOutbreakCount: 1,
+        rows: [{ farmId: 1, farmlandId: 36, riskBand: 2, visibleOutbreak: "Leaf disease" }],
+    });
+    expect(JSON.stringify(page)).not.toContain("Other farm disease");
+    expect(normalizeCompanionPages({ pages: { realisticCropRotation: page } },
+        { modules: loadModules() }).pages.realisticCropRotation.disease.rows).toHaveLength(1);
+
+    const noServer = setup.replace("getIsServer = function() return true end", "getIsServer = function() return false end");
+    expect(runCompanionPage(FILE, noServer, { farmId: 1 }).disease).toMatchObject({
+        readState: "unavailable", reason: "server-disease-state-only",
+    });
+    const unknownOwner = setup.replace("id == 36 and 1 or 2", "id == 36 and 1 or nil");
+    expect(runCompanionPage(FILE, unknownOwner, { farmId: 1 }).disease).toMatchObject({
+        readState: "partial", coverage: "partial",
+        rows: [{ farmlandId: 36, riskBand: 2 }],
+    });
+    expect(runCompanionPage(FILE, unknownOwner, { farmId: 1 }).disease.atRiskCount).toBeUndefined();
+});

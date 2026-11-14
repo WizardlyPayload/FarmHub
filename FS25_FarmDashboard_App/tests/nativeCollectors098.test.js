@@ -309,6 +309,7 @@ end }
 g_farmManager = { farms = { { farmId = 1, name = "Owned" }, { farmId = 14, name = "Other" } } }
 g_currentMission.RedTape = {
     getCumulativeMonth = function() return 42 end,
+    settings = { taxRecordingEnabled = true },
     TaxSystem = { lineItems = {
         [1] = { [42] = { { amount = 100, statistic = "soldProducts" },
             { amount = -25, statistic = "purchaseSeeds" },
@@ -340,6 +341,18 @@ local a = out.byFarm["1"].tax
 return tostring(a.currentMonthIncome) .. "|" .. tostring(a.currentMonthExpenses)
 `;
         expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
+    });
+
+    test("withholds month totals when Red Tape tax recording is disabled or unreadable", () => {
+        const body = `
+g_currentMission.RedTape.settings.taxRecordingEnabled = false
+local off = RedTapeDataCollector:collect().byFarm["1"].tax
+g_currentMission.RedTape.settings = nil
+local unknown = RedTapeDataCollector:collect().byFarm["1"].tax
+return table.concat({ tostring(off.currentMonthIncome), tostring(off.currentMonthExpenses),
+    tostring(unknown.currentMonthIncome), tostring(unknown.currentMonthExpenses) }, "|")
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil|nil|nil");
     });
 
     test("withholds old invented income/expense fields instead of reporting false zero", () => {

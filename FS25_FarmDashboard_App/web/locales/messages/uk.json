@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Максимальне значення",
   "storage.colMaxMonth": "Макс. місяць",
   "storage.noSellingPoint": "Немає аргументів на користь продавця.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "на 1000 л",
   "storage.expandRow": "Показати місця зберігання",
   "storage.collapseRow": "Приховати місця зберігання",

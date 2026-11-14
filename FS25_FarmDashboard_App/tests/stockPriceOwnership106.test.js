@@ -160,6 +160,21 @@ describe("106 fractional money-per-litre prices survive producer, JSON and consu
         expect(storage.resolveStationName(item, crop)).toBe("Public");
     });
 
+    test("enriched Storage rows distinguish an observed buyer from an economy reference", () => {
+        const crop = { fillTypeIndex: 11, avgXmlPrice: 1000,
+            locations: [{ name: "Market Base Prices", price: 1000 }],
+            bestLocation: "Market Base Prices" };
+        const economy = { marketPrices: { crops: { SILAGE: crop } } };
+        const base = { fillTypeIndex: 11, fillType: "SILAGE", totalLiters: 1000, locations: [] };
+        const reference = storage.enrichStockItem(base, null, economy, null);
+        expect(reference._pricePer1000).toBe(1000);
+        expect(reference._priceSource).toBe("reference");
+        const offer = storage.enrichStockItem({ ...base, bestSellPrice: 0.8,
+            bestSellStation: "Public" }, null, economy, null);
+        expect(offer._pricePer1000).toBe(800);
+        expect(offer._priceSource).toBe("buyer");
+    });
+
     test("a price above 1/L keeps its fraction (1.10 stays 1.1, read as 1100)", () => {
         const engine = `stations({ buyer("Mill", 0, 1.1) })`;
         const json = run(engine, `return jsonItems(StockDataCollector:collect(), 2)`);

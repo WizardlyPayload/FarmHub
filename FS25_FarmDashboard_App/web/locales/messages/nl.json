@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Maximale waarde",
   "storage.colMaxMonth": "Maximale maand",
   "storage.noSellingPoint": "Geen verkoopargumenten beschikbaar.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "per 1.000 liter",
   "storage.expandRow": "Toon opslaglocaties",
   "storage.collapseRow": "Opslaglocaties verbergen",

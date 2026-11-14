@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Uasluach",
   "storage.colMaxMonth": "Uasmhéid míosa",
   "storage.noSellingPoint": "Gan aon phointe díola ar fáil.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "in aghaidh an 1,000 L",
   "storage.expandRow": "Taispeáin suíomhanna stórála",
   "storage.collapseRow": "Folaigh suíomhanna stórála",

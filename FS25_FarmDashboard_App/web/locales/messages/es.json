@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Valor máximo",
   "storage.colMaxMonth": "Mes máximo",
   "storage.noSellingPoint": "No hay ningún punto de venta disponible.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "por 1.000 L",
   "storage.expandRow": "Mostrar ubicaciones de almacenamiento",
   "storage.collapseRow": "Ocultar ubicaciones de almacenamiento",

@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Maxvärde",
   "storage.colMaxMonth": "Max månad",
   "storage.noSellingPoint": "Inget försäljningsargument tillgängligt.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "per 1 000 liter",
   "storage.expandRow": "Visa lagringsplatser",
   "storage.collapseRow": "Dölj lagringsplatser",

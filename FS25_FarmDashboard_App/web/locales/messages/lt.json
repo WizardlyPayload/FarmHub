@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Maksimali vertė",
   "storage.colMaxMonth": "Maksimalus mėnuo",
   "storage.noSellingPoint": "Nėra pardavimo argumento.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "1000 l",
   "storage.expandRow": "Rodyti saugojimo vietas",
   "storage.collapseRow": "Slėpti saugojimo vietas",

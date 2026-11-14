@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Максимална стойност",
   "storage.colMaxMonth": "Максимален месец",
   "storage.noSellingPoint": "Няма налична рекламна точка.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "на 1000 литра",
   "storage.expandRow": "Показване на местата за съхранение",
   "storage.collapseRow": "Скриване на местата за съхранение",

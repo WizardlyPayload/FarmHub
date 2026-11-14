@@ -102,6 +102,7 @@ const ECONOMY_CROP_ALIASES: Record<string, string[]> = {
 export interface EnrichedStockItem extends StockItem {
   locations: StockLocation[];
   _pricePer1000?: number;
+  _priceSource?: "buyer" | "reference";
   _maxPrice?: number;
   _maxPriceMonth?: string | null;
   _crop?: CropLike | null;
@@ -479,9 +480,16 @@ export function enrichStockItem(
     }
   }
   const crop = findCropForItem(resolved, economy);
+  // Capture provenance before the compatibility back-fill below. Economy prices
+  // can include virtual base prices and inferred station rows, so only the
+  // stock collector's named selling-station offer is an observed buyer quote.
+  const stockStation = String(resolved.bestSellStation || "");
+  const hasBuyerOffer = Number(resolved.bestSellPrice) > 0 &&
+    stockStation !== "" && stockStation !== "Market" && stockStation !== "Market Base Prices";
   const pricePer1000 = resolvePricePer1000(resolved, crop);
   if (pricePer1000 > 0) {
     resolved._pricePer1000 = pricePer1000;
+    resolved._priceSource = hasBuyerOffer ? "buyer" : "reference";
     if (!(Number(resolved.bestSellPrice) > 0)) {
       resolved.bestSellPrice = pricePer1000;
     }

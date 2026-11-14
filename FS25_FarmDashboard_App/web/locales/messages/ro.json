@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Valoare maximă",
   "storage.colMaxMonth": "Lună maximă",
   "storage.noSellingPoint": "Nu există niciun argument de vânzare disponibil.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "la 1.000 litri",
   "storage.expandRow": "Afișați locațiile de stocare",
   "storage.collapseRow": "Ascunde locațiile de stocare",

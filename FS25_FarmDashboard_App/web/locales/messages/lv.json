@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Maksimālā vērtība",
   "storage.colMaxMonth": "Maks. mēnesī",
   "storage.noSellingPoint": "Nav pieejams pārdošanas arguments.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "uz 1000 l",
   "storage.expandRow": "Rādīt krātuves vietas",
   "storage.collapseRow": "Slēpt glabāšanas vietas",

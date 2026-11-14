@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Maksimiarvo",
   "storage.colMaxMonth": "Maksimi kuukausi",
   "storage.noSellingPoint": "Ei myyntivalttia saatavilla.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "1 000 litraa kohden",
   "storage.expandRow": "Näytä tallennuspaikat",
   "storage.collapseRow": "Piilota tallennuspaikat",

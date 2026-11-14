@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Največja vrednost",
   "storage.colMaxMonth": "Največji mesec",
   "storage.noSellingPoint": "Prodajna točka ni na voljo.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "na 1.000 litrov",
   "storage.expandRow": "Prikaži lokacije shranjevanja",
   "storage.collapseRow": "Skrij lokacije shranjevanja",

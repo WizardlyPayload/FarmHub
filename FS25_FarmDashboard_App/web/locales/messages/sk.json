@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Maximálna hodnota",
   "storage.colMaxMonth": "Maximálny mesiac",
   "storage.noSellingPoint": "Nie je k dispozícii žiadny predajný argument.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "na 1 000 litrov",
   "storage.expandRow": "Zobraziť miesta uloženia",
   "storage.collapseRow": "Skryť úložiská",

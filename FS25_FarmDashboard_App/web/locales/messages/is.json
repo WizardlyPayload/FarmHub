@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Hámarksgildi",
   "storage.colMaxMonth": "Hámarksmánuður",
   "storage.noSellingPoint": "Engin söluatriði í boði.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "á hverja 1.000 lítra",
   "storage.expandRow": "Sýna geymslustaði",
   "storage.collapseRow": "Fela geymslustaði",

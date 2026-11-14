@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Μέγιστη τιμή",
   "storage.colMaxMonth": "Μέγιστος μήνας",
   "storage.noSellingPoint": "Δεν υπάρχει διαθέσιμο σημείο πώλησης.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "ανά 1.000 λίτρα",
   "storage.expandRow": "Εμφάνιση τοποθεσιών αποθήκευσης",
   "storage.collapseRow": "Απόκρυψη τοποθεσιών αποθήκευσης",

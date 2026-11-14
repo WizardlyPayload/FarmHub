@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Max. érték",
   "storage.colMaxMonth": "Max. hónap",
   "storage.noSellingPoint": "Nincs elérhető értékesítési pont.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "1000 literenként",
   "storage.expandRow": "Tárolási helyek megjelenítése",
   "storage.collapseRow": "Tárolási helyek elrejtése",

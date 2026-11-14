@@ -2070,6 +2070,8 @@
   "storage.colMaxValue": "Valur massimu",
   "storage.colMaxMonth": "Xahar massimu",
   "storage.noSellingPoint": "L-ebda punt ta' bejgħ disponibbli.",
+  "storage.referenceEstimate": "estimate",
+  "storage.referencePriceHint": "Reference price from economy data. No current buyer offer was verified for this stock.",
   "storage.pricePer1000": "għal kull 1,000 L",
   "storage.expandRow": "Uri l-postijiet tal-ħażna",
   "storage.collapseRow": "Aħbi l-postijiet tal-ħażna",

@@ -104,6 +104,8 @@ Two high-ranked vault leads are **already source-integrated but lack a meaningfu
 
 14 November source correction: the exact reviewed Field Profitability Ledger vault basename is `FS25_369866_FS25_FieldProfitabilityLedger`, while both FarmHub's detector and provider lookup listed a different `FS25_369866_Field_Profitability_Ledger` alias. Detection could succeed through a title substring but the mod-local runtime lookup would return `unavailable` under the exact vault basename. A focused Fengari test first reproduced that failure, then passed after adding the exact basename to both lists; the farm-1-only cycle and read-only summary behavior remains covered. This correction is **source only** and is not in the frozen V91 package; B2's exact staging cause is unproved, and a nonempty installed ledger reading remains unaccepted.
 
+The same exact-basename gap existed for Farmland Marketplace: the v1.0.5.0 archive rehashed as `331588DE99894BB62FB8EC5D43B28F8B29C64CE6674C204E6A6C4C943DAF7DB1` is named `FS25_369241_FS25_FarmlandMarketplace`, but the provider lists only its short name and a different underscored alias. A focused Lua test reproduced `unavailable` with the exact vault name and passed after the detector/provider lists gained that name; existing farm-side offer/lease tests still pass. This is also **source only**, outside the frozen V91 artifacts. An actual offer or lease still needs game, committed-export and installed-page acceptance; B2's earlier unavailable result is not independently attributed to this alias.
+
 Dependency packages must be tested together, without silently requiring unrelated mods.
 
 Further source checks for the next candidates:

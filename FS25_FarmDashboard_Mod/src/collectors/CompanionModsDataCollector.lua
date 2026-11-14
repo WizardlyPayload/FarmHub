@@ -324,7 +324,7 @@ local CATALOG = {
         id = "farmlandMarketplace",
         title = "Farmland Marketplace",
         category = "fields",
-        names = { "FS25_FarmlandMarketplace", "FS25_369241_Farmland_Marketplace" },
+        names = { "FS25_FarmlandMarketplace", "FS25_369241_FS25_FarmlandMarketplace", "FS25_369241_Farmland_Marketplace" },
         substrings = { "farmlandmarketplace", "farmland_marketplace" },
         globals = {},
     },
@@ -2190,7 +2190,7 @@ local PALLET_MODS = {
 local REPUTATION_MODS = { "FS25_FarmReputation", "FS25_367320_Farm_Reputation", "FS25_367320_FS25_FarmReputation" }
 local MOISTURE_MODS = { "FS25_MoistureSystem", "FS25_354130_Moisture_System" }
 local RENT_MODS = { "FS25_RentYourField", "FS25_356641_Rent_Your_Field" }
-local MARKET_MODS = { "FS25_FarmlandMarketplace", "FS25_369241_Farmland_Marketplace" }
+local MARKET_MODS = { "FS25_FarmlandMarketplace", "FS25_369241_FS25_FarmlandMarketplace", "FS25_369241_Farmland_Marketplace" }
 local DIST_MODS = { "FS25_DistributionRedux", "FS25_365583_Distribution_Redux" }
 local SILAGE_MODS = { "FS25_SilageCompactionMonitor", "FS25_349039_Silage_Compaction_Monitor" }
 local OPS_MODS = { "FS25_FarmOperationsDashboard", "FS25_364188_Farm_Operations_Dashboard" }

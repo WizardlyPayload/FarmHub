@@ -36,8 +36,8 @@ CompanionPages.register({
         if type(vehicles) ~= "table" then
             return { readState = "settings-only", reason = "no-owned-vehicle-list" }
         end
-        local ptoHelper = ctx.global("PowerTakeOffExtension")
-        local hoseHelper = ctx.global("ConnectionHosesExtension")
+        local ptoHelper = ctx.symbol("PowerTakeOffExtension")
+        local hoseHelper = ctx.symbol("ConnectionHosesExtension")
         if type(ptoHelper) ~= "table" or type(hoseHelper) ~= "table" then
             return { readState = "settings-only", reason = "manual-attach-state-unavailable" }
         end

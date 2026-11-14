@@ -9,13 +9,15 @@ const GAME = `
   _G.g_modManager = { getActiveMods = function() return {
     { modName = "FS25_340627_FS25_manualAttach", version = "1.1.0.0" }
   } end }
-  _G.PowerTakeOffExtension = {
-    hasPowerTakeOffs = function(implement, parent) return implement.hasPto end,
-    hasAttachedPowerTakeOffs = function(implement, parent) return implement.ptoConnected end,
-  }
-  _G.ConnectionHosesExtension = {
-    hasConnectionHoses = function(implement, parent) return implement.hasHoses end,
-    hasAttachedConnectionHoses = function(implement) return implement.hosesConnected end,
+  _G["FS25_340627_FS25_manualAttach"] = {
+    PowerTakeOffExtension = {
+      hasPowerTakeOffs = function(implement, parent) return implement.hasPto end,
+      hasAttachedPowerTakeOffs = function(implement, parent) return implement.ptoConnected end,
+    },
+    ConnectionHosesExtension = {
+      hasConnectionHoses = function(implement, parent) return implement.hasHoses end,
+      hasAttachedConnectionHoses = function(implement) return implement.hosesConnected end,
+    },
   }
   local function vehicle(id, owner, hasPto, ptoConnected, hasHoses, hosesConnected, parentOwner)
     local parent = { ownerFarmId = parentOwner or 1,
@@ -66,7 +68,7 @@ test("withholds client state and unavailable helper state", () => {
   const client = GAME.replace("getIsServer = function() return true end", "getIsServer = function() return false end");
   expect(runCompanionPage(FILE, client, { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "server-vehicle-state-only" });
-  const unavailable = GAME.replace("_G.PowerTakeOffExtension = {", "_G.PowerTakeOffExtension = nil\n  local unused = {");
+  const unavailable = GAME.replace("PowerTakeOffExtension = {", "PowerTakeOffExtension = nil,\n    unused = {");
   expect(runCompanionPage(FILE, unavailable, { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "manual-attach-state-unavailable" });
   const brokenCheck = GAME.replace("hasPowerTakeOffs = function(implement, parent) return implement.hasPto end,", "");

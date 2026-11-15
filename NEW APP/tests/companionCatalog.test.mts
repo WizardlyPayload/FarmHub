@@ -53,6 +53,7 @@ test("every Lua page's exact mod aliases are present in its exporter detector", 
     const names = entry.match(/\bnames\s*=\s*\{([\s\S]*?)\}/)?.[1];
     if (id && names) detectors.set(id, new Set([...names.matchAll(/"([^"]+)"/g)].map((match) => match[1])));
   }
+  assert.equal(detectors.size, COMPANION_CATALOG.length, "each exporter detector must expose exact names");
   const folder = new URL("../../FS25_FarmDashboard_Mod/src/companionPages/", import.meta.url);
   for (const file of readdirSync(folder).filter((name) => name.endsWith(".lua"))) {
     const page = readFileSync(new URL(file, folder), "utf8")

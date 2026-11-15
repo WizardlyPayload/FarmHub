@@ -725,7 +725,7 @@ export function LiveStats({
         </Badge>
         {current && current.items != null ? (
           <Badge tone="accent">
-            {tOr("companions.live.vipCurrent", "Current order: {{left}} of {{items}} item(s) left, {{amount}} payout", {
+            {tOr("companions.live.vipCurrent", "Current order: {{left}} of {{items}} item(s) left, {{amount}} potential payout", {
               left: current.remainingItems ?? 0,
               items: current.items,
               amount: formatCurrency(current.payout ?? 0, moneyProfile),

@@ -2553,7 +2553,7 @@
   "companions.live.readUnavailable": "This mod's reading is not available in this save.",
   "companions.live.foodDays": "{{days}} day(s) per period",
   "companions.live.vipEmpty": "No open VIP orders.",
-  "companions.live.vipCurrent": "Current order: {{left}} of {{items}} item(s) left, {{amount}} payout",
+  "companions.live.vipCurrent": "Current order: {{left}} of {{items}} item(s) left, {{amount}} potential payout",
   "companions.live.vipSinglePlayer": "VIP orders are single-player only.",
   "companions.live.temperatureConditional": "(temperature dependent)",
   "companions.live.cropWindows": "Plant periods {{plant}}; harvest periods {{harvest}}",

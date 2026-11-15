@@ -129,6 +129,14 @@ test("distinguishes an initialized empty order list from an unreadable version",
   const page = runCompanionPage(FILE, empty, { farmId: 1 });
   expect(page).toMatchObject({ readState: "empty", reason: "no-current-order" });
   expect(page.rows).toBeUndefined();
+  const shared = runCompanionLua([FILE],
+    empty.replaceAll("KM_65282_VIP_Order_Manager", "FS25_VIPOrderManager"), `
+      local _, payload = CompanionModsDataCollector:collectStep({})
+      return __fdEncode(payload.vipOrders)
+    `, { farmId: 1 });
+  expect(shared).toMatchObject({ readState: "empty", orderCount: 0, farmId: 1 });
+  expect(shared).not.toHaveProperty("reason");
+  expect(shared).not.toHaveProperty("currentOrder");
 });
 
 test("invalid current progress withholds item totals", () => {

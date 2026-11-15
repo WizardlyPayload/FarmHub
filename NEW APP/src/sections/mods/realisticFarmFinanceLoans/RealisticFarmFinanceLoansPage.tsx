@@ -17,6 +17,20 @@ type Loan = {
   legacyImported?: boolean;
 };
 
+type Facility = {
+  farmId?: number;
+  id?: number;
+  kind?: "REVOLVING" | "OVERDRAFT";
+  creditLimit?: number;
+  used?: number;
+  available?: number;
+  overLimit?: number;
+  arrears?: number;
+  interestRate?: number;
+  remainingMonths?: number;
+  suspended?: boolean;
+};
+
 type AssetAgreement = {
   farmId?: number;
   id?: number;
@@ -55,11 +69,13 @@ export function Page({ entry }: CompanionPageProps) {
   const { page, farmData, farmId } = useCompanionPage(entry.key);
   const money = useMoney();
   const rows = asList<Loan>(page?.rows).filter((row) => num(row.farmId) === farmId);
+  const facilityRows = asList<Facility>(page?.facilityRows).filter((row) => num(row.farmId) === farmId);
   const assetRows = asList<AssetAgreement>(page?.assetRows).filter((row) => num(row.farmId) === farmId);
   const tenancyRows = asList<Tenancy>(page?.tenancyRows).filter((row) => num(row.farmId) === farmId);
   const tiles: ModStatTile[] = farmData ? [
     { key: "loans", label: tOr("companionPage.realisticFarmFinanceLoans.loans", "Active loans shown"), value: formatNumber(farmData.loanCount, 0) },
     { key: "arrears", label: tOr("companionPage.realisticFarmFinanceLoans.arrearsCount", "Loans in arrears"), value: formatNumber(farmData.arrearsCount, 0) },
+    { key: "facilities", label: tOr("companionPage.realisticFarmFinanceLoans.facilities", "Active credit facilities"), value: formatNumber(farmData.facilityCount, 0) },
     { key: "other", label: tOr("companionPage.realisticFarmFinanceLoans.other", "Other loan products omitted"), value: formatNumber(farmData.otherProductCount, 0) },
     ...(farmData.assetRegisterAvailable === true ? [
       { key: "assets", label: tOr("companionPage.realisticFarmFinanceLoans.assets", "Active asset agreements shown"), value: formatNumber(farmData.assetFinanceCount, 0) },
@@ -71,9 +87,9 @@ export function Page({ entry }: CompanionPageProps) {
     ] : []),
   ] : [];
   return (
-    <ModPage entry={entry} lead={tOr("companionPage.realisticFarmFinanceLoans.lead", "Current loans, asset-finance agreements and tenancies recorded by Realistic Farm Finance for this farm. Contract asset names do not prove vehicle ownership; scheduled payments are not payments already made. Revolving credit, overdrafts and insurance need separate readings.")}>
+    <ModPage entry={entry} lead={tOr("companionPage.realisticFarmFinanceLoans.lead", "Current loans, credit facilities, asset-finance agreements and tenancies recorded by Realistic Farm Finance for this farm. Contract asset names do not prove vehicle ownership; scheduled payments are not payments already made. Insurance needs a separate reading.")}>
       <ModStatTiles tiles={tiles} />
-      {rows.length === 0 && assetRows.length === 0 && tenancyRows.length === 0
+      {rows.length === 0 && facilityRows.length === 0 && assetRows.length === 0 && tenancyRows.length === 0
         ? <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.noObligations", "No current supported obligation was captured for this farm.")}</ModEmpty> : null}
       {rows.length > 0 ? (
       <Card title={tOr("companionPage.realisticFarmFinanceLoans.tableTitle", "Farm loan obligations")}>
@@ -100,6 +116,42 @@ export function Page({ entry }: CompanionPageProps) {
           }))}
           empty={tOr("companionPage.realisticFarmFinanceLoans.empty", "No active term, mortgage or bullet loan for this farm.")}
         />
+      </Card>
+      ) : null}
+      {facilityRows.length > 0 ? (
+      <Card title={tOr("companionPage.realisticFarmFinanceLoans.facilityTitle", "Credit facilities") }>
+        <ModTable
+          columns={[
+            { key: "id", label: tOr("companionPage.realisticFarmFinanceLoans.id", "Loan") },
+            { key: "kind", label: tOr("companionPage.realisticFarmFinanceLoans.type", "Product") },
+            { key: "limit", label: tOr("companionPage.realisticFarmFinanceLoans.creditLimit", "Credit limit"), align: "end" },
+            { key: "used", label: tOr("companionPage.realisticFarmFinanceLoans.used", "Currently used"), align: "end" },
+            { key: "available", label: tOr("companionPage.realisticFarmFinanceLoans.available", "Facility headroom"), align: "end" },
+            { key: "arrears", label: tOr("companionPage.realisticFarmFinanceLoans.arrears", "Arrears"), align: "end" },
+            { key: "status", label: tOr("companionPage.realisticFarmFinanceLoans.assetStatus", "Status") },
+          ]}
+          rows={facilityRows.map((row, index) => ({
+            key: String(row.id ?? index),
+            tone: row.suspended || (num(row.overLimit) ?? 0) > 0 || (num(row.arrears) ?? 0) > 0 ? "warn" as const : undefined,
+            cells: {
+              id: formatNumber(row.id, 0),
+              kind: row.kind === "OVERDRAFT"
+                ? tOr("companionPage.realisticFarmFinanceLoans.overdraft", "Overdraft")
+                : tOr("companionPage.realisticFarmFinanceLoans.revolving", "Revolving credit"),
+              limit: money(row.creditLimit),
+              used: money(row.used),
+              available: money(row.available),
+              arrears: money(row.arrears),
+              status: row.suspended
+                ? tOr("companionPage.realisticFarmFinanceLoans.suspended", "Suspended")
+                : (num(row.overLimit) ?? 0) > 0
+                  ? tOr("companionPage.realisticFarmFinanceLoans.overLimit", "Over limit")
+                  : tOr("companionPage.realisticFarmFinanceLoans.active", "Active"),
+            },
+          }))}
+          empty={tOr("companionPage.realisticFarmFinanceLoans.facilityEmpty", "No active credit facility for this farm.")}
+        />
+        <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.facilityNote", "Revolving usage is the mod's drawn balance. Overdraft usage is the current bank-account debit, not loan principal. Headroom is zero while an overdraft is suspended; arrears are separate.")}</ModEmpty>
       </Card>
       ) : null}
       {assetRows.length > 0 ? (

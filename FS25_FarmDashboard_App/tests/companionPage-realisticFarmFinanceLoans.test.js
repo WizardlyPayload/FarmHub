@@ -13,7 +13,7 @@ const GAME = `
       { id = 18, farmId = 1, type = "BULLET", paidOff = false, principal = 10000,
         arrearsBalance = 0, interestRate = 6.0, remainingMonths = 10, paymentsMade = 2 },
       { id = 19, farmId = 1, type = "REVOLVING", paidOff = false, principal = 0,
-        drawnAmount = 8000, arrearsBalance = 0 },
+        creditLimit = 12000, drawnAmount = 8000, arrearsBalance = 0 },
       { id = 20, farmId = 1, type = "TERM", paidOff = true, principal = 0, arrearsBalance = 0 },
       { id = 21, farmId = 2, type = "TERM", paidOff = false, principal = 900000,
         arrearsBalance = 1000 },
@@ -39,10 +39,14 @@ const GAME = `
 test("exports only supported active loans for the selected farm", () => {
   const page = runCompanionPage(FILE, GAME, { farmId: 1 });
   expect(page).toMatchObject({ readState: "ok", coverage: "complete" });
-  expect(page.byFarm["1"]).toMatchObject({ loanCount: 2, arrearsCount: 1, otherProductCount: 1 });
+  expect(page.byFarm["1"]).toMatchObject({ loanCount: 2, arrearsCount: 1, otherProductCount: 0, facilityCount: 1 });
   expect(page.rows.map((row) => row.id)).toEqual([17, 18]);
   expect(page.rows[0]).toMatchObject({ kind: "TERM", principal: 25000.57, arrears: 300.4 });
   expect(page.rows.some((row) => row.farmId === 2 || row.id === 19 || row.id === 20)).toBe(false);
+  expect(page.facilityRows).toEqual([expect.objectContaining({
+    farmId: 1, id: 19, kind: "REVOLVING", creditLimit: 12000, used: 8000,
+    available: 4000, overLimit: 0, arrears: 0, suspended: false,
+  })]);
   expect(page.byFarm["1"]).toMatchObject({ assetFinanceCount: 2, assetArrearsCount: 1, operatingLeaseCount: 1, assetRegisterAvailable: true });
   expect(page.assetRows.map((row) => row.id)).toEqual([31, 32]);
   expect(page.assetRows[0]).toMatchObject({ asset: "MF 8570", principal: 12000.35, monthlyPayment: 250.13, arrears: 10.5 });
@@ -51,8 +55,37 @@ test("exports only supported active loans for the selected farm", () => {
   expect(page.tenancyRows[0]).toMatchObject({ holding: "North Farm", monthlyRent: 425.26, rentDue: 425.25, arrears: 50, nextRentDuePeriod: 22 });
   const merged = normalizeCompanionPages({ pages: { realisticFarmFinanceLoans: page } }, { modules: loadModules() });
   expect(merged.pages.realisticFarmFinanceLoans.rows).toHaveLength(2);
+  expect(merged.pages.realisticFarmFinanceLoans.facilityRows).toHaveLength(1);
   expect(merged.pages.realisticFarmFinanceLoans.assetRows).toHaveLength(2);
   expect(merged.pages.realisticFarmFinanceLoans.tenancyRows).toHaveLength(1);
+});
+
+test("overdraft uses the farm's native bank debit rather than the mod's drawn field", () => {
+  const game = `${GAME}
+    _G.g_farmManager = { getFarmById = function(self, id)
+      if id == 1 then return { money = -3000 } end
+      return { money = -900000 }
+    end }
+    table.insert(_G.g_currentMission.realisticFarmFinance.repository.loans,
+      { id = 22, farmId = 1, type = "OVERDRAFT", paidOff = false,
+        creditLimit = 5000, drawnAmount = 99999, arrearsBalance = 100,
+        overdraftSuspended = false, remainingMonths = 7 })
+  `;
+  const page = runCompanionPage(FILE, game, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "ok", coverage: "complete" });
+  expect(page.byFarm["1"]).toMatchObject({ facilityCount: 2, facilityArrearsCount: 1 });
+  expect(page.facilityRows[1]).toMatchObject({
+    kind: "OVERDRAFT", creditLimit: 5000, used: 3000, available: 2000,
+    overLimit: 0, arrears: 100, remainingMonths: 7,
+  });
+  const suspended = runCompanionPage(FILE, game.replace("overdraftSuspended = false", "overdraftSuspended = true"), { farmId: 1 });
+  expect(suspended.facilityRows[1]).toMatchObject({ suspended: true, used: 3000, available: 0, overLimit: 3000 });
+});
+
+test("unreadable revolving utilisation cannot become unused credit", () => {
+  const page = runCompanionPage(FILE, GAME.replace("drawnAmount = 8000", "drawnAmount = nil"), { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(page.byFarm["1"].facilityCount).toBe(0);
 });
 
 test("withholds an absent asset register instead of reporting zero agreements", () => {

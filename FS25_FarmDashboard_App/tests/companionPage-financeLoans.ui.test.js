@@ -104,3 +104,26 @@ describe("automaticLoanRepay page", () => {
         expect(host.textContent).toContain("2,000 more cash is needed");
     });
 });
+
+describe("realisticFarmFinanceLoans credit facilities", () => {
+    test("shows selected-farm facility utilisation without presenting it as loan principal", () => {
+        const ui = loadCompanionPage("realisticFarmFinanceLoans");
+        const host = ui.renderPage(payload("realisticFarmFinanceLoans", {
+            readState: "ok", coverage: "complete",
+            rows: [], assetRows: [], tenancyRows: [],
+            facilityRows: [
+                { farmId: 1, id: 19, kind: "REVOLVING", creditLimit: 12000, used: 8000, available: 4000, overLimit: 0, arrears: 0 },
+                { farmId: 2, id: 20, kind: "OVERDRAFT", creditLimit: 999999, used: 900000, available: 99999, arrears: 0 },
+            ],
+            byFarm: { "1": { loanCount: 0, arrearsCount: 0, otherProductCount: 0, facilityCount: 1,
+                assetRegisterAvailable: true, assetFinanceCount: 0, assetArrearsCount: 0,
+                tenancyRegisterAvailable: true, tenancyCount: 0, tenancyArrearsCount: 0 } },
+        }, "1.2.0.0"), { farmId: 1 });
+        expect(text(host, '[data-stat="facilities"]')).toContain("1");
+        expect(text(host, '[data-row="19"]')).toContain("8,000");
+        expect(text(host, '[data-row="19"]')).toContain("4,000");
+        expect(host.textContent).toContain("Overdraft usage is the current bank-account debit");
+        expect(host.textContent).not.toContain("999,999");
+        expect(host.textContent).not.toContain("No current supported obligation");
+    });
+});

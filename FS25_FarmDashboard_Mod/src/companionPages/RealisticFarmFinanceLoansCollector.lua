@@ -2,7 +2,7 @@
 -- reads active term, mortgage and bullet loans plus distinct asset-finance
 -- agreements and current tenancies for one farm. It does not equate contract asset names with current
 -- vehicle ownership or a scheduled payment with a payment already made.
--- Revolving/overdraft facilities have different balance semantics and are withheld.
+-- Revolving/overdraft facilities use a limit and current utilisation, not loan principal.
 
 local MAX_SCAN = 300
 local MAX_ROWS = 40
@@ -27,12 +27,52 @@ CompanionPages.register({
         end
 
         local rows, count, arrearsCount, omittedCount = {}, 0, 0, 0
+        local facilityRows, facilityCount, facilityArrearsCount = {}, 0, 0
+        local farmManager = ctx.global("g_farmManager")
+        local farm = type(farmManager) == "table" and ctx.call(farmManager, "getFarmById", farmId) or nil
+        local bankBalance = type(farm) == "table" and ctx.num(farm.money) or nil
         local scanned, invalid, truncated = 0, false, false
         for _, loan in pairs(repo.loans) do
             scanned = scanned + 1
             if scanned > MAX_SCAN then truncated = true; break end
             if type(loan) == "table" and ctx.num(loan.farmId) == farmId and loan.paidOff ~= true then
-                if not SUPPORTED[loan.type] then
+                if loan.type == "REVOLVING" or loan.type == "OVERDRAFT" then
+                    local id = ctx.num(loan.id)
+                    local limit = ctx.num(loan.creditLimit)
+                    local arrears = ctx.num(loan.arrearsBalance)
+                    local used
+                    if loan.type == "REVOLVING" then
+                        used = ctx.num(loan.drawnAmount)
+                    elseif bankBalance ~= nil then
+                        used = math.max(0, -bankBalance)
+                    end
+                    if id == nil or id <= 0 or limit == nil or limit < 0
+                        or arrears == nil or arrears < 0 or used == nil or used < 0 then
+                        invalid = true
+                    else
+                        facilityCount = facilityCount + 1
+                        if arrears > 0 then facilityArrearsCount = facilityArrearsCount + 1 end
+                        if #facilityRows >= MAX_ROWS then
+                            truncated = true
+                        else
+                            local suspended = loan.type == "OVERDRAFT" and loan.overdraftSuspended == true
+                            local effectiveLimit = suspended and 0 or limit
+                            facilityRows[#facilityRows + 1] = {
+                                farmId = farmId,
+                                id = math.floor(id),
+                                kind = loan.type,
+                                creditLimit = ctx.round2(limit),
+                                used = ctx.round2(used),
+                                available = ctx.round2(math.max(0, effectiveLimit - used)),
+                                overLimit = ctx.round2(math.max(0, used - effectiveLimit)),
+                                arrears = ctx.round2(arrears),
+                                interestRate = ctx.num(loan.interestRate),
+                                remainingMonths = loan.type == "OVERDRAFT" and ctx.num(loan.remainingMonths) or nil,
+                                suspended = suspended,
+                            }
+                        end
+                    end
+                elseif not SUPPORTED[loan.type] then
                     omittedCount = omittedCount + 1
                 else
                     local id = ctx.num(loan.id)
@@ -65,6 +105,7 @@ CompanionPages.register({
             end
         end
         table.sort(rows, function(a, b) return a.id < b.id end)
+        table.sort(facilityRows, function(a, b) return a.id < b.id end)
 
         local assetRows, assetCount, assetArrearsCount, assetLeaseCount = {}, 0, 0, 0
         local assetAvailable = type(repo.assetFinance) == "table"
@@ -161,7 +202,7 @@ CompanionPages.register({
             table.sort(tenancyRows, function(a, b) return a.id < b.id end)
         end
         local partial = invalid or assetInvalid or tenancyInvalid or not assetAvailable or not tenancyAvailable
-        local anyRows = count > 0 or assetCount > 0 or tenancyCount > 0
+        local anyRows = count > 0 or facilityCount > 0 or assetCount > 0 or tenancyCount > 0
         return {
             readState = partial and "partial" or (anyRows and "ok" or "settings-only"),
             reason = not anyRows and "no-supported-farm-obligations" or nil,
@@ -170,6 +211,8 @@ CompanionPages.register({
                 loanCount = count,
                 arrearsCount = arrearsCount,
                 otherProductCount = omittedCount,
+                facilityCount = facilityCount,
+                facilityArrearsCount = facilityArrearsCount,
                 assetFinanceCount = assetCount,
                 assetArrearsCount = assetArrearsCount,
                 operatingLeaseCount = assetLeaseCount,
@@ -180,6 +223,7 @@ CompanionPages.register({
                 tenancyRegisterAvailable = tenancyAvailable,
             } },
             rows = rows,
+            facilityRows = facilityRows,
             assetRows = assetRows,
             tenancyRows = tenancyRows,
         }

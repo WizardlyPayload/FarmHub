@@ -64,6 +64,16 @@ test("withholds malformed breakdown entries rather than reporting an active coun
   expect(page.rows[0].breakdownCount).toBeUndefined();
 });
 
+test("withholds a malformed maintenance log instead of implying no completed work", () => {
+  const page = runCompanionPage(FILE, GAME.replace(
+    '{ type = "ads_spec_state_repair", price = 900, isVisible = false, isCompleted = false },',
+    '"bad entry",'), { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(page.byFarm).toBeUndefined();
+  expect(page.rows[0].lastLogType).toBeUndefined();
+  expect(page.rows[0].logCount).toBeUndefined();
+});
+
 test("requires the reviewed version and server vehicle ownership", () => {
   const old = runCompanionPage(FILE, GAME.replace('version = "0.9.2.4"',
     'version = "9.9.9.9"'), { farmId: 1 });

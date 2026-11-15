@@ -85,9 +85,15 @@ CompanionPages.register({
                     local breakdownCount, breakdownLimit, breakdownInvalid = countActiveBreakdowns(spec.activeBreakdowns)
                     local log = type(spec.maintenanceLog) == "table" and spec.maintenanceLog or {}
                     local logCount, logLimit = countBounded(log, MAX_LOG_ENTRIES)
-                    if breakdownLimit or breakdownInvalid or logLimit then incomplete = true end
+                    local logInvalid = not logLimit and logCount ~= #log
+                    if not logLimit and not logInvalid then
+                        for _, entry in ipairs(log) do
+                            if type(entry) ~= "table" then logInvalid = true; break end
+                        end
+                    end
+                    if breakdownLimit or breakdownInvalid or logLimit or logInvalid then incomplete = true end
                     local last = nil
-                    if not logLimit then
+                    if not (logLimit or logInvalid) then
                         for _, entry in ipairs(log) do
                             if visibleCompleted(entry) then last = entry end
                         end
@@ -100,7 +106,7 @@ CompanionPages.register({
                         local safeBreakdownCount = breakdownCount
                         local safeLogCount = logCount
                         if breakdownLimit or breakdownInvalid then safeBreakdownCount = nil end
-                        if logLimit then safeLogCount = nil end
+                        if logLimit or logInvalid then safeLogCount = nil end
                         if service == nil or condition == nil then incomplete = true end
                         rows[#rows + 1] = {
                             farmId = farmId,

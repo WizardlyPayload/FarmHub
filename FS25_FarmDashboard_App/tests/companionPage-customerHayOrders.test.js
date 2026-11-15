@@ -14,7 +14,7 @@ const GAME = `
     getIsServer = function() return true end,
     missionDynamicInfo = { isMultiplayer = false },
   }
-  _G.KM_81634_Custom_Hay_Orders = { CustomerHayOrders = { orders = {
+  _G.KM_81634_Custom_Hay_Orders = { CustomerHayOrders = { nextOrderGameMinute = 600, orders = {
     { customer = "Hill Farm", fillTypeName = "HAY", round = true, wrapped = false,
       pending = false, accepted = true, required = 24, progress = 6, reward = 30000,
       deadline = 21, dropName = "Hill Farm yard", dropX = 412, dropZ = 928 },
@@ -55,6 +55,15 @@ test("unreviewed version, client and shadow global do not expose orders", () => 
   const shadow = GAME.replace("_G.KM_81634_Custom_Hay_Orders = { CustomerHayOrders", "_G.shadow = { CustomerHayOrders");
   expect(runCompanionPage(FILE, shadow, { farmId: 1 }))
     .toMatchObject({ readState: "unavailable", reason: "order-register-unavailable" });
+});
+
+test("pre-load empty register is pending, not a confirmed empty order list", () => {
+  const loadedEmpty = GAME.replace(/orders = \{[\s\S]*?\}, dropoffs = \{\}/, "orders = {}, dropoffs = {}");
+  const preLoad = loadedEmpty.replace("nextOrderGameMinute = 600, ", "");
+  expect(runCompanionPage(FILE, preLoad, { farmId: 1 })).toMatchObject({
+    readState: "pending", reason: "order-register-not-loaded" });
+  expect(runCompanionPage(FILE, loadedEmpty, { farmId: 1 })).toMatchObject({
+    readState: "settings-only", reason: "no-current-orders", coverage: "complete" });
 });
 
 test("malformed order is withheld and coverage is partial", () => {

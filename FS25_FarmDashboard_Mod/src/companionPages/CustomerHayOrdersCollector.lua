@@ -25,6 +25,11 @@ CompanionPages.register({
         if type(mod) ~= "table" or type(mod.orders) ~= "table" then
             return { readState = "unavailable", reason = "order-register-unavailable" }
         end
+        -- The mod creates orders={} before loadMap reads its save. loadMap always
+        -- schedules nextOrderGameMinute, even when no saved locations exist.
+        if ctx.num(mod.nextOrderGameMinute) == nil then
+            return { readState = "pending", reason = "order-register-not-loaded" }
+        end
 
         local rows, pendingCount, acceptedCount = {}, 0, 0
         local invalid, truncated = false, false

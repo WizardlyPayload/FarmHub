@@ -1167,6 +1167,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "advancedDamageSystem",
+        title = "Advanced Damage System",
+        category = "fleet",
+        names = { "FS25_AdvancedDamageSystem", "KM_69590_Advanced_Damage_System" },
+        substrings = { "advanceddamagesystem", "advanced_damage_system" },
+        globals = {},
+    },
+    {
         id = "realFuelConsumption",
         title = "Real Fuel Consumption",
         category = "fleet",

@@ -6840,5 +6840,13 @@
   "companionPage.lumberjackHut.incomplete": "Some owned hut values could not be verified; totals are withheld.",
   "companions.desc.harvestoreConveyor": "Shows material queued in this farm's conveyors, awaiting transfer to a receiving vehicle.",
   "companions.desc.hydraulicBrokenTrailer": "Shows current hydraulic condition on owned tipping trailers, not repair or tipping history.",
-  "companions.desc.parkingBrake": "Detects Parking Brake. Its switch does not prove a machine is parked safely or record work."
+  "companions.desc.parkingBrake": "Detects Parking Brake. Its switch does not prove a machine is parked safely or record work.",
+  "companions.desc.advancedDamageSystem": "Shows service condition, active breakdowns and completed maintenance entries for your farm's machines. Recorded prices are not confirmed payments.",
+  "companionPage.advancedDamageSystem.lead": "Check service condition and breakdowns before using a machine. Maintenance prices are records, not proof of payment.",
+  "companionPage.advancedDamageSystem.tableTitle": "Advanced damage by machine",
+  "companionPage.advancedDamageSystem.breakdowns": "Machines with breakdowns",
+  "companionPage.advancedDamageSystem.logs": "Machines with completed maintenance",
+  "companionPage.advancedDamageSystem.state": "Status",
+  "companionPage.advancedDamageSystem.lastLog": "Latest completed maintenance",
+  "companionPage.advancedDamageSystem.empty": "No owned machine has a captured Advanced Damage System reading yet."
 }

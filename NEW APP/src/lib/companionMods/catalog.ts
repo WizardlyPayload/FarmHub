@@ -1069,6 +1069,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
+    id: "advancedDamageSystem",
+    title: "Advanced Damage System",
+    category: "fleet",
+    descKey: "companions.desc.advancedDamageSystem",
+    desc: "Shows current service condition, active breakdowns and completed maintenance entries for your owned machines. Recorded prices are not confirmed payments.",
+    relatedSection: "vehicles",
+  },
+  {
     id: "realFuelConsumption",
     title: "Real Fuel Consumption",
     category: "fleet",

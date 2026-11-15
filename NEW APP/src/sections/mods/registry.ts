@@ -258,6 +258,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/realDieselStart").then((m) => m.Page) },
   { key: "realisticMechanicalSystems", catalogId: "realisticMechanicalSystems", title: "Realistic Mechanical Systems", glyph: "MS", group: "fleet",
     load: () => import("@/sections/mods/realisticMechanicalSystems").then((m) => m.Page) },
+  { key: "advancedDamageSystem", catalogId: "advancedDamageSystem", title: "Advanced Damage System", glyph: "AD", group: "fleet",
+    load: () => import("@/sections/mods/advancedDamageSystem").then((m) => m.Page) },
   { key: "realFuelConsumption", catalogId: "realFuelConsumption", title: "Real Fuel Consumption", glyph: "FC", group: "fleet",
     load: () => import("@/sections/mods/realFuelConsumption").then((m) => m.Page) },
   { key: "dieselFuelSystem", catalogId: "dieselFuelSystem", title: "Diesel Fuel System", glyph: "DF", group: "fleet",

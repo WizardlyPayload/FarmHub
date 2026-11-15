@@ -6842,5 +6842,13 @@
   ,"companionPage.customerHayOrders.active": "Accepted"
   ,"companionPage.customerHayOrders.empty": "No current customer bale orders were recorded."
   ,"companionPage.customerHayOrders.partial": "Some order details could not be read; the list may be incomplete."
-  ,"companionPage.customerHayOrders.noValid": "No valid order row could be read."
+  ,"companionPage.customerHayOrders.noValid": "No valid order row could be read.",
+  "companions.desc.advancedDamageSystem": "Shows service condition, active breakdowns and completed maintenance entries for your farm's machines. Recorded prices are not confirmed payments.",
+  "companionPage.advancedDamageSystem.lead": "Check service condition and breakdowns before using a machine. Maintenance prices are records, not proof of payment.",
+  "companionPage.advancedDamageSystem.tableTitle": "Advanced damage by machine",
+  "companionPage.advancedDamageSystem.breakdowns": "Machines with breakdowns",
+  "companionPage.advancedDamageSystem.logs": "Machines with completed maintenance",
+  "companionPage.advancedDamageSystem.state": "Status",
+  "companionPage.advancedDamageSystem.lastLog": "Latest completed maintenance",
+  "companionPage.advancedDamageSystem.empty": "No owned machine has a captured Advanced Damage System reading yet."
 }

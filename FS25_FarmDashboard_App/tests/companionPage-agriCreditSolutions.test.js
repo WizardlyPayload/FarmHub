@@ -6,6 +6,9 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "AgriCreditSolutionsCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { KM_81927_AgriCredit_Solutions = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "KM_81927_AgriCredit_Solutions", version = "1.0.0.0" }
+  } end }
   _G.g_currentMission = {
     getFarmId = function() return 1 end,
     getIsServer = function() return true end,
@@ -57,8 +60,24 @@ test("withholds unready, client and absent-mod state", () => {
     .toMatchObject({ readState: "settings-only", reason: "agreement-register-unavailable" });
   expect(runCompanionPage(FILE, GAME.replace("getIsServer = function() return true end", "getIsServer = function() return false end"), { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "server-state-only" });
-  expect(runCompanionPage(FILE, GAME.replace("KM_81927_AgriCredit_Solutions = true", "OtherMod = true"), { farmId: 1 }))
+  expect(runCompanionPage(FILE, GAME.replaceAll("KM_81927_AgriCredit_Solutions", "OtherMod"), { farmId: 1 }))
     .toBeUndefined();
+  expect(runCompanionPage(FILE, GAME.replace('version = "1.0.0.0"', 'version = "9.9.9.9"'), { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
+});
+
+test("withholds totals when the agreement scan is truncated", () => {
+  const crowded = `${GAME}
+    for i = 1, 301 do
+      g_currentMission.agriCreditManager.financeAgreements[#g_currentMission.agriCreditManager.financeAgreements + 1] = {
+        id = "foreign-" .. i, farmId = 2
+      }
+    end
+  `;
+  const page = runCompanionPage(FILE, crowded, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "truncated" });
+  expect(page.byFarm).toBeUndefined();
+  expect(page.reason).toBeUndefined();
 });
 
 test("marks malformed agreement terms partial rather than reporting a payoff", () => {

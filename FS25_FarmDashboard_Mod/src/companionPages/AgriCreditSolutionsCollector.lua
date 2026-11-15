@@ -22,6 +22,9 @@ CompanionPages.register({
         if ctx.call(mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-state-only" }
         end
+        if ctx.version ~= "1.0.0.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local manager = type(mission) == "table" and mission.agriCreditManager or nil
         if type(manager) ~= "table" or manager.financeDataLoaded ~= true
             or type(manager.financeAgreements) ~= "table" then
@@ -105,13 +108,13 @@ CompanionPages.register({
             return tostring(a.building or "") < tostring(b.building or "")
         end)
         return {
-            readState = invalid and "partial" or (linkedCount > 0 and "ok" or "settings-only"),
-            reason = linkedCount == 0 and "no-linked-farm-agreements" or nil,
+            readState = (invalid or truncated) and "partial" or (linkedCount > 0 and "ok" or "settings-only"),
+            reason = linkedCount == 0 and not (invalid or truncated) and "no-linked-farm-agreements" or nil,
             coverage = truncated and "truncated" or invalid and "partial" or "complete",
-            byFarm = { [tostring(farmId)] = {
+            byFarm = not truncated and { [tostring(farmId)] = {
                 linkedCount = linkedCount,
                 unlinkedCount = unlinkedCount,
-            } },
+            } } or nil,
             rows = rows,
         }
     end,

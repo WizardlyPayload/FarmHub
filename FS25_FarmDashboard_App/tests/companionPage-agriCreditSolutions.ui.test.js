@@ -28,3 +28,17 @@ test("shows selected farm building terms without exposing another farm", () => {
   expect(host.textContent).toContain("withheld from this table");
   expect(host.textContent).not.toContain("Other farm barn");
 });
+
+test("a truncated source scan does not display a partial count as the farm total", () => {
+  const host = ui.renderPage({
+    companionMods: { mods: [{ id: KEY, detected: true, version: "1.0.0.0" }] },
+    companionPages: { pages: { [KEY]: {
+      key: KEY, detected: true, readState: "partial", coverage: "truncated",
+      rows: [{ farmId: 1, id: "a", building: "Milking barn",
+        termMonths: 24, paymentsMade: 4, payoffAmount: 71000 }],
+    } } },
+  }, { farmId: 1 });
+  expect(host.textContent).toContain("Milking barn");
+  expect(host.textContent).toContain("Only some agreements or buildings were scanned");
+  expect(host.textContent).not.toContain("Owned buildings financed");
+});

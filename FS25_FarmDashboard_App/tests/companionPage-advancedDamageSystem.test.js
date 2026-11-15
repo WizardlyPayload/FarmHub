@@ -15,7 +15,7 @@ const GAME = `
         spec_AdvancedDamageSystem = {
           serviceLevel = 0.42, conditionLevel = 0.67,
           currentState = "ads_spec_state_broken",
-          activeBreakdowns = { engine = {}, hydraulic = {} },
+          activeBreakdowns = { engine = {}, hydraulic = {}, suspended = { isActive = false } },
           maintenanceLog = {
             { type = "ads_spec_state_inspection", price = 80, isVisible = true, isCompleted = true },
             { type = "ads_spec_state_repair", price = 900, isVisible = false, isCompleted = false },
@@ -51,6 +51,14 @@ test("withholds totals when the breakdown register is too large", () => {
       _G.g_currentMission.vehicleSystem.vehicles[1].spec_AdvancedDamageSystem.activeBreakdowns[i] = {}
     end
   `, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(page.byFarm).toBeUndefined();
+  expect(page.rows[0].breakdownCount).toBeUndefined();
+});
+
+test("withholds malformed breakdown entries rather than reporting an active count", () => {
+  const page = runCompanionPage(FILE, GAME.replace("suspended = { isActive = false }",
+    "suspended = 1"), { farmId: 1 });
   expect(page).toMatchObject({ readState: "partial", coverage: "partial" });
   expect(page.byFarm).toBeUndefined();
   expect(page.rows[0].breakdownCount).toBeUndefined();

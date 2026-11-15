@@ -32,6 +32,27 @@ local function countBounded(value, limit)
     return n, false
 end
 
+local function countActiveBreakdowns(value)
+    if type(value) ~= "table" then return nil, false, true end
+    local active, scanned, invalid = 0, 0, false
+    for _, breakdown in pairs(value) do
+        scanned = scanned + 1
+        if scanned > MAX_BREAKDOWNS then return nil, true, invalid end
+        if type(breakdown) ~= "table" then
+            invalid = true
+        else
+            local flag = breakdown.isActive
+            if type(flag) == "string" then
+                flag = string.lower(flag)
+                if flag == "false" or flag == "0" then flag = false end
+            end
+            if flag ~= false then active = active + 1 end
+        end
+    end
+    if invalid then return nil, false, true end
+    return active, false, false
+end
+
 CompanionPages.register({
     key = "advancedDamageSystem",
     modNames = { "FS25_AdvancedDamageSystem", "KM_69590_Advanced_Damage_System" },
@@ -61,24 +82,24 @@ CompanionPages.register({
                 local spec = vehicle.spec_AdvancedDamageSystem
                 if owner == farmId and type(spec) == "table" and spec.isExcludedVehicle ~= true then
                     captured = captured + 1
-                    local breakdownCount, breakdownLimit = countBounded(spec.activeBreakdowns, MAX_BREAKDOWNS)
+                    local breakdownCount, breakdownLimit, breakdownInvalid = countActiveBreakdowns(spec.activeBreakdowns)
                     local log = type(spec.maintenanceLog) == "table" and spec.maintenanceLog or {}
                     local logCount, logLimit = countBounded(log, MAX_LOG_ENTRIES)
-                    if breakdownLimit or logLimit then incomplete = true end
+                    if breakdownLimit or breakdownInvalid or logLimit then incomplete = true end
                     local last = nil
                     if not logLimit then
                         for _, entry in ipairs(log) do
                             if visibleCompleted(entry) then last = entry end
                         end
                     end
-                    if breakdownCount > 0 then withBreakdowns = withBreakdowns + 1 end
+                    if breakdownCount ~= nil and breakdownCount > 0 then withBreakdowns = withBreakdowns + 1 end
                     if last ~= nil then withLog = withLog + 1 end
                     if #rows < MAX_ROWS then
                         local service = fraction(ctx, spec.serviceLevel)
                         local condition = fraction(ctx, spec.conditionLevel)
                         local safeBreakdownCount = breakdownCount
                         local safeLogCount = logCount
-                        if breakdownLimit then safeBreakdownCount = nil end
+                        if breakdownLimit or breakdownInvalid then safeBreakdownCount = nil end
                         if logLimit then safeLogCount = nil end
                         if service == nil or condition == nil then incomplete = true end
                         rows[#rows + 1] = {

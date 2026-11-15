@@ -597,6 +597,14 @@ export function LiveStats({
         {tasks.slice(0, 3).map((task) => (
           <Badge key={task.id}>{task.detail || task.id}</Badge>
         ))}
+        {tasks.length > 3 ? (
+          <p class="fd-economy__muted">
+            {tOr("companions.live.showingRows", "Showing {{shown}} of {{count}} row(s).", {
+              shown: 3,
+              count: tasks.length,
+            })}
+          </p>
+        ) : null}
         {payload.taskList.coverage === "partial" || payload.taskList.coverage === "truncated" ? (
           <p class="fd-economy__muted">{tOr("companions.live.readPartial", "Some items were not ready to read. The real count may be higher.")}</p>
         ) : null}

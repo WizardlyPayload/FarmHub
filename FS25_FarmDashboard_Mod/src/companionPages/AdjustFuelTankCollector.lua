@@ -12,8 +12,8 @@ local MAX_ROWS = 80
 
 CompanionPages.register({
     key = "adjustFuelTank",
-    modNames = { "KM_80971_adjust-fuel-tank", "FS25_AdjustFuelTank" },
-    substrings = { "adjust-fuel-tank", "adjustfueltank" },
+    modNames = { "KM_80971_adjust_fuel_tank", "KM_80971_adjust-fuel-tank", "FS25_AdjustFuelTank" },
+    substrings = { "adjust_fuel_tank", "adjust-fuel-tank", "adjustfueltank" },
     collect = function(ctx)
         local farmId = ctx.farmId
         if farmId == nil or farmId <= 0 then

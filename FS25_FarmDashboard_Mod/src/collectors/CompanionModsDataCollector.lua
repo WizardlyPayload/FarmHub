@@ -2763,6 +2763,8 @@ local function collectTaskList()
                 if type(sourceGroup) == "table" and tonumber(sourceGroup.farmId) == farmId
                     and type(sourceGroup.tasks) == "table" and type(sourceGroup.tasks[active.id]) == "table"
                     and tonumber(sourceGroup.tasks[active.id].type) == 1
+                    and type(tonumber(sourceGroup.tasks[active.id].period)) == "number"
+                    and type(tonumber(sourceGroup.tasks[active.id].priority)) == "number"
                     and type(sourceGroup.tasks[active.id].detail) == "string"
                     and sourceGroup.tasks[active.id].detail ~= "" then
                     local task = sourceGroup.tasks[active.id]
@@ -2779,6 +2781,13 @@ local function collectTaskList()
             end
         end
     end
+    -- The mod sorts its active-task display by period, then priority.
+    -- A stable ID tie-breaker keeps the three-task preview deterministic.
+    table.sort(tasks, function(left, right)
+        if left.period ~= right.period then return left.period < right.period end
+        if left.priority ~= right.priority then return left.priority < right.priority end
+        return left.id < right.id
+    end)
     return {
         enabled = true,
         source = "taskList",

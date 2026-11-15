@@ -33,10 +33,10 @@ test("owned template tasks resolve from their template while foreign and orphane
         g_currentMission = { taskList = {
             taskGroups = {
                 normal = { farmId = 1, type = 1, tasks = {
-                    n = { type = 1, detail = "Feed cows", priority = 2 },
+                    n = { type = 1, detail = "Feed cows", priority = 2, period = 6 },
                     dynamic = { type = 2, detail = "", priority = 1 },
                 } },
-                template = { farmId = 1, type = 2, tasks = { t = { type = 1, detail = "Check grain dryer", priority = 1 } } },
+                template = { farmId = 1, type = 2, tasks = { t = { type = 1, detail = "Check grain dryer", priority = 1, period = 6 } } },
                 instance = { farmId = 1, type = 3, templateGroupId = "template", tasks = {} },
                 foreign = { farmId = 2, type = 1, tasks = { f = { detail = "PRIVATE" } } },
             },
@@ -55,6 +55,29 @@ test("owned template tasks resolve from their template while foreign and orphane
         return table.concat({result.readState, result.coverage, result.withheldCount, #result.tasks,
             table.concat(details, ",")}, "|")
     `)).toBe("ok|partial|2|2|Check grain dryer,Feed cows");
+});
+
+test("the exported preview order follows the mod's period and priority order", () => {
+    expect(run(`
+        g_currentMission = { taskList = {
+            taskGroups = { group = { farmId = 1, type = 1, tasks = {
+                late = { type = 1, detail = "Late", period = 8, priority = 1 },
+                low = { type = 1, detail = "Low", period = 6, priority = 3 },
+                high = { type = 1, detail = "High", period = 6, priority = 1 },
+                early = { type = 1, detail = "Early", period = 5, priority = 2 },
+            } } },
+            activeTasks = {
+                a = { groupId = "group", id = "late" },
+                b = { groupId = "group", id = "low" },
+                c = { groupId = "group", id = "high" },
+                d = { groupId = "group", id = "early" },
+            },
+        } }
+        local result = collectTaskList()
+        local details = {}
+        for _, task in ipairs(result.tasks) do details[#details + 1] = task.detail end
+        return table.concat(details, ",")
+    `)).toBe("Early,High,Low,Late");
 });
 
 test("unresolved owned template does not become a confirmed empty task list", () => {

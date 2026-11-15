@@ -2761,7 +2761,10 @@ local function collectTaskList()
                     sourceGroup = list.taskGroups[group.templateGroupId]
                 end
                 if type(sourceGroup) == "table" and tonumber(sourceGroup.farmId) == farmId
-                    and type(sourceGroup.tasks) == "table" and type(sourceGroup.tasks[active.id]) == "table" then
+                    and type(sourceGroup.tasks) == "table" and type(sourceGroup.tasks[active.id]) == "table"
+                    and tonumber(sourceGroup.tasks[active.id].type) == 1
+                    and type(sourceGroup.tasks[active.id].detail) == "string"
+                    and sourceGroup.tasks[active.id].detail ~= "" then
                     local task = sourceGroup.tasks[active.id]
                     tasks[#tasks + 1] = {
                         id = clipText(active.id, 40),

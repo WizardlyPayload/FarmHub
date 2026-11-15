@@ -32,8 +32,11 @@ test("owned template tasks resolve from their template while foreign and orphane
     expect(run(`
         g_currentMission = { taskList = {
             taskGroups = {
-                normal = { farmId = 1, type = 1, tasks = { n = { detail = "Feed cows", priority = 2 } } },
-                template = { farmId = 1, type = 2, tasks = { t = { detail = "Check grain dryer", priority = 1 } } },
+                normal = { farmId = 1, type = 1, tasks = {
+                    n = { type = 1, detail = "Feed cows", priority = 2 },
+                    dynamic = { type = 2, detail = "", priority = 1 },
+                } },
+                template = { farmId = 1, type = 2, tasks = { t = { type = 1, detail = "Check grain dryer", priority = 1 } } },
                 instance = { farmId = 1, type = 3, templateGroupId = "template", tasks = {} },
                 foreign = { farmId = 2, type = 1, tasks = { f = { detail = "PRIVATE" } } },
             },
@@ -42,6 +45,7 @@ test("owned template tasks resolve from their template while foreign and orphane
                 b = { groupId = "instance", id = "t" },
                 c = { groupId = "foreign", id = "f" },
                 d = { groupId = "normal", id = "missing" },
+                e = { groupId = "normal", id = "dynamic" },
             },
         } }
         local result = collectTaskList()
@@ -50,7 +54,7 @@ test("owned template tasks resolve from their template while foreign and orphane
         table.sort(details)
         return table.concat({result.readState, result.coverage, result.withheldCount, #result.tasks,
             table.concat(details, ",")}, "|")
-    `)).toBe("ok|partial|1|2|Check grain dryer,Feed cows");
+    `)).toBe("ok|partial|2|2|Check grain dryer,Feed cows");
 });
 
 test("unresolved owned template does not become a confirmed empty task list", () => {
@@ -58,7 +62,7 @@ test("unresolved owned template does not become a confirmed empty task list", ()
         g_currentMission = { taskList = {
             taskGroups = {
                 instance = { farmId = 1, type = 3, templateGroupId = "foreign", tasks = {} },
-                foreign = { farmId = 2, type = 2, tasks = { t = { detail = "PRIVATE" } } },
+                foreign = { farmId = 2, type = 2, tasks = { t = { type = 1, detail = "PRIVATE" } } },
             },
             activeTasks = { a = { groupId = "instance", id = "t" } },
         } }

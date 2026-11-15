@@ -46,6 +46,14 @@ test("reads one single-player farm's saved staff and unpaid wages without changi
   expect(merged.pages.whiteysFarmStaff.rows).toHaveLength(2);
 });
 
+test("detects the later 5_2_4 archive name with the same live roster schema", () => {
+  const laterArchive = GAME.replace("FS25_WhiteysFarmStaff_5_2_3", "FS25_WhiteysFarmStaff_5_2_4");
+  const page = runCompanionPage(FILE, laterArchive, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "ok", coverage: "complete",
+    byFarm: { "1": { employeeCount: 2, unpaidWages: 225 } } });
+  expect(page.rows.map((row) => row.name)).toEqual(["Emily", "Oliver"]);
+});
+
 test("withholds multiplayer and mismatched export farm", () => {
   const multiplayer = GAME.replace("isMultiplayer = false", "isMultiplayer = true");
   expect(runCompanionPage(FILE, multiplayer, { farmId: 1 }))

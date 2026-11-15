@@ -368,6 +368,9 @@ export function fieldLeasingPageView(page: unknown, live: unknown, farmId: unkno
     if (!isRecord(live) || live.enabled !== true) return leaseView("unavailable");
     if (live.reason === "no-farm") return leaseView("needs-farm");
     if (live.readState === "failed") return leaseView("failed");
+    if (live.readState === "partial" || live.coverage === "truncated" || live.coverage === "partial") {
+      return leaseView("partial");
+    }
     if (live.readState !== "ok" && live.readState !== "empty") return leaseView("unavailable");
     if (live.farmId !== selected) return leaseView("unavailable");
     if (live.coverage !== "complete") return leaseView("partial");

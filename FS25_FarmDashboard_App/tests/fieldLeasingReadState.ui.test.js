@@ -91,6 +91,7 @@ describe("field leasing read state", () => {
         const partial = ui.renderPage(payload({ ...ready, coverage: "truncated" }));
         expect(partial.textContent).not.toContain("This farm has no leased farmland.");
         const livePartial = ui.renderPage(payload(ready, { ...live("partial"), coverage: "partial" }));
+        expect(livePartial.textContent).toContain("The lease reading is incomplete.");
         expect(livePartial.textContent).not.toContain("This farm has no leased farmland.");
     });
 });

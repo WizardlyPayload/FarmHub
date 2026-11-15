@@ -60,11 +60,13 @@ test("both byte-identical vault ZIP names expose the same current order", () => 
         if mod.id == "vipOrderManager" then found = true; count = count + 1 end
       end
       return __fdEncode({ found = found, count = count,
-        state = payload.vipOrders and payload.vipOrders.readState })
+        state = payload.vipOrders and payload.vipOrders.readState,
+        openCount = payload.vipOrders and payload.vipOrders.orderCount })
     `, { farmId: 1 });
     expect(detected.found).toBe(true);
     expect(detected.count).toBe(1);
     expect(detected.state).toBe("ok");
+    expect(detected.openCount).toBe(1);
   }
 });
 

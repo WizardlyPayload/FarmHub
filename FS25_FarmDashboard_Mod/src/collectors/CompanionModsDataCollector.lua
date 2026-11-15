@@ -3216,7 +3216,8 @@ local function collectVipOrders()
         source = "vipOrderManager",
         readState = truncated and "partial" or count == 0 and "empty" or "ok",
         farmId = farmId,
-        orderCount = count,
+        -- Only VIPOrders[1] is active; later rows are future orders.
+        orderCount = first ~= nil and 1 or 0,
         maxOrders = tonumber(vip.maxVIPOrdersCount),
         animalOrders = vip.isAnimalOrdersWished == true,
         currentOrder = current,

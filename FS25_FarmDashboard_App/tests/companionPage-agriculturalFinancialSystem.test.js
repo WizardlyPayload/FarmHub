@@ -47,6 +47,8 @@ test("does not expose another farm, an unloaded book, or a client-side copy", ()
     .toMatchObject({ readState: "settings-only", reason: "finance-book-unavailable" });
   expect(runCompanionPage(FILE, GAME.replace("getIsServer = function() return true end", "getIsServer = function() return false end"), { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "server-book-only" });
+  expect(runCompanionPage(FILE, GAME.replace('KM_80824_agricultural-financial-system', 'OtherMod'), { farmId: 1 }))
+    .toBeUndefined();
 });
 
 test("invalid farm entry withholds totals rather than presenting a complete obligation balance", () => {

@@ -3166,8 +3166,9 @@ local function collectVipOrders()
     end
     local current = nil
     local first = vip.VIPOrders[1]
-    if count > 0 and (type(first) ~= "table" or type(first.entries) ~= "table"
-        or tonumber(first.level) == nil) then
+    local firstLevel = type(first) == "table" and tonumber(first.level) or nil
+    if count > 0 and (type(first) ~= "table" or type(first.entries) ~= "table" or firstLevel == nil
+        or firstLevel < 0 or firstLevel > 1000000 or firstLevel ~= math.floor(firstLevel)) then
         return { enabled = true, readState = "partial", source = "vipOrderManager",
             farmId = farmId, reason = "invalid-current-order" }
     end
@@ -3176,33 +3177,44 @@ local function collectVipOrders()
         local remainingItems = 0
         local payout = 0
         local itemsTruncated = false
-        for _, entry in pairs(first.entries) do
+        local itemsInvalid = false
+        for key, entry in pairs(first.entries) do
             if items >= 24 then
                 itemsTruncated = true
                 break
             end
-            if type(entry) == "table" then
-                items = items + 1
-                local quantity = tonumber(entry.quantity)
-                local filled = tonumber(entry.fillLevel) or 0
-                if quantity ~= nil and quantity - math.ceil(filled) > 0 then
-                    remainingItems = remainingItems + 1
-                end
-                payout = payout + (tonumber(entry.payout) or 0)
+            items = items + 1
+            local quantity = type(entry) == "table" and tonumber(entry.quantity) or nil
+            local filled = type(entry) == "table" and tonumber(entry.fillLevel) or nil
+            local itemPayout = type(entry) == "table" and tonumber(entry.payout) or nil
+            if type(key) ~= "string" or type(entry) ~= "table"
+                or type(entry.fillTypeName) ~= "string" or key ~= entry.fillTypeName
+                or quantity == nil or quantity ~= quantity or quantity <= 0 or quantity > 1000000000
+                or filled == nil or filled ~= filled or filled < 0 or filled > quantity
+                or itemPayout == nil or itemPayout ~= itemPayout or itemPayout < 0 or itemPayout > 1000000000000 then
+                itemsInvalid = true
+            else
+                if quantity - math.ceil(filled) > 0 then remainingItems = remainingItems + 1 end
+                payout = payout + itemPayout
             end
         end
+        if items == 0 or itemsInvalid or itemsTruncated then
+            return { enabled = true, readState = "partial", source = "vipOrderManager",
+                farmId = farmId, reason = itemsTruncated and "order-items-truncated" or "invalid-current-order",
+                coverage = itemsTruncated and "truncated" or "partial" }
+        end
         current = {
-            level = tonumber(first.level),
+            level = firstLevel,
             items = items,
             remainingItems = remainingItems,
             payout = payout,
-            coverage = itemsTruncated and "truncated" or "complete",
+            coverage = "complete",
         }
     end
     return {
         enabled = true,
         source = "vipOrderManager",
-        readState = count == 0 and "empty" or "ok",
+        readState = truncated and "partial" or count == 0 and "empty" or "ok",
         farmId = farmId,
         orderCount = count,
         maxOrders = tonumber(vip.maxVIPOrdersCount),

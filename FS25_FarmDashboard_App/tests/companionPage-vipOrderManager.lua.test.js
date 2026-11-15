@@ -85,6 +85,18 @@ test("shared VIP summary withholds unready, unreviewed, and other-farm orders", 
   `, 2)).toMatchObject({ readState: "unavailable", reason: "local-farm-mismatch" });
   expect(sharedState(GAME.replace('level = 3, entries = {', 'entries = {')))
     .toMatchObject({ readState: "partial", reason: "invalid-current-order" });
+  const malformed = sharedState(GAME.replace('fillLevel = 2500', 'fillLevel = 11000'));
+  expect(malformed).toMatchObject({ readState: "partial", reason: "invalid-current-order" });
+  expect(malformed.currentOrder).toBeUndefined();
+  const tooMany = sharedState(GAME + `
+    for i = 1, 25 do
+      local key = "EXTRA" .. i
+      _G.KM_65282_VIP_Order_Manager.VIPOrderManager.VIPOrders[1].entries[key] =
+        { fillTypeName = key, quantity = 10, fillLevel = 0, payout = 1 }
+    end
+  `);
+  expect(tooMany).toMatchObject({ readState: "partial", coverage: "truncated" });
+  expect(tooMany.currentOrder).toBeUndefined();
 });
 
 test("withholds unreviewed, multiplayer and mismatched farm readings", () => {

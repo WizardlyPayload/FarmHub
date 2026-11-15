@@ -31,3 +31,26 @@ test("shows current local order progress and potential payout with distinct unit
   expect(host.textContent).toContain("not earned income");
   expect(host.textContent).not.toContain("Foreign private order");
 });
+
+test("does not claim an empty order when the reading is unavailable", () => {
+  const host = ui.renderPage({
+    companionMods: { mods: [{ id: KEY, detected: true, version: "1.2.2.0" }] },
+    companionPages: { pages: { [KEY]: {
+      key: KEY, detected: true, readState: "unavailable", reason: "unreviewed-version",
+    } } },
+  }, { farmId: 1 });
+  expect(host.textContent).toContain("Waiting for data");
+  expect(host.textContent).not.toContain("No current VIP order was recorded");
+  expect(host.textContent).not.toContain("Current VIP order items");
+});
+
+test("shows no current order only for a confirmed empty reading", () => {
+  const host = ui.renderPage({
+    companionMods: { mods: [{ id: KEY, detected: true, version: "1.2.2.0" }] },
+    companionPages: { pages: { [KEY]: {
+      key: KEY, detected: true, readState: "empty", reason: "no-current-order", rows: [],
+    } } },
+  }, { farmId: 1 });
+  expect(host.textContent).toContain("No current VIP order was recorded");
+  expect(host.textContent).not.toContain("Waiting for data");
+});

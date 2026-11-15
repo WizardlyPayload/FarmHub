@@ -3124,7 +3124,7 @@ local function collectVipOrders()
         return { enabled = true, readState = "unavailable", source = "vipOrderManager", reason = "single-player-only" }
     end
     local reviewedName = nil
-    for _, name in ipairs({ "KM_65282_VIP_Order_Manager", "FS25_310861_VIP_Order_Manager" }) do
+    for _, name in ipairs({ "KM_65282_VIP_Order_Manager", "FS25_310861_VIP_Order_Manager", "FS25_VIPOrderManager" }) do
         if modEntry(name) ~= nil then reviewedName = name; break end
     end
     if reviewedName == nil or modVersion(reviewedName) ~= "1.2.2.0" then

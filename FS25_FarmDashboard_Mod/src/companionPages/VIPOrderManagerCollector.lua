@@ -28,7 +28,7 @@ end
 
 CompanionPages.register({
     key = "vipOrderManager",
-    modNames = { "KM_65282_VIP_Order_Manager", "FS25_310861_VIP_Order_Manager" },
+    modNames = { "KM_65282_VIP_Order_Manager", "FS25_310861_VIP_Order_Manager", "FS25_VIPOrderManager" },
     substrings = {},
     collect = function(ctx)
         if ctx.version ~= "1.2.2.0" then
@@ -54,7 +54,7 @@ CompanionPages.register({
         end
         local current = manager.VIPOrders[1]
         if current == nil then
-            return { readState = "settings-only", reason = "no-current-order" }
+            return { readState = "empty", reason = "no-current-order" }
         end
         if type(current) ~= "table" or type(current.entries) ~= "table" then
             return { readState = "partial", reason = "invalid-current-order" }

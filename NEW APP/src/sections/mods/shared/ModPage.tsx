@@ -69,6 +69,9 @@ export function readingState(page: CompanionPageData | null, mod: CompanionModRo
       return "partial";
     case "failed":
       return "failed";
+    case "pending":
+    case "unavailable":
+      return "waiting";
     case "settings-only":
     case "detection-only":
       return "limited";

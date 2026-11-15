@@ -48,8 +48,8 @@ test("reads only the current local order without calling mutating hooks", () => 
     { modules: loadModules() }).pages.vipOrderManager.rows).toHaveLength(2);
 });
 
-test("both byte-identical vault ZIP names expose the same current order", () => {
-  for (const modName of ["KM_65282_VIP_Order_Manager", "FS25_310861_VIP_Order_Manager"]) {
+test("reviewed vault and runtime ZIP names expose the same current order", () => {
+  for (const modName of ["KM_65282_VIP_Order_Manager", "FS25_310861_VIP_Order_Manager", "FS25_VIPOrderManager"]) {
     const setup = GAME.replaceAll("KM_65282_VIP_Order_Manager", modName);
     const page = runCompanionPage(FILE, setup, { farmId: 1 });
     expect(page).toMatchObject({ readState: "ok", byFarm: { "1": { itemCount: 2 } } });
@@ -122,6 +122,13 @@ test("waits for loaded mod and requires the combined single-player host", () => 
   expect(runCompanionPage(FILE, GAME.replace('getIsClient = function() return true',
     'getIsClient = function() return false'), { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "single-player-world-not-ready" });
+});
+
+test("distinguishes an initialized empty order list from an unreadable version", () => {
+  const empty = GAME.replace('VIPOrders = {', 'VIPOrders = {}, unusedOrderFixture = {');
+  const page = runCompanionPage(FILE, empty, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "empty", reason: "no-current-order" });
+  expect(page.rows).toBeUndefined();
 });
 
 test("invalid current progress withholds item totals", () => {

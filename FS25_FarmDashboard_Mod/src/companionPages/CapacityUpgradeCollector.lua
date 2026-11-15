@@ -66,8 +66,12 @@ CompanionPages.register({
                                     if scanned > MAX_UNITS then truncated = true; break end
                                     local unit = type(index) == "number" and index == math.floor(index)
                                         and index >= 1 and index <= MAX_UNITS and fillUnits[index] or nil
-                                    local original = effect == "physical" and positive(ctx, value)
-                                        or unit ~= nil and positive(ctx, unit.defaultCapacity) or nil
+                                    local original
+                                    if effect == "physical" then
+                                        original = positive(ctx, value)
+                                    elseif unit ~= nil then
+                                        original = positive(ctx, unit.defaultCapacity)
+                                    end
                                     local observed = unit ~= nil and (positive(ctx,
                                         ctx.call(vehicle, "getFillUnitCapacity", index))
                                         or positive(ctx, unit.capacity)) or nil

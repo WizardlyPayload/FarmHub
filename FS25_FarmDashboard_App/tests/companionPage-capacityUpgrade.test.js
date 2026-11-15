@@ -61,6 +61,17 @@ test("does not credit a partial tank increase to the selected multiplier", () =>
   expect(page.byFarm["1"].capacityUnitCount).toBeUndefined();
 });
 
+test("does not substitute default capacity for a malformed mod stock capacity", () => {
+  const changed = GAME.replace("stockCapacity = { [1] = 8000 }",
+    'stockCapacity = { [1] = "unknown" }');
+  const page = runCompanionPage(FILE, changed, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(page.rows).not.toEqual(expect.arrayContaining([
+    expect.objectContaining({ vehicleId: "own-trailer", effect: "capacity" }),
+  ]));
+  expect(page.byFarm["1"].capacityUnitCount).toBeUndefined();
+});
+
 test("does not infer an upgrade from a bad configuration, client or unreviewed version", () => {
   const wrongKey = GAME.replace(/cuCapacity = /g, "capacityUpgrade = ");
   expect(runCompanionPage(FILE, wrongKey, { farmId: 1 }))

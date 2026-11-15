@@ -77,6 +77,16 @@ type InsuranceClaim = {
   paidAmount?: number;
 };
 
+type Application = {
+  farmId?: number;
+  id?: number;
+  product?: string;
+  status?: string;
+  requestedAmount?: number;
+  offeredAmount?: number;
+  offerHoursLeft?: number;
+};
+
 function loanType(row: Loan): string {
   if (row.legacyImported) return tOr("companionPage.realisticFarmFinanceLoans.legacy", "Legacy farm loan");
   switch (row.kind) {
@@ -94,6 +104,7 @@ export function Page({ entry }: CompanionPageProps) {
   const facilityRows = asList<Facility>(page?.facilityRows).filter((row) => num(row.farmId) === farmId);
   const assetRows = asList<AssetAgreement>(page?.assetRows).filter((row) => num(row.farmId) === farmId);
   const tenancyRows = asList<Tenancy>(page?.tenancyRows).filter((row) => num(row.farmId) === farmId);
+  const applicationRows = asList<Application>(page?.applicationRows).filter((row) => num(row.farmId) === farmId);
   const insurancePolicyRows = asList<InsurancePolicy>(page?.insurancePolicyRows).filter((row) => num(row.farmId) === farmId);
   const insuranceClaimRows = asList<InsuranceClaim>(page?.insuranceClaimRows).filter((row) => num(row.farmId) === farmId);
   const tiles: ModStatTile[] = farmData ? [
@@ -109,6 +120,10 @@ export function Page({ entry }: CompanionPageProps) {
       { key: "tenancies", label: tOr("companionPage.realisticFarmFinanceLoans.tenancies", "Current tenancies shown"), value: formatNumber(farmData.tenancyCount, 0) },
       { key: "tenancyArrears", label: tOr("companionPage.realisticFarmFinanceLoans.tenancyArrearsCount", "Tenancies in arrears"), value: formatNumber(farmData.tenancyArrearsCount, 0) },
     ] : []),
+    ...(farmData.applicationRegisterAvailable === true ? [
+      { key: "applications", label: tOr("companionPage.realisticFarmFinanceLoans.applications", "Open applications"), value: formatNumber(farmData.applicationCount, 0) },
+      { key: "offers", label: tOr("companionPage.realisticFarmFinanceLoans.offers", "Offers awaiting a decision"), value: formatNumber(farmData.applicationOfferCount, 0) },
+    ] : []),
     ...(farmData.insurancePolicyRegisterAvailable === true ? [
       { key: "insurancePolicies", label: tOr("companionPage.realisticFarmFinanceLoans.insurancePolicies", "Vehicle policies recorded"), value: formatNumber(farmData.insurancePolicyCount, 0) },
       { key: "premiumsDue", label: tOr("companionPage.realisticFarmFinanceLoans.premiumsDue", "Policies with premium due"), value: formatNumber(farmData.insurancePremiumDueCount, 0) },
@@ -118,10 +133,10 @@ export function Page({ entry }: CompanionPageProps) {
     ] : []),
   ] : [];
   return (
-    <ModPage entry={entry} lead={tOr("companionPage.realisticFarmFinanceLoans.lead", "Current finance obligations, vehicle policies and claims recorded by Realistic Farm Finance for this farm. Contract and policy names do not prove current vehicle ownership. Claimed or approved insurance is not money already paid.")}>
+    <ModPage entry={entry} lead={tOr("companionPage.realisticFarmFinanceLoans.lead", "Current finance obligations, applications, vehicle policies and claims recorded by Realistic Farm Finance for this farm. Contract and policy names do not prove current vehicle ownership. An offer or approved claim is not money already paid.")}>
       <ModStatTiles tiles={tiles} />
       {rows.length === 0 && facilityRows.length === 0 && assetRows.length === 0 && tenancyRows.length === 0
-          && insurancePolicyRows.length === 0 && insuranceClaimRows.length === 0
+          && applicationRows.length === 0 && insurancePolicyRows.length === 0 && insuranceClaimRows.length === 0
         ? <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.noObligations", "No supported farm finance record was captured for this farm.")}</ModEmpty> : null}
       {rows.length > 0 ? (
       <Card title={tOr("companionPage.realisticFarmFinanceLoans.tableTitle", "Farm loan obligations")}>
@@ -252,6 +267,31 @@ export function Page({ entry }: CompanionPageProps) {
         />
         <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.tenancyNote", "Monthly rent is the contract rate; rent due and arrears are separate recorded balances. A tenancy does not make the farm the legal landowner.")}</ModEmpty>
       </Card>
+      ) : null}
+      {applicationRows.length > 0 ? (
+        <Card title={tOr("companionPage.realisticFarmFinanceLoans.applicationTitle", "Loan applications and offers")}>
+          <ModTable
+            columns={[
+              { key: "id", label: tOr("companionPage.realisticFarmFinanceLoans.applicationId", "Application") },
+              { key: "product", label: tOr("companionPage.realisticFarmFinanceLoans.applicationProduct", "Product") },
+              { key: "status", label: tOr("companionPage.realisticFarmFinanceLoans.applicationStatus", "Status") },
+              { key: "requested", label: tOr("companionPage.realisticFarmFinanceLoans.requested", "Requested"), align: "end" },
+              { key: "offered", label: tOr("companionPage.realisticFarmFinanceLoans.offered", "Offered"), align: "end" },
+              { key: "expiry", label: tOr("companionPage.realisticFarmFinanceLoans.offerHours", "Offer time left (h)"), align: "end" },
+            ]}
+            rows={applicationRows.map((row, index) => ({
+              key: `application-${row.id ?? index}`,
+              tone: row.status === "OFFERED" ? "warn" as const : undefined,
+              cells: {
+                id: formatNumber(row.id, 0), product: row.product || "—",
+                status: row.status || "—", requested: money(row.requestedAmount),
+                offered: row.status === "OFFERED" ? money(row.offeredAmount) : "—",
+                expiry: row.status === "OFFERED" ? formatNumber(row.offerHoursLeft, 0) : "—",
+              },
+            }))}
+          />
+          <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.applicationNote", "An offer is a proposal awaiting a decision, not a paid advance. Offer time is shown only when the game's clock is readable.")}</ModEmpty>
+        </Card>
       ) : null}
       {insurancePolicyRows.length > 0 ? (
         <Card title={tOr("companionPage.realisticFarmFinanceLoans.insurancePolicyTitle", "Vehicle insurance policies")}>

@@ -160,3 +160,30 @@ describe("realisticFarmFinanceLoans insurance", () => {
         expect(host.textContent).not.toContain("No supported farm finance record");
     });
 });
+
+describe("realisticFarmFinanceLoans applications", () => {
+    test("shows a live offer separately from current debt and hides another farm's application", () => {
+        const ui = loadCompanionPage("realisticFarmFinanceLoans");
+        const host = ui.renderPage(payload("realisticFarmFinanceLoans", {
+            readState: "ok", coverage: "complete",
+            rows: [], facilityRows: [], assetRows: [], tenancyRows: [], insurancePolicyRows: [], insuranceClaimRows: [],
+            applicationRows: [
+                { farmId: 1, id: 71, product: "TERM", status: "OFFERED", requestedAmount: 12000, offeredAmount: 10000, offerHoursLeft: 4 },
+                { farmId: 2, id: 73, product: "TERM", status: "OFFERED", requestedAmount: 900000, offeredAmount: 900000, offerHoursLeft: 1 },
+            ],
+            byFarm: { "1": { loanCount: 0, arrearsCount: 0, otherProductCount: 0, facilityCount: 0,
+                assetRegisterAvailable: true, assetFinanceCount: 0, assetArrearsCount: 0,
+                tenancyRegisterAvailable: true, tenancyCount: 0, tenancyArrearsCount: 0,
+                applicationRegisterAvailable: true, applicationCount: 1, applicationOfferCount: 1,
+                insurancePolicyRegisterAvailable: true, insurancePolicyCount: 0, insurancePremiumDueCount: 0,
+                insuranceClaimRegisterAvailable: true, insuranceClaimCount: 0 } },
+        }, "1.2.0.0"), { farmId: 1 });
+        expect(text(host, '[data-stat="applications"]')).toContain("1");
+        expect(text(host, '[data-stat="offers"]')).toContain("1");
+        expect(text(host, '[data-row="application-71"]')).toContain("12,000");
+        expect(text(host, '[data-row="application-71"]')).toContain("10,000");
+        expect(text(host, '[data-row="application-71"]')).toContain("4");
+        expect(host.textContent).not.toContain("900,000");
+        expect(host.textContent).toContain("not a paid advance");
+    });
+});

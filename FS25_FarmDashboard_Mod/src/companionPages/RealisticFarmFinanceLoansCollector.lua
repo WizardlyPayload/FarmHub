@@ -10,6 +10,11 @@ local SUPPORTED = { TERM = true, MORTGAGE = true, BULLET = true }
 local ASSET_PRODUCTS = { HIRE_PURCHASE = true, OPERATING_LEASE = true }
 local ASSET_STATES = { ACTIVE = true, RETURN_DUE = true }
 local TENANCY_STATES = { ACTIVE = true, NOTICE_SERVED = true, RENEWAL_OFFERED = true, EXPIRING = true }
+local APPLICATION_STATES = {
+    SUBMITTED = true, INITIAL_REVIEW = true, VALUATION_INSTRUCTED = true,
+    VALUATION_RETURNED = true, UNDERWRITING = true, FINAL_REVIEW = true,
+    OFFERED = true,
+}
 
 CompanionPages.register({
     key = "realisticFarmFinanceLoans",
@@ -201,6 +206,49 @@ CompanionPages.register({
             end
             table.sort(tenancyRows, function(a, b) return a.id < b.id end)
         end
+        local applicationRows, applicationCount, applicationOfferCount = {}, 0, 0
+        local applicationAvailable = type(repo.applications) == "table"
+        local applicationInvalid, applicationTruncated = false, false
+        local env = type(ctx.mission) == "table" and ctx.mission.environment or nil
+        local day = type(env) == "table" and ctx.num(env.currentMonotonicDay) or nil
+        local hour = type(env) == "table" and ctx.num(env.currentHour) or nil
+        local nowHour = day ~= nil and hour ~= nil
+            and math.floor(day) * 24 + math.max(0, math.min(23, math.floor(hour))) or nil
+        if applicationAvailable then
+            local applicationScanned = 0
+            for _, application in pairs(repo.applications) do
+                applicationScanned = applicationScanned + 1
+                if applicationScanned > MAX_SCAN then applicationTruncated = true; break end
+                if type(application) == "table" and ctx.num(application.farmId) == farmId
+                    and APPLICATION_STATES[application.status] then
+                    local id = ctx.num(application.id)
+                    local requested = ctx.num(application.requestedAmount)
+                    local offered = ctx.num(application.offeredAmount)
+                    local expiry = ctx.num(application.offerExpiryHour)
+                    if id == nil or id <= 0 or requested == nil or requested < 0
+                        or (application.status == "OFFERED" and (offered == nil or offered < 0)) then
+                        applicationInvalid = true
+                    else
+                        applicationCount = applicationCount + 1
+                        if application.status == "OFFERED" then applicationOfferCount = applicationOfferCount + 1 end
+                        if #applicationRows >= MAX_ROWS then applicationTruncated = true
+                        else
+                            applicationRows[#applicationRows + 1] = {
+                                farmId = farmId, id = math.floor(id),
+                                product = ctx.clip(application.product, 40),
+                                status = application.status,
+                                requestedAmount = ctx.round2(requested),
+                                offeredAmount = application.status == "OFFERED" and ctx.round2(offered) or nil,
+                                offerHoursLeft = application.status == "OFFERED"
+                                    and expiry ~= nil and expiry > 0 and nowHour ~= nil
+                                    and math.max(0, math.floor(expiry - nowHour)) or nil,
+                            }
+                        end
+                    end
+                end
+            end
+            table.sort(applicationRows, function(a, b) return a.id > b.id end)
+        end
         local policyRows, policyCount, policyDueCount = {}, 0, 0
         local claimRows, claimCount = {}, 0
         local policyAvailable = type(repo.vehicleInsurancePolicies) == "table"
@@ -269,14 +317,16 @@ CompanionPages.register({
             end
             table.sort(claimRows, function(a, b) return a.id > b.id end)
         end
-        local partial = invalid or assetInvalid or tenancyInvalid or insuranceInvalid
-            or not assetAvailable or not tenancyAvailable or not policyAvailable or not claimAvailable
+        local partial = invalid or assetInvalid or tenancyInvalid or applicationInvalid or insuranceInvalid
+            or not assetAvailable or not tenancyAvailable or not applicationAvailable
+            or not policyAvailable or not claimAvailable
         local anyRows = count > 0 or facilityCount > 0 or assetCount > 0 or tenancyCount > 0
+            or applicationCount > 0
             or policyCount > 0 or claimCount > 0
         return {
             readState = partial and "partial" or (anyRows and "ok" or "settings-only"),
             reason = not anyRows and "no-supported-farm-obligations" or nil,
-            coverage = (truncated or assetTruncated or tenancyTruncated or insuranceTruncated)
+            coverage = (truncated or assetTruncated or tenancyTruncated or applicationTruncated or insuranceTruncated)
                 and "truncated" or partial and "partial" or "complete",
             byFarm = { [tostring(farmId)] = {
                 loanCount = count,
@@ -292,6 +342,9 @@ CompanionPages.register({
                 tenancyCount = tenancyCount,
                 tenancyArrearsCount = tenancyArrearsCount,
                 tenancyRegisterAvailable = tenancyAvailable,
+                applicationCount = applicationCount,
+                applicationOfferCount = applicationOfferCount,
+                applicationRegisterAvailable = applicationAvailable,
                 insurancePolicyCount = policyCount,
                 insurancePremiumDueCount = policyDueCount,
                 insuranceClaimCount = claimCount,
@@ -302,6 +355,7 @@ CompanionPages.register({
             facilityRows = facilityRows,
             assetRows = assetRows,
             tenancyRows = tenancyRows,
+            applicationRows = applicationRows,
             insurancePolicyRows = policyRows,
             insuranceClaimRows = claimRows,
         }

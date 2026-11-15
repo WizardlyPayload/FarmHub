@@ -633,7 +633,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Mowing Contracts Plus",
     category: "contracts",
     descKey: "companions.desc.mowingContractsPlus",
-    desc: "Shows saved grass-access offer decisions for this farm's assigned mowing contracts in single-player. A reward reduction is not a recorded payout.",
+    desc: "Adds a grass-access choice to mowing contracts. The game shows that choice in contract details and at the offer prompt; Farm Dashboard shows normal contract progress.",
     relatedSection: "economy",
   },
   {

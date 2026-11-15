@@ -155,8 +155,6 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
           ? tOr("companionPage.cropInsurance.serverOnly", "Insurance policies can be read only from the game's server state.")
         : key === "cropInsurance" && page?.reason === "no-policy-register"
           ? tOr("companionPage.cropInsurance.registerUnavailable", "The insurance policy register is unavailable in this game session.")
-        : key === "mowingContractsPlus" && page?.reason === "no-assigned-offer"
-          ? tOr("companionPage.mowingContractsPlus.empty", "No saved grass-access offer for a mowing contract assigned to this farm.")
         : key === "moistureSystem" && page?.readState === "settings-only" && hasMoistureMapCropReading(page)
           ? tOr(
               "companionPage.moistureSystem.noticeMapCropLimited",

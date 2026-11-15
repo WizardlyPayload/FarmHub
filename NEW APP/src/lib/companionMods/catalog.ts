@@ -1794,7 +1794,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Towing Chain With Hook",
     category: "fleet",
     descKey: "companions.desc.towingChainHook",
-    desc: "Shows current towing-chain links between vehicles owned by this farm. It does not measure towing work or recovery income.",
+    desc: "Detected. This mod adds no separate towing-work or recovery record for the dashboard.",
     relatedSection: "vehicles",
   },
   {

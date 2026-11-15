@@ -55,7 +55,7 @@ test.each([
     ["FS25_366544_Grape_And_Olive_Yield_Settings", "grapeOliveYieldSettings"],
     ["KM_83605_Real_Power_Train", "realPowertrain"],
     ["FS25_318102_Towing_Chain_With_Hook", "towingChainHook"],
-])("%s has a detector for its dedicated page", (modName, expectedId) => {
+])("%s has its expected detector ID", (modName, expectedId) => {
     const L = lauxlib.luaL_newstate();
     lualib.luaL_openlibs(L);
     const chunk = [

@@ -116,6 +116,16 @@ function loanType(row: Loan): string {
   }
 }
 
+function financePeriodLabel(value: unknown): string {
+  const absolutePeriod = num(value);
+  if (absolutePeriod === null || !Number.isInteger(absolutePeriod) || absolutePeriod < 1) return "—";
+  const year = Math.floor((absolutePeriod - 1) / 12);
+  const period = ((absolutePeriod - 1) % 12) + 1;
+  return tOr("companionPage.cropContracts.period", "Y{{year}} / P{{period}}", {
+    year: formatNumber(year, 0), period: formatNumber(period, 0),
+  });
+}
+
 export function Page({ entry }: CompanionPageProps) {
   const { page, farmData, farmId } = useCompanionPage(entry.key);
   const money = useMoney();
@@ -286,7 +296,7 @@ export function Page({ entry }: CompanionPageProps) {
               monthly: money(row.monthlyRent),
               due: money(row.rentDue),
               arrears: money(row.arrears),
-              period: formatNumber(row.nextRentDuePeriod, 0),
+              period: financePeriodLabel(row.nextRentDuePeriod),
             },
           }))}
           empty={farmData?.tenancyRegisterAvailable === true
@@ -337,7 +347,7 @@ export function Page({ entry }: CompanionPageProps) {
               tone: (num(row.premiumDue) ?? 0) > 0 || row.status !== "ACTIVE" ? "warn" as const : undefined,
               cells: {
                 vehicle: row.vehicle || "—", cover: row.cover || "—", status: row.status || "—",
-                end: formatNumber(row.endPeriod, 0), due: money(row.premiumDue),
+                end: financePeriodLabel(row.endPeriod), due: money(row.premiumDue),
                 renew: row.autoRenew ? tOr("companionPage.realisticFarmFinanceLoans.yes", "Yes") : tOr("companionPage.realisticFarmFinanceLoans.no", "No"),
               },
             }))}

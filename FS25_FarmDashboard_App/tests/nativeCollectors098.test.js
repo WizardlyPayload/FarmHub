@@ -145,6 +145,26 @@ const COMPANION_FLAT_FILES = ["collectors/CompanionModsDataCollector.lua"];
 const CROP_FILES = ["collectors/rf/RfCropStressDataCollector.lua"];
 const DAIRY_FILES = ["collectors/rf/RfDairyDataCollector.lua"];
 const RED_TAPE_FILES = ["collectors/RedTapeDataCollector.lua"];
+const RF_PRESENCE_FILES = ["collectors/rf/RfPresenceDataCollector.lua"];
+
+describe("RF presence uses the native loaded-mod metadata API", () => {
+    test("shows the loaded mod version but does not list an installed unchecked mod", () => {
+        const engine = `
+g_modIsLoaded.FS25_SoilFertilizer = true
+g_modManager = { getModByName = function(self, name)
+    if name == "FS25_SoilFertilizer" then return { version = "2.6.0.3" } end
+    if name == "FS25_TaxMod" then return { version = "1.2.0.0" } end
+end }
+`;
+        const body = `
+local mods = RfPresenceDataCollector:collect().mods
+local soil, tax = mods[1], mods[4]
+return table.concat({ tostring(soil.detected), tostring(soil.version),
+    tostring(tax.detected), tostring(tax.version) }, "|")
+`;
+        expect(run({ files: RF_PRESENCE_FILES, engine, body })).toBe("true|2.6.0.3|false|nil");
+    });
+});
 
 const slotBale = `
 BALE = { uniqueId = "b1", nodeId = 101, fillType = 3, fillLevel = 4000, ownerFarmId = 1, className = "Bale" }

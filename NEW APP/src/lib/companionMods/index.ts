@@ -188,7 +188,7 @@ export type CompanionModsPayload = {
     enabled?: boolean;
     readState?: string;
     coverage?: string;
-    tasks?: Array<{ id?: string; detail?: string; priority?: number | null }>;
+    tasks?: Array<{ id?: string; detail?: string; groupName?: string | null; priority?: number | null; effort?: number | null; recurMode?: number | null }>;
   };
   productionSchedule?: {
     enabled?: boolean;

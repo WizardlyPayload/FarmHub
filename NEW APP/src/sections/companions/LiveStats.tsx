@@ -595,7 +595,19 @@ export function LiveStats({
     return (
       <div class="fd-economy__env">
         {tasks.slice(0, 3).map((task) => (
-          <Badge key={task.id}>{task.detail || task.id}</Badge>
+          <div class="fd-companions__task" key={task.id}>
+            <Badge>{task.detail || task.id}</Badge>
+            <div class="fd-companions__task-meta">
+              {task.groupName ? <span>{task.groupName}</span> : null}
+              {task.recurMode === 2 ? <span>{tOr("companions.live.taskDaily", "Daily")}</span> : null}
+              {typeof task.priority === "number" && Number.isFinite(task.priority) ? (
+                <span>{tOr("companions.live.taskPriority", "Priority {{count}}", { count: task.priority })}</span>
+              ) : null}
+              {typeof task.effort === "number" && Number.isFinite(task.effort) ? (
+                <span>{tOr("companions.live.taskEffort", "Effort {{count}}", { count: task.effort })}</span>
+              ) : null}
+            </div>
+          </div>
         ))}
         {tasks.length > 3 ? (
           <p class="fd-economy__muted">

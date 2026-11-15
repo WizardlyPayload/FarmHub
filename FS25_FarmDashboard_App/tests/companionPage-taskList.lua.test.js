@@ -57,6 +57,29 @@ test("owned template tasks resolve from their template while foreign and orphane
     `)).toBe("ok|partial|2|2|Check grain dryer,Feed cows");
 });
 
+test("an owned active task carries its group and recurrence without leaking foreign metadata", () => {
+    expect(run(`
+        g_currentMission = { taskList = {
+            taskGroups = {
+                owned = { farmId = 1, type = 1, name = "V116 Farm Tasks", tasks = {
+                    check = { type = 1, detail = "Check water trough", priority = 1, period = 1, effort = 1, recurMode = 2 },
+                } },
+                foreign = { farmId = 2, type = 1, name = "Other farm", tasks = {
+                    hidden = { type = 1, detail = "PRIVATE", priority = 1, period = 1, effort = 1, recurMode = 2 },
+                } },
+            },
+            activeTasks = {
+                a = { groupId = "owned", id = "check" },
+                b = { groupId = "foreign", id = "hidden" },
+            },
+        } }
+        local result = collectTaskList()
+        local task = result.tasks[1]
+        return table.concat({result.readState, #result.tasks, task.detail, task.groupName,
+            task.recurMode, task.priority, task.effort}, "|")
+    `)).toBe("ok|1|Check water trough|V116 Farm Tasks|2|1|1");
+});
+
 test("the exported preview order follows the mod's period and priority order", () => {
     expect(run(`
         g_currentMission = { taskList = {

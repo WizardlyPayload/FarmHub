@@ -341,7 +341,7 @@ const COMPANION = obj({
   productionWatcher: obj({ ...READ, productionPointCount: int, countSource: text, alertsReadable: bool }),
   outOfFuel: obj({ enabled: bool }), soilWorkYieldBonus: obj({ enabled: bool }), dynamicMarket: obj({ enabled: bool }),
   saveUnitProfiles: obj({ ...READ, moneyUnit: opt(int), moneyUnitName: opt(text), profileName: opt(text), hasApplied: bool, lastApplyOk: bool }),
-  taskList: obj({ ...READ, tasks: list(obj({ id: text, detail: text, priority: opt(num) }), 256) }),
+  taskList: obj({ ...READ, tasks: list(obj({ id: text, detail: text, groupName: opt(text), priority: opt(num), effort: opt(num), recurMode: opt(num) }), 256) }),
   productionSchedule: obj({ ...READ, recipes: list(obj({ pointKey: text, recipeId: text, status: opt(text) }), 256) }),
   animalFoodCalculator: obj({ ...READ, mode: opt(text), foodScale: opt(num), waterScale: opt(num),
     strawScale: opt(num), daysPerPeriod: opt(num), scalingEnabled: bool }),

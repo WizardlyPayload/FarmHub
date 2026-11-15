@@ -2776,11 +2776,17 @@ local function collectTaskList()
                     and type(sourceGroup.tasks[active.id].detail) == "string"
                     and sourceGroup.tasks[active.id].detail ~= "" then
                     local task = sourceGroup.tasks[active.id]
+                    local recurMode = tonumber(task.recurMode)
+                    if recurMode == nil or recurMode % 1 ~= 0 or recurMode < 0 or recurMode > 4 then
+                        recurMode = nil
+                    end
                     tasks[#tasks + 1] = {
                         id = clipText(active.id, 40),
+                        groupName = type(group.name) == "string" and group.name ~= "" and clipText(group.name, 60) or nil,
                         priority = tonumber(task.priority),
                         period = tonumber(task.period),
                         effort = tonumber(task.effort),
+                        recurMode = recurMode,
                         detail = clipText(task.detail, 120),
                     }
                 else

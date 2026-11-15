@@ -69,7 +69,7 @@ This is not a pass for all 65 catalog entries or all gameplay combinations. Posi
 | britishFillUnits | unmapped | economy | A | A: hooks/samples only; no page |
 | bushelPlus | unmapped | vehicles | A | A: no combine attached; gameplay unproved |
 | seasonalWoolProduction | limited | pastures | A | A: schedule matched; no sheep |
-| taskList | limited | economy | B2 | B2: empty task list; UI/game event unproved |
+| taskList | limited | economy | B2 | B2: empty list only; later source fix resolves same-farm template instances and marks unreadable task labels partial, with nonempty game/export/installed parity still unproved |
 | productionSchedule | limited | productions | B2 | B2: empty recipes; Productions card matched empty state |
 | economicHistory | limited | economy | B2 | C4: stable paused game balance and four months matched generation 10 export and installed Economy card; moving balances are not an error proof |
 | animalPlanner | limited | pastures | B2 | B2: pen counts matched prior game/export and Pastures card |

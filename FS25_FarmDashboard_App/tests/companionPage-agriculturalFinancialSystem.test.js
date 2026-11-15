@@ -59,3 +59,20 @@ test("invalid farm entry withholds totals rather than presenting a complete obli
   expect(page.byFarm["1"]).not.toHaveProperty("receivableBalance");
   expect(page.rows).toHaveLength(1);
 });
+
+test("scan cap cannot turn an unread farm ledger into a claim of no records", () => {
+  const crowdedBook = `${GAME}
+    g_currentMission.gnFinanzas.ledger.entries = {}
+    for i = 1, 301 do
+      g_currentMission.gnFinanzas.ledger.entries[i] = {
+        id = "other-" .. i, farmId = 2, kind = 1, status = 1,
+        amount = 10, balance = 10
+      }
+    end
+  `;
+  const page = runCompanionPage(FILE, crowdedBook, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "truncated" });
+  expect(page).not.toHaveProperty("reason", "no-farm-finance-records");
+  expect(page.byFarm["1"]).not.toHaveProperty("payableBalance");
+  expect(page.byFarm["1"]).not.toHaveProperty("receivableBalance");
+});

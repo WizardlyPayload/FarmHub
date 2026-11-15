@@ -78,8 +78,8 @@ CompanionPages.register({
         local coverage = truncated and "truncated" or invalid and "partial" or "complete"
         local hasData = count > 0 or bankBalance > 0
         return {
-            readState = invalid and "partial" or (hasData and "ok" or "settings-only"),
-            reason = not hasData and "no-farm-finance-records" or nil,
+            readState = (invalid or truncated) and "partial" or (hasData and "ok" or "settings-only"),
+            reason = not hasData and coverage == "complete" and "no-farm-finance-records" or nil,
             coverage = coverage,
             byFarm = { [tostring(farmId)] = {
                 bankBalance = bankBalance, entryCount = count, overdueCount = overdue,

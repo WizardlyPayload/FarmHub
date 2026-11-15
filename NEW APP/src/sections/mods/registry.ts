@@ -89,6 +89,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/grassContracts").then((m) => m.Page) },
   { key: "autoSellSilo", catalogId: "autoSellSilo", title: "Auto Sell Silo", glyph: "AS", group: "finance",
     load: () => import("@/sections/mods/autoSellSilo").then((m) => m.Page) },
+  { key: "customerHayOrders", catalogId: "customerHayOrders", title: "Customer Hay Orders", glyph: "CH", group: "finance",
+    load: () => import("@/sections/mods/customerHayOrders").then((m) => m.Page) },
   { key: "baleDirect", catalogId: "baleDirect", title: "Bale Direct", glyph: "BD", group: "finance",
     load: () => import("@/sections/mods/baleDirect").then((m) => m.Page) },
   { key: "autoSwitchCoop", catalogId: "autoSwitchCoop", title: "AutoSwitch co-operative payments", glyph: "AC", group: "finance",

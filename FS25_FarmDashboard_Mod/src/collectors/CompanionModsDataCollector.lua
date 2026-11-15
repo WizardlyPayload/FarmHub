@@ -1462,6 +1462,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "customerHayOrders",
+        title = "Customer Hay Orders",
+        category = "finance",
+        names = { "KM_81634_Custom_Hay_Orders" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "veterinarian",
         title = "Veterinarian and Animal Diseases",
         category = "livestock",

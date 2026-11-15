@@ -741,6 +741,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "customerHayOrders",
+    title: "Customer Hay Orders",
+    category: "economy",
+    descKey: "companions.desc.customerHayOrders",
+    desc: "Shows pending offers and accepted bale orders with delivery progress and deadlines in single-player. Offered rewards are not income received.",
+    relatedSection: "economy",
+  },
+  {
     id: "baleDirect",
     title: "Bale Direct",
     category: "economy",

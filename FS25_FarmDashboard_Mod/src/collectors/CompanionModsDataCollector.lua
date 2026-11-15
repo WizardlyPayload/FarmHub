@@ -297,14 +297,6 @@ local CATALOG = {
         globals = { "ContractorHarvesting" },
     },
     {
-        id = "vipOrderManager",
-        title = "VIP Order Manager",
-        category = "economy",
-        names = { "KM_65282_VIP_Order_Manager" },
-        substrings = {},
-        globals = { "VIPOrderManager" },
-    },
-    {
         id = "factoryContracts",
         title = "GN Realism - Factory Contracts",
         category = "economy",
@@ -1634,7 +1626,7 @@ local CATALOG = {
         id = "vipOrderManager",
         title = "VIP Order Manager",
         category = "economy",
-        names = { "FS25_VIPOrderManager", "FS25_310861_VIP_Order_Manager" },
+        names = { "KM_65282_VIP_Order_Manager", "FS25_310861_VIP_Order_Manager", "FS25_VIPOrderManager" },
         substrings = { "vipordermanager", "vip_order" },
         globals = { "VIPOrderManager" },
     },
@@ -2178,7 +2170,7 @@ local SCHEDULE_MODS = { "FS25_ProductionSchedule", "FS25_352788_Production_Sched
 local HISTORY_MODS = { "FS25_EconomicHistory", "FS25_367175_Economic_History" }
 local FOOD_MODS = { "FS25_AnimalFoodCalculator", "FS25_338159_Animal_Food_Calculator" }
 local PLANNER_MODS = { "FS25_AnimalPlanner", "FS25_368672_Animal_Planner" }
-local VIP_MODS = { "FS25_VIPOrderManager", "FS25_310861_VIP_Order_Manager" }
+local VIP_MODS = { "KM_65282_VIP_Order_Manager", "FS25_310861_VIP_Order_Manager", "FS25_VIPOrderManager" }
 local MILK_MODS = { "FS25_SeasonalMilkProduction", "FS25_365513_Seasonal_Milk_Production" }
 local YIELD_MODS = { "FS25_YieldTracker", "FS25_326441_Yield_Tracker" }
 local LEASE_MODS = { "FS25_FieldLeasing", "FS25_338381_Field_Leasing" }

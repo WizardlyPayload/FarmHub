@@ -28,7 +28,7 @@ end
 
 CompanionPages.register({
     key = "vipOrderManager",
-    modNames = { "KM_65282_VIP_Order_Manager" },
+    modNames = { "KM_65282_VIP_Order_Manager", "FS25_310861_VIP_Order_Manager" },
     substrings = {},
     collect = function(ctx)
         if ctx.version ~= "1.2.2.0" then

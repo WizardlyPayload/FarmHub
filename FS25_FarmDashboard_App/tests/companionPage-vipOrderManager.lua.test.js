@@ -1,6 +1,6 @@
 "use strict";
 
-const { runCompanionPage } = require("./helpers/companion-page-lua.cjs");
+const { runCompanionPage, runCompanionLua } = require("./helpers/companion-page-lua.cjs");
 const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge.cjs");
 
 const FILE = "VIPOrderManagerCollector.lua";
@@ -46,6 +46,26 @@ test("reads only the current local order without calling mutating hooks", () => 
   expect(JSON.stringify(page)).not.toContain("SECRET");
   expect(normalizeCompanionPages({ pages: { vipOrderManager: page } },
     { modules: loadModules() }).pages.vipOrderManager.rows).toHaveLength(2);
+});
+
+test("both byte-identical vault ZIP names expose the same current order", () => {
+  for (const modName of ["KM_65282_VIP_Order_Manager", "FS25_310861_VIP_Order_Manager"]) {
+    const setup = GAME.replaceAll("KM_65282_VIP_Order_Manager", modName);
+    const page = runCompanionPage(FILE, setup, { farmId: 1 });
+    expect(page).toMatchObject({ readState: "ok", byFarm: { "1": { itemCount: 2 } } });
+    const detected = runCompanionLua([FILE], setup, `
+      local _, payload = CompanionModsDataCollector:collectStep({})
+      local found, count = false, 0
+      for _, mod in ipairs(payload.mods or {}) do
+        if mod.id == "vipOrderManager" then found = true; count = count + 1 end
+      end
+      return __fdEncode({ found = found, count = count,
+        state = payload.vipOrders and payload.vipOrders.readState })
+    `, { farmId: 1 });
+    expect(detected.found).toBe(true);
+    expect(detected.count).toBe(1);
+    expect(detected.state).toBe("ok");
+  }
 });
 
 test("withholds unreviewed, multiplayer and mismatched farm readings", () => {

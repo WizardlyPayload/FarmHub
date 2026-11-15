@@ -14,9 +14,9 @@ test("keeps selected and observed capacity separate for the selected farm", () =
       key: KEY, detected: true, readState: "ok", coverage: "complete",
       byFarm: { "1": { selectedVehicleCount: 1, matchingFillUnitCount: 1 } },
       rows: [
-        { farmId: 1, vehicleId: "own", vehicle: "Farm tractor", kind: "Diesel",
-          selectedPercent: 125, originalCapacityLitres: 400,
-          expectedCapacityLitres: 500, currentCapacityLitres: 500,
+        { farmId: 1, vehicleId: "own", vehicle: "REX 4-070 GT", kind: "Diesel",
+          selectedPercent: 150, originalCapacityLitres: 80,
+          expectedCapacityLitres: 120, currentCapacityLitres: 120,
           capacityMatchesSelection: true },
         { farmId: 2, vehicleId: "foreign", vehicle: "Other farm tractor", kind: "Diesel",
           selectedPercent: 500, originalCapacityLitres: 400,
@@ -24,10 +24,10 @@ test("keeps selected and observed capacity separate for the selected farm", () =
       ],
     } } },
   }, { farmId: 1 });
-  expect(host.textContent).toContain("Farm tractor");
-  expect(host.textContent).toContain("125%");
-  expect(host.textContent).toContain("400 L");
-  expect(host.textContent).toContain("500 L");
+  expect(host.textContent).toContain("REX 4-070 GT");
+  expect(host.textContent).toContain("150%");
+  expect(host.textContent).toContain("80 L");
+  expect(host.textContent).toContain("120 L");
   expect(host.textContent).toContain("Capacity matches");
   expect(host.textContent).not.toContain("Other farm tractor");
 });

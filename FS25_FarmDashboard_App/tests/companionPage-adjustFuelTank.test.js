@@ -54,6 +54,35 @@ test("reports a capacity mismatch without claiming the selected effect applied",
   expect(page.byFarm["1"].matchingFillUnitCount).toBe(1);
 });
 
+test("reads the V122 shop choice as 150 percent of an owned 80 L Diesel tank", () => {
+  const game = `
+    _G.g_modIsLoaded = { ["KM_80971_adjust_fuel_tank"] = true }
+    _G.g_modManager = { getActiveMods = function() return {
+      { modName = "KM_80971_adjust_fuel_tank", version = "2.1.0.23" }
+    } end }
+    _G.FillType = { DIESEL = 7 }
+    _G.g_currentMission = { getIsServer = function() return true end,
+      vehicleSystem = { vehicles = {
+        { ownerFarmId = 1, uniqueId = "v122-landini", getFullName = function() return "REX 4-070 GT" end,
+          configurations = { adjustFuelTank = 5 },
+          spec_fillUnit = { fillUnits = {
+            { supportedFillTypes = { [7] = true }, _adjustFuelTankOriginalCapacity = 80, capacity = 120 }
+          } } },
+        { ownerFarmId = 2, uniqueId = "other-farm", configurations = { adjustFuelTank = 5 } },
+      } } }
+  `;
+  const page = runCompanionPage(FILE, game, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "ok", coverage: "complete",
+    byFarm: { "1": { selectedVehicleCount: 1, matchingFillUnitCount: 1 } } });
+  expect(page.rows).toEqual([expect.objectContaining({
+    vehicleId: "v122-landini", vehicle: "REX 4-070 GT", kind: "Diesel",
+    selectedPercent: 150, originalCapacityLitres: 80,
+    expectedCapacityLitres: 120, currentCapacityLitres: 120,
+    capacityMatchesSelection: true,
+  })]);
+  expect(JSON.stringify(page)).not.toContain("other-farm");
+});
+
 test("client, invalid choice and missing mod do not produce tank claims", () => {
   const client = GAME.replace("getIsServer = function() return true end",
     "getIsServer = function() return false end");

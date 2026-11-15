@@ -146,12 +146,17 @@ describe("realisticFarmFinanceLoans insurance", () => {
                 { farmId: 1, id: 81, animal: "Daisy", animalType: "COW", reason: "ILLNESS", periodsLeft: 1 },
                 { farmId: 2, id: 82, animal: "Other farm", reason: "UNKNOWN", periodsLeft: 1 },
             ],
+            eligibleVeterinaryExpenseRows: [
+                { farmId: 1, id: 91, animal: "Daisy", diseases: "Mastitis", treatmentCost: 250.13, periodsLeft: 2 },
+                { farmId: 2, id: 92, animal: "Other farm", diseases: "Unknown", treatmentCost: 900000, periodsLeft: 1 },
+            ],
             byFarm: { "1": { loanCount: 0, arrearsCount: 0, otherProductCount: 0, facilityCount: 0,
                 assetRegisterAvailable: true, assetFinanceCount: 0, assetArrearsCount: 0,
                 tenancyRegisterAvailable: true, tenancyCount: 0, tenancyArrearsCount: 0,
                 insurancePolicyRegisterAvailable: true, insurancePolicyCount: 1, insurancePremiumDueCount: 1,
                 insuranceClaimRegisterAvailable: true, insuranceClaimCount: 1,
-                animalLossRegisterComplete: true, openAnimalLossCount: 1 } },
+                animalLossRegisterComplete: true, openAnimalLossCount: 1,
+                veterinaryExpenseRegisterComplete: true, eligibleVeterinaryExpenseCount: 1 } },
         }, "1.2.0.0"), { farmId: 1 });
         expect(text(host, '[data-stat="insurancePolicies"]')).toContain("1");
         expect(text(host, '[data-stat="insuranceClaims"]')).toContain("1");
@@ -167,6 +172,10 @@ describe("realisticFarmFinanceLoans insurance", () => {
         expect(text(host, '[data-row="loss-81"]')).toContain("1");
         expect(host.textContent).not.toContain("Other farm");
         expect(host.textContent).toContain("does not guarantee approval or payment");
+        expect(text(host, '[data-stat="veterinaryExpenses"]')).toContain("1");
+        expect(text(host, '[data-row="vet-91"]')).toContain("Mastitis");
+        expect(text(host, '[data-row="vet-91"]')).toContain("250");
+        expect(host.textContent).toContain("not an approved or paid claim");
         expect(host.textContent).not.toContain("No supported farm finance record");
     });
 });

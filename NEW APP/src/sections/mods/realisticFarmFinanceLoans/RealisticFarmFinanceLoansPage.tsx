@@ -96,6 +96,16 @@ type OpenAnimalLoss = {
   periodsLeft?: number;
 };
 
+type VeterinaryExpense = {
+  farmId?: number;
+  id?: number;
+  animal?: string;
+  animalType?: string;
+  diseases?: string;
+  treatmentCost?: number;
+  periodsLeft?: number;
+};
+
 function loanType(row: Loan): string {
   if (row.legacyImported) return tOr("companionPage.realisticFarmFinanceLoans.legacy", "Legacy farm loan");
   switch (row.kind) {
@@ -117,6 +127,7 @@ export function Page({ entry }: CompanionPageProps) {
   const insurancePolicyRows = asList<InsurancePolicy>(page?.insurancePolicyRows).filter((row) => num(row.farmId) === farmId);
   const insuranceClaimRows = asList<InsuranceClaim>(page?.insuranceClaimRows).filter((row) => num(row.farmId) === farmId);
   const openAnimalLossRows = asList<OpenAnimalLoss>(page?.openAnimalLossRows).filter((row) => num(row.farmId) === farmId);
+  const veterinaryExpenseRows = asList<VeterinaryExpense>(page?.eligibleVeterinaryExpenseRows).filter((row) => num(row.farmId) === farmId);
   const tiles: ModStatTile[] = farmData ? [
     { key: "loans", label: tOr("companionPage.realisticFarmFinanceLoans.loans", "Active loans shown"), value: formatNumber(farmData.loanCount, 0) },
     { key: "arrears", label: tOr("companionPage.realisticFarmFinanceLoans.arrearsCount", "Loans in arrears"), value: formatNumber(farmData.arrearsCount, 0) },
@@ -144,13 +155,16 @@ export function Page({ entry }: CompanionPageProps) {
     ...(farmData.animalLossRegisterComplete === true ? [
       { key: "openAnimalLosses", label: tOr("companionPage.realisticFarmFinanceLoans.openAnimalLosses", "Animal loss reports still within filing window"), value: formatNumber(farmData.openAnimalLossCount, 0) },
     ] : []),
+    ...(farmData.veterinaryExpenseRegisterComplete === true ? [
+      { key: "veterinaryExpenses", label: tOr("companionPage.realisticFarmFinanceLoans.veterinaryExpenses", "Veterinary expenses the mod accepts for filing"), value: formatNumber(farmData.eligibleVeterinaryExpenseCount, 0) },
+    ] : []),
   ] : [];
   return (
     <ModPage entry={entry} lead={tOr("companionPage.realisticFarmFinanceLoans.lead", "Current finance obligations, applications, vehicle policies and claims recorded by Realistic Farm Finance for this farm. Contract and policy names do not prove current vehicle ownership. An offer or approved claim is not money already paid.")}>
       <ModStatTiles tiles={tiles} />
       {rows.length === 0 && facilityRows.length === 0 && assetRows.length === 0 && tenancyRows.length === 0
           && applicationRows.length === 0 && insurancePolicyRows.length === 0 && insuranceClaimRows.length === 0
-          && openAnimalLossRows.length === 0
+          && openAnimalLossRows.length === 0 && veterinaryExpenseRows.length === 0
         ? <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.noObligations", "No supported farm finance record was captured for this farm.")}</ModEmpty> : null}
       {rows.length > 0 ? (
       <Card title={tOr("companionPage.realisticFarmFinanceLoans.tableTitle", "Farm loan obligations")}>
@@ -373,6 +387,29 @@ export function Page({ entry }: CompanionPageProps) {
             }))}
           />
           <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.lossNote", "These losses are recorded and have not been submitted as claims. Check the mod's claim form and policy terms before the filing window closes; a report does not guarantee approval or payment.")}</ModEmpty>
+        </Card>
+      ) : null}
+      {veterinaryExpenseRows.length > 0 ? (
+        <Card title={tOr("companionPage.realisticFarmFinanceLoans.veterinaryTitle", "Veterinary expense filing windows")}>
+          <ModTable
+            columns={[
+              { key: "id", label: tOr("companionPage.realisticFarmFinanceLoans.veterinaryId", "Expense") },
+              { key: "animal", label: tOr("companionPage.realisticFarmFinanceLoans.lossAnimal", "Animal") },
+              { key: "disease", label: tOr("companionPage.realisticFarmFinanceLoans.veterinaryDisease", "Recorded illness") },
+              { key: "cost", label: tOr("companionPage.realisticFarmFinanceLoans.veterinaryCost", "Treatment cost"), align: "end" },
+              { key: "left", label: tOr("companionPage.realisticFarmFinanceLoans.lossPeriodsLeft", "Periods left to file"), align: "end" },
+            ]}
+            rows={veterinaryExpenseRows.map((row, index) => ({
+              key: `vet-${row.id ?? index}`,
+              tone: "warn" as const,
+              cells: {
+                id: formatNumber(row.id, 0), animal: row.animal || row.animalType || "—",
+                disease: row.diseases || "—", cost: money(row.treatmentCost),
+                left: formatNumber(row.periodsLeft, 0),
+              },
+            }))}
+          />
+          <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.veterinaryNote", "The mod currently accepts these expense records for filing under its policy and deadline checks. File through its claim form; the treatment cost is not an approved or paid claim.")}</ModEmpty>
         </Card>
       ) : null}
       {page?.coverage === "partial" ? <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.partialAsset", "Some finance records could not be read.")}</ModEmpty> : null}

@@ -361,18 +361,63 @@ CompanionPages.register({
                 return a.periodsLeft < b.periodsLeft
             end)
         end
+        local vetRows, eligibleVetCount = {}, 0
+        local vetService = type(manager.insuranceClaims) == "table" and manager.insuranceClaims or nil
+        local eligibleVet = type(vetService) == "table"
+            and ctx.call(vetService, "getEligibleVeterinaryExpenses", farmId) or nil
+        local vetAvailable = type(repo.insuranceVeterinaryExpenses) == "table"
+            and type(eligibleVet) == "table"
+        local vetInvalid, vetTruncated = false, false
+        if vetAvailable then
+            local vetScanned = 0
+            for _, expense in pairs(eligibleVet) do
+                vetScanned = vetScanned + 1
+                if vetScanned > MAX_SCAN then vetTruncated = true; break end
+                local id = type(expense) == "table" and ctx.num(expense.id) or nil
+                local owner = type(expense) == "table" and ctx.num(expense.farmId) or nil
+                local linkedClaim = type(expense) == "table" and ctx.num(expense.claimId) or nil
+                local cost = type(expense) == "table" and ctx.num(expense.treatmentCost) or nil
+                local deadline = type(expense) == "table" and ctx.num(expense.deadlinePeriod) or nil
+                local incident = type(expense) == "table" and ctx.num(expense.incidentPeriod) or nil
+                if deadline == nil or deadline <= 0 then
+                    deadline = incident ~= nil and incident > 0 and incident + 3 or nil
+                end
+                if owner ~= farmId or id == nil or id <= 0 or linkedClaim == nil or linkedClaim ~= 0
+                    or cost == nil or cost < 0 or deadline == nil or currentPeriod == nil
+                    or currentPeriod >= deadline or expense.status ~= "RECORDED" then
+                    vetInvalid = true
+                else
+                    eligibleVetCount = eligibleVetCount + 1
+                    if #vetRows >= MAX_ROWS then vetTruncated = true
+                    else
+                        vetRows[#vetRows + 1] = {
+                            farmId = farmId, id = math.floor(id),
+                            animal = ctx.clip(expense.animalName, 80),
+                            animalType = ctx.clip(expense.animalType, 40),
+                            diseases = ctx.clip(expense.diseaseNames, 100),
+                            treatmentCost = ctx.round2(cost),
+                            periodsLeft = math.floor(deadline - currentPeriod),
+                        }
+                    end
+                end
+            end
+            table.sort(vetRows, function(a, b)
+                if a.periodsLeft == b.periodsLeft then return a.id > b.id end
+                return a.periodsLeft < b.periodsLeft
+            end)
+        end
         local partial = invalid or assetInvalid or tenancyInvalid or applicationInvalid or insuranceInvalid
-            or lossInvalid
+            or lossInvalid or vetInvalid
             or not assetAvailable or not tenancyAvailable or not applicationAvailable
-            or not policyAvailable or not claimAvailable or not lossAvailable
+            or not policyAvailable or not claimAvailable or not lossAvailable or not vetAvailable
         local anyRows = count > 0 or facilityCount > 0 or assetCount > 0 or tenancyCount > 0
             or applicationCount > 0
-            or policyCount > 0 or claimCount > 0 or openLossCount > 0
+            or policyCount > 0 or claimCount > 0 or openLossCount > 0 or eligibleVetCount > 0
         return {
             readState = partial and "partial" or (anyRows and "ok" or "settings-only"),
             reason = not anyRows and "no-supported-farm-obligations" or nil,
             coverage = (truncated or assetTruncated or tenancyTruncated or applicationTruncated
-                or insuranceTruncated or lossTruncated)
+                or insuranceTruncated or lossTruncated or vetTruncated)
                 and "truncated" or partial and "partial" or "complete",
             byFarm = { [tostring(farmId)] = {
                 loanCount = count,
@@ -398,6 +443,8 @@ CompanionPages.register({
                 insuranceClaimRegisterAvailable = claimAvailable,
                 openAnimalLossCount = openLossCount,
                 animalLossRegisterComplete = lossAvailable and not lossInvalid and not lossTruncated,
+                eligibleVeterinaryExpenseCount = eligibleVetCount,
+                veterinaryExpenseRegisterComplete = vetAvailable and not vetInvalid and not vetTruncated,
             } },
             rows = rows,
             facilityRows = facilityRows,
@@ -407,6 +454,7 @@ CompanionPages.register({
             insurancePolicyRows = policyRows,
             insuranceClaimRows = claimRows,
             openAnimalLossRows = lossRows,
+            eligibleVeterinaryExpenseRows = vetRows,
         }
     end,
 })

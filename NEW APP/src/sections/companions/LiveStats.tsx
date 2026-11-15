@@ -712,8 +712,11 @@ export function LiveStats({
         </p>
       );
     }
-    if (orders.readState !== "ok" || orders.orderCount == null || orders.orderCount === 0) {
+    if (orders.readState === "empty" || (orders.readState === "ok" && orders.orderCount === 0)) {
       return <p class="fd-economy__muted">{tOr("companions.live.vipEmpty", "No open VIP orders.")}</p>;
+    }
+    if (orders.readState !== "ok" || orders.orderCount == null) {
+      return <p class="fd-economy__muted">{tOr("companions.live.readUnavailable", "This mod's reading is not available in this save.")}</p>;
     }
     const current = orders.currentOrder;
     return (

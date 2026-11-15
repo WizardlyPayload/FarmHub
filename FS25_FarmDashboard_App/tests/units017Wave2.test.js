@@ -236,6 +236,11 @@ describe("wave 2 reads stay bounded", () => {
         expect(host.textContent).toContain("VIP orders are single-player only.");
         expect(host.textContent).not.toContain("open VIP order(s)");
 
+        box.state.payload = vipPayload({ enabled: true, readState: "partial", farmId: 1, reason: "invalid-current-order" });
+        render(h(sections.CompanionModsEmbed, { categories: companionMods.COMPANION_CATEGORY_ORDER }), host);
+        expect(host.textContent).toContain("This mod's reading is not available in this save.");
+        expect(host.textContent).not.toContain("No open VIP orders.");
+
         render(null, host);
         host.remove();
     });

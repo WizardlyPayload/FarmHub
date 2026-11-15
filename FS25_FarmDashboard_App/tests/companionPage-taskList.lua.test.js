@@ -97,6 +97,19 @@ test("the 40-row cap is applied after sorting the bounded scan", () => {
     `)).toBe("truncated|40|task41");
 });
 
+test("a scan cap with no owned rows does not assert a confirmed empty list", () => {
+    expect(run(`
+        local active = {}
+        for i = 1, 401 do active[i] = { groupId = "foreign", id = "task" .. i } end
+        g_currentMission = { taskList = {
+            taskGroups = { foreign = { farmId = 2, type = 1, tasks = {} } },
+            activeTasks = active,
+        } }
+        local result = collectTaskList()
+        return table.concat({result.readState, result.coverage, #result.tasks}, "|")
+    `)).toBe("partial|truncated|0");
+});
+
 test("unresolved owned template does not become a confirmed empty task list", () => {
     expect(run(`
         g_currentMission = { taskList = {

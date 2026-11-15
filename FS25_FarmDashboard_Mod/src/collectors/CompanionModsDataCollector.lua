@@ -2795,7 +2795,7 @@ local function collectTaskList()
     return {
         enabled = true,
         source = "taskList",
-        readState = #tasks == 0 and (withheld > 0 and "partial" or "empty") or "ok",
+        readState = #tasks == 0 and ((withheld > 0 or truncated) and "partial" or "empty") or "ok",
         coverage = truncated and "truncated" or (withheld > 0 and "partial" or "complete"),
         farmId = farmId,
         withheldCount = withheld,

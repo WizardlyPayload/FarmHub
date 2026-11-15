@@ -48,9 +48,14 @@ CompanionPages.register({
             return { readState = "settings-only", reason = "single-player-world-not-ready" }
         end
         local manager = ctx.symbol("VIPOrderManager")
-        if type(manager) ~= "table" or manager.InitDone ~= true
-            or type(manager.VIPOrders) ~= "table" then
-            return { readState = "settings-only", reason = "orders-not-loaded" }
+        if type(manager) ~= "table" then
+            return { readState = "pending", reason = "manager-unavailable" }
+        end
+        if manager.InitDone ~= true then
+            return { readState = "pending", reason = "initialization-pending" }
+        end
+        if type(manager.VIPOrders) ~= "table" then
+            return { readState = "pending", reason = "orders-unavailable" }
         end
         local current = manager.VIPOrders[1]
         if current == nil then

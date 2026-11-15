@@ -75,7 +75,11 @@ test("shared VIP summary withholds unready, unreviewed, and other-farm orders", 
     `local _, payload = CompanionModsDataCollector:collectStep({})
      return __fdEncode(payload.vipOrders)`, { farmId });
   expect(sharedState(GAME.replace('InitDone = true', 'InitDone = false')))
-    .toMatchObject({ readState: "pending" });
+    .toMatchObject({ readState: "pending", reason: "initialization-pending" });
+  expect(sharedState(GAME.replace('VIPOrderManager = {', 'VIPOrderManagerMissing = {')))
+    .toMatchObject({ readState: "pending", reason: "manager-unavailable" });
+  expect(sharedState(GAME.replace('VIPOrders = {', 'VIPOrders = nil, unusedOrderFixture = {')))
+    .toMatchObject({ readState: "pending", reason: "orders-unavailable" });
   expect(sharedState(GAME.replace('version = "1.2.2.0"', 'version = "1.2.2.1"')))
     .toMatchObject({ readState: "unavailable", reason: "unreviewed-version" });
   expect(sharedState(GAME.replace('getIsClient = function() return true',
@@ -118,7 +122,13 @@ test("withholds unreviewed, multiplayer and mismatched farm readings", () => {
 test("waits for loaded mod and requires the combined single-player host", () => {
   expect(runCompanionPage(FILE, GAME.replace('InitDone = true',
     'InitDone = false'), { farmId: 1 }))
-    .toMatchObject({ readState: "settings-only", reason: "orders-not-loaded" });
+    .toMatchObject({ readState: "pending", reason: "initialization-pending" });
+  expect(runCompanionPage(FILE, GAME.replace('VIPOrderManager = {',
+    'VIPOrderManagerMissing = {'), { farmId: 1 }))
+    .toMatchObject({ readState: "pending", reason: "manager-unavailable" });
+  expect(runCompanionPage(FILE, GAME.replace('VIPOrders = {',
+    'VIPOrders = nil, unusedOrderFixture = {'), { farmId: 1 }))
+    .toMatchObject({ readState: "pending", reason: "orders-unavailable" });
   expect(runCompanionPage(FILE, GAME.replace('getIsClient = function() return true',
     'getIsClient = function() return false'), { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "single-player-world-not-ready" });

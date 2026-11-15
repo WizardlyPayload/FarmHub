@@ -44,6 +44,18 @@ test("does not claim an empty order when the reading is unavailable", () => {
   expect(host.textContent).not.toContain("Current VIP order items");
 });
 
+test("does not claim settings are readable while the order manager is pending", () => {
+  const host = ui.renderPage({
+    companionMods: { mods: [{ id: KEY, detected: true, version: "1.2.2.0" }] },
+    companionPages: { pages: { [KEY]: {
+      key: KEY, detected: true, readState: "pending", reason: "initialization-pending",
+    } } },
+  }, { farmId: 1 });
+  expect(host.textContent).toContain("Waiting for data");
+  expect(host.textContent).not.toContain("Only this mod's settings are readable");
+  expect(host.textContent).not.toContain("No current VIP order was recorded");
+});
+
 test("shows no current order only for a confirmed empty reading", () => {
   const host = ui.renderPage({
     companionMods: { mods: [{ id: KEY, detected: true, version: "1.2.2.0" }] },

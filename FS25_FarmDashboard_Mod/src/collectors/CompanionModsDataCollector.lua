@@ -3152,8 +3152,17 @@ local function collectVipOrders()
         return { enabled = true, readState = "unavailable", source = "vipOrderManager", reason = "single-player-world-not-ready" }
     end
     local vip = providerSymbol({ reviewedName }, "VIPOrderManager")
-    if type(vip) ~= "table" or vip.InitDone ~= true or type(vip.VIPOrders) ~= "table" then
-        return { enabled = true, readState = "pending", source = "vipOrderManager", farmId = farmId }
+    if type(vip) ~= "table" then
+        return { enabled = true, readState = "pending", source = "vipOrderManager",
+            farmId = farmId, reason = "manager-unavailable" }
+    end
+    if vip.InitDone ~= true then
+        return { enabled = true, readState = "pending", source = "vipOrderManager",
+            farmId = farmId, reason = "initialization-pending" }
+    end
+    if type(vip.VIPOrders) ~= "table" then
+        return { enabled = true, readState = "pending", source = "vipOrderManager",
+            farmId = farmId, reason = "orders-unavailable" }
     end
     local count = 0
     local truncated = false

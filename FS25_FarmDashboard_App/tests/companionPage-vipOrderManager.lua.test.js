@@ -68,6 +68,25 @@ test("both byte-identical vault ZIP names expose the same current order", () => 
   }
 });
 
+test("shared VIP summary withholds unready, unreviewed, and other-farm orders", () => {
+  const sharedState = (setup, farmId = 1) => runCompanionLua([FILE], setup,
+    `local _, payload = CompanionModsDataCollector:collectStep({})
+     return __fdEncode(payload.vipOrders)`, { farmId });
+  expect(sharedState(GAME.replace('InitDone = true', 'InitDone = false')))
+    .toMatchObject({ readState: "pending" });
+  expect(sharedState(GAME.replace('version = "1.2.2.0"', 'version = "1.2.2.1"')))
+    .toMatchObject({ readState: "unavailable", reason: "unreviewed-version" });
+  expect(sharedState(GAME.replace('getIsClient = function() return true',
+    'getIsClient = function() return false')))
+    .toMatchObject({ readState: "unavailable", reason: "single-player-world-not-ready" });
+  expect(sharedState(GAME + `
+    _G.FarmDashboardDataCollector = {
+      _companionFarmScopeReady = true, _companionExportFarmId = 2 }
+  `, 2)).toMatchObject({ readState: "unavailable", reason: "local-farm-mismatch" });
+  expect(sharedState(GAME.replace('level = 3, entries = {', 'entries = {')))
+    .toMatchObject({ readState: "partial", reason: "invalid-current-order" });
+});
+
 test("withholds unreviewed, multiplayer and mismatched farm readings", () => {
   expect(runCompanionPage(FILE, GAME.replace('version = "1.2.2.0"',
     'version = "1.2.2.1"'), { farmId: 1 }))

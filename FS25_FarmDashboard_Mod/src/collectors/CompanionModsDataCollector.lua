@@ -3123,11 +3123,36 @@ local function collectVipOrders()
     if type(md) == "table" and md.isMultiplayer == true then
         return { enabled = true, readState = "unavailable", source = "vipOrderManager", reason = "single-player-only" }
     end
-    local vip = providerSymbol(VIP_MODS, "VIPOrderManager")
-    if type(vip) ~= "table" then
-        return { enabled = true, readState = "unavailable", source = "vipOrderManager" }
+    local reviewedName = nil
+    for _, name in ipairs({ "KM_65282_VIP_Order_Manager", "FS25_310861_VIP_Order_Manager" }) do
+        if modEntry(name) ~= nil then reviewedName = name; break end
     end
-    if type(vip.VIPOrders) ~= "table" then
+    if reviewedName == nil or modVersion(reviewedName) ~= "1.2.2.0" then
+        return { enabled = true, readState = "unavailable", source = "vipOrderManager", reason = "unreviewed-version" }
+    end
+    local mission = _G.g_currentMission
+    local localFarmId = nil
+    if mission and type(mission.getFarmId) == "function" then
+        local ok, value = pcall(mission.getFarmId, mission)
+        if ok then localFarmId = tonumber(value) end
+    end
+    if localFarmId ~= farmId then
+        return { enabled = true, readState = "unavailable", source = "vipOrderManager", reason = "local-farm-mismatch" }
+    end
+    local serverOk, isServer = false, false
+    local clientOk, isClient = false, false
+    if mission and type(mission.getIsServer) == "function" then
+        serverOk, isServer = pcall(mission.getIsServer, mission)
+    end
+    if mission and type(mission.getIsClient) == "function" then
+        clientOk, isClient = pcall(mission.getIsClient, mission)
+    end
+    if not serverOk or isServer ~= true or not clientOk or isClient ~= true
+        or mission.isMissionStarted == false then
+        return { enabled = true, readState = "unavailable", source = "vipOrderManager", reason = "single-player-world-not-ready" }
+    end
+    local vip = providerSymbol({ reviewedName }, "VIPOrderManager")
+    if type(vip) ~= "table" or vip.InitDone ~= true or type(vip.VIPOrders) ~= "table" then
         return { enabled = true, readState = "pending", source = "vipOrderManager", farmId = farmId }
     end
     local count = 0
@@ -3141,6 +3166,11 @@ local function collectVipOrders()
     end
     local current = nil
     local first = vip.VIPOrders[1]
+    if count > 0 and (type(first) ~= "table" or type(first.entries) ~= "table"
+        or tonumber(first.level) == nil) then
+        return { enabled = true, readState = "partial", source = "vipOrderManager",
+            farmId = farmId, reason = "invalid-current-order" }
+    end
     if type(first) == "table" and type(first.entries) == "table" then
         local items = 0
         local remainingItems = 0

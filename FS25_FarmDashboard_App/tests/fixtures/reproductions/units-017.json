@@ -28,7 +28,7 @@
       "id": "L05",
       "setup": "getfenv=function() return _G end\ng_currentMission={getFarmId=function() return 1 end}\ng_modIsLoaded={['FS25_310861_VIP_Order_Manager']=true}\ng_modManager={getActiveMods=function() return {{modName='FS25_310861_VIP_Order_Manager'}} end}\n_G['FS25_310861_VIP_Order_Manager']={VIPOrderManager={VIPOrders={{id=1}}}}\n",
       "expression": "tostring(out.vipOrders and out.vipOrders.readState)",
-      "expected": "ok"
+      "expected": "unavailable"
     },
     {
       "id": "L06",

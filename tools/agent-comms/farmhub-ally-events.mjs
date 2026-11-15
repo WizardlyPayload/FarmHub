@@ -24,7 +24,8 @@ export function parseSubstantiveReturns(text) {
 
 export function shouldWakeFarmHub(event, rfGateId = '') {
   if (event.id.startsWith('FARMHUB-ALLY-')) return true;
-  return /^RF-[A-Z0-9-]*TINA-[A-Z0-9-]+$/.test(rfGateId) && event.id === rfGateId;
+  const armed = Array.isArray(rfGateId) ? rfGateId : [rfGateId];
+  return armed.some(id => /^RF-[A-Z0-9-]*TINA(?:-[A-Z0-9-]+)?$/.test(id) && event.id === id);
 }
 
 export function firstRfRequestAfterHandoff(text, heading) {

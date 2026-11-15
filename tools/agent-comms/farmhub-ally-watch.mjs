@@ -59,10 +59,13 @@ function writeState(state) {
   writeAtomic(statePath, JSON.stringify(state, null, 2));
 }
 const results = parseSubstantiveReturns;
-function armedRfGateId() {
+function armedRfGateIds() {
   try {
     const gate = JSON.parse(fs.readFileSync(rfGatePath, 'utf8'));
     if (!/^FARMHUB-ALLY-\d{8}-[A-Z0-9-]+$/.test(gate.farmhubId ?? '')) return '';
+    if (Array.isArray(gate.rfIds)) {
+      return gate.rfIds.filter(id => /^RF-[A-Z0-9-]*TINA(?:-[A-Z0-9-]+)?$/.test(id)).slice(0, 3);
+    }
     if (/^FARMHUB-[A-Z0-9-]+$/.test(gate.rfAfterHeading ?? '')) {
       return firstRfRequestAfterHandoff(fs.readFileSync(outbox, 'utf8'), gate.rfAfterHeading);
     }
@@ -173,7 +176,7 @@ async function deliver() {
 function scan() {
   if (stopped) return;
   try {
-    const rfGateId = armedRfGateId();
+    const rfGateId = armedRfGateIds();
     let changed = false;
     for (const event of results(fs.readFileSync(inbox, 'utf8'))) {
       if (seen.has(event.hash)) continue;

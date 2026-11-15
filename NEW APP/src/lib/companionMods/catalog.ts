@@ -1421,14 +1421,6 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "vehicles",
   },
   {
-    id: "rentYourField",
-    title: "Rent Your Field",
-    category: "fields",
-    descKey: "companions.desc.rentYourField",
-    desc: "Shows this farm's active Rent Your Field agreements and projected monthly rent. A projection is not a recorded payment.",
-    relatedSection: "fields",
-  },
-  {
     id: "workplan",
     title: "Workplan",
     category: "fields",
@@ -1742,7 +1734,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Rent Your Field",
     category: "fields",
     descKey: "companions.desc.rentYourField",
-    desc: "Rents your own fields out. FarmHub reads this farm's agreements and does not start or end a rental.",
+    desc: "Shows this farm's active Rent Your Field agreements and projected monthly rent. A projection is not a recorded payment; FarmHub does not start or end a rental.",
     liveKey: "rentYourField",
     relatedSection: "fields",
   },

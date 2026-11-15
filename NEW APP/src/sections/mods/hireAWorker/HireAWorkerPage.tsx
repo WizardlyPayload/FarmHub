@@ -36,7 +36,7 @@ export function Page({ entry }: CompanionPageProps) {
   ] : [];
 
   return (
-    <ModPage entry={entry} lead={tOr("companionPage.hireAWorker.lead", "Current field jobs and recent history for your farm. An initial job charge may later be partly refunded; these rows are not a net-spending total.")}>
+    <ModPage entry={entry} lead={tOr("companionPage.hireAWorker.lead", "Current field jobs and recent history for your farm. The mod records a job cost at the start; the bank debit and later refunds may differ. This is not a net-spending total.")}>
       <ModStatTiles tiles={tiles} />
       <Card title={tOr("companionPage.hireAWorker.active", "Active field jobs")}>
         <ModTable
@@ -44,7 +44,7 @@ export function Page({ entry }: CompanionPageProps) {
             { key: "field", label: tOr("companionPage.hireAWorker.field", "Land parcel") },
             { key: "phase", label: tOr("companionPage.hireAWorker.phase", "Current phase") },
             { key: "progress", label: tOr("companionPage.hireAWorker.progress", "Phase") },
-            { key: "charge", label: tOr("companionPage.hireAWorker.charge", "Initial charge"), align: "end" },
+            { key: "charge", label: tOr("companionPage.hireAWorker.charge", "Recorded job cost"), align: "end" },
           ]}
           rows={active.map((row, index) => ({
             key: `${row.farmlandId ?? index}`,

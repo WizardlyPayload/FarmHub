@@ -7,7 +7,7 @@ const FILE = "RealisticFarmFinanceLoansCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { KM_82429_Realistic_Farm_Finance = true }
   _G.g_currentMission = { getFarmId = function() return 1 end,
-    environment = { currentMonotonicDay = 20, currentHour = 8 },
+    environment = { currentMonotonicDay = 20, currentHour = 8, currentYear = 2, currentPeriod = 6 },
     realisticFarmFinance = { repository = { loaded = true, loans = {
       { id = 17, farmId = 1, type = "TERM", paidOff = false, principal = 25000.568,
         arrearsBalance = 300.4, interestRate = 5.5, remainingMonths = 18, paymentsMade = 6 },
@@ -43,6 +43,12 @@ const GAME = `
       { id = 61, farmId = 1, claimType = "VEHICLE", vehicleName = "MF 8570", status = "APPROVED",
         amountClaimed = 1000, approvedAmount = 800, paidAmount = 0 },
       { id = 62, farmId = 2, status = "PAID", amountClaimed = 90000, approvedAmount = 90000, paidAmount = 90000 },
+    }, insuranceLosses = {
+      { id = 81, farmId = 1, status = "RECORDED", animalName = "Daisy", animalType = "COW",
+        deathReason = "ILLNESS", deadlinePeriod = 31, incidentPeriod = 29, claimId = 0 },
+      { id = 82, farmId = 2, status = "RECORDED", animalName = "Other farm", deadlinePeriod = 31 },
+      { id = 83, farmId = 1, status = "CLAIMED", animalName = "Filed", deadlinePeriod = 31, claimId = 61 },
+      { id = 84, farmId = 1, status = "RECORDED", animalName = "Late", deadlinePeriod = 30, claimId = 0 },
     }, tenancies = {
       { id = 41, farmId = 1, holdingName = "North Farm", status = "NOTICE_SERVED",
         monthlyRent = 425.255, rentDue = 425.25, arrears = 50, nextRentDuePeriod = 22 },
@@ -79,6 +85,8 @@ test("exports only supported active loans for the selected farm", () => {
   expect(page.insuranceClaimRows[0]).toMatchObject({ farmId: 1, id: 61, status: "APPROVED", amountClaimed: 1000, approvedAmount: 800, paidAmount: 0 });
   expect(page.insurancePolicyRows.some((row) => row.farmId === 2)).toBe(false);
   expect(page.insuranceClaimRows.some((row) => row.farmId === 2)).toBe(false);
+  expect(page.byFarm["1"]).toMatchObject({ openAnimalLossCount: 1, animalLossRegisterComplete: true });
+  expect(page.openAnimalLossRows).toEqual([expect.objectContaining({ id: 81, animal: "Daisy", periodsLeft: 1 })]);
   const merged = normalizeCompanionPages({ pages: { realisticFarmFinanceLoans: page } }, { modules: loadModules() });
   expect(merged.pages.realisticFarmFinanceLoans.rows).toHaveLength(2);
   expect(merged.pages.realisticFarmFinanceLoans.facilityRows).toHaveLength(1);
@@ -87,6 +95,7 @@ test("exports only supported active loans for the selected farm", () => {
   expect(merged.pages.realisticFarmFinanceLoans.applicationRows).toHaveLength(2);
   expect(merged.pages.realisticFarmFinanceLoans.insurancePolicyRows).toHaveLength(1);
   expect(merged.pages.realisticFarmFinanceLoans.insuranceClaimRows).toHaveLength(1);
+  expect(merged.pages.realisticFarmFinanceLoans.openAnimalLossRows).toHaveLength(1);
 });
 
 test("overdraft uses the farm's native bank debit rather than the mod's drawn field", () => {
@@ -137,7 +146,7 @@ test("shows a farm asset agreement when no supported loan exists", () => {
         { id = 4, farmId = 1, product = "OPERATING_LEASE", status = "ACTIVE",
           vehicleName = "Leased seeder", principal = 0, monthlyPayment = 120,
           arrearsBalance = 0, remainingMonths = 9, refundableDeposit = 600 },
-      }, tenancies = {}, applications = {}, vehicleInsurancePolicies = {}, insuranceClaims = {} } } }
+      }, tenancies = {}, applications = {}, vehicleInsurancePolicies = {}, insuranceClaims = {}, insuranceLosses = {} } } }
   `;
   const page = runCompanionPage(FILE, assetOnly, { farmId: 1 });
   expect(page).toMatchObject({ readState: "ok", coverage: "complete" });
@@ -153,7 +162,7 @@ test("shows a current farm tenancy without a loan or asset agreement", () => {
       realisticFarmFinance = { repository = { loaded = true, loans = {}, assetFinance = {}, tenancies = {
         { id = 6, farmId = 1, holdingName = "West Field", status = "EXPIRING",
           monthlyRent = 200, rentDue = 0, arrears = 0, nextRentDuePeriod = 25 },
-      }, applications = {}, vehicleInsurancePolicies = {}, insuranceClaims = {} } } }
+      }, applications = {}, vehicleInsurancePolicies = {}, insuranceClaims = {}, insuranceLosses = {} } } }
   `;
   const page = runCompanionPage(FILE, tenancyOnly, { farmId: 1 });
   expect(page).toMatchObject({ readState: "ok", coverage: "complete" });
@@ -183,4 +192,14 @@ test("does not present an unavailable application register or unreadable offer a
   const invalid = runCompanionPage(FILE, GAME.replace("offeredAmount = 10000", "offeredAmount = nil"), { farmId: 1 });
   expect(invalid).toMatchObject({ readState: "partial", coverage: "partial" });
   expect(invalid.byFarm["1"]).toMatchObject({ applicationCount: 1, applicationOfferCount: 0 });
+});
+
+test("withholds an animal filing-window count without the mod register or period clock", () => {
+  const missing = runCompanionPage(FILE, GAME.replace("insuranceLosses = {", "unavailableLosses = {"), { farmId: 1 });
+  expect(missing).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(missing.byFarm["1"].animalLossRegisterComplete).toBe(false);
+  const noClock = runCompanionPage(FILE, GAME.replace("currentYear = 2, currentPeriod = 6", "currentYear = nil, currentPeriod = nil"), { farmId: 1 });
+  expect(noClock).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(noClock.byFarm["1"]).toMatchObject({ openAnimalLossCount: 0, animalLossRegisterComplete: false });
+  expect(Object.keys(noClock.openAnimalLossRows)).toHaveLength(0);
 });

@@ -317,16 +317,62 @@ CompanionPages.register({
             end
             table.sort(claimRows, function(a, b) return a.id > b.id end)
         end
+        local lossRows, openLossCount = {}, 0
+        local lossAvailable = type(repo.insuranceLosses) == "table"
+        local lossInvalid, lossTruncated = false, false
+        local year = type(env) == "table" and ctx.num(env.currentYear) or nil
+        local period = type(env) == "table" and ctx.num(env.currentPeriod) or nil
+        local currentPeriod = year ~= nil and period ~= nil
+            and math.floor(year) * 12 + math.floor(period) or nil
+        if lossAvailable then
+            local lossScanned = 0
+            for _, loss in pairs(repo.insuranceLosses) do
+                lossScanned = lossScanned + 1
+                if lossScanned > MAX_SCAN then lossTruncated = true; break end
+                if type(loss) == "table" and ctx.num(loss.farmId) == farmId
+                    and (loss.status == "RECORDED" or loss.status == "CLAIMABLE") then
+                    local id = ctx.num(loss.id)
+                    local linkedClaim = ctx.num(loss.claimId)
+                    local deadline = ctx.num(loss.deadlinePeriod)
+                    local incident = ctx.num(loss.incidentPeriod)
+                    if deadline == nil or deadline <= 0 then
+                        deadline = incident ~= nil and incident > 0 and incident + 2 or nil
+                    end
+                    if id == nil or id <= 0 or deadline == nil or currentPeriod == nil
+                        or linkedClaim == nil or linkedClaim < 0 or linkedClaim > 0 then
+                        lossInvalid = true
+                    elseif currentPeriod < deadline then
+                        openLossCount = openLossCount + 1
+                        if #lossRows >= MAX_ROWS then lossTruncated = true
+                        else
+                            lossRows[#lossRows + 1] = {
+                                farmId = farmId, id = math.floor(id),
+                                animal = ctx.clip(loss.animalName, 80),
+                                animalType = ctx.clip(loss.animalType, 40),
+                                reason = ctx.clip(loss.deathReason, 40),
+                                periodsLeft = math.floor(deadline - currentPeriod),
+                            }
+                        end
+                    end
+                end
+            end
+            table.sort(lossRows, function(a, b)
+                if a.periodsLeft == b.periodsLeft then return a.id > b.id end
+                return a.periodsLeft < b.periodsLeft
+            end)
+        end
         local partial = invalid or assetInvalid or tenancyInvalid or applicationInvalid or insuranceInvalid
+            or lossInvalid
             or not assetAvailable or not tenancyAvailable or not applicationAvailable
-            or not policyAvailable or not claimAvailable
+            or not policyAvailable or not claimAvailable or not lossAvailable
         local anyRows = count > 0 or facilityCount > 0 or assetCount > 0 or tenancyCount > 0
             or applicationCount > 0
-            or policyCount > 0 or claimCount > 0
+            or policyCount > 0 or claimCount > 0 or openLossCount > 0
         return {
             readState = partial and "partial" or (anyRows and "ok" or "settings-only"),
             reason = not anyRows and "no-supported-farm-obligations" or nil,
-            coverage = (truncated or assetTruncated or tenancyTruncated or applicationTruncated or insuranceTruncated)
+            coverage = (truncated or assetTruncated or tenancyTruncated or applicationTruncated
+                or insuranceTruncated or lossTruncated)
                 and "truncated" or partial and "partial" or "complete",
             byFarm = { [tostring(farmId)] = {
                 loanCount = count,
@@ -350,6 +396,8 @@ CompanionPages.register({
                 insuranceClaimCount = claimCount,
                 insurancePolicyRegisterAvailable = policyAvailable,
                 insuranceClaimRegisterAvailable = claimAvailable,
+                openAnimalLossCount = openLossCount,
+                animalLossRegisterComplete = lossAvailable and not lossInvalid and not lossTruncated,
             } },
             rows = rows,
             facilityRows = facilityRows,
@@ -358,6 +406,7 @@ CompanionPages.register({
             applicationRows = applicationRows,
             insurancePolicyRows = policyRows,
             insuranceClaimRows = claimRows,
+            openAnimalLossRows = lossRows,
         }
     end,
 })

@@ -142,11 +142,16 @@ describe("realisticFarmFinanceLoans insurance", () => {
                 { farmId: 1, id: 61, subject: "MF 8570", status: "APPROVED", amountClaimed: 1000, approvedAmount: 800, paidAmount: 0 },
                 { farmId: 2, id: 62, subject: "Other farm", status: "PAID", amountClaimed: 900000, approvedAmount: 900000, paidAmount: 900000 },
             ],
+            openAnimalLossRows: [
+                { farmId: 1, id: 81, animal: "Daisy", animalType: "COW", reason: "ILLNESS", periodsLeft: 1 },
+                { farmId: 2, id: 82, animal: "Other farm", reason: "UNKNOWN", periodsLeft: 1 },
+            ],
             byFarm: { "1": { loanCount: 0, arrearsCount: 0, otherProductCount: 0, facilityCount: 0,
                 assetRegisterAvailable: true, assetFinanceCount: 0, assetArrearsCount: 0,
                 tenancyRegisterAvailable: true, tenancyCount: 0, tenancyArrearsCount: 0,
                 insurancePolicyRegisterAvailable: true, insurancePolicyCount: 1, insurancePremiumDueCount: 1,
-                insuranceClaimRegisterAvailable: true, insuranceClaimCount: 1 } },
+                insuranceClaimRegisterAvailable: true, insuranceClaimCount: 1,
+                animalLossRegisterComplete: true, openAnimalLossCount: 1 } },
         }, "1.2.0.0"), { farmId: 1 });
         expect(text(host, '[data-stat="insurancePolicies"]')).toContain("1");
         expect(text(host, '[data-stat="insuranceClaims"]')).toContain("1");
@@ -157,6 +162,11 @@ describe("realisticFarmFinanceLoans insurance", () => {
         expect(host.textContent).toContain("Paid");
         expect(host.textContent).toContain("800");
         expect(host.textContent).not.toContain("900,000");
+        expect(text(host, '[data-stat="openAnimalLosses"]')).toContain("1");
+        expect(text(host, '[data-row="loss-81"]')).toContain("Daisy");
+        expect(text(host, '[data-row="loss-81"]')).toContain("1");
+        expect(host.textContent).not.toContain("Other farm");
+        expect(host.textContent).toContain("does not guarantee approval or payment");
         expect(host.textContent).not.toContain("No supported farm finance record");
     });
 });

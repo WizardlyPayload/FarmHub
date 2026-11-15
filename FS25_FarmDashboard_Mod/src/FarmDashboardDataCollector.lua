@@ -3507,8 +3507,20 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
         data.gameSettings = FieldDataCollector.getCachedGameplayFlags()
     end
 
-    if data.finance and data.finance.money then
+    if type(data.finance) == "table" and type(data.finance.money) == "number" then
         data.money = data.finance.money
+        -- The farm list is frozen before staggered collection to keep companion
+        -- ownership stable. Finance is sampled later; keep this farm's balance
+        -- in that same published generation consistent with the finance reading.
+        local financeFarmId = tonumber(data.finance.farmId)
+        if financeFarmId and type(data.farmInfo) == "table" then
+            for _, farm in ipairs(data.farmInfo) do
+                if type(farm) == "table" and tonumber(farm.farmId or farm.id) == financeFarmId then
+                    farm.money = data.finance.money
+                    break
+                end
+            end
+        end
     end
 
     data.adsSummary = self:buildAdsSummary(mc.vehicles)

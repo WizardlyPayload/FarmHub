@@ -101,6 +101,24 @@ function run(body) {
 }
 
 describe("PRODUCER-010 real collector completion", () => {
+    test("published farm balance matches the later finance sample without changing ownership", () => {
+        expect(run(`
+            local s = subject({ finance = { farmId = 1, money = 101000 } })
+            s.getFarmInfo = function() return {
+                { farmId = 1, name = "My farm", money = 100000 },
+                { farmId = 2, name = "Other farm", money = 5000 }
+            } end
+            s:beginCompanionFarmSnapshot()
+            local data = s:assembleDataFromModuleCache()
+            return table.concat({
+                data.money,
+                data.farmInfo[1].money,
+                data.farmInfo[1].name,
+                data.farmInfo[2].money
+            }, "|")
+        `)).toBe("101000|101000|My farm|5000");
+    });
+
     test("P01 P02 P08 P09 P10 classify the finished section", () => {
         expect(run(`
             local s = subject({ fields = {} })

@@ -146,6 +146,28 @@ const CROP_FILES = ["collectors/rf/RfCropStressDataCollector.lua"];
 const DAIRY_FILES = ["collectors/rf/RfDairyDataCollector.lua"];
 const RED_TAPE_FILES = ["collectors/RedTapeDataCollector.lua"];
 const RF_PRESENCE_FILES = ["collectors/rf/RfPresenceDataCollector.lua"];
+const MAIN_COLLECTOR_FILES = ["FarmDashboardDataCollector.lua"];
+
+describe("animal mode before an RL farm has any animal clusters", () => {
+    test("promotes a loaded RL mod after two readings and withholds the guess when unchecked", () => {
+        const engine = `g_currentMission.husbandrySystem = { placeables = {} }`;
+        const body = `
+local c = FarmDashboardDataCollector
+c._animalMode, c._animalModeSamples = "unknown", {last = nil, agree = 0}
+g_modIsLoaded.FS25_RealisticLivestockRM = true
+c:detectAnimalModeOnce()
+local first = c._animalMode
+c:detectAnimalModeOnce()
+local second = c._animalMode
+g_modIsLoaded.FS25_RealisticLivestockRM = false
+c._animalMode, c._animalModeSamples = "unknown", {last = nil, agree = 0}
+c:detectAnimalModeOnce()
+c:detectAnimalModeOnce()
+return table.concat({first, second, c._animalMode}, "|")
+`;
+        expect(run({ files: MAIN_COLLECTOR_FILES, engine, body })).toBe("unknown|RL|unknown");
+    });
+});
 
 describe("RF presence uses the native loaded-mod metadata API", () => {
     test("shows the loaded mod version but does not list an installed unchecked mod", () => {

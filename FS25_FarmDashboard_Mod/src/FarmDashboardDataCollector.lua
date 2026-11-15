@@ -1165,12 +1165,8 @@ function FarmDashboardDataCollector:detectAnimalModeOnce()
         return
     end
 
-    -- Fast path: known mod metadata
-    local activeMod = nil
-    if _G.g_modManager and _G.g_modManager.getActiveModByName then
-        local ok, m = pcall(function() return _G.g_modManager:getActiveModByName("FS25_RealisticLivestockRM") end)
-        if ok and m then activeMod = m end
-    end
+    -- A selected mod is enough to identify RL before its first animal cluster exists.
+    local rlLoaded = _G.g_modIsLoaded and _G.g_modIsLoaded["FS25_RealisticLivestockRM"]
 
     -- Probe one placeable's first cluster to detect RL's isIndividual flag.
     local sawRL = false
@@ -1196,7 +1192,7 @@ function FarmDashboardDataCollector:detectAnimalModeOnce()
     end
 
     local sample
-    if sawRL or activeMod ~= nil then
+    if sawRL or rlLoaded then
         sample = "RL"
     elseif sawBase then
         sample = "base"

@@ -336,9 +336,10 @@ local function rtSerializeTax(rt, taxSystem, farmId)
     local byFarm = type(taxSystem.lineItems) == "table" and taxSystem.lineItems[farmId] or nil
     local lines = type(byFarm) == "table" and byFarm[cumMonth] or nil
     local reviewedTaxVersion = false
-    if _G.g_modManager and _G.g_modManager.getActiveModByName then
+    if _G.g_modIsLoaded and _G.g_modIsLoaded["FS25_RedTape"] == true and
+        _G.g_modManager and type(_G.g_modManager.getModByName) == "function" then
         local ok, mod = pcall(function()
-            return _G.g_modManager:getActiveModByName("FS25_RedTape")
+            return _G.g_modManager:getModByName("FS25_RedTape")
         end)
         reviewedTaxVersion = ok and type(mod) == "table" and mod.version == REVIEWED_TAX_VERSION
     end

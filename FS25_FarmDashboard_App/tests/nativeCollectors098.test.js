@@ -303,7 +303,7 @@ g_densityMapHeightManager = { getIsValid = function() error("not ready") end, ge
 describe("Red Tape current-month tax under a separate mod environment", () => {
     const engine = `
 g_modIsLoaded.FS25_RedTape = true
-g_modManager = { getActiveModByName = function(self, name)
+g_modManager = { getModByName = function(self, name)
     if name == "FS25_RedTape" then return { version = "1.0.3.0" } end
 end }
 g_farmManager = { farms = { { farmId = 1, name = "Owned" }, { farmId = 14, name = "Other" } } }
@@ -370,7 +370,16 @@ return tostring(tax.currentMonthIncome) .. "|" .. tostring(tax.currentMonthExpen
 
     test("withholds month totals for an unreviewed Red Tape version", () => {
         const body = `
-g_modManager.getActiveModByName = function() return { version = "1.0.4.0" } end
+g_modManager.getModByName = function() return { version = "1.0.4.0" } end
+local tax = RedTapeDataCollector:collect().byFarm["1"].tax
+return tostring(tax.currentMonthIncome) .. "|" .. tostring(tax.currentMonthExpenses)
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
+    });
+
+    test("withholds month totals when the reviewed ZIP is installed but not loaded", () => {
+        const body = `
+g_modIsLoaded.FS25_RedTape = false
 local tax = RedTapeDataCollector:collect().byFarm["1"].tax
 return tostring(tax.currentMonthIncome) .. "|" .. tostring(tax.currentMonthExpenses)
 `;

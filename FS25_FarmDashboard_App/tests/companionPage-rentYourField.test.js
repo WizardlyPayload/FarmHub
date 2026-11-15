@@ -1,6 +1,6 @@
 "use strict";
 
-const { runCompanionPage } = require("./helpers/companion-page-lua.cjs");
+const { runCompanionPage, runCompanionLua } = require("./helpers/companion-page-lua.cjs");
 const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge.cjs");
 
 const FILE = "RentYourFieldCollector.lua";
@@ -39,6 +39,18 @@ const GAME = `
     isMissionStarted = true,
   }
 `;
+
+test("the active rental mod appears once in the shared catalog", () => {
+  const result = runCompanionLua([FILE], GAME, `
+    local _, payload = CompanionModsDataCollector:collectStep({})
+    local count = 0
+    for _, mod in ipairs(payload.mods or {}) do
+      if mod.id == "rentYourField" then count = count + 1 end
+    end
+    return __fdEncode(count)
+  `, { farmId: 1 });
+  expect(result).toBe(1);
+});
 
 test("reads exact-farm rental despite native no-owner and labels projected money", () => {
   const page = runCompanionPage(FILE, GAME, { farmId: 1 });

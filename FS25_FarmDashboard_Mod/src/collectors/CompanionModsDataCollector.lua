@@ -1817,14 +1817,6 @@ local CATALOG = {
         globals = {},
     },
     {
-        id = "rentYourField",
-        title = "Rent Your Field",
-        category = "fields",
-        names = { "FS25_356641_Rent_Your_Field", "FS25_RentYourField" },
-        substrings = { "rent_your_field", "rentyourfield" },
-        globals = {},
-    },
-    {
         id = "snowContracts",
         title = "Snow Contracts",
         category = "fields",

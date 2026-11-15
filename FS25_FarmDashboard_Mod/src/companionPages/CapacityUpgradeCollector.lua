@@ -72,9 +72,11 @@ CompanionPages.register({
                                         ctx.call(vehicle, "getFillUnitCapacity", index))
                                         or positive(ctx, unit.capacity)) or nil
                                     local divisor = effect == "slowerUse" and positive(ctx, value) or nil
+                                    local expected = original ~= nil and original * FACTORS[config] or nil
                                     local valid = unit ~= nil and not unitKeys[index]
-                                        and (effect ~= "physical" or (original ~= nil
-                                            and observed ~= nil and observed > original))
+                                        and (effect ~= "physical" or (expected ~= nil
+                                            and observed ~= nil and math.abs(observed - expected)
+                                                <= math.max(0.5, expected * 0.000001)))
                                         and (effect ~= "slowerUse" or (divisor ~= nil
                                             and math.abs(divisor - FACTORS[config]) < 0.001))
                                     if not valid then

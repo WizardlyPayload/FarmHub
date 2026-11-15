@@ -1369,7 +1369,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Realistic Farm Finance obligations",
     category: "finance",
     descKey: "companions.desc.realisticFarmFinanceLoans",
-    desc: "Shows this farm's current loans, asset-finance agreements and tenancies recorded by Realistic Farm Finance. Revolving credit, overdrafts and insurance need separate readings.",
+    desc: "Shows this farm's finance obligations, vehicle insurance policies and claim statuses recorded by Realistic Farm Finance.",
     relatedSection: "economy",
   },
   {

@@ -55,6 +55,28 @@ type Tenancy = {
   nextRentDuePeriod?: number;
 };
 
+type InsurancePolicy = {
+  farmId?: number;
+  id?: number;
+  vehicle?: string;
+  cover?: string;
+  status?: string;
+  endPeriod?: number;
+  premiumDue?: number;
+  autoRenew?: boolean;
+};
+
+type InsuranceClaim = {
+  farmId?: number;
+  id?: number;
+  kind?: string;
+  subject?: string;
+  status?: string;
+  amountClaimed?: number;
+  approvedAmount?: number;
+  paidAmount?: number;
+};
+
 function loanType(row: Loan): string {
   if (row.legacyImported) return tOr("companionPage.realisticFarmFinanceLoans.legacy", "Legacy farm loan");
   switch (row.kind) {
@@ -72,6 +94,8 @@ export function Page({ entry }: CompanionPageProps) {
   const facilityRows = asList<Facility>(page?.facilityRows).filter((row) => num(row.farmId) === farmId);
   const assetRows = asList<AssetAgreement>(page?.assetRows).filter((row) => num(row.farmId) === farmId);
   const tenancyRows = asList<Tenancy>(page?.tenancyRows).filter((row) => num(row.farmId) === farmId);
+  const insurancePolicyRows = asList<InsurancePolicy>(page?.insurancePolicyRows).filter((row) => num(row.farmId) === farmId);
+  const insuranceClaimRows = asList<InsuranceClaim>(page?.insuranceClaimRows).filter((row) => num(row.farmId) === farmId);
   const tiles: ModStatTile[] = farmData ? [
     { key: "loans", label: tOr("companionPage.realisticFarmFinanceLoans.loans", "Active loans shown"), value: formatNumber(farmData.loanCount, 0) },
     { key: "arrears", label: tOr("companionPage.realisticFarmFinanceLoans.arrearsCount", "Loans in arrears"), value: formatNumber(farmData.arrearsCount, 0) },
@@ -85,12 +109,20 @@ export function Page({ entry }: CompanionPageProps) {
       { key: "tenancies", label: tOr("companionPage.realisticFarmFinanceLoans.tenancies", "Current tenancies shown"), value: formatNumber(farmData.tenancyCount, 0) },
       { key: "tenancyArrears", label: tOr("companionPage.realisticFarmFinanceLoans.tenancyArrearsCount", "Tenancies in arrears"), value: formatNumber(farmData.tenancyArrearsCount, 0) },
     ] : []),
+    ...(farmData.insurancePolicyRegisterAvailable === true ? [
+      { key: "insurancePolicies", label: tOr("companionPage.realisticFarmFinanceLoans.insurancePolicies", "Vehicle policies recorded"), value: formatNumber(farmData.insurancePolicyCount, 0) },
+      { key: "premiumsDue", label: tOr("companionPage.realisticFarmFinanceLoans.premiumsDue", "Policies with premium due"), value: formatNumber(farmData.insurancePremiumDueCount, 0) },
+    ] : []),
+    ...(farmData.insuranceClaimRegisterAvailable === true ? [
+      { key: "insuranceClaims", label: tOr("companionPage.realisticFarmFinanceLoans.insuranceClaims", "Insurance claims recorded"), value: formatNumber(farmData.insuranceClaimCount, 0) },
+    ] : []),
   ] : [];
   return (
-    <ModPage entry={entry} lead={tOr("companionPage.realisticFarmFinanceLoans.lead", "Current loans, credit facilities, asset-finance agreements and tenancies recorded by Realistic Farm Finance for this farm. Contract asset names do not prove vehicle ownership; scheduled payments are not payments already made. Insurance needs a separate reading.")}>
+    <ModPage entry={entry} lead={tOr("companionPage.realisticFarmFinanceLoans.lead", "Current finance obligations, vehicle policies and claims recorded by Realistic Farm Finance for this farm. Contract and policy names do not prove current vehicle ownership. Claimed or approved insurance is not money already paid.")}>
       <ModStatTiles tiles={tiles} />
       {rows.length === 0 && facilityRows.length === 0 && assetRows.length === 0 && tenancyRows.length === 0
-        ? <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.noObligations", "No current supported obligation was captured for this farm.")}</ModEmpty> : null}
+          && insurancePolicyRows.length === 0 && insuranceClaimRows.length === 0
+        ? <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.noObligations", "No supported farm finance record was captured for this farm.")}</ModEmpty> : null}
       {rows.length > 0 ? (
       <Card title={tOr("companionPage.realisticFarmFinanceLoans.tableTitle", "Farm loan obligations")}>
         <ModTable
@@ -220,6 +252,53 @@ export function Page({ entry }: CompanionPageProps) {
         />
         <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.tenancyNote", "Monthly rent is the contract rate; rent due and arrears are separate recorded balances. A tenancy does not make the farm the legal landowner.")}</ModEmpty>
       </Card>
+      ) : null}
+      {insurancePolicyRows.length > 0 ? (
+        <Card title={tOr("companionPage.realisticFarmFinanceLoans.insurancePolicyTitle", "Vehicle insurance policies")}>
+          <ModTable
+            columns={[
+              { key: "vehicle", label: tOr("companionPage.realisticFarmFinanceLoans.policyVehicle", "Vehicle on policy") },
+              { key: "cover", label: tOr("companionPage.realisticFarmFinanceLoans.policyCover", "Cover") },
+              { key: "status", label: tOr("companionPage.realisticFarmFinanceLoans.policyStatus", "Status") },
+              { key: "end", label: tOr("companionPage.realisticFarmFinanceLoans.policyEnd", "Cover ends period"), align: "end" },
+              { key: "due", label: tOr("companionPage.realisticFarmFinanceLoans.policyDue", "Premium due"), align: "end" },
+              { key: "renew", label: tOr("companionPage.realisticFarmFinanceLoans.policyRenew", "Auto renew") },
+            ]}
+            rows={insurancePolicyRows.map((row, index) => ({
+              key: `policy-${row.id ?? index}`,
+              tone: (num(row.premiumDue) ?? 0) > 0 || row.status !== "ACTIVE" ? "warn" as const : undefined,
+              cells: {
+                vehicle: row.vehicle || "—", cover: row.cover || "—", status: row.status || "—",
+                end: formatNumber(row.endPeriod, 0), due: money(row.premiumDue),
+                renew: row.autoRenew ? tOr("companionPage.realisticFarmFinanceLoans.yes", "Yes") : tOr("companionPage.realisticFarmFinanceLoans.no", "No"),
+              },
+            }))}
+          />
+        </Card>
+      ) : null}
+      {insuranceClaimRows.length > 0 ? (
+        <Card title={tOr("companionPage.realisticFarmFinanceLoans.insuranceClaimTitle", "Insurance claims")}>
+          <ModTable
+            columns={[
+              { key: "id", label: tOr("companionPage.realisticFarmFinanceLoans.claimId", "Claim") },
+              { key: "subject", label: tOr("companionPage.realisticFarmFinanceLoans.claimSubject", "Subject") },
+              { key: "status", label: tOr("companionPage.realisticFarmFinanceLoans.claimStatus", "Status") },
+              { key: "claimed", label: tOr("companionPage.realisticFarmFinanceLoans.claimed", "Claimed"), align: "end" },
+              { key: "approved", label: tOr("companionPage.realisticFarmFinanceLoans.approved", "Approved"), align: "end" },
+              { key: "paid", label: tOr("companionPage.realisticFarmFinanceLoans.paid", "Paid"), align: "end" },
+            ]}
+            rows={insuranceClaimRows.map((row, index) => ({
+              key: `claim-${row.id ?? index}`,
+              tone: row.status !== "PAID" && row.status !== "SETTLED" ? "warn" as const : undefined,
+              cells: {
+                id: formatNumber(row.id, 0), subject: row.subject || row.kind || "—",
+                status: row.status || "—", claimed: money(row.amountClaimed),
+                approved: money(row.approvedAmount), paid: money(row.paidAmount),
+              },
+            }))}
+          />
+          <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.insuranceNote", "Claimed and approved amounts are separate from recorded payments. A policy's vehicle name does not prove current ownership.")}</ModEmpty>
+        </Card>
       ) : null}
       {page?.coverage === "partial" ? <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.partialAsset", "Some obligation records could not be read.")}</ModEmpty> : null}
       {page?.coverage === "truncated" ? <ModEmpty>{tOr("companionPage.realisticFarmFinanceLoans.truncatedAsset", "Only some obligation records are listed.")}</ModEmpty> : null}

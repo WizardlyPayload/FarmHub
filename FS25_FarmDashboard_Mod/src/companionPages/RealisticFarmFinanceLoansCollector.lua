@@ -201,12 +201,83 @@ CompanionPages.register({
             end
             table.sort(tenancyRows, function(a, b) return a.id < b.id end)
         end
-        local partial = invalid or assetInvalid or tenancyInvalid or not assetAvailable or not tenancyAvailable
+        local policyRows, policyCount, policyDueCount = {}, 0, 0
+        local claimRows, claimCount = {}, 0
+        local policyAvailable = type(repo.vehicleInsurancePolicies) == "table"
+        local claimAvailable = type(repo.insuranceClaims) == "table"
+        local insuranceInvalid, insuranceTruncated = false, false
+        if policyAvailable then
+            local policyScanned = 0
+            for _, policy in pairs(repo.vehicleInsurancePolicies) do
+                policyScanned = policyScanned + 1
+                if policyScanned > MAX_SCAN then insuranceTruncated = true; break end
+                if type(policy) == "table" and ctx.num(policy.farmId) == farmId then
+                    local id = ctx.num(policy.id)
+                    local due = ctx.num(policy.premiumDue)
+                    local status = ctx.clip(policy.status, 40)
+                    if id == nil or id <= 0 or due == nil or due < 0 or status == nil or status == "" then
+                        insuranceInvalid = true
+                    else
+                        policyCount = policyCount + 1
+                        if due > 0 then policyDueCount = policyDueCount + 1 end
+                        if #policyRows >= MAX_ROWS then insuranceTruncated = true
+                        else
+                            policyRows[#policyRows + 1] = {
+                                farmId = farmId, id = math.floor(id),
+                                vehicle = ctx.clip(policy.vehicleName, 80),
+                                cover = ctx.clip(policy.coverType, 40), status = status,
+                                endPeriod = ctx.num(policy.endPeriod),
+                                premiumDue = ctx.round2(due),
+                                autoRenew = policy.autoRenew == true,
+                            }
+                        end
+                    end
+                end
+            end
+            table.sort(policyRows, function(a, b) return a.id < b.id end)
+        end
+        if claimAvailable then
+            local claimScanned = 0
+            for _, claim in pairs(repo.insuranceClaims) do
+                claimScanned = claimScanned + 1
+                if claimScanned > MAX_SCAN then insuranceTruncated = true; break end
+                if type(claim) == "table" and ctx.num(claim.farmId) == farmId then
+                    local id = ctx.num(claim.id)
+                    local status = ctx.clip(claim.status, 40)
+                    local claimed = ctx.num(claim.amountClaimed)
+                    local approved = ctx.num(claim.approvedAmount)
+                    local paid = ctx.num(claim.paidAmount)
+                    if id == nil or id <= 0 or status == nil or status == ""
+                        or claimed == nil or claimed < 0 or approved == nil or approved < 0
+                        or paid == nil or paid < 0 then
+                        insuranceInvalid = true
+                    else
+                        claimCount = claimCount + 1
+                        if #claimRows >= MAX_ROWS then insuranceTruncated = true
+                        else
+                            claimRows[#claimRows + 1] = {
+                                farmId = farmId, id = math.floor(id), status = status,
+                                kind = ctx.clip(claim.claimType, 40),
+                                subject = ctx.clip(claim.vehicleName or claim.animalName, 80),
+                                amountClaimed = ctx.round2(claimed),
+                                approvedAmount = ctx.round2(approved),
+                                paidAmount = ctx.round2(paid),
+                            }
+                        end
+                    end
+                end
+            end
+            table.sort(claimRows, function(a, b) return a.id > b.id end)
+        end
+        local partial = invalid or assetInvalid or tenancyInvalid or insuranceInvalid
+            or not assetAvailable or not tenancyAvailable or not policyAvailable or not claimAvailable
         local anyRows = count > 0 or facilityCount > 0 or assetCount > 0 or tenancyCount > 0
+            or policyCount > 0 or claimCount > 0
         return {
             readState = partial and "partial" or (anyRows and "ok" or "settings-only"),
             reason = not anyRows and "no-supported-farm-obligations" or nil,
-            coverage = (truncated or assetTruncated or tenancyTruncated) and "truncated" or partial and "partial" or "complete",
+            coverage = (truncated or assetTruncated or tenancyTruncated or insuranceTruncated)
+                and "truncated" or partial and "partial" or "complete",
             byFarm = { [tostring(farmId)] = {
                 loanCount = count,
                 arrearsCount = arrearsCount,
@@ -221,11 +292,18 @@ CompanionPages.register({
                 tenancyCount = tenancyCount,
                 tenancyArrearsCount = tenancyArrearsCount,
                 tenancyRegisterAvailable = tenancyAvailable,
+                insurancePolicyCount = policyCount,
+                insurancePremiumDueCount = policyDueCount,
+                insuranceClaimCount = claimCount,
+                insurancePolicyRegisterAvailable = policyAvailable,
+                insuranceClaimRegisterAvailable = claimAvailable,
             } },
             rows = rows,
             facilityRows = facilityRows,
             assetRows = assetRows,
             tenancyRows = tenancyRows,
+            insurancePolicyRows = policyRows,
+            insuranceClaimRows = claimRows,
         }
     end,
 })

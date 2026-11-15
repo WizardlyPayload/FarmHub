@@ -127,3 +127,36 @@ describe("realisticFarmFinanceLoans credit facilities", () => {
         expect(host.textContent).not.toContain("No current supported obligation");
     });
 });
+
+describe("realisticFarmFinanceLoans insurance", () => {
+    test("separates due premiums, approved claims and paid money for the selected farm", () => {
+        const ui = loadCompanionPage("realisticFarmFinanceLoans");
+        const host = ui.renderPage(payload("realisticFarmFinanceLoans", {
+            readState: "ok", coverage: "complete",
+            rows: [], facilityRows: [], assetRows: [], tenancyRows: [],
+            insurancePolicyRows: [
+                { farmId: 1, id: 51, vehicle: "MF 8570", cover: "COMPREHENSIVE", status: "ACTIVE", endPeriod: 25, premiumDue: 120.13, autoRenew: true },
+                { farmId: 2, id: 52, vehicle: "Other farm", cover: "FULL", status: "ACTIVE", premiumDue: 900000 },
+            ],
+            insuranceClaimRows: [
+                { farmId: 1, id: 61, subject: "MF 8570", status: "APPROVED", amountClaimed: 1000, approvedAmount: 800, paidAmount: 0 },
+                { farmId: 2, id: 62, subject: "Other farm", status: "PAID", amountClaimed: 900000, approvedAmount: 900000, paidAmount: 900000 },
+            ],
+            byFarm: { "1": { loanCount: 0, arrearsCount: 0, otherProductCount: 0, facilityCount: 0,
+                assetRegisterAvailable: true, assetFinanceCount: 0, assetArrearsCount: 0,
+                tenancyRegisterAvailable: true, tenancyCount: 0, tenancyArrearsCount: 0,
+                insurancePolicyRegisterAvailable: true, insurancePolicyCount: 1, insurancePremiumDueCount: 1,
+                insuranceClaimRegisterAvailable: true, insuranceClaimCount: 1 } },
+        }, "1.2.0.0"), { farmId: 1 });
+        expect(text(host, '[data-stat="insurancePolicies"]')).toContain("1");
+        expect(text(host, '[data-stat="insuranceClaims"]')).toContain("1");
+        expect(host.textContent).toContain("Premium due");
+        expect(text(host, '[data-row="policy-51"]')).toContain("120");
+        expect(host.textContent).toContain("Claimed");
+        expect(host.textContent).toContain("Approved");
+        expect(host.textContent).toContain("Paid");
+        expect(host.textContent).toContain("800");
+        expect(host.textContent).not.toContain("900,000");
+        expect(host.textContent).not.toContain("No supported farm finance record");
+    });
+});

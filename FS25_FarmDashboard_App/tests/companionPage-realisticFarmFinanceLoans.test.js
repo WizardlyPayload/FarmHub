@@ -26,6 +26,14 @@ const GAME = `
         principal = 8000, monthlyPayment = 100, arrearsBalance = 0, remainingMonths = 12 },
       { id = 34, farmId = 1, product = "HIRE_PURCHASE", status = "COMPLETED", vehicleName = "Completed",
         principal = 0, monthlyPayment = 0, arrearsBalance = 0, remainingMonths = 0 },
+    }, vehicleInsurancePolicies = {
+      { id = 51, farmId = 1, vehicleName = "MF 8570", coverType = "COMPREHENSIVE", status = "ACTIVE",
+        endPeriod = 25, premiumDue = 120.125, autoRenew = true },
+      { id = 52, farmId = 2, vehicleName = "Other farm", status = "LAPSED", premiumDue = 99999 },
+    }, insuranceClaims = {
+      { id = 61, farmId = 1, claimType = "VEHICLE", vehicleName = "MF 8570", status = "APPROVED",
+        amountClaimed = 1000, approvedAmount = 800, paidAmount = 0 },
+      { id = 62, farmId = 2, status = "PAID", amountClaimed = 90000, approvedAmount = 90000, paidAmount = 90000 },
     }, tenancies = {
       { id = 41, farmId = 1, holdingName = "North Farm", status = "NOTICE_SERVED",
         monthlyRent = 425.255, rentDue = 425.25, arrears = 50, nextRentDuePeriod = 22 },
@@ -53,11 +61,18 @@ test("exports only supported active loans for the selected farm", () => {
   expect(page.assetRows[1]).toMatchObject({ product: "OPERATING_LEASE", status: "RETURN_DUE", refundableDeposit: 500 });
   expect(page.byFarm["1"]).toMatchObject({ tenancyCount: 1, tenancyArrearsCount: 1, tenancyRegisterAvailable: true });
   expect(page.tenancyRows[0]).toMatchObject({ holding: "North Farm", monthlyRent: 425.26, rentDue: 425.25, arrears: 50, nextRentDuePeriod: 22 });
+  expect(page.byFarm["1"]).toMatchObject({ insurancePolicyCount: 1, insurancePremiumDueCount: 1, insuranceClaimCount: 1 });
+  expect(page.insurancePolicyRows[0]).toMatchObject({ farmId: 1, id: 51, premiumDue: 120.13, autoRenew: true });
+  expect(page.insuranceClaimRows[0]).toMatchObject({ farmId: 1, id: 61, status: "APPROVED", amountClaimed: 1000, approvedAmount: 800, paidAmount: 0 });
+  expect(page.insurancePolicyRows.some((row) => row.farmId === 2)).toBe(false);
+  expect(page.insuranceClaimRows.some((row) => row.farmId === 2)).toBe(false);
   const merged = normalizeCompanionPages({ pages: { realisticFarmFinanceLoans: page } }, { modules: loadModules() });
   expect(merged.pages.realisticFarmFinanceLoans.rows).toHaveLength(2);
   expect(merged.pages.realisticFarmFinanceLoans.facilityRows).toHaveLength(1);
   expect(merged.pages.realisticFarmFinanceLoans.assetRows).toHaveLength(2);
   expect(merged.pages.realisticFarmFinanceLoans.tenancyRows).toHaveLength(1);
+  expect(merged.pages.realisticFarmFinanceLoans.insurancePolicyRows).toHaveLength(1);
+  expect(merged.pages.realisticFarmFinanceLoans.insuranceClaimRows).toHaveLength(1);
 });
 
 test("overdraft uses the farm's native bank debit rather than the mod's drawn field", () => {
@@ -108,7 +123,7 @@ test("shows a farm asset agreement when no supported loan exists", () => {
         { id = 4, farmId = 1, product = "OPERATING_LEASE", status = "ACTIVE",
           vehicleName = "Leased seeder", principal = 0, monthlyPayment = 120,
           arrearsBalance = 0, remainingMonths = 9, refundableDeposit = 600 },
-      }, tenancies = {} } } }
+      }, tenancies = {}, vehicleInsurancePolicies = {}, insuranceClaims = {} } } }
   `;
   const page = runCompanionPage(FILE, assetOnly, { farmId: 1 });
   expect(page).toMatchObject({ readState: "ok", coverage: "complete" });
@@ -124,7 +139,7 @@ test("shows a current farm tenancy without a loan or asset agreement", () => {
       realisticFarmFinance = { repository = { loaded = true, loans = {}, assetFinance = {}, tenancies = {
         { id = 6, farmId = 1, holdingName = "West Field", status = "EXPIRING",
           monthlyRent = 200, rentDue = 0, arrears = 0, nextRentDuePeriod = 25 },
-      } } } }
+      }, vehicleInsurancePolicies = {}, insuranceClaims = {} } } }
   `;
   const page = runCompanionPage(FILE, tenancyOnly, { farmId: 1 });
   expect(page).toMatchObject({ readState: "ok", coverage: "complete" });
@@ -136,4 +151,13 @@ test("withholds an unloaded repository and an unloaded mod", () => {
   expect(runCompanionPage(FILE, GAME.replace("loaded = true", "loaded = false"), { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "finance-repository-unavailable" });
   expect(runCompanionPage(FILE, GAME.replace("KM_82429_Realistic_Farm_Finance = true", "OtherMod = true"), { farmId: 1 })).toBeUndefined();
+});
+
+test("withholds incomplete insurance registers and unreadable owned claims", () => {
+  const missing = runCompanionPage(FILE, GAME.replace("insuranceClaims = {", "unavailableClaims = {"), { farmId: 1 });
+  expect(missing).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(missing.byFarm["1"].insuranceClaimRegisterAvailable).toBe(false);
+  const invalid = runCompanionPage(FILE, GAME.replace("approvedAmount = 800", "approvedAmount = nil"), { farmId: 1 });
+  expect(invalid).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(invalid.byFarm["1"].insuranceClaimCount).toBe(0);
 });

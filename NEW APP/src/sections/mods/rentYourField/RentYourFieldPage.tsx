@@ -22,7 +22,7 @@ export function Page({ entry }: CompanionPageProps) {
     { key: "projection", label: tOr(`${K}.projection`, "Projected monthly rent"), value: money(farmData.projectedMonthlyRent) },
   ] : [];
   return (
-    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Active Rent Your Field agreements recorded for this farm. The mod transfers rented land to the game's no-owner state while preserving the farm's rental claim. Monthly rent and early-termination figures are current estimates, not payments received or charged.")}>
+    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Active Rent Your Field agreements recorded for this farm. Monthly rent and early-termination figures are current estimates, not payments received or charged.")}>
       <ModStatTiles tiles={tiles} />
       <Card title={tOr(`${K}.title`, "Rented-out farmland agreements")}>
         <ModTable

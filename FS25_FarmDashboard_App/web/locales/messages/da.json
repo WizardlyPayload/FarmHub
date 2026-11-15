@@ -5334,7 +5334,7 @@
   ,"companionPage.shopRefund.empty": "No current Shop Refund candidate is recorded for this farm."
   ,"companionPage.shopRefund.truncated": "Only some recorded purchases or owned vehicles were scanned."
   ,"companionPage.shopRefund.partial": "Some records could not be linked to a current, in-window farm vehicle and were withheld."
-  ,"companionPage.rentYourField.lead": "Active Rent Your Field agreements recorded for this farm. The mod transfers rented land to the game's no-owner state while preserving the farm's rental claim. Monthly rent and early-termination figures are current estimates, not payments received or charged."
+  ,"companionPage.rentYourField.lead": "Active Rent Your Field agreements recorded for this farm. Monthly rent and early-termination figures are current estimates, not payments received or charged."
   ,"companionPage.rentYourField.count": "Active rented-out farmlands"
   ,"companionPage.rentYourField.projection": "Projected monthly rent"
   ,"companionPage.rentYourField.title": "Rented-out farmland agreements"

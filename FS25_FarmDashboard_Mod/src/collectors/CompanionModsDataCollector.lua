@@ -2747,7 +2747,7 @@ local function collectTaskList()
     local withheld = 0
     for _, active in pairs(list.activeTasks) do
         scanned = scanned + 1
-        if #tasks >= 40 or scanned > 400 then
+        if scanned > 400 then
             truncated = true
             break
         end
@@ -2788,6 +2788,10 @@ local function collectTaskList()
         if left.priority ~= right.priority then return left.priority < right.priority end
         return left.id < right.id
     end)
+    if #tasks > 40 then
+        truncated = true
+        for index = #tasks, 41, -1 do tasks[index] = nil end
+    end
     return {
         enabled = true,
         source = "taskList",

@@ -80,6 +80,23 @@ test("the exported preview order follows the mod's period and priority order", (
     `)).toBe("Early,High,Low,Late");
 });
 
+test("the 40-row cap is applied after sorting the bounded scan", () => {
+    expect(run(`
+        local tasks, active = {}, {}
+        for i = 1, 41 do
+            local id = "task" .. i
+            tasks[id] = { type = 1, detail = id, period = i == 41 and 5 or 8, priority = 1 }
+            active[i] = { groupId = "group", id = id }
+        end
+        g_currentMission = { taskList = {
+            taskGroups = { group = { farmId = 1, type = 1, tasks = tasks } },
+            activeTasks = active,
+        } }
+        local result = collectTaskList()
+        return table.concat({result.coverage, #result.tasks, result.tasks[1].detail}, "|")
+    `)).toBe("truncated|40|task41");
+});
+
 test("unresolved owned template does not become a confirmed empty task list", () => {
     expect(run(`
         g_currentMission = { taskList = {

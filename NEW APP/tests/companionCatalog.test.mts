@@ -42,3 +42,26 @@ test("each dedicated UI page has a Lua collector and catalog ID", () => {
     assert.ok(collectorIds.includes(id), `${id} is missing a Lua page collector`);
   }
 });
+
+test("every Lua page's exact mod aliases are present in its exporter detector", () => {
+  const source = readFileSync(new URL("../../FS25_FarmDashboard_Mod/src/collectors/CompanionModsDataCollector.lua", import.meta.url), "utf8");
+  const catalog = source.match(/local CATALOG = \{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(catalog, "exporter catalog should be present");
+  const detectors = new Map<string, Set<string>>();
+  for (const entry of catalog.split(/^    \{\r?\n/m)) {
+    const id = entry.match(/\bid\s*=\s*"([^"]+)"/)?.[1];
+    const names = entry.match(/\bnames\s*=\s*\{([\s\S]*?)\}/)?.[1];
+    if (id && names) detectors.set(id, new Set([...names.matchAll(/"([^"]+)"/g)].map((match) => match[1])));
+  }
+  const folder = new URL("../../FS25_FarmDashboard_Mod/src/companionPages/", import.meta.url);
+  for (const file of readdirSync(folder).filter((name) => name.endsWith(".lua"))) {
+    const page = readFileSync(new URL(file, folder), "utf8")
+      .match(/CompanionPages\.register\(\{\s*key\s*=\s*"([^"]+)"[\s\S]*?\bmodNames\s*=\s*\{([^}]*)\}/);
+    if (!page) continue;
+    const detectorNames = detectors.get(page[1]);
+    assert.ok(detectorNames, `${file} has no exporter detector`);
+    for (const match of page[2].matchAll(/"([^"]+)"/g)) {
+      assert.ok(detectorNames.has(match[1]), `${file}: ${match[1]} is missing from the exporter detector`);
+    }
+  }
+});

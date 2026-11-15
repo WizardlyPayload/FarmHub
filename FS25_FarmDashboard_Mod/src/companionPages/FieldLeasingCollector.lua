@@ -90,7 +90,7 @@ CompanionPages.register({
             finance = leaseStats(ctx, farmId),
         }
         local leases = {}
-        local scanned, truncated = 0, false
+        local scanned, truncated, incomplete = 0, false, false
         for key, agreement in pairs(agreements) do
             scanned = scanned + 1
             if scanned > SCAN_LEASES then
@@ -99,6 +99,7 @@ CompanionPages.register({
             end
             if type(agreement) == "table" then
                 local owner = ctx.num(agreement.farmId)
+                if owner == nil then incomplete = true end
                 if owner == farmId and #leases >= MAX_LEASES then
                     truncated = true
                 elseif owner == farmId then
@@ -106,6 +107,9 @@ CompanionPages.register({
                     local price = ctx.num(agreement.price)
                     local duration = ctx.num(agreement.duration)
                     local info = farmlandId and farmlandInfo(ctx, farmlandId) or nil
+                    if farmlandId == nil or price == nil or duration == nil then
+                        incomplete = true
+                    end
                     local monthly = (price ~= nil and monthlyFactor ~= nil) and ctx.round2(price * monthlyFactor) or nil
                     local canEnd = nil
                     if duration ~= nil and minDuration ~= nil then
@@ -121,18 +125,24 @@ CompanionPages.register({
                         periodsPaid = duration,
                         monthlyCost = monthly,
                         canEnd = canEnd,
-                        periodsUntilEnd = (canEnd == false) and (minDuration - duration) or 0,
+                        periodsUntilEnd = canEnd == false and (minDuration - duration) or (canEnd == true and 0 or nil),
                     }
                     leases[#leases + 1] = row
                     farm.leaseCount = farm.leaseCount + 1
-                    farm.totalAreaHa = farm.totalAreaHa + (row.areaHa or 0)
+                    if farm.totalAreaHa ~= nil then
+                        farm.totalAreaHa = row.areaHa ~= nil and farm.totalAreaHa + row.areaHa or nil
+                    end
                     if farm.monthlyCost ~= nil and monthly ~= nil then
                         farm.monthlyCost = farm.monthlyCost + monthly
+                    elseif monthly == nil then
+                        farm.monthlyCost = nil
                     end
                     if canEnd == true then
                         farm.canEndCount = farm.canEndCount + 1
                     end
                 end
+            else
+                incomplete = true
             end
         end
         table.sort(leases, function(a, b)
@@ -142,8 +152,8 @@ CompanionPages.register({
         farm.monthlyCost = ctx.round2(farm.monthlyCost)
         farm.yearlyCost = farm.monthlyCost ~= nil and ctx.round2(farm.monthlyCost * 12) or nil
 
-        out.readState = (truncated or multiplier == nil) and "partial" or "ok"
-        out.coverage = truncated and "truncated" or "complete"
+        out.readState = (truncated or incomplete or multiplier == nil or minDuration == nil) and "partial" or "ok"
+        out.coverage = truncated and "truncated" or (incomplete and "partial" or "complete")
         out.byFarm = { [tostring(farmId)] = farm }
         out.leases = leases
         return out

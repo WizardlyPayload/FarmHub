@@ -102,6 +102,15 @@ describe("frozen gameplay farm scope for companion leases", () => {
         expect(Object.keys(out.page.leases)).toHaveLength(0);
     });
 
+    test("an owned lease with unreadable money and term is partial in both readings", () => {
+        const agreements = `{ [12] = { farmlandId = 12, farmId = 1 } }`;
+        const out = snapshot({ farms: [1], agreements });
+        expect(out.shared).toMatchObject({ readState: "partial", coverage: "partial" });
+        expect(out.page).toMatchObject({ readState: "partial", coverage: "partial" });
+        expect(out.page.byFarm["1"].monthlyCost).toBeUndefined();
+        expect(out.page.leases[0].periodsUntilEnd).toBeUndefined();
+    });
+
     test("Moisture stored goods uses the same sole-farm resolution", () => {
         const out = snapshot({ farms: [2], agreements: "{}", moisture: true });
         expect(out.resolved).toBe(2);

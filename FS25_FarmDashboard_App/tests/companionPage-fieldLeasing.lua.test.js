@@ -73,6 +73,19 @@ describe("Field Leasing page collector", () => {
         expect(page.byFarm["1"].monthlyCost).toBeUndefined();
     });
 
+    test("a partly unreadable owned lease does not advertise complete costs or termination timing", () => {
+        const page = runCompanionPage(FILE, `${MOD_ENV}
+            _G.FS25_FieldLeasing.g_fieldLeasingManager.fieldLeaseAgreements[30].price = nil
+            _G.FS25_FieldLeasing.g_fieldLeasingManager.fieldLeaseAgreements[30].duration = nil
+        `, { farmId: 1 });
+        expect(page.readState).toBe("partial");
+        expect(page.coverage).toBe("partial");
+        expect(page.leases[1].monthlyCost).toBeUndefined();
+        expect(page.leases[1].periodsUntilEnd).toBeUndefined();
+        expect(page.byFarm["1"].monthlyCost).toBeUndefined();
+        expect(page.byFarm["1"].yearlyCost).toBeUndefined();
+    });
+
     test("settings-only without a farm", () => {
         const page = runCompanionPage(FILE, `${MOD_ENV}
             _G.g_currentMission = { getFarmId = function() return 0 end }

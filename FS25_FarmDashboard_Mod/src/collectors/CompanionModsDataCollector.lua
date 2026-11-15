@@ -3541,6 +3541,7 @@ local function collectFieldLeases()
     end
     local rows = {}
     local truncated = false
+    local incomplete = false
     local scanned = 0
     for _, agreement in pairs(mgr.fieldLeaseAgreements) do
         scanned = scanned + 1
@@ -3548,23 +3549,31 @@ local function collectFieldLeases()
             truncated = true
             break
         end
-        if type(agreement) == "table" and tonumber(agreement.farmId) == farmId then
+        if type(agreement) ~= "table" or tonumber(agreement.farmId) == nil then
+            incomplete = true
+        elseif tonumber(agreement.farmId) == farmId then
             if #rows >= 40 then
                 truncated = true
                 break
             end
+            local farmlandId = tonumber(agreement.farmlandId)
+            local price = tonumber(agreement.price)
+            local duration = tonumber(agreement.duration)
+            if farmlandId == nil or price == nil or duration == nil then
+                incomplete = true
+            end
             rows[#rows + 1] = {
-                farmlandId = tonumber(agreement.farmlandId),
-                price = tonumber(agreement.price),
-                duration = tonumber(agreement.duration),
+                farmlandId = farmlandId,
+                price = price,
+                duration = duration,
             }
         end
     end
     return {
         enabled = true,
         source = "fieldLeasing",
-        readState = truncated and "partial" or (#rows == 0 and "empty" or "ok"),
-        coverage = truncated and "truncated" or "complete",
+        readState = (truncated or incomplete) and "partial" or (#rows == 0 and "empty" or "ok"),
+        coverage = truncated and "truncated" or (incomplete and "partial" or "complete"),
         farmId = farmId,
         leases = rows,
     }

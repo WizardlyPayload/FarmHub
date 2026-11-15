@@ -15,8 +15,8 @@ end
 
 CompanionPages.register({
     key = "agriculturalFinancialSystem",
-    modNames = { "KM_80824_agricultural-financial-system" },
-    substrings = { "agricultural-financial-system" },
+    modNames = { "KM_80824_agricultural-financial-system", "KM_80824_agricultural_financial_system" },
+    substrings = { "agricultural-financial-system", "agricultural_financial_system" },
     collect = function(ctx)
         local farmId, mission = ctx.num(ctx.farmId), ctx.mission
         if farmId == nil or farmId <= 0 or farmId ~= math.floor(farmId) then
@@ -24,6 +24,9 @@ CompanionPages.register({
         end
         if ctx.call(mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-book-only" }
+        end
+        if ctx.version ~= "1.0.2.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
         end
         local manager = type(mission) == "table" and mission.gnFinanzas or nil
         local ledger = type(manager) == "table" and manager.ledger or nil

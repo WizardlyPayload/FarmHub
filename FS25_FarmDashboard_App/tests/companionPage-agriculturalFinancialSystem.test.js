@@ -5,7 +5,10 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 
 const FILE = "AgriculturalFinancialSystemCollector.lua";
 const GAME = `
-  _G.g_modIsLoaded = { ["KM_80824_agricultural-financial-system"] = true }
+  _G.g_modIsLoaded = { KM_80824_agricultural_financial_system = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "KM_80824_agricultural_financial_system", version = "1.0.2.0" }
+  } end }
   _G.g_currentMission = { getIsServer = function() return true end,
     gnFinanzas = { loadState = 2, ledger = {
       bankBalances = { [1] = 3500, [2] = 95000 },
@@ -47,8 +50,10 @@ test("does not expose another farm, an unloaded book, or a client-side copy", ()
     .toMatchObject({ readState: "settings-only", reason: "finance-book-unavailable" });
   expect(runCompanionPage(FILE, GAME.replace("getIsServer = function() return true end", "getIsServer = function() return false end"), { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "server-book-only" });
-  expect(runCompanionPage(FILE, GAME.replace('KM_80824_agricultural-financial-system', 'OtherMod'), { farmId: 1 }))
+  expect(runCompanionPage(FILE, GAME.replaceAll('KM_80824_agricultural_financial_system', 'OtherMod'), { farmId: 1 }))
     .toBeUndefined();
+  expect(runCompanionPage(FILE, GAME.replace('version = "1.0.2.0"', 'version = "9.9.9.9"'), { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
 });
 
 test("invalid farm entry withholds totals rather than presenting a complete obligation balance", () => {

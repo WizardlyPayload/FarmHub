@@ -804,8 +804,8 @@ local CATALOG = {
         id = "agriculturalFinancialSystem",
         title = "Agricultural Financial System",
         category = "finance",
-        names = { "KM_80824_agricultural-financial-system" },
-        substrings = { "agricultural-financial-system" },
+        names = { "KM_80824_agricultural-financial-system", "KM_80824_agricultural_financial_system" },
+        substrings = { "agricultural-financial-system", "agricultural_financial_system" },
         globals = {},
     },
     {

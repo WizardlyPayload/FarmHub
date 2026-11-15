@@ -43,6 +43,18 @@ test('normalizing line endings keeps an event hash stable', () => {
     parseSubstantiveReturns(block.replace(/\n/g, '\r\n'))[0].hash);
 });
 
+test('a combined pickup and substantive return wakes, while pickup alone does not', () => {
+  const events = parseSubstantiveReturns([
+    '## [time] from Tina\nPICKUP FARMHUB-ALLY-20261115-VAULT-V122R1 | starting',
+    '## [time] from Tina\nPICKUP+RESULT FARMHUB-ALLY-20261115-VAULT-V122R1 (Ally 20:45-21:20): PARTIAL',
+    '## PICKUP+BLOCKED RF-SOIL-1141-CP-20261115-TINA-2043: safe stop',
+  ].join('\n\n'));
+  assert.deepEqual(events.map(({ id, kind }) => [id, kind]), [
+    ['FARMHUB-ALLY-20261115-VAULT-V122R1', 'RESULT'],
+    ['RF-SOIL-1141-CP-20261115-TINA-2043', 'BLOCKED'],
+  ]);
+});
+
 test('parses a substantive result in Tina\'s Markdown heading without treating ACK as a result', () => {
   const events = parseSubstantiveReturns([
     '## ACK FARMHUB-ALLY-20261114-VAULT-V98 | receipt only',

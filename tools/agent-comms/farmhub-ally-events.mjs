@@ -4,13 +4,13 @@ import { createHash } from 'node:crypto';
 // and RF's direct PASS/FAIL/STALL outcomes. ACK and STATUS are receipt only.
 // Parse RF returns for exact, explicitly armed release gates; an unrelated RF
 // result must not spend a FarmHub model turn.
-const RETURN = /^(RESULT|BLOCKED|PARTIAL|COMPLETE|PASS|FAIL|STALL)(?:(?:\s*\+\s*INCIDENT)|(?:\s*\([^\r\n)]{1,80}\)))*\s+(?:RESULT\s+)?(FARMHUB-ALLY-\d{8}-[A-Z0-9-]+|RF-[A-Z0-9-]*TINA(?:-[A-Z0-9-]+)?)(?=\s|[|:])/m;
+const RETURN = /^(?:PICKUP\s*\+\s*)?(RESULT|BLOCKED|PARTIAL|COMPLETE|PASS|FAIL|STALL)(?:(?:\s*\+\s*INCIDENT)|(?:\s*\([^\r\n)]{1,80}\)))*\s+(?:RESULT\s+)?(FARMHUB-ALLY-\d{8}-[A-Z0-9-]+|RF-[A-Z0-9-]*TINA(?:-[A-Z0-9-]+)?)(?=\s|[|:])/m;
 
 export function parseSubstantiveReturns(text) {
   const out = [];
   for (const block of text.replace(/^\uFEFF/, '').split(/(?=^## )/m)) {
     // Tina now also puts the result on the Markdown heading itself.
-    const searchable = block.replace(/^## (?=(?:RESULT|BLOCKED|PARTIAL|COMPLETE|PASS|FAIL|STALL)\b)/, '');
+    const searchable = block.replace(/^## (?=(?:PICKUP\s*\+\s*)?(?:RESULT|BLOCKED|PARTIAL|COMPLETE|PASS|FAIL|STALL)\b)/, '');
     const match = searchable.match(RETURN);
     if (!match) continue;
     out.push({

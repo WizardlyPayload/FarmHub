@@ -71,6 +71,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/kringstadPiler").then((m) => m.Page) },
   { key: "villageBank", catalogId: "villageBank", title: "Village Bank", glyph: "VB", group: "finance",
     load: () => import("@/sections/mods/villageBank").then((m) => m.Page) },
+  { key: "agriculturalFinancialSystem", catalogId: "agriculturalFinancialSystem", title: "Agricultural Financial System", glyph: "AF", group: "finance",
+    load: () => import("@/sections/mods/agriculturalFinancialSystem").then((m) => m.Page) },
   { key: "investmentSystem", catalogId: "investmentSystem", title: "Investment System", glyph: "IS", group: "finance",
     load: () => import("@/sections/mods/investmentSystem").then((m) => m.Page) },
   { key: "shopRefund", catalogId: "shopRefund", title: "Shop Refund", glyph: "SR", group: "fleet",

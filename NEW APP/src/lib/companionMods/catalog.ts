@@ -1397,6 +1397,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "agriculturalFinancialSystem",
+    title: "Agricultural Financial System",
+    category: "finance",
+    descKey: "companions.desc.agriculturalFinancialSystem",
+    desc: "Shows this farm's separate bank balance and outstanding supplier payables or customer receivables, including due game days and overdue records.",
+    relatedSection: "economy",
+  },
+  {
     id: "investmentSystem",
     title: "Investment System",
     category: "finance",

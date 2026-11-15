@@ -198,14 +198,14 @@ describe("wave 2 reads stay bounded", () => {
                 ],
                 animalFoodCalculator: { enabled: true, readState: "ok", mode: "custom", foodScale: 1.5 },
                 // Producer shape from collectVipOrders: the count belongs to the exporting farm.
-                vipOrders: { enabled: true, source: "vipOrderManager", readState: "ok", farmId: 1, orderCount: 2, coverage: "session-list" },
+                vipOrders: { enabled: true, source: "vipOrderManager", readState: "ok", farmId: 1, orderCount: 1, coverage: "complete" },
             },
         };
         const host = document.createElement("div");
         document.body.appendChild(host);
         render(h(sections.CompanionModsEmbed, { categories: companionMods.COMPANION_CATEGORY_ORDER }), host);
         expect(host.textContent).toContain("Food x1.5");
-        expect(host.textContent).toContain("2 open VIP order(s)");
+        expect(host.textContent).toContain("1 open VIP order(s)");
         expect(host.textContent).not.toContain("No active tasks");
         render(null, host);
         host.remove();

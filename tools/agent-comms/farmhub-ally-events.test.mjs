@@ -64,6 +64,9 @@ test('unrelated RF returns stay silent unless an exact release gate is armed', (
   const soil = parseSubstantiveReturns('## RESULT RF-SOIL-1443-CELLIDENTITY-20261114-TINA-2235 | restored')[0];
   assert.equal(shouldWakeFarmHub(soil), false);
   assert.equal(shouldWakeFarmHub(soil, soil.id), true);
+  const shortId = parseSubstantiveReturns('## [time] from Tina\nRESULT RF-SOIL-1141-20261115-TINA | released')[0];
+  assert.equal(shortId.id, 'RF-SOIL-1141-20261115-TINA');
+  assert.equal(shouldWakeFarmHub(shortId, ['RF-SOIL-1141-20261115-TINA-1929', shortId.id]), true);
   assert.equal(shouldWakeFarmHub({ id: 'RF-SOIL-1141-20261115-TINA', kind: 'RESULT' }, [
     'RF-SOIL-1141-20261115-TINA-1929', 'RF-SOIL-1141-20261115-TINA',
   ]), true);

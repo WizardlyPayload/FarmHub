@@ -2744,6 +2744,7 @@ local function collectTaskList()
     local tasks = {}
     local truncated = false
     local scanned = 0
+    local withheld = 0
     for _, active in pairs(list.activeTasks) do
         scanned = scanned + 1
         if #tasks >= 40 or scanned > 400 then
@@ -2752,24 +2753,36 @@ local function collectTaskList()
         end
         if type(active) == "table" then
             local group = list.taskGroups[active.groupId]
-            if type(group) == "table" and tonumber(group.farmId) == farmId and type(group.tasks) == "table" then
-                local task = group.tasks[active.id]
-                tasks[#tasks + 1] = {
-                    id = clipText(active.id, 40),
-                    priority = type(task) == "table" and tonumber(task.priority) or nil,
-                    period = type(task) == "table" and tonumber(task.period) or nil,
-                    effort = type(task) == "table" and tonumber(task.effort) or nil,
-                    detail = type(task) == "table" and clipText(task.detail, 120) or "",
-                }
+            if type(group) == "table" and tonumber(group.farmId) == farmId then
+                local sourceGroup = group
+                -- Template instances resolve their active task from the source
+                -- template in the mod's addActiveTask/getTaskById code.
+                if tonumber(group.type) == 3 then
+                    sourceGroup = list.taskGroups[group.templateGroupId]
+                end
+                if type(sourceGroup) == "table" and tonumber(sourceGroup.farmId) == farmId
+                    and type(sourceGroup.tasks) == "table" and type(sourceGroup.tasks[active.id]) == "table" then
+                    local task = sourceGroup.tasks[active.id]
+                    tasks[#tasks + 1] = {
+                        id = clipText(active.id, 40),
+                        priority = tonumber(task.priority),
+                        period = tonumber(task.period),
+                        effort = tonumber(task.effort),
+                        detail = clipText(task.detail, 120),
+                    }
+                else
+                    withheld = withheld + 1
+                end
             end
         end
     end
     return {
         enabled = true,
         source = "taskList",
-        readState = #tasks == 0 and "empty" or "ok",
-        coverage = truncated and "truncated" or "complete",
+        readState = #tasks == 0 and (withheld > 0 and "partial" or "empty") or "ok",
+        coverage = truncated and "truncated" or (withheld > 0 and "partial" or "complete"),
         farmId = farmId,
+        withheldCount = withheld,
         tasks = tasks,
     }
 end

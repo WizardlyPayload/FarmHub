@@ -187,6 +187,7 @@ export type CompanionModsPayload = {
   taskList?: {
     enabled?: boolean;
     readState?: string;
+    coverage?: string;
     tasks?: Array<{ id?: string; detail?: string; priority?: number | null }>;
   };
   productionSchedule?: {

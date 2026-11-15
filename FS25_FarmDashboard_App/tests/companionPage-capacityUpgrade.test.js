@@ -4,45 +4,65 @@ const { runCompanionPage } = require("./helpers/companion-page-lua.cjs");
 const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge.cjs");
 
 const FILE = "CapacityUpgradeCollector.lua";
-const SETUP = `
-  _G.g_modIsLoaded = { FS25_CapacityUpgrade = true }
+const GAME = `
+  _G.g_modIsLoaded = { ["FS25_373637_Capacity_Upgrade"] = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "FS25_373637_Capacity_Upgrade", version = "1.0.0.0" }
+  } end }
   _G.g_currentMission = { getIsServer = function() return true end,
     vehicleSystem = { vehicles = {
-      { ownerFarmId = 1, uniqueId = "trailer", getFullName = function() return "Owned trailer" end,
-        configurations = { capacityUpgrade = 2 },
-        spec_cuUpgrade = { level = 2, stockCapacity = { [1] = 1000 } },
-        getFillUnitCapacity = function(self, index) return index == 1 and 1250 or 0 end },
-      { ownerFarmId = 1, uniqueId = "planter", getFullName = function() return "Owned planter" end,
-        configurations = { capacityUpgrade = 4 },
-        spec_cuUpgrade = { level = 4, slowed = { [2] = 2 } } },
-      { ownerFarmId = 1, uniqueId = "stock", configurations = { capacityUpgrade = 1 },
-        spec_cuUpgrade = { level = 1 } },
-      { ownerFarmId = 2, uniqueId = "foreign", configurations = { capacityUpgrade = 7 },
-        spec_cuUpgrade = { level = 7, stockCapacity = { [1] = 100 } },
-        getFillUnitCapacity = function() return 600 end },
-      { ownerFarmId = 1, uniqueId = "mismatch", configurations = { capacityUpgrade = 7 },
-        spec_cuUpgrade = { level = 2, stockCapacity = { [1] = 100 } },
-        getFillUnitCapacity = function() return 600 end },
+      { ownerFarmId = 1, uniqueId = "own-trailer", getFullName = function() return "Farm trailer" end,
+        configurations = { cuCapacity = 3 },
+        spec_cuUpgrade = { level = 3, stockCapacity = { [1] = 8000 } },
+        spec_fillUnit = { fillUnits = { { capacity = 12000, defaultCapacity = 8000 } } } },
+      { ownerFarmId = 1, uniqueId = "own-planter", getName = function() return "Farm planter" end,
+        configurations = { cuCapacity = 2 },
+        spec_cuUpgrade = { level = 2, slowed = { [1] = 1.25 } },
+        spec_fillUnit = { fillUnits = { { capacity = 24, defaultCapacity = 24 } } } },
+      { ownerFarmId = 2, uniqueId = "foreign-upgrade", getName = function() return "Other farm" end,
+        configurations = { cuCapacity = 7 },
+        spec_cuUpgrade = { level = 7, stockCapacity = { [1] = 1000 } },
+        spec_fillUnit = { fillUnits = { { capacity = 6000 } } } },
     } } }
 `;
 
-test("reports applied capacity and slower-use effects separately for owned units", () => {
-  const page = runCompanionPage(FILE, SETUP, { farmId: 1 });
+test("reads only owned physical and slower-use effects without calling either a stock gain", () => {
+  const page = runCompanionPage(FILE, GAME, { farmId: 1 });
   expect(page).toMatchObject({ readState: "ok", coverage: "complete",
     byFarm: { "1": { vehicleCount: 2, capacityUnitCount: 1, slowedUnitCount: 1 } } });
-  expect(page.rows).toHaveLength(2);
-  expect(page.rows.find((row) => row.vehicleId === "trailer"))
-    .toMatchObject({ effect: "capacity", factor: 1.25, stockCapacity: 1000, currentCapacity: 1250 });
-  expect(page.rows.find((row) => row.vehicleId === "planter"))
-    .toMatchObject({ effect: "usage-slowed", factor: 2, fillUnitIndex: 2 });
-  expect(page.rows.map((row) => row.vehicleId)).not.toEqual(expect.arrayContaining(["stock", "foreign", "mismatch"]));
-  const merged = normalizeCompanionPages({ pages: { capacityUpgrade: page } }, { modules: loadModules() });
+  expect(page.rows).toEqual(expect.arrayContaining([
+    expect.objectContaining({ vehicleId: "own-trailer", effect: "capacity",
+      factor: 1.5, stockCapacity: 8000, currentCapacity: 12000 }),
+    expect.objectContaining({ vehicleId: "own-planter", effect: "usage-slowed",
+      factor: 1.25 }),
+  ]));
+  expect(JSON.stringify(page)).not.toContain("foreign-upgrade");
+  const merged = normalizeCompanionPages({ pages: { capacityUpgrade: page } },
+    { modules: loadModules() });
   expect(merged.pages.capacityUpgrade.rows).toHaveLength(2);
 });
 
-test("withholds client state and absent mod", () => {
-  const client = SETUP.replace("getIsServer = function() return true end", "getIsServer = function() return false end");
+test("withholds totals when a selected machine's runtime effect is missing", () => {
+  const changed = GAME.replace("capacity = 12000", "capacity = 8000");
+  const page = runCompanionPage(FILE, changed, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(page.rows).toHaveLength(1);
+  expect(page.byFarm["1"].vehicleCount).toBeUndefined();
+  expect(page.byFarm["1"].capacityUnitCount).toBeUndefined();
+});
+
+test("does not infer an upgrade from a bad configuration, client or unreviewed version", () => {
+  const wrongKey = GAME.replace(/cuCapacity = /g, "capacityUpgrade = ");
+  expect(runCompanionPage(FILE, wrongKey, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "no-upgraded-owned-vehicle" });
+  const invalid = GAME.replace("cuCapacity = 3", "cuCapacity = 8");
+  expect(runCompanionPage(FILE, invalid, { farmId: 1 }))
+    .toMatchObject({ readState: "partial", coverage: "partial" });
+  const client = GAME.replace("getIsServer = function() return true end",
+    "getIsServer = function() return false end");
   expect(runCompanionPage(FILE, client, { farmId: 1 }))
-    .toMatchObject({ readState: "settings-only", reason: "server-vehicle-state-only" });
-  expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", { farmId: 1 })).toBeUndefined();
+    .toMatchObject({ readState: "settings-only", reason: "server-vehicles-only" });
+  const newer = GAME.replace('version = "1.0.0.0"', 'version = "9.9.9.9"');
+  expect(runCompanionPage(FILE, newer, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
 });

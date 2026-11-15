@@ -1,96 +1,120 @@
--- Capacity Upgrade 1.0.0.0: applied effects on farm-owned fill units.
--- A selected level is not proof of extra storage or reduced consumption.
+-- Capacity Upgrade 1.0.0.0: a selected shop level can enlarge physical fill
+-- units or slow consumption instead. Read only the exact farm's current assets.
+-- Neither path is evidence of stock added, material consumed or money paid.
 
 local FACTORS = { 1, 1.25, 1.5, 2, 2.5, 3, 6 }
-local MAX_ROWS = 100
+local MAX_UNITS, MAX_ROWS = 32, 80
+
+local function positive(ctx, value)
+    local n = ctx.num(value)
+    if n ~= nil and n > 0 and n < 1000000000 then return n end
+    return nil
+end
 
 CompanionPages.register({
     key = "capacityUpgrade",
     modNames = { "FS25_CapacityUpgrade", "FS25_373637_Capacity_Upgrade", "KM_83362_Capacity_Upgrade" },
     substrings = { "capacityupgrade", "capacity_upgrade" },
     collect = function(ctx)
-        local farmId = ctx.farmId
-        if farmId == nil or farmId <= 0 then
-            return { readState = "settings-only", reason = "no-farm" }
+        local farmId = ctx.num(ctx.farmId)
+        if farmId == nil or farmId <= 0 or farmId ~= math.floor(farmId) then
+            return { readState = "settings-only", reason = "selected-farm-unavailable" }
         end
         if ctx.call(ctx.mission, "getIsServer") ~= true then
-            return { readState = "settings-only", reason = "server-vehicle-state-only" }
+            return { readState = "settings-only", reason = "server-vehicles-only" }
+        end
+        if ctx.version ~= "1.0.0.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
         end
         local vehicles = ctx.ownedVehicles()
         if type(vehicles) ~= "table" then
-            return { readState = "settings-only", reason = "no-owned-vehicle-list" }
+            return { readState = "settings-only", reason = "owned-vehicles-unavailable" }
         end
 
-        local rows, vehicleCount, capacityCount, slowedCount = {}, 0, 0, 0
-        local truncated = ctx.ownedScanTruncated == true
+        local rows, selected, capacityCount, slowedCount = {}, 0, 0, 0
+        local incomplete, truncated = false, ctx.ownedScanTruncated == true
+        local seen = {}
         for _, vehicle in ipairs(vehicles) do
-            local spec = type(vehicle) == "table" and vehicle.spec_cuUpgrade or nil
-            local config = type(vehicle) == "table" and vehicle.configurations or nil
-            local level = type(config) == "table" and ctx.num(config.capacityUpgrade) or nil
-            if type(spec) == "table" and level and level == math.floor(level)
-                and level > 1 and FACTORS[level] and ctx.num(spec.level) == level then
-                local seen = false
-                local name = ctx.clip(ctx.call(vehicle, "getFullName") or ctx.call(vehicle, "getName"), 70)
-                local id = ctx.clip(vehicle.uniqueId or vehicle.id, 64)
-                if type(spec.stockCapacity) == "table" then
-                    for index, rawStock in pairs(spec.stockCapacity) do
-                        local unit = ctx.num(index)
-                        local stock = ctx.num(rawStock)
-                        local current = unit and ctx.num(ctx.call(vehicle, "getFillUnitCapacity", unit)) or nil
-                        if unit and unit > 0 and unit == math.floor(unit)
-                            and stock and stock > 0 and current and current > stock then
-                            seen = true
-                            capacityCount = capacityCount + 1
-                            if #rows < MAX_ROWS then
-                                rows[#rows + 1] = {
-                                    farmId = farmId, vehicleId = id, vehicle = name,
-                                    fillUnitIndex = unit, level = level, factor = FACTORS[level],
-                                    effect = "capacity", stockCapacity = stock, currentCapacity = current,
-                                }
-                            else
-                                truncated = true
+            local config = type(vehicle) == "table" and type(vehicle.configurations) == "table"
+                and vehicle.configurations.cuCapacity or nil
+            if config ~= nil then
+                if type(config) ~= "number" or config ~= math.floor(config)
+                    or FACTORS[config] == nil then
+                    incomplete = true
+                elseif config > 1 then
+                    selected = selected + 1
+                    local id = ctx.clip(vehicle.uniqueId or vehicle.id, 64)
+                    local spec = vehicle.spec_cuUpgrade
+                    local fillUnits = type(vehicle.spec_fillUnit) == "table"
+                        and vehicle.spec_fillUnit.fillUnits or nil
+                    if id == nil or id == "" or seen[id] or type(spec) ~= "table"
+                        or spec.level ~= config or type(fillUnits) ~= "table" then
+                        incomplete = true
+                    else
+                        seen[id] = true
+                        local found, unitKeys = false, {}
+                        local name = ctx.clip(ctx.call(vehicle, "getFullName")
+                            or ctx.call(vehicle, "getName"), 70)
+                        for effect, register in pairs({ physical = spec.stockCapacity,
+                                slowerUse = spec.slowed }) do
+                            if register ~= nil and type(register) ~= "table" then
+                                incomplete = true
+                            elseif type(register) == "table" then
+                                local scanned = 0
+                                for index, value in pairs(register) do
+                                    scanned = scanned + 1
+                                    if scanned > MAX_UNITS then truncated = true; break end
+                                    local unit = type(index) == "number" and index == math.floor(index)
+                                        and index >= 1 and index <= MAX_UNITS and fillUnits[index] or nil
+                                    local original = effect == "physical" and positive(ctx, value)
+                                        or unit ~= nil and positive(ctx, unit.defaultCapacity) or nil
+                                    local observed = unit ~= nil and (positive(ctx,
+                                        ctx.call(vehicle, "getFillUnitCapacity", index))
+                                        or positive(ctx, unit.capacity)) or nil
+                                    local divisor = effect == "slowerUse" and positive(ctx, value) or nil
+                                    local valid = unit ~= nil and not unitKeys[index]
+                                        and (effect ~= "physical" or (original ~= nil
+                                            and observed ~= nil and observed > original))
+                                        and (effect ~= "slowerUse" or (divisor ~= nil
+                                            and math.abs(divisor - FACTORS[config]) < 0.001))
+                                    if not valid then
+                                        incomplete = true
+                                    else
+                                        unitKeys[index], found = true, true
+                                        if effect == "physical" then capacityCount = capacityCount + 1
+                                        else slowedCount = slowedCount + 1 end
+                                        if #rows < MAX_ROWS then
+                                            rows[#rows + 1] = {
+                                                farmId = farmId, vehicleId = id, vehicle = name,
+                                                fillUnitIndex = index, factor = FACTORS[config],
+                                                effect = effect == "physical" and "capacity" or "usage-slowed",
+                                                stockCapacity = effect == "physical" and original or nil,
+                                                currentCapacity = effect == "physical" and observed or nil,
+                                            }
+                                        else truncated = true end
+                                    end
+                                end
                             end
                         end
+                        if not found then incomplete = true end
                     end
                 end
-                if type(spec.slowed) == "table" then
-                    for index, rawFactor in pairs(spec.slowed) do
-                        local unit = ctx.num(index)
-                        local applied = ctx.num(rawFactor)
-                        if unit and unit > 0 and unit == math.floor(unit)
-                            and applied and math.abs(applied - FACTORS[level]) < 0.0001
-                            and (type(spec.stockCapacity) ~= "table" or spec.stockCapacity[index] == nil) then
-                            seen = true
-                            slowedCount = slowedCount + 1
-                            if #rows < MAX_ROWS then
-                                rows[#rows + 1] = {
-                                    farmId = farmId, vehicleId = id, vehicle = name,
-                                    fillUnitIndex = unit, level = level, factor = applied,
-                                    effect = "usage-slowed",
-                                }
-                            else
-                                truncated = true
-                            end
-                        end
-                    end
-                end
-                if seen then vehicleCount = vehicleCount + 1 end
             end
         end
         table.sort(rows, function(a, b)
-            if tostring(a.vehicle or "") ~= tostring(b.vehicle or "") then
-                return tostring(a.vehicle or "") < tostring(b.vehicle or "")
-            end
-            return a.fillUnitIndex < b.fillUnitIndex
+            if a.vehicleId == b.vehicleId then return a.fillUnitIndex < b.fillUnitIndex end
+            return a.vehicleId < b.vehicleId
         end)
-        local count = capacityCount + slowedCount
+        local coverage = truncated and "truncated" or incomplete and "partial" or "complete"
         return {
-            readState = count > 0 and "ok" or "settings-only",
-            reason = count == 0 and "no-applied-owned-upgrade" or nil,
-            coverage = truncated and "truncated" or "complete",
+            readState = (truncated or incomplete) and "partial"
+                or selected > 0 and "ok" or "settings-only",
+            reason = selected == 0 and coverage == "complete" and "no-upgraded-owned-vehicle" or nil,
+            coverage = coverage,
             byFarm = { [tostring(farmId)] = {
-                vehicleCount = vehicleCount, capacityUnitCount = capacityCount,
-                slowedUnitCount = slowedCount,
+                vehicleCount = coverage == "complete" and selected or nil,
+                capacityUnitCount = coverage == "complete" and capacityCount or nil,
+                slowedUnitCount = coverage == "complete" and slowedCount or nil,
             } },
             rows = rows,
         }

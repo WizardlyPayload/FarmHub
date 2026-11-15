@@ -19,7 +19,7 @@ type UpgradeRow = {
 export function Page({ entry }: CompanionPageProps) {
   const { page, farmData, farmId } = useCompanionPage(entry.key);
   const rows = asList<UpgradeRow>(page?.rows).filter((row) => num(row.farmId) === farmId);
-  const tiles: ModStatTile[] = farmData ? [
+  const tiles: ModStatTile[] = farmData && page?.coverage === "complete" ? [
     { key: "vehicles", label: tOr("companionPage.capacityUpgrade.vehicles", "Owned upgraded vehicles"), value: formatNumber(farmData.vehicleCount, 0) },
     { key: "capacity", label: tOr("companionPage.capacityUpgrade.capacityUnits", "Larger fill units"), value: formatNumber(farmData.capacityUnitCount, 0) },
     { key: "slowed", label: tOr("companionPage.capacityUpgrade.slowedUnits", "Slower-use units"), value: formatNumber(farmData.slowedUnitCount, 0) },
@@ -46,13 +46,14 @@ export function Page({ entry }: CompanionPageProps) {
               effect: row.effect === "usage-slowed"
                 ? tOr("companionPage.capacityUpgrade.slowerUse", "Slower use; tank unchanged")
                 : tOr("companionPage.capacityUpgrade.largerTank", "Larger capacity"),
-              stock: row.effect === "capacity" ? `${formatNumber(row.stockCapacity, 0)} L` : "—",
-              current: row.effect === "capacity" ? `${formatNumber(row.currentCapacity, 0)} L` : "—",
+              stock: row.effect === "capacity" ? formatNumber(row.stockCapacity, 0) : "—",
+              current: row.effect === "capacity" ? formatNumber(row.currentCapacity, 0) : "—",
             },
           }))}
           empty={tOr("companionPage.capacityUpgrade.empty", "No applied Capacity Upgrade found on vehicles owned by this farm.")}
         />
         {page?.coverage === "truncated" ? <ModEmpty>{tOr("companionPage.capacityUpgrade.truncated", "Only the first applied fill units are listed.")}</ModEmpty> : null}
+        {page?.coverage === "partial" ? <ModEmpty>{tOr("companionPage.capacityUpgrade.partial", "Some selected upgrade effects could not be verified; totals are withheld.")}</ModEmpty> : null}
       </Card>
     </ModPage>
   );

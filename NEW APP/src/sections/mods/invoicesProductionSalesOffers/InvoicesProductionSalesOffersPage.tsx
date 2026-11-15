@@ -20,7 +20,7 @@ export function Page({ entry }: CompanionPageProps) {
   const { page, farmData, farmId } = useCompanionPage(entry.key);
   const money = useMoney();
   const offers = asList<Offer>(page?.offers).filter((row) => num(row.farmId) === farmId);
-  const tiles: ModStatTile[] = farmData ? [
+  const tiles: ModStatTile[] = farmData && page?.coverage !== "truncated" ? [
     { key: "posted", label: tOr("companionPage.invoicesProductionSalesOffers.posted", "Posted offers"), value: formatNumber(farmData.postedCount, 0) },
     { key: "withheld", label: tOr("companionPage.invoicesProductionSalesOffers.withheld", "Offers withheld"), value: formatNumber(farmData.withheldCount, 0) },
   ] : [];
@@ -46,7 +46,9 @@ export function Page({ entry }: CompanionPageProps) {
               pallets: num(offer.listedPallets) && num(offer.listedPallets)! > 0 ? formatNumber(offer.remainingPallets, 0) : "—",
             },
           }))}
-          empty={tOr("companionPage.invoicesProductionSalesOffers.empty", "No active owned production offer has been posted.")}
+          empty={page?.coverage === "truncated"
+            ? tOr("companionPage.invoicesProductionSalesOffers.truncated", "Only some offers are listed.")
+            : tOr("companionPage.invoicesProductionSalesOffers.empty", "No active owned production offer has been posted.")}
         />
         {page?.coverage === "truncated" ? <ModEmpty>{tOr("companionPage.invoicesProductionSalesOffers.truncated", "Only some offers are listed.")}</ModEmpty> : null}
         {page?.coverage === "partial" ? <ModEmpty>{tOr("companionPage.invoicesProductionSalesOffers.partial", "Some posted offers no longer matched a current owned production output and were withheld.")}</ModEmpty> : null}

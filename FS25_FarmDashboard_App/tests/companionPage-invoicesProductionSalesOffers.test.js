@@ -66,3 +66,25 @@ test("an available empty offer register remains a live reading", () => {
     expect(page.reason).toBeUndefined();
     expect(page.offers).toEqual({});
 });
+
+test("a capped global scan cannot claim exact farm offer totals or an empty register", () => {
+    const game = `
+        _G.g_modIsLoaded = { FS25_InvoicesProductionSales = true }
+        local offers = {}
+        for i = 1, 301 do
+            offers[i] = { sellerFarmId = 2, enabled = true }
+        end
+        _G.g_currentMission = {
+            getFarmId = function() return 1 end,
+            getIsServer = function() return true end,
+            invoicesProductionSalesManager = {
+                integrationAvailable = true, offers = offers, productionByUniqueId = {},
+            },
+        }
+    `;
+    const page = runCompanionPage(FILE, game, { farmId: 1 });
+    expect(page.readState).toBe("partial");
+    expect(page.coverage).toBe("truncated");
+    expect(page.byFarm["1"].postedCount).toBeUndefined();
+    expect(page.byFarm["1"].withheldCount).toBeUndefined();
+});

@@ -69,9 +69,12 @@ CompanionPages.register({
             return tostring(a.product or "") < tostring(b.product or "")
         end)
         return {
-            readState = withheld > 0 and "partial" or "ok",
+            readState = (truncated or withheld > 0) and "partial" or "ok",
             coverage = truncated and "truncated" or withheld > 0 and "partial" or "complete",
-            byFarm = { [tostring(farmId)] = { postedCount = posted, withheldCount = withheld } },
+            byFarm = { [tostring(farmId)] = truncated and {} or {
+                postedCount = posted,
+                withheldCount = withheld,
+            } },
             offers = rows,
         }
     end,

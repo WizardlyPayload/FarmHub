@@ -41,8 +41,10 @@ export function Page({ entry }: CompanionPageProps) {
           heading: num(row.headingDeg) == null ? "—" : `${formatNumber(row.headingDeg, 0)}°`,
           spacing: `${spacing(row.rowSpacing)} / ${spacing(row.plantSpacing)}`,
           mode: row.treeMode ? tOr(`${K}.trees`, "Trees") : tOr(`${K}.other`, "Other planting"),
-        } }))} empty={tOr(`${K}.empty`, "No Auto Grove planting record is available for a field this farm still owns.")} />
-        {page?.coverage === "truncated" ? <ModEmpty>{tOr(`${K}.truncated`, "Only part of the saved planting register was scanned or displayed.")}</ModEmpty> : null}
+        } }))} empty={page?.coverage === "truncated"
+          ? tOr(`${K}.truncated`, "Only part of the saved planting register was scanned or displayed.")
+          : tOr(`${K}.empty`, "No Auto Grove planting record is available for a field this farm still owns.")} />
+        {page?.coverage === "truncated" && rows.length > 0 ? <ModEmpty>{tOr(`${K}.truncated`, "Only part of the saved planting register was scanned or displayed.")}</ModEmpty> : null}
         {page?.coverage === "partial" ? <ModEmpty>{tOr(`${K}.partial`, "Invalid records and plantings whose current field ownership could not be confirmed were withheld.")}</ModEmpty> : null}
       </Card>
     </ModPage>

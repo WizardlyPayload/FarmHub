@@ -85,7 +85,7 @@ CompanionPages.register({
         return {
             readState = (truncated or invalid or withheld > 0) and "partial" or
                 (count > 0 and "ok" or "settings-only"),
-            reason = count == 0 and "no-current-owned-plantings" or nil,
+            reason = count == 0 and not truncated and "no-current-owned-plantings" or nil,
             coverage = truncated and "truncated" or
                 (invalid or withheld > 0) and "partial" or "complete",
             byFarm = { [tostring(farmId)] = {

@@ -95,4 +95,11 @@ test("a capped planting scan withholds farm totals", () => {
   expect(page.byFarm["1"].recordedFieldCount).toBeUndefined();
   expect(page.byFarm["1"].recordedUnitCount).toBeUndefined();
   expect(page.byFarm["1"].withheldOwnership).toBeUndefined();
+  const noOwned = runCompanionPage(FILE, `${crowded}
+    for _, record in pairs(_G["KM_82201_Auto_Grove"].FSCoreAutoPlant.Data.plantings) do
+      record.farmId = 2
+    end
+  `, { farmId: 1 });
+  expect(noOwned).toMatchObject({ readState: "partial", coverage: "truncated" });
+  expect(noOwned.reason).toBeUndefined();
 });

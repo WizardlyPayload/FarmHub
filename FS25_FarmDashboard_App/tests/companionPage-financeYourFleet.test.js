@@ -6,6 +6,9 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "FinanceYourFleetCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { KM_81456_Finance_Your_Fleet = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "KM_81456_Finance_Your_Fleet", version = "1.0.0.1" }
+  } end }
   _G.g_currentMission = { getFarmId = function() return 1 end,
     financeManager = { financeDataLoaded = true, disabledForSession = false,
       financeAgreements = {
@@ -45,5 +48,13 @@ test("reads only active, linked agreements for this farm without mutating vehicl
 test("does not expose an unready register or a mod that is not loaded", () => {
   const unready = runCompanionPage(FILE, GAME.replace("financeDataLoaded = true", "financeDataLoaded = false"), { farmId: 1 });
   expect(unready).toMatchObject({ readState: "settings-only", reason: "finance-register-unavailable" });
-  expect(runCompanionPage(FILE, GAME.replace("KM_81456_Finance_Your_Fleet = true", "OtherMod = true"), { farmId: 1 })).toBeUndefined();
+  const absent = GAME.replace("KM_81456_Finance_Your_Fleet = true", "OtherMod = true")
+    .replace('modName = "KM_81456_Finance_Your_Fleet"', 'modName = "OtherMod"');
+  expect(runCompanionPage(FILE, absent, { farmId: 1 })).toBeUndefined();
+});
+
+test("withholds agreements from an unreviewed Finance Your Fleet version", () => {
+  const newer = GAME.replace('version = "1.0.0.1"', 'version = "9.9.9.9"');
+  expect(runCompanionPage(FILE, newer, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
 });

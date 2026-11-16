@@ -10,6 +10,9 @@ CompanionPages.register({
     modNames = { "KM_81456_Finance_Your_Fleet", "FS25_FinanceYourFleet" },
     substrings = { "finance_your_fleet", "financeyourfleet" },
     collect = function(ctx)
+        if ctx.version ~= "1.0.0.1" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local farmId = ctx.farmId
         if farmId == nil or farmId <= 0 then
             return { readState = "settings-only", reason = "no-farm" }

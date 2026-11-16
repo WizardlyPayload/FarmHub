@@ -6,6 +6,9 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "InvestmentSystemCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { FS25_352944_Investment_System = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "FS25_352944_Investment_System", version = "1.1.0.0" }
+  } end }
   _G.g_currentMission = { getIsServer = function() return true end }
   _G.g_bankManager = {
     getInvestmentsForFarm = function() error("must not call a manager helper") end,
@@ -49,4 +52,10 @@ test("historical interest remains meaningful after all deposits have matured", (
   const historical = GAME.replace(/\[1\] = \{\s*\{ farmId = 1[\s\S]*?\},\s*\{ farmId = 2[\s\S]*?\},\s*\},/, "[1] = {},");
   const page = runCompanionPage(FILE, historical, { farmId: 1 });
   expect(page).toMatchObject({ readState: "ok", byFarm: { "1": { investmentCount: 0, totalEarnedAllTime: 2500 } } });
+});
+
+test("withholds investments from an unreviewed Investment System version", () => {
+  const newer = GAME.replace('version = "1.1.0.0"', 'version = "1.1.0.1"');
+  expect(runCompanionPage(FILE, newer, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
 });

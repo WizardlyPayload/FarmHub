@@ -6,6 +6,9 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "BankAndCreditLoansCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { KM_77828_Bank_And_Credit = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "KM_77828_Bank_And_Credit", version = "1.1.0.0" }
+  } end }
   _G.g_currentMission = {
     getFarmId = function() return 1 end,
     getIsServer = function() return true end,
@@ -39,6 +42,12 @@ test("withholds client and absent repository state", () => {
     .toMatchObject({ readState: "settings-only", reason: "server-unavailable" });
   expect(runCompanionPage(FILE, GAME.replace("bankManager = { repository = { loans = {", "bankManager = { repository = { other = {"), { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "bank-repository-unavailable" });
-  expect(runCompanionPage(FILE, GAME.replace("KM_77828_Bank_And_Credit = true", "OtherMod = true"), { farmId: 1 }))
+  expect(runCompanionPage(FILE, GAME.replaceAll("KM_77828_Bank_And_Credit", "OtherMod"), { farmId: 1 }))
     .toBeUndefined();
+});
+
+test("withholds loans from an unreviewed Bank And Credit version", () => {
+  const newer = GAME.replace('version = "1.1.0.0"', 'version = "1.1.0.1"');
+  expect(runCompanionPage(FILE, newer, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
 });

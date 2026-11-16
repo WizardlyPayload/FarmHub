@@ -14,6 +14,9 @@ CompanionPages.register({
     modNames = { "FS25_352944_Investment_System", "FS25_InvestmentSystem" },
     substrings = { "investment_system", "investmentsystem" },
     collect = function(ctx)
+        if ctx.version ~= "1.1.0.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local farmId, mission = ctx.num(ctx.farmId), ctx.mission
         if farmId == nil or farmId <= 0 or farmId ~= math.floor(farmId) then
             return { readState = "settings-only", reason = "selected-farm-unavailable" }

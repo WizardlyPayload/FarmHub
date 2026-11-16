@@ -9,6 +9,9 @@ CompanionPages.register({
     modNames = { "KM_77828_Bank_And_Credit", "FS25_BankAndCredit" },
     substrings = { "bank_and_credit", "bankandcredit" },
     collect = function(ctx)
+        if ctx.version ~= "1.1.0.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local farmId, mission = ctx.farmId, ctx.mission
         if farmId == nil or farmId <= 0 then
             return { readState = "settings-only", reason = "no-farm" }

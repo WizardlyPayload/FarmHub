@@ -9,6 +9,9 @@ CompanionPages.register({
     modNames = { "KM_82100_FUTURES_MARKET", "FS25_FuturesMarket" },
     substrings = { "futures_market", "futuresmarket" },
     collect = function(ctx)
+        if ctx.version ~= "1.2.0.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local farmId = ctx.farmId
         local mission = ctx.mission
         if farmId == nil or farmId <= 0 then

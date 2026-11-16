@@ -22,14 +22,14 @@ local function ownedHusbandries(ctx)
     local farmId = ctx.farmId
     local mission = ctx.mission
     if farmId == nil or type(mission) ~= "table" then
-        return out, truncated
+        return out, truncated, false
     end
     local list = type(mission.husbandrySystem) == "table" and mission.husbandrySystem.placeables or nil
     if type(list) ~= "table" then
         list = type(mission.placeableSystem) == "table" and mission.placeableSystem.placeables or nil
     end
     if type(list) ~= "table" then
-        return out, truncated
+        return out, truncated, false
     end
     local scanned = 0
     for _, placeable in pairs(list) do
@@ -45,7 +45,7 @@ local function ownedHusbandries(ctx)
             end
         end
     end
-    return out, truncated
+    return out, truncated, true
 end
 
 local function readPen(ctx, prod, placeable, period, fee)
@@ -112,6 +112,9 @@ CompanionPages.register({
     modNames = { "FS25_SeasonalWoolProduction", "FS25_356143_Seasonal_Wool_Production" },
     substrings = { "seasonalwool", "seasonal_wool" },
     collect = function(ctx)
+        if ctx.version ~= "1.0.0.2" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local prod = ctx.symbol("g_seasonalWoolProduction")
         local settings = ctx.symbol("g_seasonalWoolSettings")
         if type(prod) ~= "table" and type(settings) ~= "table" then
@@ -178,8 +181,9 @@ CompanionPages.register({
         end
 
         if ctx.farmId ~= nil then
-            local owned, truncated = ownedHusbandries(ctx)
+            local owned, truncated, listAvailable = ownedHusbandries(ctx)
             local pens, sheep, mature, pending, cost = {}, 0, 0, 0, 0
+            local countsComplete, pendingComplete, costComplete = true, true, fee ~= nil
             for _, placeable in ipairs(owned) do
                 local okRow, row = pcall(readPen, ctx, prod, placeable, out.currentPeriod, fee)
                 if not okRow then
@@ -190,19 +194,35 @@ CompanionPages.register({
                     else
                         truncated = true
                     end
-                    sheep = sheep + (row.totalSheep or 0)
-                    mature = mature + (row.matureSheep or 0)
-                    pending = pending + (row.pendingWoolLiters or 0)
-                    cost = cost + (row.nextShearingCost or 0)
+                    if row.totalSheep == nil or row.matureSheep == nil then
+                        countsComplete = false
+                    else
+                        sheep = sheep + row.totalSheep
+                        mature = mature + row.matureSheep
+                    end
+                    if row.pendingWoolLiters == nil then
+                        pendingComplete = false
+                    else
+                        pending = pending + row.pendingWoolLiters
+                    end
+                    if row.nextShearingCost == nil then
+                        costComplete = false
+                    else
+                        cost = cost + row.nextShearingCost
+                    end
                 end
+            end
+            local complete = listAvailable and not truncated and not failed
+            if not complete or not countsComplete or not pendingComplete or not costComplete then
+                out.readState = "partial"
             end
             out.byFarm = {
                 [tostring(ctx.farmId)] = {
-                    penCount = #pens,
-                    totalSheep = sheep,
-                    matureSheep = mature,
-                    pendingWoolLiters = ctx.round2(pending),
-                    nextShearingCost = fee ~= nil and ctx.round2(cost) or nil,
+                    penCount = complete and #pens or nil,
+                    totalSheep = complete and countsComplete and sheep or nil,
+                    matureSheep = complete and countsComplete and mature or nil,
+                    pendingWoolLiters = complete and pendingComplete and ctx.round2(pending) or nil,
+                    nextShearingCost = complete and costComplete and ctx.round2(cost) or nil,
                     truncated = truncated,
                     pens = pens,
                 },

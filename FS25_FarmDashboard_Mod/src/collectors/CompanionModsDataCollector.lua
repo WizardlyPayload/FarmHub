@@ -4876,6 +4876,10 @@ local function collectRealisticVehicleService()
     if farmId == nil then
         return { enabled = true, readState = "unavailable", source = "realisticVehicleService", reason = "no-farm" }
     end
+    local loadedName = findLoadedName({ names = RVS_MODS })
+    if loadedName == nil or modVersion(loadedName) ~= "1.0.0.0" then
+        return { enabled = true, readState = "unavailable", source = "realisticVehicleService", farmId = farmId, reason = "unreviewed-version" }
+    end
     if providerSymbol(RVS_MODS, "RealisticVehiclesFaultSystem") == nil and providerSymbol(RVS_MODS, "g_realisticVehicles") == nil then
         return { enabled = true, readState = "unavailable", source = "realisticVehicleService", farmId = farmId }
     end

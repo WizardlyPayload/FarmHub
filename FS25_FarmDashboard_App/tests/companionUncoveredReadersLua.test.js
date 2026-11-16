@@ -26,6 +26,10 @@ test("livestock display and two vehicle-service readers keep only the active far
         }}}
         g_modIsLoaded={FS25_LivestockMonitor=true,
             FS25_ExtendedVehicleMaintenance=true, FS25_RealisticVehicleService=true}
+        rvsVersion='1.0.0.0'
+        g_modManager={getActiveMods=function() return {
+            {modName='FS25_RealisticVehicleService', version=rvsVersion}
+        } end}
         _G.FS25_LivestockMonitor={
             LivestockMonitorSettings={displayMode='alerts', hudRefreshSec=10},
             LivestockMonitorAlerts={queue={'one','two'}, current='one'}}
@@ -34,6 +38,8 @@ test("livestock display and two vehicle-service readers keep only the active far
     `;
     const expression = `
         local o=CompanionModsDataCollector:collect()
+        rvsVersion='1.0.0.1'
+        local unreviewed=CompanionModsDataCollector:collect().realisticVehicleService
         return table.concat({
             o.livestockMonitor.readState, o.livestockMonitor.displayMode,
             tostring(o.livestockMonitor.queuedAlerts),
@@ -44,6 +50,7 @@ test("livestock display and two vehicle-service readers keep only the active far
             o.realisticVehicleService.readState,
             tostring(#o.realisticVehicleService.machines),
             tostring(o.realisticVehicleService.machines[1].condition),
+            unreviewed.readState, unreviewed.reason,
         }, '|')
     `;
     const L = lauxlib.luaL_newstate();
@@ -52,5 +59,5 @@ test("livestock display and two vehicle-service readers keep only the active far
         throw new Error(to_jsstring(lua.lua_tostring(L, -1)));
     }
     expect(to_jsstring(lua.lua_tostring(L, -1)))
-        .toBe("ok|alerts|2|ok|1|13|0.12|ok|1|75");
+        .toBe("ok|alerts|2|ok|1|13|0.12|ok|1|75|unavailable|unreviewed-version");
 });

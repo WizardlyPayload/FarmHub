@@ -8,6 +8,9 @@ const FILE = "BaleBatchTrackerCollector.lua";
 test("reads only a snapshot explicitly scoped to the export farm", () => {
     const setup = `
       _G.g_modIsLoaded = { FS25_374533_Bale_Batch_Tracker = true }
+      _G.g_modManager = { getActiveMods = function() return {
+        { modName = "FS25_374533_Bale_Batch_Tracker", version = "1.0.0.0" }
+      } end }
       _G.FS25_374533_Bale_Batch_Tracker = { BaleBatchTracker = { snapshot = {
         farmId = 1, totalCount = 14, fermentingCount = 4, readyCount = 8,
         physicalCount = 10, storedCount = 4,
@@ -36,6 +39,9 @@ test("reads only a snapshot explicitly scoped to the export farm", () => {
 test("never reads a shared or farm-unknown bale snapshot", () => {
     const setup = `
       _G.g_modIsLoaded = { FS25_374533_Bale_Batch_Tracker = true }
+      _G.g_modManager = { getActiveMods = function() return {
+        { modName = "FS25_374533_Bale_Batch_Tracker", version = "1.0.0.0" }
+      } end }
       _G.BaleBatchTracker = { snapshot = { farmId = 1, totalCount = 500 } }
       _G.FS25_374533_Bale_Batch_Tracker = { BaleBatchTracker = { snapshot = {
         totalCount = 500, groups = { { state = "ready", count = 500 } }
@@ -44,4 +50,19 @@ test("never reads a shared or farm-unknown bale snapshot", () => {
     expect(runCompanionPage(FILE, setup, { farmId: 1 })).toMatchObject({
         readState: "settings-only", reason: "farm-scope-mismatch",
     });
+});
+
+test("withholds an unreviewed snapshot version", () => {
+    const setup = `
+      _G.g_modIsLoaded = { FS25_374533_Bale_Batch_Tracker = true }
+      _G.g_modManager = { getActiveMods = function() return {
+        { modName = "FS25_374533_Bale_Batch_Tracker", version = "1.1.0.0" }
+      } end }
+      _G.FS25_374533_Bale_Batch_Tracker = { BaleBatchTracker = { snapshot = {
+        farmId = 1, totalCount = 14, groups = { { state = "ready", count = 14 } }
+      } } }
+    `;
+    const page = runCompanionPage(FILE, setup, { farmId: 1 });
+    expect(page).toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
+    expect(page.byFarm).toBeUndefined();
 });

@@ -9,6 +9,9 @@ CompanionPages.register({
     modNames = { "FS25_Bale_Batch_Tracker", "FS25_374533_Bale_Batch_Tracker" },
     substrings = { "balebatchtracker", "bale_batch_tracker" },
     collect = function(ctx)
+        if ctx.version ~= "1.0.0.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local farmId = ctx.farmId
         if farmId == nil or farmId <= 0 then
             return { readState = "settings-only", reason = "no-farm" }

@@ -83,15 +83,15 @@ CompanionPages.register({
         end
         table.sort(rows, function(a, b) return a.fieldId < b.fieldId end)
         return {
-            readState = (invalid or withheld > 0) and "partial" or
+            readState = (truncated or invalid or withheld > 0) and "partial" or
                 (count > 0 and "ok" or "settings-only"),
             reason = count == 0 and "no-current-owned-plantings" or nil,
             coverage = truncated and "truncated" or
                 (invalid or withheld > 0) and "partial" or "complete",
             byFarm = { [tostring(farmId)] = {
-                recordedFieldCount = count,
-                recordedUnitCount = units,
-                withheldOwnership = withheld,
+                recordedFieldCount = not truncated and count or nil,
+                recordedUnitCount = not truncated and units or nil,
+                withheldOwnership = not truncated and withheld or nil,
             } },
             rows = rows,
         }

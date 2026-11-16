@@ -81,3 +81,18 @@ test("FSCore edition, client and missing ownership mapping never claim plantings
     withheldOwnership: 3 });
   expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", { farmId: 1 })).toBeUndefined();
 });
+
+test("a capped planting scan withholds farm totals", () => {
+  const crowded = `${GAME}
+    local plantings = _G["KM_82201_Auto_Grove"].FSCoreAutoPlant.Data.plantings
+    for id = 1000, 1501 do
+      plantings[tostring(id)] = { farmId = 2, crop = "olive", count = 1,
+        headingDeg = 0, rowSpacing = 5, plantSpacing = 2 }
+    end
+  `;
+  const page = runCompanionPage(FILE, crowded, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "truncated" });
+  expect(page.byFarm["1"].recordedFieldCount).toBeUndefined();
+  expect(page.byFarm["1"].recordedUnitCount).toBeUndefined();
+  expect(page.byFarm["1"].withheldOwnership).toBeUndefined();
+});

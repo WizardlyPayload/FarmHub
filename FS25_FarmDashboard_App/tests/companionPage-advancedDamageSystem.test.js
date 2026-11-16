@@ -96,3 +96,25 @@ test("requires the reviewed version and server vehicle ownership", () => {
     "getIsServer = function() return false end"), { farmId: 1 });
   expect(client).toMatchObject({ readState: "settings-only", reason: "server-vehicles-only" });
 });
+
+test("reads the exact as-found v0.9.2.8 schema and excludes its player-excluded vehicles", () => {
+  const newer = GAME.replace('version = "0.9.2.4"', 'version = "0.9.2.8"')
+    .replace('uniqueId = "tractor-1", getFullName',
+      'uniqueId = "tractor-1", getIsADSExcluded = function() return false end, getFullName')
+    .replace('uniqueId = "excluded", spec_AdvancedDamageSystem',
+      'uniqueId = "excluded", getIsADSExcluded = function() return true end, spec_AdvancedDamageSystem');
+  const page = runCompanionPage(FILE, newer, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "ok", coverage: "complete",
+    byFarm: { "1": { vehicleCount: 1, breakdownVehicleCount: 1 } } });
+  expect(page.rows).toHaveLength(1);
+  expect(page.rows[0]).toMatchObject({ vehicleId: "tractor-1", breakdownCount: 2,
+    serviceLevel: 0.42, conditionLevel: 0.67 });
+});
+
+test("withholds v0.9.2.8 totals if its exclusion method is missing", () => {
+  const newer = GAME.replace('version = "0.9.2.4"', 'version = "0.9.2.8"');
+  const page = runCompanionPage(FILE, newer, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(page.byFarm).toBeUndefined();
+  expect(page.rows[0]).toBeUndefined();
+});

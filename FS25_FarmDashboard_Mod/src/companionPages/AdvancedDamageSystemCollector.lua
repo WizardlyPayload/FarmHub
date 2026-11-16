@@ -1,4 +1,4 @@
--- Advanced Damage System v0.9.2.4: read only currently owned vehicle state.
+-- Advanced Damage System v0.9.2.4 / v0.9.2.8: read only currently owned vehicle state.
 -- Workshop log prices are recorded charges, not verified farm payments.
 
 local MAX_ROWS, MAX_BREAKDOWNS, MAX_LOG_ENTRIES = 60, 100, 200
@@ -69,7 +69,7 @@ CompanionPages.register({
         if ctx.call(ctx.mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-vehicles-only" }
         end
-        if ctx.version ~= "0.9.2.4" then
+        if ctx.version ~= "0.9.2.4" and ctx.version ~= "0.9.2.8" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
         local vehicles = ctx.ownedVehicles()
@@ -84,7 +84,17 @@ CompanionPages.register({
             if type(vehicle) == "table" then
                 local owner = ctx.num(vehicle.ownerFarmId) or ctx.num(ctx.call(vehicle, "getOwnerFarmId"))
                 local spec = vehicle.spec_AdvancedDamageSystem
-                if owner == farmId and type(spec) == "table" and spec.isExcludedVehicle ~= true then
+                local excluded = false
+                if owner == farmId and type(spec) == "table" then
+                    if ctx.version == "0.9.2.8" then
+                        -- v0.9.2.8 replaced the old flag with this registered vehicle method.
+                        excluded = ctx.call(vehicle, "getIsADSExcluded")
+                        if type(excluded) ~= "boolean" then incomplete = true end
+                    else
+                        excluded = spec.isExcludedVehicle == true
+                    end
+                end
+                if owner == farmId and type(spec) == "table" and excluded == false then
                     captured = captured + 1
                     local breakdownCount, breakdownLimit, breakdownInvalid = countActiveBreakdowns(spec.activeBreakdowns)
                     local log = type(spec.maintenanceLog) == "table" and spec.maintenanceLog or {}
@@ -136,8 +146,8 @@ CompanionPages.register({
             return an < bn
         end)
         return {
-            readState = captured == 0 and "settings-only" or (incomplete or truncated) and "partial" or "ok",
-            reason = captured == 0 and "no-captured-owned-vehicle" or nil,
+            readState = (incomplete or truncated) and "partial" or captured == 0 and "settings-only" or "ok",
+            reason = captured == 0 and not (incomplete or truncated) and "no-captured-owned-vehicle" or nil,
             coverage = truncated and "truncated" or incomplete and "partial" or "complete",
             byFarm = not (incomplete or truncated) and { [tostring(farmId)] = {
                 vehicleCount = captured,

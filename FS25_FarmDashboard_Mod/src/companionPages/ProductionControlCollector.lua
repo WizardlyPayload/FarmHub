@@ -11,6 +11,9 @@ CompanionPages.register({
     modNames = { "FS25_ProductionControl", "FS25_319198_Production_Control" },
     substrings = { "productioncontrol", "production_control" },
     collect = function(ctx)
+        if ctx.version ~= "1.0.0.2" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local farmId = ctx.farmId
         local mission = ctx.mission
         local manager = type(mission) == "table" and mission.productionChainManager or nil
@@ -76,9 +79,12 @@ CompanionPages.register({
             return tostring(a.recipe or "") < tostring(b.recipe or "")
         end)
         return {
-            readState = missing and "partial" or "ok",
-            coverage = truncated and "truncated" or "complete",
-            byFarm = { [tostring(farmId)] = { lineCount = count, changedCount = changed } },
+            readState = (missing or truncated) and "partial" or "ok",
+            coverage = truncated and "truncated" or missing and "partial" or "complete",
+            byFarm = { [tostring(farmId)] = {
+                lineCount = not truncated and count or nil,
+                changedCount = not (missing or truncated) and changed or nil,
+            } },
             lines = lines,
         }
     end,

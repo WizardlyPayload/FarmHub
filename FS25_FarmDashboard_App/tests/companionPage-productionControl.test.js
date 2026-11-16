@@ -6,6 +6,9 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "ProductionControlCollector.lua";
 const GAME = `
     _G.g_modIsLoaded = { FS25_319198_Production_Control = true }
+    _G.g_modManager = { getActiveMods = function() return {
+        { modName = "FS25_319198_Production_Control", version = "1.0.0.2" }
+    } end }
     local owned = {
         ownerFarmId = 1, owningPlaceable = { uniqueId = "bakery-1" },
         getName = function() return "Bakery" end,
@@ -39,4 +42,24 @@ test("reads only the export farm's chosen speeds and their effective figures", (
 
 test("no loaded mod produces no page", () => {
     expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", { farmId: 1 })).toBeUndefined();
+});
+
+test("withholds an unreviewed version instead of interpreting production state", () => {
+    const page = runCompanionPage(FILE, GAME.replace('version = "1.0.0.2"', 'version = "1.0.0.3"'), { farmId: 1 });
+    expect(page).toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
+    expect(page.lines).toBeUndefined();
+});
+
+test("withholds farm totals when a production point exceeds the recipe scan cap", () => {
+    const setup = `${GAME}
+        for i = 1, 9 do
+            owned.productions[i] = { id = "R" .. i,
+                productionControlSelfSpec_productivity = 150 }
+        end
+    `;
+    const page = runCompanionPage(FILE, setup, { farmId: 1 });
+    expect(page).toMatchObject({ readState: "partial", coverage: "truncated" });
+    expect(page.lines).toHaveLength(8);
+    expect(page.byFarm["1"].lineCount).toBeUndefined();
+    expect(page.byFarm["1"].changedCount).toBeUndefined();
 });

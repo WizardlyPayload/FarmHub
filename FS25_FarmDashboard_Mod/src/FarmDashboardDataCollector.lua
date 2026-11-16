@@ -3642,7 +3642,16 @@ function FarmDashboardDataCollector:buildAdsSummary(vehicles)
             if ads.inService then
                 summary.inServiceCount = summary.inServiceCount + 1
             end
-            if (ads.breakdownCount or 0) > 0 then
+            local hasActiveVisibleFault = false
+            if type(ads.breakdownParts) == "table" then
+                for _, part in ipairs(ads.breakdownParts) do
+                    if type(part) == "table" and part.isActive == true and part.isVisible ~= false then
+                        hasActiveVisibleFault = true
+                        break
+                    end
+                end
+            end
+            if hasActiveVisibleFault then
                 summary.breakdownVehicleCount = summary.breakdownVehicleCount + 1
             end
             if ads.intervalRatio ~= nil and ads.intervalRatio > 1 then

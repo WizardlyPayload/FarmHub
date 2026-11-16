@@ -676,6 +676,22 @@ return "missing"
 });
 
 describe("098 vehicle ownership under the native mod environment", () => {
+    test("ADS fleet total counts only vehicles with active visible faults", () => {
+        const body = `
+local summary = FarmDashboardDataCollector:buildAdsSummary({
+    { ads = { enabled = true, breakdownCount = 2, breakdownParts = {
+        { id = "engine", isActive = true, isVisible = true },
+        { id = "suspended", isActive = false, isVisible = true },
+    } } },
+    { ads = { enabled = true, breakdownCount = 1, breakdownParts = {
+        { id = "suspended-only", isActive = false, isVisible = true },
+    } } },
+})
+return tostring(summary.vehicleCount) .. ":" .. tostring(summary.breakdownVehicleCount)
+`;
+        expect(run({ files: MAIN_COLLECTOR_FILES, body })).toBe("2:1");
+    });
+
     test("generic ADS view reads the same visible faults as the dedicated page", () => {
         const body = `
 local vehicle = {

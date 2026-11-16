@@ -15,7 +15,10 @@ const GAME = `
         spec_AdvancedDamageSystem = {
           serviceLevel = 0.42, conditionLevel = 0.67,
           currentState = "ads_spec_state_broken",
-          activeBreakdowns = { engine = {}, hydraulic = {}, suspended = { isActive = false } },
+          activeBreakdowns = { engine = { isVisible = true, isActive = true },
+            hydraulic = { isVisible = true, isActive = true },
+            hidden = { isVisible = false, isActive = true },
+            suspended = { isVisible = true, isActive = false } },
           maintenanceLog = {
             { type = "ads_spec_state_inspection", price = 80, isVisible = true, isCompleted = true },
             { type = "ads_spec_state_repair", price = 900, isVisible = false, isCompleted = false },
@@ -31,7 +34,7 @@ const GAME = `
     } } }
 `;
 
-test("reads owned ADS condition and only visible completed work without mutating vehicles", () => {
+test("reads owned ADS condition and visible active faults without mutating vehicles", () => {
   const page = runCompanionPage(FILE, GAME, { farmId: 1 });
   expect(page).toMatchObject({ readState: "ok", coverage: "complete",
     byFarm: { "1": { vehicleCount: 1, breakdownVehicleCount: 1, loggedVehicleCount: 1 } } });
@@ -57,11 +60,22 @@ test("withholds totals when the breakdown register is too large", () => {
 });
 
 test("withholds malformed breakdown entries rather than reporting an active count", () => {
-  const page = runCompanionPage(FILE, GAME.replace("suspended = { isActive = false }",
+  const page = runCompanionPage(FILE, GAME.replace("suspended = { isVisible = true, isActive = false }",
     "suspended = 1"), { farmId: 1 });
   expect(page).toMatchObject({ readState: "partial", coverage: "partial" });
   expect(page.byFarm).toBeUndefined();
   expect(page.rows[0].breakdownCount).toBeUndefined();
+});
+
+test("does not warn about latent faults absent from the ADS workshop", () => {
+  const page = runCompanionPage(FILE, GAME.replace(
+    'engine = { isVisible = true, isActive = true },',
+    'engine = { isVisible = false, isActive = true },').replace(
+    'hydraulic = { isVisible = true, isActive = true },',
+    'hydraulic = { isVisible = false, isActive = true },'), { farmId: 1 });
+  expect(page).toMatchObject({ readState: "ok", coverage: "complete",
+    byFarm: { "1": { vehicleCount: 1, breakdownVehicleCount: 0 } } });
+  expect(page.rows[0].breakdownCount).toBe(0);
 });
 
 test("withholds a malformed maintenance log instead of implying no completed work", () => {

@@ -46,7 +46,11 @@ local function countActiveBreakdowns(value)
                 flag = string.lower(flag)
                 if flag == "false" or flag == "0" then flag = false end
             end
-            if flag ~= false then active = active + 1 end
+            -- ADS creates latent faults with isVisible=false. The workshop only
+            -- lists visible faults, so do not present hidden ones as jobs.
+            if flag ~= false and breakdown.isVisible == true then
+                active = active + 1
+            end
         end
     end
     if invalid then return nil, false, true end

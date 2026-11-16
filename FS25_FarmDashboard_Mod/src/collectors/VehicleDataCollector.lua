@@ -127,11 +127,9 @@ function VehicleDataCollector:_buildAdsInspection(vehicle, spec)
     end
 
     local registry = _G.ADS_Breakdowns and _G.ADS_Breakdowns.BreakdownRegistry
+    -- Both reviewed ADS builds keep the authoritative register on the spec.
+    -- A vehicle method can be replaced by another specialization at runtime.
     local activeBreakdowns = spec.activeBreakdowns
-    if vehicle.getActiveBreakdowns then
-        local ok, ab = pcall(function() return vehicle:getActiveBreakdowns() end)
-        if ok and type(ab) == "table" then activeBreakdowns = ab end
-    end
     if registry and activeBreakdowns then
         local targetMap = ADS_INSPECTION_TARGET_TITLE
         for breakdownId, breakdown in pairs(activeBreakdowns) do
@@ -222,10 +220,6 @@ function VehicleDataCollector:_serializeAdsBreakdownParts(vehicle, spec)
     local registry = _G.ADS_Breakdowns and _G.ADS_Breakdowns.BreakdownRegistry
 
     local activeBreakdowns = spec.activeBreakdowns
-    if vehicle.getActiveBreakdowns then
-        local ok, ab = pcall(function() return vehicle:getActiveBreakdowns() end)
-        if ok and type(ab) == "table" then activeBreakdowns = ab end
-    end
     if not activeBreakdowns then return parts end
 
     local partTypeOem = "ads_spec_part_types_oem"
@@ -293,9 +287,16 @@ end
 function VehicleDataCollector:_serializeAdsData(vehicle)
     local ok, ads = pcall(function()
         local spec = vehicle and vehicle.spec_AdvancedDamageSystem
-        if not spec or spec.isExcludedVehicle then
+        if not spec then
             return nil
         end
+        local excluded = spec.isExcludedVehicle
+        if type(vehicle.getIsADSExcluded) == "function" then
+            local valid, value = pcall(vehicle.getIsADSExcluded, vehicle)
+            if not valid or type(value) ~= "boolean" then return nil end
+            excluded = value
+        end
+        if excluded ~= false then return nil end
 
         local ads = { enabled = true }
 

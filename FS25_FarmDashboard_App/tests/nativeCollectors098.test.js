@@ -676,6 +676,41 @@ return "missing"
 });
 
 describe("098 vehicle ownership under the native mod environment", () => {
+    test("generic ADS view reads the same visible faults as the dedicated page", () => {
+        const body = `
+local vehicle = {
+    spec_AdvancedDamageSystem = {
+        isExcludedVehicle = false, conditionLevel = 0.55, serviceLevel = 0.88,
+        currentState = "ads_spec_state_ready",
+        activeBreakdowns = { engine = { isVisible = true, isActive = true, stage = 1 } },
+    },
+    getActiveBreakdowns = function() return {} end,
+}
+local ads = VehicleDataCollector:_serializeAdsData(vehicle)
+return tostring(ads and ads.breakdownCount) .. ":" .. tostring(ads and ads.breakdownParts and ads.breakdownParts[1] and ads.breakdownParts[1].id)
+`;
+        expect(run({ files: VEHICLE_FILES, body })).toBe("1:engine");
+    });
+
+    test("generic ADS view respects the v0.9.2.8 exclusion method", () => {
+        const body = `
+local vehicle = {
+    spec_AdvancedDamageSystem = { conditionLevel = 0.55, serviceLevel = 0.88,
+        activeBreakdowns = { engine = { isVisible = true, isActive = true } } },
+    getIsADSExcluded = function() return false end,
+}
+local included = VehicleDataCollector:_serializeAdsData(vehicle)
+vehicle.getIsADSExcluded = function() return true end
+local excluded = VehicleDataCollector:_serializeAdsData(vehicle)
+vehicle.getIsADSExcluded = function() error("unavailable") end
+local unknown = VehicleDataCollector:_serializeAdsData(vehicle)
+vehicle.getIsADSExcluded = nil
+local noReviewedShape = VehicleDataCollector:_serializeAdsData(vehicle)
+return tostring(included and included.breakdownCount) .. ":" .. tostring(excluded) .. ":" .. tostring(unknown) .. ":" .. tostring(noReviewedShape)
+`;
+        expect(run({ files: VEHICLE_FILES, body })).toBe("1:nil:nil:nil");
+    });
+
     test("Tornado Physics reports only a linked owned repair in the reviewed server version", () => {
         const body = `
 local name = "FS25_344814_FS25_TornadoPhysics"

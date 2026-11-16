@@ -6,6 +6,9 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "CropInsuranceCollector.lua";
 const SETUP = `
   _G.g_modIsLoaded = { KM_82103_Crop_Insurance = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "KM_82103_Crop_Insurance", version = "1.0.0.0" }
+  } end }
   _G.g_currentMission = { getFarmId = function() return 1 end,
     getIsServer = function() return true end }
   _G.KM_82103_Crop_Insurance = { CropInsurance = {
@@ -49,6 +52,12 @@ test("withholds client and unbound policy register", () => {
   const shadow = SETUP.replace("_G.KM_82103_Crop_Insurance = { CropInsurance = {", "_G.shadow = { CropInsurance = {");
   expect(runCompanionPage(FILE, shadow, { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "no-policy-register" });
+});
+
+test("withholds policy data from an unreviewed Crop Insurance version", () => {
+  const newer = SETUP.replace('version = "1.0.0.0"', 'version = "9.9.9.9"');
+  expect(runCompanionPage(FILE, newer, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
 });
 
 test("reports an empty authoritative register as an empty reading", () => {

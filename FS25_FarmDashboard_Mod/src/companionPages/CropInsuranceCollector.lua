@@ -10,6 +10,9 @@ CompanionPages.register({
     modNames = { "KM_82103_Crop_Insurance", "FS25_CropInsurance" },
     substrings = { "crop_insurance", "cropinsurance" },
     collect = function(ctx)
+        if ctx.version ~= "1.0.0.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local farmId = ctx.farmId
         if farmId == nil or farmId <= 0 then
             return { readState = "settings-only", reason = "no-farm" }

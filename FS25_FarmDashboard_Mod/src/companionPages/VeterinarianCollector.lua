@@ -16,6 +16,9 @@ CompanionPages.register({
         if ctx.call(ctx.mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-state-only" }
         end
+        if ctx.version ~= "0.9.0.1" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local veterinarian = ctx.symbol("g_veterinarian")
         local system = type(ctx.mission) == "table" and ctx.mission.placeableSystem or nil
         local placeables = type(system) == "table" and system.placeables or nil
@@ -42,9 +45,9 @@ CompanionPages.register({
                 if ctx.num(x) ~= nil and ctx.num(z) ~= nil then
                     local key = string.format("%s@%.1f@%.1f", pen.configFileName or "husbandry", x, z)
                     local state = veterinarian.states[key]
-                    if type(state) == "table" and ctx.num(state.sick) ~= nil then
+                    local sick = type(state) == "table" and ctx.num(state.sick) or nil
+                    if sick ~= nil and sick >= 0 and sick == math.floor(sick) then
                         matched = matched + 1
-                        local sick = math.max(0, math.floor(ctx.num(state.sick)))
                         sickTotal = sickTotal + sick
                         if #rows < MAX_ROWS then
                             local disease = ctx.num(state.disease)
@@ -64,12 +67,20 @@ CompanionPages.register({
         end
         table.sort(rows, function(a, b) return tostring(a.pen or "") < tostring(b.pen or "") end)
         local incomplete = owned > matched
+        local coverage = truncated and "truncated" or incomplete and "partial" or "complete"
+        local ownedPens = owned
+        if truncated then ownedPens = nil end
         return {
-            readState = matched == 0 and "settings-only" or incomplete and "partial" or "ok",
-            reason = matched == 0 and "no-owned-pen-state" or incomplete and "pen-states-incomplete" or nil,
-            coverage = truncated and "truncated" or incomplete and "partial" or "complete",
+            readState = truncated and "partial" or matched == 0 and "settings-only"
+                or incomplete and "partial" or "ok",
+            reason = truncated and "pen-scan-truncated"
+                or matched == 0 and "no-owned-pen-state"
+                or incomplete and "pen-states-incomplete" or nil,
+            coverage = coverage,
             byFarm = { [tostring(farmId)] = {
-                ownedPens = owned, observedPens = matched, sickAnimals = sickTotal,
+                ownedPens = ownedPens,
+                observedPens = matched,
+                sickAnimals = coverage == "complete" and sickTotal or nil,
             } },
             rows = rows,
         }

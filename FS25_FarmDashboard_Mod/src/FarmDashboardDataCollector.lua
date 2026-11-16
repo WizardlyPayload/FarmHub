@@ -3212,16 +3212,6 @@ function FarmDashboardDataCollector:ensureModLinkedCollectorsEnabled(persist)
     return changed
 end
 
-function FarmDashboardDataCollector:isAdvancedDamageSystemLoaded()
-    if _G.g_modIsLoaded and _G.g_modIsLoaded["FS25_AdvancedDamageSystem"] then
-        return true
-    end
-    if _G.g_currentMission and _G.g_currentMission.advancedDamageSystem then
-        return true
-    end
-    return rawget(_G, "AdvancedDamageSystem") ~= nil
-end
-
 function FarmDashboardDataCollector:isVehicleMileageLoaded()
     if _G.g_modIsLoaded and (_G.g_modIsLoaded["FS25_VehicleMileage"] or _G.g_modIsLoaded["FS25_Vehicle_Mileage"]) then
         return true
@@ -3664,14 +3654,16 @@ function FarmDashboardDataCollector:buildAdsSummary(vehicles)
 end
 
 function FarmDashboardDataCollector:isAdvancedDamageSystemLoaded()
-    if _G.g_modIsLoaded and _G.g_modIsLoaded["FS25_AdvancedDamageSystem"] then
-        return true
-    end
-    if _G.g_modManager and _G.g_modManager.getActiveModByName then
-        local ok, mod = pcall(function()
-            return _G.g_modManager:getActiveModByName("FS25_AdvancedDamageSystem")
-        end)
-        if ok and mod ~= nil then return true end
+    for _, name in ipairs({ "FS25_AdvancedDamageSystem", "KM_69590_Advanced_Damage_System" }) do
+        if _G.g_modIsLoaded and _G.g_modIsLoaded[name] then
+            return true
+        end
+        if _G.g_modManager and _G.g_modManager.getActiveModByName then
+            local ok, mod = pcall(function()
+                return _G.g_modManager:getActiveModByName(name)
+            end)
+            if ok and mod ~= nil then return true end
+        end
     end
     return false
 end

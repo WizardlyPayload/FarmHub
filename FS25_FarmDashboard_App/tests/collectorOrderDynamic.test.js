@@ -86,3 +86,34 @@ test('mod discovery is paced by game time while direct flag changes are immediat
         '3|weather||fields,rfSoilFertilizer|fields,rfSoilFertilizer',
     );
 });
+
+test('the reviewed ADS vault alias enables the generic vehicle collector', () => {
+    const L = lauxlib.luaL_newstate();
+    lualib.luaL_openlibs(L);
+    const script = [
+        'Logging = { info = function() end }',
+        'FarmDashLog = { devWarn = function() end, dev = function() end, error = function() end }',
+        source,
+        `local C = FarmDashboardDataCollector
+        C.config = { enableVehicles = false }
+        C.isVehicleYearsLoaded = function() return false end
+        C.isVehicleMileageLoaded = function() return false end
+        C.isPrecisionFarmingLoaded = function() return false end
+        C.isMoistureSystemLoaded = function() return false end
+        C.isRealisticLivestockLoaded = function() return false end
+        g_modIsLoaded = { KM_69590_Advanced_Damage_System = true }
+        local aliasLoaded = C:isAdvancedDamageSystemLoaded()
+        local order = table.concat(C:getEnabledCollectorOrder(), ',')
+        g_modIsLoaded = {}
+        local absent = C:isAdvancedDamageSystemLoaded()
+        g_modIsLoaded = { FS25_AdvancedDamageSystem = true }
+        local canonicalLoaded = C:isAdvancedDamageSystemLoaded()
+        return tostring(aliasLoaded) .. '|' .. order .. '|' .. tostring(absent) .. '|' .. tostring(canonicalLoaded)`,
+    ].join('\n');
+    const status = lauxlib.luaL_dostring(L, to_luastring(script));
+    if (status !== lua.LUA_OK) {
+        const error = lua.lua_tostring(L, -1);
+        throw new Error(error ? to_jsstring(error) : `Lua status ${status}`);
+    }
+    expect(to_jsstring(lua.lua_tostring(L, -1))).toBe('true|vehicles|false|true');
+});

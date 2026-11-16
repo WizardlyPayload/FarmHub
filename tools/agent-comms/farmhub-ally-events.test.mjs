@@ -85,6 +85,14 @@ test('unrelated RF returns stay silent unless an exact release gate is armed', (
   assert.equal(shouldWakeFarmHub({ id: 'RF-OTHER-20261115-TINA', kind: 'RESULT' }, [
     'RF-SOIL-1141-20261115-TINA-1929', 'RF-SOIL-1141-20261115-TINA',
   ]), false);
+  assert.equal(shouldWakeFarmHub(
+    { id: 'RF-SOIL-1143-DECIMAL-20261115-TINA', kind: 'RESULT' },
+    'RF-SOIL-1143-DECIMAL-20261115-TINA-2357',
+  ), true);
+  assert.equal(shouldWakeFarmHub(
+    { id: 'RF-SOIL-1143-DECIMAL-20261115-TINA', kind: 'RESULT' },
+    'RF-SOIL-1143-OTHER-20261115-TINA-2357',
+  ), false);
 });
 
 test('resolves only the first RF request after an explicit Ally handoff', () => {

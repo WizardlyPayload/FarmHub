@@ -25,7 +25,14 @@ export function parseSubstantiveReturns(text) {
 export function shouldWakeFarmHub(event, rfGateId = '') {
   if (event.id.startsWith('FARMHUB-ALLY-')) return true;
   const armed = Array.isArray(rfGateId) ? rfGateId : [rfGateId];
-  return armed.some(id => /^RF-[A-Z0-9-]*TINA(?:-[A-Z0-9-]+)?$/.test(id) && event.id === id);
+  return armed.some(id => {
+    if (!/^RF-[A-Z0-9-]*TINA(?:-[A-Z0-9-]+)?$/.test(id)) return false;
+    if (event.id === id) return true;
+    // Some RF results omit the timestamp suffix from their request ID.
+    // This only wakes a review; ownership and restoration are rechecked there.
+    return event.id.endsWith('-TINA') && /^RF-[A-Z0-9-]*TINA-[0-9]{4}$/.test(id)
+      && id === `${event.id}-${id.slice(-4)}`;
+  });
 }
 
 export function firstRfRequestAfterHandoff(text, heading) {

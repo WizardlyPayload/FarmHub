@@ -114,8 +114,7 @@ function applyWatchedIngress(state, srv, ingress, processLuaData) {
         return false;
     }
     state.exportIngress = ingress;
-    processLuaData(srv.id, JSON.stringify(ingress.payload), transportForIngress(ingress, srv.id));
-    return true;
+    return processLuaData(srv.id, JSON.stringify(ingress.payload), transportForIngress(ingress, srv.id)) !== false;
 }
 
 module.exports = {

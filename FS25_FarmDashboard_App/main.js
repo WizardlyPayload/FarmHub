@@ -72,6 +72,7 @@ const exportIngress = require('./exportIngress');
 const ingressOrchestration = require('./ingressOrchestration');
 const { createBoundSourcePublication, ownsOrigin, statusForPayload } = require('./boundSourcePublication.cjs');
 const localIngressController = require('./localIngressController');
+const { compareLocalSaveMap } = require('./localSaveMapIdentity.cjs');
 const replicaRegistration = require('./replicaRegistration');
 const pendingReplicaSession = require('./pendingReplicaSession.cjs');
 const { ensureIdentityProposal, publishIdentityProposalFtp } = require('./identityProvision');
@@ -3021,6 +3022,37 @@ function processLuaData(serverId, raw, transport) {
         const state = serverStates[serverId];
         if (!state) return;
 
+        const source = getServersFromStore().find((srv) => String(srv.id) === String(serverId));
+        const mapIdentity = compareLocalSaveMap(source, data);
+        if (mapIdentity.status === 'mismatch') {
+            state.configWarning = {
+                code: 'localSaveMapMismatch',
+                at: new Date().toISOString(),
+                message: `The selected save is ${mapIdentity.savedMapId}, but its old dashboard export is for ${mapIdentity.exportedMapId}. Load this save with the Farm Dashboard game mod to create a new export.`,
+            };
+            state.luaData = null;
+            state.xmlData = null;
+            state.mergedData = null;
+            state.lastGoodMergedSnapshot = null;
+            state.liveSectionBackup = null;
+            state.fieldLiveCache = {};
+            state.fieldHistory = {};
+            state.exportIngress = null;
+            state.exportIdentity = null;
+            state.lastLuaReceivedAt = null;
+            state.lastXmlReceivedAt = null;
+            state.lastXmlFingerprint = null;
+            state.lastSaveSlot = null;
+            const blocked = boundSources.clearOwned(state, 'blocked');
+            if (blocked?.changed) broadcastSourceState({ type: 'source-state', serverId,
+                sourceBinding: blocked.sourceBinding });
+            console.warn(`[processLuaData] [${serverId}] rejected export from another map (${mapIdentity.exportedMapId} vs ${mapIdentity.savedMapId})`);
+            return false;
+        }
+        if (mapIdentity.status === 'match' && state.configWarning?.code === 'localSaveMapMismatch') {
+            state.configWarning = null;
+        }
+
         const previousIdentity = state.exportIdentity;
         const careerChanged = !!(
             transport && previousIdentity && transport.careerId && previousIdentity.careerId
@@ -3037,7 +3069,6 @@ function processLuaData(serverId, raw, transport) {
                 sourceBinding: cleared.sourceBinding });
             state.luaData = null;
         }
-        const source = getServersFromStore().find((srv) => String(srv.id) === String(serverId));
         if (isExplicitReplicaXmlSource(source, transport?.replica === true ? 'replica' : state.ingressKind)) {
             clearUnprovenReplicaXml(state);
         }
@@ -3129,6 +3160,7 @@ function processLuaData(serverId, raw, transport) {
         });
 
         console.log(`[${new Date().toISOString()}] [${serverId}] Lua data updated`);
+        return true;
     } catch (e) {
         console.error(`[processLuaData] ${serverId}:`, e.message);
     }

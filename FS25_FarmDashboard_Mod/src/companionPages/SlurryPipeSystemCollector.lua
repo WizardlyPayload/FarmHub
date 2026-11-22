@@ -21,7 +21,7 @@ CompanionPages.register({
         if ctx.version ~= "1.0.1.7" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
-        local manager = ctx.global("g_slurryPipeManager")
+        local manager = ctx.symbol("g_slurryPipeManager")
         if type(manager) ~= "table" or type(manager.registeredPlaceables) ~= "table"
             or ctx.call(manager, "isFeatureEnabled") ~= true then
             return { readState = "settings-only", reason = "live-store-state-unavailable" }

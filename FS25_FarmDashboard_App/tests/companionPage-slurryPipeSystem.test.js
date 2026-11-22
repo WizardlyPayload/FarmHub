@@ -14,7 +14,7 @@ const GAME = `
   local function place(farm, name)
     return { getOwnerFarmId = function() return farm end, getName = function() return name end }
   end
-  _G.g_slurryPipeManager = {
+  _G.FS25_SlurryPipeSystem = { g_slurryPipeManager = {
     registeredPlaceables = {
       { placeable = place(1, "Farm lagoon"), storeSources = {
         { type = "STORAGE_PLANE", thickeningEnabled = true,
@@ -29,7 +29,7 @@ const GAME = `
     },
     isFeatureEnabled = function() return true end,
     getStoreSources = function(self, entry) return entry.storeSources end,
-  }
+  } }
 `;
 
 test("exports only the selected farm's mod-owned live settling pool", () => {
@@ -72,4 +72,11 @@ test("does not claim complete farm coverage when a registered store has no owner
   expect(page).toMatchObject({ readState: "partial", coverage: "partial" });
   expect(page.byFarm["1"]).not.toHaveProperty("activeStores");
   expect(page.stores).toHaveLength(1);
+});
+
+test("does not read a same-named global shadow outside the loaded mod environment", () => {
+  const shadow = GAME.replace("_G.FS25_SlurryPipeSystem = { g_slurryPipeManager = {", "_G.g_slurryPipeManager = {")
+    .replace("  } }\n", "  }\n");
+  expect(runCompanionPage(FILE, shadow, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "live-store-state-unavailable" });
 });

@@ -18,9 +18,9 @@ function payload(coverage) {
       } },
       rows: [
         { farmId: 1, id: "P-1", kind: "payable", status: "overdue", instrument: "promissoryNote",
-          description: "Seed order", counterparty: "Supplier", balance: 1030, dueDay: 14 },
+          description: "Seed order", counterparty: "Supplier", balance: 1030, dueDay: 14, voucherNumber: 7 },
         { farmId: 1, id: "R-1", kind: "receivable", status: "pending", instrument: "currentAccount",
-          description: "Grain sale", counterparty: "Mill", balance: 600 },
+          description: "Grain sale", counterparty: "Mill", balance: 600, voucherNumber: 12 },
         { farmId: 2, id: "P-9", kind: "payable", status: "open", instrument: "cheque",
           description: "Another farm's bill", balance: 90000, dueDay: 17 },
       ],
@@ -35,8 +35,10 @@ test("renders only the selected farm's unsettled decisions and keeps the mod ban
   expect(host.textContent).toContain("Remaining to pay");
   expect(host.textContent).toContain("1,030");
   expect(host.textContent).toContain("Seed order / Supplier");
+  expect(host.textContent).toContain("P-0007");
   expect(host.textContent).toContain("14");
   expect(host.textContent).toContain("Grain sale / Mill");
+  expect(host.textContent).toContain("R-0012");
   expect(host.textContent).not.toContain("Another farm's bill");
   expect(host.textContent).not.toContain("90,000");
 });

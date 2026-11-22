@@ -49,6 +49,9 @@ CompanionPages.register({
                 local kind, status = KIND[ctx.num(entry.kind)], STATUS[ctx.num(entry.status)]
                 local amount, balance = boundedMoney(ctx, entry.amount), boundedMoney(ctx, entry.balance)
                 local dueDay = entry.dueDay == nil and nil or ctx.num(entry.dueDay)
+                local voucherNumber = ctx.num(entry.voucherNumber)
+                if voucherNumber == nil or voucherNumber <= 0 or voucherNumber ~= math.floor(voucherNumber)
+                    or voucherNumber > 999999999 then voucherNumber = nil end
                 if id == nil or id == "" or kind == nil or status == nil or amount == nil
                     or balance == nil or (dueDay ~= nil and (dueDay < 0 or dueDay ~= math.floor(dueDay)))
                     or (entry.dueDay ~= nil and dueDay == nil) then
@@ -67,6 +70,7 @@ CompanionPages.register({
                             description = ctx.clip(entry.counterpartName, 100),
                             counterparty = ctx.clip(entry.providerName, 80),
                             amount = amount, balance = balance, dueDay = dueDay,
+                            voucherNumber = voucherNumber,
                         }
                     end
                 end

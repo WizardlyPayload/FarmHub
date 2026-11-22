@@ -9,7 +9,17 @@ const K = "companionPage.agriculturalFinancialSystem";
 type Entry = {
   farmId?: number; id?: string; kind?: string; status?: string; instrument?: string;
   description?: string; counterparty?: string; amount?: number; balance?: number; dueDay?: number;
+  voucherNumber?: number;
 };
+
+function voucherReference(entry: Entry): string {
+  const number = num(entry.voucherNumber);
+  if (number == null || !Number.isInteger(number) || number <= 0 || number > 999999999) return "—";
+  const prefix = entry.instrument === "promissoryNote" ? "P"
+    : entry.instrument === "cheque" ? "CH"
+    : entry.kind === "receivable" ? "R" : "C";
+  return `${prefix}-${String(number).padStart(4, "0")}`;
+}
 
 function label(key: string): string {
   const labels: Record<string, string> = {
@@ -40,12 +50,14 @@ export function Page({ entry }: CompanionPageProps) {
       <Card title={tOr(`${K}.tableTitle`, "Unsettled payables and receivables")}>
         <ModTable columns={[
           { key: "kind", label: tOr(`${K}.kind`, "Direction / state") },
+          { key: "reference", label: tOr(`${K}.reference`, "Reference") },
           { key: "description", label: tOr(`${K}.description`, "What / who") },
           { key: "instrument", label: tOr(`${K}.instrument`, "Instrument") },
           { key: "due", label: tOr(`${K}.due`, "Due game day"), align: "end" },
           { key: "balance", label: tOr(`${K}.balance`, "Remaining"), align: "end" },
         ]} rows={rows.map((r, i) => ({ key: r.id || String(i), cells: {
           kind: `${label(r.kind || "unknown")} / ${label(r.status || "unknown")}`,
+          reference: voucherReference(r),
           description: `${r.description || "—"}${r.counterparty ? ` / ${r.counterparty}` : ""}`,
           instrument: label(r.instrument || "unknown"),
           due: num(r.dueDay) == null ? "—" : formatNumber(r.dueDay, 0),

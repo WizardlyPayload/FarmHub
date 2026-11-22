@@ -15,10 +15,10 @@ const GAME = `
       entries = {
         a = { id = "P-1", farmId = 1, kind = 1, status = 2,
           instrument = 2, counterpartName = "Seed order", providerName = "Supplier",
-          amount = 1000, balance = 1030, createdDay = 10, dueDay = 14 },
+          amount = 1000, balance = 1030, createdDay = 10, dueDay = 14, voucherNumber = 7 },
         b = { id = "R-1", farmId = 1, kind = 2, status = 4,
           instrument = 1, counterpartName = "Grain sale", providerName = "Mill",
-          amount = 600, balance = 600, createdDay = 12 },
+          amount = 600, balance = 600, createdDay = 12, voucherNumber = 12 },
         paid = { id = "P-2", farmId = 1, kind = 1, status = 3,
           amount = 100, balance = 0 },
         other = { id = "P-9", farmId = 2, kind = 1, status = 1,
@@ -34,9 +34,9 @@ test("reads loaded server ledger for only the selected farm, preserving accrued 
     byFarm: { "1": { bankBalance: 3500, entryCount: 2, overdueCount: 1,
       payableBalance: 1030, receivableBalance: 600 } } });
   expect(page.rows).toHaveLength(2);
-  expect(page.rows[0]).toMatchObject({ id: "R-1", status: "pending" });
+  expect(page.rows[0]).toMatchObject({ id: "R-1", status: "pending", voucherNumber: 12 });
   expect(page.rows[0]).not.toHaveProperty("dueDay");
-  expect(page.rows[1]).toMatchObject({ id: "P-1", balance: 1030, dueDay: 14 });
+  expect(page.rows[1]).toMatchObject({ id: "P-1", balance: 1030, dueDay: 14, voucherNumber: 7 });
   const merged = normalizeCompanionPages({ pages: { agriculturalFinancialSystem: page } }, { modules: loadModules() });
   expect(merged.pages.agriculturalFinancialSystem.rows).toHaveLength(2);
 });

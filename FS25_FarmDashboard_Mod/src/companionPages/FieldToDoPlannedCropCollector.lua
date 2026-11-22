@@ -76,7 +76,7 @@ CompanionPages.register({
         return {
             readState = partial and "partial" or "ok",
             coverage = partial and "partial" or "complete",
-            byFarm = { [tostring(farmId)] = { plannedCountScanned = #rows } },
+            byFarm = { [tostring(farmId)] = { plannedCountScanned = not partial and #rows or nil } },
             rows = rows,
         }
     end,

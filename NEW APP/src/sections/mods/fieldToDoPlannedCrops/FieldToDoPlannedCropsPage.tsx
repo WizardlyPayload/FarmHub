@@ -14,9 +14,9 @@ type PlanRow = {
 export function Page({ entry }: CompanionPageProps) {
   const { page, farmData, farmId } = useCompanionPage(entry.key);
   const rows = asList<PlanRow>(page?.rows).filter((row) => num(row.farmId) === farmId);
-  const tiles: ModStatTile[] = farmData ? [
+  const tiles: ModStatTile[] = page?.coverage === "complete" && num(farmData?.plannedCountScanned) != null ? [
     { key: "plans", label: tOr(`${K}.count`, "Saved plans on currently owned land"),
-      value: formatNumber(farmData.plannedCountScanned, 0) },
+      value: formatNumber(farmData?.plannedCountScanned, 0) },
   ] : [];
   return (
     <ModPage entry={entry} lead={tOr(`${K}.lead`,
@@ -42,7 +42,9 @@ export function Page({ entry }: CompanionPageProps) {
                   : row.plannedCrop || "—",
             },
           }))}
-          empty={tOr(`${K}.empty`, "No saved plans were found on currently owned land.")}
+          empty={page?.coverage === "partial"
+            ? tOr(`${K}.partial`, "Only part of the saved plan register could be checked or listed. Unresolved land ownership and invalid entries are withheld.")
+            : tOr(`${K}.empty`, "No saved plans were found on currently owned land.")}
         />
         <p class="fd-economy__muted">{tOr(`${K}.note`,
           "The mod does not store who set a plan. Its task records are withheld because legacy tasks may be assigned to the local farm during load.")}</p>

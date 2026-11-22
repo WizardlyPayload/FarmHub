@@ -49,8 +49,17 @@ test("withholds plan rows when ownership cannot be established", () => {
     "if id == 36 then error('not ready') end; return ({ [37]=2, [40]=1, [41]=2 })[id] or 0");
   const partial = runCompanionPage(FILE, failing, {farmId:1});
   expect(partial).toMatchObject({readState:"partial",coverage:"partial"});
+  expect(partial.byFarm["1"].plannedCountScanned).toBeUndefined();
   expect(partial.rows).toHaveLength(1);
   expect(partial.rows[0]).toMatchObject({fieldId:1000040});
+});
+
+test("withholds the farm total when the plan register exceeds the scan cap", () => {
+  const oversized = SETUP.replace("[36] = 7, [37] = 8, [1000040] = -1, [1000041] = 9,",
+    Array.from({length:501}, (_, i) => `[${i+1}] = 7,`).join(" "));
+  const page = runCompanionPage(FILE, oversized, {farmId:1});
+  expect(page).toMatchObject({readState:"partial",coverage:"partial"});
+  expect(page.byFarm["1"].plannedCountScanned).toBeUndefined();
 });
 
 test("withholds client and absent mod", () => {

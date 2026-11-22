@@ -20,3 +20,14 @@ test("shows current-owner plans without claiming authorship or completed work", 
   expect(host.textContent).toContain("task records are withheld");
   expect(host.textContent).not.toContain("Wheat");
 });
+
+test("partial plan coverage does not present a complete farm count or false absence", () => {
+  const host = ui.renderPage({
+    companionMods:{mods:[{id:KEY,detected:true,version:"0.1.0.17"}]},
+    companionPages:{pages:{[KEY]:{key:KEY,detected:true,readState:"partial",coverage:"partial",
+      byFarm:{"1":{}},rows:[]}}},
+  }, {farmId:1});
+  expect(host.textContent).toContain("Only part of the saved plan register");
+  expect(host.textContent).not.toContain("No saved plans were found");
+  expect(host.textContent).not.toContain("Saved plans on currently owned land");
+});

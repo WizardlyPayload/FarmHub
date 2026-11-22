@@ -1170,7 +1170,7 @@ local CATALOG = {
         id = "realisticMechanicalSystems",
         title = "Realistic Mechanical Systems",
         category = "fleet",
-        names = { "FS25_RealisticMechanicalSystems", "GH_Squallqt__FS25_RealisticMechanicalSystems_FS25_RealisticMechanicalSystems" },
+        names = { "FS25_RealisticMechanicalSystems", "GH_Squallqt__FS25_RealisticMechanicalSystems_FS25_RealisticMechanicalSystems", "KM_82113_Realistic_Mechanical_Systems" },
         substrings = { "realisticmechanicalsystems" },
         globals = {},
     },

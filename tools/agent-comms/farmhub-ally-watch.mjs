@@ -190,7 +190,9 @@ function scan() {
     }
     state.seen = [...seen];
     state.lastScan = new Date().toISOString();
-    if (changed || Date.now() - lastScanPersist >= 300000) {
+    const recoveredScanError = state.lastError?.code === 'EBUSY' || state.lastError?.code === 'SCAN_FAILED';
+    if (recoveredScanError) state.lastError = null;
+    if (changed || recoveredScanError || Date.now() - lastScanPersist >= 300000) {
       writeState(state);
       lastScanPersist = Date.now();
     }

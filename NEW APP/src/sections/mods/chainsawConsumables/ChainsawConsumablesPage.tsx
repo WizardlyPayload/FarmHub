@@ -20,7 +20,7 @@ type SawRow = {
 export function Page({ entry }: CompanionPageProps) {
   const { page, farmData, farmId } = useCompanionPage(entry.key);
   const rows = asList<SawRow>(page?.rows).filter((row) => num(row.farmId) === farmId);
-  const tiles: ModStatTile[] = farmData ? [
+  const tiles: ModStatTile[] = typeof farmData?.sawCount === "number" ? [
     { key: "saws", label: tOr(`${K}.saws`, "Owned chainsaws"), value: formatNumber(farmData.sawCount, 0) },
   ] : [];
   const percent = (value: number | undefined) => typeof value === "number" ? `${formatNumber(value, 0)}%` : "—";

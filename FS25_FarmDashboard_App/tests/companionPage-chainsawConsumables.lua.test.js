@@ -38,11 +38,20 @@ test("withholds duplicate identity, missing state and invalid condition", () => 
   const duplicate = runCompanionPage(FILE, SETUP.replace('saw("foreign-saw", 2)', 'saw("own-saw", 1)'), { farmId: 1 });
   expect(duplicate).toMatchObject({ readState: "partial" });
   expect(Object.keys(duplicate.rows)).toHaveLength(0);
+  expect(duplicate.byFarm?.["1"]?.sawCount).toBeUndefined();
   const missing = runCompanionPage(FILE, SETUP.replace('ccState = { fuel', 'ccState = nil, other = { fuel'), { farmId: 1 });
   expect(missing).toMatchObject({ readState: "partial" });
   const invalid = runCompanionPage(FILE, SETUP.replace('chainLife = 0.6', 'chainLife = -0.6'), { farmId: 1 });
   expect(invalid).toMatchObject({ readState: "partial" });
   expect(Object.keys(invalid.rows)).toHaveLength(0);
+});
+
+test("does not label a capped saw list as the farm total", () => {
+  const extra = Array.from({ length: 30 }, (_, index) => `saw("extra-${index}", 1)`).join(", ");
+  const page = runCompanionPage(FILE, SETUP.replace('saw("foreign-saw", 2)', extra), { farmId: 1 });
+  expect(page).toMatchObject({ readState: "ok", coverage: "truncated" });
+  expect(page.rows).toHaveLength(30);
+  expect(page.byFarm?.["1"]?.sawCount).toBeUndefined();
 });
 
 test("gates unreviewed version and client-only state", () => {

@@ -80,7 +80,7 @@ CompanionPages.register({
             readState = invalid and "partial" or "ok",
             reason = invalid and "ambiguous-or-unreadable-saw" or nil,
             coverage = truncated and "truncated" or "complete",
-            byFarm = { [tostring(farmId)] = { sawCount = #rows } },
+            byFarm = { [tostring(farmId)] = { sawCount = not invalid and not truncated and #rows or nil } },
             rows = rows,
         }
     end,

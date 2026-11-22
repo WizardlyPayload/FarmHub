@@ -1674,7 +1674,7 @@ local CATALOG = {
         id = "realisticCropRotation",
         title = "Realistic Crop Rotation",
         category = "fields",
-        names = { "FS25_370461_Realistic_Crop_Rotation", "KM_83006_Realistic_Crop_Rotation" },
+        names = { "FS25_370461_Realistic_Crop_Rotation", "KM_83006_Realistic_Crop_Rotation", "GH_Squallqt__FS25_RealisticCropRotation_FS25_RealisticCropRotation" },
         substrings = {},
         globals = {},
     },

@@ -96,7 +96,7 @@ end
 
 CompanionPages.register({
     key = "realisticCropRotation",
-    modNames = { "FS25_370461_Realistic_Crop_Rotation", "KM_83006_Realistic_Crop_Rotation" },
+    modNames = { "FS25_370461_Realistic_Crop_Rotation", "KM_83006_Realistic_Crop_Rotation", "GH_Squallqt__FS25_RealisticCropRotation_FS25_RealisticCropRotation" },
     substrings = {},
     collect = function(ctx)
         local farmId = ctx.farmId

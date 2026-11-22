@@ -35,6 +35,17 @@ test("exports plans and history only for land currently owned by the export farm
         { modules: loadModules() }).pages.realisticCropRotation.rows).toHaveLength(1);
 });
 
+test("reads the exact GH vault basename with the same farm isolation", () => {
+    const name = "GH_Squallqt__FS25_RealisticCropRotation_FS25_RealisticCropRotation";
+    const setup = SETUP.replaceAll("FS25_370461_Realistic_Crop_Rotation", name);
+    const page = runCompanionPage(FILE, setup, { farmId: 1 });
+    expect(page).toMatchObject({ readState: "ok", coverage: "complete",
+        byFarm: { "1": { farmlandCount: 1, plannedCount: 1, historyCount: 1 } } });
+    expect(page.rows).toHaveLength(1);
+    expect(page.rows[0]).toMatchObject({ farmlandId: 36, plan: ["CORN", "", "WHEAT", ""] });
+    expect(JSON.stringify(page)).not.toContain("SUGARBEET");
+});
+
 test("withholds unowned records and refuses to assume ownership without the engine API", () => {
     const sold = SETUP.replace("id == 36 and 1 or 2", "2");
     const soldPage = runCompanionPage(FILE, sold, { farmId: 1 });

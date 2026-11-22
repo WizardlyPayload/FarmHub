@@ -58,14 +58,14 @@ CompanionPages.register({
                         withheld = withheld + 1
                     else
                         owned = owned + 1
+                        local tasks = {}
+                        for key, sourceField in pairs(TASK_FIELDS) do
+                            local state = integer(ctx, entry[sourceField], 1, 5)
+                            if state == nil then invalid = true end
+                            tasks[key] = state
+                        end
                         if #rows >= MAX_ROWS then truncated = true
                         else
-                            local tasks = {}
-                            for key, sourceField in pairs(TASK_FIELDS) do
-                                local state = integer(ctx, entry[sourceField], 1, 5)
-                                if state == nil then invalid = true end
-                                tasks[key] = state
-                            end
                             rows[#rows + 1] = {
                                 farmId = farmId,
                                 fieldId = fieldId,

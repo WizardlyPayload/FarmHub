@@ -45,6 +45,19 @@ test('normalizing line endings keeps an event hash stable', () => {
     parseSubstantiveReturns(block.replace(/\n/g, '\r\n'))[0].hash);
 });
 
+test('recognizes Tina release wording before the exact FarmHub request ID', () => {
+  const events = parseSubstantiveReturns([
+    '## [2026-11-22 05:35] from Tina\nACK (receipt only) FARMHUB-ALLY-20261122-VAULT-V125R3',
+    '## [2026-11-22 05:27] from Tina\nBLOCKED + ALLY RELEASED FARMHUB-ALLY-20261122-VAULT-V125R2 (ADS parity). One load.',
+    '## RESULT + ALLY RELEASED FARMHUB-ALLY-20261122-VAULT-V125R3 | restored',
+  ].join('\n\n'));
+  assert.deepEqual(events.map(({ id, kind }) => [id, kind]), [
+    ['FARMHUB-ALLY-20261122-VAULT-V125R2', 'BLOCKED'],
+    ['FARMHUB-ALLY-20261122-VAULT-V125R3', 'RESULT'],
+  ]);
+  assert.equal(shouldWakeFarmHub(events[0]), true);
+});
+
 test('a combined pickup and substantive return wakes, while pickup alone does not', () => {
   const events = parseSubstantiveReturns([
     '## [time] from Tina\nPICKUP FARMHUB-ALLY-20261115-VAULT-V122R1 | starting',

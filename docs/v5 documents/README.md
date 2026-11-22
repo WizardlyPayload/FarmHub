@@ -4,8 +4,8 @@ This is the help pack for the **V5 Windows dashboard**. Start with [installation
 
 ## Which version?
 
-- **Current V5 release:** Windows app **5.2.7** with the canonical `FS25_FarmDashboard.zip` mod **5.1.0.12**. Use matching files from [GitHub v5.2.7](https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.2.7) or the [itch.io V5 page](https://wizardlypayload.itch.io/farm-dashobaord-fs25).
-- **Acceptance boundary:** the exact 5.2.6/5.1.0.12 pair passed the PC Catuaí orchard check and bounded Ally installation, DLC, map, image, and Keep uninstall/reinstall checks. App 5.2.7 updates a packaged dependency; its PC installation and Catuaí pages passed, and the exact 5.2.7 installer passed an app-only Ally install/Keep/reinstall with restoration. The game was not reloaded for 5.2.7 because the mod ZIP is byte-identical. See the [DLC acceptance record](../DLC-COVERAGE-AUDIT-2026-10-28.md) for gameplay observations and limits.
+- **Current V5 release pair:** Windows app **5.2.150** with the canonical `FS25_FarmDashboard.zip` mod **5.1.0.140**. Use matching files from [GitHub v5.2.150](https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.2.150) or the [itch.io V5 page](https://wizardlypayload.itch.io/farm-dashobaord-fs25).
+- **Acceptance boundary:** optional-mod results are bounded to the named game, export, and installed-page readings; they do not prove every action or combination. Production Control and Distribution Redux have unbound adapters in the reviewed normal StockGuard build. See [Compatibility](COMPATIBILITY.md), the [optional-mod guide](COMPANION_MODS.md), and the earlier [DLC acceptance record](../DLC-COVERAGE-AUDIT-2026-10-28.md).
 - **Classic V4:** a separate product line. Its public 4.2.1 story and update feed have not been changed. This V5 pass was **not** a new V4 test.
 
 ## Find the answer you need

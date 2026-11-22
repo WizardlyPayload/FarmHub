@@ -7,7 +7,9 @@ const FILE = "LeaseLivestockCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { KM_81709_Lease_Livestock = true }
   _G.g_modManager = { getActiveMods = function() return { { modName = "KM_81709_Lease_Livestock", version = "1.0.0.0" } } end }
-  _G.LL_LeaseLivestock = { addLease = function() error("must not lease") end }
+  _G.KM_81709_Lease_Livestock = {
+    LL_LeaseLivestock = { addLease = function() error("must not lease") end },
+  }
   local function pen(farm, name, clusters)
     return { ownerFarmId = farm, getOwnerFarmId = function(self) return self.ownerFarmId end,
       getName = function() return name end, getClusters = function() return clusters end }
@@ -81,4 +83,15 @@ test("unpriced leased cluster withholds farm charge rather than reporting a fals
   `;
   expect(runCompanionPage(FILE, newer, { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
+});
+
+test("ignores a shared-global lease manager shadow outside the loaded mod", () => {
+  const shadow = GAME.replace(
+    `_G.KM_81709_Lease_Livestock = {
+    LL_LeaseLivestock = { addLease = function() error("must not lease") end },
+  }`,
+    `_G.LL_LeaseLivestock = { addLease = function() error("must not lease") end }`
+  );
+  expect(runCompanionPage(FILE, shadow, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "lease-state-unavailable" });
 });

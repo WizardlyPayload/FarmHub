@@ -22,7 +22,7 @@ CompanionPages.register({
         if ctx.version ~= "1.0.0.0" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
-        local mod = ctx.global("LL_LeaseLivestock")
+        local mod = ctx.symbol("LL_LeaseLivestock")
         local pens = type(mission) == "table" and type(mission.husbandrySystem) == "table"
             and mission.husbandrySystem.placeables or nil
         local animals = type(mission) == "table" and mission.animalSystem or nil

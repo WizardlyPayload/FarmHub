@@ -24,7 +24,7 @@ CompanionPages.register({
         if ctx.call(mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-investments-only" }
         end
-        local manager = ctx.global("g_bankManager")
+        local manager = ctx.symbol("g_bankManager")
         if type(manager) ~= "table" or type(manager.investments) ~= "table"
             or type(manager.totalEarned) ~= "table" then
             return { readState = "settings-only", reason = "investment-manager-unavailable" }

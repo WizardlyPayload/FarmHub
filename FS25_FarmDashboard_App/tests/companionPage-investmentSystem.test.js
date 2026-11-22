@@ -10,7 +10,7 @@ const GAME = `
     { modName = "FS25_352944_Investment_System", version = "1.1.0.0" }
   } end }
   _G.g_currentMission = { getIsServer = function() return true end }
-  _G.g_bankManager = {
+  _G.FS25_352944_Investment_System = { g_bankManager = {
     getInvestmentsForFarm = function() error("must not call a manager helper") end,
     investments = {
       [1] = {
@@ -23,7 +23,7 @@ const GAME = `
         isCompounding = false, earnedInterest = 90 } },
     },
     totalEarned = { [1] = 2500, [2] = 90 },
-  }
+  } }
 `;
 
 test("reads selected farm's saved investment and interest history only", () => {
@@ -49,6 +49,13 @@ test("other farm's register is separate; client and missing manager are withheld
   expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", { farmId: 1 })).toBeUndefined();
 });
 
+test("does not read an investment manager shadow outside the loaded mod", () => {
+  const shadow = GAME.replace("_G.FS25_352944_Investment_System = { g_bankManager = {", "_G.g_bankManager = {")
+    .replace("  } }\n", "  }\n");
+  expect(runCompanionPage(FILE, shadow, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "investment-manager-unavailable" });
+});
+
 test("historical interest remains meaningful after all deposits have matured", () => {
   const historical = GAME.replace(/\[1\] = \{\s*\{ farmId = 1[\s\S]*?\},\s*\{ farmId = 2[\s\S]*?\},\s*\},/, "[1] = {},");
   const page = runCompanionPage(FILE, historical, { farmId: 1 });
@@ -63,7 +70,7 @@ test("withholds investments from an unreviewed Investment System version", () =>
 
 test("separates an incomplete register scan from a display-row limit", () => {
   const clean = GAME.replace("{ farmId = 2, id = 8, amount = 900000, annualRate = 5 },", "");
-  const prefix = `local p = _G.g_bankManager.investments[1]\n`;
+  const prefix = `local p = _G.FS25_352944_Investment_System.g_bankManager.investments[1]\n`;
   const append = `for i = 1, N do p[#p + 1] = {
     farmId = 1, id = i + 20, amount = 100, annualRate = 4,
   } end`;

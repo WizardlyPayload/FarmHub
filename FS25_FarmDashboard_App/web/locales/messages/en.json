@@ -4885,7 +4885,7 @@
   "companionPage.grainTickets.deduction": "Deduction",
   "companionPage.grainTickets.dateValue": "Y{{year}} / P{{period}} / D{{day}}",
   "companionPage.grainTickets.empty": "No grain delivery tickets recorded for this farm in the current crop year.",
-  "companionPage.grainTickets.truncated": "Only the latest available tickets are listed.",
+  "companionPage.grainTickets.truncated": "This table may not show every ticket.",
   "companions.desc.baleCapacityMultiplier": "Shows the selected capacity multiplier on this farm's balers. It does not count bales produced.",
   "companionPage.baleCapacityMultiplier.lead": "Current selected bale capacity on balers owned by this farm. This is a setting, not bales produced or stored.",
   "companionPage.baleCapacityMultiplier.balers": "Owned balers",

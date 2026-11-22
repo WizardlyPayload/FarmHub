@@ -61,9 +61,11 @@ export function Page({ entry }: CompanionPageProps) {
               net: money(row.net),
             },
           }))}
-          empty={tOr("companionPage.grainTickets.empty", "No grain delivery tickets recorded for this farm in the current crop year.")}
+          empty={page?.coverage === "truncated" || page?.readState === "partial"
+            ? tOr("companionPage.grainTickets.truncated", "This table may not show every ticket.")
+            : tOr("companionPage.grainTickets.empty", "No grain delivery tickets recorded for this farm in the current crop year.")}
         />
-        {page?.coverage === "truncated" ? <ModEmpty>{tOr("companionPage.grainTickets.truncated", "Only the latest available tickets are listed.")}</ModEmpty> : null}
+        {rows.length > 0 && page?.coverage !== "complete" ? <ModEmpty>{tOr("companionPage.grainTickets.truncated", "This table may not show every ticket.")}</ModEmpty> : null}
       </Card>
     </ModPage>
   );

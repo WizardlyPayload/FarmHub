@@ -19,10 +19,10 @@ CompanionPages.register({
         end
 
         local rows, count, gross, deductions, net = {}, 0, 0, 0, 0
-        local truncated = false
+        local invalid, scanIncomplete, rowsTruncated = false, false, false
         for index, ticket in ipairs(mod.cropTickets) do
             if index > MAX_SCAN then
-                truncated = true
+                scanIncomplete = true
                 break
             end
             if type(ticket) == "table" and ctx.num(ticket.farmId) == farmId then
@@ -56,22 +56,26 @@ CompanionPages.register({
                             weightNetKg = ctx.num(ticket.weightNetKg),
                         }
                     else
-                        truncated = true
+                        rowsTruncated = true
                     end
+                else
+                    invalid = true
                 end
             end
         end
         table.sort(rows, function(a, b)
             return (a.id or 0) > (b.id or 0)
         end)
+        local complete = not invalid and not scanIncomplete
         return {
-            readState = "ok",
-            coverage = truncated and "truncated" or "complete",
+            readState = complete and "ok" or "partial",
+            coverage = (scanIncomplete or rowsTruncated) and "truncated"
+                or invalid and "partial" or "complete",
             cropYear = ctx.num(mod.cropTicketYear),
-            byFarm = { [tostring(farmId)] = {
+            byFarm = complete and { [tostring(farmId)] = {
                 ticketCount = count, gross = ctx.round2(gross),
                 deductions = ctx.round2(deductions), net = ctx.round2(net),
-            } },
+            } } or nil,
             rows = rows,
         }
     end,

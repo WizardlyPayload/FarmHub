@@ -31,6 +31,6 @@ test("shows mode, configured hours and live arm state separately for owned barri
   expect(host.textContent).toContain("Automatic");
   expect(host.textContent).toContain("Partway");
   expect(host.textContent).toContain("8–18");
-  expect(host.textContent).toContain("a setting, not proof");
+  expect(host.textContent).toContain("scheduled hours do not prove a gate opened or a vehicle passed");
   expect(host.textContent).not.toContain("Foreign gate");
 });

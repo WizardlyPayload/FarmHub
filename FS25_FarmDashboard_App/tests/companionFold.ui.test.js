@@ -40,7 +40,6 @@ const mocks = {
 const { VehiclesSection } = productionTs("NEW APP/src/sections/vehicles/VehiclesSection.tsx", mocks);
 const { StorageSection } = productionTs("NEW APP/src/sections/storage/StorageSection.tsx", mocks);
 const { ProductionsSection } = productionTs("NEW APP/src/sections/productions/ProductionsSection.tsx", mocks);
-const { SoilWorkBonusCard } = productionTs("NEW APP/src/sections/fields/SoilWorkBonusCard.tsx", mocks);
 const fillUnits = productionTs("NEW APP/src/lib/fill-units.ts", mocks);
 const { FOLDED_COMPANIONS } = productionTs("NEW APP/src/lib/foldedCompanions.ts", mocks);
 const { COMPANION_CATALOG } = productionTs("NEW APP/src/lib/companionMods/catalog.ts", mocks);
@@ -57,7 +56,6 @@ test("each folded mod's catalog row points at the page that now shows its data",
         collisionDamage: "vehicles",
         puncturedTires: "vehicles",
         bushelPlus: "vehicles",
-        soilWorkYieldBonus: "fields",
         britishFillUnits: "economy",
     });
     for (const [key, section] of Object.entries(FOLDED_COMPANIONS)) {
@@ -260,78 +258,6 @@ describe("Advanced Maintenance, Collision Damage, Punctured Tires and Bushel Plu
                 expect(folds(root, key)).toHaveLength(0);
             }
             expect(root.querySelector(".fd-vehicles__mod-flags")).toBeNull();
-            render(null, root);
-        }
-    });
-});
-
-const soilPage = {
-    detected: true,
-    readState: "ok",
-    settings: { enabled: true },
-    cellSize: 10,
-    workedCells: 420,
-    workedAreaHa: 4.2,
-    averageBonus: 0.08,
-    bestBonus: 0.12,
-    coverage: "complete",
-    tiers: [
-        { bonus: 0.12, areaHa: 1.5, tools: ["plow"] },
-        { bonus: 0.08, areaHa: 2.2, tools: ["cultivatorDeep", "powerHarrow"] },
-        { bonus: 0.05, areaHa: 0.5, tools: [] },
-    ],
-};
-
-describe("Soil Work Yield Bonus folded into Fields", () => {
-    afterEach(() => {
-        document.body.innerHTML = "";
-    });
-
-    test("map-wide totals and a compact tier list, in hectares or acres", () => {
-        let root = paint(SoilWorkBonusCard, { companionPages: { pages: { soilWorkYieldBonus: soilPage } } });
-        expect(root.querySelector('[data-stat="area"]').textContent).toContain("4.20 ha");
-        expect(root.querySelector('[data-stat="average"]').textContent).toContain("+8%");
-        expect(root.querySelector('[data-stat="best"]').textContent).toContain("+12%");
-        const tiers = [...root.querySelectorAll("[data-tier]")].map((li) => li.textContent);
-        expect(tiers).toHaveLength(3);
-        expect(tiers[0]).toContain("companionPage.soilWorkYieldBonus.toolPlow");
-        expect(tiers[0]).toContain("1.50 ha");
-        expect(tiers[2]).toContain("companionPage.soilWorkYieldBonus.olderSetting");
-        render(null, root);
-
-        root = paint(SoilWorkBonusCard, {
-            unitDisplay: { saveUnitProfiles: { applyState: "effective", effective: { acre: true } } },
-            companionPages: { pages: { soilWorkYieldBonus: soilPage } },
-        });
-        expect(root.querySelector('[data-stat="area"]').textContent).toContain("10.38 ac");
-        render(null, root);
-    });
-
-    test("a sampled grid labels the area as a lower bound", () => {
-        const root = paint(SoilWorkBonusCard, { companionPages: { pages: { soilWorkYieldBonus: { ...soilPage, coverage: "sampled" } } } });
-        expect(root.querySelector('[data-stat="area"]').textContent).toBe('companionPage.soilWorkYieldBonus.statAreacompanionPage.soilWorkYieldBonus.atLeast{"value":"4.20 ha"}');
-        expect(root.textContent).toContain("fields.fold.soilBonusSampled");
-        render(null, root);
-    });
-
-    test("settings-only, detection-only and switched-off readings give one short line", () => {
-        for (const [page, key] of [
-            [{ detected: true, readState: "settings-only", settings: { enabled: true } }, "companionPage.soilWorkYieldBonus.noWorked"],
-            [{ detected: true, readState: "detection-only" }, "companionPage.soilWorkYieldBonus.noWorked"],
-            [{ ...soilPage, settings: { enabled: false } }, "fields.fold.soilBonusOff"],
-        ]) {
-            const root = paint(SoilWorkBonusCard, { companionPages: { pages: { soilWorkYieldBonus: page } } });
-            const empty = root.querySelector('[data-soil-bonus="empty"]');
-            expect(empty.textContent).toBe(key);
-            expect(root.querySelector("[data-stat]")).toBeNull();
-            render(null, root);
-        }
-    });
-
-    test("hidden when the mod is not detected", () => {
-        for (const payload of [{}, { companionPages: { pages: { soilWorkYieldBonus: { ...soilPage, detected: false } } } }]) {
-            const root = paint(SoilWorkBonusCard, payload);
-            expect(root.innerHTML).toBe("");
             render(null, root);
         }
     });

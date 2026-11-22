@@ -79,7 +79,6 @@ describe("sidebar without the Companion mods index", () => {
             advancedMaintenance: ["Advanced Maintenance", "vehicles"],
             collisionDamage: ["Collision Damage", "vehicles"],
             bushelPlus: ["Bushel Plus", "vehicles"],
-            soilWorkYieldBonus: ["Soil Work Yield Bonus", "fields"],
             britishFillUnits: ["British Fill Units", "economy"],
         };
         const pages = {};

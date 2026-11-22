@@ -82,6 +82,7 @@
       "exportIngress.js",
       "ingressOrchestration.js",
       "localIngressController.js",
+      "localSaveMapIdentity.cjs",
       "replicaRegistration.js",
       "pendingReplicaSession.cjs",
       "identityProvision.js",

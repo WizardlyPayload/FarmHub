@@ -6,8 +6,11 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "VillageBankCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { KM_82435_Village_Bank = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "KM_82435_Village_Bank", version = "1.6.0.0" }
+  } end }
   _G.g_currentMission = { getIsServer = function() return true end }
-  _G.g_villageBank = {
+  _G.KM_82435_Village_Bank = { g_villageBank = {
     getFarmData = function() error("must not create or normalize accounts") end,
     getAccountBalance = function() error("must not call mutable account helper") end,
     farms = {
@@ -28,7 +31,7 @@ const GAME = `
       [2] = { accounts = { { id = 3, name = "Other farm", balance = 90000 } },
         savingsDeposits = {}, loans = {}, leases = {}, transactions = {} },
     },
-  }
+  } }
 `;
 
 test("reads selected farm's mod-owned books without duplicating native main money", () => {
@@ -56,6 +59,19 @@ test("the other farm gets only its own account; client and missing farm are with
     .toMatchObject({ readState: "settings-only", reason: "server-book-only" });
   expect(runCompanionPage(FILE, GAME, { farmId: 3 }))
     .toMatchObject({ readState: "settings-only", reason: "farm-book-unavailable" });
+});
+
+test("does not read a shared-global bank shadow outside the loaded mod", () => {
+  const shadow = GAME.replace("_G.KM_82435_Village_Bank = { g_villageBank = {", "_G.g_villageBank = {")
+    .replace("  } }\n", "  }\n");
+  expect(runCompanionPage(FILE, shadow, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "farm-book-unavailable" });
+});
+
+test("withholds an unreviewed Village Bank version", () => {
+  const newer = GAME.replace('version = "1.6.0.0"', 'version = "1.6.0.1"');
+  expect(runCompanionPage(FILE, newer, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
 });
 
 test("main-account-only farm is settings-only and absent mod has no page", () => {

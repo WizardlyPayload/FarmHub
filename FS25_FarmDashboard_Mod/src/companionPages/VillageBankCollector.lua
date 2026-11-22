@@ -31,6 +31,9 @@ CompanionPages.register({
     modNames = { "KM_82435_Village_Bank", "FS25_VillageBank" },
     substrings = { "village_bank", "villagebank" },
     collect = function(ctx)
+        if ctx.version ~= "1.6.0.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local farmId, mission = ctx.num(ctx.farmId), ctx.mission
         if farmId == nil or farmId <= 0 or farmId ~= math.floor(farmId) then
             return { readState = "settings-only", reason = "selected-farm-unavailable" }
@@ -38,7 +41,7 @@ CompanionPages.register({
         if ctx.call(mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-book-only" }
         end
-        local bank = ctx.global("g_villageBank")
+        local bank = ctx.symbol("g_villageBank")
         local data = type(bank) == "table" and type(bank.farms) == "table"
             and bank.farms[farmId] or nil
         if type(data) ~= "table" or type(data.accounts) ~= "table" then

@@ -56,6 +56,44 @@ function writeAuthority(dir, careerId, payload, slotName) {
 }
 
 describe("current XML source discovery", () => {
+    test("reused slot is discovered as the new save while its old map export is withheld", async () => {
+        const profile = tempDir();
+        try {
+            const dashboardRoot = path.join(profile, "modSettings", "FS25_FarmDashboard");
+            for (const [slot, mapId, mapTitle] of [
+                ["savegame10", "FS25_Witcombe.SampleModMap", "Witcombe Park Farm"],
+                ["savegame12", "FS25_SaddleCreek.SaddleCreek", "Saddle Creek"],
+            ]) {
+                const saveDir = path.join(profile, slot);
+                fs.mkdirSync(saveDir, { recursive: true });
+                fs.writeFileSync(path.join(saveDir, "careerSavegame.xml"),
+                    `<careerSavegame><settings><savegameName>My game save</savegameName><mapId>${mapId}</mapId><mapTitle>${mapTitle}</mapTitle></settings></careerSavegame>`);
+                writeAuthority(path.join(dashboardRoot, slot), `career-${slot}`,
+                    { serverInfo: { mapId: "FS25_Witcombe.SampleModMap", mapName: "Witcombe Park Farm" } }, slot);
+            }
+            const api = productionFunctions("FS25_FarmDashboard_App/main.js", [
+                "sameResolvedDirectory", "looksLikeSaveSlotId", "profileRootForDashboard", "discoveryLabel", "scanLocalSaves",
+            ], {
+                fs, exportIngress, ingressOrchestration: require("../ingressOrchestration"),
+                replicaRegistration: require("../replicaRegistration"),
+                getFs25DocumentsRoot: () => profile,
+                getElectronDocumentsPath: () => null,
+                collectFs25DocumentRoots: () => [profile],
+                collectFarmDashboardModSettingsRoots: () => [dashboardRoot],
+                pathExists: async (file) => fs.existsSync(file),
+                readFileUtf8WithRetryAsync: async (file) => fs.readFileSync(file, "utf8"),
+            });
+            const scan = await api.scanLocalSaves();
+            const valid = scan.saves.find((row) => row.localSubFolder === "savegame10");
+            const reused = scan.saves.filter((row) => row.localSubFolder === "savegame12");
+            expect(valid?.mapTitle).toBe("Witcombe Park Farm");
+            expect(reused).toHaveLength(1);
+            expect(reused[0]).toMatchObject({ mapTitle: "Saddle Creek", awaitingFirstExport: true });
+        } finally {
+            fs.rmSync(profile, { recursive: true, force: true });
+        }
+    });
+
     test("profiles, replicas, and legacy previews stay on their own ingress result", async () => {
         const root = tempDir();
         const defaultProfile = path.join(root, "default-profile");

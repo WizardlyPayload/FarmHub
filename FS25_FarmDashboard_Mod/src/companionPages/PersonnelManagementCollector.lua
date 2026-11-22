@@ -21,7 +21,7 @@ CompanionPages.register({
         if ctx.call(mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-roster-only" }
         end
-        local app = ctx.global("g_helperPersonnelApp")
+        local app = ctx.symbol("g_helperPersonnelApp")
         local manager = type(app) == "table" and app.manager or nil
         local farms = type(manager) == "table" and manager.farms or nil
         local data = type(farms) == "table" and farms[farmId] or nil

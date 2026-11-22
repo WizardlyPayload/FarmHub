@@ -7,7 +7,7 @@ const FILE = "PersonnelManagementCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { KM_79440_Personnel_Management = true }
   _G.g_currentMission = { getIsServer = function() return true end }
-  _G.g_helperPersonnelApp = { manager = {
+  _G.KM_79440_Personnel_Management = { g_helperPersonnelApp = { manager = {
     refreshFarmContext = function() error("must not mutate farm/applicant state") end,
     getOrCreateFarmData = function() error("must not create a farm") end,
     storeCurrentFarmData = function() error("must not write farm state") end,
@@ -27,7 +27,7 @@ const GAME = `
         applicants = {},
       },
     },
-  } }
+  } } }
 `;
 
 test("reads only the selected farm's existing personnel and reports withheld foreign rows", () => {
@@ -45,6 +45,13 @@ test("reads the other farm's separate book", () => {
   const page = runCompanionPage(FILE, GAME, { farmId: 2 });
   expect(page).toMatchObject({ readState: "ok", byFarm: { "2": { employeeCount: 1, applicantCount: 0 } } });
   expect(page.rows[0].name).toBe("Bob");
+});
+
+test("withholds a shared-global shadow outside the loaded personnel mod", () => {
+  const shadow = GAME.replace("_G.KM_79440_Personnel_Management = { g_helperPersonnelApp = { manager = {", "_G.g_helperPersonnelApp = { manager = {")
+    .replace("  } } }\n", "  } }\n");
+  expect(runCompanionPage(FILE, shadow, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "farm-roster-unavailable" });
 });
 
 test("withholds client, absent book, and undetected mod", () => {

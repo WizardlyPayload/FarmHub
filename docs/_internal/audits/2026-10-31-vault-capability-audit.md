@@ -1,6 +1,6 @@
 # FS25 vault capability audit
 
-Status: **in progress**, last updated 16 November 2026. This audit reopens the question that the 65-entry companion validation matrix could not answer: whether every vault mod with useful, distinct data has an honest Farm Dashboard reading. The completed matrix is evidence for its tested integrations, not a vault-wide pass. Entries are chronological: later results can supersede an earlier "unimplemented," "draft," or "pending" statement. Check the latest entry for an exact archive and the current collector/page before counting it as a missing integration; a filename occurring once is not proof it was only screened. Auto Grove and Realistic Weather irrigation illustrate why this current-state check matters.
+Status: **in progress**, last updated 22 November 2026. This audit reopens the question that the 65-entry companion validation matrix could not answer: whether every vault mod with useful, distinct data has an honest Farm Dashboard reading. The completed matrix is evidence for its tested integrations, not a vault-wide pass. Entries are chronological: later results can supersede an earlier "unimplemented," "draft," or "pending" statement. Check the latest entry for an exact archive and the current collector/page before counting it as a missing integration; a filename occurring once is not proof it was only screened. Auto Grove and Realistic Weather irrigation illustrate why this current-state check matters.
 
 ## Inventory boundary
 

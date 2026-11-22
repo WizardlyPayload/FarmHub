@@ -54,4 +54,7 @@ test("requires exact map version, server world and valid game clock", () => {
   expect(runCompanionPage(FILE, GAME.replace("dayTime = 36000000",
     "dayTime = nil"), { farmId: 1 }))
     .toMatchObject({ reason: "game-clock-unavailable" });
+  expect(runCompanionPage(FILE, GAME.replace("dayTime = 36000000",
+    "dayTime = nil, getEnvironmentTime = function() return 36000000 end"), { farmId: 1 }))
+    .toMatchObject({ readState: "ok" });
 });

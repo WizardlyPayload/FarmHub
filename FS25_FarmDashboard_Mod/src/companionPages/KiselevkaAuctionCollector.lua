@@ -38,6 +38,9 @@ CompanionPages.register({
         local env = mission.environment
         local day = type(env) == "table" and finite(env.currentDay, 1000000) or nil
         local dayTime = type(env) == "table" and finite(env.dayTime, 86400000) or nil
+        if dayTime == nil and type(env) == "table" then
+            dayTime = finite(ctx.call(env, "getEnvironmentTime"), 86400000)
+        end
         if not day or not dayTime then
             return { readState = "settings-only", reason = "game-clock-unavailable" }
         end

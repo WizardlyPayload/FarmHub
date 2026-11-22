@@ -1,4 +1,4 @@
--- Read-only Realistic Mechanical Systems v0.12.0.0 vehicle snapshot.
+-- Read-only Realistic Mechanical Systems v0.10.0.0/v0.12.0.0 vehicle snapshot.
 -- Never call its save/update methods; they can advance thermal state.
 
 local MAX_ROWS = 60
@@ -37,7 +37,7 @@ CompanionPages.register({
         if farmId == nil or farmId <= 0 then
             return { readState = "settings-only", reason = "no-farm" }
         end
-        if ctx.version ~= "0.12.0.0" then
+        if ctx.version ~= "0.10.0.0" and ctx.version ~= "0.12.0.0" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
         -- The exact RMS mod skips specialization registration when ADS is loaded.

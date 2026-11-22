@@ -67,7 +67,7 @@ test("reports the mod's explicit Advanced Damage System conflict instead of an u
   expect(page.byFarm).toBeUndefined();
 });
 
-test("detects the older vault build but withholds its unreviewed vehicle schema", () => {
+test("reads the reviewed service and log fields from the exact older vault build", () => {
   const page = runCompanionPage(FILE, `
     _G.g_modIsLoaded = { KM_82113_Realistic_Mechanical_Systems = true }
     _G.g_modManager = { getActiveMods = function() return {
@@ -76,6 +76,11 @@ test("detects the older vault build but withholds its unreviewed vehicle schema"
     _G.g_currentMission = { vehicleSystem = { vehicles = {
       { ownerFarmId = 1, uniqueId = "owned", spec_RealisticMechanicalSystems = {
         serviceLevel = 0.6, conditionLevel = 0.8,
+        currentState = "READY", activeBreakdowns = { engine = {} },
+        maintenanceLog = {
+          { type = "INSPECTION", price = 75, isVisible = true, isCompleted = true },
+          { type = "INTERNAL", price = 100, isVisible = false },
+        },
       } },
     } } }
   `, { farmId: 1 });
@@ -83,9 +88,20 @@ test("detects the older vault build but withholds its unreviewed vehicle schema"
     detected: true,
     modName: "KM_82113_Realistic_Mechanical_Systems",
     version: "0.10.0.0",
-    readState: "settings-only",
-    reason: "unreviewed-version",
+    readState: "ok",
   });
+  expect(page.rows).toHaveLength(1);
+  expect(page.rows[0]).toMatchObject({
+    vehicleId: "owned", serviceLevel: 0.6, conditionLevel: 0.8,
+    state: "READY", breakdownCount: 1, logCount: 1,
+    lastLogType: "INSPECTION", lastLogPrice: 75, lastLogCompleted: true,
+  });
+  expect(page.byFarm["1"]).toMatchObject({ vehicleCount: 1, breakdownVehicleCount: 1, loggedVehicleCount: 1 });
+});
+
+test("withholds a later unreviewed Realistic Mechanical Systems version", () => {
+  const page = runCompanionPage(FILE, GAME.replace('version = "0.12.0.0"', 'version = "0.13.0.0"'), { farmId: 1 });
+  expect(page).toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
   expect(page.rows).toBeUndefined();
   expect(page.byFarm).toBeUndefined();
 });

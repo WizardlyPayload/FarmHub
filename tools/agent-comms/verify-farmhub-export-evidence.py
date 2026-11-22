@@ -50,7 +50,7 @@ def check(directory: Path, page: str | None) -> list[dict[str, object]]:
         raise ValueError("no retained active route found")
     results = []
     for route in routes:
-        if not re.fullmatch(r"(?:(?:p|gen)\d+|pre)-active\.xml", route.name):
+        if not re.fullmatch(r"(?:(?:p|g|gen)\d+|pre)-active\.xml", route.name):
             continue
         prefix = route.name.removesuffix("-active.xml")
         root = ET.parse(route).getroot()

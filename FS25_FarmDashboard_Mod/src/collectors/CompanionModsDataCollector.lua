@@ -297,6 +297,14 @@ local CATALOG = {
         globals = { "FieldContractors" },
     },
     {
+        id = "kiselevkaAuction",
+        title = "Kiselevka farmland auction",
+        category = "economy",
+        names = { "KM_77461_kiselevka-4x" },
+        substrings = {},
+        globals = { "AuctionManager" },
+    },
+    {
         id = "farmContractorServices",
         title = "Farm Contractor Services",
         category = "economy",

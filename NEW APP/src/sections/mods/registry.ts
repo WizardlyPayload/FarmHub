@@ -320,6 +320,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/financialDashboardHistory").then((m) => m.Page) },
   { key: "fieldContractors", catalogId: "fieldContractors", title: "Field Contractors", glyph: "CT", group: "finance",
     load: () => import("@/sections/mods/fieldContractors").then((m) => m.Page) },
+  { key: "kiselevkaAuction", catalogId: "kiselevkaAuction", title: "Kiselevka farmland auction", glyph: "AU", group: "finance",
+    load: () => import("@/sections/mods/kiselevkaAuction").then((m) => m.Page) },
   { key: "farmContractorServices", catalogId: "farmContractorServices", title: "Farm Contractor Services", glyph: "FS", group: "finance",
     load: () => import("@/sections/mods/farmContractorServices").then((m) => m.Page) },
   { key: "vipOrderManager", catalogId: "vipOrderManager", title: "VIP Order Manager", glyph: "VO", group: "finance",

@@ -6873,5 +6873,14 @@
   "companionPage.soilCompaction.empty": "No compaction was found on this farm's field ground in the completed grid scan.",
   "companionPage.soilCompaction.truncated": "Only the worst 60 parcels are listed; the totals cover every scanned parcel.",
   "companionPage.soilCompaction.scanning": "The soil grid is still being scanned. No partial totals are shown.",
-  "companionPage.soilCompaction.unavailable": "The soil grid could not be read safely. No total is shown."
+  "companionPage.soilCompaction.unavailable": "The soil grid could not be read safely. No total is shown.",
+  "companions.desc.kiselevkaAuction": "Shows the map's active land auction price, time left and whether this farm currently leads. Values are a snapshot from the last export.",
+  "companionPage.kiselevkaAuction.lead": "The active Kiselevka land auction at the last export. Price and remaining game time can change; refresh before bidding. This page never places a bid or records a purchase.",
+  "companionPage.kiselevkaAuction.farmland": "Farmland",
+  "companionPage.kiselevkaAuction.price": "Current bid",
+  "companionPage.kiselevkaAuction.time": "Game hours remaining at export",
+  "companionPage.kiselevkaAuction.status": "This farm's bid status",
+  "companionPage.kiselevkaAuction.leading": "This farm currently leads the auction.",
+  "companionPage.kiselevkaAuction.notLeading": "This farm is not the current highest bidder.",
+  "companionPage.kiselevkaAuction.empty": "No confirmed active auction reading is available."
 }

@@ -264,6 +264,7 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/companionPages/AutomaticBaleStorageCollector.lua"/>
         <sourceFile filename="src/companionPages/ObjectStorageExtensionCollector.lua"/>
         <sourceFile filename="src/companionPages/FieldContractorsCollector.lua"/>
+        <sourceFile filename="src/companionPages/KiselevkaAuctionCollector.lua"/>
         <sourceFile filename="src/companionPages/FarmContractorServicesCollector.lua"/>
         <sourceFile filename="src/companionPages/VIPOrderManagerCollector.lua"/>
         <sourceFile filename="src/companionPages/BaleBatchTrackerCollector.lua"/>

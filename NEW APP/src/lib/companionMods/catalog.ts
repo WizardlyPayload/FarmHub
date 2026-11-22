@@ -170,6 +170,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     relatedSection: "economy",
   },
   {
+    id: "kiselevkaAuction",
+    title: "Kiselevka farmland auction",
+    category: "finance",
+    descKey: "companions.desc.kiselevkaAuction",
+    desc: "Shows the map's active land auction price, time left and whether this farm currently leads. Values are a snapshot from the last export.",
+    relatedSection: "economy",
+  },
+  {
     id: "farmContractorServices",
     title: "Farm Contractor Services",
     category: "finance",

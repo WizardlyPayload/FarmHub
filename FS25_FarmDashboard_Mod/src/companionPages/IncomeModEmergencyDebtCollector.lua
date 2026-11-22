@@ -26,7 +26,7 @@ CompanionPages.register({
         if ctx.version ~= "2.2.0.7" and ctx.version ~= "2.3.0.0" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
-        local manager = ctx.global("g_IncomeManager")
+        local manager = ctx.symbol("g_IncomeManager")
         local loan = type(manager) == "table" and manager.emergencyLoan or nil
         if type(loan) ~= "table" or loan.readiness ~= "READY"
             or type(loan.debts) ~= "table" then

@@ -8,7 +8,7 @@ const GAME = `
   _G.g_modIsLoaded = { FS25_IncomeMod = true }
   _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_IncomeMod", version = "2.2.0.7" } } end }
   _G.g_currentMission = { getIsServer = function() return true end }
-  _G.g_IncomeManager = { emergencyLoan = {
+  _G.FS25_IncomeMod = { g_IncomeManager = { emergencyLoan = {
     readiness = "READY",
     debts = {
       [1] = { active = true, principal = 12000, accruedInterest = 350.5,
@@ -19,7 +19,7 @@ const GAME = `
     },
     getView = function() error("must not build a forecast") end,
     applyRepayment = function() error("must not repay") end,
-  } }
+  } } }
 `;
 
 test("reads only selected farm emergency debt without calling loan behavior", () => {
@@ -50,6 +50,13 @@ test("retired record remains a history counter, not active debt", () => {
     byFarm: { "2": { active: false, principal: 0, accruedInterest: 0,
       outstanding: 0, drawCount: 3 } } });
   expect(page.byFarm["1"]).toBeUndefined();
+});
+
+test("does not read an Income Mod manager shadow outside the loaded mod", () => {
+  const shadow = GAME.replace("_G.FS25_IncomeMod = { g_IncomeManager = { emergencyLoan = {", "_G.g_IncomeManager = { emergencyLoan = {")
+    .replace("  } } }\n", "  } }\n");
+  expect(runCompanionPage(FILE, shadow, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "debt-register-not-ready" });
 });
 
 test("unready, client, invalid and absent state is not presented as a zero balance", () => {

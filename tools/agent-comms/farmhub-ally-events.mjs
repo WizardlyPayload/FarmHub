@@ -1,5 +1,13 @@
 import { createHash } from 'node:crypto';
 
+// A goal can keep the thread itself active after its latest turn completes.
+// Use the latest turn when present so a queued mailbox result can wake it.
+export function isChatTurnBusy(task) {
+  const busy = ['active', 'inProgress', 'waitingForInput'];
+  const latestTurn = task?.turns?.[0];
+  return latestTurn ? busy.includes(latestTurn.status) : busy.includes(task?.status);
+}
+
 // Tina's substantive replies use RESULT/BLOCKED, direct PARTIAL/COMPLETE,
 // and RF's direct PASS/FAIL/STALL outcomes. ACK and STATUS are receipt only.
 // Parse RF returns for exact, explicitly armed release gates; an unrelated RF

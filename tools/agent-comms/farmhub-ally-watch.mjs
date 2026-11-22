@@ -7,7 +7,7 @@ import os from 'node:os';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { parseSubstantiveReturns, shouldWakeFarmHub, firstRfRequestAfterHandoff } from './farmhub-ally-events.mjs';
+import { parseSubstantiveReturns, shouldWakeFarmHub, firstRfRequestAfterHandoff, isChatTurnBusy } from './farmhub-ally-events.mjs';
 
 const threadId = process.env.CODEX_THREAD_ID;
 if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(threadId ?? '')) {
@@ -113,6 +113,12 @@ const reviewedIds = new Set([
   'FARMHUB-ALLY-20261116-VAULT-V125', // StockGuard block reviewed and audited before rearm
   'FARMHUB-ALLY-20261122-VAULT-V125R3', // partial result reviewed before punctuation parser rearm
   'FARMHUB-ALLY-20261122-VAULT-V125R4', // partial result reviewed and audited before rearm
+  'FARMHUB-ALLY-20261122-VAULT-SOIL-COMPACTION', // reviewed and audited while goal turns kept the chat active
+  'FARMHUB-ALLY-20261122-VAULT-SOIL-COMPACTION-R1',
+  'FARMHUB-ALLY-20261122-VAULT-WORKPLAN',
+  'FARMHUB-ALLY-20261122-VAULT-REALISTIC-HARVESTING',
+  'FARMHUB-ALLY-20261122-VAULT-IMPLEMENT-MAINTENANCE',
+  'FARMHUB-ALLY-20261122-VAULT-REALISTIC-HARVESTING-UNITS', // independently reviewed before watcher gate restart
   ...[1, 2, 3, 4, 5].map(n => `FARMHUB-ALLY-20261102-STORAGE-ICONS-I${n}`),
 ]);
 const reviewed = initial.filter(event => reviewedIds.has(event.id));
@@ -124,7 +130,10 @@ state.pid = process.pid;
 state.lastError = null;
 const seen = new Set(state.seen);
 let lastScanPersist = Date.now();
-for (const event of state.events) if (event.status === 'inflight') event.status = 'uncertain';
+for (const event of state.events) {
+  if (event.status === 'inflight') event.status = 'uncertain';
+  if (event.status === 'queued' && reviewedIds.has(event.id)) event.status = 'reviewed';
+}
 writeState(state);
 
 let busy = false, stopped = false, debounce;
@@ -151,9 +160,7 @@ async function deliver() {
   busy = true;
   try {
     const task = await readTask();
-    const current = task.turns?.[0]?.status;
-    if (['active', 'inProgress', 'waitingForInput'].includes(current) ||
-        ['active', 'inProgress', 'waitingForInput'].includes(task.status)) return;
+    if (isChatTurnBusy(task)) return;
     for (const event of queued) event.status = 'inflight';
     writeState(state);
     const labels = queued.map(event => `${event.kind} ${event.id}`).join(', ');

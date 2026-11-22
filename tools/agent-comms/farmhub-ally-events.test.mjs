@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSubstantiveReturns, shouldWakeFarmHub, firstRfRequestAfterHandoff } from './farmhub-ally-events.mjs';
+import { parseSubstantiveReturns, shouldWakeFarmHub, firstRfRequestAfterHandoff, isChatTurnBusy } from './farmhub-ally-events.mjs';
+
+test('goal-active thread can wake after its latest turn finishes', () => {
+  assert.equal(isChatTurnBusy({ status: 'active', turns: [{ status: 'inProgress' }] }), true);
+  assert.equal(isChatTurnBusy({ status: 'active', turns: [{ status: 'completed' }] }), false);
+  assert.equal(isChatTurnBusy({ status: 'active', turns: [{ status: 'waitingForInput' }] }), true);
+  assert.equal(isChatTurnBusy({ status: 'active', turns: [] }), true);
+  assert.equal(isChatTurnBusy({ status: 'idle', turns: [] }), false);
+});
 
 test('parses substantive FarmHub and RF returns, including direct PARTIAL', () => {
   const text = [

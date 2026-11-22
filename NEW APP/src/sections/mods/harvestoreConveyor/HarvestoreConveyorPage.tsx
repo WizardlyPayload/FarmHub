@@ -15,8 +15,8 @@ type Row = {
 export function Page({ entry }: CompanionPageProps) {
   const { page, farmData, farmId } = useCompanionPage(entry.key);
   const rows = asList<Row>(page?.rows).filter((row) => num(row.farmId) === farmId);
-  const tiles: ModStatTile[] = farmData && page?.coverage === "complete" ? [
-    { key: "conveyors", label: tOr(`${K}.conveyors`, "Owned conveyors"), value: formatNumber(farmData.conveyorCount, 0) },
+  const queuedRows = rows.filter((row) => (num(row.inTransitLitres) || 0) > 0);
+  const tiles: ModStatTile[] = farmData && page?.coverage === "complete" && queuedRows.length > 0 ? [
     { key: "loaded", label: tOr(`${K}.loaded`, "Conveyors with material queued"), value: formatNumber(farmData.loadedConveyorCount, 0) },
     { key: "litres", label: tOr(`${K}.litres`, "Material in transit"), value: `${formatNumber(farmData.inTransitLitres, 0)} L` },
   ] : [];
@@ -31,7 +31,7 @@ export function Page({ entry }: CompanionPageProps) {
           { key: "batches", label: tOr(`${K}.batches`, "Batches") },
           { key: "next", label: tOr(`${K}.next`, "Next batch due") },
           { key: "state", label: tOr(`${K}.state`, "Conveyor") },
-        ]} rows={rows.map((row, index) => ({
+        ]} rows={queuedRows.map((row, index) => ({
           key: row.placeableId || String(index),
           cells: {
             silo: row.silo || row.placeableId || "—",
@@ -41,7 +41,7 @@ export function Page({ entry }: CompanionPageProps) {
             next: row.nextDeliverySeconds == null ? "—" : `${formatNumber(row.nextDeliverySeconds, 1)} s`,
             state: row.running ? tOr(`${K}.running`, "Running") : tOr(`${K}.idle`, "Idle"),
           },
-        }))} empty={tOr(`${K}.empty`, "No owned Harvestore has an enabled, readable conveyor.")} />
+        }))} empty={tOr(`${K}.emptyQueue`, "No material is queued in an owned Harvestore conveyor.")} />
         {page?.coverage === "partial" || page?.coverage === "truncated" ? (
           <ModEmpty>{tOr(`${K}.partial`, "Some conveyor readings were unavailable; totals are withheld.")}</ModEmpty>
         ) : null}

@@ -12,6 +12,9 @@ CompanionPages.register({
     },
     substrings = { "networthtracker_update", "net_worth_tracker", "fs25_networthtracker" },
     collect = function(ctx)
+        if ctx.version ~= "1.1.0.3" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local farmId = ctx.farmId
         if farmId == nil or farmId <= 0 then
             return { readState = "settings-only", reason = "no-farm" }

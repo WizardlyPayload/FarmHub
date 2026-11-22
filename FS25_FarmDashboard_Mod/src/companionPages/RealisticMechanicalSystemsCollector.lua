@@ -30,12 +30,15 @@ end
 
 CompanionPages.register({
     key = "realisticMechanicalSystems",
-    modNames = { "FS25_RealisticMechanicalSystems", "GH_Squallqt__FS25_RealisticMechanicalSystems_FS25_RealisticMechanicalSystems" },
+    modNames = { "FS25_RealisticMechanicalSystems", "GH_Squallqt__FS25_RealisticMechanicalSystems_FS25_RealisticMechanicalSystems", "KM_82113_Realistic_Mechanical_Systems" },
     substrings = { "realisticmechanicalsystems" },
     collect = function(ctx)
         local farmId = ctx.farmId
         if farmId == nil or farmId <= 0 then
             return { readState = "settings-only", reason = "no-farm" }
+        end
+        if ctx.version ~= "0.12.0.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
         end
         -- The exact RMS mod skips specialization registration when ADS is loaded.
         -- Distinguish that explicit conflict from a vehicle that has not initialized yet.

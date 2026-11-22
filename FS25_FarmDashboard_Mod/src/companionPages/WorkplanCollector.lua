@@ -64,19 +64,25 @@ CompanionPages.register({
                             if state == nil then invalid = true end
                             tasks[key] = state
                         end
+                        local fertilizer1Type = integer(ctx, entry.stateFert1_type, 1, 7)
+                        local fertilizer2Type = integer(ctx, entry.stateFert2_type, 1, 7)
+                        local currentCropIndex = integer(ctx, entry.currentFruit, 0, 1000000)
+                        local plannedCropIndex = integer(ctx, entry.plannedFruit, 0, 1000000)
+                        if fertilizer1Type == nil or fertilizer2Type == nil
+                            or currentCropIndex == nil or plannedCropIndex == nil then invalid = true end
                         if #rows >= MAX_ROWS then truncated = true
                         else
                             rows[#rows + 1] = {
                                 farmId = farmId,
                                 fieldId = fieldId,
                                 farmlandId = farmlandId,
-                                currentCrop = fruit(entry.currentFruit),
-                                currentCropIndex = integer(ctx, entry.currentFruit, 1, 1000000),
-                                plannedCrop = fruit(entry.plannedFruit),
-                                plannedCropIndex = integer(ctx, entry.plannedFruit, 1, 1000000),
+                                currentCrop = fruit(currentCropIndex),
+                                currentCropIndex = currentCropIndex,
+                                plannedCrop = fruit(plannedCropIndex),
+                                plannedCropIndex = plannedCropIndex,
                                 tasks = tasks,
-                                fertilizer1Type = integer(ctx, entry.stateFert1_type, 1, 7),
-                                fertilizer2Type = integer(ctx, entry.stateFert2_type, 1, 7),
+                                fertilizer1Type = fertilizer1Type,
+                                fertilizer2Type = fertilizer2Type,
                             }
                         end
                     end

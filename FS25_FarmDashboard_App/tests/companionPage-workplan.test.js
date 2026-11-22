@@ -97,6 +97,11 @@ test("scan cap withholds the full plan count while a row-only cap keeps it", () 
     rowsGame.replace(entryBlock, invalidBlock), { farmId: 1 });
   expect(invalidAfterDisplayCap.coverage).toBe("truncated");
   expect(invalidAfterDisplayCap.byFarm["1"].ownedPlanCount).toBeUndefined();
+  const invalidChoiceBlock = entryBlock.replace(lastEntry, lastEntry.replace("stateFert2_type = 1", "stateFert2_type = 9"));
+  const invalidChoiceAfterDisplayCap = runCompanionPage(FILE,
+    rowsGame.replace(entryBlock, invalidChoiceBlock), { farmId: 1 });
+  expect(invalidChoiceAfterDisplayCap.coverage).toBe("truncated");
+  expect(invalidChoiceAfterDisplayCap.byFarm["1"].ownedPlanCount).toBeUndefined();
   const scanGame = rowsGame.replace(entryBlock, Array.from({ length: 501 }, (_, i) => fullEntry.replace("fieldId = 11", `fieldId = ${11 + i}`)).join("\n"))
     .replace("fieldId <= 91", "fieldId <= 511").replace("fieldId <= 91", "fieldId <= 511");
   const scanCapped = runCompanionPage(FILE, scanGame, { farmId: 1 });

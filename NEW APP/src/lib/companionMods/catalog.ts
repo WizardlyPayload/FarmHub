@@ -1473,7 +1473,7 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     title: "Workplace Triggers Sites",
     category: "fields",
     descKey: "companions.desc.workplaceTriggersSites",
-    desc: "Shows this farm's named Workplace Triggers sites and current live shift terms. Site definitions do not prove work or earnings.",
+    desc: "Detects Workplace Triggers. Its site markers and live shift terms do not record completed work or earned pay.",
     relatedSection: "fields",
   },
   {

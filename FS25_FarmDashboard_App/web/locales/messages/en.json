@@ -5576,7 +5576,7 @@
   ,"companionPage.incomeModEmergencyDebt.empty": "No ready Income Mod emergency-debt record is available for this farm."
   ,"companionPage.incomeModEmergencyDebt.settled": "Last settled period counter"
   ,"companionPage.incomeModEmergencyDebt.eligible": "Interest eligible from period counter"
-  ,"companions.desc.workplaceTriggersSites": "Shows this farm's named Workplace Triggers sites and current live shift terms. Site definitions do not prove work or earnings."
+  ,"companions.desc.workplaceTriggersSites": "Detects Workplace Triggers. Its site markers and live shift terms do not record completed work or earned pay."
   ,"companionPage.workplaceTriggersSites.lead": "Named Workplace Triggers site definitions owned by this farm, plus any current in-session shift. A site is a location marker, not proof of a job, wage or completed work. No unowned sites or shared shift history are included."
   ,"companionPage.workplaceTriggersSites.siteCount": "Farm sites"
   ,"companionPage.workplaceTriggersSites.unavailableCount": "Unavailable sites"

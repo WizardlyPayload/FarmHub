@@ -58,6 +58,17 @@ test('recognizes Tina release wording before the exact FarmHub request ID', () =
   assert.equal(shouldWakeFarmHub(events[0]), true);
 });
 
+test('recognizes a sentence-ending full stop after a substantive request ID', () => {
+  const events = parseSubstantiveReturns([
+    '## [2026-11-22 06:24] from Tina\nRESULT (PARTIAL) + ALLY RELEASED FARMHUB-ALLY-20261122-VAULT-V125R3. StockGuard READY.',
+    '## [2026-11-22 07:03] from Tina\nRESULT (PARTIAL) + ALLY RELEASED FARMHUB-ALLY-20261122-VAULT-V125R4. Installed page captured.',
+  ].join('\n\n'));
+  assert.deepEqual(events.map(({ id, kind }) => [id, kind]), [
+    ['FARMHUB-ALLY-20261122-VAULT-V125R3', 'RESULT'],
+    ['FARMHUB-ALLY-20261122-VAULT-V125R4', 'RESULT'],
+  ]);
+});
+
 test('a combined pickup and substantive return wakes, while pickup alone does not', () => {
   const events = parseSubstantiveReturns([
     '## [time] from Tina\nPICKUP FARMHUB-ALLY-20261115-VAULT-V122R1 | starting',

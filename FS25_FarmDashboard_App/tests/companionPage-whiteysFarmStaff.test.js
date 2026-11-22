@@ -6,6 +6,9 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "WhiteysFarmStaffCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { FS25_WhiteysFarmStaff_5_2_3 = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "FS25_WhiteysFarmStaff_5_2_3", version = "5.2.3.0" }
+  } end }
   _G.g_currentMission = {
     missionDynamicInfo = { isMultiplayer = false },
     getFarmId = function() return 1 end,
@@ -47,11 +50,17 @@ test("reads one single-player farm's saved staff and unpaid wages without changi
 });
 
 test("detects the later 5_2_4 archive name with the same live roster schema", () => {
-  const laterArchive = GAME.replace("FS25_WhiteysFarmStaff_5_2_3", "FS25_WhiteysFarmStaff_5_2_4");
+  const laterArchive = GAME.replaceAll("FS25_WhiteysFarmStaff_5_2_3", "FS25_WhiteysFarmStaff_5_2_4");
   const page = runCompanionPage(FILE, laterArchive, { farmId: 1 });
   expect(page).toMatchObject({ readState: "ok", coverage: "complete",
     byFarm: { "1": { employeeCount: 2, unpaidWages: 225 } } });
   expect(page.rows.map((row) => row.name)).toEqual(["Emily", "Oliver"]);
+});
+
+test("withholds roster data when the active descriptor has an unreviewed version", () => {
+  const laterVersion = GAME.replace('version = "5.2.3.0"', 'version = "5.2.4.0"');
+  expect(runCompanionPage(FILE, laterVersion, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
 });
 
 test("withholds multiplayer and mismatched export farm", () => {

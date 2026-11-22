@@ -15,6 +15,9 @@ CompanionPages.register({
     modNames = { "FS25_WhiteysFarmStaff_5_2_3", "FS25_WhiteysFarmStaff" },
     substrings = { "whiteysfarmstaff" },
     collect = function(ctx)
+        if ctx.version ~= "5.2.3.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local farmId = ctx.farmId
         local mission = ctx.mission
         if farmId ~= 1 or type(mission) ~= "table"

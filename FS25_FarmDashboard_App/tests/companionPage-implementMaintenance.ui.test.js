@@ -14,7 +14,8 @@ test("renders current implement wear and service with ownership caveat", () => {
       key: KEY, detected: true, readState: "ok", coverage: "complete",
       byFarm: { "1": { vehicleCount: 1, serviceCount: 1 } },
       rows: [{ farmId: 1, vehicleId: "owned", vehicle: "Pöttinger Cultivator",
-        operatingHours: 14.25, hoursSinceGrease: 2.5, hoursSinceGeneralService: 10,
+        operatingHours: 14.25, hoursSinceGrease: 2.5,
+        greaseThresholdHours: 50, hoursSinceGeneralService: 10,
         groups: [{ key: "contacto", wearPercent: 27.5, quality: "generic" }],
         services: [{ day: 42, period: 5, meterHours: 12,
           group: "contacto", quality: "original", quantity: 1 }] },
@@ -24,6 +25,8 @@ test("renders current implement wear and service with ownership caveat", () => {
   }, { farmId: 1 });
   expect(host.textContent).toContain("Pöttinger Cultivator");
   expect(host.textContent).toContain("27.5%");
+  expect(host.textContent).toContain("2.50 / 50.00 h");
+  expect(host.textContent).toContain("storage can make greasing due sooner");
   expect(host.textContent).toContain("Day 42");
   expect(host.textContent).toContain("may predate purchase");
   expect(host.textContent).not.toContain("Other implement");

@@ -13,6 +13,7 @@ type Service = {
 type Implement = {
   farmId?: number; vehicleId?: string; vehicle?: string;
   operatingHours?: number; hoursSinceGrease?: number;
+  greaseThresholdHours?: number;
   hoursSinceGeneralService?: number;
   groups?: WearGroup[]; services?: Service[];
 };
@@ -61,11 +62,16 @@ export function Page({ entry }: CompanionPageProps) {
               wear: asList<WearGroup>(row.groups).map((group) =>
                 `${groupName(group.key)} ${formatNumber(group.wearPercent, 1)}% (${group.quality === "generic" ? tOr("companionPage.implementMaintenance.generic", "Generic") : tOr("companionPage.implementMaintenance.original", "Original")})`
               ).join(" · ") || "—",
-              attention: `${tOr("companionPage.implementMaintenance.grease", "Grease")} ${formatNumber(row.hoursSinceGrease, 2)} h · ${tOr("companionPage.implementMaintenance.generalService", "General service")} ${formatNumber(row.hoursSinceGeneralService, 2)} h`,
+              attention: `${tOr("companionPage.implementMaintenance.grease", "Grease")} ${num(row.greaseThresholdHours) != null
+                ? `${formatNumber(row.hoursSinceGrease, 2)} / ${formatNumber(row.greaseThresholdHours, 2)} h`
+                : tOr("companionPage.implementMaintenance.noGreaseInterval", "No grease interval")}
+                · ${tOr("companionPage.implementMaintenance.generalService", "General service")} ${formatNumber(row.hoursSinceGeneralService, 2)} h`,
             },
           }))}
           empty={tOr("companionPage.implementMaintenance.empty", "No maintained implements are currently owned by this farm.")}
         />
+        <p class="fd-economy__muted">{tOr("companionPage.implementMaintenance.greaseThresholdNote",
+          "The grease hour threshold helps plan service; storage can make greasing due sooner.")}</p>
       </Card>
       <Card title={tOr("companionPage.implementMaintenance.serviceTitle", "Saved completed services")}>
         <ModTable

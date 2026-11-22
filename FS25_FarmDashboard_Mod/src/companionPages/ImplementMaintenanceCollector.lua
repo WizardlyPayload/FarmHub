@@ -58,11 +58,21 @@ CompanionPages.register({
                         local hours = nonnegative(ctx, spec.operatingHours, 1000000)
                         local grease = nonnegative(ctx, spec.hoursSinceGrease, 1000000)
                         local service = nonnegative(ctx, spec.hoursSinceGeneralService, 1000000)
+                        local interval = type(spec.categories) == "table"
+                            and nonnegative(ctx, spec.categories.greaseIntervalHours, 1000000) or nil
+                        local duration = nonnegative(ctx, spec.greaseDurationHours, 1000000)
+                        local greaseType = spec.greaseType
                         local log = spec.serviceLog
                         local groups = {}
                         local bad = hours == nil or grease == nil or service == nil
                             or type(spec.categories) ~= "table" or type(spec.wear) ~= "table"
                             or type(spec.partQuality) ~= "table" or type(log) ~= "table"
+                            or interval == nil or duration == nil or type(greaseType) ~= "string"
+                        local greaseThreshold = nil
+                        if not bad and interval > 0 then
+                            greaseThreshold = greaseType ~= "none" and duration > 0
+                                and duration or interval
+                        end
                         if not bad then
                             for _, key in ipairs(GROUPS) do
                                 local applies = ctx.try(wearGroups.applies, spec.categories, key)
@@ -118,6 +128,7 @@ CompanionPages.register({
                                         or ctx.call(vehicle, "getName"), 80),
                                     operatingHours = ctx.round2(hours),
                                     hoursSinceGrease = ctx.round2(grease),
+                                    greaseThresholdHours = greaseThreshold and ctx.round2(greaseThreshold) or nil,
                                     hoursSinceGeneralService = ctx.round2(service),
                                     groups = groups, services = services,
                                 }

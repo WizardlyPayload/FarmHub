@@ -18,7 +18,9 @@ const SETUP = `
       spec_gnImplementMaintenance = {
         operatingHours = 14.25, hoursSinceGrease = 2.5,
         hoursSinceGeneralService = 10,
-        categories = { contacto = true, transmision = true },
+        categories = { contacto = true, transmision = true,
+          greaseIntervalHours = 50 },
+        greaseType = "none", greaseDurationHours = 0,
         wear = { contacto = 0.275, transmision = 0.1 },
         partQuality = { contacto = 1, transmision = 2 },
         serviceLog = { { dia = 42, mes = 5, horas = 12,
@@ -35,6 +37,7 @@ test("exports applicable current wear and saved service entries on owned impleme
     byFarm: { "1": { vehicleCount: 1, serviceCount: 1 } } });
   expect(page.rows).toEqual([expect.objectContaining({
     vehicleId: "owned", operatingHours: 14.25, hoursSinceGrease: 2.5,
+    greaseThresholdHours: 50,
     groups: [
       { key: "contacto", wearPercent: 27.5, quality: "generic" },
       { key: "transmision", wearPercent: 10, quality: "original" },
@@ -46,6 +49,22 @@ test("exports applicable current wear and saved service entries on owned impleme
   const merged = normalizeCompanionPages({ pages: { implementMaintenance: page } },
     { modules: loadModules() });
   expect(merged.pages.implementMaintenance.rows).toHaveLength(1);
+});
+
+test("uses the current greased interval and withholds an invalid threshold", () => {
+  const greased = runCompanionPage(FILE,
+    SETUP.replace('greaseType = "none", greaseDurationHours = 0',
+      'greaseType = "premium", greaseDurationHours = 75'), { farmId: 1 });
+  expect(greased.rows[0].greaseThresholdHours).toBe(75);
+  const noGrease = runCompanionPage(FILE,
+    SETUP.replace('greaseIntervalHours = 50', 'greaseIntervalHours = 0'),
+    { farmId: 1 });
+  expect(noGrease.rows[0]).not.toHaveProperty("greaseThresholdHours");
+  const invalid = runCompanionPage(FILE,
+    SETUP.replace('greaseIntervalHours = 50', 'greaseIntervalHours = -1'),
+    { farmId: 1 });
+  expect(invalid).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(invalid.byFarm["1"]).not.toHaveProperty("vehicleCount");
 });
 
 test("withholds counts for malformed wear and duplicate vehicle identity", () => {

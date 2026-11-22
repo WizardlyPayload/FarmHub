@@ -49,7 +49,24 @@ test("withholds client and shadow-global registers", () => {
 test("marks malformed farm entries partial without exporting them", () => {
     const malformed = SETUP.replace("{ farmId = 1, amount = 100, months = 1 }", "{ farmId = 1, amount = -100, months = 1 }");
     const page = runCompanionPage(FILE, malformed, { farmId: 1 });
-    expect(page).toMatchObject({ readState: "partial", coverage: "partial",
-        byFarm: { "1": { pendingCount: 1, pendingAmount: 1234.57 } } });
+    expect(page).toMatchObject({ readState: "partial", coverage: "partial" });
+    expect(page.byFarm).toBeUndefined();
     expect(page.pending).toHaveLength(1);
+});
+
+test("scan cap withholds farm totals, while a display cap keeps complete totals", () => {
+    const register = `_G.KM_83453_Auto_Sell_Silo.AutoSellSilo.pending`;
+    const capped = runCompanionPage(FILE, SETUP + `
+      local p = ${register}
+      for i = 1, 301 do p[#p + 1] = { farmId = 2, amount = 10, months = 1 } end
+    `, { farmId: 1 });
+    expect(capped).toMatchObject({ readState: "partial", coverage: "truncated" });
+    expect(capped.byFarm).toBeUndefined();
+    const listed = runCompanionPage(FILE, SETUP + `
+      local p = ${register}
+      for i = 1, 41 do p[#p + 1] = { farmId = 1, amount = 10, months = 1 } end
+    `, { farmId: 1 });
+    expect(listed).toMatchObject({ readState: "ok", coverage: "truncated",
+      byFarm: { "1": { pendingCount: 43, pendingAmount: 1744.57 } } });
+    expect(listed.pending).toHaveLength(40);
 });

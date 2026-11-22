@@ -28,10 +28,14 @@ export function Page({ entry }: CompanionPageProps) {
             key: String(index),
             cells: { due: formatNumber(row.monthsRemaining, 0), amount: money(row.amount) },
           }))}
-          empty={tOr("companionPage.autoSellSilo.empty", "No deferred Auto Sell Silo payment for this farm.")}
+          empty={page?.coverage === "truncated"
+            ? tOr("companionPage.autoSellSilo.truncated", "Only some payments are listed.")
+            : page?.readState === "partial"
+              ? tOr("companionPage.autoSellSilo.partial", "Some payment terms could not be read.")
+              : tOr("companionPage.autoSellSilo.empty", "No deferred Auto Sell Silo payment for this farm.")}
         />
-        {page?.coverage === "truncated" ? <ModEmpty>{tOr("companionPage.autoSellSilo.truncated", "Only some payments are listed.")}</ModEmpty> : null}
-        {page?.coverage === "partial" ? <ModEmpty>{tOr("companionPage.autoSellSilo.partial", "Some payment terms could not be read.")}</ModEmpty> : null}
+        {pending.length > 0 && page?.coverage === "truncated" ? <ModEmpty>{tOr("companionPage.autoSellSilo.truncated", "Only some payments are listed.")}</ModEmpty> : null}
+        {pending.length > 0 && page?.coverage === "partial" ? <ModEmpty>{tOr("companionPage.autoSellSilo.partial", "Some payment terms could not be read.")}</ModEmpty> : null}
       </Card>
     </ModPage>
   );

@@ -22,10 +22,10 @@ CompanionPages.register({
         end
 
         local rows, count, total = {}, 0, 0
-        local scanned, invalid, truncated = 0, false, false
+        local scanned, invalid, scanIncomplete, rowsTruncated = 0, false, false, false
         for _, entry in ipairs(mod.pending) do
             scanned = scanned + 1
-            if scanned > MAX_SCAN then truncated = true; break end
+            if scanned > MAX_SCAN then scanIncomplete = true; break end
             if type(entry) == "table" and ctx.num(entry.farmId) == farmId then
                 local amount = ctx.num(entry.amount)
                 local months = ctx.num(entry.months)
@@ -37,17 +37,21 @@ CompanionPages.register({
                     if #rows < MAX_ROWS then
                         rows[#rows + 1] = { farmId = farmId, amount = ctx.round2(amount), monthsRemaining = months }
                     else
-                        truncated = true
+                        rowsTruncated = true
                     end
                 end
             end
         end
         table.sort(rows, function(a, b) return a.monthsRemaining < b.monthsRemaining end)
+        local complete = not invalid and not scanIncomplete
         return {
-            readState = invalid and "partial" or count > 0 and "ok" or "settings-only",
-            reason = count == 0 and "no-farm-receivables" or nil,
-            coverage = truncated and "truncated" or invalid and "partial" or "complete",
-            byFarm = { [tostring(farmId)] = { pendingCount = count, pendingAmount = ctx.round2(total) } },
+            readState = not complete and "partial" or count > 0 and "ok" or "settings-only",
+            reason = complete and count == 0 and "no-farm-receivables" or nil,
+            coverage = (scanIncomplete or rowsTruncated) and "truncated"
+                or invalid and "partial" or "complete",
+            byFarm = complete and { [tostring(farmId)] = {
+                pendingCount = count, pendingAmount = ctx.round2(total),
+            } } or nil,
             pending = rows,
         }
     end,

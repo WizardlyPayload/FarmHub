@@ -14,7 +14,7 @@ export function Page({ entry }: CompanionPageProps) {
   const tiles: ModStatTile[] = active ? [
     { key: "land", label: tOr(`${K}.farmland`, "Farmland"),
       value: formatNumber(farmData.farmlandId, 0) },
-    { key: "price", label: tOr(`${K}.price`, "Current bid"),
+    { key: "price", label: tOr(`${K}.price`, "Current auction price"),
       value: money(farmData.currentPrice) },
     { key: "time", label: tOr(`${K}.time`, "Game hours remaining at export"),
       value: formatNumber(farmData.remainingGameHours, 2) },

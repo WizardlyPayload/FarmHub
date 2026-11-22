@@ -6879,7 +6879,7 @@
   "companions.desc.kiselevkaAuction": "Shows the map's active land auction price, time left and whether this farm currently leads. Values are a snapshot from the last export.",
   "companionPage.kiselevkaAuction.lead": "The active Kiselevka land auction at the last export. Price and remaining game time can change; refresh before bidding. This page never places a bid or records a purchase.",
   "companionPage.kiselevkaAuction.farmland": "Farmland",
-  "companionPage.kiselevkaAuction.price": "Current bid",
+  "companionPage.kiselevkaAuction.price": "Current auction price",
   "companionPage.kiselevkaAuction.time": "Game hours remaining at export",
   "companionPage.kiselevkaAuction.status": "This farm's bid status",
   "companionPage.kiselevkaAuction.leading": "This farm currently leads the auction.",

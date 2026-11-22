@@ -57,6 +57,7 @@ test.each([
     ["FS25_318102_Towing_Chain_With_Hook", "towingChainHook"],
     ["KM_80971_adjust_fuel_tank", "adjustFuelTank"],
     ["KM_82113_Realistic_Mechanical_Systems", "realisticMechanicalSystems"],
+    ["GH_user01010111__FS25_FieldProfitabilityLedger_FS25_FieldProfitabilityLedger", "fieldProfitabilityLedger"],
     ["KM_80824_agricultural_financial_system", "agriculturalFinancialSystem"],
 ])("%s has its expected detector ID", (modName, expectedId) => {
     const L = lauxlib.luaL_newstate();

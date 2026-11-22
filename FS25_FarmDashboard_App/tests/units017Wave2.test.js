@@ -68,7 +68,7 @@ function ledgerProvider(multiplayer) {
             getFarmId = function() return 1 end,
             missionDynamicInfo = { isMultiplayer = ${multiplayer ? "true" : "false"} },
         }
-        engine.g_modManager = { getActiveMods = function() return { { modName = 'FS25_FieldProfitabilityLedger' } } end }
+        engine.g_modManager = { getActiveMods = function() return { { modName = 'FS25_FieldProfitabilityLedger', version = '1.0.1.0' } } end }
         local runtime = {
             listCycles = function(options)
                 return { cycles = {
@@ -184,6 +184,14 @@ describe("wave 2 reads stay bounded", () => {
         );
         expect(inModEnv(kmVaultName, ledgerRow))
             .toBe("ok|farm|1|Field 3/ok|c1:0:false|false|nil|nil");
+        const olderVaultName = ledgerProvider(false)
+            .replaceAll("FS25_FieldProfitabilityLedger", "GH_user01010111__FS25_FieldProfitabilityLedger_FS25_FieldProfitabilityLedger")
+            .replace("version = '1.0.1.0'", "version = '1.0.0.0'");
+        expect(inModEnv(olderVaultName, ledgerRow))
+            .toBe("ok|farm|1|Field 3/ok|c1:0:false|false|nil|nil");
+        const unknownVersion = ledgerProvider(false).replace("version = '1.0.1.0'", "version = '1.0.2.0'");
+        expect(inModEnv(unknownVersion, ledgerRow))
+            .toBe("unavailable|nil|nil|||false|unreviewed-version|nil");
         expect(inModEnv(ledgerProvider(true), ledgerRow))
             .toBe("unavailable|nil|nil|||false|mp-disabled|nil");
     });

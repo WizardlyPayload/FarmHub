@@ -1658,7 +1658,7 @@ local CATALOG = {
         id = "fieldProfitabilityLedger",
         title = "Field Profitability Ledger",
         category = "fields",
-        names = { "FS25_FieldProfitabilityLedger", "FS25_369866_FS25_FieldProfitabilityLedger", "KM_80685_Field_Profitability_Ledger", "FS25_369866_Field_Profitability_Ledger" },
+        names = { "FS25_FieldProfitabilityLedger", "FS25_369866_FS25_FieldProfitabilityLedger", "KM_80685_Field_Profitability_Ledger", "GH_user01010111__FS25_FieldProfitabilityLedger_FS25_FieldProfitabilityLedger", "FS25_369866_Field_Profitability_Ledger" },
         substrings = { "fieldprofitability", "field_profitability" },
         globals = { "FieldProfitabilityLedger" },
     },
@@ -4679,7 +4679,7 @@ local function collectExtendedVehicleMaintenance()
     }
 end
 
-local LEDGER_MODS = { "FS25_FieldProfitabilityLedger", "FS25_369866_FS25_FieldProfitabilityLedger", "KM_80685_Field_Profitability_Ledger", "FS25_369866_Field_Profitability_Ledger" }
+local LEDGER_MODS = { "FS25_FieldProfitabilityLedger", "FS25_369866_FS25_FieldProfitabilityLedger", "KM_80685_Field_Profitability_Ledger", "GH_user01010111__FS25_FieldProfitabilityLedger_FS25_FieldProfitabilityLedger", "FS25_369866_Field_Profitability_Ledger" }
 local LEDGER_HEADER_CAP = 8
 local LEDGER_TOTAL_CAP = 12
 local LEDGER_TOTAL_SCAN_CAP = 64
@@ -4772,6 +4772,11 @@ local function collectFieldProfitabilityLedger()
             singlePlayerOnly = true,
             sales = ledgerSales(),
         }
+    end
+    local loadedName = findLoadedName({ names = LEDGER_MODS })
+    local version = loadedName and modVersion(loadedName) or nil
+    if version ~= "1.0.0.0" and version ~= "1.0.1.0" then
+        return { enabled = true, readState = "unavailable", source = "fieldProfitabilityLedger", reason = "unreviewed-version", singlePlayerOnly = true, sales = ledgerSales() }
     end
     local ns = providerSymbol(LEDGER_MODS, "FieldProfitabilityLedger")
     if type(ns) ~= "table" then

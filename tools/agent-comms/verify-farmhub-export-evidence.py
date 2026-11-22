@@ -45,12 +45,12 @@ def inspect_slot(path: Path) -> tuple[dict[str, str], object]:
 def check(directory: Path, page: str | None) -> list[dict[str, object]]:
     if (directory / "export").is_dir():
         directory = directory / "export"
-    routes = sorted(directory.glob("p*-active.xml"))
+    routes = sorted(directory.glob("*-active.xml"))
     if not routes:
-        raise ValueError("no retained p*-active.xml route found")
+        raise ValueError("no retained active route found")
     results = []
     for route in routes:
-        if not re.fullmatch(r"p\d+-active\.xml", route.name):
+        if not re.fullmatch(r"(?:p|gen)\d+-active\.xml", route.name):
             continue
         prefix = route.name.removesuffix("-active.xml")
         root = ET.parse(route).getroot()

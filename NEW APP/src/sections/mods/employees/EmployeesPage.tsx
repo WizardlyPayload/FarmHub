@@ -43,7 +43,7 @@ export function Page({ entry }: CompanionPageProps) {
   ] : [];
 
   return (
-    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Current farm-owned Employees roster and contract terms. Hours are the mod's current-period counters; salary is a term, not proof of payment or completed work.")}>
+    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Current farm-owned Employees roster and contract terms. Temporary staff hours count elapsed contract time, including unassigned time; other hours are the mod's period counter. Salary is a term, not proof of completed work.")}>
       <ModStatTiles tiles={tiles} />
       <Card title={tOr(`${K}.tableTitle`, "Staff roster")}>
         <ModTable
@@ -51,7 +51,7 @@ export function Page({ entry }: CompanionPageProps) {
             { key: "name", label: tOr(`${K}.name`, "Staff member") },
             { key: "role", label: tOr(`${K}.role`, "Role") },
             { key: "contract", label: tOr(`${K}.contract`, "Contract") },
-            { key: "hours", label: tOr(`${K}.hours`, "Hours this period / limit") },
+            { key: "hours", label: tOr(`${K}.hours`, "Hours counter / limit") },
             { key: "salary", label: tOr(`${K}.salary`, "Salary term") },
             { key: "status", label: tOr(`${K}.status`, "Training or illness") },
           ]}

@@ -34,10 +34,11 @@ CompanionPages.register({
             return { readState = "settings-only", reason = "farm-investments-unavailable" }
         end
 
-        local rows, count, scanned, invalid, truncated = {}, 0, 0, false, false
+        local rows, count, scanned = {}, 0, 0
+        local invalid, scanIncomplete, rowsTruncated = false, false, false
         for _, investment in ipairs(investments or {}) do
             scanned = scanned + 1
-            if scanned > MAX_SCAN then truncated = true; break end
+            if scanned > MAX_SCAN then scanIncomplete = true; break end
             if type(investment) == "table" and ctx.num(investment.farmId) == farmId then
                 local amount = nonnegative(ctx, investment.amount)
                 local annualRate = nonnegative(ctx, investment.annualRate)
@@ -56,18 +57,20 @@ CompanionPages.register({
                             depositMonth = nonnegative(ctx, investment.depositMonth),
                             endMonth = nonnegative(ctx, investment.endMonth),
                         }
-                    else truncated = true end
+                    else rowsTruncated = true end
                 else invalid = true end
             else invalid = true end
         end
         local totalEarned = nonnegative(ctx, manager.totalEarned[farmId])
         local meaningful = count > 0 or (totalEarned ~= nil and totalEarned > 0)
+        local complete = not invalid and not scanIncomplete
         return {
-            readState = invalid and "partial" or (meaningful and "ok" or "settings-only"),
-            reason = not meaningful and "no-farm-investment-records" or nil,
-            coverage = truncated and "truncated" or invalid and "partial" or "complete",
+            readState = not complete and "partial" or (meaningful and "ok" or "settings-only"),
+            reason = complete and not meaningful and "no-farm-investment-records" or nil,
+            coverage = (scanIncomplete or rowsTruncated) and "truncated"
+                or invalid and "partial" or "complete",
             byFarm = { [tostring(farmId)] = {
-                investmentCount = count,
+                investmentCount = complete and count or nil,
                 totalEarnedAllTime = totalEarned,
             } },
             rows = rows,

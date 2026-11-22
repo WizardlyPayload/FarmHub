@@ -29,7 +29,8 @@ const GAME = `
 test("reads selected farm's saved investment and interest history only", () => {
   const page = runCompanionPage(FILE, GAME, { farmId: 1 });
   expect(page).toMatchObject({ readState: "partial", coverage: "partial",
-    byFarm: { "1": { investmentCount: 1, totalEarnedAllTime: 2500 } } });
+    byFarm: { "1": { totalEarnedAllTime: 2500 } } });
+  expect(page.byFarm["1"].investmentCount).toBeUndefined();
   expect(page.rows).toHaveLength(1);
   expect(page.rows[0]).toMatchObject({ farmId: 1, id: 7, amount: 12000,
     annualRatePercent: 4.5, compounding: true, earnedInterest: 2000,
@@ -58,4 +59,20 @@ test("withholds investments from an unreviewed Investment System version", () =>
   const newer = GAME.replace('version = "1.1.0.0"', 'version = "1.1.0.1"');
   expect(runCompanionPage(FILE, newer, { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
+});
+
+test("separates an incomplete register scan from a display-row limit", () => {
+  const clean = GAME.replace("{ farmId = 2, id = 8, amount = 900000, annualRate = 5 },", "");
+  const prefix = `local p = _G.g_bankManager.investments[1]\n`;
+  const append = `for i = 1, N do p[#p + 1] = {
+    farmId = 1, id = i + 20, amount = 100, annualRate = 4,
+  } end`;
+  const capped = runCompanionPage(FILE, clean + prefix + append.replace("N", "101"), { farmId: 1 });
+  expect(capped).toMatchObject({ readState: "partial", coverage: "truncated",
+    byFarm: { "1": { totalEarnedAllTime: 2500 } } });
+  expect(capped.byFarm["1"].investmentCount).toBeUndefined();
+  const listed = runCompanionPage(FILE, clean + prefix + append.replace("N", "41"), { farmId: 1 });
+  expect(listed).toMatchObject({ readState: "ok", coverage: "truncated",
+    byFarm: { "1": { investmentCount: 42, totalEarnedAllTime: 2500 } } });
+  expect(listed.rows).toHaveLength(40);
 });

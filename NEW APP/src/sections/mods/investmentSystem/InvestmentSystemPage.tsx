@@ -17,8 +17,12 @@ export function Page({ entry }: CompanionPageProps) {
   const money = useMoney();
   const rows = asList<Investment>(page?.rows).filter((row) => num(row.farmId) === farmId);
   const tiles: ModStatTile[] = farmData ? [
-    { key: "investments", label: tOr(`${K}.count`, "Current investments"), value: formatNumber(farmData.investmentCount, 0) },
-    { key: "earned", label: tOr(`${K}.earned`, "All-time interest recorded"), value: money(farmData.totalEarnedAllTime) },
+    ...(num(farmData.investmentCount) == null ? [] : [
+      { key: "investments", label: tOr(`${K}.count`, "Current investments"), value: formatNumber(farmData.investmentCount, 0) },
+    ]),
+    ...(num(farmData.totalEarnedAllTime) == null ? [] : [
+      { key: "earned", label: tOr(`${K}.earned`, "All-time interest recorded"), value: money(farmData.totalEarnedAllTime) },
+    ]),
   ] : [];
   return (
     <ModPage entry={entry} lead={tOr(`${K}.lead`, "Investment System's farm-owned deposit records. Earned interest is a mod counter and may already be reflected in native farm money; it is not added to cash here. Deposit and maturity months are the mod's absolute month indices.")}>
@@ -39,9 +43,13 @@ export function Page({ entry }: CompanionPageProps) {
           earned: money(row.earnedInterest),
           term: num(row.termYears) == null && num(row.endMonth) == null ? "—"
             : `${formatNumber(row.termYears, 0)} y / ${formatNumber(row.endMonth, 0)}`,
-        } }))} empty={tOr(`${K}.empty`, "No current investment is recorded for this farm.")} />
-        {page?.coverage === "truncated" ? <ModEmpty>{tOr(`${K}.truncated`, "Only part of this farm's investment register was scanned.")}</ModEmpty> : null}
-        {page?.coverage === "partial" ? <ModEmpty>{tOr(`${K}.partial`, "Invalid or foreign investment records were withheld.")}</ModEmpty> : null}
+        } }))} empty={page?.coverage === "truncated"
+          ? tOr(`${K}.truncated`, "Only part of this farm's investment register was scanned.")
+          : page?.readState === "partial"
+            ? tOr(`${K}.partial`, "Invalid or foreign investment records were withheld.")
+            : tOr(`${K}.empty`, "No current investment is recorded for this farm.")} />
+        {rows.length > 0 && page?.coverage === "truncated" ? <ModEmpty>{tOr(`${K}.truncated`, "Only part of this farm's investment register was scanned.")}</ModEmpty> : null}
+        {rows.length > 0 && page?.coverage === "partial" ? <ModEmpty>{tOr(`${K}.partial`, "Invalid or foreign investment records were withheld.")}</ModEmpty> : null}
       </Card>
     </ModPage>
   );

@@ -9,7 +9,7 @@ import {
 } from "@/services/electron-bridge";
 import { fetchSetupStatus, runSetupHandshake } from "@/lib/setup-status";
 import { startModStoreImageExport } from "@/lib/mod-export-progress";
-import { discoveryContextFromScan, discoveryFeedback, importDiscoveredSaves } from "@/lib/discovered-save";
+import { discoveryContextFromScan, discoveryFeedback, importDiscoveredSaves, reconcileDiscoveredSaves } from "@/lib/discovered-save";
 import { SetupStatusNotice } from "@/setup/status-notice";
 import { resolveSetupStatusForDraft } from "@/setup/draft-status";
 import { ModExportProgressModal } from "@/platform/ModExportProgressModal";
@@ -257,8 +257,9 @@ function SetupApp() {
         setAwaitingIds([...awaitingIds, ...imported.awaitingFirstExport]);
       }
       const feedback = discoveryFeedback(imported, saves.length > 0);
+      const nextServers = reconcileDiscoveredSaves(servers, imported);
       if (feedback === "added" && imported.awaitingFirstExport.length === imported.added.length) {
-        setServers([...servers, ...imported.added]);
+        setServers(nextServers);
         const count = imported.added.length;
         flash(
           count === 1
@@ -276,12 +277,12 @@ function SetupApp() {
         return;
       }
       if (feedback === "recovery") {
-        if (imported.added.length) setServers([...servers, ...imported.added]);
+        if (imported.added.length || imported.refreshed.length) setServers(nextServers);
         flash(tOr("setup.toastRegistrationRecovery", "Replica registration could not be read. Those replica sources were not added, and the registration file was left unchanged."));
         return;
       }
       if (feedback === "conflict") {
-        if (imported.added.length) setServers([...servers, ...imported.added]);
+        if (imported.added.length || imported.refreshed.length) setServers(nextServers);
         flash(tOr("setup.toastSourceConflict", "A discovered source conflicts with one already configured. It was not added, and the existing source was left unchanged."));
         return;
       }
@@ -290,11 +291,16 @@ function SetupApp() {
         return;
       }
       const added = imported.added;
+      if (feedback === "updated") {
+        setServers(nextServers);
+        flash(`Updated ${imported.refreshed.length} reused save slot(s). Launch Dashboard to keep this change.`);
+        return;
+      }
       if (!added.length) {
         flash(t("setup.toastAllDetected"));
         return;
       }
-      setServers([...servers, ...added]);
+      setServers(nextServers);
       flash(
         added.length === 1
           ? t("setup.toastImportedSavesOne", { count: added.length })

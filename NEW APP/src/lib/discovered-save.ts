@@ -118,6 +118,7 @@ export function importDiscoveredSaves(
   context: DiscoveryContext = {},
 ): {
   added: FarmDashConfigServer[];
+  refreshed: FarmDashConfigServer[];
   conflicts: DiscoveryConflict[];
   recoveries: DiscoveryRecovery[];
   unresolved: DiscoveryUnresolved[];
@@ -125,6 +126,7 @@ export function importDiscoveredSaves(
   awaitingFirstExport: string[];
 } {
   const added: FarmDashConfigServer[] = [];
+  const refreshed: FarmDashConfigServer[] = [];
   const awaitingFirstExport: string[] = [];
   const conflicts: DiscoveryConflict[] = [];
   const recoveries: DiscoveryRecovery[] = [];
@@ -163,7 +165,17 @@ export function importDiscoveredSaves(
       continue;
     }
     const info = identityOf(row, context);
-    if (info.physical && seenPhysical.has(info.physical)) continue;
+    if (info.physical && seenPhysical.has(info.physical)) {
+      // A reused local save slot can still have the previous map's configured label.
+      // Retain the source ID and preferences while replacing only its verified career name.
+      if (save.awaitingFirstExport === true && info.kind === "local") {
+        const priorServer = existing.find((server) => identityOf(server, context).physical === info.physical);
+        if (priorServer && priorServer.name !== row.name) {
+          refreshed.push({ ...priorServer, name: row.name });
+        }
+      }
+      continue;
+    }
     const prior = info.id ? seenIds.get(info.id) : undefined;
     if (prior) {
       if (prior.binding !== info.binding) conflicts.push({ id: info.id, reason: "binding-conflict" });
@@ -181,22 +193,32 @@ export function importDiscoveredSaves(
   }
   return {
     added,
+    refreshed,
     conflicts,
     recoveries,
     unresolved,
-    allDetected: readable > 0 && added.length === 0 && conflicts.length === 0 && recoveries.length === 0 && unresolved.length === 0,
+    allDetected: readable > 0 && added.length === 0 && refreshed.length === 0 && conflicts.length === 0 && recoveries.length === 0 && unresolved.length === 0,
     awaitingFirstExport,
   };
 }
 
 export function discoveryFeedback(
-  imported: { added: FarmDashConfigServer[]; conflicts: DiscoveryConflict[]; recoveries?: DiscoveryRecovery[]; unresolved: DiscoveryUnresolved[]; allDetected: boolean },
+  imported: { added: FarmDashConfigServer[]; refreshed?: FarmDashConfigServer[]; conflicts: DiscoveryConflict[]; recoveries?: DiscoveryRecovery[]; unresolved: DiscoveryUnresolved[]; allDetected: boolean },
   hadSaves: boolean,
-): "recovery" | "conflict" | "unresolved" | "added" | "all" | "none" {
+): "recovery" | "conflict" | "unresolved" | "added" | "updated" | "all" | "none" {
   if (imported.recoveries && imported.recoveries.length) return "recovery";
   if (imported.conflicts.length) return "conflict";
   if (imported.unresolved.length && imported.added.length === 0) return "unresolved";
   if (imported.added.length) return "added";
+  if (imported.refreshed?.length) return "updated";
   if (hadSaves && imported.allDetected) return "all";
   return "none";
+}
+
+export function reconcileDiscoveredSaves(
+  existing: FarmDashConfigServer[],
+  imported: { added: FarmDashConfigServer[]; refreshed: FarmDashConfigServer[] },
+): FarmDashConfigServer[] {
+  const byId = new Map(imported.refreshed.map((server) => [server.id, server]));
+  return existing.map((server) => byId.get(server.id) || server).concat(imported.added);
 }

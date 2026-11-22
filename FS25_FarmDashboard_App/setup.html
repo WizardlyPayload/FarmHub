@@ -757,15 +757,33 @@ function autoDetectSaves() {
       toast(st('setup.toastNoDataJson', null,
         'No data.json under FS25_FarmDashboard. Load a save in-game with this mod enabled.') + extra, 'info');
     } else {
+      var refreshed = 0;
       var fresh = found.filter(function(f) {
-        return !servers.some(function(s) { return s.localSubFolder === f.localSubFolder; });
+        var existing = servers.find(function(s) {
+          return s.mode === 'local' && f.mode === 'local' &&
+            String(s.localPath || '').toLowerCase() === String(f.localPath || '').toLowerCase() &&
+            String(s.localSubFolder || '').toLowerCase() === String(f.localSubFolder || '').toLowerCase();
+        });
+        if (!existing) return true;
+        // A reused slot can retain a configured row for the previous map. Keep its stable id
+        // and settings, but replace the label with the current career's verified identity.
+        if (f.awaitingFirstExport && (existing.name !== f.name || existing.mapTitle !== f.mapTitle)) {
+          existing.name = f.name;
+          existing.savegameName = f.savegameName;
+          existing.mapTitle = f.mapTitle;
+          existing.awaitingFirstExport = true;
+          refreshed++;
+        }
+        return false;
       });
-      if (fresh.length > 0) {
+      if (fresh.length > 0 || refreshed > 0) {
         servers = servers.concat(fresh);
         renderServers();
         var fk = fresh.length === 1 ? 'setup.toastImportedSavesOne' : 'setup.toastImportedSavesMany';
-        var fallback = '✅ Imported ' + fresh.length + ' save' + (fresh.length > 1 ? 's' : '') + '!';
-        toast(st(fk, { count: fresh.length }, fallback), 'success');
+        var fallback = fresh.length
+          ? '✅ Imported ' + fresh.length + ' save' + (fresh.length > 1 ? 's' : '') + '!'
+          : '✅ Updated ' + refreshed + ' reused save slot' + (refreshed > 1 ? 's' : '') + '. Save to keep this change.';
+        toast(fresh.length ? st(fk, { count: fresh.length }, fallback) : fallback, 'success');
       } else {
         toast(st('setup.toastAllDetected', null,
           'All detected saves are already in your list.'), 'info');

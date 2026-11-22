@@ -30,7 +30,7 @@ import {
 import { isFarmDashLocalConfigHost } from "@/platform/viewer-mode";
 import { showToast } from "@/platform/ChangesModal";
 import { startModStoreImageExport } from "@/lib/mod-export-progress";
-import { discoveryContextFromScan, discoveryFeedback, importDiscoveredSaves } from "@/lib/discovered-save";
+import { discoveryContextFromScan, discoveryFeedback, importDiscoveredSaves, reconcileDiscoveredSaves } from "@/lib/discovered-save";
 import {
   THEME_TABS,
   applyThemeForSection,
@@ -1108,13 +1108,14 @@ function ServersPane(props: {
         discoveryContextFromScan(result),
       );
       const feedback = discoveryFeedback(imported, saves.length > 0);
+      const nextServers = reconcileDiscoveredSaves(serversDraft, imported);
       if (feedback === "recovery") {
-        if (imported.added.length) setServersDraft([...serversDraft, ...imported.added]);
+        if (imported.added.length || imported.refreshed.length) setServersDraft(nextServers);
         showToast(tOr("setup.toastRegistrationRecovery", "Replica registration could not be read. Those replica sources were not added, and the registration file was left unchanged."), "warning");
         return;
       }
       if (feedback === "conflict") {
-        if (imported.added.length) setServersDraft([...serversDraft, ...imported.added]);
+        if (imported.added.length || imported.refreshed.length) setServersDraft(nextServers);
         showToast(tOr("setup.toastSourceConflict", "A discovered source conflicts with one already configured. It was not added, and the existing source was left unchanged."), "warning");
         return;
       }
@@ -1123,11 +1124,16 @@ function ServersPane(props: {
         return;
       }
       const added = imported.added;
+      if (feedback === "updated") {
+        setServersDraft(nextServers);
+        showToast(`Updated ${imported.refreshed.length} reused save slot(s). Save to keep this change.`, "success");
+        return;
+      }
       if (!added.length) {
         showToast(t("setup.toastAllDetected"), "info");
         return;
       }
-      setServersDraft([...serversDraft, ...added]);
+      setServersDraft(nextServers);
       showToast(
         added.length === 1
           ? t("setup.toastImportedSavesOne", { count: added.length })

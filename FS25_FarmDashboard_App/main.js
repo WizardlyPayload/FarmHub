@@ -2496,6 +2496,8 @@ function localCacheSourceEligible(srv, state, record) {
     const proof = record && record.sourceProof;
     if (!proof || proof.kind !== 'authority' || proof.sourceId !== String(srv.id)
         || !proof.careerId || !proof.sessionId || !proof.configuredSlot) return false;
+    // A reused savegame slot can retain an otherwise valid authority cache from its old map.
+    if (require('./localSaveMapIdentity.cjs').compareLocalSaveMap(srv, record.mergedSnapshot).status === 'mismatch') return false;
 
     const matches = (identity) => !!(identity && identity.replica !== true
         && identity.legacy !== true
@@ -2513,6 +2515,7 @@ function localCacheSourceEligible(srv, state, record) {
             trustedLocalClock: true,
             explicitLegacy: srv.legacyJson === true,
         });
+        if (ingress && require('./localSaveMapIdentity.cjs').compareLocalSaveMap(srv, ingress.payload).status === 'mismatch') return false;
         return !!(ingress && ingress.status === 'valid' && ingress.replica !== true
             && matches(ingress.identity));
     } catch (_) {

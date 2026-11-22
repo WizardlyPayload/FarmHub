@@ -89,6 +89,19 @@ describe("current XML source discovery", () => {
             expect(valid?.mapTitle).toBe("Witcombe Park Farm");
             expect(reused).toHaveLength(1);
             expect(reused[0]).toMatchObject({ mapTitle: "Saddle Creek", awaitingFirstExport: true });
+            const { importDiscoveredSaves, reconcileDiscoveredSaves, discoveryFeedback } =
+                productionTs("NEW APP/src/lib/discovered-save.ts");
+            const configured = [{
+                id: "existing-slot-12", name: "RF AUTOSAVE DIAGNOSTIC — Witcombe Park Farm",
+                mode: "local", localPath: dashboardRoot, localSubFolder: "savegame12",
+            }];
+            const imported = importDiscoveredSaves(configured, reused, { defaultDashboardRoot: dashboardRoot });
+            expect(imported.added).toHaveLength(0);
+            expect(imported.refreshed).toMatchObject([{ id: "existing-slot-12", name: "My game save — Saddle Creek" }]);
+            expect(discoveryFeedback(imported, true)).toBe("updated");
+            expect(reconcileDiscoveredSaves(configured, imported)).toMatchObject([
+                { id: "existing-slot-12", name: "My game save — Saddle Creek", localSubFolder: "savegame12" },
+            ]);
         } finally {
             fs.rmSync(profile, { recursive: true, force: true });
         }

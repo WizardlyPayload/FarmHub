@@ -1,4 +1,4 @@
--- Income Mod 2.2.0.7 owns a separate emergency-debt register per farm.
+-- Income Mod 2.2.0.7 and 2.3.0.0 share the reviewed emergency-debt schema.
 -- Never call forecast, quote, grant, repay or persistence functions here.
 
 local function nonnegative(ctx, value)
@@ -23,7 +23,7 @@ CompanionPages.register({
         if ctx.call(ctx.mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-debt-only" }
         end
-        if ctx.version ~= "2.2.0.7" then
+        if ctx.version ~= "2.2.0.7" and ctx.version ~= "2.3.0.0" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
         local manager = ctx.global("g_IncomeManager")

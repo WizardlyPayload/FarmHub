@@ -33,6 +33,17 @@ test("reads only selected farm emergency debt without calling loan behavior", ()
   expect(merged.pages.incomeModEmergencyDebt.byFarm["1"].outstanding).toBe(12350.5);
 });
 
+test("accepts reviewed Income Mod 2.3.0.0 debt schema and rejects unknown versions", () => {
+  const current = GAME.replace('version = "2.2.0.7"', 'version = "2.3.0.0"');
+  expect(runCompanionPage(FILE, current, { farmId: 1 })).toMatchObject({
+    readState: "ok", byFarm: { "1": { outstanding: 12350.5, drawCount: 2 } },
+  });
+  const future = GAME.replace('version = "2.2.0.7"', 'version = "2.3.0.1"');
+  expect(runCompanionPage(FILE, future, { farmId: 1 })).toMatchObject({
+    readState: "settings-only", reason: "unreviewed-version",
+  });
+});
+
 test("retired record remains a history counter, not active debt", () => {
   const page = runCompanionPage(FILE, GAME, { farmId: 2 });
   expect(page).toMatchObject({ readState: "ok",

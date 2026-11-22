@@ -46,7 +46,7 @@ The PC Catuaí run confirmed purchased coffee parcels appear under **Your orchar
 
 ## Markets, diesel, statistics and farm economy
 
-- **Realistic Diesel Price — live:** exported diesel price/preset information appears in Economy and its page. It does not change fuel prices. [Page screenshot](doc-screenshots/current-526/mod-realisticDieselPrice.png).
+- **Realistic Diesel Price — native price context:** the game mod changes the native diesel price. Economy can show the current native price or a labelled fallback, but cannot identify which mod last set it. There is no dedicated Realistic Diesel Price dashboard reading; the older [page screenshot](doc-screenshots/current-526/mod-realisticDieselPrice.png) is historical layout evidence.
 - **Fluctuating Diesel Price — live:** the changing in-game diesel reading appears on its page when present. Do not combine it with Realistic Diesel Price into a made-up single price. [Page screenshot](doc-screenshots/current-526/mod-fluctuatingDieselPrice.png).
 - **Dynamic Market — detected in the general catalog; separate page:** the page can show exported market group moves and sell pressure when that data is available. Detection alone does not prove a live price. [Page screenshot](doc-screenshots/current-526/mod-dynamicMarket.png).
 - **Market Price Helper — reference:** the in-game price helper is described; no separate live helper ticker is promised by the catalog.
@@ -62,7 +62,7 @@ The PC Catuaí run confirmed purchased coffee parcels appear under **Your orchar
 
 - **Restricted Periods — live:** shows closed spreading windows and restrictions so you can plan fieldwork. The game mod still enforces the rule. [Page screenshot](doc-screenshots/current-526/mod-restrictedPeriods.png).
 - **Regional Crop Calendar — live:** shows the mod's regional planting/harvest calendar. It is not a new calendar invented by Farm Dashboard. [Page screenshot](doc-screenshots/current-526/mod-regionalCropCalendar.png).
-- **Soil Work Yield Bonus — limited:** reads tool bonuses and worked area awaiting harvest. It cannot perform fieldwork or promise a final yield.
+- **Soil Work Yield Bonus — detected only:** save-wide multipliers did not provide a useful farm-specific harvest reading, so its earlier page was removed. No worked-area or final-yield value is promised.
 - **Smart Crop Control — reference page:** concerns NPC crop allocation, not the player's own planting plan. The catalog has no live player-crop promise. [Page screenshot](doc-screenshots/current-526/mod-smartCropControl.png).
 - **Dynamic Field Prices — reference:** explains moving farmland prices; the catalog does not claim a live price list.
 - **Farmland Marketplace — limited:** reads this farm's exported offers. It cannot accept, withdraw or create an offer.
@@ -99,12 +99,12 @@ The PC Catuaí run confirmed purchased coffee parcels appear under **Your orchar
 ## Productions, stock checks and distribution
 
 - **Production Watcher — limited:** Farm Dashboard uses its own read-only warning rules on your exported productions because the mod's private alert list is not directly available.
-- **Production Control — reference:** the mod changes speed and operating cost in-game. The catalog does not yet read its chosen speed.
+- **Production Control — bounded private reading:** one owned production line's selected speed, cycles and operating-cost rate matched game, export and installed page with StockGuard disabled for that isolated test. The reviewed normal StockGuard build refuses this mod because its adapter is unbound, so normal-set coexistence is **not established**.
 - **Productions Manager — reference:** describes the in-game manager; no complete manager UI is imported.
 - **Factory Profit Calculator — limited:** shows estimates based on available month/price helpers for this farm. Estimates are not booked profit, and the dashboard does not modify a production point. [Page screenshot](doc-screenshots/current-526/mod-factoryProfitCalculator.png).
-- **Time Saving Stock Check — reference/direct stock context:** its in-game stock/price page is not copied wholesale. Use V5 Storage and Economy for exported figures.
+- **Time Saving Stock Check — last-open stock context:** one in-game menu's 19 nonempty rows matched a fresh export and Storage sell-advice fold. This does not establish stock movement or a continuously open menu.
 - **Production Schedule — limited:** selected schedule information can be read; start/stop decisions stay in-game.
-- **Distribution Redux — limited:** selected distribution state can appear; routing is not changed by V5.
+- **Distribution Redux — source-tested, normal-set blocked:** a reader exists for selected settings and farm data, but the reviewed normal StockGuard build refuses this mod because a compatible adapter is not bound. No normal-StockGuard game/export/dashboard acceptance is claimed.
 - **Farm Operations Dashboard — limited:** selected overview metrics can be folded into Save overview, not a duplicate full management app.
 
 ![Productions on the RF demo](doc-screenshots/current-526/suite-productions.png)

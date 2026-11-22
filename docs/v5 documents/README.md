@@ -12,7 +12,7 @@ This is the help pack for the **V5 Windows dashboard**. Start with [installation
 
 - [Install and first launch](INSTALL.md): mod ZIP, Windows installer, single-player, dedicated linking, FTP, and removal.
 - [Using the dashboard](USER_MANUAL.md): live versus held, every core section, settings, and alerts.
-- [Optional mods, one by one](COMPANION_MODS.md): 64 catalogued companions and the RF suite, including detection-only limits.
+- [Optional mods, one by one](COMPANION_MODS.md): catalogued companions and the RF suite, including detection-only and blocked-combination limits.
 - [Compatibility](COMPATIBILITY.md): independent combinations and Precision Farming versus Soil Fertilizer.
 - [Screenshots](SCREENSHOTS.md): current-build captures, older illustrations, and images still needing a manual capture.
 - [Troubleshooting](TROUBLESHOOTING.md): short symptom-first help.

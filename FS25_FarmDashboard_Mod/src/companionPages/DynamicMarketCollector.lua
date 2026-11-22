@@ -138,7 +138,7 @@ end
 
 CompanionPages.register({
     key = "dynamicMarket",
-    modNames = { "FS25_DynamicMarket", "FS25_366174_Dynamic_Market" },
+    modNames = { "FS25_DynamicMarket", "FS25_366174_Dynamic_Market", "KM_79085_Dynamic_Market" },
     substrings = { "dynamicmarket" },
     collect = function(ctx)
         local dm = ctx.symbol("DynamicMarket")

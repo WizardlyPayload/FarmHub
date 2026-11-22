@@ -60,7 +60,7 @@ local CATALOG = {
         id = "dynamicMarket",
         title = "Dynamic Market",
         category = "economy",
-        names = { "FS25_DynamicMarket", "FS25_366174_Dynamic_Market" },
+        names = { "FS25_DynamicMarket", "FS25_366174_Dynamic_Market", "KM_79085_Dynamic_Market" },
         substrings = { "dynamicmarket", "dynamic_market" },
         globals = { "DynamicMarket", "g_DynamicMarket" },
     },

@@ -4944,7 +4944,7 @@
   ,"companionPage.adjustableFillLevelAdvanced.matches": "Capacity matches"
   ,"companionPage.adjustableFillLevelAdvanced.selected": "Selected capacity"
   ,"companionPage.adjustableFillLevelAdvanced.tableTitle": "Non-stock fill capacity choices"
-  ,"companionPage.adjustableFillLevelAdvanced.truncated": "Only the first selected fill units are listed."
+  ,"companionPage.adjustableFillLevelAdvanced.truncated": "Vehicle scan incomplete; additional selections may be missing."
   ,"companionPage.adjustableFillLevelAdvanced.unit": "Fill unit"
   ,"companionPage.adjustableFillLevelAdvanced.units": "Fill units with observed base"
   ,"companionPage.adjustableFillLevelAdvanced.unverified": "Not verified"

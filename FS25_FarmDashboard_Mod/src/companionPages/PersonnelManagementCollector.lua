@@ -65,12 +65,29 @@ CompanionPages.register({
                 invalid = true
             end
         end
-        local applicants = 0
+        local applicants, applicantRows = 0, {}
         for _, applicant in ipairs(data.applicants) do
             if applicants >= MAX_SCAN then truncated = true; break end
             if type(applicant) == "table" and (applicant.farmId == nil
                 or ctx.num(applicant.farmId) == farmId) then
                 applicants = applicants + 1
+                if #applicantRows < MAX_ROWS then
+                    local first = ctx.clip(applicant.firstName, 50) or ""
+                    local last = ctx.clip(applicant.lastName, 50) or ""
+                    applicantRows[#applicantRows + 1] = {
+                        farmId = farmId,
+                        id = nonnegative(ctx, applicant.id),
+                        name = ctx.clip((first .. " " .. last):match("^%s*(.-)%s*$"), 80),
+                        experience = nonnegative(ctx, applicant.experience),
+                        reliability = nonnegative(ctx, applicant.reliability),
+                        loyalty = nonnegative(ctx, applicant.loyalty),
+                        specialization = ctx.clip(applicant.specializationPrimary, 40),
+                        wage = nonnegative(ctx, applicant.wage),
+                        monthsListed = nonnegative(ctx, applicant.monthsAvailable),
+                    }
+                else
+                    truncated = true
+                end
             else
                 invalid = true
             end
@@ -86,6 +103,7 @@ CompanionPages.register({
                 employerReputation = nonnegative(ctx, data.employerReputation),
             } },
             rows = rows,
+            applicantRows = applicantRows,
         }
     end,
 })

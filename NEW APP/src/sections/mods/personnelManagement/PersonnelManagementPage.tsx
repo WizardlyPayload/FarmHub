@@ -14,17 +14,24 @@ type StaffRow = {
   busy?: boolean; resignationPending?: boolean; dismissalPending?: boolean;
 };
 
+type ApplicantRow = {
+  farmId?: number; id?: number; name?: string; experience?: number;
+  reliability?: number; loyalty?: number; specialization?: string;
+  wage?: number; monthsListed?: number;
+};
+
 export function Page({ entry }: CompanionPageProps) {
   const { page, farmData, farmId } = useCompanionPage(entry.key);
   const money = useMoney();
   const rows = asList<StaffRow>(page?.rows).filter((row) => num(row.farmId) === farmId);
+  const applicants = asList<ApplicantRow>(page?.applicantRows).filter((row) => num(row.farmId) === farmId);
   const tiles: ModStatTile[] = farmData ? [
     { key: "staff", label: tOr(`${K}.staff`, "Hired staff"), value: formatNumber(farmData.employeeCount, 0) },
     { key: "applicants", label: tOr(`${K}.applicants`, "Applicants"), value: formatNumber(farmData.applicantCount, 0) },
     { key: "reputation", label: tOr(`${K}.reputation`, "Employer reputation"), value: formatNumber(farmData.employerReputation, 0) },
   ] : [];
   return (
-    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Personnel Management's existing staff and applicant records for this farm. Wage is a term; completed jobs and work minutes are the mod's recorded counters, not a live job audit.")}>
+    <ModPage entry={entry} lead={tOr(`${K}.lead`, "Personnel Management's existing staff and available applicants for this farm. Wages are terms; completed jobs and work minutes are the mod's recorded counters, not a live job audit.")}>
       <ModStatTiles tiles={tiles} />
       <Card title={tOr(`${K}.roster`, "Personnel roster")}>
         <ModTable
@@ -55,6 +62,29 @@ export function Page({ entry }: CompanionPageProps) {
         />
         {page?.coverage === "truncated" ? <ModEmpty>{tOr(`${K}.truncated`, "Only part of the personnel register was scanned.")}</ModEmpty> : null}
         {page?.coverage === "partial" ? <ModEmpty>{tOr(`${K}.partial`, "Invalid or foreign personnel records were withheld.")}</ModEmpty> : null}
+      </Card>
+      <Card title={tOr(`${K}.applicantRoster`, "Available applicants")}>
+        <ModTable
+          columns={[
+            { key: "name", label: tOr(`${K}.name`, "Applicant") },
+            { key: "specialization", label: tOr(`${K}.specialization`, "Specialization") },
+            { key: "attributes", label: tOr(`${K}.attributes`, "Experience / reliability / loyalty") },
+            { key: "wage", label: tOr(`${K}.applicantWage`, "Requested monthly wage"), align: "end" },
+            { key: "listed", label: tOr(`${K}.monthsListed`, "Months listed"), align: "end" },
+          ]}
+          rows={applicants.map((row, index) => ({
+            key: `${row.id ?? row.name ?? "applicant"}-${index}`,
+            cells: {
+              name: row.name || tOr(`${K}.unnamedApplicant`, "Unnamed applicant"),
+              specialization: row.specialization || "—",
+              attributes: [row.experience, row.reliability, row.loyalty]
+                .map((v) => num(v) == null ? "—" : formatNumber(v, 0)).join(" / "),
+              wage: num(row.wage) == null ? "—" : money(row.wage),
+              listed: num(row.monthsListed) == null ? "—" : formatNumber(row.monthsListed, 0),
+            },
+          }))}
+          empty={tOr(`${K}.noApplicants`, "No applicants are listed for this farm.")}
+        />
       </Card>
     </ModPage>
   );

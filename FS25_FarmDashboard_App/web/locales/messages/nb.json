@@ -6886,4 +6886,9 @@
   "companionPage.kiselevkaAuction.leading": "This farm currently leads the auction.",
   "companionPage.kiselevkaAuction.notLeading": "This farm is not the current highest bidder.",
   "companionPage.kiselevkaAuction.empty": "No confirmed active auction reading is available."
+  ,"companionPage.personnelManagement.applicantRoster": "Available applicants"
+  ,"companionPage.personnelManagement.applicantWage": "Requested monthly wage"
+  ,"companionPage.personnelManagement.monthsListed": "Months listed"
+  ,"companionPage.personnelManagement.noApplicants": "No applicants are listed for this farm."
+  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant"
 }

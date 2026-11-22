@@ -23,7 +23,13 @@ const GAME = `
             jobsCompleted = 9, totalWorkMinutes = 360, busy = true },
           { id = 4, farmId = 2, firstName = "Foreign", wage = 9999 },
         },
-        applicants = { { id = 10, farmId = 1 }, { id = 11, farmId = 1 } },
+        applicants = {
+          { id = 10, farmId = 1, firstName = "Eva", lastName = "Fields",
+            experience = 61, reliability = 78, loyalty = 69,
+            specializationPrimary = "harvest", wage = 2400, monthsAvailable = 2 },
+          { id = 11, farmId = 1, firstName = "Sam", wage = 1900 },
+          { id = 12, farmId = 2, firstName = "Other", wage = 9999 },
+        },
       },
       [2] = { farmId = 2, employerReputation = 40,
         workers = { { id = 5, farmId = 2, firstName = "Bob", wage = 900 } },
@@ -40,8 +46,14 @@ test("reads only the selected farm's existing personnel and reports withheld for
   expect(page.rows).toHaveLength(1);
   expect(page.rows[0]).toMatchObject({ farmId: 1, name: "Ada Mills", experience: 55,
     specialization: "harvest", wage: 2100, jobsCompleted: 9, totalWorkMinutes: 360 });
+  expect(page.applicantRows).toHaveLength(2);
+  expect(page.applicantRows[0]).toMatchObject({ farmId: 1, name: "Eva Fields",
+    experience: 61, reliability: 78, loyalty: 69, specialization: "harvest",
+    wage: 2400, monthsListed: 2 });
+  expect(JSON.stringify(page)).not.toContain("9999");
   const merged = normalizeCompanionPages({ pages: { personnelManagement: page } }, { modules: loadModules() });
   expect(merged.pages.personnelManagement.rows).toHaveLength(1);
+  expect(merged.pages.personnelManagement.applicantRows).toHaveLength(2);
 });
 
 test("reads the other farm's separate book", () => {

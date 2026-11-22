@@ -208,6 +208,14 @@ local CATALOG = {
         globals = { "g_soilWorkYieldBonus" },
     },
     {
+        id = "soilCompaction",
+        title = "Soil Compaction",
+        category = "fields",
+        names = { "KM_81205_Soil_Compaction", "FS25_SoilCompaction" },
+        substrings = { "soil_compaction", "soilcompaction" },
+        globals = { "g_soilCompaction" },
+    },
+    {
         id = "soilCompostBatches",
         title = "Soil & Fertilizer Compost Batches",
         category = "storage",

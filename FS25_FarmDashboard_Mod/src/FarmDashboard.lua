@@ -530,6 +530,11 @@ function FarmDashboard:update(dt)
     -- Do not freeze fields / soil / weather because Courseplay is spawning a vehicle.
     -- DataCollector already skips vehicle/finance slices during spawn grace.
 
+    local soilCompactionScanner = rawget(_G, "SoilCompactionScanner")
+    if soilCompactionScanner and type(soilCompactionScanner.step) == "function" then
+        pcall(soilCompactionScanner.step, soilCompactionScanner)
+    end
+
     if FarmDashboardVehicleShopGuard and FarmDashboardVehicleShopGuard.tryInstall then
         FarmDashboardVehicleShopGuard.tryInstall()
     end

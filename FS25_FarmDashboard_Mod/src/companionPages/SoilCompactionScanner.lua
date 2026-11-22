@@ -6,6 +6,7 @@ local MAX_CELLS_PER_FRAME = 40
 local MAX_FRAME_SECONDS = 0.001
 local RESCAN_AFTER_MS = 120000
 local MAX_SNAPSHOT_AGE_MS = 180000
+local MAX_RANKED_PARCELS = 60
 
 local function finite(n)
     return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge
@@ -114,13 +115,21 @@ function SoilCompactionScanner:read(farmId)
     if age < 0 or age > MAX_SNAPSHOT_AGE_MS then return nil, "stale-scan" end
     if not finite(farmId) or farmId <= 0 then return nil, "no-farm" end
 
-    local rows = {}
+    local rows, affectedCells = {}, 0
+    local fieldMapping = type(_G.g_fieldManager) == "table" and _G.g_fieldManager.farmlandIdFieldMapping or nil
     for parcelId, row in pairs(state.parcels) do
         local okOwner, owner = pcall(farmlandManager.getFarmlandOwner, farmlandManager, parcelId)
         if not okOwner then return nil, "ownership-unavailable" end
         if owner == farmId then
+            affectedCells = affectedCells + row.cellCount
+            local field = type(fieldMapping) == "table" and fieldMapping[parcelId] or nil
+            local fieldName
+            if type(field) == "table" and type(field.getName) == "function" then
+                local okName, name = pcall(field.getName, field)
+                if okName and type(name) == "string" and name ~= "" then fieldName = name end
+            end
             rows[#rows + 1] = {
-                parcelId = parcelId, cellCount = row.cellCount,
+                parcelId = parcelId, fieldName = fieldName, cellCount = row.cellCount,
                 averagePenalty = row.penaltySum / row.cellCount,
                 maxPenalty = row.maxPenalty,
                 hotspotX = row.hotspotX, hotspotZ = row.hotspotZ,
@@ -131,5 +140,11 @@ function SoilCompactionScanner:read(farmId)
         if a.maxPenalty == b.maxPenalty then return a.parcelId < b.parcelId end
         return a.maxPenalty > b.maxPenalty
     end)
-    return { rows = rows, scannedCells = state.scanned, cellSize = state.cellSize, ageMs = age }, nil
+    local affectedParcels = #rows
+    while #rows > MAX_RANKED_PARCELS do rows[#rows] = nil end
+    return {
+        rows = rows, affectedParcels = affectedParcels, affectedCells = affectedCells,
+        truncated = affectedParcels > MAX_RANKED_PARCELS,
+        scannedCells = state.scanned, cellSize = state.cellSize, ageMs = age,
+    }, nil
 end

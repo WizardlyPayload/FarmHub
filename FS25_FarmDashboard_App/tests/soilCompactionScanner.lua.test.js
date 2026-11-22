@@ -75,3 +75,50 @@ describe("Soil Compaction frame-bounded snapshot", () => {
     expect(result.reason).toBe("invalid-grid-cell");
   });
 });
+
+describe("Soil Compaction companion reading", () => {
+  const PAGE_SETUP = `${SETUP}
+    g_modIsLoaded = { KM_81205_Soil_Compaction = true }
+    g_modManager = { getActiveMods = function() return {
+      { modName = "KM_81205_Soil_Compaction", version = "1.0.0.0" }
+    } end }
+    g_currentMission.getFarmId = function() return 1 end
+    g_currentMission.getIsServer = function() return true end
+    g_fieldManager = { farmlandIdFieldMapping = {
+      [1] = { getName = function() return "Field 36" end },
+    } }
+  `;
+
+  test("exports only a complete owned snapshot and its field label", () => {
+    const result = runCompanionLua(
+      ["SoilCompactionScanner.lua", "SoilCompactionCollector.lua"], PAGE_SETUP,
+      `local entry = CompanionPages.entries.soilCompaction
+       SoilCompactionScanner:step()
+       local pending = CompanionPages.collectEntry(entry, 1)
+       SoilCompactionScanner:step()
+       local ready = CompanionPages.collectEntry(entry, 2)
+       return __fdEncode({ pending = pending, ready = ready })`,
+    );
+    expect(result.pending.readState).toBe("pending");
+    expect(result.pending.rows).toBeUndefined();
+    expect(result.ready.readState).toBe("ok");
+    expect(result.ready.byFarm["1"].affectedParcels).toBe(1);
+    expect(result.ready.byFarm["1"].affectedCells).toBe(23);
+    expect(result.ready.rows).toHaveLength(1);
+    expect(result.ready.rows[0].fieldName).toBe("Field 36");
+    expect(result.ready.rows[0].parcelId).toBe(1);
+  });
+
+  test("does not export an unreviewed mod version", () => {
+    const result = runCompanionLua(
+      ["SoilCompactionScanner.lua", "SoilCompactionCollector.lua"],
+      PAGE_SETUP.replace('version = "1.0.0.0"', 'version = "1.1.0.0"'),
+      `local entry = CompanionPages.entries.soilCompaction
+       SoilCompactionScanner:step(); SoilCompactionScanner:step()
+       return __fdEncode(CompanionPages.collectEntry(entry, 1))`,
+    );
+    expect(result.readState).toBe("settings-only");
+    expect(result.reason).toBe("unreviewed-version");
+    expect(result.rows).toBeUndefined();
+  });
+});

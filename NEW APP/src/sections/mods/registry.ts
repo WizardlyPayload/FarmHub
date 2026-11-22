@@ -189,6 +189,8 @@ export const COMPANION_PAGES: CompanionPageEntry[] = [
     load: () => import("@/sections/mods/personnelManagement").then((m) => m.Page) },
   { key: "tramlineSystem", catalogId: "tramlineSystem", title: "Tramline System", glyph: "TS", group: "fields",
     load: () => import("@/sections/mods/tramlineSystem").then((m) => m.Page) },
+  { key: "soilCompaction", catalogId: "soilCompaction", title: "Soil Compaction", glyph: "SC", group: "fields",
+    load: () => import("@/sections/mods/soilCompaction").then((m) => m.Page) },
   { key: "fieldToDoPlannedCrops", catalogId: "fieldToDoPlannedCrops", title: "Field To-Do List", glyph: "TD", group: "fields",
     load: () => import("@/sections/mods/fieldToDoPlannedCrops").then((m) => m.Page) },
   { key: "workplan", catalogId: "workplan", title: "Workplan", glyph: "WP", group: "fields",

@@ -136,6 +136,8 @@ https://github.com/WizardlyPayload/FarmHub]]></de>
         <sourceFile filename="src/collectors/HirePurchasingDataCollector.lua"/>
         <sourceFile filename="src/collectors/CompanionModsDataCollector.lua"/>
         <sourceFile filename="src/companionPages/CompanionPages.lua"/>
+        <sourceFile filename="src/companionPages/SoilCompactionScanner.lua"/>
+        <sourceFile filename="src/companionPages/SoilCompactionCollector.lua"/>
         <sourceFile filename="src/companionPages/EnhancedLoanSystemCollector.lua"/>
         <sourceFile filename="src/companionPages/INeedALoanCollector.lua"/>
         <sourceFile filename="src/companionPages/AutomaticLoanRepayCollector.lua"/>

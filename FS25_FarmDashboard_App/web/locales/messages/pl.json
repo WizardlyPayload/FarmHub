@@ -6851,5 +6851,22 @@
   "companionPage.advancedDamageSystem.logs": "Machines with completed maintenance",
   "companionPage.advancedDamageSystem.state": "Status",
   "companionPage.advancedDamageSystem.lastLog": "Latest completed maintenance",
-  "companionPage.advancedDamageSystem.empty": "No owned machine has a captured Advanced Damage System reading yet."
+  "companionPage.advancedDamageSystem.empty": "No owned machine has a captured Advanced Damage System reading yet.",
+  "companions.desc.soilCompaction": "Ranks compacted ground on fields this farm currently owns, so you can choose where to relieve soil before harvest. Figures are dated grid snapshots, not measured yield loss.",
+  "companionPage.soilCompaction.title": "Soil Compaction",
+  "companionPage.soilCompaction.lead": "Start with the most compacted owned field when planning soil relief. These are grid snapshots, not measured harvest losses.",
+  "companionPage.soilCompaction.affectedParcels": "Owned parcels with compaction",
+  "companionPage.soilCompaction.affectedCells": "Compacted grid cells",
+  "companionPage.soilCompaction.snapshotAge": "Grid snapshot age at export",
+  "companionPage.soilCompaction.tableTitle": "Owned ground to relieve",
+  "companionPage.soilCompaction.field": "Field or parcel",
+  "companionPage.soilCompaction.maxPenalty": "Highest yield penalty in grid",
+  "companionPage.soilCompaction.averagePenalty": "Average on affected cells",
+  "companionPage.soilCompaction.cells": "Affected cells",
+  "companionPage.soilCompaction.location": "Worst cell centre (x, z)",
+  "companionPage.soilCompaction.parcel": "Parcel",
+  "companionPage.soilCompaction.empty": "No compaction was found on this farm's field ground in the completed grid scan.",
+  "companionPage.soilCompaction.truncated": "Only the worst 60 parcels are listed; the totals cover every scanned parcel.",
+  "companionPage.soilCompaction.scanning": "The soil grid is still being scanned. No partial totals are shown.",
+  "companionPage.soilCompaction.unavailable": "The soil grid could not be read safely. No total is shown."
 }

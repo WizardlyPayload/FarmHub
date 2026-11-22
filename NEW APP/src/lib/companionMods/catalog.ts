@@ -270,6 +270,14 @@ export const COMPANION_CATALOG: CompanionCatalogEntry[] = [
     liveKey: "soilWorkYieldBonus",
   },
   {
+    id: "soilCompaction",
+    title: "Soil Compaction",
+    category: "fields",
+    descKey: "companions.desc.soilCompaction",
+    desc: "Ranks compacted ground on fields this farm currently owns, so you can choose where to relieve soil before harvest. Figures are dated grid snapshots, not measured yield loss.",
+    relatedSection: "fields",
+  },
+  {
     id: "smartCropControl",
     title: "Smart Crop Control",
     category: "fields",

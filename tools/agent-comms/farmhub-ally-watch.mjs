@@ -18,6 +18,7 @@ const outbox = 'Z:\\Graham\\agent-comms\\to-tina.md';
 const dir = path.join(os.homedir(), '.codex', 'watchers', 'farmhub-ally');
 const statePath = path.join(dir, 'state.json');
 const backupPath = path.join(dir, 'state.backup.json');
+const reviewedPath = path.join(dir, 'reviewed.json');
 const stopPath = path.join(dir, 'STOP');
 // Written only when a specific RF result gates an already prepared FarmHub
 // packet. Without this file, unrelated RF results are marked seen, not sent.
@@ -129,9 +130,19 @@ const reviewedIds = new Set([
   'FARMHUB-ALLY-20261122-VAULT-FINANCE-VOUCHER',
   'FARMHUB-ALLY-20261122-VAULT-LEASE-TRIGGER-RERUN', // reviewed and audited in this chat before pipe rearm
   'FARMHUB-ALLY-20261122-VAULT-INVESTMENT-SYSTEM', // independently reviewed before pipe rearm
+  'FARMHUB-ALLY-20261122-VAULT-EMPLOYEES', // independently reviewed and audited before this watcher rearm
   ...[1, 2, 3, 4, 5].map(n => `FARMHUB-ALLY-20261102-STORAGE-ICONS-I${n}`),
 ]);
-const reviewed = initial.filter(event => reviewedIds.has(event.id));
+function currentReviewedIds() {
+  if (!fs.existsSync(reviewedPath)) return reviewedIds;
+  const ids = JSON.parse(fs.readFileSync(reviewedPath, 'utf8'));
+  if (!Array.isArray(ids) || ids.some(id => typeof id !== 'string' || !/^FARMHUB-ALLY-\d{8}-[A-Z0-9-]+$/.test(id))) {
+    throw Error('REVIEWED_IDS_INVALID');
+  }
+  return new Set([...reviewedIds, ...ids]);
+}
+const reviewedAtStartup = currentReviewedIds();
+const reviewed = initial.filter(event => reviewedAtStartup.has(event.id));
 const state = prior ?? {
   threadId, seen: reviewed.map(event => event.hash), baselineCount: reviewed.length, events: [],
 };
@@ -142,7 +153,7 @@ const seen = new Set(state.seen);
 let lastScanPersist = Date.now();
 for (const event of state.events) {
   if (event.status === 'inflight') event.status = 'uncertain';
-  if (event.status === 'queued' && reviewedIds.has(event.id)) event.status = 'reviewed';
+  if (event.status === 'queued' && reviewedAtStartup.has(event.id)) event.status = 'reviewed';
 }
 writeState(state);
 
@@ -200,6 +211,13 @@ function scan() {
   try {
     const rfGateId = armedRfGateIds();
     let changed = false;
+    const reviewedNow = currentReviewedIds();
+    for (const event of state.events) {
+      if (event.status === 'queued' && reviewedNow.has(event.id)) {
+        event.status = 'reviewed';
+        changed = true;
+      }
+    }
     for (const event of results(fs.readFileSync(inbox, 'utf8'))) {
       if (seen.has(event.hash)) continue;
       seen.add(event.hash);

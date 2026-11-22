@@ -1,0 +1,100 @@
+<!--
+  FS25 Farm Dashboard - itch.io DESCRIPTION (itch-safe HTML)
+
+  itch.io strips most inline CSS on divs. Use h2, h3, p, strong, em, a,
+  ul, ol, li, hr, figure, figcaption, img, dl, dt, dd, code, details, summary.
+
+  HOW TO USE
+  1. Edit project → Description → <> HTML mode.
+  2. Paste from the first <p> below through the footer <p>.
+  3. Do NOT switch back to rich-text mode; save while HTML mode is open.
+  4. Cover + screenshots column: set in itch Edit project (not in this HTML).
+     The gallery retains four Catuaí captures from 5.2.7. Detailed older-page
+     examples remain in the V5 manual, not in this public description.
+
+  Release files: App 5.2.150 / Mod 5.1.0.140. Publish after GitHub and itch uploads are live.
+  Paste this HTML after the V5 downloads are verified.
+-->
+
+<p><strong><span style="color:#b8860b">Farming Simulator 25 · live farm data · V5</span></strong></p>
+
+<h2><strong>⬡ FS25 Farm Dashboard V5</strong></h2>
+
+<p>Your fields, fleet, pastures, storage, economy, productions, and <strong>fleet map</strong> — on new screens that update while you play. A lightweight <strong>in-game mod</strong> exports live data; a <strong>Windows desktop app</strong> shows it on a second monitor or LAN tablet.</p>
+
+<p><strong>App 5.2.150</strong> · <strong>Mod 5.1.0.140</strong> · 27 languages · local saves, dedicated <strong>join as client</strong> (no FTP), or <strong>FTP</strong> (Advanced)</p>
+
+<p><strong>New in 5.2.150:</strong> bounded, read-only field plans, contractor bookings, selected vehicle settings, finance records and crop rotation templates when their optional mods are loaded and tied to your farm. Recorded plans and pending amounts do not prove completed work or payment. Staff labels and partial-data wording have been clarified. New local saves need one in-game save, then Auto-Detect Local Saves in Settings.</p>
+
+<p><strong>Classic V4 is still here.</strong> If you like the old six home cards, keep <strong>Farm Dashboard V4</strong> (4.2.1). V5 is a <em>separate</em> install. Auto-update on V4 will <strong>not</strong> replace it with V5 — you only get the new screens if you download the V5 Setup. Use the matching mod from your chosen app release; V4 compatibility was not retested with this V5 mod.</p>
+
+<p>
+  <a href="https://www.farmdashboard.co.uk/install.html"><strong>Install guide</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://www.farmdashboard.co.uk/"><strong>Website</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://discord.gg/ZCG9C7h7aT"><strong>Discord</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.2.150"><strong>Also on GitHub</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://www.farmdashboard.co.uk/legacy.html"><strong>Stay on classic V4</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://www.farmdashboard.co.uk/map.html"><strong>Fleet map</strong></a>
+</p>
+
+<hr />
+
+<h2>Screen examples from 5.2.7</h2>
+
+<p>The four screenshots in this page's gallery were captured with the earlier 5.2.7 app and show the Catuaí <strong>Save overview</strong>, <strong>Orchards</strong>, <strong>Productions</strong>, and <strong>Fleet map</strong> at full-screen resolution. See the <a href="https://github.com/WizardlyPayload/FarmHub#current-v5-screens">GitHub README</a> and <a href="https://github.com/WizardlyPayload/FarmHub/blob/main/docs/v5%20documents/USER_MANUAL.md">V5 manual</a> for more screen examples and detailed instructions.</p>
+
+<ul>
+  <li><strong>Fields:</strong> crop stage, Order menu, GPS groups, soil bars, and next-step rules.</li>
+  <li><strong>Orchards:</strong> grapes and olives, plus coffee and bananas when the expansion is active.</li>
+  <li><strong>Pastures:</strong> sheds, food duration, birth warnings, and animal detail.</li>
+  <li><strong>Vehicles and Storage:</strong> farm-scoped fleet, fuel, wear, silos, bales, and pallet stock.</li>
+  <li><strong>Productions:</strong> current input and output fill levels and active chains.</li>
+  <li><strong>Fleet map:</strong> live pins on the PDA overview, with crop, growth, ownership, soil, and optional Precision Farming / Soil Fertilizer layers.</li>
+</ul>
+
+<hr />
+
+<h2>How it works</h2>
+
+<ol>
+  <li>The <strong>mod</strong> writes live farm data to <code>data.json</code> (SP, MP host, or dedicated).</li>
+  <li>On a <strong>dedicated</strong> host you can <strong>join as a client</strong> — the authority mirrors the export so the app uses <strong>Local</strong> mode (<strong>no FTP</strong>). <strong>FTP</strong> remains for headless-only admins.</li>
+  <li>The <strong>Windows app</strong> merges the Lua export with savegame XML when available.</li>
+  <li>V5 listens at <strong>http://localhost:8768</strong>. Classic V4 stays on <strong>8766</strong> if you keep it installed.</li>
+</ol>
+
+<h2>Quick start</h2>
+
+<ol>
+  <li>Download <strong>FS25_FarmDashboard.zip</strong> and <strong>FS25-Farm-Dashboard-V5-Setup-5.2.150.exe</strong> from this page (filenames include <strong>V5</strong>).</li>
+  <li>Enable the mod, load the save <strong>in-world</strong> once so <code>data.json</code> is created.</li>
+  <li>Run the V5 Setup. Start Menu: <strong>Farm Dashboard V5</strong>.</li>
+  <li>Prefer the classic cards? Download the <strong>V4</strong> Setup instead (or keep the one you already have). You do not have to switch.</li>
+</ol>
+
+<p><em>Full steps are in the <strong>Installation instructions</strong> section below this description.</em></p>
+
+<hr />
+
+<h2>Works alongside</h2>
+
+<p>Vanilla FS25 + the Farm Dashboard game mod is enough. Selected optional mods can add bounded, read-only panels when loaded for the save. Production Control and Distribution Redux are not claimed compatible with the reviewed normal StockGuard build; see the supported-mods page for specific limits.</p>
+
+<hr />
+
+<p><strong>JoshWalki</strong> (original mod &amp; concept) &middot; <strong>WizardlyPayload</strong> (app, releases, maintenance)</p>
+
+<p>
+  <a href="https://www.farmdashboard.co.uk/">Website</a>
+  &nbsp;·&nbsp;
+  <a href="https://www.farmdashboard.co.uk/install.html">Install guide</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/WizardlyPayload/FarmHub/releases">GitHub (fallback)</a>
+</p>
+
+<p><small><em>Not affiliated with GIANTS Software. Farming Simulator is a trademark of GIANTS Software GmbH.</em></small></p>

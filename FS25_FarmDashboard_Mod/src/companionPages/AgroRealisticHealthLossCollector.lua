@@ -21,7 +21,6 @@ CompanionPages.register({
             return { readState = "settings-only", reason = "version-unreviewed" }
         end
         local mod = ctx.symbol("LeandroFarmRulesAnimalHealthLoss")
-            or ctx.global("LeandroFarmRulesAnimalHealthLoss")
         local timers = type(mod) == "table" and mod.timers or nil
         if type(timers) ~= "table" then
             return { readState = "unavailable", reason = "timers-unavailable" }

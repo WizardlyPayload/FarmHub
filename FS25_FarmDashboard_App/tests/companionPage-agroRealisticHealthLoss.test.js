@@ -60,3 +60,12 @@ test("excludes a timer after health recovers", () => {
     .toMatchObject({ readState: "settings-only", reason: "no-active-zero-health-timer",
       byFarm: { "1": { activeTimerCount: 0 } } });
 });
+
+test("does not read an unrelated shared-global timer table", () => {
+  const shadow = SETUP + `
+    _G.LeandroFarmRulesAnimalHealthLoss = _G.FS25_AgroRealistic.LeandroFarmRulesAnimalHealthLoss
+    _G.FS25_AgroRealistic.LeandroFarmRulesAnimalHealthLoss = nil
+  `;
+  expect(runCompanionPage(FILE, shadow, { farmId: 1 }))
+    .toMatchObject({ readState: "unavailable", reason: "timers-unavailable" });
+});

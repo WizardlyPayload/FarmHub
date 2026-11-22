@@ -6,6 +6,9 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "FarmReputationCollector.lua";
 const SETUP = `
   _G.g_modIsLoaded = { FS25_367320_FS25_FarmReputation = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "FS25_367320_FS25_FarmReputation", version = "1.1.0.2" }
+  } end }
   _G.FS25_367320_FS25_FarmReputation = { ReputationManager = {
     reputationByFarm = { [1] = 325, [2] = 890 },
     contractorStatsByFarm = { [1] = { Alex = 5 }, [2] = { Foreign = 99 } },
@@ -35,6 +38,9 @@ test("reads only the requested farm's persisted reputation and contractor rows",
 test("does not read a shared global shadow or substitute farm 1 for a missing farm", () => {
     const shadow = `
       _G.g_modIsLoaded = { FS25_367320_FS25_FarmReputation = true }
+      _G.g_modManager = { getActiveMods = function() return {
+        { modName = "FS25_367320_FS25_FarmReputation", version = "1.1.0.2" }
+      } end }
       _G.ReputationManager = { reputationByFarm = { [1] = 999 } }
     `;
     expect(runCompanionPage(FILE, shadow, { farmId: 1 })).toMatchObject({
@@ -53,4 +59,24 @@ test("new contractor record shows zero jobs until the mod records a completed jo
     expect(page.contractors).toEqual([expect.objectContaining({
         contractor: "Alex", jobs: 0, reputation: 0, completed: 0, cancelled: 0,
     })]);
+});
+
+test("reads the exact older vault build's same farm-keyed score and contractor fields", () => {
+    const older = SETUP.replaceAll("FS25_367320_FS25_FarmReputation", "KM_80173_Farm_Reputation")
+        .replace('version = "1.1.0.2"', 'version = "1.1.0.1"');
+    const page = runCompanionPage(FILE, older, { farmId: 1 });
+    expect(page).toMatchObject({
+        detected: true, modName: "KM_80173_Farm_Reputation", version: "1.1.0.1",
+        readState: "ok", byFarm: { "1": { score: 325, rank: "Farmer", contractorCount: 1 } },
+    });
+    expect(page.contractors).toHaveLength(1);
+    expect(page.contractors[0]).toMatchObject({ contractor: "Alex", jobs: 5, completed: 4, cancelled: 1 });
+});
+
+test("withholds an unreviewed Farm Reputation version", () => {
+    const unknown = SETUP.replace('version = "1.1.0.2"', 'version = "1.1.0.3"');
+    const page = runCompanionPage(FILE, unknown, { farmId: 1 });
+    expect(page).toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
+    expect(page.contractors).toBeUndefined();
+    expect(page.byFarm).toBeUndefined();
 });

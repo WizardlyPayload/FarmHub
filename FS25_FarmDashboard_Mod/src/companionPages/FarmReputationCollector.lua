@@ -1,4 +1,4 @@
--- Farm Reputation 1.1.0.2: saved reputation and contractor records keyed by farm.
+-- Farm Reputation 1.1.0.1/1.1.0.2: saved reputation and contractor records keyed by farm.
 -- Read the exact export farm, never the mod's current-player getters (farm-1 fallback).
 
 local MAX_CONTRACTORS = 40
@@ -6,12 +6,15 @@ local MAX_SCAN = 200
 
 CompanionPages.register({
     key = "farmReputation",
-    modNames = { "FS25_367320_FS25_FarmReputation" },
+    modNames = { "FS25_367320_FS25_FarmReputation", "KM_80173_Farm_Reputation" },
     substrings = {},
     collect = function(ctx)
         local farmId = ctx.farmId
         if farmId == nil or farmId <= 0 then
             return { readState = "settings-only", reason = "no-farm" }
+        end
+        if ctx.version ~= "1.1.0.1" and ctx.version ~= "1.1.0.2" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
         end
         local manager = ctx.symbol("ReputationManager")
         if type(manager) ~= "table" or type(manager.reputationByFarm) ~= "table" then

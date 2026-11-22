@@ -1666,7 +1666,7 @@ local CATALOG = {
         id = "farmReputation",
         title = "Farm Reputation",
         category = "contracts",
-        names = { "FS25_FarmReputation", "FS25_367320_Farm_Reputation", "FS25_367320_FS25_FarmReputation" },
+        names = { "FS25_FarmReputation", "FS25_367320_Farm_Reputation", "FS25_367320_FS25_FarmReputation", "KM_80173_Farm_Reputation" },
         substrings = { "farmreputation", "farm_reputation" },
         globals = {},
     },

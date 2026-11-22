@@ -50,7 +50,11 @@ export function Page({ entry }: CompanionPageProps) {
             loaded: formatNumber(row.loadedLiters, 0),
             received: formatNumber(row.receivedLiters, 0),
           },
-        }))} empty={tOr(`${K}.empty`, "No owned fuel terminal has readable controls.")} />
+        }))} empty={page?.coverage === "truncated"
+          ? tOr(`${K}.truncated`, "Only part of the owned terminal list is shown.")
+          : page?.readState === "partial"
+            ? tOr(`${K}.partial`, "An owned terminal had ambiguous identity or unreadable state and was withheld.")
+            : tOr(`${K}.empty`, "No owned fuel terminal has readable controls.")} />
         {page?.coverage === "truncated" ? <ModEmpty>{tOr(`${K}.truncated`, "Only part of the owned terminal list is shown.")}</ModEmpty> : null}
         {page?.readState === "partial" ? <ModEmpty>{tOr(`${K}.partial`, "An owned terminal had ambiguous identity or unreadable state and was withheld.")}</ModEmpty> : null}
       </Card>

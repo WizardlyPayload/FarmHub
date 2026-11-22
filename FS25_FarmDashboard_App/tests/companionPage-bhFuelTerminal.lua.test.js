@@ -48,11 +48,23 @@ test("withholds duplicate or unreadable owned terminals", () => {
     SETUP.replace('terminal("foreign", 2)', 'terminal("own", 1)'), { farmId: 1 });
   expect(duplicate).toMatchObject({ readState: "partial" });
   expect(Object.keys(duplicate.rows)).toHaveLength(0);
+  expect(duplicate.byFarm).toBeUndefined();
   const invalid = runCompanionPage(FILE,
     SETUP.replace('{mode=0,loaded=400,received=100}', '{mode=0,loaded=-1,received=100}'),
     { farmId: 1 });
   expect(invalid).toMatchObject({ readState: "partial" });
   expect(Object.keys(invalid.rows)).toHaveLength(0);
+  expect(invalid.byFarm).toBeUndefined();
+});
+
+test("scan cap withholds full-farm terminal and transfer totals", () => {
+  const many = SETUP + `
+    local p = _G.g_currentMission.placeableSystem.placeables
+    for i = 1, 501 do p[#p + 1] = terminal("foreign" .. i, 2) end
+  `;
+  const page = runCompanionPage(FILE, many, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "truncated" });
+  expect(page.byFarm).toBeUndefined();
 });
 
 test("requires the exact reviewed version and server state", () => {

@@ -106,14 +106,15 @@ CompanionPages.register({
             return { readState = "settings-only", reason = "no-owned-terminal" }
         end
         table.sort(rows, function(a, b) return a.terminalId < b.terminalId end)
+        local complete = not invalid and not truncated
         return {
-            readState = invalid and "partial" or "ok",
+            readState = complete and "ok" or "partial",
             reason = invalid and "ambiguous-or-unreadable-owned-terminal" or nil,
-            coverage = truncated and "truncated" or "complete",
-            byFarm = { [tostring(farmId)] = {
+            coverage = truncated and "truncated" or invalid and "partial" or "complete",
+            byFarm = complete and { [tostring(farmId)] = {
                 terminalCount = #rows, loadedLiters = loadedTotal,
                 receivedLiters = receivedTotal, stoppedCount = stoppedCount, esdCount = esdCount,
-            } },
+            } } or nil,
             rows = rows,
         }
     end,

@@ -32,3 +32,15 @@ test("renders owned terminal controls and lifetime counters without a sales clai
   expect(host.textContent).toContain("do not prove a sale");
   expect(host.textContent).not.toContain("Other farm");
 });
+
+test("partial terminal coverage does not show prefix totals or claim absence", () => {
+  const host = ui.renderPage({
+    companionMods: { mods: [{ id: KEY, detected: true, version: "1.2.0.0" }] },
+    companionPages: { pages: { [KEY]: {
+      key: KEY, detected: true, readState: "partial", coverage: "truncated", rows: [],
+    } } },
+  }, { farmId: 1 });
+  expect(host.textContent).toContain("Only part of the owned terminal list");
+  expect(host.textContent).not.toContain("No owned fuel terminal has readable controls");
+  expect(host.querySelector('[data-stat="loaded"]')).toBeNull();
+});

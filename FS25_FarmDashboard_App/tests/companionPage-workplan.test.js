@@ -45,7 +45,8 @@ const GAME = `
 test("reads current owned farm plan, maps crop and exact task states", () => {
   const page = runCompanionPage(FILE, GAME, { farmId: 1 });
   expect(page).toMatchObject({ readState: "partial", coverage: "partial",
-    byFarm: { "1": { ownedPlanCount: 1, withheldOwnership: 1 } } });
+    byFarm: { "1": { withheldOwnership: 1 } } });
+  expect(page.byFarm["1"].ownedPlanCount).toBeUndefined();
   expect(page.rows).toHaveLength(1);
   expect(page.rows[0]).toMatchObject({ farmId: 1, fieldId: 11, farmlandId: 11,
     currentCrop: "SORGHUM", plannedCrop: "WHEAT",
@@ -68,9 +69,33 @@ test("a missing field-to-farmland mapping is withheld even if an owner helper sa
     "if fieldId == 12 or fieldId == 31 then return fieldId end");
   const page = runCompanionPage(FILE, unmapped, { farmId: 1 });
   expect(page).toMatchObject({ readState: "partial", coverage: "partial",
-    byFarm: { "1": { ownedPlanCount: 0, withheldOwnership: 2 } } });
+    byFarm: { "1": { withheldOwnership: 2 } } });
+  expect(page.byFarm["1"].ownedPlanCount).toBeUndefined();
   const merged = normalizeCompanionPages({ pages: { workplan: page } }, { modules: loadModules() });
   expect(merged.pages.workplan.rows).toHaveLength(0);
+});
+
+test("scan cap withholds the full plan count while a row-only cap keeps it", () => {
+  const capGame = GAME.replace("{ farmId = 2, fieldId = 31, currentFruit = 3, plannedFruit = 2,",
+    "{ farmId = 2, fieldId = 31, currentFruit = 3, plannedFruit = 2,");
+  const fullEntry = `{ farmId = 1, fieldId = 11, currentFruit = 2, plannedFruit = 3,
+    stateLime = 1, stateMulching = 2, statePlow = 3, stateRoller = 5,
+    stateFert1_type = 4, stateFert1_state = 1, stateFert2_type = 1,
+    stateFert2_state = 5, stateWeed_grooming = 2, stateWeed_spray = 4, stateStone = 3 },`;
+  const entryBlock = Array.from({ length: 81 }, (_, i) => fullEntry.replace("fieldId = 11", `fieldId = ${11 + i}`)).join("\n");
+  const rowsGame = capGame.replace(/\{ farmId = 1, fieldId = 11,[\s\S]*?stateWeed_grooming = 2, stateWeed_spray = 4, stateStone = 3 \},/, entryBlock)
+    .replace(/\{ farmId = 1, fieldId = 12, currentFruit = 2, plannedFruit = 3 \},/, "")
+    .replace("if fieldId == 11 or fieldId == 12 or fieldId == 31 then return fieldId end", "if fieldId >= 11 and fieldId <= 91 then return fieldId end")
+    .replace("return farmId == 1 and fieldId == 11 or farmId == 2 and fieldId == 31", "return farmId == 1 and fieldId >= 11 and fieldId <= 91");
+  const rowCapped = runCompanionPage(FILE, rowsGame, { farmId: 1 });
+  expect(rowCapped.coverage).toBe("truncated");
+  expect(rowCapped.rows).toHaveLength(80);
+  expect(rowCapped.byFarm["1"].ownedPlanCount).toBe(81);
+  const scanGame = rowsGame.replace(entryBlock, Array.from({ length: 501 }, (_, i) => fullEntry.replace("fieldId = 11", `fieldId = ${11 + i}`)).join("\n"))
+    .replace("fieldId <= 91", "fieldId <= 511").replace("fieldId <= 91", "fieldId <= 511");
+  const scanCapped = runCompanionPage(FILE, scanGame, { farmId: 1 });
+  expect(scanCapped.coverage).toBe("truncated");
+  expect(scanCapped.byFarm["1"].ownedPlanCount).toBeUndefined();
 });
 
 test("client, missing ownership helper and absent mod yield no farm plan", () => {

@@ -52,8 +52,8 @@ export function Page({ entry }: CompanionPageProps) {
   const { page, farmData, farmId } = useCompanionPage(entry.key);
   const rows = asList<PlanRow>(page?.rows).filter((row) => num(row.farmId) === farmId);
   const tiles: ModStatTile[] = farmData ? [
-    { key: "plans", label: tOr(`${K}.count`, "Current owned field plans"), value: formatNumber(farmData.ownedPlanCount, 0) },
-    { key: "withheld", label: tOr(`${K}.withheld`, "Ownership not confirmed"), value: formatNumber(farmData.withheldOwnership, 0) },
+    ...(num(farmData.ownedPlanCount) == null ? [] : [{ key: "plans", label: tOr(`${K}.count`, "Current owned field plans"), value: formatNumber(farmData.ownedPlanCount, 0) }]),
+    ...(num(farmData.withheldOwnership) == null ? [] : [{ key: "withheld", label: tOr(`${K}.withheld`, "Ownership not confirmed"), value: formatNumber(farmData.withheldOwnership, 0) }]),
   ] : [];
   return (
     <ModPage entry={entry} lead={tOr(`${K}.lead`, "Workplan's saved entries for fields this farm still owns. These are manually recorded plans and task statuses, not proof that the underlying field work happened. Crop names are the game's internal fruit names when available.")}>
@@ -69,7 +69,11 @@ export function Page({ entry }: CompanionPageProps) {
           field: formatNumber(row.fieldId, 0),
           crops: `${crop(row.currentCrop, row.currentCropIndex)} / ${crop(row.plannedCrop, row.plannedCropIndex)}`,
           required: taskList(row, [1]), complete: taskList(row, [3]), other: taskList(row, [2, 4, 5]),
-        } }))} empty={tOr(`${K}.empty`, "No Workplan entry is recorded for a currently owned field.")} />
+        } }))} empty={page?.coverage === "truncated"
+          ? tOr(`${K}.truncated`, "Only part of the saved plan register was scanned or displayed.")
+          : page?.coverage === "partial"
+            ? tOr(`${K}.partial`, "Invalid entries and plans whose current field ownership could not be confirmed were withheld.")
+            : tOr(`${K}.empty`, "No Workplan entry is recorded for a currently owned field.")} />
         {page?.coverage === "truncated" ? <ModEmpty>{tOr(`${K}.truncated`, "Only part of the saved plan register was scanned or displayed.")}</ModEmpty> : null}
         {page?.coverage === "partial" ? <ModEmpty>{tOr(`${K}.partial`, "Invalid entries and plans whose current field ownership could not be confirmed were withheld.")}</ModEmpty> : null}
       </Card>

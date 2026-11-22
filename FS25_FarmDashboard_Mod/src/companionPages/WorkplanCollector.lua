@@ -43,10 +43,10 @@ CompanionPages.register({
             return type(name) == "string" and ctx.clip(name, 64) or nil
         end
 
-        local rows, owned, withheld, scanned, invalid, truncated = {}, 0, 0, 0, false, false
+        local rows, owned, withheld, scanned, invalid, truncated, scanIncomplete = {}, 0, 0, 0, false, false, false
         for _, entry in pairs(plan.fieldEntries) do
             scanned = scanned + 1
-            if scanned > MAX_SCAN then truncated = true; break end
+            if scanned > MAX_SCAN then truncated = true; scanIncomplete = true; break end
             if type(entry) == "table" and integer(ctx, entry.farmId, 1, 1000000) == farmId then
                 local fieldId = integer(ctx, entry.fieldId, 1, 1000000)
                 if fieldId == nil then invalid = true
@@ -91,7 +91,8 @@ CompanionPages.register({
             coverage = truncated and "truncated" or
                 (invalid or withheld > 0) and "partial" or "complete",
             byFarm = { [tostring(farmId)] = {
-                ownedPlanCount = owned, withheldOwnership = withheld,
+                ownedPlanCount = not scanIncomplete and not invalid and withheld == 0 and owned or nil,
+                withheldOwnership = not scanIncomplete and withheld or nil,
             } },
             rows = rows,
         }

@@ -23,6 +23,26 @@ type CombineRow = {
   targetEngineLoad?: number;
 };
 
+// Realistic Harvesting v1.6.0.0 RHM_UnitConverter.PHYSICAL_RANGES.
+// Its in-game panel formats these settings in RPM/mm, while memory stores percentages.
+const physicalRanges: Record<string, Partial<Record<"fan" | "rotor" | "upperSieve" | "lowerSieve" | "feeder", [number, number, number, string]>>> = {
+  grain: { fan: [300, 1200, 10, "RPM"], rotor: [200, 1100, 10, "RPM"], upperSieve: [0, 30, 1, "mm"], lowerSieve: [0, 25, 1, "mm"], feeder: [0, 50, 1, "mm"] },
+  forage: { fan: [800, 1500, 10, "RPM"], rotor: [1000, 1200, 10, "RPM"], feeder: [200, 600, 10, "RPM"] },
+  root: { fan: [400, 1000, 10, "RPM"], rotor: [100, 350, 10, "RPM"], feeder: [100, 400, 10, "RPM"] },
+  cotton: { fan: [2500, 4000, 10, "RPM"], rotor: [150, 250, 10, "RPM"], feeder: [100, 300, 10, "RPM"] },
+  grape: { fan: [800, 1600, 10, "RPM"], rotor: [350, 550, 5, "RPM"], feeder: [50, 150, 5, "RPM"] },
+  olive: { fan: [800, 1600, 10, "RPM"], rotor: [400, 650, 5, "RPM"], feeder: [50, 150, 5, "RPM"] },
+};
+
+function displayedSetting(row: CombineRow, field: keyof CombineRow, value: number): string {
+  if (field === "targetEngineLoad") return `${formatNumber(value, 0)}%`;
+  const range = physicalRanges[row.machineType || ""]?.[field as keyof typeof physicalRanges.grain];
+  if (!range || value < 0 || value > 100) return `${formatNumber(value, 0)}%`;
+  const [min, max, step, unit] = range;
+  const physical = Math.floor((min + (max - min) * value / 100) / step + 0.5) * step;
+  return `${formatNumber(physical, 0)} ${unit}`;
+}
+
 function tuning(row: CombineRow): string {
   const params: Array<[keyof CombineRow, string, string]> = [
     ["fan", "fan", "Fan"],
@@ -34,7 +54,7 @@ function tuning(row: CombineRow): string {
   ];
   return params.flatMap(([field, key, fallback]) => {
     const value = num(row[field]);
-    return value === null ? [] : [`${tOr(`companionPage.realisticHarvesting.${key}`, fallback)} ${formatNumber(value, 0)}%`];
+    return value === null ? [] : [`${tOr(`companionPage.realisticHarvesting.${key}`, fallback)} ${displayedSetting(row, field, value)}`];
   }).join(" · ") || "—";
 }
 

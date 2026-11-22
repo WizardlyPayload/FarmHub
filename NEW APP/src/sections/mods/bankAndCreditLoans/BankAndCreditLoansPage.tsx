@@ -26,11 +26,11 @@ function loanType(kind: Loan["kind"]): string {
 }
 
 export function Page({ entry }: CompanionPageProps) {
-  const { page, farmData, farmId } = useCompanionPage(entry.key);
+  const { page, farmId } = useCompanionPage(entry.key);
   const money = useMoney();
   const rows = asList<Loan>(page?.rows).filter((row) => num(row.farmId) === farmId);
-  const tiles: ModStatTile[] = farmData ? [
-    { key: "loans", label: tOr("companionPage.bankAndCreditLoans.loans", "Active loans shown"), value: formatNumber(farmData.activeCount, 0) },
+  const tiles: ModStatTile[] = rows.length > 0 ? [
+    { key: "loans", label: tOr("companionPage.bankAndCreditLoans.loans", "Active loans shown"), value: formatNumber(rows.length, 0) },
   ] : [];
   return (
     <ModPage entry={entry} lead={tOr("companionPage.bankAndCreditLoans.lead", "Active Bank And Credit contracts recorded for this farm. Revolving credit shows the credit limit and amount drawn; other rows show original and remaining principal. This is a separate lender from Realistic Farm Finance and native loans.")}>
@@ -58,10 +58,14 @@ export function Page({ entry }: CompanionPageProps) {
               months: row.kind === "revolving" ? "—" : formatNumber(row.remainingMonths, 0),
             },
           }))}
-          empty={tOr("companionPage.bankAndCreditLoans.empty", "No active Bank And Credit loans recorded for this farm.")}
+          empty={page?.coverage === "truncated"
+            ? tOr("companionPage.bankAndCreditLoans.truncated", "Only some loans are listed.")
+            : page?.coverage === "partial"
+              ? tOr("companionPage.bankAndCreditLoans.partial", "Some loan records could not be read.")
+              : tOr("companionPage.bankAndCreditLoans.empty", "No active Bank And Credit loans recorded for this farm.")}
         />
-        {page?.coverage === "truncated" ? <ModEmpty>{tOr("companionPage.bankAndCreditLoans.truncated", "Only some loans are listed.")}</ModEmpty> : null}
-        {page?.coverage === "partial" ? <ModEmpty>{tOr("companionPage.bankAndCreditLoans.partial", "Some loan records could not be read.")}</ModEmpty> : null}
+        {rows.length > 0 && page?.coverage === "truncated" ? <ModEmpty>{tOr("companionPage.bankAndCreditLoans.truncated", "Only some loans are listed.")}</ModEmpty> : null}
+        {rows.length > 0 && page?.coverage === "partial" ? <ModEmpty>{tOr("companionPage.bankAndCreditLoans.partial", "Some loan records could not be read.")}</ModEmpty> : null}
       </Card>
     </ModPage>
   );

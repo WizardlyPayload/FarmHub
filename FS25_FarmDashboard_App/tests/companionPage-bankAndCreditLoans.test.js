@@ -51,3 +51,26 @@ test("withholds loans from an unreviewed Bank And Credit version", () => {
   expect(runCompanionPage(FILE, newer, { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
 });
+
+test("withholds the full count when the loan scan stops early or an owned loan is invalid", () => {
+  const extra = Array.from({ length: 300 }, (_, i) =>
+    `{ id = ${1000 + i}, farmId = 2, paidOff = false }`).join(",\n");
+  const capped = GAME.replace("loans = {", `loans = { ${extra},`);
+  const capPage = runCompanionPage(FILE, capped, { farmId: 1 });
+  expect(capPage).toMatchObject({ readState: "partial", coverage: "truncated" });
+  expect(capPage.byFarm).toBeUndefined();
+  const invalid = GAME.replace("id = 4, farmId = 1", "id = -4, farmId = 1");
+  const invalidPage = runCompanionPage(FILE, invalid, { farmId: 1 });
+  expect(invalidPage).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(invalidPage.byFarm).toBeUndefined();
+});
+
+test("keeps a complete count when only the display rows are capped", () => {
+  const extra = Array.from({ length: 41 }, (_, i) =>
+    `{ id = ${1000 + i}, farmId = 1, type = 1, amount = 100, restAmount = 50, interestRate = 5, monthlyPayment = 5, restDuration = 10, paidOff = false }`).join(",\n");
+  const capped = GAME.replace("loans = {", `loans = { ${extra},`);
+  const page = runCompanionPage(FILE, capped, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "ok", coverage: "truncated" });
+  expect(page.byFarm["1"].activeCount).toBe(43);
+  expect(page.rows).toHaveLength(40);
+});

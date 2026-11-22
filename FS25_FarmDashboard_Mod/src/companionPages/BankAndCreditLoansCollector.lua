@@ -27,10 +27,10 @@ CompanionPages.register({
         end
 
         local rows, activeCount, scanned = {}, 0, 0
-        local invalid, truncated = false, false
+        local invalid, scanIncomplete, rowsTruncated = false, false, false
         for _, loan in pairs(repo.loans) do
             scanned = scanned + 1
-            if scanned > MAX_SCAN then truncated = true; break end
+            if scanned > MAX_SCAN then scanIncomplete = true; break end
             if type(loan) == "table" and ctx.num(loan.farmId) == farmId and loan.paidOff ~= true then
                 local id, kind = ctx.num(loan.id), KINDS[ctx.num(loan.type)]
                 local limit, outstanding = ctx.num(loan.amount), ctx.num(loan.restAmount)
@@ -43,7 +43,7 @@ CompanionPages.register({
                 else
                     activeCount = activeCount + 1
                     if #rows >= MAX_ROWS then
-                        truncated = true
+                        rowsTruncated = true
                     else
                         rows[#rows + 1] = {
                             farmId = farmId,
@@ -61,10 +61,14 @@ CompanionPages.register({
         end
         table.sort(rows, function(a, b) return a.id < b.id end)
         return {
-            readState = invalid and "partial" or (activeCount > 0 and "ok" or "settings-only"),
-            reason = activeCount == 0 and "no-active-farm-loans" or nil,
-            coverage = truncated and "truncated" or invalid and "partial" or "complete",
-            byFarm = { [tostring(farmId)] = { activeCount = activeCount } },
+            readState = (invalid or scanIncomplete) and "partial"
+                or (activeCount > 0 and "ok" or "settings-only"),
+            reason = activeCount == 0 and not (invalid or scanIncomplete)
+                and "no-active-farm-loans" or nil,
+            coverage = (scanIncomplete or rowsTruncated) and "truncated"
+                or invalid and "partial" or "complete",
+            byFarm = not (invalid or scanIncomplete)
+                and { [tostring(farmId)] = { activeCount = activeCount } } or nil,
             rows = rows,
         }
     end,

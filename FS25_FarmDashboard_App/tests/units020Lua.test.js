@@ -75,6 +75,7 @@ describe("owning-mod companion readers", () => {
             getfenv = function() return _G end
             g_currentMission = { getFarmId = function() return 1 end }
             g_modIsLoaded = { ['FS25_369067_RealSilo_Realistic_Silo_Compartments'] = true }
+            g_modManager = { getActiveMods = function() return { { modName = 'FS25_369067_RealSilo_Realistic_Silo_Compartments', version = '1.2.0.7' } } end }
             _G['FS25_369067_RealSilo_Realistic_Silo_Compartments'] = {
                 realSiloManager = {
                     silos = { rs1 = { placeable = { ownerFarmId = 1 }, config = { numCompartments = 2, capacityPerCompartment = 1000 } } },
@@ -90,6 +91,7 @@ describe("owning-mod companion readers", () => {
             getfenv = function() return _G end
             g_currentMission = { getFarmId = function() return 1 end }
             g_modIsLoaded = { ['KM_80484_RealSilo_Realistic_Silo_Compartments'] = true }
+            g_modManager = { getActiveMods = function() return { { modName = 'KM_80484_RealSilo_Realistic_Silo_Compartments', version = '1.1.0.2' } } end }
             _G['KM_80484_RealSilo_Realistic_Silo_Compartments'] = {
                 realSiloManager = {
                     silos = {
@@ -108,6 +110,15 @@ describe("owning-mod companion readers", () => {
             }
         `, "out.realSilo.readState..'|'..tostring(#out.realSilo.silos)..'|'..tostring(out.realSilo.silos[1].slots[1].fillLevel)");
         expect(olderSilo).toBe("ok|1|250");
+
+        const unreviewedSilo = run(`
+            getfenv = function() return _G end
+            g_currentMission = { getFarmId = function() return 1 end }
+            g_modIsLoaded = { FS25_RealSilo = true }
+            g_modManager = { getActiveMods = function() return { { modName = 'FS25_RealSilo', version = '1.3.0.0' } } end }
+            _G.FS25_RealSilo = { realSiloManager = { silos = { own = { placeable = { ownerFarmId = 1 } } } } }
+        `, "out.realSilo.readState..'|'..out.realSilo.reason..'|'..tostring(out.realSilo.silos)");
+        expect(unreviewedSilo).toBe("unavailable|unreviewed-version|nil");
 
         const pallet = run(`
             getfenv = function() return _G end

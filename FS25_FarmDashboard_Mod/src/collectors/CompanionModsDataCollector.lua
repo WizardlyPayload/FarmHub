@@ -3542,6 +3542,11 @@ local function collectRealSilo()
     if farmId == nil then
         return { enabled = true, readState = "unavailable", source = "realSilo", reason = "no-farm" }
     end
+    local loadedName = findLoadedName({ names = SILO_MODS })
+    local version = loadedName and modVersion(loadedName) or nil
+    if version ~= "1.1.0.2" and version ~= "1.2.0.7" then
+        return { enabled = true, readState = "unavailable", source = "realSilo", farmId = farmId, reason = "unreviewed-version" }
+    end
     local mgr = providerSymbol(SILO_MODS, "realSiloManager")
     if type(mgr) ~= "table" or type(mgr.silos) ~= "table" then
         return { enabled = true, readState = "unavailable", source = "realSilo", farmId = farmId }

@@ -65,6 +65,9 @@ CompanionPages.register({
     modNames = { "FS25_RealSilo", "FS25_369067_RealSilo_Realistic_Silo_Compartments", "KM_80484_RealSilo_Realistic_Silo_Compartments" },
     substrings = { "realsilo", "realistic_silo" },
     collect = function(ctx)
+        if ctx.version ~= "1.1.0.2" and ctx.version ~= "1.2.0.7" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local mgr = ctx.symbol("realSiloManager")
         if type(mgr) ~= "table" then
             return nil

@@ -96,6 +96,12 @@ describe("RealSilo page collector", () => {
         expect(page.silos[0]).toMatchObject({ name: "North", fill: 47000, activeSlot: 2 });
     });
 
+    test("withholds compartment readings for an unreviewed descriptor version", () => {
+        const page = runCompanionPage(FILE, MOD_ENV.replace('version = "1.1.0.2"', 'version = "1.3.0.0"'), { farmId: 1 });
+        expect(page).toMatchObject({ readState: "settings-only", reason: "unreviewed-version", version: "1.3.0.0" });
+        expect(page.silos).toBeUndefined();
+    });
+
     test("partial when the compartment storage table is missing", () => {
         const page = runCompanionPage(FILE, `${MOD_ENV}
             _G.FS25_RealSilo.RealSiloCompartmentStorage = nil

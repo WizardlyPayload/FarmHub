@@ -14,7 +14,7 @@ type Entry = {
 function label(key: string): string {
   const labels: Record<string, string> = {
     payable: "To pay", receivable: "To receive", open: "Open", overdue: "Overdue",
-    pending: "Needs details", currentAccount: "Current account",
+    pending: "Pending", currentAccount: "Current account",
     promissoryNote: "Promissory note", cheque: "Cheque", unknown: "Unknown",
   };
   return tOr(`${K}.label.${key}`, labels[key] || key);

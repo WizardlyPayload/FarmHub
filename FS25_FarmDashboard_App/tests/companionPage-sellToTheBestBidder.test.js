@@ -12,7 +12,9 @@ const GAME = `
     getName = function(self) return self.name end }
   local sold = { ownerFarmId = 2, name = "Former trailer", getName = function(self) return self.name end }
   local other = { ownerFarmId = 2, name = "Other tractor", getName = function(self) return self.name end }
-  _G.stbb = { vehiclesForSale = {
+  _G.FS25_359753_Sell_To_The_Best_Bidder = { SellToTheBestBidder = {} }
+  local class = _G.FS25_359753_Sell_To_The_Best_Bidder.SellToTheBestBidder
+  local live = { vehiclesForSale = {
     [owned] = { farmId = 1, askingPrice = 40000, offerPrice = 38000,
       workshopPrice = 32000, buyerArrived = true, buyerWaitElapsed = 2 },
     [sold] = { farmId = 1, askingPrice = 10000, buyerArrived = false },
@@ -21,6 +23,8 @@ const GAME = `
   },
   listVehicle = function() error("must not list a vehicle") end,
   saveToXMLFile = function() error("must not save listings") end }
+  setmetatable(live, { __index = class, __metatable = class })
+  _G.g_modEventListeners = { live }
 `;
 
 test("exports only the selected farm's currently owned live listing and offer", () => {
@@ -51,9 +55,23 @@ test("client or absent register cannot expose server listings", () => {
     "getIsServer = function() return false end");
   expect(runCompanionPage(FILE, client, { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "server-listings-only" });
-  const missing = GAME.replace("_G.stbb = { vehiclesForSale = {",
-    "_G.stbb = { other = {");
+  const missing = GAME.replace("local live = { vehiclesForSale = {",
+    "local live = { other = {");
   expect(runCompanionPage(FILE, missing, { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "listing-register-unavailable" });
   expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", { farmId: 1 })).toBeUndefined();
+});
+
+test("rejects a shared-global shadow and unrelated listeners", () => {
+  const shadow = GAME.replace("_G.g_modEventListeners = { live }",
+    "_G.g_modEventListeners = { { vehiclesForSale = live.vehiclesForSale } }; _G.stbb = live");
+  expect(runCompanionPage(FILE, shadow, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "listing-register-unavailable" });
+});
+
+test("withholds an ambiguous duplicate listener instead of choosing a listing book", () => {
+  const duplicate = GAME.replace("_G.g_modEventListeners = { live }",
+    "_G.g_modEventListeners = { live, setmetatable({ vehiclesForSale = {} }, { __index = class, __metatable = class }) }");
+  expect(runCompanionPage(FILE, duplicate, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "ambiguous-listener-register" });
 });

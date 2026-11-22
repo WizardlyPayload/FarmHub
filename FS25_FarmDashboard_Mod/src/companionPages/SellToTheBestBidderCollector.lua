@@ -2,6 +2,7 @@
 -- Offers are provisional; completed sales are reflected in native farm money.
 
 local MAX_SCAN, MAX_ROWS = 300, 60
+local MAX_LISTENERS = 500
 
 CompanionPages.register({
     key = "sellToTheBestBidder",
@@ -18,7 +19,27 @@ CompanionPages.register({
         if ctx.version ~= "1.0.0.1" then
             return { readState = "settings-only", reason = "unreviewed-version" }
         end
-        local mod = ctx.symbol("stbb") or ctx.global("stbb")
+        -- The exact mod keeps `stbb` file-local and registers its instance with
+        -- addModEventListener. Class() exposes the class as the instance's
+        -- protected metatable; reject unrelated listeners and global shadows.
+        local class = ctx.symbol("SellToTheBestBidder")
+        local listeners = ctx.global("g_modEventListeners")
+        if type(class) ~= "table" or type(listeners) ~= "table" then
+            return { readState = "settings-only", reason = "listing-register-unavailable" }
+        end
+        if #listeners > MAX_LISTENERS then
+            return { readState = "settings-only", reason = "listener-scan-limit" }
+        end
+        local mod = nil
+        for i = 1, #listeners do
+            local listener = listeners[i]
+            if type(listener) == "table" and getmetatable(listener) == class then
+                if mod ~= nil then
+                    return { readState = "settings-only", reason = "ambiguous-listener-register" }
+                end
+                mod = listener
+            end
+        end
         local listings = type(mod) == "table" and mod.vehiclesForSale or nil
         if type(listings) ~= "table" then
             return { readState = "settings-only", reason = "listing-register-unavailable" }

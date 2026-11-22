@@ -127,6 +127,8 @@ const reviewedIds = new Set([
   'FARMHUB-ALLY-20261122-VAULT-AGRICULTURAL-FINANCE',
   'FARMHUB-ALLY-20261122-VAULT-LEASE-LIVESTOCK',
   'FARMHUB-ALLY-20261122-VAULT-FINANCE-VOUCHER',
+  'FARMHUB-ALLY-20261122-VAULT-LEASE-TRIGGER-RERUN', // reviewed and audited in this chat before pipe rearm
+  'FARMHUB-ALLY-20261122-VAULT-INVESTMENT-SYSTEM', // independently reviewed before pipe rearm
   ...[1, 2, 3, 4, 5].map(n => `FARMHUB-ALLY-20261102-STORAGE-ICONS-I${n}`),
 ]);
 const reviewed = initial.filter(event => reviewedIds.has(event.id));

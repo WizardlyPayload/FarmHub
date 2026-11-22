@@ -62,8 +62,16 @@ def main() -> None:
     output_rows = []
     for fingerprint, members in groups.items():
         decision = decisions.get(fingerprint)
-        if decision and (len(members) != 1 or decision["archivePath"] != members[0]["path"]):
-            raise ValueError(f"Decision does not identify one exact archive: {fingerprint}")
+        if decision:
+            if decision["archivePath"] not in {member["path"] for member in members}:
+                raise ValueError(f"Decision does not identify a group archive: {fingerprint}")
+            # A Lua fingerprint alone does not prove the other ZIPs are the same.
+            # Promote a group decision only when every whole archive matches.
+            for member in members:
+                with Path(member["path"]).open("rb") as source:
+                    actual = hashlib.file_digest(source, "sha256").hexdigest()
+                if actual.lower() != decision["archiveSHA256"].lower():
+                    raise ValueError(f"Group archive hash mismatch: {member['path']}")
         archives = sorted({row["archive"] for row in members})
         hits = sorted({i + 1 for i, line in enumerate(audit_lines)
                        if any(name in line for name in archives)})

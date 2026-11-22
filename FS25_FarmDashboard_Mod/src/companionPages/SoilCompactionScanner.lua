@@ -17,10 +17,12 @@ local function nowMs()
 end
 
 local function currentSource()
-    local mission = rawget(_G, "g_currentMission")
-    local mod = rawget(_G, "g_soilCompaction")
-    local util = rawget(_G, "FSDensityMapUtil")
-    local farmlandManager = rawget(_G, "g_farmlandManager")
+    local mission = _G.g_currentMission
+    local helpers = type(CompanionModsDataCollector) == "table" and CompanionModsDataCollector.helpers or nil
+    local mod = type(helpers) == "table" and type(helpers.companionSymbol) == "function" and
+        helpers.companionSymbol({ "KM_81205_Soil_Compaction", "FS25_SoilCompaction" }, "g_soilCompaction") or nil
+    local util = _G.FSDensityMapUtil
+    local farmlandManager = _G.g_farmlandManager
     if type(mod) ~= "table" or type(mod.cells) ~= "table" or
        type(mod.keyToWorldCenter) ~= "function" or not finite(mod.overlayRevision) or
        not finite(mod.cellSize) or mod.cellSize < 0.5 or mod.cellSize > 40 or

@@ -17,6 +17,8 @@ const SETUP = `
     cells = cells, cellSize = 0.5, overlayRevision = 1,
     keyToWorldCenter = function(_, key) return key, 0 end,
   }
+  g_modIsLoaded = { KM_81205_Soil_Compaction = true }
+  KM_81205_Soil_Compaction = { g_soilCompaction = g_soilCompaction }
 `;
 
 function run(body) {
@@ -54,8 +56,8 @@ describe("Soil Compaction frame-bounded snapshot", () => {
       SoilCompactionScanner:step(); SoilCompactionScanner:step()
       owner[1] = 2
       local afterTransfer = SoilCompactionScanner:read(1)
-      g_soilCompaction.cells[51] = 80
-      g_soilCompaction.overlayRevision = 2
+      KM_81205_Soil_Compaction.g_soilCompaction.cells[51] = 80
+      KM_81205_Soil_Compaction.g_soilCompaction.overlayRevision = 2
       local invalid, reason = SoilCompactionScanner:read(2)
       return __fdEncode({ afterTransfer = #afterTransfer.rows, invalid = invalid, reason = reason })
     `);
@@ -66,13 +68,27 @@ describe("Soil Compaction frame-bounded snapshot", () => {
 
   test("rejects unreadable grid entries rather than publishing a partial total", () => {
     const result = run(`
-      g_soilCompaction.cells = { [1] = 101 }
+      KM_81205_Soil_Compaction.g_soilCompaction.cells = { [1] = 101 }
       SoilCompactionScanner:step()
       local snapshot, reason = SoilCompactionScanner:read(1)
       return __fdEncode({ snapshot = snapshot, reason = reason })
     `);
     expect(result.snapshot).toBeUndefined();
     expect(result.reason).toBe("invalid-grid-cell");
+  });
+
+  test("uses the active companion environment, not a same-named dashboard shadow", () => {
+    const result = run(`
+      g_soilCompaction = { cells = { [1] = 99 }, cellSize = 0.5,
+        overlayRevision = 1, keyToWorldCenter = function() return 1, 0 end }
+      SoilCompactionScanner:step(); SoilCompactionScanner:step()
+      local own = SoilCompactionScanner:read(1)
+      return __fdEncode({ scanned = own.scannedCells, cells = own.rows[1].cellCount,
+        maxPenalty = own.rows[1].maxPenalty })
+    `);
+    expect(result.scanned).toBe(50);
+    expect(result.cells).toBe(23);
+    expect(result.maxPenalty).toBe(24);
   });
 });
 

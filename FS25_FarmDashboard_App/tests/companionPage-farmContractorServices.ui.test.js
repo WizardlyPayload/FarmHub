@@ -28,3 +28,18 @@ test("renders booking state and price without implying finished work or leaking 
   expect(host.textContent).toContain("not proof of completed work or final cost");
   expect(host.textContent).not.toContain("Private foreign order");
 });
+
+test("unreadable work orders do not produce a false empty-farm claim", () => {
+  for (const page of [
+    { readState: "partial", coverage: "partial", rows: [] },
+    { readState: "partial", coverage: "truncated", rows: [] },
+    { readState: "partial", reason: "persistence-recovery-error" },
+  ]) {
+    const host = ui.renderPage({
+      companionMods: { mods: [{ id: KEY, detected: true, version: "3.0.1.1" }] },
+      companionPages: { pages: { [KEY]: { key: KEY, detected: true, ...page } } },
+    }, { farmId: 1 });
+    expect(host.textContent).toContain("total is withheld");
+    expect(host.textContent).not.toContain("No current contractor work order was recorded");
+  }
+});

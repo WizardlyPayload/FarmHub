@@ -43,10 +43,14 @@ export function Page({ entry }: CompanionPageProps) {
             area: formatNumber(row.areaHa, 2),
             price: money(row.bookedPrice),
           },
-        }))} empty={tOr(`${K}.empty`, "No current contractor work order was recorded for this farm.")} />
+        }))} empty={page?.coverage === "truncated"
+          ? tOr(`${K}.truncated`, "Only part of the live work-order register was read; the total is withheld.")
+          : page?.readState === "partial"
+            ? tOr(`${K}.partial`, "Some work-order values were invalid or ambiguous; the total is withheld.")
+            : tOr(`${K}.empty`, "No current contractor work order was recorded for this farm.")} />
         {page?.coverage === "truncated" ? <ModEmpty>{tOr(`${K}.truncated`,
           "Only part of the live work-order register was read; the total is withheld.")}</ModEmpty> : null}
-        {page?.coverage === "partial" ? <ModEmpty>{tOr(`${K}.partial`,
+        {page?.readState === "partial" && page?.coverage !== "truncated" ? <ModEmpty>{tOr(`${K}.partial`,
           "Some work-order values were invalid or ambiguous; the total is withheld.")}</ModEmpty> : null}
       </Card>
     </ModPage>

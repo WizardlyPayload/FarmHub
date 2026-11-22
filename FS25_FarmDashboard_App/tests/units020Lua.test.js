@@ -95,13 +95,15 @@ describe("owning-mod companion readers", () => {
                     silos = {
                         own = { placeable = { ownerFarmId = 1 }, config = { isConfigured = true, numCompartments = 2, capacityPerCompartment = 1000 } },
                         foreign = { placeable = { ownerFarmId = 2 }, config = { isConfigured = true, numCompartments = 2, capacityPerCompartment = 1000 } },
+                        unowned = { placeable = { ownerFarmId = 0 }, config = { isConfigured = true, numCompartments = 2, capacityPerCompartment = 1000 } },
                     },
-                    siloNames = { own = 'Old Grain', foreign = 'Other Farm' },
+                    siloNames = { own = 'Old Grain', foreign = 'Other Farm', unowned = 'Unowned' },
                     applyConfig = function() error('write') end,
                 },
                 RealSiloCompartmentStorage = { siloSlots = {
                     own = { activeSlot = 1, slots = { { index = 1, fillType = 1, fillLevel = 250, capacity = 1000, isActive = true } } },
                     foreign = { activeSlot = 1, slots = { { index = 1, fillType = 1, fillLevel = 900, capacity = 1000, isActive = true } } },
+                    unowned = { activeSlot = 1, slots = { { index = 1, fillType = 1, fillLevel = 700, capacity = 1000, isActive = true } } },
                 } },
             }
         `, "out.realSilo.readState..'|'..tostring(#out.realSilo.silos)..'|'..tostring(out.realSilo.silos[1].slots[1].fillLevel)");

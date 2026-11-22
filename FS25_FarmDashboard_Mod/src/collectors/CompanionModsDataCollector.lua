@@ -3561,7 +3561,7 @@ local function collectRealSilo()
             if type(silo.placeable) == "table" then
                 owner = tonumber(silo.placeable.ownerFarmId)
             end
-            if owner ~= farmId and owner ~= 0 then
+            if owner ~= farmId then
                 skipped = skipped + 1
             else
                 local cfg = type(silo.config) == "table" and silo.config or {}

@@ -36,3 +36,24 @@ test("withholds client-only statistics", () => {
     const page = runCompanionPage(FILE, GAME.replace("getIsServer = function() return true end", "getIsServer = function() return false end"), { farmId: 1 });
     expect(page).toMatchObject({ readState: "settings-only", reason: "server-statistics-only" });
 });
+
+test("withholds full-register counts when an output is unreadable", () => {
+    const game = GAME.replace("[18] = { base = 0, actual = 0, bonus = 0 }", "[18] = { base = -1, actual = 0, bonus = 0 }");
+    const page = runCompanionPage(FILE, game, { farmId: 1 });
+    expect(page).toMatchObject({ readState: "partial", coverage: "partial" });
+    expect(page.rows).toHaveLength(1);
+    expect(page.byFarm).toBeUndefined();
+});
+
+test("withholds full-register counts when output rows exceed the cap", () => {
+    const game = GAME + `
+        local points = _G.g_currentMission.productionChainManager:getProductionPointsForFarmId()
+        local outputs = {}
+        for i = 1, 81 do outputs[i] = { base = i, actual = i, bonus = 0 } end
+        points[1].productions[1].pbsStatistics.outputs = outputs
+    `;
+    const page = runCompanionPage(FILE, game, { farmId: 1 });
+    expect(page).toMatchObject({ readState: "partial", coverage: "truncated" });
+    expect(page.rows).toHaveLength(80);
+    expect(page.byFarm).toBeUndefined();
+});

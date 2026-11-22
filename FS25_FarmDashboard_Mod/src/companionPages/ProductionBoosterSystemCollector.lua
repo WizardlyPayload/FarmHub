@@ -88,10 +88,13 @@ CompanionPages.register({
             return aKey < bKey
         end)
         return {
-            readState = invalid and "partial" or (#rows > 0 and "ok" or "settings-only"),
-            reason = not invalid and #rows == 0 and "no-recorded-output" or nil,
+            readState = (invalid or truncated) and "partial" or (#rows > 0 and "ok" or "settings-only"),
+            reason = not invalid and not truncated and #rows == 0 and "no-recorded-output" or nil,
             coverage = truncated and "truncated" or invalid and "partial" or "complete",
-            byFarm = { [tostring(farmId)] = { activeLineCount = activeLines, outputCount = #rows } },
+            -- These are full-register counts only after every point, line and output was read.
+            byFarm = not (truncated or invalid) and { [tostring(farmId)] = {
+                activeLineCount = activeLines, outputCount = #rows,
+            } } or nil,
             rows = rows,
         }
     end,

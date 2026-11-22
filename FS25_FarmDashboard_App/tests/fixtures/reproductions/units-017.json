@@ -62,7 +62,7 @@
     },
     {
       "id": "L11",
-      "setup": "getfenv=function() return _G end\ng_currentMission={getFarmId=function() return 1 end}\ng_modIsLoaded={FS25_312938_Task_List=true}\ng_currentMission.taskList={activeTasks={a={groupId=\"g1\",id=\"t1\"},b={groupId=\"g2\",id=\"t2\"}},taskGroups={g1={farmId=1,tasks={t1={detail=\"FARM ONE\",priority=1}}},g2={farmId=2,tasks={t2={detail=\"FARM TWO\",priority=1}}}}}",
+      "setup": "getfenv=function() return _G end\ng_currentMission={getFarmId=function() return 1 end}\ng_modIsLoaded={FS25_312938_Task_List=true}\ng_currentMission.taskList={activeTasks={a={groupId=\"g1\",id=\"t1\"},b={groupId=\"g2\",id=\"t2\"}},taskGroups={g1={farmId=1,type=1,tasks={t1={type=1,detail=\"FARM ONE\",priority=1,period=1}}},g2={farmId=2,type=1,tasks={t2={type=1,detail=\"FARM TWO\",priority=1,period=1}}}}}",
       "expression": "out.taskList.readState..\"|\"..tostring(#out.taskList.tasks)..\"|\"..out.taskList.tasks[1].detail",
       "expected": "ok|1|FARM ONE"
     }

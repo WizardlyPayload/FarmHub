@@ -83,10 +83,12 @@ CompanionPages.register({
             return an < bn
         end)
         return {
-            readState = vehicleCount == 0 and "settings-only" or (incomplete and "partial" or "ok"),
-            reason = vehicleCount == 0 and "no-nonstock-owned-selection" or nil,
+            readState = truncated and "partial" or (vehicleCount == 0 and "settings-only" or (incomplete and "partial" or "ok")),
+            reason = not truncated and vehicleCount == 0 and "no-nonstock-owned-selection" or nil,
             coverage = truncated and "truncated" or "complete",
-            byFarm = { [tostring(farmId)] = { selectedVehicleCount = vehicleCount, observedFillUnitCount = observedCount } },
+            byFarm = not truncated and { [tostring(farmId)] = {
+                selectedVehicleCount = vehicleCount, observedFillUnitCount = observedCount,
+            } } or nil,
             rows = rows,
         }
     end,

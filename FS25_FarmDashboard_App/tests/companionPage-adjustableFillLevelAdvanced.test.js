@@ -61,3 +61,18 @@ test("recognises the exact vault archive identity", () => {
     "FS25_367048_FS25_adjustableFillLevelAdvanced = true");
   expect(runCompanionPage(FILE, exact, { farmId: 1 }).byFarm["1"].selectedVehicleCount).toBe(2);
 });
+
+test("withholds vehicle totals when the shared owned-vehicle scan ends before another selection", () => {
+  const overCap = GAME + `
+    local vehicles = _G.g_currentMission.vehicleSystem.vehicles
+    for i = 1, 396 do
+      vehicles[#vehicles + 1] = { ownerFarmId = 1, configurations = { adjustableFillLevel = 1 } }
+    end
+    vehicles[#vehicles + 1] = { ownerFarmId = 1, uniqueId = "beyond-cap",
+      configurations = { adjustableFillLevel = 4 } }
+  `;
+  const page = runCompanionPage(FILE, overCap, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "partial", coverage: "truncated" });
+  expect(page.byFarm).toBeUndefined();
+  expect(JSON.stringify(page)).not.toMatch(/beyond-cap|no-nonstock-owned-selection/);
+});

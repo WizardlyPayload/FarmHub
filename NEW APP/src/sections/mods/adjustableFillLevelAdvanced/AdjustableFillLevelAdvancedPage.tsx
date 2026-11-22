@@ -56,9 +56,11 @@ export function Page({ entry }: CompanionPageProps) {
                 : tOr("companionPage.adjustableFillLevelAdvanced.unverified", "Not verified"),
             },
           }))}
-          empty={tOr("companionPage.adjustableFillLevelAdvanced.empty", "No owned vehicle has a non-stock Adjustable Fill Level choice yet.")}
+          empty={page?.coverage === "truncated"
+            ? tOr("companionPage.adjustableFillLevelAdvanced.truncated", "Vehicle scan incomplete; additional selections may be missing.")
+            : tOr("companionPage.adjustableFillLevelAdvanced.empty", "No owned vehicle has a non-stock Adjustable Fill Level choice yet.")}
         />
-        {page?.coverage === "truncated" ? <ModEmpty>{tOr("companionPage.adjustableFillLevelAdvanced.truncated", "Only the first selected fill units are listed.")}</ModEmpty> : null}
+        {page?.coverage === "truncated" && rows.length > 0 ? <ModEmpty>{tOr("companionPage.adjustableFillLevelAdvanced.truncated", "Vehicle scan incomplete; additional selections may be missing.")}</ModEmpty> : null}
       </Card>
     </ModPage>
   );

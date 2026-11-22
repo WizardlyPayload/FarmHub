@@ -73,6 +73,26 @@ CompanionPages.register({
                             greaseThreshold = greaseType ~= "none" and duration > 0
                                 and duration or interval
                         end
+                        local greaseDueReason = nil
+                        if not bad and interval > 0 then
+                            if grease >= greaseThreshold then
+                                greaseDueReason = "hours"
+                            else
+                                local environment = ctx.mission and ctx.mission.environment
+                                local today = environment and whole(ctx,
+                                    environment.currentMonotonicDay, 1000000000)
+                                local daysPerPeriod = environment and whole(ctx,
+                                    environment.daysPerPeriod, 365)
+                                local lastActiveDay = whole(ctx, spec.lastActiveDay, 1000000000)
+                                if today and daysPerPeriod and daysPerPeriod > 0
+                                    and lastActiveDay and lastActiveDay <= today then
+                                    greaseDueReason = today - lastActiveDay >= 3 * daysPerPeriod
+                                        and "storage" or "not-due"
+                                else
+                                    greaseDueReason = "unknown"
+                                end
+                            end
+                        end
                         if not bad then
                             for _, key in ipairs(GROUPS) do
                                 local applies = ctx.try(wearGroups.applies, spec.categories, key)
@@ -130,6 +150,7 @@ CompanionPages.register({
                                     hoursSinceGrease = ctx.round2(grease),
                                     greaseApplicable = interval > 0,
                                     greaseThresholdHours = greaseThreshold and ctx.round2(greaseThreshold) or nil,
+                                    greaseDueReason = greaseDueReason,
                                     hoursSinceGeneralService = ctx.round2(service),
                                     groups = groups, services = services,
                                 }

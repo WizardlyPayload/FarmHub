@@ -14,6 +14,7 @@ type Implement = {
   farmId?: number; vehicleId?: string; vehicle?: string;
   operatingHours?: number; hoursSinceGrease?: number;
   greaseApplicable?: boolean; greaseThresholdHours?: number;
+  greaseDueReason?: "hours" | "storage" | "not-due" | "unknown";
   hoursSinceGeneralService?: number;
   groups?: WearGroup[]; services?: Service[];
 };
@@ -24,6 +25,14 @@ function groupName(key?: string) {
   if (key === "hidraulica") return tOr("companionPage.implementMaintenance.hydraulics", "Hydraulics");
   if (key === "neumaticos") return tOr("companionPage.implementMaintenance.tyres", "Tyres");
   return key || "—";
+}
+
+function greaseDueText(row: Implement) {
+  if (row.greaseApplicable !== true) return "";
+  if (row.greaseDueReason === "hours") return tOr("companionPage.implementMaintenance.greaseDueHours", "Grease due: hours");
+  if (row.greaseDueReason === "storage") return tOr("companionPage.implementMaintenance.greaseDueStorage", "Grease due: storage");
+  if (row.greaseDueReason === "not-due") return tOr("companionPage.implementMaintenance.greaseNotDue", "Grease not due");
+  return tOr("companionPage.implementMaintenance.greaseDueUnavailable", "Grease due state unavailable");
 }
 
 export function Page({ entry }: CompanionPageProps) {
@@ -67,6 +76,7 @@ export function Page({ entry }: CompanionPageProps) {
                 : row.greaseApplicable === false
                   ? tOr("companionPage.implementMaintenance.noGreaseInterval", "No grease interval")
                   : tOr("companionPage.implementMaintenance.greaseIntervalUnavailable", "Interval unavailable")}
+                ${greaseDueText(row) ? `· ${greaseDueText(row)}` : ""}
                 · ${tOr("companionPage.implementMaintenance.generalService", "General service")} ${formatNumber(row.hoursSinceGeneralService, 2)} h`,
             },
           }))}

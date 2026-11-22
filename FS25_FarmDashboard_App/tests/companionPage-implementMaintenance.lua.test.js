@@ -18,6 +18,7 @@ const SETUP = `
       spec_gnImplementMaintenance = {
         operatingHours = 14.25, hoursSinceGrease = 2.5,
         hoursSinceGeneralService = 10,
+        lastActiveDay = 198,
         categories = { contacto = true, transmision = true,
           greaseIntervalHours = 50 },
         greaseType = "none", greaseDurationHours = 0,
@@ -28,6 +29,7 @@ const SETUP = `
       } }
   end
   _G.g_currentMission = { getIsServer = function() return true end,
+    environment = { currentMonotonicDay = 200, daysPerPeriod = 1 },
     vehicleSystem = { vehicles = { machine("owned", 1), machine("foreign", 2) } } }
 `;
 
@@ -37,7 +39,7 @@ test("exports applicable current wear and saved service entries on owned impleme
     byFarm: { "1": { vehicleCount: 1, serviceCount: 1 } } });
   expect(page.rows).toEqual([expect.objectContaining({
     vehicleId: "owned", operatingHours: 14.25, hoursSinceGrease: 2.5,
-    greaseApplicable: true, greaseThresholdHours: 50,
+    greaseApplicable: true, greaseThresholdHours: 50, greaseDueReason: "not-due",
     groups: [
       { key: "contacto", wearPercent: 27.5, quality: "generic" },
       { key: "transmision", wearPercent: 10, quality: "original" },
@@ -56,11 +58,22 @@ test("uses the current greased interval and withholds an invalid threshold", () 
     SETUP.replace('greaseType = "none", greaseDurationHours = 0',
       'greaseType = "premium", greaseDurationHours = 75'), { farmId: 1 });
   expect(greased.rows[0].greaseThresholdHours).toBe(75);
+  const storageDue = runCompanionPage(FILE,
+    SETUP.replace('lastActiveDay = 198', 'lastActiveDay = 197'), { farmId: 1 });
+  expect(storageDue.rows[0].greaseDueReason).toBe("storage");
+  const hourDue = runCompanionPage(FILE,
+    SETUP.replace('hoursSinceGrease = 2.5', 'hoursSinceGrease = 50')
+      .replace('lastActiveDay = 198', 'lastActiveDay = 197'), { farmId: 1 });
+  expect(hourDue.rows[0].greaseDueReason).toBe("hours");
+  const unknown = runCompanionPage(FILE,
+    SETUP.replace('lastActiveDay = 198', 'lastActiveDay = -1'), { farmId: 1 });
+  expect(unknown.rows[0].greaseDueReason).toBe("unknown");
   const noGrease = runCompanionPage(FILE,
     SETUP.replace('greaseIntervalHours = 50', 'greaseIntervalHours = 0'),
     { farmId: 1 });
   expect(noGrease.rows[0]).toHaveProperty("greaseApplicable", false);
   expect(noGrease.rows[0]).not.toHaveProperty("greaseThresholdHours");
+  expect(noGrease.rows[0]).not.toHaveProperty("greaseDueReason");
   const invalid = runCompanionPage(FILE,
     SETUP.replace('greaseIntervalHours = 50', 'greaseIntervalHours = -1'),
     { farmId: 1 });

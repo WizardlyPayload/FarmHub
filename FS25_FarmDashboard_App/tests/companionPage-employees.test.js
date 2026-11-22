@@ -6,6 +6,9 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "EmployeesCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { FS25_Employees = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "FS25_Employees", version = "2.6.0.0" }
+  } end }
   _G.g_currentMission = {
     getFarmId = function() return 1 end,
     getIsServer = function() return true end,
@@ -58,6 +61,15 @@ test("withholds client, missing manager and absent mod", () => {
   expect(runCompanionPage(FILE, missing, { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "staff-manager-unavailable" });
   expect(runCompanionPage(FILE, "_G.g_modIsLoaded = {}", { farmId: 1 })).toBeUndefined();
+});
+
+test("withholds an unreviewed or unavailable Employees version", () => {
+  const later = GAME.replace('version = "2.6.0.0"', 'version = "2.7.0.0"');
+  expect(runCompanionPage(FILE, later, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
+  const unavailable = GAME.replace(/_G\.g_modManager = \{ getActiveMods = function\(\) return \{[\s\S]*?\} end \}\n/, "");
+  expect(runCompanionPage(FILE, unavailable, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
 });
 
 test("caps a large owned roster and reports incomplete coverage", () => {

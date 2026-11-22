@@ -15,6 +15,9 @@ CompanionPages.register({
     modNames = { "FS25_Employees", "KM_82420_Employees" },
     substrings = { "fs25_employees" },
     collect = function(ctx)
+        if ctx.version ~= "2.6.0.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local mission = ctx.mission
         if type(mission) ~= "table" or ctx.call(mission, "getIsServer") ~= true then
             return { readState = "settings-only", reason = "server-roster-only" }

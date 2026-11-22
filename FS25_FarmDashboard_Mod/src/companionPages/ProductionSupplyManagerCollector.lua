@@ -9,11 +9,14 @@ CompanionPages.register({
     modNames = { "KM_82199_Production_Supply_Manager", "FS25_ProductionSupplyManager" },
     substrings = { "production_supply_manager", "productionsupplymanager" },
     collect = function(ctx)
+        if ctx.version ~= "1.0.0.0" then
+            return { readState = "settings-only", reason = "unreviewed-version" }
+        end
         local farmId = ctx.farmId
         if farmId == nil or farmId <= 0 then
             return { readState = "settings-only", reason = "no-farm" }
         end
-        local manager = ctx.symbol("g_productionSupplyManager") or ctx.global("g_productionSupplyManager")
+        local manager = ctx.symbol("g_productionSupplyManager")
         if type(manager) ~= "table" then
             return { readState = "settings-only", reason = "no-manager" }
         end

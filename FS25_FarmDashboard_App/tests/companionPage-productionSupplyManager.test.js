@@ -6,7 +6,10 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "ProductionSupplyManagerCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { KM_82199_Production_Supply_Manager = true }
-  _G.g_productionSupplyManager = {
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "KM_82199_Production_Supply_Manager", version = "1.0.0.0" }
+  } end }
+  _G.KM_82199_Production_Supply_Manager = { g_productionSupplyManager = {
     loadedSettingsFarmId = 2,
     autoPurchaseEnabled = true,
     autoPurchaseHistory = { { production = "Foreign farm", product = "Diesel", liters = 999, cost = 999 } },
@@ -19,7 +22,7 @@ const GAME = `
         { production = "Foreign cached", product = "Oil", liters = 200, cost = 90 },
       } },
     },
-  }
+  } }
 `;
 
 test("reads only the requested farm's recorded purchase, not the local active farm", () => {
@@ -55,4 +58,23 @@ test("withholds an absent farm record and rejects invalid purchase amounts", () 
   const merged = normalizeCompanionPages({ pages: { productionSupplyManager: page } },
     { modules: loadModules() });
   expect(merged.pages.productionSupplyManager.purchases).toEqual([]);
+});
+
+test("rejects a shared-global shadow outside the loaded mod environment", () => {
+  const shadow = GAME.replace("_G.KM_82199_Production_Supply_Manager = { g_productionSupplyManager = {",
+    "_G.g_productionSupplyManager = {").replace("  } }\n", "  }\n");
+  expect(runCompanionPage(FILE, shadow, { farmId: 1 })).toMatchObject({
+    readState: "settings-only", reason: "no-manager",
+  });
+});
+
+test("withholds unreviewed or unavailable Production Supply Manager versions", () => {
+  const later = GAME.replace('version = "1.0.0.0"', 'version = "1.0.1.0"');
+  expect(runCompanionPage(FILE, later, { farmId: 1 })).toMatchObject({
+    readState: "settings-only", reason: "unreviewed-version",
+  });
+  const unavailable = GAME.replace(/_G\.g_modManager = \{ getActiveMods = function\(\) return \{[\s\S]*?\} end \}\n/, "");
+  expect(runCompanionPage(FILE, unavailable, { farmId: 1 })).toMatchObject({
+    readState: "settings-only", reason: "unreviewed-version",
+  });
 });

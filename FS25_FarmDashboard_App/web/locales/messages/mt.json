@@ -6282,6 +6282,7 @@
 ,"companionPage.implementMaintenance.attention": "Hours since attention"
 ,"companionPage.implementMaintenance.grease": "Grease"
 ,"companionPage.implementMaintenance.noGreaseInterval": "No grease interval"
+,"companionPage.implementMaintenance.greaseIntervalUnavailable": "Interval unavailable"
 ,"companionPage.implementMaintenance.greaseThresholdNote": "The grease hour threshold helps plan service; storage can make greasing due sooner."
 ,"companionPage.implementMaintenance.generalService": "General service"
 ,"companionPage.implementMaintenance.empty": "No maintained implements are currently owned by this farm."

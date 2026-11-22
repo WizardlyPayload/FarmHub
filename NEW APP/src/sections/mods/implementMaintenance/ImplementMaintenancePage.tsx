@@ -13,7 +13,7 @@ type Service = {
 type Implement = {
   farmId?: number; vehicleId?: string; vehicle?: string;
   operatingHours?: number; hoursSinceGrease?: number;
-  greaseThresholdHours?: number;
+  greaseApplicable?: boolean; greaseThresholdHours?: number;
   hoursSinceGeneralService?: number;
   groups?: WearGroup[]; services?: Service[];
 };
@@ -62,9 +62,11 @@ export function Page({ entry }: CompanionPageProps) {
               wear: asList<WearGroup>(row.groups).map((group) =>
                 `${groupName(group.key)} ${formatNumber(group.wearPercent, 1)}% (${group.quality === "generic" ? tOr("companionPage.implementMaintenance.generic", "Generic") : tOr("companionPage.implementMaintenance.original", "Original")})`
               ).join(" · ") || "—",
-              attention: `${tOr("companionPage.implementMaintenance.grease", "Grease")} ${num(row.greaseThresholdHours) != null
+              attention: `${tOr("companionPage.implementMaintenance.grease", "Grease")} ${row.greaseApplicable === true && num(row.greaseThresholdHours) != null
                 ? `${formatNumber(row.hoursSinceGrease, 2)} / ${formatNumber(row.greaseThresholdHours, 2)} h`
-                : tOr("companionPage.implementMaintenance.noGreaseInterval", "No grease interval")}
+                : row.greaseApplicable === false
+                  ? tOr("companionPage.implementMaintenance.noGreaseInterval", "No grease interval")
+                  : tOr("companionPage.implementMaintenance.greaseIntervalUnavailable", "Interval unavailable")}
                 · ${tOr("companionPage.implementMaintenance.generalService", "General service")} ${formatNumber(row.hoursSinceGeneralService, 2)} h`,
             },
           }))}

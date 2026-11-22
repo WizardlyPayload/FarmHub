@@ -128,6 +128,7 @@ CompanionPages.register({
                                         or ctx.call(vehicle, "getName"), 80),
                                     operatingHours = ctx.round2(hours),
                                     hoursSinceGrease = ctx.round2(grease),
+                                    greaseApplicable = interval > 0,
                                     greaseThresholdHours = greaseThreshold and ctx.round2(greaseThreshold) or nil,
                                     hoursSinceGeneralService = ctx.round2(service),
                                     groups = groups, services = services,

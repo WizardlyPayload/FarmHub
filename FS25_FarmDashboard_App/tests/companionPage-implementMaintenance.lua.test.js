@@ -37,7 +37,7 @@ test("exports applicable current wear and saved service entries on owned impleme
     byFarm: { "1": { vehicleCount: 1, serviceCount: 1 } } });
   expect(page.rows).toEqual([expect.objectContaining({
     vehicleId: "owned", operatingHours: 14.25, hoursSinceGrease: 2.5,
-    greaseThresholdHours: 50,
+    greaseApplicable: true, greaseThresholdHours: 50,
     groups: [
       { key: "contacto", wearPercent: 27.5, quality: "generic" },
       { key: "transmision", wearPercent: 10, quality: "original" },
@@ -59,6 +59,7 @@ test("uses the current greased interval and withholds an invalid threshold", () 
   const noGrease = runCompanionPage(FILE,
     SETUP.replace('greaseIntervalHours = 50', 'greaseIntervalHours = 0'),
     { farmId: 1 });
+  expect(noGrease.rows[0]).toHaveProperty("greaseApplicable", false);
   expect(noGrease.rows[0]).not.toHaveProperty("greaseThresholdHours");
   const invalid = runCompanionPage(FILE,
     SETUP.replace('greaseIntervalHours = 50', 'greaseIntervalHours = -1'),

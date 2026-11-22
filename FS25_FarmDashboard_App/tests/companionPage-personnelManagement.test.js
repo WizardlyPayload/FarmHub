@@ -6,6 +6,9 @@ const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge
 const FILE = "PersonnelManagementCollector.lua";
 const GAME = `
   _G.g_modIsLoaded = { KM_79440_Personnel_Management = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "KM_79440_Personnel_Management", version = "1.1.3.0" }
+  } end }
   _G.g_currentMission = { getIsServer = function() return true end }
   _G.KM_79440_Personnel_Management = { g_helperPersonnelApp = { manager = {
     refreshFarmContext = function() error("must not mutate farm/applicant state") end,
@@ -52,6 +55,15 @@ test("withholds a shared-global shadow outside the loaded personnel mod", () => 
     .replace("  } } }\n", "  } }\n");
   expect(runCompanionPage(FILE, shadow, { farmId: 1 }))
     .toMatchObject({ readState: "settings-only", reason: "farm-roster-unavailable" });
+});
+
+test("withholds an unreviewed or unavailable Personnel Management version", () => {
+  const later = GAME.replace('version = "1.1.3.0"', 'version = "1.1.4.0"');
+  expect(runCompanionPage(FILE, later, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
+  const unavailable = GAME.replace(/_G\.g_modManager = \{ getActiveMods = function\(\) return \{[\s\S]*?\} end \}\n/, "");
+  expect(runCompanionPage(FILE, unavailable, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
 });
 
 test("withholds client, absent book, and undetected mod", () => {

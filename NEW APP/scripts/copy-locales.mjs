@@ -21,5 +21,9 @@ if (!fs.existsSync(src)) {
 }
 
 fs.mkdirSync(destDir, { recursive: true });
-fs.copyFileSync(src, dest);
-console.log("[copy-locales] copied translations.json");
+if (fs.existsSync(dest) && fs.readFileSync(src).equals(fs.readFileSync(dest))) {
+  console.log("[copy-locales] translations.json already matches source");
+} else {
+  fs.copyFileSync(src, dest);
+  console.log("[copy-locales] copied translations.json");
+}

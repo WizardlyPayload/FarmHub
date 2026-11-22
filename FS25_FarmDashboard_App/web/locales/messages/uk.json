@@ -6890,5 +6890,14 @@
   ,"companionPage.personnelManagement.applicantWage": "Requested monthly wage"
   ,"companionPage.personnelManagement.monthsListed": "Months listed"
   ,"companionPage.personnelManagement.noApplicants": "No applicants are listed for this farm."
-  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant"
+  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant",
+  "companionPage.personnelManagement.specializationValue.tillage": "Обробіток ґрунту",
+  "companionPage.personnelManagement.specializationValue.sowing": "Сівба",
+  "companionPage.personnelManagement.specializationValue.fertilizing": "Внесення добрив",
+  "companionPage.personnelManagement.specializationValue.plantProtection": "Захист рослин",
+  "companionPage.personnelManagement.specializationValue.harvest": "Збирання врожаю",
+  "companionPage.personnelManagement.specializationValue.transport": "Транспорт",
+  "companionPage.personnelManagement.specializationValue.machineCare": "Догляд за технікою",
+  "companionPage.personnelManagement.specializationValue.resourceSaver": "Ощадливе використання ресурсів",
+  "companionPage.personnelManagement.specializationUnknown": "Unrecognized specialization"
 }

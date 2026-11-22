@@ -6890,5 +6890,14 @@
   ,"companionPage.personnelManagement.applicantWage": "Requested monthly wage"
   ,"companionPage.personnelManagement.monthsListed": "Months listed"
   ,"companionPage.personnelManagement.noApplicants": "No applicants are listed for this farm."
-  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant"
+  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant",
+  "companionPage.personnelManagement.specializationValue.tillage": "Zpracování půdy",
+  "companionPage.personnelManagement.specializationValue.sowing": "Setí",
+  "companionPage.personnelManagement.specializationValue.fertilizing": "Hnojení",
+  "companionPage.personnelManagement.specializationValue.plantProtection": "Ochrana rostlin",
+  "companionPage.personnelManagement.specializationValue.harvest": "Sklizeň",
+  "companionPage.personnelManagement.specializationValue.transport": "Doprava",
+  "companionPage.personnelManagement.specializationValue.machineCare": "Péče o stroje",
+  "companionPage.personnelManagement.specializationValue.resourceSaver": "Úsporné hospodaření",
+  "companionPage.personnelManagement.specializationUnknown": "Unrecognized specialization"
 }

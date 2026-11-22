@@ -6890,5 +6890,14 @@
   ,"companionPage.personnelManagement.applicantWage": "Requested monthly wage"
   ,"companionPage.personnelManagement.monthsListed": "Months listed"
   ,"companionPage.personnelManagement.noApplicants": "No applicants are listed for this farm."
-  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant"
+  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant",
+  "companionPage.personnelManagement.specializationValue.tillage": "Maanmuokkaus",
+  "companionPage.personnelManagement.specializationValue.sowing": "Kylvö",
+  "companionPage.personnelManagement.specializationValue.fertilizing": "Lannoitus",
+  "companionPage.personnelManagement.specializationValue.plantProtection": "Kasvinsuojelu",
+  "companionPage.personnelManagement.specializationValue.harvest": "Sadonkorjuu",
+  "companionPage.personnelManagement.specializationValue.transport": "Kuljetus",
+  "companionPage.personnelManagement.specializationValue.machineCare": "Koneiden hoito",
+  "companionPage.personnelManagement.specializationValue.resourceSaver": "Säästävä työskentely",
+  "companionPage.personnelManagement.specializationUnknown": "Unrecognized specialization"
 }

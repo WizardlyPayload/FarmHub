@@ -6890,5 +6890,14 @@
   ,"companionPage.personnelManagement.applicantWage": "Requested monthly wage"
   ,"companionPage.personnelManagement.monthsListed": "Months listed"
   ,"companionPage.personnelManagement.noApplicants": "No applicants are listed for this farm."
-  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant"
+  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant",
+  "companionPage.personnelManagement.specializationValue.tillage": "Travail du sol",
+  "companionPage.personnelManagement.specializationValue.sowing": "Semis",
+  "companionPage.personnelManagement.specializationValue.fertilizing": "Fertilisation",
+  "companionPage.personnelManagement.specializationValue.plantProtection": "Protection des cultures",
+  "companionPage.personnelManagement.specializationValue.harvest": "Récolte",
+  "companionPage.personnelManagement.specializationValue.transport": "Transport",
+  "companionPage.personnelManagement.specializationValue.machineCare": "Entretien des machines",
+  "companionPage.personnelManagement.specializationValue.resourceSaver": "Utilisation économe",
+  "companionPage.personnelManagement.specializationUnknown": "Unrecognized specialization"
 }

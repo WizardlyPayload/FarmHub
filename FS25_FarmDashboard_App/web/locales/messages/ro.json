@@ -6890,5 +6890,14 @@
   ,"companionPage.personnelManagement.applicantWage": "Requested monthly wage"
   ,"companionPage.personnelManagement.monthsListed": "Months listed"
   ,"companionPage.personnelManagement.noApplicants": "No applicants are listed for this farm."
-  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant"
+  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant",
+  "companionPage.personnelManagement.specializationValue.tillage": "Prelucrarea solului",
+  "companionPage.personnelManagement.specializationValue.sowing": "Semănat",
+  "companionPage.personnelManagement.specializationValue.fertilizing": "Fertilizare",
+  "companionPage.personnelManagement.specializationValue.plantProtection": "Protecția culturilor",
+  "companionPage.personnelManagement.specializationValue.harvest": "Recoltare",
+  "companionPage.personnelManagement.specializationValue.transport": "Transport",
+  "companionPage.personnelManagement.specializationValue.machineCare": "Îngrijirea utilajelor",
+  "companionPage.personnelManagement.specializationValue.resourceSaver": "Utilizare eficientă",
+  "companionPage.personnelManagement.specializationUnknown": "Unrecognized specialization"
 }

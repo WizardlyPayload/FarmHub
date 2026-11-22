@@ -6890,5 +6890,14 @@
   ,"companionPage.personnelManagement.applicantWage": "Requested monthly wage"
   ,"companionPage.personnelManagement.monthsListed": "Months listed"
   ,"companionPage.personnelManagement.noApplicants": "No applicants are listed for this farm."
-  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant"
+  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant",
+  "companionPage.personnelManagement.specializationValue.tillage": "Jordbearbejdning",
+  "companionPage.personnelManagement.specializationValue.sowing": "Såning",
+  "companionPage.personnelManagement.specializationValue.fertilizing": "Gødskning",
+  "companionPage.personnelManagement.specializationValue.plantProtection": "Plantebeskyttelse",
+  "companionPage.personnelManagement.specializationValue.harvest": "Høst",
+  "companionPage.personnelManagement.specializationValue.transport": "Transport",
+  "companionPage.personnelManagement.specializationValue.machineCare": "Maskinpleje",
+  "companionPage.personnelManagement.specializationValue.resourceSaver": "Ressourcebesparelse",
+  "companionPage.personnelManagement.specializationUnknown": "Unrecognized specialization"
 }

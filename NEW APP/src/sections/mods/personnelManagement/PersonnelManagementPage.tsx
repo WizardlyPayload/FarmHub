@@ -6,6 +6,23 @@ import {
 } from "@/sections/mods/shared";
 
 const K = "companionPage.personnelManagement";
+const specializationNames: Record<string, string> = {
+  tillage: "Tillage",
+  sowing: "Sowing",
+  fertilizing: "Fertilizing",
+  plantProtection: "Crop Protection",
+  harvest: "Harvest",
+  transport: "Transport",
+  machineCare: "Machine Care",
+  resourceSaver: "Efficient Use",
+};
+
+function specializationLabel(value?: string) {
+  if (!value) return "—";
+  const name = specializationNames[value];
+  return name ? tOr(`${K}.specializationValue.${value}`, name)
+    : tOr(`${K}.specializationUnknown`, "Unrecognized specialization");
+}
 
 type StaffRow = {
   farmId?: number; id?: number; name?: string; experience?: number;
@@ -47,7 +64,7 @@ export function Page({ entry }: CompanionPageProps) {
             key: `${row.id ?? row.name ?? "staff"}-${index}`,
             cells: {
               name: row.name || tOr(`${K}.unnamed`, "Unnamed staff member"),
-              specialization: row.specialization || "—",
+              specialization: specializationLabel(row.specialization),
               attributes: [row.experience, row.reliability, row.loyalty]
                 .map((v) => num(v) == null ? "—" : formatNumber(v, 0)).join(" / "),
               work: num(row.jobsCompleted) == null && num(row.totalWorkMinutes) == null
@@ -76,7 +93,7 @@ export function Page({ entry }: CompanionPageProps) {
             key: `${row.id ?? row.name ?? "applicant"}-${index}`,
             cells: {
               name: row.name || tOr(`${K}.unnamedApplicant`, "Unnamed applicant"),
-              specialization: row.specialization || "—",
+              specialization: specializationLabel(row.specialization),
               attributes: [row.experience, row.reliability, row.loyalty]
                 .map((v) => num(v) == null ? "—" : formatNumber(v, 0)).join(" / "),
               wage: num(row.wage) == null ? "—" : money(row.wage),

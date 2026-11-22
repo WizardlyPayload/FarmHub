@@ -6890,5 +6890,14 @@
   ,"companionPage.personnelManagement.applicantWage": "Requested monthly wage"
   ,"companionPage.personnelManagement.monthsListed": "Months listed"
   ,"companionPage.personnelManagement.noApplicants": "No applicants are listed for this farm."
-  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant"
+  ,"companionPage.personnelManagement.unnamedApplicant": "Unnamed applicant",
+  "companionPage.personnelManagement.specializationValue.tillage": "Talajművelés",
+  "companionPage.personnelManagement.specializationValue.sowing": "Vetés",
+  "companionPage.personnelManagement.specializationValue.fertilizing": "Trágyázás",
+  "companionPage.personnelManagement.specializationValue.plantProtection": "Növényvédelem",
+  "companionPage.personnelManagement.specializationValue.harvest": "Betakarítás",
+  "companionPage.personnelManagement.specializationValue.transport": "Szállítás",
+  "companionPage.personnelManagement.specializationValue.machineCare": "Gépkímélés",
+  "companionPage.personnelManagement.specializationValue.resourceSaver": "Takarékos munkavégzés",
+  "companionPage.personnelManagement.specializationUnknown": "Unrecognized specialization"
 }

@@ -90,6 +90,37 @@ describe("Soil Compaction frame-bounded snapshot", () => {
     expect(result.cells).toBe(23);
     expect(result.maxPenalty).toBe(24);
   });
+
+  test("bounds work on a large grid and caps ranked rows without losing farm totals", () => {
+    const result = run(`
+      local mod = KM_81205_Soil_Compaction.g_soilCompaction
+      mod.cells = {}
+      for i = 1, 10000 do mod.cells[i] = (i % 100) + 1 end
+      mod.overlayRevision = 2
+      g_farmlandManager.getFarmlandAtWorldPosition = function(_, x)
+        return { id = math.floor((x - 1) / 100) + 1 }
+      end
+      g_farmlandManager.getFarmlandOwner = function() return 1 end
+      FSDensityMapUtil.getIsFieldAtWorldPos = function() return true end
+      local maxStep = 0
+      for frame = 1, 251 do
+        local before = SoilCompactionScanner.state and SoilCompactionScanner.state.scanned or 0
+        SoilCompactionScanner:step()
+        local delta = SoilCompactionScanner.state.scanned - before
+        if delta > maxStep then maxStep = delta end
+      end
+      local snapshot = SoilCompactionScanner:read(1)
+      return __fdEncode({ maxStep = maxStep, scanned = snapshot.scannedCells,
+        affectedCells = snapshot.affectedCells, affectedParcels = snapshot.affectedParcels,
+        rows = #snapshot.rows, truncated = snapshot.truncated })
+    `);
+    expect(result.maxStep).toBeLessThanOrEqual(40);
+    expect(result.scanned).toBe(10000);
+    expect(result.affectedCells).toBe(10000);
+    expect(result.affectedParcels).toBe(100);
+    expect(result.rows).toBe(60);
+    expect(result.truncated).toBe(true);
+  });
 });
 
 describe("Soil Compaction companion reading", () => {

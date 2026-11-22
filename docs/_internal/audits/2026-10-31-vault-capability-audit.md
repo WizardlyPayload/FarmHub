@@ -2,6 +2,13 @@
 
 Status: **in progress**, last updated 22 November 2026. This audit reopens the question that the 65-entry companion validation matrix could not answer: whether every vault mod with useful, distinct data has an honest Farm Dashboard reading. The completed matrix is evidence for its tested integrations, not a vault-wide pass. Entries are chronological: later results can supersede an earlier "unimplemented," "draft," or "pending" statement. Check the latest entry for an exact archive and the current collector/page before counting it as a missing integration; a filename occurring once is not proof it was only screened. Auto Grove and Realistic Weather irrigation illustrate why this current-state check matters.
 
+## Current acceptance gates (22 November)
+
+- **Field To-Do planned crop:** one exact frozen Ally request is assigned. Tina's 11:10 UTC ACK is receipt only; game/export/installed-page evidence and full release are pending. Do not count it as accepted or assign a second Ally test while it owns the window.
+- **Farm Contractor Services:** its source-tested owned-booking collector and page have no positive installed reading. The separate one-booking packet remains a mutable draft until Field To-Do returns and RF ownership, disk headroom and full restoration are checked. The exact v3.0.1.1 source charges `quote.price` before creating a booking with `price = quote.price` (`ContractorHarvesting.lua:2109-2134`); `refreshWorkOrders` then places that booking in a farm-keyed order whose operation holds the same record (`ContractorWorkOrders.lua:49-84`). This supports comparing one quoted charge to the exported booked price, but it is source evidence only, not a completed booking or final-cost proof.
+- **Implement Maintenance grease service interval and Harvestore transit:** the recent page improvements are source/UI tested only and postdate the frozen 5.1.0.133/5.2.143 pair. They need coherent private packaging and bounded nonempty installed acceptance before being reported as live behavior. Implement Maintenance's prior raised-implement meter result remains scoped to attached activity.
+- **Vault-wide exceptions:** two encoded Ursus VM scripts are not decoded; the exact unreadable `FS25_Bale_Storage.zip` remains unreviewable as a ZIP. Their names and the scanner's 1,201 Lua-bearing leads cannot establish that every distinct useful capability was integrated. RF-owned StockGuard compatibility gates remain separate from collector correctness.
+
 ## Inventory boundary
 
 - Current read-only `P:\FS25 MOD VAULT\by-category` enumeration: **8,012 ZIP paths**. The maintained vault index dated 26 October lists 8,011, so it is not an exact current inventory.

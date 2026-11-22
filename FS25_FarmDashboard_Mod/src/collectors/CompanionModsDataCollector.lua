@@ -2668,10 +2668,10 @@ local function collectProductionWatcher()
     return {
         enabled = true,
         source = "productionWatcher",
-        readState = n == 0 and "empty" or "ok",
+        readState = truncated and "partial" or (n == 0 and "empty" or "ok"),
         coverage = truncated and "truncated" or "complete",
         farmId = farmId,
-        productionPointCount = n,
+        productionPointCount = not truncated and n or nil,
         countSource = "native",
         alertsReadable = false,
     }

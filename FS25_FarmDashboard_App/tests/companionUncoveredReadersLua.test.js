@@ -61,3 +61,25 @@ test("livestock display and two vehicle-service readers keep only the active far
     expect(to_jsstring(lua.lua_tostring(L, -1)))
         .toBe("ok|alerts|2|ok|1|13|0.12|ok|1|75|unavailable|unreviewed-version");
 });
+
+test("Production Watcher native point count is withheld when its scan stops at 250", () => {
+    const L = lauxlib.luaL_newstate();
+    lualib.luaL_openlibs(L);
+    const setup = `
+        getfenv=function() return _G end
+        g_modIsLoaded={FS25_ProductionWatcher=true}
+        local points={}
+        for i=1,251 do points[i]={ownerFarmId=(i==251 and 1 or 2)} end
+        g_currentMission={getFarmId=function() return 1 end,
+            productionChainManager={productionPoints=points}}
+        local capped=CompanionModsDataCollector:collect().productionWatcher
+        points[251]=nil
+        local complete=CompanionModsDataCollector:collect().productionWatcher
+        return table.concat({capped.readState,capped.coverage,tostring(capped.productionPointCount),
+            complete.readState,complete.coverage,tostring(complete.productionPointCount)},'|')
+    `;
+    if (lauxlib.luaL_dostring(L, to_luastring([source, setup].join("\n"))) !== lua.LUA_OK) {
+        throw new Error(to_jsstring(lua.lua_tostring(L, -1)));
+    }
+    expect(to_jsstring(lua.lua_tostring(L, -1))).toBe("partial|truncated|nil|empty|complete|0");
+});

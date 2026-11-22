@@ -58,10 +58,11 @@ CompanionPages.register({
                         withheld = withheld + 1
                     else
                         owned = owned + 1
+                        local rowInvalid = false
                         local tasks = {}
                         for key, sourceField in pairs(TASK_FIELDS) do
                             local state = integer(ctx, entry[sourceField], 1, 5)
-                            if state == nil then invalid = true end
+                            if state == nil then rowInvalid = true end
                             tasks[key] = state
                         end
                         local fertilizer1Type = integer(ctx, entry.stateFert1_type, 1, 7)
@@ -69,9 +70,10 @@ CompanionPages.register({
                         local currentCropIndex = integer(ctx, entry.currentFruit, 0, 1000000)
                         local plannedCropIndex = integer(ctx, entry.plannedFruit, 0, 1000000)
                         if fertilizer1Type == nil or fertilizer2Type == nil
-                            or currentCropIndex == nil or plannedCropIndex == nil then invalid = true end
+                            or currentCropIndex == nil or plannedCropIndex == nil then rowInvalid = true end
+                        if rowInvalid then invalid = true end
                         if #rows >= MAX_ROWS then truncated = true
-                        else
+                        elseif not rowInvalid then
                             rows[#rows + 1] = {
                                 farmId = farmId,
                                 fieldId = fieldId,
@@ -89,6 +91,7 @@ CompanionPages.register({
                 end
             end
         end
+        if owned > MAX_ROWS then truncated = true end
         table.sort(rows, function(a, b) return a.fieldId < b.fieldId end)
         return {
             readState = (invalid or withheld > 0) and "partial" or

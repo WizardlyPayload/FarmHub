@@ -75,6 +75,15 @@ test("a missing field-to-farmland mapping is withheld even if an owner helper sa
   expect(merged.pages.workplan.rows).toHaveLength(0);
 });
 
+test("withholds a malformed owned plan row instead of displaying incomplete task data", () => {
+  const malformed = GAME.replace("stateFert1_type = 4", "stateFert1_type = 9");
+  const page = runCompanionPage(FILE, malformed, { farmId: 1 });
+  expect(page.readState).toBe("partial");
+  expect(page.coverage).toBe("partial");
+  expect(page.byFarm["1"].ownedPlanCount).toBeUndefined();
+  expect(Object.keys(page.rows)).toHaveLength(0);
+});
+
 test("scan cap withholds the full plan count while a row-only cap keeps it", () => {
   const capGame = GAME.replace("{ farmId = 2, fieldId = 31, currentFruit = 3, plannedFruit = 2,",
     "{ farmId = 2, fieldId = 31, currentFruit = 3, plannedFruit = 2,");

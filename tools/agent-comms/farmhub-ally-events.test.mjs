@@ -19,6 +19,7 @@ test('parses substantive FarmHub and RF returns, including direct PARTIAL', () =
     '## [time] from Tina\r\nPARTIAL + INCIDENT FARMHUB-ALLY-20261107-VAULT-V53 (save missing): stop',
     '## [time] from Tina\r\nBLOCKED (no exact copy found) FARMHUB-ALLY-20261107-V53-RECOVERY-AUDIT - retained backup',
     '## [time] from Tina\r\nRESULT RF-SOIL-1443-CELLIDENTITY-20261114-TINA-2235 | restored',
+    '## [time] from Tina\r\nRESULT-FARMHUB-ALLY-20261116-VAULT-V125 (Tina): BLOCKED at StockGuard',
   ].join('\r\n\r\n');
   assert.deepEqual(parseSubstantiveReturns(text).map(({ id, kind }) => [id, kind]), [
     ['FARMHUB-ALLY-20261101-VAULT-V8', 'RESULT'],
@@ -34,6 +35,7 @@ test('parses substantive FarmHub and RF returns, including direct PARTIAL', () =
     ['FARMHUB-ALLY-20261107-VAULT-V53', 'PARTIAL'],
     ['FARMHUB-ALLY-20261107-V53-RECOVERY-AUDIT', 'BLOCKED'],
     ['RF-SOIL-1443-CELLIDENTITY-20261114-TINA-2235', 'RESULT'],
+    ['FARMHUB-ALLY-20261116-VAULT-V125', 'RESULT'],
   ]);
 });
 

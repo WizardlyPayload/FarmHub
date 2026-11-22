@@ -108,6 +108,9 @@ const reviewedIds = new Set([
   'RF-20261102-TINA-LOCAL-LOAD-1479',
   'FARMHUB-ALLY-20261107-VAULT-V53', // incident reviewed manually before the parser fix
   'FARMHUB-ALLY-20261107-V53-RECOVERY-AUDIT', // read-only result reviewed before qualifier parser fix
+  'FARMHUB-ALLY-20261116-BACKUP-RECOVERY-CHECK', // manually reviewed before separator parser fix
+  'FARMHUB-ALLY-20261116-VAULT-V124', // accepted and audited before separator parser fix
+  'FARMHUB-ALLY-20261116-VAULT-V125', // StockGuard block reviewed and audited before rearm
   ...[1, 2, 3, 4, 5].map(n => `FARMHUB-ALLY-20261102-STORAGE-ICONS-I${n}`),
 ]);
 const reviewed = initial.filter(event => reviewedIds.has(event.id));

@@ -47,10 +47,14 @@ export function Page({ entry }: CompanionPageProps) {
               finance: row.financed ? tOr("companionPage.dynamicDealership.yes", "Yes") : tOr("companionPage.dynamicDealership.no", "No"),
             },
           }))}
-          empty={tOr("companionPage.dynamicDealership.empty", "No pending customer vehicle order recorded for this farm.")}
+          empty={page?.coverage === "truncated"
+            ? tOr("companionPage.dynamicDealership.truncated", "Only some current orders are listed.")
+            : page?.readState === "partial"
+              ? tOr("companionPage.dynamicDealership.partial", "Some current orders could not be read.")
+              : tOr("companionPage.dynamicDealership.empty", "No pending customer vehicle order recorded for this farm.")}
         />
-        {page?.coverage === "truncated" ? <ModEmpty>{tOr("companionPage.dynamicDealership.truncated", "Only some current orders are listed.")}</ModEmpty> : null}
-        {page?.coverage === "partial" ? <ModEmpty>{tOr("companionPage.dynamicDealership.partial", "Some current orders could not be read.")}</ModEmpty> : null}
+        {rows.length > 0 && page?.coverage === "truncated" ? <ModEmpty>{tOr("companionPage.dynamicDealership.truncated", "Only some current orders are listed.")}</ModEmpty> : null}
+        {rows.length > 0 && page?.coverage === "partial" ? <ModEmpty>{tOr("companionPage.dynamicDealership.partial", "Some current orders could not be read.")}</ModEmpty> : null}
       </Card>
     </ModPage>
   );

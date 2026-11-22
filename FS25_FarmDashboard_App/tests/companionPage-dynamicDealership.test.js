@@ -38,3 +38,31 @@ test("withholds a client register", () => {
     const page = runCompanionPage(FILE, GAME.replace("getIsServer = function() return true end", "getIsServer = function() return false end"), { farmId: 1 });
     expect(page).toMatchObject({ readState: "settings-only", reason: "server-orders-only" });
 });
+
+test("withholds a full order count after an unreadable farm order or scan cap", () => {
+    const malformed = GAME.replace("remainingAmount = 24000", "remainingAmount = -1");
+    const partial = runCompanionPage(FILE, malformed, { farmId: 1 });
+    expect(partial).toMatchObject({ readState: "partial", coverage: "partial" });
+    expect(partial.byFarm).toBeUndefined();
+    expect(partial.reason).toBeUndefined();
+
+    const capped = runCompanionPage(FILE, GAME + `
+      local p = _G.g_currentMission.dealerManager.purchaseOrders
+      for i = 1, 201 do p[#p + 1] = { orderType = "STOCK" } end
+    `, { farmId: 1 });
+    expect(capped).toMatchObject({ readState: "partial", coverage: "truncated" });
+    expect(capped.byFarm).toBeUndefined();
+});
+
+test("retains the complete count when only visible order rows are capped", () => {
+    const listed = runCompanionPage(FILE, GAME + `
+      local p = _G.g_currentMission.dealerManager.purchaseOrders
+      for i = 1, 61 do p[#p + 1] = {
+        orderType = "CUSTOMER", farmId = 1, xmlFilename = "tractor.xml",
+        quantity = 1, deliveryDay = 123, paidAmount = 10, remainingAmount = 20,
+      } end
+    `, { farmId: 1 });
+    expect(listed).toMatchObject({ readState: "ok", coverage: "truncated",
+        byFarm: { "1": { orderCount: 62 } } });
+    expect(listed.rows).toHaveLength(60);
+});

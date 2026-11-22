@@ -24,10 +24,10 @@ CompanionPages.register({
         end
         local store = ctx.global("g_storeManager")
         local rows, count, scanned = {}, 0, 0
-        local truncated, invalid = false, false
+        local scanIncomplete, rowsTruncated, invalid = false, false, false
         for _, order in ipairs(dealer.purchaseOrders) do
             scanned = scanned + 1
-            if scanned > MAX_SCAN then truncated = true; break end
+            if scanned > MAX_SCAN then scanIncomplete = true; break end
             if type(order) == "table" and order.orderType == "CUSTOMER"
                 and ctx.num(order.farmId) == farmId then
                 local item = ctx.call(store, "getItemByXMLFilename", order.xmlFilename)
@@ -54,16 +54,18 @@ CompanionPages.register({
                             deliveryStatus = ctx.clip(order.deliveryStatus or order.financeStatus, 48),
                         }
                     else
-                        truncated = true
+                        rowsTruncated = true
                     end
                 end
             end
         end
+        local complete = not invalid and not scanIncomplete
         return {
-            readState = invalid and "partial" or (count > 0 and "ok" or "settings-only"),
-            reason = count == 0 and not invalid and "no-customer-orders" or nil,
-            coverage = truncated and "truncated" or invalid and "partial" or "complete",
-            byFarm = { [tostring(farmId)] = { orderCount = count } },
+            readState = not complete and "partial" or (count > 0 and "ok" or "settings-only"),
+            reason = complete and count == 0 and "no-customer-orders" or nil,
+            coverage = (scanIncomplete or rowsTruncated) and "truncated"
+                or invalid and "partial" or "complete",
+            byFarm = complete and { [tostring(farmId)] = { orderCount = count } } or nil,
             rows = rows,
         }
     end,

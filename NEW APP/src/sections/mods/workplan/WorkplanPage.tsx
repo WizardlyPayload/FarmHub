@@ -45,7 +45,9 @@ function taskList(row: PlanRow, states: number[]): string {
 }
 
 function crop(name: string | undefined, index: number | undefined): string {
-  return name || (num(index) == null ? "—" : `#${formatNumber(index, 0)}`);
+  if (name) return name;
+  const fruitIndex = num(index);
+  return fruitIndex == null || fruitIndex <= 0 ? "—" : `#${formatNumber(fruitIndex, 0)}`;
 }
 
 export function Page({ entry }: CompanionPageProps) {

@@ -29,9 +29,9 @@ Read the [installation guide](https://github.com/WizardlyPayload/FarmHub/blob/v5
 
 ## Release files
 
-- `FS25-Farm-Dashboard-V5-Setup-5.2.150.exe` — Windows app, 384,520,757 bytes, SHA-256 `F2E92B6D88D4D565EA4BA1435DD5451C322A7BED954C850F60639D73D2373BE4`.
-- `FS25-Farm-Dashboard-V5-Setup-5.2.150.exe.blockmap` — matching V5 updater blockmap, SHA-256 `99CC186E3B081A90F9B7918CE002D45DDFCE6B2372EE5EB43C624BBF42AA13E9`.
+- `FS25-Farm-Dashboard-V5-Setup-5.2.150.exe` — Windows app, 384,519,348 bytes, SHA-256 `0CD9CD08D67E0B0D349516CE348B7EDA4CDEDA03FBE8855F41B2F8B28E966FAF`.
+- `FS25-Farm-Dashboard-V5-Setup-5.2.150.exe.blockmap` — matching V5 updater blockmap, SHA-256 `E7DC2EFE85F9C997AACDAD2F5A2A9DE86D0E81A4E788DEC8EC80AEC2184FEA4C`.
 - `FS25_FarmDashboard.zip` — game mod, 713,605 bytes, SHA-256 `2402E851019C699429D42635DAE814DD2FFA16E1D1CD6958A9AB84B567D2ECC8`.
-- `latest-rf.yml` — matching V5 updater metadata, SHA-256 `88AD8AC9D9CF219B8C2F09DD1D06A8CAF053C4A8F25D2155CFF8EEF4229676E2`. Classic V4 uses a separate `latest.yml` feed.
+- `latest-rf.yml` — matching V5 updater metadata, SHA-256 `0FE786654E184C038BA6A560C6845E481AC041CB0257300168DF8C1074DEEBBA`. Classic V4 uses a separate `latest.yml` feed.
 
 The installer is unsigned, so Windows may show an Unknown publisher or SmartScreen warning. Keep Windows security protections enabled. Please report issues with the app and mod versions, map/save type, freshness or coverage label, and a relevant screenshot or log excerpt; remove passwords and pairing tokens before posting.

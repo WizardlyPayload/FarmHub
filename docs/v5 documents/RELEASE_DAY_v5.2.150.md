@@ -4,12 +4,12 @@ Status: **private release candidate; publication pending.** This record is updat
 
 ## Exact private candidate
 
-The staged source of truth is `Z:\Graham\agent-comms\farmhub-companion-acceptance\release-candidate-5.2.150-5.1.0.140\RELEASE-MANIFEST-CANDIDATE.json` at source commit `bdf66c8bb7a7269ea0cb94234bd4e184872b0d93` plus documentation commits. Rehash every file before upload.
+The staged replacement pair is under `Z:\Graham\agent-comms\farmhub-companion-acceptance\release-candidate-5.2.150-security-5.1.0.140`. The earlier F2E92B6D installer/feed and its staging are **superseded; do not publish**. Rehash every replacement file before upload.
 
-- Windows installer `FS25-Farm-Dashboard-V5-Setup-5.2.150.exe`: 384,520,757 bytes; SHA-256 `F2E92B6D88D4D565EA4BA1435DD5451C322A7BED954C850F60639D73D2373BE4`.
-- Matching blockmap: 400,509 bytes; SHA-256 `99CC186E3B081A90F9B7918CE002D45DDFCE6B2372EE5EB43C624BBF42AA13E9`.
+- Windows installer `FS25-Farm-Dashboard-V5-Setup-5.2.150.exe`: 384,519,348 bytes; SHA-256 `0CD9CD08D67E0B0D349516CE348B7EDA4CDEDA03FBE8855F41B2F8B28E966FAF`.
+- Matching blockmap: 401,255 bytes; SHA-256 `E7DC2EFE85F9C997AACDAD2F5A2A9DE86D0E81A4E788DEC8EC80AEC2184FEA4C`.
 - Game mod `FS25_FarmDashboard.zip`: 713,605 bytes; SHA-256 `2402E851019C699429D42635DAE814DD2FFA16E1D1CD6958A9AB84B567D2ECC8`.
-- V5 `latest-rf.yml`: 379 bytes; SHA-256 `88AD8AC9D9CF219B8C2F09DD1D06A8CAF053C4A8F25D2155CFF8EEF4229676E2`. Its SHA-512 and size match this exact installer. Do not replace V4 `latest.yml`.
+- V5 `latest-rf.yml`: 379 bytes; SHA-256 `0FE786654E184C038BA6A560C6845E481AC041CB0257300168DF8C1074DEEBBA`. Its SHA-512 and size match this exact installer. Do not replace V4 `latest.yml`.
 - Wren's private 52-path website candidate `private-candidate.zip`: SHA-256 `F828984CA2E31B87C10F5872B577291D4E290432408DE6CF3A96F60847796879`. Its `manifest.json` names every before/after file hash. This is a separate static site package, not a GitHub release asset.
 
 ## Verification so far
@@ -17,8 +17,8 @@ The staged source of truth is `Z:\Graham\agent-comms\farmhub-companion-acceptanc
 - Full local app Jest: 491/491 suites passed; 2,914 tests passed, one skipped. App MJS 160/160 passed. TypeScript, Vite, 27-locale placeholder audit, mod ZIP CRC and source-member comparison, private installer fresh UI/asar and V5 updater channel guards passed.
 - Exact website candidate ZIP was independently checked for 52 unique members, CRC, every manifest/after byte, and absence of tester paths or installer/update binaries. Wren reviewed desktop/mobile layout and the two corrected support claims. Its versioned links remain provisional until tag/public assets exist.
 - Tina's staff wording test reported full Ally hash restoration. The temporary Employees hire/counter wording passed; the exact Personnel Efficient Use label was not generated in that natural applicant set.
-- Cumulative normal-mod-set smoke `FARMHUB-ALLY-20261122-RELEASE-SMOKE` was queued with frozen packet SHA-256 `D9036AA614F6FB65334BC72D97615E01C92F904A9406CDFD65431347BF724CFC`; ACK at 19:31 UTC is receipt only.
-- Draft [PR #16](https://github.com/WizardlyPayload/FarmHub/pull/16) is for Windows CI. Merge and publication wait for its exact final head to pass and the final Ally result.
+- Cumulative normal-mod-set smoke `FARMHUB-ALLY-20261122-RELEASE-SMOKE` was queued with frozen packet SHA-256 `D9036AA614F6FB65334BC72D97615E01C92F904A9406CDFD65431347BF724CFC`, then held when CI found new production dependency advisories. Tina reported no world load, no install, no readings, full Ally hash restoration and **ALLY RELEASED**. It is not a release pass. A new exact replacement packet/result is required.
+- Draft [PR #16](https://github.com/WizardlyPayload/FarmHub/pull/16) is for Windows CI. The first run found `basic-ftp` and `fast-xml-parser` advisories; direct dependencies were updated to 6.2.6 and 5.12.1, local production audit is zero, and fresh local/CI tests are running. Merge and publication wait for its exact final head to pass and the final Ally result.
 
 ## Claims excluded from this release
 

@@ -8,6 +8,7 @@ const exportIngress = require("../exportIngress");
 const localIngress = require("../localIngressController");
 const ingressOrchestration = require("../ingressOrchestration");
 const { mergeData } = require("../dataMerger");
+const { compareLocalSaveMap } = require("../localSaveMapIdentity.cjs");
 const { isExplicitReplicaXmlSource } = require("../xmlCollector");
 const mergedSnapshotHold = require("../mergedSnapshotHold");
 const { resolveLuaExportStaleMs, isLuaExportStale } = require("../liveExportFreshness");
@@ -105,6 +106,7 @@ describe("source orchestration chain", () => {
             "buildRuntimeSetupStatus",
         ], {
             serverStates,
+            compareLocalSaveMap,
             mergeRebuildGate: mergedSnapshotHold.createMergeRebuildGate(),
             boundSources: { snapshot: () => null },
             store,

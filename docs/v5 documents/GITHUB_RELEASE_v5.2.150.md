@@ -1,5 +1,7 @@
 # Farm Dashboard V5 5.2.150
 
+**SUPERSEDED DRAFT — DO NOT PUBLISH.** This exact candidate was replaced before the cumulative normal-set smoke. The current release draft is [5.2.155](GITHUB_RELEASE_v5.2.155.md).
+
 **Windows app 5.2.150 · in-game mod 5.1.0.140 · Farming Simulator 25**
 
 Farm Dashboard shows your save's fields, vehicles, animals, productions, storage and economy on a second screen. The base dashboard needs only its own game mod. Optional readings appear when their supporting mods are loaded for the selected save and export data tied to your farm.

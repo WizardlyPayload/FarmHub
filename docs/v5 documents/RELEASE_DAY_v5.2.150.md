@@ -1,5 +1,7 @@
 # Farm Dashboard V5 5.2.150 — release handoff
 
+**SUPERSEDED, NOT PUBLISHED.** The 5.2.150 cumulative smoke did not reach a world load or installed acceptance. Use the [5.2.155 release handoff](RELEASE_DAY_v5.2.155.md) for the current candidate; retain this file as historical evidence only.
+
 Status: **private release candidate; publication pending.** This record is updated only when each gate has a substantive result. App 5.2.150 pairs with the single canonical game mod 5.1.0.140. The previous public pair is 5.2.7/5.1.0.12.
 
 ## Exact private candidate

@@ -12,6 +12,7 @@ const {
 } = require("../mergedSnapshotHold");
 const { saveServerCache, loadServerCache } = require("../serverDataCache");
 const { mergeData } = require("../dataMerger");
+const { compareLocalSaveMap } = require("../localSaveMapIdentity.cjs");
 const ingressOrchestration = require("../ingressOrchestration");
 const exportIngress = require("../exportIngress");
 const { productionFunctions } = require("./helpers/production-source.cjs");
@@ -566,6 +567,7 @@ describe("PRODUCER-010 real collector completion", () => {
             "processLuaData",
         ], {
             serverStates,
+            compareLocalSaveMap,
             getServersFromStore: () => [{ id: "local", mode: "local" }],
             isExplicitReplicaXmlSource: () => false,
             mergeData,
@@ -642,6 +644,7 @@ describe("PRODUCER-010 real collector completion", () => {
             "processLuaData",
         ], {
             serverStates,
+            compareLocalSaveMap,
             getServersFromStore: () => [{ id: "local", mode: "local" }],
             isExplicitReplicaXmlSource: () => false,
             mergeData,

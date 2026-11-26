@@ -22,6 +22,10 @@ Close FS25. In the mods folder, remove the **duplicate version-suffixed** Farm D
 
 Choose the linked **multiplayer source** in Saves. Two same-named farms can be distinct sources. If its registration disappeared, use a **fresh in-game re-pairing** prompt; do not revive an old token from a same-name match. Check that the server and clients use the matching Farm Dashboard mod. The server is the export authority; clients should agree on the completed server generation even though their private source IDs differ.
 
+## My local save shows the wrong map or mod list
+
+A reused save slot can contain an older Farm Dashboard export from a different career. V5 5.2.155 and later reject that old map's export instead of showing it as current. In **Settings → Servers & saves**, use **Auto-Detect Local Saves**, save the refreshed source, and choose the current career in **Saves**. A waiting or empty map means this save has not produced its own dashboard export yet. Load the save fully in FS25 with the matching `FS25_FarmDashboard.zip` enabled and wait for a completed generation. The loaded mod list comes from that fresh export; a ZIP in the mods folder alone is not proof it was selected for this save. Do not delete the game save or old export as a first troubleshooting step.
+
 ## A multiplayer transfer timed out
 
 One warning as a client enters the world can recover. Watch for **later committed generations** on the server and later receipts on the dashboard. If generations stop or the warning repeats, keep the game log and Health details, including the warning's phase and time. Do not call a timeout harmless merely because an older snapshot remains visible.

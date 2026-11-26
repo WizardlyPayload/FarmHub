@@ -27,7 +27,7 @@ A detected mod with an empty block does **not** prove its gameplay failed. The d
 
 ## Versions and release boundary
 
-- **Current V5 release pair:** app **5.2.150**, mod **5.1.0.140**, canonical ZIP `FS25_FarmDashboard.zip`. Download both files from the same release. The earlier [DLC acceptance record](../DLC-COVERAGE-AUDIT-2026-10-28.md) remains bounded to its tested versions and scenarios.
+- **Current V5 release pair:** app **5.2.155**, mod **5.1.0.140**, canonical ZIP `FS25_FarmDashboard.zip`. Download both files from the same release. The earlier [DLC acceptance record](../DLC-COVERAGE-AUDIT-2026-10-28.md) remains bounded to its tested versions and scenarios.
 - **Public V5 listing:** use the versions displayed on the actual download page.
 - **Classic V4:** public **4.2.1** remains separate on **8766** and its own `latest.yml`. V5 uses **8768** and `latest-rf.yml`.
 - Production Control and Distribution Redux have no bound adapter in the reviewed normal StockGuard build. A StockGuard-off observation does not establish their normal-set coexistence. Do not infer a V4 compatibility result from this V5 pass.

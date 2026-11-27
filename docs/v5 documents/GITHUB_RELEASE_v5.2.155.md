@@ -19,6 +19,8 @@ Production Control and Distribution Redux have no bound adapter in the reviewed 
 
 These are bounded readings, not evidence that every vault mod, mod combination, map, multiplayer path, or gameplay lifecycle works. See the [optional-mod guide](https://github.com/WizardlyPayload/FarmHub/blob/v5.2.155/docs/v5%20documents/COMPANION_MODS.md) and [compatibility guide](https://github.com/WizardlyPayload/FarmHub/blob/v5.2.155/docs/v5%20documents/COMPATIBILITY.md).
 
+The final-pair normal-StockGuard smoke loaded the recorded 23-mod set and checked an owned field's separate native weed cover and RF Soil pressure against the installed card. A nonempty cow pasture and farm balance were also checked in bounded game/export/app observations. That smoke did not obtain a named machine reading in the game or nonempty production/storage in its disposable save; it does not extend earlier readings to every combination.
+
 ## Install or upgrade
 
 1. Close Farming Simulator 25. Put exactly one file named `FS25_FarmDashboard.zip` in its `mods` folder; do not rename or unpack it. Enable it for the save. A dedicated server and joining clients need matching mod ZIPs.

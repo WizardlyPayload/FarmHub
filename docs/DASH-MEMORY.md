@@ -48,7 +48,7 @@ Never put the V5 Setup.exe on V4 `latest.yml`. Guard: `tools/app/assert-rf-updat
 | **PUBLIC** | GitHub (and matching itch) release | Every time a new version is published on GitHub |
 | **DEV** | Local / tester working-tree stamp | Every app change after the last GitHub release; **reset to 0** on the next GitHub publish |
 
-Last GitHub public: **5.0.3**. This working tree: **5.0.5**. Next GitHub publish: **5.1.0**. Mod zip is four-part (`5.0.0.x` in `modDesc.xml`); bump its last number only when the Lua zip actually changes. Do not stamp a working-tree installer with the same three-part version as GitHub Latest.
+The app's public release increments the middle number and resets the final development number to zero. The V5 mod uses four parts (`5.PUBLIC.0.DEV`): increment its middle number for a public release and reset its final development number to zero too. Between releases, increment the mod's final number when the Lua ZIP changes. The app and mod have independent version sequences. Historical examples above describe the 2026-09-13 state; verify current public versions before release. Do not stamp a working-tree installer with the same three-part version as GitHub Latest.
 
 **Ports / demos:** installed V4 `:8766` (`%APPDATA%\fs25-farm-dashboard`); installed V5 `:8768` (`%APPDATA%\fs25-farm-dashboard-rf`); repo NEW UI `:8767` (`%LOCALAPPDATA%\fs25-farm-dashboard-dev`) via `npm run dev:new-ui`. Do not proxy Vite at `:5173` to installed `:8766` when testing new merge/collectors.
 

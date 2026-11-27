@@ -1,4 +1,6 @@
-# Farm Dashboard V5 5.2.155 — release handoff
+# Farm Dashboard V5 5.2.155 — superseded release handoff
+
+The 5.2.155 app / 5.1.0.140 mod pair was briefly published with development revision numbers. Graham's public release numbering rule requires 5.3.0 / 5.2.0.0 instead. This file is historical evidence for the superseded bytes; do not use it as the current release checklist or artifact manifest.
 
 Status: **private release candidate; publication pending**. App 5.2.155 pairs with the single canonical game mod 5.1.0.140. The current public pair remains 5.2.7/5.1.0.12 until publication and exact public readback.
 

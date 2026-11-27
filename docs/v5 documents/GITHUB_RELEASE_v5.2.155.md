@@ -1,4 +1,6 @@
-# Farm Dashboard V5 5.2.155
+# Farm Dashboard V5 5.2.155 — superseded numbering
+
+This release was briefly published with development revision numbers. The corrected public pair is app 5.3.0 / mod 5.2.0.0; use the corrected release files. The hashes below describe the historical 5.2.155 / 5.1.0.140 bytes only.
 
 **Windows app 5.2.155 · in-game mod 5.1.0.140 · Farming Simulator 25**
 

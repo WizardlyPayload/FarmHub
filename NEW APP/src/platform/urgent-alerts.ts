@@ -94,9 +94,9 @@ function getVehicleDamageFraction(vehicle: Record<string, unknown>): number {
 }
 
 function countActiveAdsBreakdowns(vehicle: Record<string, unknown>): number {
-  const ads = vehicle.ads as { breakdownParts?: unknown[] } | undefined;
-  if (!ads?.breakdownParts) return 0;
-  return ads.breakdownParts.length;
+  const ads = vehicle.ads as { breakdownParts?: Array<{ isActive?: boolean; isVisible?: boolean }> } | undefined;
+  if (!Array.isArray(ads?.breakdownParts)) return 0;
+  return ads.breakdownParts.filter((part) => part?.isActive === true && part.isVisible !== false).length;
 }
 
 function filterFieldsForFarmView(

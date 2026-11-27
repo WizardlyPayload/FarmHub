@@ -26,7 +26,7 @@ local function _isSellingStation(station)
     return false
 end
 
--- Engine money per litre (SellingStation:getEffectiveFillTypePrice, EconomyManager:getPricePerLiter).
+-- Engine money per litre from a live SellingStation offer.
 -- Kept fractional: 0.80/L is a real price. Anything but a finite positive number is no price.
 local function _pricePerLiter(p)
     if type(p) ~= "number" or p ~= p or p <= 0 or p == math.huge then return nil end
@@ -56,17 +56,37 @@ local function _buyerServesFarm(station, stockFarmId)
     return stockFarmId ~= nil and owner ~= stockFarmId
 end
 
+local function _sellingStationName(station)
+    local function nameFrom(object)
+        if not object or type(object.getName) ~= "function" then return nil end
+        local ok, name = pcall(object.getName, object)
+        if ok and type(name) == "string" and name:match("%S")
+            and name ~= "Unknown" and name ~= "?" then
+            return name
+        end
+        return nil
+    end
+
+    -- SellingStation:getName can return nil while its owning placeable has a name.
+    local name = nameFrom(station) or nameFrom(station.owningPlaceable)
+    if name then return name end
+    if type(station.stationName) == "string" and station.stationName:match("%S")
+        and station.stationName ~= "Unknown" and station.stationName ~= "?" then
+        return station.stationName
+    end
+    return nil
+end
+
 local function _attachSellPrices(byFarm)
     local mission = _G.g_currentMission
     if not mission then return end
-    local em = mission.economyManager
     local stations = {}
     if mission.storageSystem and mission.storageSystem.getUnloadingStations then
         local ok, list = pcall(function() return mission.storageSystem:getUnloadingStations() end)
         if ok and type(list) == "table" then stations = list end
     end
-    if em and em.sellingStations then
-        for _, st in pairs(em.sellingStations) do
+    if mission.economyManager and mission.economyManager.sellingStations then
+        for _, st in pairs(mission.economyManager.sellingStations) do
             if st then table.insert(stations, st) end
         end
     end
@@ -77,14 +97,10 @@ local function _attachSellPrices(byFarm)
         for _, item in ipairs(farmBucket.items or {}) do
             local idx = tonumber(item.fillTypeIndex)
             if idx then
+                -- EconomyManager:getPricePerLiter is a seasonal base price, not
+                -- a buyer's offer. Only an eligible selling station can supply
+                -- an actionable best sell price and destination.
                 local bestPrice, bestStation, greatDemand, priceTrend = 0, nil, false, 0
-                if em and em.getPricePerLiter then
-                    local okE, p = pcall(function() return em:getPricePerLiter(idx) end)
-                    p = okE and _pricePerLiter(p) or nil
-                    if p and p > bestPrice then
-                        bestPrice, bestStation = p, "Market"
-                    end
-                end
                 for _, station in pairs(stations) do
                     if _isSellingStation(station) then
                         if type(station.acceptedFillTypes) == "table" and station.acceptedFillTypes[idx]
@@ -93,16 +109,13 @@ local function _attachSellPrices(byFarm)
                                 if station.getEffectiveFillTypePrice then
                                     return station:getEffectiveFillTypePrice(idx)
                                 end
-                                return em and em.getPricePerLiter and em:getPricePerLiter(idx, station)
+                                return nil
                             end)
                             price = okP and _pricePerLiter(price) or nil
                             if price and price > bestPrice then
-                                bestPrice = price
-                                if station.getName then
-                                    local okN, nm = pcall(function() return station:getName() end)
-                                    if okN and nm then bestStation = nm end
-                                end
-                                if station.greatDemandFillType == idx then greatDemand = true end
+                                bestPrice, bestStation = price, _sellingStationName(station)
+                                greatDemand = station.greatDemandFillType == idx
+                                priceTrend = 0
                                 if station.getCurrentPricingTrend then
                                     local okT, tr = pcall(function() return station:getCurrentPricingTrend(idx) end)
                                     if okT and tr then priceTrend = tr end

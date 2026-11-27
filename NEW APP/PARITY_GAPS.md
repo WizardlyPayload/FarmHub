@@ -43,7 +43,7 @@ NEW APP has **all major sections routed and most business logic ported** to Type
 10. **Vehicles: fleet-level Vehicle Years summary** — intentionally removed (year badge on cards/inspector only per Vehicles/ADS UX wave).
 11. **Vehicles: scroll perf** — legacy `bindVehiclesScrollPerf` pauses heavy re-renders during scroll; not ported.
 12. **Economy: market base-price explainer** — legacy `showMarketBasePricesModal()` (`economy.js`); no equivalent in `EconomySection.tsx` `MarketTab`.
-13. **Storage: commodity row icons** — legacy `commodityIcon()` in `storage.js`; NEW APP table is text-only (`EconomySection.tsx` `StorageTab`, `src/lib/storage/`).
+13. **Storage: commodity row icons** — source ported in `StorageSection.tsx` using the live fill-type HUD URL and a glyph fallback when an image is unavailable. A fresh installed-page check of every commodity is still separate acceptance work.
 14. **Storage: expanded-row persistence on refresh** — legacy `restoreExpandedStockRows()`; NEW APP resets expand state each render (acceptable but different UX).
 15. **SimHub: pasture/production cards** — `simhub/main.tsx` uses `JSON.stringify(p).slice(0, 400)` for pasture body; legacy `simhub-page.js` renders structured cards with warnings/food like main dashboard.
 16. **SimHub: field cluster prefs** — legacy simhub uses `cfg.fieldClusterPrefs` from `/api/simhub-view-config`; SimHub fields view filters by `fieldClusterIds` only, not cluster merge prefs.
@@ -139,7 +139,7 @@ NEW APP has **all major sections routed and most business logic ported** to Type
 | Storage enriched table + expand | `storage.js` | `StorageTab` — ported |
 | Bale inventory + moisture env | `economy.js`, `moisture.js` | `StorageTab` — ported |
 | Red Tape tab | `redTape.js` | `RedTapeTab` — ported |
-| Commodity icons | `storage.js` `commodityIcon` | Missing |
+| Commodity icons | `storage.js` `commodityIcon` | `StorageSection.tsx` HUD images with a glyph fallback; installed coverage remains to be checked |
 | Consumables aggregation | `economy.js` | Ported in storage tab |
 
 ### Pastures

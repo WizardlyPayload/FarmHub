@@ -10,12 +10,15 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
+const { spawn } = require("child_process");
 const { convertDdsToPng, getFs25GameInstallRoots } = require("./mapOverviewResolver");
-const { collectFarmDashboardModSettingsRoots } = require("./fs25Paths");
+const { collectFarmDashboardModSettingsRoots, collectFs25DocumentRoots } = require("./fs25Paths");
 
 const inflightByZip = new Map();
 const inflightByCacheName = new Map();
 let inflightDiskPrefetch = null;
+let inflightArchivePrefetch = null;
+let inflightDlcPrefetch = null;
 
 function loadYauzl() {
   try {
@@ -58,6 +61,16 @@ function fillTypeNameAliases(name) {
   if (n === "SOYBEAN" || stripped === "SOYBEAN") out.push("SOYBEANS");
   if (n === "MAIZE" || stripped === "MAIZE") out.push("CORN");
   if (n === "CORN") out.push("MAIZE");
+  if (n === "CARROTS") out.push("CARROT");
+  // GIANTS names the animal milk HUDs after the producer, while the fill
+  // types used by Storage are MILK, GOATMILK and BUFFALOMILK.
+  if (n === "MILK") out.push("MILKCOW");
+  if (n === "GOATMILK") out.push("MILKGOAT");
+  if (n === "BUFFALOMILK") out.push("MILKBUFFALO");
+  if (n === "HAY" || n === "DRYGRASS") {
+    if (n === "HAY") out.push("DRYGRASS");
+    out.push("DRYGRASS_WINDROW");
+  }
   const dry = n.replace(/_DRY$/, "");
   if (dry && dry !== n) {
     out.push(dry);
@@ -114,6 +127,18 @@ function extractHudRoots() {
     push(path.join(docs, rel));
     // Env may already point at extract/ or fillTypes/
     push(path.join(docs, "dataS", "menu", "hud", "fillTypes"));
+    // Official DLCs are packed in the game install. A local FS25 source extract
+    // keeps each DLC in extract-pdlc-*/menu/hud/fillTypes instead of dataS/.
+    const sourceRoot = path.join(docs, "FS25 Game Files");
+    try {
+      for (const entry of fs.readdirSync(sourceRoot, { withFileTypes: true })) {
+        if (entry.isDirectory() && /^extract-pdlc-/i.test(entry.name)) {
+          push(path.join(sourceRoot, entry.name, "menu", "hud", "fillTypes"));
+        }
+      }
+    } catch {
+      /* no local DLC extract */
+    }
   }
   const envExtract = String(process.env.FS25_EXTRACT_ROOT || "").trim();
   if (envExtract) {
@@ -123,6 +148,15 @@ function extractHudRoots() {
   }
   for (const root of getFs25GameInstallRoots()) {
     push(path.join(root, "dataS", "menu", "hud", "fillTypes"));
+    try {
+      for (const entry of fs.readdirSync(path.join(root, "pdlc"), { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+          push(path.join(root, "pdlc", entry.name, "menu", "hud", "fillTypes"));
+        }
+      }
+    } catch {
+      /* packaged DLC, exported by the game when active */
+    }
   }
   return [...new Set(roots)];
 }
@@ -133,6 +167,102 @@ function luaHudRoots() {
     roots.push(path.join(base, "fillTypeHud"));
   }
   return roots;
+}
+
+function archiveHudSourceDir() {
+  return path.join(getFillTypeHudCacheDir(), "_local_archive_sources");
+}
+
+function bundledArchiveReader() {
+  const exe = "farmdash-map-overview-extract.exe";
+  const candidates = [
+    process.env.FARMDASH_FILL_TYPE_HUD_ARCHIVE_HELPER,
+    process.resourcesPath && path.join(process.resourcesPath, "map-overview-extract", exe),
+    path.join(__dirname, "resources", "map-overview-extract", exe),
+  ].filter(Boolean);
+  return candidates.find((candidate) => fs.existsSync(candidate)) || null;
+}
+
+function installedHudArchives() {
+  const archives = [];
+  const addDlcFiles = (pdlc) => {
+    try {
+      for (const entry of fs.readdirSync(pdlc, { withFileTypes: true })) {
+        if (entry.isFile() && entry.name.toLowerCase().endsWith(".dlc")) {
+          archives.push(path.join(pdlc, entry.name));
+        }
+      }
+    } catch {
+      /* no installed DLC here */
+    }
+  };
+  for (const root of getFs25GameInstallRoots()) {
+    const base = path.join(root, "dataS.gar");
+    if (fs.existsSync(base)) archives.push(base);
+    addDlcFiles(path.join(root, "pdlc"));
+  }
+  for (const profile of collectFs25DocumentRoots()) {
+    addDlcFiles(path.join(profile, "pdlc"));
+  }
+  return [...new Set(archives)];
+}
+
+async function runArchiveReader(exe, archive, outputDir) {
+  const timeoutMs = archive.toLowerCase().endsWith(".dlc") ? 300000 : 180000;
+  return new Promise((resolve, reject) => {
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    const child = spawn(exe, ["--hud", archive, outputDir], {
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    child.stdout.on("data", (chunk) => { stdout = (stdout + chunk).slice(-2048); });
+    child.stderr.on("data", (chunk) => { stderr = (stderr + chunk).slice(-2048); });
+    const timer = setTimeout(() => { timedOut = true; child.kill(); }, timeoutMs);
+    child.once("error", (error) => { clearTimeout(timer); reject(error); });
+    child.once("close", (code) => {
+      clearTimeout(timer);
+      if (timedOut) reject(new Error(`HUD archive reader timed out after ${timeoutMs} ms`));
+      else if (code === 0) resolve(Number(stdout.match(/HUD textures extracted: (\d+)/)?.[1]) || 0);
+      else reject(new Error(`HUD archive reader exited ${code}: ${stderr.trim()}`));
+    });
+  });
+}
+
+async function prefetchArchiveSources(dlcOnly = false) {
+  if (!gameHudRootsEnabled()) return 0;
+  const exe = bundledArchiveReader();
+  if (!exe) return 0;
+  const outputDir = archiveHudSourceDir();
+  await fs.promises.mkdir(outputDir, { recursive: true });
+  const statusPath = path.join(outputDir, "_archive_status.json");
+  let statuses = {};
+  try {
+    const saved = JSON.parse(await fs.promises.readFile(statusPath, "utf8"));
+    if (saved && typeof saved === "object" && !Array.isArray(saved)) statuses = saved;
+  } catch { /* first run */ }
+  let processed = 0;
+  for (const archive of installedHudArchives().filter((item) => item.toLowerCase().endsWith(dlcOnly ? ".dlc" : ".gar"))) {
+    try {
+      const stat = await fs.promises.stat(archive);
+      const identity = crypto.createHash("sha256")
+        .update(`${archive}|${stat.size}|${stat.mtimeMs}`)
+        .digest("hex").slice(0, 24);
+      const marker = path.join(outputDir, `_${identity}.complete`);
+      if (fs.existsSync(marker)) continue;
+      const started = Date.now();
+      const extracted = await runArchiveReader(exe, archive, outputDir);
+      await fs.promises.writeFile(marker, path.basename(archive), "utf8");
+      statuses[path.basename(archive)] = { outcome: "ok", extracted, elapsedMs: Date.now() - started };
+      processed += 1;
+    } catch (error) {
+      statuses[path.basename(archive)] = { outcome: "error", error: String(error && error.message ? error.message : error).slice(0, 240) };
+      console.warn("[fill-type-hud] archive", path.basename(archive), error && error.message ? error.message : error);
+    }
+    await fs.promises.writeFile(statusPath, JSON.stringify(statuses, null, 2), "utf8");
+  }
+  return processed;
 }
 
 function hudBasename(hudPath) {
@@ -194,7 +324,7 @@ function findFileCaseInsensitive(dir, basename) {
 
 function findOnDiskHud(name, hudPath) {
   const bases = candidateBasenames(name, hudPath);
-  const roots = gameHudRootsEnabled() ? [...extractHudRoots(), ...luaHudRoots()] : [];
+  const roots = gameHudRootsEnabled() ? [...extractHudRoots(), ...luaHudRoots(), archiveHudSourceDir()] : [];
   for (const dir of roots) {
     for (const base of bases) {
       const hit = findFileCaseInsensitive(dir, base);
@@ -437,7 +567,7 @@ async function prefetchFromDisk(hudByName) {
     jobs.push({ name, sourcePath, dest });
   };
 
-  const diskRoots = gameHudRootsEnabled() ? [...extractHudRoots(), ...luaHudRoots()] : [];
+  const diskRoots = gameHudRootsEnabled() ? [...extractHudRoots(), ...luaHudRoots(), archiveHudSourceDir()] : [];
   for (const dir of diskRoots) {
     let names = [];
     try {
@@ -536,13 +666,25 @@ async function prefetchOneZip(zipPath, hudByName) {
 }
 
 function prefetchFillTypeHudCache(hudByName) {
+  if (!inflightArchivePrefetch) {
+    inflightArchivePrefetch = prefetchArchiveSources(false).catch((error) => {
+      console.warn("[fill-type-hud] archive prefetch", error && error.message ? error.message : error);
+      return 0;
+    });
+  }
+  if (!inflightDlcPrefetch) {
+    inflightDlcPrefetch = inflightArchivePrefetch.then(() => prefetchArchiveSources(true)).catch((error) => {
+      console.warn("[fill-type-hud] DLC archive prefetch", error && error.message ? error.message : error);
+      return 0;
+    });
+  }
   if (!inflightDiskPrefetch) {
-    inflightDiskPrefetch = prefetchFromDisk({}).catch((e) => {
+    inflightDiskPrefetch = inflightArchivePrefetch.then(() => prefetchFromDisk({})).catch((e) => {
       console.warn("[fill-type-hud] disk prefetch", e && e.message ? e.message : e);
       return 0;
     });
   }
-  const jobs = [inflightDiskPrefetch];
+  const jobs = [inflightDiskPrefetch, inflightDlcPrefetch];
   if (hudByName && Object.keys(hudByName).length > 0) {
     jobs.push(
       prefetchFromDisk(hudByName).catch((e) => {
@@ -573,6 +715,8 @@ async function waitForHudPrefetch(hudByName) {
     .map((zipPath) => inflightByZip.get(zipPath))
     .filter(Boolean);
   if (inflightDiskPrefetch) waits.push(inflightDiskPrefetch);
+  if (inflightArchivePrefetch) waits.push(inflightArchivePrefetch);
+  if (inflightDlcPrefetch) waits.push(inflightDlcPrefetch);
   if (!waits.length) return;
   await Promise.all(waits.map((p) => Promise.resolve(p).catch(() => 0)));
 }
@@ -626,6 +770,11 @@ async function ensureFillTypeHudPngUncached(name, hudByName) {
   }
   await fs.promises.mkdir(getFillTypeHudCacheDir(), { recursive: true });
 
+  if (!inflightArchivePrefetch) {
+    inflightArchivePrefetch = prefetchArchiveSources(false).catch(() => 0);
+  }
+  await inflightArchivePrefetch;
+
   const exact = lookupHudSourceExact(cacheName, hudByName);
   if (await materializeFileOrDisk(exact.source, exact.alias, dest)) return dest;
   const exactDisk = findOnDiskHud(cacheName, exact.source && (exact.source.path || exact.source.entry));
@@ -634,12 +783,24 @@ async function ensureFillTypeHudPngUncached(name, hudByName) {
     if (fileLooksLikePng(dest)) return dest;
   }
 
+  for (const alias of aliases.slice(1)) {
+    const hit = lookupHudSourceExact(alias, hudByName);
+    if (await materializeFileOrDisk(hit.source, alias, dest)) return dest;
+  }
+
+  if (!inflightDlcPrefetch) {
+    inflightDlcPrefetch = inflightArchivePrefetch.then(() => prefetchArchiveSources(true)).catch(() => 0);
+  }
+
   await waitForHudPrefetch(hudByName);
   try {
     if (fileLooksLikePng(dest)) return dest;
   } catch {
     /* fallback */
   }
+
+  // A DLC may have finished extracting while this request awaited prefetch.
+  if (await materializeFileOrDisk(exact.source, exact.alias, dest)) return dest;
 
   if (await materializeZipSource(exact.source, exact.alias, dest)) return dest;
 
@@ -679,6 +840,7 @@ module.exports = {
   ensureFillTypeHudPng,
   lookupHudSource,
   extractHudRoots,
+  installedHudArchives,
   isLikelyHudEntry,
   bufferLooksLikePng,
   bufferLooksLikeDds,

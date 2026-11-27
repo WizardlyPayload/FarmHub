@@ -43,7 +43,10 @@ export function getNpcFavorForFarm(
   if (!block) return null;
   const row = block.byFarm?.[String(farmId)] ?? block.byFarm?.[String(Number(farmId))];
   return {
-    relationships: Array.isArray(row?.relationships) ? row!.relationships! : [],
+    // Older exports repeated the same world-wide scores under every farm.
+    relationships: Array.isArray(block.worldRelationships)
+      ? block.worldRelationships
+      : Array.isArray(row?.relationships) ? row.relationships : [],
     activeFavors: Array.isArray(row?.activeFavors) ? row!.activeFavors! : [],
   };
 }
@@ -124,18 +127,4 @@ export function formatProStaffFlag(flag: string): string {
     default:
       return flag;
   }
-}
-
-/** Top relationships for Overview chips (highest favor first). */
-export function npcFavorHighlights(
-  rf: RealisticFarmingPayload | null | undefined,
-  farmId: number,
-  limit = 3,
-): NpcRelationship[] {
-  const farm = getNpcFavorForFarm(rf, farmId);
-  if (!farm) return [];
-  return [...farm.relationships]
-    .filter((r) => (Number(r.value) || 0) >= 70)
-    .sort((a, b) => (Number(b.value) || 0) - (Number(a.value) || 0))
-    .slice(0, limit);
 }

@@ -68,7 +68,8 @@ function hasValidatedReplicaForState(state) {
 
 function statusForPayload(state, payload) {
   if (state?.active === false || state?.configWarning?.code === "configuration-required"
-      || state?.configWarning?.code === "registration-recovery-required") return "blocked";
+      || state?.configWarning?.code === "registration-recovery-required"
+      || state?.configWarning?.code === "localSaveMapMismatch") return "blocked";
   // A missing authority folder is not an absent source when its separately
   // registered, validated replica is the selected ingress. Its actual
   // freshness metadata, not the absent authority directory, determines status.

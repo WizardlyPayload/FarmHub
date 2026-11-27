@@ -163,6 +163,12 @@ export function AnimalDetailsModal({ animal, onClose }: Props) {
                   <td>{t("livestock.labelHealth")}</td>
                   <td>{Math.round(displayAnimalHealth(animal))}%</td>
                 </tr>
+                {typeof animal.infectiousDiseaseCount === "number" ? (
+                  <tr>
+                    <td>{tOr("livestock.infectiousDiseaseRecords", "Current infectious disease records")}</td>
+                    <td>{animal.infectiousDiseaseCount}</td>
+                  </tr>
+                ) : null}
                 <tr>
                   <td>{t("livestock.labelWeight")}</td>
                   <td>{formatWeight(animal, 0)}</td>

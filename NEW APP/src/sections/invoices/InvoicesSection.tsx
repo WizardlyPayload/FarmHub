@@ -45,6 +45,8 @@ function stateLabel(state: InvoiceDisplayState): string {
       return t("invoices.state.cancelled");
     case "sent":
       return t("invoices.state.sent");
+    case "proposed":
+      return t("invoices.state.proposed");
     default:
       return t("invoices.state.unknown");
   }

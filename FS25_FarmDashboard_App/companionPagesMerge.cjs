@@ -12,7 +12,9 @@ const path = require("path");
 const MAX_ARRAY = 200;
 const MAX_STRING = 400;
 const MAX_DEPTH = 8;
-const MAX_PAGES = 80;
+// The dedicated UI registry now exceeds 128 pages. Keep a finite bound while
+// allowing every currently catalogued page to survive a fully loaded export.
+const MAX_PAGES = 256;
 const MODULE_DIR = path.join(__dirname, "companionPages");
 const KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 

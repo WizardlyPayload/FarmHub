@@ -112,6 +112,8 @@ const CROP_CATEGORY = new Set([
   "MAIZE",
   "SUGAR_BEET",
   "SUGARBEET",
+  "BEETROOT",
+  "REDBEET",
   "POTATO",
   "POTATOES",
   "COTTON",
@@ -244,6 +246,9 @@ const CROP_MAPPINGS: Record<string, string> = {
   SUGARCANE: "Sugar Cane",
   SUGAR_BEET: "Sugar Beet",
   SUGARBEET: "Sugar Beet",
+  BEETROOT: "Red Beet",
+  REDBEET: "Red Beet",
+  RED_BEET: "Red Beet",
   POTATO: "Potato",
   POTATOES: "Potatoes",
   OAT: "Oat",
@@ -701,7 +706,7 @@ export function normalizeSellPoints(marketData: MarketPrices | null | undefined)
   return list
     .filter((sellPoint) => {
       const name = String(sellPoint?.name || "");
-      return !skipPatterns.some((pattern) => pattern.test(name));
+      return name !== "Market Base Prices" && !skipPatterns.some((pattern) => pattern.test(name));
     })
     .map((sellPoint) => {
       const usable = sellPointUsablePriceEntries(sellPoint.prices);

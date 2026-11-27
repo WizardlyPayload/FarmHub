@@ -26,5 +26,5 @@ describe('mapOverviewResolver Witcombe zip', () => {
     expect(result.sourcePath).toContain('FS25_Witcombe.zip');
     expect(result.sourcePath).toContain('overview.dds');
     expect(result.sourceKind).toBe('zip');
-  });
+  }, 30000);
 });

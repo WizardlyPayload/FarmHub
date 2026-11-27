@@ -28,6 +28,8 @@ export type ExtendedMaintenanceMachine = {
   serviceRemainingMs?: number | null;
   failureType?: string | null;
   failureSeverity?: number | null;
+  /** Extended Vehicle Maintenance stores charge as a fraction from 0 to 1. */
+  batteryCharge?: number | null;
 };
 export type ExtendedMaintenanceReading = CompanionReadEnvelope & { machines?: ExtendedMaintenanceMachine[] };
 
@@ -164,6 +166,8 @@ export function readExtendedMaintenance(block: ExtendedMaintenanceReading | null
     ...reading,
     inService: reading.rows.filter((row) => row?.serviceActive === true),
     failing: reading.rows.filter((row) => typeof row?.failureType === "string" && row.failureType.trim() !== ""),
+    lowBattery: reading.rows.filter((row) => typeof row?.batteryCharge === "number" &&
+      Number.isFinite(row.batteryCharge) && row.batteryCharge >= 0 && row.batteryCharge < 0.2),
   };
 }
 

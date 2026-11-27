@@ -64,6 +64,7 @@ export type DistributionBlock = Envelope & {
   farmAssets?: Envelope & {
     overridesReading?: Envelope & { rows?: DistributionOverride[] };
     history?: Envelope & { window?: "last-completed-cycle"; retained?: boolean; rows?: DistributionMovement[] };
+    month?: Envelope & { window?: "rolling-24-cycles"; rows?: DistributionMovement[] };
     overrides?: Array<{ uniqueId?: string; fillType?: string | null; mode?: number | null; modeKey?: string | null }>;
     lastCycle?: Array<{
       uniqueId?: string;
@@ -77,7 +78,7 @@ export type DistributionBlock = Envelope & {
 };
 
 export type DistributionOverride = { uniqueId?: string; fillType?: string | null; mode?: number | null; modeKey?: string | null };
-export type DistributionMovement = { uniqueId?: string; fillType?: string | null; distributedLiters?: number | null; soldLiters?: number | null; storedLiters?: number | null; receivedLiters?: number | null };
+export type DistributionMovement = { uniqueId?: string; assetName?: string | null; fillType?: string | null; distributedLiters?: number | null; soldLiters?: number | null; storedLiters?: number | null; receivedLiters?: number | null; producedLiters?: number | null; consumedLiters?: number | null };
 
 export type SilageHudBlock = Envelope & { context?: string; status?: string; estimate?: string | null };
 

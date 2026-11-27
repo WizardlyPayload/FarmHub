@@ -25,3 +25,23 @@ test("a standing live crop is retained even if the ground name is prepared", () 
   expect(field.fruitType).toBe("WHEAT");
   expect(field.growthState).toBe(3);
 });
+
+test("Realistic Weather menu ID and parcel charge survive a live field/XML merge", () => {
+  const xml = [{ id: 2, farmlandId: 2, ownerFarmId: 1, name: "Field 2" }];
+  const live = [{
+    id: 29,
+    farmlandId: 2,
+    ownerFarmId: 1,
+    name: "Field 2",
+    realisticWeatherIrrigationMenu: { active: true, fieldId: 2 },
+    realisticWeatherIrrigation: { active: true, parcelId: 2, pendingNextDay: 4.82 },
+  }];
+  const [on] = mergeFields(xml, live);
+  expect(on.realisticWeatherIrrigationMenu).toEqual({ active: true, fieldId: 2 });
+  expect(on.realisticWeatherIrrigation).toEqual({ active: true, parcelId: 2, pendingNextDay: 4.82 });
+
+  const [off] = mergeFields(xml, [{ ...live[0], realisticWeatherIrrigationMenu: null,
+    realisticWeatherIrrigation: { active: false, parcelId: 2, pendingNextDay: 28.85 } }]);
+  expect(off.realisticWeatherIrrigationMenu).toBeNull();
+  expect(off.realisticWeatherIrrigation).toEqual({ active: false, parcelId: 2, pendingNextDay: 28.85 });
+});

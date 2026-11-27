@@ -20,6 +20,12 @@
   gap: 0.75rem;
 }
 
+.fd-fields__irrigation-note {
+  margin: 0;
+  color: var(--farm-text-muted);
+  font-size: 0.85rem;
+}
+
 .fd-fields__soil-bonus-stats {
   display: flex;
   flex-wrap: wrap;

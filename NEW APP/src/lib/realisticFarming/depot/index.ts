@@ -31,25 +31,39 @@ export function fertilizerDepotSettings(
 
 export function fertilizerDepotSeasonHint(
   depot: RealisticFarmingPayload["fertilizerDepot"] | null | undefined,
+  farmId: number,
 ): string | null {
   if (!isFertilizerDepotActive(depot)) return null;
   if (depot?.seasonalPriceHint) return depot.seasonalPriceHint;
-  const fromRow = fertilizerDepots(depot).find((d) => d.seasonalPriceHint)?.seasonalPriceHint;
+  const fromRow = fertilizerDepots(depot, farmId).find((d) => d.seasonalPriceHint)?.seasonalPriceHint;
   return fromRow || null;
 }
 
 export function fertilizerDepots(
   depot: RealisticFarmingPayload["fertilizerDepot"] | null | undefined,
+  farmId: number,
 ): RfDepotRow[] {
   if (!isFertilizerDepotActive(depot)) return [];
-  return Array.isArray(depot?.depots) ? depot!.depots! : [];
+  if (!Number.isSafeInteger(farmId) || farmId <= 0) return [];
+  return Array.isArray(depot?.depots) ? depot!.depots!.filter((row) => row.farmId === farmId) : [];
 }
 
 export function fertilizerDepotOrders(
   depot: RealisticFarmingPayload["fertilizerDepot"] | null | undefined,
+  farmId: number,
 ): RfDepotOrder[] {
   if (!isFertilizerDepotActive(depot)) return [];
-  return Array.isArray(depot?.openOrders) ? depot!.openOrders! : [];
+  if (!Number.isSafeInteger(farmId) || farmId <= 0) return [];
+  // Legacy exports have no structured owner. Never infer one from the summary text.
+  return Array.isArray(depot?.openOrders) ? depot!.openOrders!.filter((row) => row.farmId === farmId) : [];
+}
+
+/** Show a depot surface only when the selected farm has an owned row to act on. */
+export function hasOwnedFertilizerDepotData(
+  depot: RealisticFarmingPayload["fertilizerDepot"] | null | undefined,
+  farmId: number,
+): boolean {
+  return fertilizerDepots(depot, farmId).length > 0 || fertilizerDepotOrders(depot, farmId).length > 0;
 }
 
 export function depotFillPercent(liters: number, capacity?: number): number | null {

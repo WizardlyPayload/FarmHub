@@ -97,12 +97,18 @@ export function SeasonalMilkProductionPage({ entry }: CompanionPageProps) {
     });
   }
   if (farmData) {
-    tiles.push({
-      key: "rate",
-      label: tOr(`${K}.tileRate`, "Farm milk rate now"),
-      value: lph(farmData.currentLph),
-      hint: tOr(`${K}.tileRateHint`, "Normal: {{value}}", { value: lph(farmData.baselineLph) }),
-    });
+    const penCount = num(farmData.penCount) ?? 0;
+    const pensWithBaseline = num(farmData.pensWithBaseline) ?? 0;
+    // The exported total sums captured pens only. Until every pen has a baseline,
+    // showing it as the farm's current rate would turn missing data into a false zero.
+    if (penCount > 0 && pensWithBaseline === penCount) {
+      tiles.push({
+        key: "rate",
+        label: tOr(`${K}.tileRate`, "Farm milk rate now"),
+        value: lph(farmData.currentLph),
+        hint: tOr(`${K}.tileRateHint`, "Normal: {{value}}", { value: lph(farmData.baselineLph) }),
+      });
+    }
     tiles.push({
       key: "pens",
       label: tOr(`${K}.tilePens`, "Pens with a baseline"),

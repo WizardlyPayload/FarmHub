@@ -6,16 +6,21 @@
 `7575d5f890aeb2198077646241f88cd73f013ab6`. The required upstream
 license is alongside this file as `GAR-LIB-LICENSE.txt`.
 
-The helper seeks to the archive's file table and then reads only an
-`overview.dds` or `overview.png` entry from a locally installed Farming
-Simulator 25 `.dlc` archive. It does not load the multi-gigabyte archive into
-memory. It writes that texture to the
-player's own Farm Dashboard cache for display on that machine. The installer
-does **not** contain any GIANTS DLC artwork.
+The default mode reads only an `overview.dds` or `overview.png` entry from a
+locally installed `.dlc` archive. `--hud` reads only `menu/hud/fillTypes`
+textures from a locally installed `.gar` or `.dlc` archive. It uses the archive
+file table and writes textures to the player's Farm Dashboard cache; it does
+not load the multi-gigabyte archive into memory. The installer does **not**
+contain any GIANTS artwork.
 
-Build used Rust 1.98.1's `x86_64-pc-windows-gnu` target and Zig 0.14.1 as
-linker. SHA-256 of this x64 helper:
-`843068EA664C76244A7DFE1A385FAF40E86527CF3B1C0BD3CB0ABDDF6FD33733`.
+Build used Rust 1.98.1's `x86_64-pc-windows-gnu` target and llvm-mingw
+20260908 (MSVCRT). SHA-256 of this x64 helper:
+`2575753CD23FEE5AA3E587B703A58AFD54687D4A99A6E3C767A6CD3AAC44FEEE`.
+
+The `--hud` mode reads the encrypted file table and only the selected HUD
+entries from the archive. The previous bundled helper used `GarArchive::open`
+for this mode, which read the entire multi-gigabyte archive before selecting
+entries. The default overview mode was already seek-based and is unchanged.
 
 When replacing the helper, rebuild from the pinned source, verify a local DLC
 overview against a known extract, and update the hash here and in the V5

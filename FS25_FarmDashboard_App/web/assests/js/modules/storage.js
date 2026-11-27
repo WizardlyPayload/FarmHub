@@ -51,6 +51,9 @@ const DISPLAY_NAMES = {
   POTATOES: "Potatoes",
   SUGAR_BEET: "Sugar Beet",
   SUGARBEET: "Sugar Beet",
+  BEETROOT: "Red Beet",
+  REDBEET: "Red Beet",
+  RED_BEET: "Red Beet",
   RAPE: "Rape",
   RICE: "Rice",
   RYE: "Rye",
@@ -318,14 +321,17 @@ function bestCropLocationPrice(crop) {
 }
 
 function resolvePricePer1000(item, crop) {
+  // A named stock selling-station quote is observed; economy rows can include
+  // virtual base prices or inferred station/product prices.
+  const modPrice = Number(item?.bestSellPrice) || 0;
+  if (modPrice > 0 && item?.bestSellStation !== "Market" && item?.bestSellStation !== "Market Base Prices") {
+    return modPrice < 50 ? modPrice * 1000 : modPrice;
+  }
   const fromCrop = bestCropLocationPrice(crop);
   if (fromCrop > 0) return fromCrop;
   const fromXmlAvg = Number(crop?.avgXmlPrice) || Number(crop?.avgPrice) || 0;
   if (fromXmlAvg > 0) return fromXmlAvg;
-  const modPrice = Number(item?.bestSellPrice) || 0;
-  if (modPrice > 0) {
-    return modPrice < 50 ? modPrice * 1000 : modPrice;
-  }
+  if (modPrice > 0) return modPrice < 50 ? modPrice * 1000 : modPrice;
   return 0;
 }
 
@@ -429,9 +435,13 @@ export function enrichStockItem(item, stock, economy, rootCatalog, placeables, f
     }
   }
   const crop = findCropForItem(resolved, economy);
+  const stockStation = String(resolved.bestSellStation || "");
+  const hasBuyerOffer = Number(resolved.bestSellPrice) > 0 &&
+    stockStation !== "" && stockStation !== "Market" && stockStation !== "Market Base Prices";
   const pricePer1000 = resolvePricePer1000(resolved, crop);
   if (pricePer1000 > 0) {
     resolved._pricePer1000 = pricePer1000;
+    resolved._priceSource = hasBuyerOffer ? "buyer" : "reference";
     if (!(Number(resolved.bestSellPrice) > 0)) {
       resolved.bestSellPrice = pricePer1000;
     }
@@ -658,7 +668,8 @@ function buildCommodityRow(item, idx, catalog, economy, titles) {
   const maxValue = computeValue(liters, maxPrice);
   const maxMonth = item._maxPriceMonth || resolveMaxPriceMonth(item._crop);
   const station = resolveStationName(item, item._crop);
-  const hasSell = pricePer1000 > 0 && station;
+  const referencePrice = item._priceSource === "reference";
+  const hasSell = pricePer1000 > 0 && !referencePrice && station;
   const valueHighlight = value > 0 && (item.greatDemand || value >= 10000);
 
   const detailId = `fs-commodity-detail-${idx}`;
@@ -679,9 +690,10 @@ function buildCommodityRow(item, idx, catalog, economy, titles) {
         <span class="fs-commodity-price">
           ${pricePer1000 > 0 ? formatPricePer1000(pricePer1000) : "—"}
           ${pricePer1000 > 0 ? trendIndicator(item.priceTrend) : ""}
+          ${pricePer1000 > 0 && referencePrice ? `<span class="fs-commodity-muted" title="${escapeHtml(t("storage.referencePriceHint"))}"> ${escapeHtml(t("storage.referenceEstimate"))}</span>` : ""}
         </span>
       </td>
-      <td class="fs-value-cell${valueHighlight ? " is-highlight" : ""}">${value > 0 ? formatMoney(value) : "—"}</td>
+      <td class="fs-value-cell${valueHighlight ? " is-highlight" : ""}"${referencePrice ? ` title="${escapeHtml(t("storage.referencePriceHint"))}"` : ""}>${value > 0 ? formatMoney(value) : "—"}</td>
       <td class="fs-commodity-station">${hasSell ? escapeHtml(station) : `<span class="fs-commodity-muted">${escapeHtml(t("storage.noSellingPoint"))}</span>`}</td>
       <td class="text-end fs-value-cell">${maxPrice > 0 ? formatPricePer1000(maxPrice) : "—"}</td>
       <td class="text-end fs-value-cell">${maxValue > 0 ? formatMoney(maxValue) : "—"}</td>

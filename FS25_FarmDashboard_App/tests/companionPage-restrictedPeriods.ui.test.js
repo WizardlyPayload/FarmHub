@@ -29,6 +29,7 @@ describe("restrictedPeriods page", () => {
                 liquidRead: true,
                 solidRead: true,
                 anyActive: true,
+                vehicleCoverage: "complete",
                 byFarm: { "1": { liquidVehicles: 1, solidVehicles: 0, blockedVehicles: 1 } },
                 vehicles: [
                     { farmId: 1, name: "Slurry tanker", category: "liquid", blocked: true, reason: "sperrfrist" },
@@ -52,16 +53,23 @@ describe("restrictedPeriods page", () => {
         expect(host.querySelector('[data-rules-version="mismatch"]')).toBeNull();
     });
 
-    test("open period without vehicles and a newer mod version", () => {
+    test("unreviewed version withholds rules and live availability", () => {
         const ui = loadCompanionPage("restrictedPeriods", ENTRY);
         const host = ui.renderPage(
-            payload({ readState: "ok", currentPeriod: 4, liquidRead: true, solidRead: true, anyActive: false, byFarm: { "1": { blockedVehicles: 0 } }, vehicles: [] }, "1.1.0.0"),
+            payload({ readState: "settings-only", reason: "unreviewed-version" }, "1.1.0.0"),
             { farmId: 1 },
         );
-        expect(host.querySelector('[data-stat="spreading"]').textContent).toContain("Allowed");
-        expect(host.querySelector('[data-stat="temperature"]').textContent).toContain("—");
-        expect(host.textContent).toContain("None of your vehicles is carrying slurry");
+        expect(host.querySelector('[data-stat="spreading"]')).toBeNull();
+        expect(host.querySelector('[data-rule="liquid"]')).toBeNull();
+        expect(host.textContent).not.toContain("None of your vehicles is carrying slurry");
         expect(host.querySelector('[data-rules-version="mismatch"]')).not.toBeNull();
+    });
+
+    test("a stale page from another version cannot supply live availability", () => {
+        const ui = loadCompanionPage("restrictedPeriods", ENTRY);
+        const host = ui.renderPage(payload({ version: "1.0.0.0", readState: "ok", currentPeriod: 10, anyActive: false }, "1.1.0.0"), { farmId: 1 });
+        expect(host.querySelector('[data-rule="liquid"]')).toBeNull();
+        expect(host.querySelector('[data-stat="spreading"]')).toBeNull();
     });
 
     test("waiting reading keeps the rule grid and hides live tiles", () => {
@@ -70,7 +78,22 @@ describe("restrictedPeriods page", () => {
         expect(host.querySelector(".fd-mod-page__notice.is-waiting")).not.toBeNull();
         expect(host.querySelector('[data-stat="spreading"]')).toBeNull();
         expect(host.querySelector('[data-rule="liquid"]')).not.toBeNull();
-        expect(host.textContent).toContain("Your spreaders appear after the next export.");
+        expect(host.textContent).not.toContain("The ban and frost check above are read live");
+        expect(host.textContent).toContain("Not read");
+    });
+
+    test("incomplete vehicle scan does not present partial counts as farm totals", () => {
+        const ui = loadCompanionPage("restrictedPeriods", ENTRY);
+        const host = ui.renderPage(payload({
+            readState: "ok", currentPeriod: 10, liquidRead: true, solidRead: true,
+            anyActive: true, liquidBan: "sperrfrist", solidBan: "sperrfrist",
+            vehicleCoverage: "truncated",
+            byFarm: { "1": { liquidVehicles: 1, solidVehicles: 0, blockedVehicles: 1 } },
+            vehicles: [],
+        }), { farmId: 1 });
+        expect(host.querySelector('[data-stat="blocked"]')).toBeNull();
+        expect(host.textContent).toContain("Not read");
+        expect(host.textContent).not.toContain("None of your vehicles is carrying slurry");
     });
 
     test("not detected renders the standard state", () => {

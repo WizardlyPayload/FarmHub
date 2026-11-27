@@ -187,12 +187,13 @@ export type CompanionModsPayload = {
   taskList?: {
     enabled?: boolean;
     readState?: string;
-    tasks?: Array<{ id?: string; detail?: string; priority?: number | null }>;
+    coverage?: string;
+    tasks?: Array<{ id?: string; detail?: string; groupName?: string | null; priority?: number | null; effort?: number | null; recurMode?: number | null }>;
   };
   productionSchedule?: {
     enabled?: boolean;
     readState?: string;
-    recipes?: Array<{ pointKey?: string; recipeId?: string; status?: string | null }>;
+    recipes?: Array<{ pointKey?: string; pointName?: string; recipeId?: string; recipeName?: string; status?: string | null; months?: number[]; ownerFarmId?: number }>;
   };
   economicHistory?: {
     enabled?: boolean;
@@ -250,7 +251,7 @@ export type CompanionModsPayload = {
     enabled?: boolean;
     readState?: string;
     farmId?: number;
-    rows?: Array<{ kind?: string; farmlandId?: number | null; price?: number | null }>;
+    rows?: Array<{ kind?: string; farmlandId?: number | null; farmlandIds?: number[]; price?: number | null }>;
   };
   fieldProfitabilityLedger?: {
     enabled?: boolean;

@@ -197,7 +197,7 @@ export function Page({ entry }: CompanionPageProps) {
                 reward: money(m.reward),
               },
             }))}
-            empty={tOr("companionPage.betterContracts.noOffers", "No contracts on offer right now.")}
+            empty={tOr("companionPage.betterContracts.noOffers", "No contracts on offer at the last reading.")}
           />
         </Card>
         <Card title={tOr("companionPage.betterContracts.byTypeTitle", "Offers by type")}>
@@ -210,7 +210,7 @@ export function Page({ entry }: CompanionPageProps) {
               key: t.type ?? String(i),
               cells: { type: missionTypeLabel(t.type), count: formatNumber(t.count, 0) },
             }))}
-            empty={tOr("companionPage.betterContracts.noOffers", "No contracts on offer right now.")}
+            empty={tOr("companionPage.betterContracts.noOffers", "No contracts on offer at the last reading.")}
           />
         </Card>
         {settings ? (

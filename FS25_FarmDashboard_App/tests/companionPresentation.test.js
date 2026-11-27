@@ -192,7 +192,7 @@ describe("companion panels on section pages", () => {
         expect(root.textContent).toContain("Also installed");
         expect(root.textContent).toContain("Dynamic Market");
         expect(root.querySelector('#fd-companion-dynamicMarket [data-page-link="dynamicMarket"]')).not.toBeNull();
-        expect(root.querySelector('#fd-companion-realisticDieselPrice [data-page-link="realisticDieselPrice"]')).not.toBeNull();
+        expect(root.querySelector('#fd-companion-realisticDieselPrice [data-page-link="realisticDieselPrice"]')).toBeNull();
     });
 
     test("embeds link each mod to its own page and never to a companion index", () => {

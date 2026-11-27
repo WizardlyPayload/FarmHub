@@ -132,6 +132,7 @@ function mapIndividualAnimal(
     dirt: animalGroup.dirt,
     fitness: animalGroup.fitness,
     diseaseCount: animalGroup.diseaseCount,
+    infectiousDiseaseCount: animalGroup.infectiousDiseaseCount,
     reproduction: animalGroup.reproduction,
     monthsSinceLastBirth: animalGroup.monthsSinceLastBirth,
     impregnatedBy: animalGroup.impregnatedBy,

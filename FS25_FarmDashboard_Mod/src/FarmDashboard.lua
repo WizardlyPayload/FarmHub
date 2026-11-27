@@ -4,7 +4,7 @@
 FarmDashboard = {}
 FarmDashboard.MOD_NAME = "FS25_FarmDashboard"
 FarmDashboard.MOD_DIR = _G.g_currentModDirectory
-FarmDashboard.VERSION = "5.1.0.14"
+FarmDashboard.VERSION = "5.1.0.140"
 FarmDashboard.UPDATE_INTERVAL = 10000
 FarmDashboard.PORT = 8766
 FarmDashboard.readyAt = nil
@@ -529,6 +529,11 @@ function FarmDashboard:update(dt)
 
     -- Do not freeze fields / soil / weather because Courseplay is spawning a vehicle.
     -- DataCollector already skips vehicle/finance slices during spawn grace.
+
+    local soilCompactionScanner = rawget(_G, "SoilCompactionScanner")
+    if soilCompactionScanner and type(soilCompactionScanner.step) == "function" then
+        pcall(soilCompactionScanner.step, soilCompactionScanner)
+    end
 
     if FarmDashboardVehicleShopGuard and FarmDashboardVehicleShopGuard.tryInstall then
         FarmDashboardVehicleShopGuard.tryInstall()

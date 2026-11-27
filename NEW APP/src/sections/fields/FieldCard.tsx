@@ -194,9 +194,9 @@ export function FieldCard({
           </div>
         ) : null}
 
-        {!rfSoilActive && (moisture || weed) ? (
+        {(!rfSoilActive && moisture) || weed ? (
           <div class="fd-field-card__badges">
-            {moisture ? (
+            {!rfSoilActive && moisture ? (
               <span title={t("fields.cardMoistureTitle")}>
                 <Badge tone="accent">{moisture}</Badge>
               </span>

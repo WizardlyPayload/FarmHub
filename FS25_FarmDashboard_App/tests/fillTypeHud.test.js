@@ -49,6 +49,11 @@ describe("fillTypeHud", () => {
     );
   });
 
+  test("fillTypeNameAliases resolves vanilla milk producer HUD names", () => {
+    expect(fillTypeNameAliases("MILK")).toContain("MILKCOW");
+    expect(candidateBasenames("MILKCOW", "")).toContain("hud_fill_milkcow.dds");
+  });
+
   test("lookupHudSource tries map-variant aliases", () => {
     const hit = lookupHudSource("SOYBEAN2", {
       SOYBEAN: { kind: "file", path: "hud_fill_soyBean.dds" },
@@ -116,6 +121,27 @@ describe("fillTypeHud", () => {
     expect(fillTypeNameAliases("CORN_DRY")).toEqual(
       expect.arrayContaining(["CORN_DRY", "CORN", "MAIZE"])
     );
+  });
+
+  test("fillTypeNameAliases maps displayed hay and carrots to game HUD names", () => {
+    expect(fillTypeNameAliases("HAY")).toEqual(
+      expect.arrayContaining(["DRYGRASS", "DRYGRASS_WINDROW"])
+    );
+    expect(fillTypeNameAliases("CARROTS")).toContain("CARROT");
+  });
+
+  test("extractHudRoots finds an unpacked official DLC's HUD icons", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "fd-dlc-hud-roots-"));
+    const icons = path.join(root, "FS25 Game Files", "extract-pdlc-example", "menu", "hud", "fillTypes");
+    fs.mkdirSync(icons, { recursive: true });
+    const old = process.env.FS25_EXTRACT_ROOT;
+    try {
+      process.env.FS25_EXTRACT_ROOT = root;
+      expect(extractHudRoots()).toContain(icons);
+    } finally {
+      if (old === undefined) delete process.env.FS25_EXTRACT_ROOT;
+      else process.env.FS25_EXTRACT_ROOT = old;
+    }
   });
 
   test("ensureFillTypeHudPng converts DDS bytes even when the source is named .png", async () => {

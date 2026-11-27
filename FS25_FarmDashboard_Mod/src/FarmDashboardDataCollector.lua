@@ -940,6 +940,13 @@ function FarmDashboardDataCollector:_exportFillTypeHudIcons()
                     if not ok then
                         ok = _copyFileFs25BestEffort(src, destAlt)
                     end
+                    -- Giants XML can name a .png HUD while the mounted VFS
+                    -- contains its .dds sibling (including official DLCs).
+                    -- Retry the source extension as well as the destination.
+                    if not ok and (string.lower(ext) == ".png" or string.lower(ext) == ".dds") then
+                        local altSrc = string.sub(src, 1, #src - #ext) .. altExt
+                        ok = _copyFileFs25BestEffort(altSrc, destAlt)
+                    end
                     if ok then
                         self._fillTypeHudCopied = (self._fillTypeHudCopied or 0) + 1
                     end
@@ -1158,12 +1165,8 @@ function FarmDashboardDataCollector:detectAnimalModeOnce()
         return
     end
 
-    -- Fast path: known mod metadata
-    local activeMod = nil
-    if _G.g_modManager and _G.g_modManager.getActiveModByName then
-        local ok, m = pcall(function() return _G.g_modManager:getActiveModByName("FS25_RealisticLivestockRM") end)
-        if ok and m then activeMod = m end
-    end
+    -- A selected mod is enough to identify RL before its first animal cluster exists.
+    local rlLoaded = _G.g_modIsLoaded and _G.g_modIsLoaded["FS25_RealisticLivestockRM"]
 
     -- Probe one placeable's first cluster to detect RL's isIndividual flag.
     local sawRL = false
@@ -1189,7 +1192,7 @@ function FarmDashboardDataCollector:detectAnimalModeOnce()
     end
 
     local sample
-    if sawRL or activeMod ~= nil then
+    if sawRL or rlLoaded then
         sample = "RL"
     elseif sawBase then
         sample = "base"
@@ -3209,16 +3212,6 @@ function FarmDashboardDataCollector:ensureModLinkedCollectorsEnabled(persist)
     return changed
 end
 
-function FarmDashboardDataCollector:isAdvancedDamageSystemLoaded()
-    if _G.g_modIsLoaded and _G.g_modIsLoaded["FS25_AdvancedDamageSystem"] then
-        return true
-    end
-    if _G.g_currentMission and _G.g_currentMission.advancedDamageSystem then
-        return true
-    end
-    return rawget(_G, "AdvancedDamageSystem") ~= nil
-end
-
 function FarmDashboardDataCollector:isVehicleMileageLoaded()
     if _G.g_modIsLoaded and (_G.g_modIsLoaded["FS25_VehicleMileage"] or _G.g_modIsLoaded["FS25_Vehicle_Mileage"]) then
         return true
@@ -3248,7 +3241,10 @@ function FarmDashboardDataCollector:isPrecisionFarmingLoaded()
 end
 
 function FarmDashboardDataCollector:isRealisticLivestockLoaded()
-    if _G.g_modIsLoaded and (_G.g_modIsLoaded["FS25_RealisticLivestock"] or _G.g_modIsLoaded["FS25_RealisticLiveStock"]) then
+    if _G.g_modIsLoaded and (_G.g_modIsLoaded["FS25_RealisticLivestock"]
+        or _G.g_modIsLoaded["FS25_RealisticLiveStock"]
+        or _G.g_modIsLoaded["FS25_RealisticLivestockRM"]
+        or _G.g_modIsLoaded["GH_rittermod__FS25_RealisticLivestockRM_FS25_RealisticLivestockRM"]) then
         return true
     end
     return rawget(_G, "RealisticLivestock") ~= nil
@@ -3501,8 +3497,20 @@ function FarmDashboardDataCollector:assembleDataFromModuleCache()
         data.gameSettings = FieldDataCollector.getCachedGameplayFlags()
     end
 
-    if data.finance and data.finance.money then
+    if type(data.finance) == "table" and type(data.finance.money) == "number" then
         data.money = data.finance.money
+        -- The farm list is frozen before staggered collection to keep companion
+        -- ownership stable. Finance is sampled later; keep this farm's balance
+        -- in that same published generation consistent with the finance reading.
+        local financeFarmId = tonumber(data.finance.farmId)
+        if financeFarmId and type(data.farmInfo) == "table" then
+            for _, farm in ipairs(data.farmInfo) do
+                if type(farm) == "table" and tonumber(farm.farmId or farm.id) == financeFarmId then
+                    farm.money = data.finance.money
+                    break
+                end
+            end
+        end
     end
 
     data.adsSummary = self:buildAdsSummary(mc.vehicles)
@@ -3624,7 +3632,16 @@ function FarmDashboardDataCollector:buildAdsSummary(vehicles)
             if ads.inService then
                 summary.inServiceCount = summary.inServiceCount + 1
             end
-            if (ads.breakdownCount or 0) > 0 then
+            local hasActiveVisibleFault = false
+            if type(ads.breakdownParts) == "table" then
+                for _, part in ipairs(ads.breakdownParts) do
+                    if type(part) == "table" and part.isActive == true and part.isVisible ~= false then
+                        hasActiveVisibleFault = true
+                        break
+                    end
+                end
+            end
+            if hasActiveVisibleFault then
                 summary.breakdownVehicleCount = summary.breakdownVehicleCount + 1
             end
             if ads.intervalRatio ~= nil and ads.intervalRatio > 1 then
@@ -3637,14 +3654,16 @@ function FarmDashboardDataCollector:buildAdsSummary(vehicles)
 end
 
 function FarmDashboardDataCollector:isAdvancedDamageSystemLoaded()
-    if _G.g_modIsLoaded and _G.g_modIsLoaded["FS25_AdvancedDamageSystem"] then
-        return true
-    end
-    if _G.g_modManager and _G.g_modManager.getActiveModByName then
-        local ok, mod = pcall(function()
-            return _G.g_modManager:getActiveModByName("FS25_AdvancedDamageSystem")
-        end)
-        if ok and mod ~= nil then return true end
+    for _, name in ipairs({ "FS25_AdvancedDamageSystem", "KM_69590_Advanced_Damage_System" }) do
+        if _G.g_modIsLoaded and _G.g_modIsLoaded[name] then
+            return true
+        end
+        if _G.g_modManager and _G.g_modManager.getActiveModByName then
+            local ok, mod = pcall(function()
+                return _G.g_modManager:getActiveModByName(name)
+            end)
+            if ok and mod ~= nil then return true end
+        end
     end
     return false
 end

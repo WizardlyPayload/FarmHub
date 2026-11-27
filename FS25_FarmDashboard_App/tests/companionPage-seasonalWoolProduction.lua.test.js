@@ -27,6 +27,9 @@ const FULL_SETUP = `
         } },
     }
     g_modIsLoaded = { FS25_SeasonalWoolProduction = true }
+    g_modManager = { getActiveMods = function() return {
+        { modName = "FS25_SeasonalWoolProduction", version = "1.0.0.2" },
+    } end }
     FS25_SeasonalWoolProduction = {
         g_seasonalWoolSettings = {
             shearingCostPerSheep = 5, notifyNextMonth = true, notifyShearingBegins = false,
@@ -63,6 +66,9 @@ describe("Seasonal Wool Production companion page collector", () => {
     test("uninitialized provider exports only the synced settings", () => {
         const page = run(`
             g_modIsLoaded = { FS25_356143_Seasonal_Wool_Production = true }
+            g_modManager = { getActiveMods = function() return {
+                { modName = "FS25_356143_Seasonal_Wool_Production", version = "1.0.0.2" },
+            } end }
             g_currentMission = { getFarmId = function() return 1 end }
             FS25_356143_Seasonal_Wool_Production = {
                 g_seasonalWoolSettings = { shearingCostPerSheep = 10, notifyNextMonth = false },
@@ -101,9 +107,47 @@ describe("Seasonal Wool Production companion page collector", () => {
         const page = run(`${FULL_SETUP}
             FS25_SeasonalWoolProduction.g_seasonalWoolProduction.countMatureAnimals = function() error("cluster gone") end
         `);
-        expect(page.readState).toBe("ok");
+        expect(page.readState).toBe("partial");
         const pen = page.byFarm["1"].pens[0];
         expect(pen.matureSheep).toBeUndefined();
         expect(pen.nextShearingCost).toBeUndefined();
+        expect(page.byFarm["1"].totalSheep).toBeUndefined();
+        expect(page.byFarm["1"].matureSheep).toBeUndefined();
+        expect(page.byFarm["1"].nextShearingCost).toBeUndefined();
+    });
+
+    test("an unreviewed version does not read runtime values", () => {
+        const page = run(`${FULL_SETUP}
+            g_modManager = { getActiveMods = function() return {
+                { modName = "FS25_SeasonalWoolProduction", version = "1.0.0.3" },
+            } end }
+        `);
+        expect(page).toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
+        expect(page.byFarm).toBeUndefined();
+    });
+
+    test("a pen cap keeps visible rows but withholds farm totals", () => {
+        const page = run(`${FULL_SETUP}
+            local prod = FS25_SeasonalWoolProduction.g_seasonalWoolProduction
+            for i = 1, 25 do
+                local uid = "more" .. i
+                g_currentMission.husbandrySystem.placeables[#g_currentMission.husbandrySystem.placeables + 1] = {
+                    uid = uid, ownerFarmId = 1,
+                    getOwnerFarmId = function() return 1 end,
+                    getName = function() return uid end,
+                    spec_husbandryPallets = { pendingLiters = { [7] = 10 } },
+                }
+                prod.woolRates[uid] = 1
+                prod.hookedPlaceables[uid] = true
+            end
+            prod.countMatureAnimals = function() return 1, 2 end
+        `);
+        expect(page.readState).toBe("partial");
+        const farm = page.byFarm["1"];
+        expect(farm.truncated).toBe(true);
+        expect(farm.pens).toHaveLength(24);
+        for (const key of ["penCount", "totalSheep", "matureSheep", "pendingWoolLiters", "nextShearingCost"]) {
+            expect(farm[key]).toBeUndefined();
+        }
     });
 });

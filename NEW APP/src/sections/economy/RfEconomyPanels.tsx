@@ -63,7 +63,7 @@ function TaxPanel({
         {row?.nextEventLabel
           ? t("economy.rf.tax.nextEventValue", {
               label: row.nextEventLabel,
-              months: row.nextEventDay ?? "—",
+              months: row.nextEventMonths ?? row.nextEventDay ?? "—",
             })
           : "—"}
       </MetaRow>
@@ -138,15 +138,12 @@ function WorkersPanel({
   const row = getRfWorkerCostsForFarm(rf, farmId);
   return (
     <Card title={t("economy.rf.workers.title")} class="fd-economy__rf-card">
-      <MetaRow label={t("economy.rf.workers.active")}>
-        <strong>{row?.activeWorkers ?? 0}</strong>
-      </MetaRow>
       <MetaRow label={t("economy.rf.workers.mode")}>{row?.wageMode || "—"}</MetaRow>
       <MetaRow label={t("economy.rf.workers.rate")}>
         <strong>{formatRfMoney(row?.wageRate, profile)}</strong>
       </MetaRow>
       <MetaRow label={t("economy.rf.workers.next")}>{row?.nextPaymentLabel || "—"}</MetaRow>
-      <MetaRow label={t("economy.rf.workers.period")}>
+      <MetaRow label={t("economy.rf.workers.unpaidBase")}>
         <strong>{formatRfMoney(row?.periodSpend, profile)}</strong>
       </MetaRow>
     </Card>

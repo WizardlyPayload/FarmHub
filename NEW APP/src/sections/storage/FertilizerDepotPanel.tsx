@@ -70,10 +70,16 @@ export function FertilizerDepotPanel({
   variant?: "storage" | "page";
 }) {
   const setSection = useDashboardStore((s) => s.setSection);
+  const activeFarmId = useDashboardStore((s) => s.activeFarmId);
   if (!isFertilizerDepotActive(fertilizerDepot)) return null;
-  const depots = fertilizerDepots(fertilizerDepot);
-  const orders = fertilizerDepotOrders(fertilizerDepot);
-  const seasonHint = fertilizerDepotSeasonHint(fertilizerDepot);
+  const farmId = activeFarmId ?? 0;
+  const depots = fertilizerDepots(fertilizerDepot, farmId);
+  const orders = fertilizerDepotOrders(fertilizerDepot, farmId);
+  // Storage is for this farm's usable stock and orders. A configured mod with
+  // neither should not prompt the player to place a building just to fill UI.
+  if (variant === "storage" && depots.length === 0 && orders.length === 0) return null;
+  const orderState = fertilizerDepot?.orderState;
+  const seasonHint = fertilizerDepotSeasonHint(fertilizerDepot, farmId);
   const settings = fertilizerDepotSettings(fertilizerDepot);
   const maxRows = variant === "page" ? 24 : 12;
   const title = variant === "page" ? undefined : t("storage.rfDepot.title");
@@ -111,7 +117,7 @@ export function FertilizerDepotPanel({
           </div>
           <div>
             <span class="fd-economy__muted">{t("storage.rfDepot.openOrders")}</span>
-            <strong>{orders.length}</strong>
+            <strong>{orderState === "ready" ? orders.length : "—"}</strong>
           </div>
         </div>
       ) : null}
@@ -138,8 +144,11 @@ export function FertilizerDepotPanel({
             ))}
           </ul>
         </div>
-      ) : variant === "page" ? (
+      ) : variant === "page" && orderState === "ready" ? (
         <p class="fd-muted-sm">{tOr("rf.depot.noOrders", "No open orders.")}</p>
+      ) : null}
+      {variant === "page" && orderState !== "ready" ? (
+        <p class="fd-muted-sm">{tOr("rf.depot.orderUnavailable", "This Fertilizer Depot build did not expose a complete order register; an empty order count cannot be confirmed.")}</p>
       ) : null}
 
       {variant === "storage" ? (

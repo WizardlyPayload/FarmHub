@@ -75,6 +75,7 @@ describe("owning-mod companion readers", () => {
             getfenv = function() return _G end
             g_currentMission = { getFarmId = function() return 1 end }
             g_modIsLoaded = { ['FS25_369067_RealSilo_Realistic_Silo_Compartments'] = true }
+            g_modManager = { getActiveMods = function() return { { modName = 'FS25_369067_RealSilo_Realistic_Silo_Compartments', version = '1.2.0.7' } } end }
             _G['FS25_369067_RealSilo_Realistic_Silo_Compartments'] = {
                 realSiloManager = {
                     silos = { rs1 = { placeable = { ownerFarmId = 1 }, config = { numCompartments = 2, capacityPerCompartment = 1000 } } },
@@ -85,6 +86,39 @@ describe("owning-mod companion readers", () => {
             }
         `, "out.realSilo.readState..'|'..tostring(out.realSilo.silos[1].slots[1].fillLevel)");
         expect(silo).toBe("ok|250");
+
+        const olderSilo = run(`
+            getfenv = function() return _G end
+            g_currentMission = { getFarmId = function() return 1 end }
+            g_modIsLoaded = { ['KM_80484_RealSilo_Realistic_Silo_Compartments'] = true }
+            g_modManager = { getActiveMods = function() return { { modName = 'KM_80484_RealSilo_Realistic_Silo_Compartments', version = '1.1.0.2' } } end }
+            _G['KM_80484_RealSilo_Realistic_Silo_Compartments'] = {
+                realSiloManager = {
+                    silos = {
+                        own = { placeable = { ownerFarmId = 1 }, config = { isConfigured = true, numCompartments = 2, capacityPerCompartment = 1000 } },
+                        foreign = { placeable = { ownerFarmId = 2 }, config = { isConfigured = true, numCompartments = 2, capacityPerCompartment = 1000 } },
+                        unowned = { placeable = { ownerFarmId = 0 }, config = { isConfigured = true, numCompartments = 2, capacityPerCompartment = 1000 } },
+                    },
+                    siloNames = { own = 'Old Grain', foreign = 'Other Farm', unowned = 'Unowned' },
+                    applyConfig = function() error('write') end,
+                },
+                RealSiloCompartmentStorage = { siloSlots = {
+                    own = { activeSlot = 1, slots = { { index = 1, fillType = 1, fillLevel = 250, capacity = 1000, isActive = true } } },
+                    foreign = { activeSlot = 1, slots = { { index = 1, fillType = 1, fillLevel = 900, capacity = 1000, isActive = true } } },
+                    unowned = { activeSlot = 1, slots = { { index = 1, fillType = 1, fillLevel = 700, capacity = 1000, isActive = true } } },
+                } },
+            }
+        `, "out.realSilo.readState..'|'..tostring(#out.realSilo.silos)..'|'..tostring(out.realSilo.silos[1].slots[1].fillLevel)");
+        expect(olderSilo).toBe("ok|1|250");
+
+        const unreviewedSilo = run(`
+            getfenv = function() return _G end
+            g_currentMission = { getFarmId = function() return 1 end }
+            g_modIsLoaded = { FS25_RealSilo = true }
+            g_modManager = { getActiveMods = function() return { { modName = 'FS25_RealSilo', version = '1.3.0.0' } } end }
+            _G.FS25_RealSilo = { realSiloManager = { silos = { own = { placeable = { ownerFarmId = 1 } } } } }
+        `, "out.realSilo.readState..'|'..out.realSilo.reason..'|'..tostring(out.realSilo.silos)");
+        expect(unreviewedSilo).toBe("unavailable|unreviewed-version|nil");
 
         const pallet = run(`
             getfenv = function() return _G end
@@ -160,9 +194,9 @@ describe("owning-mod companion readers", () => {
                 FlaechenVermarktung = {
                     manager = {
                         state = {
-                            saleOffers = { o1 = { farmlandId = 7, sellerFarmId = 1, targetFarmId = 2, price = 1500 } },
+                            saleOffers = { o1 = { farmlandIds = { 7, 47 }, sellerFarmId = 1, buyerFarmId = 2, price = 1500 } },
                             leaseOffers = {},
-                            leases = { c1 = { farmlandId = 8, lessorFarmId = 3, lesseeFarmId = 4, ratePerPeriod = 20 } },
+                            leases = { c1 = { farmlandIds = { 8 }, lessorFarmId = 3, lesseeFarmId = 4, ratePerPeriod = 20 } },
                         },
                         createSaleOffer = function() error('write') end,
                         respondSaleOffer = function() error('write') end,
@@ -170,8 +204,54 @@ describe("owning-mod companion readers", () => {
                     },
                 },
             }
-        `, "out.farmlandMarketplace.readState..'|'..tostring(#out.farmlandMarketplace.rows)..'|'..tostring(out.farmlandMarketplace.rows[1].price)");
-        expect(market).toBe("ok|1|1500");
+        `, "out.farmlandMarketplace.readState..'|'..tostring(#out.farmlandMarketplace.rows)..'|'..tostring(out.farmlandMarketplace.rows[1].farmlandIds[1])..'|'..tostring(out.farmlandMarketplace.rows[1].farmlandIds[2])..'|'..tostring(out.farmlandMarketplace.rows[1].price)");
+        expect(market).toBe("ok|1|7|47|1500");
+
+        const exactVaultMarketSetup = `
+            getfenv = function() return _G end
+            g_currentMission = { getFarmId = function() return 1 end }
+            g_modIsLoaded = { ['FS25_369241_FS25_FarmlandMarketplace'] = true }
+            _G['FS25_369241_FS25_FarmlandMarketplace'] = {
+                FlaechenVermarktung = { manager = { state = {
+                    saleOffers = { o1 = { farmlandIds = { 7 }, sellerFarmId = 1, price = 1500 } },
+                    leaseOffers = {}, leases = {},
+                } } },
+            }
+        `;
+        const marketReading = "out.farmlandMarketplace.readState..'|'..tostring(#out.farmlandMarketplace.rows)";
+        const exactVaultMarket = run(exactVaultMarketSetup, marketReading);
+        expect(exactVaultMarket).toBe("ok|1");
+        const kmVaultMarket = run(exactVaultMarketSetup.replaceAll(
+            "FS25_369241_FS25_FarmlandMarketplace", "KM_80211_Farmland_Marketplace",
+        ), marketReading);
+        expect(kmVaultMarket).toBe("ok|1");
+
+        const buyer = run(`
+            getfenv = function() return _G end
+            g_currentMission = { getFarmId = function() return 1 end }
+            g_modIsLoaded = { ['FS25_369241_Farmland_Marketplace'] = true }
+            _G['FS25_369241_Farmland_Marketplace'] = {
+                FlaechenVermarktung = { manager = { state = {
+                    saleOffers = { o1 = { farmlandIds = { 12 }, sellerFarmId = 2, buyerFarmId = 1, price = 2100 } },
+                    leaseOffers = {}, leases = {},
+                } } },
+            }
+        `, "out.farmlandMarketplace.readState..'|'..tostring(#out.farmlandMarketplace.rows)..'|'..tostring(out.farmlandMarketplace.rows[1].farmlandId)");
+        expect(buyer).toBe("ok|1|12");
+
+        const lessee = run(`
+            getfenv = function() return _G end
+            g_currentMission = { getFarmId = function() return 1 end }
+            g_modIsLoaded = { ['FS25_369241_Farmland_Marketplace'] = true }
+            _G['FS25_369241_Farmland_Marketplace'] = {
+                FlaechenVermarktung = { manager = { state = {
+                    saleOffers = {}, leaseOffers = {},
+                    leases = { c1 = { farmlandIds = { 8, 9 }, lessorFarmId = 3, lesseeFarmId = 1,
+                        ratePerPeriod = 20 } },
+                } } },
+            }
+        `, "out.farmlandMarketplace.readState..'|'..tostring(#out.farmlandMarketplace.rows)..'|'..tostring(out.farmlandMarketplace.rows[1].farmlandIds[2])..'|'..tostring(out.farmlandMarketplace.rows[1].price)");
+        expect(lessee).toBe("ok|1|9|20");
 
         const distribution = run(`
             getfenv = function() return _G end
@@ -186,6 +266,31 @@ describe("owning-mod companion readers", () => {
             }
         `, "out.distributionRedux.readState..'|'..tostring(out.distributionRedux.mode)..'|'..tostring(out.distributionRedux.radius)");
         expect(distribution).toBe("ok|2|50");
+
+        const monthlyDistribution = run(`
+            getfenv = function() return _G end
+            g_currentMission = { getFarmId = function() return 1 end,
+                placeableSystem = { placeables = {
+                    { uniqueId = 'owned', ownerFarmId = 1, name = 'Farm bakery' },
+                    { uniqueId = 'foreign', ownerFarmId = 2, name = 'Other bakery' },
+                } } }
+            g_fillTypeManager = { getFillTypeNameByIndex = function(_, index)
+                return index == 1 and 'BREAD' or nil end }
+            g_modIsLoaded = { FS25_DistributionRedux = true }
+            _G.FS25_DistributionRedux = { SmartDistribution = {
+                settings = { master = true, global = { mode = 2, participation = 1 } },
+                windowLedgers = function(window)
+                    if window ~= 'month' then error('wrong window') end
+                    return {
+                        { owned = { [1] = { produced = 10, sold = 4 } },
+                          foreign = { [1] = { produced = 900, sold = 900 } } },
+                        { owned = { [1] = { produced = 5, sold = 2 } } },
+                    }
+                end,
+                overviewRows = function() error('menu mutation') end,
+            } }
+        `, "out.distributionRedux.farmAssets.month.readState..'|'..tostring(#out.distributionRedux.farmAssets.month.rows)..'|'..out.distributionRedux.farmAssets.month.rows[1].assetName..'|'..tostring(out.distributionRedux.farmAssets.month.rows[1].producedLiters)..'|'..tostring(out.distributionRedux.farmAssets.month.rows[1].soldLiters)");
+        expect(monthlyDistribution).toBe("ok|1|Farm bakery|15|6");
 
         const silage = run(`
             getfenv = function() return _G end

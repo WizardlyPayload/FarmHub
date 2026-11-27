@@ -2,10 +2,15 @@ import { t, tOr } from "@/i18n/i18n";
 import { Badge, Card } from "@/components/ui";
 import { useDashboardStore } from "@/store/dashboard-store";
 import { getWorldEvents } from "@/lib/realisticFarming/life";
+import { formatRfMoney } from "@/lib/realisticFarming/economy";
+import { useUnitDisplay } from "@/lib/fill-unit-mode";
+import { saveProfileFromUnitDisplay } from "@/lib/profile-display";
 import "@/sections/economy/economy.css";
 
 export function WorldEventsSection() {
   const payload = useDashboardStore((s) => s.payload);
+  const farmId = useDashboardStore((s) => s.activeFarmId) ?? 1;
+  const profile = saveProfileFromUnitDisplay(useUnitDisplay());
   const block = getWorldEvents(payload?.realisticFarming);
 
   if (!block) {
@@ -21,6 +26,7 @@ export function WorldEventsSection() {
   const freq = block.frequency != null ? Number(block.frequency) : null;
   const intensity = block.intensity != null ? Number(block.intensity) : null;
   const typeCount = block.eventTypeCount != null ? Number(block.eventTypeCount) : null;
+  const pending = block.pendingReadState === "ok" ? block.pendingByFarm?.[String(farmId)] : undefined;
 
   return (
     <div>
@@ -89,6 +95,33 @@ export function WorldEventsSection() {
           </div>
         )}
       </Card>
+
+      {pending?.lines?.length ? (
+        <Card title={tOr("rf.worldevents.pendingTitle", "Pending farm settlement")}>
+          <p class="fd-economy__muted">
+            {tOr("rf.worldevents.pendingHelp", "Queued for a later game day; these amounts have not been paid.")}
+          </p>
+          <div class="fd-economy__table-wrap">
+            <table class="fd-economy__table">
+              <thead><tr>
+                <th>{tOr("rf.worldevents.pendingEvent", "Event")}</th>
+                <th>{t("companionPage.netWorthTracker.day")}</th>
+                <th>{t("economy.rf.income.amount")}</th>
+              </tr></thead>
+              <tbody>
+                {pending.lines.map((line, index) => (
+                  <tr key={`${line.event ?? "event"}-${line.queuedDay}-${index}`}>
+                    <td>{line.event?.replace(/[_-]+/g, " ") || "—"}</td>
+                    <td>{line.queuedDay}</td>
+                    <td>{formatRfMoney(line.amount, profile)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {pending.truncated ? <p class="fd-economy__muted">{tOr("rf.worldevents.pendingMore", "More pending lines were withheld from this view.")}</p> : null}
+        </Card>
+      ) : null}
     </div>
   );
 }

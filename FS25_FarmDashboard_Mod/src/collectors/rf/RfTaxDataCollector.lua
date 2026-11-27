@@ -4,8 +4,6 @@
 
 RfTaxDataCollector = {}
 
-local TAX_RATE_VALUES = { low = 0.01, medium = 0.02, high = 0.03 }
-
 local function rfModLoaded(name)
     if _G.g_modIsLoaded and _G.g_modIsLoaded[name] then
         return true
@@ -48,22 +46,30 @@ end
 local function collectFarmIds()
     local ids = {}
     local seen = {}
+    local farmManagerClass = _G.FarmManager
+    local spectator = farmManagerClass and farmManagerClass.SPECTATOR_FARM_ID or 0
+    local tour = farmManagerClass and farmManagerClass.GUIDED_TOUR_FARM_ID or 14
+    local invalid = farmManagerClass and farmManagerClass.INVALID_FARM_ID or 15
     local function add(fid)
         fid = tonumber(fid)
-        if fid and fid > 0 and not seen[fid] then
+        if fid and fid > 0 and fid ~= spectator and fid ~= tour and fid ~= invalid
+            and not seen[fid] then
             seen[fid] = true
             ids[#ids + 1] = fid
         end
     end
-    if _G.g_farmManager and _G.g_farmManager.farms then
-        for _, farm in pairs(_G.g_farmManager.farms) do
+    local manager = _G.g_farmManager
+    if manager ~= nil then
+        local farms = manager.farms
+        if type(manager.getFarms) == "function" then
+            local ok, reported = pcall(manager.getFarms, manager)
+            if ok and type(reported) == "table" then farms = reported end
+        end
+        for _, farm in pairs(type(farms) == "table" and farms or {}) do
             if farm then
                 add(farm.farmId or farm.id)
             end
         end
-    end
-    if #ids < 1 then
-        add(1)
     end
     return ids
 end
@@ -76,43 +82,95 @@ local function monthsUntil(target, current)
     return d
 end
 
-local function buildFarmRow(mgr)
+local function effectiveAnnualRate(mgr)
     local settings = mgr.settings or {}
-    local stats = mgr.stats or {}
-    local annualRate = tonumber(settings.annualTaxRate) or 0.05
-    local accumulated = tonumber(stats.taxesAccumulatedAnnual) or 0
-    local projected = math.floor(accumulated * annualRate)
-
-    local dailyKey = settings.taxRate
-    local dailyFrac = TAX_RATE_VALUES[dailyKey]
-    local taxRatePct = annualRate * 100
-    if dailyFrac == nil and type(dailyKey) == "number" then
-        taxRatePct = tonumber(dailyKey) or taxRatePct
+    local base = tonumber(settings.annualTaxRate) or 0.05
+    local resolver = _G.OptionScalingResolver
+    if resolver == nil then
+        return base
     end
+    if type(resolver.readProfile) ~= "function" or type(resolver.resolve) ~= "function"
+        or type(mgr.SPINE_ANNUAL_TAX) ~= "table" then
+        return nil
+    end
+    local mission = _G.g_currentMission
+    local hub = (mission and mission.settingsHub) or _G.g_settingsHub
+    local ok, scale = pcall(function()
+        local profile = resolver.readProfile(hub)
+        if profile == nil then return 1 end
+        return resolver.resolve(mgr.SPINE_ANNUAL_TAX, profile)
+    end)
+    if not ok or type(scale) ~= "number" or scale < 0 or scale == math.huge then
+        return nil
+    end
+    return base * scale
+end
 
+local function currentTaxMonth(mgr)
     local env = _G.g_currentMission and _G.g_currentMission.environment
-    local currentMonth = env and tonumber(env.currentMonth) or 1
+    if env == nil then return nil end
+    -- FS25 publishes currentPeriod. Tax Mod maps that period to a named month.
+    if type(mgr._periodMonth) ~= "function" then return nil end
+    local ok, month = pcall(mgr._periodMonth, tonumber(env.currentPeriod))
+    month = ok and tonumber(month) or nil
+    if month == nil or month < 1 or month > 12 then return nil end
+    return month
+end
+
+local function buildFarmRow(mgr, farmId)
+    local stats = mgr.stats or {}
+    -- The global annual total is a local HUD mirror in Tax Mod, not a
+    -- per-farm amount. Withhold the row unless this farm has its own bucket.
+    local farmTax = type(stats.farmTax) == "table"
+        and (stats.farmTax[farmId] or stats.farmTax[tostring(farmId)]) or nil
+    if type(farmTax) ~= "table" then
+        return nil
+    end
+    local annualRate = effectiveAnnualRate(mgr)
+    local accumulated = tonumber(farmTax.taxesAccumulatedAnnual)
+    if accumulated == nil or accumulated < 0 then
+        return nil
+    end
+    local env = _G.g_currentMission and _G.g_currentMission.environment
+    local currentMonth = currentTaxMonth(mgr)
+    local currentYear = env and tonumber(env.currentYear)
     local advisoryMonth = tonumber(stats.taxAdvisoryMonth) or 12
     local returnMonth = tonumber(stats.taxReturnMonth) or 3
-    local mToAdvisory = monthsUntil(advisoryMonth, currentMonth)
-    local mToPayment = monthsUntil(returnMonth, currentMonth)
-
     local nextEventLabel
-    local nextEventDay
-    if mToPayment <= mToAdvisory then
-        nextEventLabel = "Tax payment"
-        nextEventDay = mToPayment
-    else
-        nextEventLabel = "Tax advisory"
-        nextEventDay = mToAdvisory
+    local nextEventMonths
+    local projected
+    if currentMonth ~= nil and (mgr.settings or {}).enabled ~= false then
+        local mToAdvisory = monthsUntil(advisoryMonth, currentMonth)
+        local mToPayment = monthsUntil(returnMonth, currentMonth)
+        if mToPayment <= mToAdvisory then
+            nextEventLabel = "Tax payment"
+            nextEventMonths = mToPayment
+        else
+            nextEventLabel = "Tax advisory"
+            nextEventMonths = mToAdvisory
+        end
+        if currentYear ~= nil and annualRate ~= nil then
+            local dueYear = currentYear + (currentMonth >= returnMonth and 1 or 0)
+            projected = 0
+            if (tonumber(farmTax.lastTaxYear) or 0) < dueYear then
+                projected = projected + math.floor(accumulated * annualRate)
+            end
+            for _, bucket in ipairs(farmTax.imported or {}) do
+                local amount = tonumber(bucket.acc)
+                if amount ~= nil and amount > 0
+                    and (tonumber(bucket.paidYear) or 0) < dueYear then
+                    projected = projected + math.floor(amount * annualRate)
+                end
+            end
+        end
     end
 
     return {
         accumulatedAnnual = accumulated,
         projectedBill = projected,
-        taxRate = taxRatePct,
+        taxRate = annualRate and annualRate * 100 or nil,
         nextEventLabel = nextEventLabel,
-        nextEventDay = nextEventDay,
+        nextEventMonths = nextEventMonths,
     }
 end
 
@@ -133,16 +191,12 @@ function RfTaxDataCollector:collectStep(_opts)
             return { enabled = false }
         end
 
-        local row = buildFarmRow(mgr)
         local byFarm = {}
         for _, fid in ipairs(collectFarmIds()) do
-            byFarm[tostring(fid)] = {
-                accumulatedAnnual = row.accumulatedAnnual,
-                projectedBill = row.projectedBill,
-                taxRate = row.taxRate,
-                nextEventLabel = row.nextEventLabel,
-                nextEventDay = row.nextEventDay,
-            }
+            local row = buildFarmRow(mgr, fid)
+            if row ~= nil then
+                byFarm[tostring(fid)] = row
+            end
         end
 
         return {

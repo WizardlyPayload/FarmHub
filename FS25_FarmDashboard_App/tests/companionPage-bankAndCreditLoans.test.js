@@ -1,0 +1,76 @@
+"use strict";
+
+const { runCompanionPage } = require("./helpers/companion-page-lua.cjs");
+const { normalizeCompanionPages, loadModules } = require("../companionPagesMerge.cjs");
+
+const FILE = "BankAndCreditLoansCollector.lua";
+const GAME = `
+  _G.g_modIsLoaded = { KM_77828_Bank_And_Credit = true }
+  _G.g_modManager = { getActiveMods = function() return {
+    { modName = "KM_77828_Bank_And_Credit", version = "1.1.0.0" }
+  } end }
+  _G.g_currentMission = {
+    getFarmId = function() return 1 end,
+    getIsServer = function() return true end,
+    bankManager = { repository = { loans = {
+      { id = 4, farmId = 1, type = 1, amount = 20000, restAmount = 12400.236,
+        interestRate = 5.75, monthlyPayment = 620, restDuration = 22, paidOff = false },
+      { id = 8, farmId = 1, type = 3, amount = 10000, restAmount = 3200,
+        interestRate = 6.5, monthlyPayment = 0, restDuration = 0, paidOff = false },
+      { id = 9, farmId = 1, type = 2, amount = 5000, restAmount = 0,
+        interestRate = 5, monthlyPayment = 0, restDuration = 0, paidOff = true },
+      { id = 10, farmId = 2, type = 2, amount = 900000, restAmount = 800000,
+        interestRate = 8, monthlyPayment = 4000, restDuration = 20, paidOff = false },
+    } } },
+  }
+`;
+
+test("reads exact-farm active Bank And Credit loans with revolving drawn balance", () => {
+  const page = runCompanionPage(FILE, GAME, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "ok", coverage: "complete" });
+  expect(page.byFarm["1"].activeCount).toBe(2);
+  expect(page.rows.map((row) => row.id)).toEqual([4, 8]);
+  expect(page.rows[0]).toMatchObject({ kind: "annuity", creditLimit: 20000, outstanding: 12400.24 });
+  expect(page.rows[1]).toMatchObject({ kind: "revolving", creditLimit: 10000, outstanding: 3200 });
+  expect(page.rows.some((row) => row.id === 9 || row.id === 10)).toBe(false);
+  const merged = normalizeCompanionPages({ pages: { bankAndCreditLoans: page } }, { modules: loadModules() });
+  expect(merged.pages.bankAndCreditLoans.rows).toHaveLength(2);
+});
+
+test("withholds client and absent repository state", () => {
+  expect(runCompanionPage(FILE, GAME.replace("return true end", "return false end"), { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "server-unavailable" });
+  expect(runCompanionPage(FILE, GAME.replace("bankManager = { repository = { loans = {", "bankManager = { repository = { other = {"), { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "bank-repository-unavailable" });
+  expect(runCompanionPage(FILE, GAME.replaceAll("KM_77828_Bank_And_Credit", "OtherMod"), { farmId: 1 }))
+    .toBeUndefined();
+});
+
+test("withholds loans from an unreviewed Bank And Credit version", () => {
+  const newer = GAME.replace('version = "1.1.0.0"', 'version = "1.1.0.1"');
+  expect(runCompanionPage(FILE, newer, { farmId: 1 }))
+    .toMatchObject({ readState: "settings-only", reason: "unreviewed-version" });
+});
+
+test("withholds the full count when the loan scan stops early or an owned loan is invalid", () => {
+  const extra = Array.from({ length: 300 }, (_, i) =>
+    `{ id = ${1000 + i}, farmId = 2, paidOff = false }`).join(",\n");
+  const capped = GAME.replace("loans = {", `loans = { ${extra},`);
+  const capPage = runCompanionPage(FILE, capped, { farmId: 1 });
+  expect(capPage).toMatchObject({ readState: "partial", coverage: "truncated" });
+  expect(capPage.byFarm).toBeUndefined();
+  const invalid = GAME.replace("id = 4, farmId = 1", "id = -4, farmId = 1");
+  const invalidPage = runCompanionPage(FILE, invalid, { farmId: 1 });
+  expect(invalidPage).toMatchObject({ readState: "partial", coverage: "partial" });
+  expect(invalidPage.byFarm).toBeUndefined();
+});
+
+test("keeps a complete count when only the display rows are capped", () => {
+  const extra = Array.from({ length: 41 }, (_, i) =>
+    `{ id = ${1000 + i}, farmId = 1, type = 1, amount = 100, restAmount = 50, interestRate = 5, monthlyPayment = 5, restDuration = 10, paidOff = false }`).join(",\n");
+  const capped = GAME.replace("loans = {", `loans = { ${extra},`);
+  const page = runCompanionPage(FILE, capped, { farmId: 1 });
+  expect(page).toMatchObject({ readState: "ok", coverage: "truncated" });
+  expect(page.byFarm["1"].activeCount).toBe(43);
+  expect(page.rows).toHaveLength(40);
+});

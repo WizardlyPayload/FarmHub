@@ -54,6 +54,8 @@ export interface LivestockAnimal {
   fitness?: number;
   riding?: number;
   dirt?: number;
+  /** Current INFECTIOUS records from Ritter RL when every record has a state. */
+  infectiousDiseaseCount?: number | null;
   fillSummary?: string;
   __emptyPen?: boolean;
   __lodSynth?: boolean;

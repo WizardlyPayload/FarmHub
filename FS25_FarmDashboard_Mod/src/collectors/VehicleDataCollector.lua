@@ -10,6 +10,11 @@ local ADS_SYSTEM_KEYS = {
 local ADS_STATE_READY = "ads_spec_state_ready"
 local ADS_STATE_BROKEN = "ads_spec_state_broken"
 
+local TORNADO_REPAIR_MODS = {
+    "FS25_344814_FS25_TornadoPhysics",
+    "KM_73973_Tornado_Physics",
+}
+
 -- Mirrors ADS_InspectionDialog STATUS_PRIORITY (severity for dashboard warnings).
 local ADS_INSPECTION_STATUS_PRIORITY = {
     ["ads_inspection_ok"] = 0,
@@ -122,11 +127,9 @@ function VehicleDataCollector:_buildAdsInspection(vehicle, spec)
     end
 
     local registry = _G.ADS_Breakdowns and _G.ADS_Breakdowns.BreakdownRegistry
+    -- Both reviewed ADS builds keep the authoritative register on the spec.
+    -- A vehicle method can be replaced by another specialization at runtime.
     local activeBreakdowns = spec.activeBreakdowns
-    if vehicle.getActiveBreakdowns then
-        local ok, ab = pcall(function() return vehicle:getActiveBreakdowns() end)
-        if ok and type(ab) == "table" then activeBreakdowns = ab end
-    end
     if registry and activeBreakdowns then
         local targetMap = ADS_INSPECTION_TARGET_TITLE
         for breakdownId, breakdown in pairs(activeBreakdowns) do
@@ -217,10 +220,6 @@ function VehicleDataCollector:_serializeAdsBreakdownParts(vehicle, spec)
     local registry = _G.ADS_Breakdowns and _G.ADS_Breakdowns.BreakdownRegistry
 
     local activeBreakdowns = spec.activeBreakdowns
-    if vehicle.getActiveBreakdowns then
-        local ok, ab = pcall(function() return vehicle:getActiveBreakdowns() end)
-        if ok and type(ab) == "table" then activeBreakdowns = ab end
-    end
     if not activeBreakdowns then return parts end
 
     local partTypeOem = "ads_spec_part_types_oem"
@@ -288,9 +287,16 @@ end
 function VehicleDataCollector:_serializeAdsData(vehicle)
     local ok, ads = pcall(function()
         local spec = vehicle and vehicle.spec_AdvancedDamageSystem
-        if not spec or spec.isExcludedVehicle then
+        if not spec then
             return nil
         end
+        local excluded = spec.isExcludedVehicle
+        if type(vehicle.getIsADSExcluded) == "function" then
+            local valid, value = pcall(vehicle.getIsADSExcluded, vehicle)
+            if not valid or type(value) ~= "boolean" then return nil end
+            excluded = value
+        end
+        if excluded ~= false then return nil end
 
         local ads = { enabled = true }
 
@@ -739,6 +745,67 @@ function VehicleDataCollector:_isVehicleAlive(vehicle)
     return ok and alive == true
 end
 
+function VehicleDataCollector:_serializeAttachedEquipment(vehicle)
+    if type(vehicle.getAttachedImplements) ~= "function" then return 0, nil end
+    local success, implements = pcall(function() return vehicle:getAttachedImplements() end)
+    if not success or type(implements) ~= "table" then return 0, nil end
+
+    -- Native AttacherJoints records contain the attached vehicle as `object`.
+    -- These are direct attachments only; no companion mod is needed.
+    local names = {}
+    for i = 1, math.min(#implements, 12) do
+        local attached = implements[i] and implements[i].object
+        if attached then
+            local name
+            if type(attached.getFullName) == "function" then
+                local ok, fullName = pcall(function() return attached:getFullName() end)
+                if ok and type(fullName) == "string" then name = fullName end
+            end
+            if (not name or name == "") and type(attached.getName) == "function" then
+                local ok, shortName = pcall(function() return attached:getName() end)
+                if ok and type(shortName) == "string" then name = shortName end
+            end
+            if name and name ~= "" and name ~= "Unknown" then
+                names[#names + 1] = name
+            end
+        end
+    end
+    return #implements, #names > 0 and names or nil
+end
+
+-- The reviewed Tornado Physics v4.0.0.0 keeps its damaged-vehicle registry in
+-- its mod environment. Its saved XML has no farm ID, so never join that file
+-- by model/position or export an unresolved record as an owned vehicle.
+function VehicleDataCollector:_serializeTornadoRepair(vehicle)
+    if _G.g_server == nil or vehicle == nil or vehicle.rootNode == nil then return nil end
+    if type(vehicle.getOwnerFarmId) ~= "function" then return nil end
+    local okOwner, farmId = pcall(function() return vehicle:getOwnerFarmId() end)
+    farmId = okOwner and tonumber(farmId) or nil
+    if farmId == nil or farmId <= 0 or farmId == 100 then return nil end
+
+    for _, modName in ipairs(TORNADO_REPAIR_MODS) do
+        local loaded = _G.g_modIsLoaded and _G.g_modIsLoaded[modName] == true
+        if loaded and _G.g_modManager and type(_G.g_modManager.getModByName) == "function" then
+            local okMod, mod = pcall(function() return _G.g_modManager:getModByName(modName) end)
+            if okMod and type(mod) == "table" and tostring(mod.version) == "4.0.0.0" then
+                local modEnv = _G[modName]
+                local state = type(modEnv) == "table" and rawget(modEnv, "TornadoDestruction") or nil
+                if type(state) == "table" and state.isInitialized == true
+                    and type(state._destroyedObjects) == "table"
+                    and (type(state._pendingLoad) ~= "table" or next(state._pendingLoad) == nil) then
+                    local record = state._destroyedObjects[vehicle.rootNode]
+                    local remaining = record and tonumber(record.repairTimer)
+                    if record and record.obj == vehicle and remaining
+                        and remaining == remaining and remaining >= 0 and remaining < math.huge then
+                        return { remainingMs = math.floor(remaining) }
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
 function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
     local vData = {}
 
@@ -908,12 +975,6 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
     end
 
     vData.attachedImplementsCount = 0
-    if vehicle.getAttachedImplements then
-        local success, implements = pcall(function() return vehicle:getAttachedImplements() end)
-        if success and implements then
-            vData.attachedImplementsCount = #implements
-        end
-    end
 
     vData.vehicleType = "unknown"
     local okType, vehicleType = pcall(function()
@@ -985,6 +1046,8 @@ function VehicleDataCollector:_serializeVehicle(vehicle, vehicleCount)
             vData.vehicleType = "trailer"
         end
     end
+    vData.attachedImplementsCount, vData.attachedEquipment = self:_serializeAttachedEquipment(vehicle)
+    vData.tornadoRepair = self:_serializeTornadoRepair(vehicle)
     -- Authoritative store icon key: the game's own store image basename (e.g. ".../store_t7.dds"
     -- -> "store_t7"). The desktop app keys its shipped image library by exactly this token, so
     -- exporting it lets the dashboard pick the correct picture instead of fuzzy-matching the

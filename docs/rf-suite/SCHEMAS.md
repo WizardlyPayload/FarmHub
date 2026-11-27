@@ -123,7 +123,7 @@ The Fields section surfaces `reason` as a one-line "Soil Fertilizer is installed
 | Key | Type |
 |-----|------|
 | `enabled` | boolean |
-| `byFarm` | `{ [farmId]: { accumulatedAnnual?: number, projectedBill?: number, taxRate?: number, nextEventLabel?: string \| null, nextEventDay?: number \| null } }` |
+| `byFarm` | `{ [farmId]: { accumulatedAnnual?: number, projectedBill?: number, taxRate?: number, nextEventLabel?: string \| null, nextEventMonths?: number \| null } }` (`nextEventDay` in older exports held the same month count) |
 
 ### Economy — `marketDynamics`
 
@@ -209,7 +209,7 @@ The Fields section surfaces `reason` as a one-line "Soil Fertilizer is installed
 | `seasonalPriceHint` | string \| null | optional season + buy multiplier |
 | `settings` | `{ storageCapacity?: number, seasonalPricing?: boolean, stockSource?: "hall" \| "shopBook" }` | hall = production-point bins (1.0.4.33 building); shopBook = walk-in 50k ledger |
 | `depots` | `{ id: string, name?: string, farmId?: number \| null, levels: { fillType: string, liters: number, capacity?: number }[], seasonalPriceHint?: string \| null }[]` | capped |
-| `openOrders` | `{ id: string, summary: string, status?: string }[]` | capped |
+| `openOrders` | `{ id: string, farmId?: number \| null, summary: string, status?: string }[]` | capped; dashboard shows only orders with a structured selected-farm ID. Legacy rows without one are withheld. |
 
 ### Cores — `weatherGuard`
 

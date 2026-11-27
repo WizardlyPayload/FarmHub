@@ -380,13 +380,29 @@ function wireAppSettingsServerControlsOnce(dashboard) {
             return;
           }
           if (!_appSettingsServersDraft) _appSettingsServersDraft = [];
-          const fresh = found.filter(
-            (f) => !_appSettingsServersDraft.some((s) => s.localSubFolder === f.localSubFolder)
-          );
-          if (fresh.length > 0) {
+          let refreshed = 0;
+          const fresh = found.filter((f) => {
+            const existing = _appSettingsServersDraft.find((s) =>
+              s.mode === "local" && f.mode === "local" &&
+              String(s.localPath || "").toLowerCase() === String(f.localPath || "").toLowerCase() &&
+              String(s.localSubFolder || "").toLowerCase() === String(f.localSubFolder || "").toLowerCase()
+            );
+            if (!existing) return true;
+            if (f.awaitingFirstExport && (existing.name !== f.name || existing.mapTitle !== f.mapTitle)) {
+              existing.name = f.name;
+              existing.savegameName = f.savegameName;
+              existing.mapTitle = f.mapTitle;
+              existing.awaitingFirstExport = true;
+              refreshed++;
+            }
+            return false;
+          });
+          if (fresh.length > 0 || refreshed > 0) {
             _appSettingsServersDraft = _appSettingsServersDraft.concat(fresh);
             renderAppSettingsServerList();
-            dashboard.showAlert?.(`Imported ${fresh.length} save(s).`, "success");
+            dashboard.showAlert?.(fresh.length
+              ? `Imported ${fresh.length} save(s).`
+              : `Updated ${refreshed} reused save slot(s). Save to keep this change.`, "success");
           } else {
             dashboard.showAlert?.("All detected saves are already listed.", "info");
           }

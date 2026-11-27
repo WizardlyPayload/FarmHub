@@ -173,6 +173,17 @@ function farmland(rows: FieldEconomyLine[], row: Record<string, unknown>) {
   if (id != null) rows.push({ labelKey: "companions.field.farmland", text: String(id) });
 }
 
+function marketFarmland(rows: FieldEconomyLine[], row: Record<string, unknown>): number {
+  const ids = Array.isArray(row.farmlandIds) ? row.farmlandIds : [];
+  if (ids.length > 0 && ids.length <= 16 && ids.every((id) =>
+    typeof id === "number" && Number.isInteger(id) && id > 0)) {
+    rows.push({ labelKey: "companions.field.farmland", text: ids.join(", ") });
+    return ids.length;
+  }
+  farmland(rows, row); // Legacy single-parcel records.
+  return finite(row.farmlandId) == null ? 0 : 1;
+}
+
 function ledgerTotals(lines: FieldEconomyLine[], row: Record<string, unknown>) {
   const state = row.totalsRead;
   if (state === "pending" || state === "failed" || state === "notQueried" || state === "unavailable") {
@@ -235,8 +246,14 @@ function rowLines(liveKey: FieldEconomyLiveKey, row: Record<string, unknown>): F
       break;
     case "farmlandMarketplace":
       keyed(lines, "companions.field.offerKind", "companions.field.kind", row.kind);
-      farmland(lines, row);
-      num(lines, row.kind === "sale" ? "companions.field.askingPrice" : "companions.field.ratePerPeriod", row.price, "money");
+      {
+        const parcelCount = marketFarmland(lines, row);
+        const bundled = parcelCount > 1;
+        num(lines, row.kind === "sale"
+          ? bundled ? "companions.field.bundleAskingPrice" : "companions.field.askingPrice"
+          : bundled ? "companions.field.bundleRatePerPeriod" : "companions.field.ratePerPeriod",
+        row.price, "money");
+      }
       break;
     case "fieldProfitabilityLedger":
       raw(lines, "companions.field.land", row.land);
@@ -351,6 +368,9 @@ export function fieldLeasingPageView(page: unknown, live: unknown, farmId: unkno
     if (!isRecord(live) || live.enabled !== true) return leaseView("unavailable");
     if (live.reason === "no-farm") return leaseView("needs-farm");
     if (live.readState === "failed") return leaseView("failed");
+    if (live.readState === "partial" || live.coverage === "truncated" || live.coverage === "partial") {
+      return leaseView("partial");
+    }
     if (live.readState !== "ok" && live.readState !== "empty") return leaseView("unavailable");
     if (live.farmId !== selected) return leaseView("unavailable");
     if (live.coverage !== "complete") return leaseView("partial");

@@ -61,6 +61,7 @@ export interface SetupStatus {
   steps: SetupStatusStep[];
   recentEvents: UxEvent[];
   nextStep?: string | null;
+  waitingFor?: string | null;
   sourceId?: string;
   identityProvision?: string | null;
 }

@@ -1185,12 +1185,15 @@ function InventoryScan.scanGiantsObjectStorage(placeable, farmId, stockState, ba
         if objectInfo and type(objectInfo.objects) == "table" then
             if #objectInfo.objects == 1 and objectInfo.numObjects ~= nil and objectInfo.numObjects ~= 1 then
                 local numObjects = tonumber(objectInfo.numObjects) or 1
-                local ftIdx, fillLevel, baleCount = _objectStorageEntry(objectInfo.objects[1], numObjects)
-                if ftIdx and fillLevel > 0 then
-                    InventoryScan.addStockLiters(stockState, farmId, ftIdx, fillLevel, pname, "objectStorage", nil, nil)
-                end
-                if baleState and ftIdx and baleCount > 0 then
-                    InventoryScan.tallyBale(baleState, farmId, "inStorage", ftIdx, baleCount)
+                local obj = objectInfo.objects[1]
+                if _objectBelongsToFarm(obj, farmId) then
+                    local ftIdx, fillLevel, baleCount = _objectStorageEntry(obj, numObjects)
+                    if ftIdx and fillLevel > 0 then
+                        InventoryScan.addStockLiters(stockState, farmId, ftIdx, fillLevel, pname, "objectStorage", nil, nil)
+                    end
+                    if baleState and ftIdx and baleCount > 0 then
+                        InventoryScan.tallyBale(baleState, farmId, "inStorage", ftIdx, baleCount)
+                    end
                 end
             else
                 for _, obj in ipairs(objectInfo.objects) do

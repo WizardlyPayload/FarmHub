@@ -7,6 +7,7 @@ import { refreshFieldRulesCache } from "@/lib/rules-engine";
 import { useDashboardStore } from "@/store/dashboard-store";
 import { saveProfileFromUnitDisplay } from "@/lib/profile-display";
 import { unitDisplayFromPayload } from "@/lib/fill-units";
+import { formatCurrency } from "@/lib/economy";
 import {
   clusterFieldsForDisplay,
   type FieldRecord,
@@ -30,7 +31,6 @@ import {
 } from "./field-sort";
 import type { FieldFilterType } from "./types";
 import { FieldCard } from "./FieldCard";
-import { SoilWorkBonusCard } from "./SoilWorkBonusCard";
 import { UiStatePanel } from "@/components/ux/UiStatePanel";
 import { FreshnessChip } from "@/components/ux/FreshnessChip";
 import { buildModuleUiState } from "@/lib/ux-state";
@@ -94,6 +94,49 @@ function buildSoilTriage(rows: FieldRecord[]): SoilTriage {
   }
 
   return { active: true, urgent, watch, good };
+}
+
+/** Billing uses parcel IDs; the mod's menu toggle uses engine field IDs. */
+function readRealisticWeatherIrrigationCharges(fields: FieldRecord[], farmId: number) {
+  const parcels = new Map<number, { active: boolean; pending: number }>();
+  const ambiguous = new Set<number>();
+  for (const field of fields) {
+    if (Number(field.ownerFarmId ?? field.farmId ?? 0) !== farmId) continue;
+    const row = field.realisticWeatherIrrigation;
+    // The native collector sets farmlandId from field.farmland.id when present.
+    const id = Number(field.farmlandId);
+    const pending = Number(row?.pendingNextDay);
+    if (!row || !Number.isInteger(id) || id < 1 || Number(row.parcelId) !== id ||
+        typeof row.active !== "boolean" || !Number.isFinite(pending) || pending < 0 || ambiguous.has(id)) continue;
+    const prior = parcels.get(id);
+    if (prior && (prior.active !== row.active || prior.pending !== pending)) {
+      parcels.delete(id);
+      ambiguous.add(id);
+    } else {
+      parcels.set(id, { active: row.active, pending });
+    }
+  }
+  if (!parcels.size) return null;
+  const pending = [...parcels.values()].reduce((sum, row) => sum + row.pending, 0);
+  if (pending <= 0) return null;
+  return {
+    ids: [...parcels.entries()].filter(([, row]) => row.pending > 0).map(([id]) => id).sort((a, b) => a - b),
+    pending,
+  };
+}
+
+function readRealisticWeatherIrrigationMenu(fields: FieldRecord[], farmId: number) {
+  const names = new Map<number, string>();
+  for (const field of fields) {
+    if (Number(field.ownerFarmId ?? field.farmId ?? 0) !== farmId) continue;
+    const row = field.realisticWeatherIrrigationMenu;
+    // The collector resolves the mod's field:getId() on this owned native field.
+    // field.id is the field-manager table index and can be a different number.
+    const menuFieldId = Number(row?.fieldId);
+    if (!row || row.active !== true || !Number.isInteger(menuFieldId) || menuFieldId < 1) continue;
+    names.set(menuFieldId, String(field.name || `Field ${field.id ?? menuFieldId}`));
+  }
+  return [...names.entries()].sort(([a], [b]) => a - b).map(([, name]) => name);
 }
 
 function asFieldFilter(raw: string | undefined): FieldFilterType {
@@ -204,6 +247,14 @@ export function FieldsSection() {
 
   const stats = useMemo(() => computeFieldStats(displayRows), [displayRows]);
   const areaProfile = saveProfileFromUnitDisplay(unitDisplayFromPayload(payload));
+  const realisticWeatherIrrigationCharges = useMemo(
+    () => readRealisticWeatherIrrigationCharges(allFields, farmId),
+    [allFields, farmId],
+  );
+  const realisticWeatherIrrigationMenu = useMemo(
+    () => readRealisticWeatherIrrigationMenu(allFields, farmId),
+    [allFields, farmId],
+  );
   const areaAcres = areaProfile?.effective?.acre === true;
   const areaValue = stats.totalArea === "—" || !areaAcres
     ? stats.totalArea
@@ -341,7 +392,6 @@ export function FieldsSection() {
         <FreshnessChip payload={payload} onRefresh={() => void refreshDashboard()} />
       </header>
 
-      <SoilWorkBonusCard />
 
       <div class="fd-fields__stats">
         <Card title={t("fields.totalFields")}>
@@ -358,6 +408,22 @@ export function FieldsSection() {
           <p class="fd-fields__stat-value">{stats.harvestReady}</p>
         </Card>
       </div>
+
+      {realisticWeatherIrrigationMenu.length ? (
+        <p class="fd-fields__irrigation-note">
+          {tOr("fields.realisticWeatherIrrigation", "Realistic Weather menu shows irrigation active on: {{fields}}.", {
+            fields: realisticWeatherIrrigationMenu.join(", "),
+          })}
+        </p>
+      ) : null}
+      {realisticWeatherIrrigationCharges ? (
+        <p class="fd-fields__irrigation-note">
+          {tOr("fields.realisticWeatherIrrigationPending", "Realistic Weather shows {{amount}} unpaid for the next day on parcels {{parcels}}.", {
+            amount: formatCurrency(realisticWeatherIrrigationCharges.pending, areaProfile),
+            parcels: realisticWeatherIrrigationCharges.ids.join(", "),
+          })}
+        </p>
+      ) : null}
 
       <CompanionModsEmbed categories={["fields"]} ids={FIELD_SURFACE_IDS} title={tOr("companions.embedFields", "Field companion mods")} />
 

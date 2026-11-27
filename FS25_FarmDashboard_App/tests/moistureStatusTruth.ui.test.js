@@ -66,7 +66,8 @@ describe("Moisture System reading status", () => {
             readState: "ok", baseMoisturePercent: 11.6, crops: [], silos: [], irrigationJobs: [],
             byFarm: { "1": { siloCount: 0, bales: { gettingWet: 0, drying: 0, rottingSlowly: 0, rotting: 0, rottingQuickly: 0 }, irrigation: { jobCount: 0 } } },
         }), { farmId: 1 });
-        expect(host.textContent).toContain("None of your silos hold a crop the mod tracks");
+        expect(host.textContent).toContain("No stored-crop moisture records have been captured for this farm yet");
+        expect(host.textContent).not.toContain("None of your silos hold a crop");
         expect(host.textContent).toContain("No irrigation booked");
         expect(host.textContent).not.toContain("Silo readings are not available for this farm");
     });

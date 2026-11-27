@@ -78,6 +78,10 @@ export interface FleetVehicle extends AdsVehicle {
   operatingTime?: number;
   position?: { x?: number; z?: number } | null;
   attachedImplementsCount?: number;
+  /** Names of directly attached equipment from base-game AttacherJoints. */
+  attachedEquipment?: string[];
+  /** Tornado Physics visual-part repair timer from a linked owned vehicle; not engine damage. */
+  tornadoRepair?: { remainingMs: number } | null;
   storeImage?: string | null;
   storeName?: string | null;
   configFileName?: string | null;

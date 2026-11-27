@@ -833,7 +833,7 @@ export function FleetMapSection() {
   function applyMissingOverviewHint(data?: OverviewResponse | null) {
     const label = mapTitle || mapId || t("map.unknownMap");
     if (data?.error === "missing_map_id") {
-      setHint(t("map.hintNoImage"));
+      setHint(tOr("map.awaitingFirstExport", "Map overview is waiting for the first export from this save."));
     } else if (data?.hintKind === "dlc" && label !== t("map.unknownMap")) {
       setHint(t("map.hintNoImageDlc", { map: label }));
     } else if (label !== t("map.unknownMap")) {
@@ -960,7 +960,7 @@ export function FleetMapSection() {
     if (!mapId && !mapTitle) {
       clearOverviewImage();
       loadedOverviewKeyRef.current = "";
-      setHint(t("map.hintNoImage"));
+      setHint(tOr("map.awaitingFirstExport", "Map overview is waiting for the first export from this save."));
       return;
     }
     if (key === fetchKeyRef.current && key === loadedOverviewKeyRef.current) {

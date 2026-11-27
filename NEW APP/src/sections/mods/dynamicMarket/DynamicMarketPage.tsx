@@ -160,7 +160,7 @@ export function Page({ entry }: CompanionPageProps) {
       entry={entry}
       lead={tOr(
         "companionPage.dynamicMarket.lead",
-        "Dynamic Market moves selling prices by market group each period, driven by season, weather, supply and demand. Selling large amounts at one station pushes its price down for a while. This page shows each group's current move and the outlook for next period.",
+        "These prices and trends belong to the shared market, not this farm's sales or income. Dynamic Market moves selling prices by group with season, weather, supply and demand; large sales can temporarily lower one station's price. Use the current move and next-period outlook to plan when and where to sell.",
       )}
     >
       <ModStatTiles tiles={tiles} />

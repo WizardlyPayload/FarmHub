@@ -17,6 +17,7 @@ import { modPageSection, visibleCompanionPages } from "@/sections/mods/registry"
 import { summarizeAdsFleet } from "@/lib/vehicleAds";
 import { getDisplayFleet } from "@/lib/vehicles";
 import { getRedTapeForActiveFarm, type RedTapePayload } from "@/lib/redTape";
+import { hasOwnedFertilizerDepotData } from "@/lib/realisticFarming/depot";
 
 export function SectionSidebar() {
   const section = useDashboardStore((s) => s.section);
@@ -96,7 +97,8 @@ export function SectionSidebar() {
   );
   const modItems: SectionId[] = [
     ...MOD_NAV_SECTIONS.filter(
-      (id) => sectionVisible(id, enabledSections) && modSectionActive(id, presence),
+      (id) => sectionVisible(id, enabledSections) && modSectionActive(id, presence) &&
+        (id !== "fertilizerdepot" || hasOwnedFertilizerDepotData(payload?.realisticFarming?.fertilizerDepot, Number(activeFarmId ?? 0))),
     ),
     ...companionPageItems,
   ];

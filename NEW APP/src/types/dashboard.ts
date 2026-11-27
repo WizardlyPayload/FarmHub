@@ -143,6 +143,8 @@ export interface RealisticFarmingPayload {
         projectedBill?: number;
         taxRate?: number;
         nextEventLabel?: string | null;
+        nextEventMonths?: number | null;
+        /** Older exports used this key for a month count. */
         nextEventDay?: number | null;
       }
     >;
@@ -223,22 +225,32 @@ export interface RealisticFarmingPayload {
           lastCollectionDay?: number;
           feedDiseaseFlag?: boolean;
           contractSummary?: string | null;
+          breedSurface?: {
+            herd?: { available: boolean; totalMilkingHeadcount?: number; breeds?: { name: string; value: number }[] };
+            milk: { fillType: string; available: boolean; litres?: number; unknownLitres?: number; breeds?: { name: string; value: number }[] }[];
+          };
         }[];
       }
     >;
   };
   npcFavor?: {
     enabled: boolean;
+    worldRelationships?: { npcId: string; name?: string; value?: number }[];
     byFarm?: Record<
       string,
       {
-        relationships: { npcId: string; name?: string; value?: number }[];
+        relationships?: { npcId: string; name?: string; value?: number }[];
         activeFavors: { id?: string; type?: string; npcId?: string; summary?: string }[];
       }
     >;
   };
   worldEvents?: {
     enabled: boolean;
+    pendingReadState?: "ok" | "unavailable";
+    pendingByFarm?: Record<string, {
+      lines: { event?: string; amount: number; queuedDay: number }[];
+      truncated?: boolean;
+    }>;
     frequency?: number | null;
     intensity?: number | null;
     eventTypeCount?: number | null;
@@ -253,6 +265,7 @@ export interface RealisticFarmingPayload {
   };
   proStaff?: {
     enabled: boolean;
+    coverage?: "partial" | "truncated";
     byFarm?: Record<
       string,
       {
@@ -280,7 +293,9 @@ export interface RealisticFarmingPayload {
       levels: { fillType: string; liters: number; capacity?: number }[];
       seasonalPriceHint?: string | null;
     }[];
-    openOrders?: { id: string; summary: string; status?: string }[];
+    openOrders?: { id: string; farmId?: number | null; summary: string; status?: string }[];
+    /** ready means both mod-owned order registers were readable. */
+    orderState?: "ready" | "partial" | "unavailable";
   };
   weatherGuard?: {
     enabled: boolean;
@@ -651,6 +666,8 @@ export function normalizeSectionId(value: string | null | undefined): SectionId 
   if ((ALL_SECTIONS as string[]).includes(value)) return value as SectionId;
   if (isModPageSectionId(value)) {
     const key = value.slice(4);
+    // The fleet summary remains folded into Vehicles, but its detailed reading has a page.
+    if (key === "puncturedTires") return value;
     return isFoldedCompanion(key) ? FOLDED_COMPANIONS[key] : value;
   }
   return "overview";

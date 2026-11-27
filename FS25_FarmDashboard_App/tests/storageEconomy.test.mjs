@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { enrichStockItem, bunkerLocationLabel, locationKindLabel } from "../web/assests/js/modules/storage.js";
+import { enrichStockItem, buildStockPanelHTML, bunkerLocationLabel, locationKindLabel } from "../web/assests/js/modules/storage.js";
 
 test("enrichStockItem resolves TRITICALE by fillTypeIndex from merged economy", () => {
   const economy = {
@@ -34,9 +34,31 @@ test("enrichStockItem resolves TRITICALE by fillTypeIndex from merged economy", 
   );
   assert.equal(item.fillType, "TRITICALE");
   assert.equal(item._pricePer1000, 233);
+  assert.equal(item._priceSource, "reference");
   assert.equal(item._maxPrice, 268);
   assert.equal(item._maxPriceMonth, "Dec");
   assert.equal(item.bestSellStation, "Market Base Prices");
+});
+
+test("classic Storage prefers a named buyer and marks synthetic fallback as reference", () => {
+  const economy = { marketPrices: { crops: { SILAGE: {
+    fillTypeIndex: 11, avgXmlPrice: 1000,
+    locations: [{ name: "Market Base Prices", price: 1000 }],
+    bestLocation: "Market Base Prices",
+  } } } };
+  const base = { fillType: "SILAGE", fillTypeIndex: 11, totalLiters: 1000, locations: [] };
+  const reference = enrichStockItem(base, {}, economy, {});
+  assert.equal(reference._pricePer1000, 1000);
+  assert.equal(reference._priceSource, "reference");
+  const buyer = enrichStockItem({ ...base, bestSellPrice: 0.8, bestSellStation: "Public" }, {}, economy, {});
+  assert.equal(buyer._pricePer1000, 800);
+  assert.equal(buyer._priceSource, "buyer");
+  assert.equal(buyer.bestSellStation, "Public");
+  const html = buildStockPanelHTML({ activeFarmId: 1,
+    stock: { byFarm: { 1: { farmId: 1, items: [base] } } }, economy });
+  assert.match(html, /storage\.referenceEstimate|estimate/);
+  assert.match(html, /storage\.noSellingPoint|No selling point available/);
+  assert.doesNotMatch(html, /fs-commodity-station">Market Base Prices/);
 });
 
 test("enrichStockItem maps hay aliases to DRYGRASS economy rows", () => {

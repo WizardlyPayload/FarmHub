@@ -561,6 +561,18 @@ button.fd-vehicles-summary-card {
   border-radius: 0.65rem;
 }
 
+.fd-vehicles__attached {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fd-vehicles__table .fd-vehicles__attached {
+  max-width: 16rem;
+}
+
 .fd-vehicle-card--focused {
   border-color: var(--farm-accent);
   box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.45);

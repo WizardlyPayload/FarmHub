@@ -10,9 +10,9 @@ const collectorPath = path.resolve(
     "../../FS25_FarmDashboard_Mod/src/collectors/CompanionModsDataCollector.lua",
 );
 const source = fs.readFileSync(collectorPath, "utf8");
-const symStart = source.indexOf("local function companionSymbol");
+const symStart = source.indexOf("local function modEntry");
 const symEnd = source.indexOf("local function collectElsLoans");
-const start = source.indexOf("local function collectRestrictedPeriods()");
+const start = source.indexOf("local function collectRestrictedPeriods(modName)");
 const end = source.indexOf("local function collectCropCalendar()");
 if (symStart < 0 || symEnd < symStart || start < 0 || end < start) {
     throw new Error("restriction producer was not found");
@@ -22,7 +22,7 @@ const fn = source.slice(symStart, symEnd) + "\n" + source.slice(start, end);
 function activeSlurry(methodBody) {
     return `
         _G.g_modManager = { getActiveMods = function()
-            return { { modName = 'FS25_RestrictedPeriods' } }
+            return { { modName = 'FS25_RestrictedPeriods', version = '1.0.0.0' } }
         end }
         _G.FS25_RestrictedPeriods = { SlurryBan = { isBanActive = ${methodBody} } }
     `;
@@ -40,7 +40,7 @@ function run(setup, extra = "") {
     const chunk = [
         fn,
         setup,
-        "local row = collectRestrictedPeriods()",
+        "local row = collectRestrictedPeriods('FS25_RestrictedPeriods')",
         "local active = 'missing'",
         "if row.anyActive == true then active = 'true' elseif row.anyActive == false then active = 'false' end",
         "return tostring(row.readState) .. '|' .. active .. '|' .. tostring(row.liquidBan) .. '|' .. tostring(row.solidBan)" + extra,
@@ -56,7 +56,7 @@ describe("collectRestrictedPeriods producer", () => {
         expect(run("_G.SlurryBan = { isBanActive = function() return false end }")).toBe("unavailable|missing|nil|nil");
         expect(run(`
             _G.g_modManager = { getActiveMods = function()
-                return { { modName = 'FS25_RestrictedPeriods' } }
+                return { { modName = 'FS25_RestrictedPeriods', version = '1.0.0.0' } }
             end }
             _G.FS25_RestrictedPeriods = {}
         `)).toBe("unavailable|missing|nil|nil");
@@ -99,5 +99,12 @@ describe("collectRestrictedPeriods producer", () => {
             expect(run(inPeriod(bad, clear), reason)).toBe("unavailable|missing|nil|nil|period-unavailable");
         }
         expect(restrictionAdvice({ enabled: true, readState: "unavailable", reason: "period-unavailable" })).toBe("unavailable");
+    });
+
+    test("an unreviewed version does not publish the pinned period window", () => {
+        const setup = inPeriod(10, activeSlurry("function() return 'sperrfrist' end"))
+            .replace("version = '1.0.0.0'", "version = '1.1.0.0'");
+        expect(run(setup, " .. '|' .. tostring(row.reason)"))
+            .toBe("unavailable|missing|nil|nil|unreviewed-version");
     });
 });

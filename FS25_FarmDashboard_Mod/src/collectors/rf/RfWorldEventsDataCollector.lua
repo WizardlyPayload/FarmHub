@@ -54,6 +54,54 @@ local function displayName(eventId)
     return s:sub(1, 1):upper() .. s:sub(2)
 end
 
+local MAX_PENDING_PER_FARM = 24
+
+local function collectPendingSettlements()
+    local mission = _G.g_currentMission
+    local farms = _G.g_farmManager
+    local ledger = rawget(_G, "RWESettlement")
+    if not mission or type(mission.getIsServer) ~= "function"
+        or not mission:getIsServer()
+        or not farms or type(farms.getFarmById) ~= "function"
+        or type(ledger) ~= "table" or type(ledger.pending) ~= "table" then
+        return {}, "unavailable"
+    end
+
+    local byFarm = {}
+    for key, lines in pairs(ledger.pending) do
+        local farmId = tonumber(key)
+        if farmId and farmId > 0 and farmId % 1 == 0 and type(lines) == "table" then
+            local ok, farm = pcall(farms.getFarmById, farms, farmId)
+            if ok and farm ~= nil then
+                local rows = {}
+                local truncated = false
+                for _, line in ipairs(lines) do
+                    if type(line) == "table" and line.farmRef == farm then
+                        local amount = tonumber(line.amount)
+                        local day = tonumber(line.queuedDay)
+                        if amount and amount == amount and amount ~= 0
+                            and amount % 1 == 0 and day and day >= 0 and day % 1 == 0 then
+                            if #rows < MAX_PENDING_PER_FARM then
+                                rows[#rows + 1] = {
+                                    event = line.eventName and tostring(line.eventName) or nil,
+                                    amount = amount,
+                                    queuedDay = day,
+                                }
+                            else
+                                truncated = true
+                            end
+                        end
+                    end
+                end
+                if #rows > 0 then
+                    byFarm[tostring(farmId)] = { lines = rows, truncated = truncated }
+                end
+            end
+        end
+    end
+    return byFarm, "ok"
+end
+
 function RfWorldEventsDataCollector.isModLoaded()
     return modLoaded()
 end
@@ -85,6 +133,7 @@ function RfWorldEventsDataCollector:collectStep(_opts)
     end
 
     local ok, payload = pcall(function()
+        local pendingByFarm, pendingReadState = collectPendingSettlements()
         local evCfg = mgr.events
         local state = mgr.EVENT_STATE
         local frequency = evCfg and tonumber(evCfg.frequency) or nil
@@ -137,6 +186,8 @@ function RfWorldEventsDataCollector:collectStep(_opts)
             eventTypeCount = eventTypeCount,
             active = active,
             cooldownReady = cooldownReady,
+            pendingByFarm = pendingByFarm,
+            pendingReadState = pendingReadState,
         }
     end)
 

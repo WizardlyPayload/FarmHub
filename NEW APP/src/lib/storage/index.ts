@@ -52,6 +52,9 @@ const DISPLAY_NAMES: Record<string, string> = {
   POTATOES: "Potatoes",
   SUGAR_BEET: "Sugar Beet",
   SUGARBEET: "Sugar Beet",
+  BEETROOT: "Red Beet",
+  REDBEET: "Red Beet",
+  RED_BEET: "Red Beet",
   RAPE: "Rape",
   RICE: "Rice",
   RYE: "Rye",
@@ -99,6 +102,7 @@ const ECONOMY_CROP_ALIASES: Record<string, string[]> = {
 export interface EnrichedStockItem extends StockItem {
   locations: StockLocation[];
   _pricePer1000?: number;
+  _priceSource?: "buyer" | "reference";
   _maxPrice?: number;
   _maxPriceMonth?: string | null;
   _crop?: CropLike | null;
@@ -359,14 +363,17 @@ function bestCropLocationPrice(crop: CropLike | null | undefined): number {
 }
 
 export function resolvePricePer1000(item: StockItem, crop: CropLike | null | undefined): number {
+  // The stock collector's eligible selling-station offer is a current price.
+  // Economy crop locations and averages can include virtual base prices.
+  const modPrice = Number(item?.bestSellPrice) || 0;
+  if (modPrice > 0 && item?.bestSellStation !== "Market" && item?.bestSellStation !== "Market Base Prices") {
+    return modPrice < 50 ? modPrice * 1000 : modPrice;
+  }
   const fromCrop = bestCropLocationPrice(crop);
   if (fromCrop > 0) return fromCrop;
   const fromXmlAvg = Number(crop?.avgXmlPrice) || Number(crop?.avgPrice) || 0;
   if (fromXmlAvg > 0) return fromXmlAvg;
-  const modPrice = Number(item?.bestSellPrice) || 0;
-  if (modPrice > 0) {
-    return modPrice < 50 ? modPrice * 1000 : modPrice;
-  }
+  if (modPrice > 0) return modPrice < 50 ? modPrice * 1000 : modPrice;
   return 0;
 }
 
@@ -474,9 +481,16 @@ export function enrichStockItem(
     }
   }
   const crop = findCropForItem(resolved, economy);
+  // Capture provenance before the compatibility back-fill below. Economy prices
+  // can include virtual base prices and inferred station rows, so only the
+  // stock collector's named selling-station offer is an observed buyer quote.
+  const stockStation = String(resolved.bestSellStation || "");
+  const hasBuyerOffer = Number(resolved.bestSellPrice) > 0 &&
+    stockStation !== "" && stockStation !== "Market" && stockStation !== "Market Base Prices";
   const pricePer1000 = resolvePricePer1000(resolved, crop);
   if (pricePer1000 > 0) {
     resolved._pricePer1000 = pricePer1000;
+    resolved._priceSource = hasBuyerOffer ? "buyer" : "reference";
     if (!(Number(resolved.bestSellPrice) > 0)) {
       resolved.bestSellPrice = pricePer1000;
     }
@@ -572,12 +586,14 @@ export function fillTypeHudKey(
   const idx = Number(item?.fillTypeIndex);
   const cat = catalog && typeof catalog === "object" ? catalog : {};
   const titleMap = titles && typeof titles === "object" ? titles : {};
+  // The stock collector reports the live fill type. A fallback index catalog
+  // can be stale or map-specific, so it must not select another item's icon.
+  const fromItem = fillTypeIdent(item?.fillType);
+  if (fromItem) return fromItem;
   if (idx > 0) {
     const mapped = fillTypeIdent(cat[String(idx)] || cat[idx as unknown as string]);
     if (mapped) return mapped;
   }
-  const fromItem = fillTypeIdent(item?.fillType);
-  if (fromItem) return fromItem;
 
   const titleNeedle = String(
     (idx > 0 && (titleMap[String(idx)] || titleMap[idx as unknown as string])) ||

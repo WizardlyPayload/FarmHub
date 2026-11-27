@@ -259,8 +259,8 @@ const FACTORY_IO = obj({
 });
 const MACHINE = { id, name: text, ownerFarmId: opt(int) };
 const DISTRIBUTION_OVERRIDE = obj({ uniqueId: id, fillType: opt(text), mode: opt(int), modeKey: opt(text) });
-const DISTRIBUTION_MOVEMENT = obj({ uniqueId: id, fillType: opt(text), distributedLiters: opt(num),
-  soldLiters: opt(num), storedLiters: opt(num), receivedLiters: opt(num) });
+const DISTRIBUTION_MOVEMENT = obj({ uniqueId: id, assetName: opt(text), fillType: opt(text), distributedLiters: opt(num),
+  soldLiters: opt(num), storedLiters: opt(num), receivedLiters: opt(num), producedLiters: opt(num), consumedLiters: opt(num) });
 const RESTRICTED_WINDOW = obj({ currentAllowed: bool, nextCalendarPeriod: int,
   nextUnconditionalPeriod: int, temperatureConditional: bool, reason: text });
 const COMPANION = obj({
@@ -323,6 +323,7 @@ const COMPANION = obj({
       overrides: list(DISTRIBUTION_OVERRIDE, 256), lastCycle: list(DISTRIBUTION_MOVEMENT, 256),
       overridesReading: obj({ ...READ, rows: list(DISTRIBUTION_OVERRIDE, 256) }),
       history: obj({ ...READ, window: text, retained: bool, rows: list(DISTRIBUTION_MOVEMENT, 256) }),
+      month: obj({ ...READ, window: text, rows: list(DISTRIBUTION_MOVEMENT, 256) }),
     }),
   }),
   silageCompaction: obj({ ...READ, context: text, status: text, estimate: opt(text), line: text }),
@@ -340,7 +341,7 @@ const COMPANION = obj({
   productionWatcher: obj({ ...READ, productionPointCount: int, countSource: text, alertsReadable: bool }),
   outOfFuel: obj({ enabled: bool }), soilWorkYieldBonus: obj({ enabled: bool }), dynamicMarket: obj({ enabled: bool }),
   saveUnitProfiles: obj({ ...READ, moneyUnit: opt(int), moneyUnitName: opt(text), profileName: opt(text), hasApplied: bool, lastApplyOk: bool }),
-  taskList: obj({ ...READ, tasks: list(obj({ id: text, detail: text, priority: opt(num) }), 256) }),
+  taskList: obj({ ...READ, tasks: list(obj({ id: text, detail: text, groupName: opt(text), priority: opt(num), effort: opt(num), recurMode: opt(num) }), 256) }),
   productionSchedule: obj({ ...READ, recipes: list(obj({ pointKey: text, recipeId: text, status: opt(text) }), 256) }),
   animalFoodCalculator: obj({ ...READ, mode: opt(text), foodScale: opt(num), waterScale: opt(num),
     strawScale: opt(num), daysPerPeriod: opt(num), scalingEnabled: bool }),
@@ -359,7 +360,7 @@ const COMPANION = obj({
   betterContracts: obj({ enabled: bool, missionCount: int, lazyNPC: bool, hardMode: bool }),
   fieldLeases: obj({ ...READ, farmId: int, leases: list(obj({ farmlandId: opt(int), price: opt(num), duration: opt(num) }), 64) }),
   rentYourField: obj({ ...READ, agreements: list(obj({ farmlandId: opt(int), duration: opt(num) }), 128) }),
-  farmlandMarketplace: obj({ ...READ, rows: list(obj({ kind: text, farmlandId: opt(int), price: opt(num) }), 128) }),
+  farmlandMarketplace: obj({ ...READ, rows: list(obj({ kind: text, farmlandId: opt(int), farmlandIds: opt(list(int, 16)), price: opt(num) }), 128) }),
   fieldProfitabilityLedger: obj({ ...READ, cycles: list(obj({ cycleId: opt(text), farmId: int, land: opt(text), crop: opt(text), state: opt(text),
     area: opt(num), qualityClass: opt(text), totalsRead: text,
     totalsCoverage: text, totalsCount: int, totalsCountExact: bool, totalsScanned: int,
@@ -388,7 +389,7 @@ if (COMPANION.k === "obj") {
   if (distribution.k === "obj" && distribution.fields.farmAssets.k === "obj") {
     const assets = distribution.fields.farmAssets;
     assets.privateFarm = true;
-    for (const key of ["overridesReading", "history"]) {
+    for (const key of ["overridesReading", "history", "month"]) {
       const rule = assets.fields[key];
       if (rule.k === "obj") rule.privateFarm = true;
     }

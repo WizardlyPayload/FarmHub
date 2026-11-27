@@ -20,6 +20,8 @@ import {
   type RealSiloRow,
 } from "@/lib/companionMods";
 import { companionPanelId } from "@/lib/companionMods/presentation";
+import { finite, listOf, readFoldedCompanion, type FoldedReading } from "@/lib/companionFold";
+import { ModPageLink, useCompanionPage } from "@/sections/mods/shared";
 import { useDashboardStore } from "@/store/dashboard-store";
 import { StatTiles } from "./StatTiles";
 
@@ -49,7 +51,8 @@ function useAssetContext() {
   const selectedFarmId = useDashboardStore((s) => s.activeFarmId);
   const farmId = typeof selectedFarmId === "number" ? selectedFarmId : Number.NaN;
   const companion = (payload?.companionMods ?? null) as CompanionModsPayload | null;
-  return { companion, farmId };
+  const advanced = readFoldedCompanion(payload, "advancedMaintenance", farmId);
+  return { companion, farmId, advanced };
 }
 
 function monthName(period: number): string {
@@ -123,12 +126,41 @@ function StatusOr({ status, coverage, children }: { status: AssetStatus; coverag
   );
 }
 
-function MaintenanceLines({ companion, farmId }: { companion: CompanionModsPayload; farmId: number }) {
+function MaintenanceLines({ companion, farmId, advanced }: { companion: CompanionModsPayload; farmId: number; advanced?: FoldedReading }) {
   const lines: ComponentChildren[] = [];
-  if (companion.advancedMaintenance) {
+  const advancedState = advanced?.page?.readState;
+  const lockedCount = finite(advanced?.farmData?.lockedCount);
+  if (advanced?.detected && advanced.farmData && lockedCount !== null && (advancedState === "ok" || advancedState === "partial")) {
+    // The dedicated page collector completes a wider fleet scan than the older
+    // companionMods summary. Never let that summary's pending state mask a
+    // complete farm-scoped reading already exported on the same generation.
+    const coverage = advancedState === "partial" || advanced.page?.coverage !== "complete" ? "partial" : "complete";
+    const machineCount = finite(advanced.farmData.machineCount);
+    const locked = listOf<{ id?: string; name?: string; zone?: string }>(advanced.farmData.machines)
+      .filter((row) => row.zone === "locked");
+    const note = assetStatusText("ok", coverage);
+    lines.push(
+      <div key="am" data-asset="advancedMaintenance">
+        <strong>{text("companionPage.advancedMaintenance.title", "Advanced Maintenance")}</strong>
+        {machineCount !== null ? <Muted>{text("companions.assets.machineCount", "{{count}} modded machines checked", { count: machineCount })}</Muted> : null}
+        {lockedCount > 0 ? (
+          <Badge tone="warn">
+            {text("companions.live.maintenanceBlocked", "{{count}} machine(s) cannot start: {{names}}", {
+              count: lockedCount,
+              names: names(locked),
+            })}
+          </Badge>
+        ) : coverage === "complete" ? (
+          <Muted>{text("companions.live.maintenanceClear", "No machine on this farm is blocked from starting.")}</Muted>
+        ) : null}
+        {note ? <Muted>{note}</Muted> : null}
+      </div>,
+    );
+  } else if (companion.advancedMaintenance) {
     const am = readAdvancedMaintenance(companion.advancedMaintenance, farmId);
     lines.push(
       <div key="am" data-asset="advancedMaintenance">
+        <strong>{text("companionPage.advancedMaintenance.title", "Advanced Maintenance")}</strong>
         <StatusOr status={am.status} coverage={am.coverage}>
           {() =>
             am.blocked.length ? (
@@ -150,6 +182,7 @@ function MaintenanceLines({ companion, farmId }: { companion: CompanionModsPaylo
     const evm = readExtendedMaintenance(companion.extendedVehicleMaintenance, farmId);
     lines.push(
       <div key="evm" data-asset="extendedVehicleMaintenance">
+        <strong>{text("companions.assets.extendedVehicleMaintenance", "Extended Vehicle Maintenance")}</strong>
         <StatusOr status={evm.status} coverage={evm.coverage}>
           {() => (
             <>
@@ -171,6 +204,14 @@ function MaintenanceLines({ companion, farmId }: { companion: CompanionModsPaylo
                   })}
                 </Badge>
               ) : null}
+              {evm.lowBattery.length ? (
+                <Badge tone="warn">
+                  {text("companions.live.evmLowBattery", "{{count}} machine(s) below 20% battery charge: {{names}}", {
+                    count: evm.lowBattery.length,
+                    names: names(evm.lowBattery),
+                  })}
+                </Badge>
+              ) : null}
             </>
           )}
         </StatusOr>
@@ -181,6 +222,7 @@ function MaintenanceLines({ companion, farmId }: { companion: CompanionModsPaylo
     const rvs = readVehicleService(companion.realisticVehicleService, farmId);
     lines.push(
       <div key="rvs" data-asset="realisticVehicleService">
+        <strong>{text("companions.assets.realisticVehicleService", "Realistic Vehicle Service")}</strong>
         <StatusOr status={rvs.status} coverage={rvs.coverage}>
           {() => (
             <>
@@ -204,7 +246,7 @@ function MaintenanceLines({ companion, farmId }: { companion: CompanionModsPaylo
                 <Badge>{text("companions.live.rvsWarmup", "{{count}} machine(s) warming up", { count: rvs.warmingUp.length })}</Badge>
               ) : null}
               {rvs.lowestCondition != null ? (
-                <Badge>{text("companions.live.rvsCondition", "Lowest condition {{percent}}%", { percent: Math.round(rvs.lowestCondition) })}</Badge>
+                <Badge>{text("companions.live.rvsCondition", "Lowest condition {{percent}}%", { percent: Math.round(rvs.lowestCondition * 100) })}</Badge>
               ) : null}
             </>
           )}
@@ -220,13 +262,13 @@ export const FLEET_NOTES_IDS = ["advancedMaintenance", "extendedVehicleMaintenan
 
 /** Fleet page: maintenance mods read for the selected farm, next to the native damage cards. */
 export function FleetMaintenanceNotes() {
-  const { companion, farmId } = useAssetContext();
-  if (!companion || (!companion.advancedMaintenance && !companion.extendedVehicleMaintenance && !companion.realisticVehicleService)) {
+  const { companion, farmId, advanced } = useAssetContext();
+  if ((!companion || (!companion.advancedMaintenance && !companion.extendedVehicleMaintenance && !companion.realisticVehicleService)) && !advanced.detected) {
     return null;
   }
   return (
     <Card class="fd-asset-notes" title={text("companions.assets.fleetTitle", "Maintenance mods")}>
-      <MaintenanceLines companion={companion} farmId={farmId} />
+      <MaintenanceLines companion={companion ?? {}} farmId={farmId} advanced={advanced} />
     </Card>
   );
 }
@@ -302,18 +344,36 @@ export function StorageAssetNotes({
   economy: EconomyLike | null | undefined;
 }) {
   const { companion, farmId } = useAssetContext();
-  if (!companion || (!companion.realSilo && !companion.palletDegradation)) return null;
+  const realSiloPage = useCompanionPage("realSilo");
+  const pageState = realSiloPage.page?.readState;
+  const pageReady = Boolean(realSiloPage.mod && (pageState === "ok" || pageState === "partial"));
+  const pageFarm = realSiloPage.farmData;
+  if (!companion || (!companion.realSilo && !companion.palletDegradation && !pageReady)) return null;
   const silo = companion.realSilo ? readRealSilo(companion.realSilo, farmId) : null;
   const pallets = companion.palletDegradation ? readPalletCondition(companion.palletDegradation, farmId) : null;
   return (
     <Card class="fd-asset-notes" title={text("companions.assets.storageTitle", "Storage mods")}>
       <div class="fd-asset-notes__grid">
-      {silo ? (
+      {silo || pageReady ? (
         <div data-asset="realSilo" id={companionPanelId("realSilo")} class="fd-asset-notes__block">
           <h4>{text("companions.assets.siloHeading", "Silo compartments (RealSilo)")}</h4>
-          <StatusOr status={silo.status} coverage={silo.coverage}>
+          {pageReady ? (
+            <>
+              {pageFarm && finite(pageFarm.siloCount) !== null ? (
+                <StatTiles tiles={[
+                  { key: "silos", label: text("companionPage.realSilo.statSilos", "Silos"), value: finite(pageFarm.siloCount)! },
+                  ...(finite(pageFarm.compartments) !== null ? [{ key: "compartments", label: text("companionPage.realSilo.statCompartments", "Compartments in use"), value: `${finite(pageFarm.usedCompartments) ?? 0} / ${finite(pageFarm.compartments)}` }] : []),
+                  ...(finite(pageFarm.unconfigured) !== null ? [{ key: "unconfigured", label: text("companionPage.realSilo.statUnconfigured", "Silos not set up"), value: finite(pageFarm.unconfigured)! }] : []),
+                ]} />
+              ) : <Muted>{text("companions.live.siloEmpty", "No compartment silos for this farm.")}</Muted>}
+              {pageState === "partial" || realSiloPage.page?.coverage !== "complete" ? (
+                <Muted>{text("companions.live.readPartial", "Some items were not ready to read. The real count may be higher.")}</Muted>
+              ) : null}
+              <ModPageLink pageKey="realSilo" />
+            </>
+          ) : <StatusOr status={silo!.status} coverage={silo!.coverage}>
             {() =>
-              silo.rows.length ? (
+              silo!.rows.length ? (
                 <div class="fd-economy__table-wrap">
                   <table class="fd-economy__table">
                     <thead>
@@ -326,17 +386,17 @@ export function StorageAssetNotes({
                       </tr>
                     </thead>
                     <tbody>
-                      {silo.rows.map((row) => (
+                      {silo!.rows.map((row) => (
                         <SiloRow key={row.id} row={row} catalog={catalog} titles={titles} economy={economy} />
                       ))}
                     </tbody>
                   </table>
                 </div>
               ) : (
-                <Muted>{emptyAssetText(silo, "companions.live.siloEmpty", "No compartment silos for this farm.")}</Muted>
+                <Muted>{emptyAssetText(silo!, "companions.live.siloEmpty", "No compartment silos for this farm.")}</Muted>
               )
             }
-          </StatusOr>
+          </StatusOr>}
         </div>
       ) : null}
       {pallets ? (

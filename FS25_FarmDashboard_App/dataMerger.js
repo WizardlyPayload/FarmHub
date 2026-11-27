@@ -1882,6 +1882,10 @@ function mergeFields(xmlFields, luaFields, fieldLiveCache = {}) {
             // (lua-as-base when XML fields were empty) still showed Soil Fertilizer.
             soilFertilizer: luaField.soilFertilizer || xmlField.soilFertilizer || cacheRow?.soilFertilizer,
             cropStress: luaField.cropStress || xmlField.cropStress || cacheRow?.cropStress,
+            // Realistic Weather's live menu field ID and parcel charge are different
+            // keys. Keep both from the current Lua export; XML has neither reading.
+            realisticWeatherIrrigationMenu: luaField.realisticWeatherIrrigationMenu ?? null,
+            realisticWeatherIrrigation: luaField.realisticWeatherIrrigation ?? null,
             // Compact field polygon (world X/Z) + PDA fruit colour — Lua only.
             outline: luaField.outline || xmlField.outline || cacheRow?.outline,
             paintedBlobKey: luaField.paintedBlobKey || xmlField.paintedBlobKey || cacheRow?.paintedBlobKey,

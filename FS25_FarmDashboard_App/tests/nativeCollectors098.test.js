@@ -144,6 +144,49 @@ const COMPANION_FILES = ["MissionActiveRegistry.lua", "collectors/CompanionModsD
 const COMPANION_FLAT_FILES = ["collectors/CompanionModsDataCollector.lua"];
 const CROP_FILES = ["collectors/rf/RfCropStressDataCollector.lua"];
 const DAIRY_FILES = ["collectors/rf/RfDairyDataCollector.lua"];
+const RED_TAPE_FILES = ["collectors/RedTapeDataCollector.lua"];
+const RF_PRESENCE_FILES = ["collectors/rf/RfPresenceDataCollector.lua"];
+const MAIN_COLLECTOR_FILES = ["FarmDashboardDataCollector.lua"];
+
+describe("animal mode before an RL farm has any animal clusters", () => {
+    test("promotes a loaded RL mod after two readings and withholds the guess when unchecked", () => {
+        const engine = `g_currentMission.husbandrySystem = { placeables = {} }`;
+        const body = `
+local c = FarmDashboardDataCollector
+c._animalMode, c._animalModeSamples = "unknown", {last = nil, agree = 0}
+g_modIsLoaded.FS25_RealisticLivestockRM = true
+c:detectAnimalModeOnce()
+local first = c._animalMode
+c:detectAnimalModeOnce()
+local second = c._animalMode
+g_modIsLoaded.FS25_RealisticLivestockRM = false
+c._animalMode, c._animalModeSamples = "unknown", {last = nil, agree = 0}
+c:detectAnimalModeOnce()
+c:detectAnimalModeOnce()
+return table.concat({first, second, c._animalMode}, "|")
+`;
+        expect(run({ files: MAIN_COLLECTOR_FILES, engine, body })).toBe("unknown|RL|unknown");
+    });
+});
+
+describe("RF presence uses the native loaded-mod metadata API", () => {
+    test("shows the loaded mod version but does not list an installed unchecked mod", () => {
+        const engine = `
+g_modIsLoaded.FS25_SoilFertilizer = true
+g_modManager = { getModByName = function(self, name)
+    if name == "FS25_SoilFertilizer" then return { version = "2.6.0.3" } end
+    if name == "FS25_TaxMod" then return { version = "1.2.0.0" } end
+end }
+`;
+        const body = `
+local mods = RfPresenceDataCollector:collect().mods
+local soil, tax = mods[1], mods[4]
+return table.concat({ tostring(soil.detected), tostring(soil.version),
+    tostring(tax.detected), tostring(tax.version) }, "|")
+`;
+        expect(run({ files: RF_PRESENCE_FILES, engine, body })).toBe("true|2.6.0.3|false|nil");
+    });
+});
 
 const slotBale = `
 BALE = { uniqueId = "b1", nodeId = 101, fillType = 3, fillLevel = 4000, ownerFarmId = 1, className = "Bale" }
@@ -157,6 +200,98 @@ return "bales=" .. tostring(f.baleCountOnField) .. "|registered=" .. tostring(f.
 `;
 
 describe("098 field and soil collectors under the native mod environment", () => {
+    test("Realistic Weather irrigation uses the exact loaded version and current farmland owner", () => {
+        const body = `
+local modName = "FS25_RealisticWeather"
+ENGINE.g_server = {}
+ENGINE.g_modIsLoaded[modName] = true
+ENGINE.g_modManager = { getModByName = function(self, name) if name == modName then return { version = "1.2.1.0" } end end }
+ENGINE.g_farmlandManager.getFarmlandOwner = function(self, id) return id == 5 and 1 or 2 end
+ENGINE.g_currentMission.moistureSystem = {
+    mission = ENGINE.g_currentMission, isServer = true,
+    irrigatingFields = { [5] = { id = 5, isActive = true, pendingCost = 18.257 } },
+}
+local owned = FieldDataCollector.readRealisticWeatherIrrigation(5, 1)
+local foreign = FieldDataCollector.readRealisticWeatherIrrigation(5, 2)
+local engineFieldId = FieldDataCollector.readRealisticWeatherIrrigation(1, 1)
+ENGINE.g_modManager.getModByName = function() return { version = "1.2.0.0" } end
+local wrongVersion = FieldDataCollector.readRealisticWeatherIrrigation(5, 1)
+ENGINE.g_server = nil
+local client = FieldDataCollector.readRealisticWeatherIrrigation(5, 1)
+return tostring(owned.parcelId) .. "|" .. tostring(owned.active) .. "|" .. tostring(owned.pendingNextDay) .. "|" ..
+       tostring(foreign) .. "|" .. tostring(engineFieldId) .. "|" .. tostring(wrongVersion) .. "|" .. tostring(client)
+`;
+        expect(run({ files: FIELD_FILES, body })).toBe("5|true|18.26|nil|nil|nil|nil");
+    });
+
+    test("Realistic Weather parcel joins a field whose engine field ID differs", () => {
+        const body = `
+local modName = "FS25_RealisticWeather"
+ENGINE.g_server = {}
+ENGINE.g_modIsLoaded[modName] = true
+ENGINE.g_modManager = { getModByName = function() return { version = "1.2.1.0" } end }
+ENGINE.g_farmlandManager.getFarmlandOwner = function(self, id) return id == 5 and 1 or 2 end
+ENGINE.g_currentMission.moistureSystem = {
+    mission = ENGINE.g_currentMission, isServer = true,
+    irrigatingFields = { [5] = { id = 5, isActive = true, pendingCost = 18.257 } },
+}
+local fields = FieldDataCollector:collect()
+local field = fields[1]
+return tostring(field.id) .. "|" .. tostring(field.farmlandId) .. "|" ..
+       tostring(field.realisticWeatherIrrigation.parcelId) .. "|" ..
+       tostring(field.realisticWeatherIrrigation.pendingNextDay)
+`;
+        expect(run({ files: FIELD_FILES, body })).toBe("1|5|5|18.26");
+    });
+
+    test("Realistic Weather menu field ID is separate from the billed parcel ID", () => {
+        const body = `
+local modName = "FS25_RealisticWeather"
+ENGINE.g_server = {}
+ENGINE.g_modIsLoaded[modName] = true
+ENGINE.g_modManager = { getModByName = function() return { version = "1.2.1.0" } end }
+ENGINE.g_farmlandManager.getFarmlandOwner = function(self, id) return id == 5 and 1 or 2 end
+ENGINE.g_currentMission.moistureSystem = {
+    mission = ENGINE.g_currentMission, isServer = true,
+    irrigatingFields = { [29] = { id = 29, isActive = true, pendingCost = 0 } },
+}
+local menu = FieldDataCollector.readRealisticWeatherIrrigationMenu(29, 5, 1)
+local foreign = FieldDataCollector.readRealisticWeatherIrrigationMenu(29, 5, 2)
+local charge = FieldDataCollector.readRealisticWeatherIrrigation(5, 1)
+ENGINE.g_currentMission.moistureSystem.irrigatingFields[29].isActive = false
+local stopped = FieldDataCollector.readRealisticWeatherIrrigationMenu(29, 5, 1)
+return tostring(menu.fieldId) .. "|" .. tostring(menu.active) .. "|" ..
+       tostring(foreign) .. "|" .. tostring(charge) .. "|" .. tostring(stopped)
+`;
+        expect(run({ files: FIELD_FILES, body })).toBe("29|true|nil|nil|nil");
+    });
+
+    test("Realistic Weather collection uses field:getId rather than the field table index", () => {
+        const body = `
+local modName = "FS25_RealisticWeather"
+ENGINE.g_server = {}
+ENGINE.g_modIsLoaded[modName] = true
+ENGINE.g_modManager = { getModByName = function() return { version = "1.2.1.0" } end }
+ENGINE.g_farmlandManager.getFarmlandOwner = function(self, id) return id == 5 and 1 or 2 end
+local field = ENGINE.g_fieldManager.fields[1]
+ENGINE.g_fieldManager.fields = { [29] = field }
+field.getId = function(self) return 2 end
+ENGINE.g_currentMission.moistureSystem = {
+    mission = ENGINE.g_currentMission, isServer = true,
+    irrigatingFields = {
+        [2] = { id = 2, isActive = true, pendingCost = 0 },
+        [5] = { id = 5, isActive = true, pendingCost = 18.257 },
+    },
+}
+local row = FieldDataCollector:collect()[1]
+return tostring(row.id) .. "|" .. tostring(row.farmlandId) .. "|" ..
+       tostring(row.realisticWeatherIrrigationMenu.fieldId) .. "|" ..
+       tostring(row.realisticWeatherIrrigation.parcelId) .. "|" ..
+       tostring(row.realisticWeatherIrrigation.pendingNextDay)
+`;
+        expect(run({ files: FIELD_FILES, body })).toBe("29|5|2|5|18.26");
+    });
+
     test("slot-system bales and engine height types reach the field export", () => {
         expect(run({ files: FIELD_FILES, engine: slotBale, body: fieldBody })).toBe("bales=1|registered=2");
     });
@@ -204,6 +339,139 @@ DensityMapHeightUtil = { getFillLevelAtArea = function() return 0 end }
 g_densityMapHeightManager = { getIsValid = function() error("not ready") end, getDensityMapHeightTypes = function() return {} end }
 `;
         expect(run({ files: FIELD_FILES, engine, body: fieldBody })).toBe("bales=1|registered=1");
+    });
+});
+
+describe("Red Tape current-month tax under a separate mod environment", () => {
+    const engine = `
+g_modIsLoaded.FS25_RedTape = true
+g_modManager = { getModByName = function(self, name)
+    if name == "FS25_RedTape" then return { version = "1.0.3.0" } end
+end }
+g_farmManager = { farms = { { farmId = 1, name = "Owned" }, { farmId = 14, name = "Other" } } }
+g_currentMission.RedTape = {
+    getCumulativeMonth = function() return 42 end,
+    settings = { taxEnabled = true, taxRecordingEnabled = true },
+    TaxSystem = { lineItems = {
+        [1] = { [42] = { { amount = 100, statistic = "soldProducts" },
+            { amount = -25, statistic = "purchaseSeeds" },
+            { amount = -5, statistic = "policyFine" } },
+            [41] = { { amount = 900, statistic = "soldProducts" } } },
+        [14] = { [42] = { { amount = 999, statistic = "soldVehicles" },
+            { amount = -10, statistic = "propertyMaintenance" } } },
+    }, taxStatements = {} },
+}
+makeModEnv("FS25_RedTape", { RedTape = g_currentMission.RedTape })
+`;
+
+    test("reads the live target month and keeps farm totals separate", () => {
+        const body = `
+local out = RedTapeDataCollector:collect()
+local a, b = out.byFarm["1"].tax, out.byFarm["14"].tax
+return table.concat({ tostring(a.currentMonthIncome), tostring(a.currentMonthExpenses),
+    tostring(b.currentMonthIncome), tostring(b.currentMonthExpenses),
+    tostring(rawget(_G, "RedTape") == nil) }, "|")
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("100|30|999|10|true");
+    });
+
+    test("withholds current-month totals when the target month is unavailable", () => {
+        const body = `
+g_currentMission.RedTape.getCumulativeMonth = nil
+local out = RedTapeDataCollector:collect()
+local a = out.byFarm["1"].tax
+return tostring(a.currentMonthIncome) .. "|" .. tostring(a.currentMonthExpenses)
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
+    });
+
+    test("withholds month totals when Red Tape tax or tax recording is disabled or unreadable", () => {
+        const body = `
+g_currentMission.RedTape.settings.taxRecordingEnabled = false
+local recordingOff = RedTapeDataCollector:collect().byFarm["1"].tax
+g_currentMission.RedTape.settings.taxRecordingEnabled = true
+g_currentMission.RedTape.settings.taxEnabled = false
+local taxOff = RedTapeDataCollector:collect().byFarm["1"].tax
+g_currentMission.RedTape.settings = nil
+local unknown = RedTapeDataCollector:collect().byFarm["1"].tax
+return table.concat({ tostring(recordingOff.currentMonthIncome), tostring(recordingOff.currentMonthExpenses),
+    tostring(taxOff.currentMonthIncome), tostring(taxOff.currentMonthExpenses),
+    tostring(unknown.currentMonthIncome), tostring(unknown.currentMonthExpenses) }, "|")
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil|nil|nil|nil|nil");
+    });
+
+    test("withholds old invented income/expense fields instead of reporting false zero", () => {
+        const body = `
+g_currentMission.RedTape.TaxSystem.lineItems[1][42] = { { income = 100, expense = 25 } }
+local tax = RedTapeDataCollector:collect().byFarm["1"].tax
+return tostring(tax.currentMonthIncome) .. "|" .. tostring(tax.currentMonthExpenses)
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
+    });
+
+    test("withholds month totals for an unreviewed Red Tape version", () => {
+        const body = `
+g_modManager.getModByName = function() return { version = "1.0.4.0" } end
+local tax = RedTapeDataCollector:collect().byFarm["1"].tax
+return tostring(tax.currentMonthIncome) .. "|" .. tostring(tax.currentMonthExpenses)
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
+    });
+
+    test("withholds month totals when the reviewed ZIP is installed but not loaded", () => {
+        const body = `
+g_modIsLoaded.FS25_RedTape = false
+local tax = RedTapeDataCollector:collect().byFarm["1"].tax
+return tostring(tax.currentMonthIncome) .. "|" .. tostring(tax.currentMonthExpenses)
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
+    });
+
+    test("withholds month totals when the tax line register is unavailable", () => {
+        const body = `
+g_currentMission.RedTape.TaxSystem.lineItems = nil
+local tax = RedTapeDataCollector:collect().byFarm["1"].tax
+return tostring(tax.currentMonthIncome) .. "|" .. tostring(tax.currentMonthExpenses)
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
+    });
+
+    test("withholds an oversized current-month register instead of presenting a partial total", () => {
+        const body = `
+local lines = {}
+for i = 1, 257 do lines[i] = { amount = 1, statistic = "soldProducts" } end
+g_currentMission.RedTape.TaxSystem.lineItems[1][42] = lines
+local tax = RedTapeDataCollector:collect().byFarm["1"].tax
+return tostring(tax.currentMonthIncome) .. "|" .. tostring(tax.currentMonthExpenses)
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("nil|nil");
+    });
+
+    test("reads Red Tape's own scheme definitions to exclude active duplicates", () => {
+        const body = `
+FS25_RedTape.RTSchemes = {
+    [1] = { name = "Active", duplicationKey = "A" },
+    [2] = { name = "Duplicate", duplicationKey = "A" },
+    [3] = { name = "Other", duplicationKey = "B" },
+}
+g_currentMission.RedTape.PolicySystem = {
+    policies = {}, getProgressForFarm = function() return { tier = 1 } end,
+}
+g_currentMission.RedTape.SchemeSystem = {
+    availableSchemes = { [1] = { { schemeIndex = 2, tier = 1 }, { schemeIndex = 3, tier = 1 } } },
+    getActiveSchemesForFarm = function(self, farmId)
+        if farmId == 1 then return { { schemeIndex = 1, farmId = 1, tier = 1 } } end
+        return {}
+    end,
+}
+local out = RedTapeDataCollector:collect()
+local a, b = out.byFarm["1"].availableSchemes, out.byFarm["14"].availableSchemes
+return table.concat({ tostring(#a), tostring(a[1] and a[1].schemeIndex),
+    tostring(a[1] and a[1].nameKey), tostring(#b),
+    tostring(rawget(_G, "RTSchemes") == nil) }, "|")
+`;
+        expect(run({ files: RED_TAPE_FILES, engine, body })).toBe("1|3|Other|2|true");
     });
 });
 
@@ -294,6 +562,23 @@ return "scanned=" .. scanned .. "|farm1=" .. #(a.items or {}) .. "|farm2=" .. #(
 `;
         expect(run({ files: STOCK_FILES, engine: stockEngine, body })).toBe("scanned=2|farm1=1|farm2=1");
     });
+
+    test("compressed object storage excludes foreign bales from owned stock and bale counts", () => {
+        const body = `
+local placeable = { ownerFarmId = 1, getName = function() return "Bale store" end,
+    spec_objectStorage = { objectInfos = {
+        { numObjects = 3, objects = { { baleAttributes = { farmId = 2, fillType = 3, fillLevel = 4000 } } } },
+        { numObjects = 2, objects = { { baleAttributes = { farmId = 1, fillType = 3, fillLevel = 4000 } } } },
+        { numObjects = 1, objects = { { baleAttributes = { fillType = 3, fillLevel = 4000 } } } },
+    } } }
+local stock = InventoryScan.newStockState({ 1 })
+local bales = InventoryScan.newBaleState({ 1 })
+InventoryScan.scanGiantsObjectStorage(placeable, 1, stock, bales)
+local items = stock.byFarm["1"].items
+return tostring(#items) .. "|" .. tostring(items[1].totalLiters) .. "|" .. tostring(bales.byFarm["1"].inStorage.straw)
+`;
+        expect(run({ files: STOCK_FILES, body })).toBe("1|12000|3");
+    });
 });
 
 describe("098 prices and season periods under the native mod environment", () => {
@@ -330,9 +615,181 @@ return tostring(first) .. "|" .. tostring(second)
     test("a wrong-typed SeasonPeriod falls back to period-indexed factors", () => {
         expect(run({ files: ECON_FILES, engine: econEngine + "\nSeasonPeriod = 12\n", body: econBody })).toBe("Sep|1.0|1.3");
     });
+
+    test("production inputs and animal dealers do not become quoted selling offers", () => {
+        const engine = `
+g_currentMission.economyManager = { getPricePerLiter = function() return 0.45 end }
+local production = { getName = function() return "Grain Mill" end,
+    spec_productionPoint = { inputFillTypes = { [2] = true } } }
+local dealer = { getName = function() return "Animal Dealer" end,
+    spec_animalDealer = { animals = { { name = "WHEAT", price = 500 } } } }
+g_currentMission.placeableSystem = { placeables = { production, dealer } }
+`;
+        const body = `
+local market = EconomyDataCollector:collect().marketPrices
+for _, point in pairs(market.sellPoints) do
+    if point.name == "Grain Mill" or point.name == "Animal Dealer" then
+        return "invented:" .. point.name .. ":" .. tostring(point.prices.WHEAT and point.prices.WHEAT.price)
+    end
+end
+return "reference:" .. tostring(market.crops.WHEAT ~= nil)
+`;
+        expect(run({ files: ECON_FILES, engine, body })).toBe("reference:true");
+    });
+
+    test("a live selling-station offer below the seasonal base remains the actual quote", () => {
+        const engine = `
+local buyer = { id = 19, acceptedFillTypes = { [2] = true },
+    getName = function() return "Grain Buyer" end,
+    getEffectiveFillTypePrice = function() return 0.3 end }
+g_currentMission.economyManager = {
+    sellingStations = { buyer }, getPricePerLiter = function() return 0.45 end }
+`;
+        const body = `
+local market = EconomyDataCollector:collect().marketPrices
+for _, point in pairs(market.sellPoints) do
+    if point.name == "Grain Buyer" then return tostring(point.prices.WHEAT.price) end
+end
+return "missing"
+`;
+        expect(run({ files: ECON_FILES, engine, body })).toBe("300.0");
+    });
+
+    test("a live station uses its owning placeable name when the engine name getter returns nil", () => {
+        const engine = `
+local buyer = { id = 19, acceptedFillTypes = { [2] = true },
+    getName = function() return nil end,
+    owningPlaceable = { getName = function() return "Goldcrest Valley" end },
+    getEffectiveFillTypePrice = function() return 0.3 end }
+g_currentMission.economyManager = {
+    sellingStations = { buyer }, getPricePerLiter = function() return 0.45 end }
+`;
+        const body = `
+local market = EconomyDataCollector:collect().marketPrices
+for _, point in pairs(market.sellPoints) do
+    if point.name == "Goldcrest Valley" then return tostring(point.prices.WHEAT.price) end
+end
+return "missing"
+`;
+        expect(run({ files: ECON_FILES, engine, body })).toBe("300.0");
+    });
 });
 
 describe("098 vehicle ownership under the native mod environment", () => {
+    test("ADS fleet total counts only vehicles with active visible faults", () => {
+        const body = `
+local summary = FarmDashboardDataCollector:buildAdsSummary({
+    { ads = { enabled = true, breakdownCount = 2, breakdownParts = {
+        { id = "engine", isActive = true, isVisible = true },
+        { id = "suspended", isActive = false, isVisible = true },
+    } } },
+    { ads = { enabled = true, breakdownCount = 1, breakdownParts = {
+        { id = "suspended-only", isActive = false, isVisible = true },
+    } } },
+})
+return tostring(summary.vehicleCount) .. ":" .. tostring(summary.breakdownVehicleCount)
+`;
+        expect(run({ files: MAIN_COLLECTOR_FILES, body })).toBe("2:1");
+    });
+
+    test("generic ADS view reads the same visible faults as the dedicated page", () => {
+        const body = `
+local vehicle = {
+    spec_AdvancedDamageSystem = {
+        isExcludedVehicle = false, conditionLevel = 0.55, serviceLevel = 0.88,
+        currentState = "ads_spec_state_ready",
+        activeBreakdowns = { engine = { isVisible = true, isActive = true, stage = 1 } },
+    },
+    getActiveBreakdowns = function() return {} end,
+}
+local ads = VehicleDataCollector:_serializeAdsData(vehicle)
+return tostring(ads and ads.breakdownCount) .. ":" .. tostring(ads and ads.breakdownParts and ads.breakdownParts[1] and ads.breakdownParts[1].id)
+`;
+        expect(run({ files: VEHICLE_FILES, body })).toBe("1:engine");
+    });
+
+    test("generic ADS view respects the v0.9.2.8 exclusion method", () => {
+        const body = `
+local vehicle = {
+    spec_AdvancedDamageSystem = { conditionLevel = 0.55, serviceLevel = 0.88,
+        activeBreakdowns = { engine = { isVisible = true, isActive = true } } },
+    getIsADSExcluded = function() return false end,
+}
+local included = VehicleDataCollector:_serializeAdsData(vehicle)
+vehicle.getIsADSExcluded = function() return true end
+local excluded = VehicleDataCollector:_serializeAdsData(vehicle)
+vehicle.getIsADSExcluded = function() error("unavailable") end
+local unknown = VehicleDataCollector:_serializeAdsData(vehicle)
+vehicle.getIsADSExcluded = nil
+local noReviewedShape = VehicleDataCollector:_serializeAdsData(vehicle)
+return tostring(included and included.breakdownCount) .. ":" .. tostring(excluded) .. ":" .. tostring(unknown) .. ":" .. tostring(noReviewedShape)
+`;
+        expect(run({ files: VEHICLE_FILES, body })).toBe("1:nil:nil:nil");
+    });
+
+    test("Tornado Physics reports only a linked owned repair in the reviewed server version", () => {
+        const body = `
+local name = "FS25_344814_FS25_TornadoPhysics"
+ENGINE.g_server = {}
+ENGINE.g_modIsLoaded[name] = true
+local version = "4.0.0.0"
+ENGINE.g_modManager = {
+    getModByName = function(self, query)
+        if query == name then return { version = version } end
+    end
+}
+local vehicle = { rootNode = 101, getOwnerFarmId = function() return 1 end }
+local state = {
+    isInitialized = true, _pendingLoad = {},
+    _destroyedObjects = { [101] = { obj = vehicle, repairTimer = 5400000 } },
+}
+makeModEnv(name, { TornadoDestruction = state })
+local linked = VehicleDataCollector:_serializeTornadoRepair(vehicle)
+state._pendingLoad = { { filename = "same-model" } }
+local pending = VehicleDataCollector:_serializeTornadoRepair(vehicle)
+state._pendingLoad = {}
+local unowned = VehicleDataCollector:_serializeTornadoRepair({ rootNode = 101, getOwnerFarmId = function() return 0 end })
+state._destroyedObjects[101].obj = {}
+local stale = VehicleDataCollector:_serializeTornadoRepair(vehicle)
+state._destroyedObjects[101].obj = vehicle
+version = "4.0.0.1"
+local unreviewed = VehicleDataCollector:_serializeTornadoRepair(vehicle)
+version = "4.0.0.0"
+ENGINE.g_server = nil
+local client = VehicleDataCollector:_serializeTornadoRepair(vehicle)
+ENGINE.g_server = {}
+ENGINE.g_modIsLoaded[name] = false
+local alias = "KM_73973_Tornado_Physics"
+ENGINE.g_modIsLoaded[alias] = true
+ENGINE.g_modManager.getModByName = function(self, query)
+    if query == alias then return { version = "4.0.0.0" } end
+end
+makeModEnv(alias, { TornadoDestruction = state })
+local duplicatePath = VehicleDataCollector:_serializeTornadoRepair(vehicle)
+return tostring(linked and linked.remainingMs) .. ":" .. tostring(pending) .. ":" .. tostring(unowned) .. ":" .. tostring(stale) .. ":" .. tostring(unreviewed) .. ":" .. tostring(client) .. ":" .. tostring(duplicatePath and duplicatePath.remainingMs)
+`;
+        expect(run({ files: VEHICLE_FILES, body })).toBe("5400000:nil:nil:nil:nil:nil:5400000");
+    });
+
+    test("base-game attachment records yield direct equipment names without a companion mod", () => {
+        const body = `
+local tractor = {
+    getAttachedImplements = function()
+        return {
+            { object = { getFullName = function() return "Kühn Seeder" end } },
+            { object = { getFullName = function() error("name unavailable") end,
+                         getName = function() return "Brantner Trailer" end } },
+            { object = {} }
+        }
+    end
+}
+local count, names = VehicleDataCollector:_serializeAttachedEquipment(tractor)
+local emptyCount, emptyNames = VehicleDataCollector:_serializeAttachedEquipment({})
+return tostring(count) .. ":" .. table.concat(names, ",") .. ":" .. tostring(emptyCount) .. ":" .. tostring(emptyNames)
+`;
+        expect(run({ files: VEHICLE_FILES, body })).toBe("3:Kühn Seeder,Brantner Trailer:0:nil");
+    });
+
     const vehicleBody = `
 local out = {}
 for _, ps in ipairs({ 2, 3, 5 }) do
@@ -489,6 +946,50 @@ return tostring(p.enabled) .. "|" .. table.concat(out, "|")
 
     test("Dairy Core contract names come from its own environment and farms stay separate", () => {
         expect(run({ files: DAIRY_FILES, engine: dairyEngine, body: dairyBody })).toBe(dairyExpected);
+    });
+
+    test("Dairy Core skips ownerless barns while retaining explicit farm 2", () => {
+        const engine = `${dairyEngine}
+DAIRY.barns.b1.farmId = nil
+DAIRY.getBarnRows = function(self)
+    return { { barnId = "b1", herdHealth = 90 }, { barnId = "b2", herdHealth = 70 } }
+end
+`;
+        const body = `local _, p = RfDairyDataCollector:collectStep({})
+return tostring(p.enabled) .. ":" .. tostring(p.byFarm["1"] == nil) .. ":" .. tostring(p.byFarm["2"].barns[1].barnId)`;
+        expect(run({ files: DAIRY_FILES, engine, body })).toBe("true:true:b2");
+    });
+
+    test("Dairy Core fallback does not assign ownerless barn to farm 1", () => {
+        const engine = `${dairyEngine}
+DAIRY.getBarnRows = nil
+DAIRY.barns.b1.farmId = nil
+`;
+        const body = `local _, p = RfDairyDataCollector:collectStep({})
+return tostring(p.enabled) .. ":" .. tostring(p.byFarm["1"] == nil) .. ":" .. tostring(p.byFarm["2"].barns[1].barnId)`;
+        expect(run({ files: DAIRY_FILES, engine, body })).toBe("true:true:b2");
+    });
+
+    test("Dairy Core breed provenance is bounded to its declared farm and preserves unavailable", () => {
+        const engine = `${dairyEngine}
+DAIRY.getBarnRows = function(self)
+    return {
+        { barnId = "b1", farmId = 1, breedSurfaceVersion = 1, breedSurfaceFarmId = 1,
+          herdBreedComposition = { available = true, totalMilkingHeadcount = 3, counts = { HOLSTEIN = 2, ANGUS = 1 } },
+          milkBreedProvenance = { MILK = { available = true, litres = 100, knownLitres = { HOLSTEIN = 60 }, unknownLitres = 40 },
+            MILKGOAT = { available = false, reason = "WAITING_FOR_SERVER" } } },
+        { barnId = "b2", farmId = 2, breedSurfaceVersion = 1, breedSurfaceFarmId = 1,
+          herdBreedComposition = { available = false }, milkBreedProvenance = { MILK = { available = false } } }
+    }
+end
+`;
+        const body = `local _, p = RfDairyDataCollector:collectStep({})
+local a = p.byFarm["1"].barns[1].breedSurface
+local b = p.byFarm["2"].barns[1].breedSurface
+return table.concat({tostring(a.herd.totalMilkingHeadcount), a.herd.breeds[1].name,
+    tostring(a.milk[1].litres), tostring(a.milk[1].unknownLitres),
+    tostring(a.milk[2].available), tostring(a.milk[2].litres == nil), tostring(b == nil)}, ":")`;
+        expect(run({ files: DAIRY_FILES, engine, body })).toBe("3:ANGUS:100:40:false:true:true");
     });
 
     test("a dashboard DairyConstants shadow is ignored", () => {

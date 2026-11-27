@@ -2,6 +2,65 @@
 
 FieldDataCollector = {}
 
+-- Realistic Weather v1.2.1.0 writes menu toggles by field:getId() and grid
+-- charges by farmland ID into one table. The field table index can differ
+-- from both. Keep the meanings separate even where their numbers coincide.
+local function realisticWeatherIrrigationSystem()
+    local modName = "FS25_RealisticWeather"
+    if _G.g_server == nil or type(_G.g_modIsLoaded) ~= "table" or _G.g_modIsLoaded[modName] ~= true then
+        return nil
+    end
+    local modManager = _G.g_modManager
+    if type(modManager) ~= "table" or type(modManager.getModByName) ~= "function" then return nil end
+    local okMod, mod = pcall(modManager.getModByName, modManager, modName)
+    if not okMod or type(mod) ~= "table" or mod.version ~= "1.2.1.0" then return nil end
+    local mission = _G.g_currentMission
+    local sys = type(mission) == "table" and mission.moistureSystem or nil
+    if type(sys) ~= "table" or sys.isServer ~= true or sys.mission ~= mission or type(sys.irrigatingFields) ~= "table" then
+        return nil
+    end
+    return sys
+end
+
+local function ownedRealisticWeatherParcel(parcelId, ownerFarmId)
+    if type(parcelId) ~= "number" or parcelId < 1 or parcelId % 1 ~= 0 or
+       type(ownerFarmId) ~= "number" or ownerFarmId < 1 or ownerFarmId == 100 then return false end
+    local farmlandManager = _G.g_farmlandManager
+    if type(farmlandManager) ~= "table" or type(farmlandManager.getFarmlandOwner) ~= "function" then return false end
+    local okOwner, currentOwner = pcall(farmlandManager.getFarmlandOwner, farmlandManager, parcelId)
+    return okOwner and currentOwner == ownerFarmId
+end
+
+-- Billing resolves the record key as a farmland parcel ID. Never report a
+-- menu field-ID record as an owned next-day charge merely because it is active.
+function FieldDataCollector.readRealisticWeatherIrrigation(parcelId, ownerFarmId)
+    local sys = realisticWeatherIrrigationSystem()
+    if not sys or not ownedRealisticWeatherParcel(parcelId, ownerFarmId) then return nil end
+    local record = sys.irrigatingFields[parcelId]
+    if type(record) ~= "table" or record.id ~= parcelId or type(record.isActive) ~= "boolean" then return nil end
+    local pending = record.pendingCost
+    if type(pending) ~= "number" or pending ~= pending or pending < 0 or pending > 1000000000 then return nil end
+    if not record.isActive and pending == 0 then return nil end
+    return {
+        parcelId = parcelId,
+        active = record.isActive,
+        pendingNextDay = math.floor(pending * 100 + 0.5) / 100,
+    }
+end
+
+-- The mod's own menu calls getIsFieldBeingIrrigated(field:getId()). This
+-- mirrors that visible toggle, with a separate current parcel-owner gate.
+-- It does not claim that the record's pendingCost will be billed to this farm.
+function FieldDataCollector.readRealisticWeatherIrrigationMenu(fieldId, parcelId, ownerFarmId)
+    local sys = realisticWeatherIrrigationSystem()
+    if not sys or not ownedRealisticWeatherParcel(parcelId, ownerFarmId) or
+       type(fieldId) ~= "number" or fieldId < 1 or fieldId % 1 ~= 0 then return nil end
+    local record = sys.irrigatingFields[fieldId]
+    if type(record) ~= "table" or record.id ~= fieldId or type(record.isActive) ~= "boolean" or
+       not record.isActive then return nil end
+    return { fieldId = fieldId, active = true }
+end
+
 local soilSampleHold = {}
 
 --- Mission-monotonic g_time, inherited through the mod environment.
@@ -3383,6 +3442,14 @@ function FieldDataCollector:_collectImpl()
             fData.fruitMapColor = hex
         end
 
+        local parcelId = field.farmland and field.farmland.id or nil
+        local menuFieldId = nil
+        if type(field.getId) == "function" then
+            local okId, value = pcall(field.getId, field)
+            if okId then menuFieldId = value end
+        end
+        fData.realisticWeatherIrrigation = FieldDataCollector.readRealisticWeatherIrrigation(parcelId, ownerFarmId)
+        fData.realisticWeatherIrrigationMenu = FieldDataCollector.readRealisticWeatherIrrigationMenu(menuFieldId, parcelId, ownerFarmId)
         table.insert(fieldData, fData)
         fieldCoopTick()
         end

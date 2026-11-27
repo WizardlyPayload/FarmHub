@@ -337,6 +337,7 @@ function StorageTab({
                   const maxValue = computeValue(liters, maxPrice);
                   const maxMonth = item._maxPriceMonth || resolveMaxPriceMonth(item._crop);
                   const station = resolveStationName(item, item._crop);
+                  const referencePrice = item._priceSource === "reference";
                   const trend = priceTrendDirection(item.priceTrend);
                   const open = !!expanded[key];
                   const moistureSummary = moistureSummaries.get(item) || null;
@@ -389,14 +390,20 @@ function StorageTab({
                           <span class={`fd-economy__trend--${trend}`}>
                             {trend === "up" ? "▲" : trend === "down" ? "▼" : "−"}
                           </span>
+                          {pricePer1000 > 0 && referencePrice ? (
+                            <span class="fd-economy__muted" title={tOr("storage.referencePriceHint", "Reference price from economy data. No current buyer offer was verified for this stock.")}>
+                              {" "}{tOr("storage.referenceEstimate", "estimate")}
+                            </span>
+                          ) : null}
                         </td>
                         <td
                           class={`text-end ${value > 0 && (item.greatDemand || value >= 10000) ? "fd-economy__value-hi" : ""}`}
+                          title={referencePrice ? tOr("storage.referencePriceHint", "Reference price from economy data. No current buyer offer was verified for this stock.") : undefined}
                         >
                           {value > 0 ? formatMoney(value, profile) : "—"}
                         </td>
                         <td>
-                          {station || (
+                          {!referencePrice && station ? station : (
                             <span class="fd-economy__muted">{t("storage.noSellingPoint")}</span>
                           )}
                         </td>
@@ -619,7 +626,6 @@ export function StorageSection() {
           <p class="fd-muted-sm">{t("storage.hintEmpty")}</p>
         </header>
 
-      <CompanionModsEmbed categories={["storage"]} title={tOr("companions.embedStorage", "Storage companion mods")} />
       </div>
     );
   }
@@ -632,6 +638,11 @@ export function StorageSection() {
       </header>
       <FertilizerDepotPanel fertilizerDepot={payload.realisticFarming?.fertilizerDepot} />
       <StorageTab payload={payload} farmId={farmId} consumables={consumables} />
+      <CompanionModsEmbed
+        categories={["storage"]}
+        exclude={["realSilo", "palletDegradation"]}
+        title={tOr("companions.embedStorage", "Storage companion mods")}
+      />
     </div>
   );
 }

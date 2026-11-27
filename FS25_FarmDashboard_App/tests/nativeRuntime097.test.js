@@ -430,6 +430,19 @@ describe("native mod environment: inherited engine runtime", () => {
         expect(result).toBe("truetrue,falsefalse");
     });
 
+    test("R16b Realistic Livestock Ritter vault variants activate the animal collector", () => {
+        const result = run("inherited", `
+            E("g_modIsLoaded", { FS25_RealisticLivestockRM = true })
+            local stable = dc:isRealisticLivestockLoaded()
+            E("g_modIsLoaded", { GH_rittermod__FS25_RealisticLivestockRM_FS25_RealisticLivestockRM = true })
+            local github = dc:isRealisticLivestockLoaded()
+            E("g_modIsLoaded", {})
+            local absent = dc:isRealisticLivestockLoaded()
+            return tostring(stable) .. "," .. tostring(github) .. "," .. tostring(absent)
+        `);
+        expect(result).toBe("true,true,false");
+    });
+
     test("R17 [control] readFile already resolves through the normal-lookup branch (no change needed)", () => {
         const result = run("inherited", `
             ExportEnvelopePublisher = ExportEnvelopePublisher or {}

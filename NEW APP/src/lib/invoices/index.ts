@@ -7,6 +7,7 @@ export const INVOICE_STATE = {
   SENT: 2,
   PAID: 3,
   CANCELLED: 4,
+  PROPOSED: 5,
 } as const;
 
 export interface InvoiceCreatedAt {
@@ -126,6 +127,7 @@ export function invoiceStateCode(item: InvoiceItem | null | undefined): number {
     if (lower === "new" || lower === "unpaid" || lower === "pending") return INVOICE_STATE.NEW;
     if (lower === "sent") return INVOICE_STATE.SENT;
     if (lower === "paid") return INVOICE_STATE.PAID;
+    if (lower === "proposed") return INVOICE_STATE.PROPOSED;
     if (lower === "cancelled" || lower === "canceled") return INVOICE_STATE.CANCELLED;
     const n = Number(raw);
     if (Number.isFinite(n)) return n;
@@ -133,13 +135,14 @@ export function invoiceStateCode(item: InvoiceItem | null | undefined): number {
   return 0;
 }
 
-export type InvoiceDisplayState = "paid" | "overdue" | "unpaid" | "cancelled" | "sent" | "unknown";
+export type InvoiceDisplayState = "paid" | "overdue" | "unpaid" | "cancelled" | "sent" | "proposed" | "unknown";
 
 export function invoiceDisplayState(item: InvoiceItem | null | undefined): InvoiceDisplayState {
   if (!item) return "unknown";
   const code = invoiceStateCode(item);
   if (code === INVOICE_STATE.PAID) return "paid";
   if (code === INVOICE_STATE.CANCELLED) return "cancelled";
+  if (code === INVOICE_STATE.PROPOSED) return "proposed";
   const penalty = Number(item.penaltyAmount ?? 0);
   if (Number.isFinite(penalty) && penalty > 0 && code !== INVOICE_STATE.PAID) return "overdue";
   if (code === INVOICE_STATE.SENT) return "sent";
@@ -150,6 +153,7 @@ export function invoiceDisplayState(item: InvoiceItem | null | undefined): Invoi
     if (l.includes("overdue")) return "overdue";
     if (l.includes("cancel")) return "cancelled";
     if (l.includes("sent")) return "sent";
+    if (l.includes("proposed")) return "proposed";
     if (l.includes("unpaid") || l.includes("pending") || l.includes("new")) return "unpaid";
   }
   return code > 0 ? "unpaid" : "unknown";
@@ -196,7 +200,8 @@ export function partitionInvoiceItems(
 }
 
 function sumTotals(items: InvoiceItem[]): number {
-  return items.reduce((acc, item) => acc + invoiceTotalDue(item), 0);
+  // A proposal is not yet an invoice payable by either farm.
+  return items.reduce((acc, item) => acc + (invoiceStateCode(item) === INVOICE_STATE.PROPOSED ? 0 : invoiceTotalDue(item)), 0);
 }
 
 function buildSummary(

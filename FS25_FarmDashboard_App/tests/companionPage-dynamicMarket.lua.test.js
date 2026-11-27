@@ -83,4 +83,14 @@ describe("companion page: Dynamic Market (Lua)", () => {
         const page = runCompanionPage(FILE, setup("FS25_DynamicMarket.DynamicMarket = nil"));
         expect(page.readState).toBe("detection-only");
     });
+
+    test("exact v1.3.0.0 vault alias reads its own mod environment", () => {
+        const game = setup()
+            .replaceAll("FS25_DynamicMarket", "KM_79085_Dynamic_Market")
+            + "\n_G.FS25_DynamicMarket = { DynamicMarket = { GROUP_ORDER = {} } }\n";
+        const page = runCompanionPage(FILE, game);
+        expect(page).toMatchObject({ readState: "ok", period: 4, year: 2 });
+        expect(page.groups).toHaveLength(2);
+        expect(page.pressureActive).toBe(1);
+    });
 });

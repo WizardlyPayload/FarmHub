@@ -514,6 +514,12 @@ export function LiveStats({
         {payload.saveUnitProfiles.profileName ? (
           <Badge tone="default">{payload.saveUnitProfiles.profileName}</Badge>
         ) : null}
+        {(payload.saveUnitProfiles.hasApplied && payload.saveUnitProfiles.lastApplyOk === false)
+          || moneyProfile?.applyState === "partial" ? (
+          <Badge tone="warn">
+            {tOr("companions.live.supPartial", "Profile settings could not be fully verified")}
+          </Badge>
+        ) : null}
       </div>
     );
   }
@@ -589,8 +595,31 @@ export function LiveStats({
     return (
       <div class="fd-economy__env">
         {tasks.slice(0, 3).map((task) => (
-          <Badge key={task.id}>{task.detail || task.id}</Badge>
+          <div class="fd-companions__task" key={task.id}>
+            <Badge>{task.detail || task.id}</Badge>
+            <div class="fd-companions__task-meta">
+              {task.groupName ? <span>{task.groupName}</span> : null}
+              {task.recurMode === 2 ? <span>{tOr("companions.live.taskDaily", "Daily")}</span> : null}
+              {typeof task.priority === "number" && Number.isFinite(task.priority) ? (
+                <span>{tOr("companions.live.taskPriority", "Priority {{count}}", { count: task.priority })}</span>
+              ) : null}
+              {typeof task.effort === "number" && Number.isFinite(task.effort) ? (
+                <span>{tOr("companions.live.taskEffort", "Effort {{count}}", { count: task.effort })}</span>
+              ) : null}
+            </div>
+          </div>
         ))}
+        {tasks.length > 3 ? (
+          <p class="fd-economy__muted">
+            {tOr("companions.live.showingRows", "Showing {{shown}} of {{count}} row(s).", {
+              shown: 3,
+              count: tasks.length,
+            })}
+          </p>
+        ) : null}
+        {payload.taskList.coverage === "partial" || payload.taskList.coverage === "truncated" ? (
+          <p class="fd-economy__muted">{tOr("companions.live.readPartial", "Some items were not ready to read. The real count may be higher.")}</p>
+        ) : null}
       </div>
     );
   }
@@ -606,7 +635,8 @@ export function LiveStats({
       <div class="fd-economy__env">
         {recipes.slice(0, 3).map((row) => (
           <Badge key={`${row.pointKey}-${row.recipeId}`}>
-            {row.recipeId} {row.status === "aktiv" ? tOr("companions.live.scheduleOn", "scheduled") : tOr("companions.live.scheduleOff", "not scheduled")}
+            {row.pointName || row.pointKey}: {row.recipeName || row.recipeId} {row.status === "aktiv" ? tOr("companions.live.scheduleOn", "scheduled") : tOr("companions.live.scheduleOff", "not scheduled")}
+            {Array.isArray(row.months) && row.months.length > 0 ? ` (${row.months.join(", ")})` : ""}
           </Badge>
         ))}
       </div>
@@ -705,8 +735,11 @@ export function LiveStats({
         </p>
       );
     }
-    if (orders.readState !== "ok" || orders.orderCount == null || orders.orderCount === 0) {
+    if (orders.readState === "empty" || (orders.readState === "ok" && orders.orderCount === 0)) {
       return <p class="fd-economy__muted">{tOr("companions.live.vipEmpty", "No open VIP orders.")}</p>;
+    }
+    if (orders.readState !== "ok" || orders.orderCount == null) {
+      return <p class="fd-economy__muted">{tOr("companions.live.readUnavailable", "This mod's reading is not available in this save.")}</p>;
     }
     const current = orders.currentOrder;
     return (
@@ -718,7 +751,7 @@ export function LiveStats({
         </Badge>
         {current && current.items != null ? (
           <Badge tone="accent">
-            {tOr("companions.live.vipCurrent", "Current order: {{left}} of {{items}} item(s) left, {{amount}} payout", {
+            {tOr("companions.live.vipCurrent", "Current order: {{left}} of {{items}} item(s) left, {{amount}} potential payout", {
               left: current.remainingItems ?? 0,
               items: current.items,
               amount: formatCurrency(current.payout ?? 0, moneyProfile),

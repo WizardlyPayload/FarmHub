@@ -2,7 +2,19 @@
 
 Player-facing history for the **V5 / new screens** line. Classic 4.x notes stay in [`../CHANGELOG.md`](../CHANGELOG.md).
 
-**Current V5 release:** app **5.2.7**, mod **5.1.0.12**. Use the two files from the same release. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
+**Current V5 release pair:** app **5.2.155**, mod **5.1.0.140**. Use the two files from the same release. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
+
+---
+
+## 5.2.155 / 5.1.0.140 — release
+
+- Added bounded, read-only farm data for selected optional mods, including field plans and jobs, equipment settings, finance records, and crop rotation templates. A recorded plan, setting or pending amount does not prove work, output or payment.
+- Improved Personnel specialization wording and clarified that temporary Employees hours can include unassigned contract time. Installed testing confirmed the temporary-worker wording; the specific Personnel Efficient Use label was not generated in that run.
+- Corrected Seasonal Milk's uncaptured-baseline display and Factory Profit Calculator's whole-currency rounding in earlier private builds. These readings retain their page-specific coverage limits.
+- Reused local save slots now reject exports from a prior map and show a waiting state until the current save produces its own export. The selected save name refreshes from the current career file.
+- On fields with RF Soil, the card now keeps the separate base-game weed-cover badge visible. RF Soil weed pressure and native weed cover can differ at the same export and should not be read as the same measure.
+- Production Control and Distribution Redux are not claimed compatible with the reviewed normal StockGuard build because their adapters remain unbound. Production Supply Manager's latest test stopped before world load and is not a positive purchase-history result.
+- The V5 updater continues to use `latest-rf.yml`; Classic V4 and `latest.yml` are unchanged.
 
 ---
 

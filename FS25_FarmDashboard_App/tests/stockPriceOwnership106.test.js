@@ -140,7 +140,7 @@ function consume(json) {
 }
 
 describe("106 fractional money-per-litre prices survive producer, JSON and consumer", () => {
-    test("native 0.80/L beats the 0.30/L market and exports 0.8, read as 800 per 1000 L without economy data", () => {
+    test("native buyer at 0.80/L exports 0.8, read as 800 per 1000 L without economy data", () => {
         const engine = `stations({ buyer("Public", 0, 0.8) })`;
         expect(run(engine, `return priceOf(1)`)).toBe("0.8|Public");
         const json = run(engine, `return jsonItems(StockDataCollector:collect(), 1)`);
@@ -150,6 +150,29 @@ describe("106 fractional money-per-litre prices survive producer, JSON and consu
         expect(row.per1000).toBeCloseTo(800, 9);
         expect(row.value).toBeCloseTo(800, 9);
         expect(storage.resolvePricePer1000(JSON.parse(json)[0], null)).toBeCloseTo(800, 9);
+    });
+
+    test("an actual buyer offer takes priority over a virtual economy base price", () => {
+        const json = run(`MARKET = 1; stations({ buyer("Public", 0, 0.8) })`, `return jsonItems(StockDataCollector:collect(), 1)`);
+        const [item] = JSON.parse(json);
+        const crop = { avgXmlPrice: 1000, locations: [{ name: "Market Base Prices", price: 1000 }] };
+        expect(storage.resolvePricePer1000(item, crop)).toBeCloseTo(800, 9);
+        expect(storage.resolveStationName(item, crop)).toBe("Public");
+    });
+
+    test("enriched Storage rows distinguish an observed buyer from an economy reference", () => {
+        const crop = { fillTypeIndex: 11, avgXmlPrice: 1000,
+            locations: [{ name: "Market Base Prices", price: 1000 }],
+            bestLocation: "Market Base Prices" };
+        const economy = { marketPrices: { crops: { SILAGE: crop } } };
+        const base = { fillTypeIndex: 11, fillType: "SILAGE", totalLiters: 1000, locations: [] };
+        const reference = storage.enrichStockItem(base, null, economy, null);
+        expect(reference._pricePer1000).toBe(1000);
+        expect(reference._priceSource).toBe("reference");
+        const offer = storage.enrichStockItem({ ...base, bestSellPrice: 0.8,
+            bestSellStation: "Public" }, null, economy, null);
+        expect(offer._pricePer1000).toBe(800);
+        expect(offer._priceSource).toBe("buyer");
     });
 
     test("a price above 1/L keeps its fraction (1.10 stays 1.1, read as 1100)", () => {
@@ -171,14 +194,51 @@ describe("106 fractional money-per-litre prices survive producer, JSON and consu
         expect(consume(json)[0].per1000).toBeCloseTo(3.5, 9);
     });
 
-    test("with no selling stations the market fallback price is kept fractional", () => {
-        expect(run(`stations({})`, `return priceOf(1)`)).toBe("0.3|Market");
-        expect(run(`stations({}); g_currentMission.storageSystem = { getUnloadingStations = function() error("not ready") end }`, `return priceOf(2)`)).toBe("0.3|Market");
+    test("a seasonal base price is not represented as an available buyer", () => {
+        expect(run(`stations({})`, `return priceOf(1)`)).toBe("nil|nil");
+        expect(run(`stations({}); g_currentMission.storageSystem = { getUnloadingStations = function() error("not ready") end }`, `return priceOf(2)`)).toBe("nil|nil");
+        expect(run(`MARKET = 2; stations({ buyer("Actual buyer", 0, 0.2) })`, `return priceOf(1)`)).toBe("0.2|Actual buyer");
+    });
+
+    test("station without an effective offer method cannot turn the base price into a buyer quote", () => {
+        const engine = `
+local st = buyer("Method absent", 0, 0.8)
+st.getEffectiveFillTypePrice = nil
+stations({ st })
+MARKET = 2
+`;
+        expect(run(engine, `return priceOf(1)`)).toBe("nil|nil");
     });
 
     test("no valid price at all leaves the item unpriced instead of 0", () => {
         const engine = `MARKET = 0; stations({ buyer("Closed", 0, 0) })`;
         expect(run(engine, `local it = item(StockDataCollector:collect(), 1); return tostring(it.bestSellPrice) .. "|" .. tostring(it.bestSellStation) .. "|" .. it.totalLiters`)).toBe("nil|nil|1000");
+    });
+
+    test("a winning native station uses its placeable name when SellingStation:getName returns nil", () => {
+        const engine = `
+local st = buyer("", 0, 0.8)
+st.getName = function() return nil end
+st.owningPlaceable = { getName = function() return "Grain East" end }
+stations({ st })
+`;
+        expect(run(engine, `return priceOf(1)`)).toBe("0.8|Grain East");
+        const nameless = `
+local st = buyer("", 0, 0.8)
+st.getName = function() return nil end
+stations({ st })
+`;
+        expect(run(nameless, `return priceOf(1)`)).toBe("0.8|nil");
+    });
+
+    test("a higher priced station replaces earlier demand and trend metadata", () => {
+        const engine = `
+local low = buyer("Demand", 0, 0.6)
+low.greatDemandFillType = 11
+low.getCurrentPricingTrend = function() return 4 end
+stations({ low, buyer("Higher", 0, 0.8) })
+`;
+        expect(run(engine, `local it = item(StockDataCollector:collect(), 1); return tostring(it.bestSellStation) .. "|" .. tostring(it.greatDemand) .. "|" .. tostring(it.priceTrend)`)).toBe("Higher|false|0");
     });
 
     test("throwing readers are isolated and the good buyer still wins", () => {
@@ -242,7 +302,7 @@ return table.concat(out, "|")
         const engine = `stations({ buyer("Farm A buyer", 1, 5.0), buyer("Farm B buyer", 2, 5.0) })`;
         expect(run(engine + "\nVIEWER = 2", perFarm)).toBe("1:Farm B buyer|2:Farm A buyer");
         const selfOnly = `stations({ buyer("Farm A buyer", 1, 5.0) })`;
-        expect(run(selfOnly + "\nVIEWER = 2", `return priceOf(1) .. "/" .. priceOf(2)`)).toBe("0.3|Market/5|Farm A buyer");
+        expect(run(selfOnly + "\nVIEWER = 2", `return priceOf(1) .. "/" .. priceOf(2)`)).toBe("nil|nil/5|Farm A buyer");
     });
 
     test("unowned buyers (ownerFarmId 0 or nil) serve every farm", () => {

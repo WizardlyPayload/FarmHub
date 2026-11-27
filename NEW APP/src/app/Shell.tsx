@@ -38,6 +38,13 @@ export function Shell() {
   const activeFarmId = useDashboardStore((s) => s.activeFarmId);
   const locale = useDashboardStore((s) => s.locale);
   const setEnabledSections = useDashboardStore((s) => s.setEnabledSections);
+  const publishedGeneration = (payload as typeof payload & {
+    sourceBinding?: { exportIdentity?: { exportGeneration?: number } | null };
+  })?.sourceBinding?.exportIdentity?.exportGeneration;
+  const hasCommittedExport = Boolean(payload && !payload.error
+    && (payload.luaAvailable === true || Number(publishedGeneration) > 0));
+  const selectedSetupStatus = setupStatus?.sourceId && activeServerId
+    && setupStatus.sourceId !== activeServerId ? null : setupStatus;
 
   const unavailableModSection = useMemo(() => {
     if (!payload) return false;
@@ -115,7 +122,8 @@ export function Shell() {
       <PlatformChrome />
       <AppTopBar onOpenSettings={() => setSettingsOpen(true)} />
       <HelperPanel
-        status={setupStatus}
+        status={selectedSetupStatus}
+        hasCommittedExport={hasCommittedExport}
         onUpdated={setSetupStatus}
         onOpenSettings={() => setSettingsOpen(true)}
       />

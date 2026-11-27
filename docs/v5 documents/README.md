@@ -4,15 +4,15 @@ This is the help pack for the **V5 Windows dashboard**. Start with [installation
 
 ## Which version?
 
-- **Current V5 release:** Windows app **5.2.7** with the canonical `FS25_FarmDashboard.zip` mod **5.1.0.12**. Use matching files from [GitHub v5.2.7](https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.2.7) or the [itch.io V5 page](https://wizardlypayload.itch.io/farm-dashobaord-fs25).
-- **Acceptance boundary:** the exact 5.2.6/5.1.0.12 pair passed the PC Catuaí orchard check and bounded Ally installation, DLC, map, image, and Keep uninstall/reinstall checks. App 5.2.7 updates a packaged dependency; its PC installation and Catuaí pages passed, and the exact 5.2.7 installer passed an app-only Ally install/Keep/reinstall with restoration. The game was not reloaded for 5.2.7 because the mod ZIP is byte-identical. See the [DLC acceptance record](../DLC-COVERAGE-AUDIT-2026-10-28.md) for gameplay observations and limits.
+- **Current V5 release pair:** Windows app **5.2.155** with the canonical `FS25_FarmDashboard.zip` mod **5.1.0.140**. Use matching files from [GitHub v5.2.155](https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.2.155) or the [itch.io V5 page](https://wizardlypayload.itch.io/farm-dashobaord-fs25).
+- **Acceptance boundary:** optional-mod results are bounded to the named game, export, and installed-page readings; they do not prove every action or combination. Production Control and Distribution Redux have unbound adapters in the reviewed normal StockGuard build. See [Compatibility](COMPATIBILITY.md), the [optional-mod guide](COMPANION_MODS.md), and the earlier [DLC acceptance record](../DLC-COVERAGE-AUDIT-2026-10-28.md).
 - **Classic V4:** a separate product line. Its public 4.2.1 story and update feed have not been changed. This V5 pass was **not** a new V4 test.
 
 ## Find the answer you need
 
 - [Install and first launch](INSTALL.md): mod ZIP, Windows installer, single-player, dedicated linking, FTP, and removal.
 - [Using the dashboard](USER_MANUAL.md): live versus held, every core section, settings, and alerts.
-- [Optional mods, one by one](COMPANION_MODS.md): 64 catalogued companions and the RF suite, including detection-only limits.
+- [Optional mods, one by one](COMPANION_MODS.md): catalogued companions and the RF suite, including detection-only and blocked-combination limits.
 - [Compatibility](COMPATIBILITY.md): independent combinations and Precision Farming versus Soil Fertilizer.
 - [Screenshots](SCREENSHOTS.md): current-build captures, older illustrations, and images still needing a manual capture.
 - [Troubleshooting](TROUBLESHOOTING.md): short symptom-first help.

@@ -5,6 +5,8 @@ RedTapeDataCollector = {}
 
 local MAX_EVENTS = 20
 local MAX_TAX_STATEMENTS = 12
+local MAX_CURRENT_MONTH_LINES = 256
+local REVIEWED_TAX_VERSION = "1.0.3.0"
 local MAX_POLICIES = 16
 local MAX_SCHEMES = 12
 local MAX_GRANTS = 8
@@ -47,6 +49,17 @@ local function rtTierLabel(tierNum)
     return TIER_NAMES[tonumber(tierNum)] or "D"
 end
 
+local function rtDefinitions(symbol)
+    for _, modName in ipairs({ "FS25_RedTape", "FS25_RedTape_CareerSavegame" }) do
+        local modEnv = _G[modName]
+        if type(modEnv) == "table" and type(modEnv[symbol]) == "table" then
+            return modEnv[symbol]
+        end
+    end
+    local flat = rawget(_G, symbol)
+    return type(flat) == "table" and flat or nil
+end
+
 local function rtPolicyNameKey(policy)
     if not policy then return nil end
     if policy.getName then
@@ -54,8 +67,9 @@ local function rtPolicyNameKey(policy)
         if ok and name then return tostring(name) end
     end
     local idx = tonumber(policy.policyIndex)
-    if idx and _G.RTPolicies and _G.RTPolicies[idx] then
-        return _G.RTPolicies[idx].name
+    local definitions = rtDefinitions("RTPolicies")
+    if idx and definitions and definitions[idx] then
+        return definitions[idx].name
     end
     return nil
 end
@@ -67,8 +81,9 @@ local function rtSchemeNameKey(scheme)
         if ok and name then return tostring(name) end
     end
     local idx = tonumber(scheme.schemeIndex)
-    if idx and _G.RTSchemes and _G.RTSchemes[idx] then
-        return _G.RTSchemes[idx].name
+    local definitions = rtDefinitions("RTSchemes")
+    if idx and definitions and definitions[idx] then
+        return definitions[idx].name
     end
     return nil
 end
@@ -148,6 +163,7 @@ rtSerializeAvailableSchemesForFarm = function(schemeSystem, policySystem, farmId
     local tierList = schemeSystem.availableSchemes and schemeSystem.availableSchemes[farmTier]
     if type(tierList) ~= "table" then return {} end
     local activeSchemes = schemeSystem.getActiveSchemesForFarm and schemeSystem:getActiveSchemesForFarm(farmId) or {}
+    local definitions = rtDefinitions("RTSchemes")
     local out = {}
     for _, scheme in pairs(tierList) do
         if scheme and #out < MAX_SCHEMES then
@@ -155,10 +171,10 @@ rtSerializeAvailableSchemesForFarm = function(schemeSystem, policySystem, farmId
                 -- skip wrong tier bucket
             else
                 local available = true
-                local schemeInfo = _G.RTSchemes and _G.RTSchemes[scheme.schemeIndex]
+                local schemeInfo = definitions and definitions[scheme.schemeIndex]
                 if schemeInfo and schemeInfo.duplicationKey then
                     for _, active in pairs(activeSchemes) do
-                        local activeInfo = _G.RTSchemes and _G.RTSchemes[active.schemeIndex]
+                        local activeInfo = definitions and definitions[active.schemeIndex]
                         if activeInfo and activeInfo.duplicationKey == schemeInfo.duplicationKey then
                             available = false
                             break
@@ -287,9 +303,9 @@ local function rtSerializeGrants(grantSystem, farmId)
     return out
 end
 
-local function rtSerializeTax(taxSystem, farmId)
+local function rtSerializeTax(rt, taxSystem, farmId)
     if not taxSystem then
-        return { statements = {}, currentMonthIncome = 0, currentMonthExpenses = 0 }
+        return { statements = {} }
     end
     local statements = {}
     if taxSystem.taxStatements then
@@ -308,16 +324,48 @@ local function rtSerializeTax(taxSystem, farmId)
     end
     table.sort(statements, function(a, b) return (a.month or 0) > (b.month or 0) end)
 
-    local income, expenses = 0, 0
-    if taxSystem.lineItems and taxSystem.lineItems[farmId] then
-        local cumMonth = _G.RedTape and _G.RedTape.getCumulativeMonth and _G.RedTape.getCumulativeMonth() or nil
-        if cumMonth and taxSystem.lineItems[farmId][cumMonth] then
-            for _, line in ipairs(taxSystem.lineItems[farmId][cumMonth]) do
-                if line then
-                    income = income + (tonumber(line.income) or 0)
-                    expenses = expenses + (tonumber(line.expense) or 0)
+    local income, expenses = nil, nil
+    local cumMonth = nil
+    if rt and type(rt.getCumulativeMonth) == "function" then
+        local ok, value = pcall(rt.getCumulativeMonth)
+        if ok then cumMonth = tonumber(value) end
+    end
+    -- RTTaxLineItem in the reviewed Red Tape build has signed `amount` and
+    -- `statistic` fields. It does not have `income` or `expense` fields. These
+    -- are recorded line-item inflows/outflows, not taxable/deductible totals.
+    local byFarm = type(taxSystem.lineItems) == "table" and taxSystem.lineItems[farmId] or nil
+    local lines = type(byFarm) == "table" and byFarm[cumMonth] or nil
+    local reviewedTaxVersion = false
+    if _G.g_modIsLoaded and _G.g_modIsLoaded["FS25_RedTape"] and
+        _G.g_modManager and type(_G.g_modManager.getModByName) == "function" then
+        local ok, mod = pcall(function()
+            return _G.g_modManager:getModByName("FS25_RedTape")
+        end)
+        reviewedTaxVersion = ok and type(mod) == "table" and mod.version == REVIEWED_TAX_VERSION
+    end
+    -- An empty register is meaningful only while tax and line recording are
+    -- enabled. The mod clears its register when tax is disabled.
+    if reviewedTaxVersion and rt and type(rt.settings) == "table" and
+        rt.settings.taxEnabled == true and
+        rt.settings.taxRecordingEnabled == true and cumMonth and
+        type(taxSystem.lineItems) == "table" and
+        (byFarm == nil or type(byFarm) == "table") and
+        (lines == nil or type(lines) == "table") then
+        local selected = lines or {}
+        if #selected <= MAX_CURRENT_MONTH_LINES then
+            local monthIncome, monthExpenses = 0, 0
+            local valid = true
+            for _, line in ipairs(selected) do
+                local amount = type(line) == "table" and tonumber(line.amount) or nil
+                if type(line) ~= "table" or type(line.statistic) ~= "string" or
+                    amount == nil or amount ~= amount or math.abs(amount) == math.huge then
+                    valid = false
+                    break
                 end
+                if amount > 0 then monthIncome = monthIncome + amount end
+                if amount < 0 then monthExpenses = monthExpenses - amount end
             end
+            if valid then income, expenses = monthIncome, monthExpenses end
         end
     end
 
@@ -364,7 +412,7 @@ local function rtSerializeFarm(rt, farmId)
         end
     end
 
-    local tax = rtSerializeTax(rt.TaxSystem, farmId)
+    local tax = rtSerializeTax(rt, rt.TaxSystem, farmId)
 
     local activeSchemes = {}
     local okAct, act = pcall(function()

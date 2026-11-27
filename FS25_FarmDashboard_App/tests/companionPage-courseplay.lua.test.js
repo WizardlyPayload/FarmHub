@@ -34,6 +34,8 @@ const SETUP = `
             startCpAtFirstWp = function() error("write") end,
         }
     end
+    local transferred = veh(1, "Transferred tractor", { active = true })
+    transferred.getOwnerFarmId = function() return 2 end
     _G.g_modIsLoaded = { FS25_Courseplay = true, FS25_CourseplayGps = true }
     _G.FS25_Courseplay = { g_Courseplay = { globalSettings = gs } }
     _G.g_currentMission = { vehicleSystem = { vehicles = {
@@ -42,6 +44,7 @@ const SETUP = `
             status = { isActive = true, currentWaypointIx = 300, numberOfWaypoints = 1500, remainingTimeText = "00:42" } }),
         veh(1, "Vanilla helper", { ai = true }),
         veh(2, "Neighbour", { active = true }),
+        transferred,
         { ownerFarmId = 1, uniqueId = "trailer" },
     } } }
 `;
@@ -71,6 +74,12 @@ describe("Courseplay page collector", () => {
         expect(farm.vehicles[1]).toMatchObject({ cpActive: false, selectedJob: "Field work" });
         expect(farm.vehicles[1].status).toBeUndefined();
         expect(farm.vehicles[2]).toMatchObject({ otherHelper: true });
-        expect(JSON.stringify(page)).not.toContain("Neighbour");
+        expect(JSON.stringify(page)).not.toMatch(/Neighbour|Transferred tractor/);
+    });
+    test("recognises the exact vault archive folder without matching Courseplay GPS", () => {
+        const vault = SETUP.replaceAll("FS25_Courseplay", "FS25_331515_CoursePlay");
+        const page = runCompanionPage(FILE, vault, { farmId: 1 });
+        expect(page.modName).toBe("FS25_331515_CoursePlay");
+        expect(page.byFarm["1"].withCourseCount).toBe(2);
     });
 });

@@ -52,7 +52,7 @@ describe("Seasonal Milk Production page", () => {
         expect(host.querySelector('[data-stat="period"]').textContent).toContain("Period 2");
         expect(host.querySelector('[data-stat="modifier"]').textContent).toContain("75%");
         expect(host.querySelector('[data-stat="peak"]').textContent).toContain("Period 6");
-        expect(host.querySelector('[data-stat="rate"]').textContent).toContain("30.00 L/h");
+        expect(host.querySelector('[data-stat="rate"]')).toBeNull();
         expect(host.querySelector('[data-stat="pens"]').textContent).toContain("1 / 2");
         expect(host.querySelectorAll(".fd-mod-page__chart-col")).toHaveLength(12);
         expect(host.querySelector(".fd-mod-page__chart-col.is-current small").textContent).toBe("2");

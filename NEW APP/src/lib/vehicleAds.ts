@@ -115,6 +115,10 @@ export function getAdsBreakdownParts(vehicle: AdsVehicle | null | undefined): Ad
 }
 
 export function countActiveAdsBreakdowns(vehicle: AdsVehicle | null | undefined): number {
+  const recordedParts = vehicle?.ads?.breakdownParts;
+  if (Array.isArray(recordedParts)) {
+    return recordedParts.filter((part) => part.isVisible !== false && part.isActive === true).length;
+  }
   const parts = getAdsBreakdownParts(vehicle);
   if (parts.length > 0) return parts.length;
   const n = Number(vehicle?.ads?.breakdownCount);
@@ -237,7 +241,7 @@ export function summarizeAdsFleet(vehicles: AdsVehicle[] | null | undefined) {
     summary.enabled = true;
     summary.vehicleCount += 1;
     if (isVehicleInAdsService(v)) summary.inServiceCount += 1;
-    if (hasVisibleAdsBreakdowns(v) || countActiveAdsBreakdowns(v) > 0) {
+    if (countActiveAdsBreakdowns(v) > 0) {
       summary.breakdownVehicleCount += 1;
     }
     if (isVehicleAdsOverdue(v)) summary.overdueMaintenanceCount += 1;

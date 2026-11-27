@@ -127,6 +127,19 @@
   margin: 0.35rem 0 0;
 }
 
+.fd-companions__task {
+  min-width: 0;
+}
+
+.fd-companions__task-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.7rem;
+  margin: 0.3rem 0 0.55rem;
+  color: var(--farm-text-muted);
+  font-size: 0.8rem;
+}
+
 .fd-companions__also {
   display: flex;
   flex-wrap: wrap;

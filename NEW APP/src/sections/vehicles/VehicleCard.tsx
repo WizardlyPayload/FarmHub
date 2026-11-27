@@ -1,4 +1,6 @@
 import { Badge } from "@/components/ui";
+import { AttachedEquipmentLine } from "@/sections/vehicles/AttachedEquipmentLine";
+import { TornadoRepairLine } from "@/sections/vehicles/TornadoRepairLine";
 import { t } from "@/i18n/i18n";
 import { vehicleRowFor } from "@/lib/companionFold";
 import { vehicleNeedsAdsWarning } from "@/lib/vehicleAds";
@@ -41,7 +43,7 @@ interface Props {
   onShowOnMap?: () => void;
 }
 
-/** Lean fleet card — year badge only; ADS detail lives in the right inspector. */
+/** Lean fleet card; ADS detail lives in the right inspector. */
 export function VehicleCard({ vehicle, companions, focused, onSelect, onShowOnMap }: Props) {
   const brandName = resolveVehicleBrandLabel(vehicle.brand);
   const displayName = resolveVehicleDisplayName(vehicle);
@@ -117,6 +119,8 @@ export function VehicleCard({ vehicle, companions, focused, onSelect, onShowOnMa
       </header>
 
       <div class="fd-vehicle-card__body">
+        <AttachedEquipmentLine vehicle={vehicle} />
+        <TornadoRepairLine vehicle={vehicle} />
         <div class="fd-vehicle-card__stats">
           <div class="fd-vehicle-card__stat">
             <small class="fd-muted">{t("vehicles.cardOperatingTime")}</small>

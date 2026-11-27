@@ -5,7 +5,7 @@
 --   getCourses (Course objects: getName, getNumberOfWaypoints, getWorkWidth, getMultiTools),
 --   getCpStartText (selected job label) and spec_cpHud.status (CpStatus: plain progress fields).
 -- Only read-only getters and plain status fields are used; no job, course or setting is started or changed.
--- Detection is by exact folder name: a "courseplay" substring would also match FS25_CourseplayGps.
+-- Detection uses exact folder names: a "courseplay" substring would also match FS25_CourseplayGps.
 
 local SCAN_VEHICLES = 400
 local MAX_ROWS = 40
@@ -59,7 +59,7 @@ local function ownedVehicles(ctx)
             return false
         end
         if type(vehicle) == "table" then
-            local owner = ctx.num(vehicle.ownerFarmId) or ctx.num(ctx.call(vehicle, "getOwnerFarmId"))
+            local owner = ctx.num(ctx.call(vehicle, "getOwnerFarmId")) or ctx.num(vehicle.ownerFarmId)
             if owner == farmId then
                 out[#out + 1] = vehicle
             end
@@ -172,7 +172,7 @@ end
 
 CompanionPages.register({
     key = "courseplay",
-    modNames = { "FS25_Courseplay" },
+    modNames = { "FS25_Courseplay", "FS25_331515_CoursePlay" },
     collect = function(ctx)
         local cp = ctx.symbol("g_Courseplay") or ctx.global("g_Courseplay")
         local out = { globalSettings = readGlobalSettings(ctx, cp) }

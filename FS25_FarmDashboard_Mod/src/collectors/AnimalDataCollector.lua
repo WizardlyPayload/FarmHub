@@ -110,6 +110,21 @@ local function _readAlpacaShearing(c, ownerFarmId, subType)
     return result
 end
 
+-- Ritter RL v1.4 retains exposed/recovered records in the disease list. Only
+-- INFECTIOUS records are current infections. Older record shapes without a
+-- state are unknown, so do not present them as a measured zero.
+local function _currentInfectiousRecords(diseases)
+    if type(diseases) ~= "table" then return nil end
+    local count = 0
+    for _, record in ipairs(diseases) do
+        if type(record) ~= "table" or type(record.state) ~= "string" then
+            return nil
+        end
+        if record.state == "INFECTIOUS" then count = count + 1 end
+    end
+    return count
+end
+
 local function _avgFromSum(sum, count)
     if type(count) ~= "number" or count <= 0 then return nil end
     if type(sum) ~= "number" or sum <= 0 then return nil end
@@ -949,6 +964,7 @@ function AnimalDataCollector:collectPenDetail(placeable)
                 end
                 if type(c.diseases) == "table" then
                     entry.diseaseCount = #c.diseases
+                    entry.infectiousDiseaseCount = _currentInfectiousRecords(c.diseases)
                 end
                 out.animals[#out.animals + 1] = entry
             else

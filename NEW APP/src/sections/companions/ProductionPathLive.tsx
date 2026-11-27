@@ -230,6 +230,11 @@ function DistributionLive({ cm, farmId }: { cm: CompanionModsPayload; farmId: nu
     farmId,
     "rows",
   );
+  const monthly = privateRows<{ uniqueId?: string; assetName?: string | null; fillType?: string | null; distributedLiters?: number | null; soldLiters?: number | null; producedLiters?: number | null; consumedLiters?: number | null }>(
+    (allowed ? (assets?.month?.window === "rolling-24-cycles" ? assets.month : undefined) : assets) as never,
+    farmId,
+    "rows",
+  );
   const active = block!.masterEnabled === true && block!.activity === "active" && (block!.participation === 1 || block!.participation === 2);
   return (
     <div class="fd-companions__live" data-status="ok">
@@ -284,6 +289,23 @@ function DistributionLive({ cm, farmId }: { cm: CompanionModsPayload; farmId: nu
             .join(" · ")}
         </p>
       ) : null}
+      {monthly.status === "ok" && monthly.rows.length > 0 ? (
+        <div data-rows="rollingMonth">
+          <p class="fd-companions__desc">{tOr("companions.live.distributionMonthTitle", "Rolling 24 completed hourly cycles for this farm")}</p>
+          <p class="fd-companions__desc">
+            {monthly.rows.map((r) => tOr("companions.live.distributionMonthAsset",
+              "{{asset}} - {{fillType}}: produced {{produced}}, consumed {{consumed}}, distributed {{dist}}, sold {{sold}}", {
+                asset: r.assetName ?? r.uniqueId ?? "?", fillType: r.fillType ?? "—",
+                produced: f.quantity(r.producedLiters, r.fillType), consumed: f.quantity(r.consumedLiters, r.fillType),
+                dist: f.quantity(r.distributedLiters, r.fillType), sold: f.quantity(r.soldLiters, r.fillType),
+              })).join(" · ")}
+          </p>
+        </div>
+      ) : null}
+      {monthly.status === "empty" && monthly.coverage === "complete" ? (
+        <Muted status="empty" text={tOr("companions.live.distributionMonthEmpty", "No owned-asset flows were recorded in the rolling 24-cycle window.")} />
+      ) : monthly.status !== "ok" && monthly.status !== "empty" ? statusNote(monthly.status) : null}
+      {(monthly.status === "ok" || monthly.status === "empty") && monthly.coverage !== "complete" ? truncatedNote() : null}
       {overrides.status !== "ok" && overrides.status !== "empty" ? statusNote(overrides.status) : null}
       {(overrides.status === "ok" || overrides.status === "empty") && overrides.coverage !== "complete" ? truncatedNote() : null}
       {moved.status === "pending" ? <Muted status="pending" text={tOr("companions.live.distributionPending", "Last completed cycle: waiting for the first hourly pass.")} />
@@ -341,7 +363,11 @@ function OperationsLive({ cm, dashboard, farmId }: { cm: CompanionModsPayload; d
       </p>
       {status === "ok" ? (
         <Badge tone="default">{tOr("companions.live.opsFields", "{{count}} field HUD row(s)", { count: rows.length })}</Badge>
-      ) : status === "empty" ? null : (
+      ) : status === "empty" ? (
+        <p class="fd-economy__muted" data-reading="mod-field-rows">
+          {tOr("companions.live.opsNoRows", "Farm Operations Dashboard has no field HUD rows for this farm.")}
+        </p>
+      ) : (
         statusNote(status)
       )}
     </div>

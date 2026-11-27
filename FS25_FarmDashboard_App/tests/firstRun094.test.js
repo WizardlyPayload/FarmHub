@@ -283,7 +283,7 @@ describe("094 first-run discovery of saved careers with no export yet", () => {
 });
 
 describe("094 saved local source waits for its first export", () => {
-    function statusApi(memory, serverStates, httpListening = true) {
+    function statusApi(memory, serverStates, httpListening = true, publications = {}) {
         const uxEventLog = ux.createUxEventLog();
         const api = productionFunctions("FS25_FarmDashboard_App/main.js", [
             "pushUxEvent",
@@ -294,6 +294,7 @@ describe("094 saved local source waits for its first export", () => {
         ], {
             store: { get: (key) => memory[key] },
             serverStates,
+            boundSources: { snapshot: (id) => publications[id] || null },
             uxEventLog,
             uxRequiresRestart: false,
             server: { listening: httpListening },
@@ -357,6 +358,19 @@ describe("094 saved local source waits for its first export", () => {
         const codes = uxEventLog.list().map((row) => row.code);
         expect(codes).not.toContain("E_NETWORK");
         expect(codes).toContain("E_LUA_STALE");
+    });
+
+    test("a held committed publication suppresses the false no-export guidance", () => {
+        const held = { payload: { exportGeneration: 8, xmlAvailable: true,
+            companionPages: { pages: { objectStorageExtension: { rows: [{}] } } } },
+            sourceBinding: { stateStatus: "held" } };
+        const { api } = statusApi({ config: localConfig }, { srv_1: { active: true } },
+            true, { srv_1: held });
+        const status = api.buildRuntimeSetupStatus({ setupTokenValid: true });
+        expect(status.sourceId).toBe("srv_1");
+        expect(status.status).toBe("degraded");
+        expect(status.nextStep).toBeNull();
+        expect(status.waitingFor).toBeUndefined();
     });
 
     test("a successful save does not record a network event and drops pre-save events", () => {

@@ -9,6 +9,7 @@ const localIngressController = require("../localIngressController");
 const ingressOrchestration = require("../ingressOrchestration");
 const { createBoundSourcePublication, statusForPayload } = require("../boundSourcePublication.cjs");
 const { mergeData, buildFieldLiveFingerprints } = require("../dataMerger");
+const { compareLocalSaveMap } = require("../localSaveMapIdentity.cjs");
 const { isExplicitReplicaXmlSource } = require("../xmlCollector");
 const mergedSnapshotHold = require("../mergedSnapshotHold");
 const { resolveLuaExportStaleMs, isLuaExportStale } = require("../liveExportFreshness");
@@ -91,6 +92,7 @@ describe("local folder appearing after V5 boot", () => {
             "explicitRequestServerId", "requestSourceEligible", "resolveServerIdForRequest", "getDataForServer",
         ], {
             fs, path, serverStates: states, store, boundSources, runtimeActivation,
+            compareLocalSaveMap,
             mergeRebuildGate: mergedSnapshotHold.createMergeRebuildGate(),
             exportIngress: countedExportIngress, localIngressController, ingressOrchestration,
             mergeData, buildFieldLiveFingerprints, isExplicitReplicaXmlSource,

@@ -5,7 +5,6 @@
 CompanionModsDataCollector = {}
 
 local MAX_LOANS_PER_FARM = 24
-local MAX_MODS = 64
 
 --- Catalog: id is stable for UI; names/substrings match ModHub folder variants.
 local CATALOG = {
@@ -45,7 +44,7 @@ local CATALOG = {
         id = "realisticDieselPrice",
         title = "Realistic Diesel Price",
         category = "economy",
-        names = { "FS25_RealisticDieselPrice", "FS25_363612_Realistic_Diesel_Price" },
+        names = { "FS25_RealisticDieselPrice", "FS25_363612_FS25_RealisticDieselPrice", "KM_78609_Realistic_Diesel_Price", "FS25_363612_Realistic_Diesel_Price" },
         substrings = { "realisticdieselprice", "realistic_diesel_price" },
         globals = {},
     },
@@ -61,9 +60,65 @@ local CATALOG = {
         id = "dynamicMarket",
         title = "Dynamic Market",
         category = "economy",
-        names = { "FS25_DynamicMarket", "FS25_366174_Dynamic_Market" },
+        names = { "FS25_DynamicMarket", "FS25_366174_Dynamic_Market", "KM_79085_Dynamic_Market" },
         substrings = { "dynamicmarket", "dynamic_market" },
         globals = { "DynamicMarket", "g_DynamicMarket" },
+    },
+    {
+        id = "autoSellSilo",
+        title = "Auto Sell Silo",
+        category = "economy",
+        names = { "KM_83453_Auto_Sell_Silo", "FS25_AutoSellSilo" },
+        substrings = { "autosellsilo", "auto_sell_silo" },
+        globals = {},
+    },
+    {
+        id = "baleDirect",
+        title = "Bale Direct",
+        category = "economy",
+        names = { "FS25_354119_Bale_Direct", "FS25_BaleDirect" },
+        substrings = { "bale_direct", "baledirect" },
+        globals = {},
+    },
+    {
+        id = "autoSwitchCoop",
+        title = "AutoSwitch co-operative payments",
+        category = "economy",
+        names = { "KM_82844_AutoSwitch", "FS25_AutoSwitch" },
+        substrings = { "autoswitch" },
+        globals = { "AS_CoopPay" },
+    },
+    {
+        id = "autoSwitchRegister",
+        title = "AutoSwitch weighings and sales",
+        category = "economy",
+        names = { "KM_82844_AutoSwitch", "FS25_AutoSwitch" },
+        substrings = { "autoswitch" },
+        globals = { "AS_Register" },
+    },
+    {
+        id = "autoSwitchFieldWork",
+        title = "AutoSwitch field-work dates",
+        category = "fields",
+        names = { "KM_82844_AutoSwitch", "FS25_AutoSwitch" },
+        substrings = { "autoswitch" },
+        globals = { "AS_Fields" },
+    },
+    {
+        id = "autoSwitchTireLife",
+        title = "AutoSwitch tire life",
+        category = "fleet",
+        names = { "KM_82844_AutoSwitch", "FS25_AutoSwitch" },
+        substrings = { "autoswitch" },
+        globals = { "AS_TireLife" },
+    },
+    {
+        id = "slurryPipeSystem",
+        title = "Slurry Pipe System",
+        category = "storage",
+        names = { "FS25_SlurryPipeSystem" },
+        substrings = { "slurrypipesystem", "slurry_pipe_system" },
+        globals = { "g_slurryPipeManager" },
     },
     {
         id = "marketPriceHelper",
@@ -72,6 +127,53 @@ local CATALOG = {
         names = { "FS25_MarketPriceHelper", "FS25_362332_Market_Price_Helper" },
         substrings = { "marketpricehelper", "market_price_helper" },
         globals = { "g_priceTicker" },
+    },
+    {
+        id = "woodManager",
+        title = "Wood Manager",
+        category = "storage",
+        names = { "FS25_347200_Wood_Manager", "FS25_woodManager" },
+        substrings = { "wood_manager", "woodmanager" },
+        globals = {},
+    },
+    {
+        id = "lumberjackHut",
+        title = "Lumberjack Hut",
+        category = "storage",
+        names = { "KM_83343_Lumberjack_Hut", "FS25_LumberjackHut" },
+        substrings = { "lumberjack_hut", "lumberjackhut" },
+        globals = {},
+    },
+    {
+        id = "grapeOliveYieldSettings",
+        title = "Grape And Olive Yield Settings",
+        category = "fields",
+        names = { "FS25_366544_Grape_And_Olive_Yield_Settings", "FS25_GrapeOliveYield" },
+        substrings = { "grape_and_olive_yield_settings", "grapeoliveyield" },
+        globals = {},
+    },
+    {
+        id = "realPowertrain",
+        title = "Real Powertrain",
+        category = "fleet",
+        names = { "KM_83605_Real_Power_Train" },
+        substrings = { "real_power_train" },
+        globals = {},
+    },
+    {
+        id = "towingChainHook",
+        title = "Towing Chain With Hook",
+        category = "fleet",
+        names = { "FS25_318102_Towing_Chain_With_Hook" },
+        substrings = { "towing_chain_with_hook", "towingchainwithhook" },
+        globals = {},
+    },
+    {
+        id = "buyUsedEquipment",
+        title = "Buy Used Equipment",
+        category = "economy",
+        names = { "FS25_312631_Buy_Used_Equipment", "FS25_BuyUsedEquipment" },
+        globals = {},
     },
     {
         id = "enhancedSeasonalPrices",
@@ -106,11 +208,116 @@ local CATALOG = {
         globals = { "g_soilWorkYieldBonus" },
     },
     {
+        id = "soilCompaction",
+        title = "Soil Compaction",
+        category = "fields",
+        names = { "KM_81205_Soil_Compaction", "FS25_SoilCompaction" },
+        substrings = { "soil_compaction", "soilcompaction" },
+        globals = { "g_soilCompaction" },
+    },
+    {
+        id = "soilCompostBatches",
+        title = "Soil & Fertilizer Compost Batches",
+        category = "storage",
+        names = { "FS25_SoilFertilizer" },
+        substrings = {},
+        globals = {},
+    },
+    {
         id = "smartCropControl",
         title = "Smart Crop Control",
         category = "fields",
         names = { "FS25_SmartCropControl", "FS25_366374_Smart_Crop_Control" },
         substrings = { "smartcropcontrol", "smart_crop_control" },
+        globals = {},
+    },
+    {
+        id = "dynamicMolehills",
+        title = "Dynamic Molehills",
+        category = "fields",
+        names = { "FS25_DynamicMolehills", "FS25_370425_FS25_DynamicMoleHills" },
+        substrings = { "dynamicmolehills", "dynamic_molehills" },
+        globals = { "DynamicMolehills" },
+    },
+    {
+        id = "cropControlOverride",
+        title = "Crop Control Override",
+        category = "fields",
+        names = { "FS25_CropControlOverride", "FS25_365010_FS25_CropControlOverride",
+            "KM_78768_Crop_Control_Override", "GH_SimGamerJen__FS25_CropControlOverride_FS25_CropControlOverride" },
+        substrings = { "cropcontroloverride", "crop_control_override" },
+        globals = { "CropControlOverride" },
+    },
+    {
+        id = "resourceUsageControl",
+        title = "Resource Usage Control",
+        category = "fields",
+        names = { "FS25_ResourceUsageControl", "KM_82082_resource-usage-control" },
+        substrings = { "resourceusagecontrol", "resource_usage_control", "resource-usage-control" },
+        globals = { "ResourceUsageControl" },
+    },
+    {
+        id = "farmLimitManager",
+        title = "Farm Limit Manager",
+        category = "finance",
+        names = { "FS25_FarmLimitManager", "FS25_372370_Farm_Limit_Manager", "KM_82655_Farm_Limit_Manager" },
+        substrings = { "farmlimitmanager", "farm_limit_manager" },
+        globals = { "g_farmLimitManager" },
+    },
+    {
+        id = "agroRealisticResale",
+        title = "Agro Realistic - land resale",
+        category = "finance",
+        names = { "FS25_AgroRealistic", "FS25_371987_Agro_Realistic" },
+        substrings = { "agrorealistic", "agro_realistic" },
+        globals = { "LeandroFarmRules" },
+    },
+    {
+        id = "agroRealisticHealthLoss",
+        title = "Agro Realistic - animal health timer",
+        category = "animals",
+        names = { "FS25_AgroRealistic", "FS25_371987_Agro_Realistic" },
+        substrings = { "agrorealistic", "agro_realistic" },
+        globals = { "LeandroFarmRulesAnimalHealthLoss" },
+    },
+    {
+        id = "financialDashboardHistory",
+        title = "Financial Dashboard History",
+        category = "economy",
+        names = { "KM_83516_Financial_Dashboard" },
+        substrings = {},
+        globals = { "FinancialDashboard" },
+    },
+    {
+        id = "fieldContractors",
+        title = "Field Contractors",
+        category = "economy",
+        names = { "KM_82386_Field_Contractors" },
+        substrings = {},
+        globals = { "FieldContractors" },
+    },
+    {
+        id = "kiselevkaAuction",
+        title = "Kiselevka farmland auction",
+        category = "economy",
+        names = { "KM_77461_kiselevka-4x" },
+        substrings = {},
+        globals = { "AuctionManager" },
+    },
+    {
+        id = "farmContractorServices",
+        title = "Farm Contractor Services",
+        category = "economy",
+        names = { "KM_82945_Farm_Contractor_Services" },
+        substrings = {},
+        globals = { "ContractorHarvesting" },
+    },
+    {
+        id = "factoryContracts",
+        title = "GN Realism - Factory Contracts",
+        category = "economy",
+        names = { "FS25_FactoryContracts", "KM_82639_Factory_Contracts" },
+        substrings = { "factorycontracts", "factory_contracts" },
         globals = {},
     },
     {
@@ -125,7 +332,7 @@ local CATALOG = {
         id = "farmlandMarketplace",
         title = "Farmland Marketplace",
         category = "fields",
-        names = { "FS25_FarmlandMarketplace", "FS25_369241_Farmland_Marketplace" },
+        names = { "FS25_FarmlandMarketplace", "FS25_369241_FS25_FarmlandMarketplace", "KM_80211_Farmland_Marketplace", "FS25_369241_Farmland_Marketplace" },
         substrings = { "farmlandmarketplace", "farmland_marketplace" },
         globals = {},
     },
@@ -234,12 +441,220 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "palletSpawnStore",
+        title = "Pallet Spawn Store",
+        category = "production",
+        names = { "FS25_PalletSpawnStore", "FS25_352670_Pallet_Spawn_Store" },
+        substrings = { "palletspawnstore", "pallet_spawn_store" },
+        globals = {},
+    },
+    {
+        id = "upgradableFactories",
+        title = "Upgradable Factories",
+        category = "production",
+        names = { "FS25_340901_Upgradable_Factories" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "greenhouseAutomaticWatering",
+        title = "Greenhouse Automatic Watering",
+        category = "production",
+        names = { "FS25_303379_Greenhouse_Automatic_Watering" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "adjustProductionPoints",
+        title = "Adjust Production Points",
+        category = "production",
+        names = { "FS25_352087_Adjust_Production_Points" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "realisticFuelingSilos",
+        title = "Realistic Fueling System silos",
+        category = "storage",
+        names = { "FS25_344040_Realistic_Fueling_System" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "grainHaulingService",
+        title = "Grain Hauling Service",
+        category = "economy",
+        names = { "KM_81831_Getreidetransport-Service", "FS25_GrainHaulingService" },
+        substrings = { "getreidetransport-service", "grainhaulingservice" },
+        globals = { "GrainHaulingService" },
+    },
+    {
+        id = "kringstadPiler",
+        title = "Sugar Beet Piler tare balance",
+        category = "economy",
+        names = { "KM_82896_Kringstad_Ironworks_Sugar_Beet_Piler" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "overburden",
+        title = "Overburden",
+        category = "fields",
+        names = { "KM_83309_Overburden", "FS25_Overburden" },
+        substrings = { "overburden" },
+        globals = { "Overburden" },
+    },
+    {
+        id = "upgradeYourFactory",
+        title = "Upgrade Your Factory",
+        category = "production",
+        names = { "FS25_335994_Upgrade_Your_Factory", "FS25_UpgradeYourFactory" },
+        substrings = { "upgrade_your_factory", "upgradeyourfactory" },
+        globals = { "UpgradeYourFactory" },
+    },
+    {
+        id = "productionBoosterSystem",
+        title = "Production Booster System",
+        category = "production",
+        names = { "FS25_ProductionBoosterSystem", "KM_82331_Production_Booster_System" },
+        substrings = { "productionboostersystem", "production_booster_system" },
+        globals = {},
+    },
+    {
+        id = "productionRevamp",
+        title = "Production Revamp",
+        category = "production",
+        names = { "FS25_378044_Production_Revamp", "FS25_ProductionRevamp" },
+        substrings = { "production_revamp", "productionrevamp" },
+        globals = { "Revamp" },
+    },
+    {
+        id = "productionPalletManager",
+        title = "Production Pallet Manager",
+        category = "production",
+        names = { "FS25_376956_Production_Pallet_Manager", "FS25_ProductionPalletManager" },
+        substrings = { "production_pallet_manager", "productionpalletmanager" },
+        globals = { "PalletManager" },
+    },
+    {
         id = "productionsManager",
         title = "Productions Manager",
         category = "production",
         names = { "FS25_ProductionsManager", "FS25_346503_Productions_Manager" },
         substrings = { "productionsmanager", "productions_manager" },
         globals = {},
+    },
+    {
+        id = "productionSupplyManager",
+        title = "Production Supply Manager",
+        category = "production",
+        names = { "KM_82199_Production_Supply_Manager", "FS25_ProductionSupplyManager" },
+        substrings = { "production_supply_manager", "productionsupplymanager" },
+        globals = { "g_productionSupplyManager" },
+    },
+    {
+        id = "cropContracts",
+        title = "Crop Contracts",
+        category = "economy",
+        names = { "FS25_CropContracts", "ITCH_4385334_FS25_CropContracts", "ITCH_4066559_FS25_CropContracts" },
+        substrings = { "cropcontracts" },
+        globals = { "CropContractsMod" },
+    },
+    {
+        id = "woodChipsMissions",
+        title = "Wood Chips Missions",
+        category = "economy",
+        names = { "FS25_351625_Wood_Chips_Missions" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "kommunalServices",
+        title = "Kommunal Services",
+        category = "contracts",
+        names = { "FS25_316057_Kommunal_Services", "FS25_KommunalServices" },
+        substrings = { "kommunal_services", "kommunalservices" },
+        globals = {},
+    },
+    {
+        id = "cropInsurance",
+        title = "Crop Insurance",
+        category = "economy",
+        names = { "KM_82103_Crop_Insurance", "FS25_CropInsurance" },
+        substrings = { "crop_insurance", "cropinsurance" },
+        globals = { "CropInsurance" },
+    },
+    {
+        id = "grainTickets",
+        title = "Grain Tickets",
+        category = "economy",
+        names = { "FS25_DownCropsAndTickets" },
+        substrings = { "downcropsandtickets" },
+        globals = { "HighWindCropDamage" },
+    },
+    {
+        id = "harvestLedger",
+        title = "Harvest Ledger",
+        category = "fields",
+        names = { "FS25_HarvestLedger", "KM_82914_Harvest_Ledger" },
+        substrings = { "harvestledger", "harvest_ledger" },
+        globals = {},
+    },
+    {
+        id = "netWorthTracker",
+        title = "Net Worth Tracker",
+        category = "economy",
+        names = { "FS25_339475_FS25_netWorthTracker", "KM_72515_Net_Worth_Tracker", "GH_EvanKirsch__fs25-nwt_FS25_NetWorthTracker_update" },
+        substrings = { "networthtracker_update", "net_worth_tracker", "fs25_networthtracker" },
+        globals = {},
+    },
+    {
+        id = "multiplayerAchievements",
+        title = "Multiplayer Achievements",
+        category = "economy",
+        names = { "FS25_MultiplayerAchievements", "FS25_374265_Multiplayer_Achievements_-_Per_Player" },
+        substrings = { "multiplayerachievements", "multiplayer_achievements" },
+        globals = {},
+    },
+    {
+        id = "realLandFinance",
+        title = "Real Land Finance",
+        category = "economy",
+        names = { "KM_83258_Real_Land_Finances" },
+        substrings = { "real_land_finances" },
+        globals = { "g_ftrManager" },
+    },
+    {
+        id = "landFinancing",
+        title = "Land Financing",
+        category = "economy",
+        names = { "KM_82121_land-financing" },
+        substrings = { "land-financing" },
+        globals = {},
+    },
+    {
+        id = "contractManager",
+        title = "Contract Manager",
+        category = "economy",
+        names = { "FS25_ContractManager", "GH_Dostlar-Studio__FS25_ContractManager_FS25_ContractManager" },
+        substrings = { "fs25_contractmanager" },
+        globals = { "ContractManagerRegistry" },
+    },
+    {
+        id = "mowingContractsPlus",
+        title = "Mowing Contracts Plus",
+        category = "economy",
+        names = { "FS25_MowingContractsPlus", "KM_82704_Mowing_Contracts_Plus" },
+        substrings = { "mowingcontractsplus", "mowing_contracts_plus" },
+        globals = { "MowingContractsPlus" },
+    },
+    {
+        id = "cryptoFarm",
+        title = "Crypto Farm",
+        category = "economy",
+        names = { "FS25_CryptoFarm", "GH_AnJo888__FS25_CryptoFarm_FS25_CryptoFarm", "KM_82419_Crypto_Farm_ATM" },
+        substrings = { "fs25_cryptofarm", "crypto_farm_atm" },
+        globals = { "g_cryptoFarm" },
     },
     {
         id = "factoryProfitCalculator",
@@ -284,10 +699,242 @@ local CATALOG = {
         category = "storage",
         names = {
             "FS25_RealSilo",
+            "FS25_369067_FS25_RealSilo",
             "FS25_369067_RealSilo_Realistic_Silo_Compartments",
+            "KM_80484_RealSilo_Realistic_Silo_Compartments",
         },
         substrings = { "realsilo", "realistic_silo" },
         globals = { "realSiloManager" },
+    },
+    {
+        id = "harvestoreConveyor",
+        title = "Harvestore Conveyor",
+        category = "storage",
+        names = { "KM_83595_Harvestore_Silo_Pack" },
+        globals = {},
+    },
+    {
+        id = "mobileButcherMeatPickup",
+        title = "Mobile Butcher Meat Pickup",
+        category = "storage",
+        names = { "FS25_MobileButcher", "KM_81657_Mobile_Butcher_for_quot_Realistic_Livestock_quot_mod_" },
+        substrings = { "mobilebutcher", "mobile_butcher_for_quot_realistic_livestock" },
+        globals = {},
+    },
+    {
+        id = "automaticMilkDistribution",
+        title = "Automatic Milk Distribution",
+        category = "livestock",
+        names = { "FS25_Automatic_Milk_Distribution", "FS25_356022_Automatic_Milk_Distribution" },
+        substrings = { "automatic_milk_distribution", "automaticmilkdistribution" },
+        globals = { "AutoMilk" },
+    },
+    {
+        id = "bullMilkProduction",
+        title = "Bull Milk Production",
+        category = "livestock",
+        names = { "KM_82260_Bull_milk_production" },
+        substrings = {},
+        globals = { "BullMilkStandalone" },
+    },
+    {
+        id = "udderToTank",
+        title = "Udder to Tank",
+        category = "livestock",
+        names = { "KM_82886_Udder_to_Tank" },
+        globals = { "UdderMilk" },
+    },
+    {
+        id = "sowingMachineRollerReady",
+        title = "Sowing Machine Roller Ready",
+        category = "fleet",
+        names = { "FS25_327528_FS25_sowingMachineRollerReady", "FS25_sowingMachineRollerReady" },
+        substrings = { "sowingmachinerollerready" },
+        globals = { "SowingMachineRollerReady" },
+    },
+    {
+        id = "advancedSeedingControl",
+        title = "Advanced Seeding Control",
+        category = "fleet",
+        names = { "FS25_372286_Advanced_Seeding_Control", "FS25_Advanced_Seeding_Control" },
+        substrings = { "advanced_seeding_control", "advancedseedingcontrol" },
+        globals = { "AdvancedSeedingControlLoader" },
+    },
+    {
+        id = "flexibleCombiSeeder",
+        title = "Flexible Combi Seeder",
+        category = "fleet",
+        names = { "FS25_369800_FS25_FlexibleCombiSeeder", "KM_80682_Flexible_Combi_Seeder", "FS25_FlexibleCombiSeeder" },
+        substrings = { "flexiblecombiseeder" },
+        globals = {},
+    },
+    {
+        id = "manualPaint",
+        title = "Manual Paint",
+        category = "fleet",
+        names = { "FS25_369086_FS25_ManualPaint", "FS25_ManualPaint" },
+        substrings = { "manualpaint" },
+        globals = {},
+    },
+    {
+        id = "swathRouter",
+        title = "Swath Router",
+        category = "fleet",
+        names = { "FS25_372019_Swath_Router", "KM_82873_Swath_Router", "FS25_Swath_Router" },
+        substrings = { "swath_router", "swathrouter" },
+        globals = {},
+    },
+    {
+        id = "whiteysFarmStaff",
+        title = "Whitey's Farm Staff Manager",
+        category = "fields",
+        names = { "FS25_WhiteysFarmStaff_5_2_3", "FS25_WhiteysFarmStaff" },
+        substrings = { "whiteysfarmstaff" },
+        globals = {},
+    },
+    {
+        id = "employees",
+        title = "Employees",
+        category = "fields",
+        names = { "FS25_Employees", "KM_82420_Employees" },
+        substrings = { "fs25_employees" },
+        globals = {},
+    },
+    {
+        id = "personnelManagement",
+        title = "Personnel Management",
+        category = "fields",
+        names = { "KM_79440_Personnel_Management", "FS25_HelperPersonnel" },
+        substrings = { "personnel_management", "helperpersonnel" },
+        globals = {},
+    },
+    {
+        id = "villageBank",
+        title = "Village Bank",
+        category = "finance",
+        names = { "KM_82435_Village_Bank", "FS25_VillageBank" },
+        substrings = { "village_bank", "villagebank" },
+        globals = {},
+    },
+    {
+        id = "agriculturalFinancialSystem",
+        title = "Agricultural Financial System",
+        category = "finance",
+        names = { "KM_80824_agricultural-financial-system", "KM_80824_agricultural_financial_system" },
+        substrings = { "agricultural-financial-system", "agricultural_financial_system" },
+        globals = {},
+    },
+    {
+        id = "investmentSystem",
+        title = "Investment System",
+        category = "finance",
+        names = { "FS25_352944_Investment_System", "FS25_InvestmentSystem" },
+        substrings = { "investment_system", "investmentsystem" },
+        globals = {},
+    },
+    {
+        id = "workplan",
+        title = "Workplan",
+        category = "fields",
+        names = { "FS25_352974_Workplan", "FS25_Workplan" },
+        substrings = { "workplan" },
+        globals = {},
+    },
+    {
+        id = "sellToTheBestBidder",
+        title = "Sell To The Best Bidder",
+        category = "fleet",
+        names = { "FS25_359753_Sell_To_The_Best_Bidder", "FS25_SellToTheBestBidder" },
+        substrings = { "sell_to_the_best_bidder", "selltothebestbidder" },
+        globals = {},
+    },
+    {
+        id = "incomeModEmergencyDebt",
+        title = "Income Mod Emergency Debt",
+        category = "finance",
+        names = { "FS25_IncomeMod" },
+        substrings = { "incomemod" },
+        globals = {},
+    },
+    {
+        id = "workplaceTriggersSites",
+        title = "Workplace Triggers Sites",
+        category = "fields",
+        names = { "FS25_WorkplaceTriggers" },
+        substrings = { "workplacetriggers" },
+        globals = {},
+    },
+    {
+        id = "autoGrovePlantings",
+        title = "Auto Grove Planting Records",
+        category = "fields",
+        names = { "FS25_AutoGrove", "KM_82201_Auto_Grove" },
+        substrings = { "autogrove", "auto_grove" },
+        globals = {},
+    },
+    {
+        id = "leaseLivestock",
+        title = "Lease Livestock",
+        category = "animals",
+        names = { "KM_81709_Lease_Livestock", "FS25_LeaseLivestock", "FS25_Lease_Livestock" },
+        substrings = { "lease_livestock", "leaselivestock" },
+        globals = {},
+    },
+    {
+        id = "tramlineSystem",
+        title = "Tramline System",
+        category = "fields",
+        names = { "FS25_TramlineSystem", "FS25_Tramline_System", "KM_83120_Tramline_System" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "automaticBaleStorage",
+        title = "Automatic Bale Storage",
+        category = "storage",
+        names = { "FS25_363427_FS25_AutomaticBaleStorage", "KM_78542_Automatic_Bale_Storage" },
+        substrings = {},
+        globals = { "AutomaticBaleStorage" },
+    },
+    {
+        id = "objectStorageExtension",
+        title = "Object Storage Extension",
+        category = "storage",
+        names = { "FS25_342403_Object_Storage_Extension", "FS25_ObjectStorageExtension" },
+        substrings = { "object_storage_extension", "objectstorageextension" },
+        globals = {},
+    },
+    {
+        id = "baleBatchTracker",
+        title = "Bale Batch Tracker",
+        category = "storage",
+        names = { "FS25_Bale_Batch_Tracker", "FS25_374533_Bale_Batch_Tracker" },
+        substrings = { "balebatchtracker", "bale_batch_tracker" },
+        globals = { "BaleBatchTracker" },
+    },
+    {
+        id = "supplyTransportContracts",
+        title = "Supply Transport Contracts",
+        category = "contracts",
+        names = { "FS25_311954_Supply_Transport_Contracts" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "ritterFreshLoss",
+        title = "Ritter Fresh",
+        category = "storage",
+        names = { "FS25_Fresh", "GH_rittermod__FS25_Fresh_FS25_Fresh" },
+        substrings = { "fs25_fresh" },
+        globals = { "RmFreshManager", "RmLossTracker" },
+    },
+    {
+        id = "productionAdvisorAlerts",
+        title = "Production Advisor",
+        category = "storage",
+        names = { "FS25_ProductionAdvisor", "KM_81606_Production_Advisor" },
+        substrings = { "productionadvisor", "production_advisor" },
+        globals = { "g_productionAdvisor" },
     },
     {
         id = "advancedMaintenance",
@@ -330,6 +977,531 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "vehicleInspectionHU",
+        title = "Vehicle Inspection (HU)",
+        category = "fleet",
+        names = { "FS25_Vehicle_Inspection_HU", "FS25_373915_Vehicle_Inspection_HU" },
+        substrings = { "vehicle_inspection_hu", "vehicleinspectionhu" },
+        globals = { "g_huManager" },
+    },
+    {
+        id = "majorService",
+        title = "Major Service",
+        category = "fleet",
+        names = { "FS25_318291_Major_Service", "FS25_MajorService" },
+        substrings = { "major_service", "majorservice" },
+        globals = {},
+    },
+    {
+        id = "useYourTyres",
+        title = "Use Your Tyres",
+        category = "fleet",
+        names = { "FS25_321793_Use_Up_Your_Tyres", "FS25_useYourTyres" },
+        substrings = { "use_up_your_tyres", "useyourtyres" },
+        globals = { "UseYourTyres" },
+    },
+    {
+        id = "realisticHarvesting",
+        title = "Realistic Harvesting",
+        category = "fleet",
+        names = { "FS25_RealisticHarvesting", "KM_73932_realistic-harvesting" },
+        substrings = { "realisticharvesting", "realistic_harvesting" },
+        globals = {},
+    },
+    {
+        id = "rhmClogging",
+        title = "Realistic Harvesting Clogging Addon",
+        category = "fleet",
+        names = { "WA25_RHM_CloggingAddon", "KM_81204_Clogging_Addon" },
+        globals = {},
+    },
+    {
+        id = "variableWorkingDepth",
+        title = "Variable Working Depth",
+        category = "fleet",
+        names = { "FS25_VariableWorkingDepth", "KM_81882_variable-working-depth" },
+        globals = {},
+    },
+    {
+        id = "vehicleAssistanceSystem",
+        title = "Vehicle Assistance System",
+        category = "fleet",
+        names = { "FS25_350273_Vehicle_Assistance_System", "FS25_VehicleAssistanceSystem", "FS25_vehicleAssistanceSystem" },
+        globals = {},
+    },
+    {
+        id = "hudPlus",
+        title = "HUD+",
+        category = "fleet",
+        names = { "KM_81497_HUD_" },
+        globals = {},
+    },
+    {
+        id = "realisticBrakes",
+        title = "Realistic Brakes",
+        category = "fleet",
+        names = { "FS25_RealisticBrakes", "KM_79862_realistic-brakes" },
+        globals = {},
+    },
+    {
+        id = "hydraulicBrokenTrailer",
+        title = "Hydraulic Broken Trailer",
+        category = "fleet",
+        names = { "KM_81545_Hydraulic_Broken_Trailer" },
+        globals = {},
+    },
+    {
+        id = "parkingBrake",
+        title = "Parking Brake",
+        category = "fleet",
+        names = { "FS25_ParkingBrake", "KM_81129_Parking_Brake_Mod" },
+        globals = {},
+    },
+    {
+        id = "toggleableSilageAdditive",
+        title = "Toggleable Silage Additive",
+        category = "fleet",
+        names = { "FS25_330718_Toggleable_Silage_Additive", "FS25_toggleableSilageAdditive" },
+        globals = {},
+    },
+    {
+        id = "buyableGps",
+        title = "Buyable GPS",
+        category = "fleet",
+        names = { "FS25_324860_Buyable_GPS", "FS25_BuyableGPS" },
+        globals = {},
+    },
+    {
+        id = "lockSteeringAxles",
+        title = "Lock Steering Axle",
+        category = "fleet",
+        names = { "FS25_311154_Lock_Steering_Axle", "FS25_lockSteeringAxles" },
+        globals = {},
+    },
+    {
+        id = "automaticTramlineSystem",
+        title = "Automatic Tramline System",
+        category = "fields",
+        names = { "FS25_AutomaticTramlineSystem", "FS25_355320_Automatic_Tramline_System" },
+        globals = {},
+    },
+    {
+        id = "cvtAddon",
+        title = "CVT Addon",
+        category = "fleet",
+        names = { "FS25_CVT_Addon" },
+        globals = {},
+    },
+    {
+        id = "tripComputer",
+        title = "Trip Computer",
+        category = "fleet",
+        names = { "FS25_341715_Trip_Computer", "FS25_TripComputer", "FS25_Trip_Computer" },
+        globals = {},
+    },
+    {
+        id = "helperSilageCompacting",
+        title = "Helper Silage Compacting",
+        category = "fleet",
+        names = { "KM_81547_Helper_Silage_Compacting" },
+        globals = {},
+    },
+    {
+        id = "universalSoundTuner",
+        title = "Universal Sound Tuner",
+        category = "fleet",
+        names = { "KM_83598_Universal_Sound_Tuner", "FS25_UniversalSoundTuner" },
+        globals = {},
+    },
+    {
+        id = "welchyPerformanceAddon",
+        title = "Welchy Performance Addon",
+        category = "fleet",
+        names = { "KM_83271_Welchys_Performance_Addon" },
+        globals = {},
+    },
+    {
+        id = "fillLevelLimiter",
+        title = "Fill Level Limiter",
+        category = "fleet",
+        names = { "FS25_325794_Fill_Level_Limiter", "FS25_FillLevelLimiter" },
+        globals = {},
+    },
+    {
+        id = "farmGateKeys",
+        title = "Farm Gate Keys",
+        category = "construction",
+        names = { "FS25_356593_Farm_Gate_Keys" },
+        globals = {},
+    },
+    {
+        id = "jobQueue",
+        title = "Job Queue",
+        category = "fleet",
+        names = { "KM_82197_Job_Queue", "FS25_JobQueue" },
+        substrings = { "job_queue", "jobqueue" },
+        globals = {},
+    },
+    {
+        id = "agriculturalTerminal",
+        title = "Agricultural Terminal",
+        category = "fleet",
+        names = { "KM_82990_Agricultural_Terminal" },
+        substrings = { "agricultural_terminal" },
+        globals = {},
+    },
+    {
+        id = "implementMaintenance",
+        title = "Implement Maintenance",
+        category = "fleet",
+        names = { "KM_81822_implement-maintenance", "FS25_MantenimientoImplementos", "FS25_GN_MantenimientoImplementos" },
+        substrings = { "implement-maintenance", "mantenimientoimplementos" },
+        globals = {},
+    },
+    {
+        id = "nonStopCrop",
+        title = "Non-Stop Crop",
+        category = "fleet",
+        names = { "FS25_363554_Non-Stop_Crop", "FS25_NonStopCrop" },
+        substrings = { "non-stop_crop", "nonstopcrop" },
+        globals = {},
+    },
+    {
+        id = "terraFarmMachines",
+        title = "TerraFarm Machines",
+        category = "fleet",
+        names = { "FS25_0_TerraFarm", "KM_66597_TerraFarm" },
+        substrings = { "terrafarm" },
+        globals = { "g_machineManager" },
+    },
+    {
+        id = "realisticMechanicalSystems",
+        title = "Realistic Mechanical Systems",
+        category = "fleet",
+        names = { "FS25_RealisticMechanicalSystems", "GH_Squallqt__FS25_RealisticMechanicalSystems_FS25_RealisticMechanicalSystems", "KM_82113_Realistic_Mechanical_Systems" },
+        substrings = { "realisticmechanicalsystems" },
+        globals = {},
+    },
+    {
+        id = "advancedDamageSystem",
+        title = "Advanced Damage System",
+        category = "fleet",
+        names = { "FS25_AdvancedDamageSystem", "KM_69590_Advanced_Damage_System" },
+        substrings = { "advanceddamagesystem", "advanced_damage_system" },
+        globals = {},
+    },
+    {
+        id = "realFuelConsumption",
+        title = "Real Fuel Consumption",
+        category = "fleet",
+        names = { "FS25_RealFuelConsumption", "FS25_realFuelConsumption", "KM_79107_real-fuel-consumption" },
+        substrings = { "realfuelconsumption", "real-fuel-consumption" },
+        globals = {},
+    },
+    {
+        id = "hireAWorker",
+        title = "Hire A Worker",
+        category = "fields",
+        names = { "KM_82196_Hire_A_Worker", "FS25_Hire_A_Worker", "FS25_HireAWorker" },
+        substrings = { "hire_a_worker", "hireaworker" },
+        globals = { "g_hireAWorker" },
+    },
+    {
+        id = "dieselFuelSystem",
+        title = "Diesel Fuel System",
+        category = "fleet",
+        names = { "FS25_GNRealism_FuelSystem", "FS25_DieselFuelSystem", "KM_82984_Diesel_Fuel_System" },
+        substrings = { "gnrealism_fuelsystem", "dieselfuelsystem", "diesel_fuel_system" },
+        globals = {},
+    },
+    {
+        id = "roundBalerExtension",
+        title = "Round Baler Extension",
+        category = "fleet",
+        names = { "FS25_roundBalerExtension", "FS25_303389_FS25_roundBalerExtension", "KM_57692_Round_Baler_Extension" },
+        substrings = { "roundbalerextension", "round_baler_extension" },
+        globals = {},
+    },
+    {
+        id = "baleCapacityMultiplier",
+        title = "Bale Capacity Multiplier",
+        category = "fleet",
+        names = { "FS25_BaleCapacityMultiplier", "KM_78197_Bale_Capacity_Multiplier" },
+        substrings = { "balecapacitymultiplier", "bale_capacity_multiplier" },
+        globals = {},
+    },
+    {
+        id = "forageWagonCompression",
+        title = "Forage Wagon Compression",
+        category = "fleet",
+        names = { "FS25_ForageWagonCompression", "FS25_375007_Forage_Wagon_Compression", "KM_82574_Forage_Wagon_Compression" },
+        substrings = { "foragewagoncompression", "forage_wagon_compression" },
+        globals = {},
+    },
+    {
+        id = "enhancedMixerWagons",
+        title = "Enhanced Mixer Wagons",
+        category = "fleet",
+        names = { "FS25_308285_Enhanced_Mixer_Wagons" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "hydraulicSuspension",
+        title = "Hydraulic Suspension System",
+        category = "fleet",
+        names = { "KM_82643_Hydraulic_Suspension_System" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "realDieselStart",
+        title = "Real Diesel Start",
+        category = "fleet",
+        names = { "KM_79619_realistic-diesel-start", "FS25_RealDieselStart" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "twoRotorRakeControl",
+        title = "Two-Rotor Rake Control",
+        category = "fleet",
+        names = { "KM_80712_Universal_Two-Rotor_Rake_Control", "FS25_UniversalTwoRotorRakeControl" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "mixerWagonFeedSwitcher",
+        title = "Mixer Wagon Feed Switcher",
+        category = "fleet",
+        names = { "KM_80956_Mixer_Wagon_Feed_Switcher" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "chainsawConsumables",
+        title = "Chainsaw Consumables",
+        category = "fleet",
+        names = { "KM_82857_Chainsaw_Consumables" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "vehicleAnchor",
+        title = "Vehicle Anchor",
+        category = "fleet",
+        names = { "KM_81498_Vehicle_Anchor" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "multipleSilageTypes",
+        title = "Multiple Silage Types",
+        category = "fleet",
+        names = { "FS25_354139_Multiple_Silage_Types" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "handPlantSaplings",
+        title = "Hand Plant Saplings",
+        category = "storage",
+        names = { "KM_71329_Hand_Plant_Saplings" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "rcSheepBarn",
+        title = "RC Sheep Barn and Storage",
+        category = "livestock",
+        names = { "KM_82926_Sheep_Barn" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "unloadGarage",
+        title = "Unload Garage",
+        category = "fleet",
+        names = { "KM_77604_Unload_Garage" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "smartBarrier",
+        title = "Smart Barrier Pack",
+        category = "construction",
+        names = { "KM_82078_smart-barrier-pack", "FS25_SmartBarrierPack" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "bhFuelTerminal",
+        title = "BH Bulk Fuel Terminal",
+        category = "storage",
+        names = { "FS25_BH_FuelTerminal_V1", "ITCH_5227540_FS25_BH_FuelTerminal_V1" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "bhWaterBattery",
+        title = "BH Produced Water Tank Batteries",
+        category = "storage",
+        names = { "FS25_BHProducedWaterTankBatteries", "ITCH_5209033_FS25_BHProducedWaterTankBatteries" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "bhSandFacilities",
+        title = "BH Sand Facilities",
+        category = "storage",
+        names = { "FS25_BH_SandFacilities", "ITCH_5226982_FS25_BH_SandFacilities" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "powertrainUpgrade",
+        title = "Powertrain Upgrade",
+        category = "fleet",
+        names = { "FS25_PowertrainUpgrade", "FS25_372458_Powertrain_Upgrade" },
+        substrings = { "powertrainupgrade", "powertrain_upgrade" },
+        globals = {},
+    },
+    {
+        id = "capacityUpgrade",
+        title = "Capacity Upgrade",
+        category = "fleet",
+        names = { "FS25_CapacityUpgrade", "FS25_373637_Capacity_Upgrade", "KM_83362_Capacity_Upgrade" },
+        substrings = { "capacityupgrade", "capacity_upgrade" },
+        globals = {},
+    },
+    {
+        id = "variableTirePressure",
+        title = "Variable Tire Pressure",
+        category = "fleet",
+        names = { "FS25_VariableTirePressure", "FS25_347991_FS25_VariableTirePressure" },
+        substrings = { "variabletirepressure", "variable_tire_pressure" },
+        globals = {},
+    },
+    {
+        id = "realTireWear",
+        title = "Real Tire Wear",
+        category = "fleet",
+        names = { "KM_82753_Real_Tire_Wear", "FS25_RealTireWear" },
+        substrings = { "real_tire_wear", "realtirewear" },
+        globals = {},
+    },
+    {
+        id = "adjustableFillLevelAdvanced",
+        title = "Adjustable Fill Level Advanced",
+        category = "fleet",
+        names = { "FS25_adjustableFillLevelAdvanced", "FS25_367048_FS25_adjustableFillLevelAdvanced" },
+        substrings = { "adjustablefillleveladvanced" },
+        globals = {},
+    },
+    {
+        id = "adjustFuelTank",
+        title = "Adjustable Fuel Tank + Elektro",
+        category = "fleet",
+        names = { "KM_80971_adjust_fuel_tank", "KM_80971_adjust-fuel-tank", "FS25_AdjustFuelTank" },
+        substrings = { "adjust_fuel_tank", "adjust-fuel-tank", "adjustfueltank" },
+        globals = {},
+    },
+    {
+        id = "realisticSeeder",
+        title = "Realistic Seeder",
+        category = "fleet",
+        names = { "FS25_372197_Realistic_Seeder", "FS25_RealisticSeeder" },
+        substrings = { "realistic_seeder", "realisticseeder" },
+        globals = {},
+    },
+    {
+        id = "organicDemand",
+        title = "Demand-Oriented Organic Application",
+        category = "fleet",
+        names = { "FS25_DemandOrientedOrganicApplication", "FS25_366594_Demand-Oriented_Organic_Application" },
+        substrings = { "demandorientedorganic", "demand-oriented_organic_application" },
+        globals = {},
+    },
+    {
+        id = "vehicleControlAddon",
+        title = "Vehicle Control Addon",
+        category = "fleet",
+        names = { "FS25_vehicleControlAddon", "vehicleControlAddon", "KM_82841_Vehicle_Control_Addon_VCA_" },
+        substrings = { "vehiclecontroladdon", "vehicle_control_addon" },
+        globals = { "g_vehicleControlAddon" },
+    },
+    {
+        id = "universalAutoload",
+        title = "Universal Autoload",
+        category = "fleet",
+        names = { "FS25_UniversalAutoload", "KM_68066_Universal_Autoload",
+            "KM_58738_Universal_Autoload" },
+        substrings = { "universalautoload", "universal_autoload" },
+        globals = {},
+    },
+    {
+        id = "unloadPotatoSeeders",
+        title = "Unload Potato Seeders",
+        category = "fleet",
+        names = { "FS25_UnloadPotatoSeeders", "FS25_326817_Unload_Potato_Seeders" },
+        substrings = { "unloadpotatoseeders", "unload_potato_seeders" },
+        globals = {},
+    },
+    {
+        id = "handToolDrop",
+        title = "Hand Tool Drop",
+        category = "fleet",
+        names = { "KM_82920_Hand_Tool_Drop" },
+        globals = {},
+    },
+    {
+        id = "handTools",
+        title = "Hand Tools",
+        category = "fleet",
+        names = { "FS25_369801_Hand_Tools", "FS25_HandTools" },
+        globals = {},
+    },
+    {
+        id = "advancedVehicleFunctions",
+        title = "Advanced Vehicle Functions",
+        category = "fleet",
+        names = { "FS25_AdvancedVehicleFunctions", "KM_82760_Advanced_Vehicle_Functions" },
+        substrings = { "advancedvehiclefunctions", "advanced_vehicle_functions" },
+        globals = {},
+    },
+    {
+        id = "vehicleTradeIn",
+        title = "Vehicle Trade In",
+        category = "fleet",
+        names = { "FS25_TradeInMenu", "FS25_362333_FS25_TradeInMenu" },
+        substrings = { "tradeinmenu", "trade_in_menu" },
+        globals = { "TradeInMod" },
+    },
+    {
+        id = "dynamicDealership",
+        title = "Dynamic Dealership",
+        category = "fleet",
+        names = { "FS25_DynamicDealership", "FS25_369544_Dynamic_Dealership", "KM_80444_Dynamic_Dealership" },
+        substrings = { "dynamicdealership", "dynamic_dealership" },
+        globals = {},
+    },
+    {
+        id = "customerHayOrders",
+        title = "Customer Hay Orders",
+        category = "finance",
+        names = { "KM_81634_Custom_Hay_Orders" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "veterinarian",
+        title = "Veterinarian and Animal Diseases",
+        category = "livestock",
+        names = { "FS25_Veterinarian", "GH_Cobra-Modding__FS25_Veterinarian_FS25_Veterinarian" },
+        substrings = { "fs25_veterinarian" },
+        globals = { "g_veterinarian" },
+    },
+    {
         id = "collisionDamage",
         title = "Collision Damage",
         category = "fleet",
@@ -346,6 +1518,14 @@ local CATALOG = {
         globals = {},
     },
     {
+        id = "enhancedVehicle",
+        title = "EnhancedVehicle",
+        category = "fleet",
+        names = { "FS25_EnhancedVehicle", "KM_58808_Enhanced_Vehicle" },
+        substrings = { "enhancedvehicle", "enhanced_vehicle" },
+        globals = {},
+    },
+    {
         id = "vehicleYears",
         title = "Vehicle Years",
         category = "fleet",
@@ -358,7 +1538,7 @@ local CATALOG = {
         id = "courseplay",
         title = "Courseplay",
         category = "fleet",
-        names = { "FS25_Courseplay" },
+        names = { "FS25_Courseplay", "FS25_331515_CoursePlay" },
         substrings = {},
         globals = { "g_Courseplay" },
     },
@@ -414,8 +1594,8 @@ local CATALOG = {
         id = "statisticsExtended",
         title = "Statistics Extended",
         category = "economy",
-        names = { "FS25_StatisticsExtended", "FS25_364343_Statistics_Extended" },
-        substrings = { "statisticsextended", "statistics_extended" },
+        names = { "FS25_StatisticsExtended", "FS25_364343_Statistics_Extended", "FS25_statsExtended", "FS25_364343_FS25_statsExtended" },
+        substrings = { "statisticsextended", "statistics_extended", "statsextended" },
         globals = {},
     },
     {
@@ -435,6 +1615,14 @@ local CATALOG = {
         globals = { "TaskList" },
     },
     {
+        id = "fieldToDoPlannedCrops",
+        title = "Field To-Do List",
+        category = "fields",
+        names = { "FS25_FieldToDoList", "GH_knoellix__FS25_ToDo_FS25_FieldToDoList" },
+        substrings = { "fieldtodolist", "field_to_do_list" },
+        globals = {},
+    },
+    {
         id = "productionSchedule",
         title = "Production Schedule",
         category = "production",
@@ -451,6 +1639,14 @@ local CATALOG = {
         globals = { "FinancialLogger" },
     },
     {
+        id = "usedEquipmentYards",
+        title = "Used Equipment Yards",
+        category = "finance",
+        names = { "FS25_UsedEquipmentYards", "FS25_359834_Used_Equipment_Yards" },
+        substrings = { "usedequipmentyards", "used_equipment_yards" },
+        globals = { "YardCredit" },
+    },
+    {
         id = "animalPlanner",
         title = "Animal Planner",
         category = "livestock",
@@ -462,7 +1658,7 @@ local CATALOG = {
         id = "vipOrderManager",
         title = "VIP Order Manager",
         category = "economy",
-        names = { "FS25_VIPOrderManager", "FS25_310861_VIP_Order_Manager" },
+        names = { "KM_65282_VIP_Order_Manager", "FS25_310861_VIP_Order_Manager", "FS25_VIPOrderManager" },
         substrings = { "vipordermanager", "vip_order" },
         globals = { "VIPOrderManager" },
     },
@@ -470,7 +1666,7 @@ local CATALOG = {
         id = "fieldProfitabilityLedger",
         title = "Field Profitability Ledger",
         category = "fields",
-        names = { "FS25_FieldProfitabilityLedger", "FS25_369866_Field_Profitability_Ledger" },
+        names = { "FS25_FieldProfitabilityLedger", "FS25_369866_FS25_FieldProfitabilityLedger", "KM_80685_Field_Profitability_Ledger", "GH_user01010111__FS25_FieldProfitabilityLedger_FS25_FieldProfitabilityLedger", "FS25_369866_Field_Profitability_Ledger" },
         substrings = { "fieldprofitability", "field_profitability" },
         globals = { "FieldProfitabilityLedger" },
     },
@@ -478,9 +1674,41 @@ local CATALOG = {
         id = "farmReputation",
         title = "Farm Reputation",
         category = "contracts",
-        names = { "FS25_FarmReputation", "FS25_367320_Farm_Reputation" },
+        names = { "FS25_FarmReputation", "FS25_367320_Farm_Reputation", "FS25_367320_FS25_FarmReputation", "KM_80173_Farm_Reputation" },
         substrings = { "farmreputation", "farm_reputation" },
         globals = {},
+    },
+    {
+        id = "realisticCropRotation",
+        title = "Realistic Crop Rotation",
+        category = "fields",
+        names = { "FS25_370461_Realistic_Crop_Rotation", "KM_83006_Realistic_Crop_Rotation", "GH_Squallqt__FS25_RealisticCropRotation_FS25_RealisticCropRotation" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "cropRotationPlanner",
+        title = "Crop Rotation",
+        category = "fields",
+        names = { "FS25_347316_Crop_Rotation" },
+        substrings = {},
+        globals = { "g_cropRotationPlanner" },
+    },
+    {
+        id = "vehicleWeightModifier",
+        title = "Vehicle Weight Modifier",
+        category = "fleet",
+        names = { "FS25_357616_Vehicle_Weight_Modifier" },
+        substrings = {},
+        globals = { "VehicleWeightModifierVehicleSettings" },
+    },
+    {
+        id = "flockCamera",
+        title = "Flock Camera",
+        category = "construction",
+        names = { "KM_82460_Flock_Camera" },
+        substrings = {},
+        globals = { "FlockCamera" },
     },
     {
         id = "yieldTracker",
@@ -494,7 +1722,7 @@ local CATALOG = {
         id = "moistureSystem",
         title = "Moisture System",
         category = "fields",
-        names = { "FS25_MoistureSystem", "FS25_354130_Moisture_System" },
+        names = { "FS25_MoistureSystem", "FS25_354130_FS25_MoistureSystem", "KM_75883_Moisture_System", "FS25_354130_Moisture_System" },
         substrings = { "moisturesystem", "moisture_system" },
         globals = {},
     },
@@ -505,6 +1733,14 @@ local CATALOG = {
         names = { "FS25_FieldLeasing", "FS25_338381_Field_Leasing" },
         substrings = { "fieldleasing", "field_leasing" },
         globals = { "g_fieldLeasingManager" },
+    },
+    {
+        id = "fairLeasingPlus",
+        title = "Fair Leasing Plus",
+        category = "finance",
+        names = { "FS25_FairLeasingPlus", "FS25_356407_Fair_Leasing_Plus" },
+        substrings = { "fairleasingplus", "fair_leasing_plus" },
+        globals = { "FairLeasingPlus" },
     },
     {
         id = "rentYourField",
@@ -518,7 +1754,7 @@ local CATALOG = {
         id = "distributionRedux",
         title = "Distribution Redux",
         category = "production",
-        names = { "FS25_DistributionRedux", "FS25_365583_Distribution_Redux" },
+        names = { "FS25_DistributionRedux", "FS25_365583_FS25_Distribution_Redux", "KM_79308_Distribution_Redux", "FS25_365583_Distribution_Redux" },
         substrings = { "distributionredux", "distribution_redux" },
         globals = {},
     },
@@ -526,8 +1762,98 @@ local CATALOG = {
         id = "silageCompactionMonitor",
         title = "Silage Compaction Monitor",
         category = "storage",
-        names = { "FS25_SilageCompactionMonitor", "FS25_349039_Silage_Compaction_Monitor" },
+        names = { "FS25_SilageCompactionMonitor", "FS25_349039_FS25_Silage_Compaction_Monitor", "KM_75339_Silage_Compaction_Monitor", "FS25_349039_Silage_Compaction_Monitor" },
         substrings = { "silagecompaction", "silage_compaction" },
+        globals = {},
+    },
+    -- Dedicated pages must also appear in this detected-mod catalog. The V17
+    -- TUV page was exported but invisible because this entry was missing.
+    {
+        id = "tuvSystem",
+        title = "TUV System",
+        category = "fleet",
+        names = { "KM_81230_T_V_HU_System", "FS25_TUVSystem" },
+        substrings = { "t_v_hu_system", "tuvsystem" },
+        globals = {},
+    },
+    {
+        id = "financeYourFleet",
+        title = "Finance Your Fleet",
+        category = "finance",
+        names = { "KM_81456_Finance_Your_Fleet", "FS25_FinanceYourFleet" },
+        substrings = { "finance_your_fleet", "financeyourfleet" },
+        globals = {},
+    },
+    {
+        id = "futuresMarketPositions",
+        title = "Futures Market",
+        category = "finance",
+        names = { "KM_82100_FUTURES_MARKET", "FS25_FuturesMarket" },
+        substrings = { "futures_market", "futuresmarket" },
+        globals = {},
+    },
+    {
+        id = "grassContracts",
+        title = "Grass Contracts",
+        category = "fields",
+        names = { "FS25_377438_Grass_Contracts", "KM_83139_Grass_Contracts" },
+        substrings = {},
+        globals = {},
+    },
+    {
+        id = "invoicesProductionSalesOffers",
+        title = "Invoices - Production Sales",
+        category = "production",
+        names = { "FS25_373258_Invoices_-_Production_Sales", "KM_82919_Invoices_-_Production_Sales", "FS25_InvoicesProductionSales" },
+        substrings = { "invoices_-_production_sales", "invoicesproductionsales" },
+        globals = {},
+    },
+    {
+        id = "realisticFarmFinanceLoans",
+        title = "Realistic Farm Finance",
+        category = "finance",
+        names = { "KM_82429_Realistic_Farm_Finance", "FS25_RealisticFarmFinance" },
+        substrings = { "realistic_farm_finance", "realisticfarmfinance" },
+        globals = {},
+    },
+    {
+        id = "bankAndCreditLoans",
+        title = "Bank And Credit",
+        category = "finance",
+        names = { "KM_77828_Bank_And_Credit", "FS25_BankAndCredit" },
+        substrings = { "bank_and_credit", "bankandcredit" },
+        globals = {},
+    },
+    {
+        id = "transportCompany",
+        title = "Transport Company",
+        category = "economy",
+        names = { "FS25_TransportCompany", "KM_80292_transport_company" },
+        substrings = { "transportcompany", "transport_company", "transport-company" },
+        globals = {},
+    },
+    {
+        id = "agriCreditSolutions",
+        title = "AgriCredit Solutions",
+        category = "finance",
+        names = { "KM_81927_AgriCredit_Solutions", "FS25_AgriCredit_Solutions" },
+        substrings = { "agricredit_solutions", "agricreditsolutions" },
+        globals = {},
+    },
+    {
+        id = "shopRefund",
+        title = "Shop Refund",
+        category = "vehicles",
+        names = { "FS25_364635_Shop_Refund", "FS25_ShopRefund" },
+        substrings = { "shop_refund", "shoprefund" },
+        globals = {},
+    },
+    {
+        id = "snowContracts",
+        title = "Snow Contracts",
+        category = "fields",
+        names = { "FS25_354811_FS25_SnowContracts", "KM_76170_Snow_Contracts" },
+        substrings = {},
         globals = {},
     },
     {
@@ -861,30 +2187,30 @@ local function providerSymbol(modNames, symbolName)
 end
 
 local LOAN_REPAY_MODS = { "FS25_AutomaticLoanRepay", "FS25_365758_Automatic_Loan_Repay" }
-local DIESEL_PRICE_MODS = { "FS25_RealisticDieselPrice", "FS25_363612_Realistic_Diesel_Price" }
+local DIESEL_PRICE_MODS = { "FS25_RealisticDieselPrice", "FS25_363612_FS25_RealisticDieselPrice", "KM_78609_Realistic_Diesel_Price", "FS25_363612_Realistic_Diesel_Price" }
 local BETTER_CONTRACTS_MODS = { "FS25_BetterContracts", "FS25_307829_Better_Contracts" }
 local WOOL_MODS = { "FS25_SeasonalWoolProduction", "FS25_356143_Seasonal_Wool_Production" }
 local SCHEDULE_MODS = { "FS25_ProductionSchedule", "FS25_352788_Production_Schedule" }
 local HISTORY_MODS = { "FS25_EconomicHistory", "FS25_367175_Economic_History" }
 local FOOD_MODS = { "FS25_AnimalFoodCalculator", "FS25_338159_Animal_Food_Calculator" }
 local PLANNER_MODS = { "FS25_AnimalPlanner", "FS25_368672_Animal_Planner" }
-local VIP_MODS = { "FS25_VIPOrderManager", "FS25_310861_VIP_Order_Manager" }
+local VIP_MODS = { "KM_65282_VIP_Order_Manager", "FS25_310861_VIP_Order_Manager", "FS25_VIPOrderManager" }
 local MILK_MODS = { "FS25_SeasonalMilkProduction", "FS25_365513_Seasonal_Milk_Production" }
 local YIELD_MODS = { "FS25_YieldTracker", "FS25_326441_Yield_Tracker" }
 local LEASE_MODS = { "FS25_FieldLeasing", "FS25_338381_Field_Leasing" }
-local SILO_MODS = { "FS25_RealSilo", "FS25_369067_RealSilo_Realistic_Silo_Compartments" }
+local SILO_MODS = { "FS25_RealSilo", "FS25_369067_FS25_RealSilo", "FS25_369067_RealSilo_Realistic_Silo_Compartments", "KM_80484_RealSilo_Realistic_Silo_Compartments" }
 local PALLET_MODS = {
     "FS25_StorageOverhaulPalletDegradation",
     "FS25_StorageOverhaul",
     "FS25_PalletDegradation",
     "FS25_360720_Storage_Overhaul_Pallet_Degradation_System",
 }
-local REPUTATION_MODS = { "FS25_FarmReputation", "FS25_367320_Farm_Reputation" }
-local MOISTURE_MODS = { "FS25_MoistureSystem", "FS25_354130_Moisture_System" }
+local REPUTATION_MODS = { "FS25_FarmReputation", "FS25_367320_Farm_Reputation", "FS25_367320_FS25_FarmReputation" }
+local MOISTURE_MODS = { "FS25_MoistureSystem", "FS25_354130_FS25_MoistureSystem", "KM_75883_Moisture_System", "FS25_354130_Moisture_System" }
 local RENT_MODS = { "FS25_RentYourField", "FS25_356641_Rent_Your_Field" }
-local MARKET_MODS = { "FS25_FarmlandMarketplace", "FS25_369241_Farmland_Marketplace" }
-local DIST_MODS = { "FS25_DistributionRedux", "FS25_365583_Distribution_Redux" }
-local SILAGE_MODS = { "FS25_SilageCompactionMonitor", "FS25_349039_Silage_Compaction_Monitor" }
+local MARKET_MODS = { "FS25_FarmlandMarketplace", "FS25_369241_FS25_FarmlandMarketplace", "KM_80211_Farmland_Marketplace", "FS25_369241_Farmland_Marketplace" }
+local DIST_MODS = { "FS25_DistributionRedux", "FS25_365583_FS25_Distribution_Redux", "KM_79308_Distribution_Redux", "FS25_365583_Distribution_Redux" }
+local SILAGE_MODS = { "FS25_SilageCompactionMonitor", "FS25_349039_FS25_Silage_Compaction_Monitor", "KM_75339_Silage_Compaction_Monitor", "FS25_349039_Silage_Compaction_Monitor" }
 local OPS_MODS = { "FS25_FarmOperationsDashboard", "FS25_364188_Farm_Operations_Dashboard" }
 local FACTORY_MODS = { "FS25_FactoryProfitCalculator", "FS25_368477_Factory_Profit_Calculator" }
 local LIVESTOCK_MONITOR_MODS = { "FS25_LivestockMonitor", "FS25_367447_Livestock_Monitor" }
@@ -1065,7 +2391,10 @@ local function collectDiesel(detectedIds)
     }
 end
 
-local function collectRestrictedPeriods()
+local function collectRestrictedPeriods(modName)
+    if modName == nil or modVersion(modName) ~= "1.0.0.0" then
+        return { enabled = true, readState = "unavailable", reason = "unreviewed-version" }
+    end
     local slurry = companionSymbol({
         "FS25_RestrictedPeriods",
         "FS25_352961_Restricted_Periods",
@@ -1355,10 +2684,10 @@ local function collectProductionWatcher()
     return {
         enabled = true,
         source = "productionWatcher",
-        readState = n == 0 and "empty" or "ok",
+        readState = truncated and "partial" or (n == 0 and "empty" or "ok"),
         coverage = truncated and "truncated" or "complete",
         farmId = farmId,
-        productionPointCount = n,
+        productionPointCount = not truncated and n or nil,
         countSource = "native",
         alertsReadable = false,
     }
@@ -1447,32 +2776,67 @@ local function collectTaskList()
     local tasks = {}
     local truncated = false
     local scanned = 0
+    local withheld = 0
     for _, active in pairs(list.activeTasks) do
         scanned = scanned + 1
-        if #tasks >= 40 or scanned > 400 then
+        if scanned > 400 then
             truncated = true
             break
         end
         if type(active) == "table" then
             local group = list.taskGroups[active.groupId]
-            if type(group) == "table" and tonumber(group.farmId) == farmId and type(group.tasks) == "table" then
-                local task = group.tasks[active.id]
-                tasks[#tasks + 1] = {
-                    id = clipText(active.id, 40),
-                    priority = type(task) == "table" and tonumber(task.priority) or nil,
-                    period = type(task) == "table" and tonumber(task.period) or nil,
-                    effort = type(task) == "table" and tonumber(task.effort) or nil,
-                    detail = type(task) == "table" and clipText(task.detail, 120) or "",
-                }
+            if type(group) == "table" and tonumber(group.farmId) == farmId then
+                local sourceGroup = group
+                -- Template instances resolve their active task from the source
+                -- template in the mod's addActiveTask/getTaskById code.
+                if tonumber(group.type) == 3 then
+                    sourceGroup = list.taskGroups[group.templateGroupId]
+                end
+                if type(sourceGroup) == "table" and tonumber(sourceGroup.farmId) == farmId
+                    and type(sourceGroup.tasks) == "table" and type(sourceGroup.tasks[active.id]) == "table"
+                    and tonumber(sourceGroup.tasks[active.id].type) == 1
+                    and type(tonumber(sourceGroup.tasks[active.id].period)) == "number"
+                    and type(tonumber(sourceGroup.tasks[active.id].priority)) == "number"
+                    and type(sourceGroup.tasks[active.id].detail) == "string"
+                    and sourceGroup.tasks[active.id].detail ~= "" then
+                    local task = sourceGroup.tasks[active.id]
+                    local recurMode = tonumber(task.recurMode)
+                    if recurMode == nil or recurMode % 1 ~= 0 or recurMode < 0 or recurMode > 4 then
+                        recurMode = nil
+                    end
+                    tasks[#tasks + 1] = {
+                        id = clipText(active.id, 40),
+                        groupName = type(group.name) == "string" and group.name ~= "" and clipText(group.name, 60) or nil,
+                        priority = tonumber(task.priority),
+                        period = tonumber(task.period),
+                        effort = tonumber(task.effort),
+                        recurMode = recurMode,
+                        detail = clipText(task.detail, 120),
+                    }
+                else
+                    withheld = withheld + 1
+                end
             end
         end
+    end
+    -- The mod sorts its active-task display by period, then priority.
+    -- A stable ID tie-breaker keeps the three-task preview deterministic.
+    table.sort(tasks, function(left, right)
+        if left.period ~= right.period then return left.period < right.period end
+        if left.priority ~= right.priority then return left.priority < right.priority end
+        return left.id < right.id
+    end)
+    if #tasks > 40 then
+        truncated = true
+        for index = #tasks, 41, -1 do tasks[index] = nil end
     end
     return {
         enabled = true,
         source = "taskList",
-        readState = #tasks == 0 and "empty" or "ok",
-        coverage = truncated and "truncated" or "complete",
+        readState = #tasks == 0 and ((withheld > 0 or truncated) and "partial" or "empty") or "ok",
+        coverage = truncated and "truncated" or (withheld > 0 and "partial" or "complete"),
         farmId = farmId,
+        withheldCount = withheld,
         tasks = tasks,
     }
 end
@@ -1486,8 +2850,57 @@ local function collectProductionSchedule()
     if type(sched) ~= "table" or type(sched.data) ~= "table" then
         return { enabled = true, readState = "unavailable", source = "productionSchedule" }
     end
+    if sched.modName == nil or modVersion(sched.modName) ~= "1.1.0.0" then
+        return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "unreviewed-version" }
+    end
+    -- The mod environment inherits engine globals; rawget misses the live mission.
+    local mission = _G.g_currentMission
+    local manager = mission and mission.productionChainManager or nil
+    if mission == nil then
+        return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "no-mission" }
+    end
+    if manager == nil or type(manager.getProductionPointsForFarmId) ~= "function" then
+        return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "no-owned-production-api" }
+    end
+    local okPoints, points = pcall(manager.getProductionPointsForFarmId, manager, farmId)
+    if not okPoints or type(points) ~= "table" then
+        return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "no-owned-production-list" }
+    end
+    if type(sched.getPointKey) ~= "function" then
+        return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "no-point-key" }
+    end
+    local ownedByKey = {}
+    local duplicateKeys = {}
+    local pointCount = 0
+    for _, point in pairs(points) do
+        pointCount = pointCount + 1
+        if pointCount > 200 then
+            return { enabled = true, readState = "unavailable", source = "productionSchedule", reason = "owned-point-limit" }
+        end
+        if type(point) == "table" and type(point.getOwnerFarmId) == "function" then
+            local okPoint, pointOwner = pcall(point.getOwnerFarmId, point)
+            local placeable = point.owningPlaceable
+            if okPoint and tonumber(pointOwner) == farmId
+                and type(placeable) == "table" and type(placeable.getOwnerFarmId) == "function" then
+                local okPlaceable, placeableOwner = pcall(placeable.getOwnerFarmId, placeable)
+                if okPlaceable and tonumber(placeableOwner) == farmId then
+                    local okKey, key = pcall(sched.getPointKey, sched, point)
+                    if okKey and (type(key) == "string" or type(key) == "number") then
+                        key = tostring(key)
+                        if #key > 0 and #key <= 80 then
+                            if ownedByKey[key] ~= nil and ownedByKey[key] ~= point then
+                                duplicateKeys[key] = true
+                            else
+                                ownedByKey[key] = point
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
     local rows = {}
-    local skipped = 0
+    local partial = false
     local truncated = false
     local scanned = 0
     for pointKey, recipes in pairs(sched.data) do
@@ -1496,50 +2909,71 @@ local function collectProductionSchedule()
             truncated = true
             break
         end
-        local owner = nil
-        if type(sched.runtime) == "table" and type(sched.runtime[pointKey]) == "table" then
-            owner = tonumber(sched.runtime[pointKey].ownerFarmId)
-        end
-        local owned = owner == farmId or owner == 0
-        if not owned then
-            skipped = skipped + 1
-        elseif type(recipes) == "table" then
+        local key = tostring(pointKey)
+        local point = ownedByKey[key]
+        if duplicateKeys[key] then
+            partial = true
+        elseif point ~= nil and type(recipes) == "table" then
+            local knownRecipes = type(point.productionsIdToObj) == "table" and point.productionsIdToObj or {}
             for prodId, raw in pairs(recipes) do
                 if #rows >= 40 then
                     truncated = true
                     break
                 end
-                local status = nil
-                local months = nil
-                if type(raw) == "table" and (raw.status == "aktiv" or raw.status == "inaktiv") then
-                    status = raw.status
-                    months = raw.months
-                elseif type(raw) == "table" then
-                    months = raw
-                end
-                local monthList = {}
-                if type(months) == "table" then
-                    for month, on in pairs(months) do
-                        if type(month) == "number" and on == true and #monthList < 12 then
-                            monthList[#monthList + 1] = month
+                local numericId = tonumber(prodId)
+                local recipe = knownRecipes[prodId] or knownRecipes[tostring(prodId)]
+                    or (numericId and knownRecipes[numericId])
+                if type(recipe) ~= "table" then
+                    partial = true
+                else
+                    local status = nil
+                    local months = nil
+                    if type(raw) == "table" and (raw.status == "aktiv" or raw.status == "inaktiv") then
+                        status = raw.status
+                        months = raw.months
+                    elseif type(raw) == "table" then
+                        status = "aktiv"
+                        months = raw
+                    end
+                    local monthList = {}
+                    if type(months) == "table" then
+                        for month, on in pairs(months) do
+                            local n = tonumber(month)
+                            if n and n == math.floor(n) and n >= 1 and n <= 12 and on == true then
+                                monthList[#monthList + 1] = n
+                            else partial = true end
                         end
                     end
+                    if status == nil or type(months) ~= "table" then
+                        partial = true
+                    else
+                        table.sort(monthList)
+                        local pointName = point.name or point.baseName or pointKey
+                        if type(point.owningPlaceable.getName) == "function" then
+                            local okName, placeableName = pcall(point.owningPlaceable.getName, point.owningPlaceable)
+                            if okName and type(placeableName) == "string" and placeableName ~= "" then
+                                pointName = placeableName
+                            end
+                        end
+                        rows[#rows + 1] = {
+                            pointKey = clipText(pointKey, 80),
+                            pointName = clipText(pointName, 60),
+                            recipeId = clipText(prodId, 40),
+                            recipeName = clipText(recipe.name or recipe.id or prodId, 60),
+                            status = status,
+                            months = monthList,
+                            ownerFarmId = farmId,
+                        }
+                    end
                 end
-                rows[#rows + 1] = {
-                    pointKey = clipText(pointKey, 80),
-                    recipeId = clipText(prodId, 40),
-                    status = status,
-                    months = monthList,
-                    ownerFarmId = owner,
-                }
             end
         end
     end
     return {
         enabled = true,
         source = "productionSchedule",
-        readState = #rows == 0 and "empty" or "ok",
-        coverage = truncated and "truncated" or (skipped > 0 and "partial" or "complete"),
+        readState = (partial or truncated) and "partial" or #rows == 0 and "empty" or "ok",
+        coverage = truncated and "truncated" or partial and "partial" or "complete",
         farmId = farmId,
         recipes = rows,
     }
@@ -1756,12 +3190,46 @@ local function collectVipOrders()
     if type(md) == "table" and md.isMultiplayer == true then
         return { enabled = true, readState = "unavailable", source = "vipOrderManager", reason = "single-player-only" }
     end
-    local vip = providerSymbol(VIP_MODS, "VIPOrderManager")
+    local reviewedName = nil
+    for _, name in ipairs({ "KM_65282_VIP_Order_Manager", "FS25_310861_VIP_Order_Manager", "FS25_VIPOrderManager" }) do
+        if modEntry(name) ~= nil then reviewedName = name; break end
+    end
+    if reviewedName == nil or modVersion(reviewedName) ~= "1.2.2.0" then
+        return { enabled = true, readState = "unavailable", source = "vipOrderManager", reason = "unreviewed-version" }
+    end
+    local mission = _G.g_currentMission
+    local localFarmId = nil
+    if mission and type(mission.getFarmId) == "function" then
+        local ok, value = pcall(mission.getFarmId, mission)
+        if ok then localFarmId = tonumber(value) end
+    end
+    if localFarmId ~= farmId then
+        return { enabled = true, readState = "unavailable", source = "vipOrderManager", reason = "local-farm-mismatch" }
+    end
+    local serverOk, isServer = false, false
+    local clientOk, isClient = false, false
+    if mission and type(mission.getIsServer) == "function" then
+        serverOk, isServer = pcall(mission.getIsServer, mission)
+    end
+    if mission and type(mission.getIsClient) == "function" then
+        clientOk, isClient = pcall(mission.getIsClient, mission)
+    end
+    if not serverOk or isServer ~= true or not clientOk or isClient ~= true
+        or mission.isMissionStarted == false then
+        return { enabled = true, readState = "unavailable", source = "vipOrderManager", reason = "single-player-world-not-ready" }
+    end
+    local vip = providerSymbol({ reviewedName }, "VIPOrderManager")
     if type(vip) ~= "table" then
-        return { enabled = true, readState = "unavailable", source = "vipOrderManager" }
+        return { enabled = true, readState = "pending", source = "vipOrderManager",
+            farmId = farmId, reason = "manager-unavailable" }
+    end
+    if vip.InitDone ~= true then
+        return { enabled = true, readState = "pending", source = "vipOrderManager",
+            farmId = farmId, reason = "initialization-pending" }
     end
     if type(vip.VIPOrders) ~= "table" then
-        return { enabled = true, readState = "pending", source = "vipOrderManager", farmId = farmId }
+        return { enabled = true, readState = "pending", source = "vipOrderManager",
+            farmId = farmId, reason = "orders-unavailable" }
     end
     local count = 0
     local truncated = false
@@ -1774,40 +3242,58 @@ local function collectVipOrders()
     end
     local current = nil
     local first = vip.VIPOrders[1]
+    local firstLevel = type(first) == "table" and tonumber(first.level) or nil
+    if count > 0 and (type(first) ~= "table" or type(first.entries) ~= "table" or firstLevel == nil
+        or firstLevel < 0 or firstLevel > 1000000 or firstLevel ~= math.floor(firstLevel)) then
+        return { enabled = true, readState = "partial", source = "vipOrderManager",
+            farmId = farmId, reason = "invalid-current-order" }
+    end
     if type(first) == "table" and type(first.entries) == "table" then
         local items = 0
         local remainingItems = 0
         local payout = 0
         local itemsTruncated = false
-        for _, entry in pairs(first.entries) do
+        local itemsInvalid = false
+        for key, entry in pairs(first.entries) do
             if items >= 24 then
                 itemsTruncated = true
                 break
             end
-            if type(entry) == "table" then
-                items = items + 1
-                local quantity = tonumber(entry.quantity)
-                local filled = tonumber(entry.fillLevel) or 0
-                if quantity ~= nil and quantity - math.ceil(filled) > 0 then
-                    remainingItems = remainingItems + 1
-                end
-                payout = payout + (tonumber(entry.payout) or 0)
+            items = items + 1
+            local quantity = type(entry) == "table" and tonumber(entry.quantity) or nil
+            local filled = type(entry) == "table" and tonumber(entry.fillLevel) or nil
+            local itemPayout = type(entry) == "table" and tonumber(entry.payout) or nil
+            if type(key) ~= "string" or type(entry) ~= "table"
+                or type(entry.fillTypeName) ~= "string" or key ~= entry.fillTypeName
+                or quantity == nil or quantity ~= quantity or quantity <= 0 or quantity > 1000000000
+                or filled == nil or filled ~= filled or filled < 0 or filled > quantity
+                or itemPayout == nil or itemPayout ~= itemPayout or itemPayout < 0 or itemPayout > 1000000000000 then
+                itemsInvalid = true
+            else
+                if quantity - math.ceil(filled) > 0 then remainingItems = remainingItems + 1 end
+                payout = payout + itemPayout
             end
         end
+        if items == 0 or itemsInvalid or itemsTruncated then
+            return { enabled = true, readState = "partial", source = "vipOrderManager",
+                farmId = farmId, reason = itemsTruncated and "order-items-truncated" or "invalid-current-order",
+                coverage = itemsTruncated and "truncated" or "partial" }
+        end
         current = {
-            level = tonumber(first.level),
+            level = firstLevel,
             items = items,
             remainingItems = remainingItems,
             payout = payout,
-            coverage = itemsTruncated and "truncated" or "complete",
+            coverage = "complete",
         }
     end
     return {
         enabled = true,
         source = "vipOrderManager",
-        readState = count == 0 and "empty" or "ok",
+        readState = truncated and "partial" or count == 0 and "empty" or "ok",
         farmId = farmId,
-        orderCount = count,
+        -- Only VIPOrders[1] is active; later rows are future orders.
+        orderCount = first ~= nil and 1 or 0,
         maxOrders = tonumber(vip.maxVIPOrdersCount),
         animalOrders = vip.isAnimalOrdersWished == true,
         currentOrder = current,
@@ -2064,6 +3550,11 @@ local function collectRealSilo()
     if farmId == nil then
         return { enabled = true, readState = "unavailable", source = "realSilo", reason = "no-farm" }
     end
+    local loadedName = findLoadedName({ names = SILO_MODS })
+    local version = loadedName and modVersion(loadedName) or nil
+    if version ~= "1.1.0.2" and version ~= "1.2.0.7" then
+        return { enabled = true, readState = "unavailable", source = "realSilo", farmId = farmId, reason = "unreviewed-version" }
+    end
     local mgr = providerSymbol(SILO_MODS, "realSiloManager")
     if type(mgr) ~= "table" or type(mgr.silos) ~= "table" then
         return { enabled = true, readState = "unavailable", source = "realSilo", farmId = farmId }
@@ -2083,7 +3574,7 @@ local function collectRealSilo()
             if type(silo.placeable) == "table" then
                 owner = tonumber(silo.placeable.ownerFarmId)
             end
-            if owner ~= farmId and owner ~= 0 then
+            if owner ~= farmId then
                 skipped = skipped + 1
             else
                 local cfg = type(silo.config) == "table" and silo.config or {}
@@ -2166,6 +3657,7 @@ local function collectFieldLeases()
     end
     local rows = {}
     local truncated = false
+    local incomplete = false
     local scanned = 0
     for _, agreement in pairs(mgr.fieldLeaseAgreements) do
         scanned = scanned + 1
@@ -2173,23 +3665,31 @@ local function collectFieldLeases()
             truncated = true
             break
         end
-        if type(agreement) == "table" and tonumber(agreement.farmId) == farmId then
+        if type(agreement) ~= "table" or tonumber(agreement.farmId) == nil then
+            incomplete = true
+        elseif tonumber(agreement.farmId) == farmId then
             if #rows >= 40 then
                 truncated = true
                 break
             end
+            local farmlandId = tonumber(agreement.farmlandId)
+            local price = tonumber(agreement.price)
+            local duration = tonumber(agreement.duration)
+            if farmlandId == nil or price == nil or duration == nil then
+                incomplete = true
+            end
             rows[#rows + 1] = {
-                farmlandId = tonumber(agreement.farmlandId),
-                price = tonumber(agreement.price),
-                duration = tonumber(agreement.duration),
+                farmlandId = farmlandId,
+                price = price,
+                duration = duration,
             }
         end
     end
     return {
         enabled = true,
         source = "fieldLeasing",
-        readState = truncated and "partial" or (#rows == 0 and "empty" or "ok"),
-        coverage = truncated and "truncated" or "complete",
+        readState = (truncated or incomplete) and "partial" or (#rows == 0 and "empty" or "ok"),
+        coverage = truncated and "truncated" or (incomplete and "partial" or "complete"),
         farmId = farmId,
         leases = rows,
     }
@@ -2253,13 +3753,13 @@ local function ownedUniqueIds(farmId)
     if farmId == nil or type(list) ~= "table" then
         return nil, false
     end
-    local owned, known = {}, {}
+    local owned, known, names = {}, {}, {}
     local uncertain = false
     local seen = 0
     for _, placeable in pairs(list) do
         seen = seen + 1
         if seen > OWNED_PLACEABLE_SCAN then
-            return owned, true, known
+            return owned, true, known, names
         end
         if type(placeable) == "table" and placeable.uniqueId ~= nil then
             local owner = nil
@@ -2272,10 +3772,16 @@ local function ownedUniqueIds(farmId)
             if owner ~= nil and owner > 0 and owner % 1 == 0 then known[tostring(placeable.uniqueId)] = true else uncertain = true end
             if owner == farmId then
                 owned[tostring(placeable.uniqueId)] = true
+                local name = placeable.name
+                if type(placeable.getName) == "function" then
+                    local ok, value = pcall(placeable.getName, placeable)
+                    if ok and type(value) == "string" then name = value end
+                end
+                if type(name) == "string" and name ~= "" then names[tostring(placeable.uniqueId)] = name end
             end
         end
     end
-    return owned, uncertain, known
+    return owned, uncertain, known, names
 end
 
 local function fillTypeNameOf(index)
@@ -2403,6 +3909,10 @@ local DIST_MODE_KEYS = {
 local DIST_ASSET_SCAN = 80
 local DIST_FILL_SCAN = 40
 local DIST_ROW_LIMIT = 24
+local DIST_MONTH_FIELDS = {
+    received = "receivedLiters", produced = "producedLiters", consumed = "consumedLiters",
+    dist = "distributedLiters", stored = "storedLiters", sold = "soldLiters",
+}
 
 -- SmartDistribution.settings = S (SmartDistribution.lua 79). S.global is save-wide; S.assets[uid][ft] = mode
 -- and S.lastCycle[uid][ft] = { dist, sold, stored, received } are per placeable and stay farm-private.
@@ -2434,7 +3944,7 @@ local function collectDistributionRedux()
     if type(settings.master) == "boolean" then out.masterEnabled = settings.master end
     if type(global.sellEnabled) == "boolean" then out.sellEnabled = global.sellEnabled end
     local farmId = activeExportFarmId()
-    local owned, ownedTruncated = ownedUniqueIds(farmId)
+    local owned, ownedTruncated, _, ownedNames = ownedUniqueIds(farmId)
     if owned == nil then
         out.farmAssets = { readState = "unavailable", reason = farmId == nil and "no-farm" or "no-placeables" }
         return out
@@ -2496,11 +4006,79 @@ local function collectDistributionRedux()
     end
     history.window = "last-completed-cycle"
     history.retained = activity ~= "active"
+    -- DistributionStats exposes the same rolling 24-cycle ledgers used by its Overview's Month tab.
+    -- Read the ledgers directly so an export never calls overviewRows (which refreshes menu memos),
+    -- and join every UID to a placeable owned by this export farm before copying a value.
+    local month = { scope = "farm", farmId = farmId, window = "rolling-24-cycles", coverage = ownedTruncated and "truncated" or "complete", rows = {} }
+    if isClient then
+        month.readState = "unavailable"
+        month.reason = "server-history"
+    elseif type(dist.windowLedgers) ~= "function" then
+        month.readState = "unavailable"
+        month.reason = "window-api-missing"
+    else
+        local ok, ledgers = pcall(dist.windowLedgers, "month")
+        if not ok or type(ledgers) ~= "table" then
+            month.readState = "failed"
+            month.coverage = "truncated"
+        else
+            local accumulated, scanned, malformed = {}, 0, false
+            for _, ledger in ipairs(ledgers) do
+                if type(ledger) ~= "table" then
+                    malformed = true
+                else
+                    for uid, byFill in pairs(ledger) do
+                        scanned = scanned + 1
+                        if scanned > DIST_ASSET_SCAN * 24 then month.coverage = "truncated" break end
+                        if owned[tostring(uid)] then
+                            if type(byFill) ~= "table" then malformed = true else
+                                local seenFill = 0
+                                for ft, value in pairs(byFill) do
+                                    seenFill = seenFill + 1
+                                    if seenFill > DIST_FILL_SCAN then month.coverage = "truncated" break end
+                                    local index = tonumber(ft)
+                                    local name = index and index > 0 and index % 1 == 0 and fillTypeNameOf(index) or nil
+                                    if name == nil or type(value) ~= "table" then malformed = true else
+                                        local key = tostring(uid) .. "|" .. name
+                                        local row = accumulated[key]
+                                        if row == nil then
+                                            row = { uniqueId = tostring(uid), assetName = ownedNames[tostring(uid)], fillType = name,
+                                                receivedLiters = 0, producedLiters = 0, consumedLiters = 0,
+                                                distributedLiters = 0, storedLiters = 0, soldLiters = 0 }
+                                            accumulated[key] = row
+                                        end
+                                        for source, target in pairs(DIST_MONTH_FIELDS) do
+                                            local amount = observedNumber(value[source] or 0)
+                                            if amount == nil then malformed = true else row[target] = row[target] + amount end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+                if scanned > DIST_ASSET_SCAN * 24 then break end
+            end
+            for _, row in pairs(accumulated) do
+                if row.receivedLiters > 0 or row.producedLiters > 0 or row.consumedLiters > 0
+                    or row.distributedLiters > 0 or row.storedLiters > 0 or row.soldLiters > 0 then
+                    month.rows[#month.rows + 1] = row
+                end
+            end
+            table.sort(month.rows, function(a, b)
+                if a.uniqueId ~= b.uniqueId then return a.uniqueId < b.uniqueId end
+                return a.fillType < b.fillType
+            end)
+            while #month.rows > DIST_ROW_LIMIT do table.remove(month.rows) month.coverage = "truncated" end
+            if malformed then month.coverage = "truncated" month.reason = "malformed-rows" end
+            month.readState = #month.rows > 0 and "ok" or (malformed and "failed" or "empty")
+        end
+    end
     out.farmAssets = {
         readState = "ok", scope = "farm", farmId = farmId,
         coverage = overrides.coverage == "complete" and history.coverage == "complete" and "complete" or "truncated",
         overrides = overrides.rows, lastCycle = history.rows,
-        overridesReading = overrides, history = history,
+        overridesReading = overrides, history = history, month = month,
     }
     return out
 end
@@ -2763,9 +4341,23 @@ local function marketTouchesFarm(row, farmId)
         return false
     end
     return tonumber(row.sellerFarmId) == farmId
+        or tonumber(row.buyerFarmId) == farmId
         or tonumber(row.targetFarmId) == farmId
         or tonumber(row.lessorFarmId) == farmId
         or tonumber(row.lesseeFarmId) == farmId
+end
+
+local function marketParcels(row)
+    local source = row.farmlandIds
+    if type(source) ~= "table" then source = { row.farmlandId } end -- Legacy single-parcel records.
+    local ids = {}
+    if #source == 0 or #source > 16 then return nil end
+    for _, rawId in ipairs(source) do
+        local id = tonumber(rawId)
+        if id == nil or id <= 0 or id ~= math.floor(id) then return nil end
+        ids[#ids + 1] = id
+    end
+    return ids
 end
 
 local function collectFarmlandMarketplace()
@@ -2781,6 +4373,7 @@ local function collectFarmlandMarketplace()
     end
     local rows = {}
     local truncated = false
+    local invalid = false
     local function take(bucket, kind, priceKey)
         if type(bucket) ~= "table" or truncated then
             return
@@ -2793,11 +4386,18 @@ local function collectFarmlandMarketplace()
                 break
             end
             if marketTouchesFarm(row, farmId) then
-                rows[#rows + 1] = {
-                    kind = kind,
-                    farmlandId = tonumber(row.farmlandId),
-                    price = tonumber(row[priceKey]),
-                }
+                local ids = marketParcels(row)
+                local price = tonumber(row[priceKey])
+                if ids ~= nil and price ~= nil and price >= 0 then
+                    rows[#rows + 1] = {
+                        kind = kind,
+                        farmlandId = #ids == 1 and ids[1] or nil,
+                        farmlandIds = ids,
+                        price = price, -- total bundle price or rate, never per parcel
+                    }
+                else
+                    invalid = true
+                end
             end
         end
     end
@@ -2808,7 +4408,7 @@ local function collectFarmlandMarketplace()
         enabled = true,
         source = "farmlandMarketplace",
         readState = #rows == 0 and "empty" or "ok",
-        coverage = truncated and "truncated" or "complete",
+        coverage = truncated and "truncated" or invalid and "partial" or "complete",
         scope = "farm",
         farmId = farmId,
         rows = rows,
@@ -3054,6 +4654,10 @@ local function collectExtendedVehicleMaintenance()
             return "pending"
         end
         local ok, row = pcall(function()
+            local batteryCharge = tonumber(spec.batteryCharge)
+            if batteryCharge == nil or batteryCharge ~= batteryCharge or batteryCharge < 0 or batteryCharge > 1 then
+                batteryCharge = nil
+            end
             return {
                 id = vehicleKey(vehicle),
                 name = vehicleName(vehicle),
@@ -3062,6 +4666,7 @@ local function collectExtendedVehicleMaintenance()
                 serviceRemainingMs = tonumber(spec.serviceRemainingGameMs),
                 failureType = clipText(spec.failureType, 40),
                 failureSeverity = tonumber(spec.failureSeverity),
+                batteryCharge = batteryCharge,
             }
         end)
         if not ok then
@@ -3087,7 +4692,7 @@ local function collectExtendedVehicleMaintenance()
     }
 end
 
-local LEDGER_MODS = { "FS25_FieldProfitabilityLedger", "FS25_369866_Field_Profitability_Ledger" }
+local LEDGER_MODS = { "FS25_FieldProfitabilityLedger", "FS25_369866_FS25_FieldProfitabilityLedger", "KM_80685_Field_Profitability_Ledger", "GH_user01010111__FS25_FieldProfitabilityLedger_FS25_FieldProfitabilityLedger", "FS25_369866_Field_Profitability_Ledger" }
 local LEDGER_HEADER_CAP = 8
 local LEDGER_TOTAL_CAP = 12
 local LEDGER_TOTAL_SCAN_CAP = 64
@@ -3180,6 +4785,11 @@ local function collectFieldProfitabilityLedger()
             singlePlayerOnly = true,
             sales = ledgerSales(),
         }
+    end
+    local loadedName = findLoadedName({ names = LEDGER_MODS })
+    local version = loadedName and modVersion(loadedName) or nil
+    if version ~= "1.0.0.0" and version ~= "1.0.1.0" then
+        return { enabled = true, readState = "unavailable", source = "fieldProfitabilityLedger", reason = "unreviewed-version", singlePlayerOnly = true, sales = ledgerSales() }
     end
     local ns = providerSymbol(LEDGER_MODS, "FieldProfitabilityLedger")
     if type(ns) ~= "table" then
@@ -3291,6 +4901,10 @@ local function collectRealisticVehicleService()
     local farmId = activeExportFarmId()
     if farmId == nil then
         return { enabled = true, readState = "unavailable", source = "realisticVehicleService", reason = "no-farm" }
+    end
+    local loadedName = findLoadedName({ names = RVS_MODS })
+    if loadedName == nil or modVersion(loadedName) ~= "1.0.0.0" then
+        return { enabled = true, readState = "unavailable", source = "realisticVehicleService", farmId = farmId, reason = "unreviewed-version" }
     end
     if providerSymbol(RVS_MODS, "RealisticVehiclesFaultSystem") == nil and providerSymbol(RVS_MODS, "g_realisticVehicles") == nil then
         return { enabled = true, readState = "unavailable", source = "realisticVehicleService", farmId = farmId }
@@ -3476,12 +5090,10 @@ function CompanionModsDataCollector:collectStep(_opts)
     local ok, payload = pcall(function()
         local mods = {}
         local detectedIds = {}
+        local detectedNames = {}
         local any = false
 
         for _, entry in ipairs(CATALOG) do
-            if #mods >= MAX_MODS then
-                break
-            end
             local detected, listedName = false, nil
             local okDetect, d1, d2 = pcall(detectEntry, entry)
             if okDetect then
@@ -3492,6 +5104,7 @@ function CompanionModsDataCollector:collectStep(_opts)
             if detected then
                 any = true
                 detectedIds[entry.id] = true
+                detectedNames[entry.id] = listedName
                 mods[#mods + 1] = {
                     id = entry.id,
                     title = entry.title,
@@ -3539,7 +5152,7 @@ function CompanionModsDataCollector:collectStep(_opts)
         end
 
         if detectedIds.restrictedPeriods then
-            out.restrictedPeriods = readAdapter("restrictedPeriods", collectRestrictedPeriods, { enabled = true, readState = "failed" })
+            out.restrictedPeriods = readAdapter("restrictedPeriods", function() return collectRestrictedPeriods(detectedNames.restrictedPeriods) end, { enabled = true, readState = "failed" })
         end
 
         if detectedIds.regionalCropCalendar then

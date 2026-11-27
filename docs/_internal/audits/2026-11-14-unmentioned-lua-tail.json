@@ -1,0 +1,626 @@
+{
+  "basis": "2026-10-31 vault scan; current ZIP bytes rehashed 2026-11-14",
+  "scope": "38 previously unmentioned Lua-bearing ZIP paths; source-level classification, no installed acceptance",
+  "entries": [
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\objects\\KM_81964_strands-big-energy-xl-1800-prefab.zip",
+      "archive": "KM_81964_strands-big-energy-xl-1800-prefab.zip",
+      "category": "objects",
+      "version": null,
+      "zipSha256": "98B43F8E3FAE14369F20BC9F44CA7B0C3DD22AE0D0DE45A95550DAC10DF35FC0",
+      "classification": "visual_beacon_child_priority",
+      "scripts": [
+        {
+          "path": "COPY_TO_MOD_ROOT/scripts/NLMBeaconChildPriority.lua",
+          "sha256": "13A8DF851F245FA9C837BAAE35429050ED60D1D8D4FE1C05EAB412F07ADA6DFF",
+          "bytes": 6787
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\objects\\KM_82037_strands-big-energy-xl-warning-light-bar-prefab.zip",
+      "archive": "KM_82037_strands-big-energy-xl-warning-light-bar-prefab.zip",
+      "category": "objects",
+      "version": null,
+      "zipSha256": "449FE0DF9E06B323C817D6BAE6BCC6A51121FF95C0636367252D3F7057206A72",
+      "classification": "visual_beacon_child_priority",
+      "scripts": [
+        {
+          "path": "scripts/NLMBeaconChildPriority.lua",
+          "sha256": "D1EE45F92C4777EF06891FE8540B5B9AA4BDE93E6CB148E682B72E91020158A3",
+          "bytes": 7725
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\tools\\KM_80840_PJU-9.zip",
+      "archive": "KM_80840_PJU-9.zip",
+      "category": "tools",
+      "version": "1.0.0.0",
+      "zipSha256": "633950ACC26009CA716CF37E9D7FBB7041EC912687D4A7B2C0BD85376914741E",
+      "classification": "visual_material_slots",
+      "scripts": [
+        {
+          "path": "scripts/materialSlotSetup.lua",
+          "sha256": "BD8C51DA30373AC34A942ECB7F9FA6D501853BA8C0F8F535FD6785BFC5EB4532",
+          "bytes": 2545
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\trucks\\KM_79499_fa18-super-hornet.zip",
+      "archive": "KM_79499_fa18-super-hornet.zip",
+      "category": "trucks",
+      "version": "1.0.0.0",
+      "zipSha256": "5995A8F16385EA76FD1B32056E47DCCF7147ED5249B552B21789F2004A16EE82",
+      "classification": "aircraft_input_and_motion",
+      "scripts": [
+        {
+          "path": "HelicopterInputEvent.lua",
+          "sha256": "757F347D4FE9F7146FEDF5D15E196E40327A30DAEF9A8F1D3947828B4CCB1659",
+          "bytes": 2071
+        },
+        {
+          "path": "HelicopterMode.lua",
+          "sha256": "9036118DEB23701EC3CFAE35B67E129B83FD0666C4E7995C8C0A1E03159986BA",
+          "bytes": 6388
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\trucks\\KM_79564_b2-spirit-strategic-stealth-bomber.zip",
+      "archive": "KM_79564_b2-spirit-strategic-stealth-bomber.zip",
+      "category": "trucks",
+      "version": "1.0.0.0",
+      "zipSha256": "1AEA6A50A5598021E0E96E422F2C2AEA8C8C2A1BDA7110A427743FF3E5A9D8AD",
+      "classification": "aircraft_input_and_motion",
+      "scripts": [
+        {
+          "path": "HelicopterInputEvent.lua",
+          "sha256": "757F347D4FE9F7146FEDF5D15E196E40327A30DAEF9A8F1D3947828B4CCB1659",
+          "bytes": 2071
+        },
+        {
+          "path": "HelicopterMode.lua",
+          "sha256": "9036118DEB23701EC3CFAE35B67E129B83FD0666C4E7995C8C0A1E03159986BA",
+          "bytes": 6388
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\trucks\\KM_79686_mig-21-mikoyan-gurevich.zip",
+      "archive": "KM_79686_mig-21-mikoyan-gurevich.zip",
+      "category": "trucks",
+      "version": "1.0.0.0",
+      "zipSha256": "BAD56E52A03FA15955A8BDB4CFC481F950609F4F6EA341D87B0F091676B3C558",
+      "classification": "aircraft_input_and_motion",
+      "scripts": [
+        {
+          "path": "HelicopterInputEvent.lua",
+          "sha256": "757F347D4FE9F7146FEDF5D15E196E40327A30DAEF9A8F1D3947828B4CCB1659",
+          "bytes": 2071
+        },
+        {
+          "path": "HelicopterMode.lua",
+          "sha256": "9036118DEB23701EC3CFAE35B67E129B83FD0666C4E7995C8C0A1E03159986BA",
+          "bytes": 6388
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\trucks\\KM_80692_air-force-one.zip",
+      "archive": "KM_80692_air-force-one.zip",
+      "category": "trucks",
+      "version": "1.0.0.0",
+      "zipSha256": "F278223F7E897CA10EC718FF8FED42E485D6112773E0795D7BBFD49723F2ED68",
+      "classification": "aircraft_input_and_motion",
+      "scripts": [
+        {
+          "path": "HelicopterInputEvent.lua",
+          "sha256": "757F347D4FE9F7146FEDF5D15E196E40327A30DAEF9A8F1D3947828B4CCB1659",
+          "bytes": 2071
+        },
+        {
+          "path": "HelicopterMode.lua",
+          "sha256": "9036118DEB23701EC3CFAE35B67E129B83FD0666C4E7995C8C0A1E03159986BA",
+          "bytes": 6388
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\trucks\\KM_80736_mil-mi-8.zip",
+      "archive": "KM_80736_mil-mi-8.zip",
+      "category": "trucks",
+      "version": "1.0.0.0",
+      "zipSha256": "4C3B315476365A65A5F7B5DCBDC96E5DC97AFBEBB12C32D6095FA245653F14E0",
+      "classification": "aircraft_input_and_motion",
+      "scripts": [
+        {
+          "path": "scripts/HelicopterInputEvent.lua",
+          "sha256": "3A75784EB2A6226390C29E8EDBA460A7B135ED3F1CBAA629DC97F7437B0C7248",
+          "bytes": 2283
+        },
+        {
+          "path": "scripts/HelicopterMode.lua",
+          "sha256": "673C2CBB14E274002D3ED0F7531F0590DAEBD73D8FA5559308C7FED0B044505C",
+          "bytes": 5925
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\trucks\\KM_80920_boeing-kc-135-stratotanker.zip",
+      "archive": "KM_80920_boeing-kc-135-stratotanker.zip",
+      "category": "trucks",
+      "version": "1.0.0.0",
+      "zipSha256": "515F25AF6300A1ADE8E62024A3F62BAF309BB053ABBF7379466CF31C4340705C",
+      "classification": "aircraft_input_and_motion",
+      "scripts": [
+        {
+          "path": "HelicopterInputEvent.lua",
+          "sha256": "757F347D4FE9F7146FEDF5D15E196E40327A30DAEF9A8F1D3947828B4CCB1659",
+          "bytes": 2071
+        },
+        {
+          "path": "HelicopterMode.lua",
+          "sha256": "9036118DEB23701EC3CFAE35B67E129B83FD0666C4E7995C8C0A1E03159986BA",
+          "bytes": 6388
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\trucks\\KM_81067_anduril-fury-yfq-44a-fq-44.zip",
+      "archive": "KM_81067_anduril-fury-yfq-44a-fq-44.zip",
+      "category": "trucks",
+      "version": "1.0.0.0",
+      "zipSha256": "3389294298DBD54EFBBFBEBC2C882CFC4F4907ABD17EC8552DDE14B5B9263E81",
+      "classification": "aircraft_input_and_motion",
+      "scripts": [
+        {
+          "path": "HelicopterInputEvent.lua",
+          "sha256": "757F347D4FE9F7146FEDF5D15E196E40327A30DAEF9A8F1D3947828B4CCB1659",
+          "bytes": 2071
+        },
+        {
+          "path": "HelicopterMode.lua",
+          "sha256": "9036118DEB23701EC3CFAE35B67E129B83FD0666C4E7995C8C0A1E03159986BA",
+          "bytes": 6388
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\trucks\\KM_81843_mil-mi-8-mi-17-aerogaviota-livery.zip",
+      "archive": "KM_81843_mil-mi-8-mi-17-aerogaviota-livery.zip",
+      "category": "trucks",
+      "version": "1.0.0.0",
+      "zipSha256": "DEE23D3E6A00CE5673D32DB2A5F0B6EBF8C79AE5E5C60EAFC350F9B7EF49F5E4",
+      "classification": "aircraft_input_and_motion",
+      "scripts": [
+        {
+          "path": "scripts/HelicopterInputEvent.lua",
+          "sha256": "3A75784EB2A6226390C29E8EDBA460A7B135ED3F1CBAA629DC97F7437B0C7248",
+          "bytes": 2283
+        },
+        {
+          "path": "scripts/HelicopterMode.lua",
+          "sha256": "673C2CBB14E274002D3ED0F7531F0590DAEBD73D8FA5559308C7FED0B044505C",
+          "bytes": 5925
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_3122288_FS25_AmericanSeedImplement_Curved.zip",
+      "archive": "ITCH_3122288_FS25_AmericanSeedImplement_Curved.zip",
+      "category": "uncategorized",
+      "version": "1.0.3.0",
+      "zipSha256": "9BFDC4A2456B2E35AEE1682B8505AE7ACFF87793866766745599DE4A521130E6",
+      "classification": "clothing_pack_registration",
+      "scripts": [
+        {
+          "path": "scripts/BMP_WardrobeClothingPack.lua",
+          "sha256": "46DA0732DD25E3ED26BD5D9A042EB481221E33134BD54265CCDFBF8108647F79",
+          "bytes": 2391
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_3202827_FS25_QuebecPlate.zip",
+      "archive": "ITCH_3202827_FS25_QuebecPlate.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "56C85E6B5699D38BE680370FEF7DA02044D4442F4455F5F87ECFBA9E2FEF3F15",
+      "classification": "license_plate_asset_registration",
+      "scripts": [
+        {
+          "path": "src/loadLicensePlates.lua",
+          "sha256": "51205B5A2C1996FC98241F44BFF0F9B41DE8ED8A0F6870D1C69CD19C82B6E733",
+          "bytes": 496
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_3270493_FS25_ManitobaPlate.zip",
+      "archive": "ITCH_3270493_FS25_ManitobaPlate.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "873101623F0DD4D2D43D8B23BF6EEDF70A3BBC664FDB2FC3B168E0FDA0648122",
+      "classification": "license_plate_asset_registration",
+      "scripts": [
+        {
+          "path": "src/loadLicensePlates.lua",
+          "sha256": "51205B5A2C1996FC98241F44BFF0F9B41DE8ED8A0F6870D1C69CD19C82B6E733",
+          "bytes": 496
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_3411190_FS25_SaskatchewanPlate.zip",
+      "archive": "ITCH_3411190_FS25_SaskatchewanPlate.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "457B9028CB440C2870341E42542B1F0AA12A470AC9684A2251AACDC6937E89AD",
+      "classification": "license_plate_asset_registration",
+      "scripts": [
+        {
+          "path": "src/loadLicensePlates.lua",
+          "sha256": "51205B5A2C1996FC98241F44BFF0F9B41DE8ED8A0F6870D1C69CD19C82B6E733",
+          "bytes": 496
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_3513001_FS25_NovaScotia.zip",
+      "archive": "ITCH_3513001_FS25_NovaScotia.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "0665E6ED984907413B413F63B0338163F6DA70B2DE4842FD65DA1844F2DB27BD",
+      "classification": "license_plate_asset_registration",
+      "scripts": [
+        {
+          "path": "src/loadLicensePlates.lua",
+          "sha256": "51205B5A2C1996FC98241F44BFF0F9B41DE8ED8A0F6870D1C69CD19C82B6E733",
+          "bytes": 496
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_3639161_FS25_BritishColumbiaPlate.zip",
+      "archive": "ITCH_3639161_FS25_BritishColumbiaPlate.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "6A21AB73D572A5DABC540F5C6D58F018E96CF24F290F5148F01BAF094A832385",
+      "classification": "license_plate_asset_registration",
+      "scripts": [
+        {
+          "path": "src/loadLicensePlates.lua",
+          "sha256": "51205B5A2C1996FC98241F44BFF0F9B41DE8ED8A0F6870D1C69CD19C82B6E733",
+          "bytes": 496
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_3745878_FS25_camo_BMP.zip",
+      "archive": "ITCH_3745878_FS25_camo_BMP.zip",
+      "category": "uncategorized",
+      "version": "1.0.2.0",
+      "zipSha256": "08CC2088D74D9859AC4EF05EE6F1E34AE2D6416404B94F3E5CF9D0C4EAC60E6F",
+      "classification": "clothing_pack_registration",
+      "scripts": [
+        {
+          "path": "scripts/BMP_WardrobeClothingPack.lua",
+          "sha256": "46DA0732DD25E3ED26BD5D9A042EB481221E33134BD54265CCDFBF8108647F79",
+          "bytes": 2391
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_4015806_FS25_AlbertaPlate.zip",
+      "archive": "ITCH_4015806_FS25_AlbertaPlate.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "94291B0957DD52AF2FD39736EAD815895E8755082887634F17331D0003F06C4B",
+      "classification": "license_plate_asset_registration",
+      "scripts": [
+        {
+          "path": "src/loadLicensePlates.lua",
+          "sha256": "51205B5A2C1996FC98241F44BFF0F9B41DE8ED8A0F6870D1C69CD19C82B6E733",
+          "bytes": 496
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_4066959_FS25_OntarioPlate.zip",
+      "archive": "ITCH_4066959_FS25_OntarioPlate.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "9B4D86C10018864F88B98D882A897FDBF8EDECBFEBB408A65BB2BF552ADBF230",
+      "classification": "license_plate_asset_registration",
+      "scripts": [
+        {
+          "path": "src/loadLicensePlates.lua",
+          "sha256": "51205B5A2C1996FC98241F44BFF0F9B41DE8ED8A0F6870D1C69CD19C82B6E733",
+          "bytes": 496
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_4129512_FS25_PEI.zip",
+      "archive": "ITCH_4129512_FS25_PEI.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "820C6DC82EC77D55673BB48C553E66B89592F179A0644B3ECFFBFC707ABC2B5D",
+      "classification": "license_plate_asset_registration",
+      "scripts": [
+        {
+          "path": "src/loadLicensePlates.lua",
+          "sha256": "51205B5A2C1996FC98241F44BFF0F9B41DE8ED8A0F6870D1C69CD19C82B6E733",
+          "bytes": 496
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_4254118_FS25_VermontPlate.zip",
+      "archive": "ITCH_4254118_FS25_VermontPlate.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "7DC519D5B0769F82D294CFE3B8D73BC9BB1F435C631FE8AEC77584451FAE3061",
+      "classification": "license_plate_asset_registration",
+      "scripts": [
+        {
+          "path": "src/loadLicensePlates.lua",
+          "sha256": "51205B5A2C1996FC98241F44BFF0F9B41DE8ED8A0F6870D1C69CD19C82B6E733",
+          "bytes": 496
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_4454556_FS25_MoparPack_BMP.zip",
+      "archive": "ITCH_4454556_FS25_MoparPack_BMP.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "3E99985DD838B5F4A1CA17422D9D5542F32959017576BF4B709B1BDFD5B90A98",
+      "classification": "clothing_pack_registration",
+      "scripts": [
+        {
+          "path": "scripts/BMP_WardrobeClothingPack.lua",
+          "sha256": "46DA0732DD25E3ED26BD5D9A042EB481221E33134BD54265CCDFBF8108647F79",
+          "bytes": 2391
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_4454695_FS25_NewBrunswick.zip",
+      "archive": "ITCH_4454695_FS25_NewBrunswick.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "5E47E5663D5E65DEF65AFDFA0931F88237E2C186A223B1D8F4A91853F53BEBF0",
+      "classification": "license_plate_asset_registration",
+      "scripts": [
+        {
+          "path": "src/loadLicensePlates.lua",
+          "sha256": "51205B5A2C1996FC98241F44BFF0F9B41DE8ED8A0F6870D1C69CD19C82B6E733",
+          "bytes": 496
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_4612613_FS25_camo_BMP.zip",
+      "archive": "ITCH_4612613_FS25_camo_BMP.zip",
+      "category": "uncategorized",
+      "version": "1.0.2.0",
+      "zipSha256": "08CC2088D74D9859AC4EF05EE6F1E34AE2D6416404B94F3E5CF9D0C4EAC60E6F",
+      "classification": "clothing_pack_registration",
+      "scripts": [
+        {
+          "path": "scripts/BMP_WardrobeClothingPack.lua",
+          "sha256": "46DA0732DD25E3ED26BD5D9A042EB481221E33134BD54265CCDFBF8108647F79",
+          "bytes": 2391
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_4725470_FS25_RossMore_2200G_SPS.zip",
+      "archive": "ITCH_4725470_FS25_RossMore_2200G_SPS.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "2F6CEC69A8EFA77490C4F11F3DE5BFFA9D6A12F33DE0CF25F3F2C4626E0E975D",
+      "classification": "specialization_registration_only",
+      "scripts": [
+        {
+          "path": "scripts/ManureSystemRegistry.lua",
+          "sha256": "3179E198D5856013BFB916CDD01DE9484D9B801C415314E255C133E78ADD55A9",
+          "bytes": 349
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_4995734_FS25_PEI.zip",
+      "archive": "ITCH_4995734_FS25_PEI.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "820C6DC82EC77D55673BB48C553E66B89592F179A0644B3ECFFBFC707ABC2B5D",
+      "classification": "license_plate_asset_registration",
+      "scripts": [
+        {
+          "path": "src/loadLicensePlates.lua",
+          "sha256": "51205B5A2C1996FC98241F44BFF0F9B41DE8ED8A0F6870D1C69CD19C82B6E733",
+          "bytes": 496
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_5003119_FS25_VermontPlate.zip",
+      "archive": "ITCH_5003119_FS25_VermontPlate.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "7DC519D5B0769F82D294CFE3B8D73BC9BB1F435C631FE8AEC77584451FAE3061",
+      "classification": "license_plate_asset_registration",
+      "scripts": [
+        {
+          "path": "src/loadLicensePlates.lua",
+          "sha256": "51205B5A2C1996FC98241F44BFF0F9B41DE8ED8A0F6870D1C69CD19C82B6E733",
+          "bytes": 496
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\ITCH_5182136_FS25_OntarioPlate.zip",
+      "archive": "ITCH_5182136_FS25_OntarioPlate.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "9B4D86C10018864F88B98D882A897FDBF8EDECBFEBB408A65BB2BF552ADBF230",
+      "classification": "license_plate_asset_registration",
+      "scripts": [
+        {
+          "path": "src/loadLicensePlates.lua",
+          "sha256": "51205B5A2C1996FC98241F44BFF0F9B41DE8ED8A0F6870D1C69CD19C82B6E733",
+          "bytes": 496
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\KM_82466_Toyota_Hilux_2026_NLM.zip",
+      "archive": "KM_82466_Toyota_Hilux_2026_NLM.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "BF60D5FF8948E803E6AB6F3203D393067E3E6149F47372DE3EAD49A833EAB650",
+      "classification": "vehicle_gear_display",
+      "scripts": [
+        {
+          "path": "specializations/NLMPRDSelector.lua",
+          "sha256": "44C72CBBF1EA5C843647F7910A5FE531CC0B9A5FD2EC7877432CAC39CB135F82",
+          "bytes": 1678
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\KM_82558_2024_BMW_X5_xDrive40i.zip",
+      "archive": "KM_82558_2024_BMW_X5_xDrive40i.zip",
+      "category": "uncategorized",
+      "version": "2.0.6.0",
+      "zipSha256": "0CEEF05635144B47D2CA6919C08B273AAD1B5294DB0CDE387B5F099F7F0CA1CE",
+      "classification": "vehicle_visual_and_siren_interlock",
+      "scripts": [
+        {
+          "path": "scripts/BmwX5RimMaterialBinding.lua",
+          "sha256": "0F29161B1D0D6D5B1B71D193567A38E7B8EDB7EDB59E7CC05906930FF31DACEF",
+          "bytes": 1153
+        },
+        {
+          "path": "scripts/BmwX5UndercoverSirenInterlock.lua",
+          "sha256": "04168EE28738053BED26CFC9E91A5F6541C092CE107D8E141C3589A4449A8B8E",
+          "bytes": 2606
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\KM_82859_WSKYBNT_Apparel_Pack.zip",
+      "archive": "KM_82859_WSKYBNT_Apparel_Pack.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "18F4480047AFB1E40AC0933B70ED39E1C0068F52D908AA74BDF758D018E6DDED",
+      "classification": "clothing_pack_registration",
+      "scripts": [
+        {
+          "path": "scripts/BMP_WardrobeClothingPack.lua",
+          "sha256": "46DA0732DD25E3ED26BD5D9A042EB481221E33134BD54265CCDFBF8108647F79",
+          "bytes": 2391
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\KM_82892_Strands_Cruise_Light_850951_Prefab_.zip",
+      "archive": "KM_82892_Strands_Cruise_Light_850951_Prefab_.zip",
+      "category": "uncategorized",
+      "version": null,
+      "zipSha256": "B82C525AF93F49D832889F0937D9EDE460686F43AE968FF50D85C033AF406C48",
+      "classification": "vehicle_lighting_effect",
+      "scripts": [
+        {
+          "path": "assets/nlmCruise850951/scripts/NLMCruisePosition.lua",
+          "sha256": "B61F9A77F753D54627743F1644050220B9C1BC91DA719558B177BE316ADAC72A",
+          "bytes": 3289
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\KM_82927_Wardrobe_Clothing_Pack_BMP.zip",
+      "archive": "KM_82927_Wardrobe_Clothing_Pack_BMP.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "04226261280DE5F3C7BA4F3FF14786533A38B2E937D6F42DF84434FFF7C13951",
+      "classification": "clothing_pack_registration",
+      "scripts": [
+        {
+          "path": "scripts/BMP_WardrobeClothingPack.lua",
+          "sha256": "46DA0732DD25E3ED26BD5D9A042EB481221E33134BD54265CCDFBF8108647F79",
+          "bytes": 2391
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\KM_83254_Biker-style_clothing_set.zip",
+      "archive": "KM_83254_Biker-style_clothing_set.zip",
+      "category": "uncategorized",
+      "version": "1.0.0.0",
+      "zipSha256": "A01ED2266C570DDCA13D4108CCDD1221D031FA87BE127A9EEE1FB3CC519B1540",
+      "classification": "clothing_pack_registration",
+      "scripts": [
+        {
+          "path": "scripts/BMP_WardrobeClothingPack.lua",
+          "sha256": "46DA0732DD25E3ED26BD5D9A042EB481221E33134BD54265CCDFBF8108647F79",
+          "bytes": 2391
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\KM_83380_NLM_OZZ_XP1_Prefab_.zip",
+      "archive": "KM_83380_NLM_OZZ_XP1_Prefab_.zip",
+      "category": "uncategorized",
+      "version": null,
+      "zipSha256": "539DBEFF97CCF27C82B531D26F778FEAAAEB41E12EE13B12C2900DEE377B9405",
+      "classification": "editor_authoring_script",
+      "scripts": [
+        {
+          "path": "integration/Skapa_XP1_kopplingar.lua",
+          "sha256": "1C9DA45CDEAD1F428902FCD858667CA17D3818D455E473732F376B87F1753A95",
+          "bytes": 2176
+        },
+        {
+          "path": "prefab/integration/Skapa_XP1_kopplingar.lua",
+          "sha256": "1C9DA45CDEAD1F428902FCD858667CA17D3818D455E473732F376B87F1753A95",
+          "bytes": 2176
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\KM_83382_NLM_COB_LED_Whip_Pole_4ft_Prefab_.zip",
+      "archive": "KM_83382_NLM_COB_LED_Whip_Pole_4ft_Prefab_.zip",
+      "category": "uncategorized",
+      "version": null,
+      "zipSha256": "DDCF06A740B3E4A9A48512CB8E4D708EC7C64F7F9CAD64C12AD51DAE00725A2D",
+      "classification": "vehicle_lighting_effect",
+      "scripts": [
+        {
+          "path": "scripts/NLMWhipLights.lua",
+          "sha256": "94FF6C320EB674DF6B93EBCCFD87125A822F4A7A1074B8A8606C414A840AFE8F",
+          "bytes": 7606
+        }
+      ]
+    },
+    {
+      "path": "P:\\FS25 MOD VAULT\\by-category\\uncategorized\\KM_83455_NLM_Purelux_Spectre_3X_Flash_Prefab_.zip",
+      "archive": "KM_83455_NLM_Purelux_Spectre_3X_Flash_Prefab_.zip",
+      "category": "uncategorized",
+      "version": null,
+      "zipSha256": "41C29F61CC990F38A815E357D1A4CC96C498146F6E1C776E9EE5D4A56FFF7076",
+      "classification": "vehicle_lighting_effect",
+      "scripts": [
+        {
+          "path": "VehicleFiles/lights/nlmSpectre3X/NLMSpectrePosition.lua",
+          "sha256": "1725CB44AB913E5189A38944B7F06276B72C29DAE9F0144BC34F4BD743A9FD4E",
+          "bytes": 3236
+        }
+      ]
+    }
+  ]
+}

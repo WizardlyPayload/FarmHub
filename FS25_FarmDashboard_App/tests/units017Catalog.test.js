@@ -93,8 +93,8 @@ describe("catalog support claims", () => {
         expect(catalog.companionSupport(entry("dynamicMarket"))).toBe("detection-only");
         expect(entry("dynamicMarket").desc).toContain("on its own page");
         expect(entry("dynamicMarket").desc).not.toContain("only detects");
-        expect(catalog.companionSupport(entry("soilWorkYieldBonus"))).toBe("limited");
-        expect(entry("soilWorkYieldBonus").desc).toContain("one grid for the whole map");
+        expect(catalog.companionSupport(entry("soilWorkYieldBonus"))).toBe("detection-only");
+        expect(entry("soilWorkYieldBonus").desc).toContain("does not assign its map-wide grid to your farm");
         expect(catalog.companionSupport(entry("realSilo"))).toBe("limited");
         expect(catalog.companionSupport(entry("palletDegradation"))).toBe("limited");
         expect(catalog.companionSupport(entry("seasonalMilkProduction"))).toBe("limited");

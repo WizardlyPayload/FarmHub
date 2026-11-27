@@ -3,7 +3,8 @@
  * Default pack/dist:
  *   V4 — Documents/FarmDash Final Output (public latest.yml)
  *   V5 — Documents/FarmDash Release (flat zip + V5 Setup.exe)
- * Override with FARMDASH_BUILD_OUTPUT.
+ * Override V5 for an isolated, non-release candidate with both
+ * FARMDASH_BUILD_OUTPUT and FARMDASH_V5_PRIVATE_OUTPUT=1.
  *
  * Product lines:
  *   classic / v4 (default) — latest.yml / FS25-Farm-Dashboard-Setup-*.exe
@@ -66,9 +67,14 @@ const outDir = isV5 ? getFarmDashV5BuildOutputDir() : getFarmDashBuildOutputDir(
 if (isV5) {
     const expected = path.resolve(farmDashReleaseDir());
     const resolved = path.resolve(outDir);
-    if (resolved.toLowerCase() !== expected.toLowerCase()) {
+    const privateOutput = process.env.FARMDASH_V5_PRIVATE_OUTPUT === '1'
+        && Boolean(process.env.FARMDASH_BUILD_OUTPUT?.trim());
+    if (resolved.toLowerCase() !== expected.toLowerCase() && !privateOutput) {
         console.error(`[FarmDash V5] Output ${resolved} is not the flat FarmDash Release directory ${expected}.`);
         process.exit(1);
+    }
+    if (privateOutput && resolved.toLowerCase() !== expected.toLowerCase()) {
+        console.error(`[FarmDash V5] Private candidate output: ${resolved}`);
     }
     if (fs.existsSync(resolved)) {
         const outStat = fs.lstatSync(resolved);

@@ -117,7 +117,12 @@ local function favorFarmId(favor)
     if not favor then
         return nil
     end
-    return tonumber(favor.ownerFarmId) or tonumber(favor.farmId)
+    -- The current NPC Favor contract stamps this field only when a farm
+    -- accepts the job. Older/unowned rows must not be attributed to a farm.
+    if favor.ownerFarmIdPresent ~= true then
+        return nil
+    end
+    return tonumber(favor.ownerFarmId)
 end
 
 local function favorSummary(favor)
@@ -160,7 +165,7 @@ local function buildActiveFavors(npcSys, farmId)
         end
         if favor then
             local fid = favorFarmId(favor)
-            if fid == nil or fid == farmId then
+            if fid == farmId and (favor.status == "active" or favor.status == "in_progress") then
                 local id = favor.id
                 out[#out + 1] = {
                     id = id ~= nil and tostring(id) or nil,
@@ -201,11 +206,10 @@ function RfNpcFavorDataCollector:collectStep(_opts)
         local byFarm = {}
         for _, farmId in ipairs(collectFarmIds()) do
             byFarm[tostring(farmId)] = {
-                relationships = relationships,
                 activeFavors = buildActiveFavors(npcSys, farmId),
             }
         end
-        return { enabled = true, byFarm = byFarm }
+        return { enabled = true, worldRelationships = relationships, byFarm = byFarm }
     end)
 
     if ok and type(payload) == "table" then

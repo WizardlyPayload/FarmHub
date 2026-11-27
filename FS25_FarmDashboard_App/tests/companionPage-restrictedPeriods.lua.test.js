@@ -12,10 +12,13 @@ function modEnv(period, temperature) {
     return `
     _G.g_modIsLoaded = { FS25_RestrictedPeriods = true }
     _G.g_modManager = { getActiveMods = function() return { { modName = "FS25_RestrictedPeriods", version = "1.0.0.0" } } end }
-    local tanker = { ownerFarmId = 1, fill = "liquid", getFillUnits = function() return {} end, getName = function() return "Slurry tanker" end }
-    local spreader = { ownerFarmId = 1, fill = "solid", getFillUnits = function() return {} end, getName = function() return "Manure spreader" end }
-    local empty = { ownerFarmId = 1, getFillUnits = function() return {} end, getName = function() return "Tractor" end }
-    local foreign = { ownerFarmId = 2, fill = "liquid", getFillUnits = function() return {} end, getName = function() return "Neighbour tanker" end }
+    _G.g_fillTypeManager = { getFillTypeIndexByName = function(_, name)
+        return ({ LIQUIDMANURE = 1, DIGESTATE = 2, MANURE = 3 })[name]
+    end }
+    local tanker = { ownerFarmId = 1, fill = "liquid", getFillUnits = function() return { { fillType = 1, fillLevel = 250 } } end, getName = function() return "Slurry tanker" end }
+    local spreader = { ownerFarmId = 1, fill = "solid", getFillUnits = function() return { { fillType = 3, fillLevel = 1000 } } end, getName = function() return "Manure spreader" end }
+    local empty = { ownerFarmId = 1, fill = "liquid", getFillUnits = function() return { { fillType = 1, fillLevel = 0 }, { fillType = 4, fillLevel = 80 } } end, getName = function() return "Empty tanker" end }
+    local foreign = { ownerFarmId = 2, fill = "liquid", getFillUnits = function() return { { fillType = 1, fillLevel = 200 } } end, getName = function() return "Neighbour tanker" end }
     _G.g_currentMission = {
         environment = { currentPeriod = ${period} },
         vehicleSystem = { vehicles = { tanker, spreader, empty, foreign } },
@@ -59,6 +62,7 @@ describe("Restricted Periods page collector", () => {
         });
         expect(page.byFarm["1"]).toEqual({ liquidVehicles: 1, solidVehicles: 1, blockedVehicles: 2 });
         expect(page.vehicles.map((v) => v.name).sort()).toEqual(["Manure spreader", "Slurry tanker"]);
+        expect(page.vehicles.map((v) => v.name)).not.toContain("Empty tanker");
         expect(page.vehicles.every((v) => v.farmId === 1 && v.blocked === true)).toBe(true);
         expect(page.vehicleCoverage).toBe("complete");
     });
@@ -100,6 +104,14 @@ describe("Restricted Periods page collector", () => {
             _G.FS25_RestrictedPeriods = {}
         `, { farmId: 1 });
         expect(noClass.readState).toBe("detection-only");
+    });
+
+    test("unreviewed version withholds the live rules and vehicle reading", () => {
+        const setup = modEnv(10, 5).replace('version = "1.0.0.0"', 'version = "1.1.0.0"');
+        const page = runCompanionPage(FILE, setup, { farmId: 1 });
+        expect(page).toMatchObject({ readState: "settings-only", reason: "unreviewed-version", version: "1.1.0.0" });
+        expect(page.currentPeriod).toBeUndefined();
+        expect(page.vehicles).toBeUndefined();
     });
 
     test("collector parses as Lua", () => {

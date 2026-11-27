@@ -72,6 +72,7 @@ const exportIngress = require('./exportIngress');
 const ingressOrchestration = require('./ingressOrchestration');
 const { createBoundSourcePublication, ownsOrigin, statusForPayload } = require('./boundSourcePublication.cjs');
 const localIngressController = require('./localIngressController');
+const { compareLocalSaveMap } = require('./localSaveMapIdentity.cjs');
 const replicaRegistration = require('./replicaRegistration');
 const pendingReplicaSession = require('./pendingReplicaSession.cjs');
 const { ensureIdentityProposal, publishIdentityProposalFtp } = require('./identityProvision');
@@ -2064,7 +2065,12 @@ function buildRuntimeSetupStatus(opts) {
         : true;
     const config = store.get('config') || {};
     const resolved = statusSourceSelection(opts && opts.sourceId);
-    const evidence = sourceSetupEvidence(resolved.state, { staleMs: getLuaExportStaleMs() });
+    const published = resolved.id ? boundSources.snapshot(resolved.id) : null;
+    const evidence = sourceSetupEvidence(resolved.state, {
+        staleMs: getLuaExportStaleMs(),
+        heldBindingStatus: published?.sourceBinding?.stateStatus,
+        heldPayload: published?.payload,
+    });
     const status = buildSetupStatus({
         config,
         httpListening: !!(server && server.listening),
@@ -2490,6 +2496,8 @@ function localCacheSourceEligible(srv, state, record) {
     const proof = record && record.sourceProof;
     if (!proof || proof.kind !== 'authority' || proof.sourceId !== String(srv.id)
         || !proof.careerId || !proof.sessionId || !proof.configuredSlot) return false;
+    // A reused savegame slot can retain an otherwise valid authority cache from its old map.
+    if (require('./localSaveMapIdentity.cjs').compareLocalSaveMap(srv, record.mergedSnapshot).status === 'mismatch') return false;
 
     const matches = (identity) => !!(identity && identity.replica !== true
         && identity.legacy !== true
@@ -2507,6 +2515,7 @@ function localCacheSourceEligible(srv, state, record) {
             trustedLocalClock: true,
             explicitLegacy: srv.legacyJson === true,
         });
+        if (ingress && require('./localSaveMapIdentity.cjs').compareLocalSaveMap(srv, ingress.payload).status === 'mismatch') return false;
         return !!(ingress && ingress.status === 'valid' && ingress.replica !== true
             && matches(ingress.identity));
     } catch (_) {
@@ -3016,6 +3025,37 @@ function processLuaData(serverId, raw, transport) {
         const state = serverStates[serverId];
         if (!state) return;
 
+        const source = getServersFromStore().find((srv) => String(srv.id) === String(serverId));
+        const mapIdentity = compareLocalSaveMap(source, data);
+        if (mapIdentity.status === 'mismatch') {
+            state.configWarning = {
+                code: 'localSaveMapMismatch',
+                at: new Date().toISOString(),
+                message: `The selected save is ${mapIdentity.savedMapId}, but its old dashboard export is for ${mapIdentity.exportedMapId}. Load this save with the Farm Dashboard game mod to create a new export.`,
+            };
+            state.luaData = null;
+            state.xmlData = null;
+            state.mergedData = null;
+            state.lastGoodMergedSnapshot = null;
+            state.liveSectionBackup = null;
+            state.fieldLiveCache = {};
+            state.fieldHistory = {};
+            state.exportIngress = null;
+            state.exportIdentity = null;
+            state.lastLuaReceivedAt = null;
+            state.lastXmlReceivedAt = null;
+            state.lastXmlFingerprint = null;
+            state.lastSaveSlot = null;
+            const blocked = boundSources.clearOwned(state, 'blocked');
+            if (blocked?.changed) broadcastSourceState({ type: 'source-state', serverId,
+                sourceBinding: blocked.sourceBinding });
+            console.warn(`[processLuaData] [${serverId}] rejected export from another map (${mapIdentity.exportedMapId} vs ${mapIdentity.savedMapId})`);
+            return false;
+        }
+        if (mapIdentity.status === 'match' && state.configWarning?.code === 'localSaveMapMismatch') {
+            state.configWarning = null;
+        }
+
         const previousIdentity = state.exportIdentity;
         const careerChanged = !!(
             transport && previousIdentity && transport.careerId && previousIdentity.careerId
@@ -3032,7 +3072,6 @@ function processLuaData(serverId, raw, transport) {
                 sourceBinding: cleared.sourceBinding });
             state.luaData = null;
         }
-        const source = getServersFromStore().find((srv) => String(srv.id) === String(serverId));
         if (isExplicitReplicaXmlSource(source, transport?.replica === true ? 'replica' : state.ingressKind)) {
             clearUnprovenReplicaXml(state);
         }
@@ -3124,6 +3163,7 @@ function processLuaData(serverId, raw, transport) {
         });
 
         console.log(`[${new Date().toISOString()}] [${serverId}] Lua data updated`);
+        return true;
     } catch (e) {
         console.error(`[processLuaData] ${serverId}:`, e.message);
     }
@@ -5642,6 +5682,7 @@ async function scanLocalSaves() {
     const keyForRoot = (dir) => path.normalize(dir).replace(/[\\/]+/g, '/').replace(/\/+$/g, '').toLowerCase();
     const rootsWithSources = new Set();
     const blockedRoots = new Set();
+    const mismatchedSlots = new Set();
 
     for (const basePath of roots) {
         searchedRoots.push(basePath);
@@ -5729,6 +5770,12 @@ async function scanLocalSaves() {
                     : '';
                 if (replica && !exportIngress.safeId(remoteSlot)) continue;
                 const parsed = ingested.payload;
+                if (!replicaLayout && require('./localSaveMapIdentity.cjs').compareLocalSaveMap({
+                    mode: 'local', localPath: basePath, localSubFolder: candidate.folderName,
+                }, parsed).status === 'mismatch') {
+                    mismatchedSlots.add(keyForRoot(candidate.dirPath));
+                    continue;
+                }
                 let savegameName = discoveryLabel(parsed.savegameName);
                 let mapTitle = discoveryLabel(parsed.mapTitle) || discoveryLabel(parsed.serverInfo && parsed.serverInfo.mapName);
                 const saveMissing = !savegameName || looksLikeSaveSlotId(savegameName);
@@ -5851,7 +5898,8 @@ async function scanLocalSaves() {
     };
     for (const basePath of roots) {
         const rootKey = keyForRoot(basePath);
-        if (rootsWithSources.has(rootKey) || blockedRoots.has(rootKey)) continue;
+        if ((rootsWithSources.has(rootKey) && !Array.from(mismatchedSlots).some((slot) => slot.startsWith(`${rootKey}/`)))
+            || blockedRoots.has(rootKey)) continue;
         const profile = profileRootForDashboard(basePath);
         if (!profile) continue;
         const profileKey = keyForRoot(path.resolve(profile));
@@ -5885,8 +5933,9 @@ async function scanLocalSaves() {
                 if (slotStat === false) continue;
                 if (slotStat) {
                     if (!slotStat.isDirectory() || slotStat.isSymbolicLink()) continue;
-                    if ((await fs.promises.readdir(slotDir)).length) continue;
+                    if ((await fs.promises.readdir(slotDir)).length && !mismatchedSlots.has(keyForRoot(slotDir))) continue;
                 }
+                if (rootsWithSources.has(rootKey) && !mismatchedSlots.has(keyForRoot(slotDir))) continue;
                 const careerRaw = await readFileUtf8WithRetryAsync(careerPath);
                 if (!careerRaw || careerRaw.length > 4 * 1024 * 1024) continue;
                 const labels = careerLabels(careerRaw);

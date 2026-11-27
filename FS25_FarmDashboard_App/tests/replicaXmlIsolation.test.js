@@ -243,6 +243,14 @@ describe('replica XML source isolation', () => {
         record.sourceProof = source.localCacheSourceProof(srv.id, state);
         expect(record.sourceProof).toMatchObject({ kind: 'authority', sourceId: srv.id });
         expect(source.localCacheSourceEligible(srv, null, record)).toBe(true);
+        const careerDir = path.join(root, 'savegame1');
+        fs.mkdirSync(careerDir, { recursive: true });
+        fs.writeFileSync(path.join(careerDir, 'careerSavegame.xml'),
+            '<careerSavegame><settings><mapId>FS25_SaddleCreek.SaddleCreek</mapId></settings></careerSavegame>');
+        record.mergedSnapshot.serverInfo = { mapId: 'FS25_Witcombe.SampleModMap' };
+        expect(source.localCacheSourceEligible(srv, null, record)).toBe(false);
+        record.mergedSnapshot.serverInfo.mapId = 'FS25_SaddleCreek.SaddleCreek';
+        expect(source.localCacheSourceEligible(srv, null, record)).toBe(true);
         expect(source.readServerLiveCacheForRenderer(srv.id)).toMatchObject({
             ok: true, data: { savegameName: 'LOCAL-A' },
         });

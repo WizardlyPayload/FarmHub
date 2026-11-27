@@ -1,26 +1,24 @@
-<!--
-  FS25 Farm Dashboard â€” itch.io INSTALLATION INSTRUCTIONS (itch-safe HTML)
+<!-- PRIVATE CANDIDATE ONLY. Paste into itch Installation instructions HTML mode after final release gates, download readback, and an editor export of the existing field. -->
 
-  Paste into: Edit project → Installation instructions → <> HTML mode.
--->
-
-<p><strong><span style="color:#b8860b">Read these steps in order</span></strong> â€” install the <strong>mod first</strong>, then the Windows app.</p>
+<p><strong><span style="color:#b8860b">Read these steps in order</span></strong> — install the <strong>mod first</strong>, then the Windows app.</p>
 
 <p>The desktop app does <em>not</em> run inside FS25. It reads <code>data.json</code>, which the in-game mod creates while you play (or while a dedicated server runs with the mod). Until you load a save with the mod enabled, the dashboard shows <strong>“waiting for data”</strong>.</p>
 
-<p><strong>V5 (recommended):</strong> App <strong>5.2.0</strong> · Mod <strong>5.1.0.9</strong> · dashboard <strong>http://localhost:8768</strong> · Start Menu <strong>Farm Dashboard V5</strong></p>
+<p><strong>V5 download check:</strong> The V5 mod package is a wrapper containing <code>FS25_FarmDashboard.zip</code> and <code>INSTALL.txt</code>. The separately listed 180 kB <code>FS25_FarmDashboard.zip</code> is not the V5 mod package; do not select it for V5.</p>
 
-<p><strong>Classic V4 (optional):</strong> App <strong>4.2.1</strong> · Mod <strong>3.4.0.7</strong> · <strong>http://localhost:8766</strong>. Keep V4 if you want the old home cards. You do <strong>not</strong> have to update to V5. Use the matching mod from your chosen release; this V5 mod was not retested with V4.</p>
+<p><strong>V5 (recommended):</strong> App <strong>5.2.155</strong> · Mod <strong>5.1.0.140</strong> · dashboard <strong>http://localhost:8768</strong> · Start Menu <strong>Farm Dashboard V5</strong></p>
 
-<p><strong>Updating the mod:</strong> close Farm Dashboard and Farming Simulator → replace <code>FS25_FarmDashboard.zip</code> in <code>Documents\My Games\FarmingSimulator2025\mods\</code> (delete any old unpacked folder) → load the save → start the app. Dedicated: replace the mod on the server, restart, then update joined clients.</p>
+<p><strong>Classic V4 (optional):</strong> separate app and matching mod · <strong>http://localhost:8766</strong>. Keep V4 if you want the old home cards. You do <strong>not</strong> have to update to V5. Use the matching mod from your chosen release; this V5 mod was not retested with V4.</p>
+
+<p><strong>Updating the mod:</strong> close Farm Dashboard and Farming Simulator → replace the inner <code>FS25_FarmDashboard.zip</code> from the V5 mod package in <code>Documents\My Games\FarmingSimulator2025\mods\</code> (delete any old unpacked folder) → load the save → start the app. Dedicated: replace the mod on the server, restart, then update joined clients.</p>
 
 <hr />
 
-<h2>Stage A â€” Install the mod</h2>
+<h2>Stage A — Install the mod</h2>
 
 <ol>
-  <li>Download <strong>FS25_FarmDashboard.zip</strong> from this page (primary) or <a href="https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.2.0">GitHub V5 5.2.0</a>.</li>
-  <li>Copy the zip into <code>Documents\My Games\FarmingSimulator2025\mods\</code></li>
+  <li>Download the <strong>V5 mod package</strong> from this page (currently listed as <code>farm-dashobaord-fs25-mod-v5.zip</code>, version <strong>5.1.0.140</strong>) or the matching mod from <a href="https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.2.155">GitHub V5 5.2.155</a>. Confirm the displayed version before installing.</li>
+  <li>Open the V5 download package and copy its inner <code>FS25_FarmDashboard.zip</code> into <code>Documents\My Games\FarmingSimulator2025\mods\</code>. Do not unpack the inner ZIP.</li>
   <li>Start <strong>Farming Simulator 25</strong> once so the game registers the mod.</li>
 </ol>
 
@@ -29,7 +27,7 @@
     src="https://img.itch.zone/aW1nLzI5ODk2ODAwLnBuZw==/original/tg7mO%2F.png"
     alt="FS25_FarmDashboard zip in the mods folder"
   />
-  <figcaption><code>FS25_FarmDashboard</code> as a zip or folder under <strong>mods</strong>.</figcaption>
+  <figcaption>Place the inner <code>FS25_FarmDashboard.zip</code> under <strong>mods</strong>; keep it zipped.</figcaption>
 </figure>
 
 <hr />
@@ -47,12 +45,12 @@
     src="https://img.itch.zone/aW1nLzI5ODk2ODAxLnBuZw==/original/GFD1iB.png"
     alt="Farm Dashboard mod enabled in the save mod list"
   />
-  <figcaption>Mod ticked in the saveâ€™s mod list.</figcaption>
+  <figcaption>Mod ticked in the save’s mod list.</figcaption>
 </figure>
 
 <hr />
 
-<h2>Stage C â€” Confirm data.json is updating</h2>
+<h2>Stage C — Confirm data.json is updating</h2>
 
 <p>After about one minute in-game:</p>
 
@@ -65,16 +63,16 @@
     src="https://img.itch.zone/aW1nLzI5ODk2ODAzLnBuZw==/original/TXbtR7.png"
     alt="data.json with a recent modified timestamp in File Explorer"
   />
-  <figcaption>File Explorer â€” recent <code>data.json</code> timestamp while playing.</figcaption>
+  <figcaption>File Explorer — recent <code>data.json</code> timestamp while playing.</figcaption>
 </figure>
 
 <hr />
 
-<h2>Stage D â€” Install the Windows app</h2>
+<h2>Stage D — Install the Windows app</h2>
 
 <ol>
-  <li><strong>V5:</strong> run <strong>FS25-Farm-Dashboard-V5-Setup-5.2.0.exe</strong> (the filename includes <strong>V5</strong>). Start Menu: <strong>Farm Dashboard V5</strong>.</li>
-  <li><strong>V4 (optional):</strong> run <strong>FS25-Farm-Dashboard-Setup-4.2.1.exe</strong> if you want the classic screens. You can keep both installed.</li>
+  <li><strong>V5:</strong> run <strong>FS25-Farm-Dashboard-V5-Setup-5.2.155.exe</strong> (the filename includes <strong>V5</strong>). Start Menu: <strong>Farm Dashboard V5</strong>.</li>
+  <li><strong>V4 (optional):</strong> run the separate Classic V4 installer currently listed as <strong>FS25-Farm-Dashboard-Setup-4.2.0.exe</strong> if you want the classic screens. You can keep both installed.</li>
   <li>Installer is unsigned — Windows SmartScreen may warn. Choose your language and finish the installer.</li>
 </ol>
 
@@ -112,7 +110,7 @@
 
 <hr />
 
-<h2>Dedicated server â€” FTP (Advanced)</h2>
+<h2>Dedicated server — FTP (Advanced)</h2>
 
 <ol>
   <li>Complete Stages A–C on the server.</li>
@@ -123,6 +121,11 @@
 <hr />
 
 <h2>Troubleshooting</h2>
+
+<details>
+  <summary><strong>A reused local save slot shows old data</strong></summary>
+  <p>In V5 5.2.155, select the newly discovered save and wait for its own fresh export after loading and saving that world. The dashboard must not use an old export from another map as this save’s live data.</p>
+</details>
 
 <details>
   <summary><strong>Waiting for data</strong></summary>
@@ -136,7 +139,7 @@
 
 <details>
   <summary><strong>Did V4 auto-update to V5?</strong></summary>
-  <p>No. V4 auto-update stays on classic 4.2.1. V5 is a separate Setup.exe. You only get V5 if you install it yourself (or later choose a V5 in-app update on the V5 app).</p>
+  <p>No. V4 auto-update stays on the classic product line. V5 is a separate Setup.exe. You only get V5 if you install it yourself (or later choose a V5 in-app update on the V5 app).</p>
 </details>
 
 <hr />
@@ -144,9 +147,9 @@
 <p>
   <a href="https://www.farmdashboard.co.uk/install.html"><strong>Website install guide</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.2.0"><strong>GitHub V5 (fallback)</strong></a>
+  <a href="https://github.com/WizardlyPayload/FarmHub/releases/tag/v5.2.155"><strong>GitHub V5 (fallback)</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/WizardlyPayload/FarmHub/releases/tag/v4.2.1"><strong>GitHub classic V4</strong></a>
+  <a href="https://github.com/WizardlyPayload/FarmHub/releases"><strong>GitHub releases</strong></a>
 </p>
 
 <p><small><em>Not affiliated with GIANTS Software. Farming Simulator is a trademark of GIANTS Software GmbH.</em></small></p>

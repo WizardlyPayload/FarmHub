@@ -68,7 +68,7 @@ function ledgerProvider(multiplayer) {
             getFarmId = function() return 1 end,
             missionDynamicInfo = { isMultiplayer = ${multiplayer ? "true" : "false"} },
         }
-        engine.g_modManager = { getActiveMods = function() return { { modName = 'FS25_FieldProfitabilityLedger' } } end }
+        engine.g_modManager = { getActiveMods = function() return { { modName = 'FS25_FieldProfitabilityLedger', version = '1.0.1.0' } } end }
         local runtime = {
             listCycles = function(options)
                 return { cycles = {
@@ -174,6 +174,24 @@ describe("wave 2 reads stay bounded", () => {
         expect(entry.desc).toContain("sales are not shown");
         expect(inModEnv(ledgerProvider(false), ledgerRow))
             .toBe("ok|farm|1|Field 3/ok|c1:0:false|false|nil|nil");
+        const exactVaultName = ledgerProvider(false).replaceAll(
+            "FS25_FieldProfitabilityLedger", "FS25_369866_FS25_FieldProfitabilityLedger",
+        );
+        expect(inModEnv(exactVaultName, ledgerRow))
+            .toBe("ok|farm|1|Field 3/ok|c1:0:false|false|nil|nil");
+        const kmVaultName = ledgerProvider(false).replaceAll(
+            "FS25_FieldProfitabilityLedger", "KM_80685_Field_Profitability_Ledger",
+        );
+        expect(inModEnv(kmVaultName, ledgerRow))
+            .toBe("ok|farm|1|Field 3/ok|c1:0:false|false|nil|nil");
+        const olderVaultName = ledgerProvider(false)
+            .replaceAll("FS25_FieldProfitabilityLedger", "GH_user01010111__FS25_FieldProfitabilityLedger_FS25_FieldProfitabilityLedger")
+            .replace("version = '1.0.1.0'", "version = '1.0.0.0'");
+        expect(inModEnv(olderVaultName, ledgerRow))
+            .toBe("ok|farm|1|Field 3/ok|c1:0:false|false|nil|nil");
+        const unknownVersion = ledgerProvider(false).replace("version = '1.0.1.0'", "version = '1.0.2.0'");
+        expect(inModEnv(unknownVersion, ledgerRow))
+            .toBe("unavailable|nil|nil|||false|unreviewed-version|nil");
         expect(inModEnv(ledgerProvider(true), ledgerRow))
             .toBe("unavailable|nil|nil|||false|mp-disabled|nil");
     });
@@ -188,14 +206,14 @@ describe("wave 2 reads stay bounded", () => {
                 ],
                 animalFoodCalculator: { enabled: true, readState: "ok", mode: "custom", foodScale: 1.5 },
                 // Producer shape from collectVipOrders: the count belongs to the exporting farm.
-                vipOrders: { enabled: true, source: "vipOrderManager", readState: "ok", farmId: 1, orderCount: 2, coverage: "session-list" },
+                vipOrders: { enabled: true, source: "vipOrderManager", readState: "ok", farmId: 1, orderCount: 1, coverage: "complete" },
             },
         };
         const host = document.createElement("div");
         document.body.appendChild(host);
         render(h(sections.CompanionModsEmbed, { categories: companionMods.COMPANION_CATEGORY_ORDER }), host);
         expect(host.textContent).toContain("Food x1.5");
-        expect(host.textContent).toContain("2 open VIP order(s)");
+        expect(host.textContent).toContain("1 open VIP order(s)");
         expect(host.textContent).not.toContain("No active tasks");
         render(null, host);
         host.remove();
@@ -225,6 +243,11 @@ describe("wave 2 reads stay bounded", () => {
         render(h(sections.CompanionModsEmbed, { categories: companionMods.COMPANION_CATEGORY_ORDER }), host);
         expect(host.textContent).toContain("VIP orders are single-player only.");
         expect(host.textContent).not.toContain("open VIP order(s)");
+
+        box.state.payload = vipPayload({ enabled: true, readState: "partial", farmId: 1, reason: "invalid-current-order" });
+        render(h(sections.CompanionModsEmbed, { categories: companionMods.COMPANION_CATEGORY_ORDER }), host);
+        expect(host.textContent).toContain("This mod's reading is not available in this save.");
+        expect(host.textContent).not.toContain("No open VIP orders.");
 
         render(null, host);
         host.remove();

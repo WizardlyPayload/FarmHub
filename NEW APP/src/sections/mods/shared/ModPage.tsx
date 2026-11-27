@@ -4,6 +4,7 @@ import { Badge, Button, Card } from "@/components/ui";
 import { tOr } from "@/i18n/i18n";
 import { catalogEntry } from "@/lib/companionMods/catalog";
 import { formatCurrency } from "@/lib/economy";
+import { formatFetchedAt, readFreshness } from "@/lib/ux-freshness";
 import { useUnitDisplay } from "@/lib/fill-unit-mode";
 import { formatProfileUnitPrice, saveProfileFromUnitDisplay } from "@/lib/profile-display";
 import { useDashboardStore } from "@/store/dashboard-store";
@@ -68,6 +69,9 @@ export function readingState(page: CompanionPageData | null, mod: CompanionModRo
       return "partial";
     case "failed":
       return "failed";
+    case "pending":
+    case "unavailable":
+      return "waiting";
     case "settings-only":
     case "detection-only":
       return "limited";
@@ -120,6 +124,42 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
     case "limited":
       return page?.readState === "detection-only"
         ? tOr("companionPage.shared.noticeDetection", "This mod keeps its numbers to itself, so FarmHub can only confirm it is running.")
+        : key === "realisticMechanicalSystems" && page?.reason === "no-captured-owned-vehicle"
+          ? tOr("companionPage.realisticMechanicalSystems.empty", "No owned machine has a captured mechanical reading yet.")
+        : key === "advancedDamageSystem" && page?.reason === "no-captured-owned-vehicle"
+          ? tOr("companionPage.advancedDamageSystem.empty", "No owned machine has a captured Advanced Damage System reading yet.")
+        : key === "realFuelConsumption" && page?.reason === "no-captured-owned-vehicle"
+          ? tOr("companionPage.realFuelConsumption.empty", "No owned vehicle has recorded engine time yet.")
+        : key === "financialDashboardHistory" && page?.reason === "no-observed-change"
+          ? tOr("companionPage.financialDashboardHistory.noChange", "Only a baseline balance is recorded; no balance change has been observed yet.")
+        : key === "financialDashboardHistory" && page?.reason === "local-farm-mismatch"
+          ? tOr("companionPage.financialDashboardHistory.farmMismatch", "This local history belongs to a different farm.")
+        : key === "financialDashboardHistory" && page?.reason === "single-player-only"
+          ? tOr("companionPage.financialDashboardHistory.singlePlayer", "This mod records local single-player history only.")
+        : key === "automaticBaleStorage" && page?.reason === "no-owned-object-storage"
+          ? tOr("companionPage.automaticBaleStorage.noOwned", "No owned object storage was found for this farm.")
+        : key === "bullMilkProduction" && page?.reason === "no-captured-owned-cow-barn"
+          ? tOr("companionPage.bullMilkProduction.empty", "No owned cow barn has a calculated Bull Milk rate yet.")
+        : key === "udderToTank" && page?.reason === "server-animals-only"
+          ? tOr("companionPage.udderToTank.serverOnly", "Udder records can be read only from the game's server state.")
+        : key === "udderToTank" && page?.reason === "no-udder-register"
+          ? tOr("companionPage.udderToTank.registerUnavailable", "The Udder to Tank animal records are unavailable in this game session.")
+        : key === "udderToTank" && page?.reason === "no-husbandry-list"
+          ? tOr("companionPage.udderToTank.pensUnavailable", "The game's animal pens are unavailable in this reading.")
+        : key === "dynamicMolehills" && page?.reason === "server-state-only"
+          ? tOr("companionPage.dynamicMolehills.serverOnly", "Molehill states can be read only from the game's server state.")
+        : key === "swathRouter" && page?.reason === "no-adopted-owned-swath-implement"
+          ? tOr("companionPage.swathRouter.noneReady", "No owned swath implement has been prepared for AI pickup by this mod.")
+        : key === "swathRouter" && page?.reason === "server-vehicles-only"
+          ? tOr("companionPage.swathRouter.serverOnly", "AI swath readiness can be read only from the game's server state.")
+        : key === "whiteysFarmStaff" && page?.reason === "singleplayer-farm-one-only"
+          ? tOr("companionPage.whiteysFarmStaff.singleplayerOnly", "This staff roster is available only for the active single-player farm.")
+        : key === "whiteysFarmStaff" && page?.reason === "staff-menu-manager-unavailable"
+          ? tOr("companionPage.whiteysFarmStaff.menuUnavailable", "The mod's staff menu did not register, so its roster could not be read.")
+        : key === "cropInsurance" && page?.reason === "server-policies-only"
+          ? tOr("companionPage.cropInsurance.serverOnly", "Insurance policies can be read only from the game's server state.")
+        : key === "cropInsurance" && page?.reason === "no-policy-register"
+          ? tOr("companionPage.cropInsurance.registerUnavailable", "The insurance policy register is unavailable in this game session.")
         : key === "moistureSystem" && page?.readState === "settings-only" && hasMoistureMapCropReading(page)
           ? tOr(
               "companionPage.moistureSystem.noticeMapCropLimited",
@@ -129,6 +169,9 @@ function stateNotice(state: ModReadingState, page: CompanionPageData | null, key
     case "failed":
       return tOr("companionPage.shared.noticeFailed", "FarmHub could not read this mod on the last export. The figures below may be missing or out of date.");
     case "partial":
+      if (key === "realisticMechanicalSystems" && page?.reason === "advanced-damage-system-conflict") {
+        return tOr("companionPage.realisticMechanicalSystems.noticeConflict", "Realistic Mechanical Systems stays inactive while Advanced Damage System is loaded. Use only one of these mods in the game.");
+      }
       return tOr("companionPage.shared.noticePartial", "Some of this mod's readings were unavailable on the last export.");
     case "ok":
     case "missing":
@@ -174,6 +217,9 @@ export function ModPage({
   const state = readingState(page, mod);
   const version = page?.version ?? mod?.version ?? null;
   const notice = stateNotice(state, page, entry.key);
+  const sourceAt = readFreshness(dash).sourceAt;
+  const receivedAt = formatFetchedAt(sourceAt,
+    typeof navigator === "undefined" ? "en-GB" : navigator.language);
   return (
     <div class="fd-economy fd-mod-page" data-mod-page={entry.key}>
       <header class="fd-section-header fd-mod-page__header">
@@ -183,6 +229,9 @@ export function ModPage({
           {stateBadge(state, live)}
         </div>
         {lead ? <p class="fd-muted-sm">{lead}</p> : null}
+        {page && receivedAt ? <p class="fd-muted-sm">
+          {tOr("companionPage.shared.dataTimestamp", "Game data timestamp: {{time}}", { time: receivedAt })}
+        </p> : null}
       </header>
       {state === "missing" ? (
         <div class="fd-economy__empty">

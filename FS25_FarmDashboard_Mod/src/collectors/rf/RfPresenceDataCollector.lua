@@ -39,9 +39,10 @@ local function envGet(name)
 end
 
 local function modEntry(modName)
-    if _G.g_modManager and _G.g_modManager.getActiveModByName then
+    if _G.g_modIsLoaded and _G.g_modIsLoaded[modName] and
+        _G.g_modManager and type(_G.g_modManager.getModByName) == "function" then
         local ok, mod = pcall(function()
-            return _G.g_modManager:getActiveModByName(modName)
+            return _G.g_modManager:getModByName(modName)
         end)
         if ok and mod ~= nil then
             return mod

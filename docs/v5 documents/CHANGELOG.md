@@ -2,11 +2,13 @@
 
 Player-facing history for the **V5 / new screens** line. Classic 4.x notes stay in [`../CHANGELOG.md`](../CHANGELOG.md).
 
-**Current V5 release pair:** app **5.2.155**, mod **5.1.0.140**. Use the two files from the same release. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
+**Current V5 release pair:** app **5.3.0**, mod **5.2.0.0**. Use the two files from the same release. V5 uses **`latest-rf.yml` only**; the V4 feed remains separate.
 
 ---
 
-## 5.2.155 / 5.1.0.140 — release
+## 5.3.0 / 5.2.0.0 — release
+
+This release supersedes the public pair briefly stamped 5.2.155 / 5.1.0.140. The middle number identifies a public release; the final number is reserved for development revisions. The correction changes the release stamps, not the feature scope described below.
 
 - Added bounded, read-only farm data for selected optional mods, including field plans and jobs, equipment settings, finance records, and crop rotation templates. A recorded plan, setting or pending amount does not prove work, output or payment.
 - Improved Personnel specialization wording and clarified that temporary Employees hours can include unassigned contract time. Installed testing confirmed the temporary-worker wording; the specific Personnel Efficient Use label was not generated in that run.

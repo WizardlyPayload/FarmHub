@@ -10,7 +10,7 @@ Farm Dashboard shows your save's fields, vehicles, animals, productions, storage
 - **Vehicles and equipment:** selected owned-machine harvesting settings and capacity configurations. They do not prove performance or fuel use.
 - **Finance and planning:** a pending Agricultural Financial System obligation and voucher, one Investment System deposit with stated rate and term, and named Crop Rotation Planner template steps. Pending amounts and rates do not prove settlement or earned interest; a template is not a field assignment.
 - **Staff wording:** temporary Employees hours are labelled as elapsed contract time, including unassigned time. Personnel specialization keys have readable labels. The exact Efficient Use specialization did not appear in the latest natural applicant set, so that label remains a limited check.
-- **Display corrections:** Seasonal Milk no longer shows a false zero farm rate when no pen baseline was captured, and Factory Profit Calculator rounds its hypothetical whole-currency projections to the nearest unit.
+- **Display corrections:** Seasonal Milk no longer shows a false zero farm rate when no pen baseline was captured, Factory Profit Calculator rounds its hypothetical whole-currency projections to the nearest unit, and fields with RF Soil retain their separate base-game weed-cover badge.
 - **Local save identity:** when a save slot is reused for a different map, the app rejects the previous map's export and relabels the discovered save. It waits for a new export rather than showing the old map or mod list as current.
 
 ## Compatibility limits
@@ -30,9 +30,9 @@ Read the [installation guide](https://github.com/WizardlyPayload/FarmHub/blob/v5
 
 ## Release files
 
-- `FS25-Farm-Dashboard-V5-Setup-5.2.155.exe` — Windows app, 384,518,214 bytes, SHA-256 `795732D6C4F98A070AC0FF0CF271D58E66C459BB00D89A93CDDA428C2E9964B6`.
-- `FS25-Farm-Dashboard-V5-Setup-5.2.155.exe.blockmap` — matching V5 updater blockmap, SHA-256 `61E5EA25B2AFE30F4895ACDFDE0E804B38F35A522BA8F2245463D8951516FFEA`.
+- `FS25-Farm-Dashboard-V5-Setup-5.2.155.exe` — Windows app, 384,515,661 bytes, SHA-256 `2782D9360AA03DE3DE25AE9E06FE93808A88FEFCFDF9E3969384745017FEF482`.
+- `FS25-Farm-Dashboard-V5-Setup-5.2.155.exe.blockmap` — matching V5 updater blockmap, SHA-256 `811A47C0B4A98DC8BD2B5F162264E6D0AC157849007EF0FC242EECF6414721A0`.
 - `FS25_FarmDashboard.zip` — game mod, 713,605 bytes, SHA-256 `2402E851019C699429D42635DAE814DD2FFA16E1D1CD6958A9AB84B567D2ECC8`.
-- `latest-rf.yml` — matching V5 updater metadata, SHA-256 `B5A825F912F738B99531E3B85B829DBB3B7F8B5CC7E92A86979CD4F8C8D0C27A`. Classic V4 uses a separate `latest.yml` feed.
+- `latest-rf.yml` — matching V5 updater metadata, SHA-256 `501284E7885CB3461F20194005850D03FE8C09241A0DF470A3B26033172B0C73`. Classic V4 uses a separate `latest.yml` feed.
 
 The installer is unsigned, so Windows may show an Unknown publisher or SmartScreen warning. Keep Windows security protections enabled. Please report issues with the app and mod versions, map/save type, freshness or coverage label, and a relevant screenshot or log excerpt; remove passwords and pairing tokens before posting.

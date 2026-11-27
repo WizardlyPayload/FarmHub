@@ -7,9 +7,9 @@ Butler lives at `%USERPROFILE%\tools\butler\butler.exe` (login saved locally). T
 
 ## Prepared private channel inputs
 
-The local staging root is `%LOCALAPPDATA%\Temp\FarmDashItchRelease-5.2.155`:
+The current local staging root is `%LOCALAPPDATA%\Temp\FarmDashItchRelease-5.2.155-R4`. The earlier 5.2.155 staging folder contains the superseded R3 installer and must not be pushed.
 
-- `windows-v5\FS25-Farm-Dashboard-V5-Setup-5.2.155.exe` — SHA-256 `795732D6C4F98A070AC0FF0CF271D58E66C459BB00D89A93CDDA428C2E9964B6`.
+- `windows-v5\FS25-Farm-Dashboard-V5-Setup-5.2.155.exe` — SHA-256 `2782D9360AA03DE3DE25AE9E06FE93808A88FEFCFDF9E3969384745017FEF482`.
 - `mod-v5\FS25_FarmDashboard.zip` — SHA-256 `2402E851019C699429D42635DAE814DD2FFA16E1D1CD6958A9AB84B567D2ECC8`.
 - `mod-v5\INSTALL.txt` — SHA-256 `AF07A5B1003F4371027537425E9404A99A85963082CAFA14F0D1F4C79A9AEE90`. It explains extracting the **inner ZIP** into FS25's `mods` folder. Keep the text file beside the ZIP so itch preserves the canonical mod file in its download wrapper.
 
